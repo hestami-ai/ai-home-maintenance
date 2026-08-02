@@ -22,6 +22,7 @@ import {
 	ENFORCEMENT_REGISTER,
 	enforcedRuleIds,
 	layerOfTestFile,
+	malformedSchemaMarkers,
 	MIN_REFUSAL_MARKER_LENGTH,
 	observedAdmissionRuleIds,
 	REGISTERED_RULE_IDS,
@@ -402,6 +403,89 @@ describe('WP-16 selftest — layerOfTestFile', () => {
 
 	it('normalises Windows separators (this repo is developed on both)', () => {
 		expect(layerOfTestFile('packages\\rph-application\\src\\handlers\\x.test.ts')).toBe('COMMAND');
+	});
+});
+
+// ── SELFTESTS FOR THE SCHEMA ARM (2026-08-02) ────────────────────────────────────────────────────────────────
+//
+// The arm exists so RPH-CON's contract obligations can be recorded as ENFORCED; it is dangerous in exactly one
+// way, and these tests are aimed at that way. If `VALIDATION_FAILED` counted as a refusal for rows that did NOT
+// opt in, every probe in the register would be satisfiable by a malformed payload, and the six fixture errors this
+// programme caught would have silently reported KILLED.
+describe('classifyRefusal — the SCHEMA arm is OPT-IN and cannot leak into COMMAND rows', () => {
+	const commandRow = {
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'the declared marker text'
+	};
+	const schemaRow = {
+		refusalCode: 'RPH_VALIDATION_SCHEMA_FAILED',
+		refusalMarker: 'unrecognized_keys@',
+		refusalLayer: 'SCHEMA' as const
+	};
+	const boundaryRefusal = {
+		status: 'VALIDATION_FAILED',
+		code: 'RPH_VALIDATION_SCHEMA_FAILED',
+		message: 'Schema validation failed',
+		issues: [{ path: '', code: 'unrecognized_keys' }]
+	};
+
+	it('THE LOAD-BEARING ONE: a boundary refusal does NOT satisfy a COMMAND row', () => {
+		// This is the whole safety property. A malformed payload in any of the register's COMMAND probes must read
+		// as ADMITTED — i.e. the probe FAILS — not as a kill.
+		expect(classifyRefusal(boundaryRefusal, commandRow)).toBe('ADMITTED');
+	});
+
+	it('and a row that merely omits refusalLayer is a COMMAND row', () => {
+		// The default must be the SAFE one. Every row written before this arm existed omits the field.
+		expect(classifyRefusal(boundaryRefusal, { ...schemaRow, refusalLayer: undefined })).toBe(
+			'ADMITTED'
+		);
+	});
+
+	it('reports KILLED only when the status, the code AND the structured issue all hold', () => {
+		expect(classifyRefusal(boundaryRefusal, schemaRow)).toBe('KILLED');
+	});
+
+	it('REPORTS FAILURE on each literal failing input, and distinguishes them', () => {
+		// ADMITTED — the boundary let it through.
+		expect(classifyRefusal({ status: 'ACCEPTED' }, schemaRow)).toBe('ADMITTED');
+		// WRONG_CODE — a SEMANTIC guard refused first. A row claiming schema enforcement whose arrangement is
+		// caught by a handler has mis-declared its layer, and this is what that looks like.
+		expect(
+			classifyRefusal(
+				{ status: 'REJECTED', code: 'RPH_INVARIANT_VIOLATION', message: 'a handler caught it' },
+				schemaRow
+			)
+		).toBe('WRONG_CODE');
+		// MASKED — the boundary refused, but on a DIFFERENT field than the row declares. This is the case a
+		// message-based marker could never have distinguished, because the message is a constant.
+		expect(
+			classifyRefusal(
+				{ ...boundaryRefusal, issues: [{ path: 'issuedAt', code: 'invalid_format' }] },
+				schemaRow
+			)
+		).toBe('MASKED');
+		// MASKED — no structured issues at all (an error shape that carried none) must not pass.
+		expect(classifyRefusal({ ...boundaryRefusal, issues: [] }, schemaRow)).toBe('MASKED');
+		expect(classifyRefusal({ ...boundaryRefusal, issues: undefined }, schemaRow)).toBe('MASKED');
+	});
+
+	it('matches the issue pair by EQUALITY, not by substring', () => {
+		// `unrecognized_keys@` must not be satisfied by `unrecognized_keys@someField`: the empty path IS the claim
+		// (zod reports an undeclared property at the object root), and a substring match would let a nested failure
+		// green a root-level rule.
+		expect(
+			classifyRefusal(
+				{ ...boundaryRefusal, issues: [{ path: 'someField', code: 'unrecognized_keys' }] },
+				schemaRow
+			)
+		).toBe('MASKED');
+	});
+
+	it('SELFTEST: the marker-shape gate rejects a prose marker on a SCHEMA row', () => {
+		// A SCHEMA row whose marker reads like a COMMAND marker would never match anything and would sit green-by-
+		// never-being-probed if the probe map ever lost it. `malformedSchemaMarkers` is the structural check.
+		expect(malformedSchemaMarkers()).toEqual([]);
 	});
 });
 

@@ -33,9 +33,13 @@ export interface Coverage {
  *  file is a concrete test that actually asserts that id (conformance.test.ts checks each path exists). */
 const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-CON-001': 'packages/rph-contracts/src/envelopes.test.ts',
-	'RPH-CON-002': 'packages/rph-contracts/src/envelopes.test.ts',
 	'RPH-CON-004': 'packages/rph-contracts/src/envelopes.test.ts',
 	'RPH-CON-008': 'packages/rph-contracts/src/messages.test.ts',
+	// RE-CITED 2026-08-02 to the enforcement probe. RPH-CON-002 is the register's first SCHEMA-layer ENFORCED row,
+	// and its evidence is a DISPATCH observing the boundary refuse — not a unit test of the schema in isolation.
+	// The refusalLayer says WHERE in the pipeline the refusal happens; the cite still says where it is OBSERVED,
+	// and observing it through Engine.dispatch is the stronger claim, which is this register's whole thesis.
+	'RPH-CON-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-005': 'packages/rph-domain/src/execution.test.ts',
 	// 'RPH-PWU-007' WAS CERTIFIED COVERED HERE, citing `pwuGuards.test.ts` — "satisfiesP1: rejected assurance can't
 	// satisfy". REMOVED 2026-08-02, and the removal is the DS-001 defect caught a second time by the instrument

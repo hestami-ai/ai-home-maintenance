@@ -167,6 +167,12 @@ export interface EnforcedRule {
 	/** The `error.code` the refusal carries. */
 	readonly refusalCode: string;
 	/**
+	 * Where the refusal happens. Absent = `COMMAND` (a handler), which is every row written before 2026-08-02.
+	 * `SCHEMA` means the contract boundary refused and the outcome is `VALIDATION_FAILED`; see `classifyRefusal`
+	 * for why that is opt-in rather than universal.
+	 */
+	readonly refusalLayer?: RefusalLayer;
+	/**
 	 * A substring of the refusal MESSAGE that only THIS refusal produces.
 	 *
 	 * At least 20 characters and distinct across the whole register, both gated. Distinctness is what stops two
@@ -300,7 +306,8 @@ export type RegisteredRuleId =
 	| 'RPH-PWU-005'
 	| 'RPH-PWU-006'
 	| 'RPH-PWU-007'
-	| 'RPH-PWU-008';
+	| 'RPH-PWU-008'
+	| 'RPH-CON-002';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -1474,6 +1481,48 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'gap closing — the RPH-ASR-012 shape exactly.'
 		}
 	},
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE FIRST SCHEMA-LAYER ROW (2026-08-02), and the reason `RefusalLayer` exists.
+	//
+	// RPH-CON's obligations are enforced by the CONTRACT, not by a handler: `command-bus` validates the payload and
+	// returns status VALIDATION_FAILED before any handler runs. `classifyRefusal`'s original arm read only
+	// `REJECTED`, so it classified real, working enforcement as ADMITTED — which is why this register's scope
+	// paragraph said RPH-CON was structurally inexpressible. It was not inexpressible; it was a second layer.
+	//
+	// THE FAMILY IS NOT TOTAL AND RPH-CON IS NOT IN `TOTAL_OVER_FAMILIES`. This is one row of eight, landed to prove
+	// the arm against a real refusal rather than only against synthetic input. The other seven are uninvestigated.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-CON-002': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'CANON DELIBERATELY DELEGATES THIS, which makes it the one NO_CANON_CARRIER row whose subject does ' +
+				'NOT die on retirement. JPWB-CON-000 B1 assigns "Exact shapes (wire envelopes, schemas, enum ' +
+				'spellings, IDs, error codes)" to "the repository\'s generated contracts, schemas, migrations, and ' +
+				'conformance tests", and names those artifacts SHAPE AUTHORITY in their own right. So no canon ' +
+				'sentence states that an undeclared property is rejected, and none should: the ratified vocabulary ' +
+				'generates a `z.strictObject`, and that schema IS the authority. Recorded as NO_CANON_CARRIER because ' +
+				'the field means "no canon artifact carries this text" and that is true — but with the qualification ' +
+				'that the retirement risk the other NO_CANON_CARRIER rows carry does not apply here, since the ' +
+				'carrier is generated code that retirement does not touch.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/command-bus.ts — the payload validation step, which calls `validateAgainst` (packages/rph-contracts/src/validate.ts) against the generated `z.strictObject` payload schema and returns status VALIDATION_FAILED before any handler is routed to.',
+		refusalCode: 'RPH_VALIDATION_SCHEMA_FAILED',
+		refusalLayer: 'SCHEMA',
+		// STRUCTURED, NOT PROSE. The boundary's message is the constant 'Schema validation failed' for every failure
+		// in the system, so a message marker would discriminate nothing at all. This is `<issueCode>@<dottedPath>`
+		// matched by EQUALITY against `error.details.issues`. The path is EMPTY because zod reports an undeclared
+		// property at the object root — which is itself the claim, and why the match is equality rather than
+		// substring: `unrecognized_keys@someField` is a different (nested) failure and must not green this row.
+		refusalMarker: 'unrecognized_keys@',
+		declaredMutations: [
+			'regenerate the payload schemas with `z.object` instead of `z.strictObject` — the undeclared property is silently dropped, the command is ACCEPTED, and the probe reports ADMITTED',
+			'have `validateAgainst` return `{ ok: true }` on `unrecognized_keys` while still failing other issues — the probe reports ADMITTED and no other row moves',
+			'drop `details.issues` from the RphError built by `validateAgainst` — the boundary still refuses, but the row can no longer say WHICH field, and the probe reports MASKED. This is the mutation that shows the marker is doing work: a message-only assertion would still report KILLED.'
+		]
+	},
 	'RPH-PWU-008': {
 		kind: 'UNENFORCED_DISCLOSED',
 		canonCarriage: {
@@ -1560,12 +1609,37 @@ export type RefusalVerdict =
 	| 'MASKED' // refused with the right code but a different message — another guard produced it
 	| 'ADMITTED'; // not refused at all
 
-/** What a dispatch returned, reduced to the three fields a verdict reads. */
+/** What a dispatch returned, reduced to the fields a verdict reads. */
 export interface ObservedOutcome {
 	readonly status: string;
 	readonly code?: string;
 	readonly message?: string;
+	/**
+	 * The structured schema issues, when the boundary refused (`error.details.issues`), each reduced to its
+	 * `code` and dotted `path`. Read ONLY by the SCHEMA arm — see `classifyRefusal`.
+	 */
+	readonly issues?: readonly { readonly path: string; readonly code: string }[];
 }
+
+/**
+ * THE LAYER AT WHICH A ROW'S REFUSAL HAPPENS. Absent means `COMMAND`, so every row written before 2026-08-02 is
+ * unchanged and no existing probe shifts meaning.
+ *
+ * WHY THIS EXISTS. `RPH-CON-*` states obligations the CONTRACT enforces — "a payload with an undeclared property
+ * fails validation", "a non-RFC-3339 timestamp fails schema validation" — and those refusals never reach a handler:
+ * `command-bus` returns status `VALIDATION_FAILED`, not `REJECTED`. The COMMAND arm therefore classified real,
+ * working enforcement as ADMITTED, which is why the register's scope paragraph recorded RPH-CON as structurally
+ * inexpressible. It is not inexpressible; it is a second layer, and this names it.
+ *
+ * THE DANGER THIS DESIGN EXISTS TO AVOID, stated because the obvious implementation is catastrophic. If
+ * `classifyRefusal` simply accepted `VALIDATION_FAILED` as a refusal, EVERY row in the register would become
+ * satisfiable by a MALFORMED PAYLOAD — a probe whose fixture had a typo would report KILLED instead of failing.
+ * Six fixture errors this programme caught (a lowercase Crockford tag, an ActorReference in an AuthorityReference's
+ * place, a missing shapeReadinessAssessmentId, …) surfaced precisely BECAUSE VALIDATION_FAILED is not a pass. So
+ * the widening is OPT-IN PER ROW: a row must declare `refusalLayer: 'SCHEMA'`, and only that row's probe may be
+ * satisfied by a boundary refusal.
+ */
+export type RefusalLayer = 'COMMAND' | 'SCHEMA';
 
 /**
  * Classify an observed dispatch outcome against a declared (code, marker) pair.
@@ -1576,12 +1650,51 @@ export interface ObservedOutcome {
  */
 export function classifyRefusal(
 	observed: ObservedOutcome,
-	expected: { readonly refusalCode: string; readonly refusalMarker: string }
+	expected: {
+		readonly refusalCode: string;
+		readonly refusalMarker: string;
+		readonly refusalLayer?: RefusalLayer;
+	}
 ): RefusalVerdict {
+	// ── THE SCHEMA ARM (2026-08-02) ──────────────────────────────────────────────────────────────────────────
+	//
+	// Opt-in only. A row without `refusalLayer: 'SCHEMA'` falls through to the COMMAND arm exactly as before, so a
+	// malformed payload in ANY other probe still fails loudly instead of counting as a kill.
+	//
+	// THE MARKER IS A STRUCTURED PAIR, NOT PROSE, because the boundary's message is the CONSTANT
+	// 'Schema validation failed' for every failure in the system — it discriminates nothing. What does discriminate
+	// is `error.details.issues[]`, so a SCHEMA row's marker is `<issueCode>@<dottedPath>`: `unrecognized_keys@` for
+	// an undeclared property (zod reports those at the object root, so the path is empty), `invalid_type@issuedAt`
+	// for a mistyped field. Distinctness across rows is gated the same way COMMAND markers are.
+	//
+	// A MATCHED PATH IS NECESSARY AND NOT SUFFICIENT, which is why the SCHEMA rows' probes carry the same control
+	// discipline as every other row and lean on it harder: a sloppy payload failing on three fields would match a
+	// declared path among them. The CONTROL — the byte-identical payload with ONLY that field corrected, ACCEPTED —
+	// is what pins the refusal to the field the rule is about.
+	if (expected.refusalLayer === 'SCHEMA') {
+		if (observed.status === 'ACCEPTED') return 'ADMITTED';
+		// Something refused, but not the boundary — a semantic guard caught it first. That is the wrong site for a
+		// row claiming schema enforcement, and it is exactly what a mis-declared layer looks like.
+		if (observed.status !== 'VALIDATION_FAILED') return 'WRONG_CODE';
+		if (observed.code !== expected.refusalCode) return 'WRONG_CODE';
+		const matched = (observed.issues ?? []).some(
+			(i) => `${i.code}@${i.path}` === expected.refusalMarker
+		);
+		return matched ? 'KILLED' : 'MASKED';
+	}
+
 	if (observed.status !== 'REJECTED') return 'ADMITTED';
 	if (observed.code !== expected.refusalCode) return 'WRONG_CODE';
 	if (!(observed.message ?? '').includes(expected.refusalMarker)) return 'MASKED';
 	return 'KILLED';
+}
+
+/** Rows whose refusal is at the contract boundary rather than a handler. */
+export function schemaLayerRuleIds(): RegisteredRuleId[] {
+	return REGISTERED_RULE_IDS.filter((id) => {
+		const row = ENFORCEMENT_REGISTER[id];
+		return row.kind === 'ENFORCED' && row.refusalLayer === 'SCHEMA';
+	});
 }
 
 /** Rule ids sharing a refusal marker with another row (must be empty — see `EnforcedRule.refusalMarker`). */
@@ -1605,7 +1718,24 @@ export const MIN_REFUSAL_MARKER_LENGTH = 20;
 export function shortRefusalMarkers(minLength = MIN_REFUSAL_MARKER_LENGTH): string[] {
 	return REGISTERED_RULE_IDS.filter((id) => {
 		const row = ENFORCEMENT_REGISTER[id];
-		return row.kind === 'ENFORCED' && row.refusalMarker.length < minLength;
+		if (row.kind !== 'ENFORCED') return false;
+		// SCHEMA rows are EXEMPT FROM THE LENGTH RULE, and the exemption is principled rather than convenient. The
+		// minimum exists because a free-text message fragment needs length to be distinctive — `is inadmissible`
+		// would match refusals it has nothing to do with. A SCHEMA marker is not prose: it is the structured pair
+		// `<issueCode>@<dottedPath>`, matched by EQUALITY against the boundary's own reported issues, so
+		// `unrecognized_keys@` discriminates exactly and is 19 characters. Length would measure the wrong thing.
+		// DISTINCTNESS IS NOT EXEMPTED — `duplicateRefusalMarkers` still covers every ENFORCED row, which is the
+		// property that actually stops one arrangement greening two rules.
+		if (row.refusalLayer === 'SCHEMA') return false;
+		return row.refusalMarker.length < minLength;
+	});
+}
+
+/** SCHEMA rows whose marker is not the structured `<issueCode>@<dottedPath>` pair the arm matches on. */
+export function malformedSchemaMarkers(): string[] {
+	return schemaLayerRuleIds().filter((id) => {
+		const row = ENFORCEMENT_REGISTER[id];
+		return row.kind === 'ENFORCED' && !row.refusalMarker.includes('@');
 	});
 }
 

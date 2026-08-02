@@ -653,6 +653,8 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-INT-005': null,
 		'RPH-INT-006': null,
 		'RPH-INT-007': null,
+		// ENFORCED at the SCHEMA layer — its refusal is probed in execrem-wp16-enforcement-observed.test.ts.
+		'RPH-CON-002': null,
 		'RPH-PWU-001': null,
 		'RPH-PWU-002': null,
 		'RPH-PWU-004': null,

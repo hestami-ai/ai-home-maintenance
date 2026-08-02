@@ -47,11 +47,16 @@ const SAYS_NOTHING = {
 	detail: 'A coordination step; it authors no artifact.'
 };
 
-/** What a dispatch returned, reduced to the three fields `classifyRefusal` reads. */
+/** What a dispatch returned, reduced to the fields `classifyRefusal` reads. */
 interface Outcome {
 	readonly status: string;
 	readonly code?: string;
 	readonly message?: string;
+	/**
+	 * The boundary's structured issues, carried for SCHEMA-layer rows. The message at that layer is the constant
+	 * 'Schema validation failed', so `details.issues` is the only thing that can say WHICH field refused.
+	 */
+	readonly issues?: readonly { readonly path: string; readonly code: string }[];
 }
 
 /** One rule's proof: the same command ACCEPTED before the arranging act, then REFUSED after it. */
@@ -86,7 +91,9 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			payload
 		};
 		const r = engine.dispatch(command);
-		return { status: r.status, code: r.error?.code, message: r.error?.message };
+		const issues = (r.error?.details as { issues?: { path: string; code: string }[] } | undefined)
+			?.issues;
+		return { status: r.status, code: r.error?.code, message: r.error?.message, issues };
 	}
 
 	const ok = (r: Outcome, what: string): Outcome => {
@@ -781,6 +788,38 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-INT-002': null,
 		'RPH-INT-006': null,
 		'RPH-INT-007': null,
+		// ── THE FIRST SCHEMA-LAYER ROW (2026-08-02) ────────────────────────────────────────────────────────────
+		'RPH-CON-002': {
+			arrangement:
+				'a CaptureIntent payload carrying an undeclared property, refused by the contract boundary before any handler runs',
+			run: () => {
+				const base = (over: Record<string, unknown> = {}) => ({
+					intentId: 'int_01ARZ3NDEKTSV4RRFFQ69H6400',
+					originatingExpression: 'x',
+					ontologyId: 'o',
+					ontologyVersion: '1',
+					...over
+				});
+				// THE CONTROL IS THE SAME PAYLOAD MINUS ONE KEY, and for a SCHEMA row that minimal delta is doing
+				// more work than usual: a matched issue path is necessary but not sufficient, since a sloppy payload
+				// failing on several fields would match a declared path among them. The control is what pins the
+				// refusal to the undeclared property and nothing else.
+				const control = dispatch(
+					'CaptureIntent',
+					base(),
+					'int_01ARZ3NDEKTSV4RRFFQ69H6400',
+					'INTENT'
+				);
+				const observed = dispatch(
+					'CaptureIntent',
+					base({ notADeclaredField: 'smuggled' }),
+					'int_01ARZ3NDEKTSV4RRFFQ69H6401',
+					'INTENT'
+				);
+				return { control, observed };
+			}
+		},
+
 		// ── THE RPH-PWU FAMILY, five of ten (2026-08-02) ───────────────────────────────────────────────────────
 		'RPH-PWU-001': null,
 		'RPH-PWU-005': null,
