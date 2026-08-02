@@ -834,6 +834,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// (RPH-PER-012) is disclosed by a dead-predicate census in rph-domain. Only RPH-PER-001 is a refusal, and
 		// it is the row that made `refusalStatus` necessary.
 		'RPH-PER-002': null,
+		'RPH-PER-003': null, // disclosed — observed in disclosure-observed.test.ts
+		'RPH-PER-004': null, // disclosed — observed in disclosure-observed.test.ts
 		'RPH-PER-005': null,
 		'RPH-PER-006': null,
 		'RPH-PER-007': null,

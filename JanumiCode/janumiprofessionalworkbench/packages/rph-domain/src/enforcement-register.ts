@@ -363,12 +363,14 @@ export type RegisteredRuleId =
 	| 'RPH-CON-006'
 	| 'RPH-CON-007'
 	| 'RPH-CON-008'
-	// RPH-PER, TWELVE OF FOURTEEN (2026-08-02). RPH-PER-003 and RPH-PER-004 are investigated and OWED: both are
-	// UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards, and landing a disclosure without its observation is the
-	// one thing that arm may never do. The family is therefore deliberately ABSENT from `TOTAL_OVER_FAMILIES`, and
-	// that absence is a gated claim rather than a sentence — exactly as RPH-PWU was held out for three commits.
+	// RPH-PER, CLOSED 2026-08-02. It landed at twelve of fourteen and stayed OUT of `TOTAL_OVER_FAMILIES` for one
+	// commit, because RPH-PER-003 and RPH-PER-004 are UNENFORCED_DISCLOSED and landing a disclosure without its
+	// observation is the one thing that arm may never do. Both now carry OBSERVED_ADMISSION probes, so the family
+	// is total and the gate claims it — the same sequence RPH-PWU followed over three commits.
 	| 'RPH-PER-001'
 	| 'RPH-PER-002'
+	| 'RPH-PER-003'
+	| 'RPH-PER-004'
 	| 'RPH-PER-005'
 	| 'RPH-PER-006'
 	| 'RPH-PER-007'
@@ -1902,6 +1904,96 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'step 1 compares none of them. That is REG-F-012, filed separately and DELIBERATELY NOT folded into ' +
 			'this row: this rule\'s own statement holds, and letting a satisfied rule carry a disclosure about a ' +
 			'neighbouring sentence is the subject substitution this register records four times over.'
+	},
+	// ── THE TWO ROWS THIS FAMILY WAS HELD OPEN FOR, LANDED 2026-08-02 WITH THEIR OBSERVATIONS ────────────────
+	//
+	// PER-003 AND PER-004 ARE THE SAME GAP ON TWO AGGREGATES, and the gap is a QUANTIFIER. Every duplicate defence
+	// this engine has keys on ONE aggregate: the `fromStates` precondition reads the target's own status field;
+	// the machine's illegal self-edge is same-aggregate by definition; the store's create conflict keys on the
+	// aggregate id; the receipt keys on the idempotency key. All four answer "is THIS object being changed
+	// twice?". Both rules ask a different question — "do TWO of these now exist over one subject?" — and nothing
+	// anywhere forms that set.
+	//
+	// THE ARRANGEMENT IS NOT HYPOTHETICAL: it is what the demo surface does. `mintUiId` increments on every call,
+	// so a repeated Propose mints a NEW Decision aggregate rather than colliding with the old one, and the
+	// idempotency key is minted from a monotonic counter rather than derived from the submission — so neither the
+	// same-aggregate guard nor the receipt lookup is reachable from a repeated browser POST. "A retried approval
+	// request" is exactly the rule's own words for it.
+	'RPH-PER-003': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'baseline promotions, approval decisions, or evidence records',
+			note: 'JPWB-DOC-003 §9 PER-5, which names approval decisions in its list of business effects a retry must never duplicate. RPH-EXE-007 cites the opening clause of the same sentence for source-control commits; the sentence enumerates five effects and two rules instantiate different items of it.'
+		},
+		why:
+			'THE SAME-AGGREGATE HALF IS ENFORCED AND IS NOT THE RULE. `ApproveDecision` and `GrantWaiver` both ' +
+			'carry `fromStates(\'PROPOSED\')`, so re-approving an already-EFFECTIVE Decision is refused with ' +
+			'RPH_ILLEGAL_STATE_TRANSITION — and that precondition is load-bearing rather than decorative, because ' +
+			'the MACHINE would admit the re-issue: `Decision.status` declares `illegal: []`, so EFFECTIVE -> ' +
+			'EFFECTIVE classifies NOOP and `checkTransition` lets a NOOP through. WHAT IS UNENFORCED is the rule as ' +
+			'stated. `proposeDecision` takes its id straight from `command.targetAggregateId`, declares NO ' +
+			'precondition at all, and consults no other Decision; `approveDecision`\'s precondition and guard both ' +
+			'read ONLY the target aggregate\'s own state, and `ctx.store` is never touched inside the guard. The ' +
+			'kernel cannot express the rule either: `authorizeDecisionEffective` takes a SINGLE `DecisionView` — ' +
+			'there is no collection parameter in the signature, so uniqueness is inexpressible to it in principle, ' +
+			'not merely unimplemented. THE CONTRAST CASE IN THIS SAME REPOSITORY, which is what makes this a gap ' +
+			'rather than a design: `otherActivePlanExistsForPwu` is exactly the cross-aggregate uniqueness query ' +
+			'this rule needs, written for RPH-EXE-001, and nothing analogous exists for decisions.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'two DISTINCT Decision aggregates proposed over the SAME subjectObjectIds, both APPROVAL, both approved — the second is ACCEPTED and both are EFFECTIVE, which is "two effective decisions" in the rule\'s own words',
+			control:
+				"a re-issued ApproveDecision on the FIRST decision, already EFFECTIVE, refused at the same site with RPH_ILLEGAL_STATE_TRANSITION — so the acceptance above is a missing quantifier, not a command that is never refused",
+			whyNoPredicate:
+				'No predicate could be named without lying about its shape. `authorizeDecisionEffective` is not ' +
+				'dead — it is asked on this very path — so it fails `deadPredicate`\'s first clause; and its input ' +
+				'is one `DecisionView` with no collection parameter, so it could not implement the rule if it were ' +
+				'dead. What is absent is a QUERY over decisions, and a census cannot name a function nobody wrote.'
+		}
+	},
+	'RPH-PER-004': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Retries must never duplicate commits, external API mutations, baseline promotions',
+			note: 'JPWB-DOC-003 §9 PER-5. A LONGER span than RPH-PER-003 cites of the same sentence, deliberately: the two rules instantiate adjacent items of one enumeration, and identical anchors would leave a reader unable to tell which clause each row rests on.'
+		},
+		why:
+			'THE SAME QUANTIFIER GAP AS RPH-PER-003, and the same-aggregate half is guarded MORE strongly here — ' +
+			'which is worth recording because it is the difference a reader would otherwise assume away. Unlike ' +
+			'`Decision.status`, `Baseline.status` DECLARES `AUTHORITATIVE -> AUTHORITATIVE` illegal, and ' +
+			'`classifyTransition` consults the illegal table BEFORE the from===to shortcut, so a re-promotion of ' +
+			'the same baseline is ILLEGAL_EXPLICIT at the machine layer rather than a NOOP. Two independent ' +
+			'defences, both same-aggregate. THE RULE STILL FAILS: `createBaseline` takes its id from ' +
+			'`command.targetAggregateId`, applies no precondition, reads the ITEMS\' versions and never asks ' +
+			'whether another Baseline already freezes them; `canPromoteBaseline`\'s entire input describes ONE ' +
+			'baseline (its only status field is the target\'s own) and its nine finding codes name no competing or ' +
+			'already-authoritative sibling; and `listBaselines` filters by undertaking scope with no status ' +
+			'selection, so two AUTHORITATIVE baselines over one item are both returned as rows. THE FIELD THAT ' +
+			'WOULD HAVE CARRIED THE ANSWER IS RATIFIED AND DEAD: `ProfessionalWorkUnit.currentBaselineId` exists ' +
+			'in the contract and its only production TypeScript reference is its own declaration — no handler ' +
+			'writes it and none reads it. That is precisely the shape `activeExecutionPlanId` had before ' +
+			'RPH-EXE-001 was enforced, and RPH-EXE-001 is the proof that this class of rule IS implementable here. ' +
+			'ONE SHAPE TRAP FOR WHOEVER IMPLEMENTS THIS, learned the hard way: the wiring mutant written to redden ' +
+			'this row FAILED TO KILL on its first run, because it read the baseline\'s items from `itemObjectIds` ' +
+			'— the CreateBaseline PAYLOAD field — while the persisted aggregate carries `itemObjectVersions`, an ' +
+			'array of `{objectId, semanticVersion}`. The check compiled, ran, and could never fire. A guard written ' +
+			'against the payload field would be exactly as vacuous, and would pass its own tests.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'two DISTINCT Baseline aggregates created over the SAME itemObjectIds, each driven CANDIDATE -> UNDER_REVIEW -> APPROVED and promoted against the same effective promotion decision — the second is ACCEPTED and both are AUTHORITATIVE',
+			control:
+				'a re-issued PromoteBaseline on the FIRST baseline, already AUTHORITATIVE, refused at the same site with RPH_ILLEGAL_STATE_TRANSITION',
+			whyNoPredicate:
+				'`canPromoteBaseline` is asked on this path, so it is not dead; and its input type describes a ' +
+				'single baseline, so it could not decide uniqueness if it were. The nearest DEAD symbol is the ' +
+				'ratified field `currentBaselineId`, but a field is not a predicate: naming it under an arm whose ' +
+				'contract is "a kernel predicate implements the rule correctly and nothing asks it" would claim a ' +
+				'correct implementation that does not exist.'
+		}
 	},
 	'RPH-PER-005': {
 		kind: 'NOT_A_COMMAND_REFUSAL',

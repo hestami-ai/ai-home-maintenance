@@ -138,7 +138,13 @@ const TOTAL_OVER_FAMILIES: readonly string[] = [
 	// the day it was closed: its obligations are enforced by the CONTRACT, and `classifyRefusal` read only
 	// `REJECTED` while the boundary returns `VALIDATION_FAILED`, so real enforcement classified as ADMITTED. It was
 	// never inexpressible — it was a second layer, and naming it (`RefusalLayer`) took one opt-in field.
-	'RPH-CON-'
+	'RPH-CON-',
+	// ADDED 2026-08-02, one commit after the family landed at twelve of fourteen. The two held-back rows
+	// (RPH-PER-003/004) are UNENFORCED_DISCLOSED, and a disclosure may not land without its observation — so the
+	// family stayed out of this list until both carried OBSERVED_ADMISSION probes. RPH-PER also cost the third
+	// structural widening: `classifyRefusal` read status REJECTED alone, and RPH-PER-001's real, command-layer
+	// refusal carries CONFLICT, so working enforcement would have classified as ADMITTED.
+	'RPH-PER-'
 ];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {

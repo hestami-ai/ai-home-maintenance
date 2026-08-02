@@ -40,6 +40,9 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
+// Only the VALIDATOR RESULT builder — this file has its own `seedPolicy` (it needs the criteria override that
+// RPH-CON-005's arrangement turns on), and importing the fixture module's would shadow it.
+import { floorValidatorResult } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-01T00:00:00Z';
 const actor: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
@@ -655,6 +658,183 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		// cross-aggregate uniqueness gaps that only an observation can settle.
 		'RPH-PER-001': null,
 		'RPH-PER-002': null,
+		// ── THE TWO CROSS-AGGREGATE UNIQUENESS DISCLOSURES ────────────────────────────────────────────────────
+		// Both rules ask "do TWO of these now exist over one subject?", and every duplicate defence this engine
+		// has answers the different question "is THIS object being changed twice?". The controls below are the
+		// same-aggregate re-issues, which ARE refused — that is what makes each acceptance a missing quantifier
+		// rather than a site with no refusal machinery at all.
+		'RPH-PER-003': {
+			arrangement:
+				'two DISTINCT Decision aggregates over the SAME subject, both approved to EFFECTIVE',
+			run: () => {
+				const SUBJECT = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5W01';
+				const D1 = 'dec_01ARZ3NDEKTSV4RRFFQ69G5W11';
+				const D2 = 'dec_01ARZ3NDEKTSV4RRFFQ69G5W12';
+				const propose = (id: string) =>
+					dispatch(
+						'ProposeDecision',
+						{
+							decisionType: 'APPROVAL',
+							subjectObjectIds: [SUBJECT],
+							selectedOption: 'ship',
+							rationale: 'looks right',
+							authority: actor
+						},
+						id,
+						'DECISION'
+					);
+				const approve = (id: string) =>
+					dispatch(
+						'ApproveDecision',
+						{
+							selectedOption: 'ship',
+							rationale: 'looks right',
+							consideredEvidenceIds: [],
+							consideredObservationIds: [],
+							subjectSemanticVersions: { [SUBJECT]: 1 }
+						},
+						id,
+						'DECISION'
+					);
+				ok(propose(D1), 'propose D1');
+				ok(approve(D1), 'approve D1');
+				// THE CONTROL: the SAME decision approved again. Refused — the site's machinery is alive.
+				const control = approve(D1);
+				// THE ADMISSION: a SECOND decision over the SAME subject, approved. Both are now EFFECTIVE.
+				ok(propose(D2), 'propose D2');
+				const admitted = approve(D2);
+				expect(
+					(store.loadObject(D1)?.state as { status: string }).status,
+					'D1 must be EFFECTIVE for "two effective decisions" to be the observed fact'
+				).toBe('EFFECTIVE');
+				expect(
+					(store.loadObject(D2)?.state as { status: string }).status,
+					'D2 must also be EFFECTIVE — that IS the admission'
+				).toBe('EFFECTIVE');
+				return { admitted, control };
+			}
+		},
+		'RPH-PER-004': {
+			arrangement:
+				'two DISTINCT Baseline aggregates over the SAME itemObjectIds, both promoted to AUTHORITATIVE',
+			run: () => {
+				const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5W21';
+				const ASSESS = 'asmt_01ARZ3NDEKTSV4RRFFQ69G5W22';
+				const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5W23';
+				const B1 = 'base_01ARZ3NDEKTSV4RRFFQ69G5W24';
+				const B2 = 'base_01ARZ3NDEKTSV4RRFFQ69G5W25';
+				seedPolicy('pol_arch');
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: ASSESS,
+							assurancePolicyId: 'pol_arch',
+							policyVersion: '1',
+							subjectObjectIds: [PWU],
+							subjectSemanticVersions: { [PWU]: 1 },
+							claimIds: []
+						},
+						ASSESS,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'request assessment'
+				);
+				ok(
+					dispatch(
+						'CompleteAssuranceAssessment',
+						{
+							validatorResult: floorValidatorResult({
+								assessmentId: ASSESS,
+								policyId: 'pol_arch',
+								subjectId: PWU,
+								subjectSemanticVersion: 1,
+								disposition: 'SATISFIED'
+							})
+						},
+						ASSESS,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'complete assessment'
+				);
+				ok(
+					dispatch(
+						'ProposeDecision',
+						{
+							decisionType: 'PROMOTE_BASELINE',
+							subjectObjectIds: [PWU],
+							selectedOption: 'promote',
+							rationale: 'ready',
+							authority: actor
+						},
+						DEC,
+						'DECISION'
+					),
+					'propose promotion decision'
+				);
+				ok(
+					dispatch(
+						'ApproveDecision',
+						{
+							selectedOption: 'promote',
+							rationale: 'ready',
+							consideredEvidenceIds: [],
+							consideredObservationIds: [],
+							subjectSemanticVersions: { [PWU]: 1 }
+						},
+						DEC,
+						'DECISION'
+					),
+					'approve promotion decision'
+				);
+				const driveToApproved = (id: string) => {
+					ok(
+						dispatch(
+							'CreateBaseline',
+							{
+								baselineType: 'ARCHITECTURE',
+								itemObjectIds: [PWU],
+								assuranceAssessmentIds: [ASSESS]
+							},
+							id,
+							'BASELINE'
+						),
+						`create ${id}`
+					);
+					ok(dispatch('SubmitBaselineForReview', {}, id, 'BASELINE'), `submit ${id}`);
+					ok(dispatch('ApproveBaseline', {}, id, 'BASELINE'), `approve ${id}`);
+				};
+				const promote = (id: string) =>
+					dispatch(
+						'PromoteBaseline',
+						{
+							promotionDecisionId: DEC,
+							expectedItemObjectVersions: [{ objectId: PWU, semanticVersion: 1 }],
+							requiredAssessmentIds: [ASSESS]
+						},
+						id,
+						'BASELINE'
+					);
+				driveToApproved(B1);
+				ok(promote(B1), 'promote B1');
+				// THE CONTROL: the SAME baseline re-promoted. Refused — and here BOTH the precondition and the
+				// machine's declared illegal self-edge stand in the way, which is a stronger same-aggregate guard
+				// than the Decision case has and makes the cross-aggregate silence starker.
+				const control = promote(B1);
+				// THE ADMISSION: a SECOND baseline freezing the SAME item, promoted. Both are AUTHORITATIVE.
+				driveToApproved(B2);
+				const admitted = promote(B2);
+				expect(
+					(store.loadObject(B1)?.state as { status: string }).status,
+					'B1 must be AUTHORITATIVE for "two authoritative baselines" to be the observed fact'
+				).toBe('AUTHORITATIVE');
+				expect(
+					(store.loadObject(B2)?.state as { status: string }).status,
+					'B2 must also be AUTHORITATIVE — that IS the admission'
+				).toBe('AUTHORITATIVE');
+				return { admitted, control };
+			}
+		},
 		'RPH-PER-005': null,
 		'RPH-PER-006': null,
 		'RPH-PER-007': null,
