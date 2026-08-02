@@ -1001,24 +1001,58 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'obligation, which is the register\'s third arm by definition — and note that if the projections DID drop ' +
 			'the condition, the instrument that would catch it is a projection test, not this register.'
 	},
+	// RE-DISPOSITIONED 2026-08-02, BEFORE ANY PROBE WAS WRITTEN, and the direction matters: this row was drafted
+	// ENFORCED against the PWA-publish floor gate and is recorded here as DISCLOSED instead. The change WIDENS the
+	// admitted gap rather than dissolving one, which is the safe direction for a correction — but it was still
+	// checked rather than assumed, because it also happens to make this row's probe far cheaper, and a
+	// re-disposition that saves work is exactly the kind that needs its evidence stated.
+	//
+	// THE EVIDENCE. `RPH_SUBJECT_VERSION_MISMATCH` is a member of the ratified 15-value error enum — the code the
+	// contracts mint FOR THIS RULE — and it appears in exactly one non-test production site: a pure-kernel
+	// classifier in `rph-assurance/src/assurance-rules.ts` that returns it as a `reason` string. NO HANDLER EVER
+	// REFUSES WITH IT. On the command layer `subjectSemanticVersions` is only ever written through
+	// (requestAssuranceAssessment, the completion event payloads, the governance decisions) or checked for
+	// COMPLETENESS (`parseCompletion`, which is RPH-ASR-007's limb and asks whether a version is NAMED, never
+	// whether it MATCHES). The only production site that COMPARES a version is `floor-gate.ts`.
+	//
+	// WHY THE FLOOR GATE IS NOT THIS RULE. Its subject is a PWA at publication and the de minimis floor recorded
+	// against it; this rule's subject is an assessment of a work unit at satisfaction time. Accepting it as the
+	// enforcement site would be the same substitution the RPH-EXE-005 row records and rejects — a real refusal,
+	// quantifying over a different object. The floor gate's version binding is genuinely enforced and genuinely
+	// driven live by `pwa-authoring.test.ts`; it just is not this rule.
 	'RPH-ASR-010': {
-		kind: 'ENFORCED',
+		kind: 'UNENFORCED_DISCLOSED',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor:
 				'An assessment of version n never satisfies version n+1; a semantic change to the subject invalidates or forces review of prior assessments',
 			note: 'JPWB-DOC-003 ASR-12 (assurance binds to exact versions and never floats) carries the rule near-verbatim. Canon says "forces REVIEW OF PRIOR ASSESSMENTS" where the ratified statement says re-assessment — a weaker second disjunct, quoted as canon has it.'
 		},
-		enforcedAt:
-			'DECISION: packages/rph-application/src/handlers/floor-gate.ts — floorGateBlock, whose version limb requires the recorded floor to match the subject version being acted on. ENFORCEMENT: packages/rph-application/src/handlers/pwa-authoring.ts — the publish path, which refuses when the floor satisfied for an earlier version is offered for the current one.',
-		refusalCode: 'RPH_INVARIANT_VIOLATION',
-		refusalMarker:
-			'Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version, or a governance waiver, before publishing.',
-		declaredMutations: [
-			'drop the version comparison from floorGateBlock so any satisfied floor for any version passes',
-			'compare against the LATEST recorded floor rather than the floor for the version being published',
-			'default `versionOk` to true when the subject version is unknown, rather than fail-closed'
-		]
+		why:
+			'An assessment may be completed carrying a subject semantic version that is NOT the version the subject ' +
+			'is actually at, and nothing refuses it. The ratified error code for this exact failure, ' +
+			'RPH_SUBJECT_VERSION_MISMATCH, is one of the fifteen the contracts mint and is returned by exactly one ' +
+			'production symbol — a pure-kernel classifier in rph-assurance — as a `reason` string on a boundary ' +
+			'rejection that the floor path then folds to INCONCLUSIVE. No handler refuses with it. The command layer ' +
+			'either writes `subjectSemanticVersions` through unexamined or asks only whether a version is NAMED for ' +
+			'every subject (`parseCompletion`, which is RPH-ASR-007 and is a COMPLETENESS check, not a MATCH check). ' +
+			'The one site that compares a version is the de minimis floor gate on the PWA publish path — real ' +
+			'enforcement over a different subject, and adopting it here would be the layer/subject substitution this ' +
+			'register exists to prevent. So the rule\'s second clause — that a semantic change to the subject ' +
+			'invalidates or forces review of prior assessments — has no reader at all: nothing recomputes, ' +
+			'invalidates, or even flags a prior assessment when its subject moves.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'an assessment completed with a validatorResult binding the subject to a semantic version the subject is NOT at — a verdict on version n accepted as satisfying version n+1',
+			control:
+				'the same completion with `subjectSemanticVersions: {}`, refused by `parseCompletion` at the same site — the parse step reads the field and rejects it for being INCOMPLETE, which is precisely what shows the missing check is the MATCH, not the reading',
+			whyNoPredicate:
+				'The kernel classifier that returns RPH_SUBJECT_VERSION_MISMATCH is not dead — it is asked on the ' +
+				'floor path — so naming it would fail `deadPredicate`\'s first clause. What is absent is a caller on ' +
+				'the assessment path that knows the subject\'s CURRENT version to compare against, so there is no ' +
+				'symbol whose census could witness the gap closing.'
+		}
 	},
 	'RPH-ASR-011': {
 		kind: 'NOT_A_COMMAND_REFUSAL',

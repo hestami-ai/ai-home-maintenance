@@ -162,6 +162,98 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		return ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }), 'activate');
 	}
 
+	// ── assurance fixtures (RPH-ASR-002 / RPH-ASR-007) ───────────────────────────────────────────────────────
+	// A subject the assessments can name. The PWU seeded in beforeEach serves; these only need it to exist.
+
+	/** Create and ACTIVATE a minimal policy. A non-floor policy is born DRAFT and cannot be assessed against. */
+	const asrPolicy = (policyId: string, over: Record<string, unknown> = {}): Outcome => {
+		const created = dispatch(
+			'CreateAssurancePolicy',
+			{
+				policyId,
+				version: '1.0.0',
+				name: `ASR probe policy ${policyId}`,
+				purpose: 'Assess the subject against its approved need.',
+				rationale: 'Seeded for a live enforcement probe.',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'The subject is fit for its approved need.',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				findingDefinitions: [],
+				permittedControlActions: ['CONTINUE'],
+				...over
+			},
+			policyId,
+			'ASSURANCE_POLICY'
+		);
+		if (created.status !== 'ACCEPTED') return created;
+		return dispatch('ActivateAssurancePolicy', { policyId }, policyId, 'ASSURANCE_POLICY');
+	};
+
+	/** Request an assessment against `policyId` and complete it; `over` mutates the validator result. */
+	const asrComplete = (
+		assessmentId: string,
+		policyId: string,
+		over: Record<string, unknown> = {}
+	): Outcome => {
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId,
+					assurancePolicyId: policyId,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [PWU],
+					subjectSemanticVersions: { [PWU]: 1 },
+					claimIds: []
+				},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			),
+			`request assessment ${assessmentId}`
+		);
+		return dispatch(
+			'CompleteAssuranceAssessment',
+			{
+				validatorResult: {
+					validatorId: 'reviewer',
+					validatorVersion: '1',
+					policyId,
+					policyVersion: '1.0.0',
+					assessmentId,
+					subjectObjectIds: [PWU],
+					subjectSemanticVersions: { [PWU]: 1 },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [],
+					dispositionRecommendation: 'SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: {
+						evaluator: { actorId: 'rev-1', actorType: 'HUMAN', displayName: 'Reviewer' }
+					},
+					...over
+				}
+			},
+			assessmentId,
+			'ASSURANCE_ASSESSMENT'
+		);
+	};
+
 	/** Propose + approve a successor plan on the SAME PWU, and return the activation attempt (not asserted). */
 	function proposeSuccessor(): Outcome {
 		ok(
@@ -514,9 +606,16 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 					requiredEvidence: [
 						{
 							id: 'R-TRACE',
-							name: 'Requirement trace matrix',
-							description: 'the trace matrix the coverage assessment rests on',
-							requiredForDispositions: ['SATISFIED']
+							evidenceType: 'TRACE',
+							description: 'the requirement trace matrix the coverage assessment rests on',
+							purpose: 'demonstrate that every requirement is covered',
+							cardinality: 'EXACTLY_ONE',
+							admissibilityRules: [],
+							// SATISFIED_ONLY is what makes Gate A's `requiredForDispositions` subset non-empty for a
+							// positive disposition and empty for a non-positive one — which is exactly the delta
+							// between this row's observation and its control.
+							requiredForDispositions: 'SATISFIED_ONLY',
+							mayBeWaived: false
 						}
 					]
 				});
@@ -547,11 +646,10 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				return { control, observed };
 			}
 		},
-		'RPH-ASR-010': {
-			arrangement:
-				'a PWA published at a version whose de minimis floor was satisfied for an EARLIER version — an assessment of version n offered for version n+1',
-			run: () => publishStaleFloorProbe()
-		}
+		// RPH-ASR-010 was drafted ENFORCED here against the PWA-publish floor gate and re-dispositioned to
+		// UNENFORCED_DISCLOSED before any probe was written — the floor gate's version binding is real, and is over
+		// a different subject. Its admission is observed in `disclosure-observed.test.ts`.
+		'RPH-ASR-010': null
 	};
 
 	it('the probe map is TOTAL over the ENFORCED rows — every claim has an observation', () => {

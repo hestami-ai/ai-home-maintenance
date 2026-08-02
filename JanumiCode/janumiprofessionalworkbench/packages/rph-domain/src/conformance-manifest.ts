@@ -62,13 +62,17 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED, and a per-id COVERED
 	// row for any of the other six would collide with the register's "no disclosed rule is certified COVERED" gate.
 	'RPH-EVD-007': 'packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts',
-	// The RPH-ASR tranche (2026-08-02). Same requirement, same reason: three of the twelve are ENFORCED, and each
-	// must cite evidence at the COMMAND layer or the register's layer gate reddens. The other nine carry no per-id
-	// row — four are disclosed as unenforced (a COVERED row would collide with the register's overclaim gate) and
-	// five are outcomes or read-model obligations that no command refusal can carry.
+	// The RPH-ASR tranche (2026-08-02). Same requirement, same reason: the ENFORCED rows must cite evidence at the
+	// COMMAND layer or the register's layer gate reddens. Only TWO of the twelve qualify. The other ten carry no
+	// per-id row — five are disclosed as unenforced (a COVERED row would collide with the register's overclaim
+	// gate) and five are outcomes or read-model obligations no command refusal can carry.
+	//
+	// RPH-ASR-010 IS DELIBERATELY ABSENT. It was drafted ENFORCED with a cite to `pwa-publish-stale-floor.test.ts`,
+	// and that test is real and green — but it drives the DE MINIMIS FLOOR's version binding on the PWA publish
+	// path, whose subject is not this rule's. Citing it would have made the manifest report an assessment-path
+	// guarantee on the strength of a publish-path refusal. The row is now UNENFORCED_DISCLOSED.
 	'RPH-ASR-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-ASR-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
-	'RPH-ASR-010': 'packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',

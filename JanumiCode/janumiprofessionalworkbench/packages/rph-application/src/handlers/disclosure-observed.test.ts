@@ -309,6 +309,68 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 	 * This is the SAME limb RPH-ASR-007 records as ENFORCED, which is a coherence property rather than a
 	 * coincidence: the register says that limb refuses, and these controls observe it refusing.
 	 */
+	/** `ChangePwuState` carries all four axes FLAT, not nested — a shape this fixture got wrong once. */
+	const pwuState = (
+		pwuId: string,
+		previousState: string,
+		newState: string,
+		over: Record<string, unknown> = {}
+	): Outcome =>
+		dispatch(
+			'ChangePwuState',
+			{
+				previousState,
+				newState,
+				executionState: 'NOT_PLANNED',
+				assuranceState: 'UNASSESSED',
+				shapeIntegrityState: 'PRESERVED',
+				reasonCode: 'fixture',
+				supportingObjectIds: [],
+				...over
+			},
+			pwuId,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+
+	const driveToReady = (pwuId: string): void => {
+		ok(pwuState(pwuId, 'PROPOSED', 'SHAPING'), `${pwuId} -> SHAPING`);
+		ok(pwuState(pwuId, 'SHAPING', 'READY'), `${pwuId} -> READY`);
+	};
+
+	/**
+	 * Walk the assurance axis to `ASSESSING` — the only state SATISFIED has an in-arrow from.
+	 *
+	 * The matrix is UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING -> SATISFIED, and a probe
+	 * that jumped straight to SATISFIED was refused by the MACHINE rather than by the backing check it exists to
+	 * measure. That is the masking hazard in its arranging half: the observation would have read as "the rule is
+	 * enforced" while the arrangement had never reached the guard.
+	 */
+	const driveAssuranceToAssessing = (pwuId: string): void => {
+		ok(
+			pwuState(pwuId, 'READY', 'READY', { assuranceState: 'EVIDENCE_REQUIRED', reasonCode: 'fx' }),
+			`${pwuId} assurance -> EVIDENCE_REQUIRED`
+		);
+		ok(
+			pwuState(pwuId, 'READY', 'READY', {
+				assuranceState: 'READY_FOR_ASSESSMENT',
+				reasonCode: 'fx'
+			}),
+			`${pwuId} assurance -> READY_FOR_ASSESSMENT`
+		);
+		ok(
+			pwuState(pwuId, 'READY', 'READY', { assuranceState: 'ASSESSING', reasonCode: 'fx' }),
+			`${pwuId} assurance -> ASSESSING`
+		);
+	};
+
+	/** Assert a terminal assurance disposition, citing `supporting` as its backing. */
+	const setAssurance = (pwuId: string, assuranceState: string, supporting: string[]): Outcome =>
+		pwuState(pwuId, 'READY', 'READY', {
+			assuranceState,
+			supportingObjectIds: supporting,
+			reasonCode: 'aggregate assurance'
+		});
+
 	const parseGuardControl = (assessmentId: string, policyId: string): Outcome => {
 		requestAssessment(assessmentId, policyId);
 		return completeAssessment(assessmentId, policyId, { subjectSemanticVersions: {} });
@@ -357,7 +419,6 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-ASR-006': null,
 		'RPH-ASR-007': null, // ENFORCED
 		'RPH-ASR-009': null,
-		'RPH-ASR-010': null, // ENFORCED
 		'RPH-ASR-011': null,
 
 		'RPH-EVD-001': {
@@ -578,6 +639,30 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			}
 		},
 
+		'RPH-ASR-010': {
+			arrangement:
+				'an assessment completed with a validatorResult binding the subject to a semantic version the subject is NOT at — a verdict on version n satisfying version n+1',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5B10';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5B10';
+				seedPolicy(POL, { criterionSeverity: 'MATERIAL' });
+				requestAssessment(ASM, POL);
+				// The subject PWU is at semanticVersion 1 (nothing has revised it). The verdict claims to have
+				// assessed version 99. Asserted from live state rather than a literal, so the staleness is real:
+				// a probe that pinned BOTH sides to constants could not tell a stale floor from a fresh one.
+				const actual = Number(
+					(store.loadObject(PARENT)?.state as Record<string, unknown>)?.semanticVersion ?? 1
+				);
+				expect(actual, 'the arrangement only means something while the versions genuinely differ').not.toBe(
+					99
+				);
+				const admitted = completeAssessment(ASM, POL, {
+					subjectSemanticVersions: { [PARENT]: 99 }
+				});
+				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5B11', POL) };
+			}
+		},
+
 		'RPH-ASR-012': {
 			arrangement:
 				'a PWU assurance disposition asserted SATISFIED while citing only the satisfied assessments, with a REJECTED assessment against another required policy left uncomposed',
@@ -598,34 +683,16 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 
 				// Assert the aggregate SATISFIED citing ONLY the satisfied assessment. The REJECTED one is a real,
 				// valid assessment against another policy the subject is assessed under, and nothing composes it in.
-				const admitted = dispatch(
-					'ChangePwuState',
-					{
-						pwuId: PARENT,
-						previousState: { assuranceState: 'UNASSESSED' },
-						newState: { assuranceState: 'SATISFIED' },
-						supportingObjectIds: [ASM_OK],
-						rationale: 'the four satisfied assessments'
-					},
-					PARENT,
-					'PROFESSIONAL_WORK_UNIT'
-				);
+				driveToReady(PARENT);
+				driveAssuranceToAssessing(PARENT);
+				const admitted = setAssurance(PARENT, 'SATISFIED', [ASM_OK]);
 
 				// CONTROL — the byte-identical command citing ONLY the REJECTED assessment, refused by
 				// `rejectUnbackedDisposition` at the same site. The BACKING check is alive; the COMPOSITION across
 				// required policies is what is absent.
-				const control = dispatch(
-					'ChangePwuState',
-					{
-						pwuId: CHILD_A,
-						previousState: { assuranceState: 'UNASSESSED' },
-						newState: { assuranceState: 'SATISFIED' },
-						supportingObjectIds: [ASM_BAD],
-						rationale: 'citing only the rejected assessment'
-					},
-					CHILD_A,
-					'PROFESSIONAL_WORK_UNIT'
-				);
+				driveToReady(CHILD_A);
+				driveAssuranceToAssessing(CHILD_A);
+				const control = setAssurance(CHILD_A, 'SATISFIED', [ASM_BAD]);
 				return { admitted, control };
 			}
 		}
