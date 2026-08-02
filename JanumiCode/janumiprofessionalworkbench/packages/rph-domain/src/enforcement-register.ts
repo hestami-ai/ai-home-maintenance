@@ -1938,7 +1938,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'A REPLAY-EQUIVALENCE PROPERTY, not a refusal: it asserts that two computations agree. No command is ' +
 			'refused and none could be. IT IS GENUINELY PROVED, which is why this row also records where — ' +
 			'`packages/rph-projections/src/pwu-replay.ts` (`replayPwuAxes`, the only production function in the ' +
-			'repository that reconstructs an aggregate from its own event stream), asserted in ' +
+			'repository that reconstructs an AGGREGATE\'S OWN STATE from its own event stream — the qualifier ' +
+			'added the day this row landed, because an adversarial pass surfaced `buildConditionSubject` in ' +
+			'rph-domain, which also folds ONE plan\'s events but produces a guard-evaluation subject rather than ' +
+			'the aggregate, and `executionAttempts` in rph-projections, which folds Execution* events into ' +
+			'per-attempt records. Neither reconstructs the object, but a reader deserves to find them here rather ' +
+			'than conclude this row missed them), asserted in ' +
 			'`packages/rph-engine/src/replay-equivalence.test.ts` against the live reference undertaking, comparing ' +
 			'13 PWUs x 4 axes to the materialized objects and carrying a non-triviality control. TWO HONEST LIMITS. ' +
 			'(1) The rule names "an Intent or PWU" and only the PWU half has a reducer; nothing reconstructs an ' +
@@ -1990,8 +1995,17 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'hold: the schema declares NO foreign key from `outbox_messages.event_id` to `domain_events.event_id`, ' +
 			'so nothing at the DDL level would prevent an orphan; the one rollback test is titled for the outbox and ' +
 			'never queries it; and `SnapshotOverlayStorageAdapter.commit` — unlike the SQLite one — opens no ' +
-			'transaction of its own, so a bare overlay commit has no rollback boundary at all, and no test anywhere ' +
-			'constructs that adapter.'
+			'transaction of its own, so a bare overlay commit has no rollback boundary at all. TWO CORRECTIONS TO ' +
+			'THIS ROW, made the same day it landed, by an adversarial pass over its own supporting census. (1) The ' +
+			'overlay is NOT untested: it is constructed only by `EngineHandle.fork()`, which is called three times ' +
+			'in `packages/rph-engine/src/engine.test.ts` — a search for the CLASS NAME finds nothing, and the ' +
+			'original claim was made from exactly that search. It has a production caller too ' +
+			'(apps/rph-demo\'s authoring turn). What survives is narrower and still worth recording: no test ' +
+			'exercises the overlay\'s ROLLBACK path, and its `commit` really does lack the self-wrapping boundary ' +
+			'the SQLite adapter has. (2) "No post-commit write" was too strong — `markOutboxPublished` is a ' +
+			'post-commit UPDATE of the outbox row\'s status, invoked from `drainOutbox`. The precise claim, and the ' +
+			'one the rule needs, is that there is exactly one INSERT INTO outbox_messages and it is inside the ' +
+			'commit transaction: no second APPENDER, so no orphan row can be created after the fact.'
 	},
 	'RPH-PER-009': {
 		kind: 'NOT_A_COMMAND_REFUSAL',
@@ -2119,11 +2133,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'quantifies over a SUBJECT THAT DOES NOT EXIST. There is no ReviewRequest, HumanReview, review-task or ' +
 			'approval-request entity, field, type or command anywhere in the repository; a pending human decision ' +
 			'IS a DECISION aggregate whose `status` is the string PROPOSED, and "no duplicate review request is ' +
-			'created" has no object to be about. Nor does the rule\'s premise hold as stated: no PWU state means ' +
-			'"waiting for human approval" — the only modelled wait is ExecutionStep RUNNING->WAITING with a ' +
-			'FREE-TEXT `waitReason` and no ratified wait-reason vocabulary, so nothing distinguishes a ' +
-			'human-approval wait from any other. And the "extension" the rule names does not exist: this engine ' +
-			'ships as a web host, not a VS Code extension. WHAT SURVIVES A RESTART, and it does so by construction ' +
+			'created" has no object to be about. The rule\'s premise is also weaker than it reads. CORRECTED THE ' +
+			'DAY THIS ROW LANDED, by an adversarial pass: this sentence said "no PWU state means waiting for human ' +
+			'approval", which is FALSE as written — `PWU.executionState` has a WAITING member (RUNNING->WAITING on ' +
+			'ExecutionStepWaiting), and the PWU carries four state axes, not one. The original claim was made from ' +
+			'reading `WorkLifecycleStateSchema` alone, which is a claim about a search reported as a claim about ' +
+			'the world. WHAT IS ACTUALLY TRUE, and it still empties the rule\'s second clause: no state ' +
+			'DISTINGUISHES a human-approval wait from any other, because the wait carries a FREE-TEXT `waitReason` ' +
+			'against no ratified vocabulary. And the "extension" the rule names does not exist as a package: this ' +
+			'engine ships as a web host. WHAT SURVIVES A RESTART, and it does so by construction ' +
 			'rather than by a recovery path: the Decision is a row in the durable store, and the two duplicate ' +
 			'defences — `fromStates(\'PROPOSED\')` on the approval commands and the `command_receipts` idempotency ' +
 			'lookup — are both store-backed, so neither depends on process memory. That is the rule\'s intent ' +
@@ -2139,10 +2157,17 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		},
 		why:
 			'THE PREMISE HAS NO REFERENT IN THIS ENGINE, so there is no interrupted state to resume from. The rule ' +
-			'presupposes "a valid raw validator result PERSISTED ... before authoritative disposition", and no such ' +
-			'intermediate is ever written: `validatorResult` exists only as a field of the ' +
+			'presupposes "a valid raw validator result PERSISTED ... before authoritative disposition", and the RAW ' +
+			'RESULT is never written: `validatorResult` exists only as a field of the ' +
 			'`CompleteAssuranceAssessment` COMMAND payload, and `parseCompletion` validates it and derives the ' +
-			'disposition IN THE SAME DISPATCH that commits the terminal transition. The assessment is born directly ' +
+			'disposition IN THE SAME DISPATCH that commits the terminal transition. NARROWED THE DAY THIS ROW ' +
+			'LANDED, by an adversarial pass, because "no such intermediate is ever written" was too strong: the ' +
+			'engine\'s assurance driver dispatches `RecordAssuranceObservation` — a validator-DERIVED aggregate, ' +
+			'durably committed — BEFORE `CompleteAssuranceAssessment`. So something validator-derived does survive ' +
+			'a restart in that window. What does not is the raw §20 ValidatorResult itself, which is the rule\'s ' +
+			'actual subject, and the state that would mark the window: every one of the fifteen ' +
+			'`AssuranceAssessmentState` members was enumerated and none means "validator result in hand, ' +
+			'disposition not yet authoritative". The assessment is born directly ' +
 			'in ASSESSING, and `AssuranceAssessmentState` has no member meaning "validator result in hand, ' +
 			'disposition not yet authoritative" — VALIDATOR_FAILED is a terminal disposition, not a pending one. ' +
 			'The validator\'s content rides the EVENT, never a pre-disposition object. Nor is there a separately ' +
