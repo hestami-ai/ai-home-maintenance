@@ -740,6 +740,13 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			//   EVD-003 / EVD-004  KILLED. Neutering `evidenceAdmissibility`'s SCOPE_STATED limb turns both controls
 			//                      ACCEPTED and reddens THIS assertion (not the disclosure one above), which is the
 			//                      property a control has to have.
+			//   ASR-004/005/010/012  KILLED, one mutant each, each reddening ONLY its own row. These are ADDITIVE
+			//                      mutants — they WIRE the missing rule rather than delete an existing one, which is
+			//                      the only way to test a disclosure's real property: that it detects the gap being
+			//                      closed. F: refuse SATISFIED with a NOT_MET criterion. G: refuse SATISFIED with an
+			//                      UNABLE_TO_DETERMINE criterion. H: refuse a verdict whose subject version is not
+			//                      the subject's current one. I: refuse a positive aggregate while any assessment on
+			//                      the same subject is REJECTED. All four rows went RED and no other row moved.
 			//   EVD-001            SURVIVED BY REDUNDANCY, not by vacuity. Widening completeRecomposition's
 			//                      `fromStates('EVALUATING')` to admit READY leaves the control REJECTED, because
 			//                      the RecompositionContract.status machine independently forbids READY -> outcome.
