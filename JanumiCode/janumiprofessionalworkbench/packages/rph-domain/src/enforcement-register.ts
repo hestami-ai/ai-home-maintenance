@@ -26,19 +26,21 @@
 //   NOT_A_COMMAND_REFUSAL  the statement asserts an outcome, a permission, or a plane that does not exist. A
 //                          declared silence with a reason, so it is distinguishable from an omission.
 //
-// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-02. The register is TOTAL over four families of the
-// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`): `RPH-EXE-*`, `RPH-EVD-*`, `RPH-ASR-*` and
-// `RPH-INT-*`. A new rule in any of the four with no row is a FAILING TEST, not a discovery — they are listed as
-// DATA in `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family
-// cannot be silently dropped from the gate either.
+// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-02. The register is TOTAL over five families of the
+// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`): `RPH-EXE-*`, `RPH-EVD-*`, `RPH-ASR-*`,
+// `RPH-INT-*` and `RPH-PWU-*` — 45 rules. A new rule in any of the five with no row is a FAILING TEST, not a
+// discovery, and the families are listed as DATA in `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather
+// than hard-coded in a filter, so a family cannot be silently dropped from the gate either.
 //
-// `RPH-PWU-*` IS PRESENT BUT NOT TOTAL, DELIBERATELY: seven of its ten rules have rows (001, 002, 004, 005, 006 from
-// the 2026-08-02 tranche; 009 and 010 from JAN-EXECREM). The missing three — 003, 007, 008 — are investigated and
-// all three are UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards whose arrangements are long. Landing a
-// disclosure without its observation is the one thing that arm may never do, so they are owed rather than faked,
-// and RPH-PWU is absent from `TOTAL_OVER_FAMILIES` until they land. Also still owed: RPH-PER, and the read-model
-// families (RPH-PRJ, RPH-TRC), plus the layer-1 contract family RPH-CON whose rules are schema obligations this
-// register's ENFORCED arm cannot express (see RPH-EVD-003's history for why).
+// RPH-PWU CLOSED IN FOUR STEPS, AND ITS ABSENCE FROM THAT LIST WAS ITSELF A CLAIM. It held 5, then 8, then 9 of its
+// ten rules across three commits while deliberately staying OUT of `TOTAL_OVER_FAMILIES`, because the outstanding
+// rows were all UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards, and landing a disclosure without its
+// observation is the one thing that arm may never do. "Not yet total" was gated rather than asserted.
+//
+// STILL OWED, recorded so the remaining gap cannot read as coverage: RPH-PER (the store layer), the read-model
+// families RPH-PRJ and RPH-TRC, and the layer-1 contract family RPH-CON — whose rules are SCHEMA obligations this
+// register's ENFORCED arm structurally cannot express, since `classifyRefusal` reads only `REJECTED` and a schema
+// foreclosure surfaces as VALIDATION_FAILED (the RPH-EVD-003 finding, which cost a real correction to learn).
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
@@ -293,6 +295,7 @@ export type RegisteredRuleId =
 	| 'RPH-INT-007'
 	| 'RPH-PWU-001'
 	| 'RPH-PWU-002'
+	| 'RPH-PWU-003'
 	| 'RPH-PWU-004'
 	| 'RPH-PWU-005'
 	| 'RPH-PWU-006'
@@ -1397,6 +1400,45 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'recording it twice would let one arrangement green two rules — the duplicate-marker failure, one level ' +
 			'up. If the sponsor rules that canon\'s "only when" governs, this row becomes a duplicate of RPH-PWU-007 ' +
 			'rather than a new finding.'
+	},
+	'RPH-PWU-003': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'Canon states the PARENTAGE obligation nowhere. JPWB-DOC-003 §5 STA-5 governs a PWU\'s shape ' +
+				'readiness and enumerates required inputs, expected outputs and verification criteria — it never ' +
+				'mentions a parent, an authority, or the root/non-root distinction. The architecture-side rules ' +
+				'(DOC-001 §5, the PWA composition invariants) govern the PWU TYPE graph, which is a different object: ' +
+				'they say a non-root TYPE is reachable from the root type, not that a non-root INSTANCE must have a ' +
+				'parent instance. Adopting either as the carrier would be the subject substitution this register ' +
+				'records twice already (RPH-EXE-005 over STA-5, RPH-ASR-010 over the floor gate). So this rule\'s ' +
+				'only textual home is the pre-canon conformance specification (§8), and retirement loses it.'
+		},
+		why:
+			'A PWU Instance realizing a PWU Type the published architecture declares NON-ROOT is accepted with no ' +
+			'parentage of any kind. `proposePwu` does police parentage — but only when a parent IS NAMED: it refuses ' +
+			'a `parentWorkUnitId` that does not resolve. There is no arm for the parent being ABSENT, and no arm for ' +
+			'the "independent authority" the ratified statement offers as the alternative — no field on ProposePwu ' +
+			'carries one. THE REFUSAL THAT LOOKS LIKE THIS RULE AND IS NOT IT: that named-but-absent-parent guard ' +
+			"ends its message \"(PWU-003)\", so production CLAIMS this rule id. It enforces the converse — a wrong " +
+			'parent, not a missing one — and reading the id as evidence would have bought an ENFORCED row with a ' +
+			'real marker, a real code and a passing probe, for a rule nothing enforces. That is why this row exists ' +
+			'and why its control is that very refusal: the delta between the admitted arrangement and the refused ' +
+			'control is WHETHER A PARENT IS NAMED AT ALL.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a published architecture whose CHILD type is declared isRoot:false and reachable from the root, an Undertaking bound to it, and a PWU Instance of that child type proposed with no parentWorkUnitId — accepted, and persisted with no parentage',
+			control:
+				'the same ProposePwu at the same site with ONE field ADDED — a parentWorkUnitId that resolves to nothing — which IS refused. The engine polices a parent that is WRONG while ignoring one that is ABSENT.',
+			whyNoPredicate:
+				'No kernel predicate decides whether a non-root instance has parentage. `INTENT_AT_LEAST_PROVISIONAL` ' +
+				'and the rest of `checkPwuShapeReadiness` quantify over a ROOT PWU at MarkPwuReady, not any PWU at ' +
+				'proposal, so a non-root instance escapes them entirely — and that predicate is asked from ' +
+				'markPwuReady, so it fails `deadPredicate`\'s first clause as well. Naming it would be the ' +
+				'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss at once.'
+		}
 	},
 	'RPH-PWU-007': {
 		kind: 'UNENFORCED_DISCLOSED',

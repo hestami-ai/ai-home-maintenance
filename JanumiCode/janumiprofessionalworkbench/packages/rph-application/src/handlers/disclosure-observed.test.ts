@@ -659,6 +659,160 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-PWU-005': null,
 		'RPH-PWU-006': null,
 
+		'RPH-PWU-003': {
+			arrangement:
+				'a PWU Instance realizing a PWU Type the published architecture declares NON-ROOT, proposed with no parentWorkUnitId at all',
+			run: () => {
+				const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5301';
+				const ROOT_T = 'pwt_01ARZ3NDEKTSV4RRFFQ69G5302';
+				const CHILD_T = 'pwt_01ARZ3NDEKTSV4RRFFQ69G5303';
+				const UND = 'und_01ARZ3NDEKTSV4RRFFQ69G5304';
+
+				// A PURELY HUMAN-AUTHORED, NEVER-ASSESSED PWA PUBLISHES WITHOUT A FLOOR — pwaFloorGate applies to an
+				// AI-produced PWA (createdBy AGENT/MODEL) or to one that HAS a recorded floor. The fixture actor is
+				// HUMAN and no floor is recorded, so the whole de minimis chain is out of scope here. That is a
+				// property of the gate, not a shortcut around it.
+				ok(
+					dispatch(
+						'CreatePwa',
+						{
+							pwaId: PWA,
+							name: 'Architecture with a non-root type',
+							description: 'd',
+							domain: 'software',
+							version: '1.0.0'
+						},
+						PWA,
+						'PROFESSIONAL_WORK_ARCHITECTURE'
+					),
+					'create pwa'
+				);
+				// ROOT must PERMIT the child, or the graph's `connected` invariant blocks publication — and it is
+				// that reachability which makes CHILD_T unambiguously a NON-ROOT node of a VALID architecture,
+				// which is the only thing that gives this rule's word "non-root" a subject.
+				ok(
+					dispatch(
+						'DefinePwuType',
+						{
+							pwuTypeId: ROOT_T,
+							pwaId: PWA,
+							pwuKind: 'PRODUCT_REALIZATION',
+							name: 'Root',
+							purpose: 'the root',
+							isRoot: true,
+							permittedChildTypeIds: [CHILD_T]
+						},
+						ROOT_T,
+						'PWU_TYPE'
+					),
+					'define root type'
+				);
+				ok(
+					dispatch(
+						'DefinePwuType',
+						{
+							pwuTypeId: CHILD_T,
+							pwaId: PWA,
+							pwuKind: 'PRODUCT_REALIZATION',
+							name: 'Child',
+							purpose: 'a non-root type',
+							isRoot: false
+						},
+						CHILD_T,
+						'PWU_TYPE'
+					),
+					'define child type'
+				);
+				ok(
+					dispatch('SubmitPwaForReview', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE'),
+					'submit pwa'
+				);
+				ok(dispatch('ValidatePwa', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE'), 'validate pwa');
+				ok(
+					dispatch(
+						'PublishPwa',
+						{ rootPwuTypeId: ROOT_T },
+						PWA,
+						'PROFESSIONAL_WORK_ARCHITECTURE'
+					),
+					'publish pwa'
+				);
+				const pwaVersion = String(
+					(store.loadObject(PWA)?.state as Record<string, unknown>)?.version ?? '1.0.0'
+				);
+				ok(
+					dispatch(
+						'CreateUndertaking',
+						{
+							undertakingId: UND,
+							name: 'An undertaking',
+							description: 'd',
+							pwaId: PWA,
+							pwaVersion,
+							instantiationProfile: 'STANDARD',
+							objective: 'ship it',
+							intendedOutputProduct: 'the product'
+						},
+						UND,
+						'UNDERTAKING'
+					),
+					'create undertaking'
+				);
+
+				const proposeChild = (pwuId: string, over: Record<string, unknown> = {}) =>
+					dispatch(
+						'ProposePwu',
+						{
+							pwuId,
+							pwuKind: 'PRODUCT_REALIZATION',
+							title: 'a non-root instance',
+							description: 'd',
+							intentId: INTENT,
+							undertakingId: UND,
+							pwuTypeId: CHILD_T,
+							isLocalExtension: false,
+							boundaries: {
+								inScope: ['x'],
+								outOfScope: ['y'],
+								permittedChanges: [],
+								prohibitedChanges: []
+							},
+							obligationIds: [],
+							constraintIds: [],
+							assumptionIds: [],
+							expectedOutputs: [],
+							assurancePolicyIds: [],
+							riskProfile: {
+								consequence: 'HIGH',
+								uncertainty: 'MEDIUM',
+								irreversibility: 'MEDIUM',
+								securitySensitivity: 'HIGH',
+								regulatoryExposure: 'LOW'
+							},
+							...over
+						},
+						pwuId,
+						'PROFESSIONAL_WORK_UNIT'
+					);
+
+				// THE ADMISSION: a non-root type instantiated with NO parentage of any kind.
+				const admitted = proposeChild('pwu_01ARZ3NDEKTSV4RRFFQ69G5305');
+				expect(
+					(store.loadObject('pwu_01ARZ3NDEKTSV4RRFFQ69G5305')?.state as Record<string, unknown>)
+						?.parentWorkUnitId,
+					'the admitted PWU really must have no parentage at all'
+				).toBeUndefined();
+
+				// CONTROL — the same command at the same site with ONE field ADDED: a parent that does not resolve.
+				// The engine polices a parent that is WRONG while ignoring one that is ABSENT, and its refusal
+				// message literally ends "(PWU-003)" — production naming a rule id it does not enforce.
+				const control = proposeChild('pwu_01ARZ3NDEKTSV4RRFFQ69G5306', {
+					parentWorkUnitId: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5399'
+				});
+				return { admitted, control };
+			}
+		},
+
 		'RPH-PWU-007': {
 			arrangement:
 				'a PWU whose own assurancePolicyIds names a policy whose required assessment came back REJECTED, moved to workLifecycleState SATISFIED by citing a second, satisfied assessment',

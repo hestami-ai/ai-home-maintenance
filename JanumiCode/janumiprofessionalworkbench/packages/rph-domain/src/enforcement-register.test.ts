@@ -122,7 +122,17 @@ function productionReferencesTo(symbol: string): string[] {
  * as data, checked below — rather than left as a sentence, because the previous form of this gate hard-coded one
  * prefix in a filter and nothing would have reported a family being silently dropped from it.
  */
-const TOTAL_OVER_FAMILIES: readonly string[] = ['RPH-EXE-', 'RPH-EVD-', 'RPH-ASR-', 'RPH-INT-'];
+const TOTAL_OVER_FAMILIES: readonly string[] = [
+	'RPH-EXE-',
+	'RPH-EVD-',
+	'RPH-ASR-',
+	'RPH-INT-',
+	// ADDED 2026-08-02, closing the family. RPH-PWU was deliberately ABSENT from this list for the three commits in
+	// which it held 5, then 8, then 9 of its ten rules — because the missing rows were all UNENFORCED_DISCLOSED
+	// with OBSERVED_ADMISSION guards, and landing a disclosure without its observation is the one thing that arm
+	// may never do. The absence was a claim ("this family is not yet total"), gated by this list being data.
+	'RPH-PWU-'
+];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {
 	it.each(TOTAL_OVER_FAMILIES)('every %s* rule in the catalog carries a disposition', (family) => {
