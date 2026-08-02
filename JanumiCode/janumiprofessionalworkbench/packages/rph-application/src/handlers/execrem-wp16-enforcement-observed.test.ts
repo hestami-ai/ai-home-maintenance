@@ -781,6 +781,139 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-INT-002': null,
 		'RPH-INT-006': null,
 		'RPH-INT-007': null,
+		// ── THE RPH-PWU FAMILY, five of ten (2026-08-02) ───────────────────────────────────────────────────────
+		'RPH-PWU-001': null,
+		'RPH-PWU-005': null,
+		'RPH-PWU-006': null,
+		'RPH-PWU-002': {
+			arrangement: 'ProposePwu naming an intentId that resolves to no Intent aggregate',
+			run: () => {
+				const mk = (pwuId: string, intentId: string) =>
+					dispatch(
+						'ProposePwu',
+						{
+							pwuId,
+							pwuKind: 'ARCHITECTURE',
+							title: 'Arch',
+							description: 'd',
+							intentId,
+							boundaries: {
+								inScope: [],
+								outOfScope: [],
+								permittedChanges: [],
+								prohibitedChanges: []
+							},
+							obligationIds: [],
+							constraintIds: [],
+							assumptionIds: [],
+							expectedOutputs: [],
+							assurancePolicyIds: [],
+							riskProfile: {
+								consequence: 'HIGH',
+								uncertainty: 'MEDIUM',
+								irreversibility: 'MEDIUM',
+								securitySensitivity: 'HIGH',
+								regulatoryExposure: 'LOW'
+							}
+						},
+						pwuId,
+						'PROFESSIONAL_WORK_UNIT'
+					);
+				// The CONTROL cites the intent seeded in beforeEach — so a handler refusing every proposal cannot
+				// green this row. The observation differs by exactly one field: an intent id nothing minted.
+				return {
+					control: mk('pwu_01ARZ3NDEKTSV4RRFFQ69H6300', INTENT),
+					observed: mk('pwu_01ARZ3NDEKTSV4RRFFQ69H6301', 'int_01ARZ3NDEKTSV4RRFFQ69H6399')
+				};
+			}
+		},
+		'RPH-PWU-004': {
+			arrangement: 'MarkPwuReady on a SHAPING PWU whose expectedOutputs is empty — readiness attested over nothing',
+			run: () => {
+				// THE FIXTURE MUST SATISFY EVERY OTHER READINESS LIMB, or the control is refused for reasons that
+				// have nothing to do with this rule and the marker never gets exercised. `checkPwuShapeReadiness`
+				// also requires an in-scope statement, an out-of-scope statement, and — for a root PWU — an intent
+				// at least PROVISIONAL. So both PWUs below get all of that, and the ONLY delta between the control
+				// and the observation is `expectedOutputs`.
+				const READY_INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H6330';
+				captureIntent(READY_INTENT);
+				ok(dispatch('BeginIntentDiscovery', {}, READY_INTENT, 'INTENT'), 'discover');
+				ok(
+					dispatch('ProvisionIntent', { ambiguityIds: [] }, READY_INTENT, 'INTENT'),
+					'provision'
+				);
+				const propose = (pwuId: string, expectedOutputs: unknown[]) =>
+					ok(
+						dispatch(
+							'ProposePwu',
+							{
+								pwuId,
+								pwuKind: 'ARCHITECTURE',
+								title: 'Arch',
+								description: 'd',
+								intentId: READY_INTENT,
+								boundaries: {
+									inScope: ['the architecture note'],
+									outOfScope: ['implementation'],
+									permittedChanges: [],
+									prohibitedChanges: []
+								},
+								obligationIds: [],
+								constraintIds: [],
+								assumptionIds: [],
+								expectedOutputs,
+								assurancePolicyIds: [],
+								riskProfile: {
+									consequence: 'HIGH',
+									uncertainty: 'MEDIUM',
+									irreversibility: 'MEDIUM',
+									securitySensitivity: 'HIGH',
+									regulatoryExposure: 'LOW'
+								}
+							},
+							pwuId,
+							'PROFESSIONAL_WORK_UNIT'
+						),
+						`propose ${pwuId}`
+					);
+				const markReady = (pwuId: string) =>
+					dispatch(
+						'MarkPwuReady',
+						{ shapeReadinessAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69H6320', expectedSemanticVersion: 1 },
+						pwuId,
+						'PROFESSIONAL_WORK_UNIT'
+					);
+				const shape = (pwuId: string) =>
+					ok(
+						dispatch(
+							'ChangePwuState',
+							{
+								previousState: 'PROPOSED',
+								newState: 'SHAPING',
+								executionState: 'NOT_PLANNED',
+								assuranceState: 'UNASSESSED',
+								shapeIntegrityState: 'PRESERVED',
+								reasonCode: 'fixture',
+								supportingObjectIds: []
+							},
+							pwuId,
+							'PROFESSIONAL_WORK_UNIT'
+						),
+						`shape ${pwuId}`
+					);
+
+				const OK_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6310';
+				const BAD_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6311';
+				propose(OK_PWU, [
+					{ artifactType: 'DOCUMENT', description: 'the architecture note', verificationCriteria: ['reviewed'] }
+				]);
+				propose(BAD_PWU, []);
+				shape(OK_PWU);
+				shape(BAD_PWU);
+				return { control: markReady(OK_PWU), observed: markReady(BAD_PWU) };
+			}
+		},
+
 		'RPH-INT-003': {
 			arrangement: 'ApproveIntent dispatched against a RAW intent — before it has been formalized',
 			run: () => {

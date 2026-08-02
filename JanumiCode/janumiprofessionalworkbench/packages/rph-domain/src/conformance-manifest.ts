@@ -83,6 +83,11 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-INT-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-005': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	// The RPH-PWU tranche, five of ten (2026-08-02). Only the two ENFORCED rows appear; the family is NOT yet
+	// total in the register (RPH-PWU-003/007/008 are investigated and owed), which is why RPH-PWU is absent from
+	// TOTAL_OVER_FAMILIES.
+	'RPH-PWU-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-PWU-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',

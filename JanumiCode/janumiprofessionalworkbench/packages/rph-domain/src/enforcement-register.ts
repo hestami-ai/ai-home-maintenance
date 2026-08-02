@@ -26,19 +26,24 @@
 //   NOT_A_COMMAND_REFUSAL  the statement asserts an outcome, a permission, or a plane that does not exist. A
 //                          declared silence with a reason, so it is distinguishable from an omission.
 //
-// SCOPE, DERIVED RATHER THAN CHOSEN. The register is TOTAL over every `RPH-EXE-*` and every `RPH-EVD-*` rule in the
-// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`), plus the two `RPH-PWU-*` rules whose ratified
-// statements are themselves about execution and which WP-12b wired into that same surface. A new rule in either
-// family with no row is a FAILING TEST, not a discovery — the families are listed as DATA in
-// `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family cannot be
-// silently dropped from the gate either.
+// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-02. The register is TOTAL over four families of the
+// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`): `RPH-EXE-*`, `RPH-EVD-*`, `RPH-ASR-*` and
+// `RPH-INT-*`. A new rule in any of the four with no row is a FAILING TEST, not a discovery — they are listed as
+// DATA in `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family
+// cannot be silently dropped from the gate either.
 //
-// RPH-EVD ADDED 2026-08-01. The original scope paragraph recorded the rest of taxonomy layer 3 as "follow-up work
-// rather than faked here"; this is that follow-up discharged for the evidence family, and the remaining families
-// (the Intent lifecycle, the PWU shape/baseline rules, and RPH-ASR) are still exactly that — recorded as owed, not
-// quietly claimed. Extending the register cost a widening of the UNENFORCED arm (see `UnenforcementGuard`), because
-// the evidence rules are not the shape the execution rules were: they are refusals this engine implements at
-// NEITHER layer, where the archetype was a correct predicate nothing asked.
+// `RPH-PWU-*` IS PRESENT BUT NOT TOTAL, DELIBERATELY: seven of its ten rules have rows (001, 002, 004, 005, 006 from
+// the 2026-08-02 tranche; 009 and 010 from JAN-EXECREM). The missing three — 003, 007, 008 — are investigated and
+// all three are UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards whose arrangements are long. Landing a
+// disclosure without its observation is the one thing that arm may never do, so they are owed rather than faked,
+// and RPH-PWU is absent from `TOTAL_OVER_FAMILIES` until they land. Also still owed: RPH-PER, and the read-model
+// families (RPH-PRJ, RPH-TRC), plus the layer-1 contract family RPH-CON whose rules are schema obligations this
+// register's ENFORCED arm cannot express (see RPH-EVD-003's history for why).
+//
+// EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
+// RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
+// cost a widening of the UNENFORCED arm (see `UnenforcementGuard`); RPH-INT's and RPH-PWU's non-enforced rows are
+// mostly rules that state what a SUCCESSFUL command PRODUCES, which no refusal probe can hold at all.
 //
 // THE HONEST LIMIT (DS-001 §8 item 5). A deliberate widening edited consistently across production, this register,
 // and the probe map PASSES. That is intended: it converts a silent one-character change into a three-file,
@@ -285,7 +290,12 @@ export type RegisteredRuleId =
 	| 'RPH-INT-004'
 	| 'RPH-INT-005'
 	| 'RPH-INT-006'
-	| 'RPH-INT-007';
+	| 'RPH-INT-007'
+	| 'RPH-PWU-001'
+	| 'RPH-PWU-002'
+	| 'RPH-PWU-004'
+	| 'RPH-PWU-005'
+	| 'RPH-PWU-006';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -1272,6 +1282,119 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss taken together, and it is declined here ' +
 			'deliberately rather than stumbled into. THE RESIDUE, stated because it is real: if SUPERSEDED ever ' +
 			'becomes reachable, this rule becomes a live UNENFORCED_DISCLOSED row on the same day.'
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE RPH-PWU FAMILY — FIVE OF TEN, AND THE FAMILY IS DELIBERATELY NOT YET TOTAL (2026-08-02).
+	//
+	// `TOTAL_OVER_FAMILIES` does NOT list RPH-PWU, and that is a statement rather than an oversight. RPH-PWU-002
+	// and RPH-PWU-004 are enforced and probed; RPH-PWU-001, -005 and -006 need no probe because nothing is refused;
+	// RPH-PWU-009 and -010 have been rows since JAN-EXECREM. THE THREE THAT ARE MISSING — RPH-PWU-003, -007 and
+	// -008 — are all investigated and all three are UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards whose
+	// arrangements are long (a full PWA authoring-and-publish chain; a full execution-and-assurance chain; a full
+	// drive to INVALIDATED followed by a baseline promotion). Landing a disclosure without its observation would be
+	// the one thing this arm may never do, so they are recorded as owed instead.
+	//
+	// A TRAP THIS FAMILY CARRIES, worth naming because it nearly cost a false row. `proposePwu` refuses a named-but-
+	// absent parent with a message ending "(PWU-003)" — the production code CLAIMS this rule id. It is not this
+	// rule: the ratified statement is that a NON-ROOT PWU WITHOUT a parent (or independent authority) is rejected,
+	// and that guard fires only when a parent IS named and does not resolve. A non-root PWU naming no parent at all
+	// sails through, which is why RPH-PWU-003 is a disclosure and not an ENFORCED row citing that marker. A refusal
+	// message naming a rule id is not evidence that the rule is enforced.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-PWU-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'At birth the axes initialize independently (proposed; not planned; unassessed; unknown).',
+			note: 'JPWB-DOC-003 §5 carries all four initial axis values verbatim and in the same order as the ratified statement.'
+		},
+		why:
+			'The RPH-INT-001 shape, in the PWU family: every clause states what an ACCEPTED ProposePwu produces — the ' +
+			'four independent axis values it initializes and the event it emits. Nothing is refused, so there is no ' +
+			'arrangement for a probe to observe being refused and none for a disclosure to observe being admitted. ' +
+			'The failure mode is a handler writing the WRONG initial value on a path that succeeds, and the ' +
+			'instrument for that is an assertion over created state and emitted event — which `pwu.test.ts` carries ' +
+			'— not a refusal probe. Recorded rather than omitted so the family is legible: four of this register\'s ' +
+			'rows are now in this arm for this same reason, and it is a property of how these rules are WRITTEN, not ' +
+			'a gap in what the engine does.'
+	},
+	'RPH-PWU-002': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor:
+				'All material work traces to originating intent or an explicitly declared exploratory purpose',
+			note: 'JPWB-CON-000 §6 requires all material work to trace to an originating intent. GENERAL rather than CARRIED because canon states the traceability requirement and never says that the PROPOSAL command is the point of refusal — the general rule survives retirement of the pre-canon §8 corpus, this command-level application does not.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/pwu.ts — proposePwu, whose first act resolves the payload’s intentId against the store and refuses when it does not exist.',
+		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
+		refusalMarker: 'ProposePwu requires an existing intent',
+		declaredMutations: [
+			'delete the `if (!intentObj)` refusal arm AND read the intent state as `intentObj?.state ?? {}` — the PWU is created citing an intent that does not exist and the probe reports ADMITTED. The optional chain is PART of the mutation: a bare deletion throws on the next line and would redden the probe by CRASHING rather than by admitting, which is a different result wearing the same colour',
+			'resolve the intent with `ctx.store.loadObject(p.intentId) ?? {}` so a missing intent yields an empty object that passes the truthiness test — the F-30 shape, a guard that still runs and can no longer fail'
+		]
+	},
+	'RPH-PWU-004': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'required inputs, expected outputs, at least one completion claim or verification criterion',
+			note: 'JPWB-DOC-003 §5 STA-5 (readiness is a substantive shape gate) enumerates the admission requirements this rule names, including the expected-outputs limb the marker pins.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/pwuGuards.ts — checkPwuShapeReadiness, whose §9.1 limb fails when expectedOutputs is empty. ENFORCEMENT: packages/rph-application/src/handlers/pwu.ts — markPwuReady, which refuses when the readiness contract is unmet and names the unmet limbs in the message.',
+		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
+		// THE UNMET LIMB IS PART OF THE MARKER. The message is built as `…contract (DOC-002 §9): ${unmet.join('; ')}`,
+		// so the prefix alone would be satisfied by ANY readiness failure — including limbs this row does not
+		// exercise. Pinning the limb is the same discipline RPH-EVD-003/007 use for the admissibility condition name.
+		refusalMarker: 'shape readiness contract (DOC-002 §9): expected output (DOC-002 §9.1)',
+		declaredMutations: [
+			'delete the `if (!readiness.ok)` arm from markPwuReady — SHAPING -> READY then advances on transition legality alone and the probe reports ADMITTED',
+			'remove the `expectedOutputs.length === 0` limb from checkPwuShapeReadiness — for this minimal-delta fixture the command is ACCEPTED; for a multi-limb fixture the refusal would survive with a different message, so the marker rather than the code is what reports it',
+			'return `{ ok: true, unmet: [] }` from checkPwuShapeReadiness unconditionally — the predicate still runs and can no longer fail'
+		]
+	},
+	'RPH-PWU-005': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Execution success moves work toward evidence and assurance, never directly to satisfaction.',
+			note: 'JPWB-DOC-003 §5 STA-2 states the rule verbatim, in the same direction: success routes toward evidence, not to satisfaction.'
+		},
+		why:
+			'The statement is a conjunction of OUTCOMES of an accepted transition — execution state becomes SUCCEEDED, ' +
+			'lifecycle becomes EVIDENCE_PENDING — followed by two NEGATIVE clauses that assert what does NOT happen ' +
+			'automatically. Nothing is refused. The negative clauses are the interesting half and they are still not ' +
+			'refusals: "assurance state is not automatically SATISFIED" forbids the ENGINE from inferring a ' +
+			'disposition, and a probe cannot arrange for an inference that no command requests. What DOES refuse a ' +
+			'controller asserting satisfaction unbacked is `rejectUnbackedDisposition`, and that belongs to a ' +
+			'different subject — the assertion, not the automatic inference — so crediting it here would be a subject ' +
+			'substitution of exactly the kind the RPH-PWU-003 comment above records.'
+	},
+	'RPH-PWU-006': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'A PWU may become satisfied only when execution succeeded, required evidence is admitted, and al',
+			note: 'JPWB-DOC-003 §5 STA-3 states the satisfaction gate, and its "only when" form is what makes the reading below a judgment rather than a reading.'
+		},
+		why:
+			'The ratified statement is PERMISSIVE — "the PWU MAY transition to SATISFIED" — and a permission is never ' +
+			'a refusal a dispatch can observe, which is the same reading that puts RPH-EXE-009 in this arm. ' +
+			'A DISCLOSED ALTERNATIVE, recorded because it is a real fork and not a formality: canon states the same ' +
+			'rule in the "only when" form, which reads as a GATE, and under that reading the rule would be a ' +
+			'refusal — the negative case being a PWU reaching SATISFIED with a condition unmet. That negative case is ' +
+			'already carried by RPH-PWU-007, which IS dispositioned as a disclosure with an observed admission. So ' +
+			'the two readings do not disagree about the engine\'s behaviour, only about which row records it, and ' +
+			'recording it twice would let one arrangement green two rules — the duplicate-marker failure, one level ' +
+			'up. If the sponsor rules that canon\'s "only when" governs, this row becomes a duplicate of RPH-PWU-007 ' +
+			'rather than a new finding.'
 	}
 };
 
