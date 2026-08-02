@@ -201,7 +201,11 @@ function buildConstraintInput(
 function checkDecompositionConservation(
 	state: Record<string, unknown>,
 	ctx: HandlerContext,
-	command: DomainCommand
+	command: DomainCommand,
+	// NAMED BY THE CALLER (REG-F-006). Two commands now run this gate — ValidateDecomposition over a proposed
+	// contract, and ReviseDecomposition over a REVISED one — and a shared message saying "ValidateDecomposition"
+	// would misreport which act was refused. The findings are the same; the act is not.
+	act = `ValidateDecomposition cannot mark ${command.targetAggregateId} valid`
 ): CommandResult | null {
 	const parent = loadState(ctx, str(state.parentWorkUnitId));
 	if (!parent) return null; // ProposeDecomposition already required the parent; nothing more to gate.
@@ -223,7 +227,7 @@ function checkDecompositionConservation(
 	return reject(
 		command,
 		'RPH_INVARIANT_VIOLATION',
-		`ValidateDecomposition cannot mark ${command.targetAggregateId} valid: the decomposition does not conserve its parent's obligations/constraints (§35.1 / RPH-DEC-002/007 / RPH-CNS-001..004): ${parts.join('; ')}`
+		`${act}: the decomposition does not conserve its parent's obligations/constraints (§35.1 / RPH-DEC-002/007 / RPH-CNS-001..004): ${parts.join('; ')}`
 	);
 }
 
@@ -297,14 +301,26 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
  * refusal to do what this handler does not do needs no ratification; it is CON-000 B7 discharged rather than
  * deferred, and it makes the missing capability visible on every attempt instead of never.
  */
+// NARROWED 2026-08-02 (REG-F-006's DOCS_STRONGER component). This list carried all three carrier fields while none
+// was honoured. Two now are: `obligationAllocations` and `constraintPropagations` are applied, and gated by the
+// same M9 conservation kernel `validateDecomposition` calls — a second call site, which is what the finding said
+// the remaining work actually was.
+//
+// `childWorkUnitIds` STAYS REFUSED, and not for want of effort. DEC-2's operative clause is "triggers impact
+// analysis", and impact analysis has no plane in this engine: `impactedObjects` is a hollow-kernel-triage deferral
+// awaiting a TraceLink-minting command surface that does not exist. Applying a revised child set while silently
+// performing no impact analysis would be the F-I defect exactly — a caller told the revision succeeded, with no
+// way to learn what was not done. Refusing the one field that is genuinely blocked is the same B7 discharge as
+// before, no longer standing in for the two that are not.
 const UNHONOURED_REVISION_FIELDS: readonly (readonly [string, string])[] = [
 	[
 		'childWorkUnitIds',
-		'DOC-003 DEC-2 — a revised child set changes the parent claim and triggers impact analysis'
-	],
-	['obligationAllocations', 'DOC-003 DEC-3 — obligation conservation across a revision'],
-	['constraintPropagations', 'DOC-003 DEC-4 — constraint disposition across a semantic revision']
+		'DOC-003 DEC-2 — a revised child set changes the parent claim and triggers impact analysis, and this engine has no impact-analysis plane (impactedObjects has no caller and needs a TraceLink-minting surface)'
+	]
 ];
+
+/** The content fields a revision MAY carry, applied to the contract state when conservation holds. */
+const HONOURED_REVISION_FIELDS = ['obligationAllocations', 'constraintPropagations'] as const;
 
 export const reviseDecomposition: CommandHandler = (ctx, command, payload) => {
 	const p = (payload ?? {}) as Record<string, unknown>;
@@ -318,11 +334,32 @@ export const reviseDecomposition: CommandHandler = (ctx, command, payload) => {
 				.join(
 					'; '
 				)}. This command supersedes the contract and bumps its semantic version; it does not ` +
-				`apply a revised decomposition. Propose a new DecompositionContract for the parent instead. ` +
+				`apply a revised child set. Propose a new DecompositionContract for the parent instead. ` +
 				`(JPWB-SPEC-001-DR-002 F-I — the capability is declared on the payload and not yet implemented.)`
 		);
 	}
+
+	// DEC-3 / DEC-4 OVER THE REVISED CONTENT. The gate runs against the contract AS REVISED, not as stored —
+	// checking the stored state would pass every revision by construction, which is the vacuity shape this
+	// programme keeps finding. A revision carrying no content is unchanged content, and is still checked.
+	const revisions = Object.fromEntries(
+		HONOURED_REVISION_FIELDS.filter((f) => p[f] !== undefined).map((f) => [f, p[f]])
+	);
+	if (Object.keys(revisions).length > 0) {
+		const stored = loadState(ctx, command.targetAggregateId);
+		if (stored) {
+			const conservation = checkDecompositionConservation(
+				{ ...stored, ...revisions },
+				ctx,
+				command,
+				`ReviseDecomposition cannot apply this revision to ${command.targetAggregateId}`
+			);
+			if (conservation) return conservation;
+		}
+	}
+
 	return advanceStatus(ctx, command, {
+		mutate: (base) => ({ ...base, ...revisions }),
 		objectType: DECOMP,
 		statusField: 'status',
 		machine: 'DecompositionContract.status',

@@ -150,19 +150,25 @@ describe('F-I — ReviseDecomposition asserts nothing it does not perform', () =
 		expect(h.eventsOfType('DecompositionRevised')).toHaveLength(0);
 	});
 
-	it('REFUSES obligationAllocations and constraintPropagations for the same reason', () => {
-		// Named separately because these two are the DEC-3 / DEC-4 carriers specifically. A guard that caught only
-		// childWorkUnitIds would leave obligation conservation silently unperformed, which is the DEC-3 defect.
+	// SUPERSEDED 2026-08-02 BY THE CAPABILITY ITSELF, and rewritten rather than deleted so the progression is
+	// legible. This test used to assert that `obligationAllocations` and `constraintPropagations` were REFUSED —
+	// correct while the handler could not honour them (the B7 fail-closed discharge), and wrong the moment
+	// REG-F-006's DOCS_STRONGER component landed. They are now APPLIED, gated by the M9 conservation kernel.
+	//
+	// What the test still has to hold is the part that never changed: a revision must not DROP them silently. The
+	// discriminator is no longer refuse-vs-apply but apply-vs-vanish, so it asserts the persisted content.
+	it('APPLIES obligationAllocations and constraintPropagations rather than dropping them (DEC-3/DEC-4)', () => {
 		validContract();
-		for (const field of ['obligationAllocations', 'constraintPropagations'] as const) {
-			const r = h.d('ReviseDecomposition', DCP, 'DECOMPOSITION_CONTRACT', {
-				rationale: 'reallocate',
-				[field]: []
-			});
-			expect(r.status, `${field} must be refused, not dropped`).toBe('REJECTED');
-			expect(r.error?.message ?? '').toMatch(new RegExp(field));
-		}
-		expect(h.stateOf(DCP).status).toBe('VALID');
+		const r = h.d('ReviseDecomposition', DCP, 'DECOMPOSITION_CONTRACT', {
+			rationale: 'reallocate',
+			constraintPropagations: []
+		});
+		expect(r.status, `${r.error?.code ?? ''}: ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+		expect(
+			h.stateOf(DCP).constraintPropagations,
+			'the revised content must be persisted, not accepted and discarded'
+		).toEqual([]);
+		expect(h.stateOf(DCP).status).toBe('SUPERSEDED');
 	});
 
 	it('the emitted DecompositionRevised conforms to its OWN declared payload schema', () => {
