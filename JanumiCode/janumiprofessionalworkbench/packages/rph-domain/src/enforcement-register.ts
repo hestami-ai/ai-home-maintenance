@@ -26,21 +26,38 @@
 //   NOT_A_COMMAND_REFUSAL  the statement asserts an outcome, a permission, or a plane that does not exist. A
 //                          declared silence with a reason, so it is distinguishable from an omission.
 //
-// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-02. The register is TOTAL over five families of the
-// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`): `RPH-EXE-*`, `RPH-EVD-*`, `RPH-ASR-*`,
-// `RPH-INT-*` and `RPH-PWU-*` — 45 rules. A new rule in any of the five with no row is a FAILING TEST, not a
-// discovery, and the families are listed as DATA in `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather
-// than hard-coded in a filter, so a family cannot be silently dropped from the gate either.
+// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-02. The register is TOTAL over TEN families of the
+// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`) — `RPH-EXE`, `RPH-EVD`, `RPH-ASR`, `RPH-INT`,
+// `RPH-PWU`, `RPH-CON`, `RPH-PER`, `RPH-PRJ`, `RPH-TRC`, `RPH-CMP` — which is **81 of the catalog's 125 rules**. A
+// new rule in any of the ten with no row is a FAILING TEST, not a discovery, and the families are listed as DATA in
+// `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family cannot be
+// silently dropped from the gate either.
 //
-// RPH-PWU CLOSED IN FOUR STEPS, AND ITS ABSENCE FROM THAT LIST WAS ITSELF A CLAIM. It held 5, then 8, then 9 of its
-// ten rules across three commits while deliberately staying OUT of `TOTAL_OVER_FAMILIES`, because the outstanding
-// rows were all UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards, and landing a disclosure without its
-// observation is the one thing that arm may never do. "Not yet total" was gated rather than asserted.
+// A FAMILY'S ABSENCE FROM THAT LIST IS ITSELF A CLAIM, and twice it has been a load-bearing one. RPH-PWU held 5,
+// then 8, then 9 of its ten rules across three commits, and RPH-PER held 12 of 14 for one, each staying OUT of
+// `TOTAL_OVER_FAMILIES` on purpose: the outstanding rows were UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards,
+// and landing a disclosure without its observation is the one thing that arm may never do. "Not yet total" was
+// gated rather than asserted.
 //
-// STILL OWED, recorded so the remaining gap cannot read as coverage: RPH-PER (the store layer), the read-model
-// families RPH-PRJ and RPH-TRC, and the layer-1 contract family RPH-CON — whose rules are SCHEMA obligations this
-// register's ENFORCED arm structurally cannot express, since `classifyRefusal` reads only `REJECTED` and a schema
-// foreclosure surfaces as VALIDATION_FAILED (the RPH-EVD-003 finding, which cost a real correction to learn).
+// THE 44 RULES NOT YET DISPOSED, counted rather than gestured at, because a scope paragraph that goes stale is the
+// exact drift this module exists to prevent — and this one DID go stale for the length of one commit, still listing
+// RPH-PER/PRJ/TRC/CON as owed after all four had closed.
+//
+//   IN REACH AND GENUINELY OWED — 31 rules across five layer-2 domain-invariant families: `RPH-DEC` (7),
+//   `RPH-CNS` (4), `RPH-ASM` (6), `RPH-GOV` (7), `RPH-BAS` (7). These are ordinary command-refusal families of
+//   exactly the shape this register handles best, and several already have known gaps recorded elsewhere
+//   (REG-F-006's DEC-2, REG-F-010's group 3 in `handlers/governance.ts`). Nothing structural blocks them; they are
+//   simply not done.
+//
+//   OUT OF REACH BY CONSTRUCTION — 13 rules: `RPH-FIX` (6) and `RPH-E2E` (7), the fixture-replay and end-to-end
+//   scenario families. Both are legitimately DEFERRED in the conformance manifest with named work packages. They
+//   are the only two prefixes left in `DEFERRABLE_PREFIXES`, and after REG-F-013 that set is treated as the most
+//   dangerous data in the manifest: an entry there does not weaken a claim, it deletes it.
+//
+// WHAT "TOTAL OVER TEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means every
+// rule in those families has a DISPOSITION, not that every rule is enforced. Of the 81, a large minority are
+// NOT_A_COMMAND_REFUSAL — including all fourteen read-model rules — and several are disclosures. The register's
+// value is that those are now written down and gated, not that they are closed.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
