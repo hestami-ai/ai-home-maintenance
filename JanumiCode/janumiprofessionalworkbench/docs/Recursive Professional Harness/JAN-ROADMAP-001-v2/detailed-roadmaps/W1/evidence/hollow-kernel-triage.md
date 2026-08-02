@@ -58,6 +58,28 @@ Execution-plane + persistence-recovery, correctly out of the W1 semantic kernel:
   > **checked** row (`UNENFORCED_DISCLOSED`) in `packages/rph-domain/src/enforcement-register.ts` rather than a
   > line in a triage document, and the family's manifest claim has been downgraded to PARTIAL. A deferral nobody
   > can grep is indistinguishable from an omission.
+  >
+  > **CORRECTION (2026-08-02) — THE NOTE ABOVE IS NOW STALE, AND THIS IS THE THIRD TIME THIS DOCUMENT HAS DRIFTED.**
+  > Two of the three are no longer disclosed. `bindingPermitsExecution` (RPH-EXE-003) is **ENFORCED** — wired by
+  > JAN-EXEBIND WP-B1, re-sited by JAN-REVREM RW-0/RW-6 — and `stepMayBecomeReady` (RPH-EXE-005) is **ENFORCED**,
+  > closed by JAN-CAPBIND WP-3 once `InputBinding`'s shape was authored. Only `capabilityAuthorized` (RPH-EXE-004)
+  > is still `UNENFORCED_DISCLOSED`, and deliberately so: its row records that wiring it would be the substitution
+  > the register exists to prevent, with an exit criterion rather than a date.
+  >
+  > This is the same failure the note itself names, arriving in the note. The first drift was
+  > `canResumeExecutionOnPwu` (corrected above); the second was the manifest certifying RPH-PWU-010 COVERED; this
+  > is the third. **The document cannot hold this information**, because nothing gates it — whereas the register's
+  > rows are compiler- and test-enforced, and a row that goes stale turns the build red. The remedy is therefore
+  > not another correction pass but **retirement**: extend the register to the families that own the symbols below
+  > (Intent lifecycle, PWU shape/baseline, PER), let the rows carry the deferrals, and delete this list. Recorded
+  > as owed rather than performed, because the register is not yet total over those families.
+  >
+  > **CENSUS, 2026-08-02**, run with the register gate's own algorithm (`\b<symbol>\b` over every non-test `.ts`
+  > under `packages/*/src`): of the 23 symbols listed in this section, **18 have exactly ONE reference — their own
+  > definition — and are genuinely dead**; five now have production callers (`canSkipStep`, `stepMayBecomeReady`,
+  > `bindingPermitsExecution`, `canAuthorizeNewWork`, plus the already-struck `canResumeExecutionOnPwu`). So the
+  > list is broadly accurate about the *world* and unreliable about *itself*, which is exactly the split that makes
+  > a hand-maintained record worse than none: it is read as authoritative.
 - **W2/W3 traceability/impact plane:** `validateLinkDirectionality`, `impactedObjects` (need a TraceLink-minting command surface first).
 - **Blocked on a contract gap:** `validateAssumptionReification` — deferred beyond DWP-004 (needs an assumption-reification surface); recorded, not forced.
 
