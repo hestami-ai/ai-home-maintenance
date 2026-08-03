@@ -1,3 +1,29 @@
+================================================================================
+RETIRED 2026-08-03 — SUPERSEDED BY A GATE. NOT AUTHORITATIVE.
+
+  Everything below is kept for history and must not be read as current. The
+  live record is verif/dead-kernel-census.test.ts, which DERIVES this census
+  from the filesystem on every run and fails the build when it drifts:
+
+    - a declared-dead kernel function acquiring a production CALL site  -> RED
+    - a new uncalled exported kernel function appearing                 -> RED
+
+  Both were mutation-proved on the day this banner was written.
+
+  WHY THIS FILE COULD NOT BE TRUSTED, in its own words: it and the hollow-kernel
+  triage between them drifted four times, each drift recorded inside them after
+  the fact. This file has ten referencing documents and was READ BY NO TEST.
+  That is the whole argument for the replacement — not that its contents were
+  wrong, but that nothing could tell you when they became wrong.
+
+  Two corrections the gate makes to the record below, both measured:
+    - the census counts CALL SITES, not file mentions. A mention census reports
+      classifyRefusal as live (production comments name it, nothing calls it)
+      and schemaLayerRuleIds as dead (its only caller is in its own file).
+    - controllerMarksPwuSatisfied is dead and appears in NO prose list. It is
+      carried as UNTRIAGED rather than given a rationale nobody checked.
+================================================================================
+
 RECORD CORRECTION (2026-07-25, JAN-EXECREM WP-17).
   canResumeExecutionOnPwu is NO LONGER DEAD. JAN-EXECREM WP-12b (F-28) wired it into
   pwuOpennessRefusal in packages/rph-application/src/handlers/execution.ts, where it now gates

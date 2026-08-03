@@ -38,7 +38,30 @@ Force-wiring these would duplicate a live gate or decide nothing:
 - **`requiresReification`, `coverageFor`, `isEffectiveApproval`, `waiverPreservesFindings`, `isWaiverApplicable`, `assertBaselineItemSetImmutable`, `canSupersedeBaseline`, `resolvePath`** — superseded by live sibling paths or structural enforcement (per-agent evidence in the workflow transcript).
 - **Utilities** (`prefixOf`, `citedConcreteTestFiles`) — test/id tooling, not governance rules.
 
-## 4. DEFER → W2/W3 (24)
+## ~~4. DEFER → W2/W3 (24)~~ — **SUPERSEDED 2026-08-03, retired into a gate**
+
+> **THIS SECTION IS NO LONGER AUTHORITATIVE. It is kept, unedited below, because a deleted claim teaches nothing:
+> a reader who finds it should be able to see what was believed and how it was cleared.**
+>
+> **What replaced it:** `verif/dead-kernel-census.test.ts` — the census as GATED DATA. It derives, from the
+> filesystem, every exported `rph-domain` function that no production file CALLS, and asserts that set equals a
+> declared list in which each entry carries a kind (`GATE_HELPER` / `DEAD_BY_DESIGN` / `DISCLOSED` / `DEFERRED` /
+> `UNTRIAGED`) and a reason. Wiring one of these functions turns the build RED. So does adding a new uncalled one.
+> Both were mutation-proved before this note was written.
+>
+> **Why a gate and not a deletion into the enforcement register**, which is what the correction note below
+> prescribed and recorded as owed. The precondition it named — "the register is not yet total over those
+> families" — was met on 2026-08-03 (fifteen families, 112 of 125 rules). **The retirement still could not be done
+> that way.** Measured: only 15 of this section's 24 symbols are named by any register row. The register is total
+> over RULES, and a kernel function carrying no ratified rule will never have one — so folding this list into it
+> would have dropped nine symbols on the floor. The two instruments ask different questions: the register asks
+> *is this RULE enforced*, the census asks *is this CODE reached*. Recorded because the prescription below was
+> mine and it was wrong in a way only the measurement showed.
+>
+> **What the gate found that this list did not say:** `controllerMarksPwuSatisfied` (INV-5 / P1, the positive form
+> — a PWU is satisfied only when execution SUCCEEDED *and* assurance is SATISFIED *and* no blocking observation
+> remains) is dead and appears in NEITHER prose list. It is carried as `UNTRIAGED` rather than given a rationale
+> nobody checked. `isTerminalStepState` is dead with **no consumer at all** — not even a test.
 
 Execution-plane + persistence-recovery, correctly out of the W1 semantic kernel:
 
