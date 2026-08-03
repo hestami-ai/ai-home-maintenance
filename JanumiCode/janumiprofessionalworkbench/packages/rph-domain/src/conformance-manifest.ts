@@ -156,10 +156,26 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		testFile: 'packages/rph-domain/src/decomposition.test.ts',
 		note: 'RPH-CNS-001..004 by id (004 also in governance.test.ts)'
 	},
+	// ── CORRECTED 2026-08-02 — THE OVERCLAIM GATE'S SEVENTH CATCH, AND THE THIRD FAMILY IN A DAY ────────────
+	//
+	// This row read COVERED, "RPH-ASM-001..006 by id", on a PURE_KERNEL file. The register disposed RPH-ASM-002
+	// and RPH-ASM-005 UNENFORCED_DISCLOSED — each with a dead-predicate census — and the gate rejected the pair.
+	//
+	// THE FAMILY-LEVEL FACT IS THE ONE WORTH CARRYING: FIVE of the six ASM rules have a dedicated kernel predicate
+	// referenced by exactly one non-test file — its own definition module, rph-domain/src/decomposition.ts. Only
+	// the authorize-new-work predicate behind ASM-006 has a live caller. The cited test file is honest and its
+	// assertions hold; what it cannot see is that nothing in the running engine asks any of the other five. That
+	// is DS-001 §4 item 2 at family scale rather than rule scale.
+	//
+	// THE PREDICATES ARE DELIBERATELY NOT NAMED HERE, for the second time in this file. Writing a dead predicate's
+	// bare identifier into any production source — this manifest included — ADDS that file to the census the
+	// enforcement register greps, and turns the row's own dead-predicate gate RED. It happened again on this
+	// tranche. The register names them, once each, in the rows that disclose them; that is the only place a
+	// census-bearing symbol belongs.
 	'RPH-ASM': {
-		status: 'COVERED',
+		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/decomposition.test.ts',
-		note: 'RPH-ASM-001..006 by id'
+		note: 'ASM-006 is ENFORCED in enforcement-register.ts (approveExecutionPlan refuses a plan authorizing work for a PWU whose assumption is expired, falsified or superseded; its dispatch probe is owed). ASM-002 and ASM-005 are UNENFORCED_DISCLOSED, each guarded by a dead-predicate census over a kernel function whose only non-test reference is its own definition. ASM-001/003/004 are NOT_A_COMMAND_REFUSAL: their triggering acts are not dispatchable, since only DetectAssumption and ExpireAssumption exist and the arrows into ACCEPTED/VERIFIED/FALSIFIED are authored but command-unreachable.'
 	},
 	// ── A LAYER OBSERVATION, RECORDED 2026-08-02 WHILE DISPOSITIONING RPH-GOV-001 ────────────────────────────
 	//

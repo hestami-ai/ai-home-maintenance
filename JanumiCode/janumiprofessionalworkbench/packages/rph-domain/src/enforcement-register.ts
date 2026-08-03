@@ -431,7 +431,13 @@ export type RegisteredRuleId =
 	| 'RPH-BAS-001'
 	| 'RPH-BAS-002'
 	| 'RPH-BAS-005'
-	| 'RPH-BAS-007';
+	| 'RPH-BAS-007'
+	// RPH-ASM, FIVE OF SIX (2026-08-02). ASM-006 is ENFORCED and owes its dispatch probe.
+	| 'RPH-ASM-001'
+	| 'RPH-ASM-002'
+	| 'RPH-ASM-003'
+	| 'RPH-ASM-004'
+	| 'RPH-ASM-005';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -2860,6 +2866,148 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'ratified", and the gate\'s own test asserts that authored shapes are deliberately NOT enforced. So ' +
 			'116 authored strict schemas go unchecked, which is the DISCLOSED COST of that scope rather than a ' +
 			'defect in it — and this row is one place where the cost is now known to have been paid.'
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE RPH-ASM FAMILY — FIVE DEAD PREDICATES OUT OF SIX RULES.
+	//
+	// Measured, not asserted: `requiresReification`, `validateAssumptionReification`, `assessAcceptance`,
+	// `assessFalsification` and `blocksIrreversibleWork` are ALL referenced by exactly one non-test file — their
+	// own definition module, `rph-domain/src/decomposition.ts`. Only `canAuthorizeNewWork` (RPH-ASM-006) has live
+	// callers. A whole family of correct, unit-tested kernel predicates, each written FOR the rule it does not
+	// enforce, is the archetype this register was built around, and it has never appeared this densely.
+	//
+	// AND THE VOCABULARY IS HALF-BUILT IN A PARTICULAR WAY. `Assumption.status` declares eight states with
+	// transitions and guard prose, but only TWO commands exist — `DetectAssumption` and `ExpireAssumption`. The
+	// arrows into ACCEPTED, VERIFIED, UNDER_VERIFICATION and FALSIFIED are authored and command-unreachable, which
+	// is the RPH-EVD-002 shape (the `Claim.status` machine nothing dispatches into) repeated on a second aggregate.
+	// That is why three of these rows are arm 3 rather than disclosures: their triggering ACT cannot be dispatched,
+	// so no arrangement can demonstrate a gap.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-ASM-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'must become a first-class Assumption Object before dependent work reaches readiness',
+			note: 'JPWB-DOC-003 §4 OBJ-4 (Material assumptions are reified). Canon adds the readiness deadline the ratified rule leaves implicit.'
+		},
+		why:
+			'AN OUTCOME ASSERTION — a material premise "causes Assumption Disclosure to CREATE an Assumption ' +
+			'Object". A creating command exists (`DetectAssumption`), and it contains no reject, no precondition ' +
+			'and no guard, so nothing about it can be refused. WHAT IS ABSENT IS THE CAUSAL LINK THE RULE NAMES: ' +
+			'no production site derives an Assumption from model or validator output. The rule\'s subject is a ' +
+			'DETECTION that happens upstream of any command, and this engine has no detector — an Assumption exists ' +
+			'exactly when a caller dispatches `DetectAssumption` about one. TWO FACTS THAT BOUND THE OUTCOME, ' +
+			'recorded because they make the reification thinner than it reads: the `affectedObjectIds` link is ' +
+			'taken verbatim from the payload and never checked for resolvability, and nothing validates that ' +
+			'`CompleteExecutionStep`\'s `detectedAssumptionIds` resolve to existing ASSUMPTION aggregates. The ' +
+			'kernel predicate written for the rule, `requiresReification`, has no caller outside its own module.'
+	},
+	// ── RPH-ASM-002 — the one ASM disclosure whose predicate is BOTH correct and completely unasked ──────────
+	//
+	// `validateAssumptionReification` declares `readonly ok: boolean` with the comment
+	// "false => the assessment must be REJECTED or remain INCOMPLETE (RPH-ASM-002)". It is implemented, it is
+	// unit-tested, and `completeAssuranceAssessment` never calls it — a whole-file grep of `assurance.ts` for
+	// "assumption" returns hits only in the header comment and in the `// ---- Assumption ----` section holding
+	// detectAssumption/expireAssumption. Zero hits inside the assessment handlers, across four gates (permitted
+	// control actions, INV-8 independence, escalation, foreclosure).
+	'RPH-ASM-002': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'A material assumption detected anywhere — including inside model prose',
+			note: 'JPWB-DOC-003 §4 OBJ-4. "Including inside model prose" is the clause this rule turns on — the assumption may not REMAIN in prose, which is exactly what the ratified statement forbids. A different span of OBJ-4 than RPH-ASM-001 cites, so a reader can tell which clause each row rests on.'
+		},
+		why:
+			'THE STATEMENT IS A COMMAND REFUSAL ("causes the assessment result to be REJECTED or left INCOMPLETE"), ' +
+			'the command exists (`CompleteAssuranceAssessment`), the kernel predicate that decides it exists and is ' +
+			'correct, and NOTHING CALLS IT. `validateAssumptionReification` has exactly one non-test reference: its ' +
+			'own definition. THE ARRANGEMENT IS REACHABLE, which is what makes this a disclosure rather than an ' +
+			'unreachable-antecedent arm-3 row: an adversarial pass established that a validator CAN carry a ' +
+			'material assumption to the handler, because four of `ValidatorResultSchema`\'s sixteen fields — ' +
+			'`claimResults`, `evidenceRejected`, `observations`, and the control-action recommendations — are ' +
+			'`z.record(z.string(), z.unknown())` rather than strict objects. The top-level schema is strict; those ' +
+			'nested arrays are not. So the "assessment completes with a material assumption only in prose" ' +
+			'antecedent is dispatchable, and the assessment completes.',
+		guard: {
+			kind: 'DEAD_PREDICATE',
+			deadPredicate: 'validateAssumptionReification',
+			referencedOnlyBy: ['packages/rph-domain/src/decomposition.ts']
+		}
+	},
+	'RPH-ASM-003': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Human acceptance yields ACCEPTED status, never VERIFIED',
+			note: 'JPWB-DOC-003 §4 OBJ-4, verbatim against the ratified statement — the strongest single carriage in this family, for the rule with the least to enforce it.'
+		},
+		why:
+			'THE ACT IS NOT DISPATCHABLE. There is no `AcceptAssumption` command in the registry, so no ' +
+			'CommandResult can carry or violate this rule. Dispatching the name would be refused by the bus with ' +
+			'"No handler registered for command type" — a ROUTING refusal identical for every unknown string, ' +
+			'naming no rule, and adopting it as this rule\'s enforcement would be the vacuous negative DS-001 §4 ' +
+			'describes. THE MACHINE IS AUTHORED AND WOULD BE READY: `Assumption.status` declares BOTH in-arrows to ' +
+			'ACCEPTED (from DISCLOSED and from UNDER_VERIFICATION), each carrying the guard prose "ACCEPTED is NOT ' +
+			'equivalent to VERIFIED (§12.2)", and a separate arrow to VERIFIED. The distinction the rule protects ' +
+			'is written into the ratified transition data and nothing can reach it. `assessAcceptance`, the ' +
+			'predicate written for this rule, has no caller outside its own module.'
+	},
+	'RPH-ASM-004': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'falsification triggers impact analysis',
+			note: 'JPWB-DOC-003 §4 OBJ-4; the downstream half is carried by STA-7 (Invalidation is first-class and satisfaction is revocable), which names reshaping and invalidation as the routes falsified assumptions take.'
+		},
+		why:
+			'A FIVE-LIMB OUTCOME CASCADE whose TRIGGERING ACT is not dispatchable: no `FalsifyAssumption` command ' +
+			'exists, and no handler emits `AssumptionFalsified`. Nothing can be refused. THE PART WORTH RECORDING ' +
+			'IS THAT THE CONSEQUENT IS REACHABLE BY ASSERTION, WITHOUT THE ANTECEDENT. `ReshapePwu` — whose own doc ' +
+			'comment reads "EXECUTING|UNDER_ASSURANCE -> RESHAPING (material assumption falsified / blocking ' +
+			'finding)" — takes a free-text `reason` and an OPTIONAL `triggeringObjectId`, and never loads, ' +
+			'resolves, or status-checks the object that id names. So the exact transition this rule names as the ' +
+			'consequence of falsification can be driven by a caller asserting it, while the assumption itself ' +
+			'cannot be falsified at all. That is the REG-F-014 shape a third time — a caller-supplied fact taken ' +
+			'as true where the engine could have resolved it — and it is why that finding\'s remediation is a ' +
+			'survey rather than a patch. `assessFalsification` has no caller outside its own module.'
+	},
+	// ── RPH-ASM-005 — THE PREDICATE WITH ZERO CALLERS ANYWHERE, INCLUDING ITS OWN MODULE ─────────────────────
+	//
+	// `blocksIrreversibleWork` is three lines and correct:
+	//     if (a.materiality !== 'CRITICAL') return false;
+	//     return a.status !== 'VERIFIED' && a.status !== 'ACCEPTED';
+	// Its doc comment names RPH-ASM-005. Nothing in the repository calls it — not even its own module, which is
+	// stricter than the census the DEAD_PREDICATE arm requires.
+	//
+	// THE ONE ASSUMPTION CONSULTATION IN THE ENTIRE EXECUTION PLANE is `assumptionsAuthorizeNewWork`, and it asks
+	// `canAuthorizeNewWork` (RPH-ASM-006) instead — a STATUS-ONLY test that is MATERIALITY-BLIND. So the engine
+	// looks at assumptions exactly once, on the plan-approval arrow, and asks the other rule's question.
+	'RPH-ASM-005': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'A critical assumption must be verified or explicitly accepted by authority before dependent irreversible work proceeds',
+			note: 'JPWB-DOC-003 §4 OBJ-4, verbatim against the ratified statement including the authorized-acceptance escape.'
+		},
+		why:
+			'THE STATEMENT IS A REFUSAL ("BLOCKS an irreversible execution step"), its predicate is written ' +
+			'correctly and named for the rule, and NOTHING references it. Two facts the rule needs are both ' +
+			'unread at the step level: `materiality === CRITICAL` on the assumption, and irreversibility on the ' +
+			'step — no execution-step command reads assumptions at all, nor reads `WorkRiskProfile.irreversibility` ' +
+			'as a gate, and no site emits the seeded finding code UNASSESSED_CRITICAL_ASSUMPTION. THE ADJACENT ' +
+			'WIRING THAT IS NOT THIS RULE, named so it is not mistaken for it: `assumptionsAuthorizeNewWork` fires ' +
+			'on PLAN APPROVAL, not on a step, and asks a materiality-blind status question — that is RPH-ASM-006, ' +
+			'and adopting it here would be the subject substitution this register records repeatedly. The ' +
+			'handler\'s own comment concedes the scope: "the first live wiring of the assumption-impact half of ' +
+			'WP-3-008 (the falsification transition + reshape/reassessment loop remain)".',
+		guard: {
+			kind: 'DEAD_PREDICATE',
+			deadPredicate: 'blocksIrreversibleWork',
+			referencedOnlyBy: ['packages/rph-domain/src/decomposition.ts']
+		}
 	}
 };
 
