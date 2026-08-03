@@ -8,9 +8,23 @@
 // Guide §8.4, L854 (byte-exact): "No PWA profile, low-risk classification, planner optimization, or local agent
 // instruction may suppress this Reasoning Review floor."
 //
-// DEAD KERNEL: packages/rph-domain/src/governance.ts:127 waiverCovers(w, criterionId, subjectObjectId,
+// ~~DEAD KERNEL: packages/rph-domain/src/governance.ts:127 waiverCovers(w, criterionId, subjectObjectId,
 // subjectSemanticVersion) implements exactly this scoping and is called by nothing in production. floor-gate.ts:99
-// calls hasEffectiveFloorWaiver instead, whose whole test is `subjectObjectIds.includes(subjectId)` — a Boolean.
+// calls hasEffectiveFloorWaiver instead, whose whole test is `subjectObjectIds.includes(subjectId)` — a Boolean.~~
+//
+// CORRECTED 2026-08-02, and struck rather than deleted so a reader sees the claim existed and how it was cleared.
+// `waiverCovers` IS wired: `floor-gate.ts` imports it and calls it inside `effectiveFloorWaivers`' discharge test,
+// alongside `waiverStillDischarges`. The census that found this was run while dispositioning RPH-GOV-005 in the
+// enforcement register; measured today, the symbol has three non-test references — its definition in
+// rph-domain/src/governance.ts, the live call in floor-gate.ts, and a DOC-COMMENT mention in
+// handlers/governance.ts that is not a call. Stated precisely because "three references" and "three call sites"
+// are different claims, and this comment is being corrected for making one of them loosely in the first place.
+//
+// THE HEADER WENT STALE THE WAY EVERY PROSE CLAIM IN THIS REPOSITORY GOES STALE: the wiring landed after it was
+// written, and no gate reads a comment. This file's own tests kept passing throughout, because what they assert —
+// that an out-of-scope waiver does NOT discharge the floor — is true under either implementation. That is exactly
+// why the enforcement register records call sites as CHECKED DATA (`referencedOnlyBy`, gated by a grep) rather
+// than as sentences: RPH-EXE-003's row documented a vanished call site for four commits before the same lesson.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
