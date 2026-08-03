@@ -33,6 +33,7 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
+import { floorValidatorResult, seedPolicy as seedFloorPolicyFixture } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
@@ -135,6 +136,9 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		const r = engine.dispatch(command as unknown as DomainCommand);
 		return { status: r.status, code: r.error?.code, message: r.error?.message };
 	}
+
+	const seedFloorPolicy = (policyId: string): void =>
+		seedFloorPolicyFixture({ dispatch: (c: unknown) => engine.dispatch(c as never) } as never, policyId);
 
 	const ok = (r: Outcome, what: string): Outcome => {
 		expect(r.status, `${what}: ${r.message}`).toBe('ACCEPTED');
@@ -295,6 +299,200 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				{ disposition: 'VALID' },
 				v.dcp,
 				'DECOMPOSITION_CONTRACT'
+			);
+		};
+		return { control: drive(true), observed: drive(false) };
+	}
+
+	/**
+	 * The shared arrangement for RPH-BAS-003/004/006 and RPH-GOV-003 — four rules refused by ONE handler, three of
+	 * them through one joined finding-code message and the fourth at a later arm with its own sentence.
+	 *
+	 * `defect` selects what the OBSERVED promotion gets wrong; the CONTROL is the same promotion with that one
+	 * thing right. Everything else — the PWU, the satisfied assessment, the effective decision, the approved
+	 * baseline — is identical, so the delta is the rule under test and nothing else.
+	 */
+	function promotionProbe(
+		defect: 'blocking-observation' | 'unsatisfied-assessment' | 'no-decision' | 'stale-version'
+	): { control: Outcome; observed: Outcome } {
+		const n = ++probeSeq;
+		const b = (suffix: string) => ({
+			pwu: `pwu_01ARZ3NDEKTSV4RRFFQ69H8${n}${suffix}1`,
+			asmt: `asmt_01ARZ3NDEKTSV4RRFFQ69H8${n}${suffix}2`,
+			bad: `asmt_01ARZ3NDEKTSV4RRFFQ69H8${n}${suffix}6`,
+			dec: `dec_01ARZ3NDEKTSV4RRFFQ69H8${n}${suffix}3`,
+			base: `base_01ARZ3NDEKTSV4RRFFQ69H8${n}${suffix}4`,
+			obs: `obs_01ARZ3NDEKTSV4RRFFQ69H8${n}${suffix}5`
+		});
+
+		const drive = (pass: boolean): Outcome => {
+			const v = b(pass ? 'A' : 'B');
+			const POL = `pol_bas_${n}${pass ? 'A' : 'B'}`;
+			seedFloorPolicy(POL);
+			// THE SUBJECT MUST EXIST. decisionAuthorizesVersions skips a subject the store cannot load
+			// (`currentVersion === undefined` — a documented fail-open), so without this the RPH-GOV-003
+			// arrangement is ACCEPTED for the wrong reason and the probe reports a false ADMITTED.
+			const INT2 = `int_01ARZ3NDEKTSV4RRFFQ69H8${n}${pass ? 'A' : 'B'}0`;
+			ok(
+				dispatch(
+					'CaptureIntent',
+					{ intentId: INT2, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+					INT2,
+					'INTENT'
+				),
+				'capture intent'
+			);
+			ok(
+				dispatch(
+					'ProposePwu',
+					{
+						pwuId: v.pwu,
+						pwuKind: 'ARCHITECTURE',
+						title: 'subject',
+						description: 'd',
+						intentId: INT2,
+						boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+						obligationIds: [],
+						constraintIds: [],
+						assumptionIds: [],
+						expectedOutputs: [],
+						assurancePolicyIds: [],
+						riskProfile: {
+							consequence: 'HIGH',
+							uncertainty: 'MEDIUM',
+							irreversibility: 'MEDIUM',
+							securitySensitivity: 'HIGH',
+							regulatoryExposure: 'LOW'
+						}
+					},
+					v.pwu,
+					'PROFESSIONAL_WORK_UNIT'
+				),
+				'propose subject pwu'
+			);
+			const requestAndComplete = (
+				id: string,
+				disposition: 'SATISFIED' | 'REJECTED'
+			) => {
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: id,
+							assurancePolicyId: POL,
+							policyVersion: '1',
+							subjectObjectIds: [v.pwu],
+							subjectSemanticVersions: { [v.pwu]: 1 },
+							claimIds: []
+						},
+						id,
+						'ASSURANCE_ASSESSMENT'
+					),
+					`request ${id}`
+				);
+				ok(
+					dispatch(
+						'CompleteAssuranceAssessment',
+						{
+							validatorResult: floorValidatorResult({
+								assessmentId: id,
+								policyId: POL,
+								subjectId: v.pwu,
+								subjectSemanticVersion: 1,
+								disposition
+							})
+						},
+						id,
+						'ASSURANCE_ASSESSMENT'
+					),
+					`complete ${id}`
+				);
+			};
+			requestAndComplete(v.asmt, 'SATISFIED');
+			// The unsatisfied-assessment defect adds a SECOND, REJECTED assessment to the required list.
+			const wantsBad = defect === 'unsatisfied-assessment' && !pass;
+			if (wantsBad) requestAndComplete(v.bad, 'REJECTED');
+
+			// A blocking observation over the baselined item, OPEN — only in that defect's failing arrangement.
+			if (defect === 'blocking-observation' && !pass) {
+				ok(
+					dispatch(
+						'RecordAssuranceObservation',
+						{
+							assessmentId: v.asmt,
+							observationType: 'FINDING',
+							findingCode: 'TENANT_ISOLATION_BREACH',
+							severity: 'BLOCKING',
+							statement: 'tenant data is not isolated'
+						},
+						v.obs,
+						'ASSURANCE_OBSERVATION'
+					),
+					'record blocking observation'
+				);
+			}
+
+			// The promotion decision. The no-decision defect never makes it EFFECTIVE.
+			ok(
+				dispatch(
+					'ProposeDecision',
+					{
+						decisionType: 'PROMOTE_BASELINE',
+						subjectObjectIds: [v.pwu],
+						selectedOption: 'promote',
+						rationale: 'ready',
+						authority: actor
+					},
+					v.dec,
+					'DECISION'
+				),
+				'propose promotion decision'
+			);
+			const wantsNoDecision = defect === 'no-decision' && !pass;
+			if (!wantsNoDecision) {
+				// The stale-version defect approves the decision binding version 2 while the subject is at 1.
+				const boundVersion = defect === 'stale-version' && !pass ? 2 : 1;
+				ok(
+					dispatch(
+						'ApproveDecision',
+						{
+							selectedOption: 'promote',
+							rationale: 'ready',
+							consideredEvidenceIds: [],
+							consideredObservationIds: [],
+							subjectSemanticVersions: { [v.pwu]: boundVersion }
+						},
+						v.dec,
+						'DECISION'
+					),
+					'approve promotion decision'
+				);
+			}
+
+			ok(
+				dispatch(
+					'CreateBaseline',
+					{
+						baselineType: 'ARCHITECTURE',
+						itemObjectIds: [v.pwu],
+						assuranceAssessmentIds: [v.asmt]
+					},
+					v.base,
+					'BASELINE'
+				),
+				`create ${v.base}`
+			);
+			ok(dispatch('SubmitBaselineForReview', {}, v.base, 'BASELINE'), 'submit');
+			ok(dispatch('ApproveBaseline', {}, v.base, 'BASELINE'), 'approve baseline');
+			return dispatch(
+				'PromoteBaseline',
+				{
+					promotionDecisionId: v.dec,
+					expectedItemObjectVersions: [{ objectId: v.pwu, semanticVersion: 1 }],
+					requiredAssessmentIds: wantsBad ? [v.asmt, v.bad] : [v.asmt]
+				},
+				v.base,
+				'BASELINE'
 			);
 		};
 		return { control: drive(true), observed: drive(false) };
@@ -1101,6 +1299,26 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-ASM-003': null,
 		'RPH-ASM-004': null,
 		'RPH-ASM-005': null,
+		'RPH-BAS-003': {
+			arrangement:
+				'PromoteBaseline with an OPEN BLOCKING observation over the baselined item, against the identical promotion without it',
+			run: () => promotionProbe('blocking-observation')
+		},
+		'RPH-BAS-004': {
+			arrangement:
+				'PromoteBaseline listing a REJECTED assessment among its required set, against the identical promotion listing only the SATISFIED one',
+			run: () => promotionProbe('unsatisfied-assessment')
+		},
+		'RPH-BAS-006': {
+			arrangement:
+				'PromoteBaseline naming a promotion decision still PROPOSED, against the identical promotion whose decision is EFFECTIVE',
+			run: () => promotionProbe('no-decision')
+		},
+		'RPH-GOV-003': {
+			arrangement:
+				'PromoteBaseline under a decision that approved the subject at v2 while it is at v1, against the identical promotion whose decision bound v1',
+			run: () => promotionProbe('stale-version')
+		},
 		'RPH-BAS-001': null,
 		'RPH-BAS-002': null,
 		'RPH-BAS-005': null,

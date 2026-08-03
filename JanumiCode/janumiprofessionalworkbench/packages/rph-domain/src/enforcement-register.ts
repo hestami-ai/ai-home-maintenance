@@ -449,7 +449,11 @@ export type RegisteredRuleId =
 	| 'RPH-CNS-003'
 	| 'RPH-CNS-004'
 	| 'RPH-DEC-002'
-	| 'RPH-DEC-003';
+	| 'RPH-DEC-003'
+	| 'RPH-BAS-003'
+	| 'RPH-BAS-004'
+	| 'RPH-BAS-006'
+	| 'RPH-GOV-003';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -3256,6 +3260,93 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'delete the INAPPLICABLE arm of checkConstraintDisposition — the probe reports ADMITTED',
 			'stop mapping `rationale` in buildConstraintInput — the arm can no longer see it, so EVERY inapplicable disposition refuses and the probe\'s CONTROL reddens instead: the over-refusal failure, which is why this row\'s control is a byte-adjacent record that differs only by carrying a rationale',
 			'THE ALTERNATIVE THE RULE ALLOWS AND THE KERNEL DOES NOT: the ratified statement permits "an authority OR POLICY BASIS". The arm accepts only an `authorityDecisionId`; there is no policy-basis representation. And that id is never resolved to a real Decision — any non-empty string satisfies it, which is the REG-F-014 shape on a fifth field.'
+		]
+	},
+
+	// ── THE FOUR PROMOTION-GATE ROWS — ONE SITE AGAIN, AND THE MARKER IS AGAIN THE FINDING CODE ──────────────
+	//
+	// `promoteBaseline`'s guard joins every `canPromoteBaseline` finding into one message:
+	//   "Cannot promote baseline <id>: <CODE, CODE, …>"
+	// so BAS-003, BAS-004 and BAS-006 are separated exactly as the conservation trio are — by the code each
+	// arrangement produces. RPH-GOV-003 refuses at the SAME handler but at a LATER, separate arm with its own
+	// sentence, which is why its marker is prose rather than a code.
+	//
+	// THE GATE'S OWN HISTORY IS THE REASON TO TRUST ONLY THE OBSERVED ONES. Its header records that
+	// `promoteBaseline` once passed `openObservations: []` — a hard-coded empty list — so the RPH-BAS-003 arm
+	// iterated nothing and no observation ever blocked a promotion. That was found and repaired. Its neighbour
+	// `requiredWaivers`, one argument along in the same call, is still never supplied — RPH-GOV-006.
+	'RPH-BAS-003': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'no unresolved blocking or critical finding except through a policy-permitted scoped waiver',
+			note: 'JPWB-DOC-003 §8 ASR-16. Canon states the general form; the ratified rule instantiates it with tenant isolation, which the engine does NOT key on — see declaredMutations.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline, the OPEN_BLOCKING_FINDING arm. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline\'s guard, fed by observationsAgainstBaselineItems, which walks the event log for ASSURANCE_OBSERVATION objects whose subjectObjectIds intersect the baseline\'s OWN frozen item set and maps severity/disposition through BLOCKING_SEVERITIES and UNSETTLED_DISPOSITIONS.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'OPEN_BLOCKING_FINDING',
+		declaredMutations: [
+			'restore `openObservations: []` at the promoteBaseline call site — the arm iterates nothing and the probe reports ADMITTED. This is not hypothetical: the file\'s own header records that this WAS the code, and that no observation ever blocked a promotion until it was repaired.',
+			'delete BLOCKING from BLOCKING_SEVERITIES so only CRITICAL gates',
+			'drop OPEN from UNSETTLED_DISPOSITIONS — an open finding then reads as settled',
+			'THE RULE\'S OWN NARROWING IS UNENFORCED: it names an "open blocking TENANT-ISOLATION finding", and no production code keys on tenant isolation, or on any finding category. The gate is severity-and-disposition only, so the general rule is enforced and the specific one is not.'
+		]
+	},
+	'RPH-BAS-004': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'required claims, admitted evidence, assessments, and dispositions',
+			note: 'JPWB-DOC-003 §8 ASR-16, the promotion precondition this rule instantiates for assessments.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline\'s findAssessmentDefects, which emits REQUIRED_ASSESSMENT_INCOMPLETE for an assessment still ASSESSING or REQUESTED and REQUIRED_ASSESSMENT_NOT_SATISFIED for one that completed without SATISFIED/WAIVED. ENFORCEMENT: promoteBaseline\'s guard.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'REQUIRED_ASSESSMENT_NOT_SATISFIED',
+		declaredMutations: [
+			'make findAssessmentDefects return [] — the probe reports ADMITTED',
+			'add REJECTED to the satisfied set so a rejected assessment authorizes promotion',
+			'THE ANTECEDENT IS SATISFIED BY THE CALLER, NOT THE SYSTEM. The rule says "when Baseline Promotion REQUIRES Architecture Coverage, Intent Preservation and Assumption Disclosure" — the required set is whatever the PromoteBaseline payload lists in `requiredAssessmentIds`. A promotion listing NONE passes this arm vacuously. No code requires any particular assessment trio, so the rule is enforced over a set the promoter chooses.',
+			'AND THE TWO CODES ARE NOT REACHED AS THE NAIVE READING SUGGESTS: an assessment id that loads NOTHING falls to the default disposition INCONCLUSIVE, so `complete` is true and the refusal carries NOT_SATISFIED rather than INCOMPLETE. Both land in the same joined message, so the distinction is invisible in the CommandResult — which is why this marker names the code the probe actually produces.'
+		]
+	},
+	'RPH-BAS-006': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'A commit may exist without promotion; promotion is a separate governance event over exact versions',
+			note: 'JPWB-DOC-003 §8 ASR-17 (A repository commit is never a baseline), which carries the rule\'s antecedent; ASR-16 carries the consequent (promotion needs effective authority).'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline\'s NO_EFFECTIVE_PROMOTION_DECISION arm, fed from the STORE: the payload names a decision id, the handler loads it and reads its real status, decisionType and authority. ENFORCEMENT: promoteBaseline\'s guard, with the precondition fromStates(\'APPROVED\') and the machine\'s declared illegal UNDER_REVIEW -> AUTHORITATIVE as independent second and third defences.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'NO_EFFECTIVE_PROMOTION_DECISION',
+		declaredMutations: [
+			'make the promotionDecision input a constant `{status: "EFFECTIVE"}` instead of loading the object — the probe reports ADMITTED, and this is the BAS-002 defect shape (a gate fed a constant rather than stored state) on the neighbouring input',
+			'accept a PROPOSED decision as effective in canPromoteBaseline',
+			'THE ANTECEDENT NAMES A PLANE THAT DOES NOT EXIST: "committing source or architecture artifacts to version control". No command in the registry commits anything to version control, so nothing can trip the rule from that direction. This row is ENFORCED on the CONSEQUENT — no baseline becomes authoritative without a promotion decision — which is the half a dispatch can reach.'
+		]
+	},
+	'RPH-GOV-003': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'A decision approving version n never authorizes version n+1',
+			note: 'JPWB-DOC-003 §8 ASR-15, verbatim against the ratified statement.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/governance.ts — decisionAuthorizesVersions. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline\'s guard, at a LATER arm than canPromoteBaseline: the gate first proves the decision is EFFECTIVE, then this proves it is still CURRENT. Its own comment records that the kernel was previously unreachable and a stale-version approval promoted to AUTHORITATIVE.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		// PROSE, not a finding code, because this arm has its own sentence rather than joining canPromoteBaseline's
+		// code list — which is also why it is distinguishable from the three BAS rows at the same handler.
+		refusalMarker: 'STALE_DECISION_VERSION',
+		declaredMutations: [
+			'delete the decisionAuthorizesVersions arm — the probe reports ADMITTED, restoring the exact defect the comment says W1 WIRE-4 fixed',
+			'compare against the DECISION\'s recorded versions only, ignoring the subject\'s current version — the arm can never fire',
+			'THE INTEGRITY CAVEAT, and it is REG-F-014\'s second instance: the versions this arm compares against are CALLER-SUPPLIED at approval time. `proposeDecision` PINS them from the store, and `approveDecision`\'s extraMutate then OVERWRITES that pin with the payload. So the binding this rule enforces is exact against a number the approver chose. The refusal is real; what it is exact ABOUT is not verified.'
 		]
 	}
 };

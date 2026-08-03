@@ -131,10 +131,22 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         assertion fired in the growth direction. It caught them because the layer gate
 		//                         had just refused the same three rows for citing kernel evidence while claiming
 		//                         ENFORCED: the two gates disagreed for one commit, which is what they are for.
+		//   2026-08-02  34 -> 32  NET of two opposite moves, and the reconciliation is why this line exists.
+		//                         UP by three: RPH-BAS-003/004/006 gained per-id COMMAND-layer cites with their
+		//                         promotion probes. DOWN by five: the RPH-GOV prefix row moved COVERED -> PARTIAL.
+		//                         That row had been left COVERED when GOV-001 landed, on the stated promise that
+		//                         it would "be re-stated when they land"; five of seven have landed and it had not
+		//                         moved, so three arm-3 rules were still certified COVERED. NO DEDICATED GATE
+		//                         WATCHES THAT — the overclaim gate only refuses DISCLOSED rules certified
+		//                         COVERED, and arm 3 is not a disclosure. What found it was this assertion: the
+		//                         arithmetic of "+3 cites" did not reconcile with the observed +3 net, and chasing
+		//                         the missing rule surfaced the stale status. RPH-GOV-003 turned out to have been
+		//                         COVERED all along through that stale prefix row, which is why the delta looked
+		//                         like three rather than four.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(34);
+		).toBe(32);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

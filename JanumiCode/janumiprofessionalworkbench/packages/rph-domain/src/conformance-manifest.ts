@@ -133,6 +133,12 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
 	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
 	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
+	// The four PROMOTION-GATE rows, cited per-id 2026-08-02 with their dispatch probes. BAS-003/004/006 share one
+	// joined finding-code message; GOV-003 refuses at a later arm of the same handler with its own sentence.
+	'RPH-BAS-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-BAS-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-BAS-006': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-GOV-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// The three CONSERVATION rows, cited per-id 2026-08-02 when their dispatch probes landed. All three refuse at
 	// ONE site with ONE message and are distinguished by the finding code it carries — proved independent by a
 	// mutant that deletes a single arm and reddens exactly one row. The family prefix rows still cite the kernel
@@ -213,10 +219,20 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	// for 13 more rules. Their per-id status is NOT being changed here: what layer a test observes is a fact, but
 	// whether each rule is enforced is a judgement the enforcement register makes one rule at a time, and 19 of
 	// these 20 are not yet dispositioned. Recording the observation without pre-judging them is the honest half.
+	// RE-STATED 2026-08-02, and the delay is itself worth recording. When GOV-001 landed, this row's NOTE was
+	// corrected while its STATUS was deliberately left COVERED, on the stated grounds that "GOV-002..007 are under
+	// investigation; this prefix row will be re-stated when they land". Five of the seven have now landed — and
+	// the status had NOT moved, so three rules dispositioned NOT_A_COMMAND_REFUSAL were still being certified
+	// COVERED by this row.
+	//
+	// NO GATE CAUGHT THAT. The overclaim gate only refuses a DISCLOSED rule certified COVERED, and arm-3 rules are
+	// not disclosures. What surfaced it was the exact-count ratchet: adding three per-id cites should have moved
+	// the number by three, the arithmetic did not reconcile, and chasing the discrepancy found this row. A ratchet
+	// whose only job is "say why the number changed" caught a stale status that no dedicated gate was watching.
 	'RPH-GOV': {
-		status: 'COVERED',
+		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/governance.test.ts',
-		note: 'RPH-GOV-001..007 by id — but the evidence is PURE_KERNEL for all seven (see the comment above). GOV-001 is now cited per-id to a COMMAND-layer dispatch probe and dispositioned ENFORCED in enforcement-register.ts, with its live bypass recorded as REG-F-014. GOV-002..007 are under investigation; this prefix row will be re-stated when they land.'
+		note: 'GOV-001 and GOV-003 are ENFORCED and cited per-id to COMMAND-layer dispatch probes; GOV-001 carries a live bypass recorded as REG-F-014, and GOV-003 the same shape on approval versions. GOV-002/004/007 are NOT_A_COMMAND_REFUSAL — GOV-002 deliberately so, because it would otherwise share GOV-001\'s single refusal site and one mutant would redden both. GOV-005 is ENFORCED and owes its probe. GOV-006 is a disclosure owing a non-vacuous arrangement: canPromoteBaseline loops `requiredWaivers ?? []` and the sole production caller never supplies the field. All seven were previously COVERED on PURE_KERNEL evidence.'
 	},
 	// ── CORRECTED 2026-08-02 — THE OVERCLAIM GATE'S SIXTH CATCH ─────────────────────────────────────────────
 	//
