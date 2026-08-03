@@ -13,7 +13,11 @@
 //
 // Not in `kit.ts`: that is production. `__tests__/` is excluded from tsconfig.build and does not match vitest's
 // `*.test.ts` include, so this compiles with the tests and ships nowhere.
-import type { AssuranceDispositionRecommendation, DomainCommand } from '@janumipwb/rph-contracts';
+import type {
+	ActorReference,
+	AssuranceDispositionRecommendation,
+	DomainCommand
+} from '@janumipwb/rph-contracts';
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 
 /** Just enough of the Engine for the seed helpers to drive the bus. */
@@ -179,6 +183,105 @@ export interface FloorValidatorResultArgs {
 	readonly observations?: readonly FloorObservationFixture[];
 	readonly policyVersion?: string;
 	readonly validatorId?: string;
+}
+
+/** One OPEN finding to record against the assessment before completing it. `findingCode` must be the CRITERION a
+ *  waiver would have to name — `openFindingCodes` in floor-gate.ts reads exactly this field. */
+export interface FloorOpenFinding {
+	readonly observationId: string;
+	readonly findingCode: string;
+	readonly severity?: string;
+	readonly statement?: string;
+}
+
+export interface RecordFloorArgs {
+	readonly assessmentId: string;
+	readonly policyId: string;
+	readonly subjectId: string;
+	/** The subject's CURRENT semanticVersion. Read it from the store — do NOT default it to 1. See the header. */
+	readonly subjectSemanticVersion: number;
+	readonly disposition: AssuranceDispositionRecommendation;
+	/** OPEN observations to record BEFORE completion. Without at least one, `waiverDischargesFloorPolicy` returns
+	 *  false at its "nothing to waive" branch and the waiver-scope comparison is never reached. */
+	readonly openFindings?: readonly FloorOpenFinding[];
+	readonly now?: string;
+	readonly actor?: ActorReference;
+}
+
+/**
+ * Record ONE floor assessment over `subjectId` through the live bus, ASSERTING every step — request, each OPEN
+ * observation, completion.
+ *
+ * WHY THIS EXISTS, AND WHY IT THROWS. `floor-waiver-scope.test.ts` hand-rolled this sequence with a helper that
+ * asserted NOTHING and defaulted the subject version to the literal 1. Every `RequestAssuranceAssessment` in that
+ * file was REFUSED — the floor policies were never seeded, and the request fails closed on a policy the store has
+ * never seen — so no assessment aggregate was ever created and no floor was ever recorded. Both of its tests still
+ * passed, because a PWA with no floor is refused publication for MISSING, which is also `REJECTED` with
+ * `RPH_INVARIANT_VIOLATION`: the assertions were true, about a different refusal. Proven by instrumentation, three
+ * separate shields deep — see the file's header.
+ *
+ * So this helper's contract is that a fixture may not silently arrange nothing. Every dispatch is checked, and the
+ * caller must state the version rather than inherit a default that is wrong the moment a PWU-Type is defined.
+ */
+export function recordFloorAssessment(engine: DispatchLike, args: RecordFloorArgs): void {
+	const now = args.now ?? SEED_TS;
+	const actor = args.actor ?? SEED_ACTOR;
+	let n = 0;
+	const send = (
+		commandType: string,
+		aggregateType: string,
+		aggregateId: string,
+		payload: Record<string, unknown>
+	): void => {
+		const tag = `floorasmt-${args.assessmentId}-${++n}`;
+		const r = engine.dispatch({
+			commandId: tag,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: aggregateType,
+			targetAggregateId: aggregateId,
+			issuedAt: now,
+			issuedBy: actor,
+			correlationId: 'floor-fixture',
+			idempotencyKey: tag,
+			payload
+		} as DomainCommand);
+		if (r.status !== 'ACCEPTED') {
+			throw new Error(`${commandType} (${aggregateId}): ${JSON.stringify(r.error)}`);
+		}
+	};
+
+	send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', args.assessmentId, {
+		assessmentId: args.assessmentId,
+		assurancePolicyId: args.policyId,
+		policyVersion: '1.0.0',
+		subjectObjectIds: [args.subjectId],
+		subjectSemanticVersions: { [args.subjectId]: args.subjectSemanticVersion },
+		claimIds: []
+	});
+	for (const f of args.openFindings ?? []) {
+		send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', f.observationId, {
+			assessmentId: args.assessmentId,
+			observationType: 'FINDING',
+			findingCode: f.findingCode,
+			severity: f.severity ?? 'MATERIAL',
+			statement: f.statement ?? `Criterion ${f.findingCode} was not met.`
+		});
+	}
+	send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', args.assessmentId, {
+		validatorResult: floorValidatorResult({
+			assessmentId: args.assessmentId,
+			policyId: args.policyId,
+			subjectId: args.subjectId,
+			subjectSemanticVersion: args.subjectSemanticVersion,
+			disposition: args.disposition,
+			observations: (args.openFindings ?? []).map((f) => ({
+				findingCode: f.findingCode,
+				severity: f.severity ?? 'MATERIAL',
+				statement: f.statement ?? `Criterion ${f.findingCode} was not met.`
+			}))
+		})
+	});
 }
 
 /** A schema-valid DOC-007 §20 ValidatorResult for a floor policy's verdict over `subjectId` at a given version. */

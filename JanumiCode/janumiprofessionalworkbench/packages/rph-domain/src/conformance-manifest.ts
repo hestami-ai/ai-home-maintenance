@@ -153,6 +153,12 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// it ENFORCED and the layer gate requires COMMAND-layer evidence for that claim. The kernel test still stands
 	// and still proves what it proved; it just does not prove enforcement.
 	'RPH-GOV-001': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	// RPH-GOV-005 — waiver scope, cited per-id 2026-08-03 with its dispatch probe. THE CITE MOVED FOR A REASON WORTH
+	// RECORDING: the natural home looked like floor-waiver-scope.test.ts, whose entire subject is this rule. That
+	// file's two tests were arranging NOTHING — no floor policies seeded, so every assessment was refused — and both
+	// passed because a PWA with no floor is refused publication anyway (REG-F-015). The dispatch probe is cited
+	// instead, and the repaired scope file now carries the object/version/policy limbs with named predicted reds.
+	'RPH-GOV-005': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PER-001': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PER-002': 'packages/rph-engine/src/engine.test.ts',
 	'RPH-PER-007': 'packages/rph-engine/src/projection-rebuild.test.ts'

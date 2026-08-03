@@ -812,6 +812,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-BAS-004': null,
 		'RPH-BAS-006': null,
 		'RPH-GOV-003': null,
+		'RPH-GOV-005': null, // ENFORCED — observed in execrem-wp16-enforcement-observed.test.ts
 		'RPH-BAS-001': null,
 		'RPH-BAS-005': null,
 		'RPH-BAS-007': null,

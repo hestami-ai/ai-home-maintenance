@@ -158,7 +158,16 @@ const TOTAL_OVER_FAMILIES: readonly string[] = [
 	// `DEFERRABLE_PREFIXES` on a misread of what the family is (REG-F-013).
 	'RPH-PRJ-',
 	'RPH-TRC-',
-	'RPH-CMP-'
+	'RPH-CMP-',
+	// ADDED 2026-08-03 — the four layer-2 DOMAIN-INVARIANT families, complete and each carrying its disclosures'
+	// observations. RPH-GOV is deliberately NOT here despite sitting beside them at six of seven: RPH-GOV-006 is a
+	// disclosure still owing a non-vacuous arrangement, and this list is the place that fact is gated rather than
+	// remembered. Four in, one out, decided by the same rule that held RPH-PWU out for three commits — and the
+	// entries are load-bearing, checked by adding 'RPH-GOV-' here and observing this gate name RPH-GOV-006.
+	'RPH-DEC-',
+	'RPH-CNS-',
+	'RPH-ASM-',
+	'RPH-BAS-'
 ];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {

@@ -33,7 +33,12 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
-import { floorValidatorResult, seedPolicy as seedFloorPolicyFixture } from './__tests__/floor-fixtures.js';
+import {
+	floorValidatorResult,
+	recordFloorAssessment,
+	seedFloorPolicies,
+	seedPolicy as seedFloorPolicyFixture
+} from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
@@ -1319,6 +1324,134 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			arrangement:
 				'PromoteBaseline under a decision that approved the subject at v2 while it is at v1, against the identical promotion whose decision bound v1',
 			run: () => promotionProbe('stale-version')
+		},
+		// RPH-GOV-005 is enforced INVERSELY: no handler refuses "this waiver is out of scope". The floor gate refuses
+		// the PUBLISH, and the waiver's scope decides whether that refusal happens at all. So the two runs differ only
+		// in WHEN the waiver is granted — `requestWaiver` pins the subject version from the store, and `DefinePwuType`
+		// raises the PWA from 1 to 2, so granting before it pins a version the floor is no longer at.
+		//
+		// The CRITERION limb is driven by pwa-authoring.test.ts and the OBJECT and POLICY limbs by
+		// floor-waiver-scope.test.ts; this probe takes the VERSION limb, which is the rule's own literal example ("a
+		// waiver on Architecture version 2 does not waive Architecture version 3") and, until 2026-08-03, had no
+		// command-layer reader at all — neutralising `waiverCovers`' version conjunct reddened only the rph-domain
+		// kernel unit test.
+		'RPH-GOV-005': {
+			arrangement:
+				'PublishPwa under a waiver pinned to the PWA at v1 while its recorded floor is at v2, against the identical publish whose waiver was pinned at v2',
+			run: () => {
+				const n = ++probeSeq;
+				// Once per engine: RequestAssuranceAssessment fails closed on a policy the store has never seen, so
+				// without this every floor assessment below is refused and BOTH runs report a floor of MISSING — the
+				// exact way floor-waiver-scope.test.ts passed for months while arranging nothing (REG-F-015).
+				seedFloorPolicies({ dispatch: (c: unknown) => engine.dispatch(c as never) } as never, TS);
+				const drive = (pass: boolean): Outcome => {
+					const t = pass ? 'A' : 'B';
+					const pwa = `pwa_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}0`;
+					const root = `pwut_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}1`;
+					const wvr = `dec_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}2`;
+					const REVIEW = 'floor.reasoning-review';
+					const CRITERION = 'RR-04-no-proxy-satisfaction';
+					const version = () =>
+						Number(
+							(store.loadObject(pwa)?.state as { semanticVersion?: number } | undefined)
+								?.semanticVersion ?? 1
+						);
+					const grantWaiver = () => {
+						ok(
+							dispatch(
+								'RequestWaiver',
+								{
+									subjectObjectIds: [pwa],
+									scope: CRITERION,
+									rationale: 'Accepted residual risk for the pilot.',
+									duration: 'until superseded',
+									affectedObjectIds: [pwa],
+									waivedPolicyId: REVIEW,
+									waivedCriterionId: CRITERION,
+									waivedFindingIds: [],
+									compensatingControls: [],
+									reviewConditions: []
+								},
+								wvr,
+								'DECISION'
+							),
+							'request waiver'
+						);
+						ok(
+							dispatch(
+								'GrantWaiver',
+								{ waiverDecisionId: wvr, effectiveAt: TS, duration: 'until superseded' },
+								wvr,
+								'DECISION'
+							),
+							'grant waiver'
+						);
+					};
+					ok(
+						dispatch(
+							'CreatePwa',
+							{ pwaId: pwa, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
+							pwa,
+							'PROFESSIONAL_WORK_ARCHITECTURE'
+						),
+						'create pwa'
+					);
+					// THE ARRANGING ACT, and the ONLY difference between the two runs: the failing run pins the waiver
+					// at v1, BEFORE the PWU-Type raises the PWA to v2.
+					if (!pass) grantWaiver();
+					ok(
+						dispatch(
+							'DefinePwuType',
+							{
+								pwuTypeId: root,
+								pwaId: pwa,
+								pwuKind: 'PRODUCT_REALIZATION',
+								name: 'R',
+								purpose: 'root',
+								isRoot: true
+							},
+							root,
+							'PWU_TYPE'
+						),
+						'define root'
+					);
+					ok(dispatch('SubmitPwaForReview', {}, pwa, 'PROFESSIONAL_WORK_ARCHITECTURE'), 'submit');
+					ok(dispatch('ValidatePwa', {}, pwa, 'PROFESSIONAL_WORK_ARCHITECTURE'), 'validate');
+					const at = version();
+					for (const policyId of ['floor.schema-invariant', 'floor.identity-provenance'])
+						recordFloorAssessment(
+							{ dispatch: (c: unknown) => engine.dispatch(c as never) } as never,
+							{
+								assessmentId: `asmt_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}${policyId === 'floor.schema-invariant' ? '3' : '4'}`,
+								policyId,
+								subjectId: pwa,
+								subjectSemanticVersion: at,
+								disposition: 'SATISFIED',
+								now: TS
+							}
+						);
+					recordFloorAssessment({ dispatch: (c: unknown) => engine.dispatch(c as never) } as never, {
+						assessmentId: `asmt_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}5`,
+						policyId: REVIEW,
+						subjectId: pwa,
+						subjectSemanticVersion: at,
+						disposition: 'REJECTED',
+						openFindings: [
+							{ observationId: `obs_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}6`, findingCode: CRITERION }
+						],
+						now: TS
+					});
+					// The passing run grants the SAME waiver here instead — after the version rose, so it pins v2.
+					if (pass) grantWaiver();
+					return dispatch(
+						'PublishPwa',
+						{ rootPwuTypeId: root },
+						pwa,
+						'PROFESSIONAL_WORK_ARCHITECTURE'
+					);
+				};
+				return { control: drive(true), observed: drive(false) };
+			}
 		},
 		'RPH-ASM-006': {
 			arrangement:

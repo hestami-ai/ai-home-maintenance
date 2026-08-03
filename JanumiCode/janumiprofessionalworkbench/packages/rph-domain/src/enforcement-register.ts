@@ -26,12 +26,14 @@
 //   NOT_A_COMMAND_REFUSAL  the statement asserts an outcome, a permission, or a plane that does not exist. A
 //                          declared silence with a reason, so it is distinguishable from an omission.
 //
-// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-02. The register is TOTAL over TEN families of the
-// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`) — `RPH-EXE`, `RPH-EVD`, `RPH-ASR`, `RPH-INT`,
-// `RPH-PWU`, `RPH-CON`, `RPH-PER`, `RPH-PRJ`, `RPH-TRC`, `RPH-CMP` — which is **81 of the catalog's 125 rules**. A
-// new rule in any of the ten with no row is a FAILING TEST, not a discovery, and the families are listed as DATA in
-// `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family cannot be
-// silently dropped from the gate either.
+// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-03. The register is TOTAL over FOURTEEN families of
+// the ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`) — `RPH-EXE`, `RPH-EVD`, `RPH-ASR`,
+// `RPH-INT`, `RPH-PWU`, `RPH-CON`, `RPH-PER`, `RPH-PRJ`, `RPH-TRC`, `RPH-CMP`, `RPH-DEC`, `RPH-CNS`, `RPH-ASM`,
+// `RPH-BAS` — which is **105 of the catalog's 125 rules**. It HOLDS 111 rows: the extra six are RPH-GOV, at six of
+// seven, which stays out of the gate until its last rule lands (see below). A new rule in any of the fourteen with
+// no row is a FAILING TEST, not a discovery, and the families are listed as DATA in `enforcement-register.test.ts`
+// (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family cannot be silently dropped from the gate
+// either. Both numbers are derivable from this file and the catalog; neither is chosen.
 //
 // A FAMILY'S ABSENCE FROM THAT LIST IS ITSELF A CLAIM, and twice it has been a load-bearing one. RPH-PWU held 5,
 // then 8, then 9 of its ten rules across three commits, and RPH-PER held 12 of 14 for one, each staying OUT of
@@ -39,25 +41,34 @@
 // and landing a disclosure without its observation is the one thing that arm may never do. "Not yet total" was
 // gated rather than asserted.
 //
-// THE 44 RULES NOT YET DISPOSED, counted rather than gestured at, because a scope paragraph that goes stale is the
-// exact drift this module exists to prevent — and this one DID go stale for the length of one commit, still listing
-// RPH-PER/PRJ/TRC/CON as owed after all four had closed.
+// THE 14 RULES NOT YET DISPOSED, counted rather than gestured at, because a scope paragraph that goes stale is the
+// exact drift this module exists to prevent — and this one HAS gone stale twice: once still listing
+// RPH-PER/PRJ/TRC/CON as owed after all four had closed, and once still claiming 31 rules were in reach after four
+// of the five families in that list had been taken total.
 //
-//   IN REACH AND GENUINELY OWED — 31 rules across five layer-2 domain-invariant families: `RPH-DEC` (7),
-//   `RPH-CNS` (4), `RPH-ASM` (6), `RPH-GOV` (7), `RPH-BAS` (7). These are ordinary command-refusal families of
-//   exactly the shape this register handles best, and several already have known gaps recorded elsewhere
-//   (REG-F-006's DEC-2, REG-F-010's group 3 in `handlers/governance.ts`). Nothing structural blocks them; they are
-//   simply not done.
+//   IN REACH AND GENUINELY OWED — ONE rule: `RPH-GOV-006`. It is a disclosure (`canPromoteBaseline` loops
+//   `requiredWaivers ?? []` and the sole production caller never supplies the field) and it owes a NON-VACUOUS
+//   arrangement, which is the whole difficulty: the promotion path has no waiver logic at all, so the expired
+//   waiver has to be isolated from the RPH-BAS-003 block that would refuse the same command for a different
+//   reason. Until it lands, RPH-GOV stays OUT of `TOTAL_OVER_FAMILIES` — landing a disclosure without its
+//   observation is the one thing that arm may never do.
 //
 //   OUT OF REACH BY CONSTRUCTION — 13 rules: `RPH-FIX` (6) and `RPH-E2E` (7), the fixture-replay and end-to-end
 //   scenario families. Both are legitimately DEFERRED in the conformance manifest with named work packages. They
 //   are the only two prefixes left in `DEFERRABLE_PREFIXES`, and after REG-F-013 that set is treated as the most
 //   dangerous data in the manifest: an entry there does not weaken a claim, it deletes it.
 //
-// WHAT "TOTAL OVER TEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means every
-// rule in those families has a DISPOSITION, not that every rule is enforced. Of the 81, a large minority are
-// NOT_A_COMMAND_REFUSAL — including all fourteen read-model rules — and several are disclosures. The register's
-// value is that those are now written down and gated, not that they are closed.
+//   SO THE REACHABLE CEILING IS 112 OF 125, and the register is one rule short of it. That is not "nearly done":
+//   the thirteen out-of-reach rules are out of reach BY THIS INSTRUMENT, which observes command refusals. A
+//   fixture-replay rule is not thereby enforced, only unobservable here — the same distinction the disclosure arm
+//   exists to keep visible.
+//
+// WHAT "TOTAL OVER FOURTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
+// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 111 rows, 29 are
+// ENFORCED, 24 are UNENFORCED_DISCLOSED and 58 are NOT_A_COMMAND_REFUSAL — so a MAJORITY of the catalog's
+// command-layer rules are, by this register's own accounting, not refusals the engine performs. Including all
+// fourteen read-model rules. The register's value is that those are now written down and gated, not that they are
+// closed.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
@@ -421,8 +432,8 @@ export type RegisteredRuleId =
 	| 'RPH-CMP-002'
 	| 'RPH-CMP-003'
 	| 'RPH-CMP-004'
-	// RPH-GOV, FOUR OF SEVEN (2026-08-02). GOV-003/005 (ENFORCED) and GOV-006 (DISCLOSED) still owe their
-	// observations, so the family stays OUT of `TOTAL_OVER_FAMILIES`.
+	// RPH-GOV, SIX OF SEVEN (2026-08-03). GOV-006 (DISCLOSED) still owes its observation, so the family stays OUT
+	// of `TOTAL_OVER_FAMILIES`.
 	| 'RPH-GOV-001'
 	| 'RPH-GOV-002'
 	| 'RPH-GOV-004'
@@ -455,7 +466,8 @@ export type RegisteredRuleId =
 	| 'RPH-BAS-006'
 	| 'RPH-GOV-003'
 	| 'RPH-ASM-006'
-	| 'RPH-DEC-005';
+	| 'RPH-DEC-005'
+	| 'RPH-GOV-005';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -2746,6 +2758,52 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'The dedicated kernel predicate `waiverPreservesFindings` is DEAD — definition only, no non-test ' +
 			'reference — which is the same shape as RPH-GOV-002\'s and RPH-GOV-007\'s and is why this family needed ' +
 			'a census rather than a reading.'
+	},
+	// ENFORCED INVERSELY, and the shape is worth naming because it is the first of its kind in this register. Every
+	// other ENFORCED row points at a guard that refuses when the rule is VIOLATED. Nothing refuses "this waiver is
+	// out of scope". The floor gate refuses the PUBLISH, and the waiver's scope decides whether that refusal happens
+	// at all — so the rule is enforced by a check that PERMITS narrowly rather than one that refuses. The probe is
+	// built accordingly: both runs grant the SAME waiver and differ only in WHEN, so the version it pins is the only
+	// variable and the refusal is attributable to scope rather than to the floor being unsatisfied.
+	//
+	// THREE LIMBS, THREE DIFFERENT MECHANISMS, and the census matters more here than usual because the predicate
+	// that LOOKS like it enforces all three does not.
+	//
+	//   CRITERION — `waiverCovers`' waivedCriterionId conjunct. Genuinely decides, genuinely observed:
+	//               pwa-authoring.test.ts has a control that publishes and a discriminator that does not.
+	//   VERSION   — `waiverCovers`' subjectSemanticVersion conjunct. Genuinely decides. Had NO command-layer reader
+	//               until this row's probe; neutralising it reddened only the rph-domain kernel unit test.
+	//   OBJECT    — NOT `waiverCovers`. Its subjectObjectId conjunct is a TAUTOLOGY at the only production call
+	//               site: `effectiveFloorWaivers` builds the view with `subjectObjectId: subjectId`, the very value
+	//               it is compared against, so the conjunct compares a thing with itself. The limb is enforced
+	//               instead by that function's `subjectObjectIds.includes(subjectId)` filter and, REDUNDANTLY, by
+	//               the `?? -1` version fallback beside it — a waiver that does not name this subject carries no
+	//               version entry for it. Either alone suffices, which is why NEITHER is independently killable.
+	//
+	// THE FIRST READING OF THAT LAST POINT WAS WRONG AND IS RECORDED AS WRONG. Deleting the subject filter leaves
+	// the entire suite green, which reads as an unguarded bypass — a waiver over another PWA discharging this one's
+	// floor. It is not: the version fallback fail-closes first. The correction was proved by a COMBINED mutant
+	// (filter -> false AND `?? -1` -> `?? 2`), which does redden the object test. A finding that dissolves needs
+	// more evidence than the finding did, and single-line green was not evidence of a hole — only of redundancy.
+	'RPH-GOV-005': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'apply to another criterion, another object, or a future semantic version unless explicitly renewed',
+			note: 'JPWB-DOC-003 §8 ASR-14 (A waiver accepts risk; it never rewrites truth) — the same sentence RPH-GOV-004 anchors on, at a different clause. Canon forbids bleeding to "a FUTURE semantic version"; production compares versions with strict equality, so it also refuses a waiver pinned to a LATER version than the floor. Stronger than the anchor, and recorded as such rather than read back as agreement.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/governance.ts — waiverCovers (criterion + version; its object conjunct is a tautology at the call site, see above). ENFORCEMENT: packages/rph-application/src/handlers/floor-gate.ts — waiverDischargesFloorPolicy, which filters by waivedPolicyId, requires an OPEN finding to exist, and demands EVERY open finding be individually covered; and effectiveFloorWaivers, which scopes by subject. THE REFUSAL ITSELF is pwaFloorGate in packages/rph-application/src/handlers/pwa-authoring.ts, reached because the waiver did NOT discharge.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'the de minimis assurance floor is not SATISFIED for PWA',
+		declaredMutations: [
+			"neutralise `waiverCovers`' subjectSemanticVersion conjunct (`=== ` -> `true`) — this probe reports ADMITTED, because the v1 waiver then discharges the v2 floor and the publish is accepted",
+			"neutralise `waiverCovers`' waivedCriterionId conjunct — this probe still refuses (its criterion matches), but pwa-authoring.test.ts's no-bleeding test reddens; the two limbs are independently killable, which is what makes the criterion cite and this row distinct claims",
+			'drop `w.waivedPolicyId === policyId` from waiverDischargesFloorPolicy\'s filter — floor-waiver-scope.test.ts\'s cross-policy test reddens; this probe does not, since it never crosses policies',
+			"NEITHER OBJECT-LIMB LINE IS INDEPENDENTLY KILLABLE, recorded so a reader re-running these does not read green as absence of enforcement: `subjectObjectIds.includes(subjectId)` -> `false` alone, and `?? -1` -> a matching version alone, each leave the whole suite green. TOGETHER they redden floor-waiver-scope.test.ts's object test. Redundant enforcement, not a hole.",
+			"NO MUTATION IS NEEDED TO SHOW WHAT THIS ROW'S CITE USED TO REST ON — floor-waiver-scope.test.ts, the file named for this rule, passed for months while seeding no floor policies, arranging no assessments, and never once reaching waiverCovers. See REG-F-015."
+		]
 	},
 	'RPH-GOV-007': {
 		kind: 'NOT_A_COMMAND_REFUSAL',

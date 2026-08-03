@@ -146,10 +146,19 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//   2026-08-02  32 -> 33  RPH-ASM-006 gained a per-id COMMAND-layer cite with its dispatch probe. It is the
 		//                         only rule of its family with a kernel predicate anything asks; the other five
 		//                         have no caller at all, so this is RPH-ASM's only command-layer citation.
+		//   2026-08-03  33 -> 34  RPH-GOV-005 gained a per-id COMMAND-layer cite with its dispatch probe. The cite is
+		//                         the probe and NOT floor-waiver-scope.test.ts, the file named for the rule: that
+		//                         file seeded no floor policies, so every assessment it requested was refused and no
+		//                         floor was ever recorded, and both its tests passed anyway because a PWA with no
+		//                         floor is refused publication for MISSING — also REJECTED, also
+		//                         RPH_INVARIANT_VIOLATION. True assertions about a different refusal (REG-F-015).
+		//                         Had that file been cited here on its face, this number would have gone up on
+		//                         evidence that proved nothing, which is the failure mode the layer gate cannot see:
+		//                         it checks that a cite is COMMAND-layer, never that the arrangement was BUILT.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(33);
+		).toBe(34);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 
