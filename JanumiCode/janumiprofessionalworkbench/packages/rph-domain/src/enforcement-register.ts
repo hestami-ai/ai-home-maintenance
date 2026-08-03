@@ -1153,7 +1153,17 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'observation of a forbidden severity is OPEN — but it fires only when the POLICY declares ' +
 			'`dispositionRules.forbiddenOpenSeverities`, and it skips entirely when that set is empty. Canon states ' +
 			'the rule with no policy predicate at all. So every policy that simply omits the clause silently opts out ' +
-			'of a rule canon states absolutely, and the engine supplies nothing in its place.',
+			'of a rule canon states absolutely, and the engine supplies nothing in its place. ' +
+			'A SECOND SITE, added 2026-08-03 and driven live in `packages/rph-application/src/handlers/pwu.test.ts`: ' +
+			'the gap is not confined to assessment completion. A CRITICAL observation filed AFTER a satisfied ' +
+			'assessment does not stop the PWU itself advancing to workLifecycleState SATISFIED — the satisfaction ' +
+			'path reads no findings at any severity, and `PwuAxes` has no field that could carry one, so there the ' +
+			'check is INEXPRESSIBLE rather than merely absent. That is the site the dead kernel predicate ' +
+			'`controllerMarksPwuSatisfied` would have served; it states the rule as a three-limb conjunction and is ' +
+			'called by nothing. RECORDED HERE RATHER THAN AS A NEW FINDING, deliberately: reading DOC-003 ASR-10\'s ' +
+			'"open critical findings block satisfaction" as governing PWU workLifecycle would be a SUBJECT ' +
+			'SUBSTITUTION — that rule is titled "Composition is strictest-wins" and its subject throughout is ' +
+			'AGGREGATE ASSURANCE. One rule, two unenforced sites, one row.',
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
 			arrangement:

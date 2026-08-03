@@ -425,6 +425,149 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(lifecycle()).toBe('SATISFIED');
 	});
 
+	// ── THE PWU SATISFACTION PATH READS NO FINDINGS, AT ANY SEVERITY (2026-08-03) ─────────────────────────────
+	//
+	// WHAT THESE TWO TESTS CLAIM, and it is narrower than the first draft of this comment claimed. They record an
+	// ADMISSION at a SECOND SITE for the gap `RPH-ASR-008` already discloses ("A critical open observation
+	// prevents aggregate assurance from being SATISFIED" — disclosed UNENFORCED, because completeAssuranceAssessment
+	// forecloses a positive disposition only when the POLICY declares `forbiddenOpenSeverities`). That row's
+	// arrangement is the assessment-completion path. This is the PWU workLifecycle path, later in time: a finding
+	// filed AFTER a satisfied assessment, against a PWU that then advances to SATISFIED.
+	//
+	// TWO CORRECTIONS ON THE WAY HERE, both recorded because each nearly stood as a filed finding.
+	//   1. The pair was first written with BLOCKING alone and read as a violation. It is not. JPWB-DOC-003 §8
+	//      ASR-10, byte-exact: "Open critical findings block satisfaction; open blocking findings block promotion."
+	//      Two severities, two different gates — and the system DOES gate promotion at both (RPH-BAS-003, via
+	//      BLOCKING_SEVERITIES). The kernel predicate's own field name, `openBlockingObservations`, invited the
+	//      misreading by conflating the two severities ASR-10 separates.
+	//   2. The CRITICAL case was then nearly filed as a new divergence against ASR-10. Read in context, ASR-10 is
+	//      titled "Composition is strictest-wins" and its subject throughout is AGGREGATE ASSURANCE — so reading
+	//      its "satisfaction" as PWU workLifecycle satisfaction would be the SUBJECT SUBSTITUTION this register
+	//      records three times over (RPH-EXE-005 over STA-5, RPH-ASR-010 over the floor gate, RPH-PWU-003 over a
+	//      message naming its own rule id). No canon sentence says a PWU may not reach workLifecycleState
+	//      SATISFIED with an open critical finding; the kernel below asserts it, citing a fixture ruling.
+	// So: a second site for an existing disclosure, not a new rule.
+	//
+	// THE KERNEL SAYS OTHERWISE AND IS DEAD. `controllerMarksPwuSatisfied` (rph-domain/governance.ts) states the
+	// controller rule as a conjunction of three — execution SUCCEEDED, assurance SATISFIED, and
+	// `openBlockingObservations === 0` — and is called by nothing. The live path enforces two: execution
+	// structurally (EXECUTING -> EVIDENCE_PENDING requires SUCCEEDED, and UNDER_ASSURANCE -> SATISFIED is the only
+	// arrow in) and assurance twice over (the cross-axis guard and satisfiesP1). The third is not merely unchecked
+	// but INEXPRESSIBLE to the guard that would check it: `PwuAxes` has four fields and no observation count.
+	// Censused — `openBlockingObservations` occurs in ONE production file, its own declaration and its read inside
+	// the dead predicate.
+	//
+	// Both tests below assert ACCEPTANCE, and neither is a refusal in waiting: the first is canon-permitted
+	// outright, the second records the admission. The day the satisfaction path starts reading findings, the
+	// second goes red and should be rewritten as the refusal it becomes. Mutation-proved: wiring an open-CRITICAL
+	// check into changePwuState reddens the second and leaves the first green.
+	function driveToUnderAssurance(planSuffix: string): void {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		const step = (over: Record<string, unknown>): void => {
+			const r = engine.dispatch(change(over));
+			expect(r.status, `setup step failed: ${r.error?.message}`).toBe('ACCEPTED');
+		};
+		const planId = succeededPlanFor(PWU_ID, `exp_01ARZ3NDEKTSV4RRFFQ69G5V${planSuffix}`);
+		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+		step({
+			previousState: 'EXECUTING',
+			newState: 'EVIDENCE_PENDING',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'EVIDENCE_REQUIRED',
+			supportingObjectIds: [planId]
+		});
+		step({
+			previousState: 'EVIDENCE_PENDING',
+			newState: 'UNDER_ASSURANCE',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'READY_FOR_ASSESSMENT'
+		});
+		step({
+			previousState: 'UNDER_ASSURANCE',
+			newState: 'UNDER_ASSURANCE',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'ASSESSING'
+		});
+	}
+
+	/** Satisfy the PWU with `severity` recorded OPEN against it first. Returns the ChangePwuState result. */
+	function satisfyWithOpenFinding(
+		severity: 'BLOCKING' | 'CRITICAL',
+		ids: { plan: string; assessment: string; observation: string }
+	) {
+		driveToUnderAssurance(ids.plan);
+		const assessmentId = satisfiedAssessmentFor(PWU_ID, ids.assessment);
+		// The concern is filed AFTER the assessment settled — the realistic case, and the one no completion-time
+		// check could catch. `RecordAssuranceObservation` is ratified; its handler puts the observation in
+		// disposition OPEN and inherits the assessment's subjects, so this PWU is genuinely its subject.
+		const recorded = engine.dispatch(
+			cmd(
+				'RecordAssuranceObservation',
+				{
+					assessmentId,
+					observationType: 'FINDING',
+					findingCode: 'TENANT_ISOLATION_BREACH',
+					severity,
+					statement: 'tenant data is not isolated'
+				},
+				{ targetAggregateId: ids.observation, targetAggregateType: 'ASSURANCE_OBSERVATION' }
+			)
+		);
+		expect(recorded.status, JSON.stringify(recorded.error)).toBe('ACCEPTED');
+		const r = engine.dispatch(
+			change({
+				previousState: 'UNDER_ASSURANCE',
+				newState: 'SATISFIED',
+				executionState: 'SUCCEEDED',
+				assuranceState: 'SATISFIED',
+				supportingObjectIds: [assessmentId]
+			})
+		);
+		// The finding really is still open at the severity asked for — otherwise these tests would be asserting
+		// over an arrangement that quietly resolved itself.
+		const obs = store.loadObject(ids.observation)?.state as {
+			disposition?: string;
+			severity?: string;
+		};
+		expect(obs?.disposition).toBe('OPEN');
+		expect(obs?.severity).toBe(severity);
+		return r;
+	}
+
+	// CONTROL — canon PERMITS this. ASR-10 sends open BLOCKING findings to promotion, and promotion does refuse
+	// them (RPH-BAS-003). So an accepted satisfaction here is correct behaviour, and it proves the arrangement
+	// reaches the decision point rather than failing somewhere upstream.
+	it('CONTROL: an open BLOCKING finding does NOT block satisfaction — ASR-10 sends it to promotion', () => {
+		const r = satisfyWithOpenFinding('BLOCKING', {
+			plan: '40',
+			assessment: 'asm_01ARZ3NDEKTSV4RRFFQ69G5X10',
+			observation: 'obs_01ARZ3NDEKTSV4RRFFQ69G5X11'
+		});
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('SATISFIED');
+	});
+
+	// THE ADMISSION. Byte-identical to the control but for one enum value. This is the severity RPH-ASR-008 names,
+	// arriving at a site that row's own probe does not reach — and nothing here reads it.
+	it('a PWU reaches SATISFIED with an open CRITICAL finding against it (RPH-ASR-008, second site)', () => {
+		const r = satisfyWithOpenFinding('CRITICAL', {
+			plan: '50',
+			assessment: 'asm_01ARZ3NDEKTSV4RRFFQ69G5X20',
+			observation: 'obs_01ARZ3NDEKTSV4RRFFQ69G5X21'
+		});
+		expect(
+			r.status,
+			'THE ADMISSION: nothing on the satisfaction path reads findings, at any severity'
+		).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('SATISFIED');
+	});
 	// The guard that makes Increment 25 structural rather than conventional. Before it, the seed told the truth
 	// only because it chose to; a caller could assert any disposition and the engine would take its word.
 	it('a disposition may not be ASSERTED: SATISFIED with no assessment behind it is refused', () => {

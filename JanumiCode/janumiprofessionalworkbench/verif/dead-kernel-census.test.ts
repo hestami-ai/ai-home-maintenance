@@ -249,10 +249,13 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 		why: 'Triage §4, W2/W3 traceability plane. Needs a TraceLink-minting command surface first — the plane W1 deliberately did not build (DEF-W1-002).'
 	},
 
-	// ── UNTRIAGED (1) — a declared unknown, which is the honest alternative to an unchecked rationale ─────────
+	// ── TRIAGED 2026-08-03 — this entry was UNTRIAGED for exactly one commit ──────────────────────────────────
+	// It was carried as a declared unknown rather than given a rationale nobody checked, and the check changed
+	// the answer twice. Kept as DEAD_BY_DESIGN rather than DISCLOSED because no register row names this symbol —
+	// claiming otherwise would be this file inventing a disclosure, which the cross-check below exists to stop.
 	controllerMarksPwuSatisfied: {
-		kind: 'UNTRIAGED',
-		why: 'Implements INV-5 / P1 as a positive predicate — a PWU is satisfied only when execution SUCCEEDED and assurance is SATISFIED and no open blocking observation remains. It appears in NEITHER prose list, so it is not inherited deferral or inherited design; it is dead and unaccounted. Whether that is a gap depends on whether the satisfaction path enforces the same conjunction by other means, which has not been checked. Recorded as unknown rather than guessed.'
+		kind: 'DEAD_BY_DESIGN',
+		why: 'States the controller rule as a conjunction of three — execution SUCCEEDED, assurance SATISFIED, and openBlockingObservations === 0. Two limbs are enforced by other means: execution structurally (EXECUTING -> EVIDENCE_PENDING requires SUCCEEDED, and UNDER_ASSURANCE -> SATISFIED is the only arrow in) and assurance twice over (the cross-axis guard and satisfiesP1). The third has no reader and is INEXPRESSIBLE to the guard that would read it — PwuAxes has four fields and no observation count — but its subject matter is RPH-ASR-008 ("a critical open observation prevents aggregate assurance from being SATISFIED"), which the register already discloses UNENFORCED. The PWU-lifecycle admission is driven live in pwu.test.ts as a SECOND SITE for that row, with a canon-permitted BLOCKING control beside it. Reading ASR-10 as forbidding PWU-lifecycle satisfaction would be a subject substitution: its subject throughout is aggregate assurance.'
 	}
 };
 
