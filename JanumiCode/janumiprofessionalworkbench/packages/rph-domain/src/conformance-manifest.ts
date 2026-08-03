@@ -133,6 +133,13 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
 	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
 	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
+	// The three CONSERVATION rows, cited per-id 2026-08-02 when their dispatch probes landed. All three refuse at
+	// ONE site with ONE message and are distinguished by the finding code it carries — proved independent by a
+	// mutant that deletes a single arm and reddens exactly one row. The family prefix rows still cite the kernel
+	// test, which remains true and remains insufficient for an ENFORCED claim; that is the layer gate's whole point.
+	'RPH-DEC-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-DEC-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-CNS-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// RPH-GOV-001 — re-cited from the PURE_KERNEL family file to the dispatch probe, because the register records
 	// it ENFORCED and the layer gate requires COMMAND-layer evidence for that claim. The kernel test still stands
 	// and still proves what it proved; it just does not prove enforcement.

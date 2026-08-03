@@ -122,10 +122,19 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		// WHAT THE OLD ASSERTION WAS PROTECTING IS NOT LOST: "coverage must not silently regress" is exactly what
 		// an exact count enforces, and more strictly. What it can no longer do is protect a NUMBER that was only
 		// ever true because four families were certified on evidence that could not see enforcement.
+		// THE LEDGER OF MOVES. Append a line before changing the number; do not edit one in place.
+		//   2026-08-02  40 -> 31  RPH-GOV, RPH-BAS, RPH-ASM and RPH-DEC left COVERED for PARTIAL. Each was
+		//                         COVERED "by id" on a PURE_KERNEL file and each holds at least one rule the
+		//                         enforcement register shows is enforced NOWHERE. RPH-CNS re-stated alongside.
+		//   2026-08-02  31 -> 34  RPH-DEC-002, RPH-DEC-003 and RPH-CNS-003 gained per-id COMMAND-layer cites when
+		//                         their dispatch probes landed — a real increase, and the FIRST time this
+		//                         assertion fired in the growth direction. It caught them because the layer gate
+		//                         had just refused the same three rows for citing kernel evidence while claiming
+		//                         ENFORCED: the two gates disagreed for one commit, which is what they are for.
 		expect(
 			byStatus.COVERED,
-			'the COVERED count changed — say which rules moved and why, in this comment, before editing the number'
-		).toBe(31);
+			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
+		).toBe(34);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

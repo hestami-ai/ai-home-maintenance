@@ -42,6 +42,13 @@ const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69H6120';
 const PLAN2 = 'plan_01ARZ3NDEKTSV4RRFFQ69H6130';
 const sid = (i: number) => `${PLAN}-s${i}`;
 
+const AUTHORITY = {
+	authorityId: 'auth_arch',
+	authorityType: 'ORGANIZATIONAL_ROLE' as const,
+	scope: ['architecture'],
+	validFrom: TS
+};
+
 const SAYS_NOTHING = {
 	reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT' as const,
 	detail: 'A coordination step; it authors no artifact.'
@@ -70,6 +77,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 	let store: SqliteStorageAdapter;
 	let engine: Engine;
 	let seq = 0;
+	/** Distinct id space per decompositionProbe() call — three probes share one engine per test. */
+	let probeSeq = 0;
 
 	function dispatch(
 		commandType: string,
@@ -131,6 +140,165 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		expect(r.status, `${what}: ${r.message}`).toBe('ACCEPTED');
 		return r;
 	};
+
+	/**
+	 * The shared arrangement for RPH-DEC-002, RPH-DEC-003 and RPH-CNS-003 — three rules refused at ONE site with
+	 * ONE message, distinguished only by the finding code interpolated into it.
+	 *
+	 * Each `limb` builds a CONTROL decomposition that passes the gate and an OBSERVED one differing in exactly the
+	 * field its own rule is about. Sharing the scaffolding is what makes that difference the only difference: if
+	 * the two decompositions were built separately, a stray field could refuse for a sibling's reason and the
+	 * marker check alone would not tell (it would report MASKED, but from the wrong arrangement).
+	 */
+	function decompositionProbe(limb: 'obligation' | 'constraint' | 'rationale'): {
+		control: Outcome;
+		observed: Outcome;
+	} {
+		const n = ++probeSeq;
+		const INT = `int_01ARZ3NDEKTSV4RRFFQ69H7${n}00`;
+		const mk = (suffix: string) => ({
+			parent: `pwu_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}1`,
+			child: `pwu_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}2`,
+			obl: `obl_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}3`,
+			con: `con_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}4`,
+			dcp: `dcp_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}5`
+		});
+		ok(
+			dispatch(
+				'CaptureIntent',
+				{ intentId: INT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+				INT,
+				'INTENT'
+			),
+			'capture intent'
+		);
+		const proposePwu = (id: string, obligationIds: string[], constraintIds: string[]) =>
+			ok(
+				dispatch(
+					'ProposePwu',
+					{
+						pwuId: id,
+						pwuKind: 'ARCHITECTURE',
+						title: id,
+						description: 'd',
+						intentId: INT,
+						boundaries: {
+							inScope: [],
+							outOfScope: [],
+							permittedChanges: [],
+							prohibitedChanges: []
+						},
+						obligationIds,
+						constraintIds,
+						assumptionIds: [],
+						expectedOutputs: [],
+						assurancePolicyIds: [],
+						riskProfile: {
+							consequence: 'HIGH',
+							uncertainty: 'MEDIUM',
+							irreversibility: 'MEDIUM',
+							securitySensitivity: 'HIGH',
+							regulatoryExposure: 'LOW'
+						}
+					},
+					id,
+					'PROFESSIONAL_WORK_UNIT'
+				),
+				`propose ${id}`
+			);
+
+		/** Build one decomposition and validate it. `pass` selects the arrangement the gate should accept. */
+		const drive = (pass: boolean): Outcome => {
+			const v = mk(pass ? 'A' : 'B');
+			const gatesObligation = limb === 'obligation';
+			ok(
+				dispatch(
+					'AssertObligation',
+					{
+						statement: 'Isolate tenant data',
+						obligationType: 'SECURITY',
+						sourceObjectId: v.parent,
+						authority: AUTHORITY,
+						strength: 'MANDATORY'
+					},
+					v.obl,
+					'OBLIGATION'
+				),
+				'assert obligation'
+			);
+			ok(
+				dispatch(
+					'AssertConstraint',
+					{
+						statement: 'Encrypt PII at rest',
+						constraintType: 'SECURITY',
+						sourceObjectId: v.parent,
+						authority: AUTHORITY,
+						applicability: {},
+						strength: 'MANDATORY'
+					},
+					v.con,
+					'CONSTRAINT'
+				),
+				'assert constraint'
+			);
+			// The PARENT carries the mandatory obligation, and the constraint only when a constraint limb is
+			// under test — an unrelated mandatory constraint would refuse every arrangement for DEC-003's reason.
+			proposePwu(v.parent, [v.obl], gatesObligation ? [] : [v.con]);
+			proposePwu(v.child, [], []);
+
+			// The obligation is always accounted for EXCEPT in the obligation limb's failing arrangement.
+			const obligationFields =
+				gatesObligation && !pass ? {} : { retainedParentObligationIds: [v.obl] };
+			// The constraint disposition varies by limb.
+			const constraintFields = gatesObligation
+				? {}
+				: {
+						constraintPropagations: [
+							limb === 'constraint'
+								? // DEC-003: the failing arrangement omits the relevant child entirely.
+									{
+										constraintId: v.con,
+										childWorkUnitIds: pass ? [v.child] : [],
+										disposition: 'PROPAGATED'
+									}
+								: // CNS-003: INAPPLICABLE, and the ONLY difference is the rationale.
+									{
+										constraintId: v.con,
+										childWorkUnitIds: [v.child],
+										disposition: 'INAPPLICABLE',
+										// The arm refuses on `!rationale || !authorityDecisionId`, so the authority is
+										// present in BOTH arrangements and the RATIONALE is the only delta — otherwise
+										// the control would fail for the sibling reason under the same finding code.
+										authorityDecisionId: 'dec_01ARZ3NDEKTSV4RRFFQ69H7999',
+										...(pass ? { rationale: 'the child holds no PII' } : {})
+									}
+						]
+					};
+			ok(
+				dispatch(
+					'ProposeDecomposition',
+					{
+						parentWorkUnitId: v.parent,
+						childWorkUnitIds: [v.child],
+						rationale: 'split',
+						...obligationFields,
+						...constraintFields
+					},
+					v.dcp,
+					'DECOMPOSITION_CONTRACT'
+				),
+				'propose decomposition'
+			);
+			return dispatch(
+				'ValidateDecomposition',
+				{ disposition: 'VALID' },
+				v.dcp,
+				'DECOMPOSITION_CONTRACT'
+			);
+		};
+		return { control: drive(true), observed: drive(false) };
+	}
 
 	const mkStep = (i: number) => ({
 		id: sid(i),
@@ -903,6 +1071,24 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-GOV-002': null,
 		'RPH-GOV-004': null,
 		'RPH-GOV-007': null,
+		// ── THE THREE CONSERVATION PROBES ─────────────────────────────────────────────────────────────────────
+		// One site, one message, three finding codes. Each probe's CONTROL is the byte-adjacent arrangement that
+		// differs only in the field its own rule is about — so a refusal here cannot be a sibling's.
+		'RPH-DEC-002': {
+			arrangement:
+				'ValidateDecomposition -> VALID on a decomposition leaving a MANDATORY parent obligation neither allocated nor retained, against the identical decomposition that allocates it',
+			run: () => decompositionProbe('obligation'),
+		},
+		'RPH-DEC-003': {
+			arrangement:
+				'ValidateDecomposition -> VALID on a decomposition leaving a MANDATORY parent constraint undispositioned for a relevant child, against the identical decomposition that propagates it',
+			run: () => decompositionProbe('constraint'),
+		},
+		'RPH-CNS-003': {
+			arrangement:
+				'a constraint dispositioned INAPPLICABLE with NO rationale, against the byte-adjacent record that carries one',
+			run: () => decompositionProbe('rationale'),
+		},
 		'RPH-DEC-001': null,
 		'RPH-DEC-004': null,
 		'RPH-DEC-006': null,

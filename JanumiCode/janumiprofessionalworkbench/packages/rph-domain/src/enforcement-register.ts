@@ -446,7 +446,10 @@ export type RegisteredRuleId =
 	| 'RPH-DEC-007'
 	| 'RPH-CNS-001'
 	| 'RPH-CNS-002'
-	| 'RPH-CNS-004';
+	| 'RPH-CNS-003'
+	| 'RPH-CNS-004'
+	| 'RPH-DEC-002'
+	| 'RPH-DEC-003';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -3192,6 +3195,68 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'WAIVED_EXPIRED branch reads `waiverExpired`, and `ConstraintPropagationSchema` has no such field, so ' +
 			'no dispatch can assert it. The engine therefore knows how to expire a waiver at ONE gate, and the ' +
 			'constraint and promotion planes cannot ask.'
+	},
+
+	// ── THE THREE ENFORCED CONSERVATION ROWS — ONE SITE, ONE MESSAGE, THREE FINDING CODES ────────────────────
+	//
+	// All three refuse at `checkDecompositionConservation` with `RPH_INVARIANT_VIOLATION` and the SAME sentence.
+	// What distinguishes them at the observation point is the finding code interpolated into `<parts>`, so each
+	// row's `refusalMarker` IS its finding code. That is the marker doing precisely the job it was added for: the
+	// distinctness gate proves the three strings differ, and the three probes prove the three ARRANGEMENTS produce
+	// their own code and not a sibling's.
+	'RPH-DEC-002': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'an unallocated mandatory obligation invalidates the decomposition and blocks child execution',
+			note: 'JPWB-DOC-003 §6 DEC-3 (Obligation conservation), verbatim against the ratified statement — including the second limb, which this engine does NOT perform (see declaredMutations and the residual below).'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/decomposition.ts — validateObligationConservation, the P2 equation. ENFORCEMENT: packages/rph-application/src/handlers/decomposition.ts — checkDecompositionConservation, wired at TWO call sites: the ValidateDecomposition guard (for every disposition except INVALID) and the ReviseDecomposition precheck.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'MISSING_OBLIGATION_ALLOCATION(',
+		declaredMutations: [
+			'drop the `strength !== MANDATORY` filter in validateObligationConservation so ADVISORY obligations gate too — the probe still kills, but decomposition-conservation.test.ts\'s ADVISORY case reddens, which is where that mutant belongs',
+			'make checkDecompositionConservation return null unconditionally — the probe reports ADMITTED',
+			"remove the guard from the ValidateDecomposition site (`mapping.target === 'INVALID' ? undefined : …`) — ADMITTED",
+			'THE LIMB NO MUTATION CAN REACH, recorded as a residual rather than a mutant: the ratified statement\'s second half — "and BLOCKS CHILD EXECUTION" — has no production site at all. No execution, PWU, assurance or governance handler ever loads a DECOMPOSITION_CONTRACT or consults its status. This row is ENFORCED on limb one only.',
+			'ALSO NOT WHAT THE RULE SAYS: the rule\'s stated effect is that the decomposition BECOMES INVALID. The engine REFUSES the ValidateDecomposition command instead, leaving the contract in UNDER_REVIEW. Refusing the transition is the stronger act and the register records it as enforcement — but a reader looking for an INVALID contract will not find one.'
+		]
+	},
+	'RPH-DEC-003': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'No silent omission; no unauthorized weakening',
+			note: 'JPWB-DOC-003 §6 DEC-4 (Constraint exhaustive disposition). The "no silent omission" half is this rule; "no unauthorized weakening" is RPH-CNS-002, which is arm 3 because its arrangement cannot be put on the wire.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/decomposition.ts — validateConstraintPropagation, whose module-private collectConstraintFindings emits SILENT_CONSTRAINT_DROP for every relevant child a mandatory, applicable constraint leaves undispositioned. ENFORCEMENT: the same two call sites as RPH-DEC-002.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'SILENT_CONSTRAINT_DROP(',
+		declaredMutations: [
+			'delete the per-relevant-child coverage loop in collectConstraintFindings — the probe reports ADMITTED',
+			"drop the `c.strength !== 'MANDATORY' || !c.applicable` early return so every constraint gates — the probe still kills; the ADVISORY control is what reddens",
+			'THE SCOPE THE RULE NAMES AND THE GATE DOES NOT: the ratified statement is about a "mandatory parent SECURITY constraint". No production site keys on `constraintType` at all — the gate keys on strength plus a live status. A security-specific reading is unenforced, and `constraintType` IS carried on both the payload and the object, so the narrowing is available and simply not taken.'
+		]
+	},
+	'RPH-CNS-003': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'marked inapplicable with rationale',
+			note: 'JPWB-DOC-003 §6 DEC-4, the third of the five permitted dispositions. Canon requires the rationale in the same breath as the disposition, which is exactly what this rule refuses without.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/decomposition.ts — checkConstraintDisposition, the INAPPLICABLE arm. ENFORCEMENT: packages/rph-application/src/handlers/decomposition.ts — checkDecompositionConservation, via buildConstraintInput, which is the ONE constraint-input builder that drops nothing: it maps `disposition`, `rationale` AND `authorityDecisionId`, the three fields this arm reads. That is why this rule is enforced while its three CNS siblings are not — their arms read fields the wire cannot carry.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'INAPPLICABLE_WITHOUT_RATIONALE(',
+		declaredMutations: [
+			'delete the INAPPLICABLE arm of checkConstraintDisposition — the probe reports ADMITTED',
+			'stop mapping `rationale` in buildConstraintInput — the arm can no longer see it, so EVERY inapplicable disposition refuses and the probe\'s CONTROL reddens instead: the over-refusal failure, which is why this row\'s control is a byte-adjacent record that differs only by carrying a rationale',
+			'THE ALTERNATIVE THE RULE ALLOWS AND THE KERNEL DOES NOT: the ratified statement permits "an authority OR POLICY BASIS". The arm accepts only an `authorityDecisionId`; there is no policy-basis representation. And that id is never resolved to a real Decision — any non-empty string satisfies it, which is the REG-F-014 shape on a fifth field.'
+		]
 	}
 };
 
