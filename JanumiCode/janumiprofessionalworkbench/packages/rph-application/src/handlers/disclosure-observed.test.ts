@@ -1023,7 +1023,144 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			}
 		},
 		'RPH-DEC-001': null,
-		'RPH-DEC-004': null,
+		/**
+		 * RPH-DEC-004 — re-guarded 2026-08-03, from a DEAD_PREDICATE census to this observation, because the census
+		 * COULD NOT SEE THE EVENT IT EXISTED TO DETECT. Filed as REG-F-016.
+		 *
+		 * The row censused `intentDivergentChildIds` — an INPUT FIELD of the dead domain composition
+		 * `validateDecomposition`, chosen over the composition itself to dodge a name collision (the application
+		 * handler exports a symbol of the same name, so a census over it returns four files and looks wired). The
+		 * dodge worked and cost the guard its sensitivity: wiring the composition into a handler does not make the
+		 * FIELD appear anywhere new, so the census still returns one file and the row stays green. Demonstrated —
+		 * the composition was wired into `handlers/decomposition.ts`, compiling and running, and all 2078 tests
+		 * stayed green.
+		 *
+		 * Its sibling RPH-DEC-005 hit the same collision and answered it correctly, by guarding with behaviour. This
+		 * brings DEC-004 into line: it now reddens on the RULE being enforced, whatever symbol carries it.
+		 */
+		'RPH-DEC-004': {
+			arrangement:
+				'a decomposition whose child is proposed under a DIFFERENT intent and whose intentMappings declares it serves that foreign intent, marked VALID — accepted with no divergence finding; the control declares the same divergence but also leaves a mandatory obligation unallocated and IS refused',
+			run: () => {
+				const mk = (t: string) => ({
+					int: `int_01ARZ3NDEKTSV4RRFFQ69J30${t}0`,
+					foreign: `int_01ARZ3NDEKTSV4RRFFQ69J30${t}5`,
+					parent: `pwu_01ARZ3NDEKTSV4RRFFQ69J30${t}1`,
+					child: `pwu_01ARZ3NDEKTSV4RRFFQ69J30${t}2`,
+					obl: `obl_01ARZ3NDEKTSV4RRFFQ69J30${t}3`,
+					dcp: `dcp_01ARZ3NDEKTSV4RRFFQ69J30${t}4`
+				});
+				const drive = (allocate: boolean): Outcome => {
+					const v = mk(allocate ? 'A' : 'B');
+					for (const [id, expr] of [
+						[v.int, 'the parent intent'],
+						[v.foreign, 'work the parent never asked for']
+					] as const)
+						ok(
+							dispatch(
+								'CaptureIntent',
+								{ intentId: id, originatingExpression: expr, ontologyId: 'o', ontologyVersion: '1' },
+								id,
+								'INTENT'
+							),
+							`capture intent ${id}`
+						);
+					ok(
+						dispatch(
+							'AssertObligation',
+							{
+								statement: 'Isolate tenant data',
+								obligationType: 'SECURITY',
+								sourceObjectId: v.parent,
+								authority: {
+									authorityId: 'auth_arch',
+									authorityType: 'ORGANIZATIONAL_ROLE',
+									scope: ['architecture'],
+									validFrom: TS
+								},
+								strength: 'MANDATORY'
+							},
+							v.obl,
+							'OBLIGATION'
+						),
+						'assert obligation'
+					);
+					const pwu = (id: string, intentId: string, obligationIds: string[]) =>
+						ok(
+							dispatch(
+								'ProposePwu',
+								{
+									pwuId: id,
+									pwuKind: 'ARCHITECTURE',
+									title: id,
+									description: 'd',
+									intentId,
+									boundaries: {
+										inScope: [],
+										outOfScope: [],
+										permittedChanges: [],
+										prohibitedChanges: []
+									},
+									obligationIds,
+									constraintIds: [],
+									assumptionIds: [],
+									expectedOutputs: [],
+									assurancePolicyIds: [],
+									riskProfile: {
+										consequence: 'HIGH',
+										uncertainty: 'MEDIUM',
+										irreversibility: 'MEDIUM',
+										securitySensitivity: 'HIGH',
+										regulatoryExposure: 'LOW'
+									}
+								},
+								id,
+								'PROFESSIONAL_WORK_UNIT'
+							),
+							`propose ${id}`
+						);
+					pwu(v.parent, v.int, [v.obl]);
+					// THE DIVERGENCE, stated twice on the wire and read neither time: the child is proposed under a
+					// SECOND intent the parent does not hold, and the decomposition's own `intentMappings` declares
+					// that the child serves that foreign intent rather than anything of the parent's.
+					pwu(v.child, v.foreign, []);
+					ok(
+						dispatch(
+							'ProposeDecomposition',
+							{
+								parentWorkUnitId: v.parent,
+								childWorkUnitIds: [v.child],
+								rationale: 'split',
+								intentMappings: [
+									{
+										childWorkUnitId: v.child,
+										servesParentIntentOrObligationId: v.foreign,
+										rationale: 'the child enlarges scope beyond the parent intent'
+									}
+								],
+								...(allocate ? { retainedParentObligationIds: [v.obl] } : {})
+							},
+							v.dcp,
+							'DECOMPOSITION_CONTRACT'
+						),
+						'propose decomposition'
+					);
+					const r = dispatch(
+						'ValidateDecomposition',
+						{ disposition: 'VALID' },
+						v.dcp,
+						'DECOMPOSITION_CONTRACT'
+					);
+					if (allocate)
+						expect(
+							(store.loadObject(v.dcp)?.state as { status: string }).status,
+							'VALID over a child serving a foreign intent IS the admission — the rule says this is CHILD_INTENT_DIVERGENCE and must be rejected or routed to a human'
+						).toBe('VALID');
+					return r;
+				};
+				return { admitted: drive(true), control: drive(false) };
+			}
+		},
 		'RPH-DEC-006': null,
 		'RPH-DEC-007': null,
 		'RPH-CNS-001': null,

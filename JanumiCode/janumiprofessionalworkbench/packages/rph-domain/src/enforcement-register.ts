@@ -3149,10 +3149,33 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'parent. THE GUARD NAMES THE INPUT, NOT THE COMPOSITION, deliberately: a census over the composition ' +
 			'would return four files because the application handler shares its name, and would look wired while ' +
 			'the rule went unenforced.',
+		// RE-GUARDED 2026-08-03, from DEAD_PREDICATE to OBSERVED_ADMISSION, because THE CENSUS COULD NOT SEE THE
+		// EVENT IT EXISTED TO DETECT (REG-F-016). It censused `intentDivergentChildIds` — an INPUT FIELD of the
+		// dead composition, named instead of the composition to dodge the collision the `why` above describes. The
+		// dodge worked and cost the guard its sensitivity: WIRING THE COMPOSITION DOES NOT MAKE THE FIELD APPEAR
+		// ANYWHERE NEW, so the census still returns one file and this row would stay green through the exact
+		// change that closes the rule. Demonstrated rather than reasoned: `validateDecomposition` was wired into
+		// `handlers/decomposition.ts`, compiling and running, and all 2078 tests stayed green.
+		//
+		// THE REGISTER'S OWN "GUARD THAT CANNOT FAIL" GATE DID NOT CATCH IT, which is the part worth keeping. That
+		// gate checks the baseline set excludes the file the wiring would land in — and it passed here, correctly,
+		// because the baseline is a kernel file and no handler was in it. The wiring event this row faces is not
+		// "a handler mentions the symbol" but "a handler calls the FUNCTION THAT READS it", and a census over a
+		// symbol cannot see one symbol away. RPH-DEC-005 hit the same collision one row down and answered it
+		// correctly by guarding with behaviour; this row now does the same.
 		guard: {
-			kind: 'DEAD_PREDICATE',
-			deadPredicate: 'intentDivergentChildIds',
-			referencedOnlyBy: ['packages/rph-domain/src/decomposition.ts']
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a decomposition whose child is proposed under a DIFFERENT intent and whose intentMappings declares it serves that foreign intent, marked VALID — accepted with no divergence finding of any kind',
+			control:
+				'the identical decomposition, declaring the same divergence, but leaving a mandatory parent obligation unallocated — REFUSED at the same site by the conservation arm, which proves the validate path is live and simply has no limb for intent divergence',
+			whyNoPredicate:
+				'A census is the wrong instrument for this rule, and the reason generalises. The only implementation ' +
+				'is `rph-domain`\'s `validateDecomposition`, whose bare identifier is shared by an application ' +
+				'handler — so a census over IT returns four files and looks wired. Censusing the input field it ' +
+				'reads instead dodges the collision but is BLIND TO THE WIRING, because the field does not move ' +
+				'when the composition gains a caller. Behaviour is sensitive to both: this row now reddens when the ' +
+				'rule starts being enforced, whatever symbol carries it.'
 		}
 	},
 	'RPH-DEC-006': {
