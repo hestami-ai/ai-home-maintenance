@@ -103,9 +103,29 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 					`${r.id} deferred but not a deferrable family`
 				).toBe(true);
 		}
-		// the fully-by-id kernel families (RPH-DEC/CNS/ASM/GOV/BAS/EXE = 40 rules) are the executably-COVERED floor;
-		// deferral is a small minority, and the rest is honestly PARTIAL (core asserted, specific ids pending).
-		expect(byStatus.COVERED).toBeGreaterThanOrEqual(40);
+		// ── THE COVERED COUNT, RE-EXPRESSED 2026-08-02 ────────────────────────────────────────────────────────
+		//
+		// This read `expect(byStatus.COVERED).toBeGreaterThanOrEqual(40)`, above the comment "the fully-by-id
+		// kernel families (RPH-DEC/CNS/ASM/GOV/BAS/EXE = 40 rules) are the executably-COVERED floor". Four of
+		// those five families were then dispositioned rule-by-rule in the enforcement register and shown NOT to be
+		// executably covered: RPH-GOV, RPH-BAS, RPH-ASM and RPH-DEC were each COVERED "by id" on a PURE_KERNEL
+		// test file, and each holds at least one rule the running engine enforces nowhere. RPH-CNS was re-stated
+		// alongside them. So the floor asserted the very claim the register disproved, and it fired — correctly —
+		// the moment the record was made honest.
+		//
+		// A FLOOR THAT IS LOWERED WHENEVER IT FIRES IS NOT A RATCHET, so it is not lowered. It is replaced by an
+		// EXACT count, which fails in BOTH directions: coverage silently regressing still reddens, and coverage
+		// legitimately growing also reddens, so the number can only move by a deliberate, reviewable edit that
+		// says which rules moved and why. That is the same trade the enforcement register makes throughout —
+		// convert a silent change into a justification-bearing one.
+		//
+		// WHAT THE OLD ASSERTION WAS PROTECTING IS NOT LOST: "coverage must not silently regress" is exactly what
+		// an exact count enforces, and more strictly. What it can no longer do is protect a NUMBER that was only
+		// ever true because four families were certified on evidence that could not see enforcement.
+		expect(
+			byStatus.COVERED,
+			'the COVERED count changed — say which rules moved and why, in this comment, before editing the number'
+		).toBe(31);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

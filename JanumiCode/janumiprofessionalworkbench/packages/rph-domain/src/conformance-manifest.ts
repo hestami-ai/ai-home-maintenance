@@ -146,15 +146,26 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
  *  single-file cites live in COVERED_BY_ID. */
 const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	// Fully COVERED — the M9/M10/M11 kernel families, every id asserted by name.
+	// ── CORRECTED 2026-08-02 — THE OVERCLAIM GATE'S EIGHTH CATCH, AND THE FOURTH FAMILY IN A DAY ────────────
+	//
+	// Both rows read COVERED "by id" on a PURE_KERNEL file. The register disposed RPH-DEC-004
+	// UNENFORCED_DISCLOSED and the gate rejected the pair. RPH-CNS is re-stated in the same edit — not because a
+	// gate forced it, but because leaving it COVERED while three of its four rules are dispositioned
+	// NOT_A_COMMAND_REFUSAL would be the same claim the gate just refused, one rule short of tripping it.
+	//
+	// WHAT THE CITED TESTS PROVE IS REAL, AND IS NOT ENFORCEMENT. decomposition.test.ts asserts the kernel
+	// predicates return the right findings; they do. What no pure test can see is which of those predicates the
+	// running engine ever asks, and with what. For RPH-CNS-001/002 the answer is sharper than "nothing asks":
+	// the arm reads a field that the wire schema — a strictObject — does not carry and would refuse.
 	'RPH-DEC': {
-		status: 'COVERED',
+		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/decomposition.test.ts',
-		note: 'RPH-DEC-001..007 by id'
+		note: 'DEC-002/003 are ENFORCED in enforcement-register.ts at checkDecompositionConservation, distinguished by the finding code their shared refusal message carries (their dispatch probes are owed). DEC-004 is UNENFORCED_DISCLOSED with a dead-predicate census. DEC-005 is a disclosure owing its observation — nothing reads a recomposition contract before marking a decomposition VALID. DEC-001/006/007 are NOT_A_COMMAND_REFUSAL: a permission, an outcome cascade, and a property restatement that cannot be a second ENFORCED row because it would share DEC-002\'s only finding code and therefore its marker.'
 	},
 	'RPH-CNS': {
-		status: 'COVERED',
+		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/decomposition.test.ts',
-		note: 'RPH-CNS-001..004 by id (004 also in governance.test.ts)'
+		note: 'CNS-003 is ENFORCED (the INAPPLICABLE_WITHOUT_RATIONALE arm is reachable from dispatch — its probe is owed). CNS-001/002/004 are NOT_A_COMMAND_REFUSAL, and for a stronger reason than "unwired": their kernel arms read propagatedStrength and waiverExpired, and ConstraintPropagationSchema is a strictObject carrying NEITHER. No dispatch can express the arrangement, so the antecedents are unreachable rather than unguarded. The shape must be authored before the rules can be enforced.'
 	},
 	// ── CORRECTED 2026-08-02 — THE OVERCLAIM GATE'S SEVENTH CATCH, AND THE THIRD FAMILY IN A DAY ────────────
 	//

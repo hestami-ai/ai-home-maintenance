@@ -437,7 +437,16 @@ export type RegisteredRuleId =
 	| 'RPH-ASM-002'
 	| 'RPH-ASM-003'
 	| 'RPH-ASM-004'
-	| 'RPH-ASM-005';
+	| 'RPH-ASM-005'
+	// RPH-DEC five of seven and RPH-CNS three of four (2026-08-02). DEC-002/003 and CNS-003 are ENFORCED and owe
+	// dispatch probes; DEC-005 is a disclosure owing its observation.
+	| 'RPH-DEC-001'
+	| 'RPH-DEC-004'
+	| 'RPH-DEC-006'
+	| 'RPH-DEC-007'
+	| 'RPH-CNS-001'
+	| 'RPH-CNS-002'
+	| 'RPH-CNS-004';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -3008,6 +3017,181 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			deadPredicate: 'blocksIrreversibleWork',
 			referencedOnlyBy: ['packages/rph-domain/src/decomposition.ts']
 		}
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// RPH-DEC AND RPH-CNS — ONE REFUSAL SITE, FOUR RULES, AND THE MARKER IS THE FINDING CODE.
+	//
+	// `checkDecompositionConservation` produces ONE message for every conservation failure:
+	//   "<act>: the decomposition does not conserve its parent's obligations/constraints
+	//    (§35.1 / RPH-DEC-002/007 / RPH-CNS-001..004): <parts>"
+	// — and `<parts>` interpolates each finding as `CODE(id)`. So four rules share a site, and the only thing that
+	// distinguishes them at the observation point is which finding code lands in the message. That is exactly what
+	// `refusalMarker` is for, and it is why DEC-002, DEC-003 and CNS-003 can each be ENFORCED here while DEC-007
+	// cannot: DEC-007 restates DEC-002's equation and the obligation findings have exactly ONE code
+	// (`MISSING_OBLIGATION_ALLOCATION`, declared as a single string literal on the finding type). Two ENFORCED rows
+	// would share one marker, which the distinctness gate forbids and which is precisely the failure it exists to
+	// prevent — the same reasoning that put RPH-GOV-002 in arm 3.
+	//
+	// AND THE CNS PAIR FAILED FOR A REASON THE CENSUS DID NOT REACH. The suggested disposition for RPH-CNS-001/002
+	// was UNENFORCED_DISCLOSED on the grounds that `propagatedStrength` is never populated. Checked one layer
+	// further: `ConstraintPropagationSchema` is a `z.strictObject` with SEVEN fields and NO `propagatedStrength`
+	// among them. The field exists only on the KERNEL's own record type. So the arm does not read an unpopulated
+	// field — it reads a field THE WIRE CANNOT CARRY, and no dispatch can express the arrangement. That makes them
+	// arm 3 (the RPH-EVD-002 shape), not disclosures: an OBSERVED_ADMISSION needs an arrangement the engine
+	// accepts, and there is none to send.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-DEC-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'A decomposition is incomplete until it explains how child results will establish the parent claim',
+			note: 'JPWB-DOC-003 §6 DEC-2 (Decomposition is a Claim with a mandatory contract), whose enumeration covers all three of this rule\'s limbs — obligation allocation, constraint disposition, and a recomposition strategy.'
+		},
+		why:
+			'GRAMMATICALLY A PERMISSION — a decomposition meeting three conditions "MAY become VALID" — which no ' +
+			'refusal probe can hold, the same class as RPH-EXE-009\'s "retry or an alternate strategy MAY be ' +
+			'selected". ITS THREE LIMBS ARE NOT EQUALLY REAL, and that is the content of this row. Limbs 1 and 2 ' +
+			'(obligation allocation, constraint propagation/retention) ARE gated before the VALID advance, and are ' +
+			'recorded as RPH-DEC-002 and RPH-DEC-003. Limb 3 — "and has a recomposition contract" — is read ' +
+			'NOWHERE: `recompositionContractId` is written onto the contract, echoed into the event, and never ' +
+			'loaded, compared or required. That gap is RPH-DEC-005\'s. THE COMPOSITION THAT WOULD HAVE JOINED ALL ' +
+			'THREE IS DEAD: `rph-domain`\'s own decomposition validator is called by no non-test file — the handler ' +
+			'calls the two leaf predicates directly and skips it — so its three exclusive finding codes ' +
+			'(MISSING_RECOMPOSITION_CONTRACT, CHILD_DOES_NOT_TRACE_TO_PARENT, CHILD_INTENT_DIVERGENCE) can never ' +
+			'appear in any CommandResult. A NAME COLLISION MAKES THIS EASY TO GET WRONG, recorded so the next ' +
+			'reader does not: the APPLICATION handler exports a symbol of the same name, so a census over the ' +
+			'identifier returns four files and looks wired. The two functions are different, and only the dead one ' +
+			'implements this rule.'
+	},
+	'RPH-DEC-004': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'A child PWU introducing work beyond parent intent without authorization is a divergence',
+			note: 'JPWB-DOC-003 §6 DEC-5 (Children cannot enlarge scope), which continues "the decomposition is rejected or routed to human decision" — the ratified rule\'s disjunction, verbatim.'
+		},
+		why:
+			'THE STATEMENT IS A COMMAND REFUSAL ("emits CHILD_INTENT_DIVERGENCE and is rejected or requires a human ' +
+			'decision") and NO production site computes, receives or refuses child intent divergence. The only ' +
+			'implementation is the dead domain composition; the live handler never calls it, so the finding code ' +
+			'cannot reach a CommandResult. THREE SUPPORTING ABSENCES, each checked: `intentMappings` — the ' +
+			'ProposeDecomposition field that would carry the parent-to-child intent mapping the rule needs — is ' +
+			'stored and echoed but never read; the seeded POL-DECOMPOSITION-COVERAGE policy lists ' +
+			'CHILD_INTENT_DIVERGENCE among its finding types and nothing consumes those types except a seeder; and ' +
+			'ProposeDecomposition stores `childWorkUnitIds` without checking that any child exists or names the ' +
+			'parent. THE GUARD NAMES THE INPUT, NOT THE COMPOSITION, deliberately: a census over the composition ' +
+			'would return four files because the application handler shares its name, and would look wired while ' +
+			'the rule went unenforced.',
+		guard: {
+			kind: 'DEAD_PREDICATE',
+			deadPredicate: 'intentDivergentChildIds',
+			referencedOnlyBy: ['packages/rph-domain/src/decomposition.ts']
+		}
+	},
+	'RPH-DEC-006': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: '"All children completed, therefore parent satisfied" is always invalid',
+			note: 'JPWB-DOC-003 §6 DEC-6 (Recomposition is a judged act, never a sum), verbatim on the inference the rule forbids.'
+		},
+		why:
+			'AN OUTCOME ASSERTION — recomposition "LEAVES the parent not satisfied, SETS recomposition state ' +
+			'CONFLICTED, and EMITS a conflict observation". Nothing is refused; `CompleteRecomposition` is ' +
+			'ACCEPTED. ONE OF THE THREE LIMBS IS GENUINELY PERFORMED: the contract really does land in CONFLICTED, ' +
+			'routed by the kernel\'s outcome map. THE OTHER TWO ARE NOT. Nothing writes to the parent PWU from the ' +
+			'recomposition path at all — the kernel computes `parentSatisfied` and the handler DISCARDS it — and no ' +
+			'ASSURANCE_OBSERVATION object is minted; the only emission is a domain event whose payload is not an ' +
+			'observation. AND THE CONFLICT IS CALLER-SUPPLIED: `detectedConflicts` comes straight from the payload, ' +
+			'so the "incompatible tenant-identity models" the rule names has no engine-side detector. Only child ' +
+			'ACCEPTABILITY is derived. That is REG-F-014\'s shape a fourth time, on the input that decides whether ' +
+			'a recomposition conflicts at all.'
+	},
+	'RPH-DEC-007': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Mandatory parent obligations = allocated to children + retained by parent + already satisfied',
+			note: 'JPWB-DOC-003 §6 DEC-3 (Obligation conservation), the equation itself. A DIFFERENT span from RPH-DEC-002\'s anchor of the same rule, so a reader can tell the equation from its consequence.'
+		},
+		why:
+			'A PROPERTY RESTATEMENT OF RPH-DEC-002, and arm 3 for a structural reason rather than a gap. Its own ' +
+			'ratified text begins "Property:" and ends "(Equivalent to Property P2.)", and the conformance ' +
+			'manifest carries properties in a separate map. The equation IS enforced — at DEC-002\'s site, by ' +
+			'DEC-002\'s predicate, producing DEC-002\'s finding code, in a message that names RPH-DEC-007 by id. ' +
+			'THAT IS EXACTLY WHY IT CANNOT BE A SECOND ENFORCED ROW: the obligation finding type declares ONE code ' +
+			'literal, so both rules would carry the identical marker, one mutant would redden both, and the ' +
+			'register would report two enforced rules where one arrangement had ever been driven. The ' +
+			'distinctness gate forbids it and exists for this case. Same reasoning as RPH-GOV-002. TWO LIMITS ON ' +
+			'THE EQUATION worth recording where they will be found: the "authorized waivers" term is sourced only ' +
+			'from an OBLIGATION whose own status string is WAIVED — no Decision or waiver object is consulted, so ' +
+			'"authorized" is unchecked; and the P2 property test hard-codes `strength: MANDATORY` for every ' +
+			'generated obligation, so the CONDITIONAL/ADVISORY exclusion branch is never generated and is covered ' +
+			'only by the deterministic tests.'
+	},
+	'RPH-CNS-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'propagated (retaining authority and strength)',
+			note: 'JPWB-DOC-003 §6 DEC-4 (Constraint exhaustive disposition), the first of the five dispositions it permits — retention of strength is the clause this rule protects.'
+		},
+		why:
+			'THE ARRANGEMENT CANNOT BE EXPRESSED ON THE WIRE. The kernel arm is written and correct — one line ' +
+			'producing CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY when a propagated strength is non-MANDATORY without ' +
+			'an authority decision — and it reads `propagatedStrength`, a field that exists ONLY on the kernel\'s ' +
+			'own record type. `ConstraintPropagationSchema`, the wire shape both ProposeDecomposition and ' +
+			'ReviseDecomposition carry, is a `z.strictObject` of seven fields and `propagatedStrength` is not among ' +
+			'them; being strict, it would REFUSE the field if a caller sent it. So no dispatch can weaken a ' +
+			'propagated constraint, the antecedent is unreachable, and an OBSERVED_ADMISSION has nothing to ' +
+			'arrange — the RPH-EVD-002 shape. RECORDED BECAUSE THE OPPOSITE READING IS AVAILABLE AND WRONG: an ' +
+			'investigation proposed UNENFORCED_DISCLOSED on the grounds that the field is never populated, which ' +
+			'is true and is not the reason. "Never populated" invites wiring; "not on the wire" says the shape ' +
+			'must be authored first. THE RESIDUE: the day the field is added to the schema, this rule becomes live ' +
+			'with a correct kernel arm already waiting, and nothing here would notice.'
+	},
+	'RPH-CNS-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'a model proposing to soften a mandatory constraint to advisory is rejected without authority',
+			note: 'JPWB-DOC-003 §6 DEC-4, verbatim against the ratified statement — canon and the pre-canon rule are the same sentence twice.'
+		},
+		why:
+			'THE SAME UNREACHABLE ARM AS RPH-CNS-001 — the two are decided by ONE line of kernel code, and the ' +
+			'comment above it says so: "RPH-CNS-001: propagation preserves strength. RPH-CNS-002: weakening ' +
+			'requires authority." Everything recorded on that row about the wire schema applies here. WHAT IS ' +
+			'SHARPER HERE is the rule\'s narrower subject: a mandatory SECURITY constraint. `constraintType` IS ' +
+			'carried on both the command payload and the object, and NO production file branches on it — the gate ' +
+			'keys on strength MANDATORY and a live status only. So even were the strength field wired, the ' +
+			'security-specific reading would still be unenforced, and the two gaps would need separate fixes. ' +
+			'NOTE ALSO that this row is arm 3 while its canon carrier is one of the most emphatic sentences in ' +
+			'DOC-003 — carriage and enforcement are independent axes, which RPH-EXE-007 records in the same ' +
+			'direction.'
+	},
+	'RPH-CNS-004': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'waived through authority',
+			note: 'JPWB-DOC-003 §6 DEC-4 lists waiver as one of the five permitted constraint dispositions but says nothing about expiry; ASR-14\'s "Expired waivers stop waiving" carries the expiry half and is RPH-GOV-006\'s anchor. GENERAL because no canon sentence joins constraint disposition to waiver expiry, which is this rule\'s actual subject.'
+		},
+		why:
+			'A THREE-LIMB OUTCOME CASCADE on an act that cannot be dispatched. (1) "the waiver becomes expired" — ' +
+			'no command expires a waiver and no handler emits WaiverExpired; expiry is COMPUTED, not recorded, and ' +
+			'in exactly one place: the floor gate resolves `expiresAt <= now` against the command\'s own `issuedAt` ' +
+			'(deliberately, so replay stays deterministic — the kernel is clock-free by design). (2) "affected ' +
+			'work becomes review-required" — no such effect exists anywhere. (3) "baseline promotion is blocked" — ' +
+			'that is RPH-GOV-006, which is a disclosure, and filing it here as well would let one gap green two ' +
+			'rows. THE CONSTRAINT-SIDE ARM IS UNREACHABLE FOR THE SAME REASON AS RPH-CNS-001/002: the kernel\'s ' +
+			'WAIVED_EXPIRED branch reads `waiverExpired`, and `ConstraintPropagationSchema` has no such field, so ' +
+			'no dispatch can assert it. The engine therefore knows how to expire a waiver at ONE gate, and the ' +
+			'constraint and promotion planes cannot ask.'
 	}
 };
 
