@@ -295,7 +295,30 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
 					? `ApproveDecision cannot make WAIVER decision ${command.targetAggregateId} effective: a waiver becomes effective only via GrantWaiver, whose WaiverGranted event is the waiver fact the assurance floor audits. Approving it here would discharge the floor with no WaiverGranted fact recorded.`
 					: null
 		),
-		fromStates('PROPOSED')
+		fromStates('PROPOSED'),
+		// The ratified payload field is no longer WRITTEN (above), so this is what stops it becoming decorative:
+		// an approver may still state the versions it believes it is approving, and what it states must match the
+		// pin. Scoped to subjects the PIN covers — `proposeDecision` pins only objects the store could load, so a
+		// payload entry for a subject that never existed has nothing to disagree with. Whether a Decision may name
+		// a subject that was never created is a SEPARATE question (11 of the 13 divergences the REG-F-017 survey
+		// found were exactly that), and bundling it here would make one fix carry two rules.
+		predicate(
+			'the stated subject versions disagree with the versions pinned when the decision was proposed',
+			({ state, payload, command }) => {
+				const claimed = (payload as { subjectSemanticVersions?: Record<string, number> })
+					.subjectSemanticVersions;
+				if (!claimed) return null;
+				const pinned = (state.subjectSemanticVersions as Record<string, number> | undefined) ?? {};
+				const wrong = Object.entries(claimed)
+					.filter(([id, v]) => pinned[id] !== undefined && pinned[id] !== v)
+					.map(([id, v]) => `${id} stated@${v} pinned@${pinned[id]}`);
+				return wrong.length === 0
+					? null
+					: `ApproveDecision ${command.targetAggregateId}: the approval states subject version(s) that are ` +
+						`not the ones this decision pinned when it was proposed (${wrong.join('; ')}). A decision binds ` +
+						`the versions that were REVIEWED; to approve different ones, propose again (DOC-003 ASR-15).`;
+			}
+		)
 	),
 	(base, command) => {
 		const p = command.payload as ApproveDecisionPayload;
@@ -305,7 +328,18 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
 			rationale: p.rationale,
 			consideredEvidenceIds: p.consideredEvidenceIds,
 			consideredObservationIds: p.consideredObservationIds,
-			subjectSemanticVersions: p.subjectSemanticVersions,
+			// REG-F-017 / REG-F-014 instance 2 (2026-08-03): `subjectSemanticVersions: p.subjectSemanticVersions`
+			// USED TO BE HERE, overwriting the pin `proposeDecision` read from the store one command earlier. So the
+			// version binding RPH-GOV-003 and canon ASR-15 both rest on was, at the moment of approval, whatever the
+			// approver said it was. THE PIN IS NOW IMMUTABLE: it records the versions that existed when the decision
+			// was PROPOSED, which is what the approver reviewed.
+			//
+			// DERIVING IT AFRESH AT APPROVAL WAS TRIED AND REJECTED, and the reason is worth keeping: it would make
+			// the ENGINE perform the laundering the rule forbids. An approver who reviewed v1 and approves after the
+			// subject silently moved to v2 would be RECORDED as approving v2 — the caller's untrue number replaced by
+			// an engine's untrue number. `authority` got the opposite remedy (derive/refuse) because it is a fact
+			// about the CALLER; a subject version is a fact about a MOMENT, and the moment that binds is the review.
+			// Staleness is caught where the rule places it — at promotion, by `decisionAuthorizesVersions`.
 			effectiveAt: command.issuedAt
 		};
 	}

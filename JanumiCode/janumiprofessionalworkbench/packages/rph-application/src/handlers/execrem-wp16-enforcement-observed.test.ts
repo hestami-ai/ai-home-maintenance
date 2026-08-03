@@ -443,7 +443,10 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 					'ProposeDecision',
 					{
 						decisionType: 'PROMOTE_BASELINE',
-						subjectObjectIds: [v.pwu],
+						// The INTENT joins the subjects for the stale-version arrangement ONLY, because it is one of the
+						// three aggregates whose semanticVersion can move (REG-F-017). The other three defects are
+						// untouched, so their probes keep the exact decision they had.
+						subjectObjectIds: defect === 'stale-version' ? [v.pwu, INT2] : [v.pwu],
 						selectedOption: 'promote',
 						rationale: 'ready',
 						authority: actor
@@ -455,8 +458,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			);
 			const wantsNoDecision = defect === 'no-decision' && !pass;
 			if (!wantsNoDecision) {
-				// The stale-version defect approves the decision binding version 2 while the subject is at 1.
-				const boundVersion = defect === 'stale-version' && !pass ? 2 : 1;
+				// RE-BASED 2026-08-03 (REG-F-017). This used to approve the decision binding version 2 while the
+				// subject sat at 1 — which it could only do because `approveDecision` wrote the caller's number over
+				// the store's pin, the very defect REG-F-014 records. The approval now states what was pinned, and
+				// the staleness is arranged BELOW by moving a subject for real. It could not be moved by using the
+				// PWU: a PWU's semanticVersion is 1 forever — only INTENT, DECOMPOSITION_CONTRACT and PWA can bump.
 				ok(
 					dispatch(
 						'ApproveDecision',
@@ -465,13 +471,43 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 							rationale: 'ready',
 							consideredEvidenceIds: [],
 							consideredObservationIds: [],
-							subjectSemanticVersions: { [v.pwu]: boundVersion }
+							subjectSemanticVersions:
+								defect === 'stale-version' ? { [v.pwu]: 1, [INT2]: 1 } : { [v.pwu]: 1 }
 						},
 						v.dec,
 						'DECISION'
 					),
 					'approve promotion decision'
 				);
+			}
+
+			// THE ARRANGING ACT for stale-version, and the only difference between its two runs: an approved
+			// subject is materially revised AFTER the approval, so the decision's pin stops describing the world.
+			// Nothing about the decision is edited — which is the rule's actual scenario, and the first time this
+			// probe has asserted it from a true premise.
+			if (defect === 'stale-version' && !pass) {
+				const intent = (t: string, payload: unknown) => ok(dispatch(t, payload, INT2, 'INTENT'), t);
+				intent('BeginIntentDiscovery', {});
+				intent('ProvisionIntent', { ambiguityIds: [] });
+				intent('FormalizeIntent', {
+					formalizedObjective: 'ship it',
+					desiredOutcomes: [{ description: 'the thing ships' }],
+					successConditions: [{ statement: 'the review passes' }],
+					nonGoals: [],
+					ambiguityIds: [],
+					constraintIds: [],
+					stakeholderIds: []
+				});
+				intent('ApproveIntent', {
+					decisionId: v.dec,
+					approvedSemanticVersion: 1,
+					approvalScope: 'the intent'
+				});
+				intent('ReviseIntent', { changeRationale: 'the client widened the scope' });
+				expect(
+					store.loadObject(INT2)?.semanticVersion,
+					'the subject must really have moved, or this probe asserts staleness over an unchanged world'
+				).toBe(2);
 			}
 
 			ok(

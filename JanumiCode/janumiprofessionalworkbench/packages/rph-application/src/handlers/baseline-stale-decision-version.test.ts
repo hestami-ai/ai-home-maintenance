@@ -48,9 +48,23 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 		return (store.loadObject(id)?.state as Record<string, string>)[field] ?? '';
 	}
 
-	/** Build the full intent→pwu→assessment→decision→baseline chain, approving the decision at `approvedVersion`
-	 *  for the subject (whose current semantic version is 1). */
-	function setup(approvedVersion: number) {
+	/**
+	 * Build the full intent→pwu→assessment→decision→baseline chain. When `staleAfterApproval` is true, a SUBJECT
+	 * OF THE DECISION really moves after the decision is approved, so the decision's pinned versions stop
+	 * describing the world.
+	 *
+	 * WHY THE INTENT CARRIES THE STALENESS AND NOT THE PWU (REG-F-017, 2026-08-03). This test used to make the
+	 * decision bind v2 by having the approver STATE v2 while the subject sat at v1 — the caller-supplied-fact
+	 * bug REG-F-014 records, used as a fixture device. `approveDecision` no longer writes the caller's number,
+	 * so that premise is gone; and it cannot simply be replaced by moving the PWU, because A PWU'S
+	 * semanticVersion NEVER MOVES — censused: only INTENT (ReviseIntent), DECOMPOSITION_CONTRACT
+	 * (ReviseDecomposition) and PWA (the authoring commands) can ever bump one. So the decision names the
+	 * intent as a co-subject alongside the baselined PWU, and the intent is genuinely revised. The rule under
+	 * test is 'a decision approving version n never authorizes version n+1'; a subject moving is a subject
+	 * moving, whichever subject it is. This arrangement asserts the refusal from a TRUE premise for the first
+	 * time.
+	 */
+	function setup(staleAfterApproval: boolean) {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
@@ -113,7 +127,9 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 			'ProposeDecision',
 			{
 				decisionType: 'PROMOTE_BASELINE',
-				subjectObjectIds: [PWU_ID],
+				// The INTENT is a co-subject precisely because it is one of the three aggregates whose semantic
+				// version can move; the PWU is the baselined item and its version is 1 forever.
+				subjectObjectIds: [PWU_ID, INTENT_ID],
 				selectedOption: 'promote',
 				rationale: 'ready',
 				authority: human
@@ -127,10 +143,44 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 				rationale: 'ready',
 				consideredEvidenceIds: [],
 				consideredObservationIds: [],
-				subjectSemanticVersions: { [PWU_ID]: approvedVersion }
+				// States what the decision pinned at proposal. Stating anything else is now refused: the approval
+				// binds the versions that were REVIEWED (REG-F-017).
+				subjectSemanticVersions: { [PWU_ID]: 1, [INTENT_ID]: 1 }
 			},
 			{ targetAggregateId: DEC }
 		);
+		// THE ARRANGING ACT, and the only difference between the two runs: the intent the decision approved is
+		// materially revised AFTER the approval, bumping its semanticVersion 1 -> 2. The decision's pin still
+		// says 1. Nothing about the decision is edited — the world moved, which is the rule's actual scenario.
+		if (staleAfterApproval) {
+			const intent = (t: string, payload: unknown) =>
+				dispatch(t, payload, { targetAggregateId: INTENT_ID, targetAggregateType: 'INTENT' });
+			const step = (t: string, payload: unknown) => {
+				const r = intent(t, payload);
+				expect(r.status, `${t}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			};
+			step('BeginIntentDiscovery', {});
+			step('ProvisionIntent', { ambiguityIds: [] });
+			step('FormalizeIntent', {
+				formalizedObjective: 'ship the architecture',
+				desiredOutcomes: [{ description: 'a coherent structure' }],
+				successConditions: [{ statement: 'the review passes' }],
+				nonGoals: ['vendor selection'],
+				ambiguityIds: [],
+				constraintIds: [],
+				stakeholderIds: []
+			});
+			step('ApproveIntent', {
+				decisionId: DEC,
+				approvedSemanticVersion: 1,
+				approvalScope: 'the architecture intent'
+			});
+			step('ReviseIntent', { changeRationale: 'the client widened the scope' });
+			expect(
+				store.loadObject(INTENT_ID)?.semanticVersion,
+				'the subject must really have moved — otherwise this test asserts staleness over a world that did not change'
+			).toBe(2);
+		}
 		dispatch(
 			'CreateBaseline',
 			{ baselineType: 'ARCHITECTURE', itemObjectIds: [PWU_ID], assuranceAssessmentIds: [ASSESS] },
@@ -153,7 +203,7 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 	}
 
 	it('rejects promotion when the decision bound a version other than the subject current version (RPH-GOV-003)', () => {
-		setup(2); // decision approved PWU@v2, but the subject's current semantic version is 1 → stale
+		setup(true); // the approved intent was revised after approval → the decision's pin is stale
 		const r = promote();
 		expect(r.status).not.toBe('ACCEPTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
@@ -162,7 +212,7 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 	});
 
 	it('promotes when the decision bound the subject current version (the control must discriminate)', () => {
-		setup(1); // decision approved PWU@v1 == current → authorizes
+		setup(false); // nothing moved after approval → every pinned version is still current → authorizes
 		const r = promote();
 		expect(r.status).toBe('ACCEPTED');
 		expect(statusOf(BASE)).toBe('AUTHORITATIVE');
