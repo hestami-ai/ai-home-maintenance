@@ -684,6 +684,117 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-DEC-002': null,
 		'RPH-DEC-003': null,
 		'RPH-CNS-003': null,
+		'RPH-DEC-005': {
+			arrangement:
+				'a decomposition proposed with NO recompositionContractId, marked VALID — accepted; the control omits it too but leaves a mandatory obligation unallocated and IS refused',
+			run: () => {
+				const mk = (t: string) => ({
+					int: `int_01ARZ3NDEKTSV4RRFFQ69J10${t}0`,
+					parent: `pwu_01ARZ3NDEKTSV4RRFFQ69J10${t}1`,
+					child: `pwu_01ARZ3NDEKTSV4RRFFQ69J10${t}2`,
+					obl: `obl_01ARZ3NDEKTSV4RRFFQ69J10${t}3`,
+					dcp: `dcp_01ARZ3NDEKTSV4RRFFQ69J10${t}4`
+				});
+				const drive = (allocate: boolean): Outcome => {
+					const v = mk(allocate ? 'A' : 'B');
+					ok(
+						dispatch(
+							'CaptureIntent',
+							{ intentId: v.int, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+							v.int,
+							'INTENT'
+						),
+						'capture intent'
+					);
+					ok(
+						dispatch(
+							'AssertObligation',
+							{
+								statement: 'Isolate tenant data',
+								obligationType: 'SECURITY',
+								sourceObjectId: v.parent,
+								authority: {
+									authorityId: 'auth_arch',
+									authorityType: 'ORGANIZATIONAL_ROLE',
+									scope: ['architecture'],
+									validFrom: TS
+								},
+								strength: 'MANDATORY'
+							},
+							v.obl,
+							'OBLIGATION'
+						),
+						'assert obligation'
+					);
+					const pwu = (id: string, obligationIds: string[]) =>
+						ok(
+							dispatch(
+								'ProposePwu',
+								{
+									pwuId: id,
+									pwuKind: 'ARCHITECTURE',
+									title: id,
+									description: 'd',
+									intentId: v.int,
+									boundaries: {
+										inScope: [],
+										outOfScope: [],
+										permittedChanges: [],
+										prohibitedChanges: []
+									},
+									obligationIds,
+									constraintIds: [],
+									assumptionIds: [],
+									expectedOutputs: [],
+									assurancePolicyIds: [],
+									riskProfile: {
+										consequence: 'HIGH',
+										uncertainty: 'MEDIUM',
+										irreversibility: 'MEDIUM',
+										securitySensitivity: 'HIGH',
+										regulatoryExposure: 'LOW'
+									}
+								},
+								id,
+								'PROFESSIONAL_WORK_UNIT'
+							),
+							`propose ${id}`
+						);
+					pwu(v.parent, [v.obl]);
+					pwu(v.child, []);
+					// NEITHER arrangement names a recompositionContractId. The ONLY difference is whether the
+					// mandatory obligation is accounted for — so the control proves the guard is live and refusing,
+					// while the admitted case proves it has no limb for the recomposition contract.
+					ok(
+						dispatch(
+							'ProposeDecomposition',
+							{
+								parentWorkUnitId: v.parent,
+								childWorkUnitIds: [v.child],
+								rationale: 'split',
+								...(allocate ? { retainedParentObligationIds: [v.obl] } : {})
+							},
+							v.dcp,
+							'DECOMPOSITION_CONTRACT'
+						),
+						'propose decomposition'
+					);
+					const r = dispatch(
+						'ValidateDecomposition',
+						{ disposition: 'VALID' },
+						v.dcp,
+						'DECOMPOSITION_CONTRACT'
+					);
+					if (allocate)
+						expect(
+							(store.loadObject(v.dcp)?.state as { status: string }).status,
+							'VALID with no recomposition contract IS the admission'
+						).toBe('VALID');
+					return r;
+				};
+				return { admitted: drive(true), control: drive(false) };
+			}
+		},
 		'RPH-DEC-001': null,
 		'RPH-DEC-004': null,
 		'RPH-DEC-006': null,

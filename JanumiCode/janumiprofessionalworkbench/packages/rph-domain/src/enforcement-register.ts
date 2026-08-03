@@ -454,7 +454,8 @@ export type RegisteredRuleId =
 	| 'RPH-BAS-004'
 	| 'RPH-BAS-006'
 	| 'RPH-GOV-003'
-	| 'RPH-ASM-006';
+	| 'RPH-ASM-006'
+	| 'RPH-DEC-005';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -3375,6 +3376,49 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'TWO STATUSES THE PREDICATE REFUSES AND NO COMMAND CAN REACH: FALSIFIED and SUPERSEDED. Only DetectAssumption and ExpireAssumption exist, so EXPIRED is the sole reachable arm of the three. This row is enforced on one third of its own predicate.',
 			'AND THE SET IT WALKS IS WRITE-ONCE: only ProposePwu writes `assumptionIds`, so an Assumption created later by DetectAssumption can never become gatable on an already-proposed PWU. The rule holds for assumptions declared at proposal time and for no others.'
 		]
+	},
+	// ── RPH-DEC-005 — THE THIRD LIMB OF THE DECOMPOSITION CONTRACT, GATED NOWHERE ────────────────────────────
+	//
+	// RPH-DEC-001 names three conditions for a decomposition to become VALID. Two are enforced (RPH-DEC-002,
+	// RPH-DEC-003). The third — "has a recomposition contract" — is read by nothing: `recompositionContractId` is
+	// written onto the contract by ProposeDecomposition, echoed into the event, and never loaded, compared or
+	// required by any guard or precondition. The ValidateDecomposition guard runs `checkDecompositionConservation`
+	// and nothing else, and that function builds obligation and constraint inputs only.
+	//
+	// THE PRODUCER OF THE FINDING IS THE DEAD DOMAIN COMPOSITION, which is also RPH-DEC-004's producer — so
+	// MISSING_RECOMPOSITION_CONTRACT can no more reach a CommandResult than CHILD_INTENT_DIVERGENCE can. This row
+	// is guarded by OBSERVATION rather than a census for the reason RPH-DEC-004's row records: a census over that
+	// symbol returns four files, because the application handler exports a function of the same name.
+	'RPH-DEC-005': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'and a recomposition strategy',
+			note: 'JPWB-DOC-003 §6 DEC-2, the last item of the mandatory contract\'s enumeration, immediately followed by "A decomposition is incomplete until it explains how child results will establish the parent claim" — which is RPH-DEC-001\'s anchor. The two rules are the enumeration and its consequence.'
+		},
+		why:
+			'"CANNOT BECOME VALID" IS A REFUSAL OF THE VALID TRANSITION, and no production site performs it. Nothing ' +
+			'requires, reads or resolves a recomposition contract before a decomposition is marked VALID; the ' +
+			'carrier field is write-only. NOR IS THE LINK ENFORCED IN THE OTHER DIRECTION: `ProposeRecomposition` ' +
+			'takes a parent and required children and never references the decomposition contract that should have ' +
+			'named it, so the two objects are related by a string nothing checks. THE RULE\'S OWN QUALIFIER IS ALSO ' +
+			'UNDEFINED — "a MATERIAL parent" has no field, predicate or classifier on the command plane deciding ' +
+			'materiality, so even a wired gate would have to invent the scope. A NEAR-MISS THAT LOOKS LIKE ' +
+			'COVERAGE, named so it is not mistaken for it: the handler file cites "§14.1 / RPH-DEC-005/006" over ' +
+			'`completeRecomposition` — but that handler evaluates an ALREADY-EXISTING recomposition contract. It ' +
+			'cannot check that a decomposition HAS one, which is the entire content of this rule.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'ValidateDecomposition -> VALID on a decomposition proposed with NO recompositionContractId at all — accepted, and the contract really advances to VALID',
+			control:
+				'the byte-adjacent decomposition that also omits the recomposition contract but leaves a MANDATORY parent obligation unallocated, refused at the SAME guard with MISSING_OBLIGATION_ALLOCATION — so the acceptance is a missing limb of a live gate, not a gate that never refuses',
+			whyNoPredicate:
+				'The only producer of MISSING_RECOMPOSITION_CONTRACT is the domain decomposition composition, and a ' +
+				'census over its identifier returns FOUR files because the application handler exports a function ' +
+				'of the same name. The guard would look wired while the rule went unenforced — the same collision ' +
+				'RPH-DEC-004 records, which is why that row names a different symbol and this one observes instead.'
+		}
 	}
 };
 

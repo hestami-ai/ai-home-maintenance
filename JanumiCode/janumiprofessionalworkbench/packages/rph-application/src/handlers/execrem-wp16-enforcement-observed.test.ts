@@ -1287,6 +1287,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				'a constraint dispositioned INAPPLICABLE with NO rationale, against the byte-adjacent record that carries one',
 			run: () => decompositionProbe('rationale'),
 		},
+		'RPH-DEC-005': null,
 		'RPH-DEC-001': null,
 		'RPH-DEC-004': null,
 		'RPH-DEC-006': null,
