@@ -167,7 +167,12 @@ const TOTAL_OVER_FAMILIES: readonly string[] = [
 	'RPH-DEC-',
 	'RPH-CNS-',
 	'RPH-ASM-',
-	'RPH-BAS-'
+	'RPH-BAS-',
+	// ADDED 2026-08-03, one step after the four above — RPH-GOV was held out of that same edit at six of seven
+	// because RPH-GOV-006 was a disclosure without its observation. It has one now (an expired waiver is invisible
+	// to baseline promotion, `disclosure-observed.test.ts`), so the family closes. This is the FIFTH time the
+	// absence from this list has been the load-bearing claim, and the first time it lasted a single commit.
+	'RPH-GOV-'
 ];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {

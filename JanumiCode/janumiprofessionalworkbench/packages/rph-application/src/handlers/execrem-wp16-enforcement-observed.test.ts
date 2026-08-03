@@ -1273,6 +1273,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// declared union. GOV-003/005 (ENFORCED) and GOV-006 (DISCLOSED) still owe observations.
 		'RPH-GOV-002': null,
 		'RPH-GOV-004': null,
+		'RPH-GOV-006': null, // UNENFORCED_DISCLOSED — observed in disclosure-observed.test.ts
 		'RPH-GOV-007': null,
 		// ── THE THREE CONSERVATION PROBES ─────────────────────────────────────────────────────────────────────
 		// One site, one message, three finding codes. Each probe's CONTROL is the byte-adjacent arrangement that

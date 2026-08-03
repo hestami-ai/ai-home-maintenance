@@ -26,14 +26,14 @@
 //   NOT_A_COMMAND_REFUSAL  the statement asserts an outcome, a permission, or a plane that does not exist. A
 //                          declared silence with a reason, so it is distinguishable from an omission.
 //
-// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-03. The register is TOTAL over FOURTEEN families of
+// SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-03. The register is TOTAL over FIFTEEN families of
 // the ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`) — `RPH-EXE`, `RPH-EVD`, `RPH-ASR`,
 // `RPH-INT`, `RPH-PWU`, `RPH-CON`, `RPH-PER`, `RPH-PRJ`, `RPH-TRC`, `RPH-CMP`, `RPH-DEC`, `RPH-CNS`, `RPH-ASM`,
-// `RPH-BAS` — which is **105 of the catalog's 125 rules**. It HOLDS 111 rows: the extra six are RPH-GOV, at six of
-// seven, which stays out of the gate until its last rule lands (see below). A new rule in any of the fourteen with
-// no row is a FAILING TEST, not a discovery, and the families are listed as DATA in `enforcement-register.test.ts`
-// (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family cannot be silently dropped from the gate
-// either. Both numbers are derivable from this file and the catalog; neither is chosen.
+// `RPH-BAS`, `RPH-GOV` — which is **112 of the catalog's 125 rules, and the CEILING of what this instrument can
+// reach**. A new rule in any of the fifteen with no row is a FAILING TEST, not a discovery, and the families are
+// listed as DATA in `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a
+// family cannot be silently dropped from the gate either. The number is derivable from this file and the catalog;
+// it is not chosen.
 //
 // A FAMILY'S ABSENCE FROM THAT LIST IS ITSELF A CLAIM, and twice it has been a load-bearing one. RPH-PWU held 5,
 // then 8, then 9 of its ten rules across three commits, and RPH-PER held 12 of 14 for one, each staying OUT of
@@ -41,34 +41,29 @@
 // and landing a disclosure without its observation is the one thing that arm may never do. "Not yet total" was
 // gated rather than asserted.
 //
-// THE 14 RULES NOT YET DISPOSED, counted rather than gestured at, because a scope paragraph that goes stale is the
+// THE 13 RULES NOT DISPOSED, counted rather than gestured at, because a scope paragraph that goes stale is the
 // exact drift this module exists to prevent — and this one HAS gone stale twice: once still listing
 // RPH-PER/PRJ/TRC/CON as owed after all four had closed, and once still claiming 31 rules were in reach after four
-// of the five families in that list had been taken total.
-//
-//   IN REACH AND GENUINELY OWED — ONE rule: `RPH-GOV-006`. It is a disclosure (`canPromoteBaseline` loops
-//   `requiredWaivers ?? []` and the sole production caller never supplies the field) and it owes a NON-VACUOUS
-//   arrangement, which is the whole difficulty: the promotion path has no waiver logic at all, so the expired
-//   waiver has to be isolated from the RPH-BAS-003 block that would refuse the same command for a different
-//   reason. Until it lands, RPH-GOV stays OUT of `TOTAL_OVER_FAMILIES` — landing a disclosure without its
-//   observation is the one thing that arm may never do.
+// of the five families in that list had been taken total. NOTHING IN REACH REMAINS OWED.
 //
 //   OUT OF REACH BY CONSTRUCTION — 13 rules: `RPH-FIX` (6) and `RPH-E2E` (7), the fixture-replay and end-to-end
 //   scenario families. Both are legitimately DEFERRED in the conformance manifest with named work packages. They
 //   are the only two prefixes left in `DEFERRABLE_PREFIXES`, and after REG-F-013 that set is treated as the most
 //   dangerous data in the manifest: an entry there does not weaken a claim, it deletes it.
 //
-//   SO THE REACHABLE CEILING IS 112 OF 125, and the register is one rule short of it. That is not "nearly done":
-//   the thirteen out-of-reach rules are out of reach BY THIS INSTRUMENT, which observes command refusals. A
-//   fixture-replay rule is not thereby enforced, only unobservable here — the same distinction the disclosure arm
-//   exists to keep visible.
+//   THE CEILING IS NOT COMPLETION, and this is the sentence most likely to be misread now that the number has
+//   stopped moving. The thirteen are out of reach BY THIS INSTRUMENT, which observes COMMAND REFUSALS through
+//   `Engine.dispatch`. A fixture-replay rule is not thereby enforced — it is unobservable here, which is a fact
+//   about the register and not about the rule. Reaching them needs a different instrument (a replay harness that
+//   can assert over a recorded event log), not another row in this file. The same distinction the disclosure arm
+//   exists to keep visible, applied to the register itself.
 //
-// WHAT "TOTAL OVER FOURTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
-// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 111 rows, 29 are
-// ENFORCED, 24 are UNENFORCED_DISCLOSED and 58 are NOT_A_COMMAND_REFUSAL — so a MAJORITY of the catalog's
-// command-layer rules are, by this register's own accounting, not refusals the engine performs. Including all
-// fourteen read-model rules. The register's value is that those are now written down and gated, not that they are
-// closed.
+// WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
+// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 29 are
+// ENFORCED, 25 are UNENFORCED_DISCLOSED and 58 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
+// catalog is a refusal the engine actually performs, and a MAJORITY states outcomes, permissions, or planes that do
+// not exist. Including all fourteen read-model rules. The register's value is that those are now written down and
+// gated, not that they are closed; the honest headline is 29, not 112.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
@@ -467,7 +462,9 @@ export type RegisteredRuleId =
 	| 'RPH-GOV-003'
 	| 'RPH-ASM-006'
 	| 'RPH-DEC-005'
-	| 'RPH-GOV-005';
+	| 'RPH-GOV-005'
+	// RPH-GOV CLOSED 7/7 (2026-08-03) — the last rule in reach of this instrument.
+	| 'RPH-GOV-006';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -3353,6 +3350,62 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'drop OPEN from UNSETTLED_DISPOSITIONS — an open finding then reads as settled',
 			'THE RULE\'S OWN NARROWING IS UNENFORCED: it names an "open blocking TENANT-ISOLATION finding", and no production code keys on tenant isolation, or on any finding category. The gate is severity-and-disposition only, so the general rule is enforced and the specific one is not.'
 		]
+	},
+	// THE NEIGHBOUR ARGUMENT, DISCLOSED. RPH-BAS-003's row above records that `promoteBaseline` once passed
+	// `openObservations: []` and no observation ever blocked a promotion. `requiredWaivers` is the argument beside
+	// it in the same call, and it is not passed at all — so `findExpiredWaivers` walks `[]` on every promotion the
+	// system can make. Same call, same shape, one repaired and one not.
+	//
+	// WHY THIS IS NOT A DEAD_PREDICATE CENSUS, since the arm looks exactly like one. `findExpiredWaivers` is CALLED
+	// — once per promotion, from `canPromoteBaseline` — so it fails `deadPredicate`'s first clause, the same reason
+	// RPH-ASR-010 is guarded by observation. What is missing is an ARGUMENT, and an absent argument has no symbol to
+	// grep for. This is the third distinct shape of "unenforced" the register has had to hold: a dead predicate, a
+	// rule implemented at neither layer, and now a live predicate starved of its input.
+	//
+	// AND THE GAP IS WIDER THAN THE MISSING ARGUMENT, which is the part worth recording rather than filing as a
+	// one-line wiring task. NOTHING IN THIS SYSTEM MARKS A WAIVER AS REQUIRED BY A PROMOTION — no field, no link, no
+	// derivation. A waiver names `waivedFindingIds`; the promotion gate reads observations BY SUBJECT and never
+	// consults a waiver at all. So a waiver cannot become "required", cannot therefore become an expired required
+	// waiver, and the rule's antecedent is unreachable BY CONSTRUCTION rather than merely unchecked. Supplying
+	// `requiredWaivers` from the handler would not close this rule; it would first need something to supply.
+	//
+	// THE CONSEQUENCE, stated plainly because it is the operative fact for a reader deciding what to trust: an
+	// expired waiver has NO effect on baseline promotion. It has one on the FLOOR path, where `waiverStillDischarges`
+	// reads `expired` and an expired waiver stops discharging (RPH-GOV-005's neighbourhood) — so the same expiry
+	// that is honoured at publication is invisible at promotion. Canon ASR-14 states both halves in one sentence.
+	'RPH-GOV-006': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Expired waivers stop waiving — an expired required waiver blocks promotion',
+			note: 'JPWB-DOC-003 §8 ASR-14 (A waiver accepts risk; it never rewrites truth), verbatim and at full strength — canon names PROMOTION specifically, so this is not a rule the corpus states only in general form. The first clause is honoured on the floor path; the second, which is this rule, is honoured nowhere.'
+		},
+		why:
+			'`canPromoteBaseline` carries a correct arm for this rule — `findExpiredWaivers` emits ' +
+			'EXPIRED_REQUIRED_WAIVER for any `requiredWaivers` entry whose `expired` is true — and it is asked on ' +
+			'every promotion. But `promoteBaseline`, the sole production caller, builds that input with SIX fields ' +
+			'and `requiredWaivers` is not among them, so the loop runs over `[]` every time and the code is ' +
+			'unreachable in production. THE ABSENCE IS STRUCTURAL, NOT A MISSING LINE: nothing anywhere marks a ' +
+			'waiver as REQUIRED BY a promotion — the waiver names findings, the gate reads observations by subject, ' +
+			'and no field or derivation joins them — so the rule\'s antecedent cannot arise. Observed: a promotion ' +
+			'over an item covered by a waiver whose expiresAt is a month past the command\'s issuedAt is ACCEPTED, ' +
+			'with no finding of any kind. The same expiry IS honoured at the publication floor, where ' +
+			'`waiverStillDischarges` reads it — so an expired waiver stops waiving at one protected transition and ' +
+			'not at the other.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'PromoteBaseline over an item covered by an EFFECTIVE waiver whose expiresAt (2026-07-01) is a month before the command\'s issuedAt (2026-08-01) — ACCEPTED, and the baseline becomes AUTHORITATIVE',
+			control:
+				'the identical promotion, with the identical expired waiver, plus an OPEN BLOCKING observation over the same baselined item — REFUSED with OPEN_BLOCKING_FINDING at the same gate. The expired waiver is present in BOTH runs precisely because it is not the variable: the control shows the gate reads this item set and refuses, and that the waiver contributes nothing either way.',
+			whyNoPredicate:
+				'`findExpiredWaivers` is not dead — `canPromoteBaseline` calls it on every promotion — so naming ' +
+				'it would fail the census\'s first clause, the same reason RPH-ASR-010 is guarded by observation. ' +
+				'What is absent is the ARGUMENT `requiredWaivers`, and an absent argument has no symbol whose ' +
+				'reference set a grep could watch. A behavioural guard is also strictly the right instrument here: ' +
+				'it reddens the day a promotion starts refusing an expired waiver, whether that comes from wiring ' +
+				'the existing arm or from building the waiver-to-promotion link the rule actually presupposes.'
+		}
 	},
 	'RPH-BAS-004': {
 		kind: 'ENFORCED',

@@ -684,6 +684,233 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-DEC-002': null,
 		'RPH-DEC-003': null,
 		'RPH-CNS-003': null,
+		/**
+		 * RPH-GOV-006 — "Requesting baseline promotion when a required waiver is expired is rejected."
+		 *
+		 * The kernel arm EXISTS and is correct: `findExpiredWaivers` walks `requiredWaivers` and emits
+		 * EXPIRED_REQUIRED_WAIVER for any whose `expired` is true. It is called by `canPromoteBaseline` on the live
+		 * promotion path. What is missing is the ARGUMENT: `promoteBaseline` builds that input with six fields and
+		 * `requiredWaivers` is not one of them, so the loop iterates `[]` on every dispatch the system can make.
+		 *
+		 * NOT A DEAD_PREDICATE CENSUS, and the reason is the same one RPH-ASR-010's row records: the predicate is
+		 * NOT dead — it is asked, once per promotion — so naming it would fail `deadPredicate`'s first clause. The
+		 * absent thing is a caller that KNOWS which waivers a promotion requires, and an absent argument has no
+		 * symbol to grep for.
+		 *
+		 * AND THE ABSENCE GOES DEEPER THAN THE ARGUMENT, which is why the arrangement below is honest rather than
+		 * merely legal. Nothing in this system marks a waiver as REQUIRED BY a promotion: there is no field, no
+		 * link, no derivation. The `waivedFindingIds` on the waiver point at observations, and the promotion gate
+		 * reads observations by SUBJECT rather than by waiver. So a waiver cannot become required, cannot therefore
+		 * become an expired required waiver, and the rule's antecedent is unreachable by construction — not merely
+		 * unchecked. Wiring `requiredWaivers` from a caller would still need that link to exist first.
+		 */
+		'RPH-GOV-006': {
+			arrangement:
+				'PromoteBaseline over an item covered by a WAIVER whose expiresAt is already past at the command\'s issuedAt — accepted, with no finding; the control adds an OPEN BLOCKING observation over the same item and IS refused at the same site',
+			run: () => {
+				const mk = (t: string) => ({
+					int: `int_01ARZ3NDEKTSV4RRFFQ69J20${t}0`,
+					pwu: `pwu_01ARZ3NDEKTSV4RRFFQ69J20${t}1`,
+					asmt: `asmt_01ARZ3NDEKTSV4RRFFQ69J20${t}2`,
+					dec: `dec_01ARZ3NDEKTSV4RRFFQ69J20${t}3`,
+					base: `base_01ARZ3NDEKTSV4RRFFQ69J20${t}4`,
+					obs: `obs_01ARZ3NDEKTSV4RRFFQ69J20${t}5`,
+					wvr: `dec_01ARZ3NDEKTSV4RRFFQ69J20${t}6`
+				});
+				const drive = (clean: boolean): Outcome => {
+					const v = mk(clean ? 'A' : 'B');
+					const POL = `pol_gov6_${clean ? 'A' : 'B'}`;
+					seedPolicy(POL);
+					ok(
+						dispatch(
+							'CaptureIntent',
+							{ intentId: v.int, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+							v.int,
+							'INTENT'
+						),
+						'capture intent'
+					);
+					ok(
+						dispatch(
+							'ProposePwu',
+							{
+								pwuId: v.pwu,
+								pwuKind: 'ARCHITECTURE',
+								title: 'subject',
+								description: 'd',
+								intentId: v.int,
+								boundaries: {
+									inScope: [],
+									outOfScope: [],
+									permittedChanges: [],
+									prohibitedChanges: []
+								},
+								obligationIds: [],
+								constraintIds: [],
+								assumptionIds: [],
+								expectedOutputs: [],
+								assurancePolicyIds: [],
+								riskProfile: {
+									consequence: 'HIGH',
+									uncertainty: 'MEDIUM',
+									irreversibility: 'MEDIUM',
+									securitySensitivity: 'HIGH',
+									regulatoryExposure: 'LOW'
+								}
+							},
+							v.pwu,
+							'PROFESSIONAL_WORK_UNIT'
+						),
+						'propose subject pwu'
+					);
+					ok(
+						dispatch(
+							'RequestAssuranceAssessment',
+							{
+								assessmentId: v.asmt,
+								assurancePolicyId: POL,
+								policyVersion: '1',
+								subjectObjectIds: [v.pwu],
+								subjectSemanticVersions: { [v.pwu]: 1 },
+								claimIds: []
+							},
+							v.asmt,
+							'ASSURANCE_ASSESSMENT'
+						),
+						'request assessment'
+					);
+					ok(
+						dispatch(
+							'CompleteAssuranceAssessment',
+							{
+								validatorResult: floorValidatorResult({
+									assessmentId: v.asmt,
+									policyId: POL,
+									subjectId: v.pwu,
+									subjectSemanticVersion: 1,
+									disposition: 'SATISFIED'
+								})
+							},
+							v.asmt,
+							'ASSURANCE_ASSESSMENT'
+						),
+						'complete assessment'
+					);
+
+					// THE EXPIRED WAIVER, in BOTH runs. It is not the variable — it is the constant the rule says must
+					// block, and the point is that it never does. `expiresAt` is 2026-07-01, a month before this
+					// file's TS (2026-08-01), so it is unambiguously past at the promotion command's issuedAt.
+					ok(
+						dispatch(
+							'RequestWaiver',
+							{
+								subjectObjectIds: [v.pwu],
+								scope: 'C1',
+								rationale: 'Residual risk accepted for the pilot; review before promotion.',
+								duration: 'one month',
+								affectedObjectIds: [v.pwu],
+								waivedPolicyId: POL,
+								waivedCriterionId: 'C1',
+								waivedFindingIds: [],
+								expiresAt: '2026-07-01T00:00:00Z',
+								compensatingControls: [],
+								reviewConditions: []
+							},
+							v.wvr,
+							'DECISION'
+						),
+						'request waiver'
+					);
+					ok(
+						dispatch(
+							'GrantWaiver',
+							{ waiverDecisionId: v.wvr, effectiveAt: TS, duration: 'one month' },
+							v.wvr,
+							'DECISION'
+						),
+						'grant waiver'
+					);
+
+					// THE CONTROL'S SIBLING DEFECT, at the SAME gate: an OPEN BLOCKING observation over the baselined
+					// item, which canPromoteBaseline's OPEN_BLOCKING_FINDING arm does refuse. It proves the promotion
+					// gate is alive, reads this item set, and simply has no limb for an expired waiver.
+					if (!clean) {
+						ok(
+							dispatch(
+								'RecordAssuranceObservation',
+								{
+									assessmentId: v.asmt,
+									observationType: 'FINDING',
+									findingCode: 'TENANT_ISOLATION_BREACH',
+									severity: 'BLOCKING',
+									statement: 'tenant data is not isolated'
+								},
+								v.obs,
+								'ASSURANCE_OBSERVATION'
+							),
+							'record blocking observation'
+						);
+					}
+
+					ok(
+						dispatch(
+							'ProposeDecision',
+							{
+								decisionType: 'PROMOTE_BASELINE',
+								subjectObjectIds: [v.pwu],
+								selectedOption: 'promote',
+								rationale: 'ready',
+								authority: actor
+							},
+							v.dec,
+							'DECISION'
+						),
+						'propose promotion decision'
+					);
+					ok(
+						dispatch(
+							'ApproveDecision',
+							{
+								selectedOption: 'promote',
+								rationale: 'ready',
+								consideredEvidenceIds: [],
+								consideredObservationIds: [],
+								subjectSemanticVersions: { [v.pwu]: 1 }
+							},
+							v.dec,
+							'DECISION'
+						),
+						'approve promotion decision'
+					);
+					ok(
+						dispatch(
+							'CreateBaseline',
+							{
+								baselineType: 'ARCHITECTURE',
+								itemObjectIds: [v.pwu],
+								assuranceAssessmentIds: [v.asmt]
+							},
+							v.base,
+							'BASELINE'
+						),
+						'create baseline'
+					);
+					ok(dispatch('SubmitBaselineForReview', {}, v.base, 'BASELINE'), 'submit baseline');
+					ok(dispatch('ApproveBaseline', {}, v.base, 'BASELINE'), 'approve baseline');
+					return dispatch(
+						'PromoteBaseline',
+						{
+							promotionDecisionId: v.dec,
+							expectedItemObjectVersions: [{ objectId: v.pwu, semanticVersion: 1 }],
+							requiredAssessmentIds: [v.asmt]
+						},
+						v.base,
+						'BASELINE'
+					);
+				};
+				return { admitted: drive(true), control: drive(false) };
+			}
+		},
 		'RPH-DEC-005': {
 			arrangement:
 				'a decomposition proposed with NO recompositionContractId, marked VALID — accepted; the control omits it too but leaves a mandatory obligation unallocated and IS refused',
