@@ -673,9 +673,17 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 			);
 			if (undermined.length > 0) {
 				const detail = undermined.map((u) => `${u.evidenceId} (via ${u.via})`).join('; ');
+				// REG-F-010 group 3 (2026-08-03): this was `RPH_INVARIANT_VIOLATION`, with the actual condition living
+				// only in the prose below. `RPH_EVIDENCE_INVALIDATED` is one of the ratified fifteen, is categorised
+				// ASSURANCE, names exactly this failure — and until now was carried by NO refusal in the system. A typed
+				// error contract whose discriminating value travels in free text is asserting a status nothing performs
+				// (CON-000 B7), and `classifyRefusal` cannot tell apart two refusals reporting the same code. The message
+				// is unchanged: the CODE says what kind, the prose says which evidence. Status is unaffected —
+				// `STATUS_FOR_CODE` has no entry for either code, so both yield REJECTED, which is why RPH-PWU-008's
+				// control (this very refusal) still holds.
 				return reject(
 					command,
-					'RPH_INVARIANT_VIOLATION',
+					'RPH_EVIDENCE_INVALIDATED',
 					`Cannot promote baseline ${command.targetAggregateId}: INVALIDATED_EVIDENCE — the promotion rests on invalidated evidence that must re-examine the claims it supported before an authoritative baseline can stand on it (${detail}); re-assess before promoting (P4 / CT-10).`
 				);
 			}

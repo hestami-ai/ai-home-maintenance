@@ -3452,6 +3452,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		},
 		enforcedAt:
 			'DECISION: packages/rph-domain/src/governance.ts — decisionAuthorizesVersions. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline\'s guard, at a LATER arm than canPromoteBaseline: the gate first proves the decision is EFFECTIVE, then this proves it is still CURRENT. Its own comment records that the kernel was previously unreachable and a stale-version approval promoted to AUTHORITATIVE.',
+		// THE GENERIC CODE IS A RECORDED DECISION, NOT AN OVERSIGHT (REG-F-010 group 3 / REG-E-022, 2026-08-03).
+		// Its sibling refusal one arm away — the invalidated-evidence promotion — moved off this generic code the
+		// same day, because `RPH_EVIDENCE_INVALIDATED` names that condition exactly. NO ratified code names this
+		// one. `RPH_SUBJECT_VERSION_MISMATCH` is the obvious candidate and is deliberately not taken: it is the
+		// code RPH-ASR-010's ratified statement claims for a DIFFERENT subject, and that row is disclosed on the
+		// recorded census that no handler refuses with it — a census adopting it here would make untrue while
+		// NOTHING went red, since that row is guarded by observation rather than by a grep. Held for the sponsor.
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// PROSE, not a finding code, because this arm has its own sentence rather than joining canPromoteBaseline's
 		// code list — which is also why it is distinguishable from the three BAS rows at the same handler.

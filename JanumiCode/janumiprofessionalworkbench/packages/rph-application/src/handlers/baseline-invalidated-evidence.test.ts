@@ -192,11 +192,25 @@ describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10,
 		);
 	}
 
+	// REG-F-010 GROUP 3, CLOSED 2026-08-03. This refusal carried the generic `RPH_INVARIANT_VIOLATION` and encoded
+	// the actual condition in the MESSAGE PROSE, while `RPH_EVIDENCE_INVALIDATED` sat ratified and carried by no
+	// refusal anywhere. A typed, classified error contract whose discriminating value travels in free text is
+	// asserting a status nothing performs (CON-000 B7), and it is not cosmetic: `classifyRefusal`, the enforcement
+	// register's own instrument, cannot tell apart two refusals that report the same code, and no consumer can
+	// route on the contract.
+	//
+	// ASSERTED ON THE CONTRACT, NOT ON A STRING. The claim is that the refusal is CLASSIFIED as an assurance
+	// failure — `category` is derived from `ERROR_CODE_CATEGORY`, so a future fix that chose a different assurance
+	// code would still satisfy this, and reverting to `RPH_INVARIANT_VIOLATION` (category INVARIANT) could not.
+	// The prose check stays: the code says WHAT KIND, the message still says WHICH evidence.
 	it('blocks promotion when a required assessment claim rests on invalidated evidence (CT-10 claim path)', () => {
 		setup({ assessmentClaimIds: [CLAIM], consideredEvidenceIds: [], invalidate: true });
 		const r = promote();
 		expect(r.status).not.toBe('ACCEPTED');
-		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(r.error?.code).toBe('RPH_EVIDENCE_INVALIDATED');
+		expect(r.error?.category, 'an invalidated-evidence refusal is an ASSURANCE failure, not a bare invariant').toBe(
+			'ASSURANCE'
+		);
 		expect(r.error?.message).toContain('INVALIDATED_EVIDENCE');
 		expect(r.error?.message).toContain(CLAIM);
 		expect(statusOf(BASE)).toBe('APPROVED'); // not AUTHORITATIVE
