@@ -143,10 +143,13 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         the missing rule surfaced the stale status. RPH-GOV-003 turned out to have been
 		//                         COVERED all along through that stale prefix row, which is why the delta looked
 		//                         like three rather than four.
+		//   2026-08-02  32 -> 33  RPH-ASM-006 gained a per-id COMMAND-layer cite with its dispatch probe. It is the
+		//                         only rule of its family with a kernel predicate anything asks; the other five
+		//                         have no caller at all, so this is RPH-ASM's only command-layer citation.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(32);
+		).toBe(33);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

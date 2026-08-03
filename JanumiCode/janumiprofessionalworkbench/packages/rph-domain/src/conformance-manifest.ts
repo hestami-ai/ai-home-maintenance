@@ -133,6 +133,9 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
 	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
 	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
+	// RPH-ASM-006 — the only ASM rule with a live kernel caller, cited per-id with its dispatch probe. Its five
+	// siblings have no caller at all, which is why this is the family's only COMMAND-layer cite.
+	'RPH-ASM-006': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// The four PROMOTION-GATE rows, cited per-id 2026-08-02 with their dispatch probes. BAS-003/004/006 share one
 	// joined finding-code message; GOV-003 refuses at a later arm of the same handler with its own sentence.
 	'RPH-BAS-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',

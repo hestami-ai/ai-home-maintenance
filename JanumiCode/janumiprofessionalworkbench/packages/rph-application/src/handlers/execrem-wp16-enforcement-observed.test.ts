@@ -1319,6 +1319,111 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				'PromoteBaseline under a decision that approved the subject at v2 while it is at v1, against the identical promotion whose decision bound v1',
 			run: () => promotionProbe('stale-version')
 		},
+		'RPH-ASM-006': {
+			arrangement:
+				'ApproveExecutionPlan for a plan whose PWU declares an EXPIRED assumption, against the identical plan whose assumption is still live',
+			run: () => {
+				const n = ++probeSeq;
+				const drive = (pass: boolean): Outcome => {
+					const t = pass ? 'A' : 'B';
+					const iid = `int_01ARZ3NDEKTSV4RRFFQ69H9${n}${t}0`;
+					const pid = `pwu_01ARZ3NDEKTSV4RRFFQ69H9${n}${t}1`;
+					const aid = `asm_01ARZ3NDEKTSV4RRFFQ69H9${n}${t}2`;
+					const plid = `plan_01ARZ3NDEKTSV4RRFFQ69H9${n}${t}3`;
+					ok(
+						dispatch(
+							'CaptureIntent',
+							{ intentId: iid, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+							iid,
+							'INTENT'
+						),
+						'capture intent'
+					);
+					ok(
+						dispatch(
+							'DetectAssumption',
+							{
+								assumptionId: aid,
+								statement: 'the tenant index is unique',
+								introducedBy: actor,
+								affectedObjectIds: [pid],
+								materiality: 'CRITICAL'
+							},
+							aid,
+							'ASSUMPTION'
+						),
+						'detect assumption'
+					);
+					// THE ARRANGING ACT, and the ONLY difference between the two runs.
+					if (!pass) ok(dispatch('ExpireAssumption', {}, aid, 'ASSUMPTION'), 'expire assumption');
+					ok(
+						dispatch(
+							'ProposePwu',
+							{
+								pwuId: pid,
+								pwuKind: 'ARCHITECTURE',
+								title: 'subject',
+								description: 'd',
+								intentId: iid,
+								boundaries: {
+									inScope: [],
+									outOfScope: [],
+									permittedChanges: [],
+									prohibitedChanges: []
+								},
+								obligationIds: [],
+								constraintIds: [],
+								assumptionIds: [aid],
+								expectedOutputs: [],
+								assurancePolicyIds: [],
+								riskProfile: {
+									consequence: 'HIGH',
+									uncertainty: 'MEDIUM',
+									irreversibility: 'HIGH',
+									securitySensitivity: 'HIGH',
+									regulatoryExposure: 'LOW'
+								}
+							},
+							pid,
+							'PROFESSIONAL_WORK_UNIT'
+						),
+						'propose pwu'
+					);
+					ok(
+						dispatch(
+							'ProposeExecutionPlan',
+							{
+								executionPlanId: plid,
+								workUnitId: pid,
+								steps: [
+									{
+										id: `${plid}-s1`,
+										executionPlanId: plid,
+										stepType: 'HUMAN_INTERACTION',
+										purpose: 'work',
+										inputBindings: [],
+										outputBindings: [],
+										preconditions: [],
+										postconditions: [],
+										stepState: 'QUEUED'
+									}
+								],
+								transitions: [],
+								retryPolicy: {},
+								tacticalChangePolicy: {},
+								escalationPolicy: {},
+								terminationPolicy: {}
+							},
+							plid,
+							'EXECUTION_PLAN'
+						),
+						'propose plan'
+					);
+					return dispatch('ApproveExecutionPlan', {}, plid, 'EXECUTION_PLAN');
+				};
+				return { control: drive(true), observed: drive(false) };
+			}
+		},
 		'RPH-BAS-001': null,
 		'RPH-BAS-002': null,
 		'RPH-BAS-005': null,

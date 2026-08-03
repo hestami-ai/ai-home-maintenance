@@ -691,6 +691,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-CNS-001': null,
 		'RPH-CNS-002': null,
 		'RPH-CNS-004': null,
+		'RPH-ASM-006': null,
 		'RPH-ASM-001': null,
 		'RPH-ASM-002': null,
 		'RPH-ASM-003': null,

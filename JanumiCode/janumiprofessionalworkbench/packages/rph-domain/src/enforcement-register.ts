@@ -453,7 +453,8 @@ export type RegisteredRuleId =
 	| 'RPH-BAS-003'
 	| 'RPH-BAS-004'
 	| 'RPH-BAS-006'
-	| 'RPH-GOV-003';
+	| 'RPH-GOV-003'
+	| 'RPH-ASM-006';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -3347,6 +3348,32 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'delete the decisionAuthorizesVersions arm — the probe reports ADMITTED, restoring the exact defect the comment says W1 WIRE-4 fixed',
 			'compare against the DECISION\'s recorded versions only, ignoring the subject\'s current version — the arm can never fire',
 			'THE INTEGRITY CAVEAT, and it is REG-F-014\'s second instance: the versions this arm compares against are CALLER-SUPPLIED at approval time. `proposeDecision` PINS them from the store, and `approveDecision`\'s extraMutate then OVERWRITES that pin with the payload. So the binding this rule enforces is exact against a number the approver chose. The refusal is real; what it is exact ABOUT is not verified.'
+		]
+	},
+	// ── THE ONE LIVE WIRING IN A FAMILY OF FIVE DEAD PREDICATES ──────────────────────────────────────────────
+	//
+	// RPH-ASM-006 is the only ASM rule with a kernel predicate anything asks. `canAuthorizeNewWork` has real
+	// callers; its five siblings have none. It is also the only assumption consultation in the entire execution
+	// plane — one call, on the plan-approval arrow — and the handler's own comment concedes the scope: "the first
+	// live wiring of the assumption-impact half of WP-3-008 (the falsification transition + reshape/reassessment
+	// loop remain)".
+	'RPH-ASM-006': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'expired assumptions stop authorizing work',
+			note: 'JPWB-DOC-003 §4 OBJ-4, verbatim. The ratified rule names plan approval as the act; canon states the principle over "work" generally, which is broader and is not enforced beyond this one arrow.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/decomposition.ts — canAuthorizeNewWork, which refuses EXPIRED, FALSIFIED and SUPERSEDED. ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — approveExecutionPlan\'s guard, via assumptionsAuthorizeNewWork, which loads the plan\'s PWU, walks its assumptionIds, and returns the first dead one. The precondition fromStates(\'UNDER_REVIEW\') is sited AHEAD of the guard, which the handler\'s comment records as correcting a latent mask: a wrong-state plan whose PWU also had a dead assumption used to refuse with this rule\'s code instead of the state code.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'cannot authorize new work (RPH-ASM-006)',
+		declaredMutations: [
+			'widen canAuthorizeNewWork to accept EXPIRED — the probe reports ADMITTED',
+			'delete the guard from approveExecutionPlan — ADMITTED',
+			'drop the `a?.objectType !== ASSUMPTION` skip in assumptionsAuthorizeNewWork so an unresolvable id gates — the probe still kills; what reddens is any fixture naming a non-existent assumption, and the skip is a DELIBERATE fail-open the handler comments as "unknown status → not gatable (sound)"',
+			'TWO STATUSES THE PREDICATE REFUSES AND NO COMMAND CAN REACH: FALSIFIED and SUPERSEDED. Only DetectAssumption and ExpireAssumption exist, so EXPIRED is the sole reachable arm of the three. This row is enforced on one third of its own predicate.',
+			'AND THE SET IT WALKS IS WRITE-ONCE: only ProposePwu writes `assumptionIds`, so an Assumption created later by DetectAssumption can never become gatable on an already-proposed PWU. The rule holds for assumptions declared at proposal time and for no others.'
 		]
 	}
 };
