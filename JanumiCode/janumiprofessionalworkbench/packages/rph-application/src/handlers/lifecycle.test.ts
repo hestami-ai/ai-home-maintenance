@@ -205,7 +205,11 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 
 	it('rejects making a decision EFFECTIVE when the authority is an AGENT (GOV-001/002)', () => {
 		const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FE0';
-		dispatch(
+		// ISSUED BY THE AGENT (REG-F-014, 2026-08-03). This used to declare an AGENT authority on a HUMAN-issued
+		// command — the forgery `proposeDecision` now refuses. The agent proposing AS ITSELF is both the arrangement
+		// the rule actually describes and a stronger premise: the decision's recorded authority is an agent because
+		// an agent made it, not because a human said so.
+		const proposed = dispatch(
 			'ProposeDecision',
 			{
 				decisionType: 'APPROVAL',
@@ -214,8 +218,9 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 				rationale: 'r',
 				authority: agent
 			},
-			{ targetAggregateId: DEC, targetAggregateType: 'DECISION' }
+			{ targetAggregateId: DEC, targetAggregateType: 'DECISION', issuedBy: agent }
 		);
+		expect(proposed.status, JSON.stringify(proposed.error)).toBe('ACCEPTED');
 		const r = dispatch(
 			'ApproveDecision',
 			{

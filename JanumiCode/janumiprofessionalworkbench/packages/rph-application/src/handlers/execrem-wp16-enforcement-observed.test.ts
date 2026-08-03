@@ -1229,9 +1229,17 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const SUBJ = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6600';
 				const OK_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6610';
 				const BAD_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6611';
-				const AGENT = { actorId: 'a1', actorType: 'AGENT', displayName: 'Agent' };
-				const propose = (id: string, authority: unknown) =>
-					dispatch(
+				const AGENT: ActorReference = {
+					actorId: 'a1',
+					actorType: 'AGENT',
+					displayName: 'Agent'
+				};
+				// ISSUED BY THE ACTOR IT NAMES (REG-F-014, 2026-08-03). This used to declare an AGENT authority on a
+				// HUMAN-issued command; `proposeDecision` now refuses that disagreement, so the agent proposes as
+				// itself. The arrangement is strictly more honest — the decision's authority is an AGENT because an
+				// agent made it — and it is the sequence RPH-GOV-001's statement actually describes.
+				const propose = (id: string, authority: ActorReference) =>
+					dispatchWith(
 						'ProposeDecision',
 						{
 							decisionType: 'APPROVAL',
@@ -1241,7 +1249,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 							authority
 						},
 						id,
-						'DECISION'
+						'DECISION',
+						{ issuedBy: authority }
 					);
 				const approve = (id: string) =>
 					dispatch(
@@ -1256,10 +1265,12 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						id,
 						'DECISION'
 					);
-				// THE CONTROL: the SAME command on a decision differing ONLY in `authority.actorType`. That single
-				// field is the whole delta, which is what pins the refusal to the authority check rather than to
-				// the transition guard, the kind predicate, or the subject-version limb — all of which sit on this
-				// same path and all of which would refuse with a different code.
+				// THE CONTROL: the SAME approve command on a decision differing ONLY in whose authority it records.
+				// That is still one fact, and since REG-F-014 it is one fact by CONSTRUCTION rather than by the
+				// fixture's choice — the recorded authority now follows the issuer, so the two cannot disagree.
+				// It is what pins the refusal to the authority check rather than to the transition guard, the kind
+				// predicate, or the subject-version limb — all of which sit on this same path and all of which
+				// would refuse with a different code.
 				ok(propose(OK_ID, actor), 'propose HUMAN-authority decision');
 				const control = approve(OK_ID);
 				ok(propose(BAD_ID, AGENT), 'propose AGENT-authority decision');

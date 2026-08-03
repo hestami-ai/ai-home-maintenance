@@ -2670,16 +2670,16 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 
 	// ── READ THIS BEFORE READING THE DISPOSITION ────────────────────────────────────────────────────────────────
 	//
-	// RPH-GOV-001 IS RECORDED **ENFORCED**, AND THE REFUSAL IT NAMES CAN BE BYPASSED. Both halves are true, both
-	// were observed, and the row is written this way rather than as a disclosure for a reason argued below — but
-	// the bypass is stated FIRST, because a reader skimming dispositions must not come away believing governance
-	// authority is safe.
+	// ~~RPH-GOV-001 IS RECORDED **ENFORCED**, AND THE REFUSAL IT NAMES CAN BE BYPASSED.~~ THE BYPASS IS CLOSED
+	// (2026-08-03). Struck rather than rewritten, because the claim was true for four commits and a reader who
+	// finds it should see what was believed and how it was cleared.
 	//
-	// WHAT WAS OBSERVED, by dispatch, three commands, no human actor anywhere in the sequence:
-	//   ProposeDecision issued by an AGENT, payload `authority` naming a HUMAN  -> ACCEPTED
-	//   ApproveDecision on that decision, issued by the SAME AGENT              -> ACCEPTED
-	//   final state: status EFFECTIVE, authority { actorType: 'HUMAN' }
-	// The governed record asserts a human decided. None did. Filed as REG-F-014.
+	// WHAT WAS OBSERVED, by dispatch, no human actor anywhere in the sequence — and what happens NOW:
+	//   ProposeDecision issued by an AGENT, payload `authority` naming a HUMAN  -> ~~ACCEPTED~~ **REFUSED**
+	//   ApproveDecision on that decision, issued by the SAME AGENT              -> ~~ACCEPTED~~ (unreachable)
+	//   final state: ~~status EFFECTIVE, authority { actorType: 'HUMAN' }~~ (no Decision is created)
+	// The governed record asserted a human decided when none had. Filed as REG-F-014; the first of its five
+	// instances is fixed, the other four stand — see `RPH-GOV-003`'s integrity caveat for the second.
 	//
 	// WHY ENFORCED AND NOT UNENFORCED_DISCLOSED. The disclosure arm's contract is "the statement IS a command
 	// refusal and NOTHING in production enforces it". Something does: `makeDecisionEffective`'s guard refuses with
@@ -2688,16 +2688,21 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// Recording that as "nothing enforces it" would be false in the other direction, and would make the register's
 	// disclosure arm mean two different things.
 	//
-	// WHAT IS ACTUALLY WRONG IS THE FIELD'S PROVENANCE, NOT THE CHECK'S ABSENCE. The guard reads
-	// `state.authority.actorType`, which `proposeDecision` copies from the CALLER'S PAYLOAD with no reference to
-	// `command.issuedBy`. So the check fires exactly when the caller DECLARES an insufficient authority and cannot
-	// fire when it declares a sufficient one: it stops the agent that says what it is, not the agent that does
-	// not. The sibling handler `requestWaiver` sets `authority: command.issuedBy` and is not forgeable this way —
-	// two governance handlers, one field, two provenance models, twenty lines apart.
+	// WHAT WAS ACTUALLY WRONG WAS THE FIELD'S PROVENANCE, NOT THE CHECK'S ABSENCE. The guard reads
+	// `state.authority.actorType`, which `proposeDecision` copied from the CALLER'S PAYLOAD with no reference to
+	// `command.issuedBy`. So the check fired exactly when the caller DECLARED an insufficient authority and could
+	// not fire when it declared a sufficient one: it stopped the agent that said what it was, not the agent that
+	// did not. The sibling handler `requestWaiver` set `authority: command.issuedBy` and was never forgeable this
+	// way — two governance handlers, one field, two provenance models, twenty lines apart. `proposeDecision` now
+	// REFUSES the disagreement rather than adopting `requestWaiver`'s silent bind, so the ratified `authority`
+	// field keeps its meaning: the caller must state it, and what it states must be true.
 	//
-	// THE HONEST SUMMARY, and the thing this register can say that a coverage manifest cannot: the rule is
-	// enforced against the arrangement it names, and the enforcement rests on a fact the actor supplies about
-	// itself.
+	// THE HONEST SUMMARY, AND ITS REMAINING LIMIT. The rule is enforced against the arrangement it names, and the
+	// enforcement now rests on the ISSUER rather than on a fact the actor supplies about itself — but only up to
+	// the boundary this engine has: there is no authentication layer, so `command.issuedBy` is caller-supplied
+	// too. Binding the two makes authority CONSISTENT, not VERIFIABLE. It removes the ability to name one actor
+	// while acting as another; it cannot establish who is acting. That needs the platform tier the Charter
+	// allocates elsewhere — the same boundary RPH-EXE-004's row argues.
 	'RPH-GOV-001': {
 		kind: 'ENFORCED',
 		canonCarriage: {
@@ -2707,7 +2712,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §8 ASR-15 (Authority is positional, attributable, and version-bound), which also states "Authority is checked *before* effect" — satisfied here, the guard runs ahead of any DecisionEffective — and "an approval whose actor … cannot be identified is not authority", which is the clause REG-F-014 reports unmet.'
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/governance.ts — authorizeDecisionEffective, whose doc comment names this rule by id. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — the `guard` inside makeDecisionEffective, shared by ApproveDecision and GrantWaiver, which computes `authorityHeld` from the DECISION\'s recorded `authority.actorType` (HUMAN or SYSTEM) and rejects otherwise. THE SUBJECT IS THE RECORDED AUTHORITY, NOT THE ISSUER of the command — see the comment above and REG-F-014; `command.issuedBy` is consulted by NO decision handler.',
+			'DECISION: packages/rph-domain/src/governance.ts — authorizeDecisionEffective, whose doc comment names this rule by id. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — the `guard` inside makeDecisionEffective, shared by ApproveDecision and GrantWaiver, which computes `authorityHeld` from the DECISION\'s recorded `authority.actorType` (HUMAN or SYSTEM) and rejects otherwise. THE SUBJECT IS THE RECORDED AUTHORITY, NOT THE ISSUER of the command — see the comment above. ~~`command.issuedBy` is consulted by NO decision handler.~~ CORRECTED 2026-08-03: that clause was imprecise when written (`requestWaiver`, which creates a DECISION, has always set `authority: command.issuedBy`) and is now false outright — `proposeDecision` refuses when the declared authority is not the issuer (REG-F-014). This guard is still the one that reads the RECORDED authority; what changed is that the recorded authority can no longer name an actor the issuer is not.',
 		refusalCode: 'RPH_AUTHORITY_INSUFFICIENT',
 		refusalStatus: 'UNAUTHORIZED',
 		// THE FIRST ROW IN THE REGISTER AT THIS STATUS. `kit.ts`'s STATUS_FOR_CODE has mapped
@@ -2719,7 +2724,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'widen `authorityHeld` in makeDecisionEffective to accept any actorType — the probe reports ADMITTED',
 			'delete the `if (!check.ok)` arm of the guard — the transition-legality limb of authorizeDecisionEffective still refuses, but with a DIFFERENT reason string, so the probe reports MASKED rather than ADMITTED',
 			"drop `RPH_AUTHORITY_INSUFFICIENT` from STATUS_FOR_CODE in kit.ts — the refusal becomes REJECTED and this row's declared UNAUTHORIZED no longer matches, so the probe reports ADMITTED",
-			'NO MUTATION IS NEEDED TO DEMONSTRATE THE BYPASS — it is live: propose the decision from an AGENT while naming a HUMAN in `authority`, and both commands are ACCEPTED. That is REG-F-014, and it is recorded as a declared mutation entry precisely because a reader re-running these acts must not conclude the set is exhaustive.'
+			'~~NO MUTATION IS NEEDED TO DEMONSTRATE THE BYPASS — it is live: propose the decision from an AGENT while naming a HUMAN in `authority`, and both commands are ACCEPTED.~~ CLOSED 2026-08-03 (REG-F-014). Struck rather than deleted so a reader sees the claim existed and how it was cleared. `proposeDecision` now REFUSES when the declared `authority` is not the issuing actor, so that sequence stops at the first command. The bypass is therefore a MUTATION again rather than a live fact: neutralise that guard and `decision-authority-provenance.test.ts` reddens on three tests while both its controls stay green. Surveyed before changing behaviour — of 139 ProposeDecision dispatches in the suite, 137 already agreed, and the two that did not were this very scenario written benignly (including THIS row\'s own probe, which now issues as the agent it names).'
 		]
 	},
 	'RPH-GOV-002': {

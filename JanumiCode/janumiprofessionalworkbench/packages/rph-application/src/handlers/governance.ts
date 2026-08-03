@@ -118,6 +118,36 @@ function subjectVersions(ctx: HandlerContext, ids: readonly string[]): Record<st
 export const proposeDecision: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ProposeDecisionPayload;
 	const id = command.targetAggregateId;
+	// REG-F-014 (2026-08-03). `authority` was copied STRAIGHT FROM THE PAYLOAD with no reference to
+	// `command.issuedBy`, so an AGENT could propose a decision recording a HUMAN as its authority and then
+	// approve it itself: the governed record asserted a human decided when none had. The authority check in
+	// `makeDecisionEffective` reads the RECORDED authority, so it fired exactly when a caller declared an
+	// insufficient authority and could not fire when it declared a sufficient one — it stopped the agent that
+	// said what it was, and not the agent that did not.
+	//
+	// The sibling handler `requestWaiver` has always set `authority: command.issuedBy` and is not forgeable this
+	// way. This REFUSES the disagreement rather than silently overwriting the payload, so the ratified field
+	// keeps its meaning: the caller must state the authority, and what it states must be true. The test is
+	// IDENTITY, not a ranking of actor types — this repository has no such ranking and inventing one here would
+	// be a convenient interpretation encoded as architecture (DOC-004 §0.3). Both directions are refused.
+	//
+	// DELEGATION IS THE ABSENT MECHANISM. Canon permits authority to be DELEGATED (DOC-003 §8 ASR-15) and this
+	// repository has no object for a delegation record. Until one is ratified, declaring an authority you are
+	// not is refused rather than admitted on trust — see REG-F-014's disposition.
+	if (
+		p.authority.actorId !== command.issuedBy.actorId ||
+		p.authority.actorType !== command.issuedBy.actorType
+	) {
+		return reject(
+			command,
+			'RPH_AUTHORITY_INSUFFICIENT',
+			`ProposeDecision: the declared authority (${p.authority.actorType} ${p.authority.actorId}) is not the ` +
+				`issuing actor (${command.issuedBy.actorType} ${command.issuedBy.actorId}) — a Decision records the ` +
+				`authority of its issuer, and no delegation record exists to carry one actor's authority for another ` +
+				`(DOC-003 ASR-15).`,
+			[id]
+		);
+	}
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, DECISION, id, {
 			lifecycleStatus: 'PROPOSED',
