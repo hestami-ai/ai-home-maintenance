@@ -258,7 +258,15 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 		const before = store.readAllEvents().length;
 		const revision = store.loadObject(BINDING)?.revision;
 
-		dispatch('AuthorizeRuntimeBinding', { grantedCapabilities: [] }, BINDING, 'RUNTIME_BINDING');
+		// ASSERTED, not merely implied: if the arrangement had left BINDING absent, `revision` would be undefined
+		// both before and after and the two effect assertions would pass vacuously. See REG-F-015.
+		const again = dispatch(
+			'AuthorizeRuntimeBinding',
+			{ grantedCapabilities: [] },
+			BINDING,
+			'RUNTIME_BINDING'
+		);
+		expect(again.status, JSON.stringify(again.error)).toBe('REJECTED');
 
 		expect(store.readAllEvents()).toHaveLength(before);
 		expect(store.loadObject(BINDING)?.revision, 'no silent revision bump').toBe(revision);

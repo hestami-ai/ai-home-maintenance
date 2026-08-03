@@ -106,11 +106,13 @@ describe('AdmitEvidence enforces §8.11 admissibility at the call site (live)', 
 	it('leaves inadmissible Evidence in PROPOSED — admission is not a bare status advance (§8.11:1027)', () => {
 		proposeInadmissible();
 
-		dispatch('AdmitEvidence', {
+		// ASSERTED, not merely implied by the status below. See REG-F-015.
+		const r = dispatch('AdmitEvidence', {
 			admissibilityAssessmentId: 'a',
 			admittedScope: 'architecture',
 			admittedClaimIds: []
 		});
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
 
 		// ADMISSIBLE here is the durable lie: the object now carries a status that §8.11 says it cannot hold, and
 		// every downstream consumer (Claims, Assessments, Baseline readiness) reads that status as settled.

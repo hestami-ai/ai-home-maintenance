@@ -104,7 +104,10 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 		// A refusal that had already mutated would confer the excess capability while reporting failure, which is
 		// worse than admitting it outright: the audit trail would say REJECTED and the state would say granted.
 		request(['file-system']);
-		authorize(['file-system', 'network']);
+		// ASSERTED, not merely implied by the empty granted set: an authorize that was silently ACCEPTED while
+		// writing nothing would leave the set empty too. See REG-F-015.
+		const r = authorize(['file-system', 'network']);
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
 		expect(grantedOf()).toEqual([]);
 	});
 

@@ -161,7 +161,11 @@ describe('WP-3 / RPH-EXE-005 — a required input that does not resolve leaves t
 		// "…leaves the step not ready and performs NO model/tool invocation." A refusal that still advanced the step
 		// would satisfy the message and violate the rule.
 		activePlan([{ artifactId: ARTIFACT, required: true }]);
-		dispatch('StartExecutionStep', { stepId: sid(1) });
+		// The refusal is ASSERTED, not merely implied by the state below: a dispatch that was silently ACCEPTED and
+		// happened to advance nothing would satisfy the two effect assertions. Also what keeps this site off the
+		// unread-refusal guard (verif/unread-refusal-guard.ts) — see REG-F-015.
+		const r = dispatch('StartExecutionStep', { stepId: sid(1) });
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
 		expect(stepStateOf(1)).toBe('QUEUED');
 		expect(store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepStarted')).toEqual([]);
 	});

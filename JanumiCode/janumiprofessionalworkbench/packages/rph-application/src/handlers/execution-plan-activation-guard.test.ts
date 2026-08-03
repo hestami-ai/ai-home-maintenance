@@ -145,8 +145,13 @@ describe('ActivateExecutionPlan — one active plan per PWU (live pipeline)', ()
 	});
 
 	it('leaves the PWU with exactly one ACTIVE plan after both activations are attempted', () => {
-		activate(PLAN_A);
-		activate(PLAN_B);
+		// BOTH outcomes asserted, not just the surviving state: "exactly one ACTIVE" also holds if the FIRST
+		// activation had failed and the second succeeded, which is the opposite of what this test claims to show.
+		// See REG-F-015.
+		const first = activate(PLAN_A);
+		expect(first.status, JSON.stringify(first.error)).toBe('ACCEPTED');
+		const second = activate(PLAN_B);
+		expect(second.status, JSON.stringify(second.error)).toBe('REJECTED');
 		const active = [PLAN_A, PLAN_B].filter((p) => planStatus(p) === 'ACTIVE');
 		expect(active).toEqual([PLAN_A]);
 	});

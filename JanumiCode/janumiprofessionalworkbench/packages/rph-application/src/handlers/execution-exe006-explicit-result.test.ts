@@ -243,10 +243,14 @@ describe('JAN-EXECREM WP-11 / F-01 limb A — RPH-EXE-006 is a real decision', (
 	it('NO DEADLOCK: the refused timeout step still has its legitimate exit', () => {
 		// A refusal that stranded the step would be a worse defect than the one being fixed. The remedy the message
 		// names must actually work, on this exact step, immediately.
-		dispatch(
+		// ASSERTED: this test's whole premise is that the completion WAS refused, so the premise is checked rather
+		// than assumed — an accepted completion would leave the step COMPLETED and the FailExecutionStep below
+		// would refuse for a reason this test does not name. See REG-F-015.
+		const refused = dispatch(
 			'CompleteExecutionStep',
 			completion({ noOutputResult: { reason: 'TIMEOUT', detail: 'the model never returned' } })
 		);
+		expect(refused.status, JSON.stringify(refused.error)).toBe('REJECTED');
 		const failed = dispatch('FailExecutionStep', { stepId: S1, failureReason: 'timed out' });
 		expect(failed.status, JSON.stringify(failed.error)).toBe('ACCEPTED');
 		expect(stepStateOf(S1)).toBe('FAILED');
