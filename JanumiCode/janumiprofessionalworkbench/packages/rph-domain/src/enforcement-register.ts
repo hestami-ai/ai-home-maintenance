@@ -426,7 +426,12 @@ export type RegisteredRuleId =
 	| 'RPH-GOV-001'
 	| 'RPH-GOV-002'
 	| 'RPH-GOV-004'
-	| 'RPH-GOV-007';
+	| 'RPH-GOV-007'
+	// RPH-BAS, FOUR OF SEVEN (2026-08-02). BAS-003/004/006 are ENFORCED and owe dispatch probes.
+	| 'RPH-BAS-001'
+	| 'RPH-BAS-002'
+	| 'RPH-BAS-005'
+	| 'RPH-BAS-007';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -2740,6 +2745,121 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'what it always returns. That is a control that cannot fail, in the kernel, under a rule id — the ' +
 			'defect this repository has shipped three times and the reason every gate in this register carries a ' +
 			'named predicted red.'
+	},
+	'RPH-BAS-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'exact item identities, semantic versions, and content hashes where applicable',
+			note: 'JPWB-DOC-003 §8 ASR-16 (Baseline promotion is a governance event with exact identity), verbatim against the ratified statement including its "where applicable" hedge on hashes.'
+		},
+		why:
+			'A SHAPE ASSERTION about what a candidate baseline CONTAINS, not a refusal — and each of its three ' +
+			'limbs fails differently, which is why the census returned UNCLEAR and why the row spells them out. ' +
+			'(1) OBJECT ID and (2) SEMANTIC VERSION are guaranteed at the SCHEMA layer, not by any domain check: ' +
+			'`PromoteBaselinePayloadSchema` types `semanticVersion: z.number()` as required and the bus validates ' +
+			'the payload before the handler runs. The consequence is that the kernel arm written FOR this rule — ' +
+			'`findMissingItemVersions`, which fires only when a version is `undefined` or `null` — is fed data the ' +
+			'schema has already forced to be a number. MISSING_ITEM_VERSION cannot appear in any dispatch result. ' +
+			'It is not a dead predicate (it is called) but a SCHEMA-FORECLOSED one, the RPH-EVD-003 shape: a guard ' +
+			'whose antecedent a stricter layer has already made unreachable. (3) CONTENT HASH is checked nowhere ' +
+			'on the candidate side at all. THE SHARP FACT, and it is the opposite of what the rule asks for: ' +
+			'`createBaseline` builds each item as `{ objectId, semanticVersion: obj?.semanticVersion ?? 1 }`, so ' +
+			'when the store cannot load the item object the baseline records VERSION 1 — INVENTED, not identified. ' +
+			'A rule whose entire subject is "identifies exact versions" is implemented by a default. That is ' +
+			'canon OBJ-1 ("No semantic state may be inferred from null values, empty arrays, missing rows") ' +
+			'inverted, and it is recorded here rather than filed because no command is refused by it: the invented ' +
+			'version is written on the ACCEPT path.'
+	},
+	// ── RPH-BAS-002 — THE CHECK COMPARES A THING WITH ITSELF ────────────────────────────────────────────────
+	//
+	// `findVersionMismatches` is correct: it maps the reviewed items by id and, for each candidate, refuses when
+	// the version or hash differs. The production call site is:
+	//
+	//     canPromoteBaseline({ …, candidateItems, reviewedItems: candidateItems, … })
+	//
+	// The SAME array, passed as both arguments. So `r` IS `item` for every element and all three disjuncts are
+	// false by identity. The only payload that could produce a finding is one carrying two entries with the same
+	// `objectId` and different versions — i.e. a self-inconsistent payload, never a promoted-vs-reviewed drift.
+	//
+	// THIS IS THE SHAPE THE RPH-PER-007 TEST WAS RETITLED FOR — "asserted the fold equals ITSELF … true of any
+	// pure function and of any broken one". There it was a test. Here it is production.
+	'RPH-BAS-002': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'the promoted version exactly matching the reviewed version',
+			note: 'JPWB-DOC-003 §8 ASR-16. Canon states the requirement as one of promotion\'s preconditions; the ratified rule names the error code that must carry its refusal.'
+		},
+		why:
+			'THE STATEMENT IS A COMMAND REFUSAL NAMING ITS OWN ERROR CODE ("fails with ' +
+			'RPH_BASELINE_VERSION_MISMATCH"), and nothing performs it, on two independent grounds. FIRST, THE ARM ' +
+			'CANNOT FIRE: `promoteBaseline` passes one array as BOTH `candidateItems` and `reviewedItems`, so ' +
+			'`findVersionMismatches` compares each item to itself. SECOND, THE CODE IS CARRIED NOWHERE: ' +
+			'`RPH_BASELINE_VERSION_MISMATCH` is one of the fifteen ratified error codes and its only non-test ' +
+			'occurrences are its own declaration in `errors.ts` and a kernel finding-code string — it is never an ' +
+			'`error.code` on any CommandResult. That is REG-F-010\'s census, hitting a rule that names the code in ' +
+			'its own ratified text. OBSERVED, not argued: a baseline froze `semanticVersion: 1`, and a promotion ' +
+			'naming `semanticVersion: 999` for the same object was ACCEPTED and the baseline became AUTHORITATIVE.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'PromoteBaseline whose expectedItemObjectVersions names semanticVersion 999 for an item the baseline froze at 1 — ACCEPTED, and the baseline really becomes AUTHORITATIVE',
+			control:
+				'the same PromoteBaseline against a baseline still in CANDIDATE (never submitted or approved), refused at the same site with RPH_ILLEGAL_STATE_TRANSITION — so the acceptance is a missing comparison, not a command that is never refused',
+			whyNoPredicate:
+				'`findVersionMismatches` is NOT dead — it is called on this very dispatch, so naming it would fail ' +
+				'`deadPredicate`\'s first clause. What is defective is the ARGUMENT it is given. A census over the ' +
+				'symbol would stay green forever while the rule went unenforced, which is precisely the case the ' +
+				'OBSERVED_ADMISSION arm was added for.'
+		}
+	},
+	'RPH-BAS-005': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'An authoritative baseline is immutable — change creates a successor with a supersession trace',
+			note: 'JPWB-DOC-003 §8 ASR-16, near-verbatim against the ratified statement.'
+		},
+		why:
+			'NO DISPATCHABLE COMMAND CAN CHANGE A BASELINE\'S ITEM SET. The command vocabulary holds exactly five ' +
+			'baseline commands (Create, SubmitForReview, Approve, Promote, Supersede) and `itemObjectVersions` is ' +
+			'written at exactly one site, inside `createBaseline`, on the create path. There is no Edit, Revise, ' +
+			'Amend or AddItem command of any spelling. So immutability holds by the ABSENCE OF A MUTATOR, not by a ' +
+			'guard, and there is nothing for a refusal to refuse. THE PREDICATE WRITTEN FOR THE RULE IS DEAD — ' +
+			'`assertBaselineItemSetImmutable` and its sibling `canSupersedeBaseline` have no non-test reference — ' +
+			'AND THE TEST FILE ALREADY SAID SO: `properties.test.ts` carries the comment "(Item-set byte-stability ' +
+			'under a mutating command is an M13 integration property once the baseline command handlers exist — ' +
+			'see OPEN-QUESTIONS.)", written BEFORE those handlers landed and never revisited. The handlers landed; ' +
+			'the note did not move. That is the drift this register exists to make visible, sitting inside the ' +
+			'evidence for the rule.'
+	},
+	'RPH-BAS-007': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'change creates a successor with a supersession trace',
+			note: 'JPWB-DOC-003 §8 ASR-16. A SHORTER span than RPH-BAS-005 cites of the same sentence, deliberately: BAS-005 rests on the immutability clause and this rule on the trace clause, and identical anchors would leave a reader unable to tell which half each row is about.'
+		},
+		why:
+			'THREE POST-CONDITIONS of a SUCCESSFUL supersession — Baseline 1 stays queryable, a supersession trace ' +
+			'exists, prior evidence and decision stay intact — so no dispatch can be refused for violating them. ' +
+			'(a) QUERYABLE HOLDS, as a read-model property: `listBaselines` applies no status filter, so SUPERSEDED ' +
+			'rows are returned — deliberately unlike `listPwas`/`listPwuTypes`, which do filter tombstoned rows. ' +
+			'(b) THE TRACE IS THE FINDING, and it was OBSERVED. `supersedeBaseline` supplies neither `mutate` nor ' +
+			'`eventPayload`, so `supersedingBaselineId` is written to NO object field — `BaselineObjectSchema` has ' +
+			'none to hold it — and the emitted event carries the RAW COMMAND PAYLOAD. Dispatched, the persisted ' +
+			'`BaselineSuperseded` payload is `{ supersedingBaselineId }` and OMITS `status`, which its own ' +
+			'`BaselineSupersededPayloadSchema` — a `z.strictObject` — declares REQUIRED, as does the vocabulary ' +
+			'entry the schema is generated from. The trace exists only as an event field that violates the shape ' +
+			'this repository authored for it. WHY NOTHING CATCHES THAT, stated fairly because the gate is not at ' +
+			'fault: the event gate (`kit.ts` step d2) checks payloads against `RATIFIED_EVENT_PAYLOADS`, which ' +
+			'holds 16 of the 132 registered events, and `BaselineSuperseded` is not among them BY DESIGN — its ' +
+			'vocabulary entry reads "UNRATIFIED-AUTHORED … Do NOT treat this sourceSection as proof the shape is ' +
+			'ratified", and the gate\'s own test asserts that authored shapes are deliberately NOT enforced. So ' +
+			'116 authored strict schemas go unchecked, which is the DISCLOSED COST of that scope rather than a ' +
+			'defect in it — and this row is one place where the cost is now known to have been paid.'
 	}
 };
 

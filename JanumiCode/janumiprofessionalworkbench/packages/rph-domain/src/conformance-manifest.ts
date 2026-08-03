@@ -184,10 +184,22 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		testFile: 'packages/rph-domain/src/governance.test.ts',
 		note: 'RPH-GOV-001..007 by id — but the evidence is PURE_KERNEL for all seven (see the comment above). GOV-001 is now cited per-id to a COMMAND-layer dispatch probe and dispositioned ENFORCED in enforcement-register.ts, with its live bypass recorded as REG-F-014. GOV-002..007 are under investigation; this prefix row will be re-stated when they land.'
 	},
+	// ── CORRECTED 2026-08-02 — THE OVERCLAIM GATE'S SIXTH CATCH ─────────────────────────────────────────────
+	//
+	// This row read `status: 'COVERED'`, "RPH-BAS-002..007 by id". The enforcement register disposed RPH-BAS-002
+	// UNENFORCED_DISCLOSED — nothing performs it — and the register's overclaim gate rejected the pair on the
+	// commit that landed the disclosure. Same mechanism that caught RPH-PWU-010 (which motivated the register),
+	// RPH-PWU-007, RPH-CON-004, RPH-PER-012 and RPH-GOV-001's layer.
+	//
+	// WHAT THE CITED TEST PROVES, and it is not nothing: `governance.test.ts` calls `canPromoteBaseline` directly
+	// with DISTINCT candidate and reviewed arrays, so the kernel arm really does return BASELINE_VERSION_MISMATCH.
+	// The predicate is correct. What no test asked is what the PRODUCTION CALL SITE hands it — one array, passed
+	// as both arguments — so the arm cannot fire in any dispatch. A pure-function test cannot see that, which is
+	// the whole thesis of DS-001 §4 item 2.
 	'RPH-BAS': {
-		status: 'COVERED',
+		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/governance.test.ts',
-		note: 'RPH-BAS-002..007 by id; BAS-001 via the item-shape happy path'
+		note: 'BAS-003/004/006 have live refusals and are dispositioned ENFORCED in enforcement-register.ts (their dispatch probes are owed). BAS-005/007 and BAS-001 are NOT_A_COMMAND_REFUSAL there — no command can mutate a baseline item set, the supersession postconditions are outcomes, and BAS-001 is a shape assertion whose kernel arm is SCHEMA-FORECLOSED. BAS-002 is UNENFORCED_DISCLOSED with an observed admission: `promoteBaseline` passes one array as BOTH `candidateItems` and `reviewedItems`, so `findVersionMismatches` compares each item to itself, and a promotion naming version 999 against a baseline frozen at 1 is ACCEPTED. The kernel unit test passes DISTINCT arrays and therefore cannot see it.'
 	},
 
 	// PARTIAL — core asserted, specific ids pending (audited by the M12 review; honest split).

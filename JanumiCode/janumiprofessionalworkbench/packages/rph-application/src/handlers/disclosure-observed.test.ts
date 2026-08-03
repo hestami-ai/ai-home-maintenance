@@ -681,6 +681,128 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-GOV-002': null,
 		'RPH-GOV-004': null,
 		'RPH-GOV-007': null,
+		'RPH-BAS-001': null,
+		'RPH-BAS-005': null,
+		'RPH-BAS-007': null,
+		'RPH-BAS-002': {
+			arrangement:
+				'PromoteBaseline naming semanticVersion 999 for an item the baseline froze at 1 — accepted, because the gate is handed one array as BOTH candidate and reviewed items',
+			run: () => {
+				const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5Z01';
+				const ASSESS = 'asmt_01ARZ3NDEKTSV4RRFFQ69G5Z02';
+				const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5Z03';
+				const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69G5Z04';
+				const CTRL = 'base_01ARZ3NDEKTSV4RRFFQ69G5Z05';
+				seedPolicy('pol_bas');
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: ASSESS,
+							assurancePolicyId: 'pol_bas',
+							policyVersion: '1',
+							subjectObjectIds: [PWU],
+							subjectSemanticVersions: { [PWU]: 1 },
+							claimIds: []
+						},
+						ASSESS,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'request assessment'
+				);
+				ok(
+					dispatch(
+						'CompleteAssuranceAssessment',
+						{
+							validatorResult: floorValidatorResult({
+								assessmentId: ASSESS,
+								policyId: 'pol_bas',
+								subjectId: PWU,
+								subjectSemanticVersion: 1,
+								disposition: 'SATISFIED'
+							})
+						},
+						ASSESS,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'complete assessment'
+				);
+				ok(
+					dispatch(
+						'ProposeDecision',
+						{
+							decisionType: 'PROMOTE_BASELINE',
+							subjectObjectIds: [PWU],
+							selectedOption: 'promote',
+							rationale: 'ready',
+							authority: actor
+						},
+						DEC,
+						'DECISION'
+					),
+					'propose promotion decision'
+				);
+				ok(
+					dispatch(
+						'ApproveDecision',
+						{
+							selectedOption: 'promote',
+							rationale: 'ready',
+							consideredEvidenceIds: [],
+							consideredObservationIds: [],
+							subjectSemanticVersions: { [PWU]: 1 }
+						},
+						DEC,
+						'DECISION'
+					),
+					'approve promotion decision'
+				);
+				const create = (id: string) =>
+					ok(
+						dispatch(
+							'CreateBaseline',
+							{
+								baselineType: 'ARCHITECTURE',
+								itemObjectIds: [PWU],
+								assuranceAssessmentIds: [ASSESS]
+							},
+							id,
+							'BASELINE'
+						),
+						`create ${id}`
+					);
+				const promoteWith = (id: string, semanticVersion: number) =>
+					dispatch(
+						'PromoteBaseline',
+						{
+							promotionDecisionId: DEC,
+							expectedItemObjectVersions: [{ objectId: PWU, semanticVersion }],
+							requiredAssessmentIds: [ASSESS]
+						},
+						id,
+						'BASELINE'
+					);
+				// THE CONTROL: a baseline still in CANDIDATE. Refused at the SAME site — so the acceptance below
+				// is a missing comparison, not a command this handler never refuses.
+				create(CTRL);
+				const control = promoteWith(CTRL, 1);
+
+				create(BASE);
+				ok(dispatch('SubmitBaselineForReview', {}, BASE, 'BASELINE'), 'submit');
+				ok(dispatch('ApproveBaseline', {}, BASE, 'BASELINE'), 'approve baseline');
+				expect(
+					(store.loadObject(BASE)?.state as { itemObjectVersions: { semanticVersion: number }[] })
+						.itemObjectVersions[0]?.semanticVersion,
+					'the baseline must have FROZEN version 1 for the mismatch to be a mismatch'
+				).toBe(1);
+				const admitted = promoteWith(BASE, 999);
+				expect(
+					(store.loadObject(BASE)?.state as { status: string }).status,
+					'AUTHORITATIVE on a version the baseline never reviewed IS the admission'
+				).toBe('AUTHORITATIVE');
+				return { admitted, control };
+			}
+		},
 		'RPH-GOV-001': null, // ENFORCED — observed in execrem-wp16-enforcement-observed.test.ts
 		'RPH-PER-001': null,
 		'RPH-PER-002': null,

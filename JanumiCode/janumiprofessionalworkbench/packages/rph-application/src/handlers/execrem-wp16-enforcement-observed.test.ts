@@ -903,6 +903,10 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-GOV-002': null,
 		'RPH-GOV-004': null,
 		'RPH-GOV-007': null,
+		'RPH-BAS-001': null,
+		'RPH-BAS-002': null,
+		'RPH-BAS-005': null,
+		'RPH-BAS-007': null,
 		'RPH-PER-002': null,
 		'RPH-PER-003': null, // disclosed — observed in disclosure-observed.test.ts
 		'RPH-PER-004': null, // disclosed — observed in disclosure-observed.test.ts
