@@ -3354,7 +3354,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		declaredMutations: [
 			'delete the INAPPLICABLE arm of checkConstraintDisposition — the probe reports ADMITTED',
 			'stop mapping `rationale` in buildConstraintInput — the arm can no longer see it, so EVERY inapplicable disposition refuses and the probe\'s CONTROL reddens instead: the over-refusal failure, which is why this row\'s control is a byte-adjacent record that differs only by carrying a rationale',
-			'THE ALTERNATIVE THE RULE ALLOWS AND THE KERNEL DOES NOT: the ratified statement permits "an authority OR POLICY BASIS". The arm accepts only an `authorityDecisionId`; there is no policy-basis representation. And that id is never resolved to a real Decision — any non-empty string satisfies it, which is the REG-F-014 shape on a fifth field.'
+			'THE ALTERNATIVE THE RULE ALLOWS AND THE KERNEL DOES NOT: the ratified statement permits "an authority OR POLICY BASIS". The arm accepts only an `authorityDecisionId`; there is no policy-basis representation. ~~And that id is never resolved to a real Decision — any non-empty string satisfies it, which is the REG-F-014 shape on a fifth field.~~ CLOSED 2026-08-03, struck rather than deleted. `buildConstraintInput` now RESOLVES the id and passes it on only when it loads as an EFFECTIVE Decision, so this arm\'s truthiness test finally means what it reads as. The kernel is untouched — it cannot load objects and should not. THIS ROW\'S OWN PROBE WAS ONE OF THE TWO CALLERS CITING A FAKE ID (the only two in the suite); it now mints a real decision and approves it.'
 		]
 	},
 

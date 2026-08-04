@@ -170,7 +170,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			child: `pwu_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}2`,
 			obl: `obl_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}3`,
 			con: `con_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}4`,
-			dcp: `dcp_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}5`
+			dcp: `dcp_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}5`,
+			auth: `dec_01ARZ3NDEKTSV4RRFFQ69H7${n}${suffix}6`
 		});
 		ok(
 			dispatch(
@@ -259,6 +260,43 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			// The obligation is always accounted for EXCEPT in the obligation limb's failing arrangement.
 			const obligationFields =
 				gatesObligation && !pass ? {} : { retainedParentObligationIds: [v.obl] };
+			// A REAL, EFFECTIVE authority basis for the CNS-003 limb (REG-F-014's fifth instance, 2026-08-03).
+			// This used to be a literal id naming nothing — `authorityDecisionId` reached the kernel straight from
+			// the payload, and all three arms that read it test only TRUTHINESS, so any non-empty string was
+			// authority. The boundary now resolves it, so the probe cites a decision that exists and has actually
+			// become EFFECTIVE. The delta between the two arrangements is unchanged: still the rationale alone.
+			if (limb === 'rationale') {
+				ok(
+					dispatch(
+						'ProposeDecision',
+						{
+							decisionType: 'APPROVAL',
+							subjectObjectIds: [v.parent],
+							selectedOption: 'accept the inapplicability',
+							rationale: 'the constraint does not reach this child',
+							authority: actor
+						},
+						v.auth,
+						'DECISION'
+					),
+					'propose authority decision'
+				);
+				ok(
+					dispatch(
+						'ApproveDecision',
+						{
+							selectedOption: 'accept the inapplicability',
+							rationale: 'the constraint does not reach this child',
+							consideredEvidenceIds: [],
+							consideredObservationIds: [],
+							subjectSemanticVersions: { [v.parent]: 1 }
+						},
+						v.auth,
+						'DECISION'
+					),
+					'approve authority decision'
+				);
+			}
 			// The constraint disposition varies by limb.
 			const constraintFields = gatesObligation
 				? {}
@@ -279,7 +317,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 										// The arm refuses on `!rationale || !authorityDecisionId`, so the authority is
 										// present in BOTH arrangements and the RATIONALE is the only delta — otherwise
 										// the control would fail for the sibling reason under the same finding code.
-										authorityDecisionId: 'dec_01ARZ3NDEKTSV4RRFFQ69H7999',
+										// It is a REAL effective Decision (minted above), not a literal naming nothing.
+									authorityDecisionId: v.auth,
 										...(pass ? { rationale: 'the child holds no PII' } : {})
 									}
 						]

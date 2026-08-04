@@ -207,6 +207,92 @@ describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pip
 		expect(validate('VALID').status).toBe('ACCEPTED');
 	});
 
+	// ── AN AUTHORITY BASIS MUST BE A REAL, EFFECTIVE DECISION (REG-F-014's fifth instance, 2026-08-03) ────────
+	//
+	// Three kernel arms drop or weaken a constraint on the strength of `authorityDecisionId` —
+	// CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY, INAPPLICABLE_WITHOUT_RATIONALE, WAIVED_WITHOUT_AUTHORITY — and every
+	// one of them tests only TRUTHINESS. The id reached them straight from the payload, so ANY NON-EMPTY STRING
+	// was authority: a MANDATORY constraint could be declared INAPPLICABLE by citing a decision that named nothing.
+	//
+	// The boundary now RESOLVES it (`buildConstraintInput`), and an id that does not load as an EFFECTIVE Decision
+	// is passed on as ABSENT — so the kernel's existing ratified findings fire exactly as they do for a citation
+	// nobody made. An authority that does not exist is no authority. The kernel is untouched: it cannot load
+	// objects and should not; its arms were correct and were being fed an unverified fact.
+	//
+	// SURVEYED FIRST: across the whole suite exactly two dispositions carried an `authorityDecisionId`, both the
+	// same literal, and both named an object the store had never held — the enforcement register's own RPH-CNS-003
+	// probe, which now mints a real one.
+	function decisionOverParent(id: string, approve: boolean): void {
+		dispatch('ProposeDecision', id, 'DECISION', {
+			decisionType: 'APPROVAL',
+			subjectObjectIds: [PARENT],
+			selectedOption: 'accept the inapplicability',
+			rationale: 'the constraint does not reach these children',
+			authority: human
+		});
+		if (approve)
+			dispatch('ApproveDecision', id, 'DECISION', {
+				selectedOption: 'accept the inapplicability',
+				rationale: 'the constraint does not reach these children',
+				consideredEvidenceIds: [],
+				consideredObservationIds: [],
+				subjectSemanticVersions: { [PARENT]: 1 }
+			});
+	}
+
+	/** Declare CON inapplicable, with a rationale, citing `authorityDecisionId`. */
+	function inapplicableCiting(authorityDecisionId: string) {
+		proposeDecomposition({
+			constraintPropagations: [
+				{
+					constraintId: CON,
+					childWorkUnitIds: [CHILD_A, CHILD_B],
+					disposition: 'INAPPLICABLE',
+					rationale: 'the children hold no PII',
+					authorityDecisionId
+				}
+			]
+		});
+		return validate('VALID');
+	}
+
+	function parentWithConstraint(): void {
+		assertConstraint(CON, 'MANDATORY');
+		proposePwu(PARENT, [], [CON]);
+		proposePwu(CHILD_A, [], []);
+		proposePwu(CHILD_B, [], []);
+	}
+
+	it('a constraint declared INAPPLICABLE on an authority that does not exist is refused', () => {
+		parentWithConstraint();
+		const r = inapplicableCiting('dec_01ARZ3NDEKTSV4RRFFQ69G5V99');
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
+		expect(r.error?.message).toContain('INAPPLICABLE_WITHOUT_RATIONALE');
+		expect(statusOf(DCP)).not.toBe('VALID');
+	});
+
+	// The sharper half: the decision is REAL but has not become effective. A proposal has decided nothing, and
+	// canon ASR-15 checks authority BEFORE effect — so a PROPOSED decision cannot be the basis for dropping a
+	// mandatory constraint. Without this, `authorityBasis` could check mere existence and both other tests pass.
+	it('a constraint declared INAPPLICABLE on a PROPOSED (not yet effective) decision is refused', () => {
+		parentWithConstraint();
+		const AUTH = 'dec_01ARZ3NDEKTSV4RRFFQ69G5V07';
+		decisionOverParent(AUTH, false);
+		const r = inapplicableCiting(AUTH);
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
+		expect(r.error?.message).toContain('INAPPLICABLE_WITHOUT_RATIONALE');
+	});
+
+	// CONTROL. Without it the boundary could drop EVERY authority and both tests above would still pass.
+	it('CONTROL: the same disposition citing a real EFFECTIVE decision is ACCEPTED', () => {
+		parentWithConstraint();
+		const AUTH = 'dec_01ARZ3NDEKTSV4RRFFQ69G5V08';
+		decisionOverParent(AUTH, true);
+		const r = inapplicableCiting(AUTH);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(statusOf(DCP)).toBe('VALID');
+	});
+
 	it('an INVALID verdict is never re-gated by conservation (validator already rejected it)', () => {
 		assertObligation(OBL, 'MANDATORY');
 		proposePwu(PARENT, [OBL], []);

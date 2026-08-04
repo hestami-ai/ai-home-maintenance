@@ -186,13 +186,44 @@ function buildConstraintInput(
 			relevantChildWorkUnitIds: applicable ? childWorkUnitIds : []
 		});
 	}
+	/**
+	 * REG-F-014's fifth instance (2026-08-03). `authorityDecisionId` reached the kernel STRAIGHT FROM THE
+	 * PAYLOAD, and all three arms that read it test only TRUTHINESS — so ANY NON-EMPTY STRING was authority.
+	 * A constraint could be declared INAPPLICABLE, WAIVED, or weakened from MANDATORY by citing an id that
+	 * named nothing.
+	 *
+	 * RESOLVED AT THE BOUNDARY, DECIDED IN THE KERNEL — which is why the kernel is untouched. It cannot load
+	 * objects and should not: the arms are correct, they were simply fed an unverified fact. An id that does
+	 * not resolve to an EFFECTIVE Decision is passed on as ABSENT, so the kernel's existing ratified findings
+	 * (CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY / INAPPLICABLE_WITHOUT_RATIONALE / WAIVED_WITHOUT_AUTHORITY) fire
+	 * exactly as they do for a citation nobody made. An authority that does not exist is no authority.
+	 *
+	 * EFFECTIVE, not merely present: a PROPOSED decision has decided nothing, and canon ASR-15 checks authority
+	 * BEFORE effect. A decision that has not become effective cannot be the basis for dropping a constraint.
+	 *
+	 * SURVEYED FIRST, as every behaviour change in this series has been: across the whole suite exactly TWO
+	 * dispositions carried an `authorityDecisionId`, both the same literal, and BOTH named an object the store
+	 * has never held — the enforcement register's own RPH-CNS-003 probe, which now cites a real one.
+	 *
+	 * KNOWN IMPRECISION, PRE-EXISTING AND NOT INTRODUCED HERE: `INAPPLICABLE_WITHOUT_RATIONALE` is the code the
+	 * kernel emits for `!rationale || !authorityDecisionId`, so a caller who supplied a rationale and an
+	 * unresolvable authority is told the rationale is missing. The code name was already wrong for that half
+	 * before this change; it is recorded rather than silently widened.
+	 */
+	const authorityBasis = (id: string | undefined): string | undefined => {
+		if (!id) return undefined;
+		const decision = ctx.store.loadObject(id)?.state as
+			| { status?: string; decisionType?: string }
+			| undefined;
+		return decision?.status === 'EFFECTIVE' ? id : undefined;
+	};
 	const propagations = (state.constraintPropagations as ConstraintPropagation[] | undefined) ?? [];
 	const dispositions: ConstraintDispositionRecord[] = propagations.map((r) => ({
 		constraintId: r.constraintId,
 		disposition: (r.disposition ?? 'PROPAGATED') as ConstraintDispositionRecord['disposition'],
 		childWorkUnitIds: r.childWorkUnitIds ?? [],
 		rationale: r.rationale,
-		authorityDecisionId: r.authorityDecisionId,
+		authorityDecisionId: authorityBasis(r.authorityDecisionId),
 		supersededByConstraintId: r.supersededByConstraintId
 	}));
 	return { parentConstraints, dispositions };
