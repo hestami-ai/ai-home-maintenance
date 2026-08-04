@@ -1009,10 +1009,18 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	//
 	// AND THIS IS STILL NOT THE RATIFIED HOME. DOC-004 §32 ratifies `selectAssuranceEvaluator` as its own
 	// command — choosing the evaluator is a governed act, not a rider on the verdict. That command does not exist
-	// in this codebase (nor do §32's `recordCriterionResult`, `submitEvidenceForAssessment`, or
-	// `beginAssuranceAssessment` — 4 of §32's 13). Their absence is exactly why the evaluator was smuggled
-	// through the verdict and why criterion results and evidence are dropped at the boundary: the commands that
-	// own those facts were never built. Surfaced in HARMONIZATION-LOG PART 4, not fixed here.
+	// in this codebase (nor do §32's `recordCriterionResult` or `beginAssuranceAssessment` — ~~4~~ THREE of §32's
+	// 13; corrected 2026-08-04, REG-F-021: this sentence also named `submitEvidenceForAssessment`, which HAS been
+	// built and is registered, so the count was one too many and the record went stale in the safe direction —
+	// claiming less capability than exists). Their absence is exactly why the evaluator is smuggled through the
+	// verdict and why criterion results are dropped at the boundary: the commands that own those facts were never
+	// built. Surfaced in HARMONIZATION-LOG PART 4, not fixed here.
+	//
+	// THE MISSING TWO ARE THE ARROWS THAT LIFECYCLE COLLAPSE RUNS THROUGH (REG-F-021). The ratified
+	// `AssuranceAssessment.state` machine is REQUESTED -> EVIDENCE_PENDING -> READY -> ASSESSING, and
+	// `requestAssuranceAssessment` creates the assessment ALREADY IN `ASSESSING`. Measured: `REQUESTED`,
+	// `EVIDENCE_PENDING` and `READY` are written by NO production line. Three ratified states no assessment ever
+	// occupies, and the two commands that would move through them are the two still missing.
 	const evaluator = p.validatorResult?.executionProvenance?.evaluator;
 
 	// INDEPENDENCE (Increment I2). §39 invariant 8 ("Required independence must be verified"), §8.4, §20.2: a

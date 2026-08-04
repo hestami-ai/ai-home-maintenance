@@ -143,6 +143,30 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 		).toEqual(['AssuranceAssessmentRequested', 'ClarificationRequested', 'TacticalChangeRequested']);
 	});
 
+	// THE LIFECYCLE BEHIND THE MISSING EVENT, and it is why `AssuranceAssessmentRequested` is not a naming
+	// question. The ratified `AssuranceAssessment.state` machine (rph-domain `transitions.data.ts`) runs
+	// REQUESTED -> EVIDENCE_PENDING -> READY -> ASSESSING, each arrow with its own trigger and guard — including
+	// "all required evidence present and admissible per §6.2" on EVIDENCE_PENDING -> READY.
+	// `requestAssuranceAssessment` creates the assessment ALREADY IN `ASSESSING`, so three ratified states are
+	// never occupied and two of the three arrows are never taken. Pinned as a KNOWN GAP: the day a handler writes
+	// one of these, this reddens and the pin comes out.
+	it('three ratified assessment states are occupied by nothing — the collapse behind the missing event', () => {
+		const handlers = readFileSync(
+			`${REPO_ROOT}packages/rph-application/src/handlers/assurance.ts`,
+			'utf8'
+		);
+		const unoccupied = ['REQUESTED', 'EVIDENCE_PENDING', 'READY'].filter(
+			(s) => !handlers.includes(`assessmentState: '${s}'`)
+		);
+		expect(
+			unoccupied,
+			'these are RATIFIED states of AssuranceAssessment.state. A state no handler ever writes is a ' +
+				'lifecycle the engine declares and does not run — remove a name from this list when it is built'
+		).toEqual(['REQUESTED', 'EVIDENCE_PENDING', 'READY']);
+		// CONTROL: the state the engine DOES write, so the detector is not simply failing to find anything.
+		expect(handlers).toContain("assessmentState: 'ASSESSING'");
+	});
+
 	// The aspirational surface: declared payload contracts nothing binds and nothing produces. This number is
 	// expected to FALL as milestones land; it may not RISE without someone saying why.
 	it('declared events that are neither bound nor emitted — the unbuilt surface, bounded', () => {
