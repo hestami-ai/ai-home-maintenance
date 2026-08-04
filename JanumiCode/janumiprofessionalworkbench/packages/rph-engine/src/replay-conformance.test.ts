@@ -167,16 +167,18 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(generic).toBe(67);
 	});
 
-	it("CHARACTERIZATION: the engine emits 257 events to the trace's 72, and is still not a superset", () => {
+	it("CHARACTERIZATION: the engine emits 260 events to the trace's 72, and is still not a superset", () => {
 		const actual = driveLive();
-		// 110 -> 153 -> 166 -> 251 -> 254 -> 257. The count was never the point — at 110 it was inflated by the
-		// generic setter while 28 named types were missing. Volume is not coverage; the pins above are. The jump to
-		// 251 is mostly the de minimis FLOOR: three assessments over every AI-produced result, which is what the
+		// 110 -> 153 -> 166 -> 251 -> 254 -> 257 -> 260. The count was never the point — at 110 it was inflated by
+		// the generic setter while 28 named types were missing. Volume is not coverage; the pins above are. The jump
+		// to 251 is mostly the de minimis FLOOR: three assessments over every AI-produced result, which is what the
 		// workbench is for; +3 to 254 is Increment I5 creating the three floor policies the standalone drive had
 		// only cited. +3 to 257 (REG-F-019, 2026-08-04) is the three ARCHITECTURE OBLIGATIONS the drive now
 		// asserts and allocates — without them RPH-FIX-004 quantifies over an empty set and certifies a ratified
-		// rule on the strength of there being nothing to certify.
+		// rule on the strength of there being nothing to certify. +3 to 260 is the corpus §25 constraint chain
+		// (RPH-FIX-005): the Multi-Tenancy Constraint, the Tenant Isolation Model artifact, and the claim asserted
+		// over it — and recording that FIRST EVER artifact is what exposed REG-F-020.
 		// An assurance system's event log SHOULD be dominated by assurance.
-		expect(actual).toHaveLength(257);
+		expect(actual).toHaveLength(260);
 	});
 });

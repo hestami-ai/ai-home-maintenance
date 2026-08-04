@@ -71,6 +71,30 @@ export const recordArtifact: CommandHandler = (ctx, command, payload) => {
 		objectType: ARTIFACT,
 		aggregateId: p.artifactId,
 		state,
-		eventType: 'ArtifactRecorded'
+		eventType: 'ArtifactRecorded',
+		// The DECLARED shape, not the command payload (REG-F-020). `ArtifactRecordedPayloadSchema` is a
+		// `z.strictObject` that does NOT carry `artifactId` — the artifact's identity is the event's
+		// `aggregateId`, and repeating it in the payload is the "carries keys the strict schema rejects
+		// outright" half of the defect register this file's event had never been measured against.
+		//
+		// IT WAS INVISIBLE BECAUSE NOTHING RECORDED AN ARTIFACT. `emitted-event-conformance.test.ts` drives the
+		// Reference Undertaking and checks every event it emits; the register read CLEARED because
+		// `ArtifactRecorded` was never in the population. The moment the drive recorded its first artifact
+		// (the corpus §25 Tenant Isolation Model), the register grew an entry.
+		eventPayload: {
+			artifactType: p.artifactType,
+			mediaType: p.mediaType,
+			storageProvider: p.storageProvider,
+			storageKey: p.storageKey,
+			contentHash: p.contentHash,
+			...(p.byteSize !== undefined ? { byteSize: p.byteSize } : {}),
+			...(p.producingPwuId ? { producingPwuId: p.producingPwuId } : {}),
+			...(p.producingExecutionAttemptId
+				? { producingExecutionAttemptId: p.producingExecutionAttemptId }
+				: {}),
+			securityClassification: p.securityClassification,
+			retentionClass: p.retentionClass,
+			status: p.status
+		}
 	});
 };

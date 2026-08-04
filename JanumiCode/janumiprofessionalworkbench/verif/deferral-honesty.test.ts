@@ -36,6 +36,7 @@ import {
 	createEngine,
 	driveReferenceUndertaking,
 	loadExpectedEvents,
+	REFERENCE_CONSTRAINT_CHAIN,
 	REFERENCE_UNDERTAKING,
 	runConformance,
 	runGraphConformance
@@ -66,7 +67,13 @@ function rulesWithPassingChecks(): string[] {
 	const { store } = drivenGraph();
 	try {
 		checks.push(
-			...runGraphConformance(store, { architecturePwuId: REFERENCE_UNDERTAKING.architecture }).checks
+			...runGraphConformance(store, {
+				architecturePwuId: REFERENCE_UNDERTAKING.architecture,
+				multiTenancyPwuId: REFERENCE_UNDERTAKING.multiTenancy,
+				constraintId: REFERENCE_CONSTRAINT_CHAIN.multiTenancyConstraint,
+				tenantIsolationArtifactId: REFERENCE_CONSTRAINT_CHAIN.tenantIsolationArtifact,
+				tenantIsolationClaimId: REFERENCE_CONSTRAINT_CHAIN.tenantIsolationClaim
+			}).checks
 		);
 	} finally {
 		store.close();

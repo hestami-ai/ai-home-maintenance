@@ -155,10 +155,22 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         Had that file been cited here on its face, this number would have gone up on
 		//                         evidence that proved nothing, which is the failure mode the layer gate cannot see:
 		//                         it checks that a cite is COMMAND-layer, never that the arrangement was BUILT.
+		//   2026-08-04  34 -> 40  The whole RPH-FIX family (6), and it is the first entry in this ledger recording a
+		//                         family that was never CERTIFIED rather than never COVERED. It sat at DEFERRED in
+		//                         `DEFERRABLE_PREFIXES` while FOUR of its six rules already had named, running,
+		//                         GREEN checks in `replay.ts` — an UNDERCLAIM, which no gate could see, because an
+		//                         exempt family makes no claim to over- (REG-F-019). The remaining two are
+		//                         object-graph rules the §26 event trace cannot carry, now asserted in
+		//                         `graph-conformance.ts` over the driven store: FIX-004 (obligation allocation)
+		//                         and FIX-005 (the §25 constraint chain, walked hop by hop).
+		//                         FIX-004 WOULD HAVE BEEN A VACUOUS +1: every PWU was proposed with
+		//                         `obligationIds: []`, so the check would have quantified over nothing and passed.
+		//                         The drive now authors the obligations, and the check fails an empty population.
+		//                         `verif/deferral-honesty.test.ts` is the gate for the direction that was blind.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(34);
+		).toBe(40);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

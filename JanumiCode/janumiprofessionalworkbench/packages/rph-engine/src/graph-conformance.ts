@@ -54,7 +54,13 @@ export interface GraphConformanceReport {
  */
 export function runGraphConformance(
 	store: GraphSource,
-	subjects: { readonly architecturePwuId: string }
+	subjects: {
+		readonly architecturePwuId: string;
+		readonly multiTenancyPwuId: string;
+		readonly constraintId: string;
+		readonly tenantIsolationArtifactId: string;
+		readonly tenantIsolationClaimId: string;
+	}
 ): GraphConformanceReport {
 	const checks: ConformanceCheck[] = [];
 	const add = (id: string, ok: boolean, detail: string): void => {
@@ -108,15 +114,48 @@ export function runGraphConformance(
 			: `${architectureObligations.length} architecture obligations, ${allocatedTo.size} allocated to ${children.size} children, ${retained.size} retained; unallocated: ${unallocated.map((o) => o.id).join(', ') || 'none'}`
 	);
 
-	// RPH-FIX-005 IS NOT ASSERTED HERE, and is deliberately absent rather than present-and-failing. A check hard-
-	// coded to `false` would sit in every report as permanent noise and would drag `ok` down forever, which trains
-	// a reader to ignore the report — the failure mode this harness already had once, in the opposite direction.
+	// ── RPH-FIX-005 — the constraint trace ────────────────────────────────────────────────────────────────────
 	//
-	// WHAT IT NEEDS, so the gap is a work item rather than a shrug: the drive must author the corpus §25 chain —
-	// a Multi-Tenancy Constraint (`AssertConstraint`), referenced by the Multi-Tenancy PWU's `constraintIds`; a
-	// Tenant Isolation artifact (`RecordArtifact`, `producingPwuId`); and a claim whose `subjectObjectIds` names
-	// that artifact, reaching the assessment the drive already runs. Every one of those four references EXISTS in
-	// the ratified model, so this is authoring, not a capability gap — the same conclusion REG-F-019 reached, now
-	// with the link inventory checked rather than assumed.
+	// Corpus §25's second chain: Multi-Tenancy Constraint -> Multi-Tenancy Architecture PWU -> Tenant Isolation
+	// Model -> Tenant Isolation Claim -> Architecture Assessment.
+	//
+	// EACH HOP IS WALKED AS A REFERENCE THAT EXISTS IN THE GRAPH, not as an event having occurred. The rule says
+	// the fixture EXPOSES the trace, and a trace you cannot walk is not exposed — five objects all existing
+	// separately would satisfy an existence check and expose nothing. So every hop below reads the FORWARD field
+	// that names the next object, and the walk fails at the first link that does not resolve.
+	const hops: string[] = [];
+	const missing: string[] = [];
+	const hop = (name: string, ok: boolean): boolean => {
+		(ok ? hops : missing).push(name);
+		return ok;
+	};
+
+	const constraint = stateOf<{ statement?: string }>(subjects.constraintId);
+	const pwu = stateOf<{ constraintIds?: readonly string[] }>(subjects.multiTenancyPwuId);
+	const artifact = stateOf<{ producingPwuId?: string }>(subjects.tenantIsolationArtifactId);
+	const claim = stateOf<{ subjectObjectIds?: readonly string[] }>(subjects.tenantIsolationClaimId);
+	const assessments = idsOfType('ASSURANCE_ASSESSMENT')
+		.map((id) => stateOf<{ claimIds?: readonly string[] }>(id))
+		.filter((a) => (a?.claimIds ?? []).includes(subjects.tenantIsolationClaimId));
+
+	hop('Constraint', constraint !== undefined);
+	hop(
+		'Constraint->PWU',
+		(pwu?.constraintIds ?? []).includes(subjects.constraintId)
+	);
+	hop('PWU->Artifact', artifact?.producingPwuId === subjects.multiTenancyPwuId);
+	hop(
+		'Artifact->Claim',
+		(claim?.subjectObjectIds ?? []).includes(subjects.tenantIsolationArtifactId)
+	);
+	hop('Claim->Assessment', assessments.length > 0);
+
+	const broken = missing.length > 0 ? `; BROKEN: ${missing.join(', ')}` : '';
+	add(
+		'RPH-FIX-005',
+		missing.length === 0,
+		`${hops.length}/5 hops resolve (${hops.join(' -> ')})${broken}`
+	);
+
 	return { ok: checks.every((c) => c.ok), checks };
 }

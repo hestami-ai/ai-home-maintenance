@@ -29,9 +29,12 @@ describe('RPH-PER-006 — aggregate replay equivalence', () => {
 		return engine;
 	}
 
-	const PWU_IDS = Object.entries(REFERENCE_UNDERTAKING)
-		.filter(([k]) => k !== 'intentId')
-		.map(([, v]) => v);
+	// DERIVED POSITIVELY, by id prefix, rather than by EXCLUDING the one entry that is not a PWU. The exclusion
+	// form silently treated every future addition as a PWU: when the corpus §25 constraint chain was first added
+	// to REFERENCE_UNDERTAKING, a Constraint, an Artifact and a Claim became "PWUs" here and this suite went red
+	// pointing at a missing PWU that was never a PWU. The chain now lives in its own constant AND this reads the
+	// prefix, so neither mistake alone can reproduce it.
+	const PWU_IDS = Object.values(REFERENCE_UNDERTAKING).filter((v) => v.startsWith('pwu_'));
 
 	it("every PWU's four axes rebuild from its own event stream and match the materialized state", () => {
 		const engine = build();

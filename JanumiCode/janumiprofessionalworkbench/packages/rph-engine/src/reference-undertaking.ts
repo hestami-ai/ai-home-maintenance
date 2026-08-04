@@ -130,6 +130,22 @@ export const REFERENCE_UNDERTAKING = {
 	promotion: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5AD0'
 } as const;
 
+/**
+ * The corpus §25 constraint chain (RPH-FIX-005). Named so the conformance check can address the very objects the
+ * rule names rather than discovering whichever constraint happens to exist — a check that finds its own subject
+ * can be satisfied by the wrong one.
+ *
+ * A SEPARATE CONSTANT, and that is not tidiness. These three ids first went into `REFERENCE_UNDERTAKING` and two
+ * test suites went red: `PWU_IDS` there is derived as "every entry EXCEPT intentId", so an exclusion list silently
+ * treated a Constraint, an Artifact and a Claim as PWUs. The derivation has been made positive in the same commit,
+ * but the constant's meaning is restored here too — a map whose name says PWU should not have to be filtered.
+ */
+export const REFERENCE_CONSTRAINT_CHAIN = {
+	multiTenancyConstraint: 'cns_01ARZ3NDEKTSV4RRFFQ69G5D00',
+	tenantIsolationArtifact: 'art_01ARZ3NDEKTSV4RRFFQ69G5D10',
+	tenantIsolationClaim: 'clm_01ARZ3NDEKTSV4RRFFQ69G5D20'
+} as const;
+
 export const REFERENCE_OPEN_RESIDUALS = [
 	'Offline behavior deferred from the first implementation increment'
 ] as const;
@@ -232,6 +248,7 @@ export function driveReferenceUndertaking(
 	};
 
 	const R = REFERENCE_UNDERTAKING;
+	const C = REFERENCE_CONSTRAINT_CHAIN;
 
 	// --- The assurance policy the undertaking's assessments are judged under ---
 	// Reuse the caller's (the workbench seed passes the ratified catalog's pol_fitness_for_purpose); otherwise
@@ -333,6 +350,34 @@ export function driveReferenceUndertaking(
 		approvalScope: 'full'
 	});
 
+	// --- The Multi-Tenancy Constraint (RPH-FIX-005, corpus §25) ---
+	//
+	// ASSERTED BEFORE THE PWUs ARE PROPOSED, because the chain's first hop is the constraint PROPAGATING to the
+	// Multi-Tenancy PWU and a PWU cites its constraints at proposal (`constraintIds`). Asserting it afterwards
+	// would leave the reference dangling in the direction the rule reads.
+	//
+	// Sourced from the INTENT: §25 Test 3 makes it a property of the approved need that must remain traceable
+	// through architecture, not something the architecture invented for itself.
+	send('AssertConstraint', 'CONSTRAINT', C.multiTenancyConstraint, {
+		statement:
+			'Tenant data SHALL be isolated so that no tenant can read or write another tenant records',
+		constraintType: 'SECURITY',
+		sourceObjectId: R.intentId,
+		authority: {
+			authorityId: 'auth_architecture_lead',
+			authorityType: 'ORGANIZATIONAL_ROLE',
+			scope: ['ARCHITECTURE'],
+			validFrom: '2026-07-12T00:00:00Z'
+		},
+		applicability: { appliesTo: 'ARCHITECTURE', scope: 'all tenant-scoped work' },
+		strength: 'MANDATORY'
+	});
+
+	/** Constraints each PWU carries at proposal. Only the Multi-Tenancy concern binds one today (corpus §25). */
+	const CONSTRAINTS_BY_PWU: Readonly<Record<string, readonly string[]>> = {
+		[R.multiTenancy]: [C.multiTenancyConstraint]
+	};
+
 	// --- Propose the Professional Work Graph nodes ---
 	// Each node is SHAPED at proposal: an in-scope statement, an out-of-scope status, and an expected output.
 	// This was previously left empty, and every node was then marked READY — which DOC-002 §9.1's shape-readiness
@@ -358,7 +403,7 @@ export function driveReferenceUndertaking(
 				prohibitedChanges: []
 			},
 			obligationIds: [],
-			constraintIds: [],
+			constraintIds: [...(CONSTRAINTS_BY_PWU[pwuId] ?? [])],
 			assumptionIds: [],
 			expectedOutputs: [{ outputId: `out_${pwuId}`, kind: 'DOCUMENT' }],
 			assurancePolicyIds: [],
@@ -724,7 +769,9 @@ export function driveReferenceUndertaking(
 		pwuId: string,
 		produced: { readonly claimId: string; readonly evidenceId: string },
 		disposition: 'SATISFIED' | 'CONDITIONALLY_SATISFIED',
-		observations: readonly EarnedObservation[] = []
+		observations: readonly EarnedObservation[] = [],
+		/** Additional claims this assessment VERIFIES — the last hop of the corpus §25 chain (RPH-FIX-005). */
+		extraClaimIds: readonly string[] = []
 	): string => {
 		const label = LABELS[pwuId]?.title ?? pwuId;
 		const { claimId, evidenceId } = produced;
@@ -757,7 +804,7 @@ export function driveReferenceUndertaking(
 			policyVersion: '1.0.0',
 			subjectObjectIds: [pwuId],
 			subjectSemanticVersions: { [pwuId]: 1 },
-			claimIds: [claimId]
+			claimIds: [claimId, ...extraClaimIds]
 		});
 		chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
 			assessmentId
@@ -863,9 +910,17 @@ export function driveReferenceUndertaking(
 
 	/** Returns the satisfied assessment's id, so a caller that goes on to baseline this PWU can cite the very
 	 *  assessment that permitted its satisfaction (PromoteBaseline's `requiredAssessmentIds`). */
-	const driveToSatisfied = (pwuId: string): string => {
+	const driveToSatisfied = (
+		pwuId: string,
+		/** Runs AFTER execution and BEFORE assurance; returns extra claims the assessment must verify. The hook
+		 *  exists so the §25 chain keeps its true ordering — a PWU produces the model, a claim is asserted over
+		 *  that model, and only then is it assessed. Authoring the artifact before the PWU had executed would
+		 *  have been a small fiction inside a fixture whose whole purpose is to be faithful. */
+		afterExecution?: () => readonly string[]
+	): string => {
 		const produced = shapeAndExecute(pwuId);
-		const assessmentId = earnAssurance(pwuId, produced, 'SATISFIED');
+		const extraClaimIds = afterExecution?.() ?? [];
+		const assessmentId = earnAssurance(pwuId, produced, 'SATISFIED', [], extraClaimIds);
 		// The Given now holds and is CITED: this hop names the satisfied assessment that permits it.
 		chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
 			assessmentId
@@ -938,7 +993,30 @@ export function driveReferenceUndertaking(
 	// Architecture concerns: all satisfied except Mobile & Offline, which is only CONDITIONALLY satisfied
 	// (the offline residual is deferred) — so it is NOT qualified-green (Property P1 made visible).
 	driveToSatisfied(R.systemContext);
-	driveToSatisfied(R.multiTenancy);
+	// The corpus §25 chain, completed (RPH-FIX-005): the Multi-Tenancy PWU PRODUCES the Tenant Isolation Model, a
+	// SECURITY claim is asserted OVER that model, and the PWU's assessment VERIFIES it. The constraint hop was
+	// bound at proposal (`constraintIds`), so all five links now exist as real references in the graph.
+	driveToSatisfied(R.multiTenancy, () => {
+		send('RecordArtifact', 'ARTIFACT', C.tenantIsolationArtifact, {
+			artifactId: C.tenantIsolationArtifact,
+			artifactType: 'ARCHITECTURE_MODEL',
+			mediaType: 'text/markdown',
+			storageProvider: 'workbench',
+			storageKey: 'architecture/tenant-isolation-model.md',
+			contentHash: 'sha256:tenant-isolation-model',
+			producingPwuId: R.multiTenancy,
+			securityClassification: 'INTERNAL',
+			retentionClass: 'STANDARD',
+			status: 'AVAILABLE'
+		});
+		send('AssertClaim', 'CLAIM', C.tenantIsolationClaim, {
+			statement:
+				'The Tenant Isolation Model enforces the Multi-Tenancy Constraint for every tenant-scoped entity',
+			claimType: 'SECURITY',
+			subjectObjectIds: [C.tenantIsolationArtifact]
+		});
+		return [C.tenantIsolationClaim];
+	});
 	driveToSatisfied(R.dataArch);
 	driveToSatisfied(R.integrations);
 	driveToConditional(R.mobileOffline);

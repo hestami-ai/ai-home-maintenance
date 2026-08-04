@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { createEngine } from './engine.js';
-import { driveReferenceUndertaking, REFERENCE_UNDERTAKING } from './reference-undertaking.js';
+import { driveReferenceUndertaking, REFERENCE_CONSTRAINT_CHAIN, REFERENCE_UNDERTAKING } from './reference-undertaking.js';
 import { runGraphConformance, type GraphSource } from './graph-conformance.js';
 
 function drivenStore(): { store: SqliteStorageAdapter; source: GraphSource } {
@@ -32,7 +32,13 @@ function drivenStore(): { store: SqliteStorageAdapter; source: GraphSource } {
 	return { store, source: store };
 }
 
-const SUBJECTS = { architecturePwuId: REFERENCE_UNDERTAKING.architecture };
+const SUBJECTS = {
+	architecturePwuId: REFERENCE_UNDERTAKING.architecture,
+	multiTenancyPwuId: REFERENCE_UNDERTAKING.multiTenancy,
+	constraintId: REFERENCE_CONSTRAINT_CHAIN.multiTenancyConstraint,
+	tenantIsolationArtifactId: REFERENCE_CONSTRAINT_CHAIN.tenantIsolationArtifact,
+	tenantIsolationClaimId: REFERENCE_CONSTRAINT_CHAIN.tenantIsolationClaim
+};
 
 describe('RPH-FIX-004 — architecture decomposition coverage, over the driven graph', () => {
 	it('every MANDATORY architecture obligation is allocated to a child PWU', () => {
@@ -140,5 +146,91 @@ describe('RPH-FIX-004 — architecture decomposition coverage, over the driven g
 		};
 		const check = runGraphConformance(source, SUBJECTS).checks.find((c) => c.id === 'RPH-FIX-004');
 		expect(check?.ok, check?.detail).toBe(true);
+	});
+});
+
+// ── RPH-FIX-005 — the corpus §25 constraint chain ────────────────────────────────────────────────────────────
+//
+// "The fixture exposes the trace: Multi-Tenancy Constraint -> Multi-Tenancy Architecture PWU -> Tenant Isolation
+// Artifact -> Tenant Isolation Claim -> Assessment."
+//
+// EXPOSES, not merely CONTAINS. Five objects each existing independently would satisfy an existence check and
+// expose nothing — you could not get from the constraint to the assessment. So the check WALKS the forward
+// references, and each hop below has a control that breaks exactly that link and no other.
+describe('RPH-FIX-005 — the constraint trace, walked hop by hop', () => {
+	const fix005 = (source: GraphSource) =>
+		runGraphConformance(source, SUBJECTS).checks.find((c) => c.id === 'RPH-FIX-005');
+
+	it('all five hops resolve in the driven graph', () => {
+		const { store, source } = drivenStore();
+		const check = fix005(source);
+		expect(check?.ok, check?.detail).toBe(true);
+		expect(check?.detail).toContain('5/5 hops resolve');
+		store.close();
+	});
+
+	/** The driven graph with ONE object's state field removed — the mutant per hop. */
+	function withBrokenLink(
+		source: GraphSource,
+		targetId: string,
+		drop: (state: Record<string, unknown>) => Record<string, unknown>
+	): GraphSource {
+		return {
+			readAllEvents: () => source.readAllEvents(),
+			loadObject: (id: string) => {
+				const loaded = source.loadObject(id);
+				if (id !== targetId || !loaded) return loaded;
+				return { ...loaded, state: drop(loaded.state as Record<string, unknown>) };
+			}
+		};
+	}
+
+	it.each([
+		[
+			'Constraint->PWU',
+			() => SUBJECTS.multiTenancyPwuId,
+			(s: Record<string, unknown>) => ({ ...s, constraintIds: [] })
+		],
+		[
+			'PWU->Artifact',
+			() => SUBJECTS.tenantIsolationArtifactId,
+			(s: Record<string, unknown>) => ({ ...s, producingPwuId: 'pwu_SOMEONE_ELSE' })
+		],
+		[
+			'Artifact->Claim',
+			() => SUBJECTS.tenantIsolationClaimId,
+			(s: Record<string, unknown>) => ({ ...s, subjectObjectIds: [] })
+		]
+	])('CONTROL: breaking %s breaks the walk and names that hop', (hopName, target, drop) => {
+		const { store, source } = drivenStore();
+		const check = fix005(withBrokenLink(source, target(), drop));
+		expect(check?.ok, check?.detail).toBe(false);
+		expect(check?.detail).toContain(`BROKEN: ${hopName}`);
+		store.close();
+	});
+
+	// The last hop has no field to drop on the claim — it is the ASSESSMENT that must cite the claim — so its
+	// control removes the citation from every assessment instead.
+	it('CONTROL: an assessment that does not cite the claim breaks the last hop', () => {
+		const { store, source } = drivenStore();
+		const stripped: GraphSource = {
+			readAllEvents: () => source.readAllEvents(),
+			loadObject: (id: string) => {
+				const loaded = source.loadObject(id);
+				if (!loaded || loaded.objectType !== 'ASSURANCE_ASSESSMENT') return loaded;
+				return { ...loaded, state: { ...(loaded.state as object), claimIds: [] } };
+			}
+		};
+		const check = fix005(stripped);
+		expect(check?.ok, check?.detail).toBe(false);
+		expect(check?.detail).toContain('BROKEN: Claim->Assessment');
+		store.close();
+	});
+
+	// CONTROL: an empty graph fails at the FIRST hop rather than reporting a partial walk as success.
+	it('CONTROL: an empty graph resolves 0 of 5 hops', () => {
+		const check = fix005({ readAllEvents: () => [], loadObject: () => undefined });
+		expect(check?.ok).toBe(false);
+		expect(check?.detail).toContain('0/5 hops resolve');
 	});
 });
