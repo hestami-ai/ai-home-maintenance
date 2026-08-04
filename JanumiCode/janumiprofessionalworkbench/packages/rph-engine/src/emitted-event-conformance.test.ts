@@ -93,6 +93,19 @@ describe('emitted events vs their declared shapes', () => {
 		// Each was judged and fixed deliberately, one at a time — never a bulk edit, which would have been the
 		// fabrication this effort exists to prevent. The assertion stays as an empty-array PIN: a regression re-adds
 		// an entry and fails here, so the register cannot silently grow back.
+		//
+		// ⚠️ SCOPE, CORRECTED 2026-08-04 (REG-F-020). "CLEARED" above means CLEARED FOR THE EVENTS THIS DRIVE
+		// EMITS — 34 of the catalog's 132 declared types. It never meant the catalog, and the sentence read as
+		// though it did. What exposed the difference: closing RPH-FIX-005 made the drive record its FIRST EVER
+		// artifact, and this register immediately grew an entry (`ArtifactRecorded`). No handler had changed; only
+		// the population had. Instrumenting the commit path across the WHOLE SUITE then measured 89 distinct
+		// types and TWENTY-ONE nonconforming ones — this file saw one of them.
+		//
+		// `verif/emitted-event-guard.ts` is the total version and carries those twenty-one as a shrink-only
+		// ledger. THIS FILE IS STILL WORTH ITS KEEP and is not superseded: it is the DRIVE-scoped assertion, so it
+		// says something the ledger cannot — that the canonical reference undertaking, end to end, emits nothing
+		// nonconforming. The PREMISE test above guards its breadth (types >= 20), which is a floor and not a
+		// coverage claim; that is exactly the gap the ledger fills.
 		expect(violations.map((v) => v.eventType).sort()).toEqual([]);
 	});
 
