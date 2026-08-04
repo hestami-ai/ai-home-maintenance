@@ -9,6 +9,7 @@
 // preserving the M4 posture while the handler surface fills in.
 import {
 	COMMANDS,
+	DomainCommandSchema,
 	makeRphError,
 	mintId,
 	validateAgainst,
@@ -139,6 +140,37 @@ export class Engine {
 			correlationId,
 			commandId: command.commandId
 		});
+
+		// 0b. Validate the command ENVELOPE (REG-F-011, 2026-08-04).
+		//
+		// `DomainCommandSchema` was validated NOWHERE in production. Its four references were all inside
+		// `rph-contracts` — its own definition, the generated schema manifest, and its registration into a
+		// `SchemaRegistry` that itself had no production consumer. Only the PAYLOAD was ever checked, so measured
+		// by dispatch: `commandSchemaVersion`, `targetAggregateType`, `targetAggregateId` and `idempotencyKey`
+		// could each be omitted ENTIRELY and the command was ACCEPTED, and an undeclared envelope-level property
+		// was ACCEPTED although the schema is a `z.strictObject`.
+		//
+		// SURVEYED BEFORE TURNING IT ON, and the survey CORRECTED the finding's own estimate. REG-F-011 recorded
+		// that "several test fixtures in this repository omit envelope fields today and would begin failing,
+		// which is the honest cost". Instrumented across the whole suite, ALL 16,609 DISPATCHES ALREADY PASS. The
+		// cost was zero. The estimate was a reasonable guess and it was wrong, which is the argument for measuring
+		// rather than for guessing more carefully.
+		//
+		// BEFORE IDEMPOTENCY ON PURPOSE: a malformed envelope must not be answered from a receipt. `commandId`
+		// and `correlationId` are still checked ahead of this (the crash half, fixed 2026-08-02) because their
+		// absence breaks the store's NOT NULL columns before any schema could speak.
+		//
+		// Routed through `validateAgainst` so the refusal carries `details.issues` in the SAME shape the payload
+		// path produces — that is what the enforcement register's SCHEMA-layer markers (`<issueCode>@<path>`)
+		// match against, so an envelope rule can now be cited the way RPH-CON-002 already is.
+		const envelope = validateAgainst(DomainCommandSchema, command, {
+			correlationId,
+			targetObjectIds:
+				typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []
+		});
+		if (!envelope.ok) {
+			return { ...base, status: 'VALIDATION_FAILED', error: envelope.error };
+		}
 
 		// 1. Idempotency: a replay of the same idempotencyKey returns the prior result, no new event.
 		const prior = this.store.getReceipt(command.idempotencyKey);

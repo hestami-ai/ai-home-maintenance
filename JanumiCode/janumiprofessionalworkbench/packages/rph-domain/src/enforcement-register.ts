@@ -1716,12 +1716,17 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'ACCEPTED before the arranging act" — is an instance of this rule, so it is continuously exercised ' +
 			'without being a row. Minting an UNENFORCED row would make the disclosure set and the control set share ' +
 			'an arrangement, one dispatch simultaneously proving a gap and proving the machinery alive. ' +
-			'MEASURED RESIDUE, recorded so this row is never read as "the command envelope is validated" — IT IS ' +
+			'~~MEASURED RESIDUE, recorded so this row is never read as "the command envelope is validated" — IT IS ' +
 			'NOT. The bus validates only `command.payload`; the envelope is checked against `DomainCommandSchema` ' +
 			'nowhere. The rule therefore holds VACUOUSLY at the bus rather than because a command-schema check ' +
-			'passed. That is REG-F-011, whose crash half is fixed and whose validation half is owed — and reading ' +
-			'the contrapositive ("an incomplete envelope fails validation") as THIS rule would be the substitution ' +
-			'RPH-EXE-005, RPH-ASR-010 and RPH-PWU-003 each decline.'
+			'passed.~~ CLOSED 2026-08-04 (REG-F-011), struck rather than deleted. The bus NOW validates the ' +
+			'envelope against `DomainCommandSchema`, before idempotency and before the payload, so this rule no ' +
+			'longer holds vacuously — a well-formed envelope is accepted BECAUSE the command schema passed. THE ' +
+			'DISPOSITION IS UNCHANGED AND THAT IS THE POINT: the rule is still an ACCEPTANCE and still arm 3. ' +
+			'Reading the contrapositive ("an incomplete envelope fails validation") as THIS rule would be the ' +
+			'substitution RPH-EXE-005, RPH-ASR-010 and RPH-PWU-003 each decline — the new refusal is evidence FOR ' +
+			'the acceptance being non-vacuous, not a refusal this rule claims. Its own evidence lives in ' +
+			'`packages/rph-application/src/command-envelope-validation.test.ts`.'
 	},
 	'RPH-CON-003': {
 		kind: 'UNENFORCED_DISCLOSED',
