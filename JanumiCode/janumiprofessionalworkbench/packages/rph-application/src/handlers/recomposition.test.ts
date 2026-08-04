@@ -172,4 +172,33 @@ describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §
 		expect(r.status).toBe('ACCEPTED');
 		expect(statusOf(RCP)).toBe('INSUFFICIENT');
 	});
+
+	// ── REG-F-020 residue: the caller must NAME the claim this contract settles ──────────────────────────────
+	//
+	// `parentCompletionClaimId` is REQUIRED on CompleteRecomposition and was READ BY NOTHING — the event took it
+	// from the contract and no line referenced the payload's. A required field nothing reads is the
+	// `GrantWaiver.effectiveAt` shape. Removing it was available (the command is UNRATIFIED-AUTHORED) and is the
+	// weaker answer: checking it catches a caller completing the WRONG contract, which is a real mistake at a
+	// real seam — the contract id and the claim id are different ids.
+	describe('the named parent completion claim is a precondition, not decoration', () => {
+		it('refuses a completion that names a DIFFERENT claim, and the contract does not advance', () => {
+			propose([CHILD_A]);
+			const r = complete({ parentCompletionClaimId: 'clm_01ARZ3NDEKTSV4RRFFQ69G5VZZ' });
+			expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
+			expect(r.error?.message).toContain('was proposed to settle');
+			expect(statusOf(RCP), 'a refused completion leaves the contract EVALUATING').toBe('EVALUATING');
+		});
+
+		// CONTROL — the guard must not refuse the correct caller. Without this a `return reject(...)` with no
+		// condition would satisfy the test above.
+		it('CONTROL: the matching claim completes normally', () => {
+			propose([CHILD_A]);
+			const r = complete();
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			// INSUFFICIENT, not COMPOSABLE: a freshly proposed child is UNASSESSED and so not acceptable. The
+			// outcome is not the point — the point is that the guard ACCEPTS the correct caller and lets the
+			// evaluation decide, rather than refusing before it runs.
+			expect(statusOf(RCP)).toBe('INSUFFICIENT');
+		});
+	});
 });

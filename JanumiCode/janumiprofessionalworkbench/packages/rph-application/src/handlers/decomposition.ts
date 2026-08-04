@@ -608,6 +608,33 @@ export const completeRecomposition: CommandHandler = (ctx, command, payload) => 
 			`CompleteRecomposition requires an existing recomposition contract ${command.targetAggregateId}`
 		);
 	}
+	// The caller must NAME the claim it believes it is settling, and it must be the one this contract was
+	// proposed to settle (REG-F-020 residue).
+	//
+	// `parentCompletionClaimId` is REQUIRED on the command and, until now, READ BY NOTHING: the event payload
+	// takes it from the CONTRACT, and no other line referenced `p.parentCompletionClaimId`. A required field that
+	// nothing reads is the `GrantWaiver.effectiveAt` shape — a contract inviting a caller to believe they set
+	// something — and there were two ways to close it. REMOVING the field was available (this command is
+	// UNRATIFIED-AUTHORED, so the shape is ours) and is the WEAKER answer: the caller naming the claim is a
+	// meaningful assertion, and checking it catches a caller completing the WRONG contract, which is a real
+	// mistake at a real seam — the recomposition contract id and the claim id are different ids, and a caller
+	// that has muddled them is otherwise told it succeeded.
+	//
+	// So it becomes a PRECONDITION rather than an ignored field — the REG-F-017 medicine: refuse on disagreement
+	// rather than silently preferring one side. The event still records the CONTRACT's claim, which is now
+	// provably the same value.
+	const contractClaimId = str(contract.parentCompletionClaimId);
+	if (contractClaimId !== undefined && p.parentCompletionClaimId !== contractClaimId) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`CompleteRecomposition names parent completion claim ${p.parentCompletionClaimId}, but recomposition ` +
+				`contract ${command.targetAggregateId} was proposed to settle ${contractClaimId}. Completing a ` +
+				`contract while naming a different claim would record a settlement of work this contract never ` +
+				`covered — re-issue against the contract that owns the claim.`,
+			[command.targetAggregateId]
+		);
+	}
 	const evaluation = evaluateRecomposition(buildRecompositionInput(ctx, contract, p));
 	return advanceStatus(ctx, command, {
 		objectType: RECOMP,
