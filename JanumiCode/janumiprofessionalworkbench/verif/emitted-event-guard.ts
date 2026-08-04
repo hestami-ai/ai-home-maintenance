@@ -21,8 +21,15 @@
 // rather than reading the handlers. `PwuMarkedReady` looked like the same defect and is not: `markPwuReady`
 // already supplies a conforming `eventPayload`, and the nonconforming commit comes from `event-gate.test.ts`
 // emitting `{total: 'garbage'}` ON PURPOSE. It is filed below in a SEPARATE list, because a defect ledger that
-// contains a non-defect sends someone to fix a handler that is correct. SIX are now fixed (`ArtifactRecorded`,
-// `PwaCreated`, `PwaPublished`, `UndertakingCreated`, `PwuTypeDefined`, `PwuTypeRedefined`); FIFTEEN remain.
+// contains a non-defect sends someone to fix a handler that is correct.
+//
+// TWENTY OF THE TWENTY ARE NOW FIXED BUT ONE. `WaiverRequested` is the exception and its refusal is deliberate:
+// emitting its declared shape drops `waivedPolicyId`, which `foldWaiverRequested` in
+// `packages/rph-projections/src/assurance-view.ts` reads as its ATTACHMENT PREDICATE — and that projection is a
+// pure fold with no store handle, so the Decision object where the datum lives is unreachable to it. Conforming
+// would make every waiver attach to every assessment whose subjects it intersects, under any policy, AND STAY
+// GREEN, because that projection tests itself on hand-built events. Closing it means widening the ratified shape
+// or teaching the projection to read the Decision object — a two-package change for one commit.
 //
 // ── WHAT THIS IS AND IS NOT ──────────────────────────────────────────────────────────────────────────────────
 // A DEFECT LEDGER, not a specification. Every entry below is a defect with its MEASURED violation as its reason —
@@ -64,27 +71,6 @@ import { afterAll } from 'vitest';
  * exists for exactly this) and delete the row.
  */
 const KNOWN_NONCONFORMING: Readonly<Record<string, string>> = {
-	BaselineSuperseded:
-		'status: Invalid option: expected one of "DRAFT"|"CANDIDATE"|"UNDER_REVIEW"|"APPROVED"|"AUTHORITATIVE"|"SUPERSEDED"|"REVOKED"',
-	DecisionRevoked: 'status: Invalid option: expected one of "PROPOSED"|"EFFECTIVE"|"REVOKED"|"SUPERSEDED"',
-	DecompositionRejected: 'blockingObservationIds: Invalid input: expected array, received undefined',
-	ExecutionTerminated:
-		'status: Invalid option: expected one of "PROPOSED"|"UNDER_REVIEW"|"APPROVED"|"ACTIVE"|"COMPLETED"|"FAILED"|"SUPERSEDED"|"CANCELLED"',
-	IntentRevised: 'semanticVersion: Invalid input: expected number, received undefined',
-	RecompositionCompleted:
-		'parentCompletionClaimId: Invalid input: expected string, received undefined',
-	RecompositionConflictDetected:
-		'conflictingChildWorkUnitIds: Invalid input: expected array, received undefined',
-	RecompositionFailed: 'reason: Invalid input: expected string, received undefined',
-	RecompositionStarted: 'parentWorkUnitId: Invalid input: expected string, received undefined',
-	RuntimeBindingDenied:
-		'authorizationStatus: Invalid option: expected one of "REQUESTED"|"AUTHORIZED"|"PARTIALLY_AUTHORIZED"|"DENIED"|"REVOKED"',
-	RuntimeBindingRequested:
-		'authorizationStatus: Invalid option: expected one of "REQUESTED"|"AUTHORIZED"|"PARTIALLY_AUTHORIZED"|"DENIED"|"REVOKED"',
-	RuntimeCapabilityRevoked:
-		'revocationReason: Invalid input: expected string, received undefined',
-	TacticalChangeApplied: 'executionPlanId: Invalid input: expected string, received undefined',
-	WaiverGranted: 'waiverDecisionId: Invalid input: expected string, received undefined',
 	WaiverRequested:
 		'decisionType: Invalid option: expected one of "APPROVAL"|"REJECTION"|"WAIVER"|"ESCALATION"|"RESHAPE"|"REPLAN"|"PROMOTE_BASELINE"|"ABANDON"|"REVOKE"'
 };

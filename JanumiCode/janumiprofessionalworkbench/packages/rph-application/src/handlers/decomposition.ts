@@ -262,6 +262,44 @@ function checkDecompositionConservation(
 	);
 }
 
+/**
+ * §8.16's blocking set, as `governance.ts`'s baseline gate reads it (`BLOCKING_SEVERITIES`) — the two
+ * `AssuranceSeverity` values that block, not a new ranking authored here.
+ *
+ * THE SEVERITY SET IS SHARED; THE SURROUNDING PREDICATE IS NOT, and that difference is stated rather than left to
+ * be inferred from the name. `governance.ts`'s baseline gate filters on severity AND on `disposition`
+ * (`UNSETTLED_DISPOSITIONS`), so an observation that has been WAIVED or otherwise settled stops blocking a
+ * promotion. The derivation below keys on severity ALONE, so a settled blocking-severity observation still
+ * appears in `blockingObservationIds`.
+ *
+ * WHETHER THAT IS RIGHT IS A REAL QUESTION AND IS NOT DECIDED HERE. Promotion and decomposition-validation are
+ * different acts: a waiver granted against a promotion is not obviously a waiver against a parent's right to
+ * decompose. Copying `UNSETTLED_DISPOSITIONS` across would be assuming they are the same act; adding a
+ * disposition filter authored here would be inventing one. The field records what the VALIDATOR cited as
+ * blocking, which is severity, and the narrower reading is left to a rule that states it.
+ */
+const BLOCKING_OBSERVATION_SEVERITIES = new Set(['BLOCKING', 'CRITICAL']);
+
+/**
+ * The BLOCKING SUBSET of the observations the validator cited — `DecompositionRejected.blockingObservationIds`.
+ *
+ * DERIVED, NOT ASSERTED: `severity` is read off each cited ASSURANCE_OBSERVATION object, so the caller cannot
+ * declare a non-blocking observation to be the thing that blocked. The vocab entry says exactly this — the field
+ * is "distinct from ... observationIds (the blocking subset)" — and `ValidateDecompositionPayloadSchema` offers no
+ * `blockingObservationIds` to copy, so copying `observationIds` wholesale would assert every considered
+ * observation was blocking. An id that does not resolve to a live ASSURANCE_OBSERVATION is omitted: its severity
+ * is unknown and an unknown severity is not evidence of blocking.
+ */
+function blockingObservationIds(ctx: HandlerContext, observationIds: readonly string[]): string[] {
+	return observationIds.filter((oid) => {
+		const o = loadState(ctx, oid);
+		return (
+			o?.objectType === 'ASSURANCE_OBSERVATION' &&
+			BLOCKING_OBSERVATION_SEVERITIES.has(str(o.severity))
+		);
+	});
+}
+
 /** ValidateDecomposition — UNDER_REVIEW -> VALID|CONDITIONALLY_VALID|INVALID per the validator disposition. */
 export const validateDecomposition: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ValidateDecompositionPayload;
@@ -300,11 +338,24 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
 		// validated then discarded into neither store, so the governed stream could not say what the verdict rested
 		// on. Optional field now declared on both validation events (VALID/COND -> DecompositionValidated, INVALID ->
 		// DecompositionRejected), distinct from Rejected.blockingObservationIds (the blocking subset).
-		eventPayload: () => ({
-			status: mapping.target,
-			...(p.validatorRole ? { validatorRole: p.validatorRole } : {}),
-			...(p.observationIds?.length ? { observationIds: p.observationIds } : {})
-		})
+		//
+		// ONE BUILDER, TWO DECLARED SHAPES (REG-F-020). This call site emits `DecompositionValidated` on two arms and
+		// `DecompositionRejected` on the third, and the two interfaces are NOT the same object: Rejected REQUIRES
+		// `blockingObservationIds` and declares no `validatorRole`, so the single shared shape emitted before was
+		// missing a required field AND — whenever the validator named its role — carried a key a strictObject
+		// rejects. Branch on the event actually being emitted, not on convenience.
+		eventPayload: () =>
+			mapping.event === 'DecompositionRejected'
+				? {
+						blockingObservationIds: blockingObservationIds(ctx, p.observationIds ?? []),
+						...(p.observationIds?.length ? { observationIds: p.observationIds } : {}),
+						status: mapping.target
+					}
+				: {
+						status: mapping.target,
+						...(p.validatorRole ? { validatorRole: p.validatorRole } : {}),
+						...(p.observationIds?.length ? { observationIds: p.observationIds } : {})
+					}
 	});
 };
 
@@ -475,7 +526,27 @@ export const beginRecomposition: CommandHandler = (ctx, command) =>
 		// its `missing` list — so it is silent on the count either way.) Admitting re-evaluations (which legitimately
 		// re-emit) therefore breaks nothing; refusing the true NOOP is the only thing needed.
 		precondition: fromStates('READY', 'CONFLICTED', 'INSUFFICIENT'),
-		eventType: 'RecompositionStarted'
+		eventType: 'RecompositionStarted',
+		// REG-F-020. Without this builder `advanceStatus` emitted the raw COMMAND payload —
+		// `{recompositionContractId}` — which is not one field of the declared `RecompositionStartedPayloadSchema`:
+		// all three required fields were absent, and the one key present is not declared. The event that records
+		// "this recomposition began" could not say WHICH parent or WHICH children it began over.
+		//
+		// Every field comes from the COMMITTED next state, which is where those facts live (ProposeRecomposition
+		// wrote them and `RecompositionContractSchema` requires them). `recompositionContractId` is not dropped
+		// information: it IS `aggregateId` on the event envelope `makeEvent` builds.
+		//
+		// `workLifecycleState` is DECLARED OPTIONAL and deliberately NOT emitted: its vocab note is "parent PWU
+		// SATISFIED->RECOMPOSING", and this handler advances the CONTRACT, never the parent PWU. Emitting a
+		// lifecycle state no transition produced would be a fabricated fact in an append-only record.
+		// (The quote was checked against `vocab/m3-commands-events.json` — an earlier draft of this comment cited
+		// it as "RECOMPOSING->RECOMPOSED", which is the note on a DIFFERENT field. The conclusion is unchanged
+		// either way, and a justification that misquotes its own source is still worth correcting.)
+		eventPayload: (next) => ({
+			parentWorkUnitId: str(next.parentWorkUnitId),
+			requiredChildWorkUnitIds: (next.requiredChildWorkUnitIds as string[] | undefined) ?? [],
+			status: str(next.status)
+		})
 	});
 
 // §14.1 acceptable-child set: a required child contributes acceptably to recomposition when its assurance rollup
@@ -550,12 +621,41 @@ export const completeRecomposition: CommandHandler = (ctx, command, payload) => 
 		// trigger label names); a re-issue from a settled outcome is refused, so no contradicting second evaluation.
 		precondition: fromStates('EVALUATING'),
 		eventType: evaluation.event,
-		eventPayload: () => ({
-			status: RECOMP_OUTCOME_STATE[evaluation.status] ?? 'INSUFFICIENT',
-			...(evaluation.reasons.length ? { reasons: evaluation.reasons } : {}),
-			...(evaluation.unsatisfiedChildWorkUnitIds.length
-				? { unsatisfiedChildWorkUnitIds: evaluation.unsatisfiedChildWorkUnitIds }
-				: {})
-		})
+		// REG-F-020. ONE CALL SITE, THREE DECLARED INTERFACES — the kernel picks the event (`evaluation.event`), so
+		// the payload must be built for whichever one it picked. The single shape emitted before satisfied none of
+		// them: it carried `reasons`, which NO ONE of the three declares (a strictObject hard-rejects it), and it
+		// omitted every required field but `status` — so `RecompositionCompleted` did not name the parent completion
+		// claim it completed, `RecompositionConflictDetected` did not name the conflicting children or say what the
+		// conflict WAS, and `RecompositionFailed` did not carry a reason. The kernel's `reasons` are not lost: they
+		// are the substance of `conflictDescription` / `reason`, which is the field each shape declares for them.
+		eventPayload: (next) => {
+			const status = str(next.status);
+			if (evaluation.event === 'RecompositionCompleted') {
+				// From the CONTRACT, not `p.parentCompletionClaimId`: the claim this contract was proposed to
+				// settle is the one that was settled, and `RecompositionContractSchema` requires it.
+				// `workLifecycleState` (optional, "parent PWU RECOMPOSING->RECOMPOSED") is omitted — this handler
+				// advances the contract, not the parent PWU.
+				return { parentCompletionClaimId: str(next.parentCompletionClaimId), status };
+			}
+			if (evaluation.event === 'RecompositionConflictDetected') {
+				// The union of the children named by the detected conflicts, de-duplicated (a child can appear in
+				// more than one conflict). `reasons` is one "conflictType: description" line per conflict — the
+				// kernel's own rendering — which is what `conflictDescription` is for.
+				return {
+					conflictingChildWorkUnitIds: [
+						...new Set((p.detectedConflicts ?? []).flatMap((c) => c.conflictingChildWorkUnitIds))
+					],
+					conflictDescription: evaluation.reasons.join('; '),
+					status
+				};
+			}
+			return {
+				reason: evaluation.reasons.join('; '),
+				...(evaluation.unsatisfiedChildWorkUnitIds.length
+					? { unsatisfiedChildWorkUnitIds: [...evaluation.unsatisfiedChildWorkUnitIds] }
+					: {}),
+				status
+			};
+		}
 	});
 };

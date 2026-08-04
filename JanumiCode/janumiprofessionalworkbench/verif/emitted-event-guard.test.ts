@@ -79,7 +79,7 @@ describe('the emitted-event guard is alive', () => {
 	// rows are worth counting out loud rather than letting the number drift.
 	it('the ledger is a bounded accept-list, not an open one', () => {
 		const rows = Object.keys(LEDGER);
-		expect(rows.length, `ledger rows: ${rows.sort().join(', ')}`).toBeLessThanOrEqual(15);
+		expect(rows.length, `ledger rows: ${rows.sort().join(', ')}`).toBeLessThanOrEqual(1);
 		expect(
 			rows.every((r) => LEDGER[r] !== undefined && LEDGER[r]!.length > 0),
 			'every row carries its MEASURED violation — a row without one is an assertion nobody checked'

@@ -2966,13 +2966,20 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'exists, prior evidence and decision stay intact — so no dispatch can be refused for violating them. ' +
 			'(a) QUERYABLE HOLDS, as a read-model property: `listBaselines` applies no status filter, so SUPERSEDED ' +
 			'rows are returned — deliberately unlike `listPwas`/`listPwuTypes`, which do filter tombstoned rows. ' +
-			'(b) THE TRACE IS THE FINDING, and it was OBSERVED. `supersedeBaseline` supplies neither `mutate` nor ' +
-			'`eventPayload`, so `supersedingBaselineId` is written to NO object field — `BaselineObjectSchema` has ' +
-			'none to hold it — and the emitted event carries the RAW COMMAND PAYLOAD. Dispatched, the persisted ' +
+			'(b) THE TRACE IS THE FINDING, and it was OBSERVED. `supersedeBaseline` supplies no `mutate`, so ' +
+			'`supersedingBaselineId` is written to NO object field — `BaselineObjectSchema` has none to hold it — ' +
+			'and the event is its only carrier. ~~`supersedeBaseline` supplies neither `mutate` nor `eventPayload` ' +
+			'… and the emitted event carries the RAW COMMAND PAYLOAD. Dispatched, the persisted ' +
 			'`BaselineSuperseded` payload is `{ supersedingBaselineId }` and OMITS `status`, which its own ' +
-			'`BaselineSupersededPayloadSchema` — a `z.strictObject` — declares REQUIRED, as does the vocabulary ' +
-			'entry the schema is generated from. The trace exists only as an event field that violates the shape ' +
-			'this repository authored for it. WHY NOTHING CATCHES THAT, stated fairly because the gate is not at ' +
+			'`BaselineSupersededPayloadSchema` — a `z.strictObject` — declares REQUIRED.~~ CORRECTED 2026-08-04 ' +
+			'(REG-F-020), struck rather than deleted: the handler now supplies an `eventPayload` and the persisted ' +
+			'payload is `{ supersedingBaselineId, status }`, with `status` read off the COMMITTED NEXT STATE. THE ' +
+			'ROW\'S DISPOSITION IS UNCHANGED and that is the point — the trace is still carried ONLY by an event ' +
+			'and by no object field, which is what this row discloses. What changed is that the event no longer ' +
+			'ALSO violates the shape this repository authored for it. Recorded because the struck sentences were ' +
+			'in the PRESENT TENSE and nothing would have caught them going stale; a claim about an emitted payload ' +
+			'is now checkable by `verif/emitted-event-guard.ts`, which is the instrument this row predates. ' +
+			'WHY THE d2 GATE DOES NOT CATCH IT, stated fairly because the gate is not at ' +
 			'fault: the event gate (`kit.ts` step d2) checks payloads against `RATIFIED_EVENT_PAYLOADS`, which ' +
 			'holds 16 of the 132 registered events, and `BaselineSuperseded` is not among them BY DESIGN — its ' +
 			'vocabulary entry reads "UNRATIFIED-AUTHORED … Do NOT treat this sourceSection as proof the shape is ' +

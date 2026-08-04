@@ -9,13 +9,19 @@ import type {
 	ApproveDecisionPayload,
 	BaselineObject,
 	BaselinePromotedPayload,
+	BaselineSupersededPayload,
 	CreateBaselinePayload,
 	DecisionEffectivePayload,
 	DecisionObject,
+	DecisionRevokedPayload,
 	DomainCommand,
+	GrantWaiverPayload,
 	ProposeDecisionPayload,
 	PromoteBaselinePayload,
 	RequestWaiverPayload,
+	RevokeDecisionPayload,
+	SupersedeBaselinePayload,
+	WaiverGrantedPayload,
 	WaiverRule
 } from '@janumipwb/rph-contracts';
 import {
@@ -224,7 +230,17 @@ function makeDecisionEffective(
 	target: 'EFFECTIVE',
 	eventType: string,
 	precondition: Precondition,
-	extraMutate?: (base: Record<string, unknown>, command: DomainCommand) => Record<string, unknown>
+	extraMutate?: (base: Record<string, unknown>, command: DomainCommand) => Record<string, unknown>,
+	/**
+	 * The EVENT payload, when this caller's event is not `DecisionEffective`. ONE advanceStatus literal serves two
+	 * command types that emit two DIFFERENT event types (`DecisionEffective` and `WaiverGranted`), and the two
+	 * declare DIFFERENT interfaces — so a single hard-coded payload builder is wrong for whichever event it was
+	 * not written for. It was written for `DecisionEffective`, so `GrantWaiver` emitted a `DecisionEffective`
+	 * payload under a `WaiverGranted` type: `waiverDecisionId` absent, `duration` absent, `status` absent, and
+	 * five keys `WaiverGrantedPayloadSchema` (a `z.strictObject`) rejects outright. Omitted → the DecisionEffective
+	 * shape below, which is what `ApproveDecision` still uses.
+	 */
+	eventPayload?: (nextState: Record<string, unknown>, command: DomainCommand) => unknown
 ): CommandHandler {
 	return (ctx, command) =>
 		advanceStatus(ctx, command, {
@@ -264,6 +280,9 @@ function makeDecisionEffective(
 			// approved. Every value is read from the committed next state, which commitState validates against
 			// DecisionObjectSchema before anything is emitted.
 			eventPayload: (next) => {
+				// PER-EVENT: `GrantWaiver` emits `WaiverGranted`, whose declared interface is NOT this one.
+				// See the `eventPayload` parameter above.
+				if (eventPayload) return eventPayload(next, command);
 				const d = next as unknown as DecisionObject;
 				const event: DecisionEffectivePayload = {
 					decisionId: d.id,
@@ -356,15 +375,32 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
  * entry in the append-only log (AX-7). NONE site: the wrong-source code was already RPH_ILLEGAL_STATE_TRANSITION via
  * checkTransition, so the precondition changes NO refusal code — only WHICH re-issue is refused (the same-state NOOP).
  * No decisionType predicate on purpose: an APPROVAL-family decision AND a WAIVER are both revocable from EFFECTIVE. */
-export const revokeDecision: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+export const revokeDecision: CommandHandler = (ctx, command, payload) => {
+	const p = payload as RevokeDecisionPayload;
+	return advanceStatus(ctx, command, {
 		objectType: DECISION,
 		statusField: 'status',
 		machine: 'Decision.status',
 		target: 'REVOKED',
 		eventType: 'DecisionRevoked',
-		precondition: fromStates('EFFECTIVE')
+		precondition: fromStates('EFFECTIVE'),
+		// REG-F-020. `DecisionRevokedPayloadSchema` (a `z.strictObject`) declares `{ revocationRationale, status }`
+		// and the site supplied no `eventPayload`, so the event carried the raw `RevokeDecision` COMMAND payload —
+		// `{ revocationRationale }` — and the one event that records "this decision became REVOKED" did not contain
+		// the word REVOKED. `status` is read from the COMMITTED NEXT STATE, not written as the literal 'REVOKED':
+		// the event must record where the aggregate actually went, and `advanceStatus` has already run the
+		// `Decision.status` transition check and set the field by the time this builder is called. Nothing is
+		// dropped — `revocationRationale` is the command payload's only field and it is carried through.
+		eventPayload: (next) => {
+			const d = next as unknown as DecisionObject;
+			const event: DecisionRevokedPayload = {
+				revocationRationale: p.revocationRationale,
+				status: d.status
+			};
+			return event;
+		}
 	});
+};
 
 // ---- Waivers (a Decision of decisionType WAIVER) ----
 
@@ -451,6 +487,31 @@ export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 		objectType: DECISION,
 		aggregateId: id,
 		state,
+		// REG-F-020 — DELIBERATELY NOT FIXED, and the reason is a live reader, not an oversight.
+		//
+		// This emits the raw `RequestWaiver` COMMAND payload, which its declared shape rejects twice over:
+		// `WaiverRequestedPayloadSchema` (a `z.strictObject`) requires `decisionType` (=WAIVER) and `status`
+		// (=PROPOSED), which the command payload does not carry, and admits ONLY
+		// `{subjectObjectIds, scope, rationale, duration, affectedObjectIds, decisionType, status}` — so
+		// `waivedPolicyId`, `waivedCriterionId`, `waivedFindingIds`, `compensatingControls`, `reviewConditions`
+		// and `expiresAt` are unrecognized keys.
+		//
+		// CONFORMING WOULD BREAK `rph-projections/src/assurance-view.ts`. `foldWaiverRequested` is a PURE FOLD over
+		// the event log — it has no store handle — and it reads THREE of those rejected keys off this event:
+		// `waivedPolicyId` is its attachment predicate ("a waiver for a DIFFERENT policy does NOT attach — no
+		// over-reach", its own test), and `waivedCriterionId` / `waivedFindingIds` are the §38 waiver view's content.
+		// Emitting the declared shape makes `waivedPolicyId` undefined at every real waiver, which takes the
+		// projection's deliberate `waivedPolicyId === undefined ||` permissive branch: every waiver would attach to
+		// every assessment whose subjects it intersects, under ANY policy, while reporting that it waives no findings
+		// under no criterion. That is a §38 assurance read model claiming coverage a waiver does not have — and it
+		// would stay green, because the projection's own tests build their events by hand. The live path is real:
+		// `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts` builds this view from `readAllEvents()`.
+		//
+		// The information does live on the object (`waiver: WaiverDetail`, written above) — that is where the
+		// projection SHOULD read it, and `floor-gate.ts` already does. But making the projection object-aware is a
+		// change in another package, and the alternative — widening `WaiverRequestedPayloadSchema` — is editing
+		// ratified-material to make a handler pass, which this work may not do. Fixing this needs both halves
+		// landed together; half of it is a silent assurance regression. Left in the ledger, named.
 		eventType: 'WaiverRequested'
 	});
 };
@@ -474,7 +535,34 @@ export const grantWaiver: CommandHandler = makeDecisionEffective(
 	(base, command) => ({
 		...base,
 		effectiveAt: command.issuedAt
-	})
+	}),
+	// REG-F-020. `WaiverGrantedPayloadSchema` (a `z.strictObject`) declares `{ waiverDecisionId, effectiveAt,
+	// duration, status }`. This site shares `makeDecisionEffective` with ApproveDecision, so it inherited that
+	// helper's hard-coded `DecisionEffective` payload: the emitted WaiverGranted carried `decisionId` /
+	// `decisionType` / `subjectObjectIds` / `subjectSemanticVersions` / `selectedOption` / `rationale` — five keys
+	// the strict shape rejects — and NONE of `waiverDecisionId`, `duration`, `status`. The grant of a waiver is the
+	// fact the assurance floor audits (see the decisionType predicate above); its record could not say the waiver
+	// became EFFECTIVE, nor for how long.
+	//
+	// `waiverDecisionId` / `effectiveAt` / `status` come from the COMMITTED NEXT STATE — the event records what
+	// HAPPENED, and `effectiveAt` in particular is the value `extraMutate` above actually wrote (`command.issuedAt`),
+	// not the `effectiveAt` the grant command asked for. `duration` is read from the COMMAND payload because it is
+	// the one declared field with no home on `DecisionObjectSchema` (`WaiverDetail` carries `expiresAt`, a distinct
+	// datum), and inventing one from `expiresAt` would be minting a governance fact. The dropped keys all live on
+	// the Decision object, which is where a reader of an aggregate's identity should look; the only projection that
+	// folds WaiverGranted (`rph-projections/src/assurance-view.ts` `foldWaiverResolved`) reads `effectiveAt` and the
+	// event's own `aggregateId`, both of which survive.
+	(next, command) => {
+		const d = next as unknown as DecisionObject;
+		const p = command.payload as GrantWaiverPayload;
+		const event: WaiverGrantedPayload = {
+			waiverDecisionId: d.id,
+			effectiveAt: d.effectiveAt ?? command.issuedAt,
+			duration: p.duration,
+			status: d.status
+		};
+		return event;
+	}
 );
 
 /** DenyWaiver — PROPOSED -> SUPERSEDED (a denied waiver request; DecisionStatus has no DENIED value, §23.1 gap).
@@ -783,12 +871,30 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
  * AUTHORITATIVE -> SUPERSEDED in-arrow (Baseline.status). NONE site: a SUPERSEDED -> SUPERSEDED re-issue was a NOOP
  * admitted by checkTransition (SUPERSEDED is terminal, but from === to still classifies NOOP), appending a second
  * BaselineSuperseded. No code change — the wrong-source code was already RPH_ILLEGAL_STATE_TRANSITION. */
-export const supersedeBaseline: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+export const supersedeBaseline: CommandHandler = (ctx, command, payload) => {
+	const p = payload as SupersedeBaselinePayload;
+	return advanceStatus(ctx, command, {
 		objectType: BASELINE,
 		statusField: 'status',
 		machine: 'Baseline.status',
 		target: 'SUPERSEDED',
 		eventType: 'BaselineSuperseded',
-		precondition: fromStates('AUTHORITATIVE')
+		precondition: fromStates('AUTHORITATIVE'),
+		// REG-F-020, and the finding RPH-BAS-007 in `enforcement-register.ts` already recorded: this site supplied
+		// neither `mutate` nor `eventPayload`, so the emitted payload was the raw `SupersedeBaseline` COMMAND payload
+		// `{ supersedingBaselineId }` and OMITTED `status`, which `BaselineSupersededPayloadSchema` (a
+		// `z.strictObject`) declares REQUIRED. The supersession TRACE (ASR-16 "change creates a successor with a
+		// supersession trace") therefore existed only as an event field that violated the shape this repository
+		// authored for it. `status` is read from the COMMITTED NEXT STATE so the event says where the Baseline went;
+		// `supersedingBaselineId` still has no object field to hold it (`BaselineObjectSchema` declares none) and so
+		// is carried from the command payload, unchanged. Nothing is dropped — the command payload has one field.
+		eventPayload: (next) => {
+			const b = next as unknown as BaselineObject;
+			const event: BaselineSupersededPayload = {
+				supersedingBaselineId: p.supersedingBaselineId,
+				status: b.status
+			};
+			return event;
+		}
 	});
+};

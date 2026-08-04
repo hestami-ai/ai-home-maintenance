@@ -2,7 +2,11 @@
 // AUTHORIZED -> REVOKED. A binding grants scoped runtime capability to an execution step and carries NO semantic
 // authority (§2.4); requested capability is NOT granted capability (§22.1) — AuthorizeRuntimeBinding records the
 // separately-granted set. A revoked binding cannot back a new attempt (§22.1).
-import type { RequestRuntimeBindingPayload } from '@janumipwb/rph-contracts';
+import type {
+	DenyRuntimeBindingPayload,
+	RequestRuntimeBindingPayload,
+	RevokeRuntimeCapabilityPayload
+} from '@janumipwb/rph-contracts';
 import {
 	authorizationOutcome,
 	capabilityIdentities,
@@ -68,7 +72,27 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 		objectType: BINDING,
 		aggregateId: p.runtimeBindingId,
 		state,
-		eventType: 'RuntimeBindingRequested'
+		eventType: 'RuntimeBindingRequested',
+		// ── REG-F-020: THE EVENT RECORDS THE BINDING THAT NOW EXISTS, NOT THE REQUEST THAT ASKED FOR IT ─────────
+		//
+		// This emitted the raw COMMAND payload, which fails the declared shape TWICE OVER: it carries
+		// `runtimeBindingId` — a key `RuntimeBindingRequestedPayloadSchema` (a strictObject) rejects outright, and
+		// which is already the event envelope's `aggregateId`, so nothing is lost by dropping it — and it omits
+		// `authorizationStatus`, which the shape declares REQUIRED. An event announcing a binding entered REQUESTED
+		// did not contain the word REQUESTED.
+		//
+		// BUILT FROM `state`, the object this same call is about to validate and commit, so the event and the
+		// aggregate cannot disagree. `modelSelectionPolicy`/`sandboxPolicy` are declared OPTIONAL and are emitted
+		// because they are genuinely present on the committed object (defaulted empty here) — not written as
+		// `undefined`.
+		eventPayload: {
+			executionStepId: state.executionStepId,
+			roleId: state.roleId,
+			modelSelectionPolicy: state.modelSelectionPolicy,
+			requestedCapabilities: state.requestedCapabilities,
+			sandboxPolicy: state.sandboxPolicy,
+			authorizationStatus: state.authorizationStatus
+		}
 	});
 };
 
@@ -261,18 +285,36 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 const capabilityIds = capabilityIdentities;
 
 /** DenyRuntimeBinding — REQUESTED -> DENIED. */
-export const denyRuntimeBinding: CommandHandler = (ctx, command) =>
+export const denyRuntimeBinding: CommandHandler = (ctx, command, payload) =>
 	advanceStatus(ctx, command, {
 		objectType: BINDING,
 		statusField: 'authorizationStatus',
 		machine: MACHINE,
 		target: 'DENIED',
 		precondition: fromStates('REQUESTED'), // the machine's only in-arrow to DENIED
-		eventType: 'RuntimeBindingDenied'
+		eventType: 'RuntimeBindingDenied',
+		// ── REG-F-020: THE EVENT RECORDS THE DENIAL, AND IT IS THE ONLY PLACE THE REASON LIVES ─────────────────
+		//
+		// This emitted the raw COMMAND payload `{reason}`: `reason` is a key the declared strictObject rejects, and
+		// `authorizationStatus` — declared REQUIRED — was absent, so the event recording that a binding became
+		// DENIED did not contain the word DENIED.
+		//
+		// `reason` IS NOT DROPPED, IT IS RENAMED to the field the contract declares for it (`denialReason`). That
+		// matters here more than elsewhere: `RuntimeBindingSchema` has NO denial-reason field, so unlike the status
+		// — which a reader can always recover from the aggregate — the reason exists ONLY on this event. Losing it
+		// would make a denial unexplainable forever in an append-only log.
+		//
+		// `denialReason` is declared OPTIONAL but is emitted UNCONDITIONALLY, because `DenyRuntimeBindingPayload`
+		// declares `reason` REQUIRED and the bus validates the command payload before any handler runs — so it is
+		// always a string, never an `undefined` written into the governed stream.
+		eventPayload: (next) => ({
+			denialReason: (payload as DenyRuntimeBindingPayload).reason,
+			authorizationStatus: next.authorizationStatus
+		})
 	});
 
 /** RevokeRuntimeCapability — AUTHORIZED -> REVOKED (a revoked binding cannot back a new attempt). */
-export const revokeRuntimeCapability: CommandHandler = (ctx, command) =>
+export const revokeRuntimeCapability: CommandHandler = (ctx, command, payload) =>
 	advanceStatus(ctx, command, {
 		objectType: BINDING,
 		statusField: 'authorizationStatus',
@@ -281,5 +323,26 @@ export const revokeRuntimeCapability: CommandHandler = (ctx, command) =>
 		// In-arrows: AUTHORIZED|PARTIALLY_AUTHORIZED. A re-revocation would re-write the revocation reason/actor over
 		// an already-revoked binding and append a second RuntimeCapabilityRevoked for a revocation that did not occur.
 		precondition: fromStates('AUTHORIZED', 'PARTIALLY_AUTHORIZED'),
-		eventType: 'RuntimeCapabilityRevoked'
+		eventType: 'RuntimeCapabilityRevoked',
+		// ── REG-F-020: same defect, same rename, plus ONE DERIVED FIELD THAT IS DISCLOSED AS SUCH ──────────────
+		//
+		// The raw command payload `{reason}` failed the declared shape on all three counts: `reason` is an
+		// unrecognized key, `revocationReason` (REQUIRED) was missing, and `authorizationStatus` (REQUIRED) was
+		// missing — the event recording "this became REVOKED" did not contain the word REVOKED. As with the denial,
+		// `RuntimeBindingSchema` carries no revocation-reason field, so the event is the reason's only home.
+		//
+		// `revokedCapabilities` IS A DERIVATION, not a payload echo, and it is optional so it is emitted only when
+		// there is something to name. RevokeRuntimeCapability takes NO capability list — it revokes the BINDING
+		// (AUTHORIZED|PARTIALLY_AUTHORIZED -> REVOKED), and a revoked binding cannot back a new attempt (§22.1) —
+		// so what it revokes is exactly the set the binding held when it was revoked. Read off the COMMITTED next
+		// state (this handler does not clear `grantedCapabilities`, so the set survives on the aggregate too and
+		// the two cannot disagree).
+		eventPayload: (next) => {
+			const revoked = next.grantedCapabilities;
+			return {
+				revocationReason: (payload as RevokeRuntimeCapabilityPayload).reason,
+				...(Array.isArray(revoked) && revoked.length > 0 ? { revokedCapabilities: revoked } : {}),
+				authorizationStatus: next.authorizationStatus
+			};
+		}
 	});

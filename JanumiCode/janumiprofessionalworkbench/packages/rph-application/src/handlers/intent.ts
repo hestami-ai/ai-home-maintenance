@@ -7,7 +7,8 @@ import type {
 	CaptureIntentPayload,
 	DomainCommand,
 	FormalizeIntentPayload,
-	ProvisionIntentPayload
+	ProvisionIntentPayload,
+	ReviseIntentPayload
 } from '@janumipwb/rph-contracts';
 import {
 	checkTransition,
@@ -284,13 +285,30 @@ export const approveIntent: CommandHandler = (ctx, command, payload) => {
 };
 
 /** ReviseIntent — APPROVED -> REVISED (a material change: increments the semantic version, DOC-002 §6.3). */
-export const reviseIntent: CommandHandler = (ctx, command) =>
-	advanceIntent(ctx, command, {
+export const reviseIntent: CommandHandler = (ctx, command, payload) => {
+	const p = payload as ReviseIntentPayload;
+	return advanceIntent(ctx, command, {
 		target: 'REVISED',
 		// In-arrow: APPROVED only. Re-issuing from REVISED was absorbed as a NOOP yet still bumped semanticVersion, and
 		// ApproveIntent requires approvedSemanticVersion === current — so replaying a command that changed nothing
 		// silently VOIDED an outstanding approval, and baseline staleness keys on the same field.
 		precondition: fromStates('APPROVED'),
 		eventType: 'IntentRevised',
-		bumpSemanticVersion: true
+		bumpSemanticVersion: true,
+		// Event payload per IntentRevisedPayloadSchema — was the raw ReviseIntent command payload
+		// ({changeRationale, impactAnalysisId?}), which carries NEITHER of the two facts the revision produced:
+		// the INCREMENTED semanticVersion and the resulting intentStatus. That is the whole point of this event —
+		// RPH-INT-006 ("materially revising an approved intent ... increments semantic version, emits IntentRevised")
+		// and the stale-approval guard in `approveIntent` both key on the version this revision landed on, and the
+		// governed stream did not record it. `v.next` IS the committed newSemanticVersion (bumpSemanticVersion is
+		// true, so advanceIntent commits loaded.semanticVersion + 1 and hands the same number here) — read from the
+		// commit, not recomputed. The command's two fields carry over unchanged; impactAnalysisId is optional on
+		// both shapes and is emitted only when actually sent (never `undefined` into a strictObject).
+		eventPayload: (v) => ({
+			changeRationale: p.changeRationale,
+			...(p.impactAnalysisId !== undefined ? { impactAnalysisId: p.impactAnalysisId } : {}),
+			semanticVersion: v.next,
+			intentStatus: 'REVISED'
+		})
 	});
+};

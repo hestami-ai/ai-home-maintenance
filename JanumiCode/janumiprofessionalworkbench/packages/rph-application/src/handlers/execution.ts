@@ -8,14 +8,18 @@
 // step success ≠ PWU success, §21.1).
 import type {
 	ActivateExecutionPlanPayload,
+	ApplyTacticalChangePayload,
+	CancelExecutionPlanPayload,
 	CancelExecutionStepPayload,
 	CompleteExecutionStepPayload,
 	DomainCommand,
 	ExecutionPlanActivatedPayload,
 	ExecutionStepSucceededPayload,
+	ExecutionTerminatedPayload,
 	FailExecutionPlanPayload,
 	ProposeExecutionPlanPayload,
-	SkipExecutionStepPayload
+	SkipExecutionStepPayload,
+	TacticalChangeAppliedPayload
 } from '@janumipwb/rph-contracts';
 import {
 	buildConditionSubject,
@@ -488,15 +492,32 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
  *  `precondition: fromStates('APPROVED', 'ACTIVE')` (JAN-CMDPRE DWP-05) — the machine's TWO in-arrows to CANCELLED
  *  (ExecutionPlan.status). NONE site: an already-CANCELLED re-issue was a NOOP appending a second ExecutionTerminated.
  *  Both sources are exercised by the mandatory two-source positive fixture (INV-5). */
-export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command: DomainCommand) =>
-	advanceStatus(ctx, command, {
+export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command: DomainCommand) => {
+	const p = command.payload as CancelExecutionPlanPayload;
+	return advanceStatus(ctx, command, {
 		objectType: PLAN,
 		statusField: 'status',
 		machine: MACHINE,
 		target: 'CANCELLED',
 		eventType: 'ExecutionTerminated',
-		precondition: fromStates('APPROVED', 'ACTIVE')
+		precondition: fromStates('APPROVED', 'ACTIVE'),
+		// REG-F-020. This emitted the raw CancelExecutionPlan payload — `{ reason }` — so the event recording that a
+		// plan became CANCELLED did not contain the word CANCELLED: `status` is a REQUIRED field of the declared
+		// ExecutionTerminated shape and the command has no such field to pass through. It is read off the COMMITTED
+		// NEXT STATE rather than restated as the literal 'CANCELLED', because this event type is declared for the
+		// whole termination family ("ACTIVE->CANCELLED|FAILED" in the vocab note) — recording the state the
+		// aggregate actually reached keeps that true for any future arrow that reuses this event.
+		//
+		// `terminationPolicyId` is OPTIONAL and is deliberately OMITTED, not fabricated: neither the command nor the
+		// plan aggregate carries a termination-policy IDENTITY. The plan holds `terminationPolicy`, an opaque
+		// `z.record` (`{}` in every fixture in the repo), so mining an `id` key out of it would mint a record
+		// convention nothing ratifies. Absent is the honest answer; a wrong id would be worse than none.
+		eventPayload: (next): ExecutionTerminatedPayload => ({
+			reason: p.reason,
+			status: next.status as ExecutionTerminatedPayload['status']
+		})
 	});
+};
 
 /**
  * CompleteExecutionPlan — ACTIVE -> COMPLETED (JAN-EXECPLAN-DR-002 DWP-01 / §20.1). The completion CONDITION is a
@@ -634,15 +655,44 @@ export const supersedeExecutionPlan: CommandHandler = (ctx, command) => {
  * and returned the same code (RPH_ILLEGAL_STATE_TRANSITION) but as a bespoke guard rather than the standard
  * precondition mechanism; the precondition is now the single authoritative source-state declaration (roadmap DWP-05:
  * "remove it or keep it and say which is authoritative" — removed). */
-export const applyTacticalChange: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+export const applyTacticalChange: CommandHandler = (ctx, command) => {
+	const p = command.payload as ApplyTacticalChangePayload;
+	return advanceStatus(ctx, command, {
 		objectType: PLAN,
 		statusField: 'status',
 		machine: MACHINE,
 		target: 'ACTIVE',
 		eventType: 'TacticalChangeApplied',
-		precondition: fromStates('ACTIVE')
+		precondition: fromStates('ACTIVE'),
+		// REG-F-020. This emitted the raw ApplyTacticalChange payload, which fails the declared TacticalChangeApplied
+		// shape at BOTH ends: `executionPlanId` (required) was missing, and `rationale` is an unrecognized key that a
+		// strictObject rejects outright. The two shapes differ because they answer different questions — the COMMAND
+		// asks for a change and argues for it (`rationale`); the EVENT records which plan was changed, how, and under
+		// whose authority.
+		//
+		// `rationale` IS THEREFORE DROPPED, and the declared contract puts it on the OTHER event:
+		// `TacticalChangeRequested` — which the vocab binding names as this one's predecessor ("preceded by
+		// TacticalChangeRequested") — declares `rationale` as a required field. The WHY belongs to the request; the
+		// WHAT-HAPPENED belongs here. Nothing reads it off this event (no projection, no handler and no test
+		// references TacticalChangeApplied's payload), and it cannot be parked on the aggregate instead:
+		// ExecutionPlan is a strictObject with no field for it, so writing it to state would fail the (d) gate.
+		//
+		// STATED PLAINLY RATHER THAN IMPLIED: no command emits `TacticalChangeRequested` today (the type is declared,
+		// the handler does not exist), so until a RequestTacticalChange handler lands the argued justification is not
+		// recorded anywhere in the governed stream. That is a GAP IN THE REQUEST HALF, not a reason to smuggle the
+		// field onto an event whose ratified shape excludes it — a strictObject rejects the whole payload for it, so
+		// the pre-fix behaviour recorded neither the rationale NOR the plan id.
+		//
+		// `stepId` is emitted only when the command scoped the change to a step (a plan-wide tactical change has no
+		// step), never as an explicit `undefined`.
+		eventPayload: (): TacticalChangeAppliedPayload => ({
+			executionPlanId: command.targetAggregateId,
+			changeType: p.changeType,
+			authorizingPolicyId: p.authorizingPolicyId,
+			...(p.stepId ? { stepId: p.stepId } : {})
+		})
 	});
+};
 
 /** An event payload: a literal, or one DERIVED from the authored step (see `advanceStep`'s `eventPayload`). */
 type StepEventPayload =
