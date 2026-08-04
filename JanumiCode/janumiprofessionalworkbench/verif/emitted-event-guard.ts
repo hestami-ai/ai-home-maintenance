@@ -23,13 +23,14 @@
 // emitting `{total: 'garbage'}` ON PURPOSE. It is filed below in a SEPARATE list, because a defect ledger that
 // contains a non-defect sends someone to fix a handler that is correct.
 //
-// TWENTY OF THE TWENTY ARE NOW FIXED BUT ONE. `WaiverRequested` is the exception and its refusal is deliberate:
-// emitting its declared shape drops `waivedPolicyId`, which `foldWaiverRequested` in
-// `packages/rph-projections/src/assurance-view.ts` reads as its ATTACHMENT PREDICATE — and that projection is a
-// pure fold with no store handle, so the Decision object where the datum lives is unreachable to it. Conforming
-// would make every waiver attach to every assessment whose subjects it intersects, under any policy, AND STAY
-// GREEN, because that projection tests itself on hand-built events. Closing it means widening the ratified shape
-// or teaching the projection to read the Decision object — a two-package change for one commit.
+// ALL TWENTY-ONE ARE NOW FIXED AND THE LEDGER BELOW IS EMPTY. The last, `WaiverRequested`, was refused once and
+// the refusal was right about the DANGER and wrong about the CONSTRAINT: emitting its then-declared shape would
+// have dropped `waivedPolicyId`, which `foldWaiverRequested` reads as its ATTACHMENT PREDICATE from a pure fold
+// with no store handle — every waiver attaching to every assessment under any policy, and staying GREEN because
+// that projection tests itself on hand-built events. But the shape was UNRATIFIED-AUTHORED, so it was ours to
+// correct: a shape we authored that cannot carry what its only consumer requires IS the defect. It was widened,
+// the handler emits it in full, and `packages/rph-engine/src/waiver-attachment-live.test.ts` now tests that
+// predicate on REAL dispatched events — the control the hand-built test could never be.
 //
 // ── WHAT THIS IS AND IS NOT ──────────────────────────────────────────────────────────────────────────────────
 // A DEFECT LEDGER, not a specification. Every entry below is a defect with its MEASURED violation as its reason —
@@ -51,7 +52,9 @@
 //
 //  1. It observes what the SUITE emits. A declared event type no test ever produces is still unmeasured — 43 of
 //     the 132 remain in that state, and no gate can reach them without a dispatch that emits them. This file
-//     shrinks that blind spot from 98 to 43; it does not abolish it.
+//     shrinks that blind spot from 98 to 43; it does not abolish it. `verif/event-surface-census.test.ts`
+//     (REG-F-021) is what keeps those 43 from drifting: it holds the DECLARED / BOUND / EMITTED sets against each
+//     other, so a declared event that nothing binds and nothing produces is counted rather than merely absent.
 //  2. IT CANNOT DETECT A STALE LEDGER ROW. Vitest runs each project in its own worker, so `violations` is
 //     per-worker and no worker sees the whole catalog — an entry here for a type nothing emits any more would sit
 //     unnoticed. Every one of the twenty-one WAS observed when measured; a future one might not be. Closing that
