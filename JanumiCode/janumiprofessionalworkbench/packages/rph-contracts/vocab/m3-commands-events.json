@@ -1805,18 +1805,13 @@
 			"drivesFrom": "PROPOSED",
 			"drivesTo": "EFFECTIVE",
 			"schematized": false,
-			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (grantWaiver)",
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (grantWaiver). REG-F-020, 2026-08-04: `effectiveAt` REMOVED from this AUTHORED command shape. It was declared REQUIRED and the handler DISCARDED it, writing `command.issuedAt` instead — so every caller, including the demo UI (which sent hostNow()), supplied a value that did nothing. Two readings were possible and the handler already had the safer one: the moment a waiver became effective is a fact about the ACT, not a caller choice, and honouring a caller-supplied value would let a waiver be BACKDATED, which is the manufacture-a-governance-fact shape REG-F-014 records. The ratified sibling ApproveDecision (DOC-007 §22.1) declares no effectiveAt either and lets the engine stamp it — that is the precedent. The EVENT payload still carries effectiveAt, read off committed state.",
 			"payloadFields": [
 				{
 					"field": "waiverDecisionId",
 					"required": true,
 					"type": "string",
 					"note": "id-ref; also target Obligation.status/Constraint.status/AssuranceObservation.disposition ->WAIVED"
-				},
-				{
-					"field": "effectiveAt",
-					"required": true,
-					"type": "string"
 				},
 				{
 					"field": "duration",

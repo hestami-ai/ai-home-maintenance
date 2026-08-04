@@ -38,7 +38,6 @@ import {
 	dispatch,
 	dispatchBatch,
 	getEngine,
-	hostNow,
 	loadConversation,
 	mintUiId,
 	type ConversationEntry,
@@ -489,7 +488,6 @@ export const actions: Actions = {
 		if (req.status !== 'ACCEPTED') return fail(400, { error: req.error?.message ?? req.status });
 		const grant = dispatch('GrantWaiver', 'DECISION', waiverId, {
 			waiverDecisionId: waiverId,
-			effectiveAt: hostNow(),
 			duration: 'until superseded'
 		});
 		if (grant.status !== 'ACCEPTED')

@@ -413,7 +413,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		);
 		dispatch(
 			'GrantWaiver',
-			{ waiverDecisionId: WAIVER, effectiveAt: TS, duration: 'until superseded' },
+			{ waiverDecisionId: WAIVER, duration: 'until superseded' },
 			WAIVER,
 			'DECISION'
 		);

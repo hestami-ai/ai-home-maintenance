@@ -875,7 +875,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		const grant = d(
 			HUMAN,
 			'GrantWaiver',
-			{ waiverDecisionId: WAIVER, effectiveAt: TS, duration: 'until superseded' },
+			{ waiverDecisionId: WAIVER, duration: 'until superseded' },
 			WAIVER,
 			'DECISION'
 		);

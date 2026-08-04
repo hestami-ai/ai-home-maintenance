@@ -137,7 +137,7 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		d(
 			HUMAN,
 			'GrantWaiver',
-			{ waiverDecisionId: WAIVER, effectiveAt: TS, duration: 'until superseded' },
+			{ waiverDecisionId: WAIVER, duration: 'until superseded' },
 			WAIVER,
 			'DECISION'
 		);
@@ -266,7 +266,7 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		const r = d(
 			HUMAN,
 			'GrantWaiver',
-			{ waiverDecisionId: APPROVAL, effectiveAt: TS, duration: 'until superseded' },
+			{ waiverDecisionId: APPROVAL, duration: 'until superseded' },
 			APPROVAL,
 			'DECISION'
 		);

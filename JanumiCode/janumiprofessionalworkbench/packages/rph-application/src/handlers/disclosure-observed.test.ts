@@ -824,7 +824,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					ok(
 						dispatch(
 							'GrantWaiver',
-							{ waiverDecisionId: v.wvr, effectiveAt: TS, duration: 'one month' },
+							{ waiverDecisionId: v.wvr, duration: 'one month' },
 							v.wvr,
 							'DECISION'
 						),

@@ -1467,7 +1467,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						ok(
 							dispatch(
 								'GrantWaiver',
-								{ waiverDecisionId: wvr, effectiveAt: TS, duration: 'until superseded' },
+								{ waiverDecisionId: wvr, duration: 'until superseded' },
 								wvr,
 								'DECISION'
 							),

@@ -234,7 +234,7 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		ok(
 			HUMAN,
 			'GrantWaiver',
-			{ waiverDecisionId: WAIVER, effectiveAt: TS, duration: 'until superseded' },
+			{ waiverDecisionId: WAIVER, duration: 'until superseded' },
 			WAIVER,
 			'DECISION'
 		);

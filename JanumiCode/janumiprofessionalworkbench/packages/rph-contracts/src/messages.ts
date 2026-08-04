@@ -450,7 +450,6 @@ export const RequestWaiverPayloadSchema = z.strictObject({
 export type RequestWaiverPayload = z.infer<typeof RequestWaiverPayloadSchema>;
 export const GrantWaiverPayloadSchema = z.strictObject({
 	waiverDecisionId: z.string(),
-	effectiveAt: z.string(),
 	duration: z.string()
 });
 export type GrantWaiverPayload = z.infer<typeof GrantWaiverPayloadSchema>;

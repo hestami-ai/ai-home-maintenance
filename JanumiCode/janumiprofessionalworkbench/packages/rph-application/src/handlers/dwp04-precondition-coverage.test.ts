@@ -109,7 +109,6 @@ describe('DWP-04 RevokeDecision — fromStates(EFFECTIVE), no decisionType predi
 	function grant(id = WAIVER) {
 		return h.d('GrantWaiver', id, 'DECISION', {
 			waiverDecisionId: id,
-			effectiveAt: TS,
 			duration: 'until superseded'
 		});
 	}

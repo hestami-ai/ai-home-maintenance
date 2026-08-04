@@ -8,7 +8,7 @@
 // GrantWaiver/DenyWaiver refuse a non-WAIVER target, so each row offers only the command the engine will accept.
 import { fail } from '@sveltejs/kit';
 import { listDecisions } from '@janumipwb/rph-engine';
-import { dispatch, getEngine, hostNow, mintUiId } from '$lib/server/workbench';
+import { dispatch, getEngine, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
@@ -71,7 +71,6 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'A waiver decision id is required to grant.' });
 		const r = dispatch('GrantWaiver', 'DECISION', id, {
 			waiverDecisionId: id,
-			effectiveAt: hostNow(),
 			duration: 'until superseded'
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
