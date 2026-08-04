@@ -971,17 +971,22 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(eventsOfType('PwuReshapingStarted')).toHaveLength(1);
 	});
 
-	// AND THE FABRICATION THE HANDLER'S OWN COMMENT NAMES. `PwuInvalidatedPayload` types `triggeringObjectId` as
-	// REQUIRED while the command types it OPTIONAL, and the handler resolves the disagreement with `?? ''`. Its
-	// comment says defaulting to '' "would fabricate a reference to nothing" — and then does it. Until this test
-	// the branch had never executed, so the fabricated value had never reached the event gate.
+	// ── AN INVALIDATION MUST NAME WHAT TRIGGERED IT (2026-08-04) ──────────────────────────────────────────────
 	//
-	// Asserted as an ADMISSION, not a refusal: the empty string satisfies `z.string()`, so the gate accepts a
-	// governed event whose triggering object is the empty reference. The day the contracts are reconciled — the
-	// command requiring it, or the event admitting its absence — this goes red and should become the refusal.
-	it('InvalidatePwu with NO triggeringObjectId emits the EMPTY reference its own comment warns about', () => {
-		driveToUnderAssurance('70');
-		const assessmentId = satisfiedAssessmentFor(PWU_ID, 'asm_01ARZ3NDEKTSV4RRFFQ69G5X30');
+	// `PwuInvalidatedPayload` types `triggeringObjectId` REQUIRED while the command types it OPTIONAL. The handler
+	// resolved that disagreement with `?? ''` — under a comment saying `''` "would fabricate a reference to
+	// nothing". THE COMMENT DIAGNOSED THE DEFECT AND THE NEXT LINE COMMITTED IT.
+	//
+	// Nothing had noticed, and nothing could have. The EVENT GATE IS STRUCTURALLY BLIND to this: it validates the
+	// emitted event, and `''` satisfies `z.string()`. A fabricated value is well-formed by construction, so a
+	// malformation check cannot see it. And until 2026-08-03 no test dispatched this command at all, so the branch
+	// had never run — the fabrication was written, shipped, and never executed.
+	//
+	// A handler that cannot emit a conformant event REFUSES the command; it does not invent a value. The
+	// contracts still disagree, and that half stands as recorded; what is gone is the fabrication.
+	function satisfiedPwu(planSuffix: string, assessmentId: string): void {
+		driveToUnderAssurance(planSuffix);
+		const asm = satisfiedAssessmentFor(PWU_ID, assessmentId);
 		expect(
 			engine.dispatch(
 				change({
@@ -989,19 +994,57 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 					newState: 'SATISFIED',
 					executionState: 'SUCCEEDED',
 					assuranceState: 'SATISFIED',
-					supportingObjectIds: [assessmentId]
+					supportingObjectIds: [asm]
 				})
 			).status
 		).toBe('ACCEPTED');
+	}
 
-		const r = engine.dispatch(cmd('InvalidatePwu', { invalidationReason: 'the evidence was withdrawn' }));
+	it('InvalidatePwu with NO triggeringObjectId is refused rather than fabricating an empty reference', () => {
+		satisfiedPwu('70', 'asm_01ARZ3NDEKTSV4RRFFQ69G5X30');
+		const r = engine.dispatch(
+			cmd('InvalidatePwu', { invalidationReason: 'the evidence was withdrawn' })
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
+		expect(r.error?.message).toContain('REQUIRES a triggeringObjectId');
+		expect(lifecycle(), 'and the PWU has not moved').toBe('SATISFIED');
+		expect(eventsOfType('PwuInvalidated')).toHaveLength(0);
+	});
+
+	// The REG-F-014 half: present is not the same as real. Same judgement `authorityDecisionId` got — a provenance
+	// field pointing at nothing is provenance to nothing.
+	it('InvalidatePwu naming a triggeringObjectId that resolves to nothing is refused', () => {
+		satisfiedPwu('80', 'asm_01ARZ3NDEKTSV4RRFFQ69G5X40');
+		const r = engine.dispatch(
+			cmd('InvalidatePwu', {
+				invalidationReason: 'the evidence was withdrawn',
+				triggeringObjectId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5X99'
+			})
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
+		expect(r.error?.message).toContain('names no object the engine holds');
+		expect(lifecycle()).toBe('SATISFIED');
+	});
+
+	// CONTROL. Without it both refusals could be `return reject(...)` unconditionally — and this is also the run
+	// that actually drives the command, which the dispatch census requires.
+	it('CONTROL: InvalidatePwu naming a real triggering object drives SATISFIED -> INVALIDATED', () => {
+		satisfiedPwu('90', 'asm_01ARZ3NDEKTSV4RRFFQ69G5X50');
+		// The assessment that satisfied it is a real object, and a plausible trigger: its verdict is what was
+		// withdrawn. Any object the engine holds would do; what matters is that it holds it.
+		const r = engine.dispatch(
+			cmd('InvalidatePwu', {
+				invalidationReason: 'the evidence was withdrawn',
+				triggeringObjectId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5X50'
+			})
+		);
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(lifecycle()).toBe('INVALIDATED');
 		const emitted = eventsOfType('PwuInvalidated');
 		expect(emitted).toHaveLength(1);
 		expect(
 			(emitted[0]!.payload as { triggeringObjectId?: string }).triggeringObjectId,
-			'THE ADMISSION: a governed event records a triggering object that is the empty reference'
-		).toBe('');
+			'the governed event records a trigger that exists'
+		).toBe('asm_01ARZ3NDEKTSV4RRFFQ69G5X50');
 	});
 });

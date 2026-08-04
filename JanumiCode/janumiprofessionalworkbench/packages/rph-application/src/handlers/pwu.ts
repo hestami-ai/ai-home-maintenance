@@ -496,17 +496,52 @@ export const reshapePwu: CommandHandler = (ctx, command) => {
 /** InvalidatePwu — SATISFIED|CONDITIONALLY_SATISFIED|RECOMPOSED -> INVALIDATED. */
 export const invalidatePwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as InvalidatePwuPayload;
+	// ~~The event types `triggeringObjectId` REQUIRED while the command types it optional — so a command that
+	// omits it cannot produce a conformant event. Defaulting to '' would fabricate a reference to nothing;
+	// omitting the key fails the strictObject. Recorded rather than papered: the command/event contracts
+	// disagree, and the command is the looser one (the same drift as CreateAssurancePolicy's enums).~~
+	//
+	// CORRECTED 2026-08-04, and struck rather than deleted because the comment DIAGNOSED THE DEFECT AND THEN THE
+	// CODE COMMITTED IT: it names `''` as fabricating "a reference to nothing", and the line below it did exactly
+	// that. The contracts still disagree — that half stands — but the resolution does not get to be the option the
+	// comment condemned.
+	//
+	// A HANDLER THAT CANNOT EMIT A CONFORMANT EVENT REFUSES THE COMMAND; IT DOES NOT INVENT A VALUE. That is the
+	// general rule this site was breaking, and it is worth stating because the EVENT GATE CANNOT CATCH IT: the
+	// gate validates the emitted event, and `''` satisfies `z.string()`. A fabricated value is well-formed by
+	// construction, so malformation checks are structurally blind to it. Nothing had ever noticed, and nothing
+	// could have — until 2026-08-03 no test dispatched this command at all, so the branch had never run.
+	//
+	// AND THE ID IS RESOLVED (REG-F-014's fourth instance). Requiring it is what the ratified event contract
+	// demands; requiring it to NAME SOMETHING is the same judgement `authorityDecisionId` got one commit earlier —
+	// a provenance field pointing at nothing is provenance to nothing.
+	if (!p.triggeringObjectId) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`InvalidatePwu ${command.targetAggregateId}: the ratified PwuInvalidated event REQUIRES a ` +
+				`triggeringObjectId, so an invalidation must name what triggered it. Supply the Evidence, ` +
+				`Assumption or Observation that invalidated this work.`
+		);
+	}
+	if (!ctx.store.loadObject(p.triggeringObjectId)) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`InvalidatePwu ${command.targetAggregateId}: triggeringObjectId ${p.triggeringObjectId} names no ` +
+				`object the engine holds. An invalidation records WHY work stopped being valid; a reference to ` +
+				`nothing records nothing.`
+		);
+	}
+	// Captured after the guards so the closure below sees a `string`, not `string | undefined`.
+	const triggeringObjectId = p.triggeringObjectId;
 	return advancePwuLifecycle(ctx, command, {
 		target: 'INVALIDATED',
 		eventType: 'PwuInvalidated',
-		// The event types `triggeringObjectId` REQUIRED while the command types it optional — so a command that
-		// omits it cannot produce a conformant event. Defaulting to '' would fabricate a reference to nothing;
-		// omitting the key fails the strictObject. Recorded rather than papered: the command/event contracts
-		// disagree, and the command is the looser one (the same drift as CreateAssurancePolicy's enums).
 		eventPayload: (next) =>
 			({
 				invalidationReason: p.invalidationReason,
-				triggeringObjectId: p.triggeringObjectId ?? '',
+				triggeringObjectId,
 				workLifecycleState: next.workLifecycleState as PwuInvalidatedPayload['workLifecycleState']
 			}) satisfies PwuInvalidatedPayload
 	});
