@@ -47,16 +47,25 @@
 // of the five families in that list had been taken total. NOTHING IN REACH REMAINS OWED.
 //
 //   OUT OF REACH BY CONSTRUCTION — 13 rules: `RPH-FIX` (6) and `RPH-E2E` (7), the fixture-replay and end-to-end
-//   scenario families. Both are legitimately DEFERRED in the conformance manifest with named work packages. They
-//   are the only two prefixes left in `DEFERRABLE_PREFIXES`, and after REG-F-013 that set is treated as the most
-//   dangerous data in the manifest: an entry there does not weaken a claim, it deletes it.
+//   scenario families. ~~Both are legitimately DEFERRED in the conformance manifest with named work packages. They
+//   are the only two prefixes left in `DEFERRABLE_PREFIXES`~~ — CORRECTED 2026-08-04 (REG-F-019), struck rather
+//   than deleted. Only ONE of them was. `RPH-FIX` was DEFERRED while FOUR of its six rules had named, running,
+//   GREEN checks in `packages/rph-engine/src/replay.ts`; it is now `PARTIAL` and `DEFERRABLE_PREFIXES` holds
+//   `RPH-E2E` alone. Two families sat under one sentence and this paragraph repeated it — the association was
+//   mine, and it is the same failure the paragraph immediately below warns about, committed in the act of
+//   warning. After REG-F-013 that set is treated as the most dangerous data in the manifest: an entry there does
+//   not weaken a claim, it deletes it.
 //
 //   THE CEILING IS NOT COMPLETION, and this is the sentence most likely to be misread now that the number has
 //   stopped moving. The thirteen are out of reach BY THIS INSTRUMENT, which observes COMMAND REFUSALS through
 //   `Engine.dispatch`. A fixture-replay rule is not thereby enforced — it is unobservable here, which is a fact
-//   about the register and not about the rule. Reaching them needs a different instrument (a replay harness that
-//   can assert over a recorded event log), not another row in this file. The same distinction the disclosure arm
-//   exists to keep visible, applied to the register itself.
+//   about the register and not about the rule. ~~Reaching them needs a different instrument (a replay harness that
+//   can assert over a recorded event log), not another row in this file.~~ CORRECTED 2026-08-04: the first half
+//   is right and the tense was wrong. That instrument is not needed — it EXISTS, at
+//   `packages/rph-engine/src/replay.ts`, and has been discharging four RPH-FIX rules the whole time this
+//   paragraph called them unreached. Still not another row in this file. The same distinction the disclosure arm
+//   exists to keep visible, applied to the register itself — and a reminder that "out of reach by THIS
+//   instrument" is a claim about the register, which does not license a claim about the repository.
 //
 // WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
 // every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 29 are

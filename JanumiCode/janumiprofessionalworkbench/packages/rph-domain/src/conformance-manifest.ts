@@ -384,9 +384,21 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		testFile: 'packages/rph-projections/src/traceability-compatibility.test.ts',
 		note: 'The BASELINE kind -> milestone derivation is built and folded from events (compatibility-view.ts, W2-INC-3/WP-2-006), so CMP-001/003 have a real mechanism asserted; CMP-002/004 are dispositioned NOT_A_COMMAND_REFUSAL in enforcement-register.ts (no command can set a phase — there is no such field or command anywhere). GENUINELY OUTSTANDING, with a named work package rather than a mistaken one: W5 WP-5-003 "Compatibility Milestone Derivation", the VERSIONED rules that advance a milestone as a PWU progresses through its four axes. That is what a legitimate deferral looks like (REG-F-013).'
 	},
+	// REG-F-019, 2026-08-04. This read `status: 'DEFERRED'` with the note "field-service fixture replay
+	// (expected-events.jsonl) — the M13 Reference Undertaking replay harness", describing as FUTURE WORK a harness
+	// that exists (`packages/rph-engine/src/replay.ts`) and a fixture that exists
+	// (`packages/rph-engine/fixtures/expected-events.jsonl`, 72 events) — and that have been running named,
+	// PASSING checks for four of these six rules the whole time.
+	//
+	// AN UNDERCLAIM, WHICH IS THE DIRECTION NOTHING COULD SEE. REG-F-013 caught RPH-CMP here because its rationale
+	// named a different concern; the enforcement register's overclaim gate catches a family that certifies MORE
+	// than it proves. Nothing caught a family that certifies LESS, because an exempt family makes no claim to
+	// check. `verif/deferral-honesty.test.ts` closes that direction by RUNNING the harness rather than reading its
+	// note.
 	'RPH-FIX': {
-		status: 'DEFERRED',
-		note: 'field-service fixture replay (expected-events.jsonl) — the M13 Reference Undertaking replay harness'
+		status: 'PARTIAL',
+		testFile: 'packages/rph-engine/src/replay.test.ts',
+		note: 'FOUR OF SIX ARE ASSERTED, by name, in `runConformance` (packages/rph-engine/src/replay.ts) and green in replay.test.ts: FIX-001 (contiguous seq — reference integrity), FIX-002 (every one of the 72 trace events resolves to a registered EVENTS contract), FIX-003a/b/c (both baselines promoted; the trace ends AUTHORITATIVE + PwuBaselined; a Behavior PWU SATISFIED but not baselined), FIX-006 (the deferred offline capability stays represented as a refined intent constraint). GENUINELY OUTSTANDING — FIX-004 (architecture obligations allocated to child PWUs) and FIX-005 (Multi-Tenancy Constraint -> Architecture PWU -> Tenant Isolation Artifact -> Claim -> Assessment). Both are OBJECT-GRAPH assertions and the fixture is an EVENT trace of five fields (seq/event/aggregate/phase/label) carrying no obligations, artifacts or claims, so neither is checkable against it. The corpus states both (§25 "a second chain should demonstrate a constraint"; §25 Test 4 "decomposition coverage"), and the route is the one replay-conformance.test.ts already takes — assert them against the ENGINE-DRIVEN graph rather than enriching a hand-transcribed trace. Named work, not a missing capability.'
 	},
 	'RPH-E2E': {
 		status: 'DEFERRED',
@@ -404,8 +416,20 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
  * here does not weaken a claim, it DELETES the claim, and the enforcement register's overclaim gate — which has
  * caught four bad certifications — cannot see a family that certifies nothing. Everything else in this module
  * fails LOUDLY when wrong; a wrong entry here fails silently, forever.
+ *
+ * `RPH-FIX` REMOVED 2026-08-04 (REG-F-019), for the OPPOSITE reason and it is the more instructive one. RPH-CMP
+ * was deferred on a bad rationale; RPH-FIX was deferred while FOUR of its six rules had named, running, GREEN
+ * checks — the manifest claiming LESS than the repository proves. An overclaim is caught by the enforcement
+ * register. An UNDERCLAIM was caught by nothing, for exactly the reason the paragraph above gives: an exempt
+ * family makes no claim to check. `verif/deferral-honesty.test.ts` now closes that direction by RUNNING the
+ * replay harness and refusing to let a rule with a passing check be certified DEFERRED.
+ *
+ * ONE ENTRY REMAINS, AND ITS DEFERRAL IS REAL — checked in both directions rather than assumed by association.
+ * No `RPH-E2E` rule id appears in any check, any test, or any source file in this repository; the seven scenarios
+ * are genuinely unbuilt. The asymmetry is the point: two families sat here under one sentence, and only one of
+ * them belonged.
  */
-export const DEFERRABLE_PREFIXES: ReadonlySet<string> = new Set(['RPH-FIX', 'RPH-E2E']);
+export const DEFERRABLE_PREFIXES: ReadonlySet<string> = new Set(['RPH-E2E']);
 
 /** Properties P1–P8 are all asserted generatively in properties.test.ts. */
 export const PROPERTY_COVERAGE: Readonly<Record<string, string>> = {
