@@ -19,21 +19,59 @@
 //
 // SO THE GATE RUNS THE HARNESS RATHER THAN READING ABOUT IT. A note can say anything; a passing check is a fact.
 //
-// WHAT THIS CANNOT SEE, stated so the gate is not read as more than it is: it observes the ids the replay harness
-// EMITS. A rule discharged by some other test file, under no id, is invisible here — that is the manifest's
-// `testFile` cite's job, and the enforcement register's. This gate closes one direction of one instrument, which
+// TOTAL OVER BOTH ORACLES, and it has to be. `runConformance` reads the §26 event trace; `runGraphConformance`
+// reads the OBJECT GRAPH the engine builds — two harnesses, because four of the RPH-FIX rules are properties of a
+// sequence and the rest are properties of a graph. A gate that watched only one of them would leave the other free
+// to drift back into a deferral, which is the exact failure this file exists to prevent.
+//
+// WHAT THIS CANNOT SEE, stated so the gate is not read as more than it is: it observes the ids these harnesses
+// EMIT. A rule discharged by some other test file, under no id, is invisible here — that is the manifest's
+// `testFile` cite's job, and the enforcement register's. This gate closes one direction of two instruments, which
 // is exactly the direction that failed silently.
 import { describe, expect, it } from 'vitest';
 import { coverageFor } from '@janumipwb/rph-domain';
-import { loadExpectedEvents, runConformance } from '@janumipwb/rph-engine';
+import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import {
+	createEngine,
+	driveReferenceUndertaking,
+	loadExpectedEvents,
+	REFERENCE_UNDERTAKING,
+	runConformance,
+	runGraphConformance
+} from '@janumipwb/rph-engine';
 
 /** `RPH-FIX-003a` and `RPH-FIX-003b` both discharge rule `RPH-FIX-003`. */
 const ruleIdOf = (checkId: string): string => checkId.replace(/^(RPH-[A-Z0-9]+-\d+)[a-z]$/, '$1');
 
-/** Rule ids named by a check that PASSED. A failing check certifies nothing and is not evidence. */
+/** The object graph the engine builds when it drives the Reference Undertaking through the real pipeline. */
+function drivenGraph(): { store: SqliteStorageAdapter } {
+	const store = new SqliteStorageAdapter({ now: () => '2026-07-12T00:00:00Z' });
+	const engine = createEngine({
+		store,
+		ontology,
+		now: () => '2026-07-12T00:00:00Z',
+		newEventId: (() => {
+			let s = 0;
+			return () => `evt_${++s}`;
+		})()
+	});
+	driveReferenceUndertaking(engine);
+	return { store };
+}
+
+/** Rule ids named by a check that PASSED, across BOTH oracles. A failing check certifies nothing. */
 function rulesWithPassingChecks(): string[] {
-	const report = runConformance(loadExpectedEvents());
-	const ids = report.checks
+	const checks = [...runConformance(loadExpectedEvents()).checks];
+	const { store } = drivenGraph();
+	try {
+		checks.push(
+			...runGraphConformance(store, { architecturePwuId: REFERENCE_UNDERTAKING.architecture }).checks
+		);
+	} finally {
+		store.close();
+	}
+	const ids = checks
 		.filter((c) => c.ok)
 		.map((c) => ruleIdOf(c.id))
 		.filter((id) => /^RPH-[A-Z0-9]+-\d+$/.test(id));
@@ -70,10 +108,17 @@ describe('REG-F-019: a rule with a passing check is not certified as DEFERRED', 
 
 	// The specific rules this finding was about, pinned by NAME so a silent regression to DEFERRED is legible in
 	// the diff rather than only in a count.
-	it('the four RPH-FIX rules the harness proves are certified, not deferred', () => {
-		for (const id of ['RPH-FIX-001', 'RPH-FIX-002', 'RPH-FIX-003', 'RPH-FIX-006']) {
+	it('the five RPH-FIX rules the harnesses prove are certified, not deferred', () => {
+		for (const id of ['RPH-FIX-001', 'RPH-FIX-002', 'RPH-FIX-003', 'RPH-FIX-004', 'RPH-FIX-006']) {
 			expect(coverageFor(id)?.status, `${id}`).not.toBe('DEFERRED');
 		}
+	});
+
+	// FIX-004 comes from the GRAPH oracle, not the trace — so this also proves the second harness is actually
+	// being consulted. Drop `runGraphConformance` from the population above and this reddens while everything
+	// else stays green.
+	it('the population spans BOTH oracles — RPH-FIX-004 is graph-derived', () => {
+		expect(rulesWithPassingChecks()).toContain('RPH-FIX-004');
 	});
 
 	// AND THE OTHER DIRECTION, because the finding's precision is the asymmetry: RPH-E2E's deferral is LEGITIMATE.

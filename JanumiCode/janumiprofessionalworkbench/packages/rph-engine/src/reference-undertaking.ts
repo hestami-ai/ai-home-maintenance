@@ -391,12 +391,77 @@ export function driveReferenceUndertaking(
 	propose(R.validation, R.root);
 	propose(R.promotion, R.root);
 
+	// --- Architecture obligations (RPH-FIX-004, 2026-08-04) ---
+	//
+	// WITHOUT THESE THE RULE HOLDS VACUOUSLY, which is why they are authored rather than the check simply added.
+	// RPH-FIX-004 is "all architecture obligations in the fixture are allocated to child PWUs". Every PWU here was
+	// proposed with `obligationIds: []` and every decomposition with no `obligationAllocations`, so the universally
+	// quantified check would have ranged over an EMPTY set and passed — certifying a ratified rule on the strength
+	// of there being nothing to certify. That is the shape this register has recorded repeatedly (a floor test that
+	// arranged no floor; a guard that could not see its own subject), and adding the check first would have
+	// reproduced it exactly.
+	//
+	// SOURCED FROM THE CORPUS, not invented: §25 Test 3 requires the Multi-Tenancy Constraint to be traceable to
+	// the Multi-Tenancy, Data Architecture and Integration Architecture PWU Instances, and §25 Test 4 is the
+	// decomposition-coverage test itself. These three obligations are that requirement stated as obligations of the
+	// Architecture Definition PWU, allocated to exactly those children.
+	const OBLIGATIONS: ReadonlyArray<{
+		readonly id: string;
+		readonly statement: string;
+		readonly obligationType: 'SECURITY' | 'QUALITY' | 'FUNCTIONAL';
+		readonly allocatedTo: readonly string[];
+	}> = [
+		{
+			id: 'obl_01ARZ3NDEKTSV4RRFFQ69G5C10',
+			statement:
+				'Tenant data SHALL be isolated so that no tenant can read or write another tenant records',
+			obligationType: 'SECURITY',
+			allocatedTo: [R.multiTenancy]
+		},
+		{
+			id: 'obl_01ARZ3NDEKTSV4RRFFQ69G5C11',
+			statement: 'The data model SHALL carry a tenant discriminator on every tenant-scoped entity',
+			obligationType: 'QUALITY',
+			allocatedTo: [R.dataArch]
+		},
+		{
+			id: 'obl_01ARZ3NDEKTSV4RRFFQ69G5C12',
+			statement: 'Outbound integrations SHALL NOT leak tenant identifiers across tenant boundaries',
+			obligationType: 'FUNCTIONAL',
+			allocatedTo: [R.integrations]
+		}
+	];
+	for (const o of OBLIGATIONS) {
+		send('AssertObligation', 'OBLIGATION', o.id, {
+			statement: o.statement,
+			obligationType: o.obligationType,
+			// The obligations belong to the Architecture Definition PWU — that is what makes them ARCHITECTURE
+			// obligations, and what makes "allocated to child PWUs" a statement about THIS decomposition.
+			sourceObjectId: R.architecture,
+			authority: {
+				authorityId: 'auth_architecture_lead',
+				authorityType: 'ORGANIZATIONAL_ROLE',
+				scope: ['ARCHITECTURE'],
+				validFrom: '2026-07-12T00:00:00Z'
+			},
+			// MANDATORY on purpose: DOC-003 §6 DEC-3's conservation equation quantifies over MANDATORY parent
+			// obligations. An ADVISORY obligation would leave the check true without the equation ever binding.
+			strength: 'MANDATORY'
+		});
+	}
+
 	// --- Decomposition contracts (root -> areas, architecture -> concerns) ---
-	const decompose = (dcpId: string, parentWorkUnitId: string, childWorkUnitIds: string[]): void => {
+	const decompose = (
+		dcpId: string,
+		parentWorkUnitId: string,
+		childWorkUnitIds: string[],
+		obligationAllocations: ReadonlyArray<{ obligationId: string; allocatedTo: string[] }> = []
+	): void => {
 		send('ProposeDecomposition', 'DECOMPOSITION_CONTRACT', dcpId, {
 			parentWorkUnitId,
 			childWorkUnitIds,
-			rationale: 'Product Realization decomposition'
+			rationale: 'Product Realization decomposition',
+			...(obligationAllocations.length > 0 ? { obligationAllocations } : {})
 		});
 		send('ValidateDecomposition', 'DECOMPOSITION_CONTRACT', dcpId, { disposition: 'VALID' });
 	};
@@ -409,13 +474,12 @@ export function driveReferenceUndertaking(
 		R.validation,
 		R.promotion
 	]);
-	decompose('dcp_01ARZ3NDEKTSV4RRFFQ69G5B10', R.architecture, [
-		R.systemContext,
-		R.multiTenancy,
-		R.dataArch,
-		R.integrations,
-		R.mobileOffline
-	]);
+	decompose(
+		'dcp_01ARZ3NDEKTSV4RRFFQ69G5B10',
+		R.architecture,
+		[R.systemContext, R.multiTenancy, R.dataArch, R.integrations, R.mobileOffline],
+		OBLIGATIONS.map((o) => ({ obligationId: o.id, allocatedTo: [...o.allocatedTo] }))
+	);
 
 	// An Execution Plan is a DISTINCT object that PERFORMS a PWU Instance through temporal steps — it is NOT the
 	// Professional Work Graph (§35.3 / criterion 16). There used to be exactly ONE, hand-written here for the
