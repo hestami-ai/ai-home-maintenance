@@ -120,6 +120,29 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 		).toEqual(['AssuranceAssessmentRequested']);
 	});
 
+	// THE REQUEST HALF, counted because two separate findings landed on it independently and a hypothesis about
+	// it turned out too strong. `TacticalChangeApplied` cannot carry its command's REQUIRED `rationale` — the
+	// declared home for that argument is `TacticalChangeRequested`, which nothing emits — and REG-F-021's own
+	// subject, `AssuranceAssessmentRequested`, is the same shape. That invited the reading "the engine records
+	// the act and not the asking", and it is NOT true as stated: of five declared `*Requested` events, TWO are
+	// emitted. Three are not. The unevenness is the fact; the sweeping version was a guess.
+	it('the REQUEST half of the lifecycle — three of five are unrecorded, and that may only improve', () => {
+		const requested = sorted([...DECLARED].filter((e) => e.endsWith('Requested')));
+		expect(requested).toEqual([
+			'AssuranceAssessmentRequested',
+			'ClarificationRequested',
+			'RuntimeBindingRequested',
+			'TacticalChangeRequested',
+			'WaiverRequested'
+		]);
+		const unrecorded = requested.filter((e) => !EMITTED_2026_08_04.has(e));
+		expect(
+			unrecorded,
+			'a REQUEST event nothing emits means the argued justification for an act — the `rationale` a command ' +
+				'declares REQUIRED — is recorded nowhere in the governed stream'
+		).toEqual(['AssuranceAssessmentRequested', 'ClarificationRequested', 'TacticalChangeRequested']);
+	});
+
 	// The aspirational surface: declared payload contracts nothing binds and nothing produces. This number is
 	// expected to FALL as milestones land; it may not RISE without someone saying why.
 	it('declared events that are neither bound nor emitted — the unbuilt surface, bounded', () => {
