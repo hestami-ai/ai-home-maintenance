@@ -97,11 +97,20 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 	// The engine produces events the binding table does not describe. NOT a defect to fix by deleting them: a
 	// kernel that CHOOSES its outcome event (`eventType: evaluation.event`) cannot be expressed as a static
 	// command->event row. The count is pinned so a SEVENTH cannot appear unnoticed.
+	//
+	// 6 -> 5 (REG-F-021 increment 1), AND THE DROP IS NOT PROGRESS — READ IT CAREFULLY. `AssuranceAssessmentStarted`
+	// left this list because increment 1 BOUND it, to `BeginAssuranceAssessment`, which is where the ratified §30
+	// machine puts it. But the command actually emitting it is still `requestAssuranceAssessment`, and
+	// `BeginAssuranceAssessment` is not built. So the SET now agrees while the ENGINE has not changed at all: the
+	// event is bound to a command that never fires it and fired by a command that no longer declares it.
+	//
+	// THAT IS A REAL LIMIT OF THIS GATE, recorded rather than papered over: these three surfaces are compared as
+	// SETS, so "bound" cannot mean "bound to the RIGHT command". The gate that will catch the mismatch is the
+	// three-unoccupied-states assertion below, which stays red until increment 3 actually moves the emission.
 	it('events the engine EMITS that the vocab binding table does not bind', () => {
 		const unbound = sorted([...EMITTED_2026_08_04].filter((e) => !BOUND.has(e)));
 		expect(unbound).toEqual([
 			'AssuranceAssessmentEscalated',
-			'AssuranceAssessmentStarted',
 			'AssuranceIndependenceViolated',
 			'DecompositionRejected',
 			'RecompositionConflictDetected',
@@ -112,12 +121,27 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 	// THE SHARP ONE. A command declares it emits an event and emits a different one, so a declared lifecycle
 	// moment is never recorded. `RequestAssuranceAssessment` -> bound `AssuranceAssessmentRequested`, emits
 	// `AssuranceAssessmentStarted`. The §26 corpus trace expects the REQUESTED event at seq 31.
+	//
+	// 1 -> 3 (REG-F-021 increment 1), AND THIS RISE IS DELIBERATE — the only kind of rise this assertion permits.
+	// The increment DECLARES and BINDS `AssuranceEvidenceRequired` and `AssuranceEvaluatorSelected` before their
+	// commands exist (increment 2 builds the handlers, increment 3 moves the emission). Declaring contracts ahead
+	// of emitters is what makes the gap COUNTABLE: the alternative — build the handler and the contract together —
+	// hides the interval in which the corpus names an event the engine cannot produce, which is exactly the
+	// condition this file was written to surface. Each name here must leave on a specific increment:
+	//   AssuranceAssessmentRequested  -> increment 3 (requestAssuranceAssessment creates in REQUESTED)
+	//   AssuranceEvidenceRequired     -> increment 3 (the REQUESTED -> EVIDENCE_PENDING arrow's second event)
+	//   AssuranceEvaluatorSelected    -> increment 2 (selectAssuranceEvaluator's handler)
+	// A FOURTH name appearing, or any of these three outliving its increment, is the drift this pin exists for.
 	it('events the vocab BINDS that nothing emits', () => {
 		const unemitted = sorted([...BOUND].filter((e) => !EMITTED_2026_08_04.has(e)));
 		expect(
 			unemitted,
 			'a bound-but-unemitted event means a command produces something other than what it declares'
-		).toEqual(['AssuranceAssessmentRequested']);
+		).toEqual([
+			'AssuranceAssessmentRequested',
+			'AssuranceEvaluatorSelected',
+			'AssuranceEvidenceRequired'
+		]);
 	});
 
 	// THE REQUEST HALF, counted because two separate findings landed on it independently and a hypothesis about

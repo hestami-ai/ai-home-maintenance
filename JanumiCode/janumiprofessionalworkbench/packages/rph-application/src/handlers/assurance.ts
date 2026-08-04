@@ -25,7 +25,9 @@ import type {
 	EditAssurancePolicyPayload,
 	ProposeEvidencePayload,
 	RecordAssuranceObservationPayload,
+	BeginAssuranceAssessmentPayload,
 	RequestAssuranceAssessmentPayload,
+	SelectAssuranceEvaluatorPayload,
 	SubmitEvidenceForAssessmentPayload,
 	SupersedeAssurancePolicyPayload
 } from '@janumipwb/rph-contracts';
@@ -864,6 +866,109 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 		newSemanticVersion: loaded.semanticVersion,
 		nextState: next,
 		event
+	});
+};
+
+/**
+ * SelectAssuranceEvaluator (DOC-004 §32) — the FIRST of the two acts the ratified §30 `READY -> ASSESSING` arrow
+ * names: *"selectAssuranceEvaluator (AssuranceEvaluatorSelected) then beginAssuranceAssessment
+ * (AssuranceAssessmentStarted)"*. It records WHO will assess and deliberately does NOT move the machine.
+ *
+ * WHY IT IS WORTH BUILDING RATHER THAN FOLDING INTO `begin`. Today `completeAssuranceAssessment` reads its
+ * evaluator off `p.validatorResult?.executionProvenance?.evaluator` — the identity of the assessor arrives inside
+ * the VERDICT, because no governed selection act existed to carry it. That is the one place this restoration buys
+ * a governance guarantee rather than ordering fidelity alone: after this command, *who assessed* is a committed
+ * fact with its own event, not a field of the answer they produced.
+ *
+ * REACHABILITY, STATED PLAINLY: no assessment reaches `READY` until increment 3 flips `requestAssuranceAssessment`
+ * to create in `REQUESTED`. So this handler is correct and, on the production paths, not yet reachable. Its tests
+ * place the assessment in `READY` through the real write seam rather than pretending otherwise.
+ *
+ * AUTHORED SCHEMA, NO CORPUS RULING. §32 ratifies the NAME. Unlike `AssuranceEvidenceRequired`/`Received`, the §31
+ * "schema-and-wiring, not a ratification decision" ruling does NOT name this event — that paragraph is about §38's
+ * missing-evidence pair. This shape rests on the ordinary standing grant, and says so rather than borrowing.
+ */
+export const selectAssuranceEvaluator: CommandHandler = (ctx, command, payload) => {
+	const p = payload as SelectAssuranceEvaluatorPayload;
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	// FROM_STATES as a first-class precondition: an evaluator is selected for an assessment that is READY to be
+	// assessed. Selecting one for an assessment already ASSESSING would change the assessor mid-judgment; selecting
+	// one for a terminal assessment would edit who made a verdict already given.
+	const pre = checkPrecondition(ctx, command, fromStates('READY'), loaded.state, {
+		statusField: 'assessmentState',
+		subject: ASSESSMENT,
+		eventType: 'AssuranceEvaluatorSelected'
+	});
+	if (pre) return pre;
+	const newRevision = loaded.revision + 1;
+	const next = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		evaluator: p.evaluator
+	};
+	// The policy's requirement is resolved HERE and recorded on the event, so an audit reads what independence was
+	// required AT SELECTION TIME rather than what the policy happens to require now. Absent when the policy does not
+	// resolve — a fail-open would be worse than silence, and the independence gate at completion is unaffected.
+	const policy = ctx.store.loadObject(loaded.state.assurancePolicyId as string)?.state as
+		| { independenceRequirement?: string }
+		| undefined;
+	const event = makeEvent(ctx, command, {
+		eventType: 'AssuranceEvaluatorSelected',
+		aggregateType: ASSESSMENT,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: {
+			assessmentId: id,
+			evaluator: p.evaluator,
+			...(policy?.independenceRequirement
+				? { independenceRequirement: policy.independenceRequirement }
+				: {})
+		}
+	});
+	return commitState(ctx, command, {
+		objectType: ASSESSMENT,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/**
+ * BeginAssuranceAssessment (DOC-004 §32) — the SECOND act of the `READY -> ASSESSING` arrow, and the only one that
+ * moves the machine. It emits `AssuranceAssessmentStarted`.
+ *
+ * THIS EVENT IS THE WHOLE OF REG-F-021. `requestAssuranceAssessment` emits `AssuranceAssessmentStarted` today, at
+ * the moment of the REQUEST — the LAST arrow's event fired at the FIRST arrow's moment, because the engine fused
+ * request-and-begin. Until increment 3 moves that emission, both this handler and the request emit it, which is
+ * why the census's bound-but-unemitted pin cannot yet see the difference (it compares SETS).
+ *
+ * `startedAt` IS STAMPED HERE, which is the moment it has always meant. Increment 0 made the field optional on the
+ * object precisely so an assessment that has not begun can honestly lack it; this is where it stops lacking it,
+ * and the kit's state-conditional invariant enforces that from `ASSESSING` onward.
+ */
+export const beginAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
+	const p = payload as BeginAssuranceAssessmentPayload;
+	return advanceStatus(ctx, command, {
+		objectType: ASSESSMENT,
+		statusField: 'assessmentState',
+		machine: 'AssuranceAssessment.state',
+		target: 'ASSESSING',
+		precondition: fromStates('READY'),
+		eventType: 'AssuranceAssessmentStarted',
+		setLifecycleStatus: true,
+		mutate: (base) => ({ ...base, startedAt: p.startedAt ?? command.issuedAt }),
+		eventPayload: (next) => ({
+			assessmentId: command.targetAggregateId,
+			assurancePolicyId: next.assurancePolicyId,
+			policyVersion: next.policyVersion,
+			subjectObjectIds: next.subjectObjectIds,
+			subjectSemanticVersions: next.subjectSemanticVersions,
+			claimIds: next.claimIds
+		})
 	});
 };
 

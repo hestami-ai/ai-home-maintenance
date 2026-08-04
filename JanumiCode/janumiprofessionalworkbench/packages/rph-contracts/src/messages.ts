@@ -674,6 +674,15 @@ export const ProposeHarnessPayloadSchema = z.strictObject({
 	childHarnessIds: z.array(z.string()).optional()
 });
 export type ProposeHarnessPayload = z.infer<typeof ProposeHarnessPayloadSchema>;
+export const SelectAssuranceEvaluatorPayloadSchema = z.strictObject({
+	evaluator: ActorReferenceSchema,
+	selectionRationale: z.string().optional()
+});
+export type SelectAssuranceEvaluatorPayload = z.infer<typeof SelectAssuranceEvaluatorPayloadSchema>;
+export const BeginAssuranceAssessmentPayloadSchema = z.strictObject({
+	startedAt: z.string().optional()
+});
+export type BeginAssuranceAssessmentPayload = z.infer<typeof BeginAssuranceAssessmentPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -772,12 +781,12 @@ export type AssuranceAssessmentRejectedPayload = z.infer<
 	typeof AssuranceAssessmentRejectedPayloadSchema
 >;
 export const AssuranceAssessmentRequestedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
 	assurancePolicyId: z.string(),
 	policySemanticVersion: z.number().int(),
 	subjectObjectIds: z.array(z.string()),
-	claimIds: z.array(z.string()),
-	evaluator: ActorReferenceSchema,
-	disposition: AssuranceDispositionSchema
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
+	claimIds: z.array(z.string())
 });
 export type AssuranceAssessmentRequestedPayload = z.infer<
 	typeof AssuranceAssessmentRequestedPayloadSchema
@@ -1637,6 +1646,22 @@ export const HarnessProposedPayloadSchema = z.strictObject({
 	status: HarnessStatusSchema
 });
 export type HarnessProposedPayload = z.infer<typeof HarnessProposedPayloadSchema>;
+export const AssuranceEvidenceRequiredPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	assurancePolicyId: z.string(),
+	requiredEvidenceIds: z.array(z.string())
+});
+export type AssuranceEvidenceRequiredPayload = z.infer<
+	typeof AssuranceEvidenceRequiredPayloadSchema
+>;
+export const AssuranceEvaluatorSelectedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	evaluator: ActorReferenceSchema,
+	independenceRequirement: z.string().optional()
+});
+export type AssuranceEvaluatorSelectedPayload = z.infer<
+	typeof AssuranceEvaluatorSelectedPayloadSchema
+>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2160,6 +2185,18 @@ export const COMMANDS = {
 		targetAggregateType: 'RECURSIVE_PROFESSIONAL_HARNESS',
 		emitsEvent: 'HarnessProposed',
 		firstSlice: false
+	},
+	SelectAssuranceEvaluator: {
+		payload: SelectAssuranceEvaluatorPayloadSchema,
+		targetAggregateType: 'ASSURANCE_ASSESSMENT',
+		emitsEvent: 'AssuranceEvaluatorSelected',
+		firstSlice: false
+	},
+	BeginAssuranceAssessment: {
+		payload: BeginAssuranceAssessmentPayloadSchema,
+		targetAggregateType: 'ASSURANCE_ASSESSMENT',
+		emitsEvent: 'AssuranceAssessmentStarted',
+		firstSlice: false
 	}
 } as const;
 
@@ -2482,6 +2519,14 @@ export const EVENTS = {
 	HarnessProposed: {
 		payload: HarnessProposedPayloadSchema,
 		aggregateType: 'RecursiveProfessionalHarness'
+	},
+	AssuranceEvidenceRequired: {
+		payload: AssuranceEvidenceRequiredPayloadSchema,
+		aggregateType: 'AssuranceAssessment'
+	},
+	AssuranceEvaluatorSelected: {
+		payload: AssuranceEvaluatorSelectedPayloadSchema,
+		aggregateType: 'AssuranceAssessment'
 	}
 } as const;
 
@@ -2963,5 +3008,26 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Undertaking.status',
 		from: '(initial)',
 		to: 'ACTIVE'
+	},
+	{
+		commandType: 'RequestAssuranceAssessment',
+		eventType: 'AssuranceAssessmentRequested',
+		machine: 'AssuranceAssessment.state',
+		from: 'REQUESTED',
+		to: 'EVIDENCE_PENDING'
+	},
+	{
+		commandType: 'SelectAssuranceEvaluator',
+		eventType: 'AssuranceEvaluatorSelected',
+		machine: 'AssuranceAssessment.state',
+		from: 'READY',
+		to: 'READY'
+	},
+	{
+		commandType: 'BeginAssuranceAssessment',
+		eventType: 'AssuranceAssessmentStarted',
+		machine: 'AssuranceAssessment.state',
+		from: 'READY',
+		to: 'ASSESSING'
 	}
 ];

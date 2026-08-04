@@ -2849,6 +2849,45 @@
 					"note": "id-ref[]; defaults to []"
 				}
 			]
+		},
+		{
+			"commandType": "SelectAssuranceEvaluator",
+			"targetAggregateType": "ASSURANCE_ASSESSMENT",
+			"emitsEvent": "AssuranceEvaluatorSelected",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-04, sponsor grant; REG-F-021 increment 1): DOC-004 §32 ratifies the command NAME 'selectAssuranceEvaluator'; DOC-007 schematizes no interface for it. NO ruling covers this shape (see AssuranceEvaluatorSelected). It does NOT change assessmentState: the §30 READY -> ASSESSING arrow is 'selectAssuranceEvaluator (AssuranceEvaluatorSelected) THEN beginAssuranceAssessment (AssuranceAssessmentStarted)' — two acts, one arrow, and only the second moves the machine. Cited for the NAME only: DOC-004 §32.",
+			"payloadFields": [
+				{
+					"field": "evaluator",
+					"required": true,
+					"type": "ActorReference",
+					"note": "the actor selected to assess; the assessment aggregate is the command target"
+				},
+				{
+					"field": "selectionRationale",
+					"required": false,
+					"type": "string",
+					"note": "why this evaluator — optional, and deliberately NOT required: an argued justification nothing reads is the shape REG-F-021 already recorded for TacticalChangeRequested"
+				}
+			]
+		},
+		{
+			"commandType": "BeginAssuranceAssessment",
+			"targetAggregateType": "ASSURANCE_ASSESSMENT",
+			"emitsEvent": "AssuranceAssessmentStarted",
+			"drivesMachine": "AssuranceAssessment.state",
+			"drivesFrom": "READY",
+			"drivesTo": "ASSESSING",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-04, sponsor grant; REG-F-021 increment 1): DOC-004 §32 ratifies the command NAME 'beginAssuranceAssessment'; DOC-007 schematizes no interface for it. NO ruling covers this shape. It is the SECOND half of the §30 READY -> ASSESSING arrow and the only half that moves the machine. It emits AssuranceAssessmentStarted — the event requestAssuranceAssessment emits TODAY, which is precisely REG-F-021: the engine fused request-and-begin, so the LAST arrow's event fires at the FIRST arrow's moment. Cited for the NAME only: DOC-004 §32.",
+			"payloadFields": [
+				{
+					"field": "startedAt",
+					"required": false,
+					"type": "string",
+					"note": "when assessment actually began; absent = the engine's clock. This is the moment startedAt now records — increment 0 made the field optional on the object precisely so the pre-start states can honestly lack it"
+				}
+			]
 		}
 	],
 	"events": [
@@ -3224,8 +3263,14 @@
 		{
 			"eventType": "AssuranceAssessmentRequested",
 			"aggregateType": "AssuranceAssessment",
-			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant; CORRECTED 2026-08-04, REG-F-021 increment 1): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. Do NOT treat this sourceSection as proof the shape is ratified. Cited: DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload).\n\nWHY IT WAS CORRECTED, AND WHY THAT EXPLAINS REG-F-021. The authored shape REQUIRED two fields that cannot exist at the moment this event fires: `evaluator` — chosen two arrows later by selectAssuranceEvaluator (§32), whose whole purpose is to record that choice — and `disposition`, the assessment's OUTCOME, produced at the very end by completeAssuranceAssessment. An event announcing that an assessment has been REQUESTED cannot carry who will assess it or how it turned out.\n\nThe old `disposition` note read '=PENDING', and `PENDING` is NOT a member of AssuranceDisposition (SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, INCONCLUSIVE, WAIVED, ESCALATED) — so the annotation prescribed a value its own declared type rejects. The shape was unsatisfiable, not merely awkward.\n\nTHIS IS PART OF WHY THE EVENT WAS NEVER EMITTED. REG-F-021 recorded AssuranceAssessmentRequested as bound and produced by nothing. A contributing reason is now measured: it could not be emitted CONFORMANTLY — the REG-F-020 event gate refuses a ratified-or-declared payload that its own shape rejects, and a request-time emitter has nothing to put in `evaluator` or `disposition`. Corrected here rather than worked around, on the standing rule this programme already applies: an AUTHORED shape that cannot carry what its moment can know is the defect, and authored shapes are ours to correct.\n\nDELTA: - evaluator, - disposition (neither knowable at request time); + assessmentId (every sibling assurance event identifies its aggregate); + subjectSemanticVersions (DOC-004 invariant 2, 'every assessment identifies its subject semantic version' — the request is the moment that binding is made, and recording the subject WITHOUT its version is the exact gap Increment 10b established the floor cannot work without).",
 			"payloadFields": [
+				{
+					"field": "assessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref — the assessment being requested. ADDED 2026-08-04: every sibling assurance event names its aggregate, and a request event that does not identify what was requested is not auditable."
+				},
 				{
 					"field": "assurancePolicyId",
 					"required": true,
@@ -3245,23 +3290,16 @@
 					"note": "id-ref[]"
 				},
 				{
+					"field": "subjectSemanticVersions",
+					"required": true,
+					"type": "Record<string, number>",
+					"note": "ADDED 2026-08-04: DOC-004 invariant 2 — 'Every assessment identifies its subject semantic version'. The request is where that binding is made; an assessment bound to a subject but not to a VERSION of it can be satisfied against work that has since changed."
+				},
+				{
 					"field": "claimIds",
 					"required": true,
 					"type": "string[]",
 					"note": "id-ref[]"
-				},
-				{
-					"field": "evaluator",
-					"required": true,
-					"type": "ActorReference",
-					"note": "complex type"
-				},
-				{
-					"field": "disposition",
-					"required": true,
-					"type": "enum",
-					"enumRef": "AssuranceDispositionSchema",
-					"note": "=PENDING; drives PWU EVIDENCE_PENDING->UNDER_ASSURANCE + assuranceState ->READY_FOR_ASSESSMENT"
 				}
 			]
 		},
@@ -6897,6 +6935,56 @@
 					"enumRef": "HarnessStatusSchema"
 				}
 			]
+		},
+		{
+			"eventType": "AssuranceEvidenceRequired",
+			"aggregateType": "AssuranceAssessment",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-04, sponsor grant; REG-F-021 increment 1): DOC-004 §31 ratifies this event NAME, and the §31 ruling EXPLICITLY COVERS IT — §31 (L1783-1785) states they are 'ratified names here but schematized nowhere ... a schema-and-wiring task, NOT a ratification decision' — its 'Both events' being AssuranceEvidenceRequired + AssuranceEvidenceReceived. So authoring the schema is wiring, not a ratification decision, on the same footing as its sibling. The §30 machine's REQUESTED -> EVIDENCE_PENDING trigger names it as the act of requesting the missing evidence: 'claims instantiated, evidence requirements evaluated, missing evidence requested (AssuranceEvidenceRequired)'. Fields AUTHORED to carry the REQUIRED set (§38 'missing evidence' = this set minus the received ids). Do NOT treat this sourceSection as proof the shape is ratified. Cited for the NAME only: DOC-004 §31.",
+			"payloadFields": [
+				{
+					"field": "assessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "assurancePolicyId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref — the policy whose §6.1 requiredEvidence defines the set; recorded so the requirement is traceable to the authority that imposed it"
+				},
+				{
+					"field": "requiredEvidenceIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-refs — the EvidenceRequirement ids (DOC-004 §6.1) this assessment requires. EMPTY IS A REAL SOURCED 'none', NOT 'unknown' — and today it is empty for every policy the product can produce (REG-F-022), which is why the EVIDENCE_PENDING -> READY guard must be written as an explicit empty-set rule rather than an absent one"
+				}
+			]
+		},
+		{
+			"eventType": "AssuranceEvaluatorSelected",
+			"aggregateType": "AssuranceAssessment",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-04, sponsor grant; REG-F-021 increment 1): DOC-004 §31 ratifies this event NAME and §32 the command that produces it. NO CORPUS RULING COVERS THIS EVENT'S SCHEMA. Stated explicitly because the obvious mistake is to borrow the §31 'schema-and-wiring, not a ratification decision' sentence that AssuranceEvidenceRequired/Received use: that sentence's subject is the §38 missing-evidence pair, and this event appears NOWHERE in it (its four occurrences in DOC-004 are the §31 list, the composition bullet, and the §32 command list twice). This shape is therefore authored on the ORDINARY standing grant, with no explicit blessing, and must not be recorded as though it had one. Cited for the NAME only: DOC-004 §31 (event), §32 (command).",
+			"payloadFields": [
+				{
+					"field": "assessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "evaluator",
+					"required": true,
+					"type": "ActorReference",
+					"note": "WHO will assess. Today completeAssuranceAssessment reads the evaluator off validatorResult.executionProvenance.evaluator — smuggled through the verdict because no governed selection act existed. This field is that act's record, and §8.12 forbids resting independence on a role label, so it is a full ActorReference"
+				},
+				{
+					"field": "independenceRequirement",
+					"required": false,
+					"type": "string",
+					"note": "the policy's requirement this selection was made against, recorded at selection time so the check is auditable against what was in force THEN rather than what is in force now"
+				}
+			]
 		}
 	],
 	"bindings": [
@@ -7392,6 +7480,30 @@
 			"machine": "Undertaking.status",
 			"from": "(initial)",
 			"to": "ACTIVE"
+		},
+		{
+			"commandType": "RequestAssuranceAssessment",
+			"eventType": "AssuranceEvidenceRequired",
+			"machine": "AssuranceAssessment.state",
+			"from": "REQUESTED",
+			"to": "EVIDENCE_PENDING",
+			"note": "The §30 REQUESTED -> EVIDENCE_PENDING arrow, whose trigger prose puts BOTH acts under the request: 'AssuranceAssessmentRequested; claims instantiated, evidence requirements evaluated, missing evidence requested (AssuranceEvidenceRequired)'. So ONE command produces TWO events. The storage layer already supports that (CommitInput.events is an array); kit.ts's commitState wraps a single event and is extended in increment 3. Recorded HERE, unemitted, so the census NAMES the gap instead of hiding it."
+		},
+		{
+			"commandType": "SelectAssuranceEvaluator",
+			"eventType": "AssuranceEvaluatorSelected",
+			"machine": "AssuranceAssessment.state",
+			"from": "READY",
+			"to": "READY",
+			"note": "Records WHO will assess without moving the machine — the first of the two acts the READY -> ASSESSING arrow names. A self-edge, not a no-op: the governed fact it commits is the selection itself."
+		},
+		{
+			"commandType": "BeginAssuranceAssessment",
+			"eventType": "AssuranceAssessmentStarted",
+			"machine": "AssuranceAssessment.state",
+			"from": "READY",
+			"to": "ASSESSING",
+			"note": "The second act of the READY -> ASSESSING arrow, and the one that moves it. AssuranceAssessmentStarted belongs HERE — requestAssuranceAssessment emitting it is REG-F-021 itself."
 		}
 	],
 	"conflicts": [

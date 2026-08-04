@@ -98,6 +98,12 @@ describe('validate', () => {
 		// cut is distinguishable from a BRANCH_DECISION one — and from a waived skip, which was the finding. No new
 		// command or event: ExecutionStepPruned gains three payload fields, which do not carry their own registry ids.
 		// (+1 → 323.)
-		expect(buildContractRegistry().ids()).toHaveLength(323);
+		// then +4 for REG-F-021 increments 1-2 (the ratified §30 assessment lifecycle): +2 commands
+		// SelectAssuranceEvaluator + BeginAssuranceAssessment (DOC-004 §32 names both; the READY -> ASSESSING arrow
+		// is two acts and only the second advances), +2 events AssuranceEvaluatorSelected + AssuranceEvidenceRequired
+		// (§31 names both). No delta from the AssuranceAssessmentRequested payload CORRECTION in the same increment —
+		// dropping `evaluator`/`disposition` and adding `assessmentId`/`subjectSemanticVersions` changes fields on an
+		// existing event, which carries no registry id of its own. (+4 → 327.)
+		expect(buildContractRegistry().ids()).toHaveLength(327);
 	});
 });
