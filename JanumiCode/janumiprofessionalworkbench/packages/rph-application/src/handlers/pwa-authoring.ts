@@ -226,7 +226,11 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
 		objectType: PWA,
 		aggregateId: p.pwaId,
 		state,
-		eventType: 'PwaCreated'
+		eventType: 'PwaCreated',
+		// REG-F-020 ledger: the DECLARED shape, not the command payload. `PwaCreatedPayloadSchema` is a
+		// strictObject of { pwaId, name, version } and the command payload also carries description + domain,
+		// which it rejects outright. Nothing projects this payload — the PWA's own state carries the rest.
+		eventPayload: { pwaId: p.pwaId, name: p.name, version: p.version }
 	});
 };
 
@@ -460,7 +464,10 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 			objectType: PWU_TYPE,
 			aggregateId: p.pwuTypeId,
 			state,
-			eventType: 'PwuTypeDefined'
+			eventType: 'PwuTypeDefined',
+			// REG-F-020 ledger: declared as { pwuTypeId, pwaId, pwuKind }; the command payload carries seven more
+			// fields the strictObject rejects. The type's full shape lives in its object state, not in the event.
+			eventPayload: { pwuTypeId: p.pwuTypeId, pwaId: p.pwaId, pwuKind: p.pwuKind }
 		})
 	);
 };
@@ -678,7 +685,27 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 		aggregateType: PWU_TYPE,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload
+		// REG-F-020 ledger: the DECLARED patch shape, projected from the command payload. It is a strictObject of
+		// eight optional fields and does NOT include `executionBoundary` / `boundaryContract` / `permittedChildren`
+		// / `permittedParentTypeIds` / `requiredInputs` / `requiredOutputs`, all of which the raw payload may carry.
+		// Only fields actually PRESENT are emitted, so the event records what the edit changed rather than
+		// asserting `undefined` for what it did not.
+		payload: Object.fromEntries(
+			(
+				[
+					'pwuTypeId',
+					'name',
+					'purpose',
+					'pwuKind',
+					'isRoot',
+					'completionRule',
+					'permittedChildTypeIds',
+					'requiredAssurancePolicyIds'
+				] as const
+			)
+				.map((k) => [k, k === 'pwuTypeId' ? id : (p as Record<string, unknown>)[k]])
+				.filter(([, v]) => v !== undefined)
+		)
 	});
 	// Redefining a PWU Type materially edits the PWA's graph — raise the PWA's semanticVersion with it (§10.1 L1379).
 	return withPwaVersionBump(ctx, command, String(loaded.state.pwaId), () =>
@@ -945,7 +972,12 @@ export const publishPwa: CommandHandler = (ctx, command) =>
 		mutate: (base) => {
 			const p = command.payload as PublishPwaPayload;
 			return p.rootPwuTypeId ? { ...base, rootPwuTypeId: p.rootPwuTypeId } : base;
-		}
+		},
+		// REG-F-020 ledger: `PwaPublishedPayloadSchema` is an EMPTY strictObject — publication is a fact about the
+		// aggregate the envelope already identifies, and the event carries no fields at all. The command payload's
+		// optional `rootPwuTypeId` was being passed through and rejected. It is not lost: `mutate` above writes it
+		// onto the PWA's state, which is where a reader looks for it.
+		eventPayload: () => ({})
 	});
 
 /** DeprecatePwa — PUBLISHED -> DEPRECATED. */
@@ -1024,6 +1056,9 @@ export const createUndertaking: CommandHandler = (ctx, command, payload) => {
 		objectType: UNDERTAKING,
 		aggregateId: p.undertakingId,
 		state,
-		eventType: 'UndertakingCreated'
+		eventType: 'UndertakingCreated',
+		// REG-F-020 ledger: declared as { undertakingId, pwaId, pwaVersion }; the command payload adds name,
+		// description, instantiationProfile, objective and intendedOutputProduct, all rejected by the strictObject.
+		eventPayload: { undertakingId: p.undertakingId, pwaId: p.pwaId, pwaVersion: p.pwaVersion }
 	});
 };

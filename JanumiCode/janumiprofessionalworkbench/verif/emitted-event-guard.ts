@@ -17,6 +17,13 @@
 // types, and TWENTY-ONE types emitting a payload their own declared shape rejects. The drive-scoped register saw
 // one of them.
 //
+// TWENTY OF THE TWENTY-ONE ARE REAL, and the twenty-first is not — a correction made by DUMPING the payloads
+// rather than reading the handlers. `PwuMarkedReady` looked like the same defect and is not: `markPwuReady`
+// already supplies a conforming `eventPayload`, and the nonconforming commit comes from `event-gate.test.ts`
+// emitting `{total: 'garbage'}` ON PURPOSE. It is filed below in a SEPARATE list, because a defect ledger that
+// contains a non-defect sends someone to fix a handler that is correct. SIX are now fixed (`ArtifactRecorded`,
+// `PwaCreated`, `PwaPublished`, `UndertakingCreated`, `PwuTypeDefined`, `PwuTypeRedefined`); FIFTEEN remain.
+//
 // ── WHAT THIS IS AND IS NOT ──────────────────────────────────────────────────────────────────────────────────
 // A DEFECT LEDGER, not a specification. Every entry below is a defect with its MEASURED violation as its reason —
 // not a hand-written rationale, because a rationale for twenty-one entries authored in one sitting is exactly the
@@ -64,12 +71,6 @@ const KNOWN_NONCONFORMING: Readonly<Record<string, string>> = {
 	ExecutionTerminated:
 		'status: Invalid option: expected one of "PROPOSED"|"UNDER_REVIEW"|"APPROVED"|"ACTIVE"|"COMPLETED"|"FAILED"|"SUPERSEDED"|"CANCELLED"',
 	IntentRevised: 'semanticVersion: Invalid input: expected number, received undefined',
-	PwaCreated: '(root): Unrecognized keys: "description", "domain"',
-	PwaPublished: '(root): Unrecognized key: "rootPwuTypeId"',
-	PwuMarkedReady: 'workLifecycleState: Invalid option: expected one of "PROPOSED"|"SHAPING"|…',
-	PwuTypeDefined:
-		'(root): Unrecognized keys: "name", "purpose", "isRoot", "permittedChildTypeIds", "requiredInputs", "requiredOutputs", "requiredAssurancePolicyIds"',
-	PwuTypeRedefined: '(root): Unrecognized key: "executionBoundary"',
 	RecompositionCompleted:
 		'parentCompletionClaimId: Invalid input: expected string, received undefined',
 	RecompositionConflictDetected:
@@ -83,11 +84,28 @@ const KNOWN_NONCONFORMING: Readonly<Record<string, string>> = {
 	RuntimeCapabilityRevoked:
 		'revocationReason: Invalid input: expected string, received undefined',
 	TacticalChangeApplied: 'executionPlanId: Invalid input: expected string, received undefined',
-	UndertakingCreated:
-		'(root): Unrecognized keys: "name", "description", "instantiationProfile", "objective", "intendedOutputProduct"',
 	WaiverGranted: 'waiverDecisionId: Invalid input: expected string, received undefined',
 	WaiverRequested:
 		'decisionType: Invalid option: expected one of "APPROVAL"|"REJECTION"|"WAIVER"|"ESCALATION"|"RESHAPE"|"REPLAN"|"PROMOTE_BASELINE"|"ABANDON"|"REVOKE"'
+};
+
+/**
+ * NOT DEFECTS — types that appear nonconforming only because a test emits a bad payload ON PURPOSE.
+ *
+ * A SEPARATE LIST BECAUSE IT MEANS SOMETHING ELSE. `event-gate.test.ts` exists to prove the (d2) event gate's
+ * SCOPE: a RATIFIED event with a bad payload is refused, and an UNRATIFIED-AUTHORED one is ALLOWED — "we do not
+ * enforce shapes we authored ourselves as though the corpus had ratified them". Its negative arrangement commits
+ * `PwuMarkedReady` with `{"total":"garbage","not":"a real payload"}`, through a real command, so it carries a
+ * `commandId` and is indistinguishable from handler output at the commit path.
+ *
+ * MEASURED, NOT ASSUMED: the payload was dumped before this row was written. `markPwuReady` itself already
+ * supplies a conforming `eventPayload` (workLifecycleState from the committed next state), which is why the
+ * obvious reading — "another handler emitting its command payload" — was wrong. Filing it as a defect would have
+ * put a non-defect in a defect ledger and sent someone to fix a handler that is correct.
+ */
+const DELIBERATE_TEST_FIXTURES: Readonly<Record<string, string>> = {
+	PwuMarkedReady:
+		"event-gate.test.ts's negative arm commits `{total: 'garbage'}` to prove an UNRATIFIED event is not refused"
 };
 
 type PayloadSchema = { safeParse: (v: unknown) => { success: boolean } };
@@ -95,6 +113,20 @@ const SCHEMAS = EVENTS as unknown as Record<string, { payload?: PayloadSchema } 
 
 /** Event types seen violating their shape in THIS worker. Module-scoped: one report per worker at the end. */
 const violations = new Set<string>();
+
+/**
+ * Handler-produced events this worker actually inspected, and the types among them.
+ *
+ * A LIVENESS COUNTER, because this guard is a prototype patch in a setup file and those fail SILENTLY in the one
+ * way that matters: if it stops being reached, every run is green and the ledger below certifies nothing. That is
+ * not hypothetical — while this file was being built, a probe edit left a literal newline inside a string
+ * literal, the module stopped parsing, and three consecutive runs reported "no violations" that were really "no
+ * guard". `emitted-event-guard.test.ts` asserts these move.
+ */
+export const liveness = { inspected: 0, types: new Set<string>() };
+
+/** The ledger, exported so its own test can assert it holds only types this suite still emits. */
+export const LEDGER: Readonly<Record<string, string>> = KNOWN_NONCONFORMING;
 
 function checkEvents(events: readonly DomainEvent[]): void {
 	for (const event of events) {
@@ -108,6 +140,8 @@ function checkEvents(events: readonly DomainEvent[]): void {
 		// identity guard). So a handler-produced event cannot lack it, and a hand-built fixture event has no
 		// reason to carry it. The guard rests on a property another finding made true.
 		if (typeof event.commandId !== 'string' || event.commandId.length === 0) continue;
+		liveness.inspected += 1;
+		liveness.types.add(event.eventType);
 		const schema = SCHEMAS[event.eventType]?.payload;
 		// No declared shape is not a violation — it is a different gap, and one this file must not conflate with
 		// a shape the event actively contradicts.
@@ -134,7 +168,7 @@ instrument(SnapshotOverlayStorageAdapter.prototype);
 
 afterAll(() => {
 	const unexpected = [...violations]
-		.filter((t) => KNOWN_NONCONFORMING[t] === undefined)
+		.filter((t) => KNOWN_NONCONFORMING[t] === undefined && DELIBERATE_TEST_FIXTURES[t] === undefined)
 		.sort((a, b) => a.localeCompare(b));
 	if (unexpected.length > 0) {
 		throw new Error(
