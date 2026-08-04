@@ -242,6 +242,50 @@ export interface CommitArgs {
 const SCHEMA_BY_TYPE = OBJECT_SCHEMAS as Record<string, { schema: ZodType } | undefined>;
 
 /**
+ * STATE-CONDITIONAL FIELD INVARIANTS — constraints a per-field schema cannot express, checked at the one seam
+ * every write passes through so no handler can opt out by omission (the same reason the setup guards are declared
+ * in `vitest.projects.ts` rather than per package).
+ *
+ * REG-F-021 increment 0. `AssuranceAssessment.startedAt` became OPTIONAL because the ratified §30 machine creates
+ * an assessment in `REQUESTED`, which by definition has not started — and while the field was REQUIRED, such an
+ * object could not be persisted at all (`kit.ts` refuses to write a state its schema rejects), which made the
+ * whole lifecycle restoration unbuildable. Relaxing a required field with nothing put back is precisely the
+ * economy REG-D-013 forbids, so **the guarantee moved rather than lapsing**: optional at the schema, mandatory at
+ * the state that implies it.
+ *
+ * EXPRESSED AS THE EXEMPT SET, DELIBERATELY, BECAUSE THAT FAILS CLOSED. The three pre-start states are named; every
+ * other state — ASSESSING and all eleven terminal dispositions — requires the field. A state added later therefore
+ * defaults to REQUIRING `startedAt`. The positive form (list the states that require it) would default a new state
+ * to exempt, which is the direction that loses the guarantee silently.
+ */
+const STATE_CONDITIONAL_FIELDS: Readonly<
+	Record<string, { statusField: string; exemptStates: readonly string[]; required: readonly string[] }>
+> = {
+	ASSURANCE_ASSESSMENT: {
+		statusField: 'assessmentState',
+		exemptStates: ['REQUESTED', 'EVIDENCE_PENDING', 'READY'],
+		required: ['startedAt']
+	}
+};
+
+/** null when the state satisfies its state-conditional invariants; otherwise the reason it does not.
+ *  EXPORTED so it can be tested directly: no command can currently produce an `ASSESSING` assessment without
+ *  `startedAt` (the handler always stamps it), so an integration test alone could never show this refusing —
+ *  it would be a guard with no demonstrated failure mode, which is the defect this repository keeps finding. */
+export function stateConditionalViolation(
+	objectType: string,
+	state: Record<string, unknown>
+): string | null {
+	const rule = STATE_CONDITIONAL_FIELDS[objectType];
+	if (!rule) return null;
+	const status = state[rule.statusField];
+	if (typeof status !== 'string' || rule.exemptStates.includes(status)) return null;
+	const missing = rule.required.filter((f) => state[f] === undefined || state[f] === null);
+	if (missing.length === 0) return null;
+	return `${objectType} in ${rule.statusField} '${status}' must carry [${missing.join(', ')}] — the field is optional on the schema only because the pre-start states (${rule.exemptStates.join(', ')}) legitimately lack it; a '${status}' object without it has lost a fact its own state asserts.`;
+}
+
+/**
  * Validate the produced state against its object schema (fail-loud — never persist an object that is not a valid
  * domain object), then commit the event + state + receipt atomically and map the StoreResult to a CommandResult.
  * This is the (d)-(e)-(f) tail of the command pipeline, shared by every handler.
@@ -277,6 +321,18 @@ export function commitState(
 			status: 'REJECTED',
 			error: stateCheck.error
 		};
+	}
+	// (d1b) STATE-CONDITIONAL FIELDS — the half of the contract the per-field schema cannot carry. See
+	// STATE_CONDITIONAL_FIELDS: a field may be optional because SOME states legitimately lack it, without becoming
+	// optional for the states that assert it.
+	const conditional = stateConditionalViolation(args.objectType, args.nextState);
+	if (conditional) {
+		ctx.logger.error('invariant.state_conditional_field_missing', {
+			correlationId: command.correlationId,
+			aggregateId: args.aggregateId,
+			commandType: command.commandType
+		});
+		return reject(command, 'RPH_INVARIANT_VIOLATION', conditional, [args.aggregateId]);
 	}
 	// (d2) THE EVENT GATE — LIVE as of 2026-07-17.
 	//

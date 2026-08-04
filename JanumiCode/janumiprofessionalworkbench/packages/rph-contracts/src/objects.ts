@@ -542,7 +542,7 @@ export const AssuranceAssessmentSchema = z.strictObject({
 	evidenceConsideredIds: z.array(z.string()),
 	rejectedEvidence: z.array(RejectedEvidenceReferenceSchema),
 	observationIds: z.array(z.string()),
-	startedAt: z.string(),
+	startedAt: z.string().optional(),
 	completedAt: z.string().optional(),
 	assessmentState: AssuranceAssessmentStateSchema,
 	confidence: ConfidenceAssessmentSchema.optional(),

@@ -534,3 +534,57 @@ export function controllerMarksPwuSatisfied(axes: PwuControllerAxes): boolean {
 		axes.openBlockingObservations === 0
 	);
 }
+
+// ============================================================================================
+// Assessment conclusion (REG-F-021 increment 0) — "has this assessment reached an outcome?"
+// ============================================================================================
+
+/**
+ * The states in which an AssuranceAssessment has REACHED AN OUTCOME, so a governance act may rely on it.
+ *
+ * WHY THIS EXISTS, AND WHY IT IS A POSITIVE LIST. Baseline promotion asked the question inline as
+ * `complete = disposition !== 'ASSESSING' && disposition !== 'REQUESTED'` — an ad-hoc exclusion of two states.
+ * The ratified §30 machine has FOUR pre-conclusion states (`REQUESTED, EVIDENCE_PENDING, READY, ASSESSING`); the
+ * exclusion named two, so `EVIDENCE_PENDING` and `READY` counted as CONCLUDED. That is currently harmless only
+ * because those states are unreachable — `requestAssuranceAssessment` creates directly in `ASSESSING` — and it
+ * becomes a live fail-open defect the moment REG-F-021 makes them reachable: a baseline promoted over an
+ * assessment that has not begun, reporting `disposition: 'EVIDENCE_PENDING'`.
+ *
+ * THE DIRECTION OF THE LIST IS THE FIX, not just its contents. A negative list (name the in-flight states, treat
+ * everything else as concluded) fails OPEN on a state added later: the new state is not excluded, so it counts as
+ * concluded. A positive list fails CLOSED: an unclassified state is simply not concluded, and promotion blocks
+ * until someone says what it means. `assessment-conclusion.test.ts` asserts this set and the in-flight set
+ * together EXHAUST the machine's declared states and do not overlap, so a state added to the enum reddens rather
+ * than silently defaulting either way.
+ *
+ * NOT `isTerminalState('AssuranceAssessment.state', …)`: the machine's own `terminalStates` deliberately EXCLUDES
+ * `SATISFIED`, `CONDITIONALLY_SATISFIED` and `WAIVED` (a satisfied assessment can still be INVALIDATED or have
+ * its waiver expire). Those are exactly the outcomes a promotion cares about, so terminality is the wrong
+ * question here — "has it concluded" is not "can it never change again".
+ */
+export const ASSESSMENT_CONCLUDED_STATES: readonly string[] = [
+	'SATISFIED',
+	'CONDITIONALLY_SATISFIED',
+	'REJECTED',
+	'INCONCLUSIVE',
+	'ESCALATED',
+	'WAIVED',
+	'VALIDATOR_FAILED',
+	'INDEPENDENCE_VIOLATION',
+	'INVALIDATED',
+	'WAIVER_EXPIRED',
+	'CANCELLED'
+];
+
+/** The four states of the ratified §30 machine in which an assessment has NOT yet reached an outcome. */
+export const ASSESSMENT_IN_FLIGHT_STATES: readonly string[] = [
+	'REQUESTED',
+	'EVIDENCE_PENDING',
+	'READY',
+	'ASSESSING'
+];
+
+/** True when the assessment has reached an outcome a governance act may rely on. Unknown state => NOT concluded. */
+export function assessmentHasConcluded(assessmentState: string | undefined): boolean {
+	return assessmentState !== undefined && ASSESSMENT_CONCLUDED_STATES.includes(assessmentState);
+}

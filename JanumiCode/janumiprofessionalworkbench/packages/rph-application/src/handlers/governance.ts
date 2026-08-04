@@ -32,6 +32,7 @@ import {
 	type Precondition
 } from './command-precondition.js';
 import {
+	assessmentHasConcluded,
 	authorizeDecisionEffective,
 	canPromoteBaseline,
 	decisionAuthorizesVersions
@@ -779,7 +780,14 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 				const a = hctx.store.loadObject(assessmentId)?.state as
 					{ assessmentState?: string } | undefined;
 				const disposition = a?.assessmentState ?? 'INCONCLUSIVE';
-				const complete = disposition !== 'ASSESSING' && disposition !== 'REQUESTED';
+				// REG-F-021 increment 0. This was `disposition !== 'ASSESSING' && disposition !== 'REQUESTED'` — an
+				// ad-hoc exclusion of TWO states from a machine with FOUR pre-conclusion ones, so EVIDENCE_PENDING
+				// and READY counted as COMPLETE. Harmless only because those states are unreachable today; a
+				// fail-OPEN defect (a baseline promoted over an assessment that has not begun, reporting
+				// `disposition: 'EVIDENCE_PENDING'`) the moment REG-F-021 makes them reachable. Fixed BEFORE the
+				// states exist, so the window never opens. Now a POSITIVE classification that fails closed on any
+				// state it does not know — see ASSESSMENT_CONCLUDED_STATES and its exhaustiveness test.
+				const complete = assessmentHasConcluded(disposition);
 				return { assessmentId, complete, disposition };
 			});
 			// The item set the Baseline itself froze at CreateBaseline — the subjects whose findings §8.16 L1122

@@ -129,16 +129,30 @@ const disposition = a?.assessmentState ?? 'INCONCLUSIVE';
 const complete = disposition !== 'ASSESSING' && disposition !== 'REQUESTED';
 ```
 
-Someone already excluded `REQUESTED` — and stopped. **`EVIDENCE_PENDING` and `READY` would count as `complete`,
-with `disposition: 'EVIDENCE_PENDING'`**, so a baseline could be promoted over an assessment that has not begun.
-This is the one site where the increment does not merely change what is displayed; it would let a governance act
-through that should be refused.
+Someone already excluded `REQUESTED` — and stopped. **`EVIDENCE_PENDING` and `READY` would count as `complete`.**
 
-> **Fix it in increment 0, not increment 3.** It is correct *today* (those states are unreachable) and would be a
-> live defect the moment the states exist. Fixing it first means the dangerous window never opens, and the fix can
-> be verified in isolation against a hand-built assessment rather than against the whole new machine.
-> **The check should be positive** — `complete` iff the disposition is one of the terminal set — not a growing
-> list of exclusions, because the exclusion list is what failed here.
+> **CORRECTED 2026-08-04, BY THE MUTANT THAT REFUSED TO DIE.** This section first said a baseline "could be
+> promoted over an assessment that has not begun" — a governance act let through that should be refused. **That is
+> wrong, and the test I wrote to prove it passed against the defective code**, which is how the overstatement was
+> caught: restoring the old exclusion left all assertions green.
+>
+> The reason is a second, independent check. `complete` drives only **`REQUIRED_ASSESSMENT_INCOMPLETE`**
+> (RPH-BAS-004); a separate rule raises **`REQUIRED_ASSESSMENT_NOT_SATISFIED`** for an assessment that is complete
+> but not `SATISFIED`/`WAIVED`. An `EVIDENCE_PENDING` assessment is not SATISFIED either, so **promotion is
+> refused either way**. Defence in depth, working.
+>
+> **The real defect is a MISATTRIBUTED REFUSAL, not an unsafe admission**, and it is worth fixing on its own terms:
+> the operator is told the assessment reached an adverse verdict when in truth it never began. A true refusal for
+> a false reason is the failure mode this register keeps recording — the same family as a defect register reading
+> CLEARED for the wrong reason (REG-F-020). The discriminating assertion is therefore on the reason CODE, never on
+> "not ACCEPTED", because "not ACCEPTED" is exactly what the defective code also produces.
+
+**Still fix it in increment 0, not increment 3.** It is correct *today* only because those states are unreachable,
+and the fix can be verified in isolation against a hand-built assessment rather than against a half-restored
+machine. **The check is positive** — `complete` iff the state is in a declared concluded set — not a growing list
+of exclusions, because the exclusion list is what failed here. A positive list is only safe with an exhaustiveness
+test, so `ASSESSMENT_CONCLUDED_STATES` and `ASSESSMENT_IN_FLIGHT_STATES` are asserted to partition the ratified
+machine's own 15 states.
 
 ---
 

@@ -687,8 +687,8 @@
         {
           "field": "startedAt",
           "type": "string",
-          "required": true,
-          "note": "DOC-002 §18 only; ABSENT from DOC-007 §19 (likely superseded by event-envelope timestamps). OPEN ITEM: keep or drop."
+          "required": false,
+          "note": "DOC-002 §18 only; ABSENT from DOC-007 §19 (likely superseded by event-envelope timestamps). OPEN ITEM: keep or drop. OPTIONAL as of 2026-08-04 (REG-F-021 increment 0), and this is a CONSISTENCY CORRECTION rather than a relaxation: openItems[6] retains all six DOC-002-only fields '(optional) per union rule', and five of the six (PWU.decompositionContractId/recompositionContractId/currentBaselineId, AssuranceAssessment.completedAt/confidence) were emitted optional while this one alone was emitted required. It must also be absent-able for a real reason: the ratified §30 machine creates an assessment in REQUESTED, which by definition has not started. THE GUARANTEE DID NOT LAPSE, IT MOVED: commitState refuses any assessment that is ASSESSING or terminal without startedAt (assessment-startedat-contract.test.ts)."
         },
         {
           "field": "completedAt",
