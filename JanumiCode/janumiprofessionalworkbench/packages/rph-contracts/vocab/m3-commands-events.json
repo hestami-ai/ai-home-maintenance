@@ -633,7 +633,7 @@
 			"targetAggregateType": "ASSURANCE_ASSESSMENT",
 			"emitsEvent": "AssuranceEvidenceReceived",
 			"schematized": false,
-			"sourceSection": "UNRATIFIED-AUTHORED (2026-07-18, sponsor grant): DOC-004 §32 ratifies the command NAME 'submitEvidenceForAssessment' and §31 the event NAME 'AssuranceEvidenceReceived', but DOC-007 schematizes NO interface for either — §31 (L1770) states they are 'ratified names here but schematized nowhere ... a schema-and-wiring task, NOT a ratification decision'. These fields are therefore AUTHORED, not derived; do NOT treat this sourceSection as proof the shape is ratified. Cited for the NAME only: DOC-004 §32 (command), §31 (event).",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-07-18, sponsor grant): DOC-004 §32 ratifies the command NAME 'submitEvidenceForAssessment' and §31 the event NAME 'AssuranceEvidenceReceived', but DOC-007 schematizes NO interface for either — §31 (L1783-1785) states they are 'ratified names here but schematized nowhere ... a schema-and-wiring task, NOT a ratification decision'. These fields are therefore AUTHORED, not derived; do NOT treat this sourceSection as proof the shape is ratified. Cited for the NAME only: DOC-004 §32 (command), §31 (event).",
 			"payloadFields": [
 				{
 					"field": "evidenceId",
@@ -3300,7 +3300,7 @@
 		{
 			"eventType": "AssuranceEvidenceReceived",
 			"aggregateType": "AssuranceAssessment",
-			"sourceSection": "UNRATIFIED-AUTHORED (2026-07-18, sponsor grant): DOC-004 §31 ratifies this event NAME; DOC-007 schematizes no interface for it (§31 L1770 'ratified names here but schematized nowhere'). Fields AUTHORED to source the §38 'missing evidence' satisfaction side (missing = AssuranceAssessmentStarted.requiredEvidenceIds minus the received requirement ids). Cited for the NAME only: DOC-004 §31.",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-07-18, sponsor grant): DOC-004 §31 ratifies this event NAME; DOC-007 schematizes no interface for it (§31 L1783-1785 'ratified names here but schematized nowhere'). Fields AUTHORED to source the §38 'missing evidence' satisfaction side (missing = AssuranceAssessmentStarted.requiredEvidenceIds minus the received requirement ids). Cited for the NAME only: DOC-004 §31.",
 			"payloadFields": [
 				{
 					"field": "assessmentId",
@@ -3371,7 +3371,7 @@
 					"field": "requiredEvidenceIds",
 					"required": false,
 					"type": "string[]",
-					"note": "The evidence-requirement ids (EvidenceRequirement.id, DOC-004 §6.1) the assessment's policy declares as required, RESOLVED from the policy's requiredEvidence at request time and recorded here so the §38 Assurance View can source 'missing evidence' (§38) as the required set. Not on the RequestAssuranceAssessment command (the operator does not choose it — the policy does); requestAssuranceAssessment reads policy.requiredEvidence and constructs this. Empty when the policy requires no evidence (a real sourced 'none', not 'unknown'). NOTE: the per-requirement SATISFACTION side (§32 submitEvidenceForAssessment -> AssuranceEvidenceReceived) is not built, so 'missing' currently equals 'required'; once a policy declares requiredEvidence, all of it reads missing until that sub-lifecycle lands (DOC-004 §31 L1770)."
+					"note": "The evidence-requirement ids (EvidenceRequirement.id, DOC-004 §6.1) the assessment's policy declares as required, RESOLVED from the policy's requiredEvidence at request time and recorded here so the §38 Assurance View can source 'missing evidence' (§38) as the required set. Not on the RequestAssuranceAssessment command (the operator does not choose it — the policy does); requestAssuranceAssessment reads policy.requiredEvidence and constructs this. Empty when the policy requires no evidence (a real sourced 'none', not 'unknown'). NOTE (corrected 2026-08-04): the per-requirement SATISFACTION side (§32 submitEvidenceForAssessment -> AssuranceEvidenceReceived) IS built and registered, and the §38 view folds a real required-minus-received. The previous note said 'is not built' — stale in the safe direction. What is empty is the INPUT: no production path declares requiredEvidence on any policy, so this resolves to [] for every assessment the product can create (REG-F-022, pinned by verif/policy-evidence-requirement-census.test.ts). Ruling cited: DOC-004 §31 L1783-1785."
 				}
 			]
 		},

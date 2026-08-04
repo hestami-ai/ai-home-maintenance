@@ -721,9 +721,17 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// evidence-requirement ids; resolved from the (now loaded) policy and carried on the Started EVENT so the read
 	// model can report what this assessment requires — NOT on the command payload (the operator does not choose it,
 	// the policy does), and NOT on the object state (the ASSURANCE_ASSESSMENT schema does not carry it; the event is
-	// the fold's source). Empty when the policy requires no evidence = a real sourced "none", not "unknown". The
-	// per-requirement SATISFACTION side (§32 submitEvidenceForAssessment -> AssuranceEvidenceReceived) is a separate
-	// increment; until it lands, the read model reports the full required set as missing (DOC-004 §31 L1770).
+	// the fold's source). Empty when the policy requires no evidence = a real sourced "none", not "unknown".
+	//
+	// The per-requirement SATISFACTION side (§32 submitEvidenceForAssessment -> AssuranceEvidenceReceived) HAS SINCE
+	// BEEN BUILT — it is ~60 lines below in this file, registered, and the §38 view folds a real
+	// required-minus-received (assurance-view.ts). This note used to say it was "a separate increment; until it
+	// lands, the read model reports the full required set as missing", which was stale in the safe direction: it
+	// understated the engine while the capability sat in the same file. Corrected 2026-08-04.
+	//
+	// WHAT IS ACTUALLY EMPTY, AND IT IS NOT THIS CODE: no production path declares requiredEvidence on any policy,
+	// so this resolves to [] for every assessment the product can create — REG-F-022, pinned by
+	// verif/policy-evidence-requirement-census.test.ts. The resolution below is correct; its INPUT is empty.
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');
@@ -782,10 +790,13 @@ const evidenceNotAlreadyReceived = predicate(
  *  Evidence object satisfying one of the assessment's declared EvidenceRequirements (§6.1) was received, emitting
  *  AssuranceEvidenceReceived (§31). The §38 view folds `missingEvidence = requiredEvidenceIds` (from the Started
  *  event, Increment K) MINUS the requirement ids received here — so it flips from "the whole required set" to a
- *  faithful required-minus-received. Ratified NAMES, AUTHORED schema (§31 L1770: "ratified names here but
+ *  faithful required-minus-received. Ratified NAMES, AUTHORED schema (§31 L1783-1785: "ratified names here but
  *  schematized nowhere ... a schema-and-wiring task, NOT a ratification decision"). The received fact lives on the
  *  EVENT, not the assessment snapshot — symmetric with requiredEvidenceIds living on AssuranceAssessmentStarted,
  *  and the read model is the fold's consumer. */
+// CITATION CORRECTED 2026-08-04: this ruling was cited as "§31 L1783-1785" here and in five other artifacts. The
+// quoted sentence is at L1783-1785; L1783-1785 is a different line ("steps that drive the §30 state machine"). Checked
+// against the commit that introduced the ruling — the doc never moved, so the pointer was wrong from the start.
 export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as SubmitEvidenceForAssessmentPayload;
 	const id = command.targetAggregateId; // the assessment aggregate

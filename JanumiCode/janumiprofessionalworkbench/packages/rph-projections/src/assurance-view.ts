@@ -45,7 +45,7 @@
 //                                       submitted evidence (AssuranceEvidenceReceived.satisfiesRequirementId — the
 //                                       §32 submitEvidenceForAssessment sub-lifecycle, Increment Q). Empty = the
 //                                       policy requires no evidence OR every requirement has been satisfied. FAITHFUL
-//                                       now, not partial: it is a real difference-fold (DOC-004 §31 L1770 — the
+//                                       now, not partial: it is a real difference-fold (DOC-004 §31 L1783-1785 — the
 //                                       schema-and-wiring task, done). The one honest limit is the namespace: the
 //                                       satisfied set is keyed by EvidenceRequirement id (which the submit command
 //                                       binds explicitly), never inferred from an Evidence object's proximity.

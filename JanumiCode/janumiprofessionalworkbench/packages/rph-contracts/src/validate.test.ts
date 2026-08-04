@@ -61,7 +61,7 @@ describe('validate', () => {
 		// (CompleteAssuranceAssessment gained a `producer` FIELD, not a new command, so no command was added).
 		// then +1 SubmitEvidenceForAssessment command +1 AssuranceEvidenceReceived event (Increment Q) — the §32
 		// evidence sub-lifecycle that makes §38 "missing evidence" a real required−received fold. Ratified NAMES
-		// (DOC-004 §32/§31); schemas authored under §0.3 (§31 L1770: "ratified names ... schematized nowhere").
+		// (DOC-004 §32/§31); schemas authored under §0.3 (§31 L1783-1785: "ratified names ... schematized nowhere").
 		// then +2 AssertObligation/AssertConstraint commands +2 ObligationAsserted/ConstraintAsserted events —
 		// the first-class Obligation/Constraint object plane (JAN-ROADMAP-001 W1 gate G1 condition C1: WP-1-005's
 		// "material obligations SHALL become first-class traceable objects"); then +1 ProposeRecomposition command

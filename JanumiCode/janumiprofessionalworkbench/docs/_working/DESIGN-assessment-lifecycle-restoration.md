@@ -79,6 +79,13 @@ POLICIES WITH NON-EMPTY requiredEvidence ON THE OBJECT:  0 of 15
 ONTOLOGY seedPolicies DECLARING requiredEvidenceTypes:  12 of 12
 ```
 
+> **The first version of this measurement was blind, and the number survived by luck.** The probe read
+> `getObject(engine, id)?.state`; `getObject` returns the state itself, so it read `state.state` → `undefined` →
+> `[]` for every policy. Promoting it to `verif/policy-evidence-requirement-census.test.ts` with a **control** —
+> a policy created through the real command path carrying an `EvidenceRequirement` — reddened the control at once
+> while the finding's own assertion stayed green, because a blind reader and a real gap look identical. Both
+> counts are now derived by a reader proven able to see a non-empty value, and mutation-checked.
+
 **Every policy this product can produce has `requiredEvidence: []`** — the 3 floor policies, all 12 ratified
 catalog policies, and any policy authored through the UI (`createPolicy` in the demo's PWA route does not send
 the field). So *"all required evidence present"* is **vacuously true everywhere**, not just on the floor path.
