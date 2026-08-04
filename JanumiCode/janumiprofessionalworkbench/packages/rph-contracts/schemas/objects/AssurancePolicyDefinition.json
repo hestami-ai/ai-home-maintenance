@@ -38,7 +38,9 @@
       "maximum": 9007199254740991
     },
     "semanticVersion": {
-      "type": "number"
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
     },
     "revision": {
       "type": "integer",

@@ -163,12 +163,18 @@ function zodExpr(type: string | undefined, enumRef?: string): string {
 // Map a non-array, non-enumRef, non-literal-union scalar type string -> a Zod expression, performing the same
 // enum/external usage side effects (usedEnums.add / usedExternal.add) in the same order as the inline ladder it
 // replaces. Extracted from zodExpr to reduce cognitive complexity; behavior and emitted strings are identical.
+// REG-F-018 — integer-constrained, for the reason spelled out in `gen-messages.ts`: `contentHash` hashes every
+// persisted object state and admits only finite integers, so a bare `z.number()` here is a contract promising to
+// accept a value the store cannot write. This file is the OBJECT side, which is where that bites hardest —
+// `ArtifactSchema.byteSize` is the field that actually crashed `dispatch`.
+const INT = 'z.number().int()';
+
 function scalarZodExpr(t: string): string {
 	if (t === 'string') return 'z.string()';
-	if (t === 'number') return 'z.number()';
+	if (t === 'number') return INT;
 	if (t === 'boolean') return 'z.boolean()';
-	if (t === '(string | number)') return 'z.union([z.string(), z.number()])';
-	if (t === 'Record<string, number>') return 'z.record(z.string(), z.number())';
+	if (t === '(string | number)') return `z.union([z.string(), ${INT}])`;
+	if (t === 'Record<string, number>') return `z.record(z.string(), ${INT})`;
 	if (ENUM_NAMES.has(t)) {
 		usedEnums.add(t);
 		return `${t}Schema`;

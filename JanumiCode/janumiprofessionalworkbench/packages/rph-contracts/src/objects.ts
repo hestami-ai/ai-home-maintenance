@@ -138,7 +138,7 @@ export const AuthorityReferenceSchema = z.strictObject({
 export type AuthorityReference = z.infer<typeof AuthorityReferenceSchema>;
 export const BaselineItemVersionSchema = z.strictObject({
 	objectId: z.string(),
-	semanticVersion: z.number(),
+	semanticVersion: z.number().int(),
 	contentHash: z.string().optional()
 });
 export type BaselineItemVersion = z.infer<typeof BaselineItemVersionSchema>;
@@ -316,9 +316,9 @@ export type RemediationRule = z.infer<typeof RemediationRuleSchema>;
 export const TraceLinkSchema = z.strictObject({
 	id: z.string(),
 	sourceObjectId: z.string(),
-	sourceSemanticVersion: z.number().optional(),
+	sourceSemanticVersion: z.number().int().optional(),
 	targetObjectId: z.string(),
-	targetSemanticVersion: z.number().optional(),
+	targetSemanticVersion: z.number().int().optional(),
 	relation: TraceRelationSchema,
 	rationale: z.string().optional(),
 	createdAt: z.string(),
@@ -332,7 +332,7 @@ export const ValidatorResultSchema = z.strictObject({
 	policyVersion: z.string(),
 	assessmentId: z.string(),
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	claimResults: z.array(ClaimAssessmentResultSchema),
 	evidenceConsideredIds: z.array(z.string()),
 	evidenceRejected: z.array(RejectedEvidenceReferenceSchema),
@@ -505,7 +505,7 @@ export const AssurancePolicyDefinitionSchema = z.strictObject({
 	...objectEnvelopeShape,
 	id: z.string(),
 	version: z.string(),
-	semanticVersion: z.number(),
+	semanticVersion: z.number().int(),
 	name: z.string(),
 	purpose: z.string(),
 	rationale: z.string(),
@@ -533,9 +533,9 @@ export const AssuranceAssessmentSchema = z.strictObject({
 	...objectEnvelopeShape,
 	assurancePolicyId: z.string(),
 	policyVersion: z.string(),
-	policySemanticVersion: z.number(),
+	policySemanticVersion: z.number().int(),
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	claimIds: z.array(z.string()),
 	evaluator: ActorReferenceSchema.optional(),
 	producer: ActorReferenceSchema.optional(),
@@ -573,7 +573,7 @@ export const DecisionObjectSchema = z.strictObject({
 	...objectEnvelopeShape,
 	decisionType: DecisionTypeSchema,
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	selectedOption: z.string(),
 	rationale: z.string(),
 	authority: ActorReferenceSchema,
@@ -594,7 +594,7 @@ export const ArtifactObjectSchema = z.strictObject({
 	storageProvider: z.string(),
 	storageKey: z.string(),
 	contentHash: z.string(),
-	byteSize: z.number().optional(),
+	byteSize: z.number().int().optional(),
 	producingPwuId: z.string().optional(),
 	producingExecutionAttemptId: z.string().optional(),
 	securityClassification: z.string(),
@@ -637,7 +637,7 @@ export type RecompositionContract = z.infer<typeof RecompositionContractSchema>;
 export const ExecutionPlanSchema = z.strictObject({
 	...objectEnvelopeShape,
 	workUnitId: z.string(),
-	planVersion: z.number(),
+	planVersion: z.number().int(),
 	steps: z.array(ExecutionStepSchema),
 	transitions: z.array(ExecutionTransitionSchema),
 	retryPolicy: RetryPolicySchema,

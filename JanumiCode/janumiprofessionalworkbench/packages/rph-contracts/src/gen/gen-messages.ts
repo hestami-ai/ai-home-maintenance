@@ -76,21 +76,40 @@ function zodLiteralExpr(t: string): string | undefined {
 	return undefined;
 }
 
+// REG-F-018 — every emitted number is INTEGER-CONSTRAINED, and the constraint belongs HERE rather than on the
+// twenty-four vocab fields that would otherwise each have to remember it.
+//
+// `contentHash` canonicalizes every persisted object state and admits only FINITE INTEGERS: "the domain models
+// quantities as integers or strings; a float in hashed content is a modeling smell and is rejected loudly". The
+// generator emitted bare `z.number()`, so the contracts promised to accept values the engine cannot store —
+// `RecordArtifact` with `byteSize: 1.5` passed validation, reached `contentHash(nextState)` in `kit.ts`, and threw
+// a `CanonicalJsonError` OUT of `Engine.dispatch`.
+//
+// AND THE CONSTRAINED SCHEMA ALREADY EXISTED, UNUSED: `common.ts` defines `NonNegativeIntSchema` and re-exports it
+// as `SemanticVersionSchema` / `RevisionSchema` / `SchemaVersionSchema`, which `envelopes.ts` uses and the
+// generated surface did not.
+//
+// EVERY number-typed vocab field is a version, revision, schema version, count, attempt number or byte size — all
+// integers by nature. The two generic slots (`ApplicabilityExpression.value` / `.values`) are constrained too, and
+// that is not a capability being removed: a fractional threshold there could never be PERSISTED, only crashed on.
+// If the domain ever needs one, the contract's own sentence says how — a string, or a scaled integer.
+const INT = 'z.number().int()';
+
 function zodBaseExpr(t: string): string {
 	if (t === 'string') return 'z.string()';
-	if (t === 'number') return 'z.number()';
+	if (t === 'number') return INT;
 	if (t === 'boolean') return 'z.boolean()';
 	if (t === 'true') return 'z.literal(true)';
 	if (t === 'false') return 'z.literal(false)';
 	if (t === 'unknown') return 'z.unknown()';
 	if (t === 'enum') return 'z.string()';
-	if (t === '(string | number)') return 'z.union([z.string(), z.number()])';
+	if (t === '(string | number)') return `z.union([z.string(), ${INT}])`;
 	if (t.startsWith('Record<string'))
 		return t.includes('number')
-			? 'z.record(z.string(), z.number())'
+			? `z.record(z.string(), ${INT})`
 			: 'z.record(z.string(), z.unknown())';
 	if (t.startsWith('Array<{'))
-		return 'z.array(z.strictObject({ objectId: z.string(), semanticVersion: z.number(), contentHash: z.string().optional() }))';
+		return `z.array(z.strictObject({ objectId: z.string(), semanticVersion: ${INT}, contentHash: z.string().optional() }))`;
 	if (ENUM.has(t)) {
 		used.enums.add(t);
 		return `${t}Schema`;

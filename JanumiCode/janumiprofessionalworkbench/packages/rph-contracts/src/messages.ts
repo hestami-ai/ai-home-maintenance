@@ -104,7 +104,7 @@ export const FormalizeIntentPayloadSchema = z.strictObject({
 export type FormalizeIntentPayload = z.infer<typeof FormalizeIntentPayloadSchema>;
 export const ApproveIntentPayloadSchema = z.strictObject({
 	decisionId: z.string(),
-	approvedSemanticVersion: z.number(),
+	approvedSemanticVersion: z.number().int(),
 	approvalScope: z.string()
 });
 export type ApproveIntentPayload = z.infer<typeof ApproveIntentPayloadSchema>;
@@ -129,7 +129,7 @@ export const ProposePwuPayloadSchema = z.strictObject({
 export type ProposePwuPayload = z.infer<typeof ProposePwuPayloadSchema>;
 export const MarkPwuReadyPayloadSchema = z.strictObject({
 	shapeReadinessAssessmentId: z.string(),
-	expectedSemanticVersion: z.number()
+	expectedSemanticVersion: z.number().int()
 });
 export type MarkPwuReadyPayload = z.infer<typeof MarkPwuReadyPayloadSchema>;
 export const ProposeExecutionPlanPayloadSchema = z.strictObject({
@@ -155,7 +155,7 @@ export const RecordArtifactPayloadSchema = z.strictObject({
 	storageProvider: z.string(),
 	storageKey: z.string(),
 	contentHash: z.string(),
-	byteSize: z.number().optional(),
+	byteSize: z.number().int().optional(),
 	producingPwuId: z.string().optional(),
 	producingExecutionAttemptId: z.string().optional(),
 	securityClassification: z.string(),
@@ -198,7 +198,7 @@ export const RequestAssuranceAssessmentPayloadSchema = z.strictObject({
 	assurancePolicyId: z.string(),
 	policyVersion: z.string(),
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	claimIds: z.array(z.string())
 });
 export type RequestAssuranceAssessmentPayload = z.infer<
@@ -224,7 +224,7 @@ export const ApproveDecisionPayloadSchema = z.strictObject({
 	rationale: z.string(),
 	consideredEvidenceIds: z.array(z.string()),
 	consideredObservationIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number())
+	subjectSemanticVersions: z.record(z.string(), z.number().int())
 });
 export type ApproveDecisionPayload = z.infer<typeof ApproveDecisionPayloadSchema>;
 export const PromoteBaselinePayloadSchema = z.strictObject({
@@ -232,7 +232,7 @@ export const PromoteBaselinePayloadSchema = z.strictObject({
 	expectedItemObjectVersions: z.array(
 		z.strictObject({
 			objectId: z.string(),
-			semanticVersion: z.number(),
+			semanticVersion: z.number().int(),
 			contentHash: z.string().optional()
 		})
 	),
@@ -729,7 +729,7 @@ export const AssuranceAssessmentCompletedPayloadSchema = z.strictObject({
 	assurancePolicyId: z.string(),
 	policyVersion: z.string(),
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	disposition: z.string(),
 	evidenceConsideredIds: z.array(z.string()),
 	observationIds: z.array(z.string()),
@@ -774,7 +774,7 @@ export type AssuranceAssessmentRejectedPayload = z.infer<
 >;
 export const AssuranceAssessmentRequestedPayloadSchema = z.strictObject({
 	assurancePolicyId: z.string(),
-	policySemanticVersion: z.number(),
+	policySemanticVersion: z.number().int(),
 	subjectObjectIds: z.array(z.string()),
 	claimIds: z.array(z.string()),
 	evaluator: ActorReferenceSchema,
@@ -806,7 +806,7 @@ export const AssuranceAssessmentStartedPayloadSchema = z.strictObject({
 	assurancePolicyId: z.string(),
 	policyVersion: z.string(),
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	claimIds: z.array(z.string()),
 	requiredEvidenceIds: z.array(z.string()).optional()
 });
@@ -847,7 +847,7 @@ export const BaselinePromotedPayloadSchema = z.strictObject({
 	itemObjectVersions: z.array(
 		z.strictObject({
 			objectId: z.string(),
-			semanticVersion: z.number(),
+			semanticVersion: z.number().int(),
 			contentHash: z.string().optional()
 		})
 	),
@@ -968,7 +968,7 @@ export const DecisionEffectivePayloadSchema = z.strictObject({
 	decisionId: z.string(),
 	decisionType: DecisionTypeSchema,
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	selectedOption: z.string(),
 	rationale: z.string(),
 	effectiveAt: z.string()
@@ -1020,7 +1020,7 @@ export type DecompositionRejectedPayload = z.infer<typeof DecompositionRejectedP
 export const DecompositionRevisedPayloadSchema = z.strictObject({
 	supersedesDecompositionContractId: z.string(),
 	rationale: z.string(),
-	semanticVersion: z.number(),
+	semanticVersion: z.number().int(),
 	status: DecompositionContractStatusSchema
 });
 export type DecompositionRevisedPayload = z.infer<typeof DecompositionRevisedPayloadSchema>;
@@ -1077,7 +1077,7 @@ export type ExecutionEscalatedPayload = z.infer<typeof ExecutionEscalatedPayload
 export const ExecutionPlanActivatedPayloadSchema = z.strictObject({
 	executionPlanId: z.string(),
 	workUnitId: z.string(),
-	planVersion: z.number(),
+	planVersion: z.number().int(),
 	status: ExecutionPlanStatusSchema,
 	authorizedRuntimeBindingIds: z.array(z.string()),
 	approvalDecisionId: z.string().optional()
@@ -1090,7 +1090,7 @@ export const ExecutionPlanApprovedPayloadSchema = z.strictObject({
 export type ExecutionPlanApprovedPayload = z.infer<typeof ExecutionPlanApprovedPayloadSchema>;
 export const ExecutionPlanProposedPayloadSchema = z.strictObject({
 	workUnitId: z.string(),
-	planVersion: z.number(),
+	planVersion: z.number().int(),
 	stepIds: z.array(z.string()).optional(),
 	transitionIds: z.array(z.string()).optional(),
 	retryPolicy: RetryPolicySchema.optional(),
@@ -1102,7 +1102,7 @@ export const ExecutionPlanProposedPayloadSchema = z.strictObject({
 export type ExecutionPlanProposedPayload = z.infer<typeof ExecutionPlanProposedPayloadSchema>;
 export const ExecutionPlanRevisedPayloadSchema = z.strictObject({
 	executionPlanId: z.string(),
-	planVersion: z.number(),
+	planVersion: z.number().int(),
 	reason: z.string()
 });
 export type ExecutionPlanRevisedPayload = z.infer<typeof ExecutionPlanRevisedPayloadSchema>;
@@ -1152,7 +1152,7 @@ export const ExecutionStepReadyPayloadSchema = z.strictObject({
 export type ExecutionStepReadyPayload = z.infer<typeof ExecutionStepReadyPayloadSchema>;
 export const ExecutionStepRetriedPayloadSchema = z.strictObject({
 	stepId: z.string(),
-	attemptNumber: z.number().optional(),
+	attemptNumber: z.number().int().optional(),
 	stepState: StepStateSchema,
 	retryReason: z.string().optional()
 });
@@ -1176,7 +1176,7 @@ export const ArtifactRecordedPayloadSchema = z.strictObject({
 	storageProvider: z.string(),
 	storageKey: z.string(),
 	contentHash: z.string(),
-	byteSize: z.number().optional(),
+	byteSize: z.number().int().optional(),
 	producingPwuId: z.string().optional(),
 	producingExecutionAttemptId: z.string().optional(),
 	securityClassification: z.string(),
@@ -1219,7 +1219,7 @@ export const ExecutionTerminatedPayloadSchema = z.strictObject({
 export type ExecutionTerminatedPayload = z.infer<typeof ExecutionTerminatedPayloadSchema>;
 export const IntentApprovedPayloadSchema = z.strictObject({
 	decisionId: z.string(),
-	approvedSemanticVersion: z.number(),
+	approvedSemanticVersion: z.number().int(),
 	intentStatus: IntentStatusSchema,
 	approvalScope: z.string().optional()
 });
@@ -1244,8 +1244,8 @@ export const IntentDiscoveryStartedPayloadSchema = z.strictObject({
 });
 export type IntentDiscoveryStartedPayload = z.infer<typeof IntentDiscoveryStartedPayloadSchema>;
 export const IntentFormalizedPayloadSchema = z.strictObject({
-	priorSemanticVersion: z.number(),
-	newSemanticVersion: z.number(),
+	priorSemanticVersion: z.number().int(),
+	newSemanticVersion: z.number().int(),
 	formalizedObjective: z.string(),
 	desiredOutcomes: z.array(DesiredOutcomeSchema),
 	successConditions: z.array(SuccessConditionSchema),
@@ -1256,7 +1256,7 @@ export type IntentFormalizedPayload = z.infer<typeof IntentFormalizedPayloadSche
 export const IntentRevisedPayloadSchema = z.strictObject({
 	changeRationale: z.string(),
 	impactAnalysisId: z.string().optional(),
-	semanticVersion: z.number(),
+	semanticVersion: z.number().int(),
 	intentStatus: IntentStatusSchema
 });
 export type IntentRevisedPayload = z.infer<typeof IntentRevisedPayloadSchema>;
@@ -1615,7 +1615,7 @@ export const AssuranceIndependenceViolatedPayloadSchema = z.strictObject({
 	assurancePolicyId: z.string(),
 	policyVersion: z.string(),
 	subjectObjectIds: z.array(z.string()),
-	subjectSemanticVersions: z.record(z.string(), z.number()),
+	subjectSemanticVersions: z.record(z.string(), z.number().int()),
 	independenceRequirement: IndependenceRequirementSchema,
 	reason: z.string()
 });
