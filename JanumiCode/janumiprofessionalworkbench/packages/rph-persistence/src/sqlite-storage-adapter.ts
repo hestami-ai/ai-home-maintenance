@@ -7,7 +7,7 @@ import type {
 	StorageAdapter,
 	StoredObject
 } from '@janumipwb/rph-ports';
-import { SCHEMA_SQL, SCHEMA_VERSION } from './schema.js';
+import { planMigration, SCHEMA_SQL, SCHEMA_VERSION } from './schema.js';
 import { createSqliteDriver, type SqlDriver } from './sql-driver.js';
 
 interface ReceiptRow {
@@ -18,6 +18,8 @@ interface ReceiptRow {
 	status: string;
 	produced_event_ids: string;
 	result_hash: string | null;
+	/** v2. NULL on rows written before the migration — "not recorded", never "different" (REG-F-012). */
+	payload_hash: string | null;
 }
 interface ObjectRow {
 	object_type: string;
@@ -46,33 +48,60 @@ export class SqliteStorageAdapter implements StorageAdapter {
 	constructor(opts: { driver?: SqlDriver; filename?: string; now?: () => string } = {}) {
 		this.db = opts.driver ?? createSqliteDriver(opts.filename);
 		this.now = opts.now ?? (() => new Date().toISOString());
+		// ORDER MATTERS, and it is the one thing a migration ladder can get subtly wrong. `SCHEMA_SQL` is all
+		// `CREATE … IF NOT EXISTS`, so running it ERASES the difference between a brand-new file and a store that
+		// predates versioning — both then have every table, and both report `user_version = 0`. The distinction is
+		// captured HERE, before that happens, and it decides whether the ladder runs at all.
+		const preExisting = this.hasExistingSchema();
 		this.db.exec(SCHEMA_SQL);
-		this.enforceSchemaVersion();
+		this.enforceSchemaVersion(preExisting);
+	}
+
+	/** Did this database already carry the RPH schema before `SCHEMA_SQL` ran? (See the constructor.) */
+	private hasExistingSchema(): boolean {
+		const row = this.db
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='command_receipts'")
+			.get() as { name?: string } | undefined;
+		return row?.name === 'command_receipts';
 	}
 
 	/**
-	 * W2-INC-1 (WP-2-001) migration baseline. Read the DB's `PRAGMA user_version`:
-	 *   - 0 (fresh, or a store that predates versioning) → stamp it at `SCHEMA_VERSION`;
+	 * W2-INC-1 (WP-2-001) migration baseline, given the forward ladder in `schema.ts` (REG-F-012, v2). Read the
+	 * DB's `PRAGMA user_version`:
 	 *   - equal to `SCHEMA_VERSION` → open normally;
 	 *   - GREATER than `SCHEMA_VERSION` → fail closed: an older engine SHALL NOT read/write a store written by a
 	 *     newer one (silent misread of an unknown schema is exactly what the version guard exists to prevent);
-	 *   - between 0 and `SCHEMA_VERSION` → fail closed: a forward migration is required and none is registered yet.
-	 * Stamping is idempotent, so reopening a durable store round-trips cleanly.
+	 *   - 0 with NO pre-existing schema → a fresh store that `SCHEMA_SQL` just created at the current shape:
+	 *     nothing to migrate, stamp it;
+	 *   - 0 WITH a pre-existing schema → a store that predates versioning, and therefore has the v1 shape:
+	 *     migrate it from 1 like any other old store. Stamping it without migrating — which is what the
+	 *     pre-ladder code did, correctly, while `SCHEMA_VERSION` was 1 — would now mark a v1 store as v2 and
+	 *     leave the engine reading a column that is not there;
+	 *   - otherwise below `SCHEMA_VERSION` → run the registered forward migrations, then stamp. A GAP in the
+	 *     ladder throws (see `planMigration`) rather than skipping a step.
+	 *
+	 * The whole ladder + stamp runs in ONE transaction, so a store is never left half-migrated: either it comes
+	 * up at `SCHEMA_VERSION` with every column, or it is untouched and the next open retries.
 	 */
-	private enforceSchemaVersion(): void {
+	private enforceSchemaVersion(preExisting: boolean): void {
 		const row = this.db.prepare('PRAGMA user_version').get() as { user_version?: number } | undefined;
 		const current = row?.user_version ?? 0;
 		if (current === SCHEMA_VERSION) return;
-		if (current === 0) {
-			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-			return;
+		if (current > SCHEMA_VERSION) {
+			throw new Error(
+				`RPH persistence: database schema version ${current} is newer than this build's ${SCHEMA_VERSION}. ` +
+					'Refusing to open — an engine must not read a store written by a newer schema. Align the engine ' +
+					'build with the store.'
+			);
 		}
-		const direction = current > SCHEMA_VERSION ? 'newer than' : 'older than';
-		throw new Error(
-			`RPH persistence: database schema version ${current} is ${direction} this build's ${SCHEMA_VERSION}. ` +
-				'Refusing to open — an engine must not read a store written by a newer schema, and no forward ' +
-				'migration is registered for an older one. Align the engine build with the store.'
-		);
+		// A pre-versioning store (user_version 0 with tables already present) IS a v1 store; a genuinely fresh one
+		// was just created at the current shape and needs no step.
+		const from = current === 0 ? (preExisting ? 1 : SCHEMA_VERSION) : current;
+		const steps = planMigration(from, SCHEMA_VERSION);
+		this.db.transaction(() => {
+			for (const step of steps) this.db.exec(step);
+			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+		});
 	}
 
 	/** Run `fn` in one transaction (nestable via savepoints), so a batch of commits is all-or-nothing. */
@@ -92,7 +121,8 @@ export class SqliteStorageAdapter implements StorageAdapter {
 			targetAggregateId: row.target_aggregate_id,
 			status: row.status,
 			producedEventIds: JSON.parse(row.produced_event_ids) as string[],
-			...(row.result_hash ? { resultHash: row.result_hash } : {})
+			...(row.result_hash ? { resultHash: row.result_hash } : {}),
+			...(row.payload_hash ? { payloadHash: row.payload_hash } : {})
 		};
 	}
 
@@ -198,7 +228,7 @@ export class SqliteStorageAdapter implements StorageAdapter {
 
 			this.db
 				.prepare(
-					'INSERT INTO command_receipts(idempotency_key,command_id,command_type,target_aggregate_id,status,produced_event_ids,result_hash,created_at) VALUES(?,?,?,?,?,?,?,?)'
+					'INSERT INTO command_receipts(idempotency_key,command_id,command_type,target_aggregate_id,status,produced_event_ids,result_hash,created_at,payload_hash) VALUES(?,?,?,?,?,?,?,?,?)'
 				)
 				.run(
 					input.receipt.idempotencyKey,
@@ -208,7 +238,8 @@ export class SqliteStorageAdapter implements StorageAdapter {
 					input.receipt.status,
 					JSON.stringify(input.receipt.producedEventIds),
 					input.receipt.resultHash ?? null,
-					now
+					now,
+					input.receipt.payloadHash ?? null
 				);
 
 			return { ok: true };

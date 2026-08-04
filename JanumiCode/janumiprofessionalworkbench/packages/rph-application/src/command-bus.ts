@@ -172,6 +172,44 @@ export class Engine {
 			return { ...base, status: 'VALIDATION_FAILED', error: envelope.error };
 		}
 
+		// 0c. Hash the payload, so step 1 can bind the key to it (REG-F-012 clause 3, 2026-08-04).
+		//
+		// WHY IT CAN FAIL AND MUST NOT THROW. `contentHash` canonicalizes, and canonical JSON admits only FINITE
+		// INTEGER numbers — "a float in hashed content is a modeling smell and is rejected loudly". Twenty-two
+		// command payload fields are `z.number()` with no `.int()`, so a caller CAN send `1.5` past Zod. Hashing it
+		// unguarded here would put a `CanonicalJsonError` on the throw path out of `dispatch` — precisely the crash
+		// class REG-F-011's first half closed, reopened by the fix for a different finding.
+		//
+		// SO IT REFUSES INSTEAD, and this is a real (if narrow) tightening rather than pure plumbing: such a payload
+		// is one the engine could never have receipted, and for handlers that carry the field into state it ALREADY
+		// crashed a few frames later at `contentHash(nextState)`. This converts that into a classified refusal.
+		// `RPH_VALIDATION_SCHEMA_FAILED` is the ratified §25.1 code — "structural validation of the payload failed",
+		// which does not say SCHEMA validation — the same reading `kit.ts` already relies on for event payloads.
+		//
+		// MEASURED FIRST: 0 of 16,612 dispatches across the suite fail to canonicalize, so this refuses nothing the
+		// engine accepts today.
+		//
+		// AND IT KEEPS `payload_hash` HONEST. If an unhashable payload were instead receipted with a NULL hash, NULL
+		// would mean two different things — "written before v2" and "we gave up" — and the second is a bypass: claim
+		// a key with a float, and every later reuse of that key skips the payload comparison. One marker, one
+		// meaning.
+		let payloadHash: string;
+		try {
+			payloadHash = contentHash(command.payload);
+		} catch (e) {
+			return {
+				...base,
+				status: 'VALIDATION_FAILED',
+				error: makeRphError('RPH_VALIDATION_SCHEMA_FAILED', {
+					message:
+						`Command payload cannot be canonicalized, so it cannot be bound to its idempotency key: ` +
+						`${e instanceof Error ? e.message : String(e)}`,
+					correlationId,
+					targetObjectIds: [command.targetAggregateId]
+				})
+			};
+		}
+
 		// 1. Idempotency: a replay of the same idempotencyKey returns the prior result, no new event.
 		const prior = this.store.getReceipt(command.idempotencyKey);
 		// REG-F-012 (2026-08-04). This used to return DUPLICATE on the mere EXISTENCE of a receipt, comparing
@@ -183,25 +221,36 @@ export class Engine {
 		// `command_type` and `target_aggregate_id`, `getReceipt` reads them, `CommandReceiptRecord` carries them.
 		// This is those two comparisons. Canon PER-5 — "reuse of a key with a different payload fails".
 		//
-		// THE THIRD DIMENSION IS NOT CLOSED AND IS NOT SKIPPED SILENTLY: same command, same target, DIFFERENT
-		// PAYLOAD still replays. The receipt's `resultHash` is `contentHash(nextState)` — a hash of the RESULTING
-		// OBJECT, not of the payload — so comparing payloads needs a stored payload hash (a persistence schema
-		// change), and deriving it from `resultHash` would mean executing the command first, which is what
-		// idempotency exists to avoid.
+		// THE THIRD DIMENSION IS NOW CLOSED TOO (2026-08-04) by `command_receipts.payload_hash` — schema v2, with
+		// the first forward migration this engine has ever run. `resultHash` could never decide it: it is
+		// `contentHash(nextState)`, the RESULTING OBJECT, and having that means having executed the command, which
+		// is what idempotency exists to avoid.
+		//
+		// AN ABSENT `payloadHash` IS SKIPPED, NOT FAILED. Receipts written before v2 carry NULL, and reading that
+		// as "the payload differed" would turn every legitimate replay in an upgraded durable store into a refusal.
+		// Absence of evidence is not evidence of difference — a mistake this register has recorded more than once,
+		// so the guard is written to make it obvious rather than to be terse.
 		//
 		// THE CODE IS A RATIFIED ONE CARRYING A LABEL (the WP-11 discipline). `RPH_IDEMPOTENCY_CONFLICT` would be
 		// the natural code and is NOT among the ratified fifteen — minting one is a sponsor act.
 		// `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which REG-F-010 records as correctly
 		// carrying no error at all. So the label travels in the message where a reader and a future code can both
 		// find it.
-		if (
-			prior &&
-			(prior.commandType !== command.commandType ||
-				prior.targetAggregateId !== command.targetAggregateId)
-		) {
+		const reused = prior
+			? [
+					prior.commandType !== command.commandType ? 'command type' : undefined,
+					prior.targetAggregateId !== command.targetAggregateId ? 'target aggregate' : undefined,
+					// `undefined` is the SKIP, not a mismatch — see above.
+					prior.payloadHash !== undefined && prior.payloadHash !== payloadHash
+						? 'payload'
+						: undefined
+				].filter((d): d is string => d !== undefined)
+			: [];
+		if (prior && reused.length > 0) {
 			this.logger.info('command.idempotency_key_reused', {
 				correlationId,
-				idempotencyKey: command.idempotencyKey
+				idempotencyKey: command.idempotencyKey,
+				differing: reused.join(', ')
 			});
 			return {
 				...base,
@@ -210,9 +259,9 @@ export class Engine {
 					message:
 						`IDEMPOTENCY_KEY_REUSED: key '${command.idempotencyKey}' was claimed by ` +
 						`${prior.commandType} on ${prior.targetAggregateId}, and this is ` +
-						`${command.commandType} on ${String(command.targetAggregateId)}. A key identifies ONE ` +
-						`command; returning the prior result here would report success for work that never ` +
-						`happened (DOC-003 PER-5).`,
+						`${command.commandType} on ${String(command.targetAggregateId)} — differing by ` +
+						`${reused.join(', ')}. A key identifies ONE command; returning the prior result here ` +
+						`would report success for work that never happened (DOC-003 PER-5).`,
 					correlationId,
 					targetObjectIds:
 						typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []

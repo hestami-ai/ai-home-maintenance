@@ -21,6 +21,18 @@ export interface CommandReceiptRecord {
 	readonly status: string;
 	readonly producedEventIds: readonly string[];
 	readonly resultHash?: string;
+	/**
+	 * `contentHash(command.payload)` — the hash of the payload that CLAIMED this key (schema v2, REG-F-012).
+	 *
+	 * DOC-003 PER-5's third clause is "reuse of a key with a different PAYLOAD fails", and this is the only field
+	 * that can decide it. `resultHash` cannot: it is `contentHash(nextState)` — the RESULTING OBJECT — so deriving
+	 * the answer from it would mean executing the command first, which is exactly what idempotency exists to avoid.
+	 *
+	 * ABSENT MEANS NOT RECORDED, NEVER "DIFFERENT". Rows written before schema v2 carry NULL here; a comparison
+	 * against an absent hash is SKIPPED, not failed. Manufacturing a refusal out of an absence is the mistake this
+	 * register has recorded more than once.
+	 */
+	readonly payloadHash?: string;
 }
 
 export interface OutboxRecord {

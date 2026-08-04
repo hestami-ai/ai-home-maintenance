@@ -695,8 +695,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'packages/rph-application/ — and only the receipt LOOKUP (`getReceipt`) is the store\'s. A register whose ' +
 			'entire subject is layer precision may not be loose about its own prose, and no gate reads prose. Found ' +
 			'while dispositioning RPH-PER-002, which also found REG-F-012: canon PER-5 adds a third clause ("Reuse of ' +
-			'a key with a different payload fails") that this engine violates — a DIFFERENT command reusing a key is ' +
-			'silently swallowed and reported DUPLICATE.'
+			'a key with a different payload fails") ~~that this engine violates — a DIFFERENT command reusing a key ' +
+			'is silently swallowed and reported DUPLICATE.~~ CLOSED 2026-08-04, struck rather than deleted. All ' +
+			'three of PER-5\'s dimensions are now compared before a DUPLICATE is returned — command type and target ' +
+			'aggregate from columns already stored, and PAYLOAD from `command_receipts.payload_hash`, added in the ' +
+			'first forward schema migration this engine has run (v1 → v2).'
 	},
 	'RPH-EXE-008': {
 		kind: 'ENFORCED',
@@ -1985,7 +1988,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Replaying a mutation with the same idempotency key returns the prior result',
-			note: "JPWB-DOC-003 §9 PER-5 (Idempotency at the business-effect level), near-verbatim against the ratified statement. CANON STATES STRICTLY MORE THAN THIS RULE, and the surplus is violated: PER-5's third clause is \"Reuse of a key with a different payload fails\", a REFUSAL that nothing performs — see the `why` and REG-F-012. Cited to DOC-003, not to REG-005, which also carries the sentence only because REG-F-012 quotes it."
+			note: "JPWB-DOC-003 §9 PER-5 (Idempotency at the business-effect level), near-verbatim against the ratified statement. CANON STATES STRICTLY MORE THAN THIS RULE: PER-5's third clause is \"Reuse of a key with a different payload fails\", ~~a REFUSAL that nothing performs~~ — CLOSED 2026-08-04 (REG-F-012), struck rather than deleted; the bus now performs it, and the surplus is a surplus the engine honours rather than one it violates. THE ROW'S DISPOSITION IS UNCHANGED AND THAT IS DELIBERATE: this rule's own statement is still an OUTCOME (\"returns the prior result\"), which no refusal arm can carry, so it remains NOT_A_COMMAND_REFUSAL. What changed is the neighbouring sentence, not this one. Cited to DOC-003, not to REG-005, which also carries the sentence only because REG-F-012 quotes it."
 		},
 		why:
 			'THE STATEMENT IS AN OUTCOME AND THE OUTCOME IS PRODUCED, so neither the ENFORCED arm (which observes ' +
@@ -1994,15 +1997,23 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`producedEventIds`, the event count is unchanged, and the aggregate does not advance. ENFORCED AT ' +
 			'`packages/rph-application/src/command-bus.ts` — `dispatch` step 1, the `store.getReceipt` lookup — ' +
 			'which is the COMMAND layer; only the receipt READ is the store\'s. (RPH-EXE-007\'s row said "the store ' +
-			'layer" for six commits and is corrected in the same commit as this row.) THE PART CANON ADDS AND THIS ' +
-			'ENGINE VIOLATES, recorded here because a reader of this row must not conclude PER-5 holds: a key reused ' +
-			'for a DIFFERENT command is silently swallowed. Observed — a `CaptureIntent` for aggregate A accepted ' +
-			'under key K, then a wholly different `CaptureIntent` for aggregate B reusing K, returns DUPLICATE and ' +
-			'aggregate B IS NEVER CREATED, with the caller handed A\'s event id as its result. `command_receipts` ' +
-			'stores `command_type`, `target_aggregate_id` AND `result_hash`, `getReceipt` returns all three, and ' +
-			'step 1 compares none of them. That is REG-F-012, filed separately and DELIBERATELY NOT folded into ' +
-			'this row: this rule\'s own statement holds, and letting a satisfied rule carry a disclosure about a ' +
-			'neighbouring sentence is the subject substitution this register records four times over.'
+			'layer" for six commits and is corrected in the same commit as this row.) ~~THE PART CANON ADDS AND ' +
+			'THIS ENGINE VIOLATES, recorded here because a reader of this row must not conclude PER-5 holds: a key ' +
+			'reused for a DIFFERENT command is silently swallowed. Observed — a `CaptureIntent` for aggregate A ' +
+			'accepted under key K, then a wholly different `CaptureIntent` for aggregate B reusing K, returns ' +
+			'DUPLICATE and aggregate B IS NEVER CREATED, with the caller handed A\'s event id as its result. ' +
+			'`command_receipts` stores `command_type`, `target_aggregate_id` AND `result_hash`, `getReceipt` ' +
+			'returns all three, and step 1 compares none of them.~~ CLOSED 2026-08-04 (REG-F-012), struck rather ' +
+			'than deleted so a reader sees both the claim and its clearance. Step 1 now compares command type, ' +
+			'target aggregate, and PAYLOAD — the last via `command_receipts.payload_hash`, a new column carried by ' +
+			'this engine\'s first forward schema migration, because `result_hash` is `contentHash(nextState)` and ' +
+			'reaching it means having already executed the command. An ABSENT stored hash (any receipt written ' +
+			'before v2) is SKIPPED rather than treated as a difference — absence of evidence is not evidence of ' +
+			'difference, and reading it the other way would refuse every legitimate replay in an upgraded durable ' +
+			'store. REG-F-012 was filed separately and DELIBERATELY NOT folded into this row: this rule\'s own ' +
+			'statement held then and holds now, and letting a satisfied rule carry a disclosure about a ' +
+			'neighbouring sentence is the subject substitution this register records four times over. That is also ' +
+			'why the disposition below is untouched by the fix.'
 	},
 	// ── THE TWO ROWS THIS FAMILY WAS HELD OPEN FOR, LANDED 2026-08-02 WITH THEIR OBSERVATIONS ────────────────
 	//

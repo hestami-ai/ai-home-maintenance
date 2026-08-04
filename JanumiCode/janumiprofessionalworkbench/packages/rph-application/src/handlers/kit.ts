@@ -343,7 +343,13 @@ export function commitState(
 			targetAggregateId: args.aggregateId,
 			status: 'ACCEPTED',
 			producedEventIds: [args.event.eventId],
-			resultHash: contentHash(args.nextState)
+			resultHash: contentHash(args.nextState),
+			// REG-F-012 clause 3 — bind the key to the payload that claimed it. RECOMPUTED rather than threaded
+			// through `HandlerContext`: the bus has already hashed this exact payload at step 0c and REFUSED the
+			// command if it could not, so reaching here means it canonicalizes. A handler invoked directly (only
+			// tests do that) with an uncanonicalizable payload throws here, loudly, at the boundary that documents
+			// the requirement — which is the right failure for a caller bypassing the bus.
+			payloadHash: contentHash(command.payload)
 		}
 	};
 	// (f) Commit and map the result.
