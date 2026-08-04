@@ -6289,6 +6289,41 @@
 					"type": "enum",
 					"enumRef": "DecisionStatusSchema",
 					"note": "=PROPOSED"
+				},
+				{
+					"field": "waivedPolicyId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref. WIDENED 2026-08-04 (REG-F-020). This AUTHORED shape omitted the waiver's own detail, and rph-projections/assurance-view.ts foldWaiverRequested reads THIS FIELD as its attachment predicate off a PURE FOLD with no store handle — so the shape as authored could not carry what its only consumer requires. Authored, not ratified: the sourceSection above says so."
+				},
+				{
+					"field": "waivedCriterionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref. Read by foldWaiverRequested as the §38 waiver view's content."
+				},
+				{
+					"field": "waivedFindingIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[]. Read by foldWaiverRequested as the §38 waiver view's content."
+				},
+				{
+					"field": "compensatingControls",
+					"required": true,
+					"type": "string[]",
+					"note": "DOC-004 §12.2 — a waiver may not drop a control to nothing; the request declares them and the governed stream must record them."
+				},
+				{
+					"field": "reviewConditions",
+					"required": true,
+					"type": "string[]"
+				},
+				{
+					"field": "expiresAt",
+					"required": false,
+					"type": "string",
+					"note": "OPTIONAL, mirroring RequestWaiverPayloadSchema — the only optional field on the command."
 				}
 			]
 		},

@@ -70,10 +70,7 @@ import { afterAll } from 'vitest';
  * 2026-08-04. RATCHET: this list may only shrink. Fix the handler (see \`kit.ts\`'s `eventPayload` seam, which
  * exists for exactly this) and delete the row.
  */
-const KNOWN_NONCONFORMING: Readonly<Record<string, string>> = {
-	WaiverRequested:
-		'decisionType: Invalid option: expected one of "APPROVAL"|"REJECTION"|"WAIVER"|"ESCALATION"|"RESHAPE"|"REPLAN"|"PROMOTE_BASELINE"|"ABANDON"|"REVOKE"'
-};
+const KNOWN_NONCONFORMING: Readonly<Record<string, string>> = {};
 
 /**
  * NOT DEFECTS — types that appear nonconforming only because a test emits a bad payload ON PURPOSE.

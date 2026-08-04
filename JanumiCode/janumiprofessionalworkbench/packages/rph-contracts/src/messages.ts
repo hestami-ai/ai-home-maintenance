@@ -1484,7 +1484,13 @@ export const WaiverRequestedPayloadSchema = z.strictObject({
 	duration: z.string(),
 	affectedObjectIds: z.array(z.string()),
 	decisionType: DecisionTypeSchema,
-	status: DecisionStatusSchema
+	status: DecisionStatusSchema,
+	waivedPolicyId: z.string(),
+	waivedCriterionId: z.string(),
+	waivedFindingIds: z.array(z.string()),
+	compensatingControls: z.array(z.string()),
+	reviewConditions: z.array(z.string()),
+	expiresAt: z.string().optional()
 });
 export type WaiverRequestedPayload = z.infer<typeof WaiverRequestedPayloadSchema>;
 export const IntentProvisionedPayloadSchema = z.strictObject({

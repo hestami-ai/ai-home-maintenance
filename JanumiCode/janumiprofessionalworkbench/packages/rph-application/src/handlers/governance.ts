@@ -19,6 +19,7 @@ import type {
 	ProposeDecisionPayload,
 	PromoteBaselinePayload,
 	RequestWaiverPayload,
+	WaiverRequestedPayload,
 	RevokeDecisionPayload,
 	SupersedeBaselinePayload,
 	WaiverGrantedPayload,
@@ -487,31 +488,46 @@ export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 		objectType: DECISION,
 		aggregateId: id,
 		state,
-		// REG-F-020 — DELIBERATELY NOT FIXED, and the reason is a live reader, not an oversight.
+		// REG-F-020 — CLOSED by widening the AUTHORED shape, which is what was actually wrong.
 		//
-		// This emits the raw `RequestWaiver` COMMAND payload, which its declared shape rejects twice over:
-		// `WaiverRequestedPayloadSchema` (a `z.strictObject`) requires `decisionType` (=WAIVER) and `status`
-		// (=PROPOSED), which the command payload does not carry, and admits ONLY
-		// `{subjectObjectIds, scope, rationale, duration, affectedObjectIds, decisionType, status}` — so
-		// `waivedPolicyId`, `waivedCriterionId`, `waivedFindingIds`, `compensatingControls`, `reviewConditions`
-		// and `expiresAt` are unrecognized keys.
+		// THE FIRST PASS REFUSED THIS, and the refusal was right about the danger and wrong about the constraint.
+		// The danger is real and is why the naive fix must not be made: `foldWaiverRequested` in
+		// `rph-projections/src/assurance-view.ts` is a PURE FOLD over the event log with no store handle, and it
+		// reads `waivedPolicyId` off THIS event as its attachment predicate. Emitting only the fields the shape then
+		// declared would make that undefined at every real waiver, taking the projection's permissive
+		// `waivedPolicyId === undefined ||` branch: every waiver attaching to every assessment whose subjects it
+		// intersects, under ANY policy — and staying GREEN, because that projection's tests build their events by
+		// hand. The live path is `apps/rph-demo/.../undertakings/[id]/+page.server.ts`, built from `readAllEvents()`.
 		//
-		// CONFORMING WOULD BREAK `rph-projections/src/assurance-view.ts`. `foldWaiverRequested` is a PURE FOLD over
-		// the event log — it has no store handle — and it reads THREE of those rejected keys off this event:
-		// `waivedPolicyId` is its attachment predicate ("a waiver for a DIFFERENT policy does NOT attach — no
-		// over-reach", its own test), and `waivedCriterionId` / `waivedFindingIds` are the §38 waiver view's content.
-		// Emitting the declared shape makes `waivedPolicyId` undefined at every real waiver, which takes the
-		// projection's deliberate `waivedPolicyId === undefined ||` permissive branch: every waiver would attach to
-		// every assessment whose subjects it intersects, under ANY policy, while reporting that it waives no findings
-		// under no criterion. That is a §38 assurance read model claiming coverage a waiver does not have — and it
-		// would stay green, because the projection's own tests build their events by hand. The live path is real:
-		// `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts` builds this view from `readAllEvents()`.
+		// WHAT THE REFUSAL GOT WRONG: it called widening the shape "editing ratified-material". It is not.
+		// `WaiverRequested`'s vocab entry is annotated **UNRATIFIED-AUTHORED** — "DOC-007 schematizes NO interface
+		// for this, so these fields were AUTHORED, not derived … Do NOT treat this sourceSection as proof the shape
+		// is ratified. Ratification pending." So the shape is OURS, and a shape we authored that cannot carry what
+		// its only consumer requires is the defect. The command declares those five fields REQUIRED; the event
+		// omitted them; the projection needs three of them. The event was the thing that was wrong.
 		//
-		// The information does live on the object (`waiver: WaiverDetail`, written above) — that is where the
-		// projection SHOULD read it, and `floor-gate.ts` already does. But making the projection object-aware is a
-		// change in another package, and the alternative — widening `WaiverRequestedPayloadSchema` — is editing
-		// ratified-material to make a handler pass, which this work may not do. Fixing this needs both halves
-		// landed together; half of it is a silent assurance regression. Left in the ledger, named.
+		// So the vocab entry now carries `waivedPolicyId`, `waivedCriterionId`, `waivedFindingIds`,
+		// `compensatingControls`, `reviewConditions` and optional `expiresAt`, and this emits the full declared
+		// shape. NOTHING IS DROPPED — the projection keeps reading exactly what it read before — and `decisionType`
+		// and `status` are now present, which the shape always required and the raw command payload never carried.
+		//
+		// Both are read off the COMMITTED NEXT STATE rather than restated as literals: `state` above sets them, and
+		// an event recording what happened should read the fact rather than assert it a second time.
+		eventPayload: {
+			subjectObjectIds: p.subjectObjectIds,
+			scope: p.scope,
+			rationale: p.rationale,
+			duration: p.duration,
+			affectedObjectIds: p.affectedObjectIds,
+			decisionType: state.decisionType as WaiverRequestedPayload['decisionType'],
+			status: state.status as WaiverRequestedPayload['status'],
+			waivedPolicyId: p.waivedPolicyId,
+			waivedCriterionId: p.waivedCriterionId,
+			waivedFindingIds: p.waivedFindingIds,
+			compensatingControls: p.compensatingControls,
+			reviewConditions: p.reviewConditions,
+			...(p.expiresAt ? { expiresAt: p.expiresAt } : {})
+		} satisfies WaiverRequestedPayload,
 		eventType: 'WaiverRequested'
 	});
 };
