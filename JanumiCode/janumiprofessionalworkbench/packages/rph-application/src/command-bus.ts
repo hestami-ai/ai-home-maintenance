@@ -142,6 +142,51 @@ export class Engine {
 
 		// 1. Idempotency: a replay of the same idempotencyKey returns the prior result, no new event.
 		const prior = this.store.getReceipt(command.idempotencyKey);
+		// REG-F-012 (2026-08-04). This used to return DUPLICATE on the mere EXISTENCE of a receipt, comparing
+		// NOTHING — so a wholly different command reusing a key was silently discarded: no events, no aggregate,
+		// and a `DUPLICATE` status that the demo's own multi-step authoring path treats as SUCCESS. The caller was
+		// told its command had already happened when it never had.
+		//
+		// THE DETECTION MATERIAL WAS ALREADY PERSISTED AND ALREADY RETURNED: `command_receipts` stores
+		// `command_type` and `target_aggregate_id`, `getReceipt` reads them, `CommandReceiptRecord` carries them.
+		// This is those two comparisons. Canon PER-5 — "reuse of a key with a different payload fails".
+		//
+		// THE THIRD DIMENSION IS NOT CLOSED AND IS NOT SKIPPED SILENTLY: same command, same target, DIFFERENT
+		// PAYLOAD still replays. The receipt's `resultHash` is `contentHash(nextState)` — a hash of the RESULTING
+		// OBJECT, not of the payload — so comparing payloads needs a stored payload hash (a persistence schema
+		// change), and deriving it from `resultHash` would mean executing the command first, which is what
+		// idempotency exists to avoid.
+		//
+		// THE CODE IS A RATIFIED ONE CARRYING A LABEL (the WP-11 discipline). `RPH_IDEMPOTENCY_CONFLICT` would be
+		// the natural code and is NOT among the ratified fifteen — minting one is a sponsor act.
+		// `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which REG-F-010 records as correctly
+		// carrying no error at all. So the label travels in the message where a reader and a future code can both
+		// find it.
+		if (
+			prior &&
+			(prior.commandType !== command.commandType ||
+				prior.targetAggregateId !== command.targetAggregateId)
+		) {
+			this.logger.info('command.idempotency_key_reused', {
+				correlationId,
+				idempotencyKey: command.idempotencyKey
+			});
+			return {
+				...base,
+				status: 'REJECTED',
+				error: makeRphError('RPH_VALIDATION_SEMANTIC_FAILED', {
+					message:
+						`IDEMPOTENCY_KEY_REUSED: key '${command.idempotencyKey}' was claimed by ` +
+						`${prior.commandType} on ${prior.targetAggregateId}, and this is ` +
+						`${command.commandType} on ${String(command.targetAggregateId)}. A key identifies ONE ` +
+						`command; returning the prior result here would report success for work that never ` +
+						`happened (DOC-003 PER-5).`,
+					correlationId,
+					targetObjectIds:
+						typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []
+				})
+			};
+		}
 		if (prior) {
 			this.logger.info('command.duplicate', {
 				correlationId,
