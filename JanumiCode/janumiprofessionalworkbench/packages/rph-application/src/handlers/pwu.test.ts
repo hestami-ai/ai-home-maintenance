@@ -927,4 +927,81 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		);
 		expect(lifecycle()).toBe('SUPERSEDED');
 	});
+
+	// ── THE THREE COMMANDS NOTHING HAD EVER DISPATCHED (2026-08-03) ───────────────────────────────────────────
+	//
+	// Censused while surveying REG-F-014's fourth instance: of the 84 commands in the ratified registry, exactly
+	// THREE were never named outside `rph-contracts` — no test, no production caller. `ChallengePwu`,
+	// `InvalidatePwu` and `ReshapePwu`. Each has a live handler, each is routable, and none had ever been driven,
+	// so their preconditions, their emitted payloads and their event-gate conformance were all unobserved.
+	//
+	// That is why REG-F-014's fourth instance turned out to be unreachable rather than dangerous:
+	// `triggeringObjectId` is caller-supplied and never resolved, but it rides on two of these three, so there is
+	// nothing live to bypass. Drive them first; the field can be argued about once something asks for it.
+	//
+	// `verif/command-dispatch-census.test.ts` now keeps this at zero.
+	function readyPwu(): void {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+	}
+
+	const eventsOfType = (t: string) => store.readAllEvents().filter((e) => e.eventType === t);
+
+	it('ChallengePwu drives READY -> CHALLENGED', () => {
+		readyPwu();
+		const r = engine.dispatch(
+			cmd('ChallengePwu', { challengeReason: 'the boundary does not hold' })
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('CHALLENGED');
+		expect(eventsOfType('PwuChallenged')).toHaveLength(1);
+	});
+
+	it('ReshapePwu drives UNDER_ASSURANCE -> RESHAPING', () => {
+		driveToUnderAssurance('60');
+		const r = engine.dispatch(
+			cmd('ReshapePwu', { reason: 'a material assumption was falsified' })
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('RESHAPING');
+		expect(eventsOfType('PwuReshapingStarted')).toHaveLength(1);
+	});
+
+	// AND THE FABRICATION THE HANDLER'S OWN COMMENT NAMES. `PwuInvalidatedPayload` types `triggeringObjectId` as
+	// REQUIRED while the command types it OPTIONAL, and the handler resolves the disagreement with `?? ''`. Its
+	// comment says defaulting to '' "would fabricate a reference to nothing" — and then does it. Until this test
+	// the branch had never executed, so the fabricated value had never reached the event gate.
+	//
+	// Asserted as an ADMISSION, not a refusal: the empty string satisfies `z.string()`, so the gate accepts a
+	// governed event whose triggering object is the empty reference. The day the contracts are reconciled — the
+	// command requiring it, or the event admitting its absence — this goes red and should become the refusal.
+	it('InvalidatePwu with NO triggeringObjectId emits the EMPTY reference its own comment warns about', () => {
+		driveToUnderAssurance('70');
+		const assessmentId = satisfiedAssessmentFor(PWU_ID, 'asm_01ARZ3NDEKTSV4RRFFQ69G5X30');
+		expect(
+			engine.dispatch(
+				change({
+					previousState: 'UNDER_ASSURANCE',
+					newState: 'SATISFIED',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'SATISFIED',
+					supportingObjectIds: [assessmentId]
+				})
+			).status
+		).toBe('ACCEPTED');
+
+		const r = engine.dispatch(cmd('InvalidatePwu', { invalidationReason: 'the evidence was withdrawn' }));
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('INVALIDATED');
+		const emitted = eventsOfType('PwuInvalidated');
+		expect(emitted).toHaveLength(1);
+		expect(
+			(emitted[0]!.payload as { triggeringObjectId?: string }).triggeringObjectId,
+			'THE ADMISSION: a governed event records a triggering object that is the empty reference'
+		).toBe('');
+	});
 });
