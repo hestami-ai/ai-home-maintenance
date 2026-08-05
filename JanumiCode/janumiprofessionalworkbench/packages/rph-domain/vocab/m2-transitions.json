@@ -422,8 +422,8 @@
 		{
 			"name": "PWU.assuranceState",
 			"appliesTo": "Professional Work Unit (PWU) — independent assurance axis (§7.1 field assuranceState). Rolled-up axis on the PWU. Distinct from AssuranceAssessment.disposition (§18) and AssuranceAssessment.state (§30 assurance doc).",
-			"sourceSection": "core-model doc §7.4 enum (VERBATIM). NO from→to matrix; transitions RECONSTRUCTED from §18 dispositions + §26.5 events + Scenario 3 (§39).",
-			"initialState": "NOT_REQUIRED",
+			"sourceSection": "core-model doc §7.4 enum (VERBATIM). NO from→to matrix; transitions RECONSTRUCTED from §18 dispositions + §26.5 events + Scenario 3 (§39). initialState CORRECTED 2026-08-05 (REG-F-023 / connectivity): it was NOT_REQUIRED, which is the FIRST MEMBER OF THE §7.4 ENUM and not a ratified starting state — an enum declares no initial state. Measured: `ProposePwu` creates every PWU with assuranceState 'UNASSESSED' (pwu.ts), and UNASSESSED is the source of this machine's first arrow (UNASSESSED -> EVIDENCE_REQUIRED) with every other state descending from it. With NOT_REQUIRED declared initial, TEN OF ELEVEN states were unreachable from the machine's own start and NOT_REQUIRED was isolated (no in-arrow, no out-arrow) — read literally, a PWU could never become assured. The declaration was wrong and the engine was right; this makes them agree.",
+			"initialState": "UNASSESSED",
 			"states": [
 				"NOT_REQUIRED",
 				"UNASSESSED",
@@ -501,6 +501,13 @@
 					"to": "INVALIDATED",
 					"trigger": "EvidenceInvalidated / upstream change (§29.1)",
 					"note": "RECONSTRUCTED. Both named from-states are in the states list."
+				},
+				{
+					"from": "UNASSESSED",
+					"to": "NOT_REQUIRED",
+					"trigger": "applicability determination returns NOT_APPLICABLE for every candidate policy (§5.2 ApplicabilityOutcome)",
+					"guard": "no assurance policy applies to this PWU",
+					"note": "AUTHORED 2026-08-05 under the delegated authoring grant, on ratified ground. DOC-004 §5.2 ratifies ApplicabilityOutcome = REQUIRED | RECOMMENDED | OPTIONAL | NOT_APPLICABLE | REQUIRES_HUMAN_DETERMINATION, and §7.4 ratifies NOT_REQUIRED as a state meaning assurance does not apply. The corpus defines both and never connects them, leaving NOT_REQUIRED with no way in. THE AUTHORED PART is that a §5.2 determination should drive this axis at all — the outcome vocabulary and the state vocabulary are joined here, not in the corpus. Direction is deliberate: a PWU begins UNASSESSED (assurance is presumed to apply) and moves to NOT_REQUIRED only on a determination that nothing applies. The reverse default — begin NOT_REQUIRED and opt in — would make silence mean 'no assurance needed', which is the fail-open reading."
 				}
 			],
 			"illegal": [

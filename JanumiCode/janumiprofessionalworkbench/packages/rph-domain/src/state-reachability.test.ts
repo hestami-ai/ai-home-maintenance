@@ -63,6 +63,85 @@ const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
 		'moved between, so they have no in-arrows by construction rather than by omission.'
 };
 
+/**
+ * States reachable from a machine's OWN initial state, following arrows transitively.
+ *
+ * THE STRONGER QUESTION, AND WHY IT HAD TO BE ASKED. Everything above asks "does this state have an in-arrow",
+ * which treats each state independently. That cannot see a machine whose ENTRY POINT is mislabelled: a real entry
+ * looks like an orphan (no in-arrow, correctly) and an isolated initial state looks fine (it is the initial state).
+ * Connectivity asks whether the machine is a machine.
+ */
+function strandedFrom(machine: string): string[] {
+	const m = getMachine(machine);
+	if (!m.initialState) return [...m.states];
+	const adj = new Map<string, string[]>();
+	for (const t of m.transitions) adj.set(t.from, [...(adj.get(t.from) ?? []), t.to]);
+	const seen = new Set([m.initialState]);
+	const queue = [m.initialState];
+	while (queue.length) {
+		const cur = queue.pop() as string;
+		for (const next of adj.get(cur) ?? [])
+			if (!seen.has(next)) {
+				seen.add(next);
+				queue.push(next);
+			}
+	}
+	return m.states.filter((st) => !seen.has(st));
+}
+
+describe("states unreachable from their machine's own initial state", () => {
+	it('CONTROL: a healthy machine strands nothing — otherwise "stranded" is measuring the walk, not the data', () => {
+		// PWA.publicationStatus is an ordinary, fully connected machine. If IT reports stranded states, the traversal
+		// is broken and every count below is noise.
+		expect(strandedFrom('PWA.publicationStatus')).toEqual([]);
+		expect(strandedFrom('ExecutionPlan.status')).toEqual([]);
+	});
+
+	// ── THE FINDING, PINNED AS THE DEFECT IT IS ───────────────────────────────────────────────────────────────
+	// TEN OF ELEVEN states on the PWU assurance axis cannot be reached from where the machine says a PWU starts.
+	// Read literally, a PWU can never become assured.
+	//
+	// It is not true in practice, and the reason IS the defect: `ProposePwu` creates every PWU with
+	// `assuranceState: 'UNASSESSED'` while the machine declares `initialState: 'NOT_REQUIRED'` — a state that is
+	// measured to be initial, terminal, and ISOLATED (no in-arrow, no out-arrow). `UNASSESSED` is the source of the
+	// machine's first arrow and everything else descends from it. The engine is right; the declaration is wrong.
+	//
+	// FIXED 2026-08-05, and this assertion is what judged the fix. Two changes, both in `m2-transitions.json`:
+	//   initialState NOT_REQUIRED -> UNASSESSED    DELIVERY. The vocab's own sourceSection says the STATES are
+	//     "§7.4 enum (VERBATIM)" and the transitions are "RECONSTRUCTED" — an enum declares no initial state, so
+	//     NOT_REQUIRED was the FIRST ENUM MEMBER, not a ratified start. The engine has always created PWUs in
+	//     UNASSESSED (`pwu.ts`). The declaration was wrong; the engine was right.
+	//   + UNASSESSED -> NOT_REQUIRED               AUTHORED on ratified ground (§5.2 ApplicabilityOutcome
+	//     NOT_APPLICABLE). Without it NOT_REQUIRED is reachable by nothing; the corpus ratifies the outcome
+	//     vocabulary and the state vocabulary and never joins them.
+	//
+	// DIRECTION IS THE DESIGN, not a detail: a PWU BEGINS `UNASSESSED` — assurance is presumed to apply — and
+	// reaches `NOT_REQUIRED` only on a determination that no policy applies. Beginning at NOT_REQUIRED and opting
+	// in would make SILENCE mean "no assurance needed", which is the fail-open reading of a governance axis.
+	it('the PWU assurance axis is fully connected from its start', () => {
+		expect(
+			strandedFrom('PWU.assuranceState'),
+			'BEFORE the fix this was TEN of eleven — read literally, a PWU could never become assured'
+		).toEqual([]);
+	});
+
+	it('KNOWN DEFECT: an assessment can never be cancelled (REG-F-021 residual R-1)', () => {
+		expect(strandedFrom('AssuranceAssessment.state')).toEqual(['CANCELLED']);
+	});
+
+	it('every OTHER machine is fully connected from its initial state', () => {
+		const known = new Set(['PWU.assuranceState', 'AssuranceAssessment.state', 'ValidatorRegistryEntry.status']);
+		const offenders = machineNames()
+			.filter((m) => !(m in NOT_STATE_MACHINES) && !known.has(m))
+			.filter((m) => strandedFrom(m).length > 0);
+		expect(
+			offenders,
+			'a state unreachable from its own start is a lifecycle step the object can never take, however the ' +
+				'vocabulary reads. Three machines are known and pinned above; a fourth needs an argument'
+		).toEqual([]);
+	});
+});
+
 describe('declared states no arrow can reach', () => {
 	it('CONTROL: the machines are loaded and carry arrows — a zero here would make every list below empty', () => {
 		// The regex version of this measurement reported 0 transitions for AssuranceAssessment.state, which has 15.
@@ -100,10 +179,10 @@ describe('declared states no arrow can reach', () => {
 			// close it is unreachable BY RATIFICATION, not by omission in this engine. Wiring it needs an arrow the
 			// corpus does not declare — an elicitation item, not an implementation task.
 			'AssuranceAssessment.state.CANCELLED',
-			// The PWU assurance axis starts at NOT_REQUIRED. UNASSESSED — the state meaning "assurance applies and
-			// has not happened yet" — is entered by no declared arrow, so a PWU that NEEDS assurance can never be
-			// marked as awaiting it. Adjacent to REG-F-021's family and not part of it.
-			'PWU.assuranceState.UNASSESSED',
+			// `PWU.assuranceState.UNASSESSED` LEFT THIS LIST on 2026-08-05 — and it was never an orphan. It is the
+			// machine's real ENTRY POINT, which correctly has no in-arrow; what was wrong was that the machine
+			// named a different state as its start. An in-arrow check cannot tell those apart, which is why the
+			// connectivity assertions above exist and why they found it.
 			// ValidatorRegistryEntry.status: three states, no arrows. Validator health (§22's DEGRADED / DISABLED) is
 			// declared and unrunnable — the assurance system cannot record that one of its own validators is failing.
 			'ValidatorRegistryEntry.status.ACTIVE',

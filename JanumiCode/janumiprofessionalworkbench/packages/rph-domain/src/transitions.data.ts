@@ -546,7 +546,7 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 			'INVALIDATED',
 			'ESCALATED'
 		],
-		initialState: 'NOT_REQUIRED',
+		initialState: 'UNASSESSED',
 		terminalStates: ['NOT_REQUIRED', 'SATISFIED', 'REJECTED', 'WAIVED', 'INVALIDATED'],
 		transitions: [
 			{ from: 'UNASSESSED', to: 'EVIDENCE_REQUIRED', trigger: 'policy requires evidence' },
@@ -606,6 +606,13 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 				from: 'CONDITIONALLY_SATISFIED',
 				to: 'INVALIDATED',
 				trigger: 'EvidenceInvalidated / upstream change (§29.1)'
+			},
+			{
+				from: 'UNASSESSED',
+				to: 'NOT_REQUIRED',
+				trigger:
+					'applicability determination returns NOT_APPLICABLE for every candidate policy (§5.2 ApplicabilityOutcome)',
+				guard: 'no assurance policy applies to this PWU'
 			}
 		],
 		illegal: [],
