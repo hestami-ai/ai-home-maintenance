@@ -12,10 +12,14 @@ import {
 	FailExecutionPlanPayloadSchema,
 	FailExecutionStepPayloadSchema
 } from '@janumipwb/rph-contracts';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { RETRY_EXHAUSTION_ACTIONS } from './execution.js';
 import {
 	EXECUTION_FAILURE_CONTROL_ACTIONS,
+	EXECUTION_FAILURE_MAPPING,
 	isPermittedForFailure,
 	permittedControlActionsForFailure
 } from './execution-failure-taxonomy.js';
@@ -95,6 +99,106 @@ describe('DOC-002 §36.2 execution failure classes map to permitted control acti
 		// CONTROL: the same action IS permitted elsewhere, so the assertion above is about this class and not
 		// about RETRY being absent from the mapping altogether.
 		expect(isPermittedForFailure('TOOL_FAILURE', 'RETRY')).toBe(true);
+	});
+
+	// ── THE PROVENANCE LOCKS ───────────────────────────────────────────────────────────────────────────────────
+	//
+	// Mirrors `FindingAnnotation.severityBasis`'s three locks in doc004-conformance.test.ts, for the same reason
+	// they exist there: an authored governance table with no basis field is indistinguishable from a ratified one,
+	// and its comments cannot fail. This table shipped with seven rows that looked alike and ONE that the corpus
+	// had actually decided.
+	describe('provenance: which rows the corpus decided, and which are mine', () => {
+		const CORPUS = ['Executable Invariant and Conformance Test Specification', 'Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract']
+			.map((n) =>
+				readFileSync(
+					join(
+						dirname(fileURLToPath(import.meta.url)),
+						'..',
+						'..',
+						'..',
+						'docs',
+						'Recursive Professional Harness',
+						`Janumi Professional Workbench Recursive Professional Harness - ${n}.md`
+					),
+					'utf8'
+				)
+			)
+			.join('\n')
+			.replace(/\s+/g, ' ')
+			.trim();
+
+		it('CONTROL: the corpus is actually loaded — otherwise every quote check below passes vacuously', () => {
+			expect(CORPUS.length).toBeGreaterThan(10000);
+			expect(CORPUS).toContain('Each failure class must map to permitted control actions.');
+		});
+
+		it('ANTI-LAUNDERING: a RATIFIED row must quote words that are IN the ratified corpus', () => {
+			for (const [cls, m] of Object.entries(EXECUTION_FAILURE_MAPPING)) {
+				if (m.basis !== 'RATIFIED') continue;
+				const quote = (m.quote ?? '').replace(/\s+/g, ' ').trim();
+				expect(quote.length, `${cls} claims RATIFIED with no quote`).toBeGreaterThan(0);
+				expect(
+					CORPUS.includes(quote),
+					`${cls} claims RATIFIED on words that are NOT in the ratified corpus:\n  ${quote}`
+				).toBe(true);
+			}
+		});
+
+		it('THE INVERSE: an AUTHORED row may NOT carry a quote — authority cannot be implied decoratively', () => {
+			for (const [cls, m] of Object.entries(EXECUTION_FAILURE_MAPPING))
+				if (m.basis === 'AUTHORED')
+					expect(m.quote ?? '', `${cls} is AUTHORED but claims a quote`).toBe('');
+		});
+
+		it('every row records a rationale — the field that makes an AUTHORED row rejectable', () => {
+			for (const [cls, m] of Object.entries(EXECUTION_FAILURE_MAPPING))
+				expect(m.rationale.length, `${cls}: no rationale`).toBeGreaterThan(30);
+		});
+
+		it('the split, stated as a number: ONE of seven is ratified and SIX are mine', () => {
+			// Pinned so the honest ratio cannot drift UPWARD unnoticed — the direction that matters, because
+			// relabelling an authored row RATIFIED is how authorship disappears.
+			const ratified = Object.entries(EXECUTION_FAILURE_MAPPING).filter(
+				([, m]) => m.basis === 'RATIFIED'
+			);
+			expect(ratified.map(([c]) => c)).toEqual(['RETRY_EXHAUSTION']);
+			expect(
+				Object.values(EXECUTION_FAILURE_MAPPING).filter((m) => m.basis === 'AUTHORED')
+			).toHaveLength(6);
+		});
+
+		it('the derived actions map IS the mapping — no second copy to drift', () => {
+			for (const [cls, m] of Object.entries(EXECUTION_FAILURE_MAPPING))
+				expect(EXECUTION_FAILURE_CONTROL_ACTIONS[cls as keyof typeof EXECUTION_FAILURE_MAPPING]).toBe(
+					m.actions
+				);
+		});
+
+		it('§36 CONTAINMENT: every mapped action is in DOC-002 §37’s controller menu', () => {
+			// §36's rule is "each failure class must map to permitted CONTROL ACTIONS" — the controller's, which
+			// §37 enumerates as EIGHTEEN. The contract enum is DOC-004 §11's TWENTY-THREE, so a mapping could
+			// quietly reach for a §11 action §37 never gave the controller. Measured: it does not.
+			//
+			// THE RENAME IS NAMED, NOT NORMALIZED AWAY. §37 says `WAIVE`; §11 says `REQUEST_WAIVER`. Hiding that
+			// inside a normalization would be the laundering this file exists to prevent, so the one substitution
+			// is written down and is the only one permitted.
+			const SECTION_37 = [
+				'CONTINUE', 'WAIT', 'RETRY', 'GATHER_EVIDENCE', 'REVISE_CONTEXT', 'REVISE_PROMPT',
+				'CHANGE_MODEL', 'CHANGE_TOOL', 'CHANGE_TACTIC', 'RESHAPE_PWU', 'REVISE_DECOMPOSITION',
+				'REPLAN_EXECUTION', 'ESCALATE', 'WAIVE', 'REJECT', 'ABANDON', 'ACCEPT', 'PROMOTE_BASELINE'
+			];
+			expect(SECTION_37, 'DOC-002 §37 ratifies eighteen controller actions').toHaveLength(18);
+			const asSection37 = (a: string) => (a === 'REQUEST_WAIVER' ? 'WAIVE' : a);
+			for (const [cls, m] of Object.entries(EXECUTION_FAILURE_MAPPING))
+				for (const a of m.actions)
+					expect(
+						SECTION_37,
+						`${cls} permits ${a}, which DOC-002 §37 does not give the controller`
+					).toContain(asSection37(a));
+			// CONTROL: the substitution is doing real work — the raw spelling is genuinely absent from §37, so a
+			// future reader can see WHY the mapping needs it rather than taking the line on trust.
+			expect(SECTION_37).not.toContain('REQUEST_WAIVER');
+		});
 	});
 
 	it('an unknown class maps to NOTHING rather than to a default', () => {
