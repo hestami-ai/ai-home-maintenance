@@ -1,5 +1,11 @@
 # Implementation roadmap — restoring the three skipped Assurance Assessment states (REG-F-021)
 
+> **COMPLETE 2026-08-05. All five increments landed; REG-F-021 is CLOSED.** Two residuals are recorded in the
+> register (an assessment stalled in `EVIDENCE_PENDING` cannot be closed; the census compares surfaces as sets).
+> Three things this roadmap got wrong, corrected in place below rather than quietly: §4(c) called a misattributed
+> refusal a fail-open admission; the blast radius was 34 test files, not four callers; and increments 1 and 2 could
+> not be separated, because `command-dispatch-census` refuses a declared command that nothing drives.
+>
 > **Status: ROADMAP. No code accompanies it.** Companion to
 > `DESIGN-assessment-lifecycle-restoration.md`, which establishes *what* and *why*. This is *in what order, with
 > what red first, and what breaks*. It exists because the design's build order turned out to be wrong in one place
@@ -180,7 +186,18 @@ increment must not be read as having fixed it, and §3's explicit-empty-set rule
 
 ---
 
-## 7. What this roadmap does not promise
+## 7. What actually happened, against what this roadmap predicted
+
+| prediction | outcome |
+|---|---|
+| increments 1 and 2 are separable | **NO.** `command-dispatch-census` refuses a declared, undriven command; its `UNDRIVEN` allowance is empty by design. Events may be declared ahead of emitters; commands may not. |
+| blast radius: four callers + fixtures | **NO — 135 failing tests across 34 files.** A caller count measures who ISSUES the command; what breaks is everything that ASSERTS the resulting state. |
+| §4(c) is fail-open | **NO.** A second rule (`REQUIRED_ASSESSMENT_NOT_SATISFIED`) already refused it. The defect was a *misattributed* refusal — caught because the test written to prove fail-open passed against the defective code. |
+| the `EVIDENCE_PENDING → READY` guard is straightforward | **NO.** Keyed on ALL declared requirements it made Gate A unreachable. §6.1's `requiredForDispositions` is the discriminator: `ALL` gates assessing, `SATISFIED_ONLY` gates the conclusion. |
+| increment 0 relaxes a contract | **NO — it corrected one.** Five of six co-flagged fields were already optional under the same union rule; `startedAt` alone was not. |
+| `AssuranceAssessmentRequested` was merely unwired | **NO — it was UNEMITTABLE.** Its authored payload required two facts that cannot exist at request time. |
+
+## 8. What this roadmap does not promise
 
 It does not promise the increment closes a soundness hole — the ordering is what it buys (design §2). It does not
 promise §5.1 is settled. It does not cover `ASSESSING → INDEPENDENCE_VIOLATION`, `WAIVED`, `INVALIDATED` or
