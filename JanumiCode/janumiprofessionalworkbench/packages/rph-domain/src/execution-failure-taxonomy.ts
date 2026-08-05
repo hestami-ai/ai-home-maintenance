@@ -32,13 +32,21 @@ import { ControlActionSchema, ExecutionFailureClassSchema } from '@janumipwb/rph
 import type { ControlAction, ExecutionFailureClass } from '@janumipwb/rph-contracts';
 
 /**
- * The control actions §37 permits in response to each §36.2 execution failure class.
+ * The control actions permitted in response to each §36.2 execution failure class.
+ *
+ * ── WHICH ACTION VOCABULARY, BECAUSE THERE ARE TWO AND THEY DIFFER ───────────────────────────────────────────
+ * DOC-002 §37 lists EIGHTEEN control actions. The contract's `ControlAction` enum carries TWENTY-THREE, because
+ * it is built from **DOC-004 §11**, the ratified superset (see `canonical-vocabulary.json`). Five actions —
+ * `CLARIFY`, `GATHER_CONTEXT`, `CHANGE_VALIDATOR`, `INVALIDATE_DEPENDENTS`, `REQUEST_HUMAN_DECISION`,
+ * `REQUEST_WAIVER` — are ratified by §11 and absent from §37. This mapping draws on the §11 superset, which is
+ * the vocabulary the runtime actually validates against; the companion test asserts membership in
+ * `ControlActionSchema` rather than in §37's shorter list, so the claim it makes is the one it checks.
  *
  * ── THIS IS AUTHORED, AND HERE IS THE REASONING PER ROW ──────────────────────────────────────────────────────
- * The corpus ratifies the failure classes (§36.2) and the action vocabulary (§37) and states that a mapping must
- * exist. It does not state the mapping. What follows is authored under the sponsor's 2026-08-05 ratification,
- * built on one organising question: WHAT COULD PLAUSIBLY CHANGE THE OUTCOME? An action that cannot change
- * anything is not a permitted response, it is a way of failing twice.
+ * The corpus ratifies the failure classes (§36.2) and the action vocabulary (§11/§37) and states that a mapping
+ * must exist. It does not state the mapping. What follows is authored under the sponsor's 2026-08-05
+ * ratification, built on one organising question: WHAT COULD PLAUSIBLY CHANGE THE OUTCOME? An action that cannot
+ * change anything is not a permitted response, it is a way of failing twice.
  *
  * Two properties hold across every row, and both are gated in the companion test rather than merely asserted
  * here:
@@ -51,9 +59,16 @@ import type { ControlAction, ExecutionFailureClass } from '@janumipwb/rph-contra
 export const EXECUTION_FAILURE_CONTROL_ACTIONS: Readonly<
 	Record<ExecutionFailureClass, readonly ControlAction[]>
 > = {
-	// The tool itself failed. Another tool, or another approach, may still succeed; the model and the prompt are
-	// not implicated, so changing them is noise.
-	TOOL_FAILURE: ['RETRY', 'CHANGE_TOOL', 'CHANGE_TACTIC', 'ESCALATE'],
+	// The tool itself failed. Another tool, or another approach, may still succeed. The model and the prompt are
+	// NOT implicated — changing them would be noise — and their absence is what distinguishes this row from
+	// MODEL_FAILURE below rather than leaving the two interchangeable.
+	//
+	// `REQUEST_WAIVER` IS §37's `WAIVE`, UNDER THE SPELLING THIS REPOSITORY RATIFIED. DOC-002 §37 says `WAIVE`;
+	// DOC-004 §11 — the 23-value superset the contract enum is built from — says `REQUEST_WAIVER`, and the
+	// normalization is recorded (OPEN-QUESTIONS A-6). Writing §37's spelling here is a type error and a test
+	// failure, which is the correct outcome: the two documents genuinely differ, and the repository must not
+	// quietly hold both.
+	TOOL_FAILURE: ['RETRY', 'CHANGE_TOOL', 'CHANGE_TACTIC', 'REQUEST_WAIVER', 'ESCALATE'],
 	// The model failed. Symmetric to the above: a different model or a different prompt is the lever, not a
 	// different tool.
 	MODEL_FAILURE: ['RETRY', 'CHANGE_MODEL', 'REVISE_PROMPT', 'ESCALATE'],

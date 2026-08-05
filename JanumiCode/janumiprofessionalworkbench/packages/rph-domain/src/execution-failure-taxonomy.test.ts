@@ -41,7 +41,13 @@ describe('DOC-002 §36.2 execution failure classes map to permitted control acti
 			).toBeGreaterThan(0);
 	});
 
-	it('every mapped action is a ratified §37 ControlAction', () => {
+	it('every mapped action is in the ratified ControlAction enum (DOC-004 §11, 23 values)', () => {
+		// NAMED FOR WHAT IT CHECKS. An earlier draft called this "a ratified §37 ControlAction" while asserting
+		// membership in `ControlActionSchema` — and those are DIFFERENT SETS. DOC-002 §37 lists 18; the contract
+		// enum is DOC-004 §11's 23-value superset, and the two even disagree on a spelling (§37 `WAIVE` vs §11
+		// `REQUEST_WAIVER`). A test whose name cites the narrower authority while checking the wider one is the
+		// laundering shape this register keeps finding: the claim and the check must be the same claim.
+		expect(ControlActionSchema.options).toHaveLength(23);
 		for (const [cls, actions] of Object.entries(EXECUTION_FAILURE_CONTROL_ACTIONS))
 			for (const a of actions)
 				expect(ControlActionSchema.options, `${cls} permits ${a}, which is not a ControlAction`).toContain(
