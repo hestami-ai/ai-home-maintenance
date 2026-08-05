@@ -37,6 +37,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EvidenceTypeSchema } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { ontology } from './index.js';
 import type { SeedPolicy } from './ontology.types.js';
@@ -157,6 +158,77 @@ function ratifiedFindingCodes(body: string[]): string[] {
 }
 
 /**
+ * The five evidence items whose referent is CONTINGENT, and why (REG-E-026).
+ *
+ * ── THIS IS AUTHORED JUDGEMENT, NOT TRANSCRIPTION, AND IT IS THE MOST CONSEQUENTIAL CALL IN THIS WORK ──────────
+ * The corpus gives exactly one explicit cardinality signal: it hedges an item ("where applicable", "where
+ * relevant"). Everything else defaults to AT_LEAST_ONE, which is the non-vacuous reading and is what makes Gate A
+ * a real gate rather than a decoration.
+ *
+ * These five are the exception, because a blanket AT_LEAST_ONE produces two absurd results — and absurdity is
+ * legitimate evidence that a derivation is wrong:
+ *   * An intent captured from ONE clear user expression could never reach a SATISFIED intent-fidelity verdict,
+ *     because no clarification dialogue, supplied document, or user correction exists to submit. The policy would
+ *     punish the unambiguous request.
+ *   * POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking whatsoever, because this system has no
+ *     AMBIGUITY object type and no STAKEHOLDER object type — no command mints either. A requirement whose
+ *     referent cannot be produced is not a strict gate; it is a dead policy.
+ *
+ * Each entry carries a textual hook rather than a preference, and each is listed so a reviewer can reject one
+ * specific call. THE COST OF BEING WRONG HERE IS UNDER-GATING, and it is bounded and visible: seven of the
+ * thirteen required-evidence items still gate, all seven are evidenced by real objects in the reference
+ * undertaking, and `evidence-cardinality.test.ts` proves the gate still refuses.
+ */
+const CONTINGENT_EVIDENCE: Readonly<Record<string, string>> = {
+	'EV-15-02':
+		'a clarification dialogue exists only if a clarification exchange occurred; §15.5 nowhere requires that one happen',
+	'EV-15-03': 'supplied documents exist only if the user supplied any',
+	'EV-15-06': 'recorded user corrections exist only if the user corrected something',
+	'EV-16-02':
+		'§16.3 claim 6 asks that "major ambiguities have dispositions" — an intent with none satisfies that with zero, and no AMBIGUITY object type exists',
+	'EV-16-04':
+		'§16.3 claim 3 asks that stakeholders be "represented proportionally" — proportional to none known is none, and no STAKEHOLDER object type exists'
+};
+
+/** The bullet items of a subsection: `* text;` -> `text`. Trailing `;`/`.` is list punctuation, not content. */
+function bulletItems(body: string[]): string[] {
+	return body.flatMap((l) => {
+		const m = /^\*\s+(.+?)\s*[;.]?\s*$/.exec(l);
+		return m?.[1] ? [m[1].trim()] : [];
+	});
+}
+
+/** Which evidence tier a policy section declares, and the items it lists.
+ *
+ * ── READ THIS BEFORE CHANGING THE LOOKUP ──────────────────────────────────────────────────────────────────────
+ * `subsection` already warns: BY TITLE, never by number. This function is the other half of that warning, and it
+ * exists because I made its mirror image. Measuring the corpus by grepping the document for the heading
+ * "Required evidence" returns two hits (§15.5, §16.4) — and I reported that as "only 2 of 12 policies declare
+ * required evidence". It is not a fact about the corpus. It is a fact about the search string: from §17 onward
+ * the heading is plain "Evidence", and ELEVEN of twelve policies carry a list.
+ *
+ * So the question is asked STRUCTURE-FIRST: enumerate the twelve policy sections, then ask each one which
+ * heading it has. A name-first search can only ever tell you where a name is — never where the content is.
+ *
+ * THE TIER IS THE CORPUS'S OWN WORD, and it selects the field. DOC-004 §3.1 declares BOTH
+ * `requiredEvidence: EvidenceRequirement[]` and `optionalEvidence?: EvidenceRequirement[]`; two sections say
+ * "Required evidence" and nine say "Evidence". Calling all eleven required would add a word to nine sections
+ * that do not use it — the same "no added word" rule `sentenceCase` enforces on criterion text.
+ */
+function ratifiedEvidence(body: string[]): {
+	tier: 'REQUIRED' | 'OPTIONAL' | 'NONE';
+	items: string[];
+} {
+	// `subsection` anchors the title with `$`, so "## 15.5 Required evidence" cannot match 'Evidence' and
+	// "## 27.6 Evidence Sufficiency" cannot match it either. The two lookups are genuinely disjoint.
+	const required = subsection(body, 'Required evidence');
+	if (required) return { tier: 'REQUIRED', items: bulletItems(required) };
+	const optional = subsection(body, 'Evidence');
+	if (optional) return { tier: 'OPTIONAL', items: bulletItems(optional) };
+	return { tier: 'NONE', items: [] };
+}
+
+/**
  * The one documented normalization: the leading character is sentence-cased.
  *
  * DOC-004's numbered lists are inconsistently cased ("1. Desired outcomes are sufficiently explicit." but
@@ -218,6 +290,129 @@ describe('the seeded catalog conforms to DOC-004 itself', () => {
 			for (const code of Object.keys(policy.findingAnnotations ?? {})) {
 				expect(policy.findingTypes, `${policyId} annotates unlisted code ${code}`).toContain(code);
 			}
+		});
+	});
+
+	// ── THE EVIDENCE CENSUS, DERIVED FROM THE DOCUMENT (REG-E-026) ─────────────────────────────────────────────
+	//
+	// These numbers are load-bearing: 89 authored EvidenceRequirements rest on them, and the LAST count anybody
+	// quoted here ("2 of 12") was wrong by a factor of 5.5 because it came from a grep instead of a walk. So the
+	// count is DERIVED here, and reddens if the document changes underneath it.
+	describe('the ratified evidence sections (REG-E-026)', () => {
+		const census = SECTIONS.map(([section, policyId]) => {
+			const { tier, items } = ratifiedEvidence(sectionLines(section));
+			return { section, policyId, tier, items };
+		});
+
+		it('ELEVEN of twelve policies list evidence — and §20 is the one that does not', () => {
+			// Stated as the SPLIT rather than as "11", so a section losing its list and another gaining one cannot
+			// cancel out into a green.
+			expect(
+				census.filter((c) => c.tier === 'REQUIRED').map((c) => c.section),
+				'only §15.5 and §16.4 use the words "Required evidence"'
+			).toEqual(['15', '16']);
+			expect(
+				census.filter((c) => c.tier === 'OPTIONAL').map((c) => c.section),
+				'§17 onward the heading is plain "Evidence" — this is the list a name-first grep cannot see'
+			).toEqual(['17', '18', '19', '21', '22', '23', '24', '25', '26']);
+			expect(
+				census.filter((c) => c.tier === 'NONE').map((c) => c.policyId),
+				'POL-CONSTRAINT-PROPAGATION has no evidence subsection at all. Its requirements are honestly [] — ' +
+					'and this assertion is what stops "all twelve carry evidence" quietly becoming the pass condition.'
+			).toEqual(['pol_constraint_propagation']);
+		});
+
+		it('the item counts are the document’s, per policy and in total', () => {
+			// Per-policy, so a mis-parse in one section cannot hide inside a correct total.
+			expect(Object.fromEntries(census.map((c) => [c.section, c.items.length]))).toEqual({
+				'15': 7,
+				'16': 6,
+				'17': 7,
+				'18': 8,
+				'19': 9,
+				'20': 0,
+				'21': 11,
+				'22': 7,
+				'23': 8,
+				'24': 8,
+				'25': 9,
+				'26': 9
+			});
+			expect(census.reduce((n, c) => n + c.items.length, 0)).toBe(89);
+		});
+
+		// ── THE SEEDED SIDE: 89 authored requirements, checked against the document they claim to transcribe ────
+		//
+		// `description` is the corpus item verbatim. `id` and `cardinality` follow stated rules. Everything here is
+		// mechanically checkable — which is the point: the two fields that are NOT (evidenceType, purpose) are
+		// exactly the two this cannot defend, and they are named as authored in every policy's sourceSection.
+		describe.each(SECTIONS)('§%s -> %s evidence', (section, policyId) => {
+			const { tier, items } = ratifiedEvidence(sectionLines(section));
+			const policy = policies.get(policyId);
+			const seeded = tier === 'REQUIRED' ? policy?.requiredEvidence : policy?.optionalEvidence;
+			const other = tier === 'REQUIRED' ? policy?.optionalEvidence : policy?.requiredEvidence;
+
+			it('lands in the field the corpus heading selects, and the other stays empty', () => {
+				expect(seeded ?? [], `§${section} is a "${tier}" section`).toHaveLength(items.length);
+				// The one that matters: a §17-§26 list must NOT reach `requiredEvidence`, because that field gates
+				// Gate A. Putting 76 unratified-as-required items there would make nine policies unsatisfiable.
+				expect(other ?? [], `${policyId} must not populate both evidence fields`).toEqual([]);
+			});
+
+			it('every description is the ratified item, verbatim and in document order', () => {
+				(seeded ?? []).forEach((r, i) => {
+					expect(r.description, `${policyId}/${r.id} is not §${section}'s ratified item ${i + 1}`).toBe(
+						sentenceCase(items[i] ?? '')
+					);
+				});
+			});
+
+			it('ids are EV-<section>-<NN> by document order — the stated derivation, not a mint', () => {
+				expect((seeded ?? []).map((r) => r.id)).toEqual(
+					items.map((_, i) => `EV-${section}-${String(i + 1).padStart(2, '0')}`)
+				);
+			});
+
+			it('cardinality follows the hedge rule plus the five NAMED contingent items', () => {
+				// TWO clauses, and the second one is authored judgement rather than transcription — so it is
+				// enumerated here, item by item, where a reviewer can disagree with a specific call instead of
+				// with a vibe. EXACTLY_ONE / ONE_PER_SUBJECT / ONE_PER_OBLIGATION are ratified spellings the
+				// corpus never applies to any item, and applying one would be invention.
+				(seeded ?? []).forEach((r, i) => {
+					const hedged = /\bwhere (applicable|relevant)\b/i.test(items[i] ?? '');
+					const contingent = Object.hasOwn(CONTINGENT_EVIDENCE, r.id);
+					expect(r.cardinality, `${policyId}/${r.id}`).toBe(
+						hedged || contingent ? 'ZERO_OR_MORE' : 'AT_LEAST_ONE'
+					);
+				});
+			});
+
+			it('the derived fields are uniform, and the honest empties are empty', () => {
+				for (const r of seeded ?? []) {
+					// §15.9: "SATISFIED only when ... required evidence is admissible" — a condition of the VERDICT.
+					// Nothing gets 'ALL', which is what keeps every assessment able to reach ASSESSING.
+					expect(r.requiredForDispositions, `${policyId}/${r.id}`).toBe('SATISFIED_ONLY');
+					// Fail-closed: the corpus nowhere states that a requirement may be waived.
+					expect(r.mayBeWaived, `${policyId}/${r.id}`).toBe(false);
+					// §6.2 states admissibility globally, not per requirement.
+					expect(r.admissibilityRules, `${policyId}/${r.id}`).toEqual([]);
+					expect(r, `${policyId}/${r.id} must not invent a freshnessRule`).not.toHaveProperty(
+						'freshnessRule'
+					);
+					// AUTHORED, but constrained to the ratified enum and required to say something.
+					expect(EvidenceTypeSchema.options, `${policyId}/${r.id}`).toContain(r.evidenceType);
+					expect(r.purpose.length, `${policyId}/${r.id} purpose is not a sentence`).toBeGreaterThan(20);
+				}
+			});
+		});
+
+		it('CONTROL: the reader returns real text, not empty strings it then counts', () => {
+			// A parser that yields 89 empty strings would satisfy every count above. This is the assertion that
+			// makes "89" mean 89 ITEMS rather than 89 successful regex matches.
+			const all = census.flatMap((c) => c.items);
+			expect(all.every((t) => t.length > 2)).toBe(true);
+			expect(all[0], 'the first item of §15.5, verbatim').toBe('originating expression');
+			expect(census.find((c) => c.section === '26')?.items.at(-1)).toBe('superseded baseline');
 		});
 	});
 

@@ -843,6 +843,99 @@ export function driveReferenceUndertaking(
 	const policiesGoverning = (pwuId: string): readonly string[] =>
 		requireGoverningPolicies(handle, pwuId);
 
+	// ── THE EVIDENCE THIS FIXTURE GENUINELY HAS (REG-E-026) ────────────────────────────────────────────────────
+	//
+	// Keyed by DOC-004 §6.1 requirement id. Each entry names a REAL object this drive created, so the Evidence
+	// minted for it references something that exists. A requirement ABSENT from this map is one the reference
+	// undertaking cannot evidence — and the assessment says so instead of pretending.
+	//
+	// THAT ABSENCE IS THE FIXTURE'S OWN DESIGN, NOT AN OVERSIGHT HERE. DOC-006 §1.2 chose this intent because it
+	// is "materially underspecified": there is no clarification dialogue, no supplied documents, no recorded user
+	// corrections, no ambiguity catalog (`ProvisionIntent` passes `ambiguityIds: []`) and no stakeholder catalog
+	// (`stakeholderIds: []`). An intent-fidelity assessment that cannot see those SHOULD fall short of SATISFIED.
+	//
+	// WHY NOTHING IS INVENTED TO FILL THE GAP. `earnAssurance`'s own header records that it once "conjured
+	// evidence no work had made" and that this was fixed. Minting an Evidence object called "clarification
+	// dialogue" for a dialogue that never happened would regress that closed finding to keep a drive green —
+	// trading a real defect for a green number, which is the disease this register exists to treat.
+	const FIXTURE_EVIDENCE: Readonly<
+		Record<string, { readonly of: string; readonly evidenceType: string; readonly note: string }>
+	> = {
+		// DOC-004 §15.5 — POL-INTENT-FIDELITY.
+		'EV-15-01': {
+			of: R.intentId,
+			evidenceType: 'SOURCE',
+			note: "the INTENT object's originatingExpression, captured by CaptureIntent"
+		},
+		'EV-15-04': {
+			of: R.intentId,
+			evidenceType: 'ARTIFACT',
+			note: 'the formalized Product Intent produced by FormalizeIntent and approved by ApproveIntent'
+		},
+		'EV-15-05': {
+			of: C.multiTenancyConstraint,
+			evidenceType: 'ARTIFACT',
+			note: 'the multi-tenancy CONSTRAINT asserted from the intent (corpus §25)'
+		},
+		// DOC-004 §16.4 — POL-INTENT-COMPLETENESS.
+		'EV-16-01': {
+			of: R.intentId,
+			evidenceType: 'ARTIFACT',
+			note: 'the approved Product Intent'
+		},
+		'EV-16-03': {
+			of: C.multiTenancyConstraint,
+			evidenceType: 'ARTIFACT',
+			note: 'the constraint catalog — this undertaking asserts one constraint'
+		},
+		'EV-16-05': {
+			of: R.intentId,
+			evidenceType: 'ARTIFACT',
+			note: "the intent's declared nonGoals"
+		},
+		'EV-16-06': {
+			of: R.intentDef,
+			evidenceType: 'ARTIFACT',
+			note: "the PWU's declared riskProfile (consequence, uncertainty, irreversibility, sensitivity, exposure)"
+		}
+	};
+
+	/** Evidence objects minted for requirements, once each — the same governed object may satisfy the same
+	 *  requirement on more than one assessment, and minting it twice would assert two artifacts where there is one. */
+	const evidenceForRequirement = new Map<string, string>();
+
+	/** Which of a policy's requirements gate `disposition`, ignoring those zero instances satisfy. Mirrors Gate A
+	 *  in `completeAssuranceAssessment` deliberately: if this drive and that gate disagreed, the drive would either
+	 *  submit evidence nothing asked for or be refused for evidence it thought it had supplied. */
+	const gatingRequirements = (
+		policyId: string,
+		disposition: string
+	): readonly { readonly id: string; readonly description: string }[] => {
+		const state = handle.loadObject(policyId)?.state as
+			| {
+					requiredEvidence?: readonly {
+						id?: string;
+						description?: string;
+						cardinality?: string;
+						requiredForDispositions?: string;
+					}[];
+			  }
+			| undefined;
+		return (state?.requiredEvidence ?? [])
+			.filter((r) => {
+				const rfd = r?.requiredForDispositions;
+				return (
+					rfd === 'ALL' ||
+					rfd === 'CONDITIONAL_OR_SATISFIED' ||
+					(rfd === 'SATISFIED_ONLY' && disposition === 'SATISFIED')
+				);
+			})
+			.filter((r) => r?.cardinality !== 'ZERO_OR_MORE')
+			.flatMap((r) =>
+				typeof r?.id === 'string' ? [{ id: r.id, description: r.description ?? r.id }] : []
+			);
+	};
+
 	const earnAssurance = (
 		pwuId: string,
 		produced: { readonly claimId: string; readonly evidenceId: string },
@@ -931,11 +1024,93 @@ export function driveReferenceUndertaking(
 				});
 			}
 
+		// 4b. THE POLICY'S OWN REQUIRED EVIDENCE (REG-E-026). Until the catalog's 89 §6.1 requirements were
+		//     delivered, `requiredEvidence` was `[]` on every shipped policy and this step did not need to exist:
+		//     Gate A computed required-minus-received over an empty set and admitted everything. It is real now.
+		//
+		//     For each governing policy: submit the evidence this undertaking GENUINELY HAS, and find out what it
+		//     is short of. Both halves matter — submitting nothing would stall the drive, and submitting something
+		//     for everything would be the fiction.
+		const shortfall = new Map<string, readonly { readonly id: string; readonly description: string }[]>();
+		for (const [i, pid] of governing.entries()) {
+			const missing: { readonly id: string; readonly description: string }[] = [];
+			for (const req of gatingRequirements(pid, disposition)) {
+				const have = FIXTURE_EVIDENCE[req.id];
+				if (!have) {
+					missing.push(req);
+					continue;
+				}
+				let evId = evidenceForRequirement.get(req.id);
+				if (!evId) {
+					evId = mintId('evd');
+					evidenceForRequirement.set(req.id, evId);
+					// A REAL Evidence object, referencing a REAL governed object this drive created. `of` is the
+					// referent; if that object did not exist the reference would dangle and the fixture would be
+					// asserting an artifact it never made.
+					send('ProposeEvidence', 'EVIDENCE', evId, {
+						evidenceId: evId,
+						evidenceType: have.evidenceType,
+						contentReference: { kind: 'REFERENCE', objectId: have.of, note: have.note },
+						producedBy: ACTOR,
+						supportsClaimIds: [claimId],
+						contradictsClaimIds: [],
+						scope: `${req.description} (${have.note})`,
+						limitations: [],
+						capturedAt: '2026-07-12T00:00:00Z'
+					});
+					send('AdmitEvidence', 'EVIDENCE', evId, {
+						admissibilityAssessmentId: assessmentIds[i]!,
+						admittedScope: req.description,
+						admittedClaimIds: [claimId]
+					});
+				}
+				send('SubmitEvidenceForAssessment', 'ASSURANCE_ASSESSMENT', assessmentIds[i]!, {
+					evidenceId: evId,
+					satisfiesRequirementId: req.id,
+					evidenceType: have.evidenceType
+				});
+			}
+			if (missing.length > 0) shortfall.set(assessmentIds[i]!, missing);
+		}
+
+		// 4c. THE SHORTFALL, RECORDED AS A FINDING ON THE ASSESSMENT THAT HAS IT — not as a silent downgrade.
+		//     An assessment that cannot see evidence its policy requires has found something, and §9 findings are
+		//     how this system says so. Recorded per assessment, because observations are keyed by assessment and a
+		//     peer's gates run over its own population (REG-F-029 review finding (e)).
+		for (const [asmId, missing] of shortfall)
+			send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintId('obs'), {
+				assessmentId: asmId,
+				observationType: 'FINDING',
+				severity: 'MATERIAL',
+				statement: `Required evidence not available in this undertaking: ${missing
+					.map((m) => `${m.id} (${m.description})`)
+					.join('; ')}. DOC-006 §1.2 selected a materially underspecified originating expression, so no clarification dialogue, supplied documents, recorded user corrections, ambiguity catalog or stakeholder catalog exists to submit.`,
+				evidenceIds: [evidenceId]
+			});
+
 		// 5. The VERDICT — a full DOC-007 §20 ValidatorResult naming what was judged, at which version, on which
 		//    evidence, and how it came out. The (d2) event gate validates the event this produces.
 		//    ONE PER ASSESSMENT, each naming ITS OWN policy: a ValidatorResult whose `policyId` did not match the
 		//    assessment's would be a verdict attributed to criteria it was not measured against.
-		for (const [i, pid] of governing.entries())
+		//
+		//    THE DISPOSITION IS NOW PER ASSESSMENT (REG-E-026). A policy whose required evidence this undertaking
+		//    cannot supply does not get the caller's requested SATISFIED — it gets CONDITIONALLY_SATISFIED, which
+		//    is what the evidence actually supports. Gate A would refuse the stronger verdict anyway; asking for it
+		//    and being refused, or lowering it here, differ only in whether the drive tells the truth first.
+		//
+		//    WHAT THIS DELIBERATELY DOES NOT DO: change the PWU's own assurance axis. How N assessment verdicts
+		//    roll up into one PWU disposition is `AggregateAssuranceDisposition` — six ratified states with no
+		//    arrows, already filed as REG-E-024(b). Inventing a roll-up rule here would settle an open elicitation
+		//    by implementation, which is exactly what §0.3 forbids.
+		for (const [i, pid] of governing.entries()) {
+			const missing = shortfall.get(assessmentIds[i]!) ?? [];
+			const reached = missing.length > 0 ? 'CONDITIONALLY_SATISFIED' : disposition;
+			const residual = [
+				...observations.map((o) => o.statement),
+				...(missing.length > 0
+					? [`Unmet required evidence: ${missing.map((m) => m.id).join(', ')}`]
+					: [])
+			];
 			send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentIds[i]!, {
 				validatorResult: {
 					validatorId: 'reference-undertaking.reviewer',
@@ -946,21 +1121,25 @@ export function driveReferenceUndertaking(
 					subjectObjectIds: [pwuId],
 					subjectSemanticVersions: { [pwuId]: 1 },
 					claimResults: [],
-					evidenceConsideredIds: [evidenceId],
+					evidenceConsideredIds: [
+						evidenceId,
+						...[...evidenceForRequirement.values()].filter((e) => e !== evidenceId)
+					],
 					evidenceRejected: [],
 					observations: observations.map((o) => ({
 						severity: o.severity,
 						statement: o.statement,
 						subjectObjectIds: [pwuId]
 					})),
-					dispositionRecommendation: disposition,
+					dispositionRecommendation: reached,
 					recommendedControlActions: [],
-					residualUncertainty: observations.map((o) => o.statement),
+					residualUncertainty: residual,
 					limitations: [],
 					executionProvenance: { evaluator: EVALUATOR }
 				},
 				producer: ACTOR
 			});
+		}
 		return assessmentIds;
 	};
 

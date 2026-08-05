@@ -1,9 +1,14 @@
 // THE ONTOLOGY DELIVERY CENSUS — which authored ontology fields reach the runtime, and which are dropped.
 //
 // ── WHY IT EXISTS ────────────────────────────────────────────────────────────────────────────────────────────
-// REG-F-022: twelve ratified catalog policies declare `requiredEvidenceTypes`, and `seedAdditivePolicies` builds
-// its `CreateAssurancePolicy` payload as an explicit eleven-key literal that does not name it. The authored value
-// never reaches an AssurancePolicy object, so Gate A reads an empty set on every policy the product can produce.
+// REG-F-022: twelve ratified catalog policies declared `requiredEvidenceTypes`, and `seedAdditivePolicies` built
+// its `CreateAssurancePolicy` payload as an explicit eleven-key literal that did not name it. The authored value
+// never reached an AssurancePolicy object, so Gate A read an empty set on every policy the product could produce.
+//
+// CLOSED 2026-08-05 (REG-E-026). The field is SUPERSEDED — not merely wired — by `requiredEvidence` /
+// `optionalEvidence`, DOC-004 §6.1's ratified shape, carrying the 89 evidence items §15-§26 actually list. This
+// file keeps its shape and its teeth: the unexplained list is now empty, and the assertions below are what stop
+// that emptiness being reached by adding an exemption instead of a wire.
 //
 // NOTHING CAUGHT IT, AND NOTHING WOULD CATCH THE NEXT ONE. The field is absent from `EngineSeedPolicy` — the
 // engine's own port type for an ontology policy — so it is structurally invisible past the package boundary and
@@ -110,7 +115,15 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 			'AUTHORED ONTOLOGY FIELDS THAT REACH NOTHING. Each is governance content someone wrote into the ' +
 				'ratified catalog that no runtime object carries — REG-F-022\'s exact shape. Deliver it, or add a ' +
 				'row to ACCOUNTED_FOR saying which route its content takes. "Not yet" is not a route.'
-		).toEqual(['requiredEvidenceTypes']);
+		).toEqual([]);
+		// EMPTY SINCE 2026-08-05 (REG-E-026). This list held `requiredEvidenceTypes` — REG-F-022's own instance —
+		// for as long as that field existed. It is now removed from the ontology, superseded by `requiredEvidence`
+		// and `optionalEvidence`, which ARE delivered. An empty list here is the strongest state this census can
+		// report: nothing authored reaches nothing.
+		//
+		// AND IT MUST NOT BE ACHIEVED BY EXEMPTION. `ACCOUNTED_FOR` still holds only the four TRANSFORMED/internal
+		// rows it always did; the staleness assertion below is what stops a future author reaching this same green
+		// by adding a row instead of a wire.
 	});
 
 	// The accounting must stay honest in the other direction too: a stale exemption is how a list like this rots
@@ -162,18 +175,27 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 			).toBeGreaterThan(0);
 	});
 
-	// REG-F-022's own instance, asserted directly so the entry has a live citation rather than a prose claim.
-	it('REG-F-022: every catalog policy declares requiredEvidenceTypes and NO payload carries it', () => {
-		const declaring = ontology.seedPolicies.filter(
-			(p) => ((p as { requiredEvidenceTypes?: readonly string[] }).requiredEvidenceTypes ?? []).length > 0
-		);
-		expect(declaring.length).toBe(ontology.seedPolicies.length);
-		expect(deliveredKeys()).not.toContain('requiredEvidenceTypes');
+	// REG-F-022's own instance, now asserted in its CLOSED form so the register entry keeps a live citation.
+	it('REG-F-022 CLOSED: the evidence the catalog declares reaches the payload', () => {
+		// The finding was: 12 policies declared `requiredEvidenceTypes` and the payload named eleven fields, not
+		// that one. The field is gone — superseded, not merely wired — and both ratified fields are delivered.
 		expect(
-			deliveredKeys(),
-			'the field the policy object would need is requiredEvidence (a 9-field EvidenceRequirement array); the ' +
-				'ontology carries ONE of those nine, as readonly string[], so delivering it is authoring against a ' +
-				'ratified schema and not a mapping — which is why REG-F-022 is filed rather than patched'
-		).not.toContain('requiredEvidence');
+			ontology.seedPolicies.some((p) => 'requiredEvidenceTypes' in p),
+			'requiredEvidenceTypes is superseded by requiredEvidence/optionalEvidence; keeping both would be the ' +
+				'drifting twin REG-F-029 review finding (c) caught, on the field REG-F-022 is about'
+		).toBe(false);
+		expect(deliveredKeys()).toContain('requiredEvidence');
+		expect(deliveredKeys()).toContain('optionalEvidence');
+		// And the content is non-empty where the corpus has content — a delivered pair of empty arrays would
+		// satisfy every assertion above while reproducing the exact vacuum the finding is about.
+		const creates = capturePolicySeeding().filter((c) => c.commandType === 'CreateAssurancePolicy');
+		const items = creates.reduce((n, c) => {
+			const p = c.payload as {
+				requiredEvidence?: readonly unknown[];
+				optionalEvidence?: readonly unknown[];
+			};
+			return n + (p.requiredEvidence?.length ?? 0) + (p.optionalEvidence?.length ?? 0);
+		}, 0);
+		expect(items, 'the twelve catalog policies carry DOC-004’s 89 ratified evidence items').toBe(89);
 	});
 });

@@ -635,11 +635,6 @@
         "PRODUCT_BOUNDARY",
         "PRODUCT_REALIZATION"
       ],
-      "requiredEvidenceTypes": [
-        "SOURCE",
-        "ARTIFACT",
-        "TRACE"
-      ],
       "criteria": [
         {
           "id": "IF-01",
@@ -711,7 +706,7 @@
         "REQUEST_HUMAN_DECISION",
         "REJECT"
       ],
-      "sourceSection": "DOC-004 §15 (POL-INTENT-FIDELITY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§15.2); the 5 criterion descriptions are \"15.6 Criteria\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §15.7 verbatim in document order. Criterion ids AND names are ratified by \"15.6 Criteria\" (\"### ID Name\" headings). permittedControlActions transcribed from §15.10. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §15 (POL-INTENT-FIDELITY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§15.2); the 5 criterion descriptions are \"15.6 Criteria\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §15.7 verbatim in document order. Criterion ids AND names are ratified by \"15.6 Criteria\" (\"### ID Name\" headings). permittedControlActions transcribed from §15.10. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 7 items of DOC-004 §15's \"Required evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `requiredEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 7 items of DOC-004 §15's \"Required evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `requiredEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "SOLUTION_SUBSTITUTION": {
           "defaultSeverity": "BLOCKING",
@@ -758,7 +753,80 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "MATERIAL by default, not BLOCKING. DOC-003 §25's blocking conditions key to the formalized objective, mandatory constraints, ambiguity, and inferred solutions. The one that might reach this code is \"formalized objective contradicts user expression\", but DOC-004 §15.6 separates IF-01 objective fidelity from IF-02 boundary fidelity, where in-scope and out-of-scope statements live — so a non-goal is not the formalized objective, and the condition does not reach it. Nothing ratified decides this code; the default stands."
         }
-      }
+      },
+      "requiredEvidence": [
+        {
+          "id": "EV-15-01",
+          "evidenceType": "SOURCE",
+          "description": "Originating expression",
+          "purpose": "The user's own words are the referent every fidelity criterion is measured against; without them IF-01 cannot distinguish representing a need from substituting a preferred solution.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-15-02",
+          "evidenceType": "SOURCE",
+          "description": "Clarification dialogue",
+          "purpose": "Records what was asked and what was answered, so an interpretation can be traced to a user response rather than to the synthesizer’s inference (IF-04).",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-15-03",
+          "evidenceType": "SOURCE",
+          "description": "Supplied documents",
+          "purpose": "Material the user provided as authoritative; scope and constraints asserted here bind the intent (IF-02, IF-03).",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-15-04",
+          "evidenceType": "ARTIFACT",
+          "description": "Proposed Product Intent",
+          "purpose": "The formalization under assessment — the object whose fidelity to the originating expression is the entire question.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-15-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Constraints",
+          "purpose": "The explicit user constraints IF-03 requires be preserved; without the constraint set, preservation cannot be checked at all.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-15-06",
+          "evidenceType": "SOURCE",
+          "description": "Recorded user corrections",
+          "purpose": "A correction is the user exercising authority over an interpretation; an intent that contradicts one has drifted from the need (IF-01).",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-15-07",
+          "evidenceType": "ARTIFACT",
+          "description": "Prior intent version where applicable",
+          "purpose": "Where the intent is a revision, its predecessor is what makes an unauthorized change of scope or constraint visible (IF-02).",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ],
+      "optionalEvidence": []
     },
     {
       "policyId": "pol_intent_completeness",
@@ -772,10 +840,6 @@
       "appliesToPwuKinds": [
         "INTENT_AND_PRODUCT_DEFINITION",
         "PRODUCT_BOUNDARY"
-      ],
-      "requiredEvidenceTypes": [
-        "ARTIFACT",
-        "ANALYSIS"
       ],
       "criteria": [
         {
@@ -856,7 +920,7 @@
         "RESHAPE_PWU",
         "REQUEST_HUMAN_DECISION"
       ],
-      "sourceSection": "DOC-004 §16 (POL-INTENT-COMPLETENESS). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§16.1); the 6 criterion descriptions are \"16.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §16.5 verbatim in document order. PRECEDENTED DERIVATION: \"16.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). RAISED under the sponsor's standing grant (2026-07-18; HARMONIZATION-LOG PART 5) to include the control-action FLOOR {REQUEST_HUMAN_DECISION, RESHAPE_PWU} — the intersection of the four ratified control-action sets, which is also the principled universal minimum: a policy that can raise a blocking finding must be able to escalate to a human (REQUEST_HUMAN_DECISION) rather than invent a resolution, and to take the minimal governed corrective action (RESHAPE_PWU). This policy under-declared the floor before; its prior authored value is RETAINED and unioned with it. Still AUTHORED — the floor is derived, not ratified here. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §16 (POL-INTENT-COMPLETENESS). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§16.1); the 6 criterion descriptions are \"16.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §16.5 verbatim in document order. PRECEDENTED DERIVATION: \"16.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). RAISED under the sponsor's standing grant (2026-07-18; HARMONIZATION-LOG PART 5) to include the control-action FLOOR {REQUEST_HUMAN_DECISION, RESHAPE_PWU} — the intersection of the four ratified control-action sets, which is also the principled universal minimum: a policy that can raise a blocking finding must be able to escalate to a human (REQUEST_HUMAN_DECISION) rather than invent a resolution, and to take the minimal governed corrective action (RESHAPE_PWU). This policy under-declared the floor before; its prior authored value is RETAINED and unioned with it. Still AUTHORED — the floor is derived, not ratified here. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 6 items of DOC-004 §16's \"Required evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `requiredEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 6 items of DOC-004 §16's \"Required evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `requiredEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "MISSING_DESIRED_OUTCOME": {
           "defaultSeverity": "MATERIAL",
@@ -900,7 +964,70 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "This code pulls hardest toward BLOCKING, since it defeats the policy's own gate, but MATERIAL is sufficient to that job: under DOC-004 §10.3 a MATERIAL open finding already forecloses SATISFIED, so emitting it at MATERIAL prevents the very authorization it warns of, and REJECTED remains in range for the severe case. BLOCKING would additionally strip CONDITIONALLY_SATISFIED and INCONCLUSIVE — both listed in §16.6 for this policy — leaving the policy's own headline failure unable to reach two of its four ratified dispositions. No blocking condition in either document names it."
         }
-      }
+      },
+      "requiredEvidence": [
+        {
+          "id": "EV-16-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Product Intent",
+          "purpose": "The intent whose completeness is assessed; every claim in §16.3 is evaluated over it.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-16-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Ambiguity catalog",
+          "purpose": "Claim 6 asks whether major ambiguities have dispositions; an ambiguity absent from the catalog is the FALSE_COMPLETENESS this policy exists to catch.",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-16-03",
+          "evidenceType": "ARTIFACT",
+          "description": "Constraint catalog",
+          "purpose": "Claim 4 requires that mandatory constraints be recorded; the catalog is where that is decidable.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-16-04",
+          "evidenceType": "ARTIFACT",
+          "description": "Stakeholder and actor catalog",
+          "purpose": "Claim 3 asks whether known stakeholders and actors are represented proportionally.",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-16-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Non-goals",
+          "purpose": "Explicit exclusions bound the product; without them UNBOUNDED_PRODUCT_SCOPE cannot be distinguished from deliberate breadth (claim 2).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-16-06",
+          "evidenceType": "ARTIFACT",
+          "description": "Risk profile",
+          "purpose": "Completeness is proportional to risk, consequence, uncertainty and irreversibility (§16.1), so the profile sets the standard the other claims are judged against.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ],
+      "optionalEvidence": []
     },
     {
       "policyId": "pol_assumption_disclosure",
@@ -920,11 +1047,6 @@
         "WORK_DECOMPOSITION",
         "PRODUCT_IMPLEMENTATION",
         "INTEGRATED_PRODUCT_VALIDATION"
-      ],
-      "requiredEvidenceTypes": [
-        "ARTIFACT",
-        "SOURCE",
-        "ANALYSIS"
       ],
       "criteria": [
         {
@@ -1008,7 +1130,7 @@
         "REQUEST_HUMAN_DECISION",
         "ESCALATE"
       ],
-      "sourceSection": "DOC-004 §17 (POL-ASSUMPTION-DISCLOSURE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§17.1); the 6 criterion descriptions are \"17.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §17.5 verbatim in document order. PRECEDENTED DERIVATION: \"17.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. permittedControlActions transcribed from §17.8. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §17 (POL-ASSUMPTION-DISCLOSURE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§17.1); the 6 criterion descriptions are \"17.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §17.5 verbatim in document order. PRECEDENTED DERIVATION: \"17.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. permittedControlActions transcribed from §17.8. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 7 items of DOC-004 §17's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 7 items of DOC-004 §17's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "HIDDEN_MATERIAL_ASSUMPTION": {
           "defaultSeverity": "MATERIAL",
@@ -1053,7 +1175,80 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "No ratified condition names contradiction between assumptions; DOC-003 §27 is keyed to a single critical assumption's lack of assessment, not to consistency across a set. Not ADVISORY: an inconsistent set guarantees at least one false premise beneath work already performed, which the policy answers with CLARIFY and REQUEST_HUMAN_DECISION (§17.8) rather than with a note."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-17-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Artifact under assessment",
+          "purpose": "The work whose premises are being surfaced; assumptions are read out of it rather than asserted about it.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-17-02",
+          "evidenceType": "ANALYSIS",
+          "description": "Execution rationale",
+          "purpose": "The reasoning that produced the artifact is where an unstated premise is most often visible (claim 1).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-17-03",
+          "evidenceType": "SOURCE",
+          "description": "Prompt and context provenance where relevant",
+          "purpose": "What the agent was given bounds what it could have known; a premise absent from the context was supplied by the model, not by the record (claim 2).",
+          "cardinality": "ZERO_OR_MORE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-17-04",
+          "evidenceType": "SOURCE",
+          "description": "Known facts",
+          "purpose": "Claim 2 requires assumptions be distinguished from facts; the established fact set is the other side of that distinction.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-17-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Constraints",
+          "purpose": "A premise that contradicts an active constraint is an assumption silently authorizing prohibited work (claim 6).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-17-06",
+          "evidenceType": "APPROVAL",
+          "description": "Decisions",
+          "purpose": "An authorized decision is not an assumption; without the decision record the two are indistinguishable (claim 2).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-17-07",
+          "evidenceType": "SOURCE",
+          "description": "External sources",
+          "purpose": "A premise attributed to an outside source is verifiable only against that source (claim 5).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_requirement_coverage",
@@ -1068,11 +1263,6 @@
         "PRODUCT_BEHAVIOR_DEFINITION",
         "USER_JOURNEY_DEFINITION",
         "REQUIREMENT_DEFINITION"
-      ],
-      "requiredEvidenceTypes": [
-        "SOURCE",
-        "ARTIFACT",
-        "TRACE"
       ],
       "criteria": [
         {
@@ -1153,7 +1343,7 @@
         "REQUEST_HUMAN_DECISION",
         "RESHAPE_PWU"
       ],
-      "sourceSection": "DOC-004 §18 (POL-REQUIREMENT-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§18.1); the 6 criterion descriptions are \"18.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §18.5 verbatim in document order. PRECEDENTED DERIVATION: \"18.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §18 (POL-REQUIREMENT-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§18.1); the 6 criterion descriptions are \"18.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §18.5 verbatim in document order. PRECEDENTED DERIVATION: \"18.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 8 items of DOC-004 §18's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 8 items of DOC-004 §18's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "UNCOVERED_OUTCOME": {
           "defaultSeverity": "BLOCKING",
@@ -1205,7 +1395,90 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "Nothing ratified decides this code, and it is the one §18.5 code that falsifies none of §18.3's six claims — duplication defeats neither representation nor exclusion, so §18.1's purpose is still met with a duplicate present and the policy's claims stand. That is the positive reason to drop below the MATERIAL default rather than an appeal to the finding being minor. DOC-003 §28 lists 'duplicate requirement' among Observations only, its own word for the illustrative tier. ADVISORY not INFORMATIONAL because the finding still directs a control action (consolidation) rather than only recording a fact; ADVISORY not MATERIAL because no claim this policy evaluates is open while it stands."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-18-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Approved intent",
+          "purpose": "The authorized outcomes that requirements must cover; coverage is meaningless without the thing being covered (claim 1).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Outcome catalog",
+          "purpose": "Claim 1 asks whether each mandatory outcome is represented; the catalog is what enumerates them.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-03",
+          "evidenceType": "ARTIFACT",
+          "description": "Capability map",
+          "purpose": "UNCOVERED_CAPABILITY is decidable only against a declared capability set.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-04",
+          "evidenceType": "ARTIFACT",
+          "description": "User journeys",
+          "purpose": "Claim 2 asks whether each critical journey has applicable requirements.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Scenarios",
+          "purpose": "Claim 4 concerns important failure paths, which live in scenarios rather than in headline outcomes.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-06",
+          "evidenceType": "ARTIFACT",
+          "description": "Constraints",
+          "purpose": "Claim 3 requires each mandatory constraint create enforceable obligations; CONSTRAINT_WITHOUT_OBLIGATION is decided here.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-07",
+          "evidenceType": "ARTIFACT",
+          "description": "Requirement catalog",
+          "purpose": "The requirement set under assessment — the covering side of every coverage claim.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-18-08",
+          "evidenceType": "TRACE",
+          "description": "Traceability matrix",
+          "purpose": "Coverage is a relation, not a count; the matrix is what makes ORPHAN_REQUIREMENT and UNCOVERED_OUTCOME separately decidable (claim 5).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_decomposition_coverage",
@@ -1222,11 +1495,6 @@
         "IMPLEMENTATION_PLANNING",
         "WORK_DECOMPOSITION",
         "PRODUCT_REALIZATION"
-      ],
-      "requiredEvidenceTypes": [
-        "ARTIFACT",
-        "TRACE",
-        "ANALYSIS"
       ],
       "criteria": [
         {
@@ -1322,7 +1590,7 @@
         "REQUEST_HUMAN_DECISION",
         "REJECT"
       ],
-      "sourceSection": "DOC-004 §19 (POL-DECOMPOSITION-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§19.1); the 7 criterion descriptions are \"19.5 Criteria\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 10 finding codes are §19.6 verbatim in document order. Criterion ids AND names are ratified by \"19.5 Criteria\" (\"### ID Name\" headings). permittedControlActions transcribed from §19.8. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §19 (POL-DECOMPOSITION-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§19.1); the 7 criterion descriptions are \"19.5 Criteria\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 10 finding codes are §19.6 verbatim in document order. Criterion ids AND names are ratified by \"19.5 Criteria\" (\"### ID Name\" headings). permittedControlActions transcribed from §19.8. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 9 items of DOC-004 §19's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 9 items of DOC-004 §19's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "MISSING_OBLIGATION_ALLOCATION": {
           "defaultSeverity": "BLOCKING",
@@ -1387,7 +1655,100 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "MATERIAL by default; no blocking condition names a false coverage claim. The nearest condition, 'missing mandatory obligation' (DOC-003 §29, DOC-004 §19.7), names the absence of an obligation from the map — that is MISSING_OBLIGATION_ALLOCATION's case and blocks there. This code fires where mandatory obligations do carry allocation entries but the completeness assertion is unsupported: the obligation is not missing, the claim is false. Where a false claim conceals an actually-missing mandatory obligation, MISSING_OBLIGATION_ALLOCATION fires alongside and blocks on its own footing, so MATERIAL here does not let that case through. Not ADVISORY: an unsupported coverage claim obliges correction of the claim."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-19-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Parent PWU",
+          "purpose": "The work being decomposed; every coverage claim is relative to it.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Parent intent",
+          "purpose": "Claim 6 asks whether the decomposition preserves intent, which is a property of the parent’s intent rather than of any child.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-03",
+          "evidenceType": "ARTIFACT",
+          "description": "Parent obligations",
+          "purpose": "Claim 1 requires every mandatory obligation be allocated, retained, satisfied or waived; the obligation set is that claim’s domain.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-04",
+          "evidenceType": "ARTIFACT",
+          "description": "Constraints",
+          "purpose": "DC-02 requires applicable constraints be propagated or retained across the decomposition.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Assumptions",
+          "purpose": "An assumption held by the parent and dropped by every child is an unallocated premise, not merely a missing note.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-06",
+          "evidenceType": "ARTIFACT",
+          "description": "Child PWUs",
+          "purpose": "The covering set; claim 2 asks whether each child has a coherent professional purpose.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-07",
+          "evidenceType": "TRACE",
+          "description": "Allocations",
+          "purpose": "The parent-obligation-to-child mapping — the relation DC-01’s \"no mandatory obligation silently disappears\" is checked over.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-08",
+          "evidenceType": "TRACE",
+          "description": "Dependency graph",
+          "purpose": "Claim 3 requires sibling dependencies be explicit rather than discovered during recomposition.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-19-09",
+          "evidenceType": "ARTIFACT",
+          "description": "Recomposition contract",
+          "purpose": "Claim 5 asks whether recomposition is feasible; the contract is where that is asserted and therefore checkable.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_constraint_propagation",
@@ -1401,10 +1762,6 @@
       "appliesToPwuKinds": [
         "IMPLEMENTATION_PLANNING",
         "WORK_DECOMPOSITION"
-      ],
-      "requiredEvidenceTypes": [
-        "SOURCE",
-        "TRACE"
       ],
       "criteria": [
         {
@@ -1474,7 +1831,7 @@
         "REQUEST_HUMAN_DECISION",
         "RESHAPE_PWU"
       ],
-      "sourceSection": "DOC-004 §20 (POL-CONSTRAINT-PROPAGATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§20.1); the 5 criterion descriptions are \"20.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §20.4 verbatim in document order. PRECEDENTED DERIVATION: \"20.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §20 (POL-CONSTRAINT-PROPAGATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§20.1); the 5 criterion descriptions are \"20.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §20.4 verbatim in document order. PRECEDENTED DERIVATION: \"20.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026): DOC-004 §20 has NO evidence subsection — alone among the twelve policies. requiredEvidence and optionalEvidence are both [] and that is the corpus's state, not an omission here; inventing a list to make twelve-of-twelve look complete is the disease this programme treats. doc004-conformance.test.ts asserts that §20 is the one section carrying neither heading, so \"all twelve carry evidence\" can never quietly become the passing condition. SUPERSEDES requiredEvidenceTypes, removed here. EVIDENCE (REG-E-026): DOC-004 §20 has NO evidence subsection — alone among the twelve policies. requiredEvidence and optionalEvidence are both [] and that is the corpus's state, not an omission here; inventing a list to make twelve-of-twelve look complete is the disease this programme treats. doc004-conformance.test.ts asserts that §20 is the one section carrying neither heading, so \"all twelve carry evidence\" can never quietly become the passing condition. SUPERSEDES requiredEvidenceTypes, removed here.",
       "findingAnnotations": {
         "SILENT_CONSTRAINT_DROP": {
           "defaultSeverity": "BLOCKING",
@@ -1520,7 +1877,9 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "MATERIAL rather than BLOCKING because DOC-004 §20.5 states no mis-scoping condition. Where a scope error actually strips a mandatory constraint from a relevant child, that instance is SILENT_CONSTRAINT_DROP and blocks on its own ratified condition; what remains to this code is the mis-declaration itself, which is repairable by restating the scope. Not ADVISORY, because claim 20.3.4 obliges that 'waivers are authorized and scoped' and §12.2 requires a waiver to record its exact policy, criterion, object and semantic version; MATERIAL keeps REJECTED available under §10.3."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": []
     },
     {
       "policyId": "pol_architecture_coverage",
@@ -1536,11 +1895,6 @@
       "appliesToPwuKinds": [
         "ARCHITECTURE_DEFINITION",
         "ARCHITECTURE_CONCERN"
-      ],
-      "requiredEvidenceTypes": [
-        "ARTIFACT",
-        "TRACE",
-        "ANALYSIS"
       ],
       "criteria": [
         {
@@ -1665,7 +2019,7 @@
         "RESHAPE_PWU",
         "REQUEST_HUMAN_DECISION"
       ],
-      "sourceSection": "DOC-004 §21 (POL-ARCHITECTURE-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§21.1); the 10 criterion descriptions are \"21.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 12 finding codes are §21.5 verbatim in document order. PRECEDENTED DERIVATION: \"21.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). RAISED under the sponsor's standing grant (2026-07-18; HARMONIZATION-LOG PART 5) to include the control-action FLOOR {REQUEST_HUMAN_DECISION, RESHAPE_PWU} — the intersection of the four ratified control-action sets, which is also the principled universal minimum: a policy that can raise a blocking finding must be able to escalate to a human (REQUEST_HUMAN_DECISION) rather than invent a resolution, and to take the minimal governed corrective action (RESHAPE_PWU). This policy under-declared the floor before; its prior authored value is RETAINED and unioned with it. Still AUTHORED — the floor is derived, not ratified here. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).\n\nARCHITECTURE_CONCERN ADDED TO appliesToPwuKinds — AUTHORED 2026-08-05 under the standing grant, DERIVED FROM DOC-006 §32.2's ratified trace and disclosed as authoring rather than delivery. The corpus routes a concern's assurance through THIS policy by name: §32.2 traces 'Scheduling and Dispatch Architecture Concern -> PRODUCES -> Architecture Artifact -> SUPPORTS -> Architecture Coverage Claim -> VERIFIED_BY -> Architecture Assurance Assessment', and this policy is named 'Architecture Coverage' and evaluates COVERAGE claims. The concern's own corpus purpose is 'contributing to Architecture Definition', the kind this policy already governed. WHAT IS AUTHORED IS THE MEMBERSHIP; the routing is read off the trace. It closes REG-F-029's blocking gap: the corpus NAMES the Architecture Concern type and names no policy for it, so without this the five seeded concerns declare nothing and cannot be assessed at all once DOC-004 §5.1 is enforced.",
+      "sourceSection": "DOC-004 §21 (POL-ARCHITECTURE-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§21.1); the 10 criterion descriptions are \"21.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 12 finding codes are §21.5 verbatim in document order. PRECEDENTED DERIVATION: \"21.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). RAISED under the sponsor's standing grant (2026-07-18; HARMONIZATION-LOG PART 5) to include the control-action FLOOR {REQUEST_HUMAN_DECISION, RESHAPE_PWU} — the intersection of the four ratified control-action sets, which is also the principled universal minimum: a policy that can raise a blocking finding must be able to escalate to a human (REQUEST_HUMAN_DECISION) rather than invent a resolution, and to take the minimal governed corrective action (RESHAPE_PWU). This policy under-declared the floor before; its prior authored value is RETAINED and unioned with it. Still AUTHORED — the floor is derived, not ratified here. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).\n\nARCHITECTURE_CONCERN ADDED TO appliesToPwuKinds — AUTHORED 2026-08-05 under the standing grant, DERIVED FROM DOC-006 §32.2's ratified trace and disclosed as authoring rather than delivery. The corpus routes a concern's assurance through THIS policy by name: §32.2 traces 'Scheduling and Dispatch Architecture Concern -> PRODUCES -> Architecture Artifact -> SUPPORTS -> Architecture Coverage Claim -> VERIFIED_BY -> Architecture Assurance Assessment', and this policy is named 'Architecture Coverage' and evaluates COVERAGE claims. The concern's own corpus purpose is 'contributing to Architecture Definition', the kind this policy already governed. WHAT IS AUTHORED IS THE MEMBERSHIP; the routing is read off the trace. It closes REG-F-029's blocking gap: the corpus NAMES the Architecture Concern type and names no policy for it, so without this the five seeded concerns declare nothing and cannot be assessed at all once DOC-004 §5.1 is enforced. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 11 items of DOC-004 §21's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 11 items of DOC-004 §21's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "UNCOVERED_REQUIREMENT": {
           "defaultSeverity": "MATERIAL",
@@ -1739,7 +2093,120 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "No ratified text decides this code. It defeats the §21.1 purpose directly — 'a coherent structure for satisfying applicable product obligations' — which is the MATERIAL default case. Not ADVISORY, unlike its ARCHITECTURE_OVERFIT counterpart: underfit leaves obligations without structure sufficient to satisfy them, so it obliges correction rather than informing a judgment. Not BLOCKING: §21.6's four subject classes do not name it, and where the missing structure is specifically a security boundary or a violated mandatory constraint, the codes for those subjects fit and carry their own defaults."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-21-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Approved intent",
+          "purpose": "The product obligations the architecture must provide a coherent structure for (§21.1).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Requirements",
+          "purpose": "Claim 1 asks whether applicable requirements are allocated to architectural elements.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-03",
+          "evidenceType": "ARTIFACT",
+          "description": "Journeys",
+          "purpose": "Journeys cross component boundaries, so they expose an architecture that satisfies every requirement and no path (claim 3).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-04",
+          "evidenceType": "ARTIFACT",
+          "description": "Architecture artifacts",
+          "purpose": "The architecture under assessment.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-05",
+          "evidenceType": "APPROVAL",
+          "description": "Decision records",
+          "purpose": "An architecture choice without its decision record cannot be distinguished from an accident (claim 9).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-06",
+          "evidenceType": "ARTIFACT",
+          "description": "Interface definitions",
+          "purpose": "Claim 4 asks whether interfaces are sufficiently defined; MISSING_INTERFACE_DEFINITION is decided here.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-07",
+          "evidenceType": "ARTIFACT",
+          "description": "Data model",
+          "purpose": "Claim 5 requires data ownership be explicit; AMBIGUOUS_DATA_OWNERSHIP is decided against the model.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-08",
+          "evidenceType": "ARTIFACT",
+          "description": "Deployment model",
+          "purpose": "Claim 7 asks whether operational and deployment concerns are proportionate.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-09",
+          "evidenceType": "ANALYSIS",
+          "description": "Security analysis",
+          "purpose": "Claim 6 requires security boundaries be represented; a boundary is a conclusion of analysis, not an artifact that declares itself.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-10",
+          "evidenceType": "TRACE",
+          "description": "Traceability",
+          "purpose": "Allocation is a relation between requirements and components; UNCOVERED_REQUIREMENT is decidable only over it.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-21-11",
+          "evidenceType": "ARTIFACT",
+          "description": "Assumption catalog",
+          "purpose": "Claim 9 requires known architecture risks and assumptions be explicit.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_historical_consistency",
@@ -1751,11 +2218,6 @@
       ],
       "appliesToPwuKinds": [
         "ARCHITECTURE_DECISION"
-      ],
-      "requiredEvidenceTypes": [
-        "SOURCE",
-        "TRACE",
-        "ANALYSIS"
       ],
       "criteria": [
         {
@@ -1825,7 +2287,7 @@
         "REQUEST_HUMAN_DECISION",
         "RESHAPE_PWU"
       ],
-      "sourceSection": "DOC-004 §22 (POL-HISTORICAL-CONSISTENCY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§22.1); the 5 criterion descriptions are \"22.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §22.5 verbatim in document order. PRECEDENTED DERIVATION: \"22.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §22 (POL-HISTORICAL-CONSISTENCY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§22.1); the 5 criterion descriptions are \"22.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §22.5 verbatim in document order. PRECEDENTED DERIVATION: \"22.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 7 items of DOC-004 §22's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 7 items of DOC-004 §22's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "KNOWN_FAILURE_RECURRENCE": {
           "defaultSeverity": "MATERIAL",
@@ -1869,7 +2331,80 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "AUTHORED; no ratified text scores this code. The '_RISK' suffix — the only one among the policy's seven codes — pulls toward ADVISORY, but MATERIAL wins because DOC-004 §22.3 claim 2 protects against repeating a known failure 'unknowingly', and this code names precisely that unknowing state at the moment §22.2's 'replacement of established structures' is underway; DOC-003 §31 places 'uninformed difference' on the defect side of its rule. Not BLOCKING: neither document states a blocking condition, and the code asserts an unestablished purpose rather than an established harm."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-22-01",
+          "evidenceType": "APPROVAL",
+          "description": "Prior decisions",
+          "purpose": "Claim 3 requires active prior decisions be respected or formally superseded.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-22-02",
+          "evidenceType": "SOURCE",
+          "description": "Narrative memories",
+          "purpose": "How the work reached its present state — the referent for CHESTERTONS_FENCE_RISK, which cannot be judged from the current state alone.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-22-03",
+          "evidenceType": "OBSERVATION",
+          "description": "Incident records",
+          "purpose": "Known failures are what KNOWN_FAILURE_RECURRENCE is measured against.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-22-04",
+          "evidenceType": "REVIEW",
+          "description": "Previous assurance findings produced through validator implementations",
+          "purpose": "A finding raised before and left unaddressed is a recurrence, not a new observation.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-22-05",
+          "evidenceType": "SOURCE",
+          "description": "Git or repository history",
+          "purpose": "The record of what was actually done, as distinct from what was decided.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-22-06",
+          "evidenceType": "ARTIFACT",
+          "description": "Prior baselines",
+          "purpose": "The last authoritative state; divergence is measured from it (claim 4).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-22-07",
+          "evidenceType": "ANALYSIS",
+          "description": "Design rationale",
+          "purpose": "MISSING_DESIGN_RATIONALE is decided here; a fence with no recorded reason is this policy’s central risk.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_intent_preservation",
@@ -1890,11 +2425,6 @@
         "INTEGRATED_PRODUCT_VALIDATION",
         "PRODUCT_BASELINE_PROMOTION",
         "PRODUCT_REALIZATION"
-      ],
-      "requiredEvidenceTypes": [
-        "SOURCE",
-        "ARTIFACT",
-        "TRACE"
       ],
       "criteria": [
         {
@@ -1989,7 +2519,7 @@
         "REJECT",
         "ABANDON"
       ],
-      "sourceSection": "DOC-004 §23 (POL-INTENT-PRESERVATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§23.1); the 7 criterion descriptions are \"23.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §23.5 verbatim in document order. PRECEDENTED DERIVATION: \"23.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. permittedControlActions transcribed from §23.7. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §23 (POL-INTENT-PRESERVATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§23.1); the 7 criterion descriptions are \"23.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §23.5 verbatim in document order. PRECEDENTED DERIVATION: \"23.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. permittedControlActions transcribed from §23.7. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 8 items of DOC-004 §23's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 8 items of DOC-004 §23's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "INTENT_EROSION": {
           "defaultSeverity": "MATERIAL",
@@ -2041,7 +2571,90 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "AUTHORED: §23.6/§32 blocks material unauthorized divergence, and a broken trace link does not establish divergence — it prevents the policy from evaluating whether any exists — so the condition does not name this case and BLOCKING is unfounded. MATERIAL rather than ADVISORY because §23.4 lists trace links among required evidence and the break forecloses the §23.3 claims outright rather than informing them. The §10.3 rule 'Evidence deficit → INCONCLUSIVE' is keyed to the deficit itself, not to a severity, and is not the ground of this call."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-23-01",
+          "evidenceType": "SOURCE",
+          "description": "Originating expression",
+          "purpose": "Preservation is fidelity across a transformation, and the origin is one end of it.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Approved intent",
+          "purpose": "The authorized intent the transformation must remain faithful to.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-03",
+          "evidenceType": "ARTIFACT",
+          "description": "Parent and child PWUs",
+          "purpose": "Claim 4 asks whether descendant work continues to serve the parent objective.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-04",
+          "evidenceType": "ARTIFACT",
+          "description": "Constraints",
+          "purpose": "Claim 3 requires mandatory constraints remain active across the transformation.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Transformation artifacts",
+          "purpose": "The output whose faithfulness is the question.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-06",
+          "evidenceType": "APPROVAL",
+          "description": "Decisions",
+          "purpose": "Claim 2 turns on authority: a scope change with a decision is authorized, and the same change without one is drift.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-07",
+          "evidenceType": "TRACE",
+          "description": "Trace links",
+          "purpose": "Claim 1 asks whether desired outcomes remain represented, which is a relation across the transformation rather than a property of either side.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-23-08",
+          "evidenceType": "ARTIFACT",
+          "description": "Completion claims",
+          "purpose": "Claim 6 asks whether local success contributes to global success; the completion claim is what local success asserts.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_test_adequacy",
@@ -2055,11 +2668,6 @@
       "appliesToPwuKinds": [
         "PRODUCT_IMPLEMENTATION",
         "INTEGRATED_PRODUCT_VALIDATION"
-      ],
-      "requiredEvidenceTypes": [
-        "TEST_RESULT",
-        "TRACE",
-        "MEASUREMENT"
       ],
       "criteria": [
         {
@@ -2162,7 +2770,7 @@
         "REQUEST_HUMAN_DECISION",
         "RESHAPE_PWU"
       ],
-      "sourceSection": "DOC-004 §24 (POL-TEST-ADEQUACY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§24.1); the 8 criterion descriptions are \"24.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 10 finding codes are §24.5 verbatim in document order. PRECEDENTED DERIVATION: \"24.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §24 (POL-TEST-ADEQUACY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§24.1); the 8 criterion descriptions are \"24.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 10 finding codes are §24.5 verbatim in document order. PRECEDENTED DERIVATION: \"24.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 8 items of DOC-004 §24's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 8 items of DOC-004 §24's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "UNTESTED_REQUIREMENT": {
           "defaultSeverity": "MATERIAL",
@@ -2224,7 +2832,90 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "No blocking condition for this policy in either document, and no conformance test names this code. Not ADVISORY: DOC-003 §33's rule that 'Test count is not test adequacy' is exactly the failure this code reports, making it an evidence defect that obliges action rather than an observation. MATERIAL, not BLOCKING: a weak oracle undermines the evidence's weight, and §10.3 lets a validator carry that to REJECTED where the affected claim is load-bearing without a ratified blocking condition to license the higher severity."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-24-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Test strategy",
+          "purpose": "Claim 5 asks whether regression scope is justified, which is a statement of strategy rather than a result.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Test inventory",
+          "purpose": "The tests that exist — the covering set for every adequacy claim.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-03",
+          "evidenceType": "TRACE",
+          "description": "Trace matrix",
+          "purpose": "UNTESTED_REQUIREMENT is a relation between requirements and tests, decidable only over the matrix.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-04",
+          "evidenceType": "TEST_RESULT",
+          "description": "Test results",
+          "purpose": "Claim 7 requires results be current and reproducible where required.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-05",
+          "evidenceType": "ARTIFACT",
+          "description": "Environment description",
+          "purpose": "Claim 6 asks whether test environments are sufficiently representative; NONREPRESENTATIVE_TEST_ENVIRONMENT is decided here.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-06",
+          "evidenceType": "MEASUREMENT",
+          "description": "Coverage reports",
+          "purpose": "Coverage is a quantity, and §24.6 warns it does not establish fitness — so it is measured and weighed, never concluded from.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-07",
+          "evidenceType": "OBSERVATION",
+          "description": "Defect history",
+          "purpose": "FLAKY_TEST_EVIDENCE is a property of a test over time and is invisible in any single run.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-24-08",
+          "evidenceType": "ARTIFACT",
+          "description": "Risk profile",
+          "purpose": "Adequacy is proportional to risk, so the profile sets the standard the other claims are judged against.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_fitness_for_purpose",
@@ -2238,11 +2929,6 @@
         "INTEGRATED_PRODUCT_VALIDATION",
         "PRODUCT_REALIZATION",
         "PRODUCT_BASELINE_PROMOTION"
-      ],
-      "requiredEvidenceTypes": [
-        "OBSERVATION",
-        "REVIEW",
-        "TEST_RESULT"
       ],
       "criteria": [
         {
@@ -2332,7 +3018,7 @@
         "REQUEST_HUMAN_DECISION",
         "RESHAPE_PWU"
       ],
-      "sourceSection": "DOC-004 §25 (POL-FITNESS-FOR-PURPOSE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§25.1); the 7 criterion descriptions are \"25.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §25.5 verbatim in document order. PRECEDENTED DERIVATION: \"25.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §25 (POL-FITNESS-FOR-PURPOSE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§25.1); the 7 criterion descriptions are \"25.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §25.5 verbatim in document order. PRECEDENTED DERIVATION: \"25.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 9 items of DOC-004 §25's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 9 items of DOC-004 §25's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "PRODUCT_OUTCOME_NOT_ACHIEVABLE": {
           "defaultSeverity": "MATERIAL",
@@ -2376,7 +3062,100 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "DOC-004 §10.3's 'Evidence deficit -> INCONCLUSIVE' is keyed to the deficit, not to a severity, so it does not set this code's severity -- and it does not conflict with MATERIAL either, whose §10.3 range already includes INCONCLUSIVE. Against ADVISORY: §25.2 makes this assessment 'Required during integrated product validation and before product baseline promotion', so a required claim that cannot be assessed obliges evidence gathering. Against BLOCKING: no ratified blocking condition exists in either document for this policy."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-25-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Approved intent",
+          "purpose": "Claim 3 asks whether the product addresses the originating problem; the intent is what states what that problem was.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-02",
+          "evidenceType": "ARTIFACT",
+          "description": "Journeys",
+          "purpose": "Claim 2 asks whether major journeys function coherently.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-03",
+          "evidenceType": "ARTIFACT",
+          "description": "Requirements",
+          "purpose": "The declared obligations, against which claim 4’s technically-correct-but-unfit case is distinguished.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-04",
+          "evidenceType": "ARTIFACT",
+          "description": "Working product",
+          "purpose": "The product itself; fitness is a property of what was built, not of what was specified.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-05",
+          "evidenceType": "TEST_RESULT",
+          "description": "End-to-end evidence",
+          "purpose": "Claim 1 asks whether intended actors can achieve critical outcomes, which is observable only end to end.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-06",
+          "evidenceType": "REVIEW",
+          "description": "User or human review",
+          "purpose": "Fitness for an actual need is a human judgement; §25.1 makes the approved user need the referent.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-07",
+          "evidenceType": "OBSERVATION",
+          "description": "Operational evidence",
+          "purpose": "Claim 7 requires critical operational conditions be represented.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-08",
+          "evidenceType": "ARTIFACT",
+          "description": "Limitations",
+          "purpose": "Claim 5 asks whether known limitations are compatible with the declared use.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-25-09",
+          "evidenceType": "OBSERVATION",
+          "description": "Open findings",
+          "purpose": "Claim 6 asks whether residual uncertainty is acceptable, and unresolved findings are that uncertainty.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     },
     {
       "policyId": "pol_baseline_promotion",
@@ -2389,11 +3168,6 @@
       ],
       "appliesToPwuKinds": [
         "PRODUCT_BASELINE_PROMOTION"
-      ],
-      "requiredEvidenceTypes": [
-        "APPROVAL",
-        "ARTIFACT",
-        "TRACE"
       ],
       "criteria": [
         {
@@ -2505,7 +3279,7 @@
         "REQUEST_HUMAN_DECISION",
         "RESHAPE_PWU"
       ],
-      "sourceSection": "DOC-004 §26 (POL-BASELINE-PROMOTION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§26.1); the 9 criterion descriptions are \"26.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 9 finding codes are §26.5 verbatim in document order. PRECEDENTED DERIVATION: \"26.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code).",
+      "sourceSection": "DOC-004 §26 (POL-BASELINE-PROMOTION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§26.1); the 9 criterion descriptions are \"26.3 Claims evaluated\" verbatim (leading character sentence-cased — the doc's numbered lists are inconsistently cased; no word added, removed, or reordered); the 9 finding codes are §26.5 verbatim in document order. PRECEDENTED DERIVATION: \"26.3 Claims evaluated\" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion's criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy's failureSeverity and the humanized code). EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 9 items of DOC-004 §26's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") OR where its referent is CONTINGENT — exists only if an optional exchange happened, or the system has no object type that can produce it (five items, each named with its reason in doc004-conformance.test.ts) — else AT_LEAST_ONE. THE CONTINGENT CLAUSE IS AUTHORED JUDGEMENT AND THE MOST CONSEQUENTIAL CALL HERE: under a blanket AT_LEAST_ONE, an intent captured from one clear user expression could never reach a SATISFIED fidelity verdict for want of a clarification dialogue that never happened, and POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking, because no AMBIGUITY or STAKEHOLDER object type exists in this system at all. A requirement whose referent cannot be produced is not a strict gate, it is a dead policy; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts. EVIDENCE (REG-E-026, authored 2026-08-05 under sponsor ratification): the 9 items of DOC-004 §26's \"Evidence\" subsection are TRANSCRIBED verbatim (leading character sentence-cased, the same documented normalization the criteria use) into `optionalEvidence`. THE FIELD IS CHOSEN BY THE CORPUS'S OWN HEADING — §3.1 declares both requiredEvidence and optionalEvidence, two sections say \"Required evidence\" and nine say \"Evidence\"; calling all eleven required would add a word to nine sections that do not use it. DERIVED: id = EV-<section>-<NN> in document order; cardinality = ZERO_OR_MORE where the item is hedged (\"where applicable\"/\"where relevant\") else AT_LEAST_ONE; requiredForDispositions = SATISFIED_ONLY on §15.9 (\"SATISFIED only when ... required evidence is admissible\" — named as a condition of the verdict, not of assessing); mayBeWaived = false, fail-closed, because the corpus nowhere states that a requirement may be waived. HONESTLY EMPTY: admissibilityRules = [] (§6.2 states admissibility globally, not per requirement); freshnessRule omitted (optional, and no policy states one). AUTHORED, and the only genuinely new content: each item's evidenceType classification and its purpose sentence. SUPERSEDES requiredEvidenceTypes, removed here — a 2-3 member authored summary that nothing read, now stated at 89x the resolution and machine-checked against the document by doc004-conformance.test.ts.",
       "findingAnnotations": {
         "CANDIDATE_VERSION_MISMATCH": {
           "defaultSeverity": "BLOCKING",
@@ -2567,7 +3341,100 @@
           "severityBasis": "AUTHORED",
           "severityRationale": "Nothing ratified decides this code; RPH-DOC-003 §35's Blocking conditions do not reach §26.3 claim 9 ('the baseline has a declared purpose and scope'), so the MATERIAL default holds. Not BLOCKING: no ratified condition names it. Not ADVISORY: §26.1 makes the policy's object an 'authoritative baseline' and §26.4 lists 'superseded baseline' as evidence, so baselines are the referent for later comparison and supersession — an undeclared scope defeats that use rather than merely informing about it."
         }
-      }
+      },
+      "requiredEvidence": [],
+      "optionalEvidence": [
+        {
+          "id": "EV-26-01",
+          "evidenceType": "ARTIFACT",
+          "description": "Baseline manifest",
+          "purpose": "What is being promoted; AMBIGUOUS_BASELINE_SCOPE is decided against it.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-02",
+          "evidenceType": "MEASUREMENT",
+          "description": "Artifact hashes",
+          "purpose": "The identity of the exact bytes promoted; CANDIDATE_VERSION_MISMATCH is decidable only against them.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-03",
+          "evidenceType": "REVIEW",
+          "description": "Assurance assessments",
+          "purpose": "MISSING_REQUIRED_ASSESSMENT asks which policies judged this candidate; the assessments are that record.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-04",
+          "evidenceType": "OBSERVATION",
+          "description": "Open findings",
+          "purpose": "§26.6 forbids conditional promotion over unresolved critical findings; OPEN_BLOCKING_FINDING is decided here.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-05",
+          "evidenceType": "APPROVAL",
+          "description": "Waivers",
+          "purpose": "INVALID_OR_EXPIRED_WAIVER requires the waiver itself, carrying its authority and expiry (§12.2).",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-06",
+          "evidenceType": "APPROVAL",
+          "description": "Decisions",
+          "purpose": "Promotion requires effective decision authority; MISSING_DECISION_AUTHORITY is decided against the decision record.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-07",
+          "evidenceType": "ARTIFACT",
+          "description": "Evidence package",
+          "purpose": "Claim 5 requires evidence remain valid; INVALIDATED_EVIDENCE is decided over the package.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-08",
+          "evidenceType": "ARTIFACT",
+          "description": "Rollback plan",
+          "purpose": "Claim 8 requires rollback or recovery exist where required; MISSING_RECOVERY_PLAN is decided here.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        },
+        {
+          "id": "EV-26-09",
+          "evidenceType": "ARTIFACT",
+          "description": "Superseded baseline",
+          "purpose": "What this promotion replaces; without it the promotion’s scope and its reversal target are both undefined.",
+          "cardinality": "AT_LEAST_ONE",
+          "admissibilityRules": [],
+          "requiredForDispositions": "SATISFIED_ONLY",
+          "mayBeWaived": false
+        }
+      ]
     }
   ],
   "conformanceProfiles": [

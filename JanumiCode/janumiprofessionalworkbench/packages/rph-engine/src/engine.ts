@@ -13,6 +13,7 @@ import {
 } from '@janumipwb/rph-application';
 import type {
 	AssessmentCriterion,
+	EvidenceRequirement,
 	CommandResult,
 	DomainCommand,
 	DomainEvent,
@@ -53,6 +54,13 @@ export interface EngineSeedPolicy {
 	 *  and no type error was ever available to report the drop (REG-F-022 second instance). Optional because a
 	 *  policy that restricts no kind declares none. */
 	readonly appliesToPwuKinds?: readonly string[];
+	/** DOC-004 §6.1 evidence requirements (REG-E-026). ADDED 2026-08-05, and the reason it had to be: this port
+	 *  did not declare the ontology's evidence field either, so the seeding could not have read it even by
+	 *  accident and no type error was ever available — the same structural blindness that hid
+	 *  `appliesToPwuKinds`, on the field REG-F-022 is actually about. Two evidence fields because DOC-004 §3.1
+	 *  declares two, and the catalog's own headings select between them. */
+	readonly requiredEvidence: readonly Frozen<EvidenceRequirement>[];
+	readonly optionalEvidence: readonly Frozen<EvidenceRequirement>[];
 	readonly criteria: readonly Frozen<AssessmentCriterion>[];
 	/** RATIFIED finding codes. The per-code detail DOC-004 §9.1 mandates but never ratifies is optional. */
 	readonly findingTypes: readonly string[];

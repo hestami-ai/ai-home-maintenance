@@ -12,18 +12,23 @@
 //     source literals, because the drop happens in the seeding and reading the literals would miss it entirely.
 //   * `requiredEvidenceTypes` on the ontology's seed policies — the AUTHORED declaration that never arrives.
 //
-// THE FINDING THIS PINS. Every catalog policy declares which evidence types it requires; `seedAdditivePolicies`
-// maps eleven fields and not that one; so every policy object is born with `requiredEvidence: []`. Gate A in
-// `completeAssuranceAssessment` — the refusal that stops a SATISFIED disposition standing on unmet mandatory
-// evidence — reads that array, evaluates an empty set, and admits everything. A control whose population is
-// empty is a control that cannot fail.
+// THE FINDING THIS ONCE PINNED, AND WHAT REPLACED IT. Every catalog policy declared which evidence it needed;
+// `seedAdditivePolicies` mapped eleven fields and not that one; so every policy object was born with
+// `requiredEvidence: []`. Gate A in `completeAssuranceAssessment` — the refusal that stops a SATISFIED
+// disposition standing on unmet mandatory evidence — read that array, evaluated an empty set, and admitted
+// everything. A control whose population is empty is a control that cannot fail.
+//
+// CLOSED 2026-08-05 (REG-E-026). The 89 evidence items DOC-004 ratifies are authored as §6.1
+// EvidenceRequirements and delivered. The pin — `carrying === []` — is DELETED, per its own instruction, not
+// widened to accommodate the fix. This file now measures WHAT ARRIVES, so under- and over-delivery both redden.
 //
 // WHAT MUST REDDEN, NAMED IN ADVANCE (a green here means nothing unless these are true):
-//   1. Someone maps the authored requirement into the seed  -> `policies carrying required evidence` reddens.
-//      THAT IS THE FIX LANDING, and the pin comes out with it.
+//   1. Either field dropped from the seeding payload        -> the delivery census reddens, naming the counts.
 //   2. The reader breaks (wrong field, wrong object type)   -> only the CONTROL reddens. Without the control,
-//      a broken reader and a fixed engine both report "0", and this file would call the second one the first.
-//   3. A 13th catalog policy arrives without the field      -> `every catalog policy declares` reddens.
+//      a broken reader and a working engine both report "0", and this file would call the second one the first.
+//   3. §17-§26's 76 items routed into `requiredEvidence`    -> the 2/9 split reddens. That mutation would make
+//      nine policies unsatisfiable by any caller, so it is the one that most needs to be loud.
+//   4. A list invented for §20, or for a floor policy       -> the "carries NEITHER" assertion reddens.
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { createEngine, getObject, seedAdditivePolicies, seedFloorPolicies } from '@janumipwb/rph-engine';
@@ -79,6 +84,12 @@ const SEEDED_POLICY_IDS = [
  *  is a statement about the reader. The CONTROL below is what caught it. */
 const requiredEvidenceOf = (engine: ReturnType<typeof createEngine>, id: string): unknown[] =>
 	((getObject(engine, id) as { requiredEvidence?: unknown[] } | undefined)?.requiredEvidence ??
+		[]) as unknown[];
+
+/** The same reader for the OTHER ratified field (DOC-004 §3.1 declares both). Separate rather than parameterised
+ *  so a typo in one field name cannot silently make both report the same array. */
+const optionalEvidenceOf = (engine: ReturnType<typeof createEngine>, id: string): unknown[] =>
+	((getObject(engine, id) as { optionalEvidence?: unknown[] } | undefined)?.optionalEvidence ??
 		[]) as unknown[];
 
 describe('REG-F-022: what policies declare as required evidence, and what the engine receives', () => {
@@ -141,44 +152,78 @@ describe('REG-F-022: what policies declare as required evidence, and what the en
 		).toHaveLength(1);
 	});
 
-	it('every catalog policy DECLARES required evidence types — the authored side is not the gap', () => {
-		const declaring = ontology.seedPolicies.filter(
-			(p) => ((p as { requiredEvidenceTypes?: readonly string[] }).requiredEvidenceTypes ?? []).length > 0
-		);
-		expect(
-			declaring.map((p) => p.policyId).sort((a, b) => a.localeCompare(b)),
-			'every catalog policy states which evidence types it requires — so nothing is missing at the source'
-		).toEqual(ontology.seedPolicies.map((p) => p.policyId).sort((a, b) => a.localeCompare(b)));
-		expect(declaring.length).toBeGreaterThanOrEqual(12);
-	});
-
-	// THE FINDING. Read back from live objects, because the drop is in the seeding — the source literals are fine.
-	it('NO seeded policy OBJECT carries any required evidence — the authored declaration never arrives', () => {
+	// ── THE PIN IS GONE (REG-E-026, 2026-08-05) ────────────────────────────────────────────────────────────────
+	// This file used to assert `carrying === []` — the finding, pinned. Its own instruction was "when REG-F-022 is
+	// fixed this reddens — DELETE THE PIN, do not extend it." It reddened, and the pin is deleted rather than
+	// widened to accommodate the fix. What replaces it is the POSITIVE census: not "is it still empty" but "what
+	// exactly arrives", stated so that under-delivery and over-delivery both redden.
+	//
+	// WHY IT IS NOT "ALL TWELVE". DOC-004 §20 POL-CONSTRAINT-PROPAGATION has no evidence subsection at all, so it
+	// carries nothing and MUST carry nothing. If this file asserted "twelve of twelve", the only way to satisfy it
+	// would be to invent a list for §20 — the census would have become the thing that forces the fabrication it
+	// exists to detect.
+	it('the catalog delivers evidence to the OBJECTS: 2 policies gate, 9 carry, 1 has none', () => {
 		const { engine } = seededEngine();
-		const carrying = SEEDED_POLICY_IDS.filter((id) => requiredEvidenceOf(engine, id).length > 0);
+		const required = SEEDED_POLICY_IDS.filter((id) => requiredEvidenceOf(engine, id).length > 0);
+		const optional = SEEDED_POLICY_IDS.filter((id) => optionalEvidenceOf(engine, id).length > 0);
 		expect(
-			carrying,
-			'REG-F-022 KNOWN GAP. These policies would be the ones whose declaration survived seeding. While this ' +
-				'list is empty, Gate A in completeAssuranceAssessment (the refusal that stops a SATISFIED ' +
-				'disposition standing on unmet mandatory evidence) reads an empty set on every policy that ships, ' +
-				'and §38 "missing evidence" is always empty. When REG-F-022 is fixed this reddens — DELETE THE PIN, ' +
-				'do not extend it.'
-		).toEqual([]);
-		// Counted separately so the two halves of the finding cannot drift: N policies exist, 0 of them carry.
-		expect(SEEDED_POLICY_IDS.length).toBeGreaterThanOrEqual(15);
+			required.sort((a, b) => a.localeCompare(b)),
+			'ONLY §15.5 and §16.4 say "Required evidence", and only these two therefore gate a verdict at Gate A'
+		).toEqual(['pol_intent_completeness', 'pol_intent_fidelity']);
+		expect(
+			optional.sort((a, b) => a.localeCompare(b)),
+			'the nine §17-§26 sections headed plain "Evidence" — carried so the ratified list is not lost, and ' +
+				'read by no gate'
+		).toEqual([
+			'pol_architecture_coverage',
+			'pol_assumption_disclosure',
+			'pol_baseline_promotion',
+			'pol_decomposition_coverage',
+			'pol_fitness_for_purpose',
+			'pol_historical_consistency',
+			'pol_intent_preservation',
+			'pol_requirement_coverage',
+			'pol_test_adequacy'
+		]);
+		// Item counts, so a policy delivering an empty-but-present array cannot pass the membership checks above.
+		const count = (f: (id: string) => unknown[]) => SEEDED_POLICY_IDS.reduce((n, id) => n + f(id).length, 0);
+		expect(count((id) => requiredEvidenceOf(engine, id))).toBe(13);
+		expect(count((id) => optionalEvidenceOf(engine, id))).toBe(76);
 	});
 
-	// THE SITE. Named precisely, because the handler's `p.requiredEvidence ?? []` is the DEFAULTING and is where a
-	// reader lands first — the cause is that no production caller supplies the field at all.
-	it('the seeding site is where it is dropped — seedAdditivePolicies never mentions the field', () => {
+	it('§20 CONSTRAINT-PROPAGATION carries NEITHER, and the floor policies carry neither', () => {
+		// The non-uniformity, asserted positively. Two separate reasons for two separate zeros:
+		//   §20  — the corpus gives it no evidence subsection (see doc004-conformance.test.ts).
+		//   floor — the de minimis floor is not in §15-§26 and has no ratified evidence list at all.
+		// Naming both here is what stops a future author "completing" either one to make a number look tidy.
+		const { engine } = seededEngine();
+		for (const id of ['pol_constraint_propagation', ...FLOOR_POLICY_DEFINITIONS.map((d) => d.policyId)]) {
+			expect(requiredEvidenceOf(engine, id), `${id} must carry no required evidence`).toEqual([]);
+			expect(optionalEvidenceOf(engine, id), `${id} must carry no optional evidence`).toEqual([]);
+		}
+	});
+
+	// THE SITE, INVERTED. It used to assert the field was ABSENT from the seeding payload. It now asserts both are
+	// present — same reasoning, opposite polarity: the payload is an explicit field list with no spread, so a field
+	// it does not name cannot reach the object, and a future edit dropping either one would otherwise be silent.
+	it('the seeding site names BOTH evidence fields — a field it does not name cannot arrive', () => {
 		const seed = readFileSync(`${REPO_ROOT}packages/rph-engine/src/seed-workbench.ts`, 'utf8');
 		const body = seed.slice(seed.indexOf('export function seedAdditivePolicies'));
 		const fn = body.slice(0, body.indexOf('\n}'));
 		expect(fn).toContain("send('CreateAssurancePolicy'"); // CONTROL: we sliced the right function
+		expect(fn).toContain('requiredEvidence: p.requiredEvidence');
+		expect(fn).toContain('optionalEvidence: p.optionalEvidence');
+	});
+
+	// The ontology side, kept because the delivery census can only compare against what was authored.
+	it('the authored side is complete: 11 of 12 catalog policies declare evidence', () => {
+		const declaring = ontology.seedPolicies.filter(
+			(p) => p.requiredEvidence.length + p.optionalEvidence.length > 0
+		);
+		expect(declaring).toHaveLength(11);
 		expect(
-			fn.includes('requiredEvidence'),
-			'seedAdditivePolicies builds the CreateAssurancePolicy payload as an explicit field list with no ' +
-				'spread, so a field it does not name cannot reach the object. Fixing REG-F-022 means naming it here.'
-		).toBe(false);
+			ontology.seedPolicies.filter((p) => p.requiredEvidence.length + p.optionalEvidence.length === 0),
+			'exactly one policy declares none, and it is the one DOC-004 gives no evidence subsection'
+		).toHaveLength(1);
 	});
 });

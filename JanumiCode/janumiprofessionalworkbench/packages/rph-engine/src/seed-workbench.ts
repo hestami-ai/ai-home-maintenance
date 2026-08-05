@@ -263,6 +263,19 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
 				...(p.appliesToPwuKinds?.length ? { pwuKindConditions: [...p.appliesToPwuKinds] } : {})
 			},
 			evaluatedClaimTypes: p.evaluatedClaimTypes,
+			// REG-F-022, DELIVERED (REG-E-026). The finding this register opened with: twelve policies state which
+			// evidence they need, this payload named eleven fields and not that one, and so Gate A in
+			// `completeAssuranceAssessment` — the refusal that stops a SATISFIED disposition standing on unmet
+			// mandatory evidence — read `[]` on every policy the product can produce. A control whose population is
+			// empty is a control that cannot fail.
+			//
+			// BOTH FIELDS, because DOC-004 §3.1 declares both and the catalog's own headings select between them:
+			// §15.5 and §16.4 say "Required evidence" (13 items, and these GATE); §17.4-§26.4 say "Evidence"
+			// (76 items, carried and ungated). Routing the 76 into `requiredEvidence` would make nine policies
+			// unsatisfiable by any caller — which is why the split is asserted in doc004-conformance.test.ts rather
+			// than trusted to whoever edits this line next.
+			requiredEvidence: p.requiredEvidence,
+			optionalEvidence: p.optionalEvidence,
 			criteria: p.criteria,
 			evaluatorRole: p.evaluatorRole,
 			independenceRequirement: p.independenceRequirement,

@@ -732,6 +732,29 @@ export const expireAssumption: CommandHandler = (ctx, command, payload) => {
 };
 
 // ---- Assurance Assessment ----
+/**
+ * Does this evidence requirement demand at least one instance? (DOC-004 §6.1 `cardinality`.)
+ *
+ * ── WHY THIS EXISTS (REG-E-026) ───────────────────────────────────────────────────────────────────────────────
+ * `ZERO_OR_MORE` means exactly what it says: zero instances SATISFY the requirement. Every "outstanding evidence"
+ * computation in this file used to work on ids alone — required MINUS received — which treats a ZERO_OR_MORE
+ * requirement as unmet until something arrives, i.e. the precise inverse of what the policy declared.
+ *
+ * It was invisible while every policy shipped `requiredEvidence: []` (REG-F-022): a field nothing could reach
+ * cannot be misread. It became live the moment the catalog's 89 requirements were delivered, and DOC-004 §15.5's
+ * "prior intent version WHERE APPLICABLE" is a real instance — an intent with no predecessor would otherwise have
+ * been permanently unable to reach a SATISFIED verdict for want of a version that does not exist.
+ *
+ * REG-F-022's own family, one field deeper: a declared governance field no consumer read. The lesson recorded
+ * with it is that DELIVERING authored content is not the end of the work — every field of that content has to be
+ * read by something, or the delivery just moves the vacuum somewhere less visible.
+ *
+ * FAIL CLOSED on an absent or unrecognised cardinality: a requirement whose cardinality cannot be read demands an
+ * instance. The other arm would let a malformed requirement silently stop gating.
+ */
+const demandsAnInstance = (r: unknown): boolean =>
+	(r as { cardinality?: string } | undefined)?.cardinality !== 'ZERO_OR_MORE';
+
 const ASSESSMENT = 'ASSURANCE_ASSESSMENT';
 /**
  * DERIVED FROM THE RATIFIED ENUM, NOT RESTATED (REG-F-026 group (a)).
@@ -864,6 +887,7 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	})();
 	if (applicabilityBlock) return applicabilityBlock;
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
+		.filter(demandsAnInstance)
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');
 	// WHICH requirements gate ASSESSING, and why it is not all of them. §6.1's `requiredForDispositions` says what
@@ -881,6 +905,7 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 			(r) =>
 				(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
 		)
+		.filter(demandsAnInstance)
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');
 	//
@@ -1076,6 +1101,7 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 			(r) =>
 				(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
 		)
+		.filter(demandsAnInstance)
 		.map((r) => r?.id)
 		.filter((x): x is string => typeof x === 'string');
 	const stillOutstanding = blocking.filter((r) => !receivedIds.has(r));
@@ -1619,6 +1645,7 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			(rfd === 'SATISFIED_ONLY' && disposition === 'SATISFIED');
 		const unmet = (policyState?.requiredEvidence ?? [])
 			.filter((r) => gates(r?.requiredForDispositions))
+			.filter(demandsAnInstance)
 			.map((r) => r?.id)
 			.filter((id): id is string => typeof id === 'string' && !received.has(id));
 		if (unmet.length > 0) {

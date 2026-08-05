@@ -18,7 +18,11 @@
 //
 // These interfaces therefore have to describe the data EXACTLY. Under-declaring is what the old assertion was
 // hiding: `SeedPolicy` omitted `sourceSection`, and `PwuTemplate` omitted five fields the dataset carries.
-import type { AssessmentCriterion, Frozen } from '@janumipwb/rph-contracts';
+import type {
+	AssessmentCriterion,
+	EvidenceRequirement as ContractEvidenceRequirement,
+	Frozen
+} from '@janumipwb/rph-contracts';
 
 /**
  * An assessment criterion, per the RATIFIED DOC-004 §7 `interface AssessmentCriterion`.
@@ -30,6 +34,16 @@ import type { AssessmentCriterion, Frozen } from '@janumipwb/rph-contracts';
  * for waivers.
  */
 export type Criterion = Frozen<AssessmentCriterion>;
+
+/**
+ * An evidence requirement, per the RATIFIED DOC-004 §6.1 `interface EvidenceRequirement` (REG-E-026).
+ *
+ * Deliberately the CONTRACT type rather than a local restatement, for the same reason `Criterion` is: the
+ * dataset's `as const satisfies OntologyData` check then structurally verifies all nine fields against the
+ * ratified shape at the literal site. A local interface would only have to agree with itself — which is exactly
+ * how `{ id, statement, mandatory? }` survived as a "criterion" for months.
+ */
+export type EvidenceRequirement = Frozen<ContractEvidenceRequirement>;
 
 /**
  * AUTHORED per-finding detail, keyed by ratified finding code.
@@ -109,7 +123,25 @@ export interface SeedPolicy {
 	readonly rationale: string;
 	readonly evaluatedClaimTypes: readonly string[];
 	readonly appliesToPwuKinds?: readonly string[];
-	readonly requiredEvidenceTypes?: readonly string[];
+	/**
+	 * The policy's evidence, as DOC-004 §6.1 `EvidenceRequirement`s (REG-E-026).
+	 *
+	 * TWO FIELDS BECAUSE THE CORPUS HAS TWO. §3.1 declares `requiredEvidence` and `optionalEvidence?`, and the
+	 * catalog sections select between them by their own heading: §15.5 and §16.4 say "Required evidence"; §17.4
+	 * through §26.4 say "Evidence". Nine sections that do not use the word "required" do not get it added.
+	 *
+	 * Only `requiredEvidence` gates anything — Gate A in `completeAssuranceAssessment`, the
+	 * `EVIDENCE_PENDING -> READY` arrow, and §38's `missingEvidence`. `optionalEvidence` is carried so the
+	 * ratified list is not lost, and is read by no gate.
+	 *
+	 * §20 POL-CONSTRAINT-PROPAGATION has NO evidence subsection and therefore `[]` for both. That is the corpus's
+	 * state, asserted by `doc004-conformance.test.ts` so it can never quietly become "all twelve".
+	 *
+	 * REPLACES `requiredEvidenceTypes`, a 2-3 member authored summary nothing read. Six of the twelve named an
+	 * evidence type no item in their own ratified list supports — see DESIGN-evidence-requirements.md §5.
+	 */
+	readonly requiredEvidence: readonly EvidenceRequirement[];
+	readonly optionalEvidence: readonly EvidenceRequirement[];
 	/** RATIFIED text. Every description is the doc's own words, machine-checked against the markdown itself by
 	 *  `doc004-conformance.test.ts` — the fidelity claim is executable, not prose. */
 	readonly criteria: readonly Criterion[];
