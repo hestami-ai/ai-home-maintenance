@@ -515,6 +515,16 @@ export const invalidatePwu: CommandHandler = (ctx, command) => {
 	// AND THE ID IS RESOLVED (REG-F-014's fourth instance). Requiring it is what the ratified event contract
 	// demands; requiring it to NAME SOMETHING is the same judgement `authorityDecisionId` got one commit earlier —
 	// a provenance field pointing at nothing is provenance to nothing.
+	// ── THE CONTRACTS NOW AGREE (REG-E-023 ratified, 2026-08-05) ───────────────────────────────────────────────
+	// The disagreement the struck comment records is RESOLVED: `InvalidatePwuPayload.triggeringObjectId` is now
+	// REQUIRED, matching the event, matching the register's stated default, and matching what this handler had
+	// already been enforcing since JAN-CMDPRE. An ABSENT field is therefore refused by the SCHEMA now, one layer
+	// earlier and structurally.
+	//
+	// THIS GUARD IS NOT DEAD, AND THE DISTINCTION IS THE WHOLE POINT: `z.string()` accepts `''`. The schema owns
+	// ABSENCE; this owns the EMPTY STRING — which is exactly "a reference to nothing", the fabrication the struck
+	// comment named and the old code committed. Tightening a schema narrows a guard's population; it does not
+	// always empty it, and assuming it does is how a real check gets deleted as redundant.
 	if (!p.triggeringObjectId) {
 		return reject(
 			command,

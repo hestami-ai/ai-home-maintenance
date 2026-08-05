@@ -174,6 +174,28 @@ describe('DOC-002 §36.2 execution failure classes map to permitted control acti
 				);
 		});
 
+		it('NO execution failure class permits REQUEST_WAIVER — §12.2 makes it unconstitutable', () => {
+			// DECIDED 2026-08-05, and this is a RULE rather than one row's edit. §12.2 requires a waiver to record
+			// "exact policy and criterion" and "finding being waived". An execution-step failure has no policy, no
+			// criterion and no finding — so no §12 waiver can be CONSTITUTED for one, whichever class it is.
+			//
+			// The sharper argument is about consequence: permitting it would mean treating a step as passable
+			// without the output it failed to produce, which corrupts the evidence chain rather than governing it.
+			//
+			// REQUEST_WAIVER remains ratified for the controller generally (§37 `WAIVE` / §11 `REQUEST_WAIVER`).
+			// What it cannot be is a response to a §36.2 EXECUTION failure class — so this is asserted over ALL
+			// SEVEN rows, not fixed on the one that happened to carry it.
+			for (const [cls, m] of Object.entries(EXECUTION_FAILURE_MAPPING))
+				expect(
+					m.actions,
+					`${cls} permits REQUEST_WAIVER, but §12.2's required waiver record (exact policy, criterion, ` +
+						'finding) has no referent for an execution failure'
+				).not.toContain('REQUEST_WAIVER');
+			// CONTROL: the action is genuinely in the ratified vocabulary, so the absence above is a DECISION about
+			// this taxonomy and not an artefact of REQUEST_WAIVER being unavailable.
+			expect(ControlActionSchema.options).toContain('REQUEST_WAIVER');
+		});
+
 		it('§36 CONTAINMENT: every mapped action is in DOC-002 §37’s controller menu', () => {
 			// §36's rule is "each failure class must map to permitted CONTROL ACTIONS" — the controller's, which
 			// §37 enumerates as EIGHTEEN. The contract enum is DOC-004 §11's TWENTY-THREE, so a mapping could

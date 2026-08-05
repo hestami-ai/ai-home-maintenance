@@ -92,14 +92,18 @@ export interface FailureClassMapping {
  */
 export const EXECUTION_FAILURE_MAPPING: Readonly<Record<ExecutionFailureClass, FailureClassMapping>> = {
 	TOOL_FAILURE: {
-		actions: ['RETRY', 'CHANGE_TOOL', 'CHANGE_TACTIC', 'REQUEST_WAIVER', 'ESCALATE'],
+		actions: ['RETRY', 'CHANGE_TOOL', 'CHANGE_TACTIC', 'ESCALATE'],
 		basis: 'AUTHORED',
 		rationale:
 			'The tool failed, so another tool or another approach may still succeed. CHANGE_MODEL and REVISE_PROMPT ' +
 			'are deliberately ABSENT — the model and the prompt are not implicated — and that absence is what ' +
 			'distinguishes this row from MODEL_FAILURE rather than leaving the two interchangeable. REQUEST_WAIVER ' +
-			'is §37’s WAIVE under the spelling DOC-004 §11 ratified (OPEN-QUESTIONS A-6); it is IN the controller’s ' +
-			'ratified menu, but its presence HERE is my choice and is flagged to the sponsor as such.'
+			'was present and is REMOVED (2026-08-05): §12.2 requires a waiver to record "exact policy and ' +
+			'criterion" and "finding being waived", and an execution-step failure has no policy, no criterion and ' +
+			'no finding — so no §12 waiver can be CONSTITUTED for it. Worse, permitting one would mean treating a ' +
+			'step as passable without the output it failed to produce, which corrupts the evidence chain rather ' +
+			'than governing it. The action stays ratified for the controller generally (§37 WAIVE / §11 ' +
+			'REQUEST_WAIVER); what it cannot be is a response to a §36.2 EXECUTION failure class.'
 	},
 	MODEL_FAILURE: {
 		actions: ['RETRY', 'CHANGE_MODEL', 'REVISE_PROMPT', 'ESCALATE'],

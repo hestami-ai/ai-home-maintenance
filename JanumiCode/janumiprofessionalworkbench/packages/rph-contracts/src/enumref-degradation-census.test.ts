@@ -141,7 +141,7 @@ describe('enumRef degradation census (REG-F-026)', () => {
 		).toEqual([]);
 	});
 
-	it('the degraded population is ONE and may only fall', () => {
+	it('the degraded population is ZERO — every enumRef field resolves', () => {
 		// A ratchet, not a target. SEVEN on 2026-08-05; FOUR when group (a) closed (three enums that existed under
 		// another identifier); THREE when group (b) closed — `ValidateDecomposition.disposition` left this census
 		// entirely, because its constraint is a LITERAL UNION derived from the machine rather than an enumRef, and
@@ -155,11 +155,13 @@ describe('enumRef degradation census (REG-F-026)', () => {
 		// gated), and `TRANSIENT`, the only value ever in flight, was a test fixture with no production producer,
 		// so constraining the field refuses nothing any shipped path emits.
 		//
-		// THE LAST ONE IS NOT A REMAPPING. `ControlActionRecommendation` is a shape the corpus has never defined,
-		// so there is nothing to point the field at. It closes when the corpus defines it, or not at all.
-		expect(degraded.map((r) => r.key).sort()).toEqual(
-			['AssuranceAssessmentRejected.recommendedControlAction'].sort()
-		);
+		// ZERO since group (d) closed (2026-08-05). I had written that the last one "is NOT a remapping —
+		// `ControlActionRecommendation` is a shape the corpus has never defined, so there is nothing to point the
+		// field at", and that reasoning came from the TYPE NAME plus an M1 row literally named `(undefined)`.
+		// IT NEVER CONSULTED THE WORKED EXAMPLE. DOC-004 §33 shows the field's actual content — bare ControlAction
+		// strings, `["RESHAPE_PWU", "REQUEST_HUMAN_DECISION"]` — so the field had a ratified referent all along.
+		// An undefined type NAME is not evidence about the CONTENT; the worked example is.
+		expect(degraded.map((r) => r.key)).toEqual([]);
 	});
 
 	it('group (c) is CONSTRAINED to §36.2 — all FOUR failureClass fields, not just the two censused', () => {

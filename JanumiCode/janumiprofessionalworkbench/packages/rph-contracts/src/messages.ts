@@ -379,7 +379,7 @@ export const ReshapePwuPayloadSchema = z.strictObject({
 export type ReshapePwuPayload = z.infer<typeof ReshapePwuPayloadSchema>;
 export const InvalidatePwuPayloadSchema = z.strictObject({
 	invalidationReason: z.string(),
-	triggeringObjectId: z.string().optional()
+	triggeringObjectId: z.string()
 });
 export type InvalidatePwuPayload = z.infer<typeof InvalidatePwuPayloadSchema>;
 export const SupersedePwuPayloadSchema = z.strictObject({
@@ -785,7 +785,7 @@ export type AssuranceAssessmentInconclusivePayload = z.infer<
 >;
 export const AssuranceAssessmentRejectedPayloadSchema = z.strictObject({
 	blockingObservationIds: z.array(z.string()),
-	recommendedControlAction: z.string().optional(),
+	recommendedControlAction: ControlActionSchema.optional(),
 	disposition: AssuranceDispositionSchema
 });
 export type AssuranceAssessmentRejectedPayload = z.infer<

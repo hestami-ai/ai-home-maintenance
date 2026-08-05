@@ -280,7 +280,8 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 				'DEPLOYMENT_ARCHITECTURE',
 				'OBSERVABILITY_ARCHITECTURE',
 				'OPERATIONAL_RESILIENCE',
-				'ARCHITECTURE_DECISION_CONSOLIDATION'
+				'ARCHITECTURE_DECISION_CONSOLIDATION',
+				'ARCHITECTURE_CONCERN'
 			],
 			defaultPolicyIds: [
 				'pol_assumption_disclosure',
@@ -289,7 +290,7 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 				'pol_intent_preservation'
 			],
 			sourceSection:
-				'Spec §14; Reference §12 pwu_fsm_arch — pwuKind ARCHITECTURE_DEFINITION is a FIXTURE-CONFIRMED LITERAL; fixture assurancePolicyIds = {pol_assumption_disclosure, pol_decomposition_coverage, pol_architecture_coverage, pol_intent_preservation} (the GROUND-TRUTH 4). RECONCILED defaultPolicyIds to this fixture-confirmed set; DOC-004 additionally listed pol_constraint_propagation + pol_historical_consistency (BEYOND-SEED, attach at their lifecycle points). The FSM fixture instantiates domain-specific children (System Context, Multi-Tenancy, Data, Mobile/Offline, Integration).'
+				'Spec §14; Reference §12 pwu_fsm_arch — pwuKind ARCHITECTURE_DEFINITION is a FIXTURE-CONFIRMED LITERAL; fixture assurancePolicyIds = {pol_assumption_disclosure, pol_decomposition_coverage, pol_architecture_coverage, pol_intent_preservation} (the GROUND-TRUTH 4). RECONCILED defaultPolicyIds to this fixture-confirmed set; DOC-004 additionally listed pol_constraint_propagation + pol_historical_consistency (BEYOND-SEED, attach at their lifecycle points). The FSM fixture instantiates domain-specific children (System Context, Multi-Tenancy, Data, Mobile/Offline, Integration). CANDIDATE CHILD ADDED 2026-08-05 (REG-F-033): ARCHITECTURE_CONCERN. TRANSCRIBED, not invented — RPH-DOC-010 (PWA Designer and Undertaking Workbench Reference Demonstration) lists "Custom Architecture Concern" among Architecture Definition’s permitted children, and the workbench SEEDS that type and instantiates five of it. Its absence here made the shipped composition tree CONTRADICT the authored candidates rather than narrow them: the one child the PWA publishes was not among the ten this row listed. It is now a strict SUBSET relationship, which is what "candidate" children means.'
 		},
 		{
 			pwuKind: 'ARCHITECTURE_DECISION',

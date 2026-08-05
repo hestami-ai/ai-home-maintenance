@@ -1440,9 +1440,9 @@
 				},
 				{
 					"field": "triggeringObjectId",
-					"required": false,
+					"required": true,
 					"type": "string",
-					"note": "id-ref"
+					"note": "id-ref. TIGHTENED 2026-08-05 (REG-E-023 ratified). The command declared this OPTIONAL while PwuInvalidated declares it REQUIRED — a command the contract admitted produced an event the contract forbade. Resolved toward the EVENT, per the register’s stated default: the event describes a fact that has already happened, and DOC-003’s \"fail closed; escalate rather than invent\" favours the stricter reading. It also matches behaviour already shipped: the handler has REFUSED an absent or unresolvable triggeringObjectId since JAN-CMDPRE, so this makes the contract state what the engine already does. NOTE THE SIBLING: ReshapePwu/PwuReshapingStarted BOTH declare it optional, which is what made this an inconsistency rather than a convention — that pair is left alone, being internally consistent."
 				}
 			]
 		},
@@ -3281,9 +3281,9 @@
 				{
 					"field": "recommendedControlAction",
 					"required": false,
-					"type": "enum",
-					"enumRef": "RecommendedControlActionSchema",
-					"enumRefUnresolved": "REG-F-026 group (d) — RE-DISPOSITIONED 2026-08-05 out of group (a), because the value read that group (a) requires is what killed it. It had been filed as `RecommendedControlAction` -> `ControlAction`. M1 models this concept as ControlActionRecommendation[] — a helper the corpus DEFINES NOWHERE (its single vocab field is literally named `(undefined)` with type `-`, and it is emitted as z.record(z.string(), z.unknown())) — so the object model says a recommendation is a STRUCTURE, not a bare action code. This M3 field is a SCALAR, so the two do not agree even in shape. And nothing in the repository emits AssuranceAssessmentRejected, so binding it would assert an unratified shape in order to constrain an event with no producer. Group (d) = blocked on a helper the corpus has never defined; it cannot be closed by remapping, only by ratification."
+					"type": "ControlAction",
+					"enumRef": "ControlActionSchema",
+					"note": "DOC-004 §33 \"Validator Implementation Output Schema Example\" (CONSTRAINED 2026-08-05, REG-F-026 group (d)). The blocker was that `ControlActionRecommendation` is a type the corpus NAMES four times and DEFINES nowhere, so the field could not be pointed at it — and the prior annotation concluded from the type NAME plus an M1 row literally named `(undefined)` that \"a recommendation is a STRUCTURE, not a bare action code\". IT NEVER CONSULTED THE WORKED EXAMPLE. §33 shows the field’s actual content at both levels, and it is bare ControlAction strings: \"recommendedControlActions\": [\"RESHAPE_PWU\", \"REQUEST_HUMAN_DECISION\"]. The undefined type name is not evidence about the content; the ratified example is. Constrained to ControlAction — the conservative direction (an unvalidated string becomes a ratified enum), and widenable without breakage if the corpus ever defines the richer shape."
 				},
 				{
 					"field": "disposition",

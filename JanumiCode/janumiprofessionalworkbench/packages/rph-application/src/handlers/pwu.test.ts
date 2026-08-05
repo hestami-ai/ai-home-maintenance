@@ -1006,10 +1006,30 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		).toBe('ACCEPTED');
 	}
 
-	it('InvalidatePwu with NO triggeringObjectId is refused rather than fabricating an empty reference', () => {
+	it('InvalidatePwu with NO triggeringObjectId is refused by the SCHEMA (REG-E-023 ratified)', () => {
+		// The refusal MOVED UP A LAYER. The command declared this field optional while `PwuInvalidated` declared
+		// it required — a command the contract admitted producing an event the contract forbade. REG-E-023 is
+		// ratified toward the event, so absence is now a schema failure rather than a handler rejection: earlier,
+		// structural, and no longer dependent on a handler remembering to check.
 		satisfiedPwu('70', 'asm_01ARZ3NDEKTSV4RRFFQ69G5X30');
 		const r = engine.dispatch(
 			cmd('InvalidatePwu', { invalidationReason: 'the evidence was withdrawn' })
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('VALIDATION_FAILED');
+		expect(JSON.stringify(r.error)).toContain('triggeringObjectId');
+		expect(lifecycle(), 'and the PWU has not moved').toBe('SATISFIED');
+		expect(eventsOfType('PwuInvalidated')).toHaveLength(0);
+	});
+
+	it('and the EMPTY STRING is still refused by the handler — the schema does not cover it', () => {
+		// TIGHTENING A SCHEMA NARROWS A GUARD'S POPULATION; IT DOES NOT ALWAYS EMPTY IT. `z.string()` accepts `''`,
+		// so the handler's check is not made redundant by REG-E-023 — it now owns exactly the case the original
+		// comment named and the original code committed: fabricating "a reference to nothing".
+		//
+		// Without this, the handler branch would look dead and the next reader would delete it as superseded.
+		satisfiedPwu('71', 'asm_01ARZ3NDEKTSV4RRFFQ69G5X31');
+		const r = engine.dispatch(
+			cmd('InvalidatePwu', { invalidationReason: 'withdrawn', triggeringObjectId: '' })
 		);
 		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
 		expect(r.error?.message).toContain('REQUIRES a triggeringObjectId');

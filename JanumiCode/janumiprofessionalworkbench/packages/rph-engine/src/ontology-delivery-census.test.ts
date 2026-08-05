@@ -343,12 +343,29 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 			);
 			const archShipped = shippedChildKinds('ARCHITECTURE_DEFINITION');
 			expect(archShipped).toEqual(['ARCHITECTURE_CONCERN']);
+			// RESOLVED 2026-08-05. This assertion used to read `.not.toContain('ARCHITECTURE_CONCERN')` with the
+			// note "the two lists are not subset-related, they disagree" — a CONTRADICTION, not a narrowing. It is
+			// fixed by TRANSCRIPTION, not by weakening the check: RPH-DOC-010 lists "Custom Architecture Concern"
+			// among Architecture Definition's permitted children, and the workbench seeds that type and
+			// instantiates five of it, so its absence from the authored candidates was the error.
 			expect(
 				archAuthored,
-				'the shipped child is not one of the authored candidates — the two lists are not subset-related, ' +
-					'they disagree'
-			).not.toContain('ARCHITECTURE_CONCERN');
-			expect(archAuthored).toHaveLength(10);
+				'the shipped child must be among the authored candidates — "candidate children" is a menu the PWA ' +
+					'selects FROM, so the published tree may narrow it and may never contradict it'
+			).toContain('ARCHITECTURE_CONCERN');
+			expect(archAuthored).toHaveLength(11);
+			// THE GENERAL PROPERTY, now that the contradiction is gone: every shipped child of every type must be
+			// an authored candidate of that type. Stated over all types rather than the one that was wrong, so the
+			// next divergence is caught wherever it appears.
+			for (const c of defines) {
+				const kind = (c.payload as { pwuKind: string }).pwuKind;
+				const authored = candidateChildrenOf(ontology.pwuTemplates.find((t) => t.pwuKind === kind));
+				if (authored.length === 0) continue; // a type authoring no candidates constrains nothing
+				for (const child of shippedChildKinds(kind))
+					expect(authored, `${kind} ships child ${child}, which it does not author as a candidate`).toContain(
+						child
+					);
+			}
 		});
 
 		it('50 of the 62 authored candidate kinds have NO template — which is why wiring it is not the fix', () => {
@@ -358,7 +375,7 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 			// inert field for 50 unusable affordances. The number is asserted so the argument stays checkable.
 			const templateKinds = new Set<string>(ontology.pwuTemplates.map((t) => t.pwuKind));
 			const candidates = new Set(ontology.pwuTemplates.flatMap((t) => candidateChildrenOf(t)));
-			expect(candidates.size).toBe(62);
+			expect(candidates.size).toBe(63);
 			expect([...candidates].filter((k) => !templateKinds.has(k))).toHaveLength(50);
 		});
 	});
