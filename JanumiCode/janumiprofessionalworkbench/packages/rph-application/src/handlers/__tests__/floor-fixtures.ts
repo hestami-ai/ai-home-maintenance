@@ -129,6 +129,9 @@ export function seedPolicy(
 		requiredEvidence?: unknown[];
 		/** DOC-004 §5.1 scope. Absent = the wholesale default below, which applies to every PWU kind. */
 		applicability?: unknown;
+		/** §10.3 foreclosure rules. Absent = the policy forecloses no disposition, so Gate C skips entirely — which
+		 *  is why a test that forgets these gets a PASS from a gate that never ran. */
+		dispositionRules?: unknown[];
 	} = {}
 ): void {
 	createAndActivate(
@@ -142,6 +145,7 @@ export function seedPolicy(
 			rationale: 'Seeded for a live command-drive test.',
 			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
 			...(opts.applicability ? { applicability: opts.applicability } : {}),
+			...(opts.dispositionRules ? { dispositionRules: opts.dispositionRules } : {}),
 			evaluatedClaimTypes: ['FITNESS'],
 			criteria: [
 				{

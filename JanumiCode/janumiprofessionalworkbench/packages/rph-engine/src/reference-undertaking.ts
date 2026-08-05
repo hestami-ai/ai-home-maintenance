@@ -904,15 +904,27 @@ export function driveReferenceUndertaking(
 
 		// 4. The OBSERVATIONS. The conditional case's residual is now a recorded finding on a real assessment,
 		//    not a string handed to the view.
-		for (const o of observations) {
-			send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintId('obs'), {
-				assessmentId,
-				observationType: 'FINDING',
-				severity: o.severity,
-				statement: o.statement,
-				evidenceIds: [evidenceId]
-			});
-		}
+		//
+		//    ONE PER ASSESSMENT, NOT ONE PER PWU (REG-F-029 review finding (e)). These were recorded against the
+		//    PRIMARY assessment only, while EVERY assessment's ValidatorResult carried the same observations —
+		//    so a peer's verdict asserted findings the peer had no observation objects for. Worse than untidy:
+		//    `completeAssuranceAssessment`'s §10.3 foreclosure gate and its escalation rule both load observations
+		//    by `assessmentId === this assessment`, so on every peer they ran over an EMPTY population. A peer
+		//    could reach SATISFIED carrying a finding its own policy forbids that disposition for, because the
+		//    gate could not see a finding that was never attached to it.
+		//
+		//    An ASSURANCE_OBSERVATION belongs to an assessment (the schema keys it by `assessmentId`), so a
+		//    finding that four assessments each report is four observations — one per judgement that reports it.
+		for (const [i] of governing.entries())
+			for (const o of observations) {
+				send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintId('obs'), {
+					assessmentId: assessmentIds[i]!,
+					observationType: 'FINDING',
+					severity: o.severity,
+					statement: o.statement,
+					evidenceIds: [evidenceId]
+				});
+			}
 
 		// 5. The VERDICT — a full DOC-007 §20 ValidatorResult naming what was judged, at which version, on which
 		//    evidence, and how it came out. The (d2) event gate validates the event this produces.
