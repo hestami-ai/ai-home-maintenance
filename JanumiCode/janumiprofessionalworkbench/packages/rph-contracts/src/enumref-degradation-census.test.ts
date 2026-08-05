@@ -141,21 +141,44 @@ describe('enumRef degradation census (REG-F-026)', () => {
 		).toEqual([]);
 	});
 
-	it('the degraded population is SEVEN and may only fall', () => {
-		// A ratchet, not a target. Each of the seven carries its own reason and its own route out; the three groups
-		// differ (an enum exists under another name / no enum exists / the corpus and the runtime disagree), so
-		// they will not close together.
+	it('the degraded population is FOUR and may only fall', () => {
+		// A ratchet, not a target. SEVEN on 2026-08-05, then FOUR the same day when group (a) closed — three fields
+		// whose enum existed under another identifier. Each remaining one carries its own reason and its own route
+		// out, and they will not close together: one has no enum at all, two are a ratification question, and the
+		// fourth models a concept the corpus defines nowhere.
 		expect(degraded.map((r) => r.key).sort()).toEqual(
 			[
-				'AssuranceAssessmentCompleted.disposition',
 				'AssuranceAssessmentRejected.recommendedControlAction',
-				'AssuranceObservationRecorded.severity',
 				'ExecutionStepFailed.failureClass',
 				'FailExecutionStep.failureClass',
-				'RecordAssuranceObservation.severity',
 				'ValidateDecomposition.disposition'
 			].sort()
 		);
+	});
+
+	it('the three closed remappings are CONSTRAINED, and to the right values', () => {
+		// The ratchet above only proves they left the degraded list. This proves what they landed ON — because
+		// "constrained" was never the requirement; constrained TO THE RATIFIED SET was. `AssessmentDisposition`
+		// resolves to AssuranceDispositionRecommendation (five values) and NOT to AssuranceDisposition, which the
+		// name points at and which admits a sixth, WAIVED, that completion cannot produce.
+		const values = (owner: string, field: string): string[] => {
+			const schema = reg[`${owner}PayloadSchema`] as Node | undefined;
+			const raw = (schema?._def ?? schema?.def)?.shape;
+			const shape = (typeof raw === 'function' ? raw() : raw) as Record<string, Node>;
+			const d = (core(shape[field]!)._def ?? core(shape[field]!).def) as Record<string, unknown>;
+			const e = (d.entries ?? d.values ?? d.options) as Record<string, string> | string[];
+			return (Array.isArray(e) ? e : Object.keys(e)).slice().sort();
+		};
+		const SEVERITY = ['ADVISORY', 'BLOCKING', 'CRITICAL', 'INFORMATIONAL', 'MATERIAL'];
+		expect(values('RecordAssuranceObservation', 'severity')).toEqual(SEVERITY);
+		expect(values('AssuranceObservationRecorded', 'severity')).toEqual(SEVERITY);
+		expect(values('AssuranceAssessmentCompleted', 'disposition')).toEqual(
+			['CONDITIONALLY_SATISFIED', 'ESCALATED', 'INCONCLUSIVE', 'REJECTED', 'SATISFIED'].sort()
+		);
+		expect(
+			values('AssuranceAssessmentCompleted', 'disposition'),
+			'WAIVED belongs to AssuranceDisposition, which is the enum the NAME suggested and the wrong one'
+		).not.toContain('WAIVED');
 	});
 
 	it('CONTROL: no annotation outlives the degradation it describes', () => {
@@ -167,7 +190,10 @@ describe('enumRef degradation census (REG-F-026)', () => {
 		);
 	});
 
-	it('every annotation states WHICH of the three shapes it is, so none can be closed by guesswork', () => {
+	it('every annotation states WHICH shape it is, in its FIRST clause, so none can be closed by guesswork', () => {
+		// The group must be the annotation's OPENING claim, not a substring anywhere in it. The first version of
+		// this check matched `group (x)` loosely, and passed a reason reading "RE-DISPOSITIONED out of group (a)"
+		// — a sentence saying the field is NOT group (a) — as if it were a group (a) classification.
 		const byKey = new Map<string, string>();
 		for (const c of vocab.commands)
 			for (const f of c.payloadFields ?? [])
@@ -177,11 +203,12 @@ describe('enumRef degradation census (REG-F-026)', () => {
 				if (f.enumRefUnresolved) byKey.set(`${e.eventType}.${f.field}`, f.enumRefUnresolved);
 		const unclassified = degraded
 			.map((r) => r.key)
-			.filter((k) => !/group \((a|b|c)\)/.test(byKey.get(k) ?? ''));
+			.filter((k) => !/^REG-F-026 group \([b-d]\)/.test(byKey.get(k) ?? ''));
 		expect(
 			unclassified,
-			'a reason that does not say whether the enum exists elsewhere, does not exist, or is contradicted by the ' +
-				'runtime is a reason nobody can act on'
+			'a reason that does not OPEN by saying whether the enum exists elsewhere (b), is contradicted by the ' +
+				'runtime (c), or is blocked on an undefined helper (d) is a reason nobody can act on. Group (a) is ' +
+				'CLOSED, so a field still degraded cannot be in it'
 		).toEqual([]);
 	});
 });

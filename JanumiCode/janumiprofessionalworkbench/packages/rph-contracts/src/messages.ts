@@ -3,7 +3,9 @@
 import { z } from 'zod';
 import {
 	AssumptionStatusSchema,
+	AssuranceDispositionRecommendationSchema,
 	AssuranceDispositionSchema,
+	AssuranceSeveritySchema,
 	AssuranceStateSchema,
 	AuthorizationStatusSchema,
 	BaselineStatusSchema,
@@ -334,7 +336,7 @@ export const RecordAssuranceObservationPayloadSchema = z.strictObject({
 	assessmentId: z.string(),
 	observationType: ObservationTypeSchema,
 	findingCode: z.string().optional(),
-	severity: z.string(),
+	severity: AssuranceSeveritySchema,
 	statement: z.string(),
 	evidenceIds: z.array(z.string()).optional()
 });
@@ -746,7 +748,7 @@ export const AssuranceAssessmentCompletedPayloadSchema = z.strictObject({
 	policyVersion: z.string(),
 	subjectObjectIds: z.array(z.string()),
 	subjectSemanticVersions: z.record(z.string(), z.number().int()),
-	disposition: z.string(),
+	disposition: AssuranceDispositionRecommendationSchema,
 	evidenceConsideredIds: z.array(z.string()),
 	observationIds: z.array(z.string()),
 	residualUncertainty: z.array(z.string()),
@@ -835,7 +837,7 @@ export const AssuranceObservationRecordedPayloadSchema = z.strictObject({
 	policyId: z.string(),
 	subjectObjectIds: z.array(z.string()),
 	findingCode: z.string(),
-	severity: z.string(),
+	severity: AssuranceSeveritySchema,
 	statement: z.string(),
 	implication: z.string(),
 	evidenceIds: z.array(z.string()),

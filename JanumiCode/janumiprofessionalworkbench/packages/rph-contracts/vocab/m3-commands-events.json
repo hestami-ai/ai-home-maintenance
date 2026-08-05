@@ -1244,9 +1244,9 @@
 				{
 					"field": "severity",
 					"required": true,
-					"type": "ObservationSeverity",
-					"enumRef": "ObservationSeveritySchema",
-					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE, pending the correction increment. `ObservationSeverity` is the vocab's name for the enum emitted as AssuranceSeverity (INFORMATIONAL, ADVISORY, MATERIAL, BLOCKING, CRITICAL); enums.ts's own doc comment on that enum names `AssuranceObservation.severity (ObservationSeverity)` as one of its three uses, so the mapping is documented rather than inferred. Every severity value in flight today is inside that set."
+					"type": "AssuranceSeverity",
+					"enumRef": "AssuranceSeveritySchema",
+					"note": "REG-F-026 group (a) CLOSED 2026-08-05. `ObservationSeverity` is the vocab's name for the enum emitted as AssuranceSeverity. Confirmed by the OBJECT MODEL, not by name: M1's ASSURANCE_OBSERVATION.severity already carries enumRef AssuranceSeveritySchema, and this command is what writes that field. Every severity value in flight is inside the set."
 				},
 				{
 					"field": "statement",
@@ -3160,9 +3160,9 @@
 				{
 					"field": "disposition",
 					"required": true,
-					"type": "'SATISFIED' | 'CONDITIONALLY_SATISFIED' | 'REJECTED' | 'INCONCLUSIVE' | 'ESCALATED'",
-					"enumRef": "AssessmentDispositionSchema",
-					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE, pending the correction increment. `AssessmentDisposition` is not an emitted enum; the ratified enum carrying exactly these five values is AssuranceDispositionRecommendation (SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, INCONCLUSIVE, ESCALATED). NOTE THE TRAP: the NAME points at AssuranceDisposition, which has SIX values (it also carries WAIVED) and would be the wrong constraint. Resolved by VALUES, not by name. This field also declares the same five inline in `type`, which zodLiteralExpr would have turned into a real z.enum — the broken enumRef shadowed it."
+					"type": "AssuranceDispositionRecommendation",
+					"enumRef": "AssuranceDispositionRecommendationSchema",
+					"note": "REG-F-026 group (a) CLOSED 2026-08-05. Confirmed THREE independent ways, and by VALUES rather than name: (1) this field's own inline type union named exactly these five; (2) the handler's DISPOSITIONS guard admits exactly these five and rejects the command otherwise; (3) M1's ValidatorResult.dispositionRecommendation and DispositionRule.disposition both already bind AssuranceDispositionRecommendationSchema. NOT AssuranceDisposition, which the NAME points at and which carries a sixth value (WAIVED) this event cannot take: completion reads validatorResult.dispositionRecommendation, and a waiver is a different command."
 				},
 				{
 					"field": "evidenceConsideredIds",
@@ -3285,7 +3285,7 @@
 					"required": false,
 					"type": "enum",
 					"enumRef": "RecommendedControlActionSchema",
-					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE pending a value check. `RecommendedControlAction` is not emitted; ControlAction (23 values, DOC-004 control vocabulary) is the candidate. No value is in flight today, so nothing constrains the choice empirically and the mapping must be read off the corpus before it lands."
+					"enumRefUnresolved": "REG-F-026 group (d) — RE-DISPOSITIONED 2026-08-05 out of group (a), because the value read that group (a) requires is what killed it. It had been filed as `RecommendedControlAction` -> `ControlAction`. M1 models this concept as ControlActionRecommendation[] — a helper the corpus DEFINES NOWHERE (its single vocab field is literally named `(undefined)` with type `-`, and it is emitted as z.record(z.string(), z.unknown())) — so the object model says a recommendation is a STRUCTURE, not a bare action code. This M3 field is a SCALAR, so the two do not agree even in shape. And nothing in the repository emits AssuranceAssessmentRejected, so binding it would assert an unratified shape in order to constrain an event with no producer. Group (d) = blocked on a helper the corpus has never defined; it cannot be closed by remapping, only by ratification."
 				},
 				{
 					"field": "disposition",
@@ -3486,9 +3486,9 @@
 				{
 					"field": "severity",
 					"required": true,
-					"type": "ObservationSeverity",
-					"enumRef": "ObservationSeveritySchema",
-					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE. Same as RecordAssuranceObservation.severity: `ObservationSeverity` is emitted as AssuranceSeverity."
+					"type": "AssuranceSeverity",
+					"enumRef": "AssuranceSeveritySchema",
+					"note": "REG-F-026 group (a) CLOSED 2026-08-05. Same as RecordAssuranceObservation.severity: this is the event form of the same ASSURANCE_OBSERVATION.severity field, which M1 already binds to AssuranceSeveritySchema."
 				},
 				{
 					"field": "statement",

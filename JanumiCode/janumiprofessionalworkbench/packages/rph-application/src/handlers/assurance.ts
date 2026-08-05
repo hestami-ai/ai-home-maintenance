@@ -32,6 +32,7 @@ import type {
 	SubmitEvidenceForAssessmentPayload,
 	SupersedeAssurancePolicyPayload
 } from '@janumipwb/rph-contracts';
+import { AssuranceDispositionRecommendationSchema } from '@janumipwb/rph-contracts';
 import {
 	advanceStatus,
 	checkPrecondition,
@@ -688,13 +689,16 @@ export const expireAssumption: CommandHandler = (ctx, command, payload) => {
 
 // ---- Assurance Assessment ----
 const ASSESSMENT = 'ASSURANCE_ASSESSMENT';
-const DISPOSITIONS = new Set([
-	'SATISFIED',
-	'CONDITIONALLY_SATISFIED',
-	'REJECTED',
-	'INCONCLUSIVE',
-	'ESCALATED'
-]);
+/**
+ * DERIVED FROM THE RATIFIED ENUM, NOT RESTATED (REG-F-026 group (a)).
+ *
+ * This was a hand-written `new Set([...])` of the same five values. It was CORRECT — and it was the third copy of
+ * the same list, alongside `AssuranceDispositionRecommendationSchema` and the `AssuranceAssessmentCompleted.
+ * disposition` vocab field. That is how the enum came to be misnamed in the vocab (`AssessmentDispositionSchema`,
+ * which resolves to nothing) without any of the copies noticing: each was individually right, and none was the
+ * source. Deriving here removes one copy and makes the remaining agreement structural rather than maintained.
+ */
+const DISPOSITIONS = new Set<string>(AssuranceDispositionRecommendationSchema.options);
 
 /** RequestAssuranceAssessment — create an assessment already in ASSESSING (request-and-begin; the evidence-
  * pending/ready prep states are a deeper increment — see RESUME-STATE). */
@@ -773,7 +777,10 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// unreachable — you could never be ASSESSING with any requirement outstanding, so its refusal could never
 	// fire. Two guards that cannot both matter is one guard and a decoration.
 	const blockingEvidenceIds = (policy.requiredEvidence ?? [])
-		.filter((r) => (r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL')
+		.filter(
+			(r) =>
+				(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
+		)
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');
 	//
@@ -965,7 +972,10 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 	// request handler. A 'SATISFIED_ONLY' requirement outstanding does not keep an assessment out of ASSESSING; it
 	// keeps a SATISFIED verdict out, at Gate A.
 	const blocking = (policy?.requiredEvidence ?? [])
-		.filter((r) => (r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL')
+		.filter(
+			(r) =>
+				(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
+		)
 		.map((r) => r?.id)
 		.filter((x): x is string => typeof x === 'string');
 	const stillOutstanding = blocking.filter((r) => !receivedIds.has(r));
@@ -1044,8 +1054,7 @@ export const selectAssuranceEvaluator: CommandHandler = (ctx, command, payload) 
 	// required AT SELECTION TIME rather than what the policy happens to require now. Absent when the policy does not
 	// resolve — a fail-open would be worse than silence, and the independence gate at completion is unaffected.
 	const policy = ctx.store.loadObject(loaded.state.assurancePolicyId as string)?.state as
-		| { independenceRequirement?: string }
-		| undefined;
+		{ independenceRequirement?: string } | undefined;
 	const event = makeEvent(ctx, command, {
 		eventType: 'AssuranceEvaluatorSelected',
 		aggregateType: ASSESSMENT,
