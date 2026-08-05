@@ -201,8 +201,7 @@ function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
 	const existing = view.assessments[assessmentId];
 	// An assessment begun without a recorded request should still appear rather than vanish — a replay of an older
 	// stream (fused request-and-begin) has no Requested event, and dropping it would silently shrink the view.
-	if (!existing)
-		return foldRequested(view, p, 'ASSESSING');
+	if (!existing) return foldRequested(view, p, 'ASSESSING');
 	return withAssessment(view, assessmentId, { ...existing, assessmentState: 'ASSESSING' });
 }
 
@@ -290,7 +289,8 @@ function mapAssessments(
 	return { assessments: next };
 }
 
-const intersects = (a: readonly string[], b: readonly string[]): boolean => a.some((x) => b.includes(x));
+const intersects = (a: readonly string[], b: readonly string[]): boolean =>
+	a.some((x) => b.includes(x));
 
 /** WaiverRequested — attach a PROPOSED waiver to every assessment the waiver names by (policyId, subject). The
  *  waiver's subject + policy ride the RequestWaiver passthrough; the Decision aggregate id is the key the later
@@ -426,6 +426,15 @@ export interface ApplicablePolicyView {
 	/** The disposition of the covering assessment, once it has completed (undefined while merely ASSESSING). */
 	readonly disposition?: string;
 	readonly assessmentId?: string;
+	/**
+	 * The DOC-004 §5.2 outcome of running the policy's own §5.1 rule against this PWU — present only when the
+	 * caller supplied a determination, `undefined` when it did not. Never defaulted: "nobody asked" and "asked
+	 * and the answer was REQUIRED" are different facts, and collapsing them is how this view came to report a
+	 * policy as governing work it does not.
+	 */
+	readonly applicabilityOutcome?: string;
+	/** False when the determination says NOT_APPLICABLE. Undefined when no determination was supplied. */
+	readonly applicable?: boolean;
 }
 
 function policySource(isDirect: boolean, isTypeRequired: boolean): ApplicablePolicyView['source'] {
@@ -433,14 +442,34 @@ function policySource(isDirect: boolean, isTypeRequired: boolean): ApplicablePol
 	return isDirect ? 'DIRECT' : 'TYPE';
 }
 
-/** Join a PWU's applicable-policy set (direct + PwuType-required) against the assessment view to surface, per
- *  policy, whether it is assessed and how it came out — and, by `assessed: false`, the required-but-unassessed
- *  policies §38's green-node rule forbids ignoring. Pure: the caller supplies the object-state id arrays. */
+/**
+ * Join a PWU's applicable-policy set (direct + PwuType-required) against the assessment view to surface, per
+ * policy, whether it is assessed and how it came out — and, by `assessed: false`, the required-but-unassessed
+ * policies §38's green-node rule forbids ignoring. Pure: the caller supplies the object-state id arrays.
+ *
+ * ── IT JOINS DECLARATIONS, AND SAYS SO (REG-F-029 review finding (a)) ────────────────────────────────────────
+ * This function is pure over ID ARRAYS: it never loads a policy, so it cannot run DOC-004 §5.1 or check that a
+ * policy is ACTIVE. It therefore reported every DECLARED policy as applicable — which is how the root PWU's view
+ * came to list `pol_baseline_promotion` as applicable-and-unassessed while the engine's own determination says
+ * NOT_APPLICABLE for that exact pair. I had claimed the drive and the read model "cannot give different answers";
+ * they could, because only one of them was answering the question.
+ *
+ * The fix is NOT to drop inapplicable rows. Guide §8.4 is explicit that *"required, inherited, deferred, waived,
+ * and **inapplicable** … coverage are explainable; gaps are never silent"* — a policy declared and then
+ * determined not to govern is exactly a thing that must be explainable. So the caller may supply
+ * `outcomeByPolicy`, and the row REPORTS the outcome rather than the row vanishing.
+ *
+ * When no determination is supplied the fields stay `undefined`. That is deliberate: a default of `true` would
+ * restate the original defect, and a default of `false` would hide real coverage. "Nobody asked" is its own
+ * state, and this view now has a way to say it.
+ */
 export function buildApplicablePolicies(args: {
 	pwuId: string;
 	directPolicyIds: readonly string[];
 	typeRequiredPolicyIds: readonly string[];
 	view: AssuranceView;
+	/** policyId -> the §5.2 outcome of its §5.1 rule against this PWU. Omit when the caller cannot determine it. */
+	outcomeByPolicy?: Readonly<Record<string, string>>;
 }): ApplicablePolicyView[] {
 	const direct = new Set(args.directPolicyIds);
 	const typeReq = new Set(args.typeRequiredPolicyIds);
@@ -453,12 +482,16 @@ export function buildApplicablePolicies(args: {
 		// Prefer a COMPLETED assessment (one carrying a disposition) for the reported outcome; else the last match.
 		const completed = covering.filter((a) => a.disposition !== undefined);
 		const chosen = completed.at(-1) ?? covering.at(-1);
+		const outcome = args.outcomeByPolicy?.[policyId];
 		return {
 			policyId,
 			source,
 			assessed: covering.length > 0,
 			...(chosen?.disposition !== undefined ? { disposition: chosen.disposition } : {}),
-			...(chosen ? { assessmentId: chosen.assessmentId } : {})
+			...(chosen ? { assessmentId: chosen.assessmentId } : {}),
+			...(outcome !== undefined
+				? { applicabilityOutcome: outcome, applicable: outcome !== 'NOT_APPLICABLE' }
+				: {})
 		};
 	});
 }

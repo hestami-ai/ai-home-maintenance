@@ -257,11 +257,20 @@ describe('Assurance View fold — §38 waivers and invalidation status (cross-ob
 		const view = buildAssuranceView([
 			started('asm_iv', 'pwu_1'),
 			completed('asm_iv', 'SATISFIED', []), // sets evidenceConsideredIds: ['evd_1']; subject stays pwu_1
-			evtOn(7, 'EvidenceInvalidated', 'evd_1', { invalidationReason: 'stale', affectedClaimIds: [] }),
-			evtOn(8, 'PwuInvalidated', 'pwu_1', { invalidationReason: 'subject changed', triggeringObjectId: 'x' })
+			evtOn(7, 'EvidenceInvalidated', 'evd_1', {
+				invalidationReason: 'stale',
+				affectedClaimIds: []
+			}),
+			evtOn(8, 'PwuInvalidated', 'pwu_1', {
+				invalidationReason: 'subject changed',
+				triggeringObjectId: 'x'
+			})
 		]);
 		const inv = view.assessments['asm_iv']!.invalidations;
-		expect(inv.map((i) => i.status).sort()).toEqual(['EVIDENCE_INVALIDATED', 'SUBJECT_INVALIDATED']);
+		expect(inv.map((i) => i.status).sort()).toEqual([
+			'EVIDENCE_INVALIDATED',
+			'SUBJECT_INVALIDATED'
+		]);
 		const byEvidence = inv.find((i) => i.status === 'EVIDENCE_INVALIDATED')!;
 		expect(byEvidence.invalidatedObjectId).toBe('evd_1');
 		expect(byEvidence.reason).toBe('stale');
@@ -271,8 +280,14 @@ describe('Assurance View fold — §38 waivers and invalidation status (cross-ob
 		const view = buildAssuranceView([
 			started('asm_iv', 'pwu_1'),
 			completed('asm_iv', 'SATISFIED', []),
-			evtOn(7, 'EvidenceInvalidated', 'evd_UNRELATED', { invalidationReason: 'r', affectedClaimIds: [] }),
-			evtOn(8, 'PwuInvalidated', 'pwu_UNRELATED', { invalidationReason: 'r', triggeringObjectId: 'x' })
+			evtOn(7, 'EvidenceInvalidated', 'evd_UNRELATED', {
+				invalidationReason: 'r',
+				affectedClaimIds: []
+			}),
+			evtOn(8, 'PwuInvalidated', 'pwu_UNRELATED', {
+				invalidationReason: 'r',
+				triggeringObjectId: 'x'
+			})
 		]);
 		expect(view.assessments['asm_iv']!.invalidations).toEqual([]);
 	});
@@ -280,7 +295,10 @@ describe('Assurance View fold — §38 waivers and invalidation status (cross-ob
 	it('sourced-none, not unknown: an assessment with no waiver/invalidation event keeps real-empty arrays', () => {
 		// The waiver and invalidation events ARE folded, so an empty array here is a real "none", not "unknown" —
 		// the distinction the header comment makes load-bearing.
-		const view = buildAssuranceView([started('asm_clean', 'pwu_1'), completed('asm_clean', 'SATISFIED', [])]);
+		const view = buildAssuranceView([
+			started('asm_clean', 'pwu_1'),
+			completed('asm_clean', 'SATISFIED', [])
+		]);
 		const a = view.assessments['asm_clean']!;
 		expect(a.waivers).toEqual([]);
 		expect(a.invalidations).toEqual([]);
@@ -400,7 +418,10 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		expect(robust.assessments['asm_r2']!.missingEvidence).toEqual(['EV-01']);
 
 		// Every requirement satisfied -> a real, sourced empty (none missing), not "unknown".
-		const all = buildAssuranceView([...req('asm_r3', ['EV-01']), received('asm_r3', 'e1', 'EV-01')]);
+		const all = buildAssuranceView([
+			...req('asm_r3', ['EV-01']),
+			received('asm_r3', 'e1', 'EV-01')
+		]);
 		expect(all.assessments['asm_r3']!.missingEvidence).toEqual([]);
 
 		// Received for an assessment that never started attaches to nothing — no crash, no phantom assessment.
@@ -411,7 +432,10 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 
 describe('§38 "applicable policies" — the required-but-unassessed join (object state x assessment view)', () => {
 	it('a directly-attached policy with a completed assessment for THIS PWU reads assessed + disposition; source DIRECT', () => {
-		const view = buildAssuranceView([started('asm_1', 'pwu_1'), completed('asm_1', 'SATISFIED', [])]);
+		const view = buildAssuranceView([
+			started('asm_1', 'pwu_1'),
+			completed('asm_1', 'SATISFIED', [])
+		]);
 		const rows = buildApplicablePolicies({
 			pwuId: 'pwu_1',
 			directPolicyIds: ['pol_x'],
@@ -426,6 +450,39 @@ describe('§38 "applicable policies" — the required-but-unassessed join (objec
 			disposition: 'SATISFIED',
 			assessmentId: 'asm_1'
 		});
+	});
+
+	// ── REG-F-029 review finding (a): the view used to answer a question it never asked ──────────────────────
+	it('reports a DETERMINED-INAPPLICABLE policy as inapplicable — it does not vanish, and it is not "required"', () => {
+		// The concrete case from the shipping data: the root PWU's type declares `pol_baseline_promotion`, which
+		// scopes itself to PRODUCT_BASELINE_PROMOTION. Before this, the view listed it as applicable-and-unassessed
+		// while the engine's own §5.1 determination said NOT_APPLICABLE for that exact pair — the two artifacts
+		// disagreeing about which policies govern the work, which I had claimed could not happen.
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_root',
+			directPolicyIds: [],
+			typeRequiredPolicyIds: ['pol_baseline_promotion', 'pol_intent_fidelity'],
+			view: buildAssuranceView([]),
+			outcomeByPolicy: { pol_baseline_promotion: 'NOT_APPLICABLE', pol_intent_fidelity: 'REQUIRED' }
+		});
+		// §8.4: inapplicable coverage is EXPLAINABLE, never silent. Dropping the row would make the gap invisible,
+		// which is the failure this view exists to prevent.
+		expect(rows.map((r) => r.policyId)).toEqual(['pol_baseline_promotion', 'pol_intent_fidelity']);
+		expect(rows[0]).toMatchObject({ applicable: false, applicabilityOutcome: 'NOT_APPLICABLE' });
+		expect(rows[1]).toMatchObject({ applicable: true, applicabilityOutcome: 'REQUIRED' });
+	});
+
+	it('leaves the determination fields UNDEFINED when the caller supplied none — "nobody asked" is its own state', () => {
+		// Defaulting to applicable:true would restate the original defect; defaulting to false would hide real
+		// coverage. Absence is reported as absence.
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_1',
+			directPolicyIds: ['pol_x'],
+			typeRequiredPolicyIds: [],
+			view: buildAssuranceView([])
+		});
+		expect(rows[0]!.applicable).toBeUndefined();
+		expect(rows[0]!.applicabilityOutcome).toBeUndefined();
 	});
 
 	it('a PwuType-required policy with NO assessment is required-but-unassessed (assessed:false); source TYPE', () => {
@@ -450,7 +507,10 @@ describe('§38 "applicable policies" — the required-but-unassessed join (objec
 
 	it('subject-scoped: an assessment of the same policy but a DIFFERENT PWU is not coverage for this one', () => {
 		// asm_o is started with subject pwu_OTHER; completed() does not change the subject, so it stays pwu_OTHER.
-		const view = buildAssuranceView([started('asm_o', 'pwu_OTHER'), completed('asm_o', 'SATISFIED', [])]);
+		const view = buildAssuranceView([
+			started('asm_o', 'pwu_OTHER'),
+			completed('asm_o', 'SATISFIED', [])
+		]);
 		const rows = buildApplicablePolicies({
 			pwuId: 'pwu_1',
 			directPolicyIds: ['pol_x'],

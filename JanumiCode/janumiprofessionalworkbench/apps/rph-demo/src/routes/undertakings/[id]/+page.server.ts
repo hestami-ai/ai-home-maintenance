@@ -16,7 +16,8 @@ import {
 	listPwuTypes,
 	professionalWorkGraph,
 	REFERENCE_OPEN_RESIDUALS,
-	SEED_UNDERTAKING
+	SEED_UNDERTAKING,
+	selectGoverningPolicies
 } from '@janumipwb/rph-engine';
 import {
 	buildApplicablePolicies,
@@ -96,11 +97,21 @@ function buildApplicablePoliciesView(
 			const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
 			const type = typeId ? getObject(engine, typeId) : undefined;
 			const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+			// THE SAME DETERMINATION THE ENGINE ENFORCES (REG-F-029 review finding (a)). `buildApplicablePolicies`
+			// is pure over id arrays and cannot run §5.1 itself, so without this the view reported every DECLARED
+			// policy as governing — and said so about pairs the engine refuses, e.g. the root PWU's
+			// `pol_baseline_promotion`. Supplying the outcome does not hide those rows (§8.4: inapplicable coverage
+			// is EXPLAINABLE, never silent); it labels them.
+			const determination = selectGoverningPolicies(engine, p.id);
+			const outcomeByPolicy: Record<string, string> = {};
+			for (const id of determination.selected) outcomeByPolicy[id] = 'REQUIRED';
+			for (const e of determination.excluded) outcomeByPolicy[e.policyId] = e.reason;
 			const rows = buildApplicablePolicies({
 				pwuId: p.id,
 				directPolicyIds: asStrings(p.state.assurancePolicyIds),
 				typeRequiredPolicyIds: asStrings(type?.requiredAssurancePolicyIds),
-				view
+				view,
+				outcomeByPolicy
 			});
 			return {
 				pwuId: p.id,
