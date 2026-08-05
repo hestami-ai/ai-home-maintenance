@@ -13,6 +13,11 @@ interface Field {
 	required: boolean;
 	enumRef?: string;
 	note?: string;
+	/**
+	 * Set ONLY on a field whose `enumRef` names no emitted enum, and the value is why it is not simply corrected.
+	 * The field is then modelled permissively — but SAID SO, rather than degraded in silence. See REG-F-026.
+	 */
+	enumRefUnresolved?: string;
 }
 interface Command {
 	commandType: string;
@@ -57,13 +62,41 @@ const spec = JSON.parse(readFileSync(SPEC_PATH, 'utf8')) as Spec;
 const used = { enums: new Set<string>(), obj: new Set<string>(), env: new Set<string>() };
 const j = (v: unknown): string => JSON.stringify(v);
 
-function zodEnumRefExpr(enumRef: string): string {
+/**
+ * FAILS LOUD ON AN ENUMREF THAT NAMES NO EMITTED ENUM (REG-F-026).
+ *
+ * This used to `return 'z.string()'` with the comment *"enumRef not in the ratified enum set -> permissive, never
+ * invent values"*. Not inventing values is right; dropping the constraint and saying nothing is not. Seven payload
+ * fields — including `AssuranceAssessmentCompleted.disposition` and both observation `severity` fields — declared
+ * an enum and shipped as UNVALIDATED strings, and nothing anywhere reported it.
+ *
+ * WORSE, AND THIS IS THE PART TO KEEP: the enumRef branch in `zodExpr` returns unconditionally, so a broken
+ * reference SHADOWS a perfectly good inline literal union. `AssuranceAssessmentCompleted.disposition` declares its
+ * five values twice — once as `enumRef: AssessmentDispositionSchema` (which does not exist) and once as the
+ * literal union `'SATISFIED' | 'CONDITIONALLY_SATISFIED' | ...` that `zodLiteralExpr` would have turned into a
+ * real `z.enum`. The unusable form won.
+ *
+ * AND THE SISTER GENERATOR NEVER HAD THIS BUG, WHICH IS WHY THE SEVEN ARE ALL IN M3. `gen-objects.ts` emits the
+ * enumRef VERBATIM as an identifier, so an unresolvable one is an import of a nonexistent symbol — a compile
+ * error at the next build. The same declaration was fatal there and silent here, so the mistakes accumulated
+ * where they could hide. (`gen-objects.ts` carries its own note that these two generators had independently made
+ * the identical array-detection mistake; this is the same lesson from the other side.)
+ */
+function zodEnumRefExpr(enumRef: string, owner: string, f: Field): string {
 	const nm = enumRef.replace(/Schema$/, '');
 	if (ENUM.has(nm)) {
 		used.enums.add(nm);
 		return `${nm}Schema`;
 	}
-	return 'z.string()'; // enumRef not in the ratified enum set -> permissive, never invent values
+	if (!f.enumRefUnresolved)
+		throw new Error(
+			`${owner}.${f.field}: enumRef "${enumRef}" names no emitted enum, so this field would ship as an ` +
+				`UNVALIDATED z.string() — and would do so even though its own \`type\` may declare the values. ` +
+				`Point it at the real enum (check the VALUES, not the name — "AssessmentDisposition" resolves to ` +
+				`AssuranceDispositionRecommendation, not AssuranceDisposition), or give the field an ` +
+				`"enumRefUnresolved" reason if the constraint genuinely does not exist in ratified form.`
+		);
+	return 'z.string()'; // declared unresolvable IN THE FIELD, with a reason — permissive, and said out loud
 }
 
 // String literal(s): 'X' -> z.literal('X'); 'A' | 'B' -> z.enum([...]). Returns undefined when `t`
@@ -153,10 +186,10 @@ function zodBaseExpr(t: string): string {
  * `t.endsWith('[]')` check, so any field with both an enumRef and an array type silently lost its array. The
  * two generators had independently made the identical mistake; a fix to one is not a fix to the other.
  */
-function zodExpr(type: string | undefined, enumRef?: string): string {
-	let t = (type ?? 'unknown').trim();
-	if (enumRef) {
-		const base = zodEnumRefExpr(enumRef);
+function zodExpr(owner: string, f: Field): string {
+	let t = (f.type ?? 'unknown').trim();
+	if (f.enumRef) {
+		const base = zodEnumRefExpr(f.enumRef, owner, f);
 		return t.endsWith('[]') ? `z.array(${base})` : base;
 	}
 	const lit = zodLiteralExpr(t);
@@ -170,10 +203,10 @@ function zodExpr(type: string | undefined, enumRef?: string): string {
 	return arr ? `z.array(${expr})` : expr;
 }
 
-function payloadLit(fields: Field[]): string {
+function payloadLit(owner: string, fields: Field[]): string {
 	if (fields.length === 0) return 'z.strictObject({})';
 	const lines = fields
-		.map((f) => `\t${j(f.field)}: ${zodExpr(f.type, f.enumRef)}${f.required ? '' : '.optional()'}`)
+		.map((f) => `\t${j(f.field)}: ${zodExpr(owner, f)}${f.required ? '' : '.optional()'}`)
 		.join(',\n');
 	return `z.strictObject({\n${lines}\n})`;
 }
@@ -183,14 +216,14 @@ const body: string[] = [];
 body.push('// ---- Command payload schemas ----');
 for (const c of spec.commands) {
 	body.push(
-		`export const ${c.commandType}PayloadSchema = ${payloadLit(c.payloadFields)};`,
+		`export const ${c.commandType}PayloadSchema = ${payloadLit(c.commandType, c.payloadFields)};`,
 		`export type ${c.commandType}Payload = z.infer<typeof ${c.commandType}PayloadSchema>;`
 	);
 }
 body.push('', '// ---- Event payload schemas ----');
 for (const e of spec.events) {
 	body.push(
-		`export const ${e.eventType}PayloadSchema = ${payloadLit(e.payloadFields)};`,
+		`export const ${e.eventType}PayloadSchema = ${payloadLit(e.eventType, e.payloadFields)};`,
 		`export type ${e.eventType}Payload = z.infer<typeof ${e.eventType}PayloadSchema>;`
 	);
 }

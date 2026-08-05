@@ -876,7 +876,8 @@
 					"required": false,
 					"type": "ExecutionFailureClass",
 					"enumRef": "ExecutionFailureClassSchema",
-					"note": "§36.2; also drives PWU.executionState ->FAILED"
+					"note": "§36.2; also drives PWU.executionState ->FAILED",
+					"enumRefUnresolved": "REG-F-026 group (c) — GENUINE DIVERGENCE, DO NOT CONSTRAIN WITHOUT A DECISION. DOC-004 §36.2 gives a PROSE taxonomy of seven execution-failure kinds (tool failure, model failure, timeout, sandbox failure, dependency unavailable, retry exhaustion, invalid output schema) and no enum was ever minted from it. The runtime uses a DIFFERENT vocabulary — the only value in flight is `TRANSIENT`, from the retry-capability work — which §36.2's list does not contain. Constraining this field to the ratified taxonomy would refuse live data; constraining it to the live vocabulary would ratify an unratified one. Recorded as the open question it is."
 				}
 			]
 		},
@@ -1241,7 +1242,8 @@
 					"field": "severity",
 					"required": true,
 					"type": "ObservationSeverity",
-					"enumRef": "ObservationSeveritySchema"
+					"enumRef": "ObservationSeveritySchema",
+					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE, pending the correction increment. `ObservationSeverity` is the vocab's name for the enum emitted as AssuranceSeverity (INFORMATIONAL, ADVISORY, MATERIAL, BLOCKING, CRITICAL); enums.ts's own doc comment on that enum names `AssuranceObservation.severity (ObservationSeverity)` as one of its three uses, so the mapping is documented rather than inferred. Every severity value in flight today is inside that set."
 				},
 				{
 					"field": "statement",
@@ -1552,7 +1554,8 @@
 					"required": true,
 					"type": "DecompositionValidationDisposition",
 					"enumRef": "DecompositionValidationDispositionSchema",
-					"note": "VALID|CONDITIONALLY_VALID|INVALID; INVALID emits DecompositionRejected UNDER_REVIEW->INVALID"
+					"note": "VALID|CONDITIONALLY_VALID|INVALID; INVALID emits DecompositionRejected UNDER_REVIEW->INVALID",
+					"enumRefUnresolved": "REG-F-026 group (b) — NO ENUM EXISTS. This field's own note ratifies three values (VALID | CONDITIONALLY_VALID | INVALID), which are a SUBSET of DecompositionContractStatus (six values, incl. DRAFT/UNDER_REVIEW/SUPERSEDED) — so pointing at that enum would ADMIT states a validation disposition must not take. The correct emission is a three-value literal union, which requires the `type` field to quote them; that is a vocab edit with a ratification question attached, not a remapping."
 				},
 				{
 					"field": "validatorRole",
@@ -3155,7 +3158,8 @@
 					"field": "disposition",
 					"required": true,
 					"type": "'SATISFIED' | 'CONDITIONALLY_SATISFIED' | 'REJECTED' | 'INCONCLUSIVE' | 'ESCALATED'",
-					"enumRef": "AssessmentDispositionSchema"
+					"enumRef": "AssessmentDispositionSchema",
+					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE, pending the correction increment. `AssessmentDisposition` is not an emitted enum; the ratified enum carrying exactly these five values is AssuranceDispositionRecommendation (SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, INCONCLUSIVE, ESCALATED). NOTE THE TRAP: the NAME points at AssuranceDisposition, which has SIX values (it also carries WAIVED) and would be the wrong constraint. Resolved by VALUES, not by name. This field also declares the same five inline in `type`, which zodLiteralExpr would have turned into a real z.enum — the broken enumRef shadowed it."
 				},
 				{
 					"field": "evidenceConsideredIds",
@@ -3277,7 +3281,8 @@
 					"field": "recommendedControlAction",
 					"required": false,
 					"type": "enum",
-					"enumRef": "RecommendedControlActionSchema"
+					"enumRef": "RecommendedControlActionSchema",
+					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE pending a value check. `RecommendedControlAction` is not emitted; ControlAction (23 values, DOC-004 control vocabulary) is the candidate. No value is in flight today, so nothing constrains the choice empirically and the mapping must be read off the corpus before it lands."
 				},
 				{
 					"field": "disposition",
@@ -3479,7 +3484,8 @@
 					"field": "severity",
 					"required": true,
 					"type": "ObservationSeverity",
-					"enumRef": "ObservationSeveritySchema"
+					"enumRef": "ObservationSeveritySchema",
+					"enumRefUnresolved": "REG-F-026 group (a) — RESOLVABLE. Same as RecordAssuranceObservation.severity: `ObservationSeverity` is emitted as AssuranceSeverity."
 				},
 				{
 					"field": "statement",
@@ -4866,7 +4872,8 @@
 					"required": false,
 					"type": "enum",
 					"enumRef": "ExecutionFailureClassSchema",
-					"note": "§36.2 taxonomy"
+					"note": "§36.2 taxonomy",
+					"enumRefUnresolved": "REG-F-026 group (c) — GENUINE DIVERGENCE. Same as FailExecutionStep.failureClass: §36.2's seven prose kinds were never enumerated, and the runtime emits `TRANSIENT`, which is not among them."
 				},
 				{
 					"field": "stepState",
