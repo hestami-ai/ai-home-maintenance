@@ -9,6 +9,7 @@ import {
 	listBaselines,
 	listByType,
 	listDecisions,
+	driveAssessmentToAssessing,
 	listExecutionPlans,
 	listObservations,
 	listPwus,
@@ -884,25 +885,25 @@ export const actions: Actions = {
 						{ policyId: DEMO_POLICY_ID }
 					]
 				];
+		// The ratified §30 sequence, built by the one helper that knows it (REG-F-021 increment 4). It is
+		// dispatch-agnostic: here its `send` COLLECTS steps into this route's batch rather than dispatching, so the
+		// batch keeps its all-or-nothing error handling and the lifecycle is still written in exactly one place.
+		const assessmentSteps: Step[] = [];
+		driveAssessmentToAssessing(
+			(commandType, targetAggregateType, targetAggregateId, payload) =>
+				assessmentSteps.push([commandType, targetAggregateType, targetAggregateId, payload]),
+			{
+				assessmentId,
+				assurancePolicyId: DEMO_POLICY_ID,
+				policyVersion: '1.0.0',
+				subjectObjectIds: [pwuId],
+				subjectSemanticVersions: { [pwuId]: 1 },
+				claimIds: []
+			}
+		);
 		const err = runSteps([
 			...policySteps,
-			[
-				'RequestAssuranceAssessment',
-				'ASSURANCE_ASSESSMENT',
-				assessmentId,
-				{
-					assessmentId,
-					assurancePolicyId: DEMO_POLICY_ID,
-					policyVersion: '1.0.0',
-					subjectObjectIds: [pwuId],
-					subjectSemanticVersions: { [pwuId]: 1 },
-					claimIds: []
-				}
-			],
-			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
-			// REQUESTED -> EVIDENCE_PENDING and lands in READY (this policy declares no required evidence, so
-			// "all required evidence present" is vacuously true). Begin it before completing it.
-			['BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {}],
+			...assessmentSteps,
 			[
 				'CompleteAssuranceAssessment',
 				'ASSURANCE_ASSESSMENT',

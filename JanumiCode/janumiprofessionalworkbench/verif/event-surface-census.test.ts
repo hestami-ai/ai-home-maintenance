@@ -59,7 +59,8 @@ const BOUND = new Set<string>([
  */
 const EMITTED_2026_08_04 = new Set([
 	'ArtifactRecorded', 'AssumptionDetected', 'AssumptionExpired', 'AssuranceAssessmentCompleted',
-	'AssuranceAssessmentEscalated', 'AssuranceAssessmentStarted', 'AssuranceEvidenceReceived',
+	'AssuranceAssessmentEscalated', 'AssuranceAssessmentRequested', 'AssuranceAssessmentStarted',
+	'AssuranceEvaluatorSelected', 'AssuranceEvidenceReceived', 'AssuranceEvidenceRequired',
 	'AssuranceIndependenceViolated', 'AssuranceObservationRecorded', 'AssurancePolicyActivated',
 	'AssurancePolicyCreated', 'AssurancePolicyEdited', 'AssurancePolicySuperseded',
 	'AssurancePolicySuspended', 'BaselineApproved', 'BaselineCreated', 'BaselinePromoted',
@@ -137,11 +138,7 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 		expect(
 			unemitted,
 			'a bound-but-unemitted event means a command produces something other than what it declares'
-		).toEqual([
-			'AssuranceAssessmentRequested',
-			'AssuranceEvaluatorSelected',
-			'AssuranceEvidenceRequired'
-		]);
+		).toEqual([]);
 	});
 
 	// THE REQUEST HALF, counted because two separate findings landed on it independently and a hypothesis about
@@ -150,7 +147,13 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 	// subject, `AssuranceAssessmentRequested`, is the same shape. That invited the reading "the engine records
 	// the act and not the asking", and it is NOT true as stated: of five declared `*Requested` events, TWO are
 	// emitted. Three are not. The unevenness is the fact; the sweeping version was a guess.
-	it('the REQUEST half of the lifecycle — three of five are unrecorded, and that may only improve', () => {
+	//
+	// THREE -> TWO (REG-F-021 increment 3). `AssuranceAssessmentRequested` now fires, so the asking of an assurance
+	// assessment is in the governed stream. That was the sweeping version's own subject and it is now recorded;
+	// what is left is `ClarificationRequested` and `TacticalChangeRequested`, and for the latter the consequence is
+	// still sharp — `TacticalChangeApplied` cannot carry its command's REQUIRED `rationale`, whose declared home is
+	// the event nothing emits. The unevenness remains the fact. It may only improve.
+	it('the REQUEST half of the lifecycle — two of five are unrecorded, and that may only improve', () => {
 		const requested = sorted([...DECLARED].filter((e) => e.endsWith('Requested')));
 		expect(requested).toEqual([
 			'AssuranceAssessmentRequested',
@@ -164,7 +167,7 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 			unrecorded,
 			'a REQUEST event nothing emits means the argued justification for an act — the `rationale` a command ' +
 				'declares REQUIRED — is recorded nowhere in the governed stream'
-		).toEqual(['AssuranceAssessmentRequested', 'ClarificationRequested', 'TacticalChangeRequested']);
+		).toEqual(['ClarificationRequested', 'TacticalChangeRequested']);
 	});
 
 	// THE LIFECYCLE, NOW RUN (REG-F-021 increment 3) — and what is left is a real fact, not a leftover pin.

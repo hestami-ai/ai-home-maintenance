@@ -10,4 +10,5 @@ export * from './reference-undertaking.js';
 export * from './pwa-ontology.js';
 export * from './seed-workbench.js';
 export * from './record-assurance.js';
+export * from './assessment-drive.js';
 export * from './queries.js';

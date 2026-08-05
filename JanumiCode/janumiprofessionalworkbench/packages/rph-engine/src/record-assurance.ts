@@ -8,6 +8,7 @@
 // exec≠assurance (INV-5) is upheld structurally — nothing here reads executionState.
 import type { AssuranceRecordingPlan, Identity } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { driveAssessmentToAssessing } from './assessment-drive.js';
 import type { EngineHandle } from './engine.js';
 
 /** The ratified DOC-007 ActorType enum. The assurance-island `Identity.actorType` is a free string by design
@@ -110,7 +111,10 @@ export function recordAssuranceRecordingPlan(
 		const assessmentId = opts.newId('asmt');
 		assessmentIds.push(assessmentId);
 		// Request-and-begin: the assessment is created directly in ASSESSING (see requestAssuranceAssessment).
-		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+		// The ratified §30 sequence, issued through the one helper that knows it (REG-F-021 increment 4). The floor
+		// policies declare no ALL-gating evidence (REG-F-022), so the request lands in READY and the begin follows
+		// directly; the helper stays correct the day that stops being true.
+		driveAssessmentToAssessing(send, {
 			assessmentId,
 			assurancePolicyId: a.policyId,
 			policyVersion: a.policyVersion,
@@ -118,11 +122,6 @@ export function recordAssuranceRecordingPlan(
 			subjectSemanticVersions: { [plan.subjectId]: plan.subjectSemanticVersion },
 			claimIds: []
 		});
-		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment no longer creates the
-		// assessment in ASSESSING: it crosses REQUESTED -> EVIDENCE_PENDING and lands in READY, because no floor
-		// policy declares required evidence (REG-F-022) so "all required evidence present" is vacuously true. The
-		// assessment must therefore be BEGUN before observations are recorded against it or it is completed.
-		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
 		// Record each proposed observation while ASSESSING (observations require the assessment to exist).
 		a.observations.forEach((o) => {
 			const observationId = opts.newId('obs');

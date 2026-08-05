@@ -72,6 +72,7 @@
 // satisfied" — is what was missing, and is what now holds.
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { driveAssessmentToAssessing } from './assessment-drive.js';
 import type { EngineHandle } from './engine.js';
 
 const ACTOR: ActorReference = {
@@ -593,7 +594,8 @@ export function driveReferenceUndertaking(
 			// verifies. The other two floors are deterministic checks (independence NONE); their evaluator is
 			// immaterial to the check, so they keep the human reviewer and supply no producer.
 			const isReasoningReview = floorPolicyId === 'floor.reasoning-review';
-			send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			// The ratified §30 sequence, through the one helper that knows it (REG-F-021 increment 4).
+			driveAssessmentToAssessing(send, {
 				assessmentId,
 				assurancePolicyId: floorPolicyId,
 				policyVersion: '1.0.0',
@@ -601,10 +603,6 @@ export function driveReferenceUndertaking(
 				subjectSemanticVersions: { [subjectId]: 1 },
 				claimIds: []
 			});
-			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
-			// REQUESTED -> EVIDENCE_PENDING and lands in READY (no policy declares required evidence — REG-F-022 — so
-			// "all required evidence present" is vacuously true). The assessment must be BEGUN before it is assessed.
-			send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
 			send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
 				validatorResult: {
 					validatorId: `deterministic.${floorPolicyId.replace(/^floor\./, '')}`,
@@ -802,18 +800,18 @@ export function driveReferenceUndertaking(
 		);
 
 		// 3. The ASSESSMENT, bound to the policy version AND the subject's semantic version (DOC-004 invariant 2).
-		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+		// The ratified §30 sequence, through the one helper that knows it (REG-F-021 increment 4). This is the
+		// CANONICAL drive, so it names its evaluator: `selectAssuranceEvaluator` is what gives "who assessed" a
+		// governed home instead of letting it arrive inside the verdict.
+		driveAssessmentToAssessing(send, {
 			assessmentId,
 			assurancePolicyId: policyId,
 			policyVersion: '1.0.0',
 			subjectObjectIds: [pwuId],
 			subjectSemanticVersions: { [pwuId]: 1 },
-			claimIds: [claimId, ...extraClaimIds]
+			claimIds: [claimId, ...extraClaimIds],
+			evaluator: EVALUATOR
 		});
-		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
-		// REQUESTED -> EVIDENCE_PENDING and lands in READY (no policy declares required evidence — REG-F-022 — so
-		// "all required evidence present" is vacuously true). The assessment must be BEGUN before it is assessed.
-		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
 		chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
 			assessmentId
 		]);

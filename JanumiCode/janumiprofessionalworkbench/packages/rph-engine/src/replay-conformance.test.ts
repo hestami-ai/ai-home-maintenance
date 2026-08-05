@@ -192,6 +192,10 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// one fused Started — AssuranceAssessmentRequested + AssuranceEvidenceRequired at the request, and
 		// AssuranceAssessmentStarted at the begin. Three governed facts where there was one, across every assessment
 		// the drive records. The count rising is the lifecycle being run, not noise.
-		expect(actual).toHaveLength(324);
+		// +8 to 332 (REG-F-021 increment 4): the canonical drive now SELECTS its evaluator. That is the one place
+		// this restoration buys a governance guarantee rather than ordering fidelity — WHO assessed becomes a
+		// committed act with its own event, instead of arriving inside the verdict as
+		// `validatorResult.executionProvenance.evaluator`, a field of the answer the assessor produced.
+		expect(actual).toHaveLength(332);
 	});
 });
