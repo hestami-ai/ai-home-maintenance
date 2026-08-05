@@ -141,23 +141,61 @@ describe('enumRef degradation census (REG-F-026)', () => {
 		).toEqual([]);
 	});
 
-	it('the degraded population is THREE and may only fall', () => {
+	it('the degraded population is ONE and may only fall', () => {
 		// A ratchet, not a target. SEVEN on 2026-08-05; FOUR when group (a) closed (three enums that existed under
 		// another identifier); THREE when group (b) closed — `ValidateDecomposition.disposition` left this census
 		// entirely, because its constraint is a LITERAL UNION derived from the machine rather than an enumRef, and
 		// this file only watches fields that name an enum. Its own gate is
 		// `rph-domain/src/decomposition-disposition-derivation.test.ts`, which holds it to the ratified machine.
 		//
-		// The three that remain will not close together, and none closes by remapping: two are a ratification
-		// question the corpus and the runtime answer differently, and one is blocked on a helper the corpus has
-		// never defined.
+		// ONE since group (c) closed (2026-08-05, REG-E-025 ratified): both `failureClass` fields now name
+		// `ExecutionFailureClass`, minted from RPH-DOC-002 §36.2's seven prose items. Two things had to be true
+		// before that was honest rather than convenient — the §36-wide rule "each failure class must map to
+		// permitted control actions" is now MET for this family (`EXECUTION_FAILURE_CONTROL_ACTIONS`, total and
+		// gated), and `TRANSIENT`, the only value ever in flight, was a test fixture with no production producer,
+		// so constraining the field refuses nothing any shipped path emits.
+		//
+		// THE LAST ONE IS NOT A REMAPPING. `ControlActionRecommendation` is a shape the corpus has never defined,
+		// so there is nothing to point the field at. It closes when the corpus defines it, or not at all.
 		expect(degraded.map((r) => r.key).sort()).toEqual(
-			[
-				'AssuranceAssessmentRejected.recommendedControlAction',
-				'ExecutionStepFailed.failureClass',
-				'FailExecutionStep.failureClass'
-			].sort()
+			['AssuranceAssessmentRejected.recommendedControlAction'].sort()
 		);
+	});
+
+	it('group (c) is CONSTRAINED to §36.2 — all FOUR failureClass fields, not just the two censused', () => {
+		// THE CENSUS COULD ONLY EVER SEE TWO OF THEM. It watches fields that NAME an enum, and
+		// `FailExecutionPlan.failureClass` / `ExecutionPlanFailed.failureClass` were declared plain `string` with
+		// no enumRef at all — carrying the same §36.2 classification, equally unvalidated, and structurally
+		// invisible to the instrument that exists to find exactly this. A field is not safe because the census is
+		// quiet about it; it may simply be below the census's floor.
+		const SEVEN = [
+			'DEPENDENCY_UNAVAILABLE',
+			'INVALID_OUTPUT_SCHEMA',
+			'MODEL_FAILURE',
+			'RETRY_EXHAUSTION',
+			'SANDBOX_FAILURE',
+			'TIMEOUT',
+			'TOOL_FAILURE'
+		];
+		for (const owner of [
+			'FailExecutionStep',
+			'ExecutionStepFailed',
+			'FailExecutionPlan',
+			'ExecutionPlanFailed'
+		]) {
+			const schema = reg[`${owner}PayloadSchema`] as Node | undefined;
+			const raw = (schema?._def ?? schema?.def)?.shape;
+			const shape = (typeof raw === 'function' ? raw() : raw) as Record<string, Node>;
+			const d = (core(shape.failureClass!)._def ?? core(shape.failureClass!).def) as Record<
+				string,
+				unknown
+			>;
+			const e = (d.entries ?? d.values ?? d.options) as Record<string, string> | string[];
+			expect(
+				(Array.isArray(e) ? e : Object.keys(e)).slice().sort(),
+				`${owner}.failureClass must be constrained to DOC-002 §36.2's seven execution failure classes`
+			).toEqual(SEVEN);
+		}
 	});
 
 	it('the three closed remappings are CONSTRAINED, and to the right values', () => {

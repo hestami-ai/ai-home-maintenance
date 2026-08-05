@@ -879,8 +879,7 @@
 					"required": false,
 					"type": "ExecutionFailureClass",
 					"enumRef": "ExecutionFailureClassSchema",
-					"note": "§36.2; also drives PWU.executionState ->FAILED",
-					"enumRefUnresolved": "REG-F-026 group (c) — RAISED TO THE SPONSOR AS REG-E-025 (2026-08-05). DOC-004 §36.2 names seven execution-failure kinds in PROSE (tool failure; model failure; timeout; sandbox failure; dependency unavailable; retry exhaustion; invalid output schema) and no enum was ever minted from it. The runtime uses a different vocabulary: the only value ever passed is TRANSIENT, which is in no §36 list and no enum, and which has NO production producer — every occurrence is a test fixture. The field is also INERT: execution.ts only passes it through, and nothing reads or branches on it. And §36 closes with a rule nobody has met — 'Each failure class must map to permitted control actions' — so whichever vocabulary is adopted becomes the domain of an unbuilt mapping, and adopting TRANSIENT would orphan the rule outright. Constraining to the seven refuses the only value in flight; constraining to TRANSIENT ratifies a vocabulary the corpus does not contain. Neither is a repository decision."
+					"note": "RPH-DOC-002 §36.2 execution-failure taxonomy (CONSTRAINED 2026-08-05, REG-E-025). Was an open string; the seven ratified classes are now minted as ExecutionFailureClass. Each maps to permitted control actions per the §36-wide rule — see EXECUTION_FAILURE_CONTROL_ACTIONS in rph-domain."
 				}
 			]
 		},
@@ -1947,8 +1946,9 @@
 				{
 					"field": "failureClass",
 					"required": false,
-					"type": "string",
-					"note": "optional §36.2 failure classification (open string; the FailureClass shape is Source-TBD)"
+					"type": "ExecutionFailureClass",
+					"note": "RPH-DOC-002 §36.2 execution-failure taxonomy (CONSTRAINED 2026-08-05, REG-E-025). Was an open string; the seven ratified classes are now minted as ExecutionFailureClass. Each maps to permitted control actions per the §36-wide rule — see EXECUTION_FAILURE_CONTROL_ACTIONS in rph-domain.",
+					"enumRef": "ExecutionFailureClassSchema"
 				}
 			]
 		},
@@ -4763,8 +4763,9 @@
 				{
 					"field": "failureClass",
 					"required": false,
-					"type": "string",
-					"note": "optional §36.2 classification (open string)"
+					"type": "ExecutionFailureClass",
+					"note": "RPH-DOC-002 §36.2 execution-failure taxonomy (CONSTRAINED 2026-08-05, REG-E-025). Was an open string; the seven ratified classes are now minted as ExecutionFailureClass. Each maps to permitted control actions per the §36-wide rule — see EXECUTION_FAILURE_CONTROL_ACTIONS in rph-domain.",
+					"enumRef": "ExecutionFailureClassSchema"
 				}
 			]
 		},
@@ -4871,10 +4872,9 @@
 				{
 					"field": "failureClass",
 					"required": false,
-					"type": "enum",
+					"type": "ExecutionFailureClass",
 					"enumRef": "ExecutionFailureClassSchema",
-					"note": "§36.2 taxonomy",
-					"enumRefUnresolved": "REG-F-026 group (c) — RAISED TO THE SPONSOR AS REG-E-025 (2026-08-05). DOC-004 §36.2 names seven execution-failure kinds in PROSE (tool failure; model failure; timeout; sandbox failure; dependency unavailable; retry exhaustion; invalid output schema) and no enum was ever minted from it. The runtime uses a different vocabulary: the only value ever passed is TRANSIENT, which is in no §36 list and no enum, and which has NO production producer — every occurrence is a test fixture. The field is also INERT: execution.ts only passes it through, and nothing reads or branches on it. And §36 closes with a rule nobody has met — 'Each failure class must map to permitted control actions' — so whichever vocabulary is adopted becomes the domain of an unbuilt mapping, and adopting TRANSIENT would orphan the rule outright. Constraining to the seven refuses the only value in flight; constraining to TRANSIENT ratifies a vocabulary the corpus does not contain. Neither is a repository decision."
+					"note": "RPH-DOC-002 §36.2 execution-failure taxonomy (CONSTRAINED 2026-08-05, REG-E-025). Was an open string; the seven ratified classes are now minted as ExecutionFailureClass. Each maps to permitted control actions per the §36-wide rule — see EXECUTION_FAILURE_CONTROL_ACTIONS in rph-domain."
 				},
 				{
 					"field": "stepState",

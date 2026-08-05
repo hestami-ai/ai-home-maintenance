@@ -22,6 +22,7 @@ import {
 	EvidenceStatusSchema,
 	EvidenceTypeSchema,
 	ExecutionBoundarySchema,
+	ExecutionFailureClassSchema,
 	ExecutionPlanStatusSchema,
 	ExecutionStateSchema,
 	HarnessStatusSchema,
@@ -264,7 +265,7 @@ export type StartExecutionStepPayload = z.infer<typeof StartExecutionStepPayload
 export const FailExecutionStepPayloadSchema = z.strictObject({
 	stepId: z.string(),
 	failureReason: z.string(),
-	failureClass: z.string().optional()
+	failureClass: ExecutionFailureClassSchema.optional()
 });
 export type FailExecutionStepPayload = z.infer<typeof FailExecutionStepPayloadSchema>;
 export const SkipExecutionStepPayloadSchema = z.strictObject({
@@ -479,7 +480,7 @@ export const CompleteExecutionPlanPayloadSchema = z.strictObject({});
 export type CompleteExecutionPlanPayload = z.infer<typeof CompleteExecutionPlanPayloadSchema>;
 export const FailExecutionPlanPayloadSchema = z.strictObject({
 	failureReason: z.string(),
-	failureClass: z.string().optional()
+	failureClass: ExecutionFailureClassSchema.optional()
 });
 export type FailExecutionPlanPayload = z.infer<typeof FailExecutionPlanPayloadSchema>;
 export const SupersedeExecutionPlanPayloadSchema = z.strictObject({
@@ -1136,7 +1137,7 @@ export type ExecutionPlanCompletedPayload = z.infer<typeof ExecutionPlanComplete
 export const ExecutionPlanFailedPayloadSchema = z.strictObject({
 	status: ExecutionPlanStatusSchema,
 	failureReason: z.string(),
-	failureClass: z.string().optional()
+	failureClass: ExecutionFailureClassSchema.optional()
 });
 export type ExecutionPlanFailedPayload = z.infer<typeof ExecutionPlanFailedPayloadSchema>;
 export const ExecutionStepCancelledPayloadSchema = z.strictObject({
@@ -1159,7 +1160,7 @@ export type ExecutionStepPrunedPayload = z.infer<typeof ExecutionStepPrunedPaylo
 export const ExecutionStepFailedPayloadSchema = z.strictObject({
 	stepId: z.string(),
 	failureReason: z.string(),
-	failureClass: z.string().optional(),
+	failureClass: ExecutionFailureClassSchema.optional(),
 	stepState: StepStateSchema
 });
 export type ExecutionStepFailedPayload = z.infer<typeof ExecutionStepFailedPayloadSchema>;

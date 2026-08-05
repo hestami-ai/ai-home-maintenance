@@ -108,6 +108,8 @@ describe('validate', () => {
 		// AssuranceAssessmentCancelled. The ARROW they drive is ratified (DOC-004 §30 `ANY ACTIVE → CANCELLED`, one
 		// of six alternate transitions, the only one the transcription dropped because its from-state is quantified);
 		// the NAMES are authored, since §32 names no cancel command and §31 no cancel event. (+2 → 329.)
-		expect(buildContractRegistry().ids()).toHaveLength(329);
+		// +1 → 330: ExecutionFailureClass, minted 2026-08-05 from RPH-DOC-002 §36.2's seven prose items when
+		// REG-E-025 was ratified (REG-F-026 group (c)).
+		expect(buildContractRegistry().ids()).toHaveLength(330);
 	});
 });

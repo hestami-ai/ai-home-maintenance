@@ -44,6 +44,8 @@ import {
 	type PruneProvenance,
 	prunableStepIds,
 	resolveBranchSelection,
+	isPermittedForFailure,
+	permittedControlActionsForFailure,
 	retryDecision,
 	// JAN-RETRYCAP (N-12): the cap convention and the attempt count are kernel declarations now, so the read-model
 	// can consult the SAME ones rather than deriving its own and agreeing by coincidence.
@@ -1485,6 +1487,39 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 			stepState: 'QUEUED'
 		},
 		precheck: (step, plan) => {
+			// ── THE §36 RULE, ENFORCED (REG-E-025) ──────────────────────────────────────────────────────────────
+			// DOC-002 §36 closes with "Each failure class must map to permitted control actions." The mapping now
+			// exists (EXECUTION_FAILURE_CONTROL_ACTIONS) and THIS is where it bites: a step whose recorded failure
+			// class does not permit RETRY may not be retried.
+			//
+			// RETRY_EXHAUSTION is the case that gives it teeth — retrying is precisely what has already been
+			// established not to work — and it is a DIFFERENT check from the retry cap below. The cap counts
+			// attempts against this plan's RetryPolicy; this reads what the failure was. A caller that reports
+			// retry exhaustion on attempt one is refused here and would pass the cap.
+			//
+			// Read from the LAST ExecutionStepFailed event rather than from the step, because `failureClass` is
+			// recorded on the event and never lands on the step snapshot. A step failed twice under different
+			// classes is judged on its most recent failure, which is the one being retried.
+			const lastClass = ctx.store
+				.readAggregateEvents(PLAN, command.targetAggregateId)
+				.filter(
+					(e) =>
+						e.eventType === 'ExecutionStepFailed' &&
+						(e.payload as { stepId?: string }).stepId === p.stepId
+				)
+				.map((e) => (e.payload as { failureClass?: string }).failureClass)
+				.filter((c): c is string => typeof c === 'string')
+				.at(-1);
+			if (lastClass !== undefined && !isPermittedForFailure(lastClass, 'RETRY')) {
+				const permitted = permittedControlActionsForFailure(lastClass);
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`Cannot retry step ${p.stepId}: its last failure was classified ${lastClass}, and DOC-002 §36's control-action mapping does not permit RETRY for that class${
+						permitted ? ` — select one of: ${permitted.join(', ')}` : ''
+					}.`
+				);
+			}
 			const attemptsMade = attemptsMadeFrom(
 				ctx.store.readAllEvents(),
 				command.targetAggregateId,

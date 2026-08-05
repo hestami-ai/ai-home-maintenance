@@ -653,6 +653,20 @@
       "note": "NORMALIZATION into this canonical set: (a) DOC-002 §18 AssuranceAssessment.recommendedControlAction RESHAPE→RESHAPE_PWU, REPLAN→REPLAN_EXECUTION (other 8 of its 10 already match); (b) DOC-002 §37 ControlAction token WAIVE→REQUEST_WAIVER. DOC-004 adds CLARIFY, GATHER_CONTEXT, CHANGE_VALIDATOR, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION over DOC-002 §37's 18. See openItems re: whether legacy WAIVE should persist as a distinct token."
     },
     {
+      "name": "ExecutionFailureClass",
+      "appliesTo": "FailExecutionStep.failureClass; ExecutionStepFailed.failureClass; FailExecutionPlan.failureClass; ExecutionPlanFailed.failureClass",
+      "values": [
+        "TOOL_FAILURE",
+        "MODEL_FAILURE",
+        "TIMEOUT",
+        "SANDBOX_FAILURE",
+        "DEPENDENCY_UNAVAILABLE",
+        "RETRY_EXHAUSTION",
+        "INVALID_OUTPUT_SCHEMA"
+      ],
+      "canonicalSource": "RPH-DOC-002 §36.2 \"Execution failures\" (7 values, TRANSCRIBED in document order; the prose spellings \"tool failure; model failure; timeout; sandbox failure; dependency unavailable; retry exhaustion; invalid output schema\" upper-snake-cased, no item added, dropped or reordered). MINTED 2026-08-05 under sponsor ratification of REG-E-025. NOTE THE DOCUMENT: REG-E-025 and both field annotations cited \"DOC-004 §36.2\", which is Assurance Profiles (Lightweight/Standard/High) and contains no failure taxonomy at all — the taxonomy is DOC-002 §36 and its §36.2 is Execution failures. The right seven items under the wrong document; corrected here because a mis-cited ratification is how a claim gets laundered. ONLY §36.2 IS MINTED: §36.1 shape, §36.3 assurance, §36.4 governance and §36.5 persistence failures are equally ratified (32 classes in all) but no field carries them, and minting a vocabulary nothing can reach is REG-F-023's finding. THE §36-WIDE RULE \"Each failure class must map to permitted control actions\" is met for this family by EXECUTION_FAILURE_CONTROL_ACTIONS in rph-domain, which is total over these seven and gated; the other four families remain unmapped and unminted, and that is disclosed rather than silently satisfied."
+    },
+    {
       "name": "DecisionType",
       "appliesTo": "DecisionObject.decisionType",
       "values": [
@@ -766,7 +780,10 @@
     {
       "name": "TransitionType",
       "appliesTo": "ExecutionTransition.transitionType",
-      "values": ["SEQUENTIAL", "CONDITIONAL"],
+      "values": [
+        "SEQUENTIAL",
+        "CONDITIONAL"
+      ],
       "canonicalSource": "AUTHORED-NEW 2026-07-21 (JAN-EXECPLAN-DR-004 Tier 3C-ii): the DOC-009 §10.3 execution_transitions.transition_type column is `text NOT NULL` with NO ratified value set; this is the minimal edge-role set (SEQUENTIAL=unconditional, CONDITIONAL=guarded). UNRATIFIED-AUTHORED under R2 + the ratified machine. Flow-node kinds stay on StepType (§21)."
     },
     {

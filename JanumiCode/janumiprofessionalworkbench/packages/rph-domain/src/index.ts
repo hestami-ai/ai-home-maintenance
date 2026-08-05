@@ -16,3 +16,4 @@ export * from './condition-grammar.js';
 export * from './presentation.js';
 export * from './conformance-manifest.js';
 export * from './enforcement-register.js';
+export * from './execution-failure-taxonomy.js';

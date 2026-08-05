@@ -88,7 +88,7 @@ describe('N-12 — engine and read-model flip on the SAME attempt', () => {
 			dispatch('FailExecutionStep', {
 				stepId: STEP,
 				failureReason: 'deliberate',
-				failureClass: 'TRANSIENT'
+				failureClass: 'TIMEOUT'
 			}),
 			'fail'
 		);
@@ -245,7 +245,7 @@ describe('N-12 — engine and read-model flip on the SAME attempt', () => {
 			dispatch('FailExecutionStep', {
 				stepId: STEP,
 				failureReason: 'after a wait',
-				failureClass: 'TRANSIENT'
+				failureClass: 'TIMEOUT'
 			}),
 			'fail'
 		);

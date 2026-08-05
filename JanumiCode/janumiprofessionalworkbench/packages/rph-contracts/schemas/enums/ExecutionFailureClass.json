@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "TOOL_FAILURE",
+    "MODEL_FAILURE",
+    "TIMEOUT",
+    "SANDBOX_FAILURE",
+    "DEPENDENCY_UNAVAILABLE",
+    "RETRY_EXHAUSTION",
+    "INVALID_OUTPUT_SCHEMA"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ExecutionFailureClass:1"
+}

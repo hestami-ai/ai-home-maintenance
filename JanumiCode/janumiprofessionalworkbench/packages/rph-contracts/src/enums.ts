@@ -427,6 +427,18 @@ export type EvidenceType = z.infer<typeof EvidenceTypeSchema>;
 export const ExecutionBoundarySchema = z.enum(['INTERNAL', 'DELEGATED_EXTERNAL']);
 export type ExecutionBoundary = z.infer<typeof ExecutionBoundarySchema>;
 
+/** FailExecutionStep.failureClass; ExecutionStepFailed.failureClass; FailExecutionPlan.failureClass; ExecutionPlanFailed.failureClass — RPH-DOC-002 §36.2 "Execution failures" (7 values, TRANSCRIBED in document order; the prose spellings "tool failure; model failure; timeout; sandbox failure; dependency unavailable; retry exhaustion; invalid output schema" upper-snake-cased, no item added, dropped or reordered). MINTED 2026-08-05 under sponsor ratification of REG-E-025. NOTE THE DOCUMENT: REG-E-025 and both field annotations cited "DOC-004 §36.2", which is Assurance Profiles (Lightweight/Standard/High) and contains no failure taxonomy at all — the taxonomy is DOC-002 §36 and its §36.2 is Execution failures. The right seven items under the wrong document; corrected here because a mis-cited ratification is how a claim gets laundered. ONLY §36.2 IS MINTED: §36.1 shape, §36.3 assurance, §36.4 governance and §36.5 persistence failures are equally ratified (32 classes in all) but no field carries them, and minting a vocabulary nothing can reach is REG-F-023's finding. THE §36-WIDE RULE "Each failure class must map to permitted control actions" is met for this family by EXECUTION_FAILURE_CONTROL_ACTIONS in rph-domain, which is total over these seven and gated; the other four families remain unmapped and unminted, and that is disclosed rather than silently satisfied. */
+export const ExecutionFailureClassSchema = z.enum([
+	'TOOL_FAILURE',
+	'MODEL_FAILURE',
+	'TIMEOUT',
+	'SANDBOX_FAILURE',
+	'DEPENDENCY_UNAVAILABLE',
+	'RETRY_EXHAUSTION',
+	'INVALID_OUTPUT_SCHEMA'
+]);
+export type ExecutionFailureClass = z.infer<typeof ExecutionFailureClassSchema>;
+
 /** ExecutionPlan.status — RPH-DOC-007 §15 / DOC-002 §20.1 (8 values) */
 export const ExecutionPlanStatusSchema = z.enum([
 	'PROPOSED',
@@ -849,6 +861,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	EvidenceStatus: EvidenceStatusSchema,
 	EvidenceType: EvidenceTypeSchema,
 	ExecutionBoundary: ExecutionBoundarySchema,
+	ExecutionFailureClass: ExecutionFailureClassSchema,
 	ExecutionPlanStatus: ExecutionPlanStatusSchema,
 	ExecutionState: ExecutionStateSchema,
 	FailureSeverity: FailureSeveritySchema,

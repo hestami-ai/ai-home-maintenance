@@ -143,7 +143,7 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 		ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start s1');
 		ok(dispatch('EnterExecutionStepWait', { stepId: sid(1), waitReason: 'awaiting input' }), 'wait');
 		ok(dispatch('ResolveExecutionStepWait', { stepId: sid(1), resolution: 'input arrived' }), 'resolve');
-		ok(dispatch('FailExecutionStep', { stepId: sid(1), failureReason: 'boom', failureClass: 'TRANSIENT' }), 'fail');
+		ok(dispatch('FailExecutionStep', { stepId: sid(1), failureReason: 'boom', failureClass: 'TIMEOUT' }), 'fail');
 		ok(dispatch('RetryExecutionStep', { stepId: sid(1), retryReason: 'transient, worth another go' }), 'retry');
 		ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'restart s1');
 		ok(
@@ -211,7 +211,7 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 		expect(failed.payload).toEqual({
 			stepId: sid(1),
 			failureReason: 'boom',
-			failureClass: 'TRANSIENT',
+			failureClass: 'TIMEOUT',
 			stepState: 'FAILED'
 		});
 	});
