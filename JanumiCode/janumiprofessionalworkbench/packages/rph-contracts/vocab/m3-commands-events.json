@@ -880,7 +880,7 @@
 					"type": "ExecutionFailureClass",
 					"enumRef": "ExecutionFailureClassSchema",
 					"note": "§36.2; also drives PWU.executionState ->FAILED",
-					"enumRefUnresolved": "REG-F-026 group (c) — GENUINE DIVERGENCE, DO NOT CONSTRAIN WITHOUT A DECISION. DOC-004 §36.2 gives a PROSE taxonomy of seven execution-failure kinds (tool failure, model failure, timeout, sandbox failure, dependency unavailable, retry exhaustion, invalid output schema) and no enum was ever minted from it. The runtime uses a DIFFERENT vocabulary — the only value in flight is `TRANSIENT`, from the retry-capability work — which §36.2's list does not contain. Constraining this field to the ratified taxonomy would refuse live data; constraining it to the live vocabulary would ratify an unratified one. Recorded as the open question it is."
+					"enumRefUnresolved": "REG-F-026 group (c) — RAISED TO THE SPONSOR AS REG-E-025 (2026-08-05). DOC-004 §36.2 names seven execution-failure kinds in PROSE (tool failure; model failure; timeout; sandbox failure; dependency unavailable; retry exhaustion; invalid output schema) and no enum was ever minted from it. The runtime uses a different vocabulary: the only value ever passed is TRANSIENT, which is in no §36 list and no enum, and which has NO production producer — every occurrence is a test fixture. The field is also INERT: execution.ts only passes it through, and nothing reads or branches on it. And §36 closes with a rule nobody has met — 'Each failure class must map to permitted control actions' — so whichever vocabulary is adopted becomes the domain of an unbuilt mapping, and adopting TRANSIENT would orphan the rule outright. Constraining to the seven refuses the only value in flight; constraining to TRANSIENT ratifies a vocabulary the corpus does not contain. Neither is a repository decision."
 				}
 			]
 		},
@@ -1555,10 +1555,8 @@
 				{
 					"field": "disposition",
 					"required": true,
-					"type": "DecompositionValidationDisposition",
-					"enumRef": "DecompositionValidationDispositionSchema",
-					"note": "VALID|CONDITIONALLY_VALID|INVALID; INVALID emits DecompositionRejected UNDER_REVIEW->INVALID",
-					"enumRefUnresolved": "REG-F-026 group (b) — NO ENUM EXISTS. This field's own note ratifies three values (VALID | CONDITIONALLY_VALID | INVALID), which are a SUBSET of DecompositionContractStatus (six values, incl. DRAFT/UNDER_REVIEW/SUPERSEDED) — so pointing at that enum would ADMIT states a validation disposition must not take. The correct emission is a three-value literal union, which requires the `type` field to quote them; that is a vocab edit with a ratification question attached, not a remapping."
+					"type": "'VALID' | 'CONDITIONALLY_VALID' | 'INVALID'",
+					"note": "REG-F-026 group (b) CLOSED 2026-08-05, and NOT by quoting this note's own earlier text. The note read \"VALID|CONDITIONALLY_VALID|INVALID\" and this command's sourceSection says UNRATIFIED-AUTHORED — DOC-007 schematizes no interface for it — so those three values were AUTHORED, not transcribed, and quoting them would have ratified a note by promoting it. They are instead DERIVED from a ratified artifact: the six DecompositionContract.status states are VERBATIM core-model §13.1, and the machine's only arrows out of UNDER_REVIEW — the state this command acts on — are to VALID, CONDITIONALLY_VALID and INVALID. A validation disposition is therefore exactly the set of outcomes the machine can reach from the state being validated. DecompositionContractStatus (six values) would have been the wrong constraint: it also admits DRAFT, UNDER_REVIEW and SUPERSEDED, none of which is an outcome of validating. Emitted as a LITERAL UNION rather than a new canonical enum on purpose — minting one would add an AUTHORED narrowing to the ratified enum surface that enums.test.ts holds to the canonical vocabulary. decomposition-disposition-derivation.test.ts checks the emitted set against the machine, so the two cannot drift."
 				},
 				{
 					"field": "validatorRole",
@@ -4876,7 +4874,7 @@
 					"type": "enum",
 					"enumRef": "ExecutionFailureClassSchema",
 					"note": "§36.2 taxonomy",
-					"enumRefUnresolved": "REG-F-026 group (c) — GENUINE DIVERGENCE. Same as FailExecutionStep.failureClass: §36.2's seven prose kinds were never enumerated, and the runtime emits `TRANSIENT`, which is not among them."
+					"enumRefUnresolved": "REG-F-026 group (c) — RAISED TO THE SPONSOR AS REG-E-025 (2026-08-05). DOC-004 §36.2 names seven execution-failure kinds in PROSE (tool failure; model failure; timeout; sandbox failure; dependency unavailable; retry exhaustion; invalid output schema) and no enum was ever minted from it. The runtime uses a different vocabulary: the only value ever passed is TRANSIENT, which is in no §36 list and no enum, and which has NO production producer — every occurrence is a test fixture. The field is also INERT: execution.ts only passes it through, and nothing reads or branches on it. And §36 closes with a rule nobody has met — 'Each failure class must map to permitted control actions' — so whichever vocabulary is adopted becomes the domain of an unbuilt mapping, and adopting TRANSIENT would orphan the rule outright. Constraining to the seven refuses the only value in flight; constraining to TRANSIENT ratifies a vocabulary the corpus does not contain. Neither is a repository decision."
 				},
 				{
 					"field": "stepState",

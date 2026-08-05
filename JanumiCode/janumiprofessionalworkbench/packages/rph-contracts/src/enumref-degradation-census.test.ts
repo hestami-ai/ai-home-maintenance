@@ -141,17 +141,21 @@ describe('enumRef degradation census (REG-F-026)', () => {
 		).toEqual([]);
 	});
 
-	it('the degraded population is FOUR and may only fall', () => {
-		// A ratchet, not a target. SEVEN on 2026-08-05, then FOUR the same day when group (a) closed — three fields
-		// whose enum existed under another identifier. Each remaining one carries its own reason and its own route
-		// out, and they will not close together: one has no enum at all, two are a ratification question, and the
-		// fourth models a concept the corpus defines nowhere.
+	it('the degraded population is THREE and may only fall', () => {
+		// A ratchet, not a target. SEVEN on 2026-08-05; FOUR when group (a) closed (three enums that existed under
+		// another identifier); THREE when group (b) closed — `ValidateDecomposition.disposition` left this census
+		// entirely, because its constraint is a LITERAL UNION derived from the machine rather than an enumRef, and
+		// this file only watches fields that name an enum. Its own gate is
+		// `rph-domain/src/decomposition-disposition-derivation.test.ts`, which holds it to the ratified machine.
+		//
+		// The three that remain will not close together, and none closes by remapping: two are a ratification
+		// question the corpus and the runtime answer differently, and one is blocked on a helper the corpus has
+		// never defined.
 		expect(degraded.map((r) => r.key).sort()).toEqual(
 			[
 				'AssuranceAssessmentRejected.recommendedControlAction',
 				'ExecutionStepFailed.failureClass',
-				'FailExecutionStep.failureClass',
-				'ValidateDecomposition.disposition'
+				'FailExecutionStep.failureClass'
 			].sort()
 		);
 	});

@@ -400,7 +400,7 @@ export const ProposeDecompositionPayloadSchema = z.strictObject({
 });
 export type ProposeDecompositionPayload = z.infer<typeof ProposeDecompositionPayloadSchema>;
 export const ValidateDecompositionPayloadSchema = z.strictObject({
-	disposition: z.string(),
+	disposition: z.enum(['VALID', 'CONDITIONALLY_VALID', 'INVALID']),
 	validatorRole: z.string().optional(),
 	observationIds: z.array(z.string()).optional()
 });
