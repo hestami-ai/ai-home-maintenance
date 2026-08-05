@@ -1698,7 +1698,9 @@ export const FIRST_SLICE_COMMANDS = [
 	'PromoteBaseline'
 ] as const;
 
-/** Registry: commandType -> payload schema + target aggregate + emitted event + first-slice flag. */
+/** Registry: commandType -> payload schema + target aggregate + emitted event(s) + first-slice flag.
+ *  `alsoEmitsEvents` is present only where ONE dispatch commits several governed facts (kit's alsoEvents);
+ *  a reader taking `emitsEvent` as the whole story would be wrong about those commands. See REG-F-027. */
 export const COMMANDS = {
 	CaptureIntent: {
 		payload: CaptureIntentPayloadSchema,
@@ -1770,6 +1772,7 @@ export const COMMANDS = {
 		payload: RequestAssuranceAssessmentPayloadSchema,
 		targetAggregateType: 'ASSURANCE_ASSESSMENT',
 		emitsEvent: 'AssuranceAssessmentRequested',
+		alsoEmitsEvents: ['AssuranceEvidenceRequired'],
 		firstSlice: true
 	},
 	SubmitEvidenceForAssessment: {
@@ -3039,7 +3042,7 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 	},
 	{
 		commandType: 'RequestAssuranceAssessment',
-		eventType: 'AssuranceAssessmentRequested',
+		eventType: 'AssuranceEvidenceRequired',
 		machine: 'AssuranceAssessment.state',
 		from: 'REQUESTED',
 		to: 'EVIDENCE_PENDING'

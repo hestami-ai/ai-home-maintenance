@@ -584,6 +584,9 @@
 			"commandType": "RequestAssuranceAssessment",
 			"targetAggregateType": "ASSURANCE_ASSESSMENT",
 			"emitsEvent": "AssuranceAssessmentRequested",
+			"alsoEmitsEvents": [
+				"AssuranceEvidenceRequired"
+			],
 			"drivesMachine": "AssuranceAssessment.disposition",
 			"drivesFrom": "(initial)",
 			"drivesTo": "PENDING",

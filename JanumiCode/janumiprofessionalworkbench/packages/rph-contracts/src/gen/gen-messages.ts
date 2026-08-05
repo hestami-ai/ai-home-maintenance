@@ -1,8 +1,12 @@
 // GENERATOR — emits src/messages.ts (command + event payload schemas + the command->event->transition
 // BINDING table) from the grounded extraction vocab/m3-commands-events.json (DOC-007 §32/§33 + DOC-002 §26,
 // reconciled). Run via `bun run gen:messages`. Payload complex types reuse the M1 object/helper schemas;
-// enum fields reference the generated enums; id-reference fields are strings. Event-only "enums" not in the
-// ratified enum set are modeled permissively (z.string()) — we never invent enum values.
+// enum fields reference the generated enums; id-reference fields are strings.
+//
+// THIS HEADER USED TO END: "Event-only 'enums' not in the ratified enum set are modeled permissively
+// (z.string()) — we never invent enum values." That sentence described a POLICY the generator did not have. It
+// had no way to tell an event-only enum from a MISSPELLED reference, and seven fields took the second route while
+// the header said the first (REG-F-026). An unresolvable enumRef now THROWS unless the field declares why.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +27,13 @@ interface Command {
 	commandType: string;
 	targetAggregateType?: string;
 	emitsEvent?: string;
+	/**
+	 * FURTHER events this command commits in the same dispatch (kit's `alsoEvents`). `emitsEvent` is 1:1 and the
+	 * corpus is not: DOC-004 §30 puts the request and its requirement evaluation under ONE trigger, so
+	 * `RequestAssuranceAssessment` commits two governed facts atomically. Declared here so the binding table can
+	 * name the event that actually drives each arrow. See REG-F-027.
+	 */
+	alsoEmitsEvents?: string[];
 	payloadFields: Field[];
 }
 interface Event {
@@ -232,12 +243,16 @@ const firstSlice = spec.firstSliceCommands ?? [];
 body.push(
 	`export const FIRST_SLICE_COMMANDS = [${firstSlice.map(j).join(', ')}] as const;`,
 	'',
-	'/** Registry: commandType -> payload schema + target aggregate + emitted event + first-slice flag. */',
+	'/** Registry: commandType -> payload schema + target aggregate + emitted event(s) + first-slice flag.',
+	" *  `alsoEmitsEvents` is present only where ONE dispatch commits several governed facts (kit's alsoEvents);",
+	' *  a reader taking `emitsEvent` as the whole story would be wrong about those commands. See REG-F-027. */',
 	'export const COMMANDS = {'
 );
 for (const c of spec.commands) {
+	const also = (c.alsoEmitsEvents ?? []).filter(Boolean);
+	const alsoLit = also.length ? ` alsoEmitsEvents: [${also.map(j).join(', ')}],` : '';
 	body.push(
-		`\t${j(c.commandType)}: { payload: ${c.commandType}PayloadSchema, targetAggregateType: ${j(c.targetAggregateType ?? '')}, emitsEvent: ${j(c.emitsEvent ?? '')}, firstSlice: ${firstSlice.includes(c.commandType)} },`
+		`\t${j(c.commandType)}: { payload: ${c.commandType}PayloadSchema, targetAggregateType: ${j(c.targetAggregateType ?? '')}, emitsEvent: ${j(c.emitsEvent ?? '')},${alsoLit} firstSlice: ${firstSlice.includes(c.commandType)} },`
 	);
 }
 body.push(
@@ -292,24 +307,45 @@ body.push(
 	'\treadonly to?: string;',
 	'}'
 );
-// A command is authoritative for WHICH event it emits (DOC-007). Align each binding's eventType to the
-// command's emitsEvent so the two never drift.
+// A command is authoritative for WHICH event it emits (DOC-007), and this step used to ENFORCE that by
+// OVERWRITING each binding's eventType with the command's `emitsEvent`.
 //
-// This alignment is right, but note what it does: it SILENTLY RESOLVES a disagreement rather than reporting one.
-// Until 2026-07-17 the vocab's command entry said MarkPwuReady -> PwuStateChanged while its own transitions table
-// said MarkPwuReady -> PwuMarkedReady; this line overwrote the table with the command entry, so the generated
-// output was self-consistent and the contradiction never surfaced. The command entry was the wrong side (the
-// Reference Undertaking §26 worked trace emits PwuMarkedReady; PwuStateChanged appears in no trace), and the
-// comment here previously rationalized the overwrite by calling PwuMarkedReady "a display alias" — a theory
-// invented to explain away the very drift this line was erasing. A resolver that cannot dissent is a resolver
-// that launders whichever side it was pointed at.
-const emitsByCommand = new Map(spec.commands.map((c) => [c.commandType, c.emitsEvent ?? '']));
+// THE PREVIOUS COMMENT ALREADY NAMED THE HAZARD AND KEPT THE BEHAVIOUR. It read: *"a resolver that cannot dissent
+// is a resolver that launders whichever side it was pointed at"* — written after the overwrite had erased a real
+// contradiction (MarkPwuReady -> PwuStateChanged in the command entry vs -> PwuMarkedReady in the table; the
+// command entry was the wrong side, and an earlier comment had invented a "display alias" theory to explain it
+// away). The hazard was documented and the laundering left in place, so it laundered again (REG-F-027):
+// `RequestAssuranceAssessment` has TWO binding rows because §30 puts two governed facts under one trigger, and
+// the second — `AssuranceEvidenceRequired` driving REQUESTED -> EVIDENCE_PENDING — was rewritten to say
+// `AssuranceAssessmentRequested`. The generated table then attributed an arrow to an event that does not drive
+// it, while the vocab row's own note said it was written *"so the census NAMES the gap instead of hiding it."*
+//
+// SO THE STEP NO LONGER REWRITES DATA; IT CHECKS IT. A binding may name any event its command actually commits
+// (`emitsEvent` plus `alsoEmitsEvents`), and naming anything else THROWS. That keeps the MarkPwuReady catch — a
+// genuine drift is still not in the declared set — and stops the catch from being silent.
+const declaredEvents = new Map(
+	spec.commands.map((c) => [
+		c.commandType,
+		new Set([c.emitsEvent ?? '', ...(c.alsoEmitsEvents ?? [])].filter(Boolean))
+	])
+);
 body.push(
 	'/** The command -> event -> state-transition binding table. */',
 	'export const BINDINGS: readonly CommandEventBinding[] = ['
 );
 for (const b of spec.bindings) {
-	const eventType = emitsByCommand.get(b.commandType) || b.eventType;
+	const declared = declaredEvents.get(b.commandType);
+	if (!declared)
+		throw new Error(`binding names command "${b.commandType}", which the vocab does not declare.`);
+	if (b.eventType && !declared.has(b.eventType))
+		throw new Error(
+			`binding ${b.commandType} -> ${b.eventType} (${b.machine ?? '?'} ${b.from ?? '?'} -> ${b.to ?? '?'}) ` +
+				`names an event the command does not commit. The command declares {${[...declared].join(', ')}}. ` +
+				`One of the two is wrong — resolve it rather than letting the generator pick a side. If the command ` +
+				`legitimately commits several events in one dispatch (kit's alsoEvents), declare them in ` +
+				`"alsoEmitsEvents" so the binding may name the one that actually drives this arrow.`
+		);
+	const eventType = b.eventType || [...declared][0] || '';
 	body.push(
 		`\t{ commandType: ${j(b.commandType)}, eventType: ${j(eventType)}, machine: ${j(b.machine ?? '')}, from: ${j(b.from ?? '')}, to: ${j(b.to ?? '')} },`
 	);
