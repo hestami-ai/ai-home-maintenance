@@ -54,7 +54,8 @@
 // field as "none" is the false-negative that lets a node look assured when it was never checked. Every §38 field is
 // sourced; `missingEvidence` is a real required-minus-received fold, and its empties are real (a policy requiring no
 // evidence, or one whose requirements are all satisfied, has none missing).
-import type { DomainEvent } from '@janumipwb/rph-contracts';
+import type { AggregateAssuranceDisposition, DomainEvent } from '@janumipwb/rph-contracts';
+import { aggregateAssuranceDisposition } from '@janumipwb/rph-domain';
 
 export interface AssuranceObservationView {
 	readonly observationId: string;
@@ -494,4 +495,33 @@ export function buildApplicablePolicies(args: {
 				: {})
 		};
 	});
+}
+
+/**
+ * The subject's AGGREGATE assurance disposition, folded from its applicable-policy rows (DOC-004 §28.2).
+ *
+ * ── WHY THE VIEW OWES THIS, AND WHY IT DID NOT HAVE IT ───────────────────────────────────────────────────────
+ * `buildApplicablePolicies` returns N policies with N verdicts and never says what they add up to. §28.1 states
+ * that the aggregate "must preserve the strictest unresolved disposition" and §28.2 that it "must not be reduced
+ * to a numerical average" — two rules about a value this view left the READER to compute, by eye, from a table.
+ * A rule with no implementation is a rule the reader is invited to break.
+ *
+ * REG-E-024(b) recorded this axis as "six states, no arrows", which framed it as an unbuilt state machine. It is
+ * a FOLD, its rule is ratified in full, and `gen-transitions.ts` already called it "a computed reduction, not an
+ * arrow". Only the reduction was missing.
+ *
+ * The DECISION is `aggregateAssuranceDisposition` in the kernel — the same discipline as `retryDecision` and
+ * `isPermittedForFailure`: this layer supplies facts, the kernel supplies the rule, and there is no second copy.
+ */
+export function aggregateDispositionFor(
+	policies: readonly ApplicablePolicyView[]
+): AggregateAssuranceDisposition {
+	return aggregateAssuranceDisposition(
+		policies.map((p) => ({
+			policyId: p.policyId,
+			...(p.disposition === undefined ? {} : { disposition: p.disposition }),
+			assessed: p.assessed,
+			...(p.applicable === undefined ? {} : { applicable: p.applicable })
+		}))
+	);
 }

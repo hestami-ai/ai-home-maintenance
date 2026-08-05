@@ -20,6 +20,7 @@ import {
 	selectGoverningPolicies
 } from '@janumipwb/rph-engine';
 import {
+	aggregateDispositionFor,
 	buildApplicablePolicies,
 	buildAssuranceView,
 	uncertaintyDisclosures,
@@ -120,7 +121,11 @@ function buildApplicablePoliciesView(
 			return {
 				pwuId: p.id,
 				pwuTitle: String((p.state.title ?? p.id) as string),
-				rows
+				rows,
+				// DOC-004 §28.2, folded by the kernel (REG-E-024(b)). The table above lists N verdicts; §28.1 says
+				// the aggregate "must preserve the strictest unresolved disposition" and "must not be reduced to a
+				// numerical average" — rules about a value the reader was previously left to compute by eye.
+				aggregate: aggregateDispositionFor(rows)
 			};
 		})
 		.filter((x) => x.rows.length > 0);

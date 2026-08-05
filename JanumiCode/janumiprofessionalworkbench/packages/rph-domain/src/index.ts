@@ -17,3 +17,4 @@ export * from './presentation.js';
 export * from './conformance-manifest.js';
 export * from './enforcement-register.js';
 export * from './execution-failure-taxonomy.js';
+export * from './aggregate-assurance.js';
