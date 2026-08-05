@@ -1312,18 +1312,11 @@
 					"note": "§30"
 				},
 				{
-					"from": "ANY_ACTIVE",
-					"to": "CANCELLED",
-					"trigger": "assessment cancellation",
-					"guard": "assessment is in a non-terminal (active) state",
-					"note": "§30 'ANY ACTIVE → CANCELLED' wildcard. ACTIVE = {REQUESTED, EVIDENCE_PENDING, READY, ASSESSING} — each may transition directly to CANCELLED."
-				},
-				{
 					"from": "REQUESTED",
 					"to": "CANCELLED",
 					"trigger": "cancelAssuranceAssessment (AssuranceAssessmentCancelled)",
 					"guard": "the assessment is ACTIVE — it has not reached a disposition",
-					"note": "DELIVERED 2026-08-05 (REG-F-021 residual R-1). DOC-004 §30's \"Alternate transitions\" block ratifies SIX arrows; FIVE were transcribed and this one was DROPPED, because its from-state is QUANTIFIED rather than literal: the corpus writes `ANY ACTIVE → CANCELLED`, which is not a row. So CANCELLED sat declared, TERMINAL, and reachable by nothing — an ending nothing could end at, and the reason an assessment stalled in EVIDENCE_PENDING could not be closed by any means.\n\nACTIVE = the four states before an outcome is reached (REQUESTED, EVIDENCE_PENDING, READY, ASSESSING). Once an assessment reaches a disposition it is concluded, not active, and post-outcome change is what INVALIDATED and WAIVER_EXPIRED are for. This is the same partition `assessmentHasConcluded` uses for baseline promotion, derived independently there and agreeing here.\n\nIT CORRECTS AN AUTHORED JUDGEMENT OF MINE. The design proposed cancellation from the three PRE-ASSESSING states only, reasoning that an assessment being judged should reach a disposition and INCONCLUSIVE exists for \"could not decide\". The corpus says ANY ACTIVE, which includes ASSESSING. The ratified rule is broader than the rule I was about to author, and it wins."
+					"note": "DELIVERED 2026-08-05 (REG-F-021 residual R-1), and its ACCOUNT CORRECTED 2026-08-05 (REG-F-025) — the correction is kept here because the wrong account is the more instructive half.\n\nWHAT WAS TRUE: DOC-004 §30's \"Alternate transitions\" block ratifies SIX arrows, and the sixth — `ANY ACTIVE → CANCELLED` — did not reach the machine. CANCELLED sat declared, TERMINAL, and reachable by nothing: an ending nothing could end at, and the reason an assessment stalled in EVIDENCE_PENDING could not be closed by any means.\n\nWHAT WAS WRONG: the arrow was NOT lost in transcription. It was transcribed, at this exact spot, spelled `ANY_ACTIVE`, carrying a note stating its own intended expansion — and it had been here since the workbench arrived in the repository (19a1b20f). `gen-transitions.ts` recognises the quantifier spelled `Any active`, with a SPACE; `ANY_ACTIVE` matched nothing, fell through to the literal branch, failed the state-set test, and was FILTERED OUT SILENTLY. The corpus said it, the vocab carried it, and the build dropped it — in the one place nobody looked, between two artifacts each individually correct.\n\nWHY THE FIX IS FOUR LITERAL ROWS AND NOT A LOOSER MATCHER: `expandFrom` implements \"any active\" as states MINUS terminalStates. Here those partitions DIFFER. SATISFIED, CONDITIONALLY_SATISFIED and WAIVED are non-terminal — each can still leave, via INVALIDATED or WAIVER_EXPIRED — but they are not ACTIVE; they are verdicts. Teaching the matcher to accept `ANY_ACTIVE` would have minted SATISFIED → CANCELLED and two more like it: cancelling an assessment that has already concluded, which §30 does not ratify. The silent drop was, by accident, the only thing keeping this machine honest.\n\nACTIVE = the four states before an outcome is reached (REQUESTED, EVIDENCE_PENDING, READY, ASSESSING) — the same partition `assessmentHasConcluded` uses for baseline promotion, derived independently there and agreeing here.\n\nIT CORRECTS AN AUTHORED JUDGEMENT OF MINE. The design proposed cancellation from the three PRE-ASSESSING states only, reasoning that an assessment being judged should reach a disposition and INCONCLUSIVE exists for \"could not decide\". The corpus says ANY ACTIVE, which includes ASSESSING. The ratified rule is broader than the rule I was about to author, and it wins."
 				},
 				{
 					"from": "EVIDENCE_PENDING",
@@ -1821,42 +1814,48 @@
 					"to": "REJECTED",
 					"trigger": "aggregate recomputation",
 					"guard": "any critical rejection OR any blocking rejection among applicable policies",
-					"note": "§28.2. Strictest unresolved disposition wins (§28.1); a satisfied advisory policy does not override a rejected blocking policy. Pseudo-source: this is a reduction, not an FSM edge."
+					"note": "§28.2. Strictest unresolved disposition wins (§28.1); a satisfied advisory policy does not override a rejected blocking policy. Pseudo-source: this is a reduction, not an FSM edge.",
+					"unrepresentable": "NOT AN ARROW. JAN-CMDPRE-SPEC-001 §2 excludes this entry from the machines BY NAME: it is a computed disposition, not a state machine. Nothing MOVES an aggregate — it is recomputed from the assessments it summarises, so `(aggregate evaluation)` is a condition, not a from-state. The six rows are `condition → aggregate state`, and the generator is right to emit no edge for them. Marked per-row rather than per-machine so the exemption is read next to the thing it exempts."
 				},
 				{
 					"from": "(aggregate evaluation)",
 					"to": "EVIDENCE_REQUIRED",
 					"trigger": "aggregate recomputation",
 					"guard": "any required assessment missing (evidence-deficit variant)",
-					"note": "§28.2 lists 'EVIDENCE_REQUIRED or UNASSESSED' for a missing required assessment — see open items."
+					"note": "§28.2 lists 'EVIDENCE_REQUIRED or UNASSESSED' for a missing required assessment — see open items.",
+					"unrepresentable": "NOT AN ARROW — see the REJECTED row. JAN-CMDPRE-SPEC-001 §2."
 				},
 				{
 					"from": "(aggregate evaluation)",
 					"to": "UNASSESSED",
 					"trigger": "aggregate recomputation",
 					"guard": "any required assessment missing / not yet run",
-					"note": "§28.2"
+					"note": "§28.2",
+					"unrepresentable": "NOT AN ARROW — see the REJECTED row. JAN-CMDPRE-SPEC-001 §2."
 				},
 				{
 					"from": "(aggregate evaluation)",
 					"to": "INCONCLUSIVE",
 					"trigger": "aggregate recomputation",
 					"guard": "any inconclusive required assessment (and no rejection / missing assessment of higher precedence)",
-					"note": "§28.2"
+					"note": "§28.2",
+					"unrepresentable": "NOT AN ARROW — see the REJECTED row. JAN-CMDPRE-SPEC-001 §2."
 				},
 				{
 					"from": "(aggregate evaluation)",
 					"to": "CONDITIONALLY_SATISFIED",
 					"trigger": "aggregate recomputation",
 					"guard": "any conditional required assessment (and none of the higher-precedence conditions hold)",
-					"note": "§28.2"
+					"note": "§28.2",
+					"unrepresentable": "NOT AN ARROW — see the REJECTED row. JAN-CMDPRE-SPEC-001 §2."
 				},
 				{
 					"from": "(aggregate evaluation)",
 					"to": "SATISFIED",
 					"trigger": "aggregate recomputation",
 					"guard": "all required assessments satisfied",
-					"note": "§28.2"
+					"note": "§28.2",
+					"unrepresentable": "NOT AN ARROW — see the REJECTED row. JAN-CMDPRE-SPEC-001 §2."
 				}
 			],
 			"illegal": [

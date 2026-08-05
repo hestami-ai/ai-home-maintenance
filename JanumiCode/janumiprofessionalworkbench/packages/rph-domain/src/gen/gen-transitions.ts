@@ -20,6 +20,11 @@ interface RawTransition {
 	trigger?: string;
 	guard?: string;
 	note?: string;
+	/**
+	 * Set ONLY on a row that is not an arrow at all (a computed reduction, e.g. AggregateAssuranceDisposition's
+	 * `condition → aggregate state` rows); the value is the ruling that says so. See the fail-loud check below.
+	 */
+	unrepresentable?: string;
 }
 interface RawIllegal {
 	from: string;
@@ -76,6 +81,24 @@ function crossAxisLit(c: { machine: string; from: string; to: string; reason?: s
 	]);
 }
 
+/**
+ * THE QUANTIFIER VOCABULARY IS A CLOSED SET OF FOUR SPELLINGS, AND THAT IS DELIBERATE.
+ *
+ * Anything else falls through to the literal branch, fails the caller's state-set test, and — until 2026-08-05 —
+ * was dropped in silence. That is exactly how §30's `ANY ACTIVE → CANCELLED` went missing for the lifetime of the
+ * repository: the vocab spelled it `ANY_ACTIVE`, this matcher wanted `Any active`, and one underscore cost a
+ * ratified arrow (REG-F-025). The row is no longer silent — `buildLegalTransitions` now THROWS — so the fix for a
+ * new spelling is to write the row literally or add the spelling here, on purpose, with the reading below in mind.
+ *
+ * READ THE NEXT SENTENCE BEFORE ADDING A SPELLING. This function implements "any active" as `states MINUS
+ * terminalStates` — an ACTIVE state is assumed to be a NON-TERMINAL one. Those are different claims: "active"
+ * says work is still under way, "non-terminal" says the machine can still leave. They coincide in every machine
+ * where this quantifier currently lands, and they DIVERGE in AssuranceAssessment.state, whose SATISFIED,
+ * CONDITIONALLY_SATISFIED and WAIVED are non-terminal verdicts — reachable onward via INVALIDATED and
+ * WAIVER_EXPIRED, and not active by any reading. Widening the matcher to catch `ANY_ACTIVE` there would have
+ * minted `SATISFIED → CANCELLED`: cancelling an assessment that has already concluded. That machine therefore
+ * states its four cancel arrows LITERALLY, and this comment is why.
+ */
 function expandFrom(from: string, states: string[], terminal: string[]): string[] {
 	const f = from.trim().toLowerCase();
 	// "Any active" / "Any non-baselined" / "Any non-terminal" all mean: transition FROM a non-terminal state
@@ -94,7 +117,16 @@ function expandFrom(from: string, states: string[], terminal: string[]): string[
 	return [from];
 }
 
-/** Expand + filter the raw transitions to concrete same-axis legal edges, then dedupe by `from->to`. */
+/**
+ * Expand + filter the raw transitions to concrete same-axis legal edges, then dedupe by `from->to`.
+ *
+ * FAILS LOUD ON A ROW THAT LANDS NOTHING (REG-F-025). Both filters below used to be silent `continue`s, and a row
+ * that survived neither left no trace anywhere: not an error, not a warning, not a line in the output. §30's
+ * `ANY ACTIVE → CANCELLED` was ratified in the corpus, transcribed into the vocab, and disappeared here for the
+ * lifetime of the repository — reviewing either artifact alone showed the arrow present. The Constitution's rule
+ * applies to build steps too: fail loud, never silently repair. A row that genuinely is not an arrow says so IN
+ * THE ROW, via `unrepresentable`, and the reason is read next to the thing it exempts.
+ */
 function buildLegalTransitions(
 	m: RawMachine,
 	stateSet: Set<string>,
@@ -102,10 +134,24 @@ function buildLegalTransitions(
 ): RawTransition[] {
 	const legal: RawTransition[] = [];
 	for (const t of m.transitions) {
-		if (!stateSet.has(t.to)) continue; // cross-axis / malformed target
-		for (const f of expandFrom(t.from, m.states, terminal)) {
-			if (stateSet.has(f)) legal.push({ ...t, from: f });
-		}
+		const before = legal.length;
+		if (stateSet.has(t.to))
+			for (const f of expandFrom(t.from, m.states, terminal)) {
+				if (stateSet.has(f)) legal.push({ ...t, from: f });
+			}
+		const landed = legal.length > before;
+		if (landed && t.unrepresentable)
+			throw new Error(
+				`${m.name}: row "${t.from}" -> ${t.to} is marked unrepresentable and produced ${legal.length - before} ` +
+					`edge(s). One of the two is now wrong — resolve it rather than leaving the row claiming both.`
+			);
+		if (!landed && !t.unrepresentable)
+			throw new Error(
+				`${m.name}: row "${t.from}" -> ${t.to} [${t.trigger ?? 'no trigger'}] produced NO edge and would ` +
+					`have been dropped silently. Either its from-state names something this machine declares (check ` +
+					`the quantifier spellings expandFrom accepts, and read why widening them is usually the wrong ` +
+					`fix), or the row is not an arrow at all — in which case give it an "unrepresentable" reason.`
+			);
 	}
 	const seen = new Set<string>();
 	return legal.filter((t) => {

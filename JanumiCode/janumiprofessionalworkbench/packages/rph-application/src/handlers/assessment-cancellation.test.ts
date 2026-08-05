@@ -7,11 +7,23 @@
 // act that waits on it waited forever.
 //
 // ── THE ARROW WAS RATIFIED ALL ALONG ─────────────────────────────────────────────────────────────────────────
-// DOC-004 §30's "Alternate transitions" block declares SIX arrows. Five were transcribed into the machine; the
-// sixth — `ANY ACTIVE → CANCELLED` — was dropped, because its from-state is QUANTIFIED rather than literal and a
-// quantifier is not a row. CANCELLED sat declared, TERMINAL, and reachable by nothing: an ending nothing could
+// DOC-004 §30's "Alternate transitions" block declares SIX arrows, and the sixth — `ANY ACTIVE → CANCELLED` —
+// did not reach the machine. CANCELLED sat declared, TERMINAL, and reachable by nothing: an ending nothing could
 // end at. The COMMAND and EVENT names are authored (§32 names no cancel command, §31 no cancel event); the
 // TRANSITION is delivered. One of each, which is why both are said separately wherever this is described.
+//
+// ── WHERE IT WAS LOST — CORRECTED 2026-08-05 (REG-F-025) ─────────────────────────────────────────────────────
+// This file first said the arrow was dropped IN TRANSCRIPTION, because a quantifier is not a row. That was wrong,
+// and the correction matters more than the original claim. The row WAS transcribed, at the right spot in
+// `m2-transitions.json`, spelled `ANY_ACTIVE`, with a note stating its own intended expansion — and it had been
+// there since the workbench arrived in the repository. It was lost one layer lower, in `gen-transitions.ts`,
+// which recognises the quantifier spelled `Any active` with a SPACE and silently filtered the row out. Corpus,
+// vocab and machine were each defensible read alone; the arrow died in the gap between them, which is why the
+// gate that found it (`transition-row-landing.test.ts`) is the only thing here that reads two artifacts at once.
+//
+// The four literal rows below are still the right fix, and NOT because the quantifier was unspelled: teaching the
+// matcher to accept `ANY_ACTIVE` would have expanded it to every NON-TERMINAL state, which here includes the
+// SATISFIED / CONDITIONALLY_SATISFIED / WAIVED verdicts — minting the very transition the last test forbids.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
