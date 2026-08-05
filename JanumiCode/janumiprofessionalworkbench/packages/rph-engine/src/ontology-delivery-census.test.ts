@@ -30,7 +30,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { CommandResult, DomainCommand } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import type { EngineHandle } from './engine.js';
-import { seedAdditivePolicies } from './seed-workbench.js';
+import { authorProductRealizationPwa, seedAdditivePolicies } from './seed-workbench.js';
 
 /** Capture every command the seeder issues, without an engine — the payload keys are the delivered surface. */
 function capturePolicySeeding(): DomainCommand[] {
@@ -44,6 +44,38 @@ function capturePolicySeeding(): DomainCommand[] {
 	} as unknown as EngineHandle;
 	seedAdditivePolicies(handle);
 	return sent;
+}
+
+/** Capture the PWU-TYPE seeding the same way — `authorProductRealizationPwa` publishes the PWA and defines every
+ *  PWU Type, so its `DefinePwuType` payloads are the delivered surface for `pwuTemplates`. */
+function captureTemplateSeeding(): DomainCommand[] {
+	const sent: DomainCommand[] = [];
+	const handle = {
+		ontology,
+		dispatch: (command: DomainCommand): CommandResult => {
+			sent.push(command);
+			return { commandId: command.commandId, status: 'ACCEPTED', producedEventIds: [] };
+		}
+	} as unknown as EngineHandle;
+	authorProductRealizationPwa(handle);
+	return sent;
+}
+
+/** The union of keys the ontology authors across all PWU TEMPLATES. */
+function authoredTemplateKeys(): string[] {
+	const keys = new Set<string>();
+	for (const t of ontology.pwuTemplates) for (const k of Object.keys(t)) keys.add(k);
+	return [...keys].sort((a, b) => a.localeCompare(b));
+}
+
+/** The union of keys the seeder puts on its DefinePwuType payloads. */
+function deliveredTemplateKeys(): string[] {
+	const keys = new Set<string>();
+	for (const c of captureTemplateSeeding()) {
+		if (c.commandType !== 'DefinePwuType') continue;
+		for (const k of Object.keys(c.payload as Record<string, unknown>)) keys.add(k);
+	}
+	return [...keys].sort((a, b) => a.localeCompare(b));
 }
 
 /** The union of keys the ontology actually authors across all seed policies. */
@@ -89,6 +121,26 @@ const ACCOUNTED_FOR: Readonly<Record<string, string>> = {
 		'nothing read either field. It was moved OUT into the finding, and is back only now that the route it ' +
 		'claims actually exists and is asserted. That is the difference between an exemption and an allowlist ' +
 		'entry, and it is why the staleness check below exists.'
+};
+
+/** `candidateChildren` is optional on `PwuTemplate`, so the generated literal's union does not carry it on every
+ *  member. One accessor rather than a cast at each site — a cast per use is how one of them quietly reads
+ *  something else. */
+const candidateChildrenOf = (t: unknown): readonly string[] =>
+	((t as { candidateChildren?: readonly string[] }).candidateChildren ?? []);
+
+/**
+ * The template equivalent of `ACCOUNTED_FOR`. Two rows, and both are CHECKED below rather than trusted — the
+ * policy census's own notation records that this table once carried a false exemption, so an entry here is a
+ * claim with a test behind it.
+ */
+const TEMPLATE_ACCOUNTED_FOR: Readonly<Record<string, string>> = {
+	defaultPolicyIds:
+		'TRANSFORMED — delivered as `requiredAssurancePolicyIds` via policiesForKind(), which is what replaced the ' +
+		'hand-written per-type policy lists. Asserted per kind below.',
+	sourceSection:
+		'ONTOLOGY-INTERNAL — provenance about the transcription (which corpus section, what is verbatim, what is ' +
+		'AUTHORED). It documents the ontology; the runtime governs with the content, not with its citation.'
 };
 
 describe('REG-F-022 generalized: what the ontology authors vs what the seeding delivers', () => {
@@ -173,6 +225,142 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 				(c.payload as { applicability?: { objectTypeConditions?: unknown[] } }).applicability
 					?.objectTypeConditions?.length
 			).toBeGreaterThan(0);
+	});
+
+	// ── THE SAME QUESTION, ONE OBJECT TYPE OVER: PWU TEMPLATES (REG-F-022's other half) ────────────────────────
+	//
+	// This file walked `seedPolicies` and nothing else — so 64 authored declarations across FIVE template fields
+	// sat outside the very instrument built to find them. That is the lesson REG-E-025 produced the same day, when
+	// two `failureClass` fields turned out to be invisible to the enumRef census because they declared no enum:
+	// A FIELD IS NOT SAFE BECAUSE THE CENSUS IS QUIET ABOUT IT — it may simply be below the census's floor.
+	//
+	// The engine's port makes it structural, exactly as it did for policies: `EngineOntology.pwuTemplates` is
+	// declared `{ pwuKind, isRoot }` — two members — so no type error was ever available for the other eight.
+	describe('PWU TEMPLATES: what the ontology authors vs what authorProductRealizationPwa delivers', () => {
+		it('CONTROL: the capture sees real PWU-type seeding', () => {
+			const defines = captureTemplateSeeding().filter((c) => c.commandType === 'DefinePwuType');
+			expect(defines.length).toBeGreaterThanOrEqual(9);
+			expect(
+				Object.keys(defines[0]!.payload as Record<string, unknown>).length
+			).toBeGreaterThan(5);
+			expect(authoredTemplateKeys().length).toBeGreaterThan(5);
+		});
+
+		it('KNOWN GAP: five authored template fields reach nothing, and the count may only FALL', () => {
+			const delivered = new Set(deliveredTemplateKeys());
+			const unexplained = authoredTemplateKeys().filter(
+				(k) => !delivered.has(k) && !(k in TEMPLATE_ACCOUNTED_FOR)
+			);
+			expect(
+				unexplained,
+				'AUTHORED PWU-TEMPLATE FIELDS THAT REACH NOTHING — REG-F-022 one object type over. Deliver, or add ' +
+					'a TEMPLATE_ACCOUNTED_FOR row naming the route. "Not yet" is not a route. This list is PINNED ' +
+					'rather than empty because closing it is a GOVERNANCE act, not a wiring one: see the design note ' +
+					'(docs/_working/DESIGN-template-delivery-census.md §3) — deriving permittedChildren from ' +
+					'candidateChildren would publish 50 child types that cannot be assessed. AND BECAUSE THIS IS AN ' +
+					'EXACT LIST RATHER THAN A CEILING, the gap cannot be closed by ADDING AN EXEMPTION either: a new ' +
+					'TEMPLATE_ACCOUNTED_FOR row shrinks this list and reddens here. Mutation-checked both ways.'
+			).toEqual([
+				'candidateChildren',
+				'completionClaims',
+				'inputs',
+				'outputArtifactTypes',
+				'requiredEvidenceTypes'
+			]);
+			// The DECLARATION count, so a field quietly shedding carriers cannot pass as progress.
+			const declarations = unexplained.reduce(
+				(n, k) =>
+					n +
+					ontology.pwuTemplates.filter((t) => {
+						const v = (t as unknown as Record<string, unknown>)[k];
+						return v !== undefined && (!Array.isArray(v) || v.length > 0);
+					}).length,
+				0
+			);
+			expect(declarations, 'authored template declarations consumed by nothing').toBe(64);
+		});
+
+		it('no TEMPLATE_ACCOUNTED_FOR row is stale, and none guards a field the ontology does not author', () => {
+			const delivered = new Set(deliveredTemplateKeys());
+			expect(Object.keys(TEMPLATE_ACCOUNTED_FOR).filter((k) => delivered.has(k))).toEqual([]);
+			const authored = new Set(authoredTemplateKeys());
+			expect(Object.keys(TEMPLATE_ACCOUNTED_FOR).filter((k) => !authored.has(k))).toEqual([]);
+		});
+
+		it('defaultPolicyIds really IS transformed — the exemption is checked, not asserted', () => {
+			// The row claims `defaultPolicyIds` reaches the runtime as `requiredAssurancePolicyIds`. An exemption
+			// nobody checks is how a census rots into an allowlist (REG-F-022's own notation), so it is checked.
+			const byKind = new Map(
+				captureTemplateSeeding()
+					.filter((c) => c.commandType === 'DefinePwuType')
+					.map((c) => [
+						(c.payload as { pwuKind: string }).pwuKind,
+						(c.payload as { requiredAssurancePolicyIds?: readonly string[] })
+							.requiredAssurancePolicyIds ?? []
+					])
+			);
+			expect(byKind.size).toBeGreaterThan(0);
+			for (const [kind, delivered] of byKind) {
+				const authored = ontology.pwuTemplates.find((t) => t.pwuKind === kind)?.defaultPolicyIds ?? [];
+				expect([...delivered].sort(), `${kind} must deliver its authored defaultPolicyIds`).toEqual(
+					[...authored].sort()
+				);
+			}
+		});
+
+		// THE ONE THAT IS NOT MERELY UNREAD — IT CONTRADICTS THE TREE THAT SHIPS.
+		it('candidateChildren DIVERGES from the published tree, and the divergence is named', () => {
+			// A census that only counted "unread fields" would file this as one inert field among five and hide
+			// that the shipped composition tree and the authored one disagree. `permittedChildren` comes from a
+			// hand-written PWU_TYPES list — the copy that `policiesForKind`'s comment says was supposed to stop
+			// existing ("a THIRD copy of content the ontology already carries"). The policy list was fixed; this
+			// one was not.
+			const defines = captureTemplateSeeding().filter((c) => c.commandType === 'DefinePwuType');
+			const kindOf = new Map(
+				defines.map((c) => [
+					(c.payload as { pwuTypeId: string }).pwuTypeId,
+					(c.payload as { pwuKind: string }).pwuKind
+				])
+			);
+			const shippedChildKinds = (pwuKind: string): string[] =>
+				(
+					defines.find((c) => (c.payload as { pwuKind: string }).pwuKind === pwuKind)?.payload as
+						| { permittedChildTypeIds?: readonly string[] }
+						| undefined
+				)?.permittedChildTypeIds?.map((id) => kindOf.get(id) ?? id) ?? [];
+
+			// The root AGREES — so the divergence below is specific, not "the seed ignores the ontology".
+			expect([...shippedChildKinds('PRODUCT_REALIZATION')].sort()).toEqual(
+				[
+					...candidateChildrenOf(
+						ontology.pwuTemplates.find((t) => t.pwuKind === 'PRODUCT_REALIZATION')
+					)
+				].sort()
+			);
+			// ARCHITECTURE_DEFINITION does not: it ships ONE child, and that child is not among the ten authored.
+			const archAuthored = candidateChildrenOf(
+				ontology.pwuTemplates.find((t) => t.pwuKind === 'ARCHITECTURE_DEFINITION')
+			);
+			const archShipped = shippedChildKinds('ARCHITECTURE_DEFINITION');
+			expect(archShipped).toEqual(['ARCHITECTURE_CONCERN']);
+			expect(
+				archAuthored,
+				'the shipped child is not one of the authored candidates — the two lists are not subset-related, ' +
+					'they disagree'
+			).not.toContain('ARCHITECTURE_CONCERN');
+			expect(archAuthored).toHaveLength(10);
+		});
+
+		it('50 of the 62 authored candidate kinds have NO template — which is why wiring it is not the fix', () => {
+			// A kind with no pwuTemplate row has no defaultPolicyIds, and `requireGoverningPolicies` THROWS on an
+			// undescribed kind (REG-F-029). Deriving permittedChildren from candidateChildren would therefore
+			// publish a tree offering 50 child types that cannot be assessed and cannot be driven — trading an
+			// inert field for 50 unusable affordances. The number is asserted so the argument stays checkable.
+			const templateKinds = new Set<string>(ontology.pwuTemplates.map((t) => t.pwuKind));
+			const candidates = new Set(ontology.pwuTemplates.flatMap((t) => candidateChildrenOf(t)));
+			expect(candidates.size).toBe(62);
+			expect([...candidates].filter((k) => !templateKinds.has(k))).toHaveLength(50);
+		});
 	});
 
 	// REG-F-022's own instance, now asserted in its CLOSED form so the register entry keeps a live citation.
