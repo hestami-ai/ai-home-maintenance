@@ -6841,6 +6841,12 @@
 					"type": "ControlAction[]",
 					"enumRef": "ControlActionSchema",
 					"note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
+				},
+				{
+					"field": "applicability",
+					"required": false,
+					"type": "ApplicabilityRule",
+					"note": "REG-F-029 review finding (c), 2026-08-05. The COMMAND declared this and the CREATED event carried it, but the EDITED event did not — an asymmetry introduced when §5.1 scope was first delivered, and invisible while `applicability` was absent from EDITABLE_PATCH_FIELDS: the handler never put it in an edit event because the handler never patched it. Making the field patchable exposed it immediately, via the REG-F-020 emitted-event ledger, which refused a payload the event's own strictObject shape rejects. Without this the governed stream would record every part of a scope edit EXCEPT the field the enforced §5.1 determination actually reads."
 				}
 			]
 		},

@@ -1617,7 +1617,8 @@ export const AssurancePolicyEditedPayloadSchema = z.strictObject({
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
 	remediationRules: z.array(RemediationRuleSchema).optional(),
-	permittedControlActions: z.array(ControlActionSchema).optional()
+	permittedControlActions: z.array(ControlActionSchema).optional(),
+	applicability: ApplicabilityRuleSchema.optional()
 });
 export type AssurancePolicyEditedPayload = z.infer<typeof AssurancePolicyEditedPayloadSchema>;
 export const AssurancePolicySupersededPayloadSchema = z.strictObject({

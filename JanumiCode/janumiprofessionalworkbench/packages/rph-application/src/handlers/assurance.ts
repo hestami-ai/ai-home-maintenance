@@ -254,7 +254,14 @@ const EDITABLE_PATCH_FIELDS = [
 	'escalationRules',
 	'waiverRules',
 	'remediationRules',
-	'permittedControlActions'
+	'permittedControlActions',
+	// `applicability` was on the Edit PAYLOAD and missing from this list, so an edit that supplied it had it
+	// SILENTLY DROPPED — the authored-then-dropped shape REG-F-022 named, on the very field REG-F-024 was about
+	// (adversarial review, 2026-08-05). Worse than inert: `applicableObjectTypes` IS patchable, so narrowing that
+	// left `applicability` — the field the newly-enforced §5.1 gate PREFERS — pinned at its creation value. The
+	// declared scope and the enforced scope could be driven apart through a supported command, which is REG-F-024
+	// re-openable by anyone with an EditAssurancePolicy. See `reconcileApplicability` below for the other half.
+	'applicability'
 ] as const satisfies readonly (keyof EditAssurancePolicyPayload)[];
 
 /** JAN-CMDPRE DWP-08 (EDIT): refuse a no-op EditAssurancePolicy — every payload-present editable field already equals
@@ -276,7 +283,38 @@ function buildEditedPolicyState(
 	for (const field of EDITABLE_PATCH_FIELDS) {
 		if (p[field] !== undefined) next[field] = p[field];
 	}
-	return next;
+	return reconcileApplicability(next, p);
+}
+
+/**
+ * KEEP THE TWO SCOPE REPRESENTATIONS FROM DIVERGING (adversarial review, 2026-08-05).
+ *
+ * A policy carries its object-type scope TWICE: as `applicableObjectTypes` (DOC-007's field, older) and inside
+ * `applicability.objectTypeConditions` (DOC-004 §5.1's rule, which the enforced determination reads and prefers).
+ * `createAssurancePolicy` derives the second from the first when none is supplied, so a created policy is always
+ * consistent. EDIT had no such rule: patching `applicableObjectTypes` alone changed the field the gate falls back
+ * to while leaving the field the gate actually reads at its creation value.
+ *
+ * That is the same "two copies, no test that they agree" shape that produced the hand-written policy lists and
+ * the seeder's kind abbreviations, arriving this time on the one field a live refusal depends on. So the edit
+ * seam now states the invariant instead of hoping: when an edit narrows `applicableObjectTypes` and does NOT
+ * supply an explicit rule, the rule's object-type arm follows — and every OTHER arm it carries (kind conditions,
+ * tags, a §18 expression) is preserved, because those were authored separately and a type edit does not speak
+ * to them.
+ *
+ * An edit that supplies `applicability` explicitly wins outright: it is the more specific statement of scope.
+ */
+function reconcileApplicability(
+	next: Record<string, unknown>,
+	p: EditAssurancePolicyPayload
+): Record<string, unknown> {
+	if (p.applicability !== undefined) return next; // explicit rule wins; nothing to reconcile
+	if (p.applicableObjectTypes === undefined) return next; // scope untouched by this edit
+	const existing = (next.applicability ?? {}) as Record<string, unknown>;
+	return {
+		...next,
+		applicability: { ...existing, objectTypeConditions: [...p.applicableObjectTypes] }
+	};
 }
 
 /** EditAssurancePolicy — revise a non-floor, non-superseded policy's content in place (same version, revision++).
