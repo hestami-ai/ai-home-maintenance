@@ -70,11 +70,11 @@
 // The controller lever itself is NOT the defect: ratified RPH-PWU-006's "When" is "the controller evaluates the
 // PWU". Its Given — "execution succeeded; required evidence is admitted; all mandatory assurance assessments are
 // satisfied" — is what was missing, and is what now holds.
-import { evaluateApplicability, FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
+import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
-import { applicabilityPermitsAssessment, policyApplicability } from '@janumipwb/rph-domain';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
+import { requireGoverningPolicies } from './governing-policies.js';
 import type { EngineHandle } from './engine.js';
 
 const ACTOR: ActorReference = {
@@ -840,46 +840,8 @@ export function driveReferenceUndertaking(
 	 * returning `[]` here would surface as a missing assessment three layers away — or, worse, as a PWU driven to
 	 * SATISFIED with no assessment backing it, which is the shape RPH-PWU-006 exists to forbid.
 	 */
-	const policiesGoverning = (pwuId: string): string[] => {
-		const pwu = handle.loadObject(pwuId)?.state as
-			| { pwuKind?: string; pwuTypeId?: string; assurancePolicyIds?: string[]; tags?: string[] }
-			| undefined;
-		const viaType = pwu?.pwuTypeId
-			? ((
-					handle.loadObject(pwu.pwuTypeId)?.state as
-						{ requiredAssurancePolicyIds?: string[] } | undefined
-				)?.requiredAssurancePolicyIds ?? [])
-			: [];
-		const declared = [...new Set([...(pwu?.assurancePolicyIds ?? []), ...viaType])];
-		const excluded: string[] = [];
-		const selected = declared.filter((pid) => {
-			const pol = handle.loadObject(pid)?.state as
-				{ status?: string; applicability?: unknown; applicableObjectTypes?: string[] } | undefined;
-			if (!pol) return excluded.push(`${pid}: not in the store`) && false;
-			if (pol.status !== 'ACTIVE') return excluded.push(`${pid}: ${String(pol.status)}`) && false;
-			const outcome = policyApplicability(
-				pol.applicability ?? { objectTypeConditions: pol.applicableObjectTypes },
-				{
-					objectType: 'PROFESSIONAL_WORK_UNIT',
-					...(pwu?.pwuKind ? { pwuKind: pwu.pwuKind } : {}),
-					...(pwu?.tags ? { tags: pwu.tags } : {})
-				},
-				// Same evaluator the handler injects — the point of "one answer computed once" is that both sides
-				// decide expressions the same way too, not merely the fields either happens to understand.
-				(expr, subj) => evaluateApplicability(expr as never, subj)
-			);
-			if (applicabilityPermitsAssessment(outcome)) return true;
-			excluded.push(`${pid}: ${outcome}`);
-			return false;
-		});
-		if (selected.length === 0)
-			throw new Error(
-				`Reference Undertaking: no policy governs ${pwuId} (${String(pwu?.pwuKind)}). Declared ` +
-					`[${declared.join(', ') || 'nothing'}]; excluded [${excluded.join('; ') || 'n/a'}]. A PWU nothing ` +
-					`can assess cannot be driven to a disposition — RPH-PWU-006 requires an assessment behind it.`
-			);
-		return selected;
-	};
+	const policiesGoverning = (pwuId: string): readonly string[] =>
+		requireGoverningPolicies(handle, pwuId);
 
 	const earnAssurance = (
 		pwuId: string,
