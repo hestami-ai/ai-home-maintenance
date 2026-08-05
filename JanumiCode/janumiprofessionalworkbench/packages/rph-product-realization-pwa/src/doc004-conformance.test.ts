@@ -305,6 +305,74 @@ describe('the seeded catalog conforms to DOC-004 itself', () => {
 		});
 	});
 
+	// ── THE 2026-08-05 CORPUS AMENDMENTS, CHECKED AGAINST THE DOCUMENT ─────────────────────────────────────────
+	//
+	// Two §0.3 authored clarifications were added to DOC-004 itself, and three repository annotations were changed
+	// from AUTHORED to RATIFIED on the strength of them. THAT IS A RATIFICATION CLAIM, and this file's own
+	// anti-laundering rule applies to it: a claim that the corpus decided something must be checkable against the
+	// corpus, or it is exactly the borrowed authority the rule exists to prevent — with the aggravating factor
+	// that here I am both the amender and the claimant.
+	describe('the corpus amendments are IN the corpus', () => {
+		const DOC_TEXT = readFileSync(DOC, 'utf8');
+
+		it('§30 declared the arrow, and §31/§32 now name its event and command', () => {
+			// The gap: §30's alternate transitions carried `ANY ACTIVE -> CANCELLED` while the event list and the
+			// command list named neither — an ARROW WITH NO TRIGGER. The amendment adds only the two names that
+			// arrow already required.
+			/** A top-level `# N.` section's body lines — `sectionLines` handles only policy sections' shape. */
+			const section = (n: string): string[] => {
+				const start = lines.findIndex((l) => new RegExp(`^# ${n}\\. `).test(l));
+				const rest = lines.slice(start + 1);
+				const end = rest.findIndex((l) => /^# \d+\./.test(l));
+				return end < 0 ? rest : rest.slice(0, end);
+			};
+			expect(section('30'), 'the arrow this rests on must still be declared').toContain(
+				'ANY ACTIVE → CANCELLED'
+			);
+			// THE FENCED LIST, NOT THE SECTION TEXT — and this correction came from the mutant. The first version
+			// asserted `section(n)` CONTAINED the name, and it passed with the name REMOVED FROM THE LIST, because
+			// the amendment blockquote below the list also mentions it: the check was satisfied by the commentary
+			// ABOUT the declaration rather than by the declaration. A gate that cannot tell a declaration from
+			// prose discussing it is reading a label instead of the content — this file's oldest lesson, in the
+			// test I wrote to enforce that lesson.
+			const fencedList = (n: string): string[] => {
+				const body = section(n);
+				const open = body.findIndex((l) => l.startsWith('```'));
+				const close = body.findIndex((l, i) => i > open && l.startsWith('```'));
+				expect(open, `§${n} must have a fenced list to read`).toBeGreaterThanOrEqual(0);
+				return body.slice(open + 1, close);
+			};
+			expect(fencedList('31'), '§31’s EVENT LIST must name the cancellation event').toContain(
+				'AssuranceAssessmentCancelled'
+			);
+			expect(fencedList('32'), '§32’s COMMAND LIST must name the cancellation command').toContain(
+				'cancelAssuranceAssessment'
+			);
+			// Both amendments must be MARKED as authored clarifications, not slipped in as though always present.
+			// A silent corpus edit is worse than an unratified annotation: it destroys the reader's ability to tell
+			// ratified text from ours.
+			// `.join` here on purpose: this one IS a claim about the prose, so it reads the prose. The assertions
+			// above are claims about the DECLARATION and read the fenced list. Same section, two different
+			// questions, two different readers — which is the distinction the mutant proved was missing.
+			expect(section('31').join(' ')).toContain('authored clarification, §0.3 grant');
+			expect(section('32').join(' ')).toContain('authored clarification, §0.3 grant');
+		});
+
+		it('ControlActionRecommendation is now DEFINED, and defined as §33 demonstrates it', () => {
+			// It was referenced four times across the corpus and defined nowhere — which is what blocked
+			// REG-F-026 group (d) until §33's worked example was read.
+			expect(DOC_TEXT).toContain('type ControlActionRecommendation = ControlAction;');
+			expect(DOC_TEXT, 'the definition must be marked as authored').toContain(
+				'`ControlActionRecommendation` (authored clarification, §0.3 grant'
+			);
+			// And it must still AGREE with the worked example it was derived from — if §33 ever changes to show a
+			// structure, this definition is wrong and must redden rather than quietly disagree.
+			expect(normalize(DOC_TEXT)).toContain(
+				normalize('"recommendedControlActions": [\n        "RESHAPE_PWU",\n        "REQUEST_HUMAN_DECISION"\n      ]')
+			);
+		});
+	});
+
 	// ── THE EVIDENCE CENSUS, DERIVED FROM THE DOCUMENT (REG-E-026) ─────────────────────────────────────────────
 	//
 	// These numbers are load-bearing: 89 authored EvidenceRequirements rest on them, and the LAST count anybody

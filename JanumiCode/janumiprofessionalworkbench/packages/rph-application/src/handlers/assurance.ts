@@ -1244,7 +1244,8 @@ export const beginAssuranceAssessment: CommandHandler = (ctx, command, payload) 
  * CancelAssuranceAssessment — close an assessment that will never reach a verdict.
  *
  * THE ARROW IS RATIFIED, THE NAME IS NOT. DOC-004 §30's "Alternate transitions" block declares
- * `ANY ACTIVE → CANCELLED`; §32 names no cancel command and §31 no cancel event. Five of §30's six alternate
+ * `ANY ACTIVE → CANCELLED`. §32/§31 named no cancel command or event when this was written — an arrow with no
+ * trigger — and both are RATIFIED as of 2026-08-05 (§0.3 authored clarification). Five of §30's six alternate
  * arrows were transcribed into `m2-transitions.json` and this one was dropped, because its from-state is
  * QUANTIFIED rather than literal — "ANY ACTIVE" is not a row. So CANCELLED sat declared, TERMINAL and reachable
  * by nothing, which is why REG-F-021's residual R-1 existed: an assessment stalled in EVIDENCE_PENDING, its

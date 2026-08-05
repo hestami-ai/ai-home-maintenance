@@ -9,7 +9,8 @@
 // ── THE ARROW WAS RATIFIED ALL ALONG ─────────────────────────────────────────────────────────────────────────
 // DOC-004 §30's "Alternate transitions" block declares SIX arrows, and the sixth — `ANY ACTIVE → CANCELLED` —
 // did not reach the machine. CANCELLED sat declared, TERMINAL, and reachable by nothing: an ending nothing could
-// end at. The COMMAND and EVENT names are authored (§32 names no cancel command, §31 no cancel event); the
+// end at. The COMMAND and EVENT names were authored when this was written and are RATIFIED as of 2026-08-05
+// (DOC-004 §31/§32, §0.3 authored clarification — the corpus had declared the arrow and named no trigger); the
 // TRANSITION is delivered. One of each, which is why both are said separately wherever this is described.
 //
 // ── WHERE IT WAS LOST — CORRECTED 2026-08-05 (REG-F-025) ─────────────────────────────────────────────────────

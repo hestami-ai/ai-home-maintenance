@@ -107,7 +107,10 @@ describe('validate', () => {
 		// then +2 for REG-F-021 residual R-1: +1 command CancelAssuranceAssessment + +1 event
 		// AssuranceAssessmentCancelled. The ARROW they drive is ratified (DOC-004 §30 `ANY ACTIVE → CANCELLED`, one
 		// of six alternate transitions, the only one the transcription dropped because its from-state is quantified);
-		// the NAMES are authored, since §32 names no cancel command and §31 no cancel event. (+2 → 329.)
+		// the NAMES were authored when added, since §32 named no cancel command and §31 no cancel event. (+2 → 329.)
+		// RATIFIED 2026-08-05: the corpus was amended instead of the annotation left standing — §30 declared
+		// `ANY ACTIVE → CANCELLED`, an ARROW WITH NO TRIGGER, and §31/§32 now name the event and command it
+		// already required (authored clarification, §0.3 grant).
 		// +1 → 330: ExecutionFailureClass, minted 2026-08-05 from RPH-DOC-002 §36.2's seven prose items when
 		// REG-E-025 was ratified (REG-F-026 group (c)).
 		expect(buildContractRegistry().ids()).toHaveLength(330);

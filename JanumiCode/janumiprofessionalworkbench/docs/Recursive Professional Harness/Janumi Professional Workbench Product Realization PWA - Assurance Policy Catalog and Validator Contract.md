@@ -255,6 +255,37 @@ interface ValidatorResult {
 
 The validator implementation's recommendation does not itself mutate assurance state.
 
+> **`ControlActionRecommendation` (authored clarification, §0.3 grant, 2026-08-05).**
+> This type is REFERENCED four times across the ratified corpus — here, and three times in RPH-DOC-007 §19 — and
+> **defined nowhere**. A named type with no definition is not a gap a reader can resolve by care: it admits any
+> shape, and an implementation must guess.
+> 
+> **§33 already answers it.** The *Validator Implementation Output Schema Example* is a ratified worked instance
+> of this very interface, and it carries the field — at both the observation level and the result level — as bare
+> `ControlAction` values:
+> 
+> ```json
+> "recommendedControlActions": ["RESHAPE_PWU", "REQUEST_HUMAN_DECISION"]
+> ```
+> 
+> So the definition is stated as what the corpus demonstrates rather than as something richer that would
+> contradict its own example:
+> 
+> ```typescript
+> type ControlActionRecommendation = ControlAction;
+> ```
+> 
+> **This is not a claim that a recommendation carries no rationale — it is a claim about WHERE the rationale
+> lives.** DOC-002 §37 requires that *"every control action must record: triggering condition; evidence or
+> observations considered; policy authorizing the action; actor; affected objects; expected outcome"* — an
+> obligation on the controller when it TAKES an action, not on the validator when it RECOMMENDS one. The
+> validator's surrounding `ValidatorResult` already supplies the evidence considered, the observations, the
+> policy and the validator identity; duplicating them per recommended action would restate the record, not
+> enrich it.
+> 
+> If a later ratification gives the recommendation its own structure, every existing reference stays valid — the
+> alias widens without breaking, which is why it is the conservative resolution rather than merely the smallest.
+
 The Assurance Service validates the result, enforces policy, and records the authoritative disposition.
 
 ---
@@ -1748,12 +1779,25 @@ AssuranceAssessmentRejected
 AssuranceAssessmentInconclusive
 AssuranceAssessmentEscalated
 AssuranceAssessmentInvalidated
+AssuranceAssessmentCancelled
 
 WaiverRequested
 WaiverGranted
 WaiverDenied
 WaiverExpired
 ```
+
+> **`AssuranceAssessmentCancelled` (authored clarification, §0.3 grant, 2026-08-05).**
+> §30's *Alternate transitions* declares **`ANY ACTIVE → CANCELLED`**, and this list named no event for it — so
+> the catalog ratified an **arrow with no event**. Every other §30 arrow has one here. An assessment that cannot
+> proceed (its evidence will never arrive, its subject was withdrawn) had a declared destination and no governed
+> way to record arriving there, which is the shape §0.3 asks to be surfaced rather than resolved by whoever is
+> editing the file.
+> 
+> This adds **only the name the declared arrow already requires**. It invents no new transition: `CANCELLED` and
+> its in-arrow are both pre-existing §30 content. The implementing repository had already authored this event
+> (and its §32 command below) for exactly that reason and recorded them as **authored, not ratified**; this
+> amendment is what makes that transcription true rather than a divergence.
 
 > **Relationship to the Canonical Domain Model §26.5 (authored clarification, §0.3 grant, 2026-07-17).**
 > This list **refines, and does not contradict,** the assurance events in DOC-002 (Canonical Domain Model,
@@ -1800,12 +1844,22 @@ recordCriterionResult
 recordAssuranceObservation
 completeAssuranceAssessment
 invalidateAssuranceAssessment
+cancelAssuranceAssessment
 
 requestAssuranceWaiver
 grantAssuranceWaiver
 denyAssuranceWaiver
 expireAssuranceWaiver
 ```
+
+> **`cancelAssuranceAssessment` (authored clarification, §0.3 grant, 2026-08-05).**
+> The trigger for §30's **`ANY ACTIVE → CANCELLED`**. Without it the catalog named a destination state, an arrow
+> into it, and no command able to take that arrow — leaving an assessment stalled in `EVIDENCE_PENDING` with no
+> exit at all, since `invalidateAssuranceAssessment` runs only from `SATISFIED` / `CONDITIONALLY_SATISFIED`.
+> 
+> **Scope is deliberately narrow.** It adds no state, no arrow and no source state: `ANY ACTIVE` is §30's own
+> phrase and the mutation obligations below apply to it unchanged. It is the minimum that makes the ratified
+> machine operable, and nothing more.
 
 Every mutation must enforce:
 
