@@ -123,3 +123,43 @@ describe('selectGoverningPolicies — the exclusions actually fire (REG-F-029 re
 		);
 	});
 });
+
+describe('a promotion cites EVERY assessment that permitted it (REG-F-029 review finding (d))', () => {
+	it('the seeded baselines carry the whole governing set, not the first of it', () => {
+		// §24 asks a promotion to carry its required assessments. `driveToSatisfied` returned ONE assessment id —
+		// the primary — so `assuranceAssessmentIds` named 1 of 3 and 1 of 4: the promotion gate verified a single
+		// policy's verdict and took the other governing policies on trust, at the one moment the corpus asks for
+		// them. Counts read from the committed EVENT, keyed by the event's OWN field name.
+		//
+		// (The first probe of this used the COMMAND's field name, `requiredAssessmentIds`, against the EVENT —
+		// which carries `assuranceAssessmentIds` — and reported 0 for both. A blind reader, one more time; the
+		// numbers below are from the field the event actually has.)
+		let n = 0;
+		const engine = createEngine({
+			ontology,
+			now: () => '2026-08-05T00:00:00Z',
+			newEventId: () => `evt_${++n}`
+		});
+		seedWorkbench(engine);
+		const cited = engine
+			.readAllEvents()
+			.filter((e) => e.eventType === 'BaselinePromoted')
+			.map((e) => {
+				const p = e.payload as { baselineType?: string; assuranceAssessmentIds?: string[] };
+				return { type: p.baselineType, count: (p.assuranceAssessmentIds ?? []).length };
+			});
+		expect(cited, 'the drive promotes two baselines').toHaveLength(2);
+		expect(cited).toEqual([
+			{ type: 'INTENT', count: 3 },
+			{ type: 'ARCHITECTURE', count: 4 }
+		]);
+		// CONTROL: those counts must equal what the SELECTOR says governs each subject, or the promotion is
+		// citing a set unrelated to the determination that produced it.
+		expect(selectGoverningPolicies(engine, REFERENCE_UNDERTAKING.intentDef).selected).toHaveLength(
+			3
+		);
+		expect(
+			selectGoverningPolicies(engine, REFERENCE_UNDERTAKING.architecture).selected
+		).toHaveLength(4);
+	});
+});

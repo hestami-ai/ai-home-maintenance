@@ -850,7 +850,12 @@ export function driveReferenceUndertaking(
 		observations: readonly EarnedObservation[] = [],
 		/** Additional claims this assessment VERIFIES — the last hop of the corpus §25 chain (RPH-FIX-005). */
 		extraClaimIds: readonly string[] = []
-	): string => {
+		// RETURNS EVERY assessment it created, not just the primary (REG-F-029 review finding (d)). A caller that
+		// goes on to promote a baseline must cite the assessments that permitted the satisfaction — ALL of them.
+		// Returning one made `requiredAssessmentIds` name 1 of 3 / 1 of 4, so the promotion gate verified a single
+		// policy's verdict while the other governing policies went unnamed at the one moment the corpus asks for
+		// them (§24: promotion carries the required assessments).
+	): readonly string[] => {
 		const label = LABELS[pwuId]?.title ?? pwuId;
 		const { claimId, evidenceId } = produced;
 		// EVERY policy that governs this PWU gets its own assessment, not just the first (REG-F-029). Citing one of
@@ -956,7 +961,7 @@ export function driveReferenceUndertaking(
 				},
 				producer: ACTOR
 			});
-		return assessmentId;
+		return assessmentIds;
 	};
 
 	// --- THE GOVERNANCE LOOP (Increment 26b) ---
@@ -1015,8 +1020,9 @@ export function driveReferenceUndertaking(
 		return [baselineId, decisionId];
 	};
 
-	/** Returns the satisfied assessment's id, so a caller that goes on to baseline this PWU can cite the very
-	 *  assessment that permitted its satisfaction (PromoteBaseline's `requiredAssessmentIds`). */
+	/** Returns EVERY satisfied assessment's id, so a caller that goes on to baseline this PWU cites all of the
+	 *  assessments that permitted its satisfaction (PromoteBaseline's `requiredAssessmentIds`) — not just the one
+	 *  that happened to be first. See REG-F-029 review finding (d). */
 	const driveToSatisfied = (
 		pwuId: string,
 		/** Runs AFTER execution and BEFORE assurance; returns extra claims the assessment must verify. The hook
@@ -1024,20 +1030,21 @@ export function driveReferenceUndertaking(
 		 *  that model, and only then is it assessed. Authoring the artifact before the PWU had executed would
 		 *  have been a small fiction inside a fixture whose whole purpose is to be faithful. */
 		afterExecution?: () => readonly string[]
-	): string => {
+	): readonly string[] => {
 		const produced = shapeAndExecute(pwuId);
 		const extraClaimIds = afterExecution?.() ?? [];
-		const assessmentId = earnAssurance(pwuId, produced, 'SATISFIED', [], extraClaimIds);
-		// The Given now holds and is CITED: this hop names the satisfied assessment that permits it.
+		const assessmentIds = earnAssurance(pwuId, produced, 'SATISFIED', [], extraClaimIds);
+		// The Given now holds and is CITED. `rejectUnbackedDisposition` needs ONE cited assessment in the
+		// satisfied state; citing them all is stronger and truer — every assessment that permits this hop is named.
 		chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
-			assessmentId
+			...assessmentIds
 		]);
-		return assessmentId;
+		return assessmentIds;
 	};
 
 	const driveToConditional = (pwuId: string): void => {
 		const produced = shapeAndExecute(pwuId);
-		const assessmentId = earnAssurance(pwuId, produced, 'CONDITIONALLY_SATISFIED', [
+		const assessmentIds = earnAssurance(pwuId, produced, 'CONDITIONALLY_SATISFIED', [
 			{ severity: 'MATERIAL', statement: REFERENCE_OPEN_RESIDUALS[0] }
 		]);
 		chg(
@@ -1047,7 +1054,7 @@ export function driveReferenceUndertaking(
 			'SUCCEEDED',
 			'CONDITIONALLY_SATISFIED',
 			'AT_RISK',
-			[assessmentId]
+			[...assessmentIds]
 		);
 	};
 
@@ -1063,8 +1070,11 @@ export function driveReferenceUndertaking(
 	// Intent & Product Definition: satisfied, then frozen as the authoritative Intent Baseline (§26 trace steps
 	// 15-16). The Behavior PWU is satisfied and deliberately NOT baselined — the reference undertaking's point is
 	// that satisfied and baselined are different things.
-	const intentDefAssessment = driveToSatisfied(R.intentDef);
-	baseline(R.intentDef, 'INTENT', 'Intent Baseline', [intentDefAssessment]);
+	// EVERY assessment that permitted the satisfaction is cited, not the first (REG-F-029 review finding (d)).
+	// §24 asks a promotion to carry its required assessments; naming one of three would have the gate verify a
+	// single policy's verdict and take the rest on trust.
+	const intentDefAssessments = driveToSatisfied(R.intentDef);
+	baseline(R.intentDef, 'INTENT', 'Intent Baseline', [...intentDefAssessments]);
 
 	driveToSatisfied(R.behavior);
 
@@ -1085,12 +1095,12 @@ export function driveReferenceUndertaking(
 	// authorizing PROMOTE_BASELINE decision made effective, approve, promote — and only then the controller's
 	// hop, citing the baseline and the decision that authorized it. DOC-002 §8.1's Given for this arrow is
 	// "Authorized promotion decision"; it used to be nothing at all.
-	const archAssessment = driveToSatisfied(R.architecture);
+	const archAssessments = driveToSatisfied(R.architecture);
 	const [archBaseline, archDecision] = baseline(
 		R.architecture,
 		'ARCHITECTURE',
 		'Architecture Baseline',
-		[archAssessment]
+		[...archAssessments]
 	);
 	chg(R.architecture, 'SATISFIED', 'BASELINED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
 		archBaseline!,
