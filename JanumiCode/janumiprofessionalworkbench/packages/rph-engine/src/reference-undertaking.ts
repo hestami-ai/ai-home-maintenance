@@ -72,6 +72,7 @@
 // satisfied" — is what was missing, and is what now holds.
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
 import type { EngineHandle } from './engine.js';
 
@@ -168,7 +169,10 @@ const LABELS: Record<string, { title: string; kind: string }> = {
 		title: 'Product Behavior Definition',
 		kind: 'PRODUCT_BEHAVIOR_DEFINITION'
 	},
-	[REFERENCE_UNDERTAKING.architecture]: { title: 'Architecture Definition', kind: 'ARCHITECTURE_DEFINITION' },
+	[REFERENCE_UNDERTAKING.architecture]: {
+		title: 'Architecture Definition',
+		kind: 'ARCHITECTURE_DEFINITION'
+	},
 	[REFERENCE_UNDERTAKING.systemContext]: { title: 'System Context', kind: 'ARCHITECTURE_CONCERN' },
 	[REFERENCE_UNDERTAKING.multiTenancy]: {
 		title: 'Multi-Tenancy Architecture',
@@ -316,7 +320,16 @@ export function driveReferenceUndertaking(
 				name: def.name,
 				purpose: def.purpose,
 				rationale: def.rationale,
-				applicableObjectTypes: ['PROFESSIONAL_WORK_ARCHITECTURE'],
+				// THE SECOND CREATION SITE, AND THE ONE REG-F-024'S FIX MISSED. `seedFloorPolicies` was corrected to
+				// derive this from the object-type enum; THIS copy kept the narrow `['PROFESSIONAL_WORK_ARCHITECTURE']`
+				// for another commit, and `floor-declared-scope.test.ts` could not see it because that gate calls only
+				// `seedFloorPolicies`. So the gate written to stop the floor being scoped away from the work it governs
+				// asserted over one of the two places that scope is set — and on THIS path `satisfyFloor`'s subjects
+				// are EVIDENCE objects, exactly the case that produced the original step-#47 refusal.
+				//
+				// A gate that covers one of two writers is not a gate; it is the first writer's own test wearing the
+				// word "declared". Both sites derive now, and the gate drives both paths.
+				applicableObjectTypes: [...ProfessionalWorkObjectTypeSchema.options],
 				evaluatedClaimTypes: def.evaluatedClaimTypes,
 				criteria: def.criteria,
 				evaluatorRole: def.evaluatorRole,

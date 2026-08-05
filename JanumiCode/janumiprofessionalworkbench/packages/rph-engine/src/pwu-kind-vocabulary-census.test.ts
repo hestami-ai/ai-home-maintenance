@@ -91,13 +91,22 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		// Definition', 'Integrated Product Validation'), and only the UPPER_SNAKE `kind` had been shortened. So the
 		// migration was snake-casing the name each type already had — derived, with no judgement in it.
 		//
-		// ARCHITECTURE_CONCERN is the one left, and it is a different kind of thing: 'Architecture Concern' appears
-		// ZERO times in the ontology specification. The repository invented a generic child of Architecture
-		// Definition; the corpus defines a real one at §15, 'Architecture Decision' — *"a governed choice among
-		// materially different architectural alternatives"*. Those are related and NOT the same: a concern is an
-		// area of consideration, a decision is a choice among alternatives. Renaming would change what the seeded
-		// type MEANS, not how it is spelled, so it is left as an authoring question rather than folded into a
-		// mechanical migration. See REG-F-028.
+		// ARCHITECTURE_CONCERN is the one left, and what it is was CORRECTED 2026-08-05 after this comment claimed
+		// the opposite. It said: *"'Architecture Concern' appears ZERO times in the ontology specification. The
+		// repository invented a generic child of Architecture Definition"* — and proposed the corpus's §15
+		// 'Architecture Decision' as the real counterpart.
+		//
+		// THE MEASUREMENT WAS TRUE AND THE INFERENCE WAS FALSE. Zero hits in the ontology SPECIFICATION is a fact
+		// about one file. The CORPUS names this type repeatedly: the PWA Designer Reference Demonstration lists
+		// 'Custom Architecture Concern' among Architecture Definition's permitted children and defines the type
+		// with the inherited purpose *"Define a coherent architecture concern contributing to Architecture
+		// Definition."* — which `seed-workbench.ts` carries almost verbatim. The Field Service Management
+		// Reference Undertaking puts 'Architecture Concern' in its §32 trace. So the seeded type is TRANSCRIBED,
+		// and renaming it to 'Architecture Decision' would have replaced one corpus concept with a different one.
+		// Searching one document and concluding about the corpus is the absence-of-evidence error, committed here.
+		//
+		// WHAT IS GENUINELY ABSENT is a POLICY scoped to this kind — absent from the dataset AND the corpus. That
+		// is REG-F-029's blocking question, and it is an authoring decision, not a spelling one.
 		const cat = catalogKinds();
 		expect(seeded.filter((k) => !cat.includes(k))).toEqual(['ARCHITECTURE_CONCERN']);
 	});
