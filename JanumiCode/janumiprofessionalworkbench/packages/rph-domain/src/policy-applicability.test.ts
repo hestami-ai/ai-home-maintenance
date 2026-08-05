@@ -63,15 +63,55 @@ describe('policyApplicability (DOC-004 §5.1 / §5.2)', () => {
 	});
 
 	// ── WHAT IT REFUSES TO DECIDE ─────────────────────────────────────────────────────────────────────────────
-	it('an opaque expression yields REQUIRES_HUMAN_DETERMINATION even when every other field matches', () => {
+	it('an expression yields REQUIRES_HUMAN_DETERMINATION when NO EVALUATOR IS SUPPLIED', () => {
+		// CORRECTED 2026-08-05. This assertion used to be justified by "the corpus NAMES and DEFINES NOWHERE" the
+		// expression type. It does define it — DOC-007 §18 ratifies the eight-op grammar and item C-9 unifies
+		// `PolicyExpression` with it — and this repository has evaluated it since before the kernel was written.
+		// The outcome is unchanged; the REASON is now true. Without an evaluator this call genuinely cannot decide,
+		// and answering REQUIRED would report a policy applicable while a condition it carries goes unread.
 		expect(
 			policyApplicability(
 				{ objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'], expression: { some: 'condition' } },
 				PWU
-			),
-			'answering REQUIRED here would report a policy applicable on the strength of the conditions we happen ' +
-				'to understand, while a condition we do not understand goes unread. An unevaluable condition is not ' +
-				'an absent one'
+			)
+		).toBe('REQUIRES_HUMAN_DETERMINATION');
+	});
+
+	it('WITH an evaluator, the expression DECIDES — both ways', () => {
+		const rule = { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'], expression: { op: 'X' } };
+		expect(policyApplicability(rule, PWU, () => true)).toBe('REQUIRED');
+		expect(
+			policyApplicability(rule, PWU, () => false),
+			'an expression that does not hold means the policy does not govern this subject — that is the whole ' +
+				'point of scoping by one, and returning REQUIRED anyway would be the fail-open reading'
+		).toBe('NOT_APPLICABLE');
+	});
+
+	it('an expression can only NARROW — it never re-admits a subject the other conditions excluded', () => {
+		// Order matters: the expression is consulted last, after object type / kind / tags. An always-true
+		// expression must not rescue a subject whose kind the policy excludes, or scope would be decidable twice
+		// with the looser answer winning.
+		expect(
+			policyApplicability(
+				{ objectTypeConditions: ['PROFESSIONAL_WORK_ARCHITECTURE'], expression: { op: 'X' } },
+				PWU,
+				() => true
+			)
+		).toBe('NOT_APPLICABLE');
+	});
+
+	it('an evaluator that THROWS yields REQUIRES_HUMAN_DETERMINATION, not NOT_APPLICABLE', () => {
+		// A malformed or out-of-grammar expression is undecidable, not unsatisfied. Reporting NOT_APPLICABLE would
+		// be a decided negative derived from failing to understand the input — the exact confusion this kernel
+		// exists to prevent, and one already made once at its call site.
+		expect(
+			policyApplicability(
+				{ objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'], expression: { op: 'NONSENSE' } },
+				PWU,
+				() => {
+					throw new Error('unknown op');
+				}
+			)
 		).toBe('REQUIRES_HUMAN_DETERMINATION');
 	});
 

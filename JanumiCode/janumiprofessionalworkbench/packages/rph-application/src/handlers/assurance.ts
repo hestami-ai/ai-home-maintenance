@@ -7,6 +7,7 @@
 // called, not a copy of it. Validator-independence scoring still lives there uncalled; that is the next increment.
 import {
 	checkIndependence,
+	evaluateApplicability,
 	evidenceAdmissibility,
 	FLOOR_POLICY_IDS,
 	type Identity,
@@ -810,7 +811,10 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 				objectType: subject.objectType,
 				...(typeof subject.pwuKind === 'string' ? { pwuKind: subject.pwuKind } : {}),
 				...(Array.isArray(subject.tags) ? { tags: subject.tags as string[] } : {})
-			}
+			},
+			// The DOC-007 §18 evaluator, injected (rph-domain cannot import rph-assurance — cycle). Passing it is
+			// what makes an `expression` DECIDE rather than come back undecidable; see policyApplicability's note.
+			(expr, subj) => evaluateApplicability(expr as never, subj)
 		);
 		if (applicabilityPermitsAssessment(outcome)) return null;
 		return reject(

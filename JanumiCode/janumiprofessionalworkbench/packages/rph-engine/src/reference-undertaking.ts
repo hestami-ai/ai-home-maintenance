@@ -70,7 +70,7 @@
 // The controller lever itself is NOT the defect: ratified RPH-PWU-006's "When" is "the controller evaluates the
 // PWU". Its Given — "execution succeeded; required evidence is admitted; all mandatory assurance assessments are
 // satisfied" — is what was missing, and is what now holds.
-import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
+import { evaluateApplicability, FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import { applicabilityPermitsAssessment, policyApplicability } from '@janumipwb/rph-domain';
@@ -863,7 +863,10 @@ export function driveReferenceUndertaking(
 					objectType: 'PROFESSIONAL_WORK_UNIT',
 					...(pwu?.pwuKind ? { pwuKind: pwu.pwuKind } : {}),
 					...(pwu?.tags ? { tags: pwu.tags } : {})
-				}
+				},
+				// Same evaluator the handler injects — the point of "one answer computed once" is that both sides
+				// decide expressions the same way too, not merely the fields either happens to understand.
+				(expr, subj) => evaluateApplicability(expr as never, subj)
 			);
 			if (applicabilityPermitsAssessment(outcome)) return true;
 			excluded.push(`${pid}: ${outcome}`);

@@ -620,13 +620,29 @@ export interface ApplicabilityRuleView {
  * would be REG-F-022 one field over — an authored value that reaches an object nothing consults.
  *
  * ── WHAT IT REFUSES TO DECIDE, AND WHY THAT IS THE IMPORTANT PART ──────────────────────────────────────────
- * §5.1's `expression` is a `PolicyExpression`, a type the corpus NAMES and DEFINES NOWHERE. A rule carrying one
- * states a condition this kernel cannot evaluate. It returns **REQUIRES_HUMAN_DETERMINATION** — a §5.2 outcome,
- * not an invented one — rather than ignoring the expression and answering from the fields it does understand.
+ * A rule may carry an `expression`. Given no way to evaluate one, this kernel returns
+ * **REQUIRES_HUMAN_DETERMINATION** — a §5.2 outcome, not an invented one — rather than ignoring it and answering
+ * from the fields it does understand. Ignoring it would be the fail-open reading: a policy whose real condition
+ * is "applies only to externally delegated work" would be reported APPLICABLE to everything. An unevaluable
+ * condition is not an absent one.
  *
- * Ignoring it would be the fail-open reading: a policy whose real condition is "applies only to externally
- * delegated work" would be reported APPLICABLE to everything, and the assessment would proceed under a policy
- * that does not govern it. An unevaluable condition is not an absent one.
+ * ⚠ THE REASON THIS FILE GAVE FOR THAT WAS FALSE, AND IS CORRECTED HERE (2026-08-05, adversarial review).
+ * It read: *"§5.1's `expression` is a `PolicyExpression`, a type the corpus NAMES and DEFINES NOWHERE."* The
+ * corpus defines it. DOC-007 §18 ratifies the full **eight-op `ApplicabilityExpression` grammar**
+ * (ALL/ANY/NOT/EQUALS/IN/CONTAINS/EXISTS/RISK_AT_LEAST), ratified item **C-9** unifies the two names — *"the
+ * PolicyExpression grammar is unified with the ApplicabilityExpression op set (one DSL)"* — and this repository
+ * has implemented and unit-tested that evaluator since before this kernel was written
+ * (`rph-assurance/src/applicability.ts::evaluateApplicability`).
+ *
+ * I searched for the string `PolicyExpression`, found only references, and concluded the CONCEPT was undefined.
+ * Searching one name and concluding about the corpus is the absence-of-evidence error, and the refutation was
+ * sitting in the register this kernel's own finding was being written into.
+ *
+ * SO THE UNDECIDABLE OUTCOME IS NOW EARNED RATHER THAN ASSERTED. `evaluate` is INJECTED: the DSL evaluator lives
+ * in `rph-assurance`, which depends on this package, so importing it here would be a cycle the boundary check
+ * forbids. Callers that can see both packages supply it. With an evaluator, an expression is EVALUATED. Without
+ * one, the outcome is still REQUIRES_HUMAN_DETERMINATION — but that now states a true fact about THIS CALL ("no
+ * evaluator was supplied") instead of a false one about the corpus.
  *
  * `lifecycleTriggers`, `eventTriggers`, `riskConditions` and `semanticChangeConditions` are ACTIVATION conditions
  * (§5.3 — *when* a policy activates), not SCOPE conditions (*what* it governs). This kernel answers scope only,
@@ -635,7 +651,12 @@ export interface ApplicabilityRuleView {
  */
 export function policyApplicability(
 	rule: ApplicabilityRuleView | undefined,
-	subject: ApplicabilitySubject
+	subject: ApplicabilitySubject,
+	/**
+	 * Evaluates a DOC-007 §18 expression against the subject. Injected rather than imported — see the note above.
+	 * Omit it and an expression stays undecidable; supply it and the expression decides.
+	 */
+	evaluate?: (expression: unknown, subject: ApplicabilitySubject) => boolean
 ): ApplicabilityOutcomeValue {
 	// No rule at all: nothing scopes the policy, so nothing excludes this subject. Not the same as a rule that
 	// says "everything" — it is the absence of a scope, and the honest reading of absence here is permissive
@@ -658,19 +679,25 @@ export function policyApplicability(
 	const tags = subject.tags ?? [];
 	if ((rule.requiredTags ?? []).some((t) => !tags.includes(t))) return 'NOT_APPLICABLE';
 	if ((rule.excludedTags ?? []).some((t) => tags.includes(t))) return 'NOT_APPLICABLE';
-	// Everything this kernel CAN decide says the policy applies. If the rule also carries an expression, that
-	// verdict is provisional — see the note above.
-	if (rule.expression !== undefined) return 'REQUIRES_HUMAN_DETERMINATION';
+	// Everything this kernel CAN decide says the policy applies. An expression is the last word: it can only
+	// NARROW the verdict reached above, never widen it — a subject already excluded by object type or kind is not
+	// re-admitted by an expression that happens to hold.
+	if (rule.expression !== undefined) {
+		if (!evaluate) return 'REQUIRES_HUMAN_DETERMINATION'; // no evaluator supplied — see the note above
+		// A malformed or out-of-grammar expression must not read as "condition not met", which would be a DECIDED
+		// negative derived from not understanding the input. It is undecidable, and says so.
+		try {
+			return evaluate(rule.expression, subject) ? 'REQUIRED' : 'NOT_APPLICABLE';
+		} catch {
+			return 'REQUIRES_HUMAN_DETERMINATION';
+		}
+	}
 	return 'REQUIRED';
 }
 
 /** The §5.2 outcomes, as a local union so rph-domain stays free of a contracts import (pure kernel, string states). */
 export type ApplicabilityOutcomeValue =
-	| 'REQUIRED'
-	| 'RECOMMENDED'
-	| 'OPTIONAL'
-	| 'NOT_APPLICABLE'
-	| 'REQUIRES_HUMAN_DETERMINATION';
+	'REQUIRED' | 'RECOMMENDED' | 'OPTIONAL' | 'NOT_APPLICABLE' | 'REQUIRES_HUMAN_DETERMINATION';
 
 /** True when an outcome permits assessing the subject under the policy. Only NOT_APPLICABLE forbids it: a
  *  REQUIRES_HUMAN_DETERMINATION outcome means the machine cannot decide, and refusing on it would block work on

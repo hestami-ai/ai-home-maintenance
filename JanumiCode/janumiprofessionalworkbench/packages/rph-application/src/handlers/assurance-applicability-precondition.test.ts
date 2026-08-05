@@ -133,17 +133,49 @@ describe('RequestAssuranceAssessment enforces §5.1 applicability (REG-F-029)', 
 		expect(request('pol_unrestricted', 'asm_01ARZ3NDEKTSV4RRFFQ69G5N22').status).toBe('ACCEPTED');
 	});
 
-	it('PERMITS an undecidable condition, and says so — REQUIRES_HUMAN_DETERMINATION is not a refusal', () => {
-		// The contestable judgement, asserted rather than buried: §5.1's `expression` is a type the corpus names
-		// and defines nowhere. Refusing on it would block real work on a condition nobody can evaluate; treating it
-		// as applicable-without-comment would let the undecidable pass as decided. It is PERMITTED.
+	it('PERMITS an expression that is not in the grammar — undecidable is not a refusal', () => {
+		// The contestable judgement, asserted rather than buried. NOTE THE CORRECTED REASON (2026-08-05): this used
+		// to say §5.1's `expression` is "a type the corpus names and defines nowhere". The corpus DOES define it —
+		// DOC-007 §18's eight-op grammar, unified with `PolicyExpression` by ratified item C-9 — and the handler
+		// now injects the evaluator. What stays permitted is an expression OUTSIDE that grammar: it cannot be
+		// evaluated, and refusing on a condition nobody can evaluate would block real work.
 		seedPolicy(engine, 'pol_opaque', {
 			applicability: {
 				objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],
-				expression: { some: 'condition nothing can evaluate' }
+				expression: { some: 'condition outside the ratified grammar' }
 			}
 		});
 		expect(request('pol_opaque', 'asm_01ARZ3NDEKTSV4RRFFQ69G5N23').status).toBe('ACCEPTED');
+	});
+
+	it('a RATIFIED §18 expression now DECIDES at the handler — it refuses when the condition does not hold', () => {
+		// The capability the kernel had been declining to use. `EQUALS` is one of DOC-007 §18's eight ops, and
+		// `evaluateApplicability` has implemented it since before the kernel was written; the kernel returned
+		// REQUIRES_HUMAN_DETERMINATION anyway, on the false ground that the corpus defined no grammar. This is the
+		// predicted red for the fix: an expression scoping the policy to a kind this subject is not.
+		seedPolicy(engine, 'pol_expr_excludes', {
+			applicability: {
+				objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],
+				expression: { op: 'EQUALS', path: '$.pwuKind', value: 'INTEGRATED_PRODUCT_VALIDATION' }
+			}
+		});
+		const r = request('pol_expr_excludes', 'asm_01ARZ3NDEKTSV4RRFFQ69G5N25');
+		expect(
+			r.status,
+			'an expression that does not hold must refuse, not come back undecidable'
+		).not.toBe('ACCEPTED');
+		expect(JSON.stringify(r.error)).toContain('NOT_APPLICABLE');
+	});
+
+	it('CONTROL: the same expression ADMITS when it holds — the refusal is the expression, not its presence', () => {
+		seedPolicy(engine, 'pol_expr_admits', {
+			applicability: {
+				objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],
+				expression: { op: 'EQUALS', path: '$.pwuKind', value: 'ARCHITECTURE_DEFINITION' }
+			}
+		});
+		const r = request('pol_expr_admits', 'asm_01ARZ3NDEKTSV4RRFFQ69G5N26');
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 	});
 
 	it('DECLINES TO DECIDE about a subject that does not resolve — absence is not a decided negative', () => {
