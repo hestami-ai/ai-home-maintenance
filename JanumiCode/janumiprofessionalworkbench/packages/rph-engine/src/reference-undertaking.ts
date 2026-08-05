@@ -73,13 +73,26 @@
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
+import { applicabilityPermitsAssessment, policyApplicability } from '@janumipwb/rph-domain';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
 import type { EngineHandle } from './engine.js';
 
 const ACTOR: ActorReference = {
 	actorId: 'owner-1',
 	actorType: 'HUMAN',
-	displayName: 'Undertaking Owner'
+	displayName: 'Undertaking Owner',
+	// THE INVOCATION THIS PARTY ACTED IN (REG-F-029, second layer). `checkIndependence`'s `differs()` requires the
+	// compared field present on BOTH sides, so DIFFERENT_INVOCATION FAILS CLOSED when neither party records one —
+	// correctly: independence you cannot demonstrate is independence you do not have. That was invisible while the
+	// drive cited a single policy requiring DIFFERENT_AGENT. Selecting the policies that actually govern each PWU
+	// brought in `pol_intent_completeness` and `pol_assumption_disclosure`, both DIFFERENT_INVOCATION, and both
+	// reached INDEPENDENCE_VIOLATION — the WEAKER requirement refused where the STRONGER one passed, purely for
+	// want of the datum.
+	//
+	// This records a fact that was already true rather than asserting a new one: producing the work and assessing
+	// it are separate acts, issued as separate commands by separate parties. The seam maps
+	// `executionInstanceId` -> `invocationId`.
+	executionInstanceId: 'exec-production'
 };
 
 // The assurance EVALUATOR is a DISTINCT party from the work producer (ACTOR) — the whole point of independence
@@ -92,7 +105,10 @@ const ACTOR: ActorReference = {
 const EVALUATOR: ActorReference = {
 	actorId: 'evaluator-1',
 	actorType: 'HUMAN',
-	displayName: 'Independent Assurance Reviewer'
+	displayName: 'Independent Assurance Reviewer',
+	// DISTINCT from the producer's — see the note on ACTOR. Same value on both sides would satisfy nothing:
+	// `differs()` demands present-on-both AND different.
+	executionInstanceId: 'exec-assurance-review'
 };
 
 // The Reasoning Review floor (§8.4) is the AI-review floor: an AI produced the work, and a DIFFERENT model must
@@ -432,7 +448,16 @@ export function driveReferenceUndertaking(
 			constraintIds: [...(CONSTRAINTS_BY_PWU[pwuId] ?? [])],
 			assumptionIds: [],
 			expectedOutputs: [{ outputId: `out_${pwuId}`, kind: 'DOCUMENT' }],
-			assurancePolicyIds: [],
+			// WHICH POLICIES GOVERN THIS PWU DIRECTLY (REG-F-029). This shipped `[]` while `earnAssurance` assessed
+			// every PWU under one policy chosen elsewhere — so the object said "no policy governs me" and the drive
+			// assessed it anyway, which is the finding in miniature.
+			//
+			// On the SEEDED path the declaration comes from the PWU Type (`pwuTypeId` above → its
+			// `requiredAssurancePolicyIds`), so this stays empty and the type's list is the whole declaration.
+			// On the STANDALONE path there is no PWA and no type, so the drive's own policy is declared HERE rather
+			// than being a fallback inside the selector: a fallback cannot tell "declared nothing" from "declared
+			// this", and that distinction is the one this finding turned on.
+			assurancePolicyIds: opts.pwuTypeByKind?.[meta.kind] ? [] : [policyId],
 			riskProfile: {
 				consequence: 'HIGH',
 				uncertainty: 'MEDIUM',
@@ -792,6 +817,67 @@ export function driveReferenceUndertaking(
 	 *  Takes the claim and evidence the EXECUTION produced (Increment 28). It used to mint both itself — asserting
 	 *  a claim and conjuring "evidence" that no work had made, an artifact of nothing. Assurance does not
 	 *  manufacture its own evidence; it admits and assesses what execution actually produced. */
+	/**
+	 * WHICH POLICIES GOVERN THIS PWU — DECLARED ∩ DETERMINED (REG-F-029).
+	 *
+	 * `earnAssurance` used to cite ONE policy for every PWU, resolved once at the top of the drive. On the seeded
+	 * path that policy is the catalog's `pol_fitness_for_purpose`, scoped to three PWU kinds — and the eight PWUs
+	 * this drive assesses are of four OTHER kinds. The assessed population and the policy's scope were **perfectly
+	 * disjoint**: every assessment the canonical drive recorded cited a policy the catalog says does not govern
+	 * its subject.
+	 *
+	 * DECLARED is the same join §38's `buildApplicablePolicies` computes — the PWU's own `assurancePolicyIds` plus
+	 * its PWU Type's `requiredAssurancePolicyIds` — so the drive and the read model cannot give different answers
+	 * to "which policies apply here".
+	 *
+	 * DETERMINED runs the ratified §5.1 kernel, `policyApplicability`, over the policy objects ACTUALLY IN THE
+	 * STORE. That is the point: `requestAssuranceAssessment`'s precondition calls the same function on the same
+	 * data, so once it is enforced this drive passes **by construction rather than by coincidence**. It also drops
+	 * the ontology's own internal contradictions without anyone hand-editing them — `PRODUCT_REALIZATION` declares
+	 * `pol_baseline_promotion`, which scopes itself to `PRODUCT_BASELINE_PROMOTION`.
+	 *
+	 * FAILS LOUD ON AN EMPTY SELECTION. A PWU whose declaration survives nothing is a PWU nothing can assess, and
+	 * returning `[]` here would surface as a missing assessment three layers away — or, worse, as a PWU driven to
+	 * SATISFIED with no assessment backing it, which is the shape RPH-PWU-006 exists to forbid.
+	 */
+	const policiesGoverning = (pwuId: string): string[] => {
+		const pwu = handle.loadObject(pwuId)?.state as
+			| { pwuKind?: string; pwuTypeId?: string; assurancePolicyIds?: string[]; tags?: string[] }
+			| undefined;
+		const viaType = pwu?.pwuTypeId
+			? ((
+					handle.loadObject(pwu.pwuTypeId)?.state as
+						{ requiredAssurancePolicyIds?: string[] } | undefined
+				)?.requiredAssurancePolicyIds ?? [])
+			: [];
+		const declared = [...new Set([...(pwu?.assurancePolicyIds ?? []), ...viaType])];
+		const excluded: string[] = [];
+		const selected = declared.filter((pid) => {
+			const pol = handle.loadObject(pid)?.state as
+				{ status?: string; applicability?: unknown; applicableObjectTypes?: string[] } | undefined;
+			if (!pol) return excluded.push(`${pid}: not in the store`) && false;
+			if (pol.status !== 'ACTIVE') return excluded.push(`${pid}: ${String(pol.status)}`) && false;
+			const outcome = policyApplicability(
+				pol.applicability ?? { objectTypeConditions: pol.applicableObjectTypes },
+				{
+					objectType: 'PROFESSIONAL_WORK_UNIT',
+					...(pwu?.pwuKind ? { pwuKind: pwu.pwuKind } : {}),
+					...(pwu?.tags ? { tags: pwu.tags } : {})
+				}
+			);
+			if (applicabilityPermitsAssessment(outcome)) return true;
+			excluded.push(`${pid}: ${outcome}`);
+			return false;
+		});
+		if (selected.length === 0)
+			throw new Error(
+				`Reference Undertaking: no policy governs ${pwuId} (${String(pwu?.pwuKind)}). Declared ` +
+					`[${declared.join(', ') || 'nothing'}]; excluded [${excluded.join('; ') || 'n/a'}]. A PWU nothing ` +
+					`can assess cannot be driven to a disposition — RPH-PWU-006 requires an assessment behind it.`
+			);
+		return selected;
+	};
+
 	const earnAssurance = (
 		pwuId: string,
 		produced: { readonly claimId: string; readonly evidenceId: string },
@@ -802,7 +888,14 @@ export function driveReferenceUndertaking(
 	): string => {
 		const label = LABELS[pwuId]?.title ?? pwuId;
 		const { claimId, evidenceId } = produced;
-		const assessmentId = mintId('asm');
+		// EVERY policy that governs this PWU gets its own assessment, not just the first (REG-F-029). Citing one of
+		// four would leave the other three reading `assessed: false` in the §38 view on a PWU this drive calls
+		// SATISFIED — a required-but-unassessed gap, which is the same class of defect as the finding itself. The
+		// PRIMARY assessment (the first) is the one the evidence admission cites and the one returned to callers,
+		// because those reference a single assessment id; the rest are peers, not subordinates.
+		const governing = policiesGoverning(pwuId);
+		const assessmentIds = governing.map(() => mintId('asm'));
+		const assessmentId = assessmentIds[0]!;
 
 		// The evidence execution proposed is now ADMITTED. Admission is the ratified trigger for the assurance
 		// axis leaving EVIDENCE_REQUIRED, so the hop below is caused rather than asserted.
@@ -828,15 +921,18 @@ export function driveReferenceUndertaking(
 		// The ratified §30 sequence, through the one helper that knows it (REG-F-021 increment 4). This is the
 		// CANONICAL drive, so it names its evaluator: `selectAssuranceEvaluator` is what gives "who assessed" a
 		// governed home instead of letting it arrive inside the verdict.
-		driveAssessmentToAssessing(send, {
-			assessmentId,
-			assurancePolicyId: policyId,
-			policyVersion: '1.0.0',
-			subjectObjectIds: [pwuId],
-			subjectSemanticVersions: { [pwuId]: 1 },
-			claimIds: [claimId, ...extraClaimIds],
-			evaluator: EVALUATOR
-		});
+		for (const [i, pid] of governing.entries())
+			driveAssessmentToAssessing(send, {
+				assessmentId: assessmentIds[i]!,
+				assurancePolicyId: pid,
+				policyVersion: '1.0.0',
+				subjectObjectIds: [pwuId],
+				subjectSemanticVersions: { [pwuId]: 1 },
+				claimIds: [claimId, ...extraClaimIds],
+				evaluator: EVALUATOR
+			});
+		// The PWU's own assurance axis hops ONCE regardless of how many policies govern it — the axis records that
+		// this WORK is being assessed, not how many assessments are open against it.
 		chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
 			assessmentId
 		]);
@@ -855,31 +951,34 @@ export function driveReferenceUndertaking(
 
 		// 5. The VERDICT — a full DOC-007 §20 ValidatorResult naming what was judged, at which version, on which
 		//    evidence, and how it came out. The (d2) event gate validates the event this produces.
-		send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
-			validatorResult: {
-				validatorId: 'reference-undertaking.reviewer',
-				validatorVersion: '1',
-				policyId,
-				policyVersion: '1.0.0',
-				assessmentId,
-				subjectObjectIds: [pwuId],
-				subjectSemanticVersions: { [pwuId]: 1 },
-				claimResults: [],
-				evidenceConsideredIds: [evidenceId],
-				evidenceRejected: [],
-				observations: observations.map((o) => ({
-					severity: o.severity,
-					statement: o.statement,
-					subjectObjectIds: [pwuId]
-				})),
-				dispositionRecommendation: disposition,
-				recommendedControlActions: [],
-				residualUncertainty: observations.map((o) => o.statement),
-				limitations: [],
-				executionProvenance: { evaluator: EVALUATOR }
-			},
-			producer: ACTOR
-		});
+		//    ONE PER ASSESSMENT, each naming ITS OWN policy: a ValidatorResult whose `policyId` did not match the
+		//    assessment's would be a verdict attributed to criteria it was not measured against.
+		for (const [i, pid] of governing.entries())
+			send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentIds[i]!, {
+				validatorResult: {
+					validatorId: 'reference-undertaking.reviewer',
+					validatorVersion: '1',
+					policyId: pid,
+					policyVersion: '1.0.0',
+					assessmentId: assessmentIds[i]!,
+					subjectObjectIds: [pwuId],
+					subjectSemanticVersions: { [pwuId]: 1 },
+					claimResults: [],
+					evidenceConsideredIds: [evidenceId],
+					evidenceRejected: [],
+					observations: observations.map((o) => ({
+						severity: o.severity,
+						statement: o.statement,
+						subjectObjectIds: [pwuId]
+					})),
+					dispositionRecommendation: disposition,
+					recommendedControlActions: [],
+					residualUncertainty: observations.map((o) => o.statement),
+					limitations: [],
+					executionProvenance: { evaluator: EVALUATOR }
+				},
+				producer: ACTOR
+			});
 		return assessmentId;
 	};
 

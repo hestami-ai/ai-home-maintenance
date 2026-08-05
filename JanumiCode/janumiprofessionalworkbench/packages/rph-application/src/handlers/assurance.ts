@@ -12,7 +12,12 @@ import {
 	type Identity,
 	type IndependenceRequirement
 } from '@janumipwb/rph-assurance';
-import { classifyEvidenceInvalidation, TraceGraph } from '@janumipwb/rph-domain';
+import {
+	applicabilityPermitsAssessment,
+	classifyEvidenceInvalidation,
+	policyApplicability,
+	TraceGraph
+} from '@janumipwb/rph-domain';
 import type {
 	ActorReference,
 	AdmitEvidencePayload,
@@ -713,7 +718,12 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// (not yet activated), a SUSPENDED one (out of force), or a SUPERSEDED version (a new assessment pins the current
 	// version, §18). Two distinct rejections so the audit says which.
 	const policy = ctx.store.loadObject(p.assurancePolicyId)?.state as
-		| { status?: string; requiredEvidence?: Array<{ id?: string }>; applicability?: unknown }
+		| {
+				status?: string;
+				requiredEvidence?: Array<{ id?: string }>;
+				applicability?: unknown;
+				applicableObjectTypes?: string[];
+		  }
 		| undefined;
 	if (!policy) {
 		return reject(
@@ -760,24 +770,57 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// a placeholder awaiting one. The floor's declared scope is now derived from the object-type enum, and the 54
 	// refusals were a false declaration rather than a scope conflict.
 	//
-	// STILL NOT ENFORCED — THIRD TIME, THIRD REASON, AND THIS ONE IS NOT THE REPOSITORY CONTRADICTING ITSELF.
-	// Each run of this check has found a real, different defect, which is what an instrument is for:
-	//   #47, REG-F-024 — the floor declared a scope narrower than the one it enforced, justified by a
-	//                    "single-value applicableObjectTypes limitation" that does not exist in the schema. FIXED.
-	//   #56, REG-F-028 — the seeder's PWU kinds were abbreviations of the corpus names the catalog uses, so
-	//                    kind-scoped policies matched nothing. FIXED (five renames; one disclosed remainder).
-	//   now,  REG-F-029 — the canonical drive assesses EVERY PWU under `pol_fitness_for_purpose`, and the ratified
-	//                    catalog scopes that policy to three kinds. THREE of the drive's thirteen PWUs are
-	//                    governed by it; the rest are assessed under a policy the corpus says does not govern them.
+	// ── DOES THIS POLICY GOVERN THIS WORK AT ALL? (DOC-004 §5.1 / §5.2) — ENFORCED ────────────────────────────
+	// Written, run and withdrawn THREE times before it could land. Each run found a real and different defect,
+	// which is what the instrument was for; twice my account of the blocker was itself wrong:
+	//   #47 → REG-F-024. The floor declared a scope narrower than the one it enforced. The stated cause — a
+	//         "single-value applicableObjectTypes limitation … §16-unresolved" — does not exist in the schema; it
+	//         was a code comment taken as evidence of a contract constraint. FIXED (scope derived from the enum,
+	//         at BOTH creation sites; the first fix covered one and the gate could not see the other).
+	//   #56 → REG-F-028. The seeder's PWU kinds were abbreviations of the corpus names the catalog uses, so
+	//         kind-scoped policies matched nothing. FIXED (five renames, each snake-casing the name the type
+	//         already carried).
+	//   then → REG-F-029. The canonical drive cited ONE policy for every PWU. On the seeded path that is
+	//         `pol_fitness_for_purpose`, scoped to three kinds — and the eight PWUs the drive assesses are of four
+	//         OTHER kinds, so the assessed population and the scope were PERFECTLY DISJOINT. FIXED: the drive now
+	//         selects DECLARED ∩ DETERMINED per PWU and assesses the resulting SET.
 	//
-	// THAT ONE IS NOT A SPELLING OR A SCOPE MISTAKE — it is the fixture claiming governance the catalog does not
-	// grant, and the fix is for the drive to cite, per PWU, a policy that governs that PWU's kind (the seeded PWU
-	// Types already declare exactly that, in their `policies` field). Enforcing before then would refuse the
-	// canonical drive for asking a real question badly, which is the same trade as before: a green suite that had
-	// stopped assessing rather than one that had started checking.
+	// IT PASSES BY CONSTRUCTION, NOT BY COINCIDENCE. The drive runs `policyApplicability` over the same policy
+	// objects this handler reads, so "which policies govern this PWU" has one answer computed once. A drive that
+	// merely happened to agree would drift the first time either side moved.
 	//
-	// The kernel stays deferred with an instrument waiting — but note what the instrument has done. It has been
-	// wrong about its own diagnosis twice and right about there being something wrong three times out of three.
+	// IT REFUSES ONLY A DECIDED NEGATIVE. `applicabilityPermitsAssessment` admits every §5.2 outcome except
+	// NOT_APPLICABLE — including REQUIRES_HUMAN_DETERMINATION, which an unevaluable `expression` yields. Blocking
+	// on a condition nobody can evaluate would stop real work on the strength of not understanding it.
+	//
+	// AND AN UNRESOLVABLE SUBJECT IS NOT A NEGATIVE. The first version read
+	// `objectType: String(subj?.objectType ?? '')`, so a subject the store could not load became the empty string,
+	// matched no condition, and was reported NOT_APPLICABLE — a decided negative manufactured from having no
+	// information, at the call site of the kernel built to prevent exactly that. A subject that does not resolve
+	// is left to the checks that own it; this one declines to answer.
+	const applicabilityBlock = ((): CommandResult | null => {
+		const subjectId = p.subjectObjectIds?.[0];
+		if (!subjectId) return null;
+		const subject = ctx.store.loadObject(subjectId)?.state as
+			{ objectType?: unknown; pwuKind?: unknown; tags?: unknown } | undefined;
+		if (typeof subject?.objectType !== 'string') return null; // cannot decide; do not decide
+		const outcome = policyApplicability(
+			policy.applicability ?? { objectTypeConditions: policy.applicableObjectTypes },
+			{
+				objectType: subject.objectType,
+				...(typeof subject.pwuKind === 'string' ? { pwuKind: subject.pwuKind } : {}),
+				...(Array.isArray(subject.tags) ? { tags: subject.tags as string[] } : {})
+			}
+		);
+		if (applicabilityPermitsAssessment(outcome)) return null;
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RequestAssuranceAssessment: assurance policy ${p.assurancePolicyId} does not apply to ${subjectId} (a ${subject.objectType}${typeof subject.pwuKind === 'string' ? `, kind ${subject.pwuKind}` : ''}) — its DOC-004 §5.1 applicability rule yields ${outcome}. Assessing work a policy does not govern would record a verdict against criteria written for something else.`,
+			[p.assessmentId, p.assurancePolicyId, subjectId]
+		);
+	})();
+	if (applicabilityBlock) return applicabilityBlock;
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');

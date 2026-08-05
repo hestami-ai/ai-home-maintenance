@@ -70,27 +70,16 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	// Every one is called by a gate test and by no handler, which is the CORRECT state: a production call would
 	// mean the running engine consulting the conformance record about itself. They appear here because "dead in
 	// production" is exactly what they should be, and a census that omitted them would be hiding its own tools.
-	policyApplicability: {
-		kind: 'DEFERRED',
-		why:
-			'DOC-004 §5.1/§5.2 scope decision — does this policy govern this work? BUILT AND DELIBERATELY NOT WIRED ' +
-			'(2026-08-05). The precondition on RequestAssuranceAssessment was written, run, and withdrawn: it refused ' +
-			'54 drives, including the canonical reference undertaking at step #47, because seedFloorPolicies scopes ' +
-			'all three de minimis floor policies to PROFESSIONAL_WORK_ARCHITECTURE — a narrowing its own comment ' +
-			'discloses as "§16-unresolved; the plane-agnostic array is a later reconciliation". The floor is UNIVERSAL ' +
-			'by design (§8.4). Enforcing today would turn a disclosed limitation into a hard refusal and stop the floor ' +
-			'governing exactly the work it exists to govern — a green suite that had stopped assessing rather than ' +
-			'started checking. Waits on the §16 floor-scope reconciliation (REG-F-024), with its own tests so the ' +
-			'reconciliation has an instrument ready.'
-	},
-	applicabilityPermitsAssessment: {
-		kind: 'DEFERRED',
-		why:
-			'The companion predicate to policyApplicability: only NOT_APPLICABLE forbids assessing. Deferred with it, ' +
-			'and separate BECAUSE the decision it encodes is the contestable one — REQUIRES_HUMAN_DETERMINATION is ' +
-			'PERMITTED rather than refused, since refusing on an undecidable condition blocks real work while ignoring ' +
-			'it lets the undecidable pass as decided. That judgement should be reviewable on its own line.'
-	},
+	// policyApplicability + applicabilityPermitsAssessment WERE HERE, DEFERRED, and their rows are deleted
+	// 2026-08-05 because they acquired a production call site: `reference-undertaking.ts` selects each PWU's
+	// governing policies as DECLARED n DETERMINED, running the §5.1 kernel over the policy objects in the
+	// store (REG-F-029). This file's 'DECLARED DEAD BUT NOW CALLED' branch is what required the deletion —
+	// the good failure it exists to produce, and the one a prose list could never have raised.
+	//
+	// Their deferral note cited a blocker that turned out to be false (a "single-value applicableObjectTypes
+	// limitation … §16-unresolved" that does not exist in the schema — REG-F-024). Recorded here because the
+	// census carried that claim forward unexamined for as long as the row stood: a deferral reason is an
+	// assertion like any other, and nothing was checking this one.
 	classifyRefusal: {
 		kind: 'GATE_HELPER',
 		why: 'The enforcement register\'s verdict function (KILLED / ADMITTED / WRONG_CODE / MASKED). Called by the two observation suites. It is also the clearest case for counting CALLS rather than mentions: several production comments name it, so a mention census reports it live.'

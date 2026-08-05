@@ -123,7 +123,13 @@ export function seedFloorPolicies(engine: DispatchLike, now: string = SEED_TS): 
 export function seedPolicy(
 	engine: DispatchLike,
 	policyId: string,
-	opts: { independenceRequirement?: string; now?: string; requiredEvidence?: unknown[] } = {}
+	opts: {
+		independenceRequirement?: string;
+		now?: string;
+		requiredEvidence?: unknown[];
+		/** DOC-004 §5.1 scope. Absent = the wholesale default below, which applies to every PWU kind. */
+		applicability?: unknown;
+	} = {}
 ): void {
 	createAndActivate(
 		engine,
@@ -135,6 +141,7 @@ export function seedPolicy(
 			purpose: 'Assess the subject against its approved need.',
 			rationale: 'Seeded for a live command-drive test.',
 			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			...(opts.applicability ? { applicability: opts.applicability } : {}),
 			evaluatedClaimTypes: ['FITNESS'],
 			criteria: [
 				{
