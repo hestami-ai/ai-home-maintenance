@@ -125,8 +125,11 @@ describe("states unreachable from their machine's own initial state", () => {
 		).toEqual([]);
 	});
 
-	it('KNOWN DEFECT: an assessment can never be cancelled (REG-F-021 residual R-1)', () => {
-		expect(strandedFrom('AssuranceAssessment.state')).toEqual(['CANCELLED']);
+	// CLOSED 2026-08-05. DOC-004 §30's "Alternate transitions" declares SIX arrows; five were transcribed and
+	// `ANY ACTIVE → CANCELLED` was DROPPED, because a quantified from-state is not a row. Delivering its four arms
+	// (REQUESTED, EVIDENCE_PENDING, READY, ASSESSING) makes the machine whole.
+	it('the assessment machine is fully connected — cancellation is reachable', () => {
+		expect(strandedFrom('AssuranceAssessment.state')).toEqual([]);
 	});
 
 	it('every OTHER machine is fully connected from its initial state', () => {
@@ -173,12 +176,9 @@ describe('declared states no arrow can reach', () => {
 	// what has already been decided about it.
 	it('the unreachable set is exactly these, each for a stated reason', () => {
 		expect(unreachableStates().map(key)).toEqual([
-			// The ratified §30 machine declares CANCELLED **terminal** and gives it NO in-arrow. So an assessment can
-			// never be cancelled — REG-F-021's residual R-1 in its sharpest form: an assessment stalled in
-			// EVIDENCE_PENDING (its required evidence never arriving) has no exit at all, and the state that would
-			// close it is unreachable BY RATIFICATION, not by omission in this engine. Wiring it needs an arrow the
-			// corpus does not declare — an elicitation item, not an implementation task.
-			'AssuranceAssessment.state.CANCELLED',
+			// `AssuranceAssessment.state.CANCELLED` LEFT THIS LIST on 2026-08-05. It was recorded as needing "an
+			// arrow the corpus does not declare" — WRONG: §30's alternate-transitions block declares
+			// `ANY ACTIVE → CANCELLED` and the transcription dropped it. Delivered, not authored.
 			// `PWU.assuranceState.UNASSESSED` LEFT THIS LIST on 2026-08-05 — and it was never an orphan. It is the
 			// machine's real ENTRY POINT, which correctly has no in-arrow; what was wrong was that the machine
 			// named a different state as its start. An in-arrow check cannot tell those apart, which is why the
@@ -226,6 +226,6 @@ describe('declared states no arrow can reach', () => {
 			orphanTerminals.sort((a, b) => a.localeCompare(b)),
 			'a state declared TERMINAL with no arrow into it is an ending nothing can reach — the object it governs ' +
 				'can never finish that way, however the vocabulary reads'
-		).toEqual(['AssuranceAssessment.state.CANCELLED']);
+		).toEqual([]);
 	});
 });

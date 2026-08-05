@@ -26,6 +26,7 @@ import type {
 	ProposeEvidencePayload,
 	RecordAssuranceObservationPayload,
 	BeginAssuranceAssessmentPayload,
+	CancelAssuranceAssessmentPayload,
 	RequestAssuranceAssessmentPayload,
 	SelectAssuranceEvaluatorPayload,
 	SubmitEvidenceForAssessmentPayload,
@@ -1100,6 +1101,52 @@ export const beginAssuranceAssessment: CommandHandler = (ctx, command, payload) 
 			subjectObjectIds: next.subjectObjectIds,
 			subjectSemanticVersions: next.subjectSemanticVersions,
 			claimIds: next.claimIds
+		})
+	});
+};
+
+/**
+ * CancelAssuranceAssessment — close an assessment that will never reach a verdict.
+ *
+ * THE ARROW IS RATIFIED, THE NAME IS NOT. DOC-004 §30's "Alternate transitions" block declares
+ * `ANY ACTIVE → CANCELLED`; §32 names no cancel command and §31 no cancel event. Five of §30's six alternate
+ * arrows were transcribed into `m2-transitions.json` and this one was dropped, because its from-state is
+ * QUANTIFIED rather than literal — "ANY ACTIVE" is not a row. So CANCELLED sat declared, TERMINAL and reachable
+ * by nothing, which is why REG-F-021's residual R-1 existed: an assessment stalled in EVIDENCE_PENDING, its
+ * required evidence never arriving, could not be closed by any command in the system.
+ *
+ * ACTIVE means the four states before an outcome: REQUESTED, EVIDENCE_PENDING, READY, ASSESSING. A concluded
+ * assessment is not cancelled — post-outcome change is what INVALIDATED and WAIVER_EXPIRED are for, and §32's
+ * `invalidateAssuranceAssessment` invalidates a VERDICT, which a cancelled assessment never reached.
+ *
+ * AND IT IS NOT `INCONCLUSIVE`. That disposition means "we assessed and could not conclude". CANCELLED means "we
+ * never assessed". Recording a never-started assessment as a judgment that reached no conclusion is a stronger
+ * claim than the truth — the reason the two must stay distinct even though both close an assessment without a
+ * positive verdict.
+ */
+export const cancelAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
+	const p = payload as CancelAssuranceAssessmentPayload;
+	const loaded = loadOrReject(ctx, command, command.targetAggregateId);
+	if (!loaded.ok) return loaded.result;
+	// Captured BEFORE the transition: the terminal state records that the assessment was cancelled and not from
+	// where. An assessment abandoned in EVIDENCE_PENDING (evidence never arrived) and one abandoned in ASSESSING
+	// (the assessor withdrew) are different facts, and only the event will ever hold the difference.
+	const cancelledFromState = String(loaded.state.assessmentState);
+	return advanceStatus(ctx, command, {
+		objectType: ASSESSMENT,
+		statusField: 'assessmentState',
+		machine: 'AssuranceAssessment.state',
+		target: 'CANCELLED',
+		// The machine itself refuses a cancel from a concluded state — every ACTIVE state has the arrow and no
+		// other state does — so this precondition is the machine's own shape, not a second opinion about it.
+		precondition: fromStates('REQUESTED', 'EVIDENCE_PENDING', 'READY', 'ASSESSING'),
+		eventType: 'AssuranceAssessmentCancelled',
+		setLifecycleStatus: true,
+		eventPayload: (next) => ({
+			assessmentId: command.targetAggregateId,
+			assurancePolicyId: next.assurancePolicyId,
+			cancelledFromState,
+			reason: p.reason
 		})
 	});
 };

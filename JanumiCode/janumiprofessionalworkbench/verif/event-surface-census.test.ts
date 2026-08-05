@@ -59,7 +59,8 @@ const BOUND = new Set<string>([
  */
 const EMITTED_2026_08_04 = new Set([
 	'ArtifactRecorded', 'AssumptionDetected', 'AssumptionExpired', 'AssuranceAssessmentCompleted',
-	'AssuranceAssessmentEscalated', 'AssuranceAssessmentRequested', 'AssuranceAssessmentStarted',
+	'AssuranceAssessmentCancelled', 'AssuranceAssessmentEscalated', 'AssuranceAssessmentRequested',
+	'AssuranceAssessmentStarted',
 	'AssuranceEvaluatorSelected', 'AssuranceEvidenceReceived', 'AssuranceEvidenceRequired',
 	'AssuranceIndependenceViolated', 'AssuranceObservationRecorded', 'AssurancePolicyActivated',
 	'AssurancePolicyCreated', 'AssurancePolicyEdited', 'AssurancePolicySuperseded',
@@ -200,12 +201,13 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 		);
 		expect(
 			unwritten,
-			'EVIDENCE_PENDING and READY are now written — an assessment genuinely waits in them. REQUESTED is ' +
-				'CROSSED and not occupied: §30 puts the request and the requirement evaluation under one trigger, ' +
-				'so both events commit atomically and the assessment lands beyond it. That is faithful, not ' +
-				'unfinished — occupying REQUESTED would need a second dispatch the corpus does not name. If a ' +
-				'THIRD name appears here, a state stopped being reachable'
-		).toEqual(['REQUESTED']);
+			'ALL THREE are now written. EVIDENCE_PENDING and READY are landing states an assessment waits in. ' +
+				'REQUESTED joined them on 2026-08-05 not because it became a resting state — it is still CROSSED, ' +
+				'since §30 puts the request and the requirement evaluation under one trigger — but because ' +
+				'cancelAssuranceAssessment names it as a FROM-state of the §30 rule `ANY ACTIVE -> CANCELLED`. A state ' +
+				'the engine can cancel FROM is a state the engine writes about. If a name appears here again, a ' +
+				'state stopped being reachable'
+		).toEqual([]);
 		// CONTROL: the detector can still report a miss, so [] means "all found" and not "looked for nothing".
 		expect(handlers.includes("'NOT_A_REAL_STATE'")).toBe(false);
 		// And the state the collapse used to write directly is still written — by the command that owns it now.

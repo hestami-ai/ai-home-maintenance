@@ -123,7 +123,7 @@ export function seedFloorPolicies(engine: DispatchLike, now: string = SEED_TS): 
 export function seedPolicy(
 	engine: DispatchLike,
 	policyId: string,
-	opts: { independenceRequirement?: string; now?: string } = {}
+	opts: { independenceRequirement?: string; now?: string; requiredEvidence?: unknown[] } = {}
 ): void {
 	createAndActivate(
 		engine,
@@ -149,6 +149,10 @@ export function seedPolicy(
 				}
 			],
 			evaluatorRole: 'REVIEWER',
+			// Omitted → absent, not []: a policy that declares no required evidence and one that declares an empty
+			// list are the same to the engine, but the ABSENT form is what every real seeded policy carries, so a
+			// fixture that always sent [] would be testing a shape production never produces.
+			...(opts.requiredEvidence ? { requiredEvidence: opts.requiredEvidence } : {}),
 			independenceRequirement: opts.independenceRequirement ?? 'NONE',
 			findingDefinitions: [
 				{

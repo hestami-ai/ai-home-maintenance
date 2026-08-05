@@ -280,7 +280,16 @@ const STATE_CONDITIONAL_FIELDS: Readonly<
 > = {
 	ASSURANCE_ASSESSMENT: {
 		statusField: 'assessmentState',
-		exemptStates: ['REQUESTED', 'EVIDENCE_PENDING', 'READY'],
+		// CANCELLED joins the three pre-start states (REG-F-021 R-1, 2026-08-05) and the reason is the same one:
+		// DOC-004 §30's `ANY ACTIVE → CANCELLED` means an assessment can be cancelled BEFORE it begins, so a
+		// cancelled assessment may honestly have no `startedAt`. Without this the arrow is declared and
+		// unusable from exactly the state it was delivered for — an assessment stalled in EVIDENCE_PENDING
+		// could be cancelled by the machine and then refused by this invariant.
+		//
+		// FOUND BY THIS GUARD REFUSING THE INCREMENT THAT NEEDED IT, which is the exempt set doing its job
+		// rather than a hole in it: adding a terminal state reachable from a pre-start state is exactly the
+		// change that should have to come back here and say so.
+		exemptStates: ['REQUESTED', 'EVIDENCE_PENDING', 'READY', 'CANCELLED'],
 		required: ['startedAt']
 	}
 };

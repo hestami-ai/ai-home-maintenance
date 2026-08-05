@@ -1291,6 +1291,30 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 				trigger: 'expireAssuranceWaiver (WaiverExpired)',
 				guard:
 					'WaiverRule.maximumDuration / recorded expiration reached, OR revalidationTrigger fired, OR a new subject semantic version (waiver does not apply to future semantic versions unless explicitly renewed — §12.2, INV-14)'
+			},
+			{
+				from: 'REQUESTED',
+				to: 'CANCELLED',
+				trigger: 'cancelAssuranceAssessment (AssuranceAssessmentCancelled)',
+				guard: 'the assessment is ACTIVE — it has not reached a disposition'
+			},
+			{
+				from: 'EVIDENCE_PENDING',
+				to: 'CANCELLED',
+				trigger: 'cancelAssuranceAssessment (AssuranceAssessmentCancelled)',
+				guard: 'the assessment is ACTIVE — it has not reached a disposition'
+			},
+			{
+				from: 'READY',
+				to: 'CANCELLED',
+				trigger: 'cancelAssuranceAssessment (AssuranceAssessmentCancelled)',
+				guard: 'the assessment is ACTIVE — it has not reached a disposition'
+			},
+			{
+				from: 'ASSESSING',
+				to: 'CANCELLED',
+				trigger: 'cancelAssuranceAssessment (AssuranceAssessmentCancelled)',
+				guard: 'the assessment is ACTIVE — it has not reached a disposition'
 			}
 		],
 		illegal: [

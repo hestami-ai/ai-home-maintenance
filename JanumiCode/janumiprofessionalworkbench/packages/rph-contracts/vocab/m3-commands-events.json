@@ -2900,6 +2900,22 @@
 					"note": "when assessment actually began; absent = the engine's clock. This is the moment startedAt now records — increment 0 made the field optional on the object precisely so the pre-start states can honestly lack it"
 				}
 			]
+		},
+		{
+			"commandType": "CancelAssuranceAssessment",
+			"targetAggregateType": "ASSURANCE_ASSESSMENT",
+			"emitsEvent": "AssuranceAssessmentCancelled",
+			"drivesMachine": "AssuranceAssessment.state",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-05, delegated authoring grant; REG-F-021 residual R-1). THE ARROW IS RATIFIED AND THE NAME IS NOT: DOC-004 §30 declares `ANY ACTIVE → CANCELLED`, but §32 names no cancel command and §31 no cancel event — so the TRANSITION is delivered from the corpus while the command and event NAMES are authored. Stated this way round deliberately: it would be easy to present the whole thing as ratified because the arrow is, and easy to present it as invented because the names are. It is one of each.\n\nDistinct from §32's `invalidateAssuranceAssessment`, whose ratified arrows run SATISFIED / CONDITIONALLY_SATISFIED → INVALIDATED: that invalidates a VERDICT. A cancelled assessment never reached one. INCONCLUSIVE is also different — it means \"we assessed and could not conclude\"; CANCELLED means \"we never assessed\". Recording a never-started assessment as a judgment that reached no conclusion is a stronger claim than the truth.",
+			"payloadFields": [
+				{
+					"field": "reason",
+					"required": true,
+					"type": "string",
+					"note": "WHY the assessment is being abandoned. REQUIRED, unlike most authored rationales here: cancellation is the one act that closes an assessment WITHOUT a verdict, so the reason is the only account of it that will ever exist. An optional field here would let an assessment vanish with no record of why — which is the shape REG-F-021 recorded for TacticalChangeRequested."
+				}
+			]
 		}
 	],
 	"events": [
@@ -7003,6 +7019,36 @@
 					"note": "the policy's requirement this selection was made against, recorded at selection time so the check is auditable against what was in force THEN rather than what is in force now"
 				}
 			]
+		},
+		{
+			"eventType": "AssuranceAssessmentCancelled",
+			"aggregateType": "AssuranceAssessment",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-05, delegated authoring grant; REG-F-021 residual R-1). THE ARROW IS RATIFIED AND THE NAME IS NOT: DOC-004 §30 declares `ANY ACTIVE → CANCELLED`, but §32 names no cancel command and §31 no cancel event — so the TRANSITION is delivered from the corpus while the command and event NAMES are authored. Stated this way round deliberately: it would be easy to present the whole thing as ratified because the arrow is, and easy to present it as invented because the names are. It is one of each.\n\nDistinct from §32's `invalidateAssuranceAssessment`, whose ratified arrows run SATISFIED / CONDITIONALLY_SATISFIED → INVALIDATED: that invalidates a VERDICT. A cancelled assessment never reached one. INCONCLUSIVE is also different — it means \"we assessed and could not conclude\"; CANCELLED means \"we never assessed\". Recording a never-started assessment as a judgment that reached no conclusion is a stronger claim than the truth.",
+			"payloadFields": [
+				{
+					"field": "assessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "assurancePolicyId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "cancelledFromState",
+					"required": true,
+					"type": "string",
+					"note": "WHICH active state it was cancelled from. An assessment abandoned in EVIDENCE_PENDING (its evidence never arrived) and one abandoned in ASSESSING (the assessor withdrew) are different facts, and the terminal state records neither."
+				},
+				{
+					"field": "reason",
+					"required": true,
+					"type": "string"
+				}
+			]
 		}
 	],
 	"bindings": [
@@ -7522,6 +7568,14 @@
 			"from": "READY",
 			"to": "ASSESSING",
 			"note": "The second act of the READY -> ASSESSING arrow, and the one that moves it. AssuranceAssessmentStarted belongs HERE — requestAssuranceAssessment emitting it is REG-F-021 itself."
+		},
+		{
+			"commandType": "CancelAssuranceAssessment",
+			"eventType": "AssuranceAssessmentCancelled",
+			"machine": "AssuranceAssessment.state",
+			"from": "ASSESSING",
+			"to": "CANCELLED",
+			"note": "§30's `ANY ACTIVE → CANCELLED` has FOUR arms; the binding table holds one row per command and records the widest. The four arms are in m2-transitions.json."
 		}
 	],
 	"conflicts": [

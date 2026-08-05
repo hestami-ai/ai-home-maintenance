@@ -17,9 +17,11 @@ const withState = (assessmentState: string, extra: Record<string, unknown> = {})
 	...extra
 });
 
-/** The three states the ratified §30 machine occupies BEFORE the assessment begins. Named here from the enum's
- *  own order rather than retyped, so a rename cannot leave this file quietly testing a string nothing uses. */
-const PRE_START = ['REQUESTED', 'EVIDENCE_PENDING', 'READY'] as const;
+/** The states that legitimately carry no `startedAt`. */
+// CANCELLED joined these on 2026-08-05: §30's `ANY ACTIVE → CANCELLED` means an assessment can be cancelled
+// BEFORE it begins, so a cancelled assessment may honestly carry no `startedAt`. It is exempt for the same
+// reason the three pre-start states are, not as a loosening.
+const EXEMPT = ['REQUESTED', 'EVIDENCE_PENDING', 'READY', 'CANCELLED'] as const;
 
 describe('state-conditional field invariants (REG-F-021 increment 0)', () => {
 	it('REFUSES an ASSESSING assessment with no startedAt — the guarantee the schema relaxation handed over', () => {
@@ -34,9 +36,11 @@ describe('state-conditional field invariants (REG-F-021 increment 0)', () => {
 		// and nobody has to remember this file. The exempt set is the only hand-written list, and it is the one the
 		// production rule also names.
 		const terminal = AssuranceAssessmentStateSchema.options.filter(
-			(s) => !(PRE_START as readonly string[]).includes(s)
+			(s) => !(EXEMPT as readonly string[]).includes(s)
 		);
-		expect(terminal.length).toBeGreaterThanOrEqual(12); // CONTROL: the derivation found states to check
+		// 12 -> 11 when CANCELLED joined the exempt set. The CONTROL still earns its place: it is what stops the
+		// exempt set growing until `terminal` is empty and this test passes by having nothing left to check.
+		expect(terminal.length).toBeGreaterThanOrEqual(11);
 		const permitted = terminal.filter((s) => stateConditionalViolation(ASSESSMENT, withState(s)) === null);
 		expect(
 			permitted,
@@ -46,7 +50,7 @@ describe('state-conditional field invariants (REG-F-021 increment 0)', () => {
 	});
 
 	it('PERMITS the three pre-start states without startedAt — which is the entire point of the relaxation', () => {
-		const refused = PRE_START.filter((s) => stateConditionalViolation(ASSESSMENT, withState(s)) !== null);
+		const refused = EXEMPT.filter((s) => stateConditionalViolation(ASSESSMENT, withState(s)) !== null);
 		expect(
 			refused,
 			'a pre-start state that still demands startedAt would leave the §30 machine exactly as unbuildable as ' +

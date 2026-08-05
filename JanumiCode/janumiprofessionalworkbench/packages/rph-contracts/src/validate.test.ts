@@ -104,6 +104,10 @@ describe('validate', () => {
 		// (§31 names both). No delta from the AssuranceAssessmentRequested payload CORRECTION in the same increment —
 		// dropping `evaluator`/`disposition` and adding `assessmentId`/`subjectSemanticVersions` changes fields on an
 		// existing event, which carries no registry id of its own. (+4 → 327.)
-		expect(buildContractRegistry().ids()).toHaveLength(327);
+		// then +2 for REG-F-021 residual R-1: +1 command CancelAssuranceAssessment + +1 event
+		// AssuranceAssessmentCancelled. The ARROW they drive is ratified (DOC-004 §30 `ANY ACTIVE → CANCELLED`, one
+		// of six alternate transitions, the only one the transcription dropped because its from-state is quantified);
+		// the NAMES are authored, since §32 names no cancel command and §31 no cancel event. (+2 → 329.)
+		expect(buildContractRegistry().ids()).toHaveLength(329);
 	});
 });

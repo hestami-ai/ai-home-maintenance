@@ -685,6 +685,12 @@ export const BeginAssuranceAssessmentPayloadSchema = z.strictObject({
 	startedAt: z.string().optional()
 });
 export type BeginAssuranceAssessmentPayload = z.infer<typeof BeginAssuranceAssessmentPayloadSchema>;
+export const CancelAssuranceAssessmentPayloadSchema = z.strictObject({
+	reason: z.string()
+});
+export type CancelAssuranceAssessmentPayload = z.infer<
+	typeof CancelAssuranceAssessmentPayloadSchema
+>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1665,6 +1671,15 @@ export const AssuranceEvaluatorSelectedPayloadSchema = z.strictObject({
 export type AssuranceEvaluatorSelectedPayload = z.infer<
 	typeof AssuranceEvaluatorSelectedPayloadSchema
 >;
+export const AssuranceAssessmentCancelledPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	assurancePolicyId: z.string(),
+	cancelledFromState: z.string(),
+	reason: z.string()
+});
+export type AssuranceAssessmentCancelledPayload = z.infer<
+	typeof AssuranceAssessmentCancelledPayloadSchema
+>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2200,6 +2215,12 @@ export const COMMANDS = {
 		targetAggregateType: 'ASSURANCE_ASSESSMENT',
 		emitsEvent: 'AssuranceAssessmentStarted',
 		firstSlice: false
+	},
+	CancelAssuranceAssessment: {
+		payload: CancelAssuranceAssessmentPayloadSchema,
+		targetAggregateType: 'ASSURANCE_ASSESSMENT',
+		emitsEvent: 'AssuranceAssessmentCancelled',
+		firstSlice: false
 	}
 } as const;
 
@@ -2529,6 +2550,10 @@ export const EVENTS = {
 	},
 	AssuranceEvaluatorSelected: {
 		payload: AssuranceEvaluatorSelectedPayloadSchema,
+		aggregateType: 'AssuranceAssessment'
+	},
+	AssuranceAssessmentCancelled: {
+		payload: AssuranceAssessmentCancelledPayloadSchema,
 		aggregateType: 'AssuranceAssessment'
 	}
 } as const;
@@ -3032,5 +3057,12 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'AssuranceAssessment.state',
 		from: 'READY',
 		to: 'ASSESSING'
+	},
+	{
+		commandType: 'CancelAssuranceAssessment',
+		eventType: 'AssuranceAssessmentCancelled',
+		machine: 'AssuranceAssessment.state',
+		from: 'ASSESSING',
+		to: 'CANCELLED'
 	}
 ];
