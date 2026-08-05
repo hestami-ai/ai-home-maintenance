@@ -42,9 +42,10 @@ interface SeedChild {
 	note?: string;
 }
 
-/** The Product Realization PWA PWU Types (RPH-DOC-010 §7 work areas + a generic Architecture Concern type). The
- *  root permits the 7 canonical branches (each mandatory-exactly-one), Architecture Definition permits the generic
- *  Architecture Concern (conditional one-or-more), and a few types declare required assurance policies (§11.7.4). */
+/** The Product Realization PWA PWU Types (RPH-DOC-010 §7 work areas + the corpus's Architecture Concern type). The
+ *  root permits the 7 canonical branches (each mandatory-exactly-one), Architecture Definition permits the
+ *  Architecture Concern (conditional one-or-more), and each type's required assurance policies are DERIVED from the
+ *  ontology (§11.7.4) — see `policiesForKind` below. */
 const PWU_TYPES: ReadonlyArray<{
 	id: string;
 	kind: string;
@@ -52,7 +53,6 @@ const PWU_TYPES: ReadonlyArray<{
 	purpose: string;
 	root?: boolean;
 	children?: readonly SeedChild[];
-	policies?: readonly string[];
 }> = [
 	{
 		id: PT_ROOT,
@@ -68,15 +68,13 @@ const PWU_TYPES: ReadonlyArray<{
 			{ id: PT_IMPL, cardinality: 'M1' },
 			{ id: PT_VALIDATE, cardinality: 'M1' },
 			{ id: PT_PROMOTE, cardinality: 'M1' }
-		],
-		policies: ['pol_intent_preservation']
+		]
 	},
 	{
 		id: PT_INTENT,
 		kind: 'INTENT_AND_PRODUCT_DEFINITION',
 		name: 'Intent & Product Definition',
-		purpose: 'Originating intent, stakeholders, product boundary',
-		policies: ['pol_intent_fidelity', 'pol_intent_completeness', 'pol_assumption_disclosure']
+		purpose: 'Originating intent, stakeholders, product boundary'
 	},
 	{
 		id: PT_BEHAVIOR,
@@ -91,15 +89,13 @@ const PWU_TYPES: ReadonlyArray<{
 		purpose: 'A coherent technical structure realizing approved behavior',
 		children: [
 			{ id: PT_CONCERN, cardinality: 'C+', note: 'One per material architecture concern' }
-		],
-		policies: ['pol_architecture_coverage']
+		]
 	},
 	{
 		id: PT_PLAN,
 		kind: 'IMPLEMENTATION_PLANNING',
 		name: 'Implementation Planning',
-		purpose: 'Increments, decomposition, dependencies, test + migration planning',
-		policies: ['pol_decomposition_coverage']
+		purpose: 'Increments, decomposition, dependencies, test + migration planning'
 	},
 	{
 		id: PT_IMPL,
@@ -126,6 +122,32 @@ const PWU_TYPES: ReadonlyArray<{
 		purpose: 'A generic architecture concern contributing to Architecture Definition'
 	}
 ];
+
+/**
+ * The policies a PWU Type DECLARES, read from the ontology the engine was composed with (REG-F-029).
+ *
+ * These four lists used to be written by hand on `PWU_TYPES` — a THIRD copy of content the ontology already
+ * carries as `pwuTemplates[].defaultPolicyIds`, and it had drifted exactly the way a hand-maintained copy does:
+ * a strict SUBSET for three kinds, and ABSENT for five, so `PT_BEHAVIOR` and `PT_CONCERN` declared nothing at
+ * all. Any per-kind policy selection built on that copy would have inherited the gaps rather than closed them —
+ * which is what made this the first step of REG-F-029 rather than a tidy-up.
+ *
+ * The same move `seedAdditivePolicies` already made for `seedPolicies`: read the ontology, so the catalog is one
+ * thing. FAILS LOUD on a kind the ontology does not describe, because a silent `[]` here is precisely the shape
+ * that produces an unassessable PWU Type three layers downstream.
+ */
+function policiesForKind(handle: EngineHandle, pwuKind: string): string[] {
+	const template = handle.ontology.pwuTemplates.find(
+		(t) => (t as { pwuKind?: string }).pwuKind === pwuKind
+	) as { defaultPolicyIds?: readonly string[] } | undefined;
+	if (!template)
+		throw new Error(
+			`seedWorkbench: the ontology describes no PWU Type of kind "${pwuKind}", so its required assurance ` +
+				`policies cannot be derived. Add a pwuTemplates row for it (grounded in the corpus) rather than ` +
+				`letting the type ship declaring no policies — an unassessable type is invisible until §5.1 is enforced.`
+		);
+	return [...(template.defaultPolicyIds ?? [])];
+}
 
 // Each sender uses a UNIQUE key prefix so idempotency keys never collide across logical seed operations (a
 // collision would return a prior receipt as DUPLICATE and silently skip the command).
@@ -312,7 +334,7 @@ export function authorProductRealizationPwa(handle: EngineHandle): void {
 				cardinality: c.cardinality,
 				...(c.note ? { applicabilityNote: c.note } : {})
 			})),
-			requiredAssurancePolicyIds: [...(t.policies ?? [])]
+			requiredAssurancePolicyIds: policiesForKind(handle, t.kind)
 		});
 	}
 	send('SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {});

@@ -44,13 +44,18 @@ function catalogKinds(): string[] {
  * it by construction and could not have seen this divergence, which is a mismatch between what the seeder writes
  * and what the catalog expects to find.
  */
-function seededKinds(engine: EngineHandle): string[] {
+function pwuTypeIds(engine: EngineHandle): string[] {
 	const ids = new Set<string>();
 	for (const e of engine.readAllEvents())
 		if ((e as { aggregateType?: string }).aggregateType === 'PWU_TYPE')
 			ids.add((e as unknown as { aggregateId: string }).aggregateId);
+	return [...ids];
+}
+
+/** The kinds those types carry. */
+function seededKinds(engine: EngineHandle): string[] {
 	const out = new Set<string>();
-	for (const id of ids) {
+	for (const id of pwuTypeIds(engine)) {
 		const state = getObject(engine, id) as { pwuKind?: string } | undefined;
 		if (typeof state?.pwuKind === 'string') out.add(state.pwuKind);
 	}
@@ -60,6 +65,7 @@ function seededKinds(engine: EngineHandle): string[] {
 describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 	let engine: EngineHandle;
 	let seeded: string[];
+	let typeIds: string[];
 
 	beforeAll(() => {
 		let n = 0;
@@ -70,6 +76,7 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		});
 		seedWorkbench(engine);
 		seeded = seededKinds(engine);
+		typeIds = pwuTypeIds(engine);
 	});
 
 	it('CONTROL: both vocabularies are non-empty and read from their real sources', () => {
@@ -85,7 +92,7 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		).toBeGreaterThan(5);
 	});
 
-	it('exactly ONE seeded kind is outside the catalog vocabulary, and it is the repository’s own invention', () => {
+	it('NO seeded kind is outside the catalog vocabulary — every kind the workbench seeds can be governed', () => {
 		// SIX on 2026-08-05, then ONE the same day. The five that closed were ABBREVIATIONS of names the seeder
 		// already carried in full: every PWU Type's `name` was already the corpus's prose ('Architecture
 		// Definition', 'Integrated Product Validation'), and only the UPPER_SNAKE `kind` had been shortened. So the
@@ -105,10 +112,18 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		// and renaming it to 'Architecture Decision' would have replaced one corpus concept with a different one.
 		// Searching one document and concluding about the corpus is the absence-of-evidence error, committed here.
 		//
-		// WHAT IS GENUINELY ABSENT is a POLICY scoped to this kind — absent from the dataset AND the corpus. That
-		// is REG-F-029's blocking question, and it is an authoring decision, not a spelling one.
+		// WHAT WAS GENUINELY ABSENT was a POLICY scoped to this kind — absent from the dataset AND the corpus. That
+		// was REG-F-029's blocking question, and it is now AUTHORED and CLOSED: `pol_architecture_coverage` names
+		// ARCHITECTURE_CONCERN, derived from DOC-006 §32.2's ratified trace — *"Scheduling and Dispatch Architecture
+		// Concern → PRODUCES → Architecture Artifact → SUPPORTS → Architecture Coverage Claim → VERIFIED_BY →
+		// Architecture Assurance Assessment"* — where that policy is named "Architecture Coverage" and evaluates
+		// COVERAGE claims. The MEMBERSHIP is authored; the routing is read off the trace. Disclosed in full in the
+		// policy's own `sourceSection`, and 6 -> 1 -> 0 is the ratchet this file exists to hold.
 		const cat = catalogKinds();
-		expect(seeded.filter((k) => !cat.includes(k))).toEqual(['ARCHITECTURE_CONCERN']);
+		expect(
+			seeded.filter((k) => !cat.includes(k)),
+			'a seeded kind no catalog policy names is work the workbench creates and no policy can govern'
+		).toEqual([]);
 	});
 
 	it('every catalog kind that binds to nothing seeded is a type the workbench simply does not seed', () => {
@@ -141,6 +156,89 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		).toEqual([]);
 		// CONTROL: the map is a real lookup that can miss, so the empty list above is a judgement not a constant.
 		expect(MAPPED_PWU_KINDS).not.toContain('A_KIND_NOBODY_DEFINED');
+	});
+
+	it('every seeded PWU Type DECLARES at least one policy, and every declared policy APPLIES to it', () => {
+		// THE PRECONDITION'S PRECONDITION (REG-F-029). Once §5.1 is enforced at RequestAssuranceAssessment, a PWU
+		// whose type declares no applicable policy cannot be assessed at all — and the failure would surface as a
+		// refused dispatch deep in a drive, three layers from the empty list that caused it. This asserts the two
+		// halves at the source: DECLARED is non-empty, and DECLARED ⊆ APPLICABLE.
+		//
+		// Both sides are read from the ENGINE — the type objects the seeder actually wrote, and the policy objects
+		// actually in the store — never from PWU_TYPES or the ontology constants. Until today the declaration was a
+		// hand-written third copy on PWU_TYPES that was a strict subset of the ontology for three kinds and absent
+		// for five; a census reading that copy would have called it healthy.
+		// READ THE DELIVERED FORM, AND REFUSE TO SKIP. The first draft of this check read `pol.appliesToPwuKinds`
+		// off the stored object — an ONTOLOGY field name. The seeding delivers it as
+		// `applicability.pwuKindConditions`, so the lookup was `undefined` for every policy and the guard
+		// `if (kinds && ...)` made the whole second half silently inert. It PASSED, and it was measuring nothing:
+		// the blind reader again, inside a gate written to catch exactly this class, twenty minutes after writing
+		// it. An absent applicability is now a REPORTED problem rather than a skipped one.
+		const problems: string[] = [];
+		const inapplicable: string[] = [];
+		for (const id of typeIds) {
+			const t = getObject(engine, id) as
+				{ pwuKind?: string; name?: string; requiredAssurancePolicyIds?: string[] } | undefined;
+			if (!t?.pwuKind) continue;
+			const declared = t.requiredAssurancePolicyIds ?? [];
+			if (declared.length === 0) {
+				problems.push(`${t.name} (${t.pwuKind}) declares NO policy — nothing could assess it`);
+				continue;
+			}
+			let applicableToThisType = 0;
+			for (const pid of declared) {
+				const pol = getObject(engine, pid) as
+					{ applicability?: { pwuKindConditions?: string[] } } | undefined;
+				if (!pol) {
+					problems.push(`${t.name} declares ${pid}, which is not an object in the store`);
+					continue;
+				}
+				if (!pol.applicability) {
+					problems.push(
+						`${t.name} declares ${pid}, whose delivered object carries NO applicability — the §5.1 ` +
+							'determination would have nothing to read'
+					);
+					continue;
+				}
+				const kinds = pol.applicability.pwuKindConditions;
+				// Absent pwuKindConditions means UNRESTRICTED by kind (governance.ts), which IS applicable.
+				if (!kinds || kinds.includes(t.pwuKind)) applicableToThisType++;
+				else inapplicable.push(`${t.pwuKind} declares ${pid}, scoped to [${kinds.join(', ')}]`);
+			}
+			if (applicableToThisType === 0)
+				problems.push(
+					`${t.name} (${t.pwuKind}) declares ${declared.length} policy/policies and NONE applies to its ` +
+						'own kind — the intersection is empty, so once §5.1 is enforced nothing can assess it'
+				);
+		}
+		expect(
+			problems,
+			'each is a PWU Type the workbench seeds that no policy could assess once §5.1 is enforced'
+		).toEqual([]);
+
+		// DECLARED-BUT-INAPPLICABLE IS NOT A DEFECT OF THE SELECTOR — it is precisely what DECLARED n DETERMINED
+		// exists to drop, and the ontology carries four such pairs across its fourteen templates (one of them on a
+		// SEEDED kind). Pinned rather than asserted to zero: removing them edits the catalog's own authored scope
+		// lists, which is an authoring act on top of another, and the intersection makes them harmless meanwhile.
+		expect(
+			inapplicable.sort(),
+			'a declaration the policy itself refuses — visible, not fatal'
+		).toEqual([
+			'PRODUCT_REALIZATION declares pol_baseline_promotion, scoped to [PRODUCT_BASELINE_PROMOTION]'
+		]);
+	});
+
+	it('CONTROL: the check above reads real types with real declarations', () => {
+		// Zero types and zero declarations would also produce an empty problem list. This proves the population.
+		expect(typeIds.length, 'no PWU Types were read from the engine').toBeGreaterThan(5);
+		const declaredCounts = typeIds.map(
+			(id) =>
+				(
+					(getObject(engine, id) as { requiredAssurancePolicyIds?: string[] } | undefined)
+						?.requiredAssurancePolicyIds ?? []
+				).length
+		);
+		expect(Math.min(...declaredCounts), 'some type declares nothing').toBeGreaterThan(0);
 	});
 
 	it('the seeded root tree now speaks the corpus vocabulary, name for name', () => {
