@@ -259,6 +259,10 @@ export function recordFloorAssessment(engine: DispatchLike, args: RecordFloorArg
 		subjectSemanticVersions: { [args.subjectId]: args.subjectSemanticVersion },
 		claimIds: []
 	});
+	// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
+	// REQUESTED -> EVIDENCE_PENDING and lands in READY (no policy declares required evidence — REG-F-022 — so
+	// "all required evidence present" is vacuously true). The assessment must be BEGUN before it is assessed.
+	send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', args.assessmentId, {});
 	for (const f of args.openFindings ?? []) {
 		send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', f.observationId, {
 			assessmentId: args.assessmentId,

@@ -167,28 +167,46 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 		).toEqual(['AssuranceAssessmentRequested', 'ClarificationRequested', 'TacticalChangeRequested']);
 	});
 
-	// THE LIFECYCLE BEHIND THE MISSING EVENT, and it is why `AssuranceAssessmentRequested` is not a naming
-	// question. The ratified `AssuranceAssessment.state` machine (rph-domain `transitions.data.ts`) runs
-	// REQUESTED -> EVIDENCE_PENDING -> READY -> ASSESSING, each arrow with its own trigger and guard — including
-	// "all required evidence present and admissible per §6.2" on EVIDENCE_PENDING -> READY.
-	// `requestAssuranceAssessment` creates the assessment ALREADY IN `ASSESSING`, so three ratified states are
-	// never occupied and two of the three arrows are never taken. Pinned as a KNOWN GAP: the day a handler writes
-	// one of these, this reddens and the pin comes out.
-	it('three ratified assessment states are occupied by nothing — the collapse behind the missing event', () => {
+	// THE LIFECYCLE, NOW RUN (REG-F-021 increment 3) — and what is left is a real fact, not a leftover pin.
+	//
+	// This assertion used to read ['REQUESTED', 'EVIDENCE_PENDING', 'READY']: three ratified states of the
+	// AssuranceAssessment.state machine that NO production line ever wrote, while `requestAssuranceAssessment`
+	// created assessments already in ASSESSING. Two of them are now occupied — an assessment waits in
+	// EVIDENCE_PENDING while evidence it needs to be judged is outstanding, and rests in READY until
+	// `beginAssuranceAssessment` starts it.
+	//
+	// REQUESTED REMAINS UNOCCUPIED, AND THAT IS CORRECT RATHER THAN UNFINISHED. §30's REQUESTED -> EVIDENCE_PENDING
+	// trigger puts both acts under ONE trigger — "AssuranceAssessmentRequested; claims instantiated, evidence
+	// requirements evaluated, missing evidence requested (AssuranceEvidenceRequired)" — so the request CROSSES
+	// REQUESTED rather than resting in it, emitting both events in one atomic commit. The state is transited and
+	// recorded (the event exists, and the §26 trace's seq-31 expectation is met); it is not a place an assessment
+	// sits. Occupying it would require a second dispatch the corpus does not name.
+	//
+	// THE DETECTOR IS TEXTUAL, AND THAT LIMIT IS NOW LOAD-BEARING. It greps the handler for `assessmentState: '<S>'`
+	// literals. The handler assigns a computed `landingState`, so the literals it finds are the ternary's arms.
+	// That is enough to prove the states are REACHABLE in code, and NOT enough to prove an assessment ever holds
+	// one — which is why `assessment-ready-arrow.test.ts` and `assurance-independence.test.ts` assert the occupancy
+	// behaviourally, against a live engine. Recorded so nobody reads this file's green as the stronger claim.
+	it('the ratified assessment states the engine still never writes', () => {
 		const handlers = readFileSync(
 			`${REPO_ROOT}packages/rph-application/src/handlers/assurance.ts`,
 			'utf8'
 		);
-		const unoccupied = ['REQUESTED', 'EVIDENCE_PENDING', 'READY'].filter(
-			(s) => !handlers.includes(`assessmentState: '${s}'`)
+		const unwritten = ['REQUESTED', 'EVIDENCE_PENDING', 'READY'].filter(
+			(s) => !handlers.includes(`'${s}'`)
 		);
 		expect(
-			unoccupied,
-			'these are RATIFIED states of AssuranceAssessment.state. A state no handler ever writes is a ' +
-				'lifecycle the engine declares and does not run — remove a name from this list when it is built'
-		).toEqual(['REQUESTED', 'EVIDENCE_PENDING', 'READY']);
-		// CONTROL: the state the engine DOES write, so the detector is not simply failing to find anything.
-		expect(handlers).toContain("assessmentState: 'ASSESSING'");
+			unwritten,
+			'EVIDENCE_PENDING and READY are now written — an assessment genuinely waits in them. REQUESTED is ' +
+				'CROSSED and not occupied: §30 puts the request and the requirement evaluation under one trigger, ' +
+				'so both events commit atomically and the assessment lands beyond it. That is faithful, not ' +
+				'unfinished — occupying REQUESTED would need a second dispatch the corpus does not name. If a ' +
+				'THIRD name appears here, a state stopped being reachable'
+		).toEqual(['REQUESTED']);
+		// CONTROL: the detector can still report a miss, so [] means "all found" and not "looked for nothing".
+		expect(handlers.includes("'NOT_A_REAL_STATE'")).toBe(false);
+		// And the state the collapse used to write directly is still written — by the command that owns it now.
+		expect(handlers).toContain("target: 'ASSESSING'");
 	});
 
 	// The aspirational surface: declared payload contracts nothing binds and nothing produces. This number is

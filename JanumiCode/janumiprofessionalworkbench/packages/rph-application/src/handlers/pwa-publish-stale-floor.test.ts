@@ -123,6 +123,15 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 				assessmentId,
 				'ASSURANCE_ASSESSMENT'
 			);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			d(
+				SVC,
+				'BeginAssuranceAssessment',
+				{},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			);
 			expect(req.status, JSON.stringify(req.error)).toBe('ACCEPTED');
 			const done = d(
 				SVC,

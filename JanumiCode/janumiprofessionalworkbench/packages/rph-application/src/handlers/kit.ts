@@ -237,6 +237,23 @@ export interface CommitArgs {
 	readonly newSemanticVersion: number;
 	readonly nextState: Record<string, unknown>;
 	readonly event: DomainEvent;
+	/**
+	 * FURTHER events committed atomically after `event`, in order, with contiguous aggregateRevisions.
+	 *
+	 * WHY A COMMAND MAY NEED MORE THAN ONE. The ratified §30 `REQUESTED -> EVIDENCE_PENDING` arrow puts two acts
+	 * under a single trigger: *"AssuranceAssessmentRequested; claims instantiated, evidence requirements evaluated,
+	 * missing evidence requested (AssuranceEvidenceRequired)"*. One command, two governed facts, and the second is
+	 * not a detail of the first — it names the required evidence set, which is what §38 folds "missing evidence"
+	 * from. Collapsing them would lose the record of WHAT was required at request time.
+	 *
+	 * The storage layer always supported this (`CommitInput.events` is an array); only this helper wrapped a single
+	 * event, so no handler could express it. Extended rather than worked around, because the alternative — a second
+	 * dispatch — would make the requirement evaluation a separately-failable act, which the trigger says it is not.
+	 *
+	 * EVERY event still passes the (d2) event gate individually: a follow-on event is not a way to smuggle an
+	 * unvalidated payload in behind a valid one.
+	 */
+	readonly alsoEvents?: readonly DomainEvent[];
 }
 
 const SCHEMA_BY_TYPE = OBJECT_SCHEMAS as Record<string, { schema: ZodType } | undefined>;
@@ -354,9 +371,14 @@ export function commitState(
 	// exist. The blocker was an authored vocab entry binding MarkPwuReady to the generic PwuStateChanged, which
 	// contradicted the vocab's own transitions table and the corpus's own §26 worked trace. See pwu.ts
 	// markPwuReady. HARMONIZATION-LOG PART 3h.
-	const ratifiedEventPayload = RATIFIED_EVENT_PAYLOADS[args.event.eventType];
-	if (ratifiedEventPayload) {
-		const eventCheck = ratifiedEventPayload.safeParse(args.event.payload);
+	//
+	// LOOPS OVER EVERY EVENT, not just the first. `alsoEvents` lets ONE command commit several governed facts — the
+	// ratified §30 REQUESTED -> EVIDENCE_PENDING arrow is two acts under one trigger. A follow-on event must not
+	// become a way to smuggle an unvalidated payload in behind a valid one, so the gate applies to each in turn.
+	for (const evt of [args.event, ...(args.alsoEvents ?? [])]) {
+		const ratifiedEventPayload = RATIFIED_EVENT_PAYLOADS[evt.eventType];
+		if (!ratifiedEventPayload) continue;
+		const eventCheck = ratifiedEventPayload.safeParse(evt.payload);
 		if (!eventCheck.success) {
 			const detail = eventCheck.error.issues
 				.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
@@ -365,7 +387,7 @@ export function commitState(
 				correlationId: command.correlationId,
 				aggregateId: args.aggregateId,
 				commandType: command.commandType,
-				eventType: args.event.eventType,
+				eventType: evt.eventType,
 				detail
 			});
 			// The ratified code, not a new one. DOC-007 §25.1 fixes FIFTEEN canonical error codes; a 16th
@@ -377,7 +399,7 @@ export function commitState(
 			return reject(
 				command,
 				'RPH_VALIDATION_SCHEMA_FAILED',
-				`${command.commandType} would emit a ${args.event.eventType} event whose payload violates its ratified contract — refusing to write it to the governed stream. ${detail}`,
+				`${command.commandType} would emit a ${evt.eventType} event whose payload violates its ratified contract — refusing to write it to the governed stream. ${detail}`,
 				[args.aggregateId]
 			);
 		}
@@ -391,7 +413,7 @@ export function commitState(
 		newRevision: args.newRevision,
 		newSemanticVersion: args.newSemanticVersion,
 		currentState: args.nextState,
-		events: [args.event],
+		events: [args.event, ...(args.alsoEvents ?? [])],
 		receipt: {
 			commandId: command.commandId,
 			idempotencyKey: command.idempotencyKey,
@@ -488,6 +510,11 @@ export function createObject(
 		/** The event's ratified DOC-007 payload. Omitted → the raw command payload (the legacy pass-through, which
 		 *  for a schematized event is a different shape than the one DOC-007 ratifies). */
 		readonly eventPayload?: unknown;
+		/** FURTHER events this creation commits, in order — see `CommitArgs.alsoEvents`. A creating command may
+		 *  cross more than one arrow of its machine: the ratified §30 request evaluates evidence requirements in
+		 *  the same trigger that creates the assessment, and the required set it computes is a governed fact with
+		 *  its own event. Each gets the next contiguous aggregateRevision. */
+		readonly alsoEvents?: readonly { eventType: string; payload: unknown }[];
 	}
 ): CommandResult {
 	const event = makeEvent(ctx, command, {
@@ -497,14 +524,26 @@ export function createObject(
 		aggregateRevision: 0,
 		payload: args.eventPayload ?? command.payload
 	});
+	const alsoEvents = (args.alsoEvents ?? []).map((e, i) =>
+		makeEvent(ctx, command, {
+			eventType: e.eventType,
+			aggregateType: args.objectType,
+			aggregateId: args.aggregateId,
+			aggregateRevision: i + 1,
+			payload: e.payload
+		})
+	);
 	return commitState(ctx, command, {
 		objectType: args.objectType,
 		aggregateId: args.aggregateId,
 		expectedRevision: undefined,
-		newRevision: 0,
+		// The aggregate's revision after the commit is the LAST event's revision — otherwise a follow-on event
+		// would carry a revision the aggregate never reaches, and replay would reconstruct a gap.
+		newRevision: alsoEvents.length,
 		newSemanticVersion: 1,
 		nextState: args.state,
-		event
+		event,
+		alsoEvents
 	});
 }
 

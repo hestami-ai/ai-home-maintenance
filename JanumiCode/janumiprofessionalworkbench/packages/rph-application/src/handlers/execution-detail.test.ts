@@ -108,6 +108,14 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 				id,
 				'ASSURANCE_ASSESSMENT'
 			);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			dispatch(
+				'BeginAssuranceAssessment',
+				{},
+				id,
+				'ASSURANCE_ASSESSMENT'
+			);
 			dispatch(
 				'CompleteAssuranceAssessment',
 				{

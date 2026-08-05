@@ -304,6 +304,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			),
 			`request assessment ${assessmentId}`
 		);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			dispatch(
+				'BeginAssuranceAssessment',
+				{},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			);
 	};
 
 	/** A schema-valid §20 verdict. `over` mutates the validator result, which is where every ASR delta lives. */
@@ -469,6 +477,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			),
 			'request baseline assessment'
 		);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			dispatch(
+				'BeginAssuranceAssessment',
+				{},
+				asm,
+				'ASSURANCE_ASSESSMENT'
+			);
 		ok(completeAssessmentFor(asm, pol, pwu), 'complete baseline assessment');
 		ok(
 			dispatch(
@@ -779,6 +795,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 						),
 						'request assessment'
 					);
+						// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+						// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+						dispatch(
+							'BeginAssuranceAssessment',
+							{},
+							v.asmt,
+							'ASSURANCE_ASSESSMENT'
+						);
 					ok(
 						dispatch(
 							'CompleteAssuranceAssessment',
@@ -1206,6 +1230,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					),
 					'request assessment'
 				);
+					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+					dispatch(
+						'BeginAssuranceAssessment',
+						{},
+						ASSESS,
+						'ASSURANCE_ASSESSMENT'
+					);
 				ok(
 					dispatch(
 						'CompleteAssuranceAssessment',
@@ -1384,6 +1416,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					),
 					'request assessment'
 				);
+					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+					dispatch(
+						'BeginAssuranceAssessment',
+						{},
+						ASSESS,
+						'ASSURANCE_ASSESSMENT'
+					);
 				ok(
 					dispatch(
 						'CompleteAssuranceAssessment',
@@ -1671,6 +1711,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					),
 					'request assessment targeting v2'
 				);
+					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+					dispatch(
+						'BeginAssuranceAssessment',
+						{},
+						ASM,
+						'ASSURANCE_ASSESSMENT'
+					);
 				// … and the validator answers about version 1.
 				const admitted = completeAssessment(ASM, POL, { subjectSemanticVersions: { [PARENT]: 1 } });
 				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5C73', POL) };
@@ -1888,6 +1936,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					),
 					'request the rejecting assessment'
 				);
+					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+					dispatch(
+						'BeginAssuranceAssessment',
+						{},
+						ASM_REJ,
+						'ASSURANCE_ASSESSMENT'
+					);
 				ok(
 					completeAssessmentFor(ASM_REJ, POL_REJ, PWU7, {
 						dispositionRecommendation: 'REJECTED'
@@ -1916,6 +1972,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					),
 					'request the satisfying assessment'
 				);
+					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+					dispatch(
+						'BeginAssuranceAssessment',
+						{},
+						ASM_OK,
+						'ASSURANCE_ASSESSMENT'
+					);
 				ok(completeAssessmentFor(ASM_OK, POL_OK, PWU7), 'complete it SATISFIED');
 
 				// Execution genuinely succeeds against a live plan — `rejectUnbackedExecutionSuccess` demands it.

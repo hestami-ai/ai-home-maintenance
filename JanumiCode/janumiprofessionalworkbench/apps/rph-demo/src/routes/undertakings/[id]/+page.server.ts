@@ -899,6 +899,10 @@ export const actions: Actions = {
 					claimIds: []
 				}
 			],
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
+			// REQUESTED -> EVIDENCE_PENDING and lands in READY (this policy declares no required evidence, so
+			// "all required evidence present" is vacuously true). Begin it before completing it.
+			['BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {}],
 			[
 				'CompleteAssuranceAssessment',
 				'ASSURANCE_ASSESSMENT',

@@ -118,6 +118,11 @@ export function recordAssuranceRecordingPlan(
 			subjectSemanticVersions: { [plan.subjectId]: plan.subjectSemanticVersion },
 			claimIds: []
 		});
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment no longer creates the
+		// assessment in ASSESSING: it crosses REQUESTED -> EVIDENCE_PENDING and lands in READY, because no floor
+		// policy declares required evidence (REG-F-022) so "all required evidence present" is vacuously true. The
+		// assessment must therefore be BEGUN before observations are recorded against it or it is completed.
+		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
 		// Record each proposed observation while ASSESSING (observations require the assessment to exist).
 		a.observations.forEach((o) => {
 			const observationId = opts.newId('obs');

@@ -737,9 +737,52 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');
+	// WHICH requirements gate ASSESSING, and why it is not all of them. §6.1's `requiredForDispositions` says what
+	// a requirement is required FOR. 'ALL' means the assessment cannot be judged without it — that is a
+	// precondition of assessing, and it is what the §30 EVIDENCE_PENDING -> READY guard is about.
+	// 'SATISFIED_ONLY' / 'CONDITIONAL_OR_SATISFIED' mean the requirement gates a positive CONCLUSION, not the act
+	// of assessing: an assessor may examine the work and REJECT it without ever seeing evidence that only a
+	// SATISFIED verdict would need. Those stay with Gate A at completion.
+	//
+	// Reading the arrow as "all declared requirements" would collapse the two checks into one and make Gate A
+	// unreachable — you could never be ASSESSING with any requirement outstanding, so its refusal could never
+	// fire. Two guards that cannot both matter is one guard and a decoration.
+	const blockingEvidenceIds = (policy.requiredEvidence ?? [])
+		.filter((r) => (r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL')
+		.map((r) => r?.id)
+		.filter((id): id is string => typeof id === 'string');
+	//
+	// ── THE FLIP (REG-F-021 increment 3) ──────────────────────────────────────────────────────────────────────
+	// This handler used to create the assessment ALREADY IN `ASSESSING`, with `startedAt` stamped, emitting
+	// `AssuranceAssessmentStarted` — the event belonging to the LAST arrow of the §30 machine, fired at the FIRST
+	// arrow's moment. Three ratified states were occupied by nothing and two of three arrows were never taken.
+	//
+	// It now crosses the arrows the corpus declares, in one dispatch, because the trigger text says they belong to
+	// ONE act: "AssuranceAssessmentRequested; claims instantiated, evidence requirements evaluated, missing
+	// evidence requested (AssuranceEvidenceRequired)". Two governed facts, one trigger — so two events, committed
+	// atomically (kit's `alsoEvents`, each independently passing the event gate).
+	//
+	// WHERE IT LANDS DEPENDS ON A RULE, WRITTEN EXPLICITLY:
+	//   requiredEvidenceIds NON-EMPTY -> EVIDENCE_PENDING. Evidence is genuinely outstanding; the assessment waits,
+	//                                    and `submitEvidenceForAssessment` advances it when the last one arrives.
+	//   requiredEvidenceIds EMPTY     -> READY. "All required evidence present" is VACUOUSLY TRUE, so the machine
+	//                                    does not linger in a state whose exit condition is already met.
+	//
+	// THE EMPTY ARM IS A RULE, NOT AN ACCIDENT, and that distinction is the whole design. Today it is the ONLY arm
+	// that ever runs: no production path declares `requiredEvidence` on any policy (REG-F-022), so every assessment
+	// this product creates takes the vacuous route. Written as "advance when the required set is empty" it keeps
+	// working — and starts genuinely gating — the day REG-F-022 is fixed. Written as "advance unless something
+	// objects" it would pass for a reason nobody recorded, and fixing REG-F-022 would silently change the behaviour
+	// of every caller at once. The `AssuranceEvidenceRequired` event carries the set either way, so the audit log
+	// records a real sourced "none" rather than a silence.
+	const evidenceOutstanding = blockingEvidenceIds.length > 0;
+	const landingState = evidenceOutstanding ? 'EVIDENCE_PENDING' : 'READY';
+	// `startedAt` is NOT stamped here — the assessment has not started. Increment 0 made the field optional on the
+	// object for exactly this moment, and `beginAssuranceAssessment` is what fills it. The kit's state-conditional
+	// invariant enforces that it IS present from ASSESSING onward, so the guarantee did not lapse with the field.
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, ASSESSMENT, p.assessmentId, {
-			lifecycleStatus: 'ASSESSING',
+			lifecycleStatus: landingState,
 			sourceObjectIds: p.subjectObjectIds
 		}),
 		assurancePolicyId: p.assurancePolicyId,
@@ -751,8 +794,7 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 		evidenceConsideredIds: [],
 		rejectedEvidence: [],
 		observationIds: [],
-		startedAt: command.issuedAt,
-		assessmentState: 'ASSESSING',
+		assessmentState: landingState,
 		residualUncertainty: [],
 		recommendedControlActions: []
 	};
@@ -760,8 +802,30 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 		objectType: ASSESSMENT,
 		aggregateId: p.assessmentId,
 		state,
-		eventType: 'AssuranceAssessmentStarted',
-		eventPayload: { ...p, requiredEvidenceIds }
+		// THE REQUEST MOMENT, recorded at last. Its payload was corrected in increment 1: the authored shape
+		// REQUIRED `evaluator` and `disposition` — chosen two arrows later and produced at the very end — so no
+		// conformant emitter was possible, which is a large part of why nothing ever emitted it.
+		eventType: 'AssuranceAssessmentRequested',
+		eventPayload: {
+			assessmentId: p.assessmentId,
+			assurancePolicyId: p.assurancePolicyId,
+			policySemanticVersion: 1,
+			subjectObjectIds: p.subjectObjectIds,
+			subjectSemanticVersions: p.subjectSemanticVersions,
+			claimIds: p.claimIds
+		},
+		// THE REQUIREMENT EVALUATION, which §38 folds "missing evidence" from. Emitted even when the set is empty:
+		// an absent event would make "requires nothing" indistinguishable from "was never evaluated".
+		alsoEvents: [
+			{
+				eventType: 'AssuranceEvidenceRequired',
+				payload: {
+					assessmentId: p.assessmentId,
+					assurancePolicyId: p.assurancePolicyId,
+					requiredEvidenceIds
+				}
+			}
+		]
 	});
 };
 
@@ -804,15 +868,27 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 	const id = command.targetAggregateId; // the assessment aggregate
 	const loaded = loadOrReject(ctx, command, id);
 	if (!loaded.ok) return loaded.result;
-	// Evidence may only be submitted while the assessment is OPEN. requestAssuranceAssessment creates it in
-	// ASSESSING and completeAssuranceAssessment moves it to a terminal disposition; recording evidence against a
-	// completed assessment would silently shrink its "missing" set after the verdict was already reached.
+	// Evidence may only be submitted while the assessment is OPEN, and "open" now means the states in which
+	// evidence can still change the outcome. `completeAssuranceAssessment` moves the assessment to a terminal
+	// disposition; recording evidence against a completed one would silently shrink its "missing" set AFTER the
+	// verdict was already reached.
+	//
+	// WIDENED IN REG-F-021 INCREMENT 3, AND IT HAD TO BE. This guard read `!== 'ASSESSING'`, which was right while
+	// requestAssuranceAssessment created assessments directly in ASSESSING. Under the restored §30 machine evidence
+	// is submitted in EVIDENCE_PENDING — the state whose exit condition is "all required evidence present" — so the
+	// ratified trigger for the EVIDENCE_PENDING -> READY arrow was being REFUSED at the state the arrow starts
+	// from. The guard would have blocked the very transition it exists to serve.
+	//
+	// READY is included too: an evaluator may have been selected and the assessment not yet begun, and evidence
+	// arriving in that window is still evidence for a verdict not yet given. REQUESTED is NOT: the required set has
+	// not been evaluated there, so `satisfiesRequirementId` could not be checked against a declared requirement.
+	const OPEN_FOR_EVIDENCE = ['EVIDENCE_PENDING', 'READY', 'ASSESSING'];
 	const assessmentState = loaded.state.assessmentState;
-	if (assessmentState !== 'ASSESSING') {
+	if (typeof assessmentState !== 'string' || !OPEN_FOR_EVIDENCE.includes(assessmentState)) {
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
-			`SubmitEvidenceForAssessment: assessment ${id} is ${String(assessmentState)}, not ASSESSING — evidence may only be submitted while the assessment is open.`,
+			`SubmitEvidenceForAssessment: assessment ${id} is ${String(assessmentState)}, not one of [${OPEN_FOR_EVIDENCE.join(', ')}] — evidence may only be submitted while the assessment is open to it.`,
 			[id]
 		);
 	}
@@ -844,8 +920,40 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 	const dup = checkPrecondition(ctx, command, evidenceNotAlreadyReceived, loaded.state);
 	if (dup) return dup;
 	const newRevision = loaded.revision + 1;
-	// The assessment SNAPSHOT is unchanged beyond the envelope bump — the received-evidence fact lives on the EVENT.
-	const next = nextEnvelope(loaded.state, command, newRevision);
+	// ── THE EVIDENCE_PENDING -> READY ARROW (REG-F-021 increment 3) ────────────────────────────────────────────
+	// §30's guard is "all required evidence present and admissible per §6.2", and §32 names THIS command as the
+	// arrow's trigger. So the arrow is taken HERE, at the moment the last outstanding requirement is satisfied —
+	// required MINUS received, the same difference §38 folds "missing evidence" from and the same one Gate A
+	// recomputes at completion, so the view, this arrow, and the completion gate cannot disagree.
+	//
+	// The receipt for THIS submission is not yet in the event log (it is committed below), so it is added to the
+	// received set explicitly. Reading the log alone would leave the assessment one requirement short forever.
+	const receivedIds = new Set(
+		ctx.store
+			.readAggregateEvents(ASSESSMENT, id)
+			.filter((e) => e.eventType === 'AssuranceEvidenceReceived')
+			.map((e) => (e.payload as { satisfiesRequirementId?: string }).satisfiesRequirementId)
+			.filter((x): x is string => typeof x === 'string')
+	);
+	receivedIds.add(p.satisfiesRequirementId);
+	// Only the requirements that gate ASSESSING (requiredForDispositions === 'ALL') hold the arrow — see the
+	// request handler. A 'SATISFIED_ONLY' requirement outstanding does not keep an assessment out of ASSESSING; it
+	// keeps a SATISFIED verdict out, at Gate A.
+	const blocking = (policy?.requiredEvidence ?? [])
+		.filter((r) => (r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL')
+		.map((r) => r?.id)
+		.filter((x): x is string => typeof x === 'string');
+	const stillOutstanding = blocking.filter((r) => !receivedIds.has(r));
+	// Only from EVIDENCE_PENDING: submitting more evidence to an assessment already READY or ASSESSING records the
+	// receipt without moving anything, which is correct — the machine does not go backwards and does not re-enter a
+	// state it has left.
+	const advancesToReady = assessmentState === 'EVIDENCE_PENDING' && stillOutstanding.length === 0;
+	// The assessment SNAPSHOT is otherwise unchanged beyond the envelope bump — the received-evidence fact lives on
+	// the EVENT.
+	const next = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		...(advancesToReady ? { assessmentState: 'READY', lifecycleStatus: 'READY' } : {})
+	};
 	const event = makeEvent(ctx, command, {
 		eventType: 'AssuranceEvidenceReceived',
 		aggregateType: ASSESSMENT,

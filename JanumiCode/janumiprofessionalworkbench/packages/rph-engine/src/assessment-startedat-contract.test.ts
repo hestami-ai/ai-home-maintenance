@@ -86,27 +86,45 @@ describe('REG-F-021 increment 0: the assessment contract admits an assessment th
 		// If this reddens, every assertion below is measuring my fixture rather than the contract.
 		const parsed = AssuranceAssessmentSchema.safeParse(realAssessmentState());
 		expect(parsed.success, JSON.stringify((parsed as { error?: unknown }).error)).toBe(true);
-		// CONTROL's control: the state we captured actually carries the field under discussion.
-		expect(Object.keys(realAssessmentState())).toContain('startedAt');
+		// CONTROL's control: the state carries the OTHER fields, so "startedAt is absent" below is a real absence
+		// rather than an empty object that would make every assertion here vacuous.
+		const keys = Object.keys(realAssessmentState());
+		expect(keys).toContain('assessmentState');
+		expect(keys).toContain('assurancePolicyId');
 	});
 
-	it('an assessment WITHOUT startedAt is a valid domain object — the REQUESTED state is representable', () => {
-		const { startedAt: _dropped, ...withoutStartedAt } = realAssessmentState();
-		const parsed = AssuranceAssessmentSchema.safeParse(withoutStartedAt);
+	it('an assessment WITHOUT startedAt is a valid domain object — the pre-start states are representable', () => {
+		// This is now demonstrated by the ENGINE rather than by deleting a field: after increment 3 a freshly
+		// requested assessment genuinely has no startedAt, and it persists. Before increment 0 the schema REJECTED
+		// such a state, which is exactly what made the §30 machine unbuildable — an assessment that has not started
+		// could not be written at all, so every RequestAssuranceAssessment would have failed
+		// RPH_VALIDATION_SCHEMA_FAILED, the floor would have stopped recording, and PublishPwa would have stayed
+		// blocked.
+		const state = realAssessmentState();
+		expect(Object.keys(state)).not.toContain('startedAt');
+		const parsed = AssuranceAssessmentSchema.safeParse(state);
+		expect(parsed.success, JSON.stringify((parsed as { error?: unknown }).error)).toBe(true);
+	});
+
+	// The compensating half, and INCREMENT 3'S PROOF at the same time: the request no longer starts anything.
+	it('a freshly requested assessment is READY and has NOT started — the flip, and the relaxation it needed', () => {
+		const { engine } = engineWithAssessment();
+		const state = realAssessmentState() as { startedAt?: string; assessmentState?: string };
+		// Increment 3: requestAssuranceAssessment crosses REQUESTED -> EVIDENCE_PENDING and lands in READY,
+		// because no floor policy declares required evidence (REG-F-022) so the guard is vacuously true.
+		expect(state.assessmentState).toBe('READY');
 		expect(
-			parsed.success,
-			'BEFORE increment 0 this was FALSE, and that is precisely what made the restored §30 machine ' +
-				'unbuildable: an assessment created in REQUESTED has not started, so it cannot carry startedAt, so ' +
-				'kit.ts would refuse to persist it and every RequestAssuranceAssessment would fail ' +
-				'RPH_VALIDATION_SCHEMA_FAILED. ' +
-				JSON.stringify((parsed as { error?: unknown }).error)
-		).toBe(true);
+			state.startedAt,
+			'a READY assessment has NOT begun, so it must not claim a moment at which it did. This is exactly why ' +
+				'the field had to become optional BEFORE the machine could be restored: while it was required, an ' +
+				'assessment that had not started could not be persisted at all'
+		).toBeUndefined();
+		void engine;
 	});
 
-	// The compensating half. Optional at the schema; mandatory at the state that implies it.
-	it('an ASSESSING assessment without startedAt is REFUSED at the write seam — the guarantee moved, not lapsed', () => {
+	it('and once BEGUN it is ASSESSING and DOES carry startedAt — the guarantee moved, it did not lapse', () => {
 		const { engine, send } = engineWithAssessment();
-		const r = send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', ASSESSMENT, {
+		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', ASSESSMENT, {
 			assessmentId: ASSESSMENT,
 			assurancePolicyId: FLOOR_POLICY,
 			policyVersion: '1.0.0',
@@ -114,14 +132,14 @@ describe('REG-F-021 increment 0: the assessment contract admits an assessment th
 			subjectSemanticVersions: { [SUBJECT]: 1 },
 			claimIds: []
 		});
-		expect(r.status).toBe('ACCEPTED');
-		// The handler still stamps startedAt when it creates in ASSESSING, so the happy path is unchanged.
+		const r = send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', ASSESSMENT, {});
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		const state = getObject(engine, ASSESSMENT) as { startedAt?: string; assessmentState?: string };
 		expect(state.assessmentState).toBe('ASSESSING');
 		expect(
 			state.startedAt,
 			'an assessment that IS assessing must carry the moment it started — this is the guarantee the schema ' +
-				'relaxation handed to the invariant, and if it is absent the relaxation simply lost it'
+				'relaxation handed to the kit invariant, and if it is absent the relaxation simply lost it'
 		).toBeTruthy();
 	});
 });

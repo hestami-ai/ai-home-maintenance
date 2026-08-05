@@ -95,6 +95,14 @@ describe('Execution floor subject: the result, at its exact version — not the 
 				id,
 				'ASSURANCE_ASSESSMENT'
 			);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			d(
+				'BeginAssuranceAssessment',
+				{},
+				id,
+				'ASSURANCE_ASSESSMENT'
+			);
 			d(
 				'CompleteAssuranceAssessment',
 				{
@@ -248,6 +256,14 @@ describe('Execution floor subject: the result, at its exact version — not the 
 				subjectSemanticVersions: { [ART]: 1 },
 				claimIds: []
 			},
+			id,
+			'ASSURANCE_ASSESSMENT'
+		);
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+		// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+		d(
+			'BeginAssuranceAssessment',
+			{},
 			id,
 			'ASSURANCE_ASSESSMENT'
 		);

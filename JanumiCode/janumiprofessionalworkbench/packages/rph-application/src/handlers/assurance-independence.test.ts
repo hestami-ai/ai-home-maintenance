@@ -96,7 +96,12 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		}
 	}
 
-	/** Request an assessment (created directly in ASSESSING) against the policy. */
+	/** Request an assessment and drive it to ASSESSING against the policy.
+	 *
+	 *  REG-F-021 increment 3: the request no longer creates the assessment in ASSESSING. It crosses
+	 *  REQUESTED -> EVIDENCE_PENDING and lands in READY when the policy requires no evidence, so reaching ASSESSING
+	 *  now takes the §32 command DOC-004 names for it. Policies in THIS file that DO declare requiredEvidence land
+	 *  in EVIDENCE_PENDING instead and are driven separately by their own tests. */
 	function requestAssessment(assessmentId: string): void {
 		dispatchOk(
 			cmd('RequestAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {
@@ -108,6 +113,14 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 				claimIds: []
 			})
 		);
+		// BEGIN ONLY IF THE REQUEST REACHED READY. Where the policy declares required evidence the assessment lands
+		// in EVIDENCE_PENDING instead, and beginning it there is correctly REFUSED — those tests drive the evidence
+		// flow themselves. A helper that begins unconditionally would turn that refusal into a fixture failure and
+		// hide the very arm it is meant to exercise.
+		const landed = (store.loadObject(assessmentId)?.state as { assessmentState?: string })
+			?.assessmentState;
+		if (landed === 'READY')
+			dispatchOk(cmd('BeginAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {}));
 	}
 
 	/** A schema-valid §20 verdict recommending SATISFIED, evaluated by `evaluatorActorId`. */
@@ -160,6 +173,7 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
 		expect(store.loadObject('asm_01ARZ3NDEKTSV4RRFFQ69G5A00')).toBeUndefined();
 	});
+	// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
 
 	it('rejects RequestAssuranceAssessment against a DRAFT (created-but-not-activated) policy — a policy governs only while ACTIVE (DOC-002 §18)', () => {
 		createPolicy('NONE', { activate: false }); // regular policy, left DRAFT
@@ -197,6 +211,7 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			).status
 		).toBe('ACCEPTED');
 	});
+	// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
 
 	it('a DIFFERENT_AGENT policy where producer === evaluator drives ASSESSING -> INDEPENDENCE_VIOLATION', () => {
 		createPolicy('DIFFERENT_AGENT');
@@ -434,16 +449,24 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
 		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A20';
 		requestAssessment(A);
-		const startedEvt = store
+		// REG-F-021 increment 3: the required set moved to AssuranceEvidenceRequired — the event DOC-004 §31 says
+		// NAMES it. It rode AssuranceAssessmentStarted only because the fused request had no other event to put it
+		// on, and Started now belongs to `beginAssuranceAssessment` two arrows later.
+		const requiredEvt = store
 			.readAllEvents()
 			.find(
 				(e) =>
-					e.eventType === 'AssuranceAssessmentStarted' &&
+					e.eventType === 'AssuranceEvidenceRequired' &&
 					(e.payload as { assessmentId?: string }).assessmentId === A
 			);
 		expect(
-			(startedEvt!.payload as { requiredEvidenceIds?: string[] }).requiredEvidenceIds
+			(requiredEvt!.payload as { requiredEvidenceIds?: string[] }).requiredEvidenceIds
 		).toEqual(['EV-01', 'EV-02']);
+		// And the assessment WAITS: evidence is genuinely outstanding, so it is EVIDENCE_PENDING rather than READY.
+		// This is the non-vacuous arm of the guard — the one REG-F-022 keeps every shipped policy out of.
+		expect((store.loadObject(A)?.state as { assessmentState?: string })?.assessmentState).toBe(
+			'EVIDENCE_PENDING'
+		);
 	});
 
 	it('§32 submitEvidenceForAssessment emits AssuranceEvidenceReceived with the (evidence, requirement) binding', () => {
@@ -607,22 +630,39 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A50';
 		requestAssessment(A);
 
-		// SATISFIED with EV-01 unmet -> fail closed; the assessment stays ASSESSING.
+		// ── THE GUARD MOVED EARLIER (REG-F-021 increment 3), AND THAT IS THE POINT ────────────────────────────
+		// This test used to complete straight to SATISFIED with EV-01 unmet and watch Gate A refuse it at the
+		// VERDICT. Under the restored §30 machine the refusal happens two arrows sooner: EVIDENCE_PENDING -> READY
+		// requires ALL declared evidence, so an assessment with EV-01 outstanding cannot reach ASSESSING at all,
+		// and a verdict cannot even be offered. The evidence requirement stopped being a late veto on a conclusion
+		// and became a precondition of assessing — which is the ORDERING the collapse cost and the restoration buys.
+		expect(stateOf(A)?.assessmentState).toBe('EVIDENCE_PENDING');
 		const early = engine.dispatch(
 			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
 				validatorResult: verdict(A, 'reviewer-y')
 			})
 		);
 		expect(early.status).toBe('REJECTED');
-		expect(stateOf(A)?.assessmentState).toBe('ASSESSING');
+		expect(stateOf(A)?.assessmentState).toBe('EVIDENCE_PENDING');
+		// Beginning it is refused too — not because someone remembered to check, but because READY is where the
+		// begin arrow starts and the evidence guard is what stands between.
+		expect(
+			engine.dispatch(cmd('BeginAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {})).status
+		).toBe('REJECTED');
 
-		// Submit the required evidence, then the SATISFIED verdict stands.
+		// Submit the required evidence: the LAST outstanding requirement satisfied takes the arrow to READY.
 		dispatchOk(
 			cmd('SubmitEvidenceForAssessment', A, 'ASSURANCE_ASSESSMENT', {
 				evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5E01',
 				satisfiesRequirementId: 'EV-01'
 			})
 		);
+		expect(
+			stateOf(A)?.assessmentState,
+			'the EVIDENCE_PENDING -> READY arrow, by its ratified §32 trigger — required MINUS received is empty'
+		).toBe('READY');
+		dispatchOk(cmd('BeginAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {}));
+		expect(stateOf(A)?.assessmentState).toBe('ASSESSING');
 		dispatchOk(
 			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
 				validatorResult: verdict(A, 'reviewer-y')
@@ -630,15 +670,37 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		);
 		expect(stateOf(A)?.assessmentState).toBe('SATISFIED');
 
-		// A NEGATIVE disposition is NOT gated on evidence: rejecting BECAUSE evidence is insufficient is correct.
+		// GATE A IS NOW DEFENCE IN DEPTH, NOT THE ONLY GUARD, and it is worth saying which: reaching ASSESSING
+		// already implies every declared requirement was received, so Gate A's set is a SUBSET of the arrow's. It
+		// still earns its place against evidence invalidated between READY and the verdict — a window the arrow
+		// cannot see because it is evaluated once, on the way in.
+		// ── AN OPEN RESIDUAL, RECORDED RATHER THAN PAPERED OVER ──────────────────────────────────────────────
+		// Gate A deliberately does NOT gate negative dispositions: rejecting BECAUSE evidence is insufficient is the
+		// correct response, not a blocked one. But under the restored machine a negative disposition is unreachable
+		// for an assessment whose evidence never arrives — `completeAssuranceAssessment` requires ASSESSING, and
+		// EVIDENCE_PENDING's only ratified exit is getting the evidence. So an assessment that CANNOT gather what it
+		// requires has no way to be closed at all.
+		//
+		// That is a real gap in the restoration and it is asserted here as the engine's ACTUAL behaviour, not
+		// wished away: §30 declares CANCELLED and INVALIDATED states and §32 declares
+		// `invalidateAssuranceAssessment`, so the machinery to close a stalled assessment is NAMED by the corpus and
+		// not yet wired to this state. Writing an arrow here to make the test pass would be inventing a governance
+		// fact — exactly the disease this programme treats. Filed as a residual of REG-F-021.
 		const B = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A51';
 		requestAssessment(B);
-		dispatchOk(
+		expect(stateOf(B)?.assessmentState).toBe('EVIDENCE_PENDING');
+		const stalled = engine.dispatch(
 			cmd('CompleteAssuranceAssessment', B, 'ASSURANCE_ASSESSMENT', {
 				validatorResult: { ...verdict(B, 'reviewer-z'), dispositionRecommendation: 'REJECTED' }
 			})
 		);
-		expect(stateOf(B)?.assessmentState).toBe('REJECTED');
+		expect(
+			stalled.status,
+			'REG-F-021 RESIDUAL: an assessment stalled in EVIDENCE_PENDING cannot be closed by any command. When ' +
+				'that is wired (invalidateAssuranceAssessment / CANCELLED, both §32/§30 names), this assertion ' +
+				'reddens and is replaced by the real close — do not widen it'
+		).toBe('REJECTED');
+		expect(stateOf(B)?.assessmentState).toBe('EVIDENCE_PENDING');
 	});
 
 	it('§10.3 dispositionRules foreclosure (Gate C): SATISFIED is rejected while an observation of a forbidden severity is OPEN', () => {

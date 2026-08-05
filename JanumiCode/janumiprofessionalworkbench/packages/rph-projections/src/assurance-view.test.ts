@@ -334,15 +334,23 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		expect(a.controlActions).toEqual([]); // not recommended until completion
 	});
 
-	it('§38 "missing evidence" is the policy-declared required set (Started.requiredEvidenceIds); absent = sourced none', () => {
+	// REG-F-021 increment 3: the required set moved from AssuranceAssessmentStarted to AssuranceEvidenceRequired —
+	// the event DOC-004 §31 says NAMES it ("AssuranceEvidenceRequired names the required set ... so 'missing
+	// evidence' is their difference"). It rode Started only because the fused request had no other event to put it
+	// on. The row itself is now created by AssuranceAssessmentRequested.
+	it('§38 "missing evidence" is the policy-declared required set (AssuranceEvidenceRequired); absent = sourced none', () => {
 		const withReq = buildAssuranceView([
-			evt(1, 'AssuranceAssessmentStarted', {
+			evt(1, 'AssuranceAssessmentRequested', {
 				assessmentId: 'asm_me',
 				assurancePolicyId: 'pol_x',
 				policyVersion: '1.0.0',
 				subjectObjectIds: ['pwu_1'],
 				subjectSemanticVersions: { pwu_1: 1 },
-				claimIds: [],
+				claimIds: []
+			}),
+			evt(2, 'AssuranceEvidenceRequired', {
+				assessmentId: 'asm_me',
+				assurancePolicyId: 'pol_x',
 				requiredEvidenceIds: ['EV-01', 'EV-02']
 			})
 		]);
@@ -354,22 +362,29 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 	});
 
 	it('§38 "missing evidence" is required MINUS received: AssuranceEvidenceReceived drops the satisfied requirement', () => {
-		const req = (assessmentId: string, ids: string[]) =>
-			evt(1, 'AssuranceAssessmentStarted', {
+		// The request creates the row; the requirement evaluation names the set. Two events, one commit — which is
+		// how the engine emits them (kit's `alsoEvents`).
+		const req = (assessmentId: string, ids: string[]) => [
+			evt(1, 'AssuranceAssessmentRequested', {
 				assessmentId,
 				assurancePolicyId: 'pol_x',
 				policyVersion: '1.0.0',
 				subjectObjectIds: ['pwu_1'],
 				subjectSemanticVersions: { pwu_1: 1 },
-				claimIds: [],
+				claimIds: []
+			}),
+			evt(2, 'AssuranceEvidenceRequired', {
+				assessmentId,
+				assurancePolicyId: 'pol_x',
 				requiredEvidenceIds: ids
-			});
+			})
+		];
 		const received = (assessmentId: string, evidenceId: string, satisfiesRequirementId: string) =>
 			evt(2, 'AssuranceEvidenceReceived', { assessmentId, evidenceId, satisfiesRequirementId });
 
 		// One of three requirements satisfied -> the other two remain, in order.
 		const one = buildAssuranceView([
-			req('asm_r', ['EV-01', 'EV-02', 'EV-03']),
+			...req('asm_r', ['EV-01', 'EV-02', 'EV-03']),
 			received('asm_r', 'evd_1', 'EV-02')
 		]);
 		expect(one.assessments['asm_r']!.missingEvidence).toEqual(['EV-01', 'EV-03']);
@@ -377,7 +392,7 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		// Idempotent (same requirement twice) AND a submission naming a requirement the policy never declared both
 		// leave the set unchanged — no negative "missing", no spurious removal.
 		const robust = buildAssuranceView([
-			req('asm_r2', ['EV-01', 'EV-02']),
+			...req('asm_r2', ['EV-01', 'EV-02']),
 			received('asm_r2', 'e1', 'EV-02'),
 			received('asm_r2', 'e2', 'EV-02'),
 			received('asm_r2', 'e3', 'EV-NOT-REQUIRED')
@@ -385,7 +400,7 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		expect(robust.assessments['asm_r2']!.missingEvidence).toEqual(['EV-01']);
 
 		// Every requirement satisfied -> a real, sourced empty (none missing), not "unknown".
-		const all = buildAssuranceView([req('asm_r3', ['EV-01']), received('asm_r3', 'e1', 'EV-01')]);
+		const all = buildAssuranceView([...req('asm_r3', ['EV-01']), received('asm_r3', 'e1', 'EV-01')]);
 		expect(all.assessments['asm_r3']!.missingEvidence).toEqual([]);
 
 		// Received for an assessment that never started attaches to nothing — no crash, no phantom assessment.

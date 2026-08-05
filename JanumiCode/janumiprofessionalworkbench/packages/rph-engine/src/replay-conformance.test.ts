@@ -97,14 +97,18 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// 28 -> 23 in Increment 25 (claim/evidence/assessment/observation now fire for real). Three entries below
 		// are MODELING DRIFT rather than absence, and will not go away by writing more seed code — they need the
 		// vocab conflicts resolved:
-		//   AssuranceAssessmentRequested — requestAssuranceAssessment emits AssuranceAssessmentStarted (it fuses
-		//     request-and-begin; DOC-004 §32's separate `beginAssuranceAssessment` does not exist here).
+		//   AssuranceAssessmentRequested — RESOLVED 2026-08-04 (REG-F-021 increment 3) and REMOVED from this list.
+		//     It read "requestAssuranceAssessment emits AssuranceAssessmentStarted (it fuses request-and-begin;
+		//     DOC-004 §32's separate `beginAssuranceAssessment` does not exist here)". Both halves are now false:
+		//     the request emits AssuranceAssessmentRequested + AssuranceEvidenceRequired and lands the assessment in
+		//     EVIDENCE_PENDING or READY, and `beginAssuranceAssessment` exists and is what emits Started. So this
+		//     was never "modeling drift the vocab must resolve" — it was a lifecycle the engine skipped, and 14 -> 13
+		//     is that being built rather than re-described.
 		//   AssuranceAssessmentSatisfied / ...ConditionallySatisfied — completeAssuranceAssessment emits ONE
 		//     AssuranceAssessmentCompleted carrying the disposition, per DOC-007; DOC-002 names five outcome
 		//     events. The vocab's conflicts[] records the choice and says "pick one modeling" — it is unpicked.
 		expect(missing).toEqual([
 			'AssuranceAssessmentConditionallySatisfied',
-			'AssuranceAssessmentRequested',
 			'AssuranceAssessmentSatisfied',
 			'ClarificationRequested',
 			'ExecutionPlanRevised',
@@ -131,11 +135,16 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// This must only ever GROW. Still absent: the governance half — no decision proposes or takes effect, no
 		// baseline is created or promoted, and no assumption is ever detected. So the Architecture PWU still
 		// reaches BASELINED with no Baseline object, which ratified RPH-BAS-004 forbids.
+		// GREW 2026-08-04 (REG-F-021 increment 3): AssuranceAssessmentRequested now fires. The §26 trace expects it
+		// at seq 31 and the engine had never once produced it — partly because it was UNWIRED and partly because its
+		// authored payload REQUIRED `evaluator` and `disposition`, neither knowable at request time, so no conformant
+		// emitter was possible until that shape was corrected.
 		expect(emitted, 'this list must only grow — update the pin when it does').toEqual([
 			'AssumptionDetected',
 			'ClaimAsserted',
 			'EvidenceProposed',
 			'EvidenceAdmitted',
+			'AssuranceAssessmentRequested',
 			'AssuranceAssessmentStarted',
 			'AssuranceObservationRecorded',
 			'DecisionProposed',
@@ -179,6 +188,10 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// (RPH-FIX-005): the Multi-Tenancy Constraint, the Tenant Isolation Model artifact, and the claim asserted
 		// over it — and recording that FIRST EVER artifact is what exposed REG-F-020.
 		// An assurance system's event log SHOULD be dominated by assurance.
-		expect(actual).toHaveLength(260);
+		// +64 to 324 (REG-F-021 increment 3): every assessment now records the arrows it actually crosses instead of
+		// one fused Started — AssuranceAssessmentRequested + AssuranceEvidenceRequired at the request, and
+		// AssuranceAssessmentStarted at the begin. Three governed facts where there was one, across every assessment
+		// the drive records. The count rising is the lifecycle being run, not noise.
+		expect(actual).toHaveLength(324);
 	});
 });

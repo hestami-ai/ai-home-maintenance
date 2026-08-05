@@ -125,6 +125,9 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 				})
 			).status
 		).toBe('ACCEPTED');
+				// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+				// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+				expect(engine.dispatch(assess('BeginAssuranceAssessment', {})).status).toBe('ACCEPTED');
 		expect(
 			engine.dispatch(
 				assess('CompleteAssuranceAssessment', {
@@ -620,6 +623,9 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 				claimIds: []
 			})
 		);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			expect(engine.dispatch(assess('BeginAssuranceAssessment', {})).status).toBe('ACCEPTED');
 		engine.dispatch(
 			assess('CompleteAssuranceAssessment', {
 				validatorResult: {

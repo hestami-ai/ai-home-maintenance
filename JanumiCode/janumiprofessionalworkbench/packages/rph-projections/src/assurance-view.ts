@@ -142,7 +142,16 @@ function withAssessment(
 	return { assessments: { ...view.assessments, [id]: assessment } };
 }
 
-function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
+/**
+ * The assessment ROW is created at the REQUEST (REG-F-021 increment 3), not at the start.
+ *
+ * It used to be created by `AssuranceAssessmentStarted`, because `requestAssuranceAssessment` fused
+ * request-and-begin and emitted that event at request time. Under the restored §30 machine the request emits
+ * `AssuranceAssessmentRequested` and lands the assessment in EVIDENCE_PENDING or READY — so a view keyed on
+ * Started would show NOTHING for every assessment that has been requested and not yet begun, which is precisely
+ * the interval the restoration exists to make visible.
+ */
+function foldRequested(view: AssuranceView, p: Payload, landingState: string): AssuranceView {
 	const assessmentId = str(p.assessmentId);
 	const policyId = str(p.assurancePolicyId);
 	if (!assessmentId || !policyId) return view;
@@ -151,19 +160,50 @@ function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
 		policyId,
 		policyVersion: str(p.policyVersion) ?? '',
 		subjectObjectIds: strArr(p.subjectObjectIds),
-		assessmentState: 'ASSESSING',
+		assessmentState: landingState,
 		evidenceConsideredIds: [],
 		observations: [],
 		openConditions: [],
 		waivers: [],
 		invalidations: [],
-		// §38 "claims evaluated" rides the Started event; "control actions" are recommended only at completion.
+		// §38 "claims evaluated" rides the request; "control actions" are recommended only at completion.
 		claimsEvaluated: strArr(p.claimIds),
 		controlActions: [],
-		// §38 "missing evidence": the policy's required-evidence-requirement ids, resolved onto the Started event. It
-		// is the full required set until §32 submitEvidenceForAssessment tracks per-requirement satisfaction.
+		// Filled by AssuranceEvidenceRequired, which is the event §31 says NAMES the required set. Empty here means
+		// "not yet evaluated", and the very next event in the same commit says what it is.
+		missingEvidence: []
+	});
+}
+
+/**
+ * §38 "missing evidence" — sourced from the event whose whole purpose is to name the required set.
+ *
+ * §31: *"`AssuranceEvidenceRequired` names the required set and `AssuranceEvidenceReceived` / `EvidenceAdmitted`
+ * name the satisfied set, so 'missing evidence' is their difference."* It used to ride
+ * `AssuranceAssessmentStarted.requiredEvidenceIds` because that was the only event the request emitted. Now the
+ * corpus's own answer is available, so the fold reads it.
+ */
+function foldEvidenceRequired(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	if (!assessmentId) return view;
+	const existing = view.assessments[assessmentId];
+	if (!existing) return view;
+	return withAssessment(view, assessmentId, {
+		...existing,
 		missingEvidence: strArr(p.requiredEvidenceIds)
 	});
+}
+
+/** The READY -> ASSESSING arrow. The row already exists (created at the request); this records that it BEGAN. */
+function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	if (!assessmentId) return view;
+	const existing = view.assessments[assessmentId];
+	// An assessment begun without a recorded request should still appear rather than vanish — a replay of an older
+	// stream (fused request-and-begin) has no Requested event, and dropping it would silently shrink the view.
+	if (!existing)
+		return foldRequested(view, p, 'ASSESSING');
+	return withAssessment(view, assessmentId, { ...existing, assessmentState: 'ASSESSING' });
 }
 
 function foldObservation(view: AssuranceView, p: Payload): AssuranceView {
@@ -327,6 +367,12 @@ function foldInvalidation(
 export function applyAssuranceEvent(view: AssuranceView, event: DomainEvent): AssuranceView {
 	const p = (event.payload ?? {}) as Payload;
 	switch (event.eventType) {
+		case 'AssuranceAssessmentRequested':
+			// EVIDENCE_PENDING is the landing state whenever evidence is genuinely required; the AssuranceEvidenceRequired
+			// event committed alongside this one carries the set, and submitEvidenceForAssessment moves it to READY.
+			return foldRequested(view, p, 'EVIDENCE_PENDING');
+		case 'AssuranceEvidenceRequired':
+			return foldEvidenceRequired(view, p);
 		case 'AssuranceAssessmentStarted':
 			return foldStarted(view, p);
 		case 'AssuranceObservationRecorded':

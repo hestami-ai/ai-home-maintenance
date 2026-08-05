@@ -210,7 +210,9 @@ describe('REG-F-021 increment 2: the READY -> ASSESSING arrow', () => {
 	});
 
 	it('SelectAssuranceEvaluator is REFUSED unless the assessment is READY', () => {
-		// The assessment is ASSESSING as created. Selecting an evaluator now would change the assessor mid-judgment.
+		// Drive past READY: selecting an evaluator for an assessment already ASSESSING would change the assessor
+		// mid-judgment.
+		expect(dispatch('BeginAssuranceAssessment', {}).status).toBe('ACCEPTED');
 		expect(stateOf().assessmentState).toBe('ASSESSING');
 		const r = dispatch('SelectAssuranceEvaluator', { evaluator: REVIEWER });
 		expect(r.status).not.toBe('ACCEPTED');
@@ -240,6 +242,7 @@ describe('REG-F-021 increment 2: the READY -> ASSESSING arrow', () => {
 	});
 
 	it('BeginAssuranceAssessment is REFUSED from ASSESSING — an assessment cannot begin twice', () => {
+		expect(dispatch('BeginAssuranceAssessment', {}).status).toBe('ACCEPTED');
 		expect(stateOf().assessmentState).toBe('ASSESSING');
 		const before = stateOf().startedAt;
 		const r = dispatch('BeginAssuranceAssessment', { startedAt: LATER });
@@ -247,23 +250,28 @@ describe('REG-F-021 increment 2: the READY -> ASSESSING arrow', () => {
 		expect(stateOf().startedAt, 'a refused begin must not re-stamp the start').toBe(before);
 	});
 
-	// ── THE INTERVAL, PINNED ──────────────────────────────────────────────────────────────────────────────────
-	it('AssuranceAssessmentStarted still has TWO emitters until increment 3 — recorded, not hidden', () => {
-		// The request emits it (wrongly — that IS REG-F-021: the last arrow's event at the first arrow's moment).
+	// ── THE OVERLAP, CLOSED (increment 3) ─────────────────────────────────────────────────────────────────────
+	it('AssuranceAssessmentStarted now has exactly ONE emitter — the command it belongs to', () => {
+		// WRITTEN IN INCREMENT 2 AS A DELIBERATE RED FOR INCREMENT 3. It asserted TWO AssuranceAssessmentStarted
+		// events on one aggregate — the fused request (wrongly) and the real begin (rightly) — and said it "must go
+		// red in increment 3". It did. This is what replaces it.
+		//
+		// WHY IT EXISTS AT ALL: the event-surface census compares its three surfaces as SETS, so an event bound to
+		// the right command and FIRED BY THE WRONG ONE looks identical to a correct one. Only a per-aggregate count
+		// can see the difference, which is why this assertion is here and not there.
+		expect(
+			eventsOf().filter((e) => e === 'AssuranceAssessmentStarted'),
+			'the REQUEST must no longer emit the STARTED event — that fusion IS REG-F-021'
+		).toEqual([]);
 		expect(
 			eventsOf(),
-			'requestAssuranceAssessment emits the STARTED event at REQUEST time; increment 3 is what moves it'
-		).toContain('AssuranceAssessmentStarted');
-		// And so does the command it actually belongs to.
-		force('READY');
+			'the request emits the events of the arrows it actually crosses'
+		).toEqual(['AssuranceAssessmentRequested', 'AssuranceEvidenceRequired']);
+
 		expect(dispatch('BeginAssuranceAssessment', {}).status).toBe('ACCEPTED');
-		const started = eventsOf().filter((e) => e === 'AssuranceAssessmentStarted');
 		expect(
-			started,
-			'TWO AssuranceAssessmentStarted events on one aggregate: the fused request and the real begin. The ' +
-				'event-surface census CANNOT see this — it compares the three surfaces as SETS, so an event bound ' +
-				'to the right command and fired by the wrong one looks identical to one that is correct. This ' +
-				'assertion is the thing that watches the overlap, and it must go red in increment 3'
-		).toHaveLength(2);
+			eventsOf().filter((e) => e === 'AssuranceAssessmentStarted'),
+			'and beginning it emits STARTED exactly once, from the command DOC-004 §32 names for it'
+		).toHaveLength(1);
 	});
 });

@@ -221,6 +221,9 @@ describe('DWP-04 Baseline — PromoteBaseline fromStates(APPROVED) + code change
 				claimIds: []
 			}).status
 		).toBe('ACCEPTED');
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			h.d('BeginAssuranceAssessment', ASSESS, 'ASSURANCE_ASSESSMENT', {});
 		expect(
 			h.d('CompleteAssuranceAssessment', ASSESS, 'ASSURANCE_ASSESSMENT', {
 				validatorResult: floorValidatorResult({

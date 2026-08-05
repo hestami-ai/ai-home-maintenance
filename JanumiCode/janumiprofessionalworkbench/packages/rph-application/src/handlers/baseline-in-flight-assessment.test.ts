@@ -98,7 +98,12 @@ describe('PromoteBaseline: an assessment that has not concluded blocks promotion
 		// was setting up to test something else.
 		const preStart = ['REQUESTED', 'EVIDENCE_PENDING', 'READY'].includes(assessmentState);
 		const { startedAt: _unset, ...withoutStartedAt } = prior;
-		const base = preStart ? withoutStartedAt : prior;
+		const base = preStart
+			? withoutStartedAt
+			: // A concluded assessment must carry the moment it began. After increment 3 the request lands in READY
+				// with NO startedAt, so a fixture jumping straight to a terminal state has to supply one — the kit
+				// invariant refuses otherwise, which is how this branch came to exist.
+				{ ...prior, startedAt: prior.startedAt ?? TS };
 		const nextState = { ...base, assessmentState, lifecycleStatus: assessmentState };
 		const event = makeEvent(ctx, command, {
 			eventType: 'AssuranceAssessmentStarted',
@@ -254,6 +259,12 @@ describe('PromoteBaseline: an assessment that has not concluded blocks promotion
 	it('refuses promotion while the required assessment is still ASSESSING (the arm that already worked)', () => {
 		// CONTROL for the fix's SCOPE: the two states the old check DID exclude must still be refused. If this
 		// reddens, the positive classification lost ground the exclusion already held.
+		//
+		// The request now lands in READY (increment 3), so the assessment is BEGUN to reach ASSESSING — the state
+		// this arm is about.
+		expect(
+			dispatch('BeginAssuranceAssessment', {}, { targetAggregateId: ASSESS, targetAggregateType: 'ASSURANCE_ASSESSMENT' }).status
+		).toBe('ACCEPTED');
 		expect((store.loadObject(ASSESS)?.state as Record<string, string>).assessmentState).toBe('ASSESSING');
 		const r = promote();
 		expect(r.status).not.toBe('ACCEPTED');

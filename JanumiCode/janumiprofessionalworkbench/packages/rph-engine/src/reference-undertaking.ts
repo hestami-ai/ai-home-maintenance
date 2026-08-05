@@ -601,6 +601,10 @@ export function driveReferenceUndertaking(
 				subjectSemanticVersions: { [subjectId]: 1 },
 				claimIds: []
 			});
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
+			// REQUESTED -> EVIDENCE_PENDING and lands in READY (no policy declares required evidence — REG-F-022 — so
+			// "all required evidence present" is vacuously true). The assessment must be BEGUN before it is assessed.
+			send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
 			send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
 				validatorResult: {
 					validatorId: `deterministic.${floorPolicyId.replace(/^floor\./, '')}`,
@@ -806,6 +810,10 @@ export function driveReferenceUndertaking(
 			subjectSemanticVersions: { [pwuId]: 1 },
 			claimIds: [claimId, ...extraClaimIds]
 		});
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3). requestAssuranceAssessment now crosses
+		// REQUESTED -> EVIDENCE_PENDING and lands in READY (no policy declares required evidence — REG-F-022 — so
+		// "all required evidence present" is vacuously true). The assessment must be BEGUN before it is assessed.
+		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
 		chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
 			assessmentId
 		]);

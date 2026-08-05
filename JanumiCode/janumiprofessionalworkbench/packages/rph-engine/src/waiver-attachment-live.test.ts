@@ -105,7 +105,7 @@ describe('REG-F-020: the waiver attachment predicate holds over REAL emitted eve
 		ok(cmd('ActivateAssurancePolicy', policyId, 'ASSURANCE_POLICY', { policyId }));
 
 	/** Two assessments over the SAME subject under DIFFERENT policies — the arrangement the predicate discriminates. */
-	const requestAssessment = (assessmentId: string, policyId: string): void =>
+	const requestAssessment = (assessmentId: string, policyId: string): void => {
 		ok(
 			cmd('RequestAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {
 				assessmentId,
@@ -116,6 +116,10 @@ describe('REG-F-020: the waiver attachment predicate holds over REAL emitted eve
 				claimIds: []
 			})
 		);
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+		// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+		ok(cmd('BeginAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {}));
+	};
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });

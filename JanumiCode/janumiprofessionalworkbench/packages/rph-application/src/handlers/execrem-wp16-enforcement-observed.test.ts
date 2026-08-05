@@ -434,6 +434,14 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 					),
 					`request ${id}`
 				);
+					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+					dispatch(
+						'BeginAssuranceAssessment',
+						{},
+						id,
+						'ASSURANCE_ASSESSMENT'
+					);
 				ok(
 					dispatch(
 						'CompleteAssuranceAssessment',
@@ -762,6 +770,14 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			),
 			`request assessment ${assessmentId}`
 		);
+			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+			dispatch(
+				'BeginAssuranceAssessment',
+				{},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			);
 		return dispatch(
 			'CompleteAssuranceAssessment',
 			{

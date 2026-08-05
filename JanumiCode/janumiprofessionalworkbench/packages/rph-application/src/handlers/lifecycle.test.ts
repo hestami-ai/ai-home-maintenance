@@ -249,6 +249,13 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 			},
 			{ targetAggregateId: id, targetAggregateType: 'ASSURANCE_ASSESSMENT' }
 		);
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+		// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+		dispatch(
+			'BeginAssuranceAssessment',
+			{},
+			{ targetAggregateId: id, targetAggregateType: 'ASSURANCE_ASSESSMENT' }
+		);
 		dispatch(
 			'CompleteAssuranceAssessment',
 			{
@@ -384,6 +391,13 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 				subjectSemanticVersions: { [PWU_ID]: 1 },
 				claimIds: []
 			},
+			{ targetAggregateId: ASSESS, targetAggregateType: 'ASSURANCE_ASSESSMENT' }
+		);
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+		// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+		dispatch(
+			'BeginAssuranceAssessment',
+			{},
 			{ targetAggregateId: ASSESS, targetAggregateType: 'ASSURANCE_ASSESSMENT' }
 		);
 		dispatch(
