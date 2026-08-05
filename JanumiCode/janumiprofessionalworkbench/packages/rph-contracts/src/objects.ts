@@ -64,8 +64,6 @@ import {
 // placeholders (any object) — tightened in the milestone that defines them (M7/M9/M11). ----
 export const ApplicabilityExpressionSchema = z.record(z.string(), z.unknown());
 export type ApplicabilityExpression = z.infer<typeof ApplicabilityExpressionSchema>;
-export const ApplicabilityRuleSchema = z.record(z.string(), z.unknown());
-export type ApplicabilityRule = z.infer<typeof ApplicabilityRuleSchema>;
 export const ArtifactReferenceSchema = z.record(z.string(), z.unknown());
 export type ArtifactReference = z.infer<typeof ArtifactReferenceSchema>;
 export const ArtifactRequirementSchema = z.record(z.string(), z.unknown());
@@ -110,6 +108,18 @@ export const AggregationRuleSchema = z.strictObject({
 	rule: z.string()
 });
 export type AggregationRule = z.infer<typeof AggregationRuleSchema>;
+export const ApplicabilityRuleSchema = z.strictObject({
+	objectTypeConditions: z.array(z.unknown()),
+	pwuKindConditions: z.array(z.string()).optional(),
+	lifecycleTriggers: z.array(z.string()).optional(),
+	eventTriggers: z.array(z.string()).optional(),
+	riskConditions: z.array(z.unknown()).optional(),
+	semanticChangeConditions: z.array(z.unknown()).optional(),
+	requiredTags: z.array(z.string()).optional(),
+	excludedTags: z.array(z.string()).optional(),
+	expression: z.unknown().optional()
+});
+export type ApplicabilityRule = z.infer<typeof ApplicabilityRuleSchema>;
 export const AssessmentCriterionSchema = z.strictObject({
 	id: z.string(),
 	name: z.string(),

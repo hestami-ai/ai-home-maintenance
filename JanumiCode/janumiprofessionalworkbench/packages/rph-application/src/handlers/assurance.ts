@@ -175,7 +175,13 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		purpose: p.purpose,
 		rationale: p.rationale,
 		applicableObjectTypes: p.applicableObjectTypes,
-		applicability: {},
+		// DOC-004 §5.1's ApplicabilityRule — WHICH WORK THIS POLICY APPLIES TO. This was hardcoded `{}`, an empty
+		// rule, while `ApplicabilityRuleSchema` was an opaque record that could not object. That is why REG-F-022's
+		// second instance could exist: the ontology authors `appliesToPwuKinds` per policy and it had nowhere to go.
+		// Omitted by the caller → derived from the object types the policy declares, so a policy always states what
+		// it applies to. §5.1 makes `objectTypeConditions` the one REQUIRED field, which is why `{}` is no longer a
+		// legal value at all.
+		applicability: p.applicability ?? { objectTypeConditions: p.applicableObjectTypes },
 		evaluatedClaimTypes: p.evaluatedClaimTypes,
 		defaultClaimTemplates: [],
 		requiredEvidence: p.requiredEvidence ?? [],

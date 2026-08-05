@@ -75,14 +75,15 @@ const ACCOUNTED_FOR: Readonly<Record<string, string>> = {
 	sourceSection:
 		'ONTOLOGY-INTERNAL — provenance about the transcription (which DOC-004 section, what was verbatim, what was ' +
 		'AUTHORED). It documents the ontology; the runtime governs with the content, not with its citation.',
-	// `appliesToPwuKinds` was FIRST WRITTEN HERE, with the reasoning "the value is not silently lost — it is
-	// overridden by a broader scope (applicableObjectTypes: [PROFESSIONAL_WORK_UNIT])". That was wrong, and it was
-	// the exact rot this file's next test exists to prevent: an exemption asserted rather than checked.
-	//
-	// Checked: `appliesToPwuKinds` is read by NOTHING — it appears only in the ontology's own type and data. And
-	// `applicableObjectTypes`, the field I claimed overrides it, is STORED on the policy object and consulted by no
-	// applicability decision anywhere. So nothing is overriding anything; the scope is dropped exactly as
-	// `requiredEvidenceTypes` is. It belongs in the finding, not in the accounting.
+	appliesToPwuKinds:
+		'TRANSFORMED (2026-08-05) — delivered nested as `applicability.pwuKindConditions`, which is DOC-004 ' +
+		'§5.1’s ratified home for it, so a name-level census cannot see it. The dedicated test below asserts the ' +
+		'actual delivery per policy, including that a policy restricting NO kind delivers the field ABSENT rather ' +
+		'than empty. THIS ROW WAS HERE ONCE BEFORE AND WAS FALSE: it first read “the value is not silently ' +
+		'lost — it is overridden by a broader scope”, which was asserted and not checked, and one grep showed ' +
+		'nothing read either field. It was moved OUT into the finding, and is back only now that the route it ' +
+		'claims actually exists and is asserted. That is the difference between an exemption and an allowlist ' +
+		'entry, and it is why the staleness check below exists.'
 };
 
 describe('REG-F-022 generalized: what the ontology authors vs what the seeding delivers', () => {
@@ -109,7 +110,7 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 			'AUTHORED ONTOLOGY FIELDS THAT REACH NOTHING. Each is governance content someone wrote into the ' +
 				'ratified catalog that no runtime object carries — REG-F-022\'s exact shape. Deliver it, or add a ' +
 				'row to ACCOUNTED_FOR saying which route its content takes. "Not yet" is not a route.'
-		).toEqual(['appliesToPwuKinds', 'requiredEvidenceTypes']);
+		).toEqual(['requiredEvidenceTypes']);
 	});
 
 	// The accounting must stay honest in the other direction too: a stale exemption is how a list like this rots
@@ -123,27 +124,42 @@ describe('REG-F-022 generalized: what the ontology authors vs what the seeding d
 		expect(Object.keys(ACCOUNTED_FOR).filter((k) => !authored.has(k))).toEqual([]);
 	});
 
-	// THE SECOND INSTANCE, which is a SCOPE rather than a requirement — and is why this census exists at all.
-	// REG-F-022 was found by chasing one field. The general question found another beside it.
-	it('REG-F-022 second instance: policy SCOPE is authored per PWU kind and delivered to nothing', () => {
+	// THE SECOND INSTANCE, DELIVERED 2026-08-05. `appliesToPwuKinds` left the unexplained list above — not by being
+	// exempted, but by reaching the runtime. DOC-004 §5.1's `ApplicabilityRule.pwuKindConditions` was always its
+	// ratified home; what stood in the way was that `ApplicabilityRuleSchema` was `z.record(string, unknown)` — an
+	// opaque bag — and the handler hardcoded `applicability: {}`. Schematizing §5.1 made `{}` illegal (its one
+	// REQUIRED field is `objectTypeConditions`) and gave the authored value somewhere to land.
+	it('policy SCOPE now reaches the runtime in its ratified §5.1 home', () => {
 		const scoped = ontology.seedPolicies.filter(
 			(p) => ((p as { appliesToPwuKinds?: readonly string[] }).appliesToPwuKinds ?? []).length > 0
 		);
 		expect(scoped.length).toBeGreaterThan(0);
-		expect(deliveredKeys()).not.toContain('appliesToPwuKinds');
-		// Every catalog policy is seeded with the same wholesale object scope instead.
 		const creates = capturePolicySeeding().filter((c) => c.commandType === 'CreateAssurancePolicy');
-		const scopes = new Set(
-			creates.map((c) =>
-				JSON.stringify((c.payload as { applicableObjectTypes?: unknown }).applicableObjectTypes)
-			)
+		const byId = new Map(
+			creates.map((c) => [
+				(c.payload as { policyId: string }).policyId,
+				(c.payload as { applicability?: { pwuKindConditions?: readonly string[] } }).applicability
+			])
 		);
-		expect(
-			[...scopes],
-			'every catalog policy gets the identical object-type scope, so a policy the ontology authored for ONE ' +
-				'PWU kind is seeded as applying to all of them. And the field that replaced it is itself read by no ' +
-				'applicability decision — so policy scope is authored, dropped, and then not consulted either'
-		).toEqual(['["PROFESSIONAL_WORK_UNIT"]']);
+		for (const p of scoped) {
+			expect(
+				byId.get(p.policyId)?.pwuKindConditions,
+				`${p.policyId} authors appliesToPwuKinds and must deliver it as §5.1 pwuKindConditions`
+			).toEqual([...(p as { appliesToPwuKinds?: readonly string[] }).appliesToPwuKinds!]);
+		}
+		// And a policy that restricts NO kind delivers the field ABSENT, not empty: [] would read as "applies to no
+		// PWU kind", which is the opposite of what the ontology means by declaring nothing.
+		const unrestricted = ontology.seedPolicies.filter(
+			(p) => !((p as { appliesToPwuKinds?: readonly string[] }).appliesToPwuKinds ?? []).length
+		);
+		for (const p of unrestricted)
+			expect(byId.get(p.policyId)).not.toHaveProperty('pwuKindConditions');
+		// Every policy still declares WHAT IT APPLIES TO — §5.1's one required field is never empty.
+		for (const c of creates)
+			expect(
+				(c.payload as { applicability?: { objectTypeConditions?: unknown[] } }).applicability
+					?.objectTypeConditions?.length
+			).toBeGreaterThan(0);
 	});
 
 	// REG-F-022's own instance, asserted directly so the entry has a live citation rather than a prose claim.

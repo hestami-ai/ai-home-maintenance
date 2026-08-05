@@ -81,7 +81,7 @@ describe('AssertObligation / AssertConstraint mint first-class objects (WP-1-005
 			constraintType: 'SECURITY',
 			sourceObjectId: PWU_ID,
 			authority,
-			applicability: {},
+			applicability: { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'] },
 			strength: 'MANDATORY'
 		});
 		expect(r.status).toBe('ACCEPTED');

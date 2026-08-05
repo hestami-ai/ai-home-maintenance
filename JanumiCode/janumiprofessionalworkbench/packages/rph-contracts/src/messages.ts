@@ -630,7 +630,8 @@ export const CreateAssurancePolicyPayloadSchema = z.strictObject({
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
 	remediationRules: z.array(RemediationRuleSchema).optional(),
-	permittedControlActions: z.array(ControlActionSchema)
+	permittedControlActions: z.array(ControlActionSchema),
+	applicability: ApplicabilityRuleSchema.optional()
 });
 export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
 export const EditAssurancePolicyPayloadSchema = z.strictObject({
@@ -650,7 +651,8 @@ export const EditAssurancePolicyPayloadSchema = z.strictObject({
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
 	remediationRules: z.array(RemediationRuleSchema).optional(),
-	permittedControlActions: z.array(ControlActionSchema).optional()
+	permittedControlActions: z.array(ControlActionSchema).optional(),
+	applicability: ApplicabilityRuleSchema.optional()
 });
 export type EditAssurancePolicyPayload = z.infer<typeof EditAssurancePolicyPayloadSchema>;
 export const SupersedeAssurancePolicyPayloadSchema = z.strictObject({
@@ -1575,6 +1577,7 @@ export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
 	purpose: z.string(),
 	rationale: z.string(),
 	applicableObjectTypes: z.array(ProfessionalWorkObjectTypeSchema),
+	applicability: ApplicabilityRuleSchema.optional(),
 	evaluatedClaimTypes: z.array(ClaimTypeSchema),
 	criteria: z.array(AssessmentCriterionSchema),
 	evaluatorRole: z.string(),

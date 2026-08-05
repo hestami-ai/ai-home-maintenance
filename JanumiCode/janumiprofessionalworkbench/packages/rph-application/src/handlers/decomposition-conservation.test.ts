@@ -92,7 +92,7 @@ describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pip
 			constraintType: 'SECURITY',
 			sourceObjectId: PARENT,
 			authority,
-			applicability: {},
+			applicability: { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'] },
 			strength
 		});
 	}

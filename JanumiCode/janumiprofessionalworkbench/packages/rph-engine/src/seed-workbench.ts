@@ -203,6 +203,14 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
 			purpose: p.purpose,
 			rationale: p.rationale,
 			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			// REG-F-022 second instance, DELIVERED. `appliesToPwuKinds` is authored by every catalog policy and was
+			// dropped here; DOC-004 §5.1's `pwuKindConditions` is its ratified home. Absent on a policy that
+			// declares none → the field stays absent rather than becoming an empty array, because [] would read as
+			// "applies to no PWU kind" and absent reads as "unrestricted", which is what the ontology means.
+			applicability: {
+				objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],
+				...(p.appliesToPwuKinds?.length ? { pwuKindConditions: [...p.appliesToPwuKinds] } : {})
+			},
 			evaluatedClaimTypes: p.evaluatedClaimTypes,
 			criteria: p.criteria,
 			evaluatorRole: p.evaluatorRole,

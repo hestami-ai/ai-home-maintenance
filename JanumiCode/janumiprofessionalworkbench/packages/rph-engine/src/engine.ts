@@ -48,6 +48,11 @@ export interface EngineSeedPolicy {
 	readonly purpose: string;
 	readonly rationale: string;
 	readonly evaluatedClaimTypes: readonly string[];
+	/** DOC-004 §5.1 `pwuKindConditions` — which PWU kinds the policy applies to. ADDED 2026-08-05: it was ABSENT
+	 *  from this port type, so the ontology's authored value was structurally invisible past the package boundary
+	 *  and no type error was ever available to report the drop (REG-F-022 second instance). Optional because a
+	 *  policy that restricts no kind declares none. */
+	readonly appliesToPwuKinds?: readonly string[];
 	readonly criteria: readonly Frozen<AssessmentCriterion>[];
 	/** RATIFIED finding codes. The per-code detail DOC-004 §9.1 mandates but never ratifies is optional. */
 	readonly findingTypes: readonly string[];

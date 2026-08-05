@@ -291,10 +291,55 @@
     },
     "applicability": {
       "type": "object",
-      "propertyNames": {
-        "type": "string"
+      "properties": {
+        "objectTypeConditions": {
+          "type": "array",
+          "items": {}
+        },
+        "pwuKindConditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lifecycleTriggers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eventTriggers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "riskConditions": {
+          "type": "array",
+          "items": {}
+        },
+        "semanticChangeConditions": {
+          "type": "array",
+          "items": {}
+        },
+        "requiredTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludedTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expression": {}
       },
-      "additionalProperties": {}
+      "required": [
+        "objectTypeConditions"
+      ],
+      "additionalProperties": false
     },
     "strength": {
       "type": "string",

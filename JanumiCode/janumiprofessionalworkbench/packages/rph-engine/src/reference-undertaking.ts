@@ -370,7 +370,19 @@ export function driveReferenceUndertaking(
 			scope: ['ARCHITECTURE'],
 			validFrom: '2026-07-12T00:00:00Z'
 		},
-		applicability: { appliesTo: 'ARCHITECTURE', scope: 'all tenant-scoped work' },
+		// CONFORMED 2026-08-05. This read `{ appliesTo: 'ARCHITECTURE', scope: 'all tenant-scoped work' }` — two
+		// field names DOC-004 §5.1 does not define, accepted only because `ApplicabilityRuleSchema` was an opaque
+		// `z.record(string, unknown)`. Schematizing §5.1 made it visible: the canonical drive had been writing a
+		// shape that is not an ApplicabilityRule into a field typed as one, and nothing could object.
+		//
+		// `appliesTo: 'ARCHITECTURE'` maps exactly onto the ratified `pwuKindConditions`. The `scope` prose has NO
+		// §5.1 home — it is not a condition, it is a description — so it is NOT smuggled into `expression` (the
+		// escape hatch for conditions the structured fields cannot express, which is a different thing from prose).
+		// It survives where it belongs: in the constraint's own statement text below.
+		applicability: {
+			objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],
+			pwuKindConditions: ['ARCHITECTURE']
+		},
 		strength: 'MANDATORY'
 	});
 

@@ -2653,6 +2653,12 @@
 					"type": "ControlAction[]",
 					"enumRef": "ControlActionSchema",
 					"note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
+				},
+				{
+					"field": "applicability",
+					"required": false,
+					"type": "ApplicabilityRule",
+					"note": "ADDED 2026-08-05 (REG-F-022 second instance). DOC-004 §5.1's ApplicabilityRule is the RATIFIED home for which work a policy applies to — including `pwuKindConditions`, which twelve catalog policies author as `appliesToPwuKinds` and which reached nothing because this command could not carry it and the handler hardcoded `applicability: {}`. Omitted → the handler derives `{ objectTypeConditions: applicableObjectTypes }`, so a policy always declares what it applies to rather than carrying an empty rule."
 				}
 			]
 		},
@@ -2760,6 +2766,12 @@
 					"type": "ControlAction[]",
 					"enumRef": "ControlActionSchema",
 					"note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
+				},
+				{
+					"field": "applicability",
+					"required": false,
+					"type": "ApplicabilityRule",
+					"note": "ADDED 2026-08-05 (REG-F-022 second instance). DOC-004 §5.1's ApplicabilityRule is the RATIFIED home for which work a policy applies to — including `pwuKindConditions`, which twelve catalog policies author as `appliesToPwuKinds` and which reached nothing because this command could not carry it and the handler hardcoded `applicability: {}`. Omitted → the handler derives `{ objectTypeConditions: applicableObjectTypes }`, so a policy always declares what it applies to rather than carrying an empty rule."
 				}
 			]
 		},
@@ -6624,6 +6636,12 @@
 					"type": "ProfessionalWorkObjectType[]",
 					"enumRef": "ProfessionalWorkObjectTypeSchema",
 					"note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `applicableObjectTypes: ProfessionalWorkObjectType[]`. Was `string` — a single value. TIGHTENED 2026-07-16."
+				},
+				{
+					"field": "applicability",
+					"required": false,
+					"type": "ApplicabilityRule",
+					"note": "ADDED 2026-08-05 (REG-F-022 second instance). The event log is the audit record and the replay source, so WHAT WORK A POLICY APPLIES TO must be in it — a policy reconstructed from this event without its §5.1 ApplicabilityRule would be scoped differently than the one that was created. It is OPTIONAL rather than required because the creating handler DERIVES a rule when the caller omits one, and an event field that is always present but sometimes derived should not claim to have been supplied."
 				},
 				{
 					"field": "evaluatedClaimTypes",

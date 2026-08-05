@@ -244,7 +244,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						constraintType: 'SECURITY',
 						sourceObjectId: v.parent,
 						authority: AUTHORITY,
-						applicability: {},
+						applicability: { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'] },
 						strength: 'MANDATORY'
 					},
 					v.con,
