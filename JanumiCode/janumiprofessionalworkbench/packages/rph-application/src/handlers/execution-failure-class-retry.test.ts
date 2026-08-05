@@ -166,23 +166,42 @@ describe('RetryExecutionStep honours the §36.2 failure-class control-action map
 	});
 
 	it('the refusal is CLEAN — it appends no event and leaves the step FAILED', () => {
-		// A refused command must change nothing. Named for what it checks: an earlier draft of this test was
-		// called "the same step becomes retryable again once its latest failure is a retryable class" and did not
-		// check that at all — it asserted an event count. A test whose name promises more than its body delivers
-		// is worse than no test, because it reads as coverage.
-		//
-		// The stronger claim (that the check reads the LAST failure rather than any failure) is not reachable
-		// from here: the step stays FAILED after the refusal, and FAILED -> RUNNING is not an arrow, so a second
-		// classified failure cannot be staged without inventing a transition. It is asserted where it IS
-		// decidable — `.at(-1)` in the handler — and left unclaimed here rather than faked.
+		// A refused command must change nothing.
 		expect(failThenRetry('RETRY_EXHAUSTION').status).not.toBe('ACCEPTED');
-		const failures = store
-			.readAllEvents()
-			.filter((e) => e.eventType === 'ExecutionStepFailed');
-		expect(failures).toHaveLength(1);
+		expect(store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepFailed')).toHaveLength(
+			1
+		);
 		expect(
 			store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepRetried')
 		).toHaveLength(0);
+	});
+
+	it('the check reads the LAST failure, not any failure — retryable first, exhausted second', () => {
+		// ── THIS TEST EXISTS BECAUSE I CLAIMED IT COULD NOT (adversarial review, 2026-08-05) ──────────────────
+		// An earlier comment here read: "the stronger claim ... is not reachable from here: the step stays FAILED
+		// after the refusal, and FAILED -> RUNNING is not an arrow, so a second classified failure cannot be
+		// staged without inventing a transition." That is false, and it was false in the direction that mattered.
+		// The refusal is not the only way to get two failures — an ACCEPTED retry puts the step back to QUEUED,
+		// and it can be started and failed again. The whole sequence uses legal arrows.
+		//
+		// The lesson is the one this repository keeps relearning at a different altitude: "untestable" is a claim
+		// about the search for a test. Writing it into a comment is how a gap becomes permanent, because the next
+		// reader believes it.
+		//
+		// WHAT IT DISCRIMINATES: if the handler read the FIRST failure (or `.some()`), the retry below would be
+		// ACCEPTED, because the first failure was TOOL_FAILURE and TOOL_FAILURE permits RETRY.
+		expect(failThenRetry('TOOL_FAILURE').status, 'attempt 1 is retryable').toBe('ACCEPTED');
+		const second = failThenRetry('RETRY_EXHAUSTION');
+		expect(
+			second.status,
+			'the step has TWO recorded failures; the latest forbids RETRY, and that is the one that governs'
+		).not.toBe('ACCEPTED');
+		expect(JSON.stringify(second.error)).toContain('RETRY_EXHAUSTION');
+		// CONTROL: two failures were genuinely recorded, so the refusal above is about the SECOND and not about
+		// a fixture that never reached one.
+		expect(store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepFailed')).toHaveLength(
+			2
+		);
 	});
 
 	it('a non-§36.2 value is REFUSED at the schema, so the mapping never sees an unknown class', () => {

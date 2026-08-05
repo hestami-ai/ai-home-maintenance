@@ -897,6 +897,18 @@ export function driveReferenceUndertaking(
 			of: R.intentDef,
 			evidenceType: 'ARTIFACT',
 			note: "the PWU's declared riskProfile (consequence, uncertainty, irreversibility, sensitivity, exposure)"
+		},
+		// THE CATALOG, NOT THE AMBIGUITIES. `ambiguityIds` is a MANDATORY field of `IntentObjectSchema`, written by
+		// the mandatory `ProvisionIntent` command — so an intent that has been provisioned HAS an ambiguity
+		// catalog, which is exactly what DOC-002 §6.2's guard ("Objective and known ambiguities recorded") asks
+		// for. This undertaking's catalog is EMPTY, and the note says so: `cardinality` counts evidence instances,
+		// not ambiguities, so one catalog satisfies AT_LEAST_ONE and the assessor judges its contents (§6.3,
+		// "evidence is not proof by existence"). An intent that never reached PROVISIONAL would have no catalog to
+		// point at, which is the case this requirement genuinely gates.
+		'EV-16-02': {
+			of: R.intentId,
+			evidenceType: 'ARTIFACT',
+			note: "the intent's declared ambiguityIds — the recorded catalog, empty in this undertaking"
 		}
 	};
 
@@ -1073,20 +1085,35 @@ export function driveReferenceUndertaking(
 			if (missing.length > 0) shortfall.set(assessmentIds[i]!, missing);
 		}
 
-		// 4c. THE SHORTFALL, RECORDED AS A FINDING ON THE ASSESSMENT THAT HAS IT — not as a silent downgrade.
-		//     An assessment that cannot see evidence its policy requires has found something, and §9 findings are
-		//     how this system says so. Recorded per assessment, because observations are keyed by assessment and a
-		//     peer's gates run over its own population (REG-F-029 review finding (e)).
-		for (const [asmId, missing] of shortfall)
-			send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintId('obs'), {
-				assessmentId: asmId,
-				observationType: 'FINDING',
-				severity: 'MATERIAL',
-				statement: `Required evidence not available in this undertaking: ${missing
-					.map((m) => `${m.id} (${m.description})`)
-					.join('; ')}. DOC-006 §1.2 selected a materially underspecified originating expression, so no clarification dialogue, supplied documents, recorded user corrections, ambiguity catalog or stakeholder catalog exists to submit.`,
-				evidenceIds: [evidenceId]
-			});
+		// 4c. THE SHORTFALL IS A LOUD FAILURE, NOT A SILENT DOWNGRADE (adversarial review, 2026-08-05).
+		//
+		//     This block first recorded a MATERIAL observation and quietly dropped the verdict to
+		//     CONDITIONALLY_SATISFIED. The review found it UNREACHABLE — the contingent set had been sized to
+		//     exactly what this fixture can produce, so `shortfall` was always empty and the downgrade was dead
+		//     code wearing the costume of a governance control. A branch that cannot execute proves nothing, and
+		//     this one would have reported "the fixture falls short" as a *feature* while never firing.
+		//
+		//     It is now an ASSERTION with a real subject: the canonical drive CLAIMS it can evidence every gating
+		//     requirement of every policy governing its PWUs, and says so by failing if it cannot. That claim is
+		//     checked on every run of the seed, which is the difference between a control and a decoration.
+		//
+		//     WHY FAIL RATHER THAN DOWNGRADE. A downgrade is a decision, and this is a fixture: if the ratified
+		//     catalog grows a gating requirement the reference undertaking genuinely cannot meet, that is a
+		//     governance question for a person — evidence the referent, or accept that the fixture demonstrates a
+		//     conditional outcome — and not something a driver should settle by lowering its own verdict.
+		if (shortfall.size > 0) {
+			const detail = [...shortfall]
+				.map(([asmId, missing]) => `${asmId}: ${missing.map((m) => `${m.id} (${m.description})`).join(', ')}`)
+				.join(' | ');
+			throw new Error(
+				`Reference Undertaking cannot evidence required evidence that GATES the ${disposition} verdict it ` +
+					`asks for on ${pwuId} — ${detail}. Every gating requirement must have a real referent in ` +
+					`FIXTURE_EVIDENCE, or this drive would be claiming a verdict its evidence does not support. ` +
+					`Either add the referent (it must be an object this drive actually creates — do not conjure ` +
+					`evidence no work has made), or decide deliberately that the fixture demonstrates a ` +
+					`non-satisfied disposition here.`
+			);
+		}
 
 		// 5. The VERDICT — a full DOC-007 §20 ValidatorResult naming what was judged, at which version, on which
 		//    evidence, and how it came out. The (d2) event gate validates the event this produces.
@@ -1103,14 +1130,10 @@ export function driveReferenceUndertaking(
 		//    arrows, already filed as REG-E-024(b). Inventing a roll-up rule here would settle an open elicitation
 		//    by implementation, which is exactly what §0.3 forbids.
 		for (const [i, pid] of governing.entries()) {
-			const missing = shortfall.get(assessmentIds[i]!) ?? [];
-			const reached = missing.length > 0 ? 'CONDITIONALLY_SATISFIED' : disposition;
-			const residual = [
-				...observations.map((o) => o.statement),
-				...(missing.length > 0
-					? [`Unmet required evidence: ${missing.map((m) => m.id).join(', ')}`]
-					: [])
-			];
+			// The disposition is the caller's, unqualified: the assertion above has already established that every
+			// gating requirement is evidenced, so there is nothing left for this loop to downgrade. An earlier
+			// draft computed a per-assessment `reached` here — dead alongside the branch that fed it.
+			const residual = observations.map((o) => o.statement);
 			send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentIds[i]!, {
 				validatorResult: {
 					validatorId: 'reference-undertaking.reviewer',
@@ -1131,7 +1154,7 @@ export function driveReferenceUndertaking(
 						statement: o.statement,
 						subjectObjectIds: [pwuId]
 					})),
-					dispositionRecommendation: reached,
+					dispositionRecommendation: disposition,
 					recommendedControlActions: [],
 					residualUncertainty: residual,
 					limitations: [],

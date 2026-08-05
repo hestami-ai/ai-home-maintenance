@@ -769,6 +769,40 @@ export function attemptsMadeFrom(
 	return n;
 }
 
+/**
+ * The §36.2 class of a step's MOST RECENT failure, or `undefined` if it has none (REG-E-025).
+ *
+ * ── WHY IT IS HERE AND NOT IN THE HANDLER ────────────────────────────────────────────────────────────────────
+ * `failureClass` is recorded on `ExecutionStepFailed` and never lands on the step snapshot, so deciding "may this
+ * step be retried" needs a fold over the event stream — exactly like `attemptsMadeFrom`. That is what made
+ * RPH-EXE-008 F-29's fourth instance: the engine could see the count and the read-model could not, so `retry`
+ * was offered on a step the engine would refuse.
+ *
+ * The §36 control-action refusal has the same shape and would have repeated it, so the fold lives in the kernel
+ * from the start and BOTH callers use it — the handler that refuses and the projection that withholds the
+ * affordance. Two folds over the same events is how the two answers diverge.
+ *
+ * THE LATEST, not any: a step that failed, was legitimately retried, and failed again is judged on the failure
+ * being retried now. `.at(-1)` rather than `.some()`.
+ */
+export function lastFailureClassFrom(
+	events: Iterable<AttemptCountableEvent>,
+	planId: string,
+	stepId: string
+): string | undefined {
+	let last: string | undefined;
+	for (const e of events)
+		if (
+			e.eventType === 'ExecutionStepFailed' &&
+			e.aggregateId === planId &&
+			(e.payload as { stepId?: string } | undefined)?.stepId === stepId
+		) {
+			const c = (e.payload as { failureClass?: string } | undefined)?.failureClass;
+			if (typeof c === 'string') last = c;
+		}
+	return last;
+}
+
 // ============================================================================================
 // Exec != assurance at the execution layer (Property P1 / RPH-PWU-005/007; Contract §35.2)
 // ============================================================================================

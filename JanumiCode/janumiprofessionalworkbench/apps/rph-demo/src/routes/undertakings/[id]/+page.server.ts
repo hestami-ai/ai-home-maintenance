@@ -38,7 +38,11 @@ import {
 } from '@janumipwb/rph-projections';
 // JAN-RETRYCAP (N-12): the kernel's own attempt counter, so this loader supplies the number the ENGINE would
 // compute rather than one that merely agrees with it today.
-import { attemptsMadeFrom, capabilityIdentities } from '@janumipwb/rph-domain';
+import {
+	attemptsMadeFrom,
+	capabilityIdentities,
+	lastFailureClassFrom
+} from '@janumipwb/rph-domain';
 import {
 	buildPwaExport,
 	dispatch,
@@ -161,6 +165,13 @@ function shapeExecutionPlanInput(
 					: {}),
 				// N-12: the count the retry cap is decided against, from the SAME kernel function the engine uses.
 				attemptsMade: attemptsMadeFrom(events, pl.id, String((s.id ?? '') as string)),
+				// REG-E-025: the §36 fact, from the SAME kernel fold the engine's retry refusal uses. Without it
+				// the tab offers `retry` on a step whose last failure class forbids it and the engine rejects the
+				// click — F-29's invariant, sixth instance.
+				...(() => {
+					const c = lastFailureClassFrom(events, pl.id, String((s.id ?? '') as string));
+					return c === undefined ? {} : { lastFailureClass: c };
+				})(),
 				// N-21: RPH-EXE-005's fact — which REQUIRED input artifacts do not resolve. Resolved HERE because only
 				// this layer has a store; the RULE is the engine's and is applied identically (`required` defaults
 				// TRUE, an absent artifactId is out of scope, presence is a store read).

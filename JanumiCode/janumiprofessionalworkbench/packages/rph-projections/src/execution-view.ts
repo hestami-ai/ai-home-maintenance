@@ -35,6 +35,8 @@ import {
 	type BindingAuthorityFacts,
 	// JAN-RETRYCAP (N-12): same discipline one limb further on — the ratified kernel decides, and `retryCapFrom`
 	// applies the SAME cap convention the engine applies, so neither the default nor the validity rules exist twice.
+	isPermittedForFailure,
+	permittedControlActionsForFailure,
 	retryDecision,
 	retryCapFrom,
 	type RetryInput,
@@ -109,6 +111,24 @@ export interface ExecutionStepInput {
 	 * engine still refuses, so the cost is a rejected click and not an illegal act.
 	 */
 	readonly attemptsMade?: number;
+	/**
+	 * The §36.2 class of this step's most recent failure — `lastFailureClassFrom` over the event stream
+	 * (REG-E-025), or absent if it has never failed or the failure was unclassified.
+	 *
+	 * THE FIFTH AUTHORITY LIMB, AND I CREATED IT (adversarial review, 2026-08-05). Landing the §36 control-action
+	 * mapping gave `retryExecutionStep` a new refusal — a step whose last failure class does not permit RETRY —
+	 * and did not tell this read-model, so `retry` was offered on a step the engine now rejects. **F-29's "no
+	 * affordance the engine would reject", sixth instance, created by the commit that added the refusal**, one
+	 * work package after I wrote a register entry about the fifth.
+	 *
+	 * The same split as `attemptsMade`: this layer supplies the FACT, the kernel's `isPermittedForFailure` makes
+	 * the DECISION, and the spec table's `retryBudget` column says which commands the rule governs. Nothing about
+	 * §36 is re-derived here.
+	 *
+	 * ABSENT is the disclosed FAIL-OPEN, identical to the retry cap's: a caller that supplies no class gets the
+	 * old behaviour rather than a silent refusal. It never means "unknown, withhold anyway".
+	 */
+	readonly lastFailureClass?: string;
 	/**
 	 * The step's REQUIRED input artifacts that do not resolve — RPH-EXE-005 (N-21).
 	 *
@@ -216,6 +236,19 @@ export interface ExecutionStepView {
 	 * fail-open as the affordance itself. It never means "unknown, render a warning anyway".
 	 */
 	readonly retryExhaustion?: { readonly permittedControlActions: readonly string[] };
+	/**
+	 * Present when DOC-002 §36's control-action mapping FORBIDS retrying this step's last failure class
+	 * (REG-E-025) — the class, and what the controller may do instead.
+	 *
+	 * Distinct from `retryExhaustion`: that one means "you have spent your attempts", this means "this kind of
+	 * failure is not one retrying fixes". A step can be well inside its budget and still land here.
+	 *
+	 * ABSENT means retryable-or-unclassified, never "unknown".
+	 */
+	readonly retryForbiddenByFailureClass?: {
+		readonly failureClass: string;
+		readonly permittedControlActions: readonly string[];
+	};
 }
 
 export interface ExecutionPlanView {
@@ -360,7 +393,8 @@ function planPermitsAffordance(
 	pwuWorkLifecycleState?: string,
 	binding?: StepBindingContext,
 	retry?: RetryInput,
-	unresolvedRequiredInputs?: readonly string[]
+	unresolvedRequiredInputs?: readonly string[],
+	lastFailureClass?: string
 ): boolean {
 	const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];
 	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE)
@@ -400,6 +434,21 @@ function planPermitsAffordance(
 	// split as `bindingAuthority` + `bindingAuthorityVerdict`, and for the same reason. The DECISION is
 	// `retryDecision`, the ratified kernel the engine calls; the cap comes from `retryCapFrom`, the same convention
 	// the engine applies. Nothing about RPH-EXE-008 is re-derived here.
+	// ── DOC-002 §36, the FIFTH authority limb (REG-E-025) ──────────────────────────────────────────────────────
+	//
+	// "Each failure class must map to permitted control actions." A step whose LAST failure class does not permit
+	// RETRY may not be retried, and the engine refuses it — so this read-model must not offer it. Gated on the
+	// same `retryBudget` column as the cap, because that column already names exactly the commands that ARE a
+	// RETRY control action; the decision is the kernel's `isPermittedForFailure`, the same call the handler makes.
+	//
+	// A DIFFERENT REFUSAL FROM THE CAP, not a duplicate of it: the cap counts attempts, this reads what the
+	// failure WAS. A step can be inside its budget and still forbidden to retry.
+	if (
+		spec.retryBudget === 'CONSUMES_RETRY_BUDGET' &&
+		lastFailureClass !== undefined &&
+		!isPermittedForFailure(lastFailureClass, 'RETRY')
+	)
+		return false;
 	if (spec.retryBudget === 'CONSUMES_RETRY_BUDGET' && retry !== undefined) {
 		const decision = retryDecision(retry);
 		if (!decision.mayRetry) return false;
@@ -476,7 +525,8 @@ export function planAffordancesFor(
 	pwuWorkLifecycleState?: string,
 	binding?: StepBindingContext,
 	retry?: RetryInput,
-	unresolvedRequiredInputs?: readonly string[]
+	unresolvedRequiredInputs?: readonly string[],
+	lastFailureClass?: string
 ): StepAffordances {
 	const permits = (a: StepAdvanceCommand | StepControlCommand) =>
 		planPermitsAffordance(
@@ -485,7 +535,8 @@ export function planAffordancesFor(
 			pwuWorkLifecycleState,
 			binding,
 			retry,
-			unresolvedRequiredInputs
+			unresolvedRequiredInputs,
+			lastFailureClass
 		);
 	return {
 		advance: advanceCommandsFor(stepState).filter(permits),
@@ -535,7 +586,8 @@ function stepView(
 		pwuWorkLifecycleState,
 		bindingContextFor(s),
 		retry,
-		s.unresolvedRequiredInputs
+		s.unresolvedRequiredInputs,
+		s.lastFailureClass
 	);
 	// ── WITHHOLDING THE AFFORDANCE MUST NOT ALSO WITHHOLD THE REASON ───────────────────────────────────────────
 	//
@@ -548,6 +600,17 @@ function stepView(
 	// from the ratified kernel rather than restated in a template — and available WITHOUT requiring the engine to
 	// reject a click the read-model should never have offered.
 	const exhausted = retry ? retryDecision(retry) : undefined;
+	// THE SAME RULE ONE LIMB FURTHER ON (REG-E-025). The §36 refusal also removes a button, so it also owes the
+	// operator a remedy. Present ONLY when the class genuinely forbids RETRY — absent means "retryable" or "no
+	// classified failure", never "unknown". The permitted set comes from the same kernel call that withheld the
+	// affordance, so the notice and the withholding cannot disagree.
+	const failureBlock =
+		s.lastFailureClass !== undefined && !isPermittedForFailure(s.lastFailureClass, 'RETRY')
+			? {
+					failureClass: s.lastFailureClass,
+					permittedControlActions: permittedControlActionsForFailure(s.lastFailureClass) ?? []
+				}
+			: undefined;
 	const base: ExecutionStepView = {
 		id: s.id,
 		stepType: s.stepType,
@@ -560,6 +623,7 @@ function stepView(
 		advanceCommands: afforded.advance,
 		controlCommands: afforded.control,
 		belowQueued: isBelowQueued(s.stepState),
+		...(failureBlock === undefined ? {} : { retryForbiddenByFailureClass: failureBlock }),
 		// Present ONLY when the cap has actually been reached — absent means "not exhausted", never "unknown", so a
 		// caller cannot render an exhaustion notice for a step that still has attempts left.
 		...(exhausted?.mustSelectAlternateAction

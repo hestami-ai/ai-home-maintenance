@@ -30,17 +30,21 @@
 // would preserve a vocabulary the corpus does not contain, and the §36 rule could not map it.
 import { ControlActionSchema, ExecutionFailureClassSchema } from '@janumipwb/rph-contracts';
 import type { ControlAction, ExecutionFailureClass } from '@janumipwb/rph-contracts';
+import { RETRY_EXHAUSTION_ACTIONS } from './execution.js';
 
 /**
  * The control actions permitted in response to each §36.2 execution failure class.
  *
- * ── WHICH ACTION VOCABULARY, BECAUSE THERE ARE TWO AND THEY DIFFER ───────────────────────────────────────────
- * DOC-002 §37 lists EIGHTEEN control actions. The contract's `ControlAction` enum carries TWENTY-THREE, because
- * it is built from **DOC-004 §11**, the ratified superset (see `canonical-vocabulary.json`). Five actions —
- * `CLARIFY`, `GATHER_CONTEXT`, `CHANGE_VALIDATOR`, `INVALIDATE_DEPENDENTS`, `REQUEST_HUMAN_DECISION`,
- * `REQUEST_WAIVER` — are ratified by §11 and absent from §37. This mapping draws on the §11 superset, which is
- * the vocabulary the runtime actually validates against; the companion test asserts membership in
- * `ControlActionSchema` rather than in §37's shorter list, so the claim it makes is the one it checks.
+ * ── WHICH ACTION VOCABULARY, BECAUSE THERE ARE TWO AND THEY ARE NOT NESTED ───────────────────────────────────
+ * DOC-002 §37 lists EIGHTEEN control actions. The contract's `ControlAction` enum carries TWENTY-THREE, built
+ * from **DOC-004 §11** (see `canonical-vocabulary.json`). §11 ADDS six — `CLARIFY`, `GATHER_CONTEXT`,
+ * `CHANGE_VALIDATOR`, `INVALIDATE_DEPENDENTS`, `REQUEST_HUMAN_DECISION`, `REQUEST_WAIVER` — and RENAMES §37's
+ * `WAIVE` to `REQUEST_WAIVER`. 18 + 6 − 1 = 23.
+ *
+ * So §11 is **not a strict superset**: `WAIVE` is in §37 and not in §11. Calling it "the superset" (as an earlier
+ * draft of this comment did) is the loose kind of claim this file exists to avoid. This mapping uses §11, which
+ * is the vocabulary the runtime actually validates against, and the companion test asserts membership in
+ * `ControlActionSchema` under a name that says §11 — so the claim it makes is the claim it checks.
  *
  * ── THIS IS AUTHORED, AND HERE IS THE REASONING PER ROW ──────────────────────────────────────────────────────
  * The corpus ratifies the failure classes (§36.2) and the action vocabulary (§11/§37) and states that a mapping
@@ -81,10 +85,19 @@ export const EXECUTION_FAILURE_CONTROL_ACTIONS: Readonly<
 	// Something the step depends on is not there. WAIT (it may return) and CHANGE_TACTIC (route around it) are
 	// the substantive levers; RETRY covers a transient lookup.
 	DEPENDENCY_UNAVAILABLE: ['WAIT', 'RETRY', 'CHANGE_TACTIC', 'ESCALATE'],
-	// Retries are spent. RETRY is deliberately ABSENT — see the class doc above. What remains is to plan
-	// differently, approach differently, escalate, or stop; ABANDON is included because "stop" must be sayable,
-	// and a class whose only exits require someone else to act is how a runtime hangs.
-	RETRY_EXHAUSTION: ['REPLAN_EXECUTION', 'CHANGE_TACTIC', 'ESCALATE', 'ABANDON'],
+	// Retries are spent. RETRY is deliberately ABSENT — see the class doc above.
+	//
+	// ── NOT AUTHORED. THIS ROW IS THE RATIFIED SET, REFERENCED (adversarial review, 2026-08-05) ────────────────
+	// I authored this row as ['REPLAN_EXECUTION','CHANGE_TACTIC','ESCALATE','ABANDON'] — and the corpus had
+	// already stated it. RPH-EXE-008 ratifies the exhaustion remedy set as FIVE actions, and `retryDecision`
+	// in this same package has published them as `RETRY_EXHAUSTION_ACTIONS` all along, surfacing them in the
+	// retry-cap refusal. My version silently DROPPED `REJECT`.
+	//
+	// So the fix is not "add REJECT" — it is to stop holding a second copy. Two constants naming the same
+	// governed set is the drifting twin REG-F-029 review finding (c) caught, and I had just written a register
+	// entry about it. The row now IS the ratified constant, so they cannot disagree; the companion test asserts
+	// the identity rather than trusting this comment.
+	RETRY_EXHAUSTION: [...RETRY_EXHAUSTION_ACTIONS],
 	// The output did not match its schema. The prompt is the first lever (the instruction may be underspecified),
 	// the model the second; RETRY covers non-determinism.
 	INVALID_OUTPUT_SCHEMA: ['REVISE_PROMPT', 'RETRY', 'CHANGE_MODEL', 'ESCALATE']

@@ -45,6 +45,7 @@ import {
 	prunableStepIds,
 	resolveBranchSelection,
 	isPermittedForFailure,
+	lastFailureClassFrom,
 	permittedControlActionsForFailure,
 	retryDecision,
 	// JAN-RETRYCAP (N-12): the cap convention and the attempt count are kernel declarations now, so the read-model
@@ -1500,16 +1501,14 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 			// Read from the LAST ExecutionStepFailed event rather than from the step, because `failureClass` is
 			// recorded on the event and never lands on the step snapshot. A step failed twice under different
 			// classes is judged on its most recent failure, which is the one being retried.
-			const lastClass = ctx.store
-				.readAggregateEvents(PLAN, command.targetAggregateId)
-				.filter(
-					(e) =>
-						e.eventType === 'ExecutionStepFailed' &&
-						(e.payload as { stepId?: string }).stepId === p.stepId
-				)
-				.map((e) => (e.payload as { failureClass?: string }).failureClass)
-				.filter((c): c is string => typeof c === 'string')
-				.at(-1);
+			// ONE FOLD, IN THE KERNEL, called by the projection too — see `lastFailureClassFrom`. Reading the log
+			// inline here is what made the retry CAP F-29's fourth instance: the engine could see a fact the
+			// read-model could not, so the UI offered a click the engine refused.
+			const lastClass = lastFailureClassFrom(
+				ctx.store.readAggregateEvents(PLAN, command.targetAggregateId),
+				command.targetAggregateId,
+				p.stepId
+			);
 			if (lastClass !== undefined && !isPermittedForFailure(lastClass, 'RETRY')) {
 				const permitted = permittedControlActionsForFailure(lastClass);
 				return reject(

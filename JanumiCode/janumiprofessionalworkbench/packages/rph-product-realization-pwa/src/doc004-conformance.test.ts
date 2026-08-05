@@ -158,36 +158,48 @@ function ratifiedFindingCodes(body: string[]): string[] {
 }
 
 /**
- * The five evidence items whose referent is CONTINGENT, and why (REG-E-026).
+ * The four evidence items whose referent is CONTINGENT, and why (REG-E-026).
  *
  * ── THIS IS AUTHORED JUDGEMENT, NOT TRANSCRIPTION, AND IT IS THE MOST CONSEQUENTIAL CALL IN THIS WORK ──────────
  * The corpus gives exactly one explicit cardinality signal: it hedges an item ("where applicable", "where
  * relevant"). Everything else defaults to AT_LEAST_ONE, which is the non-vacuous reading and is what makes Gate A
  * a real gate rather than a decoration.
  *
- * These five are the exception, because a blanket AT_LEAST_ONE produces two absurd results — and absurdity is
- * legitimate evidence that a derivation is wrong:
- *   * An intent captured from ONE clear user expression could never reach a SATISFIED intent-fidelity verdict,
- *     because no clarification dialogue, supplied document, or user correction exists to submit. The policy would
- *     punish the unambiguous request.
- *   * POL-INTENT-COMPLETENESS could never be satisfied by ANY undertaking whatsoever, because this system has no
- *     AMBIGUITY object type and no STAKEHOLDER object type — no command mints either. A requirement whose
- *     referent cannot be produced is not a strict gate; it is a dead policy.
+ * These four are the exception, because a blanket AT_LEAST_ONE would punish the unambiguous request: an intent
+ * captured from ONE clear user expression could never reach a SATISFIED intent-fidelity verdict, for want of a
+ * clarification dialogue that never happened. Absurdity is legitimate evidence that a derivation is wrong.
+ *
+ * ── ⚠ THE RULE HAD A SECOND ARM AND IT WAS INVALID. WITHDRAWN 2026-08-05 BY ADVERSARIAL REVIEW ───────────────
+ * The first draft also exempted an item when *"the system has no object type that can produce it"*, and used
+ * that to make `EV-16-02` (ambiguity catalog) and `EV-16-04` (stakeholder catalog) contingent — reasoning that
+ * no `AMBIGUITY` or `STAKEHOLDER` object type exists, so the requirement would be unsatisfiable.
+ *
+ * **That reasoning is false, and it was false 200 lines from where I wrote it.** `cardinality` counts EVIDENCE
+ * instances, and an Evidence object needs no same-named object type — `EvidenceObject.contentReference` is an
+ * open record. There is no `NON_GOAL` object type either, yet `EV-16-05` gates and the reference undertaking
+ * evidences it by pointing at the INTENT. Applied consistently the arm would also have voided `EV-15-01`,
+ * `EV-16-05` and `EV-16-06`. **It emptied the gate rather than discriminating within it** — which is the exact
+ * failure mode the whole exercise exists to prevent, committed inside the fix for it.
+ *
+ * **What survives is a criterion the corpus actually licenses:** an item is contingent when it exists only if an
+ * optional exchange occurred AND no ratified transition guard or mandatory schema field makes its record
+ * unavoidable. DOC-002 §6.2's intent transition matrix is the discriminator, and it separates the two cases the
+ * bad arm lumped together:
+ *   * `| UNDER_DISCOVERY | Create provisional intent | PROVISIONAL | Objective and **known ambiguities
+ *     recorded** |` — a GUARD on the only path to the state these policies assess. So EV-16-02 **gates**.
+ *   * The matrix names **stakeholders nowhere**, while its next row names non-goals and constraints (which is
+ *     why EV-16-03 and EV-16-05 correctly gate). So EV-16-04 stays contingent, on its surviving ground alone.
  *
  * Each entry carries a textual hook rather than a preference, and each is listed so a reviewer can reject one
- * specific call. THE COST OF BEING WRONG HERE IS UNDER-GATING, and it is bounded and visible: seven of the
- * thirteen required-evidence items still gate, all seven are evidenced by real objects in the reference
- * undertaking, and `evidence-cardinality.test.ts` proves the gate still refuses.
+ * specific call — which is how this correction arrived.
  */
 const CONTINGENT_EVIDENCE: Readonly<Record<string, string>> = {
 	'EV-15-02':
-		'a clarification dialogue exists only if a clarification exchange occurred; §15.5 nowhere requires that one happen',
+		'a clarification dialogue exists only if a clarification exchange occurred; §15.5 nowhere requires that one happen, and DOC-002 §6.2 makes no transition depend on it',
 	'EV-15-03': 'supplied documents exist only if the user supplied any',
 	'EV-15-06': 'recorded user corrections exist only if the user corrected something',
-	'EV-16-02':
-		'§16.3 claim 6 asks that "major ambiguities have dispositions" — an intent with none satisfies that with zero, and no AMBIGUITY object type exists',
 	'EV-16-04':
-		'§16.3 claim 3 asks that stakeholders be "represented proportionally" — proportional to none known is none, and no STAKEHOLDER object type exists'
+		'§16.3 claim 3 asks that stakeholders be "represented proportionally" — proportional to none known is none — and DOC-002 §6.2\'s intent transition matrix names stakeholders in no guard, unlike ambiguities, non-goals and constraints'
 };
 
 /** The bullet items of a subsection: `* text;` -> `text`. Trailing `;`/`.` is list punctuation, not content. */
