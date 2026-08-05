@@ -27,6 +27,7 @@ interface Unreachable {
 function unreachableStates(): Unreachable[] {
 	const out: Unreachable[] = [];
 	for (const name of machineNames()) {
+		if (name in NOT_STATE_MACHINES) continue;
 		const m = getMachine(name);
 		const reachable = new Set<string>(m.transitions.map((t) => t.to));
 		if (m.initialState) reachable.add(m.initialState);
@@ -38,6 +39,29 @@ function unreachableStates(): Unreachable[] {
 }
 
 const key = (u: Unreachable) => `${u.machine}.${u.state}`;
+
+/**
+ * Entries in the transition table that are NOT state machines, and the ruling that says so.
+ *
+ * JAN-CMDPRE-SPEC-001 §2 excludes them by name: *"Two non-transition entries in the same table are noted and
+ * excluded: `AggregateAssuranceDisposition` (transitions.data.ts:1591) and any `initialState: undefined` rollup
+ * carry no transitions and are **computed dispositions, not state machines**."* A computed disposition has no
+ * arrows because nothing MOVES it — it is derived from the things it summarises. Counting its states as
+ * "unreachable" is a category error, and this file made it: the first version of this finding reported ELEVEN
+ * unreachable states, six of which were this rollup's.
+ *
+ * THE EXCLUSION CANNOT BE DERIVED, AND THAT IS THE UNCOMFORTABLE PART. `ValidatorRegistryEntry.status` has the
+ * IDENTICAL structural signature — zero transitions, `initialState: undefined`, no terminal states — and the same
+ * §2 catalogues it as a machine, with a transition table that is simply empty. So the two are indistinguishable by
+ * shape and were dispositioned differently by judgement. This list therefore cites a ruling rather than computing
+ * one, and any addition to it needs the same: a citation, not a resemblance.
+ */
+const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
+	AggregateAssuranceDisposition:
+		'JAN-CMDPRE-SPEC-001 §2 — a computed disposition rollup with no transitions, out of transition-legality ' +
+		'scope. Its six states are outcomes DERIVED from the assessments it summarises, not states an object is ' +
+		'moved between, so they have no in-arrows by construction rather than by omission.'
+};
 
 describe('declared states no arrow can reach', () => {
 	it('CONTROL: the machines are loaded and carry arrows — a zero here would make every list below empty', () => {
@@ -57,21 +81,19 @@ describe('declared states no arrow can reach', () => {
 	// THE PIN. Each entry is a declared state the machine cannot enter, with what it means. This list may SHRINK —
 	// wiring an arrow, or removing a state the corpus does not want — and may not GROW without an argument.
 	//
-	// ELEVEN, NOT FIVE. A first pass at this measurement scraped the source with a regex and found five. Deriving
-	// from `getMachine` found eleven, because the regex silently skipped whole blocks whose formatting it did not
-	// match. Recorded because the under-count was the COMFORTABLE direction, and an instrument that fails toward
-	// "less wrong than you thought" is the hardest kind to notice.
+	// THE COUNT WENT 5 -> 11 -> 5, AND BOTH MOVES ARE WORTH KNOWING.
+	//   5  a regex over the source, which silently skipped whole blocks whose formatting it did not match — at one
+	//      point reporting ZERO transitions for a machine with fifteen. An under-count in the COMFORTABLE
+	//      direction, which is the hardest instrument failure to notice.
+	//   11 derived from `getMachine`. Correct as a derivation and wrong as a FINDING: six of the eleven belonged to
+	//      `AggregateAssuranceDisposition`, which JAN-CMDPRE-SPEC-001 §2 had ALREADY ruled a computed disposition
+	//      rather than a machine. I had searched the transition table and the register, not the spec that
+	//      interprets them — the count was a claim about my search, exactly as an absence would have been.
+	//   5  the same derivation, with the prior ruling honoured.
+	// The lesson is not "measure better". It is that a DERIVED number still needs its POPULATION checked against
+	// what has already been decided about it.
 	it('the unreachable set is exactly these, each for a stated reason', () => {
 		expect(unreachableStates().map(key)).toEqual([
-			// ── AggregateAssuranceDisposition: SIX states, NO arrows — the whole machine (see the empty-machine
-			// test below). This is the axis that would roll assurance up across an aggregate, so what is declared
-			// and unrunnable is the answer to "is this body of work assured overall".
-			'AggregateAssuranceDisposition.CONDITIONALLY_SATISFIED',
-			'AggregateAssuranceDisposition.EVIDENCE_REQUIRED',
-			'AggregateAssuranceDisposition.INCONCLUSIVE',
-			'AggregateAssuranceDisposition.REJECTED',
-			'AggregateAssuranceDisposition.SATISFIED',
-			'AggregateAssuranceDisposition.UNASSESSED',
 			// The ratified §30 machine declares CANCELLED **terminal** and gives it NO in-arrow. So an assessment can
 			// never be cancelled — REG-F-021's residual R-1 in its sharpest form: an assessment stalled in
 			// EVIDENCE_PENDING (its required evidence never arriving) has no exit at all, and the state that would
@@ -99,6 +121,14 @@ describe('declared states no arrow can reach', () => {
 				'an unreachable state, because every one of its states is unreachable. BOTH of these are assurance ' +
 				'axes: whether a body of work is assured OVERALL, and whether a validator is healthy'
 		).toEqual(['AggregateAssuranceDisposition', 'ValidatorRegistryEntry.status']);
+		// AND THE TWO ARE STRUCTURALLY IDENTICAL: both have zero transitions, no initial state and no terminal
+		// states. One is ruled a computed disposition (see NOT_STATE_MACHINES) and one is catalogued as a machine
+		// whose table is empty. Nothing in the DATA separates them — the distinction is a judgement the spec made,
+		// which is why it is cited above rather than inferred here.
+		for (const m of empty) {
+			expect(getMachine(m).initialState).toBeUndefined();
+			expect(getMachine(m).terminalStates).toEqual([]);
+		}
 	});
 
 	// A terminal state with no in-arrow is the worst shape: declared as an ENDING that nothing can end at.
