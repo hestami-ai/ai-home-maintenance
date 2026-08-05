@@ -24,6 +24,7 @@
 //
 // This census does not fix it. It pins the size of it so the number can only fall, and so the next author sees
 // the mismatch as a measured fact rather than rediscovering it through a refusal three layers away.
+import { MAPPED_PWU_KINDS } from '@janumipwb/rph-projections';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createEngine, getObject, type EngineHandle } from './index.js';
@@ -84,42 +85,73 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		).toBeGreaterThan(5);
 	});
 
-	it('records the divergence at its measured size, which may only fall', () => {
+	it('exactly ONE seeded kind is outside the catalog vocabulary, and it is the repository’s own invention', () => {
+		// SIX on 2026-08-05, then ONE the same day. The five that closed were ABBREVIATIONS of names the seeder
+		// already carried in full: every PWU Type's `name` was already the corpus's prose ('Architecture
+		// Definition', 'Integrated Product Validation'), and only the UPPER_SNAKE `kind` had been shortened. So the
+		// migration was snake-casing the name each type already had — derived, with no judgement in it.
+		//
+		// ARCHITECTURE_CONCERN is the one left, and it is a different kind of thing: 'Architecture Concern' appears
+		// ZERO times in the ontology specification. The repository invented a generic child of Architecture
+		// Definition; the corpus defines a real one at §15, 'Architecture Decision' — *"a governed choice among
+		// materially different architectural alternatives"*. Those are related and NOT the same: a concern is an
+		// area of consideration, a decision is a choice among alternatives. Renaming would change what the seeded
+		// type MEANS, not how it is spelled, so it is left as an authoring question rather than folded into a
+		// mechanical migration. See REG-F-028.
 		const cat = catalogKinds();
-		const unmatched = seeded.filter((k) => !cat.includes(k));
-		const unbindable = cat.filter((k) => !seeded.includes(k));
-		expect(
-			unmatched,
-			'these seeded kinds appear in NO catalog policy, so a kind-scoped policy can never govern work of ' +
-				'this kind however correctly its objectType matches'
-		).toEqual([
-			'ARCHITECTURE',
-			'ARCHITECTURE_CONCERN',
-			'BASELINE_PROMOTION',
-			'INTEGRATED_VALIDATION',
-			'INTENT_DEFINITION',
-			'PRODUCT_BEHAVIOR'
-		]);
-		expect(
-			unbindable.length,
-			'these catalog kinds bind to nothing the workbench seeds — authored scope that governs no work'
-		).toBe(11);
+		expect(seeded.filter((k) => !cat.includes(k))).toEqual(['ARCHITECTURE_CONCERN']);
 	});
 
-	it('the three that DO agree are the proof the mechanism works when the names match', () => {
-		// Without this the divergence could be read as "kind scoping is broken". It is not: where the two
-		// vocabularies happen to agree, a kind-scoped policy binds exactly as intended.
-		expect(seeded.filter((k) => catalogKinds().includes(k))).toEqual([
+	it('every catalog kind that binds to nothing seeded is a type the workbench simply does not seed', () => {
+		// Not a defect on its own: the catalog scopes policies for PWU Types beyond the seven the reference
+		// workbench stands up (Intent Discovery, Product Boundary, Requirement Definition, User Journey
+		// Definition, Work Decomposition, Architecture Decision). Counted so that an accidental narrowing of the
+		// seeded set, or a stray catalog kind, shows up as a change rather than as silence.
+		const unbindable = catalogKinds().filter((k) => !seeded.includes(k));
+		expect(unbindable.sort()).toEqual([
+			'ARCHITECTURE_DECISION',
+			'INTENT_DISCOVERY',
+			'PRODUCT_BOUNDARY',
+			'REQUIREMENT_DEFINITION',
+			'USER_JOURNEY_DEFINITION',
+			'WORK_DECOMPOSITION'
+		]);
+	});
+
+	it('every seeded kind has an EXPLICIT compatibility milestone — none relies on the silent default', () => {
+		// Found the hard way during this migration. `milestoneForKind` ends `?? 'INTAKE'`, which is the right
+		// reading for a kind from an arbitrary PWA — but it cannot distinguish "a kind we never knew" from "a kind
+		// we knew, renamed underneath us". Renaming five seeded kinds left five stale keys, and FOUR of the five
+		// degraded to INTAKE with nothing failing; one test asserting one specific milestone is the only reason it
+		// surfaced at all. This closes that: the default now covers only the case it was written for.
+		const unmapped = seeded.filter((k) => !MAPPED_PWU_KINDS.includes(k));
+		expect(
+			unmapped,
+			'these seeded kinds fall through to the INTAKE default, so their milestone is a fallback wearing the ' +
+				'appearance of a derivation'
+		).toEqual([]);
+		// CONTROL: the map is a real lookup that can miss, so the empty list above is a judgement not a constant.
+		expect(MAPPED_PWU_KINDS).not.toContain('A_KIND_NOBODY_DEFINED');
+	});
+
+	it('the seeded root tree now speaks the corpus vocabulary, name for name', () => {
+		// The ontology specification draws the tree in prose: Product Realization over Intent and Product
+		// Definition / Product Behavior Definition / Architecture Definition / Implementation Planning / Product
+		// Implementation / Integrated Product Validation / Product Baseline Promotion. UPPER_SNAKE of those eight
+		// IS the catalog's vocabulary, which is what settles the direction of the migration — the catalog is
+		// grounded in the corpus and the seeder's abbreviations were not.
+		for (const k of [
+			'PRODUCT_REALIZATION',
+			'INTENT_AND_PRODUCT_DEFINITION',
+			'PRODUCT_BEHAVIOR_DEFINITION',
+			'ARCHITECTURE_DEFINITION',
 			'IMPLEMENTATION_PLANNING',
 			'PRODUCT_IMPLEMENTATION',
-			'PRODUCT_REALIZATION'
-		]);
-	});
-
-	it('the CORPUS uses the catalog vocabulary, which is what makes the seeder the drift', () => {
-		// The load-bearing claim of REG-F-028's disposition, asserted rather than left in a comment: the fix
-		// belongs in the seeder. If this ever fails, the direction of the migration is no longer settled.
-		expect(catalogKinds()).toContain('INTENT_AND_PRODUCT_DEFINITION');
-		expect(seeded).toContain('INTENT_DEFINITION');
+			'INTEGRATED_PRODUCT_VALIDATION',
+			'PRODUCT_BASELINE_PROMOTION'
+		])
+			expect(seeded, `${k} is named by the ontology specification's own PWU Type tree`).toContain(
+				k
+			);
 	});
 });

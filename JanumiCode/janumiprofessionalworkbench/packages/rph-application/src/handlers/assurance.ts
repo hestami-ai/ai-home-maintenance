@@ -760,19 +760,24 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// a placeholder awaiting one. The floor's declared scope is now derived from the object-type enum, and the 54
 	// refusals were a false declaration rather than a scope conflict.
 	//
-	// STILL NOT ENFORCED — BUT THE REASON HAS CHANGED, AND THE OLD ONE IS GONE. Wiring it now gets PAST the floor
-	// and fails at step #56 instead of #47: `pol_fitness_for_purpose` reports NOT_APPLICABLE for a
-	// PROFESSIONAL_WORK_UNIT whose objectType it explicitly names. Measured, the cause is a SECOND vocabulary
-	// divergence, filed as REG-F-028 — the catalog's `appliesToPwuKinds` and the kinds `seed-workbench.ts` gives
-	// its PWU Types are two different naming schemes. SIX of the nine seeded kinds appear in no catalog policy
-	// (INTENT_DEFINITION vs the catalog's INTENT_AND_PRODUCT_DEFINITION, INTEGRATED_VALIDATION vs
-	// INTEGRATED_PRODUCT_VALIDATION, BASELINE_PROMOTION vs PRODUCT_BASELINE_PROMOTION, and three more), and ELEVEN
-	// of the fourteen catalog kinds bind to nothing seeded. The corpus settles which is right — the Reference
-	// Undertaking writes `"pwuKind": "INTENT_AND_PRODUCT_DEFINITION"` — so the SEEDER is the drift, not the catalog.
+	// STILL NOT ENFORCED — THIRD TIME, THIRD REASON, AND THIS ONE IS NOT THE REPOSITORY CONTRADICTING ITSELF.
+	// Each run of this check has found a real, different defect, which is what an instrument is for:
+	//   #47, REG-F-024 — the floor declared a scope narrower than the one it enforced, justified by a
+	//                    "single-value applicableObjectTypes limitation" that does not exist in the schema. FIXED.
+	//   #56, REG-F-028 — the seeder's PWU kinds were abbreviations of the corpus names the catalog uses, so
+	//                    kind-scoped policies matched nothing. FIXED (five renames; one disclosed remainder).
+	//   now,  REG-F-029 — the canonical drive assesses EVERY PWU under `pol_fitness_for_purpose`, and the ratified
+	//                    catalog scopes that policy to three kinds. THREE of the drive's thirteen PWUs are
+	//                    governed by it; the rest are assessed under a policy the corpus says does not govern them.
 	//
-	// That is a vocabulary migration touching seeded types, projections and E2E expectations, and it does not
-	// belong inside a scope reconciliation. The kernel stays deferred, with an instrument waiting, exactly as
-	// before — but no longer behind a limitation that never existed.
+	// THAT ONE IS NOT A SPELLING OR A SCOPE MISTAKE — it is the fixture claiming governance the catalog does not
+	// grant, and the fix is for the drive to cite, per PWU, a policy that governs that PWU's kind (the seeded PWU
+	// Types already declare exactly that, in their `policies` field). Enforcing before then would refuse the
+	// canonical drive for asking a real question badly, which is the same trade as before: a green suite that had
+	// stopped assessing rather than one that had started checking.
+	//
+	// The kernel stays deferred with an instrument waiting — but note what the instrument has done. It has been
+	// wrong about its own diagnosis twice and right about there being something wrong three times out of three.
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');

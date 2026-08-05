@@ -162,13 +162,13 @@ const LABELS: Record<string, { title: string; kind: string }> = {
 	[REFERENCE_UNDERTAKING.root]: { title: 'Product Realization', kind: 'PRODUCT_REALIZATION' },
 	[REFERENCE_UNDERTAKING.intentDef]: {
 		title: 'Intent & Product Definition',
-		kind: 'INTENT_DEFINITION'
+		kind: 'INTENT_AND_PRODUCT_DEFINITION'
 	},
 	[REFERENCE_UNDERTAKING.behavior]: {
 		title: 'Product Behavior Definition',
-		kind: 'PRODUCT_BEHAVIOR'
+		kind: 'PRODUCT_BEHAVIOR_DEFINITION'
 	},
-	[REFERENCE_UNDERTAKING.architecture]: { title: 'Architecture Definition', kind: 'ARCHITECTURE' },
+	[REFERENCE_UNDERTAKING.architecture]: { title: 'Architecture Definition', kind: 'ARCHITECTURE_DEFINITION' },
 	[REFERENCE_UNDERTAKING.systemContext]: { title: 'System Context', kind: 'ARCHITECTURE_CONCERN' },
 	[REFERENCE_UNDERTAKING.multiTenancy]: {
 		title: 'Multi-Tenancy Architecture',
@@ -193,11 +193,11 @@ const LABELS: Record<string, { title: string; kind: string }> = {
 	},
 	[REFERENCE_UNDERTAKING.validation]: {
 		title: 'Integrated Product Validation',
-		kind: 'INTEGRATED_VALIDATION'
+		kind: 'INTEGRATED_PRODUCT_VALIDATION'
 	},
 	[REFERENCE_UNDERTAKING.promotion]: {
 		title: 'Product Baseline Promotion',
-		kind: 'BASELINE_PROMOTION'
+		kind: 'PRODUCT_BASELINE_PROMOTION'
 	}
 };
 

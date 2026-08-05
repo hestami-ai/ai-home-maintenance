@@ -39,7 +39,10 @@ test.describe('PWA Designer — rich PWU Type authoring (fields, help, template,
 		let snap = await introspect(request);
 		let t = snap.pwuTypes.find((x) => x.state.name === 'Architecture Definition');
 		expect(t, 'the defined PWU Type exists in engine truth').toBeTruthy();
-		expect(t!.state.pwuKind).toBe('ARCHITECTURE');
+		// ARCHITECTURE -> ARCHITECTURE_DEFINITION (REG-F-028). Note the lookup two lines up already matched on
+		// `name === 'Architecture Definition'` — the corpus's own prose, which the template always carried. The
+		// kind was the abbreviation, and this assertion is where that showed.
+		expect(t!.state.pwuKind).toBe('ARCHITECTURE_DEFINITION');
 		expect(t!.state.completionRule).toBe('architecture done rule');
 		expect(t!.state.isRoot).toBe(true);
 

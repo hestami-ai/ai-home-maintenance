@@ -12,17 +12,29 @@ import type { Projector } from './projector.js';
 
 // PWU kind -> legacy phase milestone. The Product Realization PWA's kinds map onto DOC-006's phase labels.
 // Unknown kinds fall back to INTAKE (the entry milestone) rather than fabricate a later phase.
+//
+// THE FALLBACK IS RIGHT AND IT IS ALSO A BLIND SPOT (REG-F-028). `pwuKind` is a free string — any PWA may define
+// kinds this map has never seen — so defaulting to the ENTRY milestone rather than inventing a later one is the
+// correct reading, and it stays. But a silent default cannot tell "a kind we do not know" from "a kind we DID
+// know, renamed underneath us". When the seeded kinds were migrated to the corpus vocabulary, five keys here went
+// stale at once and four of the five degraded to INTAKE with nothing failing; a single test asserting one
+// specific milestone is the only reason it surfaced. `pwu-kind-vocabulary-census.test.ts` now asserts that every
+// kind the reference workbench actually seeds has an EXPLICIT entry here, so the fallback covers only the case it
+// was written for.
 const KIND_TO_MILESTONE: Record<string, CompatibilityMilestone> = {
 	PRODUCT_REALIZATION: 'INTAKE',
-	INTENT_DEFINITION: 'INTAKE',
-	PRODUCT_BEHAVIOR: 'PROPOSE',
-	ARCHITECTURE: 'ARCHITECTURE',
+	INTENT_AND_PRODUCT_DEFINITION: 'INTAKE',
+	PRODUCT_BEHAVIOR_DEFINITION: 'PROPOSE',
+	ARCHITECTURE_DEFINITION: 'ARCHITECTURE',
 	ARCHITECTURE_CONCERN: 'ARCHITECTURE',
 	IMPLEMENTATION_PLANNING: 'PROPOSE',
 	PRODUCT_IMPLEMENTATION: 'EXECUTE',
-	INTEGRATED_VALIDATION: 'VALIDATE',
-	BASELINE_PROMOTION: 'COMMIT'
+	INTEGRATED_PRODUCT_VALIDATION: 'VALIDATE',
+	PRODUCT_BASELINE_PROMOTION: 'COMMIT'
 };
+
+/** The kinds this projection maps explicitly — exported so a gate can check nothing seeded relies on the default. */
+export const MAPPED_PWU_KINDS: readonly string[] = Object.keys(KIND_TO_MILESTONE);
 
 /** Derive the baseline compatibility milestone for a PWU kind (WP-2-006; W5/WP-5-003 refines with axis state). */
 export function milestoneForKind(pwuKind: string): CompatibilityMilestone {

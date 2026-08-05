@@ -73,20 +73,20 @@ const PWU_TYPES: ReadonlyArray<{
 	},
 	{
 		id: PT_INTENT,
-		kind: 'INTENT_DEFINITION',
+		kind: 'INTENT_AND_PRODUCT_DEFINITION',
 		name: 'Intent & Product Definition',
 		purpose: 'Originating intent, stakeholders, product boundary',
 		policies: ['pol_intent_fidelity', 'pol_intent_completeness', 'pol_assumption_disclosure']
 	},
 	{
 		id: PT_BEHAVIOR,
-		kind: 'PRODUCT_BEHAVIOR',
+		kind: 'PRODUCT_BEHAVIOR_DEFINITION',
 		name: 'Product Behavior Definition',
 		purpose: 'Actors, capabilities, journeys, requirements'
 	},
 	{
 		id: PT_ARCH,
-		kind: 'ARCHITECTURE',
+		kind: 'ARCHITECTURE_DEFINITION',
 		name: 'Architecture Definition',
 		purpose: 'A coherent technical structure realizing approved behavior',
 		children: [
@@ -109,13 +109,13 @@ const PWU_TYPES: ReadonlyArray<{
 	},
 	{
 		id: PT_VALIDATE,
-		kind: 'INTEGRATED_VALIDATION',
+		kind: 'INTEGRATED_PRODUCT_VALIDATION',
 		name: 'Integrated Product Validation',
 		purpose: 'Journey/requirement/architecture/fitness validation'
 	},
 	{
 		id: PT_PROMOTE,
-		kind: 'BASELINE_PROMOTION',
+		kind: 'PRODUCT_BASELINE_PROMOTION',
 		name: 'Product Baseline Promotion',
 		purpose: 'Evidence package, residual-risk + promotion decisions, authoritative baseline'
 	},

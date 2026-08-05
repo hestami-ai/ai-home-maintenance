@@ -62,7 +62,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 	{
 		key: 'intent-definition',
 		name: 'Intent & Product Definition',
-		pwuKind: 'INTENT_DEFINITION',
+		pwuKind: 'INTENT_AND_PRODUCT_DEFINITION',
 		isRoot: false,
 		purpose: 'Originating intent, stakeholders, product boundary.',
 		requiredInputs: ['originating-intent'],
@@ -71,7 +71,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 	{
 		key: 'product-behavior',
 		name: 'Product Behavior Definition',
-		pwuKind: 'PRODUCT_BEHAVIOR',
+		pwuKind: 'PRODUCT_BEHAVIOR_DEFINITION',
 		isRoot: false,
 		purpose: 'Actors, capabilities, journeys, requirements.',
 		requiredInputs: ['product-definition'],
@@ -80,7 +80,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 	{
 		key: 'architecture',
 		name: 'Architecture Definition',
-		pwuKind: 'ARCHITECTURE',
+		pwuKind: 'ARCHITECTURE_DEFINITION',
 		isRoot: false,
 		purpose: 'A coherent technical structure realizing approved behavior.',
 		requiredInputs: ['approved-behavior'],
@@ -107,7 +107,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 	{
 		key: 'integrated-validation',
 		name: 'Integrated Product Validation',
-		pwuKind: 'INTEGRATED_VALIDATION',
+		pwuKind: 'INTEGRATED_PRODUCT_VALIDATION',
 		isRoot: false,
 		purpose: 'Journey / requirement / architecture / fitness validation.',
 		requiredInputs: ['implemented-increments'],
@@ -116,7 +116,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 	{
 		key: 'baseline-promotion',
 		name: 'Product Baseline Promotion',
-		pwuKind: 'BASELINE_PROMOTION',
+		pwuKind: 'PRODUCT_BASELINE_PROMOTION',
 		isRoot: false,
 		purpose: 'Evidence package, residual-risk + promotion decisions, authoritative baseline.',
 		requiredInputs: ['validation-evidence'],

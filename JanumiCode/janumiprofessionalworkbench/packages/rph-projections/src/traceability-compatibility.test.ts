@@ -67,9 +67,9 @@ describe('traceabilityProjector', () => {
 
 describe('compatibilityProjector', () => {
 	const events: DomainEvent[] = [
-		ev('PwuProposed', 'PROFESSIONAL_WORK_UNIT', 'pwu_a', { pwuId: 'pwu_a', pwuKind: 'ARCHITECTURE' }),
+		ev('PwuProposed', 'PROFESSIONAL_WORK_UNIT', 'pwu_a', { pwuId: 'pwu_a', pwuKind: 'ARCHITECTURE_DEFINITION' }),
 		ev('PwuProposed', 'PROFESSIONAL_WORK_UNIT', 'pwu_i', { pwuId: 'pwu_i', pwuKind: 'PRODUCT_IMPLEMENTATION' }),
-		ev('PwuProposed', 'PROFESSIONAL_WORK_UNIT', 'pwu_p', { pwuId: 'pwu_p', pwuKind: 'BASELINE_PROMOTION' }),
+		ev('PwuProposed', 'PROFESSIONAL_WORK_UNIT', 'pwu_p', { pwuId: 'pwu_p', pwuKind: 'PRODUCT_BASELINE_PROMOTION' }),
 		ev('PwuProposed', 'PROFESSIONAL_WORK_UNIT', 'pwu_x', { pwuId: 'pwu_x', pwuKind: 'SOMETHING_UNKNOWN' })
 	];
 

@@ -279,7 +279,10 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		const r = broker.defineFromTemplate('architecture');
 		expect(r.ok).toBe(true);
 		expect(broker.getType(r.id!)).toMatchObject({
-			pwuKind: 'ARCHITECTURE',
+			// ARCHITECTURE -> ARCHITECTURE_DEFINITION (REG-F-028): the catalog's kinds were abbreviations of the
+			// names they already carried, and the ontology specification's PWU Type tree writes 'Architecture
+			// Definition'. The template's own `name` was already that; only the kind token had been shortened.
+			pwuKind: 'ARCHITECTURE_DEFINITION',
 			requiredInputs: ['approved-behavior'],
 			requiredOutputs: ['architecture-baseline']
 		});
