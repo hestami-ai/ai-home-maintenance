@@ -708,7 +708,8 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// (not yet activated), a SUSPENDED one (out of force), or a SUPERSEDED version (a new assessment pins the current
 	// version, §18). Two distinct rejections so the audit says which.
 	const policy = ctx.store.loadObject(p.assurancePolicyId)?.state as
-		{ status?: string; requiredEvidence?: Array<{ id?: string }> } | undefined;
+		| { status?: string; requiredEvidence?: Array<{ id?: string }>; applicability?: unknown }
+		| undefined;
 	if (!policy) {
 		return reject(
 			command,
@@ -740,6 +741,23 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// WHAT IS ACTUALLY EMPTY, AND IT IS NOT THIS CODE: no production path declares requiredEvidence on any policy,
 	// so this resolves to [] for every assessment the product can create — REG-F-022, pinned by
 	// verif/policy-evidence-requirement-census.test.ts. The resolution below is correct; its INPUT is empty.
+	// ── DOES THIS POLICY GOVERN THIS WORK AT ALL? (DOC-004 §5.1 / §5.2) — MEASURED, NOT YET ENFORCED ─────────
+	// The kernel exists (`policyApplicability`, rph-domain) and the scope now REACHES the runtime (REG-F-022 second
+	// instance). Wiring it here as a REFUSAL was written, run, and DELIBERATELY WITHDRAWN, because of what it
+	// measured: 54 drives refused, and the canonical reference undertaking failed at step #47 requesting an
+	// assessment of an EVIDENCE object under `floor.schema-invariant`.
+	//
+	// THE MISMATCH IS REAL AND IT IS NOT THE DRIVE'S FAULT. `seedFloorPolicies` scopes all three de minimis floor
+	// policies to `PROFESSIONAL_WORK_ARCHITECTURE`, and says why in its own comment: *"the single-value
+	// applicableObjectTypes limitation is §16-unresolved; the plane-agnostic array is a later reconciliation"*. The
+	// floor is UNIVERSAL by design (§8.4) and scoped narrowly by a limitation the codebase already discloses. So
+	// enforcing §5.1 today would enforce data the repository says is provisional — turning a disclosed limitation
+	// into a hard refusal without fixing the thing it discloses.
+	//
+	// ENFORCING BAD SCOPE IS WORSE THAN NOT ENFORCING. A refusal here would block the floor from governing exactly
+	// the work it exists to govern, and the green suite that followed would be a system that had stopped assessing
+	// rather than one that had started checking. The check lands when the floor's scope is reconciled; the kernel
+	// and its tests stay so that reconciliation has an instrument waiting. Filed as REG-F-024.
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');

@@ -588,3 +588,93 @@ export const ASSESSMENT_IN_FLIGHT_STATES: readonly string[] = [
 export function assessmentHasConcluded(assessmentState: string | undefined): boolean {
 	return assessmentState !== undefined && ASSESSMENT_CONCLUDED_STATES.includes(assessmentState);
 }
+
+// ============================================================================================
+// Policy applicability (DOC-004 §5.1 / §5.2) — does this policy govern this work at all?
+// ============================================================================================
+
+/** The subject facts an applicability decision needs. Assembled by the caller from the object it is about. */
+export interface ApplicabilitySubject {
+	readonly objectType: string;
+	/** PWU kind, when the subject is a PWU. Absent for other object types. */
+	readonly pwuKind?: string;
+	readonly tags?: readonly string[];
+}
+
+/** The §5.1 fields this kernel can decide from. Everything else in the rule is ignored, deliberately — see below. */
+export interface ApplicabilityRuleView {
+	readonly objectTypeConditions?: readonly unknown[];
+	readonly pwuKindConditions?: readonly string[];
+	readonly requiredTags?: readonly string[];
+	readonly excludedTags?: readonly string[];
+	readonly expression?: unknown;
+}
+
+/**
+ * Decide whether a policy applies to a subject, as a DOC-004 §5.2 `ApplicabilityOutcome`.
+ *
+ * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────────────────────────────────────
+ * §5.1 ratifies an ApplicabilityRule and §5.2 ratifies the outcomes a determination yields. The corpus defines
+ * both and the engine consulted neither: `applicability` was hardcoded `{}` on every policy, and no code path
+ * asked whether a policy governed the work it was being used to assess. Delivering the field without reading it
+ * would be REG-F-022 one field over — an authored value that reaches an object nothing consults.
+ *
+ * ── WHAT IT REFUSES TO DECIDE, AND WHY THAT IS THE IMPORTANT PART ──────────────────────────────────────────
+ * §5.1's `expression` is a `PolicyExpression`, a type the corpus NAMES and DEFINES NOWHERE. A rule carrying one
+ * states a condition this kernel cannot evaluate. It returns **REQUIRES_HUMAN_DETERMINATION** — a §5.2 outcome,
+ * not an invented one — rather than ignoring the expression and answering from the fields it does understand.
+ *
+ * Ignoring it would be the fail-open reading: a policy whose real condition is "applies only to externally
+ * delegated work" would be reported APPLICABLE to everything, and the assessment would proceed under a policy
+ * that does not govern it. An unevaluable condition is not an absent one.
+ *
+ * `lifecycleTriggers`, `eventTriggers`, `riskConditions` and `semanticChangeConditions` are ACTIVATION conditions
+ * (§5.3 — *when* a policy activates), not SCOPE conditions (*what* it governs). This kernel answers scope only,
+ * which is the question `RequestAssuranceAssessment` needs answered; activation is a separate concern and is not
+ * silently folded in here.
+ */
+export function policyApplicability(
+	rule: ApplicabilityRuleView | undefined,
+	subject: ApplicabilitySubject
+): ApplicabilityOutcomeValue {
+	// No rule at all: nothing scopes the policy, so nothing excludes this subject. Not the same as a rule that
+	// says "everything" — it is the absence of a scope, and the honest reading of absence here is permissive
+	// because a policy with no declared scope has not declared this subject out.
+	if (!rule) return 'REQUIRED';
+	const objectTypes = (rule.objectTypeConditions ?? []).filter(
+		(c): c is string => typeof c === 'string'
+	);
+	// A rule whose objectTypeConditions are present but NOT plain strings cannot be compared — the corpus does not
+	// define ObjectTypeCondition, so a structured one is undecidable here rather than unsatisfied.
+	if ((rule.objectTypeConditions ?? []).length > 0 && objectTypes.length === 0)
+		return 'REQUIRES_HUMAN_DETERMINATION';
+	if (objectTypes.length > 0 && !objectTypes.includes(subject.objectType)) return 'NOT_APPLICABLE';
+	// pwuKindConditions restricts WHICH KIND of work unit. Absent = unrestricted; present = an allow-list. A
+	// subject with no pwuKind (a PWA, say) cannot satisfy a kind restriction, so a kind-scoped policy does not
+	// apply to it.
+	const kinds = rule.pwuKindConditions ?? [];
+	if (kinds.length > 0 && (subject.pwuKind === undefined || !kinds.includes(subject.pwuKind)))
+		return 'NOT_APPLICABLE';
+	const tags = subject.tags ?? [];
+	if ((rule.requiredTags ?? []).some((t) => !tags.includes(t))) return 'NOT_APPLICABLE';
+	if ((rule.excludedTags ?? []).some((t) => tags.includes(t))) return 'NOT_APPLICABLE';
+	// Everything this kernel CAN decide says the policy applies. If the rule also carries an expression, that
+	// verdict is provisional — see the note above.
+	if (rule.expression !== undefined) return 'REQUIRES_HUMAN_DETERMINATION';
+	return 'REQUIRED';
+}
+
+/** The §5.2 outcomes, as a local union so rph-domain stays free of a contracts import (pure kernel, string states). */
+export type ApplicabilityOutcomeValue =
+	| 'REQUIRED'
+	| 'RECOMMENDED'
+	| 'OPTIONAL'
+	| 'NOT_APPLICABLE'
+	| 'REQUIRES_HUMAN_DETERMINATION';
+
+/** True when an outcome permits assessing the subject under the policy. Only NOT_APPLICABLE forbids it: a
+ *  REQUIRES_HUMAN_DETERMINATION outcome means the machine cannot decide, and refusing on it would block work on
+ *  an unevaluable condition rather than surfacing it. It is permitted and DISCLOSED by the caller. */
+export function applicabilityPermitsAssessment(outcome: ApplicabilityOutcomeValue): boolean {
+	return outcome !== 'NOT_APPLICABLE';
+}
