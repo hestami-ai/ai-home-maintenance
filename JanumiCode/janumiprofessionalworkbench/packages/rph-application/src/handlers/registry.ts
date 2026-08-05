@@ -67,6 +67,13 @@ import {
 	suspendAssurancePolicy
 } from './assurance.js';
 import {
+	disableValidator,
+	enableValidator,
+	markValidatorDegraded,
+	registerValidator,
+	restoreValidator
+} from './validator-registry.js';
+import {
 	approveBaseline,
 	approveDecision,
 	createBaseline,
@@ -159,6 +166,11 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	SupersedeAssurancePolicy: supersedeAssurancePolicy,
 	SuspendAssurancePolicy: suspendAssurancePolicy,
 	ActivateAssurancePolicy: activateAssurancePolicy,
+	RegisterValidator: registerValidator,
+	MarkValidatorDegraded: markValidatorDegraded,
+	RestoreValidator: restoreValidator,
+	DisableValidator: disableValidator,
+	EnableValidator: enableValidator,
 	RequestAssuranceAssessment: requestAssuranceAssessment,
 	SelectAssuranceEvaluator: selectAssuranceEvaluator,
 	BeginAssuranceAssessment: beginAssuranceAssessment,

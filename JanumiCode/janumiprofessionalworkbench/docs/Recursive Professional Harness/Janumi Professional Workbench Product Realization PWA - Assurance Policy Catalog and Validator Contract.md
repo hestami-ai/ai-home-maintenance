@@ -2037,6 +2037,33 @@ Selection should consider:
 * availability;
 * risk profile.
 
+> **`ValidatorRegistryEntry.status` transition table (authored clarification, §0.3 grant, 2026-08-05).**
+> This section ratifies three statuses and **no transitions between them**, so the registry could record a
+> validator's health in principle and had no governed way to change it. That is not a cosmetic gap: **§34.1
+> depends on this field.** A validator implementation failure "produces … retry, **alternate validator
+> implementation**, or escalation action", and an alternate cannot be chosen unless the runtime knows which
+> implementations are available — which is also why *availability* appears in the selection list above.
+> 
+> The arrows are therefore declared:
+> 
+> ```text
+> (registration)       → ACTIVE
+> ACTIVE               → DEGRADED     validator execution failure (§34.1)
+> DEGRADED             → ACTIVE       recovery confirmed
+> ACTIVE | DEGRADED    → DISABLED     authorized withdrawal
+> DISABLED             → ACTIVE       authorized reinstatement
+> ```
+> 
+> **`DEGRADED` does not bar selection.** This section says selection *considers* availability; a degraded
+> implementation is impaired, not withdrawn, and refusing it would be stronger than this section states.
+> `DISABLED` does bar it — selecting a withdrawn implementation defeats both the consideration above and
+> §34.1's alternate.
+> 
+> **Degradation is a governed act, not an inference.** §30's `ASSESSING → VALIDATOR_FAILED` records that an
+> ASSESSMENT failed; this records that a VALIDATOR did. RPH-ASR-006 keeps them distinct — *"the assessed work is
+> not automatically rejected"* — and the same separation applies in reverse: one failed run is not, on its own,
+> a ratified rule for condemning an implementation.
+
 ---
 
 # 36. Assurance Profiles

@@ -25,10 +25,11 @@
         "PWU_TYPE",
         "UNDERTAKING",
         "AUTHORING_CONVERSATION",
-        "RECURSIVE_PROFESSIONAL_HARNESS"
+        "RECURSIVE_PROFESSIONAL_HARNESS",
+        "VALIDATOR_REGISTRY_ENTRY"
       ],
       "canonicalSource": "RPH-DOC-002 §4 (17 runtime) + 4 authoring objects (RPH-DOC-010)",
-      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor.) RECURSIVE_PROFESSIONAL_HARNESS added for JAN-IRP capability C7 (durable RPH coordination object)."
+      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor.) RECURSIVE_PROFESSIONAL_HARNESS added for JAN-IRP capability C7 (durable RPH coordination object). VALIDATOR_REGISTRY_ENTRY added 2026-08-05 (REG-E-024(c)): DOC-004 §35's registry entry becomes a governed object so its ratified status can change through commands. NOTE THE FLOOR: seedFloorPolicies derives applicableObjectTypes from this enum precisely so a new type cannot be silently exempted (REG-F-024) — the declaration widens, enforcement is unchanged (floor-gate requires the FLOOR_POLICY_IDS triple outright, never this list)."
     },
     {
       "name": "HarnessStatus",

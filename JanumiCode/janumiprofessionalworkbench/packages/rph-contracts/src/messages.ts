@@ -39,6 +39,9 @@ import {
 	RecompositionContractStatusSchema,
 	ShapeIntegrityStateSchema,
 	StepStateSchema,
+	ValidatorCostClassSchema,
+	ValidatorLatencyClassSchema,
+	ValidatorRegistryStatusSchema,
 	WorkLifecycleStateSchema
 } from './enums.js';
 import { ActorReferenceSchema } from './envelopes.js';
@@ -81,6 +84,7 @@ import {
 	SuccessConditionSchema,
 	TacticalChangePolicySchema,
 	TerminationPolicySchema,
+	ValidatorIndependenceAttributesSchema,
 	ValidatorResultSchema,
 	WaiverRuleSchema,
 	WorkBoundarySchema,
@@ -694,6 +698,37 @@ export const CancelAssuranceAssessmentPayloadSchema = z.strictObject({
 export type CancelAssuranceAssessmentPayload = z.infer<
 	typeof CancelAssuranceAssessmentPayloadSchema
 >;
+export const RegisterValidatorPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	supportedPolicies: z.array(z.string()),
+	roleId: z.string(),
+	implementationType: z.string(),
+	requiredCapabilities: z.array(CapabilityRequestSchema),
+	independenceAttributes: ValidatorIndependenceAttributesSchema,
+	costClass: ValidatorCostClassSchema,
+	latencyClass: ValidatorLatencyClassSchema
+});
+export type RegisterValidatorPayload = z.infer<typeof RegisterValidatorPayloadSchema>;
+export const MarkValidatorDegradedPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string()
+});
+export type MarkValidatorDegradedPayload = z.infer<typeof MarkValidatorDegradedPayloadSchema>;
+export const RestoreValidatorPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string()
+});
+export type RestoreValidatorPayload = z.infer<typeof RestoreValidatorPayloadSchema>;
+export const DisableValidatorPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string()
+});
+export type DisableValidatorPayload = z.infer<typeof DisableValidatorPayloadSchema>;
+export const EnableValidatorPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string()
+});
+export type EnableValidatorPayload = z.infer<typeof EnableValidatorPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1684,6 +1719,38 @@ export const AssuranceAssessmentCancelledPayloadSchema = z.strictObject({
 export type AssuranceAssessmentCancelledPayload = z.infer<
 	typeof AssuranceAssessmentCancelledPayloadSchema
 >;
+export const ValidatorRegisteredPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	supportedPolicies: z.array(z.string()),
+	roleId: z.string(),
+	implementationType: z.string(),
+	status: ValidatorRegistryStatusSchema
+});
+export type ValidatorRegisteredPayload = z.infer<typeof ValidatorRegisteredPayloadSchema>;
+export const ValidatorDegradedPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string(),
+	status: ValidatorRegistryStatusSchema
+});
+export type ValidatorDegradedPayload = z.infer<typeof ValidatorDegradedPayloadSchema>;
+export const ValidatorRestoredPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string(),
+	status: ValidatorRegistryStatusSchema
+});
+export type ValidatorRestoredPayload = z.infer<typeof ValidatorRestoredPayloadSchema>;
+export const ValidatorDisabledPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string(),
+	status: ValidatorRegistryStatusSchema
+});
+export type ValidatorDisabledPayload = z.infer<typeof ValidatorDisabledPayloadSchema>;
+export const ValidatorEnabledPayloadSchema = z.strictObject({
+	validatorId: z.string(),
+	reason: z.string(),
+	status: ValidatorRegistryStatusSchema
+});
+export type ValidatorEnabledPayload = z.infer<typeof ValidatorEnabledPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2228,6 +2295,36 @@ export const COMMANDS = {
 		targetAggregateType: 'ASSURANCE_ASSESSMENT',
 		emitsEvent: 'AssuranceAssessmentCancelled',
 		firstSlice: false
+	},
+	RegisterValidator: {
+		payload: RegisterValidatorPayloadSchema,
+		targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
+		emitsEvent: 'ValidatorRegistered',
+		firstSlice: false
+	},
+	MarkValidatorDegraded: {
+		payload: MarkValidatorDegradedPayloadSchema,
+		targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
+		emitsEvent: 'ValidatorDegraded',
+		firstSlice: false
+	},
+	RestoreValidator: {
+		payload: RestoreValidatorPayloadSchema,
+		targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
+		emitsEvent: 'ValidatorRestored',
+		firstSlice: false
+	},
+	DisableValidator: {
+		payload: DisableValidatorPayloadSchema,
+		targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
+		emitsEvent: 'ValidatorDisabled',
+		firstSlice: false
+	},
+	EnableValidator: {
+		payload: EnableValidatorPayloadSchema,
+		targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
+		emitsEvent: 'ValidatorEnabled',
+		firstSlice: false
 	}
 } as const;
 
@@ -2562,6 +2659,26 @@ export const EVENTS = {
 	AssuranceAssessmentCancelled: {
 		payload: AssuranceAssessmentCancelledPayloadSchema,
 		aggregateType: 'AssuranceAssessment'
+	},
+	ValidatorRegistered: {
+		payload: ValidatorRegisteredPayloadSchema,
+		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
+	},
+	ValidatorDegraded: {
+		payload: ValidatorDegradedPayloadSchema,
+		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
+	},
+	ValidatorRestored: {
+		payload: ValidatorRestoredPayloadSchema,
+		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
+	},
+	ValidatorDisabled: {
+		payload: ValidatorDisabledPayloadSchema,
+		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
+	},
+	ValidatorEnabled: {
+		payload: ValidatorEnabledPayloadSchema,
+		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
 	}
 } as const;
 
@@ -2584,7 +2701,12 @@ export const RATIFIED_EVENT_PAYLOADS: Record<string, z.ZodType | undefined> = {
 	IntentCaptured: IntentCapturedPayloadSchema,
 	IntentFormalized: IntentFormalizedPayloadSchema,
 	PwuProposed: PwuProposedPayloadSchema,
-	PwuStateChanged: PwuStateChangedPayloadSchema
+	PwuStateChanged: PwuStateChangedPayloadSchema,
+	ValidatorRegistered: ValidatorRegisteredPayloadSchema,
+	ValidatorDegraded: ValidatorDegradedPayloadSchema,
+	ValidatorRestored: ValidatorRestoredPayloadSchema,
+	ValidatorDisabled: ValidatorDisabledPayloadSchema,
+	ValidatorEnabled: ValidatorEnabledPayloadSchema
 };
 
 export interface CommandEventBinding {

@@ -358,6 +358,44 @@ describe('the seeded catalog conforms to DOC-004 itself', () => {
 			expect(section('32').join(' ')).toContain('authored clarification, §0.3 grant');
 		});
 
+		it('§35 declares the ValidatorRegistryEntry.status transition table', () => {
+			// §35 ratified three statuses and NO arrows between them — recorded verbatim in the transitions vocab
+			// as "NO transition table specified in the doc" — which left the registry able to describe a
+			// validator's health and unable to change it. §34.1 DEPENDS on the field ("retry, alternate validator
+			// implementation, or escalation action"), so this was a gap in a mechanism the corpus already relies on.
+			const s35 = (() => {
+				const start = lines.findIndex((l) => /^# 35\. /.test(l));
+				const rest = lines.slice(start + 1);
+				const end = rest.findIndex((l) => /^# \d+\./.test(l));
+				return end < 0 ? rest : rest.slice(0, end);
+			})();
+			// The DECLARATION, read from the fenced block — not from prose mentioning it. Same correction the
+			// §31/§32 check needed, applied here from the start rather than after a mutant found it.
+			const fenced = (() => {
+				const open = s35.findIndex((l) => l.trim().startsWith('> ```text'));
+				const close = s35.findIndex((l, i) => i > open && l.trim() === '> ```');
+				expect(open, '§35 must carry a fenced transition table').toBeGreaterThanOrEqual(0);
+				return s35.slice(open + 1, close).join('\n');
+			})();
+			for (const arrow of [
+				'→ ACTIVE',
+				'ACTIVE               → DEGRADED',
+				'DEGRADED             → ACTIVE',
+				'ACTIVE | DEGRADED    → DISABLED',
+				'DISABLED             → ACTIVE'
+			])
+				expect(fenced, `§35's table must declare: ${arrow}`).toContain(arrow);
+			expect(s35.join(' ')).toContain('authored clarification, §0.3 grant');
+			// The two design claims the amendment makes, so they cannot be quietly dropped from the corpus while
+			// the code still rests on them.
+			expect(s35.join(' '), 'DEGRADED must not bar selection').toContain(
+				'`DEGRADED` does not bar selection'
+			);
+			expect(s35.join(' '), 'degradation is a governed act, not an inference').toContain(
+				'Degradation is a governed act, not an inference'
+			);
+		});
+
 		it('ControlActionRecommendation is now DEFINED, and defined as §33 demonstrates it', () => {
 			// It was referenced four times across the corpus and defined nowhere — which is what blocked
 			// REG-F-026 group (d) until §33's worked example was read.

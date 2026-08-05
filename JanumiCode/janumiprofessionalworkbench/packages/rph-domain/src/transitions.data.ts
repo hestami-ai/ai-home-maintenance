@@ -1650,9 +1650,35 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 	'ValidatorRegistryEntry.status': {
 		name: 'ValidatorRegistryEntry.status',
 		states: ['ACTIVE', 'DEGRADED', 'DISABLED'],
-		initialState: undefined,
+		initialState: 'ACTIVE',
 		terminalStates: [],
-		transitions: [],
+		transitions: [
+			{
+				from: 'ACTIVE',
+				to: 'DEGRADED',
+				trigger: 'MarkValidatorDegraded',
+				guard: 'a validator execution failure was observed (§34.1)'
+			},
+			{ from: 'DEGRADED', to: 'ACTIVE', trigger: 'RestoreValidator', guard: 'recovery confirmed' },
+			{
+				from: 'ACTIVE',
+				to: 'DISABLED',
+				trigger: 'DisableValidator',
+				guard: 'authorized withdrawal'
+			},
+			{
+				from: 'DEGRADED',
+				to: 'DISABLED',
+				trigger: 'DisableValidator',
+				guard: 'authorized withdrawal'
+			},
+			{
+				from: 'DISABLED',
+				to: 'ACTIVE',
+				trigger: 'EnableValidator',
+				guard: 'authorized reinstatement'
+			}
+		],
 		illegal: [],
 		guarded: []
 	},

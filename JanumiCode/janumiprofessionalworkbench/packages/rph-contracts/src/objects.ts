@@ -57,6 +57,9 @@ import {
 	StepTypeSchema,
 	TraceRelationSchema,
 	TransitionTypeSchema,
+	ValidatorCostClassSchema,
+	ValidatorLatencyClassSchema,
+	ValidatorRegistryStatusSchema,
 	WorkLifecycleStateSchema
 } from './enums.js';
 
@@ -335,6 +338,13 @@ export const TraceLinkSchema = z.strictObject({
 	createdBy: ActorReferenceSchema
 });
 export type TraceLink = z.infer<typeof TraceLinkSchema>;
+export const ValidatorIndependenceAttributesSchema = z.strictObject({
+	agentFamily: z.string().optional(),
+	modelFamily: z.string().optional(),
+	provider: z.string().optional(),
+	organization: z.string().optional()
+});
+export type ValidatorIndependenceAttributes = z.infer<typeof ValidatorIndependenceAttributesSchema>;
 export const ValidatorResultSchema = z.strictObject({
 	validatorId: z.string(),
 	validatorVersion: z.string(),
@@ -772,6 +782,22 @@ export const RecursiveProfessionalHarnessSchema = z.strictObject({
 });
 export type RecursiveProfessionalHarness = z.infer<typeof RecursiveProfessionalHarnessSchema>;
 
+/** VALIDATOR_REGISTRY_ENTRY — id prefix: VALIDATOR_REGISTRY_ENTRY */
+export const ValidatorRegistryEntrySchema = z.strictObject({
+	...objectEnvelopeShape,
+	validatorId: z.string(),
+	supportedPolicies: z.array(z.string()),
+	roleId: z.string(),
+	implementationType: z.string(),
+	modelPolicy: ModelSelectionPolicySchema.optional(),
+	requiredCapabilities: z.array(CapabilityRequestSchema),
+	independenceAttributes: ValidatorIndependenceAttributesSchema,
+	costClass: ValidatorCostClassSchema,
+	latencyClass: ValidatorLatencyClassSchema,
+	status: ValidatorRegistryStatusSchema
+});
+export type ValidatorRegistryEntry = z.infer<typeof ValidatorRegistryEntrySchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -851,5 +877,10 @@ export const OBJECT_SCHEMAS = {
 		schema: RecursiveProfessionalHarnessSchema,
 		idPrefixEntity: 'rph',
 		tsName: 'RecursiveProfessionalHarness'
+	},
+	VALIDATOR_REGISTRY_ENTRY: {
+		schema: ValidatorRegistryEntrySchema,
+		idPrefixEntity: 'VALIDATOR_REGISTRY_ENTRY',
+		tsName: 'ValidatorRegistryEntry'
 	}
 } as const;

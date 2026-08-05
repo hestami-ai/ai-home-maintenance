@@ -1515,6 +1515,71 @@
 					"enumRef": "HarnessStatusSchema"
 				}
 			]
+		},
+		{
+			"objectType": "VALIDATOR_REGISTRY_ENTRY",
+			"tsName": "ValidatorRegistryEntry",
+			"idPrefixEntity": "VALIDATOR_REGISTRY_ENTRY",
+			"note": "DOC-004 §35 (VERBATIM interface) + the §35 transition table declared by the 2026-08-05 §0.3 authored clarification. REG-E-024(c): the three statuses were the LAST unreachable states in the system — declared, with `transitions: []` and the vocab's own note \"NO transition table specified in the doc\". §34.1 depends on this field (\"retry, ALTERNATE VALIDATOR IMPLEMENTATION, or escalation action\"), which is why the registry is operative rather than descriptive. Fields are §35 VERBATIM; `status` is the machine axis. Extends ObjectEnvelope.",
+			"fields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "supportedPolicies",
+					"type": "string[]",
+					"required": true
+				},
+				{
+					"field": "roleId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "implementationType",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "modelPolicy",
+					"type": "ModelSelectionPolicy",
+					"required": false,
+					"note": "Helper undefined — same disclosed shape as RuntimeBinding.modelSelectionPolicy."
+				},
+				{
+					"field": "requiredCapabilities",
+					"type": "CapabilityRequest[]",
+					"required": true,
+					"note": "Helper undefined."
+				},
+				{
+					"field": "independenceAttributes",
+					"type": "ValidatorIndependenceAttributes",
+					"required": true,
+					"note": "§35 inline object: agentFamily?, modelFamily?, provider?, organization? — all optional."
+				},
+				{
+					"field": "costClass",
+					"type": "ValidatorCostClass",
+					"enumRef": "ValidatorCostClassSchema",
+					"required": true
+				},
+				{
+					"field": "latencyClass",
+					"type": "ValidatorLatencyClass",
+					"enumRef": "ValidatorLatencyClassSchema",
+					"required": true
+				},
+				{
+					"field": "status",
+					"type": "ValidatorRegistryStatus",
+					"enumRef": "ValidatorRegistryStatusSchema",
+					"required": true,
+					"note": "The machine axis — ValidatorRegistryEntry.status."
+				}
+			]
 		}
 	],
 	"helperSubTypes": [
@@ -3105,6 +3170,32 @@
 					"type": "string",
 					"required": true,
 					"note": "WHY the skip is authorized. A bare id would record THAT it was authorized without the reasoning — the REG-Q-012 mistake."
+				}
+			]
+		},
+		{
+			"name": "ValidatorIndependenceAttributes",
+			"note": "DOC-004 §35 inline object, VERBATIM (all four optional).",
+			"fields": [
+				{
+					"field": "agentFamily",
+					"type": "string",
+					"required": false
+				},
+				{
+					"field": "modelFamily",
+					"type": "string",
+					"required": false
+				},
+				{
+					"field": "provider",
+					"type": "string",
+					"required": false
+				},
+				{
+					"field": "organization",
+					"type": "string",
+					"required": false
 				}
 			]
 		}

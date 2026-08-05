@@ -1869,14 +1869,51 @@
 		{
 			"name": "ValidatorRegistryEntry.status",
 			"appliesTo": "Operational status of a registered validator in the Validator Registry (assurance-service doc §35).",
-			"sourceSection": "assurance-service doc §35 enum (VERBATIM). NO transition table specified in the doc.",
+			"sourceSection": "assurance-service doc §35 enum (VERBATIM). TRANSITIONS DECLARED 2026-08-05 by the §35 §0.3 authored clarification — this note previously read \"NO transition table specified in the doc\", which was true and was the whole of REG-E-024(c): three declared states with no way to move between them, the last unreachable group in the system.",
 			"states": [
 				"ACTIVE",
 				"DEGRADED",
 				"DISABLED"
 			],
-			"transitions": [],
-			"illegal": []
+			"transitions": [
+				{
+					"from": "ACTIVE",
+					"to": "DEGRADED",
+					"trigger": "MarkValidatorDegraded",
+					"guard": "a validator execution failure was observed (§34.1)",
+					"note": "§30 records that an ASSESSMENT failed (ASSESSING → VALIDATOR_FAILED); THIS records that the VALIDATOR did. A governed act, not an inference from one run — RPH-ASR-006 keeps the two apart."
+				},
+				{
+					"from": "DEGRADED",
+					"to": "ACTIVE",
+					"trigger": "RestoreValidator",
+					"guard": "recovery confirmed",
+					"note": "Degradation must be recoverable or it is disablement under another name."
+				},
+				{
+					"from": "ACTIVE",
+					"to": "DISABLED",
+					"trigger": "DisableValidator",
+					"guard": "authorized withdrawal",
+					"note": "A governance act. §35 makes availability a selection input; DISABLED is what removes an implementation from selection."
+				},
+				{
+					"from": "DEGRADED",
+					"to": "DISABLED",
+					"trigger": "DisableValidator",
+					"guard": "authorized withdrawal",
+					"note": "§35's table reads \"ACTIVE | DEGRADED → DISABLED\" — both source states, one trigger."
+				},
+				{
+					"from": "DISABLED",
+					"to": "ACTIVE",
+					"trigger": "EnableValidator",
+					"guard": "authorized reinstatement",
+					"note": "The inverse governance act. Returns to ACTIVE, not DEGRADED: reinstatement asserts fitness."
+				}
+			],
+			"illegal": [],
+			"initialState": "ACTIVE"
 		},
 		{
 			"name": "PWA.publicationStatus",

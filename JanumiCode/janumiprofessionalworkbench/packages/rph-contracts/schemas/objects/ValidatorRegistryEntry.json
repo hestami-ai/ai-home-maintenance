@@ -232,40 +232,84 @@
         "additionalProperties": false
       }
     },
-    "artifactType": {
+    "validatorId": {
       "type": "string"
     },
-    "mediaType": {
+    "supportedPolicies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "roleId": {
       "type": "string"
     },
-    "storageProvider": {
+    "implementationType": {
       "type": "string"
     },
-    "storageKey": {
-      "type": "string"
+    "modelPolicy": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
     },
-    "contentHash": {
-      "type": "string"
+    "requiredCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability"
+        ],
+        "additionalProperties": false
+      }
     },
-    "byteSize": {
-      "type": "integer",
-      "minimum": -9007199254740991,
-      "maximum": 9007199254740991
+    "independenceAttributes": {
+      "type": "object",
+      "properties": {
+        "agentFamily": {
+          "type": "string"
+        },
+        "modelFamily": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "organization": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     },
-    "producingPwuId": {
-      "type": "string"
+    "costClass": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ]
     },
-    "producingExecutionAttemptId": {
-      "type": "string"
-    },
-    "securityClassification": {
-      "type": "string"
-    },
-    "retentionClass": {
-      "type": "string"
+    "latencyClass": {
+      "type": "string",
+      "enum": [
+        "INTERACTIVE",
+        "STANDARD",
+        "LONG_RUNNING"
+      ]
     },
     "status": {
-      "type": "string"
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "DEGRADED",
+        "DISABLED"
+      ]
     }
   },
   "required": [
@@ -282,15 +326,16 @@
     "provenance",
     "tags",
     "extensions",
-    "artifactType",
-    "mediaType",
-    "storageProvider",
-    "storageKey",
-    "contentHash",
-    "securityClassification",
-    "retentionClass",
+    "validatorId",
+    "supportedPolicies",
+    "roleId",
+    "implementationType",
+    "requiredCapabilities",
+    "independenceAttributes",
+    "costClass",
+    "latencyClass",
     "status"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:ArtifactObject:1"
+  "$id": "urn:janumi:rph:schema:object:ValidatorRegistryEntry:1"
 }

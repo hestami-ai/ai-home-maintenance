@@ -155,9 +155,34 @@ describe('declared states no arrow can reach', () => {
 		expect(getMachine('AssuranceAssessment.state').transitions.length).toBeGreaterThan(10);
 	});
 
-	it('CONTROL: the detector CAN report a state as unreachable', () => {
-		// Otherwise "the list is exactly these five" is a statement about a detector that finds nothing.
-		expect(unreachableStates().length).toBeGreaterThan(0);
+	it('CONTROL: the detector CAN report a state as unreachable — on a SYNTHETIC machine', () => {
+		// Otherwise "the list is exactly these" is a statement about a detector that finds nothing.
+		//
+		// ── THIS CONTROL USED TO REST ON A REAL DEFECT, AND THAT MADE IT SELF-DESTRUCTING ─────────────────────
+		// It asserted `unreachableStates().length > 0` against the LIVE machine set. That held only while the
+		// system still HAD an unreachable state, so the control was guaranteed to fail on the day the last one
+		// was fixed — which is exactly what happened when `ValidatorRegistryEntry.status` got its arrows
+		// (REG-E-024(c)). A control whose witness is the defect it guards against reports "the detector works"
+		// and "the system is broken" with the same assertion, and cannot distinguish them.
+		//
+		// It is the mirror of `a-control-that-cannot-fail`: this one CANNOT PASS once the system is correct. The
+		// fix is the same in both directions — the control supplies its OWN witness, so it is a statement about
+		// the detector and about nothing else.
+		const reachableOf = (m: { states: readonly string[]; transitions: readonly { to: string }[]; initialState?: string }) => {
+			const reachable = new Set<string>(m.transitions.map((t) => t.to));
+			if (m.initialState) reachable.add(m.initialState);
+			return m.states.filter((s) => !reachable.has(s));
+		};
+		// A machine with a state no arrow enters and no initial claim: the detector must name it.
+		expect(
+			reachableOf({ states: ['A', 'B', 'STRANDED'], transitions: [{ to: 'B' }], initialState: 'A' }),
+			'the detector must report a state with no in-arrow and no initial claim'
+		).toEqual(['STRANDED']);
+		// And the inverse, so it is not simply reporting everything: an initial state needs no in-arrow.
+		expect(
+			reachableOf({ states: ['A', 'B'], transitions: [{ to: 'B' }], initialState: 'A' }),
+			'an INITIAL state is reachable by initialization — reporting it would be the REG-E-024(d) error'
+		).toEqual([]);
 	});
 
 	// THE PIN. Each entry is a declared state the machine cannot enter, with what it means. This list may SHRINK —
@@ -175,20 +200,13 @@ describe('declared states no arrow can reach', () => {
 	// The lesson is not "measure better". It is that a DERIVED number still needs its POPULATION checked against
 	// what has already been decided about it.
 	it('the unreachable set is exactly these, each for a stated reason', () => {
-		expect(unreachableStates().map(key)).toEqual([
-			// `AssuranceAssessment.state.CANCELLED` LEFT THIS LIST on 2026-08-05. It was recorded as needing "an
-			// arrow the corpus does not declare" — WRONG: §30's alternate-transitions block declares
-			// `ANY ACTIVE → CANCELLED` and the transcription dropped it. Delivered, not authored.
-			// `PWU.assuranceState.UNASSESSED` LEFT THIS LIST on 2026-08-05 — and it was never an orphan. It is the
-			// machine's real ENTRY POINT, which correctly has no in-arrow; what was wrong was that the machine
-			// named a different state as its start. An in-arrow check cannot tell those apart, which is why the
-			// connectivity assertions above exist and why they found it.
-			// ValidatorRegistryEntry.status: three states, no arrows. Validator health (§22's DEGRADED / DISABLED) is
-			// declared and unrunnable — the assurance system cannot record that one of its own validators is failing.
-			'ValidatorRegistryEntry.status.ACTIVE',
-			'ValidatorRegistryEntry.status.DEGRADED',
-			'ValidatorRegistryEntry.status.DISABLED'
-		]);
+		expect(
+			unreachableStates().map(key),
+			'ZERO since 2026-08-05 (REG-E-024(c)). This list held ValidatorRegistryEntry.status’s three values — ' +
+				'the last unreachable states in the system — because §35 ratified the enum and specified no transition ' +
+				'table. The table is now declared (§0.3 authored clarification) and the arrows exist. THE COUNT MAY ONLY ' +
+				'RISE BY A DELIBERATE ACT: a new declared state with no in-arrow reddens here.'
+		).toEqual([]);
 	});
 
 	// The sharper half: a machine with no arrows at all is not a partially-wired machine, it is a name.
@@ -199,7 +217,11 @@ describe('declared states no arrow can reach', () => {
 			'a declared machine with zero transitions promises a lifecycle that cannot be run at all — worse than ' +
 				'an unreachable state, because every one of its states is unreachable. BOTH of these are assurance ' +
 				'axes: whether a body of work is assured OVERALL, and whether a validator is healthy'
-		).toEqual(['AggregateAssuranceDisposition', 'ValidatorRegistryEntry.status']);
+		).toEqual(['AggregateAssuranceDisposition']);
+		// ONE, and it is not a defect: `AggregateAssuranceDisposition` is a computed REDUCTION (DOC-004 §28.2),
+		// folded by `aggregateAssuranceDisposition` — it has no arrows because it is not a machine. Asking which
+		// arrows it lacks is the malformed question REG-E-024(b) asked. `ValidatorRegistryEntry.status` left this
+		// list on 2026-08-05 when §35's transition table was declared.
 		// AND THE TWO ARE STRUCTURALLY IDENTICAL: both have zero transitions, no initial state and no terminal
 		// states. One is ruled a computed disposition (see NOT_STATE_MACHINES) and one is catalogued as a machine
 		// whose table is empty. Nothing in the DATA separates them — the distinction is a judgement the spec made,

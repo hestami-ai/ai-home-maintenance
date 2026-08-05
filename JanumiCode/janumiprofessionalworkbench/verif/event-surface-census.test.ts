@@ -58,6 +58,13 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-08-05, REG-E-024(c): the validator registry. §35 ratified three statuses and no transition table,
+	// so these five events had no commands to be emitted by; the table is now declared (§0.3 authored
+	// clarification) and `validator-registry.test.ts` drives every arrow. Added HERE because this set is a
+	// pinned snapshot — a live count cannot cross vitest workers — so a new emitter must be recorded by hand
+	// or the census reports it as bound-but-unemitted, which would be false.
+	'ValidatorRegistered', 'ValidatorDegraded', 'ValidatorRestored', 'ValidatorDisabled',
+	'ValidatorEnabled',
 	'ArtifactRecorded', 'AssumptionDetected', 'AssumptionExpired', 'AssuranceAssessmentCompleted',
 	'AssuranceAssessmentCancelled', 'AssuranceAssessmentEscalated', 'AssuranceAssessmentRequested',
 	'AssuranceAssessmentStarted',

@@ -113,6 +113,9 @@ describe('validate', () => {
 		// already required (authored clarification, §0.3 grant).
 		// +1 → 330: ExecutionFailureClass, minted 2026-08-05 from RPH-DOC-002 §36.2's seven prose items when
 		// REG-E-025 was ratified (REG-F-026 group (c)).
-		expect(buildContractRegistry().ids()).toHaveLength(330);
+		// +11 → 341: the validator registry (REG-E-024(c)) — VALIDATOR_REGISTRY_ENTRY, three §35 enums
+		// (ValidatorRegistryStatus / CostClass / LatencyClass), five commands and five events, less the two
+		// helper shapes that resolve rather than register.
+		expect(buildContractRegistry().ids()).toHaveLength(341);
 	});
 });

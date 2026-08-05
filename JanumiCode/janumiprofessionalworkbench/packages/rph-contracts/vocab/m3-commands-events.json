@@ -2920,6 +2920,132 @@
 					"note": "WHY the assessment is being abandoned. REQUIRED, unlike most authored rationales here: cancellation is the one act that closes an assessment WITHOUT a verdict, so the reason is the only account of it that will ever exist. An optional field here would let an assessment vanish with no record of why — which is the shape REG-F-021 recorded for TacticalChangeRequested."
 				}
 			]
+		},
+		{
+			"commandType": "RegisterValidator",
+			"targetAggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"emitsEvent": "ValidatorRegistered",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "supportedPolicies",
+					"type": "string[]",
+					"required": true
+				},
+				{
+					"field": "roleId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "implementationType",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "requiredCapabilities",
+					"type": "CapabilityRequest[]",
+					"required": true
+				},
+				{
+					"field": "independenceAttributes",
+					"type": "ValidatorIndependenceAttributes",
+					"required": true
+				},
+				{
+					"field": "costClass",
+					"type": "ValidatorCostClass",
+					"enumRef": "ValidatorCostClassSchema",
+					"required": true
+				},
+				{
+					"field": "latencyClass",
+					"type": "ValidatorLatencyClass",
+					"enumRef": "ValidatorLatencyClassSchema",
+					"required": true
+				}
+			]
+		},
+		{
+			"commandType": "MarkValidatorDegraded",
+			"targetAggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"emitsEvent": "ValidatorDegraded",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				}
+			]
+		},
+		{
+			"commandType": "RestoreValidator",
+			"targetAggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"emitsEvent": "ValidatorRestored",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				}
+			]
+		},
+		{
+			"commandType": "DisableValidator",
+			"targetAggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"emitsEvent": "ValidatorDisabled",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				}
+			]
+		},
+		{
+			"commandType": "EnableValidator",
+			"targetAggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"emitsEvent": "ValidatorEnabled",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				}
+			]
 		}
 	],
 	"events": [
@@ -7061,6 +7187,135 @@
 					"field": "reason",
 					"required": true,
 					"type": "string"
+				}
+			]
+		},
+		{
+			"eventType": "ValidatorRegistered",
+			"aggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "supportedPolicies",
+					"type": "string[]",
+					"required": true
+				},
+				{
+					"field": "roleId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "implementationType",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "status",
+					"type": "ValidatorRegistryStatus",
+					"enumRef": "ValidatorRegistryStatusSchema",
+					"required": true
+				}
+			]
+		},
+		{
+			"eventType": "ValidatorDegraded",
+			"aggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				},
+				{
+					"field": "status",
+					"type": "ValidatorRegistryStatus",
+					"enumRef": "ValidatorRegistryStatusSchema",
+					"required": true
+				}
+			]
+		},
+		{
+			"eventType": "ValidatorRestored",
+			"aggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				},
+				{
+					"field": "status",
+					"type": "ValidatorRegistryStatus",
+					"enumRef": "ValidatorRegistryStatusSchema",
+					"required": true
+				}
+			]
+		},
+		{
+			"eventType": "ValidatorDisabled",
+			"aggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				},
+				{
+					"field": "status",
+					"type": "ValidatorRegistryStatus",
+					"enumRef": "ValidatorRegistryStatusSchema",
+					"required": true
+				}
+			]
+		},
+		{
+			"eventType": "ValidatorEnabled",
+			"aggregateType": "VALIDATOR_REGISTRY_ENTRY",
+			"sourceSection": "AUTHORED 2026-08-05 under the §0.3 grant, alongside the DOC-004 §35 transition-table amendment (REG-E-024(c)). §35 ratifies the entry and its three statuses and specified NO transitions and NO commands; the arrows are declared by that amendment and these are their triggers. Named per transition rather than one SetValidatorStatus, so the machine — not a payload field — decides legality.",
+			"payloadFields": [
+				{
+					"field": "validatorId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true,
+					"note": "Why. A status change nobody explained is a governance fact with no provenance."
+				},
+				{
+					"field": "status",
+					"type": "ValidatorRegistryStatus",
+					"enumRef": "ValidatorRegistryStatusSchema",
+					"required": true
 				}
 			]
 		}
