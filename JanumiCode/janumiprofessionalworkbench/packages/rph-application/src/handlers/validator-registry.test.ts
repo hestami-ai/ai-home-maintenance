@@ -134,3 +134,162 @@ describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
 		);
 	});
 });
+
+// ── GATE D: the status becomes OPERATIVE (REG-E-024(c)) ──────────────────────────────────────────────────────
+//
+// A governed field nothing reads is REG-F-022's disease, so the registry owes a refusal. §35 makes availability a
+// selection input and §34.1 requires an ALTERNATE implementation be choosable when one fails — both empty words
+// unless a withdrawn implementation is actually barred.
+//
+// THE SEAM IS COMPLETION, NOT SELECTION, and that is a correction made during implementation:
+// `selectAssuranceEvaluator` carries an `evaluator: ActorReference` (a PERSON — `evaluator-1`) while the registry
+// keys on `validatorId` (an IMPLEMENTATION — `reference-undertaking.reviewer`). Different namespaces; joining
+// them would infer a binding from proximity, the exact error REG-F-022 records for evidenceId vs requirement id.
+describe('Gate D — a DISABLED validator’s result cannot complete an assessment', () => {
+	let engine: Engine;
+	let seq = 0;
+	const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5W00';
+	const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5W10';
+	const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5W20';
+	const POLICY = 'pol_gate_d';
+
+	const to = (commandType: string, type: string, id: string, payload: unknown) => {
+		const n = ++seq;
+		return engine.dispatch({
+			commandId: `d-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'corr-d',
+			idempotencyKey: `dk-${n}`,
+			payload
+		} as DomainCommand);
+	};
+	const ok = (c: string, t: string, i: string, p: unknown) => {
+		const r = to(c, t, i, p);
+		expect(r.status, `${c}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+		return r;
+	};
+
+	/** Complete the assessment with a result naming `validatorId`. */
+	const completeWith = (validatorId: string) =>
+		to('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', ASM, {
+			validatorResult: {
+				validatorId,
+				validatorVersion: '1',
+				policyId: POLICY,
+				policyVersion: '1.0.0',
+				assessmentId: ASM,
+				subjectObjectIds: [PWU],
+				subjectSemanticVersions: { [PWU]: 1 },
+				claimResults: [],
+				evidenceConsideredIds: [],
+				evidenceRejected: [],
+				observations: [],
+				dispositionRecommendation: 'SATISFIED',
+				recommendedControlActions: [],
+				residualUncertainty: [],
+				limitations: [],
+				executionProvenance: {}
+			}
+		});
+
+	beforeEach(async () => {
+		seq = 0;
+		const { seedPolicy } = await import('./__tests__/floor-fixtures.js');
+		engine = new Engine({
+			store: new SqliteStorageAdapter({ now: () => TS }),
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
+		ok('CaptureIntent', 'INTENT', INTENT, {
+			intentId: INTENT,
+			originatingExpression: 'x',
+			ontologyId: 'o',
+			ontologyVersion: '1'
+		});
+		ok('ProposePwu', 'PROFESSIONAL_WORK_UNIT', PWU, {
+			pwuId: PWU,
+			pwuKind: 'ARCHITECTURE_DEFINITION',
+			title: 'T',
+			description: 'd',
+			intentId: INTENT,
+			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+			obligationIds: [],
+			constraintIds: [],
+			assumptionIds: [],
+			expectedOutputs: [],
+			assurancePolicyIds: [],
+			riskProfile: {
+				consequence: 'LOW',
+				uncertainty: 'LOW',
+				irreversibility: 'LOW',
+				securitySensitivity: 'NONE',
+				regulatoryExposure: 'NONE'
+			}
+		});
+		seedPolicy(engine, POLICY, {});
+		ok('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', ASM, {
+			assessmentId: ASM,
+			assurancePolicyId: POLICY,
+			policyVersion: '1.0.0',
+			subjectObjectIds: [PWU],
+			subjectSemanticVersions: { [PWU]: 1 },
+			claimIds: []
+		});
+		ok('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', ASM, {});
+	});
+
+	const registerAs = (status: 'ACTIVE' | 'DEGRADED' | 'DISABLED') => {
+		ok('RegisterValidator', 'VALIDATOR_REGISTRY_ENTRY', VID, {
+			validatorId: VID,
+			supportedPolicies: [POLICY],
+			roleId: 'REVIEWER',
+			implementationType: 'MODEL',
+			requiredCapabilities: [],
+			independenceAttributes: {},
+			costClass: 'LOW',
+			latencyClass: 'STANDARD'
+		});
+		if (status === 'DEGRADED')
+			ok('MarkValidatorDegraded', 'VALIDATOR_REGISTRY_ENTRY', VID, {
+				validatorId: VID,
+				reason: 'flaky'
+			});
+		if (status === 'DISABLED')
+			ok('DisableValidator', 'VALIDATOR_REGISTRY_ENTRY', VID, {
+				validatorId: VID,
+				reason: 'withdrawn'
+			});
+	};
+
+	it('REFUSES a result from a DISABLED validator, naming the remedy', () => {
+		registerAs('DISABLED');
+		const r = completeWith(VID);
+		expect(r.status).not.toBe('ACCEPTED');
+		const msg = JSON.stringify(r.error);
+		expect(msg).toContain('DISABLED');
+		expect(msg, 'a governed refusal names what may be done instead').toContain('EnableValidator');
+	});
+
+	it('CONTROL: an ACTIVE validator completes — the refusal is about the STATUS', () => {
+		registerAs('ACTIVE');
+		expect(completeWith(VID).status).toBe('ACCEPTED');
+	});
+
+	it('DEGRADED does NOT refuse — §35 says selection CONSIDERS availability, not that it bars', () => {
+		// A design claim, not an omission: a degraded implementation is impaired, not withdrawn, and barring it
+		// would be stronger than the corpus states. If this ever reddens, the gate has been over-implemented.
+		registerAs('DEGRADED');
+		expect(completeWith(VID).status).toBe('ACCEPTED');
+	});
+
+	it('an UNREGISTERED validator does NOT refuse — the disclosed fail-open', () => {
+		// No production path registers a validator today. Refusing on absence would make every existing assessment
+		// uncompletable: a gate that bars the entire product is not a stricter gate, it is a broken one.
+		expect(completeWith('never-registered').status).toBe('ACCEPTED');
+	});
+});

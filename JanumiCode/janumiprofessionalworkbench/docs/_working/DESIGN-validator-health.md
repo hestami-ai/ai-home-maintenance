@@ -76,14 +76,33 @@ gives the status teeth, rather than trusting callers to remember.
 
 A status nothing reads is REG-F-022 again. Two consumers, both grounded:
 
-1. **`selectAssuranceEvaluator` REFUSES a `DISABLED` validator.** §35 makes availability a selection input and
-   §34.1 requires an *alternate* implementation be choosable; selecting a withdrawn validator defeats both.
+1. **A `DISABLED` validator's RESULT is refused, at `completeAssuranceAssessment`.** §35 makes availability a
+   selection input and §34.1 requires an *alternate* implementation be choosable; both are empty words unless a
+   withdrawn implementation is actually barred.
+   - **⚠ CORRECTED DURING IMPLEMENTATION — §35's prose points at a seam that does not carry the identity.**
+     `selectAssuranceEvaluator` carries `evaluator: ActorReference` — a PERSON — while the registry keys on
+     `validatorId`, an IMPLEMENTATION. The reference undertaking's evaluator is `evaluator-1` and its validator is
+     `reference-undertaking.reviewer`: **different namespaces**, and joining them would be inferring a binding
+     from proximity — the exact error REG-F-022 records for `evidenceId` vs requirement id. `validatorId` enters
+     the assurance flow in exactly ONE place, `validatorResult` at completion, so that is the only sound seam.
+     It is also stronger: it refuses the RESULT, not merely the intention to use the validator.
 2. **`DEGRADED` does NOT refuse.** §35 says selection *considers* availability — a degraded validator is impaired,
    not withdrawn, and refusing it would be stronger than the corpus states. It is surfaced, not barred. **Stating
    the non-refusal explicitly matters:** it is the difference between implementing §35 and over-implementing it.
-3. **The read-model must know.** A new engine refusal that the projection is not told about is F-29, and this
-   session created the sixth instance exactly that way. The evaluator affordance withholds `DISABLED` validators
-   with the same kernel/decision split used for the retry cap and §36.
+3. **The read-model — MEASURED, AND F-29 DOES NOT APPLY HERE.** A new engine refusal the projection is not told
+   about is F-29, and I created the sixth instance that way earlier the same day, so this was checked before
+   anything was built rather than after.
+   - **There is no affordance to withhold.** F-29's invariant is *"no affordance the engine would reject"*.
+     Gate D refuses at `CompleteAssuranceAssessment`, and **no UI surface offers that click keyed to a validator**:
+     the one production caller is a fixed demo action that runs a whole assessment sequence with a hardcoded
+     `validatorId: 'workbench.demo-signoff'`, which is never registered — so the fail-open covers it and the
+     engine refuses nothing a user can click.
+   - **Building the limb anyway would be the disease, not the cure.** An affordance filter for a click nobody
+     offers is a control that cannot fire, which is what this register spends its time deleting.
+   - **THE CONDITION UNDER WHICH IT BECOMES REQUIRED, stated so a future author does not read this as an
+     oversight:** the moment any production path (a) registers a validator that (b) a user-triggered action then
+     names in a `validatorResult`, the affordance must consult status — same kernel/decision split as the retry
+     cap and §36. Recorded here rather than discovered as F-29's seventh instance.
 
 ## 6. What this deliberately does not do
 

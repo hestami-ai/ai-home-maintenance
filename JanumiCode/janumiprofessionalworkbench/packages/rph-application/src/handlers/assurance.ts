@@ -1516,6 +1516,45 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				.map((o) => o!.severity as string)
 		));
 
+	// ── GATE D — A DISABLED VALIDATOR'S RESULT IS REFUSED (REG-E-024(c), DOC-004 §35) ──────────────────────────
+	//
+	// §35 makes availability a selection input and §34.1 requires an *alternate validator implementation* be
+	// choosable when one fails. Both are empty words unless a withdrawn implementation is actually barred.
+	//
+	// WHY HERE AND NOT AT SELECTION, WHICH IS WHERE §35's PROSE POINTS. `selectAssuranceEvaluator` carries an
+	// `evaluator: ActorReference` — a PERSON OR AGENT — while the registry keys on `validatorId`, an
+	// IMPLEMENTATION. They are different namespaces: the reference undertaking's evaluator is `evaluator-1` and
+	// its validator is `reference-undertaking.reviewer`. Joining them would be inferring a binding from
+	// proximity, which is the exact error REG-F-022 records for `evidenceId` vs requirement id.
+	//
+	// `validatorId` enters the assurance flow in exactly one place — `validatorResult` on THIS command — so this
+	// is the only seam where the check is sound. It is also the stronger position: it refuses the RESULT, not
+	// merely the intention to use the validator.
+	//
+	// DEGRADED DOES NOT REFUSE. §35 says selection *considers* availability; a degraded implementation is
+	// impaired, not withdrawn, and barring it would be stronger than the corpus states. Stating the non-refusal
+	// is part of the design, not an omission.
+	//
+	// AN UNREGISTERED VALIDATOR DOES NOT REFUSE — the disclosed fail-open, the same shape as `attemptsMade` and
+	// `lastFailureClass`. No production path registers a validator today, so refusing on absence would make every
+	// existing assessment uncompletable: a gate that bars the entire product is not a stricter gate, it is a
+	// broken one.
+	const validatorIdOnResult = (
+		command.payload as { validatorResult?: { validatorId?: string } } | undefined
+	)?.validatorResult?.validatorId;
+	if (typeof validatorIdOnResult === 'string') {
+		const entry = ctx.store.loadObject(validatorIdOnResult)?.state as
+			| { status?: string }
+			| undefined;
+		if (entry?.status === 'DISABLED')
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`CompleteAssuranceAssessment: validator ${validatorIdOnResult} is DISABLED in the registry (DOC-004 §35), so its result cannot complete an assessment. §34.1's response to a failed validator is an ALTERNATE implementation; accepting a withdrawn one instead would defeat both that and §35's availability consideration. Re-enable it (EnableValidator) or complete with a validator that is ACTIVE or DEGRADED.`,
+				[command.targetAggregateId, validatorIdOnResult]
+			);
+	}
+
 	// GATE B (Increment R) — permittedControlActions ENFORCED, not merely displayed. A validator may only recommend
 	// a control action the policy permits (§11); an action outside the permitted set is a policy violation, so the
 	// completion fails closed rather than record an ungoverned recommendation. permittedControlActions is now a
