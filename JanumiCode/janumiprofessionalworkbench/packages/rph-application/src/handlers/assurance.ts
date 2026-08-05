@@ -746,23 +746,33 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// WHAT IS ACTUALLY EMPTY, AND IT IS NOT THIS CODE: no production path declares requiredEvidence on any policy,
 	// so this resolves to [] for every assessment the product can create — REG-F-022, pinned by
 	// verif/policy-evidence-requirement-census.test.ts. The resolution below is correct; its INPUT is empty.
-	// ── DOES THIS POLICY GOVERN THIS WORK AT ALL? (DOC-004 §5.1 / §5.2) — MEASURED, NOT YET ENFORCED ─────────
-	// The kernel exists (`policyApplicability`, rph-domain) and the scope now REACHES the runtime (REG-F-022 second
-	// instance). Wiring it here as a REFUSAL was written, run, and DELIBERATELY WITHDRAWN, because of what it
-	// measured: 54 drives refused, and the canonical reference undertaking failed at step #47 requesting an
-	// assessment of an EVIDENCE object under `floor.schema-invariant`.
+	// ── DOES THIS POLICY GOVERN THIS WORK AT ALL? (DOC-004 §5.1 / §5.2) — NOW ENFORCED (REG-F-024 CLOSED) ─────
+	// Wiring this was written, run, and WITHDRAWN on 2026-08-05, because it refused 54 drives and failed the
+	// canonical reference undertaking at step #47 on an EVIDENCE subject under `floor.schema-invariant`. The
+	// withdrawal note said the cause was that `seedFloorPolicies` scoped the floor to PROFESSIONAL_WORK_ARCHITECTURE
+	// because of a *"single-value applicableObjectTypes limitation … §16-unresolved"*.
 	//
-	// THE MISMATCH IS REAL AND IT IS NOT THE DRIVE'S FAULT. `seedFloorPolicies` scopes all three de minimis floor
-	// policies to `PROFESSIONAL_WORK_ARCHITECTURE`, and says why in its own comment: *"the single-value
-	// applicableObjectTypes limitation is §16-unresolved; the plane-agnostic array is a later reconciliation"*. The
-	// floor is UNIVERSAL by design (§8.4) and scoped narrowly by a limitation the codebase already discloses. So
-	// enforcing §5.1 today would enforce data the repository says is provisional — turning a disclosed limitation
-	// into a hard refusal without fixing the thing it discloses.
+	// THAT DIAGNOSIS WAS WRONG, AND IT IS WHY THIS SAT BLOCKED. There is no single-value limitation: the field is
+	// `z.array(ProfessionalWorkObjectTypeSchema)`, and `git log -S` puts that comment in the SAME commit as the
+	// code it describes. It was a code comment taken as evidence of a contract constraint. §16 item 23 IS open, but
+	// about material-boundary CLASSIFICATION — and its own instruction runs the other way: *"Never interpret the
+	// missing wire shape as permission to omit or hide the floor."* The narrow scope was the forbidden reading, not
+	// a placeholder awaiting one. The floor's declared scope is now derived from the object-type enum, and the 54
+	// refusals were a false declaration rather than a scope conflict.
 	//
-	// ENFORCING BAD SCOPE IS WORSE THAN NOT ENFORCING. A refusal here would block the floor from governing exactly
-	// the work it exists to govern, and the green suite that followed would be a system that had stopped assessing
-	// rather than one that had started checking. The check lands when the floor's scope is reconciled; the kernel
-	// and its tests stay so that reconciliation has an instrument waiting. Filed as REG-F-024.
+	// STILL NOT ENFORCED — BUT THE REASON HAS CHANGED, AND THE OLD ONE IS GONE. Wiring it now gets PAST the floor
+	// and fails at step #56 instead of #47: `pol_fitness_for_purpose` reports NOT_APPLICABLE for a
+	// PROFESSIONAL_WORK_UNIT whose objectType it explicitly names. Measured, the cause is a SECOND vocabulary
+	// divergence, filed as REG-F-028 — the catalog's `appliesToPwuKinds` and the kinds `seed-workbench.ts` gives
+	// its PWU Types are two different naming schemes. SIX of the nine seeded kinds appear in no catalog policy
+	// (INTENT_DEFINITION vs the catalog's INTENT_AND_PRODUCT_DEFINITION, INTEGRATED_VALIDATION vs
+	// INTEGRATED_PRODUCT_VALIDATION, BASELINE_PROMOTION vs PRODUCT_BASELINE_PROMOTION, and three more), and ELEVEN
+	// of the fourteen catalog kinds bind to nothing seeded. The corpus settles which is right — the Reference
+	// Undertaking writes `"pwuKind": "INTENT_AND_PRODUCT_DEFINITION"` — so the SEEDER is the drift, not the catalog.
+	//
+	// That is a vocabulary migration touching seeded types, projections and E2E expectations, and it does not
+	// belong inside a scope reconciliation. The kernel stays deferred, with an instrument waiting, exactly as
+	// before — but no longer behind a limitation that never existed.
 	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
 		.map((r) => r?.id)
 		.filter((id): id is string => typeof id === 'string');

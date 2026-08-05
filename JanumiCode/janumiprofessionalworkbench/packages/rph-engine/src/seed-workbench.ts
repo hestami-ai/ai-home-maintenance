@@ -4,6 +4,7 @@
 // context) AND a real Undertaking with a live graph (Undertaking context) to render — the RPH-DOC-010 separation,
 // demonstrated end to end. It is deterministic: it drives commands; no fixture event log is replayed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import {
 	FLOOR_POLICY_DEFINITIONS,
 	findingsFor,
@@ -158,10 +159,38 @@ function sender(handle: EngineHandle, prefix: string) {
 	};
 }
 
-/** Create the 3 de minimis floor policies as canonical ASSURANCE_POLICY objects (guide §8.4/§8.9). These are
- *  universal (every engine needs them for the floor gate), so this is safe to call on any engine. For the authoring
- *  plane they are scoped to PROFESSIONAL_WORK_ARCHITECTURE (the single-value applicableObjectTypes limitation is
- *  §16-unresolved; the plane-agnostic array is a later reconciliation). */
+/**
+ * Create the 3 de minimis floor policies as canonical ASSURANCE_POLICY objects (guide §8.4/§8.9). These are
+ * universal (every engine needs them for the floor gate), so this is safe to call on any engine.
+ *
+ * ── THE SCOPE, AND THE COMMENT THAT USED TO BE HERE (REG-F-024) ──────────────────────────────────────────────
+ * This declared `['PROFESSIONAL_WORK_ARCHITECTURE']` and said why: *"the single-value applicableObjectTypes
+ * limitation is §16-unresolved; the plane-agnostic array is a later reconciliation."* **There is no such
+ * limitation and there never was.** The field is `z.array(ProfessionalWorkObjectTypeSchema)` — a required array of
+ * the ratified 22-value enum — and `git log -S` puts that comment in the SAME commit as the code it describes, so
+ * it was wrong when written rather than true-then-stale. The test fixture had already been seeding three types
+ * for as long as it has existed, which is how the suite passed against a floor scoped more honestly than the one
+ * that shipped.
+ *
+ * ── WHY BROAD, AND WHY DERIVED ───────────────────────────────────────────────────────────────────────────────
+ * §16 item 23 IS open, and it is about this floor — but what it leaves unresolved is material-boundary
+ * classification, not which object types a policy may name. Its own instruction settles the direction, verbatim:
+ * **"Never interpret the missing wire shape as permission to omit or hide the floor."** A narrow scope citing the
+ * unresolved wire shape is precisely that reading. §8.4 scopes the floor by *"every material professional
+ * transformation"* and enumerates no object types at all.
+ *
+ * So the declaration is derived from the enum, not listed: a hand-written list goes stale the day a 23rd object
+ * type is added, and it goes stale in the FORBIDDEN direction — silently exempting new work. The fixture's own
+ * three-type list is the proof, since it was already missing EVIDENCE, which is what the reference undertaking
+ * tripped on at step #47.
+ *
+ * ── AND IT REQUIRES NOTHING NEW ──────────────────────────────────────────────────────────────────────────────
+ * `floor-gate.ts` never reads `applicableObjectTypes` or `applicability`; it requires the FLOOR_POLICY_IDS triple
+ * outright. So the floor was ALREADY universal in enforcement and narrow only in declaration, and the two
+ * disagreed. Broadening the declaration permits strictly more and requires strictly nothing more — which is what
+ * makes this safe, and what made the 54 refusals a false declaration rather than a real scope conflict.
+ * `floor-declared-scope.test.ts` holds declared ⊇ enforced so the two cannot part again.
+ */
 export function seedFloorPolicies(handle: EngineHandle): void {
 	const send = sender(handle, 'seedpol');
 	for (const def of FLOOR_POLICY_DEFINITIONS) {
@@ -171,7 +200,7 @@ export function seedFloorPolicies(handle: EngineHandle): void {
 			name: def.name,
 			purpose: def.purpose,
 			rationale: def.rationale,
-			applicableObjectTypes: ['PROFESSIONAL_WORK_ARCHITECTURE'],
+			applicableObjectTypes: [...ProfessionalWorkObjectTypeSchema.options],
 			evaluatedClaimTypes: def.evaluatedClaimTypes,
 			criteria: def.criteria,
 			evaluatorRole: def.evaluatorRole,
