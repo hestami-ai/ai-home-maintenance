@@ -442,6 +442,38 @@ export const revokeDecision: CommandHandler = (ctx, command, payload) => {
 		target: 'REVOKED',
 		eventType: 'DecisionRevoked',
 		precondition: fromStates('EFFECTIVE'),
+		// ── REVOCATION REQUIRES THE AUTHORITY APPROVAL REQUIRES (REG-E-031, sponsor ruling 2026-08-06) ────────
+		// REG-F-048. This handler had a precondition and NO guard, while its two siblings twenty lines away both
+		// refuse an AGENT through `makeDecisionEffective`. Measured before the fix: a HUMAN proposed and approved
+		// a decision to EFFECTIVE, an AGENT issued RevokeDecision, and it was ACCEPTED. THREE COMMANDS ON ONE
+		// AGGREGATE — THE TWO THAT CONFER AUTHORITY WERE GUARDED AND THE ONE THAT WITHDRAWS IT WAS NOT.
+		//
+		// WHY SYMMETRIC AND NOT SOMETHING ELSE. The sponsor was given three candidates and chose this one. The
+		// second — "the original approver or greater" — needs an ORDERING OVER ACTORS that this repository
+		// deliberately does not have (REG-F-014 refused to invent one). The third — revocation is deliberately
+		// EASIER, because stopping is the safe direction — is not obviously wrong and was put to the sponsor as
+		// such; it was declined on the ground that revocation here is not a stop: it retracts the authorization
+		// under work ALREADY PERFORMED, and the impact analysis that would make that safe is itself unbuilt.
+		//
+		// THE CONSEQUENCE, recorded rather than discovered later: an agent that finds the assumption under an
+		// approval falsified CANNOT revoke — it must escalate. That is survivable because it keeps every other
+		// lever: it can contest the claim, record a blocking observation, and move the work to AT_RISK. It can
+		// make a situation visible and unpromotable without holding the authority to undo.
+		//
+		// THE ISSUER, not the decision's recorded authority — because the question this asks is whether THIS
+		// ACTOR may withdraw, not who originally decided.
+		guard: () =>
+			command.issuedBy.actorType === 'HUMAN'
+				? null
+				: reject(
+						command,
+						'RPH_AUTHORITY_INSUFFICIENT',
+						`Decision ${command.targetAggregateId} cannot be revoked by a ${command.issuedBy.actorType}: ` +
+							`revoking a decision requires the authority approving one requires (REG-E-031). An agent ` +
+							`that has found grounds to withdraw an approval must escalate — it may still contest the ` +
+							`claim, record a blocking observation, and move the work to AT_RISK.`,
+						[command.targetAggregateId]
+					),
 		// REG-F-020. `DecisionRevokedPayloadSchema` (a `z.strictObject`) declares `{ revocationRationale, status }`
 		// and the site supplied no `eventPayload`, so the event carried the raw `RevokeDecision` COMMAND payload —
 		// `{ revocationRationale }` — and the one event that records "this decision became REVOKED" did not contain

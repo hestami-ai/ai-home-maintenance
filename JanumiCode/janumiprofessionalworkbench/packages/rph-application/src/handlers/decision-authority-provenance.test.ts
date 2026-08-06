@@ -23,11 +23,18 @@
 // HUMAN-issued command in order to exercise the approval guard — and both now issue as the agent they name, which
 // is a more honest arrangement than the one they replace. No production caller declares a foreign authority.
 //
-// WHAT THIS DOES NOT BUY, stated because the limit is real. This engine has no authentication layer, so
+// WHAT THIS DOES NOT BUY, stated because the limit is real. This engine has no authentication layer TODAY, so
 // `command.issuedBy` is caller-supplied too. Binding the two does not make authority VERIFIABLE — it makes it
-// CONSISTENT, and removes the ability to name one actor while acting as another. Full verifiability needs the
-// platform tier the Charter allocates elsewhere. That is a reason to state the limit, not a reason to leave two
-// fields unrelated when one handler already relates them.
+// CONSISTENT, and removes the ability to name one actor while acting as another.
+//
+// ⚠ CORRECTED 2026-08-06 (REG-F-047). This paragraph used to close: "full verifiability needs the platform tier
+// THE CHARTER ALLOCATES ELSEWHERE." THE CHARTER ALLOCATES NO SUCH THING — that sentence was authored here and
+// then cited as if it were a rule, which is how a DIVERGENCE was recorded as an ALLOCATION. What the corpus
+// actually says is the opposite: DOC-002 §1 allocates identity to the Platform AS MACHINERY THIS ENGINE MUST
+// CONSUME, and DOC-004 §5 then commands it to "derive tenant and principal context from authenticated context,
+// NEVER FROM A PAYLOAD'''S CLAIM ABOUT ITSELF" — while RPH-DOC-002 §27.2 makes "authenticate actor" obligation
+// ONE of every command handler. So the missing authentication is not a boundary; it is an unbuilt obligation,
+// and the sponsor has confirmed it is unbuilt in EVERY configuration (standalone included, REG-D-025).
 //
 // DELEGATION IS THE ABSENT MECHANISM, and it is deliberately not invented here. Canon says authority may be
 // DELEGATED (DOC-003 §8 ASR-15), and this repository has no object for a delegation record. Until one is ratified,
@@ -142,6 +149,73 @@ describe('REG-F-014: a Decision records the authority of its ISSUER, not one it 
 
 		const state = store.loadObject(DEC)?.state as { status?: string };
 		expect(state?.status, 'no EFFECTIVE decision exists on any route').not.toBe('EFFECTIVE');
+	});
+
+	// ══ REG-F-048 / REG-E-031 — THE ENGINE GUARDED THE MAKING OF AUTHORITY AND NOT ITS UNMAKING ═════════════
+	//
+	// REG-F-014's survey enumerated every site where an agent could MANUFACTURE authority and closed them one by
+	// one. It never asked the mirror question — where an agent could DESTROY authority — because the finding's own
+	// title framed the family as manufacture. A SURVEY INHERITS THE BLIND SPOT OF THE SENTENCE THAT NAMES IT.
+	//
+	// Sponsor ruling REG-E-031 (2026-08-06): SYMMETRIC. Revocation requires the authority approval requires.
+	const approveAsHuman = () => {
+		expect(propose(HUMAN, HUMAN).status, 'arrange: human proposes').toBe('ACCEPTED');
+		expect(
+			dispatch(HUMAN, 'ApproveDecision', {
+				selectedOption: 'approve',
+				rationale: 'ship it',
+				consideredEvidenceIds: [],
+				consideredObservationIds: [],
+				subjectSemanticVersions: {}
+			}).status,
+			'arrange: human approves'
+		).toBe('ACCEPTED');
+		expect((store.loadObject(DEC)?.state as { status?: string })?.status).toBe('EFFECTIVE');
+	};
+
+	const revoke = (by: ActorReference) =>
+		dispatch(by, 'RevokeDecision', { revocationRationale: 'superseded by new information' });
+
+	// PREDICTED RED (run and observed): delete the guard and this reddens while the control below stays green —
+	// i.e. it reproduces exactly the behaviour that shipped until today.
+	it('an AGENT cannot revoke a decision a HUMAN authorized', () => {
+		approveAsHuman();
+		const r = revoke(AGENT);
+		expect(r.status, 'revocation requires the authority approval requires').not.toBe('ACCEPTED');
+		expect(
+			(store.loadObject(DEC)?.state as { status?: string })?.status,
+			'and the decision is still EFFECTIVE'
+		).toBe('EFFECTIVE');
+	});
+
+	// THE CONTROL. Without it, a guard that refused EVERY revocation would pass the test above — which is
+	// REG-F-015's anatomy exactly: every assertion true, about an arrangement that never happened.
+	// PREDICTED RED: make the guard unconditional and ONLY this reddens.
+	it('CONTROL — a HUMAN can revoke the same decision', () => {
+		approveAsHuman();
+		const r = revoke(HUMAN);
+		expect(r.status, 'the symmetric rule permits what it mirrors').toBe('ACCEPTED');
+		expect((store.loadObject(DEC)?.state as { status?: string })?.status).toBe('REVOKED');
+	});
+
+	// THE ASYMMETRY THIS CLOSES, asserted as one proposition rather than inferred from two files: the same actor
+	// that cannot approve also cannot revoke. If a future change re-opens either half, this reddens.
+	it('the agent refused at approval is refused at revocation — the two are now symmetric', () => {
+		expect(propose(AGENT, AGENT).status, 'an agent may still PROPOSE').toBe('ACCEPTED');
+		expect(
+			dispatch(AGENT, 'ApproveDecision', {
+				selectedOption: 'approve',
+				rationale: 'ready',
+				consideredEvidenceIds: [],
+				consideredObservationIds: [],
+				subjectSemanticVersions: {}
+			}).status,
+			'and is refused at approval'
+		).toBe('UNAUTHORIZED');
+		// the decision never became EFFECTIVE, so revocation is refused on the PRECONDITION here; the authority
+		// half is proved by the first test, where the decision IS effective. Both refusals are asserted so that
+		// neither can quietly become the other.
+		expect(revoke(AGENT).status, 'and is refused at revocation').not.toBe('ACCEPTED');
 	});
 
 	// ── THE GUARD'S SECOND DISJUNCT COULD NEVER BE TRUE, AND ITS REMOVAL NEEDS A CONTROL AIMED AT THE FUTURE ──────
