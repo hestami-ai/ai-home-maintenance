@@ -33,6 +33,7 @@
 // DELEGATED (DOC-003 §8 ASR-15), and this repository has no object for a delegation record. Until one is ratified,
 // declaring an authority you are not is refused rather than admitted on trust.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { ActorTypeSchema } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -141,5 +142,29 @@ describe('REG-F-014: a Decision records the authority of its ISSUER, not one it 
 
 		const state = store.loadObject(DEC)?.state as { status?: string };
 		expect(state?.status, 'no EFFECTIVE decision exists on any route').not.toBe('EFFECTIVE');
+	});
+
+	// ── THE GUARD'S SECOND DISJUNCT COULD NEVER BE TRUE, AND ITS REMOVAL NEEDS A CONTROL AIMED AT THE FUTURE ──────
+	// REG-F-040. `makeDecisionEffective`'s guard read `actorType === 'HUMAN' || actorType === 'SYSTEM'`. `authority`
+	// is schema-validated as an `ActorReference`, and `ActorTypeSchema` has no `SYSTEM` member — so the disjunct was
+	// unsatisfiable from the day the enum was minted and the operative rule was always HUMAN-only.
+	//
+	// The disjunct is removed, and the risk that removing it addressed was never present-tense: it was that the day
+	// somebody adds `SYSTEM` to `ActorTypeSchema` for an unrelated reason, a SYSTEM actor would silently acquire the
+	// authority to make a governance decision EFFECTIVE. So the control cannot be a test of TODAY'S behaviour — no
+	// arrangement can produce a SYSTEM authority to test with. It has to be a test of the ENUM, which reddens on the
+	// addition rather than on the grant, and turns a silent widening into a question somebody has to answer.
+	//
+	// PREDICTED RED, RUN AND OBSERVED: adding `'SYSTEM'` to `ActorTypeSchema` reddens this test and nothing else.
+	it('ActorTypeSchema has no SYSTEM member — adding one must force the authority question, not answer it', () => {
+		expect(
+			[...ActorTypeSchema.options].sort(),
+			'ActorTypeSchema changed. If a member was ADDED, decide explicitly whether it may hold decision ' +
+				'authority (governance.ts `authorityHeld`) before updating this list — that guard is HUMAN-only and ' +
+				'a new actor type does not acquire authority by being minted.'
+		).toEqual(
+			['AGENT', 'EXTERNAL_SYSTEM', 'HUMAN', 'MODEL', 'POLICY_ENGINE', 'SERVICE'].sort()
+		);
+		expect(ActorTypeSchema.options, 'the removed disjunct was unsatisfiable').not.toContain('SYSTEM');
 	});
 });

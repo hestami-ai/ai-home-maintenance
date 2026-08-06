@@ -815,7 +815,14 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'CALLER-TYPED BOOLEAN. It is defaulted to `true` in packages/rph-application/src/handlers/decomposition.ts ' +
 			'and consumed directly by `evaluateRecomposition` (packages/rph-domain/src/decomposition.ts) with no Claim ' +
 			'Object mediating — while the sibling `parentCompletionClaimId`, which IS required on both ' +
-			'`ProposeRecomposition` and `CompleteRecomposition`, is resolved by no handler and read for no decision. So ' +
+			// CORRECTED 2026-08-06 (REG-F-040). This clause read "is resolved by no handler AND READ FOR NO DECISION".
+			// The second half went stale when `b2f7b153` turned the field into a refusing precondition: handlers/
+			// decomposition.ts rejects a CompleteRecomposition whose claim id disagrees with the contract's. The first
+			// half stands and is the one this rule is about — the id is still never LOADED as a Claim aggregate, which
+			// is what "reified" means. Narrowed rather than deleted: an equality check between two caller-reachable
+			// strings is not reification, so the disclosure is unchanged in substance and only its overreach is cut.
+			'`ProposeRecomposition` and `CompleteRecomposition`, is resolved by no handler — it is checked for ' +
+			'AGREEMENT with the contract and never loaded, so nothing establishes the Claim exists. So ' +
 			'assurance evaluates a completion assertion that references a Claim id it never loads, on the strength of a ' +
 			'boolean the caller supplied. THE ADJACENT REFUSAL THAT IS NOT THIS ONE, recorded so it is not mistaken ' +
 			'for it: `rejectUnbackedExecutionSuccess` (packages/rph-application/src/handlers/pwu.ts) refuses a declared ' +

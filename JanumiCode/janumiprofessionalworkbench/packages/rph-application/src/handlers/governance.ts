@@ -254,7 +254,20 @@ function makeDecisionEffective(
 			precondition,
 			guard: (state) => {
 				const authority = state.authority as { actorType?: string } | undefined;
-				const authorityHeld = authority?.actorType === 'HUMAN' || authority?.actorType === 'SYSTEM';
+				// ── HUMAN ONLY, AND THE `|| 'SYSTEM'` THAT USED TO SIT HERE COULD NEVER BE TRUE ──────────────────────
+				// REG-F-040. `authority` is schema-validated as an `ActorReference`, whose `actorType` is
+				// `ActorTypeSchema` — HUMAN | AGENT | MODEL | SERVICE | POLICY_ENGINE | EXTERNAL_SYSTEM. There is no
+				// `SYSTEM` member and there never has been, so the second disjunct was unsatisfiable from the day the
+				// enum was minted and the operative rule has always been the one that remains.
+				//
+				// It is REMOVED rather than left as harmless dead code because it was a fail-open aimed at the FUTURE:
+				// the day `SYSTEM` is added to `ActorTypeSchema` for any unrelated reason, a SYSTEM actor would
+				// silently acquire the authority to make a governance decision EFFECTIVE, with nobody having decided
+				// that. A dead branch that GRANTS A PERMISSION defers the decision to whoever next edits an enum.
+				//
+				// `decision-authority-provenance.test.ts` pins the enum's membership, so minting `SYSTEM` reddens and
+				// forces the question — may a non-human hold decision authority? — at the moment it becomes answerable.
+				const authorityHeld = authority?.actorType === 'HUMAN';
 				const check = authorizeDecisionEffective({
 					decisionId: command.targetAggregateId,
 					decisionType: String(state.decisionType),
