@@ -30,6 +30,7 @@ import type {
 	ExpireAssumptionPayload,
 	EditAssurancePolicyPayload,
 	ProposeEvidencePayload,
+	RecordClaimAssessmentPayload,
 	RecordAssuranceObservationPayload,
 	BeginAssuranceAssessmentPayload,
 	CancelAssuranceAssessmentPayload,
@@ -656,6 +657,180 @@ export const assertClaim: CommandHandler = (ctx, command, payload) => {
 		}
 	});
 };
+
+/**
+ * The claim ids that have at least one ADMISSIBLE piece of evidence supporting them.
+ *
+ * DERIVED FROM COMMITTED STATE, NEVER FROM THE PAYLOAD — which is the whole reason this check is worth
+ * anything. Evidence reaches `ADMISSIBLE` only through `AdmitEvidence`, which runs the eight-condition kernel
+ * predicate `evidenceAdmissibility`; a caller cannot assert admissibility on the command that consumes it.
+ *
+ * `ADMISSIBLE` and not "exists": `EvidenceStatus` is PROPOSED | ADMISSIBLE | REJECTED | SUPERSEDED |
+ * INVALIDATED, and RPH-EVD-002's word is *admissible*. A presence check would satisfy the sentence's shape and
+ * not its content — the same distinction `authorityDecisionId` needed when it began resolving to an EFFECTIVE
+ * Decision rather than to any Decision at all.
+ */
+function claimsWithAdmissibleEvidence(ctx: HandlerContext): ReadonlySet<string> {
+	const evidenceIds = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === EVIDENCE) evidenceIds.add(e.aggregateId);
+	const supported = new Set<string>();
+	for (const id of evidenceIds) {
+		const st = ctx.store.loadObject(id)?.state as
+			| { status?: unknown; supportsClaimIds?: unknown }
+			| undefined;
+		if (!st || String(st.status) !== 'ADMISSIBLE') continue;
+		if (!Array.isArray(st.supportsClaimIds)) continue;
+		for (const claimId of st.supportsClaimIds) if (typeof claimId === 'string') supported.add(claimId);
+	}
+	return supported;
+}
+
+/** The ratified event each destination records (RPH-DOC-002 §26.5). Absent = the machine allows the move and
+ *  the corpus ratifies no event for it, which is REG-F-045's territory and is refused below rather than
+ *  papered over with an invented event name. */
+const CLAIM_STATUS_EVENT: Readonly<Record<string, string>> = {
+	SUPPORTED: 'ClaimSupported',
+	CONTESTED: 'ClaimContested',
+	REJECTED: 'ClaimRejected',
+	// AUTHORED, and disclosed in full at its vocab row. The corpus ratifies NO event for this state, and
+	// the reconstructed machine makes it the sole in-arrow of every state the corpus DOES ratify — so
+	// every ratified claim state is unreachable without an unratified event. Emitting `ClaimAsserted`
+	// instead was tried and the engine's own event gate REFUSED it, which is the gate working.
+	UNDER_ASSESSMENT: 'ClaimUnderAssessment'
+};
+
+/**
+ * RecordClaimAssessment — the act that moves a Claim off OPEN. REG-D-024 (sponsor conferral) / REG-F-044.
+ *
+ * ── WHY A COMMAND AT ALL, since the corpus ratifies EVENTS and no claim command ────────────────────────────
+ * Because the corpus ratifies the command BY PRESUPPOSITION and only its name was missing. RPH-DOC-008 §13
+ * RPH-EVD-002: *"Given a claim with no admissible evidence. When status is changed to SUPPORTED. Then THE
+ * COMMAND IS REJECTED."* And JPWB-DOC-003 §9 PER-3 forecloses the alternative — canonical state moves "only
+ * through authenticated, authorized, semantically named commands", with PER-7 shutting the projection escape.
+ * A prior measurement read the events-with-no-commands gap as evidence that status was meant to be DERIVED;
+ * that gap is not claim-specific (EvidenceRejected, EvidenceExpired and WaiverExpired share it) and §34's own
+ * heading is "Minimum API Surface". A minimum is not a doctrine.
+ *
+ * ── ONE COMMAND, NOT FOUR VERBS ────────────────────────────────────────────────────────────────────────────
+ * The corpus draws no distinction between them: three ratified event NAMES and no command names at all. Four
+ * identifiers would be four inventions where one suffices, and the emitted event is chosen from the target
+ * status — so the payload must be built for whichever event was picked (the REG-F-020 trap: one call site,
+ * three declared interfaces, satisfying none).
+ *
+ * ── ⚠ WHAT THIS IS NOT ─────────────────────────────────────────────────────────────────────────────────────
+ * NOT A GATE. This engine has no authentication layer, so one actor can propose evidence, admit its own
+ * evidence, and then record the assessment that consumes it. Measured before this was written: nine such
+ * commands from a single actor, all ACCEPTED, against a policy declaring DIFFERENT_AGENT independence. What
+ * this delivers is a REACHABLE machine and LIVE consumers, not unforgeable claim status. The smallest thing
+ * that would close it is an assessment rendered by a validator the caller does not control, which needs the
+ * authentication tier the Charter allocates elsewhere (the boundary REG-F-014 and RPH-EXE-004 both record).
+ *
+ * The transition table this rides on is AUTHORED, not ratified — all 15 Claim.status arrows are, and the
+ * vocab says so ("Transitions RECONSTRUCTED … NO explicit matrix") in a field the generator cannot carry
+ * (REG-F-045).
+ */
+export const recordClaimAssessment: CommandHandler = (ctx, command, payload) => {
+	const p = payload as RecordClaimAssessmentPayload;
+	const target = String(p.targetStatus);
+	const eventType = CLAIM_STATUS_EVENT[target];
+	if (!eventType)
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RecordClaimAssessment cannot record ${target}: this build mints no event name for it. DOC-002 ` +
+				`\u00a726.5 ratifies claim events for SUPPORTED, CONTESTED and REJECTED; UNDER_ASSESSMENT is authored ` +
+				`and disclosed (REG-D-024). CONDITIONALLY_SUPPORTED, WAIVED and SUPERSEDED have neither a ratified ` +
+				`event nor a consumer \u2014 and a state reached by an INVENTED event looks governed, where a state ` +
+				`nothing can reach is visible.`
+		);
+
+	return advanceStatus(ctx, command, {
+		objectType: CLAIM,
+		statusField: 'status',
+		machine: 'Claim.status',
+		target,
+		eventType,
+		// JAN-CMDPRE: the states this command may be issued FROM — every non-terminal claim state. Which
+		// DESTINATIONS are legal from each is the machine's judgement; duplicating it here would create a
+		// second, drifting copy of the arrow table (REG-F-027's shape).
+		precondition: fromStates(
+			'OPEN',
+			'UNDER_ASSESSMENT',
+			'SUPPORTED',
+			'CONDITIONALLY_SUPPORTED',
+			'CONTESTED'
+		),
+		// ── RPH-EVD-002, THE ONE NON-FORGEABLE REFUSAL IN THIS COMMAND ────────────────────────────────────────
+		// Scoped to SUPPORTED, because that is the destination the ratified test names. A guard that demanded
+		// evidence for every destination would pass the refusal tests and be wrong: CONTESTED and REJECTED are
+		// precisely the outcomes reached when evidence is absent or against.
+		guard: (_state, hctx) => {
+			if (target !== 'SUPPORTED') return null;
+			if (claimsWithAdmissibleEvidence(hctx).has(command.targetAggregateId)) return null;
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`Claim ${command.targetAggregateId} cannot be SUPPORTED: no ADMISSIBLE evidence supports it ` +
+					`(RPH-DOC-008 §13 RPH-EVD-002). Evidence that is merely PROPOSED has not been admitted.`,
+				[command.targetAggregateId]
+			);
+		},
+		mutate: (base) => ({
+			...base,
+			...(p.contradictingEvidenceIds?.length
+				? { contradictingEvidenceIds: p.contradictingEvidenceIds }
+				: {}),
+			// The supporting evidence is DERIVED and written onto the claim, closing the other half of the
+			// hollow: `supportingEvidenceIds` was written once at creation and never populated thereafter, so
+			// the one decision that reads it (baseline promotion's pull-guard) traversed to zero evidence.
+			...(target === 'SUPPORTED'
+				? {
+						supportingEvidenceIds: [...admissibleEvidenceFor(ctx, command.targetAggregateId)]
+					}
+				: {})
+		}),
+		// Built per the event actually chosen — REG-F-020's medicine.
+		eventPayload: (next) => {
+			const status = String(next.status);
+			if (eventType === 'ClaimSupported')
+				return {
+					supportingEvidenceIds: (next.supportingEvidenceIds as string[] | undefined) ?? [],
+					...(p.assessmentId ? { assessmentId: p.assessmentId } : {}),
+					status
+				};
+			if (eventType === 'ClaimUnderAssessment')
+				return { status, ...(p.assessmentId ? { assessmentId: p.assessmentId } : {}) };
+			if (eventType === 'ClaimContested')
+				return {
+					contradictingEvidenceIds: (next.contradictingEvidenceIds as string[] | undefined) ?? [],
+					status
+				};
+			return {
+				...(p.assessmentId ? { assessmentId: p.assessmentId } : {}),
+				...(p.rationale ? { rationale: p.rationale } : {}),
+				status
+			};
+		}
+	});
+};
+
+/** The ADMISSIBLE evidence ids supporting one claim — the same fold as `claimsWithAdmissibleEvidence`, kept
+ *  separate so the guard answers a yes/no question and the mutator records the actual ids. */
+function admissibleEvidenceFor(ctx: HandlerContext, claimId: string): string[] {
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === EVIDENCE) ids.add(e.aggregateId);
+	const out: string[] = [];
+	for (const id of ids) {
+		const st = ctx.store.loadObject(id)?.state as
+			| { status?: unknown; supportsClaimIds?: unknown }
+			| undefined;
+		if (!st || String(st.status) !== 'ADMISSIBLE') continue;
+		if (Array.isArray(st.supportsClaimIds) && st.supportsClaimIds.includes(claimId)) out.push(id);
+	}
+	return out;
+}
 
 // ---- Assumption ----
 const ASSUMPTION = 'ASSUMPTION';

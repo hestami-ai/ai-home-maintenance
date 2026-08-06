@@ -116,6 +116,7 @@ describe('validate', () => {
 		// +11 → 341: the validator registry (REG-E-024(c)) — VALIDATOR_REGISTRY_ENTRY, three §35 enums
 		// (ValidatorRegistryStatus / CostClass / LatencyClass), five commands and five events, less the two
 		// helper shapes that resolve rather than register.
-		expect(buildContractRegistry().ids()).toHaveLength(341);
+		// 341 -> 343 (2026-08-06, REG-D-024): `RecordClaimAssessmentPayload` and `ClaimUnderAssessmentPayload`.
+		expect(buildContractRegistry().ids()).toHaveLength(343);
 	});
 });

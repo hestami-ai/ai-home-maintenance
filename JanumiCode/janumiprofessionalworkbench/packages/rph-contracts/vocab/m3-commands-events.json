@@ -1123,6 +1123,43 @@
 			]
 		},
 		{
+			"commandType": "RecordClaimAssessment",
+			"targetAggregateType": "CLAIM",
+			"emitsEvent": "ClaimSupported",
+			"alsoEmitsEvents": ["ClaimUnderAssessment", "ClaimContested", "ClaimRejected"],
+			"drivesMachine": "Claim.status",
+			"drivesFrom": "UNDER_ASSESSMENT",
+			"drivesTo": "SUPPORTED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-06, sponsor conferral REG-D-024): the corpus ratifies that a claim-status-changing COMMAND EXISTS \u2014 RPH-DOC-008 \u00a713 RPH-EVD-002 reads 'When status is changed to SUPPORTED. Then THE COMMAND IS REJECTED' \u2014 and names none, so this identifier and every field below are AUTHORED. DOC-002 \u00a726.5 is a bare event-name list and DOC-007 schematizes no claim payload but ClaimAsserted (\u00a713.1). Do NOT treat this sourceSection as proof the shape is ratified. What IS ratified and constrains it: the eight ClaimStatus values (\u00a715.1), the four event NAMES (\u00a726.5), RPH-EVD-002's refusal, ASR-8, \u00a715.2, and PER-3 (canonical state moves only by command). Cited: RPH-DOC-008 \u00a713 RPH-EVD-002; JPWB-DOC-003 \u00a79 PER-3.",
+			"payloadFields": [
+				{
+					"field": "targetStatus",
+					"required": true,
+					"type": "ClaimStatus",
+					"enumRef": "ClaimStatusSchema",
+					"note": "AUTHORED. One command carries the target rather than four verbs, because the corpus draws no distinction between them: it ratifies THREE event names and no command names at all, so four identifiers would be four inventions where one suffices. The emitted event is chosen from this value (ClaimSupported / ClaimContested / ClaimRejected), so the handler must build the payload for whichever it picked \u2014 the REG-F-020 trap, where one call site served three declared interfaces and satisfied none."
+				},
+				{
+					"field": "assessmentId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref. AUTHORED, optional. NOT resolved by the handler: resolving it would assert that the assessment DECIDED the claim, which is RPH-EVD-001 reification and is exactly what this build does NOT deliver."
+				},
+				{
+					"field": "rationale",
+					"required": false,
+					"type": "string"
+				},
+				{
+					"field": "contradictingEvidenceIds",
+					"required": false,
+					"type": "string[]",
+					"note": "id-ref[]. AUTHORED and CALLER-SUPPLIED \u2014 disclosed as such. There is no engine-side contradiction detector (contradictsClaimIds is non-empty at ZERO sites repository-wide), so a caller-driven CONTESTED rests on the caller's own list. The DERIVED route to CONTESTED is ASR-8's cascade on evidence invalidation, which is where the non-forgeable path lives."
+				}
+			]
+		},
+		{
 			"commandType": "AssertObligation",
 			"targetAggregateType": "OBLIGATION",
 			"emitsEvent": "ObligationAsserted",
@@ -3971,6 +4008,26 @@
 					"type": "enum",
 					"enumRef": "ClaimStatusSchema",
 					"note": "UNDER_ASSESSMENT->REJECTED"
+				}
+			]
+		},
+		{
+			"eventType": "ClaimUnderAssessment",
+			"aggregateType": "Claim",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-06, REG-D-024) \u2014 AND MINTED RELUCTANTLY, WITH THE REASON RECORDED. DOC-002 \u00a726.5 ratifies FOUR claim events (ClaimAsserted / ClaimSupported / ClaimContested / ClaimRejected) and NONE for UNDER_ASSESSMENT. But the reconstructed Claim.status machine makes UNDER_ASSESSMENT the sole in-arrow of every ratified destination \u2014 OPEN reaches only UNDER_ASSESSMENT, and SUPPORTED / CONTESTED / REJECTED reach only from it \u2014 SO EVERY RATIFIED CLAIM STATE IS UNREACHABLE WITHOUT AN UNRATIFIED EVENT. The three alternatives were each worse: emitting ClaimAsserted for it was tried and the engine's own event gate REFUSED it (its ratified payload requires claimId/statement/claimType/assertedBy, none of which an assessment-begins transition has), which is the gate working; rewriting the arrow OPEN->SUPPORTED would replace their authored machine with mine; and refusing the state leaves the capability undeliverable. The machine's own authored trigger says 'assertClaim then requestAssuranceAssessment / assessment begins', so the RIGHT long-term home is BeginAssuranceAssessment driving the claims it cites \u2014 unavailable today because a commit writes ONE aggregate. Do NOT treat this as ratified. Cited: DOC-002 \u00a715.1 (the state), \u00a726.5 (the four that ARE ratified, this not among them).",
+			"payloadFields": [
+				{
+					"field": "status",
+					"required": true,
+					"type": "enum",
+					"enumRef": "ClaimStatusSchema",
+					"note": "OPEN->UNDER_ASSESSMENT"
+				},
+				{
+					"field": "assessmentId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref. Optional and UNRESOLVED: resolving it would assert the assessment DECIDED the claim, which is RPH-EVD-001 reification and is NOT what this build delivers."
 				}
 			]
 		},
@@ -7502,6 +7559,34 @@
 			"machine": "Claim.status",
 			"from": "(initial)",
 			"to": "OPEN"
+		},
+		{
+			"commandType": "RecordClaimAssessment",
+			"eventType": "ClaimSupported",
+			"machine": "Claim.status",
+			"from": "UNDER_ASSESSMENT",
+			"to": "SUPPORTED"
+		},
+		{
+			"commandType": "RecordClaimAssessment",
+			"eventType": "ClaimUnderAssessment",
+			"machine": "Claim.status",
+			"from": "OPEN",
+			"to": "UNDER_ASSESSMENT"
+		},
+		{
+			"commandType": "RecordClaimAssessment",
+			"eventType": "ClaimContested",
+			"machine": "Claim.status",
+			"from": "UNDER_ASSESSMENT",
+			"to": "CONTESTED"
+		},
+		{
+			"commandType": "RecordClaimAssessment",
+			"eventType": "ClaimRejected",
+			"machine": "Claim.status",
+			"from": "UNDER_ASSESSMENT",
+			"to": "REJECTED"
 		},
 		{
 			"commandType": "AssertObligation",

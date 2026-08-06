@@ -320,6 +320,13 @@ export const AssertClaimPayloadSchema = z.strictObject({
 	contradictingEvidenceIds: z.array(z.string()).optional()
 });
 export type AssertClaimPayload = z.infer<typeof AssertClaimPayloadSchema>;
+export const RecordClaimAssessmentPayloadSchema = z.strictObject({
+	targetStatus: ClaimStatusSchema,
+	assessmentId: z.string().optional(),
+	rationale: z.string().optional(),
+	contradictingEvidenceIds: z.array(z.string()).optional()
+});
+export type RecordClaimAssessmentPayload = z.infer<typeof RecordClaimAssessmentPayloadSchema>;
 export const AssertObligationPayloadSchema = z.strictObject({
 	statement: z.string(),
 	obligationType: ObligationTypeSchema,
@@ -965,6 +972,11 @@ export const ClaimRejectedPayloadSchema = z.strictObject({
 	status: ClaimStatusSchema
 });
 export type ClaimRejectedPayload = z.infer<typeof ClaimRejectedPayloadSchema>;
+export const ClaimUnderAssessmentPayloadSchema = z.strictObject({
+	status: ClaimStatusSchema,
+	assessmentId: z.string().optional()
+});
+export type ClaimUnderAssessmentPayload = z.infer<typeof ClaimUnderAssessmentPayloadSchema>;
 export const ClaimSupportedPayloadSchema = z.strictObject({
 	supportingEvidenceIds: z.array(z.string()),
 	assessmentId: z.string().optional(),
@@ -1948,6 +1960,13 @@ export const COMMANDS = {
 		emitsEvent: 'ClaimAsserted',
 		firstSlice: false
 	},
+	RecordClaimAssessment: {
+		payload: RecordClaimAssessmentPayloadSchema,
+		targetAggregateType: 'CLAIM',
+		emitsEvent: 'ClaimSupported',
+		alsoEmitsEvents: ['ClaimUnderAssessment', 'ClaimContested', 'ClaimRejected'],
+		firstSlice: false
+	},
 	AssertObligation: {
 		payload: AssertObligationPayloadSchema,
 		targetAggregateType: 'OBLIGATION',
@@ -2394,6 +2413,7 @@ export const EVENTS = {
 	ConstraintAsserted: { payload: ConstraintAssertedPayloadSchema, aggregateType: 'Constraint' },
 	ClaimContested: { payload: ClaimContestedPayloadSchema, aggregateType: 'Claim' },
 	ClaimRejected: { payload: ClaimRejectedPayloadSchema, aggregateType: 'Claim' },
+	ClaimUnderAssessment: { payload: ClaimUnderAssessmentPayloadSchema, aggregateType: 'Claim' },
 	ClaimSupported: { payload: ClaimSupportedPayloadSchema, aggregateType: 'Claim' },
 	ClarificationRequested: {
 		payload: ClarificationRequestedPayloadSchema,
@@ -2878,6 +2898,34 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Claim.status',
 		from: '(initial)',
 		to: 'OPEN'
+	},
+	{
+		commandType: 'RecordClaimAssessment',
+		eventType: 'ClaimSupported',
+		machine: 'Claim.status',
+		from: 'UNDER_ASSESSMENT',
+		to: 'SUPPORTED'
+	},
+	{
+		commandType: 'RecordClaimAssessment',
+		eventType: 'ClaimUnderAssessment',
+		machine: 'Claim.status',
+		from: 'OPEN',
+		to: 'UNDER_ASSESSMENT'
+	},
+	{
+		commandType: 'RecordClaimAssessment',
+		eventType: 'ClaimContested',
+		machine: 'Claim.status',
+		from: 'UNDER_ASSESSMENT',
+		to: 'CONTESTED'
+	},
+	{
+		commandType: 'RecordClaimAssessment',
+		eventType: 'ClaimRejected',
+		machine: 'Claim.status',
+		from: 'UNDER_ASSESSMENT',
+		to: 'REJECTED'
 	},
 	{
 		commandType: 'AssertObligation',

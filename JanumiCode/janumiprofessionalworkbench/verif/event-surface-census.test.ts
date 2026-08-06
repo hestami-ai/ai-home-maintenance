@@ -63,6 +63,13 @@ const EMITTED_2026_08_04 = new Set([
 	// clarification) and `validator-registry.test.ts` drives every arrow. Added HERE because this set is a
 	// pinned snapshot — a live count cannot cross vitest workers — so a new emitter must be recorded by hand
 	// or the census reports it as bound-but-unemitted, which would be false.
+	// + 2026-08-06, REG-D-024: the claim-assessment capability. Seven of the eight ratified ClaimStatus values
+	// were reachable by nothing — one command targeted a CLAIM and hard-coded OPEN — so these events had no
+	// emitter. `RecordClaimAssessment` now emits them and `claim-assessment.test.ts` drives each. Recorded by
+	// hand per this set's own rule. NOTE `ClaimUnderAssessment` is AUTHORED, not ratified (DOC-002 §26.5 names
+	// four claim events and not this one); it is minted because the reconstructed machine makes
+	// UNDER_ASSESSMENT the sole in-arrow of every state the corpus DOES ratify. Disclosed at its vocab row.
+	'ClaimSupported', 'ClaimContested', 'ClaimRejected', 'ClaimUnderAssessment',
 	'ValidatorRegistered', 'ValidatorDegraded', 'ValidatorRestored', 'ValidatorDisabled',
 	'ValidatorEnabled',
 	'ArtifactRecorded', 'AssumptionDetected', 'AssumptionExpired', 'AssuranceAssessmentCompleted',
