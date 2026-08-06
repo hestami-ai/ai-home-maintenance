@@ -60,6 +60,49 @@ const BLOCKING_SEVERITIES = new Set(['BLOCKING', 'CRITICAL']);
  *  are not findings the promotion gate re-adjudicates. */
 const UNSETTLED_DISPOSITIONS = new Set(['OPEN', 'WAIVED']);
 
+const CLAIM_TYPE = 'CLAIM';
+
+/**
+ * §15.2 — the CONTESTED claims bearing on a baseline's items.
+ *
+ * ── WHY THIS FUNCTION DID NOT EXIST UNTIL NOW ────────────────────────────────────────────────────────────────
+ * `findContestedClaims` (rph-domain) is a LIVE, RATIFIED kernel predicate wired into `canPromoteBaseline`, and
+ * its input was populated NOWHERE outside rph-domain's own unit tests: the call site below passed no
+ * `contestedClaims` argument at all, and the field is optional with a `?? []` inside. So every production
+ * baseline promotion evaluated §15.2 against an empty list and found nothing.
+ *
+ * That is worse than an absent check. An absent check is visible; a ratified predicate that runs on every
+ * promotion and can never fire reports a clean §15.2 result forever — REG-F-022's Gate A shape, on a rule whose
+ * whole job is to stop a contested claim authorizing a promotion. It could not fire for a second reason as
+ * well, which is why it is only fixable now: NO claim could reach CONTESTED, because one command targeted a
+ * CLAIM and hard-coded OPEN (REG-F-044). Feeding it before REG-D-024's build would have fed it a list that was
+ * empty for a different reason.
+ *
+ * DERIVED, and from the store rather than the promoting payload — a promoter does not get to say which claims
+ * about its own subjects are contested.
+ */
+function contestedClaimsAgainstBaselineItems(
+	ctx: HandlerContext,
+	itemObjectIds: ReadonlySet<string>
+): { readonly claimId: string; readonly contested: boolean }[] {
+	const claimIds = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === CLAIM_TYPE) claimIds.add(e.aggregateId);
+	const out: { claimId: string; contested: boolean }[] = [];
+	for (const id of claimIds) {
+		const st = ctx.store.loadObject(id)?.state as
+			| { subjectObjectIds?: unknown; status?: unknown }
+			| undefined;
+		if (!st || !Array.isArray(st.subjectObjectIds)) continue;
+		if (!st.subjectObjectIds.some((sid) => typeof sid === 'string' && itemObjectIds.has(sid))) continue;
+		// CONTESTED only. §15.2 bars a contested claim "unless resolved or waived", and the corpus defines
+		// resolution for a claim nowhere — so REJECTED and WAIVED are NOT reported as contested here, and that
+		// restraint is the point: widening this to "anything not SUPPORTED" would invent the rule §15.2 leaves open.
+		out.push({ claimId: id, contested: String(st.status) === 'CONTESTED' });
+	}
+	return out;
+}
+
 /**
  * The observations recorded against the items this Baseline freezes, projected onto the kernel's
  * `OpenObservationView`. `promoteBaseline` passed `openObservations: []` — a hard-coded empty list — so
@@ -816,7 +859,11 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 				candidateItems,
 				reviewedItems: candidateItems,
 				requiredAssessments,
-				openObservations: observationsAgainstBaselineItems(hctx, baselineItemIds)
+				openObservations: observationsAgainstBaselineItems(hctx, baselineItemIds),
+				// §15.2, fed for the first time — see `contestedClaimsAgainstBaselineItems`. Until REG-D-024 no
+				// claim could reach CONTESTED, so this argument was absent and `findContestedClaims` ran on `[]`
+				// at every promotion.
+				contestedClaims: contestedClaimsAgainstBaselineItems(hctx, baselineItemIds)
 			});
 			if (!result.ok) {
 				const codes = result.findings.map((f) => f.code).join(', ');

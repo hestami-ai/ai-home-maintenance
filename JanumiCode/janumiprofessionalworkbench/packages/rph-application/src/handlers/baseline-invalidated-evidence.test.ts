@@ -237,4 +237,104 @@ describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10,
 		expect(r.status).toBe('ACCEPTED');
 		expect(statusOf(BASE)).toBe('AUTHORITATIVE');
 	});
+
+	// ══ §15.2 — A CONTESTED CLAIM CANNOT AUTHORIZE A PROMOTION (REG-D-024 INC-3) ═══════════════════════════════
+	//
+	// THESE LIVE HERE RATHER THAN IN THEIR OWN FILE because the arrangement is exactly this one — intent -> pwu ->
+	// claim(+evidence) -> assessment -> decision -> baseline(APPROVED) — and a second copy of a 180-line fixture is
+	// a second thing to drift. REG-F-015 is this repository's case study in a fixture that silently stopped
+	// arranging what its name claimed; one fixture, exercised by every rule that needs it, is the cheaper honesty.
+	//
+	// WHAT WAS WRONG. `findContestedClaims` is a LIVE, RATIFIED §15.2 kernel predicate, wired into
+	// `canPromoteBaseline`, emitting a CONTESTED_CLAIM finding — and `promoteBaseline` passed NO `contestedClaims`
+	// argument at all. The field is optional and `?? []` inside, so every production promotion evaluated §15.2
+	// against an empty list. Not an absent check: a ratified predicate that runs every time and can never fire,
+	// reporting a clean §15.2 result forever. REG-F-022's Gate A shape.
+	//
+	// AND IT HAD A SECOND, INDEPENDENT REASON TO BE VACUOUS, which is why this is only fixable now: NO claim could
+	// reach CONTESTED at all (REG-F-044 — one command targeted a CLAIM and hard-coded OPEN). Feeding the predicate
+	// before REG-D-024's build would have handed it a list that was empty for a different reason, and the fix
+	// would have looked complete while changing nothing.
+	function contest() {
+		expect(
+			dispatch(
+				'RecordClaimAssessment',
+				{ targetStatus: 'UNDER_ASSESSMENT' },
+				{ targetAggregateId: CLAIM, targetAggregateType: 'CLAIM' }
+			).status,
+			'arranging: OPEN -> UNDER_ASSESSMENT'
+		).toBe('ACCEPTED');
+		expect(
+			dispatch(
+				'RecordClaimAssessment',
+				{ targetStatus: 'CONTESTED', rationale: 'the fitness argument does not hold at scale' },
+				{ targetAggregateId: CLAIM, targetAggregateType: 'CLAIM' }
+			).status,
+			'arranging: UNDER_ASSESSMENT -> CONTESTED'
+		).toBe('ACCEPTED');
+	}
+
+	// PREDICTED RED (run and observed): remove the `contestedClaims` argument from `promoteBaseline`'s
+	// `canPromoteBaseline` call and this reddens while every other test in the file stays green — i.e. it
+	// reproduces exactly the behaviour that shipped until today.
+	it('§15.2 — a CONTESTED claim on a baseline item blocks promotion', () => {
+		setup({ assessmentClaimIds: [CLAIM], consideredEvidenceIds: [EV], invalidate: false });
+		contest();
+
+		const r = promote();
+		expect(r.status, 'a contested claim cannot authorize promotion').not.toBe('ACCEPTED');
+		expect(String(r.error?.message)).toContain('CONTESTED_CLAIM');
+		expect(statusOf(BASE), 'and the baseline did not move').toBe('APPROVED');
+	});
+
+	// THE CONTROL, on the same path and the same claim. Without it, the test above is indistinguishable from a
+	// promotion refused for one of the gate's SIX other reasons — which is precisely how REG-F-015's file passed
+	// for months while arranging nothing: every assertion was true, about a different refusal.
+	// PREDICTED RED: make `contestedClaimsAgainstBaselineItems` report `contested: true` unconditionally and ONLY
+	// this test reddens — proving the deriver reads the claim's status rather than merely finding the claim.
+	it('CONTROL — the same claim at UNDER_ASSESSMENT does NOT block promotion', () => {
+		setup({ assessmentClaimIds: [CLAIM], consideredEvidenceIds: [EV], invalidate: false });
+		expect(
+			dispatch(
+				'RecordClaimAssessment',
+				{ targetStatus: 'UNDER_ASSESSMENT' },
+				{ targetAggregateId: CLAIM, targetAggregateType: 'CLAIM' }
+			).status
+		).toBe('ACCEPTED');
+
+		const r = promote();
+		expect(r.status, 'only CONTESTED blocks — not "any claim that is not SUPPORTED"').toBe('ACCEPTED');
+		expect(statusOf(BASE)).toBe('AUTHORITATIVE');
+	});
+
+	// THE SCOPE CONJUNCT. A contested claim about something this baseline does not freeze must not block it —
+	// otherwise the deriver is "any contested claim anywhere", which would be a different and unratified rule.
+	// This is REG-F-015's OBJECT limb, which in that case turned out to compare a thing with itself.
+	it('a CONTESTED claim about an object the baseline does not freeze does not block it', () => {
+		setup({ assessmentClaimIds: [CLAIM], consideredEvidenceIds: [EV], invalidate: false });
+		const foreign = 'clm_01ARZ3NDEKTSV4RRFFQ69G5V77';
+		expect(
+			dispatch(
+				'AssertClaim',
+				{
+					statement: 'an unrelated subject is fit',
+					claimType: 'FITNESS',
+					subjectObjectIds: ['pwu_01ARZ3NDEKTSV4RRFFQ69G5V78']
+				},
+				{ targetAggregateId: foreign, targetAggregateType: 'CLAIM' }
+			).status
+		).toBe('ACCEPTED');
+		for (const targetStatus of ['UNDER_ASSESSMENT', 'CONTESTED'])
+			expect(
+				dispatch(
+					'RecordClaimAssessment',
+					{ targetStatus, rationale: 'unrelated' },
+					{ targetAggregateId: foreign, targetAggregateType: 'CLAIM' }
+				).status
+			).toBe('ACCEPTED');
+
+		const r = promote();
+		expect(r.status, 'the contested claim names no item this baseline freezes').toBe('ACCEPTED');
+		expect(statusOf(BASE)).toBe('AUTHORITATIVE');
+	});
 });
