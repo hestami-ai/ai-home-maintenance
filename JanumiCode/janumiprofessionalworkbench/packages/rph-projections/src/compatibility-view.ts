@@ -30,7 +30,17 @@ const KIND_TO_MILESTONE: Record<string, CompatibilityMilestone> = {
 	IMPLEMENTATION_PLANNING: 'PROPOSE',
 	PRODUCT_IMPLEMENTATION: 'EXECUTE',
 	INTEGRATED_PRODUCT_VALIDATION: 'VALIDATE',
-	PRODUCT_BASELINE_PROMOTION: 'COMMIT'
+	PRODUCT_BASELINE_PROMOTION: 'COMMIT',
+	// DEEPENING 2026-08-06: the five sub-kinds the PWA now publishes. A CHILD WORK AREA SITS IN ITS PARENT'S
+	// LEGACY PHASE — the rule ARCHITECTURE_CONCERN already followed (child of Architecture Definition, mapped to
+	// ARCHITECTURE). Derived from the composition tree rather than chosen per kind, so a sixth sub-kind has an
+	// obvious answer instead of a judgement call. The milestone is a VIEWER'S FAMILIAR PHASE and never
+	// authoritative state, so inheriting the parent's cannot mislead about governance.
+	INTENT_DISCOVERY: 'INTAKE',
+	PRODUCT_BOUNDARY: 'INTAKE',
+	USER_JOURNEY_DEFINITION: 'PROPOSE',
+	REQUIREMENT_DEFINITION: 'PROPOSE',
+	WORK_DECOMPOSITION: 'PROPOSE'
 };
 
 /** The kinds this projection maps explicitly — exported so a gate can check nothing seeded relies on the default. */

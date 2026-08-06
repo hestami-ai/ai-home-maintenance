@@ -39,6 +39,78 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		expect(types.filter((t) => t.state.isRoot)).toHaveLength(1);
 	});
 
+	// ── THE PUBLISHED NAMES ARE PINNED, BECAUSE A REFACTOR RENAMED THEM ONCE ─────────────────────────────────
+	// The tree is now DERIVED from the ontology (REG-F-033) instead of a hand-written literal. The first version
+	// of that derivation took names from `humanizeCode`, which sentence-cases — so every published type was
+	// silently relabelled ("Architecture definition" for "Architecture Definition"). Seventy-nine references
+	// across the suite depend on these names and three e2e specs went red, which is the only reason it was
+	// caught: a refactor whose whole point was to change the SOURCE of the data changed the DATA.
+	//
+	// Pinned here so the next such change reddens in a unit test rather than in a browser five minutes later.
+	it('the derived display names reproduce the established ones EXACTLY', () => {
+		const engine = build();
+		const byKind = new Map(
+			listPwuTypes(engine, SEED_PWA).map((t) => [String(t.state.pwuKind), String(t.state.name)])
+		);
+		expect(byKind.get('PRODUCT_REALIZATION')).toBe('Product Realization');
+		expect(byKind.get('INTENT_AND_PRODUCT_DEFINITION')).toBe('Intent & Product Definition');
+		expect(byKind.get('PRODUCT_BEHAVIOR_DEFINITION')).toBe('Product Behavior Definition');
+		expect(byKind.get('ARCHITECTURE_DEFINITION')).toBe('Architecture Definition');
+		expect(byKind.get('IMPLEMENTATION_PLANNING')).toBe('Implementation Planning');
+		expect(byKind.get('PRODUCT_IMPLEMENTATION')).toBe('Product Implementation');
+		expect(byKind.get('INTEGRATED_PRODUCT_VALIDATION')).toBe('Integrated Product Validation');
+		expect(byKind.get('PRODUCT_BASELINE_PROMOTION')).toBe('Product Baseline Promotion');
+		expect(byKind.get('ARCHITECTURE_CONCERN')).toBe('Architecture Concern');
+		// And the five the 2026-08-06 deepening added, by the same rule.
+		expect(byKind.get('INTENT_DISCOVERY')).toBe('Intent Discovery');
+		expect(byKind.get('USER_JOURNEY_DEFINITION')).toBe('User Journey Definition');
+	});
+
+	// ── THE DEEPENING (2026-08-06) ───────────────────────────────────────────────────────────────────────────
+	it('publishes THREE levels, derived from the ontology’s candidateChildren', () => {
+		const engine = build();
+		const types = listPwuTypes(engine, SEED_PWA);
+		const byId = new Map(types.map((t) => [t.id, t.state]));
+		const kindOf = (id: string) => String(byId.get(id)?.pwuKind ?? id);
+		const childrenOf = (kind: string) =>
+			(
+				(types.find((t) => t.state.pwuKind === kind)?.state.permittedChildTypeIds ?? []) as string[]
+			).map(kindOf);
+
+		expect(types).toHaveLength(14);
+		// Level 2 -> level 3: the five sub-kinds the PWA never published before.
+		expect(childrenOf('INTENT_AND_PRODUCT_DEFINITION').sort()).toEqual([
+			'INTENT_DISCOVERY',
+			'PRODUCT_BOUNDARY'
+		]);
+		expect(childrenOf('PRODUCT_BEHAVIOR_DEFINITION').sort()).toEqual([
+			'REQUIREMENT_DEFINITION',
+			'USER_JOURNEY_DEFINITION'
+		]);
+		expect(childrenOf('IMPLEMENTATION_PLANNING')).toEqual(['WORK_DECOMPOSITION']);
+		// ARCHITECTURE_DECISION is DESCRIBED by the ontology and named in NO candidateChildren list, so
+		// `ValidatePwa` would refuse it as an orphan (§11.6). Unpublished by measurement, not by omission.
+		expect(types.map((t) => String(t.state.pwuKind))).not.toContain('ARCHITECTURE_DECISION');
+	});
+
+	it('the four formerly-unread template fields reach the PWU Types', () => {
+		// REG-F-033: `inputs`, `outputArtifactTypes`, `completionClaims` and `candidateChildren` reached nothing.
+		// Their ratified homes on PWU_TYPE existed all along and were simply never populated.
+		const engine = build();
+		const arch = listPwuTypes(engine, SEED_PWA).find(
+			(t) => t.state.pwuKind === 'ARCHITECTURE_DEFINITION'
+		)!.state;
+		expect((arch.requiredInputs as string[])?.length, 'inputs -> requiredInputs').toBeGreaterThan(5);
+		expect(
+			(arch.requiredOutputs as string[])?.length,
+			'outputArtifactTypes -> requiredOutputs'
+		).toBeGreaterThan(5);
+		expect(String(arch.completionRule), 'completionClaims -> completionRule').toContain(
+			'Architecture covers applicable requirements.'
+		);
+		expect(String(arch.completionRule)).toMatch(/^All of: /);
+	});
+
 	it('§11.3: PwuProposed carries pwuTypeId (the join key the Assurance View needs) and isLocalExtension', () => {
 		// The event dropped both fields until Increment 35. pwuTypeId is what "applicable policies" (§38) folds
 		// on: pwuTypeId -> PwuType.requiredAssurancePolicyIds. Without it that field rendered a false "none".

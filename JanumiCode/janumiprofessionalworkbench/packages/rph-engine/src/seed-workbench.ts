@@ -24,104 +24,139 @@ export const SEED_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Z00';
 export const SEED_PWA_VERSION = '1.3.0';
 export const SEED_UNDERTAKING = 'und_01ARZ3NDEKTSV4RRFFQ69G5Z10';
 
-// Stable ids for the Product Realization PWA's PWU Types (referenced below to wire the composition tree).
-const PT_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z20';
-const PT_INTENT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z30';
-const PT_BEHAVIOR = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z40';
-const PT_ARCH = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z50';
-const PT_PLAN = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z60';
-const PT_IMPL = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z70';
-const PT_VALIDATE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z80';
-const PT_PROMOTE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z90';
-const PT_CONCERN = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZA0';
+// Stable ids for the Product Realization PWA's PWU Types, keyed by KIND.
+//
+// ── THE ONLY HAND-WRITTEN THING LEFT, AND WHY (REG-F-033) ────────────────────────────────────────────────────
+// The tree itself used to be a hand-written `PWU_TYPES` literal: the name, purpose and composition children of
+// every type. `policiesForKind`'s comment already named that shape — "a THIRD copy of content the ontology
+// already carries" — and fixed the POLICY list while leaving the COMPOSITION list. REG-F-033 measured the cost:
+// the shipped tree CONTRADICTED the authored candidates (Architecture Definition authored ten children and
+// shipped one that was not among them), and four further ontology fields reached nothing at all.
+//
+// Everything is now DERIVED from `handle.ontology.pwuTemplates`. Only the ids stay hand-assigned, because they
+// are stable identity: deriving them would rename every PWU Type the moment a kind was renamed, and committed
+// events reference them. A kind->id map is the smallest thing that cannot drift, and a missing entry is a hard
+// failure below rather than a silently skipped type.
+const PT_BY_KIND: Readonly<Record<string, string>> = {
+	PRODUCT_REALIZATION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z20',
+	INTENT_AND_PRODUCT_DEFINITION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z30',
+	PRODUCT_BEHAVIOR_DEFINITION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z40',
+	ARCHITECTURE_DEFINITION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z50',
+	IMPLEMENTATION_PLANNING: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z60',
+	PRODUCT_IMPLEMENTATION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z70',
+	INTEGRATED_PRODUCT_VALIDATION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z80',
+	PRODUCT_BASELINE_PROMOTION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z90',
+	ARCHITECTURE_CONCERN: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZA0',
+	// DEEPENING 2026-08-06 (sponsor direction). Six templates the ontology has always described and the PWA never
+	// published, so the tree was two levels where the ontology describes three.
+	INTENT_DISCOVERY: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZB0',
+	PRODUCT_BOUNDARY: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZC0',
+	USER_JOURNEY_DEFINITION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZD0',
+	REQUIREMENT_DEFINITION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZE0',
+	ARCHITECTURE_DECISION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZF0',
+	WORK_DECOMPOSITION: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZG0'
+};
 
-/** A permitted-child composition rule on a seeded type (cardinality per §11.7.2). */
-interface SeedChild {
-	id: string;
-	cardinality: string;
-	note?: string;
+/**
+ * The DISPLAY NAME of a PWU Type, derived from its kind.
+ *
+ * ── WHY NOT `humanizeCode` ───────────────────────────────────────────────────────────────────────────────────
+ * The first version of this derivation used it and QUIETLY RENAMED EVERY PUBLISHED TYPE: `humanizeCode` sentence-
+ * cases ("Architecture definition") where the hand-written names were title-cased ("Architecture Definition").
+ * Seventy-nine references across the suite depend on those names and three e2e specs went red — a user-facing
+ * regression introduced by a refactor whose whole point was to change nothing but the SOURCE of the data.
+ *
+ * So the rule is title-case per underscore-separated word, with `AND` rendered `&` — which reproduces all nine
+ * pre-existing names EXACTLY. `seed-workbench.test.ts` pins them, so a future change to this function that
+ * renames a shipped type reddens instead of silently relabelling the workbench.
+ */
+function typeName(kind: string): string {
+	return kind
+		.split('_')
+		.map((w) => (w === 'AND' ? '&' : w.charAt(0) + w.slice(1).toLowerCase()))
+		.join(' ');
 }
 
-/** The Product Realization PWA PWU Types (RPH-DOC-010 §7 work areas + the corpus's Architecture Concern type). The
- *  root permits the 7 canonical branches (each mandatory-exactly-one), Architecture Definition permits the
- *  Architecture Concern (conditional one-or-more), and each type's required assurance policies are DERIVED from the
- *  ontology (§11.7.4) — see `policiesForKind` below. */
-const PWU_TYPES: ReadonlyArray<{
-	id: string;
-	kind: string;
-	name: string;
-	purpose: string;
-	root?: boolean;
-	children?: readonly SeedChild[];
-}> = [
-	{
-		id: PT_ROOT,
-		kind: 'PRODUCT_REALIZATION',
-		name: 'Product Realization',
-		purpose: 'Root: structure product work from intent to authoritative baselines',
-		root: true,
-		children: [
-			{ id: PT_INTENT, cardinality: 'M1' },
-			{ id: PT_BEHAVIOR, cardinality: 'M1' },
-			{ id: PT_ARCH, cardinality: 'M1' },
-			{ id: PT_PLAN, cardinality: 'M1' },
-			{ id: PT_IMPL, cardinality: 'M1' },
-			{ id: PT_VALIDATE, cardinality: 'M1' },
-			{ id: PT_PROMOTE, cardinality: 'M1' }
-		]
-	},
-	{
-		id: PT_INTENT,
-		kind: 'INTENT_AND_PRODUCT_DEFINITION',
-		name: 'Intent & Product Definition',
-		purpose: 'Originating intent, stakeholders, product boundary'
-	},
-	{
-		id: PT_BEHAVIOR,
-		kind: 'PRODUCT_BEHAVIOR_DEFINITION',
-		name: 'Product Behavior Definition',
-		purpose: 'Actors, capabilities, journeys, requirements'
-	},
-	{
-		id: PT_ARCH,
-		kind: 'ARCHITECTURE_DEFINITION',
-		name: 'Architecture Definition',
-		purpose: 'A coherent technical structure realizing approved behavior',
-		children: [
-			{ id: PT_CONCERN, cardinality: 'C+', note: 'One per material architecture concern' }
-		]
-	},
-	{
-		id: PT_PLAN,
-		kind: 'IMPLEMENTATION_PLANNING',
-		name: 'Implementation Planning',
-		purpose: 'Increments, decomposition, dependencies, test + migration planning'
-	},
-	{
-		id: PT_IMPL,
-		kind: 'PRODUCT_IMPLEMENTATION',
-		name: 'Product Implementation',
-		purpose: 'Realize the planned increments'
-	},
-	{
-		id: PT_VALIDATE,
-		kind: 'INTEGRATED_PRODUCT_VALIDATION',
-		name: 'Integrated Product Validation',
-		purpose: 'Journey/requirement/architecture/fitness validation'
-	},
-	{
-		id: PT_PROMOTE,
-		kind: 'PRODUCT_BASELINE_PROMOTION',
-		name: 'Product Baseline Promotion',
-		purpose: 'Evidence package, residual-risk + promotion decisions, authoritative baseline'
-	},
-	{
-		id: PT_CONCERN,
-		kind: 'ARCHITECTURE_CONCERN',
-		name: 'Architecture Concern',
-		purpose: 'A generic architecture concern contributing to Architecture Definition'
+/** A PWU Type as the ontology describes it, resolved to ids. */
+interface DerivedType {
+	readonly id: string;
+	readonly kind: string;
+	readonly isRoot: boolean;
+	readonly purpose: string;
+	readonly children: readonly { readonly id: string; readonly kind: string }[];
+	readonly requiredInputs: readonly string[];
+	readonly requiredOutputs: readonly string[];
+	readonly completionClaims: readonly string[];
+}
+
+/**
+ * Derive the published PWU Types from the ontology.
+ *
+ * ── THE TREE IS `candidateChildren`, INTERSECTED WITH WHAT HAS A TEMPLATE ────────────────────────────────────
+ * The ontology authors 63 candidate child kinds and 50 have NO `pwuTemplate` row. A kind with no template has no
+ * `defaultPolicyIds`, and `requireGoverningPolicies` THROWS on an undescribed kind (REG-F-029) — so publishing
+ * those 50 would mint child types that cannot be assessed and cannot be driven. The intersection is the honest
+ * ceiling: it takes the tree from 9 types to 15 and from two levels to three, while the delivery census keeps
+ * pinning the 50 rather than letting a deeper tree stand in for a coherent ontology.
+ */
+function derivedTypes(handle: EngineHandle): DerivedType[] {
+	const templates = handle.ontology.pwuTemplates as readonly {
+		pwuKind: string;
+		isRoot?: boolean;
+		purpose?: string;
+		candidateChildren?: readonly string[];
+		inputs?: readonly string[];
+		outputArtifactTypes?: readonly string[];
+		completionClaims?: readonly string[];
+	}[];
+	const idFor = (kind: string): string => {
+		const id = PT_BY_KIND[kind];
+		if (!id)
+			throw new Error(
+				`seedWorkbench: the ontology describes a PWU Type of kind "${kind}" with no stable id in ` +
+					`PT_BY_KIND. Add one rather than letting the type go unpublished — a work area the ontology ` +
+					`describes and the PWA omits is exactly the gap REG-F-033 measured.`
+			);
+		return id;
+	};
+	const described = new Set(templates.map((t) => t.pwuKind));
+	const types = templates.map((t) => ({
+		id: idFor(t.pwuKind),
+		kind: t.pwuKind,
+		isRoot: t.isRoot ?? false,
+		purpose: t.purpose ?? typeName(t.pwuKind),
+		children: (t.candidateChildren ?? [])
+			.filter((c) => described.has(c))
+			.map((c) => ({ id: idFor(c), kind: c })),
+		requiredInputs: t.inputs ?? [],
+		requiredOutputs: t.outputArtifactTypes ?? [],
+		completionClaims: t.completionClaims ?? []
+	}));
+	// Root first — PublishPwa names types[0] as the root, and the ontology declares exactly one.
+	const roots = types.filter((t) => t.isRoot);
+	if (roots.length !== 1)
+		throw new Error(
+			`seedWorkbench: the ontology declares ${roots.length} root PWU Types, expected exactly 1.`
+		);
+	// ── ONLY WHAT THE ROOT CAN REACH (§11.6) ─────────────────────────────────────────────────────────────────
+	// `ValidatePwa` refuses a composition with an orphan: "every type reachable from that root". The ontology
+	// describes ARCHITECTURE_DECISION and names it in NO `candidateChildren` list, so publishing all fifteen is
+	// REFUSED BY THE ENGINE — correctly. Parenting it by guess would be authoring composition structure the
+	// ontology declined to state, so it stays unpublished and `ontology-delivery-census` NAMES it rather than
+	// letting it disappear into a filter. The engine caught this independently of the design note predicting it.
+	const byId = new Map(types.map((t) => [t.id, t]));
+	const reachable = new Set([roots[0]!.id]);
+	const queue = [roots[0]!];
+	while (queue.length) {
+		for (const c of queue.pop()!.children)
+			if (!reachable.has(c.id)) {
+				reachable.add(c.id);
+				const child = byId.get(c.id);
+				if (child) queue.push(child);
+			}
 	}
-];
+	return [roots[0]!, ...types.filter((t) => !t.isRoot && reachable.has(t.id))];
+}
 
 /**
  * The policies a PWU Type DECLARES, read from the ontology the engine was composed with (REG-F-029).
@@ -332,28 +367,42 @@ export function authorProductRealizationPwa(handle: EngineHandle): void {
 			'Structure product-development work from originating intent through validated, authoritative product baselines.',
 		version: SEED_PWA_VERSION
 	});
-	for (const t of PWU_TYPES) {
-		const children = t.children ?? [];
+	const types = derivedTypes(handle);
+	for (const t of types) {
 		send('DefinePwuType', 'PWU_TYPE', t.id, {
 			pwuTypeId: t.id,
 			pwaId: SEED_PWA,
 			pwuKind: t.kind,
-			name: t.name,
+			name: typeName(t.kind),
 			purpose: t.purpose,
-			isRoot: t.root ?? false,
-			permittedChildTypeIds: children.map((c) => c.id),
-			permittedChildren: children.map((c) => ({
+			isRoot: t.isRoot,
+			permittedChildTypeIds: t.children.map((c) => c.id),
+			// CARDINALITY IS AUTHORED, and narrowly. `candidateChildren` is a flat list carrying no cardinality, so
+			// the root's seven canonical branches stay M1 (each happens exactly once in a product realization) and
+			// every deeper child is C+ — conditional, one-or-more — which is what "candidate" means. Claiming M1
+			// for a candidate would assert a mandate the ontology does not state.
+			permittedChildren: t.children.map((c) => ({
 				typeId: c.id,
-				cardinality: c.cardinality,
-				...(c.note ? { applicabilityNote: c.note } : {})
+				cardinality: t.isRoot ? 'M1' : 'C+'
 			})),
-			requiredAssurancePolicyIds: policiesForKind(handle, t.kind)
+			requiredAssurancePolicyIds: policiesForKind(handle, t.kind),
+			// THE FOUR TEMPLATE FIELDS THAT REACHED NOTHING (REG-F-033), delivered into the ratified homes they
+			// always had on PWU_TYPE. Absent stays absent: an empty array would read as "this type requires no
+			// inputs", which is a claim, where omission is silence.
+			...(t.requiredInputs.length ? { requiredInputs: [...t.requiredInputs] } : {}),
+			...(t.requiredOutputs.length ? { requiredOutputs: [...t.requiredOutputs] } : {}),
+			// TRANSFORMED, not verbatim: `completionClaims` is a string[] and `completionRule` a single string, so
+			// the claims are rendered as an explicit CONJUNCTION — a completion rule over claims is exactly "all of
+			// these hold" — with every claim retained rather than summarised away.
+			...(t.completionClaims.length
+				? { completionRule: 'All of: ' + t.completionClaims.join(' ') }
+				: {})
 		});
 	}
 	send('SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {});
 	send('ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {});
 	send('PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {
-		rootPwuTypeId: PWU_TYPES[0]!.id
+		rootPwuTypeId: types[0]!.id
 	});
 }
 
@@ -374,7 +423,9 @@ export function seedWorkbench(handle: EngineHandle): void {
 		intendedOutputProduct: 'Field Service Management SaaS'
 	});
 	const pwuTypeByKind: Record<string, string> = {};
-	for (const t of PWU_TYPES) pwuTypeByKind[t.kind] = t.id;
+	// The SAME derivation the publish loop used, so the instance-side kind->type map cannot name a type the PWA
+	// did not publish.
+	for (const t of derivedTypes(handle)) pwuTypeByKind[t.kind] = t.id;
 	// The undertaking's assessments are judged under the RATIFIED catalog's Fitness For Purpose policy
 	// ("Determine whether the completed product is suitable for the actual approved user need") — seeded just
 	// above from the DOC-004 catalog. Passing it means the demo EXERCISES the catalog rather than growing it:

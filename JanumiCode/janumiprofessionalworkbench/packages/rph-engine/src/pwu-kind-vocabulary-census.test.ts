@@ -133,12 +133,12 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 		// seeded set, or a stray catalog kind, shows up as a change rather than as silence.
 		const unbindable = catalogKinds().filter((k) => !seeded.includes(k));
 		expect(unbindable.sort()).toEqual([
-			'ARCHITECTURE_DECISION',
-			'INTENT_DISCOVERY',
-			'PRODUCT_BOUNDARY',
-			'REQUIREMENT_DEFINITION',
-			'USER_JOURNEY_DEFINITION',
-			'WORK_DECOMPOSITION'
+			// ONE, since the 2026-08-06 deepening. This list held SIX: the five sub-kinds the PWA now publishes
+			// left it by being published, which is the deepening working rather than the pin being relaxed.
+			// ARCHITECTURE_DECISION remains because the ontology describes it and names it in NO candidateChildren
+			// list — `ValidatePwa` refuses an orphan type (§11.6), and parenting it by guess would author
+			// composition structure the ontology declined to state.
+			'ARCHITECTURE_DECISION'
 		]);
 	});
 
