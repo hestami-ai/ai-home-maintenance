@@ -8,6 +8,10 @@ import type { EngineHandle } from './engine.js';
 export interface ObjectRow {
 	readonly id: string;
 	readonly state: Record<string, unknown>;
+	/** The aggregate revision this row was read at — the value a caller must later declare as
+	 *  `expectedRevision` (PER-4; JPWB-SPEC-001 §11.4.22 item 2). Optional only so that existing rows
+	 *  built without it still type-check; every helper in this file supplies it. */
+	readonly revision?: number;
 }
 
 /** Every object of `objectType` (by aggregateType on the event log) with its current materialized state. */
@@ -185,4 +189,23 @@ export function getConversation(h: EngineHandle, pwaId: string): ObjectRow | und
 /** A single object's current state by id, or undefined. */
 export function getObject(handle: EngineHandle, id: string): Record<string, unknown> | undefined {
 	return handle.loadObject(id)?.state as Record<string, unknown> | undefined;
+}
+
+/**
+ * The aggregate revision an object is currently at, or undefined if the store has never held it.
+ *
+ * ── WHY THIS EXISTS AS A SEPARATE READ (JPWB-SPEC-001 §11.4.22 item 2; JPWB-DOC-003 §9 PER-4) ──────────
+ * `StoredObject` carries `revision`, and every read helper in this file threw it away one layer up —
+ * `ObjectRow` was `{ id, state }` and `getObject` returns `.state`. So the revision was dropped
+ * STRUCTURALLY, below every loader, and no route could have declared one even if it wanted to. The
+ * result was that all surface dispatch was last-write-wins while the engine sat ready to enforce
+ * otherwise: `loadOrReject` honours `expectedRevision` whenever it is present.
+ *
+ * ⚠ THE VALUE IS ONLY WORTH ANYTHING IF IT TRAVELS. PER-4 asks for "the revision they BELIEVE current",
+ * so this must be read when the page is DERIVED and then round-tripped through the client. A caller
+ * that fetches it immediately before dispatching would pass every test and protect nothing — the
+ * tautology REG-F-050 records, reproduced one layer out.
+ */
+export function getObjectRevision(handle: EngineHandle, id: string): number | undefined {
+	return handle.loadObject(id)?.revision;
 }

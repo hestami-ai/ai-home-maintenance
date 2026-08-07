@@ -144,6 +144,31 @@ export interface DeclaredMutant {
 }
 
 export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
+	// ── SPEC-001 §11.4.22 FORK-22 item 2 / JPWB-DOC-003 §9 PER-4 ────────────────────────────────────────────
+	// The ruling names a red-proof mutant as part of its own conformance. These are it. Both anchor on the ONE
+	// conjunct that decides whether a declared revision is honoured, and they fail in OPPOSITE directions —
+	// which is what distinguishes a real gate from one that merely refuses a lot.
+	{
+		id: 'MU-FRESH-18-A-neutralise-revision-check',
+		file: 'packages/rph-application/src/handlers/kit.ts',
+		find:
+			'if (command.expectedRevision !== undefined && command.expectedRevision !== existing.revision)',
+		replace:
+			'if (false && command.expectedRevision !== undefined && command.expectedRevision !== existing.revision)',
+		expectRed: ['verif/optimistic-concurrency-surface.test.ts'],
+		why: 'PER-4 fail-open: neutralising the compare-and-swap reproduces last-write-wins, which is what all 28 surface dispatch sites did before FORK-22 item 2. Observed: reddens ONLY the stale-page test; the control and the tautology control stay green.',
+		source: 'SPEC-001 §11.4.22 item 2'
+	},
+	{
+		id: 'MU-FRESH-18-B-refuse-any-declared-revision',
+		file: 'packages/rph-application/src/handlers/kit.ts',
+		find:
+			'if (command.expectedRevision !== undefined && command.expectedRevision !== existing.revision)',
+		replace: 'if (command.expectedRevision !== undefined)',
+		expectRed: ['verif/optimistic-concurrency-surface.test.ts'],
+		why: 'THE CONTROL NEEDS ITS OWN MUTANT (a control that cannot fail is not a control). A guard that refused every command carrying a revision would satisfy the stale-page test while protecting nothing. Observed: reddens ONLY the CONTROL and the tautology control; the stale-page test stays green.',
+		source: 'SPEC-001 §11.4.22 item 2'
+	},
 	{
 		id: 'M1-widen-start-sources',
 		file: 'packages/rph-domain/src/step-command-spec.ts',

@@ -151,6 +151,11 @@ export interface UiCommandInput {
 	readonly targetAggregateType: string;
 	readonly targetAggregateId: string;
 	readonly payload: unknown;
+	/** The aggregate revision the PAGE WAS RENDERED FROM, round-tripped through the form. Declaring it
+	 *  is what makes a surface dispatch optimistic rather than last-write-wins (PER-4; SPEC-001
+	 *  §11.4.22 item 2). Omit it only where the caller genuinely never read the subject — never to
+	 *  avoid a conflict. */
+	readonly expectedRevision?: number;
 }
 
 /** Build one UI-authored command with the same envelope policy used by single and atomic dispatch. */
@@ -168,6 +173,17 @@ function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
 		idempotencyKey: TEST_MODE
 			? `ui-idem-${cmdSeq}`
 			: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
+		// ── THE REVISION THE PAGE WAS RENDERED FROM (SPEC-001 §11.4.22 item 2; DOC-003 §9 PER-4) ────────
+		// Set only when the caller supplies one, because a value invented here would be exactly the
+		// tautology REG-F-050 records: the engine comparing a number against the read it came from.
+		// What makes this meaningful is that the caller's value originated in the EARLIER read that
+		// produced the page and travelled back through the form.
+		//
+		// The ruling's trigger is "a Projection whose `freshness` is not `FRESH`", and the ratified
+		// default for `freshness` is `UNKNOWN` (§2.5.2) — which is not `FRESH` — so a surface carrying
+		// no ProjectionEnvelope (none exists; §5.9 says so itself) is IN SCOPE by default. Passing it
+		// whenever it is known is the literal reading, not a strengthening.
+		...(input.expectedRevision === undefined ? {} : { expectedRevision: input.expectedRevision }),
 		payload: input.payload
 	};
 }
