@@ -202,6 +202,26 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'DOC-003 §9 PER-4 (population, not wiring — the census asserts no coverage)'
 	},
 	{
+		id: 'MU-FRESH-18-F-lifecycle-form-stops-carrying-the-revision',
+		file: 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte',
+		find:
+			'<form method="POST" action="?/deprecate" use:enhance>\n\t\t\t\t\t\t<input type="hidden" name="expectedRevision" value={data.pwa.revision} />',
+		replace:
+			'<form method="POST" action="?/deprecate" use:enhance>\n\t\t\t\t\t\t<input type="hidden" name="expectedRevision" value="" />',
+		expectRed: ['apps/rph-demo/e2e/pwa-lifecycle-deprecate.e2e.ts'],
+		why: 'The five PWA publication-lifecycle forms posted ZERO fields before PER-4 — the subject came from params.id — so the declared revision is the only thing any of them submits, and only an e2e can prove the round-trip. NARROW BY DESIGN: mutating just the deprecate form makes the kill attributable to ONE spec. Observed: exactly 1 of 65 e2e tests fails, and it is pwa-lifecycle-deprecate.e2e.ts:13; the four specs that drive submitForReview (pwa-authoring, agent-sse, assurance-floor, policy-manager) all stay green.',
+		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
+	},
+	{
+		id: 'MU-FRESH-18-G-declared-revision-taken-from-the-authoring-fork',
+		file: 'apps/rph-demo/src/routes/pwa/[id]/+page.server.ts',
+		find: 'const pwaRevision = canonicalEngine.loadObject(params.id)?.revision;',
+		replace: 'const pwaRevision = engine.loadObject(params.id)?.revision;',
+		expectRed: ['apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts'],
+		why: "THE EXPECTATION MUST DESCRIBE THE STORE THE COMMAND WILL HIT. This is the only loader in the app that can render from a FORK (`candidate?.engine ?? canonicalEngine`), while every action on the page dispatches into CANONICAL — so a fork-sourced revision is an expectation about a store the command never touches, which either conflicts spuriously or happens to match and protects nothing. ⚠ THIS MUTANT SURVIVED ALL 65 E2E SPECS when first measured: no lifecycle spec stages an authoring candidate, so the two engines are the same object wherever those forms are driven. The named victim was written FOR this mutant, and its own control asserts the two stores actually disagree first — otherwise the assertion would hold under either implementation. Observed: fork 17 vs canonical 18.",
+		source: 'DOC-003 §9 PER-4; REG-F-050 (a revision that cannot conflict protects nothing)'
+	},
+	{
 		id: 'M1-widen-start-sources',
 		file: 'packages/rph-domain/src/step-command-spec.ts',
 		find: "\t\tsourceStates: ['QUEUED'],\n\t\teventType: 'ExecutionStepStarted',",

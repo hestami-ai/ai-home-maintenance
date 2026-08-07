@@ -101,8 +101,10 @@ time (`ObjectRow`, then `dispatch()`, now the loaders).
 | ✅ W-1 | `/decisions` — approve, grant, deny | A | — |
 | ✅ W-2 | Extract the guard to one module + pin the empty-string branch | A | — |
 | ✅ W-3 | `/baselines` — submit, approve | A | — |
+| ✅ W-3b | `verif/route-action-census.test.ts` — pin the population (§5) | — | — |
 | W-4 | `routes/+page.server.ts#delete` and `undertakings#create`'s 5 UPDATE sites | A | loader |
-| W-5 | `pwa/[id]` — the 5 `advancePwa` lifecycle actions + the 5 policy actions | A | loader |
+| ✅ W-5a | `pwa/[id]` — the 5 publication-lifecycle actions | A | — |
+| W-5b | `pwa/[id]` — editPolicy, suspendPolicy, activatePolicy, newPolicyVersion's supersede element | A | loader (policies `.map()`) |
 | W-6 | `ExecutionPlanInput` gains `revision`; `shapeExecutionPlanInput` carries it | — | contract change |
 | W-7 | `undertakings/[id]` — 16 actions over the repaired projection | A + B | W-6 |
 | W-8 | `lib/server/floor.ts`, `agent/tools.ts` — 7 UPDATE sites reached through helpers, not `dispatch()` | B | design |
@@ -126,11 +128,48 @@ quietly dropped, because "we should add a ratchet" will otherwise be re-proposed
 3. **Its control mutant was not attributable.** Renaming a route action key breaks a live form post and reddens
    that route's e2e, so RED could not distinguish "the ratchet works" from "the e2e caught a broken form."
 
-**The deeper reason, and the thing to solve first:** once a route is *correctly* wired, its e2e already reddens
-on any break in the chain — so the ratchet's only unique job is detecting a **newly added unwired action**, and
-no find/replace mutant on existing code can prove that capability. The honest instrument for it is an
-enumeration test that pins the action set and forces a human to classify anything new; it claims nothing about
-wiring. **That is the next thing to build here, and it is deliberately less than what was proposed.**
+**The deeper reason:** once a route is *correctly* wired, its e2e already reddens on any break in the chain — so
+the ratchet's only unique job is detecting a **newly added unwired action**.
+
+**✅ BUILT, as the smaller thing: `verif/route-action-census.test.ts`.** It derives the 43 route actions from the
+filesystem each run and compares them to a pinned snapshot. It asserts **nothing** about `expectedRevision`, and
+that separation is what makes it honest — the wiring status lives in §4 of this document, where a human maintains
+it, rather than in a test that would be claiming what it cannot check.
+
+**Its control is attributable, which the refused design's was not.** `MU-FRESH-18-E` **adds** an action rather
+than renaming one: a rename breaks a live form post and reddens that route's e2e, so RED could not distinguish
+*"the instrument works"* from *"the e2e caught a broken form."* Adding is additive — observed, it reddens only
+the population assertion while 13 neighbouring tests stay green.
+
+**And the extractor is tested against the mistake I actually made.** `^\t(\w+): async \(` finds 11 of `pwa/[id]`'s
+17. It throws on an unrecognised key shape rather than skipping it, because a census that silently drops what it
+cannot parse reports a smaller population and calls it complete — the exact failure it exists to prevent.
+
+## 5b. A THIRD shape hazard, found while wiring W-5a: the page and the command can read different stores
+
+`pwa/[id]` is the only loader in the app that can render from an **authoring fork** —
+`candidate?.engine ?? canonicalEngine`, a snapshot overlay whose revisions for the same aggregate ids are not
+canonical's. Every action on that page dispatches into **canonical**.
+
+**So "the revision the page was rendered from" is the wrong rule here.** The correct rule is **the revision of
+the store the command will hit**, and the two coincide everywhere else only because everywhere else there is one
+store. A fork-sourced expectation would either conflict spuriously or — worse — happen to match and protect
+nothing.
+
+This is *not* the re-fetched tautology: the read still happens at render. What makes a revision meaningless is
+being read at **dispatch** time, not being read from the store the dispatch targets.
+
+⚠ **And the choice survived every e2e.** Swapping `canonicalEngine.loadObject(…)` for `engine.loadObject(…)`
+left all 65 specs green, because no lifecycle spec stages a candidate — so in every test that drives those forms
+the two engines are the same object. `apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts` was
+written for that mutant (`MU-FRESH-18-G`), and **its control asserts the two stores actually disagree before
+asserting which one was used** — otherwise the assertion holds under either implementation.
+
+**Open, and deliberately not closed here:** the authoring broker *can* create a policy inside a fork
+(`broker.ts:336`), and the policy manager is not gated on `editable` — so a fork-only policy can render a card
+whose forms dispatch into a canonical store where the aggregate does not exist. It fails closed today, but with
+`RPH_VALIDATION_SEMANTIC_FAILED`, which is neither `STALE_FORM` nor `RPH_REVISION_CONFLICT` — so the two-message
+vocabulary this programme introduces does not describe it. **W-5b must decide that case rather than inherit it.**
 
 ## 6. What this programme does not claim
 

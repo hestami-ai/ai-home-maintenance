@@ -51,6 +51,10 @@
 		data: PageData;
 		form: {
 			error?: string;
+			// The RPH error code, so a STALE PAGE is distinguishable from a refused act. Without it a
+			// revision CONFLICT reads as "this cannot be done" when it means "someone changed this while you
+			// were looking at it" — different instructions to a professional (JPWB-DOC-003 §9 PER-4).
+			code?: string;
 			definedType?: string;
 			editedType?: string;
 			removedType?: string;
@@ -123,6 +127,8 @@
 		RETIRED: 6
 	};
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
+	/** A revision conflict is not a refusal — the act was legal and this page was simply out of date. */
+	const isStale = $derived(form?.code === 'RPH_REVISION_CONFLICT');
 
 	// Node graph: PWU Types are nodes rendered by the PwuTypeCard custom node. The BASE view is the composition
 	// ("permits") tree, projected through @statelyai/graph and laid out by ELK. Data-flow
@@ -894,7 +900,16 @@
 					<button type="button" class="ghost small" onclick={() => (showPwaEdit = false)}>Cancel</button>
 				</form>
 			{/if}
-			{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
+			{#if form?.error}
+				<p class="err" role="alert">
+					{#if isStale}
+						This PWA changed while the page was open, so the act was not applied. Reload to see the
+						current state, then decide again. ({form.error})
+					{:else}
+						{form.error}
+					{/if}
+				</p>
+			{/if}
 		</div>
 
 		<div class="tbpub">
@@ -915,25 +930,33 @@
 				{/if}
 				{#if data.pwa.publicationStatus === 'DRAFT'}
 					<form method="POST" action="?/submitForReview" use:enhance>
+						<!-- The canonical revision this page was rendered from (PER-4). These five forms posted NO
+						     fields at all before this — the subject came from params.id — so this is the only thing
+						     any of them submits. -->
+						<input type="hidden" name="expectedRevision" value={data.pwa.revision} />
 						<button class="ghost small" type="submit" disabled={!hasRoot || hasStagedCandidate}
 							>Submit for Review →</button
 						>
 					</form>
 				{:else if data.pwa.publicationStatus === 'UNDER_REVIEW'}
 					<form method="POST" action="?/validate" use:enhance>
+						<input type="hidden" name="expectedRevision" value={data.pwa.revision} />
 						<button class="ghost small" type="submit">Validate →</button>
 					</form>
 				{:else if data.pwa.publicationStatus === 'VALIDATED'}
 					<form method="POST" action="?/publish" use:enhance>
+						<input type="hidden" name="expectedRevision" value={data.pwa.revision} />
 						<button class="primary small" type="submit">Publish</button>
 					</form>
 				{:else if data.pwa.publicationStatus === 'PUBLISHED'}
 					<span class="immutable">🔒 Published versions are immutable</span>
 					<form method="POST" action="?/deprecate" use:enhance>
+						<input type="hidden" name="expectedRevision" value={data.pwa.revision} />
 						<button class="ghost small" type="submit">Deprecate</button>
 					</form>
 				{:else if data.pwa.publicationStatus === 'DEPRECATED'}
 					<form method="POST" action="?/retire" use:enhance>
+						<input type="hidden" name="expectedRevision" value={data.pwa.revision} />
 						<button class="ghost small" type="submit">Retire</button>
 					</form>
 				{:else if data.pwa.publicationStatus === 'RETIRED'}

@@ -44,6 +44,7 @@ import {
 	type UiCommandInput
 } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
+import { readRenderedRevision, refuse, STALE_FORM } from '$lib/server/optimistic-concurrency';
 import {
 	commitAuthoringTurn,
 	discardAuthoringTurn,
@@ -79,6 +80,22 @@ export const load: PageServerLoad = ({ params }) => {
 	const engine = candidate?.engine ?? canonicalEngine;
 	const pwa = getObject(engine, params.id);
 	if (!pwa) throw error(404, 'PWA not found');
+	// ── THE REVISION FOR PER-4 COMES FROM CANONICAL, AND THE DISPLAY STATE MAY NOT ──────────────────────────
+	// This loader is the only one in the app that can read from a FORK: with an agent candidate staged, `engine`
+	// above is `candidate.engine`, a snapshot overlay whose revisions for the same aggregate ids are NOT
+	// canonical's. Every action on this page dispatches through `dispatch()` -> `getEngine()`, i.e. CANONICAL.
+	//
+	// So a fork-sourced revision would be an expectation about a store the command never touches — which either
+	// conflicts spuriously or, far worse, happens to match and protects nothing. The expectation must describe
+	// THE STORE THE COMMAND WILL HIT, so it is read from `canonicalEngine` explicitly.
+	//
+	// This is NOT the re-fetched tautology REG-F-050 records: the read happens HERE, at render, and a canonical
+	// write between this load and the submit still conflicts. What makes a revision meaningless is being read
+	// at DISPATCH time, not being read from the store the dispatch targets.
+	//
+	// `undefined` is a safe outcome rather than a hole: the template then renders an empty value, the strict
+	// parser returns null, and the action fails closed.
+	const pwaRevision = canonicalEngine.loadObject(params.id)?.revision;
 	// Conformance fixtures (§13/§21): Undertakings instantiated from this PWA that serve as reference fixtures.
 	const fixtures = listUndertakings(canonicalEngine)
 		.filter((u) => u.state.pwaId === params.id)
@@ -151,6 +168,9 @@ export const load: PageServerLoad = ({ params }) => {
 	return {
 		pwa: {
 			id: params.id,
+			// The canonical revision this page was rendered from (JPWB-DOC-003 §9 PER-4). See the note at the
+			// `pwaRevision` read: it is deliberately NOT taken from `engine`, which may be an authoring fork.
+			revision: pwaRevision,
 			name: String((pwa.name ?? params.id) as string),
 			description: String((pwa.description ?? '') as string),
 			domain: String((pwa.domain ?? '') as string),
@@ -296,10 +316,26 @@ function bumpVersion(v: string): string {
 	return `${v}-v2`;
 }
 
-/** Advance the PWA publication FSM and surface any engine rejection to the form. */
-function advancePwa(commandType: string, pwaId: string, payload: Record<string, unknown>) {
-	const r = dispatch(commandType, 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, payload);
-	if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+/**
+ * Advance the PWA publication FSM and surface any engine rejection to the form.
+ *
+ * `expectedRevision` is REQUIRED, not optional. Every caller updates an existing PWA — none of the five
+ * lifecycle acts is a creation — so PER-4 applies to all of them and an optional parameter would be an
+ * invitation to omit it silently at one call site. Making it required puts the enforcement in the type checker
+ * rather than in a reviewer, which is the same lesson `withinScope`'s mandatory scope argument records
+ * (packages/rph-engine/src/queries.ts:60-72) after an optional one was duly omitted four times over.
+ */
+function advancePwa(
+	commandType: string,
+	pwaId: string,
+	payload: Record<string, unknown>,
+	expectedRevision: number
+) {
+	const r = dispatch(commandType, 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, payload, expectedRevision);
+	// `refuse` rather than a bare fail(400): this dropped `r.error.code`, so a CONFLICT was indistinguishable
+	// from a state-machine refusal — and once a revision is declared, telling those two apart is the only
+	// evidence the surface can offer about why the act did not happen.
+	if (r.status !== 'ACCEPTED') return refuse(r);
 	return { advanced: commandType };
 }
 
@@ -441,17 +477,42 @@ export const actions: Actions = {
 		return { removedType: pwuTypeId };
 	},
 
-	submitForReview: ({ params }) => advancePwa('SubmitPwaForReview', params.id, {}),
-	validate: ({ params }) => advancePwa('ValidatePwa', params.id, {}),
+	// ── THE FIVE PUBLICATION-LIFECYCLE ACTS ─────────────────────────────────────────────────────────────────
+	// Each updates the PWA aggregate itself, so PER-4 binds all five. They took no `request` at all before this
+	// and their forms posted ZERO fields — not even an id, because `params.id` supplied the subject. Declaring
+	// the revision is therefore the first thing any of them has ever had to read from the submission.
+	submitForReview: async ({ request, params }) => {
+		const expectedRevision = readRenderedRevision(await request.formData());
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		return advancePwa('SubmitPwaForReview', params.id, {}, expectedRevision);
+	},
+	validate: async ({ request, params }) => {
+		const expectedRevision = readRenderedRevision(await request.formData());
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		return advancePwa('ValidatePwa', params.id, {}, expectedRevision);
+	},
 	// Publish requires a declared root PWU Type (which must have been defined while DRAFT); resolve it server-side.
-	publish: ({ params }) => {
+	publish: async ({ request, params }) => {
+		const expectedRevision = readRenderedRevision(await request.formData());
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		// ⚠ `root` NAMES A DIFFERENT AGGREGATE AND CONTRIBUTES NO REVISION. It is a PAYLOAD field; the subject
+		// of PublishPwa is the PWA. Declaring the root type's revision here would be the subject-identity error
+		// PER-4 wiring exists to avoid — an expectation about an object the command does not target.
 		const root = listPwuTypes(getEngine(), params.id).find((t) => t.state.isRoot === true);
 		if (!root) return fail(400, { error: 'Define a root PWU Type before publishing.' });
-		return advancePwa('PublishPwa', params.id, { rootPwuTypeId: root.id });
+		return advancePwa('PublishPwa', params.id, { rootPwuTypeId: root.id }, expectedRevision);
 	},
 	// Continue the publication FSM past PUBLISHED: PUBLISHED -> DEPRECATED -> RETIRED.
-	deprecate: ({ params }) => advancePwa('DeprecatePwa', params.id, {}),
-	retire: ({ params }) => advancePwa('RetirePwa', params.id, {}),
+	deprecate: async ({ request, params }) => {
+		const expectedRevision = readRenderedRevision(await request.formData());
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		return advancePwa('DeprecatePwa', params.id, {}, expectedRevision);
+	},
+	retire: async ({ request, params }) => {
+		const expectedRevision = readRenderedRevision(await request.formData());
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		return advancePwa('RetirePwa', params.id, {}, expectedRevision);
+	},
 
 	// Human-in-the-loop resolution: record + grant an auditable governance WAIVER over the de minimis assurance
 	// floor so a non-SATISFIED PWA can PUBLISH — the alternative to revising the graph and re-running the floor.
