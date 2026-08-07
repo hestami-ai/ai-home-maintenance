@@ -244,7 +244,42 @@ If the credential is OPTIONAL this patch drops it suite-wide: every test dispatc
 test still passes, and the increment is vacuous with a green suite. **The credential must be a REQUIRED
 positional parameter with no default**, so the suite goes red loudly and the fix is one line.
 
-### Blast radius — measured, and the migration is mechanical
+### ⚠ THE MIGRATION WAS BUILT AND MEASURED 2026-08-07, AND THE ESTIMATE BELOW UNDERCOUNTS IT
+
+The core landed and worked in a scratch pass — `Engine.as(credential)` added, `dispatch`/`dispatchBatch`/
+`dispatchBatchGuarded` made private, the port required at construction. **The gate behaved exactly as designed:
+every unmigrated site became a compile error.** Then the tree was reverted, because it could not be finished in
+one increment and a partly-migrated tree cannot be committed.
+
+**What the run measured, which the estimate below did not include.** A codemod over engine construction sites
+rewrote **117 files** and left **473 type errors in `rph-application` alone**:
+
+| n | cause | fix |
+|---|---|---|
+| 83 | `Cannot find module '@janumipwb/rph-ports/testing'` | **one** `exports` entry in `packages/rph-ports/package.json` |
+| 240 + 84 | variables annotated `: Engine` now holding an `AuthedEngine` | a second codemod pass over **type annotations** |
+| 28 | a local `DispatchLike` helper parameter type | one widening |
+| 2 | `AuthedEngine` passed where `Engine` is expected | by hand |
+
+**THE COUNT THAT WAS WRONG IS THE ONE THAT MATTERED.** The blast-radius analysis said *"88 of 102 files need
+ONE edit each"* — counting **construction sites**. Measured, the construction edit is indeed one line per file,
+but **the dominant cost is TYPE ANNOTATIONS, which were never counted**: ~324 of the 473 errors come from
+`: Engine` declarations that must become `AuthedEngine`. A census of the *places a type is written* is a
+different population from a census of *calls*, and only the second was taken.
+
+**THE RECIPE, in order, so the next increment is mechanical rather than exploratory:**
+1. Add the `./testing` subpath to `rph-ports`'s `exports` map **first** — it alone clears 83 errors and is the
+   cheapest way to stop them masking the rest.
+2. Codemod the construction sites: insert `authenticate: testAuthenticator(),` into the deps literal and append
+   `.as(TEST_CRED.human)`, by paren-matching. Verified working over 117 files.
+3. Codemod the **annotations**: `: Engine` → `: AuthedEngine` in test files. This is the step the estimate
+   missed and it is the largest.
+4. Widen the local `DispatchLike` helper type.
+5. Then the production wiring **by hand**, because each is a judgement: `workbench.ts`'s per-request session,
+   the broker's own AGENT credential, `authoring-turn.ts`'s `recordingEngine` and its replay, the seed paths'
+   SYSTEM principal, `verif/unread-refusal-guard.ts`'s prototype patch, and the two double-cast partial handles.
+
+### Blast radius — the earlier estimate, superseded above for the annotation count
 
 **284 executed dispatch sites across 102 files** is the planning number. Not 30,123 dispatches (75.9% of which
 come from a single line), and not the 16,609 I quoted earlier, which was neither. **A site that dispatches once
