@@ -208,6 +208,18 @@ export function makeEvent(
 		actor: command.issuedBy,
 		correlationId: command.correlationId,
 		commandId: command.commandId,
+		// ── THE CHAIN, NOT THE HOP ─────────────────────────────────────────────────────────────────────────
+		// `commandId` already answers "which command produced this event" and is populated on 446/446 events.
+		// `causationId` answers a different question — what caused THE COMMAND — so an event inherits its
+		// command's cause rather than being handed its own command as its cause.
+		//
+		// THE NAIVE VERSION WAS WRITTEN INTO THE DESIGN RECORD AND IS WRONG: setting `causationId` to the
+		// dispatching command on every event would duplicate `commandId` and destroy the very distinction the
+		// field exists for. If everything has a cause, nothing is marked as derived. Causation is meaningful
+		// PRECISELY BECAUSE IT IS ABSENT on an act somebody actually issued.
+		//
+		// So this line is `undefined` for the overwhelming majority of events, and that is the correct result.
+		...(command.causationId === undefined ? {} : { causationId: command.causationId }),
 		payload: args.payload
 	};
 }

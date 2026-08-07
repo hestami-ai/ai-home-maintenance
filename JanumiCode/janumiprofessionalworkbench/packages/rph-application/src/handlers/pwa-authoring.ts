@@ -154,7 +154,25 @@ function bumpPwaSemanticVersion(
 	const bumpCommand: DomainCommand = {
 		...command,
 		commandId: `${command.commandId}#pwa-version`,
-		idempotencyKey: `${command.idempotencyKey}#pwa-version`
+		idempotencyKey: `${command.idempotencyKey}#pwa-version`,
+		// ── THE ONE DERIVED ACT IN THE ENGINE, AND IT NOW SAYS WHAT CAUSED IT (JPWB-DOC-003 §9 PER-9) ──────
+		// Nobody issued this command. The engine synthesized it because a PWU_TYPE edit obliges the owning
+		// PWA's version to rise. Before this line the spread inherited `causationId: undefined` from the
+		// original and never set one, so a governed event existed with an actor who did not perform it and
+		// nothing recording why it was written.
+		//
+		// PER-9 is the ratified obligation — "Every material act in the stream retains identity, scope, actor
+		// and provenance, CORRELATION AND CAUSATION…" — and DOC-003's `doesNotGovern` cedes the exact shape to
+		// the repository, so the field is ours and the duty is canon's. (The oft-cited sentence defining
+		// `causationId` lives in RPH-DOC-007, which CON-000 B1 makes historical material; the FIELD is
+		// authoritative as repository shape, the SENTENCE is not. See REG-F-049.)
+		//
+		// WHY THIS IS THE SHAPE THE SPONSOR'S CASCADE RULING NEEDS. REG-E-030 ruled that a derived act is
+		// attributed to the actor whose act triggered it — so `issuedBy` stays the editor. The objection was
+		// that the record would then claim they performed an act they did not. It does not, because these are
+		// two different axes and the corpus already separates them: `issuedBy` is WHO IT IS ATTRIBUTED TO,
+		// `causationId` is WHAT CAUSED IT. This is that ruling made honest, in the one place it already applies.
+		causationId: command.commandId
 	};
 	const newRevision = loaded.revision + 1;
 	const newSemanticVersion = loaded.semanticVersion + 1;
