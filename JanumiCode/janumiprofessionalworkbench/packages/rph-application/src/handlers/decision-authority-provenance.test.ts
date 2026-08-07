@@ -41,7 +41,7 @@
 // declaring an authority you are not is refused rather than admitted on trust.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ActorTypeSchema } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -50,21 +50,34 @@ import { Engine } from '../index.js';
 const TS = '2026-08-03T00:00:00Z';
 const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
 const AGENT: ActorReference = { actorId: 'agent-1', actorType: 'AGENT', displayName: 'Author' };
+// This suite dispatches AS BOTH actors on purpose — REG-F-014 is about an issuer declaring an authority it
+// is not — so it registers a two-principal directory instead of the single shared credential.
+const DIR = testDirectory([
+	{ ...HUMAN, tenantId: 't', organizationId: 'o' },
+	{ ...AGENT, tenantId: 't', organizationId: 'o' }
+]);
+
 const SUBJECT = 'pwu_01ARZ3NDEKTSV4RRFFQ69J6001';
 const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69J6002';
 
 describe('REG-F-014: a Decision records the authority of its ISSUER, not one it names', () => {
 	let store: SqliteStorageAdapter;
-	let engine: AuthedEngine;
+	let engine: Engine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
 	});
 
 	const dispatch = (
+		issuedBy: ActorReference,
 		commandType: string,
 		payload: unknown,
 		id = DEC,
@@ -78,12 +91,13 @@ describe('REG-F-014: a Decision records the authority of its ISSUER, not one it 
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy,
 			correlationId: 'reg-f-014',
 			idempotencyKey: `k-${n}`,
 			payload
 		};
-		return engine.dispatch(command);
+		// THE ACTOR IS NOW THE SESSION, not a field. Declaring `issuedBy` in the envelope as well would be
+		// refused on disagreement — which is the very rule this suite exists to check.
+		return engine.as(DIR.credentialFor(issuedBy.actorId)).dispatch(command);
 	};
 
 	const propose = (issuedBy: ActorReference, authority: ActorReference) =>

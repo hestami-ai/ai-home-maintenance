@@ -89,3 +89,39 @@ export function testAuthenticator(): AuthenticationPort {
 		}
 	};
 }
+
+/**
+ * A closed directory built from an explicit principal list, for the few tests that legitimately dispatch AS
+ * MORE THAN ONE ACTOR — the REG-F-014 authority tests, the independence tests.
+ *
+ * ⚠ IT DOES NOT REOPEN THE LAUNDERING HOLE, and the distinction is worth stating because it looks close to it.
+ * The caller may SELECT among principals the fixture registered up front; it cannot INVENT one at dispatch
+ * time — `credentialFor` throws on an unregistered actor. What property (b) forbids is a caller choosing who
+ * it is; what this allows is a fixture declaring, in advance, the cast of a scenario.
+ */
+export function testDirectory(principals: readonly Principal[]): {
+	readonly authenticate: AuthenticationPort;
+	credentialFor(actorId: string): Credential;
+} {
+	const byCredential: Record<string, Principal> = {};
+	const byActor: Record<string, Credential> = {};
+	principals.forEach((p, i) => {
+		// Opaque and positional — deliberately not derived from the actorId it resolves to.
+		const c = `d${i}-${'x'.repeat(3)}${i * 7 + 11}` as Credential;
+		byCredential[c] = p;
+		byActor[p.actorId] = c;
+	});
+	return {
+		authenticate: {
+			authenticate: (credential) => {
+				const principal = byCredential[credential];
+				return principal ? { ok: true, principal } : { ok: false, reason: 'UNKNOWN_CREDENTIAL' };
+			}
+		},
+		credentialFor(actorId) {
+			const c = byActor[actorId];
+			if (!c) throw new Error(`No principal registered for ${actorId}; register it in the fixture.`);
+			return c;
+		}
+	};
+}

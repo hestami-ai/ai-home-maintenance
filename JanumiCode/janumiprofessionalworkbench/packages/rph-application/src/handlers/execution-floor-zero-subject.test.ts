@@ -21,7 +21,7 @@
 // mutation "aiProduced && ... -> false && ..." survives GREEN, and neither limb is actually killed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -35,6 +35,13 @@ const AGENT: ActorReference = {
 };
 const MODEL_ACTOR = { actorId: 'model-7', actorType: 'MODEL', displayName: 'gpt-oss:20b' };
 const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'Operator' };
+
+// Dispatches as BOTH: the floor's AI-produced determination turns on who acted, so the actor is the variable
+// under test and each one needs its own session.
+const DIR = testDirectory([
+	{ ...AGENT, tenantId: 't', organizationId: 'o' },
+	{ ...HUMAN, tenantId: 't', organizationId: 'o' }
+]);
 
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69GY100';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69GY110';
@@ -50,7 +57,7 @@ const SAYS_NOTHING = {
 
 describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 	let store: SqliteStorageAdapter;
-	let engine: AuthedEngine;
+	let engine: Engine;
 	let seq = 0;
 
 	function dispatch(
@@ -58,6 +65,7 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 		payload: unknown,
 		id = PLAN,
 		aggType = 'EXECUTION_PLAN',
+		issuedBy: ActorReference = AGENT
 	) {
 		const n = ++seq;
 		const command: DomainCommand = {
@@ -67,12 +75,11 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy,
 			correlationId: 'wp11b',
 			idempotencyKey: `k-${n}`,
 			payload
 		};
-		return engine.dispatch(command);
+		return engine.as(DIR.credentialFor(issuedBy.actorId)).dispatch(command);
 	}
 
 	const planOf = () => store.loadObject(PLAN)!;
@@ -115,7 +122,12 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
