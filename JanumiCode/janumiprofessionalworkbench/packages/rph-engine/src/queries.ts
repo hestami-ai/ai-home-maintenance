@@ -8,9 +8,24 @@ import type { EngineHandle } from './engine.js';
 export interface ObjectRow {
 	readonly id: string;
 	readonly state: Record<string, unknown>;
-	/** The aggregate revision this row was read at — the value a caller must later declare as
-	 *  `expectedRevision` (PER-4; JPWB-SPEC-001 §11.4.22 item 2). Optional only so that existing rows
-	 *  built without it still type-check; every helper in this file supplies it. */
+	/**
+	 * The aggregate revision this row was read at — the value a caller must later declare as
+	 * `expectedRevision` (JPWB-DOC-003 §9 PER-4; JPWB-SPEC-001 §11.4.22 item 2).
+	 *
+	 * ⚠ THIS COMMENT WAS FALSE FOR ONE COMMIT, AND THE FALSEHOOD IS THE INSTRUCTIVE PART. It read
+	 * "every helper in this file supplies it" while `listByType` — the SOLE constructor of every
+	 * ObjectRow here — pushed `{ id, state }`. So the field was declared, documented as populated, and
+	 * populated by nothing: the exact hollow shape this repository has spent the week finding
+	 * elsewhere (`AuthorityReference`, `roleId`, `causationId`, seeded policy objects), created anew in
+	 * the commit that was curing one. A doc comment asserting a property nothing enforces is a claim
+	 * the type system cannot check and no test was watching.
+	 *
+	 * It is true now — `listByType` supplies it — and `queries-revision.test.ts` asserts it, so the
+	 * claim has a reader rather than a promise.
+	 *
+	 * Optional in the TYPE because a caller may legitimately hold a row it did not read (a projection
+	 * fold, a test fixture); required in FACT from every helper here.
+	 */
 	readonly revision?: number;
 }
 
@@ -21,8 +36,13 @@ export function listByType(handle: EngineHandle, objectType: string): ObjectRow[
 		if (e.aggregateType === objectType) ids.add(e.aggregateId);
 	const rows: ObjectRow[] = [];
 	for (const id of ids) {
-		const state = handle.loadObject(id)?.state;
-		if (state) rows.push({ id, state: state as Record<string, unknown> });
+		const loaded = handle.loadObject(id);
+		if (loaded?.state)
+			rows.push({
+				id,
+				state: loaded.state as Record<string, unknown>,
+				revision: loaded.revision
+			});
 	}
 	return rows;
 }
