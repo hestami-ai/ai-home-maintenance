@@ -66,7 +66,6 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'exebind',
 			idempotencyKey: `k-${n}`,
 			payload

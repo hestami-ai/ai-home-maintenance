@@ -47,7 +47,6 @@ describe('N-12 — engine and read-model flip on the SAME attempt', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'retrycap',
 			idempotencyKey: `k-${n}`,
 			payload

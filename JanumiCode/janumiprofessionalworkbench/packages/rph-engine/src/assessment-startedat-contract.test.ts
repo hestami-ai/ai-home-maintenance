@@ -54,7 +54,6 @@ function engineWithAssessment() {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: '2026-08-04T00:00:00Z',
-			issuedBy: ACTOR,
 			correlationId: 'inc0',
 			idempotencyKey: `inc0-idem-${c}`,
 			payload

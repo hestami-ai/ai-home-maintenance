@@ -43,7 +43,6 @@ describe('Execution floor subject: the result, at its exact version — not the 
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: AGENT,
 			correlationId: 'floor-subject',
 			idempotencyKey: `k-${n}`,
 			payload

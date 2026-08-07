@@ -31,7 +31,6 @@ describe('RetryExecutionStep — RPH-EXE-008 cap (DWP-04)', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

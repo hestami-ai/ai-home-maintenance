@@ -39,7 +39,6 @@ describe('EditAssurancePolicy keeps the two scope representations in step (revie
 			targetAggregateType: 'ASSURANCE_POLICY',
 			targetAggregateId: POLICY,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-scope-edit',
 			idempotencyKey: `idem-${n}`,
 			payload: { policyId: POLICY, ...payload }

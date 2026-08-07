@@ -33,7 +33,6 @@ function dispatch(engine: AuthedEngine, seq: { n: number }, id: string, type: st
 		targetAggregateType: type,
 		targetAggregateId: id,
 		issuedAt: TS,
-		issuedBy: human,
 		correlationId: 'corr',
 		idempotencyKey: `k-${n}`,
 		payload

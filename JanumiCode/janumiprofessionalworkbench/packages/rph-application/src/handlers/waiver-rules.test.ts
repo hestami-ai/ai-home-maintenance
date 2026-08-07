@@ -34,7 +34,6 @@ describe('requestWaiver — waiverRules enforcement (#1c)', () => {
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

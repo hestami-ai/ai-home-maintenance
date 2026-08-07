@@ -61,7 +61,6 @@ describe('a PEER assessment’s §10.3 foreclosure gate sees its own observation
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-peer',
 			idempotencyKey: `idem-${n}`,
 			payload

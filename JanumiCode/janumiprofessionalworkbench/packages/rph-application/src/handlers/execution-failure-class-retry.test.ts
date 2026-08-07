@@ -50,7 +50,6 @@ describe('RetryExecutionStep honours the §36.2 failure-class control-action map
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

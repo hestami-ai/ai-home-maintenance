@@ -54,7 +54,6 @@ describe('JAN-BINDEXCL — ProposeExecutionPlan refuses a step bound to somebody
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'bindexcl',
 			idempotencyKey: `k-${n}`,
 			payload

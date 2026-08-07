@@ -48,7 +48,6 @@ describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, liv
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU_ID,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-blocking-obs',
 			idempotencyKey: `idem-${n}`,
 			payload,

@@ -73,7 +73,6 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU_ID,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-1',
 			idempotencyKey: `idem-${n}`,
 			payload,

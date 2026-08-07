@@ -41,7 +41,6 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT_ID,
 			issuedAt: '2026-07-12T00:00:00Z',
-			issuedBy: actor,
 			correlationId: 'corr-1',
 			idempotencyKey: `idem-${n}`,
 			payload,

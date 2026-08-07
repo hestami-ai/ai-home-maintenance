@@ -75,7 +75,6 @@ function captureIntent(
 		targetAggregateType: 'INTENT',
 		targetAggregateId: intentId,
 		issuedAt: '2026-07-28T00:00:00.000Z',
-		issuedBy: { actorId: 'w2', actorType: 'HUMAN', displayName: 'Durability Probe' },
 		correlationId: 'w2',
 		idempotencyKey: `w2-idem-${intentId}`,
 		payload: {

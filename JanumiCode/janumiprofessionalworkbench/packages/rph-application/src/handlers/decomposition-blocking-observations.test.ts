@@ -46,7 +46,6 @@ describe('DecompositionRejected.blockingObservationIds is derived from severity,
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'blocking-obs',
 			idempotencyKey: `k-${n}`,
 			payload

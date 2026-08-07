@@ -36,7 +36,6 @@ describe('the emitted-event guard is alive', () => {
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'guard-liveness',
 			idempotencyKey: 'guard-liveness-1',
 			payload: {

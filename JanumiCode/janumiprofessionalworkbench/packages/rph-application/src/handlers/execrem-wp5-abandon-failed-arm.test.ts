@@ -43,7 +43,6 @@ describe('JAN-EXECREM WP-5 — abandoning a FAILED arm', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp5',
 			idempotencyKey: `k-${n}`,
 			payload

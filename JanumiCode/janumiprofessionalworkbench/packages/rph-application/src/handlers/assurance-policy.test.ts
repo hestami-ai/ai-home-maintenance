@@ -32,7 +32,6 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 			targetAggregateType: POLICY,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

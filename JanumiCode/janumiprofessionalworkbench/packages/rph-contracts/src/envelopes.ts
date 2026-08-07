@@ -100,7 +100,20 @@ export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 		targetAggregateId: z.string().min(1),
 		expectedRevision: RevisionSchema.optional(),
 		issuedAt: RfcTimestampSchema,
-		issuedBy: ActorReferenceSchema,
+		/**
+		 * OPTIONAL SINCE REG-D-027(b), and the optionality is the point.
+		 *
+		 * ABSENT  -> the engine stamps the authenticated principal. This is the shape new callers should use:
+		 *            there is nothing to launder because nothing is declared.
+		 * PRESENT -> a CHECKED CLAIM. The engine compares it to the resolved principal and REFUSES on
+		 *            disagreement rather than correcting it, so an attempt to declare an issuer one is not
+		 *            becomes a recorded refusal instead of an invisible overwrite.
+		 *
+		 * It was REQUIRED, which made every caller author an issuer and made the laundering shape mandatory.
+		 * Handlers still see it as present — see `StampedCommand`, which is what the engine hands inward after
+		 * the trust boundary has run.
+		 */
+		issuedBy: ActorReferenceSchema.optional(),
 		correlationId: z.string().min(1),
 		causationId: z.string().optional(),
 		idempotencyKey: z.string().min(1),
@@ -109,6 +122,13 @@ export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 }
 export const DomainCommandSchema = domainCommandSchema(z.unknown());
 export type DomainCommand = z.infer<typeof DomainCommandSchema>;
+
+/**
+ * A command that has crossed the trust boundary: `issuedBy` is the AUTHENTICATED principal, never a caller's
+ * claim, and is therefore always present. Handlers receive this, not `DomainCommand` — which is how the
+ * engine's guarantee is carried in the type system rather than in a comment.
+ */
+export type StampedCommand = DomainCommand & { readonly issuedBy: ActorReference };
 
 /** DomainEvent envelope factory (DOC-007 §9). Events assert accepted facts; `aggregateRevision` is
  * monotonic and must equal prior + 1 (§35.6, enforced in persistence M4). */

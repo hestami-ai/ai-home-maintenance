@@ -20,7 +20,6 @@ function captureIntent(over: Partial<DomainCommand> = {}): DomainCommand {
 		targetAggregateType: 'INTENT',
 		targetAggregateId: INTENT_ID,
 		issuedAt: '2026-07-11T00:00:00Z',
-		issuedBy: actor,
 		correlationId: 'corr-1',
 		idempotencyKey: 'idem-1',
 		payload: {

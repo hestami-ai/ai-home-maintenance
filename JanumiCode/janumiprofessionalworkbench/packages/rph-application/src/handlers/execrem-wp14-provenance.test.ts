@@ -52,7 +52,6 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp14',
 			idempotencyKey: `k-${n}`,
 			payload

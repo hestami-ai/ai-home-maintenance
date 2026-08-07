@@ -26,7 +26,6 @@ function harness() {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'dwp03',
 			idempotencyKey: `k-${n}`, // distinct each time — a re-issue is a new request, not a transport retry
 			payload

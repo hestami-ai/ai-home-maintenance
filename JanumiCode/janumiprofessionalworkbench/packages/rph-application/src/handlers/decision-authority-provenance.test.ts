@@ -65,7 +65,6 @@ describe('REG-F-014: a Decision records the authority of its ISSUER, not one it 
 	});
 
 	const dispatch = (
-		issuedBy: ActorReference,
 		commandType: string,
 		payload: unknown,
 		id = DEC,

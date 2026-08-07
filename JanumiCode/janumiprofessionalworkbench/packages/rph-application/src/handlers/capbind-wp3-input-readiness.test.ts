@@ -43,7 +43,6 @@ describe('WP-3 / RPH-EXE-005 — a required input that does not resolve leaves t
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-wp3',
 			idempotencyKey: `k-${n}`,
 			payload

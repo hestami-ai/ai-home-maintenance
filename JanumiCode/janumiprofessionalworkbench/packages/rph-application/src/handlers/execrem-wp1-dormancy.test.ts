@@ -56,7 +56,6 @@ describe('JAN-EXECREM WP-1 — the new contract fields are DORMANT (no emitter p
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp1',
 			idempotencyKey: `k-${n}`,
 			payload

@@ -32,7 +32,6 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

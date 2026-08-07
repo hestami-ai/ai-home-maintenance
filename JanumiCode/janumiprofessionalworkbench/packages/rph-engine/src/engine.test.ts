@@ -19,7 +19,6 @@ function captureIntent(): DomainCommand {
 		targetAggregateType: 'INTENT',
 		targetAggregateId: INTENT_ID,
 		issuedAt: '2026-07-11T00:00:00Z',
-		issuedBy: { actorId: 'user-1', actorType: 'HUMAN', displayName: 'Alice' },
 		correlationId: 'corr-1',
 		idempotencyKey: 'idem-1',
 		payload: {

@@ -39,7 +39,6 @@ describe('isolated authoring turn and guarded commit', () => {
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: { actorId: 'setup', actorType: 'HUMAN', displayName: 'Setup' },
 			correlationId: 'setup',
 			idempotencyKey: `setup-idem-${sequence}`,
 			payload

@@ -53,7 +53,6 @@ describe('RecordArtifact — DOC-009 §18.1 transcribed; the Artifact is a versi
 			targetAggregateType: 'ARTIFACT',
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: AGENT,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

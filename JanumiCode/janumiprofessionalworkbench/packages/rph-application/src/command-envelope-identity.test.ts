@@ -36,7 +36,6 @@ describe('REG-F-011 — a malformed envelope is REFUSED, never thrown (Engine.di
 		targetAggregateType: 'INTENT',
 		targetAggregateId: INTENT,
 		issuedAt: TS,
-		issuedBy: actor,
 		correlationId: 'corr-1',
 		idempotencyKey: 'k-1',
 		payload: {

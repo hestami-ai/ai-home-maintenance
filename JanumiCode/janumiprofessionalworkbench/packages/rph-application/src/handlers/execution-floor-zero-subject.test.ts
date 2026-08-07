@@ -58,7 +58,6 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 		payload: unknown,
 		id = PLAN,
 		aggType = 'EXECUTION_PLAN',
-		issuedBy: ActorReference = AGENT
 	) {
 		const n = ++seq;
 		const command: DomainCommand = {

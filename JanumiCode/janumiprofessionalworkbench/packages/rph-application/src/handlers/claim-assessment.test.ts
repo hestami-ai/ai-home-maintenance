@@ -60,7 +60,6 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'reg-d-024',
 			idempotencyKey: `k-${n}`,
 			payload

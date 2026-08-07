@@ -54,7 +54,6 @@ describe('PER-4 — a surface command declares the revision it was rendered from
 		targetAggregateType,
 		targetAggregateId,
 		issuedAt: TS,
-		issuedBy: HUMAN,
 		correlationId: 'ui',
 		idempotencyKey: `ui-idem-${seq}`,
 		...(expectedRevision === undefined ? {} : { expectedRevision }),

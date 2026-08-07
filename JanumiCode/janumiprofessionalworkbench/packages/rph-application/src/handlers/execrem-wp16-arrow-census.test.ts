@@ -147,7 +147,6 @@ describe('JAN-EXECREM WP-16 (a) — the arrow census over STEP_COMMAND_SPECS', (
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp16a',
 			idempotencyKey: `k-${n}`,
 			payload

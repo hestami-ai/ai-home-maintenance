@@ -42,7 +42,6 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

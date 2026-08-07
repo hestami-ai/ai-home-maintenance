@@ -102,7 +102,6 @@ describe('command / event / result envelopes', () => {
 		targetAggregateType: 'INTENT',
 		targetAggregateId: 'int_' + ULID,
 		issuedAt: '2026-07-10T22:00:00Z',
-		issuedBy: actor,
 		correlationId: 'corr-1',
 		idempotencyKey: 'idem-1',
 		payload: { title: 'x' }

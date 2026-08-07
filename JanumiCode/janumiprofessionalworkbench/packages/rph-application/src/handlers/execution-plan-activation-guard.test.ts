@@ -42,7 +42,6 @@ describe('ActivateExecutionPlan — one active plan per PWU (live pipeline)', ()
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

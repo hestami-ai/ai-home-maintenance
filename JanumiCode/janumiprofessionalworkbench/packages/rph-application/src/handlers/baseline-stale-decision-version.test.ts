@@ -37,7 +37,6 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU_ID,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-stale-version',
 			idempotencyKey: `idem-${n}`,
 			payload,

@@ -29,7 +29,6 @@ describe('DWP-06 — submitBaselineForReview (the gap the required-precondition 
 			targetAggregateType: 'BASELINE',
 			targetAggregateId: BASE,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'dwp06',
 			idempotencyKey: `k-${n}`, // distinct each time — a re-issue is a new request, not a transport retry
 			payload

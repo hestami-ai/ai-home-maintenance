@@ -65,7 +65,6 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'decision-kind',
 			idempotencyKey: `k-${n}`, // a DISTINCT key each time — a re-aimed command is a new request, not a retry
 			payload

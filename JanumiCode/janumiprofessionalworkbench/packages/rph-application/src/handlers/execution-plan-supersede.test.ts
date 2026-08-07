@@ -35,7 +35,6 @@ describe('SupersedeExecutionPlan + RPH-EXE-002 (DWP-02)', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

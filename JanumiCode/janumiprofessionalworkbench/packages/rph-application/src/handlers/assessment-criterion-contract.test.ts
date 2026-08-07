@@ -59,7 +59,6 @@ describe('AssessmentCriterion (DOC-004 §7) is enforced, not merely documented',
 			targetAggregateType: 'ASSURANCE_POLICY',
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload: {

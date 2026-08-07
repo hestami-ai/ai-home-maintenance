@@ -56,7 +56,6 @@ describe('ReviseDecomposition conserves the parent obligations (REG-F-006, DOC-0
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-revise-cons',
 			idempotencyKey: `idem-${n}`,
 			payload

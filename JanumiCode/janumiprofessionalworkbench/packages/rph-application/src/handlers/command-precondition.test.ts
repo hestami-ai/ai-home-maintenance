@@ -34,7 +34,6 @@ const command = (commandType = 'AdvanceThing', targetAggregateId = 'thing-1'): D
 	targetAggregateType: 'THING',
 	targetAggregateId,
 	issuedAt: TS,
-	issuedBy: HUMAN,
 	correlationId: 'corr',
 	idempotencyKey: 'k-1',
 	payload: { note: 'p' }
@@ -159,7 +158,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'corr',
 			idempotencyKey: 'k-cap',
 			payload: {
@@ -198,7 +196,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-cap2',
 				payload: {
@@ -229,7 +226,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-adv',
 				payload: { note: 'from-the-command' }
@@ -262,7 +258,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-cap3',
 				payload: {
@@ -289,7 +284,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-adv2',
 				payload: {}

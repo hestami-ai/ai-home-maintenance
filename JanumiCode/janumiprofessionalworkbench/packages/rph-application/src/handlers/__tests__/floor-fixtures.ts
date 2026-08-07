@@ -42,7 +42,6 @@ function policyCommand(
 		targetAggregateType: 'ASSURANCE_POLICY',
 		targetAggregateId: policyId,
 		issuedAt: now,
-		issuedBy: SEED_ACTOR,
 		correlationId: 'seed',
 		idempotencyKey: `${tag}-${policyId}`,
 		payload
@@ -256,7 +255,6 @@ export function recordFloorAssessment(engine: DispatchLike, args: RecordFloorArg
 			targetAggregateType: aggregateType,
 			targetAggregateId: aggregateId,
 			issuedAt: now,
-			issuedBy: actor,
 			correlationId: 'floor-fixture',
 			idempotencyKey: tag,
 			payload

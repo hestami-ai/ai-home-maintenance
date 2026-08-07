@@ -62,7 +62,6 @@ function harness() {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'f-i',
 			idempotencyKey: `k-${n}`,
 			payload

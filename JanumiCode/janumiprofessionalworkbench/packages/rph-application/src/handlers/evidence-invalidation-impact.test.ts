@@ -46,7 +46,6 @@ function harness() {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'wire4',
 			idempotencyKey: `k-${n}`,
 			payload

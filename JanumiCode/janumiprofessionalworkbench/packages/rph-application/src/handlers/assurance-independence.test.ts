@@ -40,7 +40,6 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-1',
 			idempotencyKey: `idem-${n}`,
 			payload

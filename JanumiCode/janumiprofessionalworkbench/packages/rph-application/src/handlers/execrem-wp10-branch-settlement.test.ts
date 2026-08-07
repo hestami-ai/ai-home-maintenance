@@ -64,7 +64,6 @@ describe('JAN-EXECREM WP-10 — a BRANCH decides ONCE, against the move it is ma
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp10',
 			idempotencyKey: `k-${n}`,
 			payload

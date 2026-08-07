@@ -15,7 +15,8 @@ import {
 	validateAgainst,
 	type CommandResult,
 	type DomainCommand,
-	type DomainEvent
+	type DomainEvent,
+	type StampedCommand
 } from '@janumipwb/rph-contracts';
 import { contentHash } from '@janumipwb/rph-contracts/hash';
 import type {
@@ -189,7 +190,7 @@ export class Engine {
 		principal: Principal | undefined,
 		reason: string | undefined,
 		command: DomainCommand
-	): { command: DomainCommand } | { error: CommandResult } {
+	): { command: StampedCommand } | { error: CommandResult } {
 		const base = {
 			commandId: typeof command.commandId === 'string' ? command.commandId : '',
 			producedEventIds: [] as string[]
@@ -217,17 +218,11 @@ export class Engine {
 			);
 		}
 
-		// ⚠ INTERIM: THE DISAGREEMENT REFUSAL IS STAGED OFF, AND THAT IS A DISCLOSED WEAKENING (REG-D-027).
-		// The ruling says a declared issuer that disagrees with the principal is REFUSED, not corrected. It is
-		// implemented below and currently unreachable, because ~100 test files still AUTHOR an `issuedBy` (u1,
-		// gov-1, lead, agent-1 …) and every one of them would refuse. Turning it on requires REG-D-027(b) —
-		// `issuedBy` optional, then removed from fixtures — which is the next increment.
-		// UNTIL THEN THE STAMP STILL OVERWRITES, so the RECORD is truthful either way; what is missing is that
-		// a forgery ATTEMPT is corrected silently instead of being recorded as a refusal.
-		const REFUSE_ON_DISAGREEMENT = false;
+		// A DECLARED ISSUER IS A CHECKED CLAIM (REG-D-027(b)). Most callers now declare nothing and are simply
+		// stamped; one that DOES declare is compared, and a disagreement is refused rather than corrected — so
+		// an attempt to act as someone else is a recorded refusal instead of an invisible overwrite.
 		const declared = command.issuedBy as { actorId?: string; actorType?: string } | undefined;
 		if (
-			REFUSE_ON_DISAGREEMENT &&
 			declared &&
 			(declared.actorId !== principal.actorId || declared.actorType !== principal.actorType)
 		) {
@@ -255,11 +250,11 @@ export class Engine {
 						? {}
 						: { executionInstanceId: principal.executionInstanceId })
 				}
-			} as DomainCommand
+			} as StampedCommand
 		};
 	}
 
-	private dispatchStamped(command: DomainCommand): CommandResult {
+	private dispatchStamped(command: StampedCommand): CommandResult {
 		// ── REG-F-011, THE CRASH HALF ────────────────────────────────────────────────────────────────────────
 		//
 		// `commandId` and `correlationId` are the two envelope fields the STORE requires NOT NULL

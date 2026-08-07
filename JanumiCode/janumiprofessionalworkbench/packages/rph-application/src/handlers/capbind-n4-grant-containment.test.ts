@@ -41,7 +41,6 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: BINDING,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-n4',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -189,7 +188,6 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: OTHER,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-n4',
 			idempotencyKey: `k-${n}`,
 			payload: {
@@ -209,7 +207,6 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: OTHER,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-n4',
 			idempotencyKey: `k-${m}`,
 			payload: { grantedCapabilities: [{ capability: 'file-system' }, { capability: 'network' }] }

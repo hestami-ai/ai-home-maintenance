@@ -44,7 +44,6 @@ describe('JAN-EXECREM WP-12c / F-30 — a bare id is not an authorization', () =
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt,
-			issuedBy: actor,
 			correlationId: 'wp12c',
 			idempotencyKey: `k-${n}`,
 			payload

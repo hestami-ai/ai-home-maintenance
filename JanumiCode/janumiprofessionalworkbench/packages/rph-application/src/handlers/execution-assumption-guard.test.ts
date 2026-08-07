@@ -30,7 +30,6 @@ describe('ApproveExecutionPlan — a dead assumption cannot authorize new work (
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

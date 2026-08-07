@@ -66,7 +66,6 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'stale-floor',
 			idempotencyKey: `k-${n}`,
 			payload

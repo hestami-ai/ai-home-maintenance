@@ -55,7 +55,6 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp12b',
 			idempotencyKey: `k-${n}`,
 			payload

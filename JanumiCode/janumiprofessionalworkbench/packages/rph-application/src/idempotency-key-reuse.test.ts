@@ -65,7 +65,6 @@ describe('REG-F-012: an idempotency key is bound to the command that claimed it'
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'reg-f-012',
 			idempotencyKey,
 			payload
@@ -178,7 +177,6 @@ describe('REG-F-012: an idempotency key is bound to the command that claimed it'
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT_A,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'reg-f-012-pre-v2',
 			idempotencyKey: KEY,
 			payload: {
@@ -314,7 +312,6 @@ describe('a replay of a command whose handler ALSO commits a derived one', () =>
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'reg-f-018',
 			idempotencyKey: key,
 			payload

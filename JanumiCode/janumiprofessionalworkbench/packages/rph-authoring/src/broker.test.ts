@@ -34,7 +34,6 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: { actorId: 'setup', actorType: 'HUMAN', displayName: 'Setup' },
 			correlationId: 'setup',
 			idempotencyKey: `setup-idem-${evtSeq}`,
 			payload

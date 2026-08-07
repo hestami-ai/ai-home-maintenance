@@ -43,7 +43,6 @@ describe('AssertObligation / AssertConstraint mint first-class objects (WP-1-005
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-obl-con',
 			idempotencyKey: `idem-${n}`,
 			payload

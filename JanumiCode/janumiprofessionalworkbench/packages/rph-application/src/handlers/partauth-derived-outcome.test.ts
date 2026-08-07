@@ -41,7 +41,6 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: BINDING,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'partauth',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -315,7 +314,6 @@ describe('N-18 — a binding that confers nothing does not authorize a start', (
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'n18',
 			idempotencyKey: `n18k-${n}`,
 			payload

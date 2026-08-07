@@ -50,7 +50,6 @@ describe('REG-F-020: the waiver attachment predicate holds over REAL emitted eve
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'reg-f-020-waiver',
 			idempotencyKey: `k-${n}`,
 			payload

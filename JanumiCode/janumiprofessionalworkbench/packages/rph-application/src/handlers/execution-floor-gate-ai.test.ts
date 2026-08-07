@@ -41,7 +41,6 @@ describe('CompleteExecutionStep floor gate — an AI-produced step with NO recor
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: AGENT,
 			correlationId: 'exec-floor',
 			idempotencyKey: `k-${n}`,
 			payload

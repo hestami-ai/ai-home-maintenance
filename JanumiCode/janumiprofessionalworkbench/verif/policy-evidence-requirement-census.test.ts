@@ -62,7 +62,6 @@ function seededEngine() {
 			targetAggregateType: 'ASSURANCE_POLICY',
 			targetAggregateId: aggregateId,
 			issuedAt: '2026-08-04T00:00:00Z',
-			issuedBy: ACTOR,
 			correlationId: 'evidence-census',
 			idempotencyKey: `census-idem-${c}`,
 			payload

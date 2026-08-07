@@ -33,7 +33,6 @@ describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
 			targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
 			targetAggregateId: VID,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-vr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -164,7 +163,6 @@ describe('Gate D — a DISABLED validator’s result cannot complete an assessme
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-d',
 			idempotencyKey: `dk-${n}`,
 			payload

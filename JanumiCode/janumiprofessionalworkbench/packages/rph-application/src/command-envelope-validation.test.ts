@@ -54,7 +54,6 @@ describe('REG-F-011: the command envelope is validated at the bus', () => {
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'reg-f-011',
 			idempotencyKey: `k-${n}`,
 			payload: {

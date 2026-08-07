@@ -26,7 +26,6 @@ describe('published-PWA -> EngineOntology seam', () => {
 				targetAggregateType: type,
 				targetAggregateId: id,
 				issuedAt: TS,
-				issuedBy: actor,
 				correlationId: 'corr',
 				idempotencyKey: `k-${n}`,
 				payload

@@ -58,7 +58,6 @@ describe('PromoteBaseline: an assessment that has not concluded blocks promotion
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU_ID,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-in-flight',
 			idempotencyKey: `idem-${n}`,
 			payload,
@@ -85,7 +84,6 @@ describe('PromoteBaseline: an assessment that has not concluded blocks promotion
 			targetAggregateType: 'ASSURANCE_ASSESSMENT',
 			targetAggregateId: ASSESS,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-in-flight',
 			idempotencyKey: `idem-force-${seq}`,
 			payload: {}

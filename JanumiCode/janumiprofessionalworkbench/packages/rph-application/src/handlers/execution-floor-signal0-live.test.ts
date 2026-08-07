@@ -33,8 +33,7 @@ describe('CompleteExecutionStep floor gate — signal 0 wiring (a human-complete
 			commandSchemaVersion: 1,
 			targetAggregateType: type,
 			targetAggregateId: id,
-			issuedAt: TS,
-			issuedBy: human, // a HUMAN completes the step — heuristic 2 (AGENT/MODEL completer) cannot fire
+			issuedAt: TS, // a HUMAN completes the step — heuristic 2 (AGENT/MODEL completer) cannot fire
 			correlationId: 'sig0',
 			idempotencyKey: `k-${n}`,
 			payload

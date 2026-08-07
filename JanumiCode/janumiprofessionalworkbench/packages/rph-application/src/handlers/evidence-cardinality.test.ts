@@ -76,7 +76,6 @@ describe('§6.1 cardinality is READ: ZERO_OR_MORE does not hold a verdict (REG-E
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-card',
 			idempotencyKey: `idem-${n}`,
 			payload

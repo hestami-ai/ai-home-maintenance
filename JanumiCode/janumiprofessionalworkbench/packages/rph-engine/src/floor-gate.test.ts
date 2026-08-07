@@ -91,7 +91,6 @@ function send(
 		targetAggregateType: type,
 		targetAggregateId: id,
 		issuedAt: TS,
-		issuedBy: actor,
 		correlationId: 'gate-e2e',
 		idempotencyKey: `g-idem-${seq}`,
 		payload

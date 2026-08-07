@@ -41,7 +41,6 @@ describe('ExecutionStep re-issue guards — requireFrom kill tests (CMDPRE revie
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`, // distinct each time — a re-issue is a fresh request, not a transport retry
 			payload

@@ -51,8 +51,7 @@ describe('JAN-EXECREM WP-11 / F-01 limb A — RPH-EXE-006 is a real decision', (
 			commandSchemaVersion: 1,
 			targetAggregateType: aggType,
 			targetAggregateId: id,
-			issuedAt: TS,
-			issuedBy: HUMAN, // HUMAN issuer: signal 2 of stepOutputIsAiProduced stays false
+			issuedAt: TS, // HUMAN issuer: signal 2 of stepOutputIsAiProduced stays false
 			correlationId: 'wp11a',
 			idempotencyKey: `k-${n}`,
 			payload

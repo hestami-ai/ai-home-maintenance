@@ -64,7 +64,6 @@ describe('WaiverRule (DOC-004 §12.1) is enforced, not a placeholder', () => {
 			targetAggregateType: 'ASSURANCE_POLICY',
 			targetAggregateId: POL,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload: {

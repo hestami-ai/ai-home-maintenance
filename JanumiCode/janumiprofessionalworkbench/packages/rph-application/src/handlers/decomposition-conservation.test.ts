@@ -47,7 +47,6 @@ describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pip
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-cons',
 			idempotencyKey: `idem-${n}`,
 			payload

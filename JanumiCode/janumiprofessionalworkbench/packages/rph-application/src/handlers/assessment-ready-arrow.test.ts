@@ -62,7 +62,6 @@ describe('REG-F-021 increment 2: the READY -> ASSESSING arrow', () => {
 			targetAggregateType: 'ASSURANCE_ASSESSMENT',
 			targetAggregateId: ASSESS,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-ready-arrow',
 			idempotencyKey: `idem-${n}`,
 			payload,
@@ -93,7 +92,6 @@ describe('REG-F-021 increment 2: the READY -> ASSESSING arrow', () => {
 			targetAggregateType: 'ASSURANCE_ASSESSMENT',
 			targetAggregateId: ASSESS,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-ready-arrow',
 			idempotencyKey: `idem-force-${seq}`,
 			payload: {}

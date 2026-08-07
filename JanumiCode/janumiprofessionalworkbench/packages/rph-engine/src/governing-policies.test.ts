@@ -85,7 +85,6 @@ describe('selectGoverningPolicies — the exclusions actually fire (REG-F-029 re
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU,
 			issuedAt: '2026-08-05T00:00:00Z',
-			issuedBy: { actorId: 'gp', actorType: 'HUMAN', displayName: 'GP' },
 			correlationId: 'gp',
 			idempotencyKey: `gp-idem-${++n}`,
 			payload: {

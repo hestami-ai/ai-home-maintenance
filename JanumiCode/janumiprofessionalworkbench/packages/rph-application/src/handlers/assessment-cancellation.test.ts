@@ -66,7 +66,6 @@ describe('CancelAssuranceAssessment (REG-F-021 residual R-1)', () => {
 			targetAggregateType: 'ASSURANCE_ASSESSMENT',
 			targetAggregateId: ASSESS,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-cancel',
 			idempotencyKey: `idem-${n}`,
 			payload,

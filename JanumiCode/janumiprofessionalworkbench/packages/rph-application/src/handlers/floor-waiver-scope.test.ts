@@ -110,7 +110,6 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'waiver-scope',
 			idempotencyKey: `k-${n}`,
 			payload

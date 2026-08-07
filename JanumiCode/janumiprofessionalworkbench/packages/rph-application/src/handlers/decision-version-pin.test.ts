@@ -56,7 +56,6 @@ describe('REG-F-017: a Decision pins its subject versions at PROPOSAL', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'reg-f-017',
 			idempotencyKey: `k-${n}`,
 			payload

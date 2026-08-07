@@ -55,7 +55,6 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp13',
 			idempotencyKey: `k-${n}`,
 			payload

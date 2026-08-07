@@ -36,7 +36,6 @@ describe('JAN-EXECREM WP-3 — a plan-entry edge through the live bus', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp3',
 			idempotencyKey: `k-${n}`,
 			payload

@@ -42,7 +42,6 @@ describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-recomp',
 			idempotencyKey: `idem-${n}`,
 			payload

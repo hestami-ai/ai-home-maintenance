@@ -61,7 +61,6 @@ describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVI
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp12',
 			idempotencyKey: `k-${n}`,
 			payload

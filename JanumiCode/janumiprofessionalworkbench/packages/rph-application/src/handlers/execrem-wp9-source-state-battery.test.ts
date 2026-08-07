@@ -91,7 +91,6 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp9',
 			idempotencyKey: `k-${n}`,
 			payload
