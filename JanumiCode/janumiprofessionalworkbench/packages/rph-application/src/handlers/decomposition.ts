@@ -549,9 +549,27 @@ export const beginRecomposition: CommandHandler = (ctx, command) =>
 		})
 	});
 
-// §14.1 acceptable-child set: a required child contributes acceptably to recomposition when its assurance rollup
-// is SATISFIED / CONDITIONALLY_SATISFIED / WAIVED. (Child COMPLETION alone is necessary but NOT sufficient.)
-const ACCEPTABLE_CHILD_ASSURANCE = new Set(['SATISFIED', 'CONDITIONALLY_SATISFIED', 'WAIVED']);
+// ── THE ACCEPTABLE-CHILD SET, AND WHY `CONDITIONALLY_SATISFIED` IS NOT IN IT (REG-F-042) ────────────────────
+// A required child contributes acceptably to recomposition when its assurance rollup is SATISFIED or WAIVED.
+// Child COMPLETION alone is necessary but NOT sufficient.
+//
+// ⚠ THIS SET USED TO ADMIT `CONDITIONALLY_SATISFIED`, AND TWO CANON RULES EXCLUDE IT BY NAME.
+//   JPWB-DOC-003 §7 DEC-6: *"'Assured required child results' EXCLUDES conditionally satisfied dispositions: a
+//   conditionally satisfied child contributes to recomposition or promotion ONLY THROUGH AN EXPLICIT,
+//   POLICY-PERMITTED ACT THAT CLOSES ITS CONDITION (STA-4, ASR-9)."*
+//   JPWB-DOC-003 §6 STA-4: *"conditionally satisfied work CANNOT ENTER RECOMPOSITION or baseline promotion."*
+// No condition-closing act exists in this engine — the Assurance machine has no arrow for it — so admitting the
+// state was admitting the antecedent of an exception whose discharge cannot be performed. Fail-closed is the
+// only honest reading: excluded unless closed, and closing is unimplementable, therefore excluded.
+//
+// AND THE COMMENT CITED THE WRONG AUTHORITY, WHICH IS HOW IT SURVIVED. It read "§14.1 acceptable-child set" —
+// a section of RPH-DOC-002, which CON-000 B1 makes HISTORICAL MATERIAL (REG-F-049). A set contradicting canon
+// read as sourced because the citation pointed at the weaker document. Both rules above are canon.
+//
+// `WAIVED` STAYS, and the distinction is DEC-6's own. A waiver is a §12 ratified, scoped, authority-bearing
+// act — plausibly the very "explicit, policy-permitted act" the rule contemplates. `CONDITIONALLY_SATISFIED`
+// is the opposite case: the condition is BY DEFINITION still open.
+export const ACCEPTABLE_CHILD_ASSURANCE = new Set(['SATISFIED', 'WAIVED']);
 
 // evaluateRecomposition outcome -> RecompositionContract.status machine state.
 const RECOMP_OUTCOME_STATE: Record<string, string> = {
