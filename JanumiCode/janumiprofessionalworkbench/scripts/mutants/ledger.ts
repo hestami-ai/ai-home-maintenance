@@ -222,6 +222,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'DOC-003 §9 PER-4; REG-F-050 (a revision that cannot conflict protects nothing)'
 	},
 	{
+		id: 'MU-FRESH-18-H-batch-element-stops-declaring-its-revision',
+		file: 'apps/rph-demo/src/routes/pwa/[id]/+page.server.ts',
+		find: '\t\t\t\texpectedRevision\n\t\t\t}\n\t\t];',
+		replace: '\t\t\t}\n\t\t];',
+		expectRed: ['apps/rph-demo/src/lib/server/batch-revision-rollback.test.ts'],
+		why: "THE ONLY PAGE-DERIVABLE EXPECTATION IN A BATCH, AND NO E2E CAN SEE IT. `newPolicyVersion` mints a successor, activates it, migrates PWU-Type references, then supersedes the predecessor — and only that LAST element touches an aggregate the page rendered. A single-actor happy path never produces a conflict, so the wiring is invisible to every test that merely exercises it; the named victim drives the ACTION directly with a stale revision. It also guards more than itself: because dispatchBatch runs one store transaction, a conflict here rolls element 0 back, so this one expectation covers the successor's entire content copy (read from the predecessor AFTER render). Observed: reddens 1 of that file's 4 cases — the action-level stale case — while its two engine-level cases, its control, and 15 other surface tests all stay GREEN, so the kill is attributable.",
+		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
+	},
+	{
 		id: 'M1-widen-start-sources',
 		file: 'packages/rph-domain/src/step-command-spec.ts',
 		find: "\t\tsourceStates: ['QUEUED'],\n\t\teventType: 'ExecutionStepStarted',",

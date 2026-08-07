@@ -137,6 +137,19 @@ export const load: PageServerLoad = ({ params }) => {
 	// picker offers the ACTIVE non-floor ones, and the rail resolves ids to names. Floor policies are flagged locked.
 	const policies = listAssurancePolicies(engine).map((p) => ({
 		id: p.id,
+		// The revision this row was rendered from (JPWB-DOC-003 §9 PER-4). `listAssurancePolicies` goes straight
+		// to `listByType` with NO `withinScope` (queries.ts:198-199), so the row reaches here with its revision
+		// intact and this `.map()` was the only place it was dropped — the fourth loader with that shape.
+		//
+		// ⚠ THESE MAY BE FORK REVISIONS, and unlike the PWA above they are NOT re-read from canonical. See the
+		// note on `pwaRevision`: with a candidate staged, `engine` is the authoring fork. The agent broker has
+		// no command that mutates an EXISTING policy (its only policy command is `CreateAssurancePolicy`,
+		// broker.ts:336), so a policy already in the base snapshot cannot drift inside the fork — its revision
+		// is canonical's. A policy CREATED in the fork is the case this does not cover, and it is handled by
+		// failing closed rather than by a revision: it does not exist in canonical at all, so the dispatch is
+		// refused for non-existence before any revision is compared. Recorded because the refusal code is then
+		// RPH_VALIDATION_SEMANTIC_FAILED, which is neither STALE_FORM nor a conflict — see the roadmap §5b.
+		revision: p.revision,
 		name: String((p.state.name ?? p.id) as string),
 		purpose: String((p.state.purpose ?? '') as string),
 		rationale: String((p.state.rationale ?? '') as string),
@@ -586,26 +599,39 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const policyId = String((form.get('policyId') ?? '') as string).trim();
 		if (!policyId) return fail(400, { error: 'Missing policy.' });
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
 		// Pass the STORED criteria so an unchanged line keeps its id, name and severity. Without this the edit
 		// re-mints every criterion from its description and silently destroys both — see readPolicyFields.
+		//
+		// ⚠ AND THE REVISION IS WHAT MAKES THIS READ SAFE, which is a stronger reason than PER-4's letter. These
+		// stored criteria are fetched HERE, after the page was rendered: if the policy changed in between, the
+		// edit would merge the professional's form against criteria they never saw. Declaring the rendered
+		// revision converts that silent merge into a refusal.
 		const stored = getObject(getEngine(), policyId);
 		const priorCriteria = Array.isArray(stored?.criteria)
 			? (stored.criteria as AssessmentCriterion[])
 			: [];
 		const f = readPolicyFields(form, priorCriteria);
-		const r = dispatch('EditAssurancePolicy', 'ASSURANCE_POLICY', policyId, {
+		const r = dispatch(
+			'EditAssurancePolicy',
+			'ASSURANCE_POLICY',
 			policyId,
-			...(f.name ? { name: f.name } : {}),
-			...(f.purpose ? { purpose: f.purpose } : {}),
-			...(f.rationale ? { rationale: f.rationale } : {}),
-			...(f.evaluatedClaimTypes ? { evaluatedClaimTypes: f.evaluatedClaimTypes } : {}),
-			...(f.evaluatorRole ? { evaluatorRole: f.evaluatorRole } : {}),
-			...(f.independenceRequirement ? { independenceRequirement: f.independenceRequirement } : {}),
-			...(f.applicableObjectTypes ? { applicableObjectTypes: f.applicableObjectTypes } : {}),
-			...(f.permittedControlActions ? { permittedControlActions: f.permittedControlActions } : {}),
-			...(f.criteria.length ? { criteria: f.criteria } : {})
-		});
-		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+			{
+				policyId,
+				...(f.name ? { name: f.name } : {}),
+				...(f.purpose ? { purpose: f.purpose } : {}),
+				...(f.rationale ? { rationale: f.rationale } : {}),
+				...(f.evaluatedClaimTypes ? { evaluatedClaimTypes: f.evaluatedClaimTypes } : {}),
+				...(f.evaluatorRole ? { evaluatorRole: f.evaluatorRole } : {}),
+				...(f.independenceRequirement ? { independenceRequirement: f.independenceRequirement } : {}),
+				...(f.applicableObjectTypes ? { applicableObjectTypes: f.applicableObjectTypes } : {}),
+				...(f.permittedControlActions ? { permittedControlActions: f.permittedControlActions } : {}),
+				...(f.criteria.length ? { criteria: f.criteria } : {})
+			},
+			expectedRevision
+		);
+		if (r.status !== 'ACCEPTED') return refuse(r);
 		return { editedPolicy: policyId };
 	},
 
@@ -617,6 +643,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const policyId = String((form.get('policyId') ?? '') as string).trim();
 		if (!policyId) return fail(400, { error: 'Missing policy.' });
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
 		const prev = getObject(getEngine(), policyId);
 		if (!prev) return fail(400, { error: 'Policy not found.' });
 		if (FLOOR_POLICY_IDS.has(policyId))
@@ -685,16 +713,31 @@ export const actions: Actions = {
 				commandType: 'SupersedeAssurancePolicy',
 				targetAggregateType: 'ASSURANCE_POLICY',
 				targetAggregateId: policyId,
-				payload: { policyId, supersededByPolicyId: successorId }
+				payload: { policyId, supersededByPolicyId: successorId },
+				// ── THE ONLY PAGE-DERIVABLE EXPECTATION IN THIS BATCH, and it protects far more than itself ──
+				// Element 0 MINTS `successorId`, so it did not exist at render and PER-4's NON-EXAMPLE exempts
+				// it. Element 1 activates that same brand-new id. Elements 2..n-1 target PWU_TYPEs the policy
+				// manager never rendered (`draftReferences` derives from a workspace-wide `listPwuTypes` with no
+				// pwaId). This LAST element is the first and only touch of `policyId`, which IS a rendered row.
+				//
+				// AND BECAUSE `dispatchBatch` RUNS ONE STORE TRANSACTION (command-bus.ts:334-353), a conflict
+				// here rolls back element 0 too. That matters: the successor's entire content — name, purpose,
+				// rationale, criteria, all six rule arrays — is copied from a `getObject` read taken AFTER the
+				// page was rendered. Without this the successor could be minted from a predecessor the
+				// professional never saw. One expectation, transitively guarding the whole copy.
+				expectedRevision
 			}
 		];
 		const batch = dispatchBatch(commands);
 		if (!batch.ok) {
 			const rejected =
 				batch.failedIndex === undefined ? undefined : batch.results[batch.failedIndex];
-			return fail(400, {
-				error: rejected?.error?.message ?? 'Policy versioning was rejected and rolled back.'
-			});
+			// `refuse` rather than a bare fail(400): a rejected element carries its own CommandResult, and a
+			// per-command revision conflict surfaces there as status CONFLICT (only `dispatchBatchGuarded`
+			// reports a batch-level `guardConflict`). Forwarding it unconditionally as 400 would erase the one
+			// distinction this wiring exists to make.
+			if (rejected) return refuse(rejected);
+			return fail(400, { error: 'Policy versioning was rejected and rolled back.' });
 		}
 		return {
 			newVersion: successorId,
@@ -703,19 +746,45 @@ export const actions: Actions = {
 		};
 	},
 
+	// ⚠ THE FORMDATA IS HOISTED, not read inline as `(await request.formData()).get(...)`. Both of these read it
+	// twice now (id and revision), and consuming the stream inside an expression made that impossible to add
+	// without noticing — which is why the inline shape is worth removing rather than working around.
 	suspendPolicy: async ({ request }) => {
-		const policyId = String(((await request.formData()).get('policyId') ?? '') as string).trim();
+		const form = await request.formData();
+		const policyId = String((form.get('policyId') ?? '') as string).trim();
 		if (!policyId) return fail(400, { error: 'Missing policy.' });
-		const r = dispatch('SuspendAssurancePolicy', 'ASSURANCE_POLICY', policyId, { policyId });
-		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		const r = dispatch(
+			'SuspendAssurancePolicy',
+			'ASSURANCE_POLICY',
+			policyId,
+			{ policyId },
+			expectedRevision
+		);
+		if (r.status !== 'ACCEPTED') return refuse(r);
 		return { suspendedPolicy: policyId };
 	},
 
+	// ⚠ THIS IS THE ACT THE E2E DRIVES FIRST, AND IT IS THE ONE A NAIVE PARSER WOULD LET THROUGH. A policy is
+	// born DRAFT at revision 0 (`createObject` commits `newRevision: alsoEvents.length`, kit.ts:563) and
+	// `policy-manager.e2e.ts` activates it a few lines after creating it. `Number('')` is also 0, so a form that
+	// round-tripped nothing would MATCH here and be accepted; only the later suspend (revision 1) would fail.
+	// `readRenderedRevision` rejects the empty string for exactly this reason — never a local `Number(raw)`.
 	activatePolicy: async ({ request }) => {
-		const policyId = String(((await request.formData()).get('policyId') ?? '') as string).trim();
+		const form = await request.formData();
+		const policyId = String((form.get('policyId') ?? '') as string).trim();
 		if (!policyId) return fail(400, { error: 'Missing policy.' });
-		const r = dispatch('ActivateAssurancePolicy', 'ASSURANCE_POLICY', policyId, { policyId });
-		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		const r = dispatch(
+			'ActivateAssurancePolicy',
+			'ASSURANCE_POLICY',
+			policyId,
+			{ policyId },
+			expectedRevision
+		);
+		if (r.status !== 'ACCEPTED') return refuse(r);
 		return { activatedPolicy: policyId };
 	}
 };

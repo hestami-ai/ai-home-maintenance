@@ -104,7 +104,7 @@ time (`ObjectRow`, then `dispatch()`, now the loaders).
 | ✅ W-3b | `verif/route-action-census.test.ts` — pin the population (§5) | — | — |
 | W-4 | `routes/+page.server.ts#delete` and `undertakings#create`'s 5 UPDATE sites | A | loader |
 | ✅ W-5a | `pwa/[id]` — the 5 publication-lifecycle actions | A | — |
-| W-5b | `pwa/[id]` — editPolicy, suspendPolicy, activatePolicy, newPolicyVersion's supersede element | A | loader (policies `.map()`) |
+| ✅ W-5b | `pwa/[id]` — editPolicy, suspendPolicy, activatePolicy, newPolicyVersion's supersede element | A | — |
 | W-6 | `ExecutionPlanInput` gains `revision`; `shapeExecutionPlanInput` carries it | — | contract change |
 | W-7 | `undertakings/[id]` — 16 actions over the repaired projection | A + B | W-6 |
 | W-8 | `lib/server/floor.ts`, `agent/tools.ts` — 7 UPDATE sites reached through helpers, not `dispatch()` | B | design |

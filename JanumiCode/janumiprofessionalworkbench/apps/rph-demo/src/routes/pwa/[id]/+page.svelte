@@ -542,7 +542,18 @@
 	// activate. The 3 de minimis floor policies are shown LOCKED (read-only). Opened from the pub-action bar.
 	type PolicyView = PageData['policies'][number];
 	let showPolicyManager = $state(false);
-	let policyFormMode = $state<null | 'create' | { editId: string }>(null);
+	// ⚠ CARRIES THE REVISION AS WELL AS THE ID. The edit form lives OUTSIDE the {#each}, so there is no `p`
+	// in scope where it renders — the revision must be captured at the same moment as the id, from the same
+	// row. Widening this type is what makes that impossible to forget: `openEditPolicy` cannot compile without
+	// supplying the field, which puts the enforcement in the type checker rather than in a reviewer.
+	//
+	// It is `number | undefined` because `ObjectRow.revision` is optional in the TYPE (queries.ts:29) even
+	// though every helper supplies it in FACT. So the type compels the field to be CARRIED, not to be
+	// non-empty — and that residue is handled rather than asserted away: undefined renders an empty value,
+	// the strict parser returns null, and the action fails closed.
+	let policyFormMode = $state<null | 'create' | { editId: string; editRevision: number | undefined }>(
+		null
+	);
 	const pf = $state({
 		name: '',
 		purpose: '',
@@ -555,6 +566,10 @@
 	});
 	const policyEditingId = $derived(
 		typeof policyFormMode === 'object' && policyFormMode ? policyFormMode.editId : ''
+	);
+	/** The revision of the row the edit form was opened FROM — never re-read at submit, which is the point. */
+	const policyEditingRevision = $derived(
+		typeof policyFormMode === 'object' && policyFormMode ? policyFormMode.editRevision : undefined
 	);
 	// Option lists for the policy form (subset of the ASSURANCE_POLICY object contract enums; the engine validates).
 	const CLAIM_TYPES = [
@@ -660,7 +675,7 @@
 			permittedControlActions: p.permittedControlActions || 'ESCALATE',
 			criteria: p.criteria.join('\n')
 		});
-		policyFormMode = { editId: p.id };
+		policyFormMode = { editId: p.id, editRevision: p.revision };
 	}
 	// After any policy mutation succeeds, return to the manager list (the graph reloaded via enhance/invalidateAll).
 	$effect(() => {
@@ -1289,7 +1304,8 @@
 										use:enhance
 										class="typeform"
 									>
-										{#if pediting}<input type="hidden" name="policyId" value={policyEditingId} />{/if}
+										{#if pediting}<input type="hidden" name="policyId" value={policyEditingId} />
+							<input type="hidden" name="expectedRevision" value={policyEditingRevision} />{/if}
 										<div class="ffield">
 											<span class="flabel">Name</span>
 											<input name="name" bind:value={pf.name} required />
@@ -1375,17 +1391,23 @@
 														{#if p.status === 'ACTIVE' || p.status === 'SUSPENDED'}
 															<form method="POST" action="?/newPolicyVersion" use:enhance>
 																<input type="hidden" name="policyId" value={p.id} />
+																<!-- PER-4: the revision THIS ROW was rendered from. In the batch behind this form only
+																     the final SupersedeAssurancePolicy touches p.id; the freshly minted successor and
+																     the PWU-Type migrations correctly declare nothing. -->
+																<input type="hidden" name="expectedRevision" value={p.revision} />
 																<button class="ghost xs" type="submit">Create & activate version</button>
 															</form>
 														{/if}
 														{#if p.status === 'ACTIVE'}
 															<form method="POST" action="?/suspendPolicy" use:enhance>
 																<input type="hidden" name="policyId" value={p.id} />
+																<input type="hidden" name="expectedRevision" value={p.revision} />
 																<button class="ghost xs" type="submit">Suspend</button>
 															</form>
 														{:else if p.status === 'SUSPENDED' || p.status === 'DRAFT'}
 															<form method="POST" action="?/activatePolicy" use:enhance>
 																<input type="hidden" name="policyId" value={p.id} />
+																<input type="hidden" name="expectedRevision" value={p.revision} />
 																<button class="ghost xs" type="submit">Activate</button>
 															</form>
 														{/if}
