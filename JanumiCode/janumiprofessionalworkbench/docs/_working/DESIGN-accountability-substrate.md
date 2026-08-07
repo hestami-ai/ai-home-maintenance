@@ -146,7 +146,15 @@ acceptable:
 
 1. **`causationId` written on every derived act** — needs nothing new; closes the cascade concern.
 2. **The symmetric revoke guard** (REG-E-031 ruled) — one guard, one control.
-3. **`expectedRevision` required** where the engine can supply it — the ratified default restored.
+3. ~~**`expectedRevision` required** where the engine can supply it — the ratified default restored.~~
+   **⚠ STRUCK 2026-08-07 (REG-F-050): an engine-supplied expectation is `x !== x`.** The handler compares the
+   field against the same single read it would have been filled from, so the check could never fail — and this
+   line contradicts §1.4 above, which correctly locates the gap at the CALLER. **Replaced by: implement
+   JPWB-SPEC-001 §11.4.22 FORK-22** (ratified, REG-D-023), which binds the SURFACE to set `expectedRevision`
+   from the projection's `derivedAtSubjectRevision` — a caller-side value that is literally *"the revision they
+   believe current"*, and the one thing the engine cannot fabricate. SPEC-001 also names the check
+   (`SPEC-001-FX-FRESH-18`), its assertion, a census over `workbench.ts`, and a red-proof mutant. Zero of it is
+   implemented; SPEC-001 says so itself.
 4. **The trust-boundary parameter** — `issuedBy` derived rather than asserted (§1.1). The largest.
 5. **`roleId` + `AuthorityReference` fed and read** — the identity/role sockets (REG-E-027).
 6. **The cross-aggregate read race** (§2) — needs §30.2's tier; sequenced last because it is the
