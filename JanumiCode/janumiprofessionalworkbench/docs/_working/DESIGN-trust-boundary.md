@@ -90,6 +90,31 @@ and *"a derived act may move work toward caution and may not approve or revoke."
 
 ## 2. The design
 
+> ### ⚠ SETTLED 2026-08-07 BY A SECOND ADVERSARIAL PASS — AND NOT BY THE RULE I EXPECTED
+>
+> I framed the API question as *"does a credential on the command envelope violate DOC-004 §5?"* **It does not,
+> and conceding that is what makes the answer trustworthy.** §5 prohibits a **source of derivation**, not a
+> location of bytes: under an envelope-credential design the engine derives the principal from the *port's
+> verification result*, and the token is an input to authentication rather than the principal context itself.
+> **PER-3 is neutral too** — its SCOPE clause cedes *"the exact pipeline ordering **and envelope**"* as
+> repository shapes, mandating only the gate's existence.
+>
+> **What decides it is REG-Q-004, and it binds today.** REG-005 §1: an `OPEN` entry means *"live; **any recorded
+> safe default binds**"*, and §3 makes every Section B entry OPEN unless stated. REG-Q-004's safe default:
+> *"Serialize the repository's generated envelopes exactly. **Enforce tenant/principal scoping through
+> authenticated transport**, repository, and RLS context. **A public-envelope addition requires a new schema
+> version and coordinated code/storage/test change**; never create an unscoped path."* **JPWB-SPEC-001 §11.4.2
+> restates it as a ratified SHALL.** The enforcement locus is named, and it is the transport — expressly not the
+> envelope.
+>
+> **And the blast-radius argument inverts under measurement.** `DomainCommand` is a closed, versioned wire
+> contract (`additionalProperties: false`, `$id …DomainCommand:1`) and therefore CON-000 B1 shape authority, so
+> an envelope credential is a **`DomainCommand:2` contract change** — larger than an in-process signature change,
+> not smaller. It would also version a wire that has **no traffic**: measured, *no command envelope crosses a
+> process boundary anywhere in this repository*. Every page route reads `request.formData()`; the envelope is
+> built server-side. **The real trust boundary is the HTTP request into the SvelteKit server action** — exactly
+> where REG-Q-004 puts it.
+
 **One port, supplied at construction; one credential, supplied per dispatch; the engine stamps the actor.**
 
 ```
@@ -105,7 +130,22 @@ engine.dispatch(command, credential)
   rather than running in a permissive mode — a permissive default is how a gate becomes decorative.
 - **`Principal` carries what the object contract already demands:** `actorId`, `actorType`, `displayName`,
   `roleId?`, `tenantId`, `organizationId`. The last two per REG-D-026 (carried, not governed; a well-known
-  constant in standalone — *present and singular*, never absent).
+  constant in standalone — *present and singular*, never absent). ⚠ **Plus `modelId?`, `providerId?` and an
+  execution-instance id for AGENT/MODEL principals** — omitting them would leave ASR-13's `DIFFERENT_MODEL` and
+  `DIFFERENT_PROVIDER` rungs unable to resolve an identity, and `differs()` fails closed on an absent id, so the
+  rungs would refuse *every* actor rather than compare.
+- **⚠ `AuthenticationOutcome`, NOT `Principal | null`.** A bare `null` discards the reason, and DOC-004 §5
+  requires typed errors while §7.2 requires a denied transition to carry its guard result. The port returns
+  `{ ok: true, principal } | { ok: false, reason }`.
+- **⚠ `Credential` is a BRANDED opaque type.** A caller must be able to *present* one and unable to *author* one.
+  This is why `dispatch(command, principal)` is rejected outright: a `Principal` is authorable by anyone who can
+  type an object literal — the same self-assertion moved one parameter out. A context object
+  (`{ credential, tenantId, … }`) is rejected for the same reason, and additionally because REG-D-026 requires
+  the scope axes be *derived*, never supplied.
+- **⚠ THE CREDENTIAL GOES FIRST on `dispatchBatchGuarded`, not last.** It already has four positional parameters,
+  two of them optional; appending a fifth reproduces exactly the defect `dispatch-expected-revision.test.ts`
+  exists to catch — an argument *"accepted and dropped on the floor"*. This is the one signature choice that
+  cannot be undone cheaply.
 - **Authorization is a second, separate stage** and stays deliberately thin in v1: the socket exists and is
   called, and its v1 policy is *"the authenticated principal may act"*. ⚠ **A stage that always returns true is
   a gate that cannot fail** — so it ships with its own mutant and a refusing case, or it does not ship.
@@ -144,8 +184,60 @@ destroys professional A's 60-second agent turn, reported under a pseudo-aggregat
 | **D-5** | Authorization stage with a real refusing case | a gate that can fail |
 
 **D-1 is the largest and it is not splittable**, because a half-built gate is worse than a disclosed absence:
-it reads as protection. The migration cost is real and is stated rather than discovered — every engine
-construction and every dispatch in the suite acquires a principal.
+it reads as protection.
+
+### ⚠ D-1 AS ORIGINALLY SCOPED WOULD MAKE THINGS WORSE, AND THIS IS THE MOST IMPORTANT FINDING OF THE PASS
+
+**The broker inversion.** `broker.ts:241` defaults the authoring agent to `actorType: 'AGENT'`, and
+`makeAuthoringBroker` never overrides it. **Once the engine stamps `issuedBy` from the session principal,
+`this.actor` (`broker.ts:792`) becomes dead** and every agent-authored command silently acquires the **HUMAN
+session identity**. That is machine authority arriving by accident — the exact back door REG-E-027 closes by
+keeping delegation human-to-deputy.
+
+**So D-1 would convert forgeability from ARCHITECTURAL to LIVE**, inverting §0's finding in the increment
+that exists to close it. **D-1 therefore MUST include the broker presenting its own AGENT credential**, in the
+same commit. The increment is bigger than I scoped it, not smaller.
+
+**The seed inversion.** `openWorkbench` seeds at construction and `reference-undertaking.ts` account for **80.7%
+of all measured dispatches**; both run before any session exists and cannot use a request-scoped principal
+(`getRequestEvent()` throws outside a request). They need an explicit **SYSTEM** principal. If they are handed
+`ui-user` for convenience, D-2 is defeated at the largest site by volume and the evaluator=executor collision
+in §0.2 gets *worse*.
+
+**The silent-bypass hazard that decides one signature.** `verif/unread-refusal-guard.ts:53-74` monkey-patches
+`Engine.prototype.dispatch` with a **one-argument signature** and is a `setupFiles` entry for **every** project.
+If the credential is OPTIONAL this patch drops it suite-wide: every test dispatches with no credential, every
+test still passes, and the increment is vacuous with a green suite. **The credential must be a REQUIRED
+positional parameter with no default**, so the suite goes red loudly and the fix is one line.
+
+### Blast radius — measured, and the migration is mechanical
+
+**284 executed dispatch sites across 102 files** is the planning number. Not 30,123 dispatches (75.9% of which
+come from a single line), and not the 16,609 I quoted earlier, which was neither. **A site that dispatches once
+costs the same edit as one that dispatches 22,869 times.**
+
+- **91.1% of construction sites are reused builders**; in production it is **5 builders and 0 one-offs**.
+- **88 of the 102 dispatching files need ONE edit each** — their helper builds *and* dispatches.
+- **14 files need a per-file rewrite** covering 190 sites; `pwu.test.ts` alone holds 87, because its `cmd()`
+  only builds.
+- **~8 files need real thought**: those that vary the actor per dispatch (they need a credential→principal map)
+  and those whose *subject* is the envelope contract.
+
+### Two hard dependencies, stated rather than discovered
+
+1. **`issuedBy` is REQUIRED on a `z.strictObject` and enforced in production** since REG-F-011. Until it becomes
+   optional — a generated-contract change under B1 shape authority — **100 test files keep authoring an issuer**,
+   and the laundering shape stays one keystroke away in each. If that is deferred, D-1 ships with the standing
+   guard doing all the work alone, and **that must be the disclosed posture, not a discovery**.
+2. **There is no ratified error code for an authentication refusal.** The fifteen ratified codes have none, and
+   `command-bus.ts:234-238` records the precedent verbatim: minting one *"is a sponsor act"*. Use a ratified code
+   and carry the label in the message, or get a ruling. **Do not quietly extend the enum.**
+
+### And D-1 does NOT close the evaluator=executor hole — a reader will assume it does
+
+`checkIndependence` is called on producer/evaluator read from **state and payload**, never on `command.issuedBy`.
+**Authenticating the dispatcher does not authenticate the evaluator named in a payload.** REG-E-032 stays open,
+and D-1's record must say so or *"the trust boundary landed"* will be cited as having closed it.
 
 ## 5. What this design does not claim
 
