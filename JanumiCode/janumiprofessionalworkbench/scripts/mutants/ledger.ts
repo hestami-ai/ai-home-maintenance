@@ -192,6 +192,16 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
 	},
 	{
+		id: 'MU-FRESH-18-E-a-new-mutating-action-appears-unnoticed',
+		file: 'apps/rph-demo/src/routes/baselines/+page.server.ts',
+		find: 'export const actions: Actions = {\n',
+		replace:
+			"export const actions: Actions = {\n\tsmuggled: async () => fail(400, { error: 'an unwired mutating action nobody classified' }),\n\n",
+		expectRed: ['verif/route-action-census.test.ts'],
+		why: "THE CENSUS'S OWN CONTROL, and the only capability no other test in the repo has. Once a route is correctly wired its e2e reddens on any break in the chain — so the single thing nothing could see was an action that was NEVER wired. ADDING an action is the right mutant shape rather than renaming one: a rename breaks a live form post and reddens that route's e2e, making a red unattributable (which is why the larger ratchet design was refused — see ROADMAP-fork22-surface-wiring.md §5). Observed: reddens ONLY the population assertion (1 of 6 in the census file), and `baselines`, `optimistic-concurrency` and `dispatch-expected-revision` — 13 tests — all stay GREEN, so the kill is attributable to the census alone.",
+		source: 'DOC-003 §9 PER-4 (population, not wiring — the census asserts no coverage)'
+	},
+	{
 		id: 'M1-widen-start-sources',
 		file: 'packages/rph-domain/src/step-command-spec.ts',
 		find: "\t\tsourceStates: ['QUEUED'],\n\t\teventType: 'ExecutionStepStarted',",
