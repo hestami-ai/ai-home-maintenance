@@ -437,8 +437,18 @@ if (!treeIsClean()) {
 	process.exit(2);
 }
 
-const only = process.argv[2];
-const chosen = only ? DECLARED_MUTANTS.filter((m) => m.id.includes(only)) : DECLARED_MUTANTS;
+// ⚠ EVERY ARGUMENT IS A FILTER, NOT JUST THE FIRST. This read was `process.argv[2]`, which silently DISCARDED
+// argv[3..]: `bun run mutants -- MU-A MU-B` measured MU-A alone and printed `KILLED 1 / SURVIVED 0`, a summary
+// that reads as "both passed" over a population of one. The banner's honest count was the only tell.
+//
+// Found while measuring MU-FRESH-18-C and -D together. Both do kill — verified by running them SEPARATELY,
+// which is the check that exposed this. Safe to widen: PREFLIGHT/HARVEST/ADVISORY are environment variables
+// (lines 54, 69, 589), so no argv entry is ever a flag, and a single argument behaves exactly as before.
+const only = process.argv.slice(2);
+const chosen =
+	only.length > 0
+		? DECLARED_MUTANTS.filter((m) => only.some((pattern) => m.id.includes(pattern)))
+		: DECLARED_MUTANTS;
 // HARVEST narrows to exactly the population the summary complains about: measurable mutants with no named victim.
 // A mutant declared `expectSurvive` or `expectNoCompile` is NOT in that population — an empty `expectRed` is CORRECT
 // for both (one must redden nothing, the other never reaches a test run), and harvesting a "victim" for either would
