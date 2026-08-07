@@ -6,13 +6,13 @@
 
 **Canonical title:** JPWB TypeScript Repository Semantic Inventory and Conformance Mapping
 
-**Version:** `0.3.0`
+**Version:** `0.3.1`
 
 **Status:** Draft
 
 **Settledness:** HYPOTHESIS
 
-**Classification:** Refreshed controlled-CSAA member candidate; non-authoritative Draft. The former `JAN-CSAA-W1-MANIFEST-002@0.2.0` / `JAN-CSAA-W1-GAP-003` intermediate synchronization path is withdrawn because its exact register preimage and governing authority state changed; its immutable records remain historical evidence. This `0.3.0` pre-objective-verification Draft carries the reconciled current-subject and candidate-propagation corrections while cross-document claim-by-claim verification remains open. This Draft does not self-declare closure
+**Classification:** Correction-only controlled-CSAA member candidate; non-authoritative Draft. This `0.3.1` successor corrects `JAN-CSAA-005-SR-001` and `JAN-CSAA-005-SR-002` currentness and lifecycle presentation without changing any requirement ID, obligation, repository-inventory fact, conformance mapping, authority boundary, or later-lifecycle nonpass. Exact predecessor objective closure and preliminary author review remain historical evidence for `0.3.0`; changed `0.3.1` bytes inherit no objective PASS and require direct-current corrective verification
 
 **Governing status:** Documentation preparation was activated by `JPWB-REG-005 REG-D-018` and is continued for every documentation subphase by `REG-D-021` as corrected by `REG-D-022`; this document has no member authority
 
@@ -22,17 +22,17 @@
 
 **Scope:** Accepted-snapshot workspaces, packages, apps, project contexts, dependency declarations, source classifications, generated contracts, configured commands, architecture rules, tests, coverage, mutation, runtime seams, observability, and missing semantic capabilities within the first JPWB subject
 
-**Applicability:** The repository state rooted at `E:/Projects/hestami-ai/JanumiCode/janumiprofessionalworkbench`, bound to parent commit `0e7893f5fd343e3d74ca7dc73bad0221bb95f81c`, the exact two-record unstaged working-tree identity below, the tracked implementation/configuration manifest, and the separately identified generated SvelteKit configuration
+**Applicability:** Historical recorded-subject description only: the exact OBS-029/030 repository and worktree subject formerly bound to parent `0e7893f5fd343e3d74ca7dc73bad0221bb95f81c`, preserved as dated predecessor evidence. No branch, parent, worktree, generated configuration, package, dependency, source, test, tool, runtime, process, or implementation fact in this correction is asserted live-current
 
-**Observation time:** OBS-029 began at `2026-07-28T13:08:58.6982147-04:00`; OBS-030 began at `2026-07-28T13:08:59.3965320-04:00`; the second internally stable read completed at `2026-07-28T13:08:59.7313669-04:00`
+**Observation time:** Historical OBS-029 began at `2026-07-28T13:08:58.6982147-04:00`; historical OBS-030 began at `2026-07-28T13:08:59.3965320-04:00`; that accepted pair completed at `2026-07-28T13:08:59.7313669-04:00`. Later OBS-035/036 completed at `2026-07-28T19:20:40.359Z` and is retained only as the dated EVIDENCE-007 authoring baseline
 
-**As-of state:** `CURRENT_FOR_RECORDED_DIRTY_SUBJECT_ONLY`; the selected implementation/configuration scope contained two tracked unstaged changes and was otherwise identical in the accepted pair. The observations do not claim that those changes are correct, tested, approved, staged, committed, behavior-preserving, or current for any later worktree or commit
+**As-of state:** `HISTORICAL_RECORDED_SUBJECT_ONLY / NOT_LIVE_CURRENT`. OBS-029/030 and EVIDENCE-004 are historical; OBS-035/036 and EVIDENCE-007 are dated only; EVIDENCE-008 is an intermediate documentation-authoring control rather than a repository observation. The mandatory consolidated final implementation refresh is unperformed
 
-**Freshness recheck:** The current author-side recheck is recorded in [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>). Any mismatch with its OBS-029/030 identities makes affected conclusions stale and prevents a freshness claim. A separate immediately preceding recheck remains required for any exact Proposed-candidate freeze
+**Freshness recheck:** No live-current recheck is claimed. [EVIDENCE-008](<records/JAN-CSAA-005 - Non-Blocking External Drift and Authoring Baseline Record.md>) permits bounded intermediate documentation work without Git polling but requires one consolidated implementation refresh before exact-corpus freeze. Only a later exact refresh record may establish a new cutoff and support affected currentness conclusions
 
-**Evidence provenance:** [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>), including the exact current Git subject, tracked-manifest, dirty-content/diff, generated-context, repeated method, carried-forward compatibility analysis, and no-execution boundaries; the [Current Subject Refresh and Compatibility Record](<records/JAN-CSAA-005 - Current Subject Refresh and Compatibility Record.md>), clean [Successor Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Successor Preparation Evidence Snapshot.md>), predecessor [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>), and [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>) remain exact historical evidence
+**Evidence provenance:** Historical [EVIDENCE-004](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>) preserves OBS-029/030; historical EVIDENCE-005 and EVIDENCE-006 preserve their exact successor observation events; dated [EVIDENCE-007](<records/JAN-CSAA-005 - Current Subject Rebinding Record 004.md>) preserves OBS-035/036 only; [EVIDENCE-008](<records/JAN-CSAA-005 - Non-Blocking External Drift and Authoring Baseline Record.md>) controls intermediate documentation authoring and is not implementation-observation evidence. No record is silently rebound to a present repository state
 
-**Last verification time:** None. Current refresh evidence was observed at the time above, but no objective author verification, author self-review, independent review, build, test, analyzer, generator, mutation, gate, or runtime-trace execution has been performed for this Draft
+**Last verification time:** Exact predecessor `JAN-CSAA-005@0.3.0` received bounded objective verification under VERIFICATION-001 and VERIFICATION-002, synchronized ledger closure at `2026-07-28T15:52:01.7063014-04:00`, and preliminary SELF-REVIEW-001 at `2026-07-28T16:01:59.8656794-04:00`; that review remained nonpass with two MAJOR findings. Changed `0.3.1` bytes have no direct-current objective PASS at source finalization. No build, test, analyzer, generator, mutation, gate, runtime trace, final refresh, completed author self-review, independent review, or integrity validation is claimed
 
 **Staleness and supersession condition:** The conclusion-affecting triggers in §3.4 make affected observations stale. `CSAA-005-REQ-059` and `CSAA-005-REQ-313` preserve this revision and its observations as historical evidence when a successor is authored
 
@@ -42,7 +42,7 @@
 
 **Parent and inherited authorities:** `JAN-CSAA-000@0.3.0`, `JPWB-CON-000`, `JPWB-DOC-001`, `JPWB-DOC-002`, `JPWB-DOC-003`, `JPWB-DOC-004`, and `JPWB-REG-005@1.0.0 REG-D-018`, `REG-D-021`, and `REG-D-022`, each only for its owned concern
 
-**Precedence and conflict routing:** Canon and recognized enforced reference artifacts retain concern ownership. `JAN-CSAA-001` owns candidate logical architecture; `JAN-CSAA-002` owns candidate provider-independent code-semantic identity; later `JAN-CSAA-003` and `JAN-CSAA-004` are reserved to own analysis/query and rule/finding/gate semantics. This document reports repository facts and divergence without silently adjudicating authority. `CSAA-005-REQ-008` records apparent conflicts, and `CSAA-005-REQ-103` routes them to their concern owner through `JPWB-REG-005`
+**Precedence and conflict routing:** Canon and recognized enforced reference artifacts retain concern ownership. The current peer bindings are exactly the non-authoritative Draft candidates `JAN-CSAA-001@0.3.1`, `JAN-CSAA-002@0.3.1`, `JAN-CSAA-003@0.1.1`, and `JAN-CSAA-004@0.1.1`, by ID/version only and without peer digests. Within that surface, `JAN-CSAA-001@0.3.1` owns candidate logical architecture; `JAN-CSAA-002@0.3.1` owns candidate provider-independent code-semantic identity; `JAN-CSAA-003@0.1.1` owns candidate analysis and query semantics; and `JAN-CSAA-004@0.1.1` owns candidate Analysis Rule Profile, Analyzer Finding Record, severity, suppression, waiver, and repository-gate semantics. These bindings imply neither implementation, execution, result, nor program authority. This document reports repository facts and divergence without silently adjudicating authority. `CSAA-005-REQ-008` records apparent conflicts, and `CSAA-005-REQ-103` routes them to their concern owner through `JPWB-REG-005`
 
 **Requirement ledger:** [JAN-CSAA-005 Requirement Ledger](<records/JAN-CSAA-005 - Requirement Ledger.md>)
 
@@ -50,9 +50,11 @@
 
 **Change authority and procedure:** Authors MAY revise this Draft under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. Ledger closure and author self-review precede an exact candidate freeze and Proposed promotion. Proposed status is followed by independent adversarial review; completed adversarial review is followed by distinct integrity/provenance validation. Every candidate-byte change after an exact review freeze requires affected re-review unless it is an exact pre-frozen administrative substitution set that enumerates every operation and source/result byte identity, binds exact source and result digests, causes no semantic or judgment change, is independently replayed and result-validated, and is ministerially recorded against exact predicates. Normative status requires an individual exact-member `JPWB-REG-005` conferral in the one final itemized corpus transaction
 
-**Current preparation evidence:** [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>)
+**Current preparation evidence:** [JAN-CSAA-005-EVIDENCE-008@0.1.0](<records/JAN-CSAA-005 - Non-Blocking External Drift and Authoring Baseline Record.md>) as intermediate documentation-authoring control only; no live-current repository evidence exists for this correction
 
-**Review and evidence companions:** Current preparation evidence and requirement ledger above; historical [Current Subject Refresh and Compatibility Record](<records/JAN-CSAA-005 - Current Subject Refresh and Compatibility Record.md>), [Successor Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Successor Preparation Evidence Snapshot.md>), [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>), and [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>); [Wave 1 Closure Pass A Current-State and Propagation Gap Record](<records/JAN-CSAA-W1 - Closure Pass A Current-State and Propagation Gap Record.md>); [Sponsor Standing Direction](<records/JAN-CSAA - Sponsor Standing Direction for Autonomous Corpus Preparation and Final Review.md>); [Standing Direction Correction](<records/JAN-CSAA - Standing Direction Interpretation Correction and Assurance Clarification.md>); author self-review and later Proposed-candidate independent-review and integrity-validation records are not yet authored
+**Authority-readiness input drift reconciliation:** [JAN-CSAA-W4-AUTHORITY-READINESS-INPUT-DRIFT-RECONCILIATION-002@0.1.0](<records/JAN-CSAA-W4 - Affected Authority Readiness Input Drift Reconciliation Record 002.md>); 16,087 bytes; SHA-256 `2478ffc8e6971e2c82c9a1ca455142b672fb5edb60335599907544e6eea4c83c`; result `PASS_BOUNDED_FOR_CSAA_STANDING_AUTHORITY_ONLY`; branch `SECOND_KNOWN_POST_W3_EXTERNAL_DRIFT_BOUNDED_FOR_CSAA_AUTHORITY`; exact current `JPWB-REG-005` input 140,469 bytes / SHA-256 `f19d1e22161a05a42cb55c195b8dbb507b0dda4f4f0fe4eacf334165fa97042e`; exact D021 7,547 bytes / `53652662928e744e131be3fbaa03ff5304288df71208c02d5748775f59db8c4a`; exact D022 4,773 bytes / `6e7dfd670c43ad72a0a4a4830f786c020a985924463dceed6c09ff0ae73b416f`; exact D023 3,911 bytes / `dd0b116881a9cd35c18ed9c34ef24fe84490af0d079e5ddc7e3f2daa9f407f00`; all twelve `W4-ADR2-P-001` through `W4-ADR2-P-012` predicates pass. This evidence-only binding reconciles only the exact current register drift for CSAA standing authority; it does not close affected cross-package reconciliation, change member content or arithmetic, or confer authority. A later numbered authority-readiness successor may continue this publication-time binding only when both the publisher and an independent validator exact-bind that successor, the then-current whole-register byte count and SHA-256, these same exact D021/D022/D023 section byte counts and SHA-256 digests, and all twelve W4-ADR2 predicates, while proving that the successor has no generated-content, requirement-population, arithmetic, correction-objective, ledger-transition, lifecycle, or assurance-conclusion effect; every other later register identity or failed predicate SHALL block publication.
+
+**Review and evidence companions:** [predecessor objective VERIFICATION-002](<records/JAN-CSAA-005 - Objective Author Verification Record 002.md>), [predecessor closed ledger](<records/JAN-CSAA-005 - Requirement Ledger.md>), historical [Wave 1 reconciliation 002](<records/JAN-CSAA-W1 - Wave 1 Cross-Package Objective Reconciliation Record 002.md>), historical [Wave 1 ledger closure](<records/JAN-CSAA-W1 - Synchronized Ledger Closure and Integrity Record.md>), and preliminary [SELF-REVIEW-001](<records/JAN-CSAA-005 - Author Self Review.md>) remain exact evidence for `0.3.0`; historical [EVIDENCE-004](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>), dated [EVIDENCE-007](<records/JAN-CSAA-005 - Current Subject Rebinding Record 004.md>), and intermediate-control [EVIDENCE-008](<records/JAN-CSAA-005 - Non-Blocking External Drift and Authoring Baseline Record.md>) retain distinct roles. Corrective objective verification, affected cross-package reconciliation, final implementation refresh, completed successor SELF, exact freeze, Proposed promotion, and independent assurance remain separate later acts
 
 **Companion enforced artifacts:** None created or selected by this Draft. Existing source, manifests, generated contracts, configurations, tests, and scripts remain revision-bound repository evidence and retain only their existing concern-specific standing
 
@@ -64,7 +66,7 @@
 
 **Structural exemplar:** [Recursive Professional Harness document-set README](<../Recursive Professional Harness/README.md>)
 
-**Supersedes:** `JAN-CSAA-005@0.2.2 / Draft`, preserved at `records/archive/JAN-CSAA-005@0.2.2.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** [JAN-CSAA-005@0.3.0 / Draft](<records/archive/JAN-CSAA-005@0.3.0.Draft.PRE-W4-SELF-REVIEW-CORRECTION.snapshot>); 119,118 bytes; SHA-256 `3a9f49a492ca0b73cb50413bf694cf90e0608d73d6248db9df7cb45804b80625`; exact predecessor and its ledger, objective, reconciliation, closure, observation, and preliminary-review evidence remain immutable historical evidence
 
 **Superseded by:** None
 
@@ -119,7 +121,9 @@ Recorded-snapshot tool                 != qualified CSAA provider
 
 ## 3. Observation identity and subject binding
 
-### 3.1 Exact accepted snapshot
+### 3.1 Exact historical accepted snapshot
+
+The table below preserves the exact OBS-029/030 subject formerly accepted by `0.3.0`. It is historical event-time evidence only and supplies no present repository identity or live-current conclusion.
 
 | Field | Recorded value |
 | --- | --- |
@@ -134,7 +138,7 @@ Recorded-snapshot tool                 != qualified CSAA provider
 | `packages` Git tree object | `9a1646f73dc4e75e6f1462c15e524e943e5b526a` |
 | `apps` Git tree object | `673f7ae53d54a66ca6cc93f8a602413547c062ef` |
 
-The status and dirty-identity digests hash explicitly normalized UTF-8/LF manifests. The tracked subject digest hashes UTF-8, LF-terminated, ordinal-sorted `git ls-files -s` records with one terminal LF. Those records bind paths to Git modes, blob identities, and stages. The two selected tracked files do not equal their parent-commit blobs: `apps/rph-demo/src/lib/PwuTypeCard.svelte` adds a presentational and accessible inline agent icon plus layout styling, and `apps/rph-demo/e2e/pwa-node-graph.e2e.ts` adds one Playwright source assertion for the icon count. Neither staged diff contains bytes. The exact dirty identities are part of the accepted subject rather than treated as noise or omitted.
+The status and dirty-identity digests hash explicitly normalized UTF-8/LF manifests. The tracked subject digest hashes UTF-8, LF-terminated, ordinal-sorted `git ls-files -s` records with one terminal LF. Those records bind paths to Git modes, blob identities, and stages. In the historical OBS-029/030 subject, the two selected tracked files did not equal their parent-commit blobs: `apps/rph-demo/src/lib/PwuTypeCard.svelte` added a presentational and accessible inline agent icon plus layout styling, and `apps/rph-demo/e2e/pwa-node-graph.e2e.ts` added one Playwright source assertion for the icon count. Neither staged diff contained bytes. These exact values remain historical subject identity; they are not silently represented as the present worktree.
 
 ### 3.2 Explicit tracked implementation/configuration scope
 
@@ -166,26 +170,13 @@ The file is configuration evidence for the app include surface. It is not compil
 
 ### 3.4 Staleness rule
 
-This inventory is `CURRENT_FOR_RECORDED_DIRTY_SUBJECT_ONLY`. It becomes stale for affected conclusions when any of the following changes:
+This correction is `HISTORICAL_RECORDED_SUBJECT_ONLY / NOT_LIVE_CURRENT`. The predecessor invalidation rule remains material: any change to the parent, branch, 19-path perimeter, tracked manifest, worktree status or dirty content, committed trees, generated context, mutation-journal or process state, workspace/configuration/tool/entry-point/evidence surfaces, supported-region boundary, or concern-owner disposition prevents reuse of the affected observation as current.
 
-- parent commit;
-- branch identity;
-- the explicit 19-path perimeter membership or serialized identity;
-- a tracked implementation/configuration path;
-- the explicit tracked manifest membership or digest;
-- selected worktree-status membership, dirty content, unstaged diff, or staged diff;
-- the committed `packages` or `apps` tree identity;
-- the generated SvelteKit configuration bytes or recorded last-write identity;
-- mutation-journal presence or the recorded Bun-process quiescence state;
-- a workspace manifest, export map, lockfile, project context, build/test command, architecture rule, generated source, schema input, runtime entry point, trace source, or evidence instrument;
-- a previously excluded region becomes supported; or
-- an observation is adjudicated by its concern owner.
+`CSAA-005-REQ-058`, `CSAA-005-REQ-296` through `300`, `CSAA-005-REQ-307` through `312`, and `CSAA-005-REQ-333` through `336` require re-observation and conclusion-bearing comparison rather than inference from document modification time. That mandatory consolidated implementation refresh is deliberately deferred until the full planned documentation corpus is authored and internally assured.
 
-Under `CSAA-005-REQ-058` and `CSAA-005-REQ-296` through `CSAA-005-REQ-300`, promotion review re-observes the subject rather than inferring freshness from this Draft's modification time.
+[EVIDENCE-004](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>) preserves OBS-029/030 as historical evidence. EVIDENCE-005 and EVIDENCE-006 preserve their later exact observation events and invalidations. [EVIDENCE-007](<records/JAN-CSAA-005 - Current Subject Rebinding Record 004.md>) preserves only the dated OBS-035/036 authoring baseline. [EVIDENCE-008](<records/JAN-CSAA-005 - Non-Blocking External Drift and Authoring Baseline Record.md>) permits intermediate documentation work without treating later external drift as an intermediate blocker, but it is not a repository observation and cannot establish continuous currentness.
 
-The [Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>) preserves the exact accepted OBS-029/030 dirty subject, repeated observation method, compatibility continuity, and invalidation rule. The [Current Subject Refresh and Compatibility Record](<records/JAN-CSAA-005 - Current Subject Refresh and Compatibility Record.md>) preserves historical OBS-027/028, whose parent-commit identity was later invalidated. The [Successor Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Successor Preparation Evidence Snapshot.md>) preserves the complete rejection and later-invalidation history for observations 003 through 018 and the historical clean observations 019 and 020. The earlier [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>) remains evidence of why the predecessor Draft could not be refreshed at its earlier attempt; no historical record is the source of current facts.
-
-This working Draft carries only facts re-observed or explicitly compatibility-checked against the accepted OBS-029/030 subject. The `0.2.1` pre-`REG-D-021`, `0.2.0` Closure Pass A, and `0.1.0` predecessors remain exact historical snapshots and are not rewritten as if they described a different subject. The two dirty files do not change the recorded workspace, package, dependency, configuration, analyzer, coverage, runtime-trace, or semantic-capability counts; this is a bounded inventory-compatibility conclusion, not a correctness or behavior-preservation judgment.
+The exact OBS-029/030 values in §3.1 and all later observation records remain append-only history under `CSAA-005-REQ-059` and `CSAA-005-REQ-313`. This `0.3.1` correction neither invents present values nor silently updates counts, configuration, source, behavior, or conclusions. A later exact refresh may require a further versioned substantive successor.
 
 ---
 
@@ -1377,22 +1368,22 @@ The frozen [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation E
 
 | Verification target | Current verification route | Status for this Draft |
 | --- | --- | --- |
-| Metadata and authority boundary | Controlled-document review against `JAN-CSAA-000`, `REG-D-018`, `REG-D-021`, and `REG-D-022` | Author objective check pending |
-| Revision/worktree identity | Current-subject evidence and repeated Git observation | OBS-029/030 recorded and matched; two tracked unstaged changes are exact subject members; Proposed-transition freshness recheck remains later |
-| Workspace/project inventory | Manifest/configuration/path inspection | Current compatibility evidence recorded; author verification pending |
-| Dependency graph | Manifest parsing plus bounded source-import inspection | Current compatibility evidence recorded; compiler resolution absent |
-| File classifications and counts | Read-only filesystem enumeration plus dirty-diff compatibility check | Current compatibility evidence recorded; author verification pending |
-| Tool roles and resolved versions | Script/configuration/lockfile inspection | Current compatibility evidence recorded; execution absent |
-| Coverage identity | Root Vitest configuration inspection | Current compatibility evidence recorded; measurement absent |
-| Mutation identity | Ledger, runner, and self-test inspection | Current static evidence recorded; runner not executed by this preparation |
-| Runtime seams and paths | Source inspection | Current compatibility evidence recorded; trace absent |
-| Security capability boundary | Named configuration/dependency/source search | Current bounded absence observation |
-| Observation routing | Author cross-document review; only genuine residual authority conflict routes to the concern owner through `JPWB-REG-005` | Pending |
-| Local requirement atomicity and substantive mapping | 336-row requirement catalog and requirement ledger | Corrected in this Draft; author verification and self-review remain open |
-| Inherited `JAN-CSAA-000` intake | Eighty-eight individually identified source rows, including eighteen explicitly allocated post-ledger self-review obligations | Corrected in the ledger; objective intake verification remains not run |
-| Direct cited-canon intake | Seventy-one concern-aware source rows against `JPWB-CON-000` and `JPWB-DOC-001` through `004` | Corrected in the ledger; objective source/binding/polarity verification remains not run |
-| Requirement closure | Current requirement ledger | Open |
-| Author self-review | Eighteen-question author/integrator review after objective ledger evidence closes | Allocated; not yet active |
+| Metadata and authority boundary | Controlled-document review against `JAN-CSAA-000`, `REG-D-018`, `REG-D-021`, and `REG-D-022` | Exact `0.3.0` predecessor objective closure is historical; changed `0.3.1` corrective objective verification is required |
+| Revision/worktree identity | Historical observation records plus mandatory later consolidated refresh | OBS-029/030 and EVIDENCE-004 historical; OBS-035/036 and EVIDENCE-007 dated only; EVIDENCE-008 intermediate control; no live-current subject |
+| Workspace/project inventory | Historical manifest/configuration/path inspection | Predecessor bounded result preserved; direct-current corrective documentation verification and final implementation refresh remain separate |
+| Dependency graph | Historical manifest parsing plus bounded source-import inspection | Predecessor bounded result preserved; compiler resolution absent; no live-current dependency conclusion |
+| File classifications and counts | Historical read-only enumeration and dated compatibility evidence | Predecessor classifications preserved; no current count claim; final implementation refresh pending |
+| Tool roles and resolved versions | Historical script/configuration/lockfile inspection | Predecessor bounded result preserved; no execution or current-version claim |
+| Coverage identity | Historical root Vitest configuration inspection | Predecessor configuration fact preserved; measurement absent; no live-current claim |
+| Mutation identity | Historical ledger, runner, and self-test inspection | Predecessor static evidence preserved; runner not executed; no live-current claim |
+| Runtime seams and paths | Historical bounded source inspection | Predecessor seams preserved as dated description; trace absent; final refresh pending |
+| Security capability boundary | Historical named configuration/dependency/source search | Bounded predecessor absence observation only; no current security conclusion |
+| Observation routing | Author cross-document review; only genuine residual authority conflict routes through `JPWB-REG-005` | Historical W1 reconciliation 002 applies only to exact `0.3.0`; affected corrective cross-package reconciliation pending |
+| Local requirement atomicity and substantive mapping | Unchanged 336-row requirement catalog and corrective successor ledger | Predecessor objective PASS historical; all 336 IDs, wording, order, and sites preserved; direct-current corrective rerun required |
+| Inherited `JAN-CSAA-000` intake | Eighty-eight individually identified rows, including eighteen post-ledger SELF allocations | Predecessor objective PASS historical; exact intake preserved; corrective rerun required |
+| Direct cited-canon intake | Seventy-one concern-aware source rows against `JPWB-CON-000` and `JPWB-DOC-001` through `004` | Predecessor objective PASS historical; exact intake preserved; corrective rerun required |
+| Requirement closure | Historical ledger `@0.3.1` plus corrective successor ledger | Predecessor objective commission closed; corrective `@0.3.2 / OPEN` begins with no inherited PASS |
+| Author self-review | Preliminary SELF-REVIEW-001 plus mandatory later successor rerun | Preliminary review performed and nonpass with SR-001/SR-002 MAJOR; completed successor SELF ineligible until final refresh and affected reruns |
 | Formal independent adversarial review | Distinct adversarial reviewer after exact Proposed promotion | Allocated to later lifecycle; not a Draft-promotion prerequisite |
 | Integrity/provenance validation | Distinct validator after completed adversarial review of the unchanged exact Proposed candidate | Allocated to later lifecycle; not a Draft-promotion prerequisite |
 | Final corpus decision and recording | Final decision authority followed by a distinct ministerial recorder, with an individual full-judgment response field for this exact member and for every independently contestable material fork, exception, residual-risk acceptance, or amendment affecting it | Allocated to the one final corpus transaction |
@@ -1401,30 +1392,17 @@ The frozen [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation E
 
 ## 20. Draft acceptance state
 
-This working revision remains a prepared, non-authoritative Draft candidate under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. It preserves the revision-and-worktree subject bound to the exact accepted OBS-029/030 pair, including both tracked unstaged changes; the atomic local judgment grain; exact substantive-site equality; 88-row `JAN-CSAA-000` intake; 71-row direct concern-owning canon intake; and explicit treatment of the frozen predecessor preparation-evidence obligation. It makes a current claim only for the exact recorded dirty subject and its stated compatibility bounds.
+This `0.3.1` revision is a correction-only, non-authoritative Draft successor. It preserves every `0.3.0` repository fact, requirement, mapping, uncertainty, authority boundary, and no-execution statement as historical event-time content while correcting the false currentness and mixed lifecycle presentation identified by `JAN-CSAA-005-SR-001` and `JAN-CSAA-005-SR-002`.
 
-The `0.2.1`, `0.2.0`, and `0.1.0` predecessor Drafts and ledgers, the Preparation Evidence Snapshot, the Refresh Blocker Record, and every unexecuted MANIFEST-002 record remain exact historical evidence. This successor does not rewrite them, represent their earlier observations as current, or preserve the withdrawn MANIFEST-002 chain as an active solicitation path.
+The exact `0.3.0` predecessor completed bounded objective verification and ledger closure, then received preliminary SELF-REVIEW-001. That review remained nonpass: question 3 failed and two distinct MAJOR findings remain open. Those results are not erased, weakened, or retroactively rebound to changed `0.3.1` bytes.
 
-The Draft is ready for continued objective author verification and, after exact ledger closure, author self-review, but it is not ready for Proposed promotion, exact-candidate independent review, final corpus inclusion, or closure because:
+At corrective source finalization, the exact predecessor account is 458 applicable obligations: 322 state-bearing local rows, 65 state-bearing charter rows, and 71 direct-canon rows verified through their shared methods. The 387 state-bearing rows were `PASSED`; the 71 direct-canon raw rows carry no duplicate row-state cell. Thirty-seven other rows are explicitly noncurrent, fifteen objective methods passed, and five future methods remain nonpass. The corrective `@0.3.2 / OPEN` ledger resets exactly the 387 state-bearing raw rows and fifteen objective methods to `NOT_RUN`, retains all 71 direct-canon rows byte-for-byte under those shared methods, and preserves all 37 noncurrent rows. No predecessor green state is inherited by this byte-changed successor.
 
-- direct cited-canon and inherited self-review intake are corrected but remain open for objective author/ledger-closer verification;
-- the adopted README remains the authority and adoption baseline, the MANIFEST-002 intermediate-carriage procedure is withdrawn because its exact preimage and authority state changed, and synchronized member/manifest carriage is reserved for the final corpus transaction rather than a Proposed-promotion gate;
-- at this `0.3.0` pre-objective-verification authoring state, candidate propagation edits for `JAN-CSAA-001` and `JAN-CSAA-002` have not yet received author-side claim-by-claim cross-document reconciliation and recording under `JAN-CSAA-W1-GAP-004`; any later exact reconciliation record controls the live state;
-- 458 Draft-applicable ledger rows remain `PLANNED` and `NOT_RUN`;
-- 18 author-self-review rows remain `ALLOCATED_TO_POST_LEDGER_SELF_REVIEW` and `NOT_REQUIRED_CURRENT_PHASE` until objective ledger closure;
-- 15 post-Proposed or final-transaction rows remain explicitly allocated to later lifecycle and `NOT_REQUIRED_CURRENT_PHASE`;
-- one full executable Wave 1 exit row remains allocated to later execution and `NOT_REQUIRED_CURRENT_PHASE`;
-- one predecessor conferral-model condition is satisfied by the recorded successor model and remains `NOT_REQUIRED_CURRENT_PHASE`;
-- one predecessor per-member adoption-package rule is not applicable under the successor final-corpus model and remains `NOT_REQUIRED_CURRENT_PHASE`;
-- one manifest-carriage row is deferred by cited authority to the final corpus transaction and remains `NOT_REQUIRED_CURRENT_PHASE`;
-- author self-review remains open; and
-- any later Proposed transition requires a new exact-candidate byte freeze and freshness recheck after the remaining authoring and self-review work.
+OBS-029/030 and EVIDENCE-004 are historical. OBS-035/036 and EVIDENCE-007 are dated only. EVIDENCE-008 controls intermediate documentation authoring and is not repository-observation evidence. This Draft therefore makes no live-current implementation, configuration, source, dependency, generated-context, test, runtime, process, or behavior claim.
 
-Formal independent adversarial review activates after an exact ledger-closed and self-reviewed candidate becomes Proposed; distinct integrity/provenance validation follows completed adversarial review of the unchanged exact candidate. Their absence blocks final corpus inclusion and Normative conferral; neither creates a circular prerequisite to Proposed promotion. The final package preserves the predecessor evidence grain through individual exact-member and material-fork/exception/residual-risk/amendment fields even though the predecessor per-member package rule is no longer applicable. Documentation-subphase completion does not satisfy the full executable Wave 1 exit.
+Before Proposed eligibility, the exact corrective Draft requires direct-current objective verification, corrective ledger closure, affected cross-package reconciliation, the one consolidated implementation refresh against a selected cutoff, affected objective and cross-package reruns, and a new all-eighteen-question author review that leaves no blocker or major finding. Only then may an exact candidate be frozen. Independent adversarial review and distinct integrity/provenance validation remain post-Proposed activities.
 
-Draft completion does not confer authority, approve recorded-snapshot or current repository divergence, validate current source, complete any executable wave, or authorize implementation, providers, dependencies, fixtures, schemas, tests, oracle changes, or source/configuration mutation.
-
----
+No correction intent, candidate generation, objective PASS, or ledger transition closes `JAN-CSAA-005-SR-001` or `JAN-CSAA-005-SR-002`. No provider, dependency, implementation, experiment, topology, gate, oracle, source mutation, sponsor disposition, status promotion, or authority is created by this Draft.
 
 ## 21. Closing inventory rule
 

@@ -6,7 +6,7 @@
 
 **Canonical title:** TypeScript Semantic Model and Invariant Catalog
 
-**Version:** `0.3.0`
+**Version:** `0.3.1`
 
 **Status:** Draft
 
@@ -38,7 +38,7 @@
 
 **Change authority and procedure:** `REG-D-018`, as extended by `REG-D-021` and corrected by `REG-D-022`, permits authors to revise this Draft. Proposed eligibility is governed by `CSAA-002-REQ-098` and `CSAA-002-REQ-474`: ledger closure and author self-review precede an exact candidate freeze and Proposed promotion. Proposed status is followed by independent adversarial review and distinct integrity/provenance validation. `CSAA-002-REQ-099` requires affected re-review after every candidate-byte change following an exact review freeze except an exact pre-frozen administrative substitution set that names its operations and source/result digests, causes no semantic or judgment change, and is independently replayed, independently result-validated, and ministerially recorded against exact predicates. Normative status requires an individual exact-member `JPWB-REG-005` conferral in the one final itemized corpus transaction
 
-**Review and evidence companions:** Requirement ledger above; deliberately historical examples grounded by their cited `JAN-CSAA-005` predecessor snapshot; current repository compatibility supplied separately by the [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>); [Sponsor Standing Direction](<records/JAN-CSAA - Sponsor Standing Direction for Autonomous Corpus Preparation and Final Review.md>); [Standing Direction Correction](<records/JAN-CSAA - Standing Direction Interpretation Correction and Assurance Clarification.md>); authoring-input [Working Corpus Authoring Status 002](<records/JAN-CSAA - Working Corpus Authoring Status 002.md>), with any later exact successor controlling live construction state; historical [Wave 1 Manifest Gap Record](<records/JAN-CSAA-W1 - Draft Authoring Initiation and Manifest Gap Record.md>); self-review, Proposed-candidate review, and integrity-validation records are not yet authored
+**Review and evidence companions:** Requirement ledger above; deliberately historical examples grounded by their cited `JAN-CSAA-005` predecessor snapshot; historical [JAN-CSAA-005-EVIDENCE-004@0.1.0](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>) supplies no current-use claim; dated [JAN-CSAA-005-EVIDENCE-007@0.1.0](<records/JAN-CSAA-005 - Current Subject Rebinding Record 004.md>) supplies only the OBS-035/036 authoring baseline; [JAN-CSAA-005-EVIDENCE-008@0.1.0](<records/JAN-CSAA-005 - Non-Blocking External Drift and Authoring Baseline Record.md>) controls intermediate documentation authoring without making that dated baseline continuously current, and the consolidated implementation refresh remains open before exact-corpus freeze; historical [VERIFICATION-001](<records/JAN-CSAA-002 - Objective Author Verification Record.md>), [VERIFICATION-002](<records/JAN-CSAA-002 - Objective Author Verification Record 002.md>), [Wave 1 reconciliation 002](<records/JAN-CSAA-W1 - Wave 1 Cross-Package Objective Reconciliation Record 002.md>), and [Wave 1 ledger closure](<records/JAN-CSAA-W1 - Synchronized Ledger Closure and Integrity Record.md>) remain evidence for their exact predecessor surfaces; the [preliminary author self-review](<records/JAN-CSAA-002 - Author Self Review.md>) records `JAN-CSAA-002-SR-001 / MAJOR` against `0.3.0`; [Working Corpus Authoring Status 013](<records/JAN-CSAA - Working Corpus Authoring Status 013.md>) controls the pre-correction corpus state, with any later exact successor controlling live construction state; corrective objective verification, affected cross-package reconciliation, corrective author self-review, exact Proposed freeze, Proposed-candidate review, and integrity/provenance validation remain separate later evidence-bearing acts
 
 **Companion enforced artifacts:** Existing repository contracts, schemas, configurations, and tests remain exact shape authorities for their own concerns. This Draft creates none
 
@@ -50,7 +50,7 @@
 
 **Structural exemplar:** [RPH Canonical Domain Model and Invariant Catalog](<../Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract.md>)
 
-**Supersedes:** `JAN-CSAA-002@0.2.0 / Draft`, preserved at `records/archive/JAN-CSAA-002@0.2.0.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** `JAN-CSAA-002@0.3.0 / Draft`, 162,179 bytes, SHA-256 `9bcaa9f9a2212d66ae7c417af84c4f0e14672d282c04e73d719f7f9cceda1911`; stable publication of this correction SHALL preserve that exact predecessor at `records/archive/JAN-CSAA-002@0.3.0.Draft.PRE-SR-001-CORRECTION.snapshot`
 
 **Superseded by:** None
 
@@ -1462,7 +1462,7 @@ The Wave 1 methods below are author-side adversarial-question, example, and scen
 
 ## 21. Draft acceptance state
 
-This `0.3.0` revision is a non-authoritative Draft reconciliation under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries current preparation state without interim README carriage. The withdrawn MANIFEST-002 path and its historical gap evidence remain preserved, but neither an intermediate manifest decision nor a sponsor response blocks ledger closure or Proposed promotion. This Draft does not self-declare closure and is not a Proposed or Normative member.
+This `0.3.1` revision is a correction-only, non-authoritative Draft successor under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. It corrects `JAN-CSAA-002-SR-001` in the controlled evidence and lifecycle wording without changing the semantic catalog, requirement IDs, provider-independent contract, authority boundary, or later-lifecycle nonpasses. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries non-authoritative preparation state without interim README carriage. Historical objective closure and preliminary review remain true only for their exact predecessor bytes. This corrective Draft does not self-declare corrective objective closure, author-review completion, Proposed standing, or Normative authority.
 
 Present:
 
@@ -1478,15 +1478,14 @@ Present:
 - 553-row independently dispositionable stable candidate requirement catalog comprising 119 retained prior IDs below 131 and 434 continuous, non-reused new IDs from `CSAA-002-REQ-131` through `CSAA-002-REQ-564`, with later verification allocations;
 - open-fork safe defaults.
 
-At this `0.3.0` pre-objective-verification authoring state, which is not an exact review freeze or Proposed-candidate freeze, the following work remains before Proposed. Later exact closure and reconciliation records control live completion state without retroactively rewriting preserved predecessor snapshots:
+At this `0.3.1` corrective authoring state, which is not an exact review freeze or Proposed-candidate freeze, the following work remains before Proposed. Later exact closure and reconciliation records control live completion state without retroactively rewriting preserved predecessor evidence:
 
-- refresh and reconcile the exact repository subject and current working-status evidence without silently upgrading the historical `JAN-CSAA-005@0.1.0` examples;
-- complete the current-phase author/objective verification needed to close the requirement ledger; later-lifecycle and later-execution allocations remain explicit non-pass states;
-- complete terminology and ownership audits against canon and sibling Drafts;
-- close the requirement ledger;
-- complete author self-review against the closed ledger and all eighteen `JAN-CSAA-000` adversarial questions;
-- resolve every Draft-phase blocker or major finding and rerun each affected check; and
-- freeze the exact candidate version and digest and record the transition to Proposed.
+- preserve `JAN-CSAA-005-EVIDENCE-004@0.1.0` as historical evidence only, use `JAN-CSAA-005-EVIDENCE-007@0.1.0` only as the dated OBS-035/036 baseline, and use `JAN-CSAA-005-EVIDENCE-008@0.1.0` only as the intermediate documentation-authoring control;
+- perform the consolidated implementation refresh required before exact-corpus freeze; no dated evidence record is silently upgraded to continuously current repository evidence;
+- complete corrective objective verification against the exact `0.3.1` Draft and its OPEN successor ledger, close that named objective commission, and preserve all later-lifecycle and later-execution allocations as explicit nonpasses;
+- complete affected cross-package reconciliation against the exact corrective identities;
+- complete a separately recorded corrective author self-review against the reconciled closed ledger and all eighteen `JAN-CSAA-000` adversarial questions, closing `JAN-CSAA-002-SR-001` only if question 3 and every other required judgment pass without a blocker or major finding; and
+- freeze the exact candidate version and digest and record the transition to Proposed only after those predicates are satisfied.
 
 After Proposed and before final-corpus inclusion:
 
