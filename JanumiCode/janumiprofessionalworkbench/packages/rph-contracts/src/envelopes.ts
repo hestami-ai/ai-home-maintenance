@@ -67,8 +67,30 @@ export const objectEnvelopeShape = {
 export const ObjectEnvelopeSchema = z.strictObject(objectEnvelopeShape);
 export type ObjectEnvelope = z.infer<typeof ObjectEnvelopeSchema>;
 
-/** DomainCommand envelope factory (DOC-007 §8). `expectedRevision` is optional in the schema; the
- * command handler enforces its presence for updates to existing aggregates (RPH-CON-003, M4). */
+/**
+ * DomainCommand envelope factory (DOC-007 §8 — HISTORICAL MATERIAL; the shape is authoritative, the prose is
+ * evidence of intent).
+ *
+ * ⚠ A CLAIM THAT WAS HERE IS REMOVED BECAUSE IT WAS FALSE, AND IT WAS FALSE IN A SHAPE-AUTHORITY ARTIFACT.
+ * This comment read: *"`expectedRevision` is optional in the schema; the command handler **enforces its
+ * presence** for updates to existing aggregates (RPH-CON-003, M4)."* **No handler enforces any such thing.**
+ * `kit.ts` gates on `command.expectedRevision !== undefined`, so an update that declares nothing is simply not
+ * checked — which is precisely the last-write-wins default JPWB-DOC-003 §9 PER-4 forbids, and the whole reason
+ * the surface-wiring programme exists (`docs/_working/ROADMAP-fork22-surface-wiring.md`).
+ *
+ * That matters more than an ordinary stale comment: CON-000 B1 makes this file **shape authority**, so a
+ * sentence here asserting an enforcement nobody performs is the *"asserted status must be performed status"*
+ * failure (B7) inside the artifact other readers are told to trust over prose.
+ *
+ * WHAT IS ACTUALLY TRUE: `expectedRevision` is optional here, the engine honours it **when present**, and
+ * supplying it is a SURFACE obligation the routes discharge one at a time.
+ *
+ * ── `issuedBy` IS REQUIRED HERE AND THAT IS SCHEDULED TO CHANGE (REG-D-027) ──────────────────────────────────
+ * It becomes `.optional()` in the same increment that gives the engine an authenticated principal to stamp
+ * from — not before. Widening it earlier would make every handler read of `command.issuedBy` optional while
+ * the only correct replacement (the stamped principal) does not yet exist, so the field would be softened
+ * with nothing standing behind it. The order is: stamp first, then widen.
+ */
 export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 	return z.strictObject({
 		commandId: z.string().min(1),

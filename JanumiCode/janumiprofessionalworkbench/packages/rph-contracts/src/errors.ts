@@ -5,7 +5,27 @@
 import { z } from 'zod';
 import { RphErrorCategorySchema, type RphErrorCategory } from './enums.js';
 
-/** The 15 canonical RPH error codes (DOC-007 §25.1). */
+/**
+ * The RPH error codes. Fifteen transcribed from DOC-007 §25.1 (**HISTORICAL MATERIAL** — evidence of intent
+ * for the spellings, binding nothing as prose), plus one AUTHORED addition disclosed inline below.
+ *
+ * ⚠ THE COUNT IS NOT IN THIS COMMENT ON PURPOSE. It said "The 15 canonical RPH error codes" and that number
+ * was load-bearing in three other places — including a code comment in `command-bus.ts` that refused to mint a
+ * needed code on the strength of it. `errors.test.ts` derives the set from `vocab/canonical-vocabulary.json`
+ * and asserts equality, so the vocabulary is the population and this list is checked against it.
+ *
+ * ── WHO MAY ADD ONE, SETTLED 2026-08-07 (REG-D-027, REG-F-057) ───────────────────────────────────────────────
+ * **A repository shape change, through the contract procedure — NOT a sponsor act.** `command-bus.ts` carried
+ * the claim that *"minting one is a sponsor act"* and the codebase obeyed it; it is contradicted by ratified
+ * text. **REG-D-004** (sponsor-participated DECISION): *"The repository — generated contracts, schemas,
+ * migrations, conformance tests — is authoritative for exact shapes: wire envelopes, JSON schemas, enum
+ * spellings, ID prefixes, **error codes**."* **DOC-004 §5** routes the change: *"extending an enum — is a
+ * contract change: new schema version, coordinated code/storage/fixture/test change, **through the
+ * repository's contract procedure**."* **DOC-004 §8.2** reserves Constitutional, Vocabulary, Hypothesis and
+ * Canon text to the sponsor and grants *"Code — full agency within this protocol"*; shapes are not reserved.
+ * SPEC-001 §6.1's `SHALL NOT` binds *that specification*, not this repository, and SPEC-001 §11.4.15 rejected
+ * enum growth **under delegated authority** on cost and arithmetic — never on reservation.
+ */
 export const RphErrorCodeSchema = z.enum([
 	'RPH_VALIDATION_SCHEMA_FAILED',
 	'RPH_VALIDATION_SEMANTIC_FAILED',
@@ -21,7 +41,18 @@ export const RphErrorCodeSchema = z.enum([
 	'RPH_SUBJECT_VERSION_MISMATCH',
 	'RPH_BASELINE_VERSION_MISMATCH',
 	'RPH_IDEMPOTENCY_DUPLICATE',
-	'RPH_EXTERNAL_OPERATION_UNCERTAIN'
+	'RPH_EXTERNAL_OPERATION_UNCERTAIN',
+	// ── AUTHORED 2026-08-07 (REG-D-027). Not from DOC-007 §25.1; disclosed rather than blended in. ──────────
+	// The acting principal could not be established from authenticated context, so the command cannot be
+	// ATTRIBUTED and is refused before any effect (PER-3; DOC-004 §5).
+	//
+	// WHY NOT REUSE `RPH_AUTHORITY_INSUFFICIENT`: it means the principal IS known and may not act. Conflating
+	// the two would make the governed record unable to distinguish *"I do not know who you are"* from *"I know
+	// who you are and you may not"* — and telling those apart is the first clause of the accountability
+	// standard this work exists to serve. It is also the distinction each deployment tier routes DIFFERENTLY:
+	// in SaaS and Enterprise an unauthenticated command is a security event, in standalone it is a
+	// misconfiguration. A distinct code lets any host route it without string-matching a message.
+	'RPH_AUTHENTICATION_REQUIRED'
 ]);
 export type RphErrorCode = z.infer<typeof RphErrorCodeSchema>;
 
@@ -44,7 +75,13 @@ export const ERROR_CODE_CATEGORY: Readonly<Record<RphErrorCode, RphErrorCategory
 	RPH_SUBJECT_VERSION_MISMATCH: 'ASSURANCE',
 	RPH_BASELINE_VERSION_MISMATCH: 'INVARIANT',
 	RPH_IDEMPOTENCY_DUPLICATE: 'CONCURRENCY',
-	RPH_EXTERNAL_OPERATION_UNCERTAIN: 'EXTERNAL_DEPENDENCY'
+	RPH_EXTERNAL_OPERATION_UNCERTAIN: 'EXTERNAL_DEPENDENCY',
+	// AUTHORIZATION, deliberately, and NOT a new category. `RphErrorCategorySchema` is GENERATED from
+	// `vocab/canonical-vocabulary.json` and its ten values are canon-facing; adding an AUTHENTICATION category
+	// would be a second, larger shape change for no gain the code itself does not already carry. The CODE is
+	// what an operator routes on; the category is a coarse bucket, and "you may not act, because I cannot
+	// establish who you are" sits in it honestly.
+	RPH_AUTHENTICATION_REQUIRED: 'AUTHORIZATION'
 };
 
 /** The serialized error shape carried in CommandResult.error and event/observation payloads. */

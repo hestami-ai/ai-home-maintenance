@@ -19,7 +19,7 @@ const vocab = JSON.parse(
 ) as { errorCodes: { code: string }[] };
 
 describe('errors', () => {
-	it('exposes exactly the 15 canonical RPH_* error codes', () => {
+	it('exposes exactly the RPH_* error codes the vocabulary declares — no more, no fewer', () => {
 		const canonical = vocab.errorCodes.map((e) => e.code).filter((c) => c.startsWith('RPH_'));
 		expect([...RphErrorCodeSchema.options].sort()).toEqual([...canonical].sort());
 	});

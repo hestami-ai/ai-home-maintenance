@@ -1453,6 +1453,11 @@
       "meaning": "Outcome of an external operation could not be determined. DOC-007 §25.1."
     },
     {
+      "code": "RPH_AUTHENTICATION_REQUIRED",
+      "category": "",
+      "meaning": "The acting principal could not be established from authenticated context, so the command cannot be attributed and is refused before any effect (DOC-003 §9 PER-3; DOC-004 §5). DISTINCT FROM RPH_AUTHORITY_INSUFFICIENT, which means the principal IS known and may not act - an operator must be able to tell 'I do not know who you are' from 'I know who you are and you may not' without parsing a message string, in every deployment tier. AUTHORED 2026-08-07 under REG-D-027, NOT from DOC-007 §25.1, and disclosed as such: REG-D-004 names error codes as repository shape and DOC-004 §5 routes enum extension to the repository's contract procedure, so this is a shape change and not a sponsor act."
+    },
+    {
       "code": "VALIDATOR_FAILED",
       "category": "Validator execution failure",
       "meaning": "DOC-004 §34.1 — validator failed to EXECUTE. NOT an assurance rejection: yields an execution error + incomplete assessment + retry/alternate-validator/escalation. Also a state-machine state (ASSESSING→VALIDATOR_FAILED, §30). Only backticked error token in DOC-004."
