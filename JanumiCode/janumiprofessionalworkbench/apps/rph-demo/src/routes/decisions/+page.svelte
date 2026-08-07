@@ -8,12 +8,19 @@
 		data: PageData;
 		form: {
 			error?: string;
+			// The RPH error code, surfaced so a STALE PAGE is distinguishable from a refused act. `refuse()`
+			// has returned it since /decisions was wired; until now nothing rendered it, which made it a field
+			// that existed only in the claim that it existed.
+			code?: string;
 			proposed?: string;
 			approved?: string;
 			granted?: string;
 			denied?: string;
 		} | null;
 	} = $props();
+
+	/** A revision conflict is not a refusal — the act was legal and the page was simply out of date. */
+	const isStale = $derived(form?.code === 'RPH_REVISION_CONFLICT');
 
 	// The proposable DecisionType values (RPH-DOC-007 §22 / DOC-002 §23.1) — WAIVER deliberately absent:
 	// ProposeDecision cannot carry DOC-004 §12.2's WaiverDetail, so a waiver proposed here could never
@@ -45,7 +52,16 @@
 	<button class="ghost" onclick={() => (showProposeForm = !showProposeForm)}>+ Propose Decision</button>
 </header>
 
-{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
+{#if form?.error}
+	<p class="err" role="alert">
+		{#if isStale}
+			This decision changed while this page was open, so the act was not applied. Reload to see the
+			current state, then decide again. <span class="mono">({form.error})</span>
+		{:else}
+			{form.error}
+		{/if}
+	</p>
+{/if}
 
 {#if showProposeForm}
 	<form method="POST" action="?/propose" use:enhance class="proposeform">

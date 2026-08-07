@@ -6,8 +6,20 @@
 		form
 	}: {
 		data: PageData;
-		form: { error?: string; created?: string; submitted?: string; approved?: string } | null;
+		form: {
+			error?: string;
+			// The RPH error code, surfaced so a STALE PAGE is distinguishable from a refused act. Without it
+			// the two read identically to the professional, and "someone else changed this while you were
+			// looking at it" is a different instruction from "this cannot be done" (JPWB-DOC-003 §9 PER-4).
+			code?: string;
+			created?: string;
+			submitted?: string;
+			approved?: string;
+		} | null;
 	} = $props();
+
+	/** A revision conflict is not a refusal — the act was legal and the page was simply out of date. */
+	const isStale = $derived(form?.code === 'RPH_REVISION_CONFLICT');
 
 	// The 6 BaselineType values (RPH-DOC-007 §23). Promotion to AUTHORITATIVE is a documented follow-up — it needs
 	// an effective promotion Decision + satisfied assessments (canPromoteBaseline) and is out of this surface's scope.
@@ -48,7 +60,16 @@
 	</form>
 {/if}
 
-{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
+{#if form?.error}
+	<p class="err" role="alert">
+		{#if isStale}
+			This baseline changed while this page was open, so the act was not applied. Reload to see the
+			current state, then decide again. <span class="mono">({form.error})</span>
+		{:else}
+			{form.error}
+		{/if}
+	</p>
+{/if}
 
 <table>
 	<thead>
@@ -68,11 +89,16 @@
 					{#if b.status === 'CANDIDATE'}
 						<form method="POST" action="?/submit" use:enhance>
 							<input type="hidden" name="id" value={b.id} />
+							<!-- The revision THIS ROW was rendered from. Interpolated from the load data and never
+							     recomputed in the action — a value re-read at submit is always current, can never
+							     conflict, and would satisfy PER-4's letter while protecting nothing. -->
+							<input type="hidden" name="expectedRevision" value={b.revision} />
 							<button class="ghost small" type="submit">Submit</button>
 						</form>
 					{:else if b.status === 'UNDER_REVIEW'}
 						<form method="POST" action="?/approve" use:enhance>
 							<input type="hidden" name="id" value={b.id} />
+							<input type="hidden" name="expectedRevision" value={b.revision} />
 							<button class="primary small" type="submit">Approve</button>
 						</form>
 					{:else}

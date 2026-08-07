@@ -169,6 +169,28 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: 'THE CONTROL NEEDS ITS OWN MUTANT (a control that cannot fail is not a control). A guard that refused every command carrying a revision would satisfy the stale-page test while protecting nothing. Observed: reddens ONLY the CONTROL and the tautology control; the stale-page test stays green.',
 		source: 'SPEC-001 §11.4.22 item 2'
 	},
+	// A and B above pin the ENGINE's half. C and D pin the SURFACE's half — the round-trip through the form,
+	// which is where the protection actually lives and where nothing measured it until now.
+	{
+		id: 'MU-FRESH-18-C-empty-string-parses-as-zero',
+		file: 'apps/rph-demo/src/lib/server/optimistic-concurrency.ts',
+		find: 'if (!/^\\d+$/.test(trimmed)) return null;',
+		replace: 'if (!/^\\d*$/.test(trimmed)) return null;',
+		expectRed: ['apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts'],
+		why: "ONE CHARACTER IS THE WHOLE DEFENCE. `+`->`*` admits the empty string, `Number('')` is 0, and a form that round-tripped NOTHING then declares 'expect revision 0' — which MATCHES every freshly created aggregate, because createObject commits `newRevision: alsoEvents.length` (kit.ts:563). MEASURED end to end on /baselines: under this mutant the `submit` step (acting on a row at revision 0) is ACCEPTED and its e2e assertion stays GREEN; only `approve` (revision 1) reddens. So the defect hides behind the first step of the only test that drives it. Observed at unit level: reddens exactly 2 of 8 assertions — the empty-string case and the discrimination case — leaving the other 6 green.",
+		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
+	},
+	{
+		id: 'MU-FRESH-18-D-template-stops-carrying-the-revision',
+		file: 'apps/rph-demo/src/routes/baselines/+page.svelte',
+		find:
+			'<input type="hidden" name="expectedRevision" value={b.revision} />\n\t\t\t\t\t\t\t<button class="primary small" type="submit">Approve</button>',
+		replace:
+			'<input type="hidden" name="expectedRevision" value="" />\n\t\t\t\t\t\t\t<button class="primary small" type="submit">Approve</button>',
+		expectRed: ['apps/rph-demo/e2e/baselines.e2e.ts'],
+		why: "THE VALUE MUST COME FROM THE RENDER, and only an e2e can prove the round-trip. Emptying the rendered value (rather than deleting the element) is deliberate: a DELETED input posts no key at all, so `form.get` returns null and the missing-key branch fires — a different branch. Keeping the element and emptying it is the exact wire shape a broken interpolation produces, and it is the one the strict parser exists to refuse. Observed: reddens the APPROVED assertion (baselines.e2e.ts:31) via fail-closed, while the earlier UNDER_REVIEW assertion stays green because only the approve form was mutated.",
+		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
+	},
 	{
 		id: 'M1-widen-start-sources',
 		file: 'packages/rph-domain/src/step-command-spec.ts',
