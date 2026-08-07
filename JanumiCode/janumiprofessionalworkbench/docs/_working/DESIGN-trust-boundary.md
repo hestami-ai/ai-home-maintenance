@@ -279,6 +279,31 @@ different population from a census of *calls*, and only the second was taken.
    the broker's own AGENT credential, `authoring-turn.ts`'s `recordingEngine` and its replay, the seed paths'
    SYSTEM principal, `verif/unread-refusal-guard.ts`'s prototype patch, and the two double-cast partial handles.
 
+### ⚠ BUILT AND PRESERVED ON `wip/d1-trust-boundary` (2026-08-07) — ONE BOUNDED CLASS REMAINS
+
+The recipe above was executed. **The whole workspace typechecks clean and 133 files are migrated.** The branch
+does NOT pass — 136 tests fail, of one class — so it is a branch and `main` stays green.
+
+**Landed and proven on the branch:** the port; `Engine.as(credential)` with the three dispatch methods private
+and off `EngineHandle`, so every unmigrated site is a compile error; the engine STAMPING `issuedBy` from the
+resolved principal; `createEngine`'s explicit field enumeration fixed; **a fork inheriting its session's
+identity** (the authoring turn depends on it); and the demo host running **three distinct principals** —
+SESSION, AGENT, SYSTEM — with the broker holding its own agent credential and seeds running as SYSTEM.
+
+**Measured progression, and both numbers are the gate working rather than defects:** 473 type errors → 0; then
+804 test failures → 136 once the disagreement refusal was staged off.
+
+**THE ONE REMAINING CLASS.** 136 tests assert the actor **they declared** (`u1`, `gov-1`, `lead`, `agent-1`, …)
+and now receive the session principal, because the stamp overwrites. **The fix is REG-D-027(b) and it is the
+same edit that finishes the increment:** make `issuedBy` optional, then remove it from fixtures. That deletes
+the 136 assertions' premise *and* re-enables the disagreement refusal in one move.
+
+⚠ **THE REFUSAL IS CURRENTLY STAGED OFF** behind `REFUSE_ON_DISAGREEMENT = false`, disclosed in the code. It is
+implemented and unreachable, because ~100 fixtures declare an issuer and every one would refuse. **The stamp
+still overwrites, so the RECORD is truthful either way** — what is missing is that a forgery *attempt* is
+corrected silently instead of being recorded as a refusal. That is a weakening of REG-D-027 and it must not
+ship to `main` in that state.
+
 ### Blast radius — the earlier estimate, superseded above for the annotation count
 
 **284 executed dispatch sites across 102 files** is the planning number. Not 30,123 dispatches (75.9% of which
