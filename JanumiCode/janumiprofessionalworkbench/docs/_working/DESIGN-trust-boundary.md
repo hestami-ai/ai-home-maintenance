@@ -115,7 +115,41 @@ and *"a derived act may move work toward caution and may not approve or revoke."
 > built server-side. **The real trust boundary is the HTTP request into the SvelteKit server action** — exactly
 > where REG-Q-004 puts it.
 
-**One port, supplied at construction; one credential, supplied per dispatch; the engine stamps the actor.**
+> ### ⚠ REFINED 2026-08-07 WHILE IMPLEMENTING — A SESSION RECEIVER, NOT A POSITIONAL ARGUMENT
+>
+> The shape below said `dispatch(command, credential)`. **Implementing it produced a better one, and the reason
+> is not that it is smaller — it is that it solves structurally the two hazards the positional form only let me
+> remember to handle.**
+>
+> ```
+> engine.as(credential) -> AuthedDispatcher   // dispatch / dispatchBatch / dispatchBatchGuarded live HERE
+> ```
+>
+> `dispatch` is **removed from `EngineHandle`**, so a caller cannot reach it without first presenting a
+> credential. There is no positional argument, therefore nothing to append and nothing to drop — which retires
+> the `dispatchBatchGuarded` hazard entirely rather than mitigating it with an argument-ordering rule.
+>
+> **THE TWO HAZARDS IT CLOSES BY CONSTRUCTION, both previously "must remember to":**
+> - **The broker inversion.** The broker holds `engine.as(agentCredential)`. Its AGENT identity becomes the
+>   thing it *is* rather than a default it *carries*, so there is no `this.actor` to fall dead when the engine
+>   starts stamping. REG-F-056's showstopper stops being a thing to remember.
+> - **The commit replay.** A turn's recorded commands replay through **the session that recorded them**, not
+>   through the accepting human's. Under the positional form, `commitAuthoringTurn` would have re-stamped every
+>   agent-authored command with the approving human's principal — attributing an agent's work to a person who
+>   only pressed *accept*.
+>
+> **And the migration shrinks about threefold, which is a consequence and not the argument.** Measured: **296
+> call sites across 104 files**. Rebinding the receiver once per file leaves the call sites untouched — a file
+> with 87 dispatches (`pwu.test.ts`) needs *one* edit, not 87.
+>
+> **It satisfies every constraint the ruling imposed:** the credential is presentable and not authorable; a
+> `Principal` is never a parameter; no permissive default; the engine cannot be reached without a credential;
+> and removing `dispatch` from the handle makes every unmigrated site a **compile error** rather than a silent
+> pass. ⚠ Except two: `ontology-delivery-census.test.ts` builds partial handles with `as unknown as
+> EngineHandle` double casts, which defeat the checker. **Those two must be migrated by hand and named**, or
+> they are the silent bypass in a design whose whole claim is that there is none.
+
+**One port, supplied at construction; one credential, supplied per session; the engine stamps the actor.**
 
 ```
 createEngine({ authenticate: (credential) => Principal | null, … })
