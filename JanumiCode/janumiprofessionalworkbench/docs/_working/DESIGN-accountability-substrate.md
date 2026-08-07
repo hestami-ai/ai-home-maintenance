@@ -3,6 +3,28 @@
 **Authority:** REG-D-025 (standing directive, 2026-08-06). **Method:** the directive's mandated
 adversarial corpus pass — 12 agents, 2.0M tokens, measure-then-refute, run **before** any authoring.
 
+> ### ⚠ CITATION STATUS CORRECTED 2026-08-07 (REG-F-049) — READ BEFORE RELYING ON ANY CITATION BELOW
+>
+> This record was written calling the **RPH-DOC-00N** documents *ratified*. **They are not.**
+> JPWB-CON-000 **B1** fixes the canon as exactly JPWB-CON-000, DOC-001..004, REG-005, the
+> **JPWB-SPEC-nnn** series, program working references under a registered grant, and *"the repository's
+> generated contracts, schemas, migrations, and conformance tests as **shape authority**. Nothing else
+> governs. A document not in this registry — whatever its title or voice — is **historical material**."*
+> RPH-DOC-007's own status block reads `Initial implementation baseline`, `Contract version: 0.1.0`.
+>
+> **What that changes, and what it does not.** A field transcribed from an RPH document into
+> `packages/rph-contracts` **is** authoritative — as shape. So `causationId`, `roleId`,
+> `AuthorityReference` and `ValidatorContract` remain real obligations on the implementation. What is
+> historical is the **prose that gives them meaning**. Where a canon twin exists it is named inline
+> below; where none does, the item is marked **[HISTORICAL — no canon twin]** and must not be relied on
+> as an obligation without one.
+>
+> **And the promotion path already exists**: **REG-D-008** (sponsor-directed, 2026-07-16) established the
+> **shape-survivorship audit** — for every schema in a source document, verify an *enforced* repository
+> reference artifact exists and the implementation conforms or has a filed divergence. That is the
+> ratified mechanism for these shapes, and it was sitting unused while I improvised citations around it.
+
+
 ---
 
 ## 0. The directive's hypothesis, tested and upheld
@@ -22,7 +44,7 @@ ever writes.**
 
 ### 1.1 ⚠ The engine skips the first two obligations of every command handler
 
-**RPH-DOC-002 §27.2 "Required command behavior"**, verbatim:
+**RPH-DOC-002 §27.2 "Required command behavior"** — **[HISTORICAL MATERIAL — no canon twin for the ten-step sequence; the AUTHENTICATE limb does have one, JPWB-DOC-003 §9 PER-3 + JPWB-DOC-004 §5]** — verbatim:
 
 > Every command handler must: **1. authenticate actor; 2. authorize requested operation;** 3. load
 > aggregate; **4. check expected revision;** 5. validate preconditions; 6. enforce invariants;
@@ -32,8 +54,7 @@ ever writes.**
 payload schema, handler route. **Steps 1 and 2 are absent as pipeline stages**, and step 4 is
 conditional (§1.4). Reinforced by **JPWB-DOC-004 §5** (*"derive tenant and principal context from
 authenticated context, never from a payload's claim about itself"*), **JPWB-DOC-003 §9 PER-3**,
-**RPH-DOC-009 §3.7** (*"authenticated commands"*), **RPH-DOC-007 §39** (*"Human decisions require
-authenticated identity"*).
+**RPH-DOC-009 §3.7** and **RPH-DOC-007 §39** (both **historical material**, cited as corroboration only — the obligation rests on PER-3 and DOC-004 §5, which are canon).
 
 **And it was already found once.** `JAN-ROADMAP-001-v2/W0/evidence/divergence-register.md` records
 it verbatim — *"the corpus mandates authentication on governed commands… with **no**
@@ -42,8 +63,7 @@ on it. This is REG-F-047 at its true scope.
 
 ### 1.2 ⚠ `causationId` answers the cascade question, and nothing writes it
 
-**RPH-DOC-007**, verbatim: *"`correlationId` groups one professional operation across services.
-**`causationId` identifies the command or event that caused this command.**"*
+**RPH-DOC-007** (**historical material**), verbatim: *"`correlationId` groups one professional operation across services. **`causationId` identifies the command or event that caused this command.**"* — and the CANON TWIN that actually binds is **JPWB-DOC-003 §9 PER-9**: every material act *"retains identity, scope, actor and provenance, **correlation and causation**"*, with **PER-2** requiring events preserve *"causal relationships"*. INC-B was built on PER-9.
 
 Declared on **both** envelopes (`envelopes.ts:83`, `:105`) and **persisted** to the events table
 (`sqlite-storage-adapter.ts:213`). **Writers: zero.** Measured on the reference undertaking:
@@ -59,8 +79,7 @@ whole time. **Sixth instance this week of an instinct to invent where transcript
 
 ### 1.3 The role socket is ratified twice and used nowhere
 
-`ActorReference.roleId` appears in **RPH-DOC-002 §5** and **RPH-DOC-007 §6** (both the TypeScript
-interface and the JSON Schema). Production writes: **zero**. Production reads: **zero**.
+`ActorReference.roleId` appears in **RPH-DOC-002 §5** and **RPH-DOC-007 §6** (both **historical material**) — but the FIELD ships in `packages/rph-contracts`, which B1 makes **shape authority**, so the socket is real. Canon twin for the DUTY: **JPWB-DOC-003 §3**'s Common object contract requires *"authority or an authority reference where professional effect requires it"*. Production writes: **zero**. Production reads: **zero**.
 
 That is precisely the *"ability to track identities and roles"* the directive asks for — already
 ratified. Note `record-assurance.ts:38` records a deliberate refusal to *synthesize* a `roleId` from
@@ -69,8 +88,7 @@ which is the same rule as §1.1.
 
 ### 1.4 ⚠ `expectedRevision` is ratified MANDATORY and enforced only when volunteered
 
-Ratified in four places, including §27.2's step 4 and **RPH §28.1** (*"All aggregate mutations
-require an expected revision"*) and **JPWB-DOC-003 §9 PER-4** (*"Optimistic concurrency; never
+Cited in four places, of which only the canon one binds: §27.2 step 4 and **RPH §28.1** (*"All aggregate mutations require an expected revision"*) are **historical material**; **JPWB-DOC-003 §9 PER-4** (*"Optimistic concurrency; never
 last-write-wins"*). The envelope declares it `.optional()`; the check runs only
 `if (command.expectedRevision !== undefined)`; **zero of the production command-producing sites set
 it.** So the ratified concurrency contract is inert by default — a caller opts *in* to being
@@ -78,7 +96,7 @@ protected.
 
 ### 1.5 `ValidatorContract.implementationType: EXTERNAL_SERVICE | HUMAN` — ratified, unbuilt
 
-**RPH-DOC-004 §4.1**, with its schema file named in **RPH-DOC-007 §3**. A second genuine plug-in
+**RPH-DOC-004 §4.1**, schema file named in **RPH-DOC-007 §3** — **[HISTORICAL — no canon twin located; promote via REG-D-008's shape-survivorship audit before treating as an obligation]**. A second genuine plug-in
 seam, and the one that lets a human or an external service satisfy an assurance obligation — which
 is what the enterprise scenarios need. (`RuntimeBinding`, RPH-DOC-002 §22, is the seam that **is**
 built.)
@@ -102,7 +120,7 @@ the result is a fully legitimate-looking governed record.
   baseline. A claim contested between derivation and commit ⇒ promotion proceeds.
 
 **Neither is protected by `expectedRevision`, because the aggregate they read is not the aggregate
-they write.** §1.4's remedy does not reach this; **RPH-DOC-009 §30.2**'s does — *"domain event;
+they write.** §1.4's remedy does not reach this; **RPH-DOC-009 §30.2** (**historical material** — no canon twin for the four-mechanism list; the rule that binds is **JPWB-DOC-003 §4 AGG-1**, which forbids the alternatives without naming a replacement)'s does — *"domain event;
 saga/controller; compensating actions; explicit intermediate states."*
 
 ---
