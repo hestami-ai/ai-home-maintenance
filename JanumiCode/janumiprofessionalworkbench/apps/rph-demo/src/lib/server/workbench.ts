@@ -188,15 +188,35 @@ function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
 	};
 }
 
-/** Dispatch a command into the shared engine with sensible envelope defaults. Returns the CommandResult. */
+/**
+ * Dispatch a command into the shared engine with sensible envelope defaults. Returns the CommandResult.
+ *
+ * ── `expectedRevision` IS THE FIFTH ARGUMENT, AND ITS ABSENCE WAS A HOLLOW ONE LAYER UP ────────────────────
+ * `UiCommandInput.expectedRevision` was added and reachable from NOTHING: this function is the funnel for 25
+ * of the 28 surface dispatch sites and had four positional parameters with no slot for it, so the field was
+ * declared, honoured by the engine, and unreachable from almost every caller. A field only a minority of
+ * callers can express is the same defect as a field nobody reads — see REG-F-051 and `ObjectRow.revision`,
+ * which was the identical mistake in the same increment.
+ *
+ * ⚠ OPTIONAL, AND THE OMISSION IS NOT NEUTRAL. Passing nothing means "no expectation", which is
+ * last-write-wins — legitimate ONLY for a pure creation (JPWB-DOC-003 §9 PER-4's NON-EXAMPLE: *"Command types
+ * explicitly exempted by contract (pure creations) need no expected revision"*) or where the caller genuinely
+ * never read the subject. It is NOT a way to avoid a conflict, and a caller that has the value and withholds
+ * it has silently opted the professional out of the protection PER-4 requires.
+ *
+ * ⚠ AND THE VALUE MUST COME FROM THE RENDER, NOT FROM HERE. A revision fetched at dispatch is always current
+ * and can never conflict — it satisfies PER-4's letter and none of its purpose. `optimistic-concurrency-
+ * surface.test.ts` holds a standing test pinning exactly that distinction, because it is invisible in review.
+ */
 export function dispatch(
 	commandType: string,
 	targetAggregateType: string,
 	targetAggregateId: string,
-	payload: unknown
+	payload: unknown,
+	expectedRevision?: number
 ) {
 	return getEngine().dispatch(
-		uiCommand({ commandType, targetAggregateType, targetAggregateId, payload })
+		uiCommand({ commandType, targetAggregateType, targetAggregateId, payload, expectedRevision })
 	);
 }
 
