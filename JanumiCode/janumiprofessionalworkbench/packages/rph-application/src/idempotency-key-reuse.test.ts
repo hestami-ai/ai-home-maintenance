@@ -27,6 +27,8 @@
 // duplicate path, and BOTH are true replays (same command type, same target). No caller anywhere reuses a key
 // across commands, so this refuses nothing the engine accepts today.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { createSqliteDriver, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
@@ -39,13 +41,13 @@ const KEY = 'the-one-key';
 
 describe('REG-F-012: an idempotency key is bound to the command that claimed it', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	const dispatch = (
@@ -168,7 +170,7 @@ describe('REG-F-012: an idempotency key is bound to the command that claimed it'
 		const driver = createSqliteDriver();
 		const migrated = new SqliteStorageAdapter({ driver, now: () => TS });
 		let n = 0;
-		const eng = new Engine({ store: migrated, now: () => TS, newEventId: () => `x${++n}` });
+		const eng = new Engine({ authenticate: testAuthenticator(), store: migrated, now: () => TS, newEventId: () => `x${++n}` }).as(TEST_CRED.human);
 		const cmd = (expression: string): DomainCommand => ({
 			commandId: `c-${++n}`,
 			commandType: 'CaptureIntent',
@@ -294,13 +296,13 @@ describe('a replay of a command whose handler ALSO commits a derived one', () =>
 	const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69J9100';
 	const ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69J9110';
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	const d = (commandType: string, id: string, aggType: string, payload: unknown, key: string) => {

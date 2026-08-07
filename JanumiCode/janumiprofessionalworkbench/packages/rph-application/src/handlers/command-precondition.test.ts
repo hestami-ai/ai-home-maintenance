@@ -8,6 +8,8 @@
 // the critique-B4 signature, which stays unused by production predicates until DWP-08, so an untested wiring
 // would be a promise, not a ruling.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { Logger } from '@janumipwb/rph-ports';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -130,7 +132,7 @@ describe('allOf — ordered conjunction, first refusal wins', () => {
 
 describe('preconditionReader — the critique-B4 read-only surface, against the real store', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 
 	const silent: Logger = {
 		log: () => {},
@@ -145,7 +147,7 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		let seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it('reads a committed object state and an aggregate event stream', () => {

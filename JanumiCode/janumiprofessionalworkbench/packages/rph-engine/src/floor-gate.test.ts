@@ -15,9 +15,10 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 import { createEngine, recordAssuranceRecordingPlan } from './index.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
@@ -66,16 +67,16 @@ const rrSatisfied: Validator = {
 };
 
 let seq = 0;
-function build(): EngineHandle {
+function build(): AuthedEngineHandle {
 	let s = 0;
 	seq = 0;
-	return createEngine({ ontology, now: () => TS, newEventId: () => `e${++s}` });
+	return createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId: () => `e${++s}` }).as(TEST_CRED.human);
 }
 
 // Every command gets a UNIQUE idempotency key (a colliding key returns the prior receipt as DUPLICATE — so a
 // blocked publish would otherwise mask a legitimate retry, and the recorder's commands would be skipped).
 function send(
-	eng: EngineHandle,
+	eng: AuthedEngineHandle,
 	actor: ActorReference,
 	commandType: string,
 	id: string,
@@ -98,7 +99,7 @@ function send(
 	return eng.dispatch(command);
 }
 
-function authorValidated(eng: EngineHandle) {
+function authorValidated(eng: AuthedEngineHandle) {
 	send(eng, AGENT, 'CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
 		pwaId: PWA,
 		name: 'Agent PWA',
@@ -118,7 +119,7 @@ function authorValidated(eng: EngineHandle) {
 	send(eng, AGENT, 'ValidatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {});
 }
 
-const publish = (eng: EngineHandle) =>
+const publish = (eng: AuthedEngineHandle) =>
 	send(eng, AGENT, 'PublishPwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', { rootPwuTypeId: ROOT });
 
 describe('floor gate + recorder compose (3b + 3c)', () => {

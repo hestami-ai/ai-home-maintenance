@@ -3,6 +3,8 @@
 // -> ApproveIntent. Plus the negative guards: an illegal transition (FormalizeIntent from RAW) and the INT-004
 // invariant (approving an intent with no desired outcome). This is the first proof of the registry + kit path.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -11,7 +13,7 @@ const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Al
 
 describe('Intent lifecycle handlers (live command drive)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5FAV';
@@ -19,11 +21,11 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => '2026-07-12T00:00:00Z' });
 		seq = 0;
-		engine = new Engine({
+		engine = new Engine({ authenticate: testAuthenticator(),
 			store,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: () => `evt_${++seq}`
-		});
+		}).as(TEST_CRED.human);
 	});
 
 	function cmd(

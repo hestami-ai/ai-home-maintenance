@@ -25,9 +25,10 @@
 // This census does not fix it. It pins the size of it so the number can only fall, and so the next author sees
 // the mismatch as a measured fact rather than rediscovering it through a refusal three layers away.
 import { MAPPED_PWU_KINDS } from '@janumipwb/rph-projections';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createEngine, getObject, type EngineHandle } from './index.js';
+import { createEngine, getObject, type AuthedEngineHandle } from './index.js';
 import { seedWorkbench } from './seed-workbench.js';
 
 /** Every PWU kind the CATALOG scopes a policy to. */
@@ -44,7 +45,7 @@ function catalogKinds(): string[] {
  * it by construction and could not have seen this divergence, which is a mismatch between what the seeder writes
  * and what the catalog expects to find.
  */
-function pwuTypeIds(engine: EngineHandle): string[] {
+function pwuTypeIds(engine: AuthedEngineHandle): string[] {
 	const ids = new Set<string>();
 	for (const e of engine.readAllEvents())
 		if ((e as { aggregateType?: string }).aggregateType === 'PWU_TYPE')
@@ -53,7 +54,7 @@ function pwuTypeIds(engine: EngineHandle): string[] {
 }
 
 /** The kinds those types carry. */
-function seededKinds(engine: EngineHandle): string[] {
+function seededKinds(engine: AuthedEngineHandle): string[] {
 	const out = new Set<string>();
 	for (const id of pwuTypeIds(engine)) {
 		const state = getObject(engine, id) as { pwuKind?: string } | undefined;
@@ -63,17 +64,17 @@ function seededKinds(engine: EngineHandle): string[] {
 }
 
 describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
-	let engine: EngineHandle;
+	let engine: AuthedEngineHandle;
 	let seeded: string[];
 	let typeIds: string[];
 
 	beforeAll(() => {
 		let n = 0;
-		engine = createEngine({
+		engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		seedWorkbench(engine);
 		seeded = seededKinds(engine);
 		typeIds = pwuTypeIds(engine);

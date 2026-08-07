@@ -23,6 +23,8 @@
 // The probe map is TOTAL over `enforcedRuleIds()` by TYPE — adding an ENFORCED row without a probe is a compile
 // error, which is the property that makes the register an instrument rather than a document.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import {
 	classifyRefusal,
@@ -81,7 +83,7 @@ interface Probe {
 
 describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not asserted', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	/** Distinct id space per decompositionProbe() call — three probes share one engine per test. */
 	let probeSeq = 0;
@@ -833,7 +835,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

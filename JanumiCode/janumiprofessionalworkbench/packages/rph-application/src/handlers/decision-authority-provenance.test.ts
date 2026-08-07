@@ -40,6 +40,8 @@
 // DELEGATED (DOC-003 §8 ASR-15), and this repository has no object for a delegation record. Until one is ratified,
 // declaring an authority you are not is refused rather than admitted on trust.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ActorTypeSchema } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -53,13 +55,13 @@ const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69J6002';
 
 describe('REG-F-014: a Decision records the authority of its ISSUER, not one it names', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	const dispatch = (

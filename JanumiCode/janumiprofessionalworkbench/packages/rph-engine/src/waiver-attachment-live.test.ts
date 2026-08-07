@@ -14,7 +14,10 @@
 // This drives a REAL `RequestWaiver` through the command bus and folds the REAL event log, so the projection is
 // tested against what the engine actually emits. It is the control the hand-built test cannot be.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
-import { Engine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { Engine,
+	type AuthedEngine
+} from '@janumipwb/rph-application';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { buildAssuranceView } from '@janumipwb/rph-projections';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -30,7 +33,7 @@ const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69JB600';
 
 describe('REG-F-020: the waiver attachment predicate holds over REAL emitted events', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const cmd = (
@@ -124,7 +127,7 @@ describe('REG-F-020: the waiver attachment predicate holds over REAL emitted eve
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		createPolicy(POLICY_A, 'Policy A');
 		createPolicy(POLICY_B, 'Policy B');
 		activatePolicy(POLICY_A);

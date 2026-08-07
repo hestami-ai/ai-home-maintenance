@@ -16,6 +16,8 @@
 // term is invisible. The fixture below is parameterised over exactly the two axes the defect lived in — step
 // completeness and final plan status — because a fixture with one shape can only ever test one shape.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -47,7 +49,7 @@ interface PlanShape {
 
 describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVIDENCES success', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string) {
@@ -109,7 +111,7 @@ describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVI
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

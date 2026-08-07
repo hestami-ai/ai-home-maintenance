@@ -55,6 +55,8 @@
 // The fixture is now `recordFloorAssessment` in `__tests__/floor-fixtures.ts`, which THROWS on any non-ACCEPTED
 // dispatch and requires the caller to state the subject version. A fixture may not silently arrange nothing.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -80,7 +82,7 @@ const FAILED_CRITERION = 'RR-04-no-proxy-satisfaction';
 
 describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	let idSeq = 0;
 
@@ -88,7 +90,7 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		idSeq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		// Shield 1 above. Without this every floor assessment is refused and the file proves nothing.
 		seedFloorPolicies(engine, TS);
 	});

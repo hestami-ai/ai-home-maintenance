@@ -3,6 +3,7 @@
 // qualified-green (SATISFIED), while Mobile & Offline is CONDITIONALLY_SATISFIED and therefore NOT qualified —
 // "no green without assurance". The Architecture PWU is frozen into a baseline.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import {
 	createEngine,
@@ -14,14 +15,14 @@ import {
 
 describe('Reference Undertaking driven live', () => {
 	function build() {
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		});
+		}).as(TEST_CRED.human);
 		driveReferenceUndertaking(engine);
 		return {
 			engine,

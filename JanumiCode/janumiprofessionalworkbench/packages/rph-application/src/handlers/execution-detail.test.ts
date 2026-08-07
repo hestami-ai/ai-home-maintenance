@@ -2,6 +2,8 @@
 // remaining runtime commands are wired: a step advances QUEUED -> RUNNING -> SUCCEEDED inside the plan aggregate
 // (and a completed step must record a result), and a runtime binding advances REQUESTED -> AUTHORIZED.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -23,7 +25,7 @@ const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5FG0';
 
 describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -160,7 +162,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // floor assessments below cite floor.* policies — now they must exist
 		dispatch(
 			'CaptureIntent',

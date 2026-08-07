@@ -14,6 +14,8 @@
 // Found by adversarial review, not by the suite — every test here would have passed before the fix except the
 // ones below, which is the point of writing them.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -25,7 +27,7 @@ const POLICY = 'pol_scope_edit';
 
 describe('EditAssurancePolicy keeps the two scope representations in step (review finding (c))', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const edit = (payload: Record<string, unknown>) => {
@@ -52,7 +54,7 @@ describe('EditAssurancePolicy keeps the two scope representations in step (revie
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		seedPolicy(engine, POLICY, {
 			applicability: {
 				objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],

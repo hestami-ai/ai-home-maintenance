@@ -15,6 +15,8 @@
 // that kind is governed by exactly ONE policy — so N = 1 and the primary IS the whole set. A green drive proves
 // nothing here, which is precisely why this test exists rather than a drive assertion.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -31,7 +33,7 @@ const FORECLOSING = 'pol_forecloses_on_blocking';
 
 describe('a PEER assessment’s §10.3 foreclosure gate sees its own observations (review finding (e))', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	/** Dispatch and ASSERT acceptance. REG-F-015's guard is right: an arrangement whose command was refused is an
@@ -91,7 +93,7 @@ describe('a PEER assessment’s §10.3 foreclosure gate sees its own observation
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		dispatch('CaptureIntent', 'INTENT', INTENT, {
 			intentId: INTENT,
 			originatingExpression: 'x',

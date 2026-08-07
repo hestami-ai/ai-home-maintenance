@@ -9,12 +9,13 @@ import {
 	traceabilityProjector
 } from '@janumipwb/rph-projections';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING as R } from './index.js';
 
 function build() {
 	let s = 0;
-	const engine = createEngine({ ontology, now: () => '2026-07-12T00:00:00Z', newEventId: () => `evt_${++s}` });
+	const engine = createEngine({ authenticate: testAuthenticator(), ontology, now: () => '2026-07-12T00:00:00Z', newEventId: () => `evt_${++s}` }).as(TEST_CRED.human);
 	driveReferenceUndertaking(engine);
 	return engine.readAllEvents();
 }

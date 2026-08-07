@@ -10,6 +10,7 @@
 // EVERY site proves BOTH halves: the refusable case is REFUSED, and — the over-refusal trap this DWP exists to avoid —
 // the LEGITIMATE case still SUCCEEDS. Mutation red-proof (neuter checkPrecondition) is performed live in implementation.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -20,7 +21,7 @@ const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 
 function harness() {
 	const store = new SqliteStorageAdapter({ now: () => TS });
 	let seq = 0;
-	const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+	const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	const d = (commandType: string, id: string, type: string, payload: unknown) => {
 		const n = ++seq;
 		const command: DomainCommand = {

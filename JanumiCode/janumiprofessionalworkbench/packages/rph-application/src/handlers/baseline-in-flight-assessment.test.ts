@@ -17,6 +17,8 @@
 // state were not a legal domain object, this fixture would fail rather than manufacture a scenario the engine
 // could never hold.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { Logger } from '@janumipwb/rph-ports';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -44,7 +46,7 @@ const silent: Logger = {
 
 describe('PromoteBaseline: an assessment that has not concluded blocks promotion (REG-F-021 increment 0)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) {
@@ -147,7 +149,7 @@ describe('PromoteBaseline: an assessment that has not concluded blocks promotion
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		seedPolicy(engine, 'pol_arch');
 		dispatch(
 			'CaptureIntent',

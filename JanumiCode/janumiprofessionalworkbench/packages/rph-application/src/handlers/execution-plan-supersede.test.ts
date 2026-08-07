@@ -3,6 +3,8 @@
 // new execution attempts and no new step may begin") is enforced on BOTH startExecutionStep AND retryExecutionStep
 // — a retry re-opens the attempt cycle, which the start-only precheck did not cover (§19 L3-5).
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -21,7 +23,7 @@ const S_FAILED = `${PLAN_A}-sf`;
 
 describe('SupersedeExecutionPlan + RPH-EXE-002 (DWP-02)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string) {
@@ -115,7 +117,7 @@ describe('SupersedeExecutionPlan + RPH-EXE-002 (DWP-02)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

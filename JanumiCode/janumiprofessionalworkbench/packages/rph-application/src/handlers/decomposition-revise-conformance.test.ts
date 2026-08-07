@@ -33,6 +33,7 @@
 // RATIFICATION CLAIM and is the sponsor's to make; asserting the shape in a test achieves the same guarantee and
 // claims nothing.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { DecompositionRevisedPayloadSchema } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -51,7 +52,7 @@ const DCP = 'dcp_01ARZ3NDEKTSV4RRFFQ69G6W32';
 function harness() {
 	const store = new SqliteStorageAdapter({ now: () => TS });
 	let seq = 0;
-	const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+	const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	const d = (commandType: string, id: string, type: string, payload: unknown) => {
 		const n = ++seq;
 		const command: DomainCommand = {

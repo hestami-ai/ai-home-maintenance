@@ -2,6 +2,7 @@
 // project it to an EngineOntology, and stand up a fresh engine bound to that authored PWA — closing the loop
 // (author a PWA, then run Undertakings under it).
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createEngine, engineOntologyForPwa } from './index.js';
@@ -15,7 +16,7 @@ const CHILD = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q20';
 describe('published-PWA -> EngineOntology seam', () => {
 	it('authors + publishes a PWA and stands up an engine bound to it', () => {
 		let seq = 0;
-		const author = createEngine({ ontology, now: () => TS, newEventId: () => `e${++seq}` });
+		const author = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		const send = (commandType: string, payload: unknown, id: string, type: string) => {
 			const n = ++seq;
 			const command: DomainCommand = {
@@ -80,11 +81,11 @@ describe('published-PWA -> EngineOntology seam', () => {
 		expect(authored.pwuTemplates.filter((t) => t.isRoot)).toHaveLength(1);
 
 		// The authored PWA can stand up a fresh engine (createEngine's one-root gate passes).
-		const runtime = createEngine({
+		const runtime = createEngine({ authenticate: testAuthenticator(),
 			ontology: authored,
 			now: () => TS,
 			newEventId: () => `r${++seq}`
-		});
+		}).as(TEST_CRED.human);
 		expect(runtime.ontology.version).toBe('2.0.0');
 		runtime.close();
 		author.close();

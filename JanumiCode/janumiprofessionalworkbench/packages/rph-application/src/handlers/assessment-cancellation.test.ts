@@ -26,6 +26,8 @@
 // matcher to accept `ANY_ACTIVE` would have expanded it to every NON-TERMINAL state, which here includes the
 // SATISFIED / CONDITIONALLY_SATISFIED / WAIVED verdicts — minting the very transition the last test forbids.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -52,7 +54,7 @@ const ev = (id: string) => ({
 
 describe('CancelAssuranceAssessment (REG-F-021 residual R-1)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const dispatch = (commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) => {
@@ -76,7 +78,7 @@ describe('CancelAssuranceAssessment (REG-F-021 residual R-1)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		// A policy that REQUIRES evidence, so the assessment lands in EVIDENCE_PENDING and stays there.
 		seedPolicy(engine, POLICY, { requiredEvidence: [ev('EV-01')] });
 		dispatch(

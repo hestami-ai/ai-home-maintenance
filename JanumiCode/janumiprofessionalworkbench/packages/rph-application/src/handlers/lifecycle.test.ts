@@ -4,6 +4,8 @@
 // (effective promotion decision + a SATISFIED required assessment + version pinning) and is rejected when the
 // required assessment is not satisfied ("no green without assurance", INV-20).
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -17,13 +19,13 @@ const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5FB0';
 
 describe('Execution / assurance / governance / decomposition handlers (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		seedPolicy(engine, 'pol_arch'); // makeSatisfiedAssessment cites pol_arch — now it must exist
 		// Seed an intent + PWU (the PWU is the assessment subject + baseline item).
 		dispatch(

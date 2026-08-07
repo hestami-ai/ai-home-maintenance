@@ -23,6 +23,8 @@
 // cost was zero, and the estimate — a reasonable guess, written carefully — was simply wrong. Recorded because
 // the lesson is not "guess better" but "the survey is cheap; run it".
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
@@ -33,13 +35,13 @@ const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69J9001';
 
 describe('REG-F-011: the command envelope is validated at the bus', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	/** A complete, well-formed CaptureIntent envelope. Every case below is this minus (or plus) one field. */

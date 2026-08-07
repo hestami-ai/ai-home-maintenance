@@ -2,6 +2,7 @@
 // PWA with its PWU Types, one Undertaking bound to it, and that Undertaking's 9-node Professional Work Graph —
 // all via real commands. The query surface returns the read-model the UI renders.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import {
 	createEngine,
@@ -19,11 +20,11 @@ import {
 describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 	function build() {
 		let s = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: () => `e${++s}`
-		});
+		}).as(TEST_CRED.human);
 		seedWorkbench(engine);
 		return engine;
 	}

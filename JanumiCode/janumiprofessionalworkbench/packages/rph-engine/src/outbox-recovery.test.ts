@@ -6,6 +6,7 @@
 // deliver nothing (an already-PUBLISHED message is never re-delivered). This test simulates the crash with a
 // file-backed store closed WITHOUT draining, then reopens a fresh engine and recovers.
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +32,7 @@ describe('W2-INC-2 restart outbox recovery', () => {
 
 		// --- session 1: commit a full undertaking, then "crash" (close without draining) ---
 		const store1 = new SqliteStorageAdapter({ filename: path, now: () => TS });
-		const engine1 = createEngine({ ontology, now: () => TS, newEventId, store: store1 });
+		const engine1 = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId, store: store1 }).as(TEST_CRED.human);
 		driveReferenceUndertaking(engine1);
 		const committed = store1.readAllEvents().length;
 		// Premise: dispatch did NOT auto-deliver — every committed event is still PENDING in the outbox.
@@ -41,7 +42,7 @@ describe('W2-INC-2 restart outbox recovery', () => {
 		// --- session 2: restart, wire a subscriber, recover ---
 		const store2 = new SqliteStorageAdapter({ filename: path, now: () => TS });
 		try {
-			const engine2 = createEngine({ ontology, now: () => TS, newEventId, store: store2 });
+			const engine2 = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId, store: store2 }).as(TEST_CRED.human);
 			const delivered: string[] = [];
 			engine2.subscribe((e) => delivered.push(e.eventId));
 

@@ -19,10 +19,11 @@ import {
 	listDecisions,
 	listObservations,
 	recordAssuranceRecordingPlan,
-	type EngineHandle
+	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
 import type { ActorReference, AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { createFloorRegistry } from './assurance/index.js';
+import { SESSION_CREDENTIAL } from './identity.js';
 import { buildPwaExport, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
 
 /**
@@ -44,7 +45,7 @@ import { buildPwaExport, getEngine, hostNow, isTestMode, mintUiId } from './work
  * possible moment. §8.4 L854 agrees — a required review that is unavailable "cannot satisfy assurance or permit
  * its protected transition".
  */
-function reasoningReviewCriteria(engine: EngineHandle): readonly AssessmentCriterion[] {
+function reasoningReviewCriteria(engine: AuthedEngineHandle): readonly AssessmentCriterion[] {
 	const policy = getObject(engine, FLOOR_POLICY_IDS.REASONING_REVIEW);
 	if (!policy) {
 		throw new Error(
@@ -246,7 +247,7 @@ const isFloorPolicy = (id: unknown): boolean =>
 	id === FLOOR_POLICY_IDS.REASONING_REVIEW;
 
 /** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId` (the auditable override of a blocking floor). */
-function hasEffectiveWaiver(engine: EngineHandle, subjectId: string): boolean {
+function hasEffectiveWaiver(engine: AuthedEngineHandle, subjectId: string): boolean {
 	// WORKSPACE, and deliberately so (SPEC-001 INV-02 / FORK-9): this lookup's subject is the `subjectId` argument
 	// filtered below, not an Undertaking. A waiver may be authored anywhere in the workspace and still cover this
 	// subject, so narrowing the read to one Undertaking would hide legitimate overrides.
@@ -277,7 +278,9 @@ export async function runPwaFloor(
 		narration?: string;
 		priorGaps?: string[];
 	},
-	engine: EngineHandle = getEngine()
+	// This path RECORDS an assurance floor, so it needs a session. SESSION rather than SYSTEM: the floor
+	// is run because a professional asked for it, and the record should say so.
+	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL)
 ): Promise<FloorView | undefined> {
 	const pwa = getObject(engine, pwaId);
 	const graphExport = buildPwaExport(pwaId, engine);
@@ -360,7 +363,7 @@ interface LatestAssessment {
 
 /** Latest recorded floor assessment per policy for the subject (by updatedAt; ties → last seen). */
 function latestFloorAssessments(
-	engine: EngineHandle,
+	engine: AuthedEngineHandle,
 	pwaId: string
 ): Map<string, LatestAssessment> {
 	const latest = new Map<string, LatestAssessment>();
@@ -378,7 +381,7 @@ function latestFloorAssessments(
 
 /** Floor observations for the subject, grouped by their assessment id. */
 function observationsByAssessment(
-	engine: EngineHandle,
+	engine: AuthedEngineHandle,
 	pwaId: string
 ): Map<string, { code: string; severity: string; statement: string }[]> {
 	const byId = new Map<string, { code: string; severity: string; statement: string }[]>();
@@ -408,7 +411,7 @@ function floorAggregate(satisfied: boolean, policies: FloorPolicyView[]): string
  *  objects (the read surface the UI renders). Undefined if no floor has been recorded for the subject yet. */
 export function loadPwaFloor(
 	pwaId: string,
-	engine: EngineHandle = getEngine()
+	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL)
 ): FloorView | undefined {
 	const latest = latestFloorAssessments(engine, pwaId);
 	if (latest.size === 0) return undefined;

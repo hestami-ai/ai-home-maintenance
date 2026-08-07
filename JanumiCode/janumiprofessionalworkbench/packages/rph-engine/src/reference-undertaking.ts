@@ -75,7 +75,7 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
 import { requireGoverningPolicies } from './governing-policies.js';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 
 const ACTOR: ActorReference = {
 	actorId: 'owner-1',
@@ -224,7 +224,7 @@ const LABELS: Record<string, { title: string; kind: string }> = {
 /** Drive the Reference Undertaking end to end via live commands. Throws if any command is rejected (fail-loud).
  * Pass `undertakingId` to stamp each proposed PWU with its owning Undertaking (CON-009 ownership binding). */
 export function driveReferenceUndertaking(
-	handle: EngineHandle,
+	handle: AuthedEngineHandle,
 	opts: {
 		readonly undertakingId?: string;
 		readonly pwuTypeByKind?: Readonly<Record<string, string>>;

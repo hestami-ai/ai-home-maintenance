@@ -32,18 +32,19 @@
 // NOT the right bar and is not attempted. The bar here is coverage of event TYPES: the engine should eventually
 // be able to emit every kind of event the corpus's worked example says this undertaking produces.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, loadExpectedEvents } from './index.js';
 
 function driveLive(): string[] {
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
 		newEventId: (() => {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(TEST_CRED.human);
 	driveReferenceUndertaking(engine);
 	return engine.readAllEvents().map((e) => e.eventType);
 }

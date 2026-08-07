@@ -18,6 +18,8 @@
 //   2. Filter too eagerly (drop the AT_LEAST_ONE too) -> the CONTROL reddens: Gate A stops refusing anything,
 //      which is REG-F-022 all over again with extra steps.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -57,7 +59,7 @@ const REQUIREMENTS = [
 ];
 
 describe('§6.1 cardinality is READ: ZERO_OR_MORE does not hold a verdict (REG-E-026)', () => {
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const dispatchRaw = (
@@ -115,11 +117,11 @@ describe('§6.1 cardinality is READ: ZERO_OR_MORE does not hold a verdict (REG-E
 
 	beforeEach(() => {
 		seq = 0;
-		engine = new Engine({
+		engine = new Engine({ authenticate: testAuthenticator(),
 			store: new SqliteStorageAdapter({ now: () => TS }),
 			now: () => TS,
 			newEventId: () => `evt_${++seq}`
-		});
+		}).as(TEST_CRED.human);
 		dispatch('CaptureIntent', 'INTENT', INTENT, {
 			intentId: INTENT,
 			originatingExpression: 'x',

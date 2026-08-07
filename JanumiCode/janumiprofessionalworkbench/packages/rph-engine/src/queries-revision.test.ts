@@ -14,6 +14,7 @@
 // shaped so that a NEW helper which forgets the field is caught too, rather than only the one that forgot first.
 
 import { createEngine } from './engine.js';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { listByType, getObject, getObjectRevision } from './queries.js';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { seedWorkbench } from './seed-workbench.js';
@@ -24,12 +25,12 @@ const TS = '2026-08-07T00:00:00Z';
 
 describe('PER-4 — the read boundary carries the revision it read at', () => {
 	let store: SqliteStorageAdapter;
-	let engine: ReturnType<typeof createEngine>;
+	let engine: ReturnType<ReturnType<typeof createEngine>['as']>;
 
 	beforeAll(() => {
 		let n = 0;
 		store = new SqliteStorageAdapter({ now: () => TS });
-		engine = createEngine({ ontology, store, now: () => TS, newEventId: () => `evt_${++n}` });
+		engine = createEngine({ authenticate: testAuthenticator(), ontology, store, now: () => TS, newEventId: () => `evt_${++n}` }).as(TEST_CRED.human);
 		seedWorkbench(engine);
 	});
 

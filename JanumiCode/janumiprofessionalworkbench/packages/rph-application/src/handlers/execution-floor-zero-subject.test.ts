@@ -20,6 +20,8 @@
 // `noOutputResult`, i.e. a payload limb A ACCEPTS. Omit it and limb A refuses these inputs first, the limb-B
 // mutation "aiProduced && ... -> false && ..." survives GREEN, and neither limb is actually killed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -48,7 +50,7 @@ const SAYS_NOTHING = {
 
 describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -114,7 +116,7 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

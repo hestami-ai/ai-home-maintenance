@@ -31,6 +31,8 @@
 // retry cap and the prunability precheck, so a code-only assertion proves that SOMETHING refused — the vacuous
 // negative this lineage keeps removing. Each case asserts the marker.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { STEP_COMMAND_SPECS, STEP_COMMAND_TYPES } from '@janumipwb/rph-domain';
@@ -52,7 +54,7 @@ const SCOPE_MARKER = 'a binding authorizes the step it names and no other';
 
 describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id = PLAN, aggType = 'EXECUTION_PLAN') {
@@ -143,7 +145,7 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 	function resetEngine() {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

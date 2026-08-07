@@ -44,6 +44,7 @@ import {
 	type UiCommandInput
 } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
+import { SESSION_CREDENTIAL } from '$lib/server/identity';
 import { readRenderedRevision, refuse, STALE_FORM } from '$lib/server/optimistic-concurrency';
 import {
 	commitAuthoringTurn,
@@ -199,7 +200,10 @@ export const load: PageServerLoad = ({ params }) => {
 			.filter((e) => e.kind !== 'thinking')
 			.map(toLogEntry),
 		// The latest recorded assurance floor for this PWA (canonical ASSURANCE_ASSESSMENT/OBSERVATION).
-		floor: loadPwaFloor(params.id, engine),
+		// The floor RECORDS as well as reads, so it needs a session. It gets the professional's, because the
+		// floor is being run on their behalf — and `engine` here may be an authoring FORK, which is why the
+		// credential is applied to that handle rather than reaching for the canonical one.
+		floor: loadPwaFloor(params.id, engine.as(SESSION_CREDENTIAL)),
 		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority
 		// boundary explicit to the browser and supplies the exact hash required by the accept action.
 		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined

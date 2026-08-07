@@ -17,6 +17,7 @@
 //
 // The subject is the reference undertaking's real stream: every event this system emits in a full undertaking.
 import { EVENTS } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking } from './index.js';
@@ -27,14 +28,14 @@ interface Violation {
 }
 
 function driveAndCheck(): { violations: Violation[]; checked: number; types: number } {
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
 		newEventId: (() => {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(TEST_CRED.human);
 	driveReferenceUndertaking(engine);
 
 	const registry = EVENTS as Record<string, { payload?: { safeParse: (v: unknown) => unknown } }>;

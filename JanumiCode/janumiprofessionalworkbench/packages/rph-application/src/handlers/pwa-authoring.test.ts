@@ -2,6 +2,8 @@
 // then instantiate it as an Undertaking. Proves the guards: PWU Types can only be defined on a DRAFT PWA, and an
 // Undertaking can only instantiate a PUBLISHED PWA. Also proves the CON-009 ownership binding on ProposePwu.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -16,13 +18,13 @@ const UND = 'und_01ARZ3NDEKTSV4RRFFQ69G5P30';
 
 describe('PWA-authoring handlers (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -619,7 +621,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	const REVIEW = 'floor.reasoning-review';
 
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	let asmtSeq = 0;
 
@@ -627,7 +629,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmtSeq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — now they must exist
 	});
 
@@ -950,7 +952,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 // patch-merging EditPwuType. The engine is the authoritative gate (C-5); these prove it directly.
 describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-001, DWP-02)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	const B_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5B00';
 	const B_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5B10';
@@ -989,7 +991,7 @@ describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-00
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		const r = dispatch(
 			'CreatePwa',
 			{ pwaId: B_PWA, name: 'Boundary', description: 'd', domain: 'healthcare', version: '1.0.0' },
@@ -1110,7 +1112,7 @@ describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-00
 // delegated node's boundaryContract.attestedAssurancePolicyIds. Existing declarations are retained.
 describe('PWU-Type assurance-policy references — handler write-boundary gate (F-7 closure)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	const F_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5F00';
 	const F_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5F10';
@@ -1187,7 +1189,7 @@ describe('PWU-Type assurance-policy references — handler write-boundary gate (
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine);
 		createPolicy(ACTIVE_POL, true);
 		createPolicy(DRAFT_POL, false);

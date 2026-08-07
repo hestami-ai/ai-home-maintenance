@@ -19,6 +19,7 @@
 // performed BEFORE the intervening write, exactly as a rendered page would.
 
 import { createEngine, getObjectRevision } from '@janumipwb/rph-engine';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
@@ -68,7 +69,7 @@ describe('PER-4 — a surface command declares the revision it was rendered from
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = createEngine({ ontology, store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = createEngine({ authenticate: testAuthenticator(), ontology, store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		expect(
 			engine.dispatch(
 				cmd('AssertClaim', 'CLAIM', CLAIM, {

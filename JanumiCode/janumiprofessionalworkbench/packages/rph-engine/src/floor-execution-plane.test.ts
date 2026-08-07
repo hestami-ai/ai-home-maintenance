@@ -17,9 +17,10 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ActorReference } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
@@ -93,9 +94,9 @@ const goodCtx: ValidatorContext = {
 	}
 };
 
-function engine(): EngineHandle {
+function engine(): AuthedEngineHandle {
 	let s = 0;
-	return createEngine({ ontology, now: () => TS, newEventId: () => `e${++s}` });
+	return createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId: () => `e${++s}` }).as(TEST_CRED.human);
 }
 
 describe('de minimis floor is plane-agnostic (authoring + execution)', () => {

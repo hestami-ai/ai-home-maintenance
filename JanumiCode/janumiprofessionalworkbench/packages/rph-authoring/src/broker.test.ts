@@ -2,7 +2,8 @@
 // Proves every READ + PROPOSE path and the governance guards — this is the surface the Pi agent will call, so if
 // these pass, the agent's tools are exercising a verified layer and only the LLM wiring remains to test live.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
-import { createEngine, type EngineHandle } from '@janumipwb/rph-engine';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { createEngine, type AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { monotonicFactory } from 'ulid';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +13,7 @@ const TS = '2026-07-12T00:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
 
 describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer', () => {
-	let engine: EngineHandle;
+	let engine: AuthedEngineHandle;
 	let broker: PwaAuthoringBroker;
 	let mintSeq: number;
 	let evtSeq: number;
@@ -44,7 +45,7 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 	beforeEach(() => {
 		mintSeq = 0;
 		evtSeq = 0;
-		engine = createEngine({ ontology, now: () => TS, newEventId: () => `e${++evtSeq}` });
+		engine = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId: () => `e${++evtSeq}` }).as(TEST_CRED.human);
 		raw('CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
 			pwaId: PWA,
 			name: 'Ops PWA',

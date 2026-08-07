@@ -16,6 +16,7 @@
 // below therefore lock the two things that could still be WRONG rather than merely unread: the transcription is
 // faithful, and the authored fields cannot exceed what their own policy declares.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import { createEngine, getObject } from './index.js';
 import { seedAdditivePolicies, seedFloorPolicies } from './seed-workbench.js';
@@ -31,11 +32,11 @@ interface Finding {
 
 function seeded() {
 	let n = 0;
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		ontology,
 		now: () => '2026-07-16T00:00:00Z',
 		newEventId: () => `e${++n}`
-	});
+	}).as(TEST_CRED.human);
 	seedFloorPolicies(engine);
 	seedAdditivePolicies(engine);
 	return (id: string) =>

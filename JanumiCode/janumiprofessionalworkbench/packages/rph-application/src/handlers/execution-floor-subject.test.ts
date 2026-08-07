@@ -11,6 +11,8 @@
 //    independence-invalid required review cannot satisfy assurance or permit its protected transition").
 // 2. THE UNRECORDED-OUTPUT BYPASS — a step naming an output that is not a recorded object.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -29,7 +31,7 @@ const GHOST = 'art_01ARZ3NDEKTSV4RRFFQ69G5V60';
 
 describe('Execution floor subject: the result, at its exact version — not the step', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -135,7 +137,7 @@ describe('Execution floor subject: the result, at its exact version — not the 
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmt = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — now they must exist
 		d(
 			'CaptureIntent',

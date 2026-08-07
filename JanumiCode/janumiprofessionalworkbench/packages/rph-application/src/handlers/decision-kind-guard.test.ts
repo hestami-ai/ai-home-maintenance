@@ -23,6 +23,8 @@ import type {
 	DomainCommand
 } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
@@ -42,7 +44,7 @@ const REVIEW = 'floor.reasoning-review';
 
 describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIND of decision', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	let asmtSeq = 0;
 
@@ -50,7 +52,7 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmtSeq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — they must exist
 	});
 

@@ -30,6 +30,7 @@
 //      nine policies unsatisfiable by any caller, so it is the one that most needs to be loud.
 //   4. A list invented for §20, or for a floor policy       -> the "carries NEITHER" assertion reddens.
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { createEngine, getObject, seedAdditivePolicies, seedFloorPolicies } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
@@ -44,11 +45,11 @@ const ACTOR: ActorReference = { actorId: 'census', actorType: 'HUMAN', displayNa
 /** A seeded engine plus a raw dispatcher, so the CONTROL can create a policy the seeds cannot. */
 function seededEngine() {
 	let n = 0;
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		ontology,
 		now: () => '2026-08-04T00:00:00Z',
 		newEventId: () => `e${++n}`
-	});
+	}).as(TEST_CRED.human);
 	seedFloorPolicies(engine);
 	seedAdditivePolicies(engine);
 	let c = 0;

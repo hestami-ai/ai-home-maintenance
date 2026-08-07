@@ -29,7 +29,7 @@
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { CommandResult, DomainCommand } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 import { authorProductRealizationPwa, seedAdditivePolicies } from './seed-workbench.js';
 
 /** Capture every command the seeder issues, without an engine — the payload keys are the delivered surface. */
@@ -41,7 +41,7 @@ function capturePolicySeeding(): DomainCommand[] {
 			sent.push(command);
 			return { commandId: command.commandId, status: 'ACCEPTED', producedEventIds: [] };
 		}
-	} as unknown as EngineHandle;
+	} as unknown as AuthedEngineHandle;
 	seedAdditivePolicies(handle);
 	return sent;
 }
@@ -56,7 +56,7 @@ function captureTemplateSeeding(): DomainCommand[] {
 			sent.push(command);
 			return { commandId: command.commandId, status: 'ACCEPTED', producedEventIds: [] };
 		}
-	} as unknown as EngineHandle;
+	} as unknown as AuthedEngineHandle;
 	authorProductRealizationPwa(handle);
 	return sent;
 }

@@ -31,6 +31,8 @@
 // reason: `ArtifactReferenceSchema` is `z.record(z.string(), z.unknown())`, so `contentReference: {}` is valid, and
 // the guard's CONTENT_AVAILABLE limb is a null-check that `{}` passes.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import {
 	ENFORCEMENT_REGISTER,
@@ -73,7 +75,7 @@ interface DisclosureProbe {
 
 describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -647,7 +649,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		ok(
 			dispatch(
 				'CaptureIntent',

@@ -24,20 +24,21 @@
 // events. If the fold and the write-side disagree, one of them is wrong — and that is a real finding either way.
 // The Work view's whole job is to describe those objects to a surface.
 import { rebuildProjection, workProjector, type WorkView } from '@janumipwb/rph-projections';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING } from './index.js';
 
 describe('RPH-PER-007 — projection rebuild', () => {
 	function build() {
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		});
+		}).as(TEST_CRED.human);
 		driveReferenceUndertaking(engine);
 		return engine;
 	}

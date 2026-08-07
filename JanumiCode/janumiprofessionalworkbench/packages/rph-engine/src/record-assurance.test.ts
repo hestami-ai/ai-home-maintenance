@@ -16,6 +16,7 @@ import {
 	type ValidatorRegistry
 } from '@janumipwb/rph-assurance';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import type { ActorReference } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
@@ -74,7 +75,7 @@ function registry(): ValidatorRegistry {
 
 function engine() {
 	let s = 0;
-	return createEngine({ ontology, now: () => '2026-07-14T00:00:00Z', newEventId: () => `e${++s}` });
+	return createEngine({ authenticate: testAuthenticator(), ontology, now: () => '2026-07-14T00:00:00Z', newEventId: () => `e${++s}` }).as(TEST_CRED.human);
 }
 
 const subject: AssuranceSubject = {

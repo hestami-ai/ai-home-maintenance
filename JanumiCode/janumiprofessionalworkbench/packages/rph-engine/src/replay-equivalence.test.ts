@@ -11,20 +11,21 @@
 // governance and baselining. Not a hand-authored two-event fixture: the property is only interesting over a
 // stream complex enough to get wrong.
 import { replayPwuAxes } from '@janumipwb/rph-projections';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING } from './index.js';
 
 describe('RPH-PER-006 — aggregate replay equivalence', () => {
 	function build() {
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		});
+		}).as(TEST_CRED.human);
 		driveReferenceUndertaking(engine);
 		return engine;
 	}

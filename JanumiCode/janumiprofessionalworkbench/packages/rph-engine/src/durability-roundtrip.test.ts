@@ -4,6 +4,7 @@
 // round-trip byte-for-byte (plus the whole event log). This is the durability half of RPH-PER; the in-memory
 // replay-equivalence half is RPH-PER-006/007.
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,7 +29,7 @@ describe('W2-INC-1 reference-fixture durability round-trip', () => {
 		let counter = 1;
 
 		const store1 = new SqliteStorageAdapter({ filename: path, now: () => TS });
-		const engine1 = createEngine({ ontology, now: () => TS, newEventId, store: store1 });
+		const engine1 = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId, store: store1 }).as(TEST_CRED.human);
 		driveReferenceUndertaking(engine1);
 
 		// Every aggregate that received an event, captured before the store is closed.

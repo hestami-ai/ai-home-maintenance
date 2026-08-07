@@ -6,6 +6,7 @@
 // carry an e2e victim — the runner is vitest-only — so a guard proved ONLY end to end is a guard the mutation gate
 // cannot measure. This spec puts the same rule where the ledger can reach it.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import {
 	createEngine,
@@ -20,11 +21,11 @@ import {
 
 function build() {
 	let s = 0;
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
 		newEventId: () => `e${++s}`
-	});
+	}).as(TEST_CRED.human);
 	seedWorkbench(engine);
 	return engine;
 }

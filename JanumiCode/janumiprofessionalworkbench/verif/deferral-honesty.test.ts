@@ -29,6 +29,7 @@
 // `testFile` cite's job, and the enforcement register's. This gate closes one direction of two instruments, which
 // is exactly the direction that failed silently.
 import { describe, expect, it } from 'vitest';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { coverageFor } from '@janumipwb/rph-domain';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
@@ -48,7 +49,7 @@ const ruleIdOf = (checkId: string): string => checkId.replace(/^(RPH-[A-Z0-9]+-\
 /** The object graph the engine builds when it drives the Reference Undertaking through the real pipeline. */
 function drivenGraph(): { store: SqliteStorageAdapter } {
 	const store = new SqliteStorageAdapter({ now: () => '2026-07-12T00:00:00Z' });
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		store,
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
@@ -56,7 +57,7 @@ function drivenGraph(): { store: SqliteStorageAdapter } {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(TEST_CRED.human);
 	driveReferenceUndertaking(engine);
 	return { store };
 }

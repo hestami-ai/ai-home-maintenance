@@ -2,6 +2,8 @@
 // validate -> produce IntentCaptured -> persist events+outbox atomically -> drain outbox -> project —
 // with idempotency and optimistic concurrency. This is the smallest end-to-end proof of the architecture.
 import type { DomainCommand, DomainEvent } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
@@ -33,18 +35,18 @@ function captureIntent(over: Partial<DomainCommand> = {}): DomainCommand {
 
 describe('M4 walking skeleton: CaptureIntent -> IntentCaptured -> persist -> outbox -> projection', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let projection: Map<string, { intentStatus: string; originatingExpression: string }>;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => '2026-07-11T00:00:00Z' });
 		seq = 0;
-		engine = new Engine({
+		engine = new Engine({ authenticate: testAuthenticator(),
 			store,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_${++seq}`
-		});
+		}).as(TEST_CRED.human);
 		projection = new Map();
 		// A minimal Work-view projection built from events (full rebuildable projections = M5).
 		engine.subscribe((event: DomainEvent) => {

@@ -10,6 +10,8 @@
 // fires and an unenforced one are indistinguishable from a green run. This file is the predicted red — it asserts
 // the refusal HAPPENS, names the outcome that causes it, and asserts the two outcomes that must NOT cause it.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -22,7 +24,7 @@ const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5N11';
 
 describe('RequestAssuranceAssessment enforces §5.1 applicability (REG-F-029)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const dispatch = (commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) => {
@@ -60,7 +62,7 @@ describe('RequestAssuranceAssessment enforces §5.1 applicability (REG-F-029)', 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

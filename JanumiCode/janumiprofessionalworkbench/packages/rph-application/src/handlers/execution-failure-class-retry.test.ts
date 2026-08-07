@@ -18,6 +18,8 @@
 // WHAT MUST REDDEN: remove the precheck from `retryExecutionStep` -> the refusal below stops firing while the
 // CONTROL (a retryable class on the same fixture, same attempt number) stays green.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -30,7 +32,7 @@ const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5R20';
 const STEP = `${PLAN}-s`;
 
 describe('RetryExecutionStep honours the §36.2 failure-class control-action mapping', () => {
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let store: SqliteStorageAdapter;
 	let seq = 0;
 
@@ -64,7 +66,7 @@ describe('RetryExecutionStep honours the §36.2 failure-class control-action map
 	beforeEach(() => {
 		seq = 0;
 		store = new SqliteStorageAdapter({ now: () => TS });
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		ok(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

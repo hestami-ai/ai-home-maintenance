@@ -5,6 +5,8 @@
 // Steps are seeded directly at their target stepState in ProposeExecutionPlan (no step handlers run — SKIPPED/
 // CANCELLED/SUPERSEDED have none, 3C), which is exactly how the allow-list is exercised against every terminal state.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -18,7 +20,7 @@ const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5J20';
 
 describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle (DWP-01)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string) {
@@ -98,7 +100,7 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

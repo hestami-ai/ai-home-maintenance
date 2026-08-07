@@ -5,20 +5,21 @@
 // of the honest contract: the fields the log genuinely sources ARE populated and correct, and the fields it does
 // NOT source are visibly absent (undefined), never faked into a reassuring value.
 import { buildAssuranceView } from '@janumipwb/rph-projections';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING } from './index.js';
 
 describe('Assurance View (DOC-004 §38) over the live log', () => {
 	function build() {
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		});
+		}).as(TEST_CRED.human);
 		driveReferenceUndertaking(engine);
 		return buildAssuranceView(engine.readAllEvents());
 	}

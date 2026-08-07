@@ -24,6 +24,7 @@
 // exactly the economy REG-D-013 forbids ("success is guarantee-strength against intent"). The check lives at
 // `commitState` — the single seam every write passes through — so no handler can opt out by omission.
 import { AssuranceAssessmentSchema } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
@@ -37,11 +38,11 @@ const SUBJECT = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Z91';
 
 function engineWithAssessment() {
 	let n = 0;
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		ontology,
 		now: () => '2026-08-04T00:00:00Z',
 		newEventId: () => `e${++n}`
-	});
+	}).as(TEST_CRED.human);
 	seedFloorPolicies(engine);
 	let c = 0;
 	const send = (commandType: string, type: string, id: string, payload: unknown) => {

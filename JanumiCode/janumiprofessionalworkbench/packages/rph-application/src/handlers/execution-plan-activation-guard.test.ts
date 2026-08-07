@@ -10,6 +10,8 @@
 // Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event
 // Contract.md:1242): "* A PWU may have only one active plan at a time."
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -23,7 +25,7 @@ const PLAN_B = 'plan_01ARZ3NDEKTSV4RRFFQ69G5H30';
 
 describe('ActivateExecutionPlan — one active plan per PWU (live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -96,7 +98,7 @@ describe('ActivateExecutionPlan — one active plan per PWU (live pipeline)', ()
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

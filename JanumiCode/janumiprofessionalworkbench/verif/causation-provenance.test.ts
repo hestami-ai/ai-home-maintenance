@@ -19,6 +19,7 @@
 // distinct: `issuedBy` is WHO IT IS ATTRIBUTED TO, `causationId` is WHAT CAUSED IT.
 
 import { createEngine, seedWorkbench } from '@janumipwb/rph-engine';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
@@ -29,7 +30,7 @@ const TS = '2026-08-07T00:00:00Z';
 function drive() {
 	let n = 0;
 	const store = new SqliteStorageAdapter({ now: () => TS });
-	seedWorkbench(createEngine({ ontology, store, now: () => TS, newEventId: () => `evt_${++n}` }));
+	seedWorkbench(createEngine({ authenticate: testAuthenticator(), ontology, store, now: () => TS, newEventId: () => `evt_${++n}` }).as(TEST_CRED.human));
 	return store.readAllEvents() as unknown as {
 		eventType: string;
 		commandId?: string;

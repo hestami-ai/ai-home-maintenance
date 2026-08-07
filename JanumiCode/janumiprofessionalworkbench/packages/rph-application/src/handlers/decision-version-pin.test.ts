@@ -24,6 +24,8 @@
 // subject that never existed the old code recorded the caller's claim and the new code records nothing. That is
 // the third test, and it is the only discriminating case for the immutability half.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -36,13 +38,13 @@ const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69J7002';
 
 describe('REG-F-017: a Decision pins its subject versions at PROPOSAL', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	const dispatch = (commandType: string, payload: unknown, id: string, aggType: string) => {

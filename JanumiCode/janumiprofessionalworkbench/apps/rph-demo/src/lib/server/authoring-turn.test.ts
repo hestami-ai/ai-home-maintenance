@@ -1,9 +1,10 @@
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import {
 	createEngine,
 	getConversation,
 	listPwuTypes,
-	type EngineHandle
+	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -21,7 +22,7 @@ const TS = '2026-07-18T12:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
 
 describe('isolated authoring turn and guarded commit', () => {
-	let engine: EngineHandle;
+	let engine: AuthedEngineHandle;
 	let sequence: number;
 
 	function command(
@@ -56,11 +57,11 @@ describe('isolated authoring turn and guarded commit', () => {
 
 	beforeEach(() => {
 		sequence = 0;
-		engine = createEngine({
+		engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => TS,
 			newEventId: () => `evt_${++sequence}`
-		});
+		}).as(TEST_CRED.human);
 		expect(
 			dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', PWA, {
 				pwaId: PWA,

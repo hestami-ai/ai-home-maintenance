@@ -6,6 +6,8 @@
 // assessments' claims' supportingEvidenceIds, and the promotion decision's consideredEvidenceIds. These tests
 // drive the LIVE pipeline and assert the CALL SITE blocks a promotion that rests on invalidated evidence.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -29,7 +31,7 @@ interface SetupOpts {
 
 describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) {
@@ -60,7 +62,7 @@ describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10,
 	function setup(opts: SetupOpts) {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		seedPolicy(engine, 'pol_arch');
 		dispatch(
 			'CaptureIntent',

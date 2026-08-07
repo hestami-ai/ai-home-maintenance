@@ -6,3 +6,4 @@ export const RPH_PORTS_VERSION = '0.0.0';
 export * from './ports/logger.js';
 export * from './defaults/logger.js';
 export * from './ports/storage.js';
+export * from './ports/authentication.js';

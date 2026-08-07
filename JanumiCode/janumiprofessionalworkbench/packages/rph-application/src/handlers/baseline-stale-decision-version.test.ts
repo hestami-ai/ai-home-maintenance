@@ -8,6 +8,8 @@
 // re-review-required." This drives the REAL command pipeline (engine.dispatch) to ask whether the CALL SITE
 // enforces it, not just the kernel.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -23,7 +25,7 @@ const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69G5V05';
 
 describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003 / P5, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) {
@@ -67,7 +69,7 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 	function setup(staleAfterApproval: boolean) {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		seedPolicy(engine, 'pol_arch');
 		dispatch(
 			'CaptureIntent',

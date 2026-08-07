@@ -11,6 +11,7 @@
 // (corpus §25 Test 3's three traceability targets) and allocates them, and `runGraphConformance` treats an empty
 // population as a FAILURE with the word VACUOUS in its detail.
 import { describe, expect, it } from 'vitest';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { createEngine } from './engine.js';
@@ -19,7 +20,7 @@ import { runGraphConformance, type GraphSource } from './graph-conformance.js';
 
 function drivenStore(): { store: SqliteStorageAdapter; source: GraphSource } {
 	const store = new SqliteStorageAdapter({ now: () => '2026-07-12T00:00:00Z' });
-	const engine = createEngine({
+	const engine = createEngine({ authenticate: testAuthenticator(),
 		store,
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
@@ -27,7 +28,7 @@ function drivenStore(): { store: SqliteStorageAdapter; source: GraphSource } {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(TEST_CRED.human);
 	driveReferenceUndertaking(engine);
 	return { store, source: store };
 }

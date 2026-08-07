@@ -26,9 +26,10 @@ import {
 	ProfessionalWorkObjectTypeSchema
 } from '@janumipwb/rph-contracts';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createEngine, getObject, type EngineHandle } from './index.js';
+import { createEngine, getObject, type AuthedEngineHandle } from './index.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
@@ -47,7 +48,7 @@ const FLOOR_IDS = Object.values(FLOOR_POLICY_IDS);
  * A gate that covers one of two writers is not a gate; it is the first writer's own test wearing the word
  * "declared". Parameterised so that adding a third writer without adding it here is itself the visible omission.
  */
-const CREATION_PATHS: ReadonlyArray<{ name: string; run: (e: EngineHandle) => void }> = [
+const CREATION_PATHS: ReadonlyArray<{ name: string; run: (e: AuthedEngineHandle) => void }> = [
 	{ name: 'seedFloorPolicies (workbench seed)', run: (e) => seedFloorPolicies(e) },
 	{
 		name: 'driveReferenceUndertaking (standalone path)',
@@ -58,15 +59,15 @@ const CREATION_PATHS: ReadonlyArray<{ name: string; run: (e: EngineHandle) => vo
 describe.each(CREATION_PATHS)(
 	'the de minimis floor declares a scope covering everything it enforces — via $name (REG-F-024)',
 	({ run }) => {
-		let engine: EngineHandle;
+		let engine: AuthedEngineHandle;
 
 		beforeEach(() => {
 			let n = 0;
-			engine = createEngine({
+			engine = createEngine({ authenticate: testAuthenticator(),
 				ontology,
 				now: () => '2026-08-05T00:00:00Z',
 				newEventId: () => `evt_${++n}`
-			});
+			}).as(TEST_CRED.human);
 			run(engine);
 		});
 

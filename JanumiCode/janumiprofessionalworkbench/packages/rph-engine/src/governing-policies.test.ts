@@ -15,22 +15,23 @@
 // This file executes them, against the REAL seeded workbench rather than a hand-built fixture, so what it proves
 // is a property of the shipping data and not of a mock.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createEngine, type EngineHandle } from './index.js';
+import { createEngine, type AuthedEngineHandle } from './index.js';
 import { requireGoverningPolicies, selectGoverningPolicies } from './governing-policies.js';
 import { REFERENCE_UNDERTAKING } from './reference-undertaking.js';
 import { seedWorkbench } from './seed-workbench.js';
 
 describe('selectGoverningPolicies — the exclusions actually fire (REG-F-029 review finding (b))', () => {
-	let engine: EngineHandle;
+	let engine: AuthedEngineHandle;
 
 	beforeAll(() => {
 		let n = 0;
-		engine = createEngine({
+		engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		seedWorkbench(engine);
 	});
 
@@ -135,11 +136,11 @@ describe('a promotion cites EVERY assessment that permitted it (REG-F-029 review
 		// which carries `assuranceAssessmentIds` — and reported 0 for both. A blind reader, one more time; the
 		// numbers below are from the field the event actually has.)
 		let n = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		seedWorkbench(engine);
 		const cited = engine
 			.readAllEvents()

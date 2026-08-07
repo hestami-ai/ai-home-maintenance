@@ -11,7 +11,7 @@ import {
 	humanizeCode,
 	type Severity
 } from '@janumipwb/rph-assurance';
-import type { EngineHandle, EngineSeedPolicy } from './engine.js';
+import type { AuthedEngineHandle, EngineSeedPolicy } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
 const ACTOR: ActorReference = {
@@ -99,7 +99,7 @@ interface DerivedType {
  * ceiling: it takes the tree from 9 types to 15 and from two levels to three, while the delivery census keeps
  * pinning the 50 rather than letting a deeper tree stand in for a coherent ontology.
  */
-function derivedTypes(handle: EngineHandle): DerivedType[] {
+function derivedTypes(handle: AuthedEngineHandle): DerivedType[] {
 	const templates = handle.ontology.pwuTemplates as readonly {
 		pwuKind: string;
 		isRoot?: boolean;
@@ -171,7 +171,7 @@ function derivedTypes(handle: EngineHandle): DerivedType[] {
  * thing. FAILS LOUD on a kind the ontology does not describe, because a silent `[]` here is precisely the shape
  * that produces an unassessable PWU Type three layers downstream.
  */
-function policiesForKind(handle: EngineHandle, pwuKind: string): string[] {
+function policiesForKind(handle: AuthedEngineHandle, pwuKind: string): string[] {
 	const template = handle.ontology.pwuTemplates.find(
 		(t) => (t as { pwuKind?: string }).pwuKind === pwuKind
 	) as { defaultPolicyIds?: readonly string[] } | undefined;
@@ -186,7 +186,7 @@ function policiesForKind(handle: EngineHandle, pwuKind: string): string[] {
 
 // Each sender uses a UNIQUE key prefix so idempotency keys never collide across logical seed operations (a
 // collision would return a prior receipt as DUPLICATE and silently skip the command).
-function sender(handle: EngineHandle, prefix: string) {
+function sender(handle: AuthedEngineHandle, prefix: string) {
 	let n = 0;
 	return (
 		commandType: string,
@@ -248,7 +248,7 @@ function sender(handle: EngineHandle, prefix: string) {
  * makes this safe, and what made the 54 refusals a false declaration rather than a real scope conflict.
  * `floor-declared-scope.test.ts` holds declared ⊇ enforced so the two cannot part again.
  */
-export function seedFloorPolicies(handle: EngineHandle): void {
+export function seedFloorPolicies(handle: AuthedEngineHandle): void {
 	const send = sender(handle, 'seedpol');
 	for (const def of FLOOR_POLICY_DEFINITIONS) {
 		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', def.policyId, {
@@ -279,7 +279,7 @@ export function seedFloorPolicies(handle: EngineHandle): void {
  * elsewhere. The FAITHFUL copy was the one nothing seeded. Reading the ontology here is what makes the catalog
  * one thing; `seed-policy-arrays.test.ts` is what keeps it one.
  */
-export function seedAdditivePolicies(handle: EngineHandle): void {
+export function seedAdditivePolicies(handle: AuthedEngineHandle): void {
 	const send = sender(handle, 'seedaddpol');
 	for (const p of handle.ontology.seedPolicies) {
 		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', p.policyId, {
@@ -351,13 +351,13 @@ function rawFindings(
 /** The full workbench policy library: the 3 locked de minimis floor policies + the additive Product Realization
  *  policies. Seed this in EVERY engine (reference AND empty) so the PWA Designer's policy manager + picker are
  *  always populated and the floor policies are present as (locked) real objects. */
-export function seedPolicyLibrary(handle: EngineHandle): void {
+export function seedPolicyLibrary(handle: AuthedEngineHandle): void {
 	seedFloorPolicies(handle);
 	seedAdditivePolicies(handle);
 }
 
 /** Author + publish the Product Realization PWA (idempotent-ish: safe to call once per engine). */
-export function authorProductRealizationPwa(handle: EngineHandle): void {
+export function authorProductRealizationPwa(handle: AuthedEngineHandle): void {
 	const send = sender(handle, 'seedpwa');
 	send('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {
 		pwaId: SEED_PWA,
@@ -407,7 +407,7 @@ export function authorProductRealizationPwa(handle: EngineHandle): void {
 }
 
 /** Author the PWA, instantiate the Field Service Management Undertaking under it, and drive its graph. */
-export function seedWorkbench(handle: EngineHandle): void {
+export function seedWorkbench(handle: AuthedEngineHandle): void {
 	seedPolicyLibrary(handle);
 	authorProductRealizationPwa(handle);
 	const send = sender(handle, 'sedund');

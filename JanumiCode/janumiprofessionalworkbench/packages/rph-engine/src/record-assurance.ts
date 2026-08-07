@@ -9,7 +9,7 @@
 import type { AssuranceRecordingPlan, Identity } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 
 /** The ratified DOC-007 ActorType enum. The assurance-island `Identity.actorType` is a free string by design
  *  (the island is plane-agnostic), so the seam below must coerce it to a valid contract value. */
@@ -73,7 +73,7 @@ function observationTypeFor(policyId: string): string {
 }
 
 export function recordAssuranceRecordingPlan(
-	handle: EngineHandle,
+	handle: AuthedEngineHandle,
 	plan: AssuranceRecordingPlan,
 	opts: RecordAssuranceOptions
 ): RecordedAssurance {

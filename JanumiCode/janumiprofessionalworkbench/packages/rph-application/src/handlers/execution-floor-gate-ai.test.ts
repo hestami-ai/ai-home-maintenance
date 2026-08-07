@@ -3,6 +3,8 @@
 // non-SATISFIED floor EXISTS; the complement — nothing was ever assessed — is the one an unassessed agent actually
 // takes, and it is the path §8.4 says must resolve to material rather than to silent admission.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -27,7 +29,7 @@ const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5T50';
 
 describe('CompleteExecutionStep floor gate — an AI-produced step with NO recorded floor (§8.4)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -53,7 +55,7 @@ describe('CompleteExecutionStep floor gate — an AI-produced step with NO recor
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 
 		d(
 			'CaptureIntent',

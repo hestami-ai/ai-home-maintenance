@@ -12,6 +12,7 @@
 //
 // So: the guard now counts what it inspects, and this asserts the counter MOVES for a real dispatch.
 import { readFileSync } from 'node:fs';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -27,7 +28,7 @@ describe('the emitted-event guard is alive', () => {
 		const before = liveness.inspected;
 		const store = new SqliteStorageAdapter({ now: () => TS });
 		let seq = 0;
-		const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		const command: DomainCommand = {
 			commandId: 'c-1',
 			commandType: 'CaptureIntent',
