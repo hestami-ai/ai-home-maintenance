@@ -90,16 +90,25 @@
 						{#if d.type === 'WAIVER'}
 							<form method="POST" action="?/grant" use:enhance>
 								<input type="hidden" name="id" value={d.id} />
+								<!-- The revision this row was RENDERED from. Interpolated from the load data and never
+								     recomputed in the action — that is the whole of the PER-4 protection. -->
+								<input type="hidden" name="expectedRevision" value={d.revision} />
 								<button class="ghost small" type="submit">Grant waiver</button>
 							</form>
 							<form method="POST" action="?/deny" use:enhance>
 								<input type="hidden" name="id" value={d.id} />
+								<!-- The revision this row was RENDERED from. Interpolated from the load data and never
+								     recomputed in the action — that is the whole of the PER-4 protection. -->
+								<input type="hidden" name="expectedRevision" value={d.revision} />
 								<input type="hidden" name="rationale" value={d.rationale} />
 								<button class="ghost small" type="submit">Deny</button>
 							</form>
 						{:else}
 							<form method="POST" action="?/approve" use:enhance>
 								<input type="hidden" name="id" value={d.id} />
+								<!-- The revision this row was RENDERED from. Interpolated from the load data and never
+								     recomputed in the action — that is the whole of the PER-4 protection. -->
+								<input type="hidden" name="expectedRevision" value={d.revision} />
 								<input type="hidden" name="selectedOption" value={d.selectedOption} />
 								<input type="hidden" name="rationale" value={d.rationale} />
 								<button class="ghost small" type="submit">Approve</button>

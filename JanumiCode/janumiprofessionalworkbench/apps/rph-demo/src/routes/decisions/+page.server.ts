@@ -11,10 +11,45 @@ import { listDecisions } from '@janumipwb/rph-engine';
 import { dispatch, getEngine, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
+/**
+ * The revision the SUBMITTING PAGE was rendered from, or null when the form declared none.
+ *
+ * ⚠ `Number('')` IS 0, AND 0 IS A REAL REVISION. A newly created aggregate lands at revision 0, so a
+ * just-proposed Decision sits at 0. If the hidden input is missing, the browser posts an EMPTY STRING and a
+ * naive `Number(raw)` would turn *"the form carried nothing"* into *"expect revision 0"* — which MATCHES a
+ * freshly proposed decision. The propose-then-approve e2e would stay green over a form that round-trips
+ * nothing at all. THE EMPTY-STRING GUARD IS THE ENTIRE DEFENCE, and it is the easiest thing here to get wrong.
+ */
+function readRenderedRevision(form: FormData): number | null {
+	const raw = form.get('expectedRevision');
+	if (typeof raw !== 'string') return null;
+	const trimmed = raw.trim();
+	if (trimmed === '') return null;
+	const n = Number(trimmed);
+	return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+const STALE_FORM =
+	'This page did not declare the revision it was rendered from. Reload the page and retry.';
+
+/** Surface the RPH code alongside the message so a CONFLICT is distinguishable from a state-machine refusal —
+ *  the two read identically otherwise, and that distinction is the only evidence this route can offer. */
+function refuse(r: ReturnType<typeof dispatch>) {
+	return fail(r.status === 'CONFLICT' ? 409 : 400, {
+		error: r.error?.message ?? r.status,
+		code: r.error?.code
+	});
+}
+
 export const load: PageServerLoad = () => {
 	// WORKSPACE by design (SPEC-001 INV-02 / FORK-9): this IS the workspace-wide Decision register.
 	const decisions = listDecisions(getEngine(), { kind: 'WORKSPACE' }).map((d) => ({
 		id: d.id,
+		// THE REVISION THIS PAGE IS RENDERED FROM (JPWB-DOC-003 §9 PER-4). It must reach the template and
+		// travel back through the form: a value re-read inside the action is ALWAYS current and can never
+		// conflict, which satisfies the letter of PER-4 and none of its purpose. `listByType` supplies it and
+		// WORKSPACE scope passes the rows through unchanged — this `.map()` was the only place it was dropped.
+		revision: d.revision,
 		type: String((d.state.decisionType ?? '') as string),
 		status: String((d.state.status ?? '') as string),
 		selectedOption: String((d.state.selectedOption ?? '') as string),
@@ -51,16 +86,26 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const id = String((form.get('id') ?? '') as string).trim();
 		if (!id) return fail(400, { error: 'A decision id is required to approve.' });
+		// PER-4 FAIL-CLOSED. No declared revision means NO EXPECTATION, which is last-write-wins. The id is
+		// already refused when absent; under PER-4 the revision is exactly as load-bearing.
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
 		const selectedOption = String((form.get('selectedOption') ?? '') as string).trim();
 		const rationale = String((form.get('rationale') ?? '') as string).trim();
-		const r = dispatch('ApproveDecision', 'DECISION', id, {
-			selectedOption,
-			rationale,
-			consideredEvidenceIds: [],
-			consideredObservationIds: [],
-			subjectSemanticVersions: {}
-		});
-		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		const r = dispatch(
+			'ApproveDecision',
+			'DECISION',
+			id,
+			{
+				selectedOption,
+				rationale,
+				consideredEvidenceIds: [],
+				consideredObservationIds: [],
+				subjectSemanticVersions: {}
+			},
+			expectedRevision
+		);
+		if (r.status !== 'ACCEPTED') return refuse(r);
 		return { approved: id };
 	},
 
@@ -69,11 +114,16 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const id = String((form.get('id') ?? '') as string).trim();
 		if (!id) return fail(400, { error: 'A waiver decision id is required to grant.' });
-		const r = dispatch('GrantWaiver', 'DECISION', id, {
-			waiverDecisionId: id,
-			duration: 'until superseded'
-		});
-		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		const r = dispatch(
+			'GrantWaiver',
+			'DECISION',
+			id,
+			{ waiverDecisionId: id, duration: 'until superseded' },
+			expectedRevision
+		);
+		if (r.status !== 'ACCEPTED') return refuse(r);
 		return { granted: id };
 	},
 
@@ -84,10 +134,16 @@ export const actions: Actions = {
 		const id = String((form.get('id') ?? '') as string).trim();
 		const rationale = String((form.get('rationale') ?? '') as string).trim();
 		if (!id) return fail(400, { error: 'A waiver decision id is required to deny.' });
-		const r = dispatch('DenyWaiver', 'DECISION', id, {
-			rationale: rationale || 'Denied from the Decision Center.'
-		});
-		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		const expectedRevision = readRenderedRevision(form);
+		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
+		const r = dispatch(
+			'DenyWaiver',
+			'DECISION',
+			id,
+			{ rationale: rationale || 'Denied from the Decision Center.' },
+			expectedRevision
+		);
+		if (r.status !== 'ACCEPTED') return refuse(r);
 		return { denied: id };
 	}
 };
