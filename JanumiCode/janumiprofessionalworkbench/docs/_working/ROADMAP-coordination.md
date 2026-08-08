@@ -84,17 +84,34 @@ CLOSED.
 
 ---
 
-## C-1 — DECISION joins the authoring turn's revision vector
+## ~~C-1 — DECISION joins the authoring turn's revision vector~~ WITHDRAWN 2026-08-08: VACUOUS
 
-`snapshotRevisions` (`authoring-turn.ts:125-146`) pins the PWA, every PWU_TYPE, every
-ASSURANCE_POLICY and the conversation. `hasEffectiveWaiver` (`floor.ts`) reads DECISIONs to set
-`FloorView.waived`, and **no DECISION is pinned**. A waiver granted or revoked mid-turn is a read
-dependency the vector does not carry.
+~~`snapshotRevisions` pins the PWA, every PWU_TYPE, every ASSURANCE_POLICY and the conversation.
+`hasEffectiveWaiver` reads DECISIONs to set `FloorView.waived`, and no DECISION is pinned. A waiver
+granted or revoked mid-turn is a read dependency the vector does not carry.~~
 
-One line, using the mechanism that already exists and is already correct. **Predicted red:** a test
-that grants a waiver between fork and commit must produce `CONFLICTED`, and must NOT before the fix.
+**Every sentence above is TRUE and the increment is still worthless, which is the part worth
+keeping.** I promoted a real-but-inconsequential observation to a roadmap increment without tracing
+what depends on it. Traced now:
 
-**Gate:** full. **Anchor:** ASR-12 (a derived verdict is invalidated by a change in what it read).
+- `FloorView.waived` has exactly two consumers, both in `pwa/[id]/+page.svelte` (L1854, L1874).
+  **It is display-only.** It reaches no command, no payload, no canonical write.
+- The floor RECORDING is built from `runFloorAndPlanRecording(subject, ctx, …)`, and `ctx` is
+  schema-invariant + identity-provenance + reasoning-review. **No waiver enters it.**
+- The turn's own staging decision reads `floorResult.floor?.satisfied` — **never `waived`**.
+- The publication gate *does* honour an EFFECTIVE waiver (`pwa-authoring.ts:946`), but it runs at
+  `PublishPwa`, reading live state at that moment. **A staged turn cannot make it stale.**
+
+So the vector is not missing anything that affects a write: everything the recording depends on —
+the PWA, the types, the reasoning-review policy whose criteria it reads — is already pinned. **The
+mechanism is right AND its input is complete**, which is the opposite of what this increment and the
+survey critic both asserted.
+
+**THIS IS THE SECOND HAZARD IN THIS PROGRAMME THAT DISSOLVED ON VERIFICATION** (REG-F-065 was the
+first, and it was mine too). Both were written down from a plausible reading and neither was traced
+to a consequence before being scheduled. Recorded as REG-F-066; struck rather than deleted, because
+"a read dependency the vector does not carry" is a true sentence a later reader will rediscover, and
+they should find the trace rather than repeat it.
 
 ---
 
