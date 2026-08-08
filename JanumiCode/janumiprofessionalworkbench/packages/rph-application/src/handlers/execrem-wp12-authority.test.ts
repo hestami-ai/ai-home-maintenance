@@ -155,6 +155,26 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 			'PROFESSIONAL_WORK_UNIT'
 		);
 
+	/**
+	 * REG-F-072 — SHAPING and READY through the commands that OWN those arrows. This file WAS the finding's
+	 * exemplar: two `chg` hops walked a PWU with empty boundaries, no expected output and a RAW intent straight to
+	 * READY, and `markPwuReady` would have refused it on four limbs.
+	 */
+	const toReady = () => {
+		ok(dispatch('BeginIntentDiscovery', {}, INTENT, 'INTENT'), 'intent discovery');
+		ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INTENT, 'INTENT'), 'intent provisional');
+		ok(dispatch('BeginPwuShaping', {}, PWU, 'PROFESSIONAL_WORK_UNIT'), 'shaping');
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'ready'
+		);
+	};
+
 	const complete = (i: number) =>
 		dispatch('CompleteExecutionStep', {
 			executionStepId: sid(i),
@@ -186,11 +206,16 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 				title: 'Arch',
 				description: 'd',
 				intentId: INTENT,
-				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				boundaries: {
+					inScope: ['the governed work under test'],
+					outOfScope: ['not yet known'],
+					permittedChanges: [],
+					prohibitedChanges: []
+				},
 				obligationIds: [],
 				constraintIds: [],
 				assumptionIds: [],
-				expectedOutputs: [],
+				expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 				assurancePolicyIds: [],
 				riskProfile: {
 					consequence: 'MEDIUM',
@@ -207,8 +232,7 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 
 	/** An ACTIVE 3-step plan on an OPEN PWU, with s1 left RUNNING and s2/s3 QUEUED. */
 	function activePlanWithRunningStep(transitions: unknown[] = [], steps = [mkStep(1), mkStep(2), mkStep(3)]) {
-		ok(chg('PROPOSED', 'SHAPING', 'NOT_PLANNED'), 'shaping');
-		ok(chg('SHAPING', 'READY', 'NOT_PLANNED'), 'ready');
+		toReady();
 		ok(
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,
@@ -359,11 +383,16 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 					title: 'Arch',
 					description: 'd',
 					intentId: INTENT,
-					boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+					boundaries: {
+					inScope: ['the governed work under test'],
+					outOfScope: ['not yet known'],
+					permittedChanges: [],
+					prohibitedChanges: []
+				},
 					obligationIds: [],
 					constraintIds: [],
 					assumptionIds: [],
-					expectedOutputs: [],
+					expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 					assurancePolicyIds: [],
 					riskProfile: {
 						consequence: 'MEDIUM',
@@ -466,8 +495,7 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 	it('openness/activate-under-closed-pwu-REJECTS — activation is the other privilege-granting command', () => {
 		// Gating the step commands alone would leave the hole where a plan is activated AFTER the PWU closed and
 		// then simply used. Exactly ONE plan exists, so RPH-EXE-001 cannot be what refused.
-		ok(chg('PROPOSED', 'SHAPING', 'NOT_PLANNED'), 'shaping');
-		ok(chg('SHAPING', 'READY', 'NOT_PLANNED'), 'ready');
+		toReady();
 		ok(
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,
@@ -493,8 +521,7 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 	it('authoring is NOT executing: proposing and approving on a closed PWU remain ACCEPTED (§20.2)', () => {
 		// The over-refusal guard. §20.2 is explicit that approval grants no runtime privileges, so neither
 		// authoring nor approving is gated — only the acts that actually open or credit execution.
-		ok(chg('PROPOSED', 'SHAPING', 'NOT_PLANNED'), 'shaping');
-		ok(chg('SHAPING', 'READY', 'NOT_PLANNED'), 'ready');
+		toReady();
 		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
 		ok(
 			dispatch('ProposeExecutionPlan', {

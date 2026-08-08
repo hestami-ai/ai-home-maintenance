@@ -387,9 +387,37 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			'PROFESSIONAL_WORK_UNIT'
 		);
 
+	/**
+	 * REG-F-072 — SHAPING and READY are reached through the commands that OWN those arrows. This used two
+	 * `ChangePwuState` hops; the generic setter no longer performs an arrow a semantic command owns, and
+	 * `markPwuReady` enforces the eight-limb shape readiness contract the setter never checked.
+	 *
+	 * The intent is matured HERE rather than at each call site: a ROOT PWU may not reach READY under a RAW intent
+	 * (the eighth limb), and reading the PWU's own `intentId` keeps every caller correct without a second place to
+	 * remember. Idempotent — a non-RAW intent is left alone.
+	 */
 	const driveToReady = (pwuId: string): void => {
-		ok(pwuState(pwuId, 'PROPOSED', 'SHAPING'), `${pwuId} -> SHAPING`);
-		ok(pwuState(pwuId, 'SHAPING', 'READY'), `${pwuId} -> READY`);
+		const intentId = (store.loadObject(pwuId)?.state as { intentId?: string } | undefined)?.intentId;
+		const intentStatus = intentId
+			? (store.loadObject(intentId)?.state as { intentStatus?: string } | undefined)?.intentStatus
+			: undefined;
+		if (intentId && intentStatus === 'RAW') {
+			ok(dispatch('BeginIntentDiscovery', {}, intentId, 'INTENT'), `${intentId} -> UNDER_DISCOVERY`);
+			ok(
+				dispatch('ProvisionIntent', { ambiguityIds: [] }, intentId, 'INTENT'),
+				`${intentId} -> PROVISIONAL`
+			);
+		}
+		ok(dispatch('BeginPwuShaping', {}, pwuId, 'PROFESSIONAL_WORK_UNIT'), `${pwuId} -> SHAPING`);
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 },
+				pwuId,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			`${pwuId} -> READY`
+		);
 	};
 
 	/**

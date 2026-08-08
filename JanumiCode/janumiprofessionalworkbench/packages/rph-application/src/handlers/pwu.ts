@@ -296,13 +296,56 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
+/**
+ * REG-F-072 — THE WORKLIFECYCLE TARGETS A SEMANTICALLY NAMED COMMAND OWNS, and which the generic setter
+ * therefore may not reach.
+ *
+ * ⚠ CANON, AND IT IS A RULE ABOUT THE WRITE PATH RATHER THAN ABOUT ANY ONE ARROW.
+ * JPWB-DOC-003 §9 PER-3 (L343): *"**One authoritative write path.** Canonical state is mutated only through
+ * authenticated, authorized, **semantically named commands** that check expected revision, **validate
+ * preconditions and invariants**, enforce required assurance, and atomically persist state, version history,
+ * events, outbox, and command receipt. **No generic CRUD/PATCH path**, UI local state, RPH worker, validator,
+ * projection worker, broker message, agent output, or informal approval bypasses this pipeline."*
+ *
+ * Keyed by TARGET because every legal in-arrow to each of these six states is reachable by the one command whose
+ * `advancePwuLifecycle({ target })` names it — `canAdvanceWorkLifecycle` accepts any legal `from` — so closing
+ * the target closes nothing the owning command cannot still do.
+ *
+ * ⚠ WHY THIS IS NOT SCOPED TO "§8.2 EXCEPTION TRANSITIONS", WHICH IS WHAT I FIRST BUILT.
+ * The comment on `markPwuReady` below asserted that `ChangePwuState` is the vehicle for DOC-002 §8.2 EXCEPTION
+ * transitions while §8.1 PRIMARY transitions have their own commands — and I took that as decisive, from a
+ * comment in the very file under repair. Its own source admits otherwise: `docs/_working/HARMONIZATION-LOG.md`
+ * ends the derivation *"(That §8.2 is its referent is my inference; the corpus never links them.)"* Three
+ * independent facts refute it: the machine's own triggers name `challengePwu` / `reshapePwu` / `invalidatePwu`
+ * AS the exception commands, so §8.2 is where the NAMED commands already are; all ten production `chg()` sites
+ * in the reference undertaking are §8.1 primaries or holds, so scoping the setter TO §8.2 would delete its
+ * entire real use; and `ChangePwuState` is `UNRATIFIED-AUTHORED` with the vocab noting *"DOC-007-only generic
+ * transition; DOC-002 has no ChangePwuState (uses named per-transition commands)"*. A preference laundered as a
+ * rule, believed because it was written down nearby.
+ */
+export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
+	SHAPING: 'BeginPwuShaping',
+	READY: 'MarkPwuReady',
+	CHALLENGED: 'ChallengePwu',
+	RESHAPING: 'ReshapePwu',
+	INVALIDATED: 'InvalidatePwu',
+	SUPERSEDED: 'SupersedePwu'
+} as const satisfies Readonly<Record<string, string>>;
+
+/**
+ * THE ANTI-ROT MECHANISM. `advancePwuLifecycle`'s `target` is narrowed to this union, so a SEVENTH semantic
+ * lifecycle command cannot be added without adding its row here — `check-types` fails before the new command's
+ * arrow can quietly become reachable through the generic setter as well.
+ */
+export type OwnedLifecycleTarget = keyof typeof PWU_SEMANTIC_LIFECYCLE_COMMANDS;
+
 /** Shared advance of the workLifecycle axis for an authored transition that does not change the sub-axes:
  * load -> canAdvanceWorkLifecycle (legality + cross-axis guard) -> commit. */
 function advancePwuLifecycle(
 	ctx: HandlerContext,
 	command: DomainCommand,
 	args: {
-		readonly target: string;
+		readonly target: OwnedLifecycleTarget;
 		readonly eventType: string;
 		readonly mutate?: (current: Record<string, unknown>) => Record<string, unknown>;
 		/** Build the EVENT payload from the committed next state. Without this the event carries
@@ -405,9 +448,20 @@ function readinessFactsOf(ctx: HandlerContext, state: Record<string, unknown>): 
  * events, so they were never alternatives. §11 schematizes 2 of ~11 PWU commands — a first-slice sampler
  * (§16 item 6), not an exhaustive pairing.
  *
- * `PwuStateChanged` belongs to `ChangePwuState` (below), which already carries `reasonCode` — the reason a
- * §8.2 EXCEPTION transition needs, because §8.2 is keyed by a Trigger column with no command name to recover
- * it from. §8.1 PRIMARY transitions like this one are keyed by Command: the reason IS "Mark ready".
+ * `PwuStateChanged` belongs to `ChangePwuState` (below), which already carries `reasonCode`.
+ *
+ * ⚠ CORRECTED 2026-08-08 (REG-F-072). This sentence used to continue: *"— the reason a §8.2 EXCEPTION
+ * transition needs, because §8.2 is keyed by a Trigger column with no command name to recover it from. §8.1
+ * PRIMARY transitions like this one are keyed by Command: the reason IS 'Mark ready'."* **That was an inference
+ * presented as a rule, and its own derivation says so** — `docs/_working/HARMONIZATION-LOG.md` closes the
+ * argument with *"(That §8.2 is its referent is my inference; the corpus never links them.)"* It then survived
+ * long enough to be quoted BACK as decisive evidence while designing REG-F-072's fix, from inside this file.
+ * Three facts refute it: the machine's own triggers name `challengePwu` / `reshapePwu` / `invalidatePwu` as the
+ * exception commands, so §8.2 is where the NAMED commands already are; every production `ChangePwuState` call
+ * performs a §8.1 primary or a hold, never an exception arrow; and `ChangePwuState` is UNRATIFIED-AUTHORED, the
+ * vocab noting *"DOC-007-only generic transition; DOC-002 has no ChangePwuState (uses named per-transition
+ * commands)"*. What `reasonCode` is genuinely for is the derived middle of the lifecycle — PLANNED, EXECUTING,
+ * EVIDENCE_PENDING, UNDER_ASSURANCE — which has no named command at all. That gap is registered, not fixed here.
  *
  * All three PwuMarkedReady fields derive; nothing is minted. (The payload is AUTHORED, not ratified — no corpus
  * doc schematizes it — so this event is outside RATIFIED_EVENT_PAYLOADS and the (d2) gate does not check it.
@@ -763,6 +817,54 @@ function rejectUnbackedExecutionSuccess(
 }
 
 /**
+ * THE GENERIC SETTER MAY NOT PERFORM AN ARROW A SEMANTIC COMMAND OWNS (REG-F-072).
+ *
+ * Not a guard about a fact or an authority — a guard about the WRITE PATH, which is what PER-3 legislates. The
+ * finding it closes: `markPwuReady` runs `checkPwuShapeReadiness` (eight limbs, failing closed) and
+ * `changePwuState` performed the SAME `SHAPING -> READY` arrow checking none of it, demonstrated by a shipped
+ * test that reached READY with empty `inScope`, `outOfScope` and `expectedOutputs` and a RAW intent.
+ *
+ * ⚠ WHY CLOSE THE ROUTE RATHER THAN COPY THE GUARD, which is what I built first and withdrew.
+ * Copying `checkPwuShapeReadiness` into a fifth "may not be asserted" guard fixes ONE arrow and leaves the class
+ * open — and it is a no-op for four of the six owning commands, because `beginPwuShaping`, `challengePwu`,
+ * `reshapePwu` and `supersedePwu` add NO precondition at all over the shared `advancePwuLifecycle`. Their delta
+ * is the EVENT: `PwuChallenged`, `PwuReshapingStarted`, `PwuSuperseded`, `PwuInvalidated` each carry fields
+ * (`challengeReason`, `reason`, `supersedingWorkUnitId`, `triggeringObjectId`) that `ChangePwuStatePayload`
+ * cannot express — so no precondition could restore them, and every one of those events is currently emitted by
+ * NOTHING when the setter is used. Closing the route is the only repair that restores both the precondition and
+ * the record.
+ *
+ * MEASURED BEFORE CHOSEN: the whole structural fix costs ONE test more than the single-arrow one (49 vs 48), and
+ * the production surface is zero — the reference undertaking, the demo route and every e2e already reach these
+ * six states through the named commands.
+ *
+ * A HOLD IS NOT A MOVE. `newState === current` is how the setter advances an orthogonal axis while the
+ * workLifecycle axis stays put (the dominant case), and it performs no arrow, so it is untouched.
+ */
+function rejectArrowOwnedBySemanticCommand(
+	command: DomainCommand,
+	id: string,
+	currentWorkLifecycleState: string,
+	newState: string
+): CommandResult | undefined {
+	if (newState === currentWorkLifecycleState) return undefined;
+	const owner = (PWU_SEMANTIC_LIFECYCLE_COMMANDS as Readonly<Record<string, string | undefined>>)[
+		newState
+	];
+	if (owner === undefined) return undefined;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`ChangePwuState may not perform PWU ${id} ${currentWorkLifecycleState} -> ${newState}: that arrow ` +
+			`belongs to ${owner}, which records the act as its own semantic event and enforces the preconditions ` +
+			`this generic setter does not. Dispatch ${owner} instead. (JPWB-DOC-003 §9 PER-3 — canonical state is ` +
+			`mutated "only through … semantically named commands that … validate preconditions and invariants"; ` +
+			`"no generic CRUD/PATCH path … bypasses this pipeline". REG-F-072.)`,
+		[id]
+	);
+}
+
+/**
  * ABANDONMENT MAY NOT BE ASSERTED — the fourth guard, and the only one of the four that is about AUTHORITY
  * rather than evidence.
  *
@@ -935,6 +1037,16 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		nextAxes
 	);
 	if (illegalMove) return illegalMove;
+	// REG-F-072 — LAST, and deliberately so. An arrow that is ILLEGAL should be reported as illegal rather than
+	// as owned; a caller redirected to MarkPwuReady for a transition the machine forbids outright would be sent
+	// to a command that will refuse it for a different reason.
+	const ownedArrow = rejectArrowOwnedBySemanticCommand(
+		command,
+		id,
+		current.workLifecycleState,
+		p.newState
+	);
+	if (ownedArrow) return ownedArrow;
 	const newRevision = loaded.revision + 1;
 	const next = {
 		...nextEnvelope(loaded.state, command, newRevision),

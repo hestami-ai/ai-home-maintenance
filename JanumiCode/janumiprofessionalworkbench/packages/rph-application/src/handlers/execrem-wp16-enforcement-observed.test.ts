@@ -213,15 +213,15 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						description: 'd',
 						intentId: INT,
 						boundaries: {
-							inScope: [],
-							outOfScope: [],
+							inScope: ['the governed work under test'],
+							outOfScope: ['not yet known'],
 							permittedChanges: [],
 							prohibitedChanges: []
 						},
 						obligationIds,
 						constraintIds,
 						assumptionIds: [],
-						expectedOutputs: [],
+						expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 						assurancePolicyIds: [],
 						riskProfile: {
 							consequence: 'HIGH',
@@ -415,11 +415,16 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						title: 'subject',
 						description: 'd',
 						intentId: INT2,
-						boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+						boundaries: {
+					inScope: ['the governed work under test'],
+					outOfScope: ['not yet known'],
+					permittedChanges: [],
+					prohibitedChanges: []
+				},
 						obligationIds: [],
 						constraintIds: [],
 						assumptionIds: [],
-						expectedOutputs: [],
+						expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 						assurancePolicyIds: [],
 						riskProfile: {
 							consequence: 'HIGH',
@@ -622,21 +627,9 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		stepState: 'QUEUED'
 	});
 
-	const chg = (previousState: string, newState: string) =>
-		dispatch(
-			'ChangePwuState',
-			{
-				previousState,
-				newState,
-				executionState: 'NOT_PLANNED',
-				assuranceState: 'UNASSESSED',
-				shapeIntegrityState: 'PRESERVED',
-				reasonCode: 'fixture',
-				supportingObjectIds: []
-			},
-			PWU,
-			'PROFESSIONAL_WORK_UNIT'
-		);
+	// REG-F-072 — the local `chg` helper is GONE, not merely unused: with SHAPING and READY moved to their
+	// owning commands this file no longer dispatches ChangePwuState for the PWU at all. Its absence is the
+	// tell that the arrangement now goes through the same route production does.
 
 	const start = (i: number) => dispatch('StartExecutionStep', { stepId: sid(i) });
 	const fail = (i: number) =>
@@ -657,10 +650,28 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 		});
 
+	/**
+	 * REG-F-072 — SHAPING and READY through the commands that OWN those arrows, which is also what makes the PWU
+	 * genuinely shaped rather than merely flipped. `markPwuReady` refuses the pre-repair fixture on four limbs.
+	 */
+	const toReady = () => {
+		ok(dispatch('BeginIntentDiscovery', {}, INTENT, 'INTENT'), 'intent discovery');
+		ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INTENT, 'INTENT'), 'intent provisional');
+		ok(dispatch('BeginPwuShaping', {}, PWU, 'PROFESSIONAL_WORK_UNIT'), 'shaping');
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'ready'
+		);
+	};
+
 	/** An ACTIVE 3-step linear plan on an OPEN (READY) PWU. Returns the activation outcome. */
 	function activePlan(retryPolicy: Record<string, unknown> = {}): Outcome {
-		ok(chg('PROPOSED', 'SHAPING'), 'shaping');
-		ok(chg('SHAPING', 'READY'), 'ready');
+		toReady();
 		ok(
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,
@@ -878,11 +889,16 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				title: 'Arch',
 				description: 'd',
 				intentId: INTENT,
-				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				boundaries: {
+					inScope: ['the governed work under test'],
+					outOfScope: ['not yet known'],
+					permittedChanges: [],
+					prohibitedChanges: []
+				},
 				obligationIds: [],
 				constraintIds: [],
 				assumptionIds: [],
-				expectedOutputs: [],
+				expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 				assurancePolicyIds: [],
 				riskProfile: {
 					consequence: 'MEDIUM',
@@ -966,8 +982,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 
 				requestBinding(1);
 				requestBinding(2);
-				ok(chg('PROPOSED', 'SHAPING'), 'shaping');
-				ok(chg('SHAPING', 'READY'), 'ready');
+				toReady();
 				ok(
 					dispatch('ProposeExecutionPlan', {
 						executionPlanId: PLAN,
@@ -1017,8 +1032,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				// Every earlier limb is deliberately satisfied so the input-readiness limb is the ONLY thing that can
 				// refuse: ACTIVE plan, open PWU, no binding (out of scope), QUEUED source state, first step so the
 				// start-gate is clear. Reaching this refusal through any other guard would be a vacuous negative.
-				ok(chg('PROPOSED', 'SHAPING'), 'shaping');
-				ok(chg('SHAPING', 'READY'), 'ready');
+				toReady();
 				ok(
 					dispatch('ProposeExecutionPlan', {
 						executionPlanId: PLAN,
@@ -1633,15 +1647,15 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 								description: 'd',
 								intentId: iid,
 								boundaries: {
-									inScope: [],
-									outOfScope: [],
+									inScope: ['the governed work under test'],
+									outOfScope: ['not yet known'],
 									permittedChanges: [],
 									prohibitedChanges: []
 								},
 								obligationIds: [],
 								constraintIds: [],
 								assumptionIds: [aid],
-								expectedOutputs: [],
+								expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 								assurancePolicyIds: [],
 								riskProfile: {
 									consequence: 'HIGH',
@@ -1792,15 +1806,15 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 							description: 'd',
 							intentId,
 							boundaries: {
-								inScope: [],
-								outOfScope: [],
+								inScope: ['the governed work under test'],
+								outOfScope: ['not yet known'],
 								permittedChanges: [],
 								prohibitedChanges: []
 							},
 							obligationIds: [],
 							constraintIds: [],
 							assumptionIds: [],
-							expectedOutputs: [],
+							expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 							assurancePolicyIds: [],
 							riskProfile: {
 								consequence: 'HIGH',
@@ -1877,24 +1891,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						pwuId,
 						'PROFESSIONAL_WORK_UNIT'
 					);
+				// REG-F-072 — through BeginPwuShaping, which OWNS this arrow. Using the generic setter here was
+				// especially wrong: this probe exists to observe the READINESS rule being enforced, and it reached
+				// the state it observes from by way of the bypass that rule was being escaped through.
 				const shape = (pwuId: string) =>
-					ok(
-						dispatch(
-							'ChangePwuState',
-							{
-								previousState: 'PROPOSED',
-								newState: 'SHAPING',
-								executionState: 'NOT_PLANNED',
-								assuranceState: 'UNASSESSED',
-								shapeIntegrityState: 'PRESERVED',
-								reasonCode: 'fixture',
-								supportingObjectIds: []
-							},
-							pwuId,
-							'PROFESSIONAL_WORK_UNIT'
-						),
-						`shape ${pwuId}`
-					);
+					ok(dispatch('BeginPwuShaping', {}, pwuId, 'PROFESSIONAL_WORK_UNIT'), `shape ${pwuId}`);
 
 				const OK_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6310';
 				const BAD_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6311';

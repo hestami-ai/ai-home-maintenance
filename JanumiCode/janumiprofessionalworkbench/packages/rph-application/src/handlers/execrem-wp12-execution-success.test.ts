@@ -125,11 +125,16 @@ describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVI
 				title: 'Arch',
 				description: 'd',
 				intentId: INTENT,
-				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				boundaries: {
+					inScope: ['the governed work under test'],
+					outOfScope: ['not yet known'],
+					permittedChanges: [],
+					prohibitedChanges: []
+				},
 				obligationIds: [],
 				constraintIds: [],
 				assumptionIds: [],
-				expectedOutputs: [],
+				expectedOutputs: [{ outputId: 'out_fixture', kind: 'DOCUMENT' }],
 				assurancePolicyIds: [],
 				riskProfile: {
 					consequence: 'MEDIUM',
@@ -142,11 +147,23 @@ describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVI
 			PWU,
 			'PROFESSIONAL_WORK_UNIT'
 		);
+		// REG-F-072 — SHAPING and READY leave the walk: those two arrows belong to BeginPwuShaping and
+		// MarkPwuReady, which is also what makes the PWU genuinely shaped rather than merely flipped.
+		ok(dispatch('BeginIntentDiscovery', {}, INTENT, 'INTENT'), 'intent discovery');
+		ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INTENT, 'INTENT'), 'intent provisional');
+		ok(dispatch('BeginPwuShaping', {}, PWU, 'PROFESSIONAL_WORK_UNIT'), 'shaping');
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'ready'
+		);
 		// Walk the PWU to EXECUTING/RUNNING so the success claim is the ONLY thing under test.
-		// The real arrows, in order (PWU.workLifecycleState): PROPOSED -> SHAPING -> READY -> PLANNED -> EXECUTING.
+		// The remaining arrows, in order (PWU.workLifecycleState): READY -> PLANNED -> EXECUTING.
 		for (const [previousState, newState, exec] of [
-			['PROPOSED', 'SHAPING', 'NOT_PLANNED'],
-			['SHAPING', 'READY', 'NOT_PLANNED'],
 			['READY', 'PLANNED', 'PLANNED'],
 			// executionState advances PLANNED -> QUEUED -> RUNNING, so the EXECUTING hop takes QUEUED and a
 			// subsequent HOLD carries it to RUNNING (a hold that moves an orthogonal axis is the dominant case).

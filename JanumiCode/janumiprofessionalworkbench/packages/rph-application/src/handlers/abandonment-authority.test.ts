@@ -64,11 +64,18 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 				title: 'Arch',
 				description: 'd',
 				intentId: INTENT,
-				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				// REG-F-072: a PWU must actually BE shaped to reach READY. These were empty, and the generic
+				// setter let it through anyway — the exact bypass this file's own fixture was relying on.
+				boundaries: {
+					inScope: ['the governed work under test'],
+					outOfScope: ['not yet known'],
+					permittedChanges: [],
+					prohibitedChanges: []
+				},
 				obligationIds: [],
 				constraintIds: [],
 				assumptionIds: [],
-				expectedOutputs: [],
+				expectedOutputs: [{ outputId: `out_${id}`, kind: 'DOCUMENT' }],
 				assurancePolicyIds: [],
 				riskProfile: {
 					consequence: 'MEDIUM',
@@ -82,10 +89,24 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 			'PROFESSIONAL_WORK_UNIT'
 		);
 
-	/** Move a PWU PROPOSED -> SHAPING -> READY, the state the `-> ABANDONED` arrow under test leaves from. */
+	/**
+	 * Move a PWU PROPOSED -> SHAPING -> READY, the state the `-> ABANDONED` arrow under test leaves from.
+	 *
+	 * ⚠ THROUGH THE COMMANDS THAT OWN THOSE ARROWS (REG-F-072). This used two `ChangePwuState` hops, and that is
+	 * how a PWU with empty boundaries and no expected output reached READY — `markPwuReady` would have refused it
+	 * on four limbs. The generic setter no longer performs an arrow a semantic command owns.
+	 */
 	const toReady = (id: string) => {
-		ok(chgOn(id, 'PROPOSED', 'SHAPING'), 'shaping');
-		ok(chgOn(id, 'SHAPING', 'READY'), 'ready');
+		ok(dispatch('BeginPwuShaping', {}, id, 'PROFESSIONAL_WORK_UNIT'), 'shaping');
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 },
+				id,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'ready'
+		);
 	};
 
 	const chgOn = (id: string, previousState: string, newState: string, supportingObjectIds: string[] = []) =>
@@ -183,6 +204,9 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 			),
 			'intent'
 		);
+		// A root PWU may not reach READY under a RAW intent (DOC-002 §6.3 L472, the eighth readiness limb).
+		ok(dispatch('BeginIntentDiscovery', {}, INTENT, 'INTENT'), 'intent discovery');
+		ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INTENT, 'INTENT'), 'intent provisional');
 		ok(proposePwu(PWU), 'pwu');
 		toReady(PWU);
 	});
@@ -288,9 +312,11 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 	// THE HERD, so it is not a control — a control must have a failure mode of its own. Kept as documentation of
 	// the intended scope, demoted in name so the count of real controls stays true.
 	it('a transition that is not an abandonment needs no decision', () => {
+		// Uses arrows the generic setter still OWNS. SHAPING and READY moved to their semantic commands under
+		// REG-F-072, so asserting them here would now be testing that guard rather than this one.
 		ok(proposePwu(OTHER_PWU), 'other pwu');
-		ok(chgOn(OTHER_PWU, 'PROPOSED', 'SHAPING'), 'SHAPING needs no governance decision');
-		ok(chgOn(OTHER_PWU, 'SHAPING', 'READY'), 'READY needs no governance decision');
+		toReady(OTHER_PWU);
+		ok(chgOn(OTHER_PWU, 'READY', 'PLANNED'), 'PLANNED needs no governance decision');
 	});
 
 	// ── CONTROL 1: THE ALREADY-CLOSED LIMB, WHICH IS THE ONE WITH ITS OWN FAILURE MODE ───────────────────────
