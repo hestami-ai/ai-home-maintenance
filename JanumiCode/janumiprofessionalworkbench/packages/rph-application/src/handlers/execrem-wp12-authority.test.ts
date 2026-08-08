@@ -74,6 +74,54 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 	const pwuLifecycle = () =>
 		(store.loadObject(PWU)!.state as { workLifecycleState: string }).workLifecycleState;
 
+	/**
+	 * An EFFECTIVE `ABANDON` Decision naming THIS PWU at its CURRENT semantic version, returned as the id to cite.
+	 *
+	 * ⚠ THIS HELPER IS THE REPAIR OF A DEMONSTRATED HOLE, NOT FIXTURE CEREMONY. Until REG-F-070 the three
+	 * abandonments below carried `reasonCode: 'fixture'` and an empty `supportingObjectIds` and were ACCEPTED —
+	 * this file was the register's own evidence that the one act JPWB-DOC-001 §5.2 reserves to Governance could be
+	 * performed by anyone. `subjectSemanticVersions` is NOT passed to ProposeDecision: `proposeDecision` derives it
+	 * from the subjects' current versions (`governance.ts:42`), which is what makes ASR-15's version bind real
+	 * rather than caller-asserted.
+	 */
+	const authorizeAbandon = (): string => {
+		const decisionId = `dec_01ARZ3NDEKTSV4RRFFQ69H21${seq.toString().padStart(2, '0')}`;
+		const version = store.loadObject(PWU)!.semanticVersion;
+		ok(
+			dispatch(
+				'ProposeDecision',
+				{
+					decisionType: 'ABANDON',
+					subjectObjectIds: [PWU],
+					selectedOption: 'abandon',
+					rationale: 'the sponsor is closing this unit of work',
+					authority: actor,
+					consideredEvidenceIds: [],
+					consideredObservationIds: []
+				},
+				decisionId,
+				'DECISION'
+			),
+			'propose abandon decision'
+		);
+		ok(
+			dispatch(
+				'ApproveDecision',
+				{
+					selectedOption: 'abandon',
+					rationale: 'the sponsor is closing this unit of work',
+					consideredEvidenceIds: [],
+					consideredObservationIds: [],
+					subjectSemanticVersions: { [PWU]: version }
+				},
+				decisionId,
+				'DECISION'
+			),
+			'approve abandon decision'
+		);
+		return decisionId;
+	};
+
 	const mkStep = (i: number, stepType = 'HUMAN_INTERACTION') => ({
 		id: sid(i),
 		executionPlanId: PLAN,
@@ -375,7 +423,10 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 	function closePwu() {
 		// executionState HOLDS at NOT_PLANNED: the four axes are orthogonal, and closing the unit of work
 		// says nothing about the execution axis, which the running plan owns.
-		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED'), 'abandon');
+		//
+		// REG-F-070: the abandonment now cites an EFFECTIVE ABANDON Decision. Before that guard these three lines
+		// closed a governed unit of work on `reasonCode: 'fixture'` alone.
+		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
 		expect(pwuLifecycle()).toBe('ABANDONED');
 	}
 
@@ -431,7 +482,7 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 			'propose'
 		);
 		ok(dispatch('ApproveExecutionPlan', {}), 'approve');
-		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED'), 'abandon');
+		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
 		const r = dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] });
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
@@ -444,7 +495,7 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 		// authoring nor approving is gated — only the acts that actually open or credit execution.
 		ok(chg('PROPOSED', 'SHAPING', 'NOT_PLANNED'), 'shaping');
 		ok(chg('SHAPING', 'READY', 'NOT_PLANNED'), 'ready');
-		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED'), 'abandon');
+		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
 		ok(
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,

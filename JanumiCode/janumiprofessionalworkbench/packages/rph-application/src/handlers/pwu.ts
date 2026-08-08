@@ -44,6 +44,7 @@ import {
 	type HandlerContext
 } from './kit.js';
 import { evaluatePrecondition, predicate } from './command-precondition.js';
+import { resolveAbandonAuthorization } from './abandon-authorization.js';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -762,6 +763,65 @@ function rejectUnbackedExecutionSuccess(
 }
 
 /**
+ * ABANDONMENT MAY NOT BE ASSERTED — the fourth guard, and the only one of the four that is about AUTHORITY
+ * rather than evidence.
+ *
+ * The three above ask "is the fact true": a disposition needs an assessment, a baselining needs a promoted
+ * baseline, an execution success needs a succeeded step. This one asks a different question — "who said so" —
+ * because closing a unit of work is not a fact about the work at all. JPWB-DOC-001 §5.2: *"**Governance is an
+ * authority function outside the six disciplines.** It alone authorizes waiver, risk acceptance, rejection or
+ * abandonment of governed work, and promotion. No discipline may absorb it."*
+ *
+ * ⚠ THIS WAS DEMONSTRATED, NOT INFERRED. All seventeen `-> ABANDONED` arrows declared the guard *"Authorized
+ * decision (Decision.decisionType=ABANDON)"*; nothing read it; and `execrem-wp12-authority.test.ts` abandoned a
+ * PWU with `reasonCode: 'fixture'` and an empty `supportingObjectIds`, ACCEPTED, three times over (REG-F-070).
+ *
+ * AND IT IS THE OPPOSITE FAILURE FROM THE ONE C-0 HUNTS. That census asks whether an arrow CAN be performed;
+ * these seventeen could be performed by too many actors. An over-permissive arrow is invisible to a coverage
+ * census by construction — which is why this one survived every control the repository had.
+ *
+ * The seven ordered checks live in `abandon-authorization.ts`, including the version bind ASR-15 requires.
+ */
+function rejectUnauthorizedAbandonment(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	currentWorkLifecycleState: string,
+	// The SIXTH parameter, and a disclosed divergence from the three siblings: ASR-15's version bind needs the
+	// PWU's current semantic version, which the axes bag does not carry.
+	currentSemanticVersion: number
+): CommandResult | undefined {
+	if (p.newState !== 'ABANDONED' || currentWorkLifecycleState === 'ABANDONED') return undefined;
+	const cited = p.supportingObjectIds ?? [];
+	// Collected so the refusal says WHICH check each cited id failed. "Nothing backed it" is unactionable when
+	// the caller supplied a real decision that was merely PROPOSED, or scoped to a sibling PWU.
+	const failures: string[] = [];
+	const authorized = cited.some((oid) => {
+		const verdict = resolveAbandonAuthorization(ctx, {
+			pwuId: id,
+			authorizationId: oid,
+			pwuSemanticVersion: currentSemanticVersion
+		});
+		if (!verdict.ok) failures.push(`${oid}: ${verdict.reason}`);
+		return verdict.ok;
+	});
+	if (authorized) return undefined;
+	const detail = failures.length ? ` Cited object(s) rejected — ${failures.join('; ')}.` : '';
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`ChangePwuState would abandon PWU ${id} with no authorized decision to back it. Abandonment of governed ` +
+			`work is reserved to Governance ("It alone authorizes waiver, risk acceptance, rejection or abandonment ` +
+			`of governed work, and promotion" — JPWB-DOC-001 §5.2), and authority is checked BEFORE effect ` +
+			`(ASR-15). Cite a DECISION in supportingObjectIds whose decisionType is ABANDON, whose status is ` +
+			`EFFECTIVE, whose subjectObjectIds include ${id}, and whose subjectSemanticVersions bind ${id} at ` +
+			`version ${currentSemanticVersion}. Supplied: [${cited.join(', ') || 'nothing'}].${detail}`,
+		[id]
+	);
+}
+
+/**
  * The workLifecycle axis either ADVANCES (a legal transition whose cross-axis guard holds against the NEW
  * sub-axes) or HOLDS (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park
  * the PWU in a SATISFIED-without-assurance state (property P1 / INV-5). Returns a reject-result when the move is
@@ -845,14 +905,24 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		const illegal = checkTransition(command, machine, from, to);
 		if (illegal) return illegal;
 	}
-	// THE THREE "MAY NOT BE ASSERTED" GUARDS. checkTransition above answers only "is this an arrow on the
-	// machine". These answer "is the fact true": a disposition needs an assessment, a baselining needs a promoted
-	// baseline, an execution success needs a succeeded step. Together they are the difference between a demo that
-	// tells the truth because it chooses to and one that could not lie if it tried.
+	// THE FOUR "MAY NOT BE ASSERTED" GUARDS. checkTransition above answers only "is this an arrow on the
+	// machine". Three of these answer "is the fact true": a disposition needs an assessment, a baselining needs a
+	// promoted baseline, an execution success needs a succeeded step. The fourth answers "WHO SAID SO" —
+	// abandonment is a governance act (JPWB-DOC-001 §5.2), not a fact about the work, and it was the one arrow of
+	// the four whose declared guard nothing had ever evaluated (REG-F-070). Together they are the difference
+	// between a demo that tells the truth because it chooses to and one that could not lie if it tried.
 	const unearned =
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
 		rejectUnbackedBaselining(ctx, command, id, p, current.workLifecycleState) ??
-		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
+		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState) ??
+		rejectUnauthorizedAbandonment(
+			ctx,
+			command,
+			id,
+			p,
+			current.workLifecycleState,
+			loaded.semanticVersion
+		);
 	if (unearned) return unearned;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
 	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in
