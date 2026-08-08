@@ -2054,3 +2054,23 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **⚠ THIS IS THE OPPOSITE FAILURE FROM THE ONE C-0 HUNTS, AND C-0 IS STRUCTURALLY BLIND TO IT.** The census asks whether an arrow can be performed; this arrow can be performed **by too many actors**. An over-permissive arrow is invisible to a coverage census by construction, and would have stayed invisible if the triage had answered only the question it was asked. The general form: **a declared guard on an arrow is a claim, and no control in this repository checks that arrow guards are enforced.**
 - **Related, same family:** the ratified events `PwuAbandoned` and `PwuBlocked` are declared (messages.ts:1361, 1372) and registered (2543, 2545) and **emitted by no handler** — all 32 generic-setter arrows emit `PwuStateChanged` instead.
 - **Merge target:** Repository — an abandonment precondition citing an EFFECTIVE ABANDON Decision, plus the two ratified events. **Status:** OPEN. **Safe default:** until enforced, no document may describe abandonment as governance-controlled.
+
+---
+
+### REG-F-071 — Four state machines declare an initial state the engine never writes, and the reachability control walks from that fiction
+- **Date:** 2026-08-08 · **Type:** FINDING (build agent) · **Source:** building C-0a's occupancy check; measured, then each limb re-verified by grep against production handlers.
+- **The generalisation of REG-F-067, which found one instance and predicted the class.** Measured across all 26 machines:
+
+| machine | declared `initialState` | what creation actually writes |
+|---|---|---|
+| `DecompositionContract.status` | `DRAFT` | `UNDER_REVIEW` (`decomposition.ts:66`) |
+| `RecompositionContract.status` | `DRAFT` | `READY` (`decomposition.ts:498`) |
+| `ExecutionPlan.status` | `PROPOSED` | `UNDER_REVIEW` (`execution.ts:264`) |
+| `AssuranceAssessment.state` | `REQUESTED` | `READY` / `EVIDENCE_PENDING` (`assurance.ts:1263`) |
+
+  **In every case the declared initial state is written NOWHERE in production** — verified by grepping for the literal in the owning handler, which returns nothing.
+- **⚠ SO `state-reachability.test.ts` COMPUTES ITS ANSWER FROM A ROOT THAT DOES NOT EXIST.** Its `strandedFrom` walks the arrow graph outward from `m.initialState`. For these four machines that root is never occupied, so *"reachable from the initial state"* is a claim about a diagram whose entry point the engine does not use. The control is not merely blind here (REG-F-063); its premise is false. **Both controls over these machines are now known to be measuring something other than what they say.**
+- **AND IT MAKES C-0 OVER-REPORT COVERAGE.** A covered arrow out of an unoccupiable source is dead. Measured: **18 covered arrows leave a non-initial state with no covered in-arrow.** Fourteen are FALSE positives — the state is BORN outside the declared initial (exactly the four rows above) — which is why the occupancy check cannot be built from the arrow graph alone. The residue is genuinely dead, and three of them I created hours ago: `UNDER_VERIFICATION|ACCEPTED|VERIFIED -> FALSIFIED`, scored covered by `FalsifyAssumption` while nothing can produce those three sources.
+- **WHAT THIS COSTS THE NEXT INCREMENT, STATED SO IT IS NOT DISCOVERED LATE.** C-0a's occupancy check needs BIRTH STATES, and they are not derivable from the arrow graph or from `initialState` — both lie. They must be DECLARED at the 22 `createObject` sites and checked at runtime, the same shape as `targetStates` (REG-F-069's increment), so a birth that drifts from its declaration fails a command rather than only a census.
+- **AND THE DECLARED `initialState` FIELDS ARE THEMSELVES SUSPECT.** Once births are declared, four `initialState` values are provably wrong and must be corrected or struck — which moves C-0's arrow total and is therefore a deliberate, reviewed edit, not a silent one.
+- **Merge target:** Repository — C-0a. **Status:** OPEN. **Safe default:** no document or control may treat `initialState` as the state an object is created in until births are declared; `state-reachability.test.ts` carries a note saying so.

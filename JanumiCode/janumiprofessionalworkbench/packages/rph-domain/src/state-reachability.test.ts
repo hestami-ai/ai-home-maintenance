@@ -71,6 +71,21 @@ const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
  * looks like an orphan (no in-arrow, correctly) and an isolated initial state looks fine (it is the initial state).
  * Connectivity asks whether the machine is a machine.
  */
+/**
+ * ⚠ THIS WALK STARTS FROM A ROOT FOUR MACHINES NEVER OCCUPY (REG-F-071, 2026-08-08).
+ *
+ * `m.initialState` is a DECLARATION, and for `DecompositionContract.status` (DRAFT),
+ * `RecompositionContract.status` (DRAFT), `ExecutionPlan.status` (PROPOSED) and
+ * `AssuranceAssessment.state` (REQUESTED) the engine writes something else at creation — verified by grepping
+ * each literal in its owning handler and finding no production write at all.
+ *
+ * So for those four, "reachable from the initial state" is a claim about a diagram whose entry point the engine
+ * does not use. This is not the blind spot REG-F-063 records (that one is about ARROWS having no command); the
+ * premise here is false. The repair is C-0a: declare BIRTH STATES at the `createObject` sites, check them at
+ * runtime, then correct or strike the four `initialState` values — after which this walk can start from a state
+ * that exists. Disclosed here rather than in the register alone, because a reader of THIS FILE is the one who
+ * would otherwise trust the result.
+ */
 function strandedFrom(machine: string): string[] {
 	const m = getMachine(machine);
 	if (!m.initialState) return [...m.states];
