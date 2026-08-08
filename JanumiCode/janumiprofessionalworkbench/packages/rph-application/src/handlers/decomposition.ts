@@ -315,6 +315,10 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
 		objectType: DECOMP,
 		statusField: 'status',
 		machine: 'DecompositionContract.status',
+		// The RANGE of `DECOMP_DISPOSITIONS[*].target`, declared. `advanceStatus` refuses an outcome outside it, so
+		// a fourth disposition added to that table without being named here fails loudly instead of driving an
+		// arrow the C-0 census believes nothing can reach.
+		targetStates: ['VALID', 'CONDITIONALLY_VALID', 'INVALID'],
 		target: mapping.target,
 		// JAN-CMDPRE DWP-03: the target is payload-derived (VALID|CONDITIONALLY_VALID|INVALID), but ALL THREE share
 		// a SINGLE in-arrow — from UNDER_REVIEW — so the source precondition is a clean state set, NOT a D10-shaped
@@ -658,6 +662,9 @@ export const completeRecomposition: CommandHandler = (ctx, command, payload) => 
 		objectType: RECOMP,
 		statusField: 'status',
 		machine: 'RecompositionContract.status',
+		// The RANGE of `RECOMP_OUTCOME_STATE`'s values plus its `?? 'INSUFFICIENT'` fallback — which is already one
+		// of them, so the fallback adds no arrow. Enforced at runtime by advanceStatus.
+		targetStates: ['COMPOSABLE', 'CONFLICTED', 'INSUFFICIENT'],
 		target: RECOMP_OUTCOME_STATE[evaluation.status] ?? 'INSUFFICIENT',
 		// JAN-CMDPRE DWP-03: like validateDecomposition, the target is EVALUATION-derived
 		// (COMPOSABLE|CONFLICTED|INSUFFICIENT) but ALL THREE share a SINGLE in-arrow — from EVALUATING — so the

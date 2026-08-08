@@ -749,6 +749,11 @@ export const recordClaimAssessment: CommandHandler = (ctx, command, payload) => 
 		objectType: CLAIM,
 		statusField: 'status',
 		machine: 'Claim.status',
+		// The RANGE, from the one table that already bounds it — `eventType` is looked up in
+		// CLAIM_STATUS_EVENT above and an unlisted target is rejected before we get here. Declaring the keys
+		// rather than a second literal list keeps ONE source of truth: a state added to that table becomes
+		// performable here and visible to the C-0 arrow census in the same edit, with no list to forget.
+		targetStates: Object.keys(CLAIM_STATUS_EVENT),
 		target,
 		eventType,
 		// JAN-CMDPRE: the states this command may be issued FROM — every non-terminal claim state. Which
@@ -1891,6 +1896,11 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		objectType: ASSESSMENT,
 		statusField: 'assessmentState',
 		machine: 'AssuranceAssessment.state',
+		// The RANGE, taken from the ratified enum that already bounds it — `disposition` is refused above unless
+		// it is one of `DISPOSITIONS`, which IS this schema's options. Naming the schema rather than retyping its
+		// members keeps one source of truth: a disposition added to the contract becomes performable here and
+		// visible to the C-0 arrow census in the same edit.
+		targetStates: AssuranceDispositionRecommendationSchema.options,
 		target: disposition,
 		// The verdict's CONTENT (subject versions, validator identity, residual uncertainty) rides the EVENT, not the
 		// object — so re-completing an already-terminal assessment appended a second, fully contradicting verdict: a

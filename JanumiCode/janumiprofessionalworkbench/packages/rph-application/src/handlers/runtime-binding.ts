@@ -118,6 +118,9 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 		machine: MACHINE,
 		// DERIVED from the request this grant answers. `checkTransition` then validates whichever arrow that is, so
 		// both outcomes are checked against the ratified machine rather than one being asserted.
+		// The deriver's RANGE, declared. Checked at runtime by `advanceStatus` (an outcome outside it refuses),
+		// and read by the C-0 arrow census, which cannot infer a function's range and must not guess one.
+		targetStates: ['AUTHORIZED', 'PARTIALLY_AUTHORIZED'],
 		target: (state) =>
 			authorizationOutcome({
 				requested: capabilityIds(state.requestedCapabilities),
