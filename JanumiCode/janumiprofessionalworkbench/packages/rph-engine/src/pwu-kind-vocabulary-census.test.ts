@@ -25,10 +25,30 @@
 // This census does not fix it. It pins the size of it so the number can only fall, and so the next author sees
 // the mismatch as a measured fact rather than rediscovering it through a refusal three layers away.
 import { MAPPED_PWU_KINDS } from '@janumipwb/rph-projections';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createEngine, getObject, type EngineHandle } from './index.js';
+import { createEngine, getObject, type AuthedEngineHandle } from './index.js';
 import { seedWorkbench } from './seed-workbench.js';
+
+// ── THE SEED RUNS AS THE UNDERTAKING OWNER (D-1) ─────────────────────────────────────────────────────────────
+// `seedWorkbench` -> `driveReferenceUndertaking` proposes each promotion Decision with
+// `authority: { actorId: 'owner-1', actorType: 'HUMAN' }`, and REG-F-014 refuses a Decision whose declared
+// authority is not its issuer. The drive used to assert that identity in the envelope (`issuedBy: ACTOR`); the
+// SESSION carries it now, so only a session that IS `owner-1` can seed. As `u1` the first `ProposeDecision`
+// refuses RPH_AUTHORITY_INSUFFICIENT and the fail-loud drive throws inside `beforeAll` — which for a CENSUS is
+// the worst failure mode available, since every count below would then be read off a half-built store.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+const OWNER_CRED = DIR.credentialFor(OWNER.actorId);
 
 /** Every PWU kind the CATALOG scopes a policy to. */
 function catalogKinds(): string[] {
@@ -44,7 +64,7 @@ function catalogKinds(): string[] {
  * it by construction and could not have seen this divergence, which is a mismatch between what the seeder writes
  * and what the catalog expects to find.
  */
-function pwuTypeIds(engine: EngineHandle): string[] {
+function pwuTypeIds(engine: AuthedEngineHandle): string[] {
 	const ids = new Set<string>();
 	for (const e of engine.readAllEvents())
 		if ((e as { aggregateType?: string }).aggregateType === 'PWU_TYPE')
@@ -53,7 +73,7 @@ function pwuTypeIds(engine: EngineHandle): string[] {
 }
 
 /** The kinds those types carry. */
-function seededKinds(engine: EngineHandle): string[] {
+function seededKinds(engine: AuthedEngineHandle): string[] {
 	const out = new Set<string>();
 	for (const id of pwuTypeIds(engine)) {
 		const state = getObject(engine, id) as { pwuKind?: string } | undefined;
@@ -63,17 +83,18 @@ function seededKinds(engine: EngineHandle): string[] {
 }
 
 describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
-	let engine: EngineHandle;
+	let engine: AuthedEngineHandle;
 	let seeded: string[];
 	let typeIds: string[];
 
 	beforeAll(() => {
 		let n = 0;
 		engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		});
+		}).as(OWNER_CRED);
 		seedWorkbench(engine);
 		seeded = seededKinds(engine);
 		typeIds = pwuTypeIds(engine);

@@ -6,21 +6,23 @@
 // ONLY this seam; they never reach into the individual packages.
 import {
 	Engine,
-	type BatchResult,
 	type EventSubscriber,
-	type ObjectPostcondition,
-	type RevisionPrecondition
+	type AuthedEngine
 } from '@janumipwb/rph-application';
 import type {
 	AssessmentCriterion,
 	EvidenceRequirement,
-	CommandResult,
-	DomainCommand,
 	DomainEvent,
 	Frozen
 } from '@janumipwb/rph-contracts';
 import { SnapshotOverlayStorageAdapter, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
-import type { Logger, StorageAdapter, StoredObject } from '@janumipwb/rph-ports';
+import type {
+	AuthenticationPort,
+	Credential,
+	Logger,
+	StorageAdapter,
+	StoredObject
+} from '@janumipwb/rph-ports';
 
 /** A structural issue found while validating a loaded PWA ontology (mirrors the PWA package's OntologyIssue). */
 export interface OntologyIssue {
@@ -89,6 +91,11 @@ export interface CreateEngineDeps {
 	readonly validateOntology?: () => OntologyIssue[];
 	/** The storage adapter (event log + objects + outbox + receipts). Defaults to an in-memory SqliteStorageAdapter. */
 	readonly store?: StorageAdapter;
+	/**
+	 * THE TRUST BOUNDARY (REG-D-027). Required — see `EngineDeps.authenticate`: an optional port turns "no
+	 * gate" from a compile error into a runtime condition.
+	 */
+	readonly authenticate: AuthenticationPort;
 	/** Deterministic clock for tests (ISO timestamp). */
 	readonly now?: () => string;
 	/** Deterministic event-id minter for tests. */
@@ -98,17 +105,21 @@ export interface CreateEngineDeps {
 
 /** The public engine seam. Everything a host needs: dispatch commands, observe events, drain the outbox to
  *  projections, query current objects / the event log, and read the loaded ontology. */
+/** An `EngineHandle` that has been given a credential: everything the handle does, plus dispatch. */
+export interface AuthedEngineHandle extends EngineHandle, AuthedEngine {
+	/** A fork of an authenticated handle stays bound to the same principal — see the note at `as`. */
+	fork(): AuthedEngineHandle;
+}
+
 export interface EngineHandle {
-	dispatch(command: DomainCommand): CommandResult;
-	/** Dispatch several commands atomically (all-or-nothing) — for multi-step authoring / agent proposals. */
-	dispatchBatch(commands: readonly DomainCommand[]): BatchResult;
-	/** Atomically verify a captured revision vector and replay the complete command batch. */
-	dispatchBatchGuarded(
-		commands: readonly DomainCommand[],
-		preconditions: readonly RevisionPrecondition[],
-		expectedEventCount?: number,
-		postconditions?: readonly ObjectPostcondition[]
-	): BatchResult;
+	/**
+	 * Present a credential and obtain the ONLY object that can dispatch (REG-D-028).
+	 *
+	 * ⚠ `dispatch`, `dispatchBatch` and `dispatchBatchGuarded` USED TO LIVE HERE. Moving them behind a
+	 * credential is what makes every unmigrated call site a COMPILE ERROR rather than a silent last-write-wins
+	 * path — the property PER-3's SCOPE clause asks for, enforced by the type checker instead of by review.
+	 */
+	as(credential: Credential): AuthedEngineHandle;
 	subscribe(handler: EventSubscriber): void;
 	drainOutbox(): number;
 	/** WP-2-007 restart recovery: re-drive PENDING outbox on (re)open of a durable store, idempotently (an
@@ -152,18 +163,32 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 	}
 
 	const store = deps.store ?? new SqliteStorageAdapter({ now: deps.now });
+	// ⚠ AN EXPLICIT FIELD ENUMERATION, AND IT IS A TRAP THIS INCREMENT WALKED INTO ONCE. `fork()` below
+	// spreads `...deps`, so anything added to `CreateEngineDeps` reaches a FORK automatically and reaches THIS
+	// object — the only one that becomes an actual `Engine` — not at all. A port added above and forgotten here
+	// would leave the parent ungated while every fork looked correct.
 	const engine = new Engine({
 		store,
+		authenticate: deps.authenticate,
 		now: deps.now,
 		newEventId: deps.newEventId,
 		logger: deps.logger
 	});
 
-	return {
-		dispatch: (command) => engine.dispatch(command),
-		dispatchBatch: (commands) => engine.dispatchBatch(commands),
-		dispatchBatchGuarded: (commands, preconditions, expectedEventCount, postconditions) =>
-			engine.dispatchBatchGuarded(commands, preconditions, expectedEventCount, postconditions),
+	const handle: EngineHandle = {
+		// The authed view is the READ HANDLE PLUS DISPATCH, so presenting a credential upgrades the object a
+		// caller already has rather than handing back a second, narrower one. Two references — one gated, one
+		// not — is how an ungated engine stays in scope next to the gated one.
+		as: (credential) => ({
+			...handle,
+			...engine.as(credential),
+			// ⚠ A FORK INHERITS THE SESSION'S IDENTITY, and it must. The authoring turn forks canonical and
+			// records commands into the fork; if the fork came back unauthenticated the turn could not dispatch
+			// at all, and if it came back bound to someone else the recorded commands would carry the wrong
+			// actor into the replay. Re-applying the same credential is the only reading that keeps a turn's
+			// work attributable to the identity that did it.
+			fork: () => handle.fork().as(credential)
+		}),
 		subscribe: (handler) => engine.subscribe(handler),
 		drainOutbox: () => engine.drainOutbox(),
 		recoverOutbox: () => engine.recoverOutbox(),
@@ -177,4 +202,5 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 		ontology,
 		close: () => store.close()
 	};
+	return handle;
 }

@@ -8,17 +8,18 @@
 //   1. An arrow removed from `m2-transitions.json`  -> its ACCEPTED case reddens.
 //   2. A source state widened (e.g. DEGRADED -> ACTIVE allowed from DISABLED) -> the matching refusal reddens.
 //   3. The whole registry reverted -> every case here reddens, and `state-reachability` un-closes.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const actor: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const VID = 'vld_01ARZ3NDEKTSV4RRFFQ69G5V10';
 
 describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let store: SqliteStorageAdapter;
 	let seq = 0;
 
@@ -31,7 +32,6 @@ describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
 			targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
 			targetAggregateId: VID,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-vr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -56,7 +56,7 @@ describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
 	beforeEach(() => {
 		seq = 0;
 		store = new SqliteStorageAdapter({ now: () => TS });
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it('registers in ACTIVE — the machine’s declared initial state', () => {
@@ -83,7 +83,7 @@ describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
 		// ...and from DEGRADED, on a fresh entry.
 		seq = 0;
 		store = new SqliteStorageAdapter({ now: () => TS });
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		register();
 		send('MarkValidatorDegraded', { validatorId: VID, reason: 'flaky' });
 		expect(send('DisableValidator', { validatorId: VID, reason: 'withdrawn' }).status).toBe('ACCEPTED');
@@ -146,7 +146,7 @@ describe('ValidatorRegistryEntry.status — the five declared arrows', () => {
 // keys on `validatorId` (an IMPLEMENTATION — `reference-undertaking.reviewer`). Different namespaces; joining
 // them would infer a binding from proximity, the exact error REG-F-022 records for evidenceId vs requirement id.
 describe('Gate D — a DISABLED validator’s result cannot complete an assessment', () => {
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5W00';
 	const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5W10';
@@ -162,7 +162,6 @@ describe('Gate D — a DISABLED validator’s result cannot complete an assessme
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-d',
 			idempotencyKey: `dk-${n}`,
 			payload
@@ -200,11 +199,11 @@ describe('Gate D — a DISABLED validator’s result cannot complete an assessme
 	beforeEach(async () => {
 		seq = 0;
 		const { seedPolicy } = await import('./__tests__/floor-fixtures.js');
-		engine = new Engine({
+		engine = new Engine({ authenticate: testAuthenticator(),
 			store: new SqliteStorageAdapter({ now: () => TS }),
 			now: () => TS,
 			newEventId: () => `e${++seq}`
-		});
+		}).as(TEST_CRED.human);
 		ok('CaptureIntent', 'INTENT', INTENT, {
 			intentId: INTENT,
 			originatingExpression: 'x',

@@ -15,6 +15,7 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import type { EngineHandle } from './engine.js';
@@ -65,11 +66,42 @@ const rrSatisfied: Validator = {
 		)
 };
 
+// TWO ACTORS, AND THE AGENT IS THE ONE THE HEADLINE DEPENDS ON.
+//
+// ⚠ `send`'s `actor` PARAMETER IS LOAD-BEARING, NOT VESTIGIAL. It used to be written onto the envelope as
+// `issuedBy`; now the SESSION carries it and the parameter SELECTS that session. The difference is not cosmetic
+// — a codemod that dropped the envelope field left the parameter dead, and dead is wrong here: `pwaFloorGate`
+// derives `aiProduced` from the PWA's `createdBy.actorType`, which is the stamped issuer of `CreatePwa`. Author the
+// PWA as a HUMAN and `aiProduced` is false, no floor has been recorded yet so `latestFloorDispositions` is empty,
+// and `floorGateBlock` returns null — the FIRST assertion in this file, that publish is blocked, would go green
+// against a PWA the floor never governed. The test would still pass its last line and prove nothing, which is
+// exactly the shape of vacuity this suite exists to refuse.
+//
+// SVC is the second, and the REASON CHANGED under it — worth stating, because the parameter surviving a change in
+// why it matters is how a knob quietly becomes dead. It used to matter because `recordAssuranceRecordingPlan`
+// DECLARED `issuedBy: opts.actor`, so a session that disagreed was refused outright. That declaration is gone
+// (REG-F-062): the recorder now takes its issuer FROM the session, which means SVC is what lands in every recorded
+// assessment's `createdBy` — the assurance-recording arm is a different actor from the PWA's AGENT author, and this
+// suite reads `createdBy.actorType` to decide `aiProduced`. Collapse the two and the separation stops being tested.
+const DIR = testDirectory([
+	{ ...AGENT, tenantId: 'tenant-test', organizationId: 'org-test' },
+	{ ...SVC, tenantId: 'tenant-test', organizationId: 'org-test' }
+]);
+
+/** The session for one of the two registered actors. `credentialFor` throws for anyone else — the cast is fixed. */
+const asActor = (eng: EngineHandle, actor: ActorReference) =>
+	eng.as(DIR.credentialFor(actor.actorId));
+
 let seq = 0;
 function build(): EngineHandle {
 	let s = 0;
 	seq = 0;
-	return createEngine({ ontology, now: () => TS, newEventId: () => `e${++s}` });
+	return createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		now: () => TS,
+		newEventId: () => `e${++s}`
+	});
 }
 
 // Every command gets a UNIQUE idempotency key (a colliding key returns the prior receipt as DUPLICATE — so a
@@ -90,12 +122,13 @@ function send(
 		targetAggregateType: type,
 		targetAggregateId: id,
 		issuedAt: TS,
-		issuedBy: actor,
 		correlationId: 'gate-e2e',
 		idempotencyKey: `g-idem-${seq}`,
 		payload
 	};
-	return eng.dispatch(command);
+	// The envelope declares NO issuer — the session is the claim, and declaring it again would only add something
+	// the engine could disagree with.
+	return asActor(eng, actor).dispatch(command);
 }
 
 function authorValidated(eng: EngineHandle) {
@@ -124,7 +157,8 @@ const publish = (eng: EngineHandle) =>
 describe('floor gate + recorder compose (3b + 3c)', () => {
 	it('an AGENT PWA is blocked until the real recorded floor is SATISFIED, then publishes', async () => {
 		const eng = build();
-		seedFloorPolicies(eng); // the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
+		// the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
+		seedFloorPolicies(asActor(eng, SVC));
 		authorValidated(eng);
 
 		// Gate blocks: no floor recorded yet.
@@ -165,8 +199,7 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 		const plan = await runFloorAndPlanRecording(subject, ctx, registry);
 		expect(plan.gatePermitsTransition).toBe(true);
 		let idn = 0;
-		recordAssuranceRecordingPlan(eng, plan, {
-			actor: SVC,
+		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
 			issuedAt: TS,
 			correlationId: 'floor',
 			idPrefix: 'rec',

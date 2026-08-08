@@ -26,13 +26,33 @@ import {
 	ProfessionalWorkObjectTypeSchema
 } from '@janumipwb/rph-contracts';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createEngine, getObject, type EngineHandle } from './index.js';
+import { createEngine, getObject, type AuthedEngineHandle } from './index.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
 const FLOOR_IDS = Object.values(FLOOR_POLICY_IDS);
+
+// THE SECOND CREATION PATH NAMES ITS OWN ACTOR, and that decides the session for both.
+// `driveReferenceUndertaking` promotes baselines with a `ProposeDecision` declaring `authority: owner-1`, and
+// REG-F-014 refuses a Decision whose declared authority is not its issuer — so under the shared `TEST_CRED.human`
+// (`u1`) the drive throws in `beforeEach` and this gate never runs on the path it was written to cover. Which is the
+// failure this file already documents once: a gate that reaches one of two writers is not a gate. `seedFloorPolicies`
+// declares no issuer and is indifferent, so ONE registered principal — the undertaking owner, exactly the
+// `ActorReference` the drive used to declare for itself — serves both paths.
+const OWNER = 'owner-1';
+const DIR = testDirectory([
+	{
+		actorId: OWNER,
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
 
 /**
  * EVERY PATH THAT CREATES THE FLOOR POLICIES — and there are two, which is the correction this file needed.
@@ -47,7 +67,7 @@ const FLOOR_IDS = Object.values(FLOOR_POLICY_IDS);
  * A gate that covers one of two writers is not a gate; it is the first writer's own test wearing the word
  * "declared". Parameterised so that adding a third writer without adding it here is itself the visible omission.
  */
-const CREATION_PATHS: ReadonlyArray<{ name: string; run: (e: EngineHandle) => void }> = [
+const CREATION_PATHS: ReadonlyArray<{ name: string; run: (e: AuthedEngineHandle) => void }> = [
 	{ name: 'seedFloorPolicies (workbench seed)', run: (e) => seedFloorPolicies(e) },
 	{
 		name: 'driveReferenceUndertaking (standalone path)',
@@ -58,15 +78,16 @@ const CREATION_PATHS: ReadonlyArray<{ name: string; run: (e: EngineHandle) => vo
 describe.each(CREATION_PATHS)(
 	'the de minimis floor declares a scope covering everything it enforces — via $name (REG-F-024)',
 	({ run }) => {
-		let engine: EngineHandle;
+		let engine: AuthedEngineHandle;
 
 		beforeEach(() => {
 			let n = 0;
 			engine = createEngine({
+				authenticate: DIR.authenticate,
 				ontology,
 				now: () => '2026-08-05T00:00:00Z',
 				newEventId: () => `evt_${++n}`
-			});
+			}).as(DIR.credentialFor(OWNER));
 			run(engine);
 		});
 

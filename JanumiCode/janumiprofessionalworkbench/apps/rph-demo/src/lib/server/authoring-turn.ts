@@ -5,10 +5,11 @@ import {
 	getConversation,
 	listAssurancePolicies,
 	listPwuTypes,
-	type EngineHandle
+	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
 import { createActor } from 'xstate';
 import { authoringTurnMachine, type AuthoringTurnState } from '$lib/server/authoring-turn-machine';
+import { AGENT_CREDENTIAL } from './identity.js';
 import { getEngine, makeAuthoringBroker, mintUiId } from '$lib/server/workbench';
 
 type TurnActor = ReturnType<typeof newTurnActor>;
@@ -26,7 +27,7 @@ interface RevisionSnapshot {
 export interface AuthoringTurn {
 	readonly id: string;
 	readonly pwaId: string;
-	readonly engine: EngineHandle;
+	readonly engine: AuthedEngineHandle;
 	readonly broker: PwaAuthoringBroker;
 	readonly createdAt: string;
 	/** Defensive snapshot; callers cannot mutate the replay log. */
@@ -40,8 +41,8 @@ export interface AuthoringTurn {
 interface MutableAuthoringTurn {
 	readonly id: string;
 	readonly pwaId: string;
-	readonly canonical: EngineHandle;
-	readonly engine: EngineHandle;
+	readonly canonical: AuthedEngineHandle;
+	readonly engine: AuthedEngineHandle;
 	readonly broker: PwaAuthoringBroker;
 	readonly createdAt: string;
 	readonly recordedCommands: DomainCommand[];
@@ -121,7 +122,7 @@ function publicTurn(turn: MutableAuthoringTurn): AuthoringTurn {
 	};
 }
 
-function snapshotRevisions(snapshot: EngineHandle, pwaId: string): RevisionSnapshot {
+function snapshotRevisions(snapshot: AuthedEngineHandle, pwaId: string): RevisionSnapshot {
 	const revisions = new Map<string, number>();
 	const pwa = snapshot.loadObject(pwaId);
 	if (!pwa) throw new Error(`PWA ${pwaId} does not exist.`);
@@ -162,10 +163,10 @@ export function isResumableAuthoringTurn(status: AuthoringTurnState): boolean {
 /** Record only mutations that really exist in the isolated fork. Failed commands and rolled-back batches never
  * enter the replay log. Any accepted mutation invalidates cached assurance/acceptance bindings. */
 function recordingEngine(
-	delegate: EngineHandle,
+	delegate: AuthedEngineHandle,
 	commands: DomainCommand[],
 	currentTurn: () => MutableAuthoringTurn
-): EngineHandle {
+): AuthedEngineHandle {
 	const assertMutable = () => {
 		const status = stateOf(currentTurn());
 		if (!MUTABLE_STATES.has(status)) {
@@ -179,7 +180,16 @@ function recordingEngine(
 		turn.assuredSubjectHash = undefined;
 		turn.detail = undefined;
 	};
-	return {
+	const recorder: AuthedEngineHandle = {
+		// The recorder IS the delegate's identity, not a second one. Anything else would let a surface read one
+		// actor off this handle and have its commands recorded as another.
+		principal: delegate.principal,
+		/**
+		 * Re-binding produces a recorder bound to the NEW identity, never this one wearing another name.
+		 * Returning `recorder` unchanged would let a caller present any credential and still have the acts
+		 * recorded — and later replayed — as the identity this turn happened to open with.
+		 */
+		as: (credential) => recordingEngine(delegate.as(credential), commands, currentTurn),
 		dispatch(command) {
 			assertMutable();
 			const result = delegate.dispatch(command);
@@ -208,12 +218,13 @@ function recordingEngine(
 		ontology: delegate.ontology,
 		close: () => delegate.close()
 	};
+	return recorder;
 }
 
 /** Begin an isolated candidate. There may be only one pending natural-language turn per PWA in this process. */
 export function beginAuthoringTurn(
 	pwaId: string,
-	canonical: EngineHandle = getEngine()
+	canonical: AuthedEngineHandle = getEngine().as(AGENT_CREDENTIAL)
 ): AuthoringTurn {
 	const existing = turnsByPwa.get(pwaId);
 	if (existing) {
@@ -362,8 +373,8 @@ export function finalizeAuthoringTurn(turn: AuthoringTurn): string {
 	return current.candidateHash;
 }
 
-type GuardedBatchResult = ReturnType<EngineHandle['dispatchBatchGuarded']>;
-type GuardPrecondition = Parameters<EngineHandle['dispatchBatchGuarded']>[1][number];
+type GuardedBatchResult = ReturnType<AuthedEngineHandle['dispatchBatchGuarded']>;
+type GuardPrecondition = Parameters<AuthedEngineHandle['dispatchBatchGuarded']>[1][number];
 
 /** Guard the READY_TO_COMMIT preconditions and re-verify the exact accepted candidate; returns its digest. */
 function assertReadyToCommit(

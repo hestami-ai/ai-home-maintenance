@@ -13,13 +13,14 @@
 //
 // These tests fail if anyone loosens the schema back, and they are written from the ATTACKER's side: the first
 // one is the exact payload the codebase shipped for its whole life.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-16T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'Author' };
 const POL = 'pol_criterion_contract';
 
 /** The RATIFIED shape — DOC-004 §7, all 8 fields. */
@@ -39,13 +40,13 @@ const INVENTED_CRITERION = { id: 'C-01', statement: 'Tenant data is isolated.', 
 
 describe('AssessmentCriterion (DOC-004 §7) is enforced, not merely documented', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function createPolicy(criteria: unknown[], id = POL) {
@@ -57,7 +58,6 @@ describe('AssessmentCriterion (DOC-004 §7) is enforced, not merely documented',
 			targetAggregateType: 'ASSURANCE_POLICY',
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload: {

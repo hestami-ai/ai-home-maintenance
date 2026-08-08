@@ -14,12 +14,13 @@
 // retryExecutionStep.requireFrom to ['FAILED','QUEUED'] makes the RetryExecutionStep test RED and leaves the Fail
 // test green. Each kill test kills exactly its own mutant.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5R00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5R10';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5R20';
@@ -27,7 +28,7 @@ const STEP = `${PLAN}-s`;
 
 describe('ExecutionStep re-issue guards — requireFrom kill tests (CMDPRE review remediation)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string) {
@@ -39,7 +40,6 @@ describe('ExecutionStep re-issue guards — requireFrom kill tests (CMDPRE revie
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`, // distinct each time — a re-issue is a fresh request, not a transport retry
 			payload
@@ -88,7 +88,7 @@ describe('ExecutionStep re-issue guards — requireFrom kill tests (CMDPRE revie
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

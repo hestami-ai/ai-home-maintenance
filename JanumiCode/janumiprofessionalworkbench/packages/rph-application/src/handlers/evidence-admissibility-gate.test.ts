@@ -16,6 +16,8 @@
 // admission is attempted, so the red below is the real defect — a command that succeeded when §8.11 requires
 // refusal — and not a payload-shape or fixture error.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { evidenceAdmissibility } from '@janumipwb/rph-assurance';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -27,13 +29,13 @@ const EV = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FD1';
 
 describe('AdmitEvidence enforces §8.11 admissibility at the call site (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function dispatch(commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) {
@@ -45,7 +47,6 @@ describe('AdmitEvidence enforces §8.11 admissibility at the call site (live)', 
 			targetAggregateType: 'EVIDENCE',
 			targetAggregateId: EV,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-1',
 			idempotencyKey: `idem-${n}`,
 			payload,

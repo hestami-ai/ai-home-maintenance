@@ -15,6 +15,7 @@
 // handoff — weakening a site's set (adding the target) or deleting the precondition must make that site's negative
 // kill test go RED. A test that stays green under that mutation is a finding, not a pass.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -22,11 +23,20 @@ import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js'
 
 const TS = '2026-07-24T00:00:00Z';
 const HUMAN: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
+// The Governor is this file's only actor, and it has to be the SESSION rather than a declared field: both
+// `ProposeDecision` fixtures record `authority: HUMAN`, which REG-F-014 requires to equal the issuer. Dispatching
+// as anyone else would refuse the seed and leave every precondition test asserting a refusal it did not arrange.
+const DIR = testDirectory([{ ...HUMAN, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 
 function harness() {
 	const store = new SqliteStorageAdapter({ now: () => TS });
 	let seq = 0;
-	const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+	const engine = new Engine({
+		authenticate: DIR.authenticate,
+		store,
+		now: () => TS,
+		newEventId: () => `e${++seq}`
+	}).as(DIR.credentialFor(HUMAN.actorId));
 	const d = (commandType: string, id: string, type: string, payload: unknown) => {
 		const n = ++seq;
 		const command: DomainCommand = {
@@ -36,7 +46,6 @@ function harness() {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'dwp04',
 			idempotencyKey: `k-${n}`, // distinct each time — a re-issue is a new request, not a transport retry
 			payload

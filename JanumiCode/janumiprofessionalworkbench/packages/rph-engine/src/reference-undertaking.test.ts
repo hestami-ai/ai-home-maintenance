@@ -3,6 +3,7 @@
 // qualified-green (SATISFIED), while Mobile & Offline is CONDITIONALLY_SATISFIED and therefore NOT qualified —
 // "no green without assurance". The Architecture PWU is frozen into a baseline.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import {
 	createEngine,
@@ -12,16 +13,45 @@ import {
 	REFERENCE_UNDERTAKING
 } from './index.js';
 
+// ── THE SESSION THE DRIVE MUST RUN IN, AND WHY IT IS NOT THE SHARED CREDENTIAL ────────────────────────────────
+// `driveReferenceUndertaking` AUTHORS ITS ACTING PARTY into the payloads it sends: `producedBy` on every piece
+// of evidence, `producer` on every completed assessment, `introducedBy` on the residual, and — load-bearing —
+// `authority` on the two `ProposeDecision` commands that baseline the Intent and the Architecture. REG-F-014
+// requires that declared authority to EQUAL the issuing actor, and the engine now stamps the issuer from the
+// authenticated session. So the session's principal must BE that party: `owner-1`, the Undertaking Owner.
+// Under any other principal the drive is refused at ProposeDecision with RPH_AUTHORITY_INSUFFICIENT and its
+// fail-loud `send` throws.
+//
+// THIS IS ALSO WHAT KEEPS THE INDEPENDENCE TEST BELOW HONEST. `Increment I1` asserts producer ≠ evaluator over
+// `owner-1` vs `evaluator-1`/`reviewer-agent-1`. Dispatching as some third identity would leave that assertion
+// true while the acting party had quietly become someone the fixture never names.
+//
+// ⚠ The literal is duplicated from `reference-undertaking.ts`'s module-private ACTOR, which is not exported.
+// `executionInstanceId` is carried for the same reason it exists there: with it, the stamped `issuedBy` is the
+// exact value the envelope carried before the trust boundary landed, so nothing downstream of the gate moves.
+const DIR = testDirectory([
+	{
+		actorId: 'owner-1',
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
+const OWNER = DIR.credentialFor('owner-1');
+
 describe('Reference Undertaking driven live', () => {
 	function build() {
 		const engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		});
+		}).as(OWNER);
 		driveReferenceUndertaking(engine);
 		return {
 			engine,

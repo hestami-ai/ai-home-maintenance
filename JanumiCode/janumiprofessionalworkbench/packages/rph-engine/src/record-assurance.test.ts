@@ -16,6 +16,7 @@ import {
 	type ValidatorRegistry
 } from '@janumipwb/rph-assurance';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import type { ActorReference } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
@@ -38,6 +39,21 @@ const ACTOR: ActorReference = {
 	actorType: 'SERVICE',
 	displayName: 'Assurance Service'
 };
+
+// ONE ACTOR, AND IT MUST BE THE ASSURANCE SERVICE — not the shared human credential.
+//
+// ⚠ WHY THIS COMMENT CHANGED, WHICH MATTERS MORE THAN WHAT IT NOW SAYS. It used to justify the choice by a
+// REFUSAL: the recorder DECLARED `issuedBy: opts.actor`, so a session that disagreed aborted the run. That
+// declaration is gone (REG-F-062) and the refusal with it — meaning the justification evaporated while the
+// fixture stayed identical. A knob whose stated reason has quietly expired is dead in every way that counts,
+// so it gets a live one or it gets removed.
+//
+// THE LIVE REASON: the recorder now takes its issuer FROM the session, so `ACTOR` is what lands in every
+// recorded assessment's `createdBy` — and the test below ASSERTS that. Point this directory at a human and
+// that assertion reddens. `seedFloorPolicies` declares no issuer either and runs as whoever holds the session;
+// the assurance service standing up the policies it goes on to cite is the honest reading of who acts here.
+// (Same shape as `floor-execution-plane.test.ts`, deliberately — two fixtures over the same seam.)
+const DIR = testDirectory([{ ...ACTOR, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 
 /** Deterministic ULID-format id minter (`<prefix>_<26 digits>`) — digits are valid Crockford base32. */
 function ulidGen() {
@@ -74,7 +90,12 @@ function registry(): ValidatorRegistry {
 
 function engine() {
 	let s = 0;
-	return createEngine({ ontology, now: () => '2026-07-14T00:00:00Z', newEventId: () => `e${++s}` });
+	return createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		now: () => '2026-07-14T00:00:00Z',
+		newEventId: () => `e${++s}`
+	}).as(DIR.credentialFor(ACTOR.actorId));
 }
 
 const subject: AssuranceSubject = {
@@ -100,7 +121,6 @@ async function runAndRecord(ctx: ValidatorContext) {
 	seedFloorPolicies(eng); // the recorder cites floor.* policies — RequestAssuranceAssessment now requires them to exist
 	const plan = await runFloorAndPlanRecording(subject, ctx, registry());
 	const recorded = recordAssuranceRecordingPlan(eng, plan, {
-		actor: ACTOR,
 		issuedAt: '2026-07-14T00:00:00Z',
 		correlationId: 'floor-run',
 		idPrefix: 'rec1',
@@ -126,6 +146,24 @@ describe('recordAssuranceRecordingPlan — floor outcome → canonical assessmen
 			assessments.every((a) => (a.state.subjectObjectIds as string[])[0] === 'pwa_under_test')
 		).toBe(true);
 		expect(listByType(eng, 'ASSURANCE_OBSERVATION')).toHaveLength(0);
+	});
+
+	it('attributes every recorded assessment to the AUTHENTICATED session, not to a declared actor (REG-F-062)', async () => {
+		const { eng } = await runAndRecord(goodCtx);
+		const assessments = listByType(eng, 'ASSURANCE_ASSESSMENT');
+		expect(assessments.length).toBeGreaterThan(0);
+		// The recorder declares no issuer. What lands in `createdBy` is the principal the session resolved to —
+		// which is why this fixture's directory holds the assurance service and nobody else. Restore
+		// `issuedBy: opts.actor` in the recorder and this still passes (the values agree); point the SESSION at a
+		// different actor and it reddens. That is the right sensitivity: the claim is about where the identity
+		// COMES FROM, and only the session can change it now.
+		for (const a of assessments) {
+			const createdBy = a.state.createdBy as ActorReference;
+			expect(createdBy.actorId, `assessment ${a.id} must be attributed to its session`).toBe(
+				'assurance-svc'
+			);
+			expect(createdBy.actorType).toBe('SERVICE');
+		}
 	});
 
 	it('persists the reasoning-review evaluator identity on the Assessment (§9.7 resolved model/provider; §8.4 recorded identities)', async () => {

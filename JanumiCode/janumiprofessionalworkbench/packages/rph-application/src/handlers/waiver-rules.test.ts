@@ -3,19 +3,20 @@
 // carry every compensating control that rule requires (DOC-004 §12.2 / JCPWA §36.4 — a waiver may not drop a
 // control to nothing). An EMPTY waiverRules array (the seeded default) stays permissive, so floor/reference/demo
 // waivers are unaffected. These drive that live against a policy that declares real rules.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-18T00:00:00Z';
-const actor: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Lead' };
 const POLICY = 'pol_01ARZ3NDEKTSV4RRFFQ69G5WVR';
 const SUBJECT = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5WSB';
 
 describe('requestWaiver — waiverRules enforcement (#1c)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const cmd = (
@@ -32,7 +33,6 @@ describe('requestWaiver — waiverRules enforcement (#1c)', () => {
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -116,7 +116,7 @@ describe('requestWaiver — waiverRules enforcement (#1c)', () => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		waiverSeq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it('rejects a waiver of a criterion no rule makes eligible', () => {

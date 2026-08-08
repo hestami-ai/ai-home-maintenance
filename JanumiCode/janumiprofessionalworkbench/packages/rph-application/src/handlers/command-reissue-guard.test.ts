@@ -15,6 +15,7 @@
 // hand-authored from each machine's own in-arrows — deliberately NOT generated from the vocab's `drivesFrom`, which
 // has no ratified authority, is absent for twelve commands, and names the wrong machine for at least one.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -22,6 +23,16 @@ import { Engine } from '../index.js';
 const TS = '2026-07-22T00:00:00Z';
 const USER_1 = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'First approver' };
 const USER_2 = { actorId: 'u2', actorType: 'HUMAN' as const, displayName: 'Second actor' };
+
+// TWO ACTORS ON PURPOSE, and the second one is load-bearing. Several re-issues below are made by a DIFFERENT
+// actor from the one that made the first accepted call — that is what makes them privilege-escalation
+// arrangements rather than tidy duplicates. Under the trust boundary the acting identity comes from the
+// SESSION, so a scenario with two actors needs two registered principals, not one credential and a payload
+// field. `credentialFor` throws on anyone this list does not name, so the cast is declared here in advance.
+const DIR = testDirectory([
+	{ ...USER_1, tenantId: 'tenant-test', organizationId: 'org-test' },
+	{ ...USER_2, tenantId: 'tenant-test', organizationId: 'org-test' }
+]);
 
 const BINDING = 'rb_01ARZ3NDEKTSV4RRFFQ69GN100';
 const STEP = 'step_01ARZ3NDEKTSV4RRFFQ69GN110';
@@ -47,12 +58,14 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`, // a DISTINCT key each time — this is a new request, not a transport retry
 			payload
 		};
-		return engine.dispatch(command);
+		// `issuedBy` selects the SESSION now; it is no longer a field on the envelope. Declaring it as well
+		// would be redundant when it agrees and refused when it does not, and either way it would stop being
+		// the thing that decides who acted.
+		return engine.as(DIR.credentialFor(issuedBy.actorId)).dispatch(command);
 	}
 
 	const stateOf = (id: string) => store.loadObject(id)?.state as Record<string, unknown>;
@@ -61,7 +74,12 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
 	});
 
 	// THE SECURITY CASE. A runtime binding gates what an execution step may actually do, and §22.1 is explicit that a

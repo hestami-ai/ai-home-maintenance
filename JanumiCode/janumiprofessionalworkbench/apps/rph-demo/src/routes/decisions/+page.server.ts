@@ -8,7 +8,8 @@
 // GrantWaiver/DenyWaiver refuse a non-WAIVER target, so each row offers only the command the engine will accept.
 import { fail } from '@sveltejs/kit';
 import { listDecisions } from '@janumipwb/rph-engine';
-import { dispatch, getEngine, mintUiId } from '$lib/server/workbench';
+import { dispatch, getEngine, mintUiId, uiSession } from '$lib/server/workbench';
+import { actingActor } from '$lib/server/identity';
 // The PER-4 surface guard lives in ONE module (`$lib/server/optimistic-concurrency`), not inline here. It was
 // inline for exactly one route, and the moment a second route needed it the copy would have been the third
 // place this repo learned that one guard becomes several that disagree. Extracting it also made its
@@ -49,7 +50,11 @@ export const actions: Actions = {
 			subjectObjectIds: [],
 			selectedOption,
 			rationale,
-			authority: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
+			// THE AUTHORITY IS THE SESSION, READ FROM AUTHENTICATED CONTEXT. `proposeDecision` refuses a payload
+			// authority that is not the stamped issuer (ASR-15: a Decision records the authority of ITS issuer, and
+			// no delegation record exists to carry one actor's for another). The literal that used to sit here —
+			// `ui-user` — was neither, so every propose in the running app was refused.
+			authority: actingActor(uiSession()),
 			consideredEvidenceIds: [],
 			consideredObservationIds: []
 		});

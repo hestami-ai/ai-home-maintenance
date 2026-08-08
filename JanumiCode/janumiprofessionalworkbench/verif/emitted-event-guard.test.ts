@@ -12,14 +12,14 @@
 //
 // So: the guard now counts what it inspects, and this asserts the counter MOVES for a real dispatch.
 import { readFileSync } from 'node:fs';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { Engine } from '@janumipwb/rph-application';
 import { LEDGER, liveness } from './emitted-event-guard.js';
 
 const TS = '2026-08-04T00:00:00Z';
-const ACTOR: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69JA001';
 
 describe('the emitted-event guard is alive', () => {
@@ -27,7 +27,7 @@ describe('the emitted-event guard is alive', () => {
 		const before = liveness.inspected;
 		const store = new SqliteStorageAdapter({ now: () => TS });
 		let seq = 0;
-		const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		const command: DomainCommand = {
 			commandId: 'c-1',
 			commandType: 'CaptureIntent',
@@ -35,7 +35,6 @@ describe('the emitted-event guard is alive', () => {
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'guard-liveness',
 			idempotencyKey: 'guard-liveness-1',
 			payload: {

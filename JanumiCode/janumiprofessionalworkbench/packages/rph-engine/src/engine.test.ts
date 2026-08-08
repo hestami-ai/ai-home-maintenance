@@ -1,6 +1,7 @@
 // createEngine composition smoke: the M4 walking-skeleton flow (CaptureIntent -> IntentCaptured -> persist ->
 // outbox -> projection) driven entirely through the public facade — proving createEngine wires the whole stack.
 import type { DomainCommand, DomainEvent } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { contentHash } from '@janumipwb/rph-contracts/hash';
 // The TEST is the composition root here: it chooses which PWA to load and injects it (the engine itself is
 // PWA-agnostic and imports no concrete PWA — rph-product-realization-pwa is a devDependency for this reason).
@@ -18,7 +19,6 @@ function captureIntent(): DomainCommand {
 		targetAggregateType: 'INTENT',
 		targetAggregateId: INTENT_ID,
 		issuedAt: '2026-07-11T00:00:00Z',
-		issuedBy: { actorId: 'user-1', actorType: 'HUMAN', displayName: 'Alice' },
 		correlationId: 'corr-1',
 		idempotencyKey: 'idem-1',
 		payload: {
@@ -42,7 +42,7 @@ function beginDiscovery(): DomainCommand {
 
 describe('createEngine — the composition facade', () => {
 	it('stands up an in-memory engine with the Product Realization PWA ontology loaded (root Product Realization PWU)', () => {
-		const engine = createEngine({ ontology, now: () => '2026-07-11T00:00:00Z' });
+		const engine = createEngine({ authenticate: testAuthenticator(), ontology, now: () => '2026-07-11T00:00:00Z' }).as(TEST_CRED.human);
 		const root = engine.ontology.pwuTemplates.find((t) => t.isRoot);
 		expect(root?.pwuKind).toBe('PRODUCT_REALIZATION');
 		engine.close();
@@ -50,11 +50,11 @@ describe('createEngine — the composition facade', () => {
 
 	it('drives the walking-skeleton flow end-to-end through the public seam', () => {
 		let n = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		const projected: string[] = [];
 		engine.subscribe((e: DomainEvent) => {
 			if (e.eventType === 'IntentCaptured')
@@ -85,11 +85,11 @@ describe('createEngine — the composition facade', () => {
 
 	it('forks a point-in-time candidate that exercises real handlers without mutating canonical state', () => {
 		let n = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_fork_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		const candidate = engine.fork();
 
 		expect(candidate.dispatch(captureIntent()).status).toBe('ACCEPTED');
@@ -106,11 +106,11 @@ describe('createEngine — the composition facade', () => {
 
 	it('a fork is point-in-time: later canonical writes do not leak into the candidate', () => {
 		let n = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_snapshot_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		const candidate = engine.fork();
 
 		expect(engine.dispatch(captureIntent()).status).toBe('ACCEPTED');
@@ -126,11 +126,11 @@ describe('createEngine — the composition facade', () => {
 
 	it('guards the base revision and exact resultant object state inside the replay transaction', () => {
 		let n = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_guard_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		expect(engine.dispatch(captureIntent()).status).toBe('ACCEPTED');
 		const candidate = engine.fork();
 		expect(candidate.dispatch(beginDiscovery()).status).toBe('ACCEPTED');
@@ -151,11 +151,11 @@ describe('createEngine — the composition facade', () => {
 
 	it('rolls back replay when a resultant-state postcondition does not match', () => {
 		let n = 0;
-		const engine = createEngine({
+		const engine = createEngine({ authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_post_${++n}`
-		});
+		}).as(TEST_CRED.human);
 		expect(engine.dispatch(captureIntent()).status).toBe('ACCEPTED');
 		const before = engine.loadObject(INTENT_ID);
 

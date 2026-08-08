@@ -9,13 +9,14 @@
 // unresolvable-id rule, and the "not every cited observation is a blocker" distinction were all unproven, and the
 // field was `[]` on every path the suite ever drove. A derivation with a careful comment and no arrangement is
 // the shape this programme keeps finding; the comment is not the evidence.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-08-04T00:00:00Z';
-const ACTOR: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Lead' };
 const POLICY = 'pol_01ARZ3NDEKTSV4RRFFQ69JC100';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69JC200';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69JC300';
@@ -27,7 +28,7 @@ const OBS_GHOST = 'obs_01ARZ3NDEKTSV4RRFFQ69JC800';
 
 describe('DecompositionRejected.blockingObservationIds is derived from severity, not asserted', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const cmd = (
@@ -44,7 +45,6 @@ describe('DecompositionRejected.blockingObservationIds is derived from severity,
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: ACTOR,
 			correlationId: 'blocking-obs',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -69,7 +69,7 @@ describe('DecompositionRejected.blockingObservationIds is derived from severity,
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 
 		ok(
 			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {

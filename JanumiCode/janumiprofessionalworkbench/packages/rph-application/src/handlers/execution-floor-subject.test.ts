@@ -10,14 +10,15 @@
 //    floor for the same reason, which §8.4 L854 forbids" ("A missing, STALE, malformed, failed, unavailable, or
 //    independence-invalid required review cannot satisfy assurance or permit its protected transition").
 // 2. THE UNRECORDED-OUTPUT BYPASS — a step naming an output that is not a recorded object.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-16T00:00:00Z';
-const AGENT: ActorReference = { actorId: 'agent-9', actorType: 'AGENT', displayName: 'Executor' };
 
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5V00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V10';
@@ -29,7 +30,7 @@ const GHOST = 'art_01ARZ3NDEKTSV4RRFFQ69G5V60';
 
 describe('Execution floor subject: the result, at its exact version — not the step', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -41,7 +42,6 @@ describe('Execution floor subject: the result, at its exact version — not the 
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: AGENT,
 			correlationId: 'floor-subject',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -135,7 +135,7 @@ describe('Execution floor subject: the result, at its exact version — not the 
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmt = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — now they must exist
 		d(
 			'CaptureIntent',

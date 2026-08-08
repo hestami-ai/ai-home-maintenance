@@ -19,6 +19,7 @@
 // the object it looks for is there among the duplicates. A durable store that doubles its seed each restart is a
 // worse defect than the volatile one it replaced, and it would have shipped behind a green (1).
 import { existsSync, rmSync } from 'node:fs';
+import { SESSION_CREDENTIAL } from './identity.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -63,7 +64,10 @@ function rphId(prefix: string, suffix: string): string {
 }
 
 /** Author one distinctive Intent — something the SEED does not contain, so its survival is about the store. */
-function captureIntent(engine: ReturnType<typeof openWorkbench>, intentId: string): void {
+function captureIntent(
+	engine: ReturnType<ReturnType<typeof openWorkbench>['as']>,
+	intentId: string
+): void {
 	const result = engine.dispatch({
 		commandId: `w2-${intentId}`,
 		commandType: 'CaptureIntent',
@@ -71,7 +75,6 @@ function captureIntent(engine: ReturnType<typeof openWorkbench>, intentId: strin
 		targetAggregateType: 'INTENT',
 		targetAggregateId: intentId,
 		issuedAt: '2026-07-28T00:00:00.000Z',
-		issuedBy: { actorId: 'w2', actorType: 'HUMAN', displayName: 'Durability Probe' },
 		correlationId: 'w2',
 		idempotencyKey: `w2-idem-${intentId}`,
 		payload: {
@@ -95,12 +98,12 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 		const path = tempDbPath();
 		const intentId = rphId('int', 'W2SRVR');
 
-		const first = openWorkbench(path);
+		const first = openWorkbench(path).as(SESSION_CREDENTIAL);
 		captureIntent(first, intentId);
 		first.close();
 
 		// A brand-new host over the SAME file. Nothing in memory carries over.
-		const restarted = openWorkbench(path);
+		const restarted = openWorkbench(path).as(SESSION_CREDENTIAL);
 		try {
 			const found = restarted.readAllEvents().filter((e) => e.aggregateId === intentId);
 			expect(found.length, 'the Intent authored before the restart must survive it').toBeGreaterThan(0);
@@ -127,7 +130,7 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 	it('reopening a populated store does not seed it a second time', () => {
 		const path = tempDbPath();
 
-		const first = openWorkbench(path);
+		const first = openWorkbench(path).as(SESSION_CREDENTIAL);
 		const seededEvents = first.readAllEvents().length;
 		first.close();
 
@@ -135,7 +138,7 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 		// duplicate, and a host that re-seeds on every boot would be indistinguishable from one that does not.
 		expect(seededEvents, 'the first open must seed the reference workbench').toBeGreaterThan(0);
 
-		const restarted = openWorkbench(path);
+		const restarted = openWorkbench(path).as(SESSION_CREDENTIAL);
 		try {
 			expect(
 				restarted.readAllEvents().length,
@@ -147,7 +150,7 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 	});
 
 	it('CONTROL — a durable host recovers its PENDING outbox at startup, as the engine requires', () => {
-		// `EngineHandle.recoverOutbox` states the obligation in its own doc comment: "WP-2-007 restart recovery:
+		// `AuthedEngineHandle.recoverOutbox` states the obligation in its own doc comment: "WP-2-007 restart recovery:
 		// re-drive PENDING outbox on (re)open of a durable store, idempotently … A DURABLE HOST SHALL CALL THIS AT
 		// STARTUP." Until W-2 the demo had no durable store, so the SHALL bound nothing and no one noticed it. The
 		// work package that makes the host durable is the work package that activates it — a new obligation is a
@@ -157,11 +160,11 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 		// second call finds nothing left. The pre-fix red measured 300 pending entries here, which is also the
 		// arrangement assertion — it is what proves the store had anything to recover.
 		const path = tempDbPath();
-		const first = openWorkbench(path);
+		const first = openWorkbench(path).as(SESSION_CREDENTIAL);
 		captureIntent(first, rphId('int', 'W2XBX'));
 		first.close();
 
-		const restarted = openWorkbench(path);
+		const restarted = openWorkbench(path).as(SESSION_CREDENTIAL);
 		try {
 			expect(
 				restarted.recoverOutbox(),
@@ -175,7 +178,7 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 	it('an in-memory host is still seeded, so omitting a path keeps today’s behaviour', () => {
 		// The default path must not become "empty workbench": the demo with no `JPWB_DEMO_DB` set is the seeded
 		// reference workbench, exactly as before W-2.
-		const engine = openWorkbench(undefined);
+		const engine = openWorkbench(undefined).as(SESSION_CREDENTIAL);
 		try {
 			expect(engine.readAllEvents().length).toBeGreaterThan(0);
 		} finally {

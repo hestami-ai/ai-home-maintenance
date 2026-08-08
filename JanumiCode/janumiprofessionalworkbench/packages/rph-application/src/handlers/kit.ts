@@ -10,6 +10,7 @@ import {
 	validateAgainst,
 	type CommandResult,
 	type DomainCommand,
+	type StampedCommand,
 	type DomainEvent,
 	type RphErrorCode
 } from '@janumipwb/rph-contracts';
@@ -34,7 +35,7 @@ export interface HandlerContext {
 /** A command handler: given the context + validated payload, produce next state + event and commit. */
 export type CommandHandler = (
 	ctx: HandlerContext,
-	command: DomainCommand,
+	command: StampedCommand,
 	payload: unknown
 ) => CommandResult;
 
@@ -205,7 +206,7 @@ export function makeEvent(
 		aggregateRevision: args.aggregateRevision,
 		occurredAt: command.issuedAt,
 		recordedAt: ctx.now(),
-		actor: command.issuedBy,
+		actor: command.issuedBy as StampedCommand['issuedBy'],
 		correlationId: command.correlationId,
 		commandId: command.commandId,
 		// ── THE CHAIN, NOT THE HOP ─────────────────────────────────────────────────────────────────────────
@@ -236,7 +237,7 @@ export function nextEnvelope(
 		revision: newRevision,
 		...(newSemanticVersion !== undefined ? { semanticVersion: newSemanticVersion } : {}),
 		updatedAt: command.issuedAt,
-		updatedBy: command.issuedBy
+		updatedBy: command.issuedBy as StampedCommand['issuedBy']
 	};
 }
 
@@ -504,9 +505,9 @@ export function newEnvelope(
 		revision: 0,
 		lifecycleStatus: opts.lifecycleStatus,
 		createdAt: ts,
-		createdBy: command.issuedBy,
+		createdBy: command.issuedBy as StampedCommand['issuedBy'],
 		updatedAt: ts,
-		updatedBy: command.issuedBy,
+		updatedBy: command.issuedBy as StampedCommand['issuedBy'],
 		provenance: {
 			originType: opts.originType ?? 'USER_INPUT',
 			sourceObjectIds: opts.sourceObjectIds ?? [],

@@ -85,11 +85,16 @@ export type ObjectEnvelope = z.infer<typeof ObjectEnvelopeSchema>;
  * WHAT IS ACTUALLY TRUE: `expectedRevision` is optional here, the engine honours it **when present**, and
  * supplying it is a SURFACE obligation the routes discharge one at a time.
  *
- * ── `issuedBy` IS REQUIRED HERE AND THAT IS SCHEDULED TO CHANGE (REG-D-027) ──────────────────────────────────
- * It becomes `.optional()` in the same increment that gives the engine an authenticated principal to stamp
- * from — not before. Widening it earlier would make every handler read of `command.issuedBy` optional while
- * the only correct replacement (the stamped principal) does not yet exist, so the field would be softened
- * with nothing standing behind it. The order is: stamp first, then widen.
+ * ── ~~`issuedBy` IS REQUIRED HERE AND THAT IS SCHEDULED TO CHANGE (REG-D-027)~~ IT IS NOW OPTIONAL ───────────
+ * ~~It becomes `.optional()` in the same increment that gives the engine an authenticated principal to stamp
+ * from — not before.~~ That increment landed; the field is `.optional()` below and the reasoning moved onto it.
+ * Struck rather than deleted: the sequencing constraint it records (stamp first, then widen — never the
+ * reverse) is the part a future reader needs, and it stopped being a plan the moment the stamp existed.
+ *
+ * ⚠ THIS HEADING WAS LEFT ASSERTING THE OPPOSITE OF THE SCHEMA BELOW FOR THE LENGTH OF ONE INCREMENT. In a
+ * file CON-000 B1 designates SHAPE AUTHORITY, that is the same defect the `expectedRevision` paragraph above
+ * records, committed in the act of fixing it — a caller reading the prose here would have concluded it must
+ * author an issuer, which is precisely the laundering shape REG-D-027 removed.
  */
 export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 	return z.strictObject({
@@ -100,7 +105,20 @@ export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 		targetAggregateId: z.string().min(1),
 		expectedRevision: RevisionSchema.optional(),
 		issuedAt: RfcTimestampSchema,
-		issuedBy: ActorReferenceSchema,
+		/**
+		 * OPTIONAL SINCE REG-D-027(b), and the optionality is the point.
+		 *
+		 * ABSENT  -> the engine stamps the authenticated principal. This is the shape new callers should use:
+		 *            there is nothing to launder because nothing is declared.
+		 * PRESENT -> a CHECKED CLAIM. The engine compares it to the resolved principal and REFUSES on
+		 *            disagreement rather than correcting it, so an attempt to declare an issuer one is not
+		 *            becomes a recorded refusal instead of an invisible overwrite.
+		 *
+		 * It was REQUIRED, which made every caller author an issuer and made the laundering shape mandatory.
+		 * Handlers still see it as present — see `StampedCommand`, which is what the engine hands inward after
+		 * the trust boundary has run.
+		 */
+		issuedBy: ActorReferenceSchema.optional(),
 		correlationId: z.string().min(1),
 		causationId: z.string().optional(),
 		idempotencyKey: z.string().min(1),
@@ -109,6 +127,13 @@ export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 }
 export const DomainCommandSchema = domainCommandSchema(z.unknown());
 export type DomainCommand = z.infer<typeof DomainCommandSchema>;
+
+/**
+ * A command that has crossed the trust boundary: `issuedBy` is the AUTHENTICATED principal, never a caller's
+ * claim, and is therefore always present. Handlers receive this, not `DomainCommand` — which is how the
+ * engine's guarantee is carried in the type system rather than in a comment.
+ */
+export type StampedCommand = DomainCommand & { readonly issuedBy: ActorReference };
 
 /** DomainEvent envelope factory (DOC-007 §9). Events assert accepted facts; `aggregateRevision` is
  * monotonic and must equal prior + 1 (§35.6, enforced in persistence M4). */

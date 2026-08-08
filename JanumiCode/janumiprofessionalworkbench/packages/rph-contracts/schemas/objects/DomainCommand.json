@@ -95,7 +95,6 @@
     "targetAggregateType",
     "targetAggregateId",
     "issuedAt",
-    "issuedBy",
     "correlationId",
     "idempotencyKey",
     "payload"

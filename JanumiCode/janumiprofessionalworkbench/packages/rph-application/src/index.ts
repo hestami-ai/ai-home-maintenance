@@ -3,6 +3,7 @@
 export const RPH_APPLICATION_VERSION = '0.0.0';
 
 export { Engine } from './command-bus.js';
+export type { AuthedEngine } from './command-bus.js';
 export type {
 	BatchResult,
 	EngineDeps,

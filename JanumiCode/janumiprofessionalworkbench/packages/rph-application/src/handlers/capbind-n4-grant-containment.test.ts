@@ -15,7 +15,9 @@
 // deleted — because the state machine refused it — and would therefore prove nothing about this rule. **Every
 // refusal case below is the FIRST authorization from REQUESTED**, which is the only arrangement where the state
 // machine has nothing to say and the new guard is the sole thing that can refuse.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -23,11 +25,10 @@ import { Engine } from '../index.js';
 const TS = '2026-07-26T00:00:00.000Z';
 const BINDING = 'bind_01ARZ3NDEKTSV4RRFFQ69GW1B0';
 const STEP = 'step_01ARZ3NDEKTSV4RRFFQ69GW1S0';
-const actor: ActorReference = { actorType: 'HUMAN', actorId: 'usr_1', displayName: 'Sponsor' };
 
 describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its request', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const dispatch = (commandType: string, payload: unknown) => {
@@ -39,7 +40,6 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: BINDING,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-n4',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -82,7 +82,7 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it('THE KILL TEST: a FIRST authorization granting an unrequested capability is REFUSED', () => {
@@ -187,7 +187,6 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: OTHER,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-n4',
 			idempotencyKey: `k-${n}`,
 			payload: {
@@ -207,7 +206,6 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: OTHER,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'capbind-n4',
 			idempotencyKey: `k-${m}`,
 			payload: { grantedCapabilities: [{ capability: 'file-system' }, { capability: 'network' }] }

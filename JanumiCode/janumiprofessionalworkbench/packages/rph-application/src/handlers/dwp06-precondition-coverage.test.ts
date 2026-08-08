@@ -4,17 +4,18 @@
 // `submitBaselineForReview` (a Baseline.status NONE site, outside DWP-04's six) — which this file covers. The flip
 // itself needed ZERO edits to existing assertions; this is the one gap it revealed, now closed with the same
 // kill-test + mutation-red-proof discipline as every other JAN-CMDPRE site.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-24T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'User' };
 
 describe('DWP-06 — submitBaselineForReview (the gap the required-precondition flip surfaced)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69GF600';
 
@@ -27,7 +28,6 @@ describe('DWP-06 — submitBaselineForReview (the gap the required-precondition 
 			targetAggregateType: 'BASELINE',
 			targetAggregateId: BASE,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'dwp06',
 			idempotencyKey: `k-${n}`, // distinct each time — a re-issue is a new request, not a transport retry
 			payload
@@ -41,7 +41,7 @@ describe('DWP-06 — submitBaselineForReview (the gap the required-precondition 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		// CreateBaseline nominates a CANDIDATE; item versions default to 1 for absent items (best-effort, createBaseline).
 		expect(
 			d('CreateBaseline', {

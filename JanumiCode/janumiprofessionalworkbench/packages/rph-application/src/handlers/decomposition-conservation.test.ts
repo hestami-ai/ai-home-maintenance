@@ -6,12 +6,19 @@
 // from a relevant child, was accepted anyway. These tests drive the LIVE engine pipeline (engine.dispatch) and
 // assert the call site — not just the kernel — rejects the violating input.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-19T00:00:00Z';
 const human = { actorId: 'arch-1', actorType: 'HUMAN' as const, displayName: 'Architect' };
+// `decisionOverParent` records `authority: human` on a Decision, and REG-F-014 requires that authority to BE
+// the issuer — so the session has to be `arch-1` itself, not the shared operator credential. Registering the
+// architect as this scenario's only principal is what makes the CONTROL below ("a real EFFECTIVE decision is
+// accepted") an arrangement that actually happens rather than one refused at proposal.
+const DIR = testDirectory([{ ...human, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 const authority = {
 	authorityId: 'auth_arch',
 	authorityType: 'ORGANIZATIONAL_ROLE' as const,
@@ -28,7 +35,7 @@ const DCP = 'dcp_01ARZ3NDEKTSV4RRFFQ69G5V04';
 
 describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -45,7 +52,6 @@ describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pip
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-cons',
 			idempotencyKey: `idem-${n}`,
 			payload
@@ -117,7 +123,12 @@ describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pip
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `evt_${++seq}`
+		}).as(DIR.credentialFor(human.actorId));
 		dispatch('CaptureIntent', INTENT, 'INTENT', {
 			intentId: INTENT,
 			originatingExpression: 'x',

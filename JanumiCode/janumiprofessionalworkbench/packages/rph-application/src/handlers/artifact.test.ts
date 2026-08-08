@@ -9,12 +9,13 @@
 //
 // So the load-bearing assertion here is `semanticVersion` + registry presence, not field round-tripping.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-16T00:00:00Z';
-const AGENT = { actorId: 'agent-1', actorType: 'AGENT' as const, displayName: 'Producing Agent' };
 const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5A10';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A20';
 const ATTEMPT = 'attempt_01ARZ3NDEKTSV4RRFFQ69G5A30';
@@ -33,13 +34,13 @@ const REQUIRED = {
 
 describe('RecordArtifact — DOC-009 §18.1 transcribed; the Artifact is a versioned Professional Work Object', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function record(payload: unknown, id = ART) {
@@ -51,7 +52,6 @@ describe('RecordArtifact — DOC-009 §18.1 transcribed; the Artifact is a versi
 			targetAggregateType: 'ARTIFACT',
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: AGENT,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

@@ -52,7 +52,6 @@ describe('kit (d1b) state-conditional field invariant — the wiring, not the pr
 		targetAggregateType: 'ASSURANCE_ASSESSMENT',
 		targetAggregateId: ASSESSMENT_ID,
 		issuedAt: TS,
-		issuedBy: actor,
 		correlationId: 'corr-1',
 		idempotencyKey: `idem-${seq}`,
 		payload: {}

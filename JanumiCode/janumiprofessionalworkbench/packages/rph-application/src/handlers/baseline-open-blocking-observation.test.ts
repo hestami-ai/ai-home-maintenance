@@ -18,6 +18,8 @@
 // PROMOTE_BASELINE decision, pinned item versions — so the ONLY reason to reject is the open BLOCKING
 // observation. Today the dispatch returns ACCEPTED and the baseline reaches AUTHORITATIVE anyway.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -25,6 +27,11 @@ import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js'
 
 const TS = '2026-07-15T00:00:00Z';
 const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
+// ONE governor issues everything, and it must be `gov-1` specifically: the PROMOTE_BASELINE decision declares
+// `authority: human`, and since REG-F-014 a declared authority that is not the authenticated principal is
+// refused. Borrowing the shared `TEST_CRED.human` (`u1`) would collapse the fixture at proposal — and this
+// file's headline assertion is `not.toBe('ACCEPTED')`, so it would still pass while arranging nothing.
+const DIR = testDirectory([{ ...human, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5H00';
 const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5H01';
 const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5H02';
@@ -34,7 +41,7 @@ const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69G5H05';
 
 describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) {
@@ -46,7 +53,6 @@ describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, liv
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU_ID,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-blocking-obs',
 			idempotencyKey: `idem-${n}`,
 			payload,
@@ -62,7 +68,12 @@ describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, liv
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `evt_${++seq}`
+		}).as(DIR.credentialFor(human.actorId));
 		seedPolicy(engine, 'pol_arch'); // the assessment below cites pol_arch — now it must exist
 		dispatch(
 			'CaptureIntent',

@@ -13,19 +13,20 @@
 //
 // Found by adversarial review, not by the suite — every test here would have passed before the fix except the
 // ones below, which is the point of writing them.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const human: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const POLICY = 'pol_scope_edit';
 
 describe('EditAssurancePolicy keeps the two scope representations in step (review finding (c))', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const edit = (payload: Record<string, unknown>) => {
@@ -37,7 +38,6 @@ describe('EditAssurancePolicy keeps the two scope representations in step (revie
 			targetAggregateType: 'ASSURANCE_POLICY',
 			targetAggregateId: POLICY,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-scope-edit',
 			idempotencyKey: `idem-${n}`,
 			payload: { policyId: POLICY, ...payload }
@@ -52,7 +52,7 @@ describe('EditAssurancePolicy keeps the two scope representations in step (revie
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		seedPolicy(engine, POLICY, {
 			applicability: {
 				objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'],

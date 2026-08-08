@@ -23,6 +23,8 @@ import type {
 	DomainCommand
 } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
@@ -31,6 +33,16 @@ const TS = '2026-07-23T00:00:00Z';
 const AGENT: ActorReference = { actorId: 'agent-1', actorType: 'AGENT', displayName: 'Authoring Agent' };
 const SVC: ActorReference = { actorId: 'assurance', actorType: 'SERVICE', displayName: 'Assurance' };
 const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
+
+// THREE ACTORS, AND THE SEPARATION IS LOAD-BEARING — which is why `d`'s first parameter must select a session
+// rather than decorate a payload. The AGENT authors the PWA (so `floor-gate.ts` reads the work as AI-produced
+// and the de minimis floor applies at all), the SERVICE records the assurance assessments and findings against
+// it, and only the HUMAN issues the governance acts — `makeDecisionEffective` grants EFFECTIVE only on a HUMAN
+// authority, and `proposeDecision` refuses an authority its issuer is not. Collapse these onto one principal
+// and the file stops testing the kind guard: it tests one actor doing everything.
+const DIR = testDirectory(
+	[AGENT, SVC, HUMAN].map((a) => ({ ...a, tenantId: 'tenant-test', organizationId: 'org-test' }))
+);
 
 const AI_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5T00';
 const AI_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5T10';
@@ -46,12 +58,24 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 	let seq = 0;
 	let asmtSeq = 0;
 
+	/** The session for one of the three registered actors. `credentialFor` THROWS on an unregistered actor, so a
+	 *  scenario cannot quietly acquire an identity the fixture never declared. */
+	const sessionOf = (actor: ActorReference): AuthedEngine =>
+		engine.as(DIR.credentialFor(actor.actorId));
+
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmtSeq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
-		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — they must exist
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
+		// The floor assessments below cite floor.* policies — they must exist. Seeded by the human, as the
+		// fixture's SEED_ACTOR did before the engine took over stamping.
+		seedFloorPolicies(sessionOf(HUMAN));
 	});
 
 	function d(actor: ActorReference, commandType: string, payload: unknown, id: string, type: string) {
@@ -63,12 +87,13 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'decision-kind',
 			idempotencyKey: `k-${n}`, // a DISTINCT key each time — a re-aimed command is a new request, not a retry
 			payload
 		};
-		return engine.dispatch(command);
+		// `actor` SELECTS THE SESSION; it is no longer written into the envelope. The engine stamps `issuedBy`
+		// from the authenticated principal, and a declared issuer that disagreed would be refused outright.
+		return sessionOf(actor).dispatch(command);
 	}
 
 	const stateOf = (id: string) => store.loadObject(id)?.state as Record<string, unknown>;

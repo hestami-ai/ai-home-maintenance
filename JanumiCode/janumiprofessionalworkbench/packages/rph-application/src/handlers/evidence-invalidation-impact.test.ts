@@ -18,6 +18,7 @@
 // validateObligationConservation and validateConstraintPropagation at decomposition.ts:210-211,
 // evaluateRecomposition at :467, decisionAuthorizesVersions at governance.ts:652. This was the last one.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -35,7 +36,7 @@ const EV_LONELY = 'evd_01ARZ3NDEKTSV4RRFFQ69G7W0F';
 function harness() {
 	const store = new SqliteStorageAdapter({ now: () => TS });
 	let seq = 0;
-	const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+	const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	const d = (commandType: string, id: string, type: string, payload: unknown) => {
 		const n = ++seq;
 		const command: DomainCommand = {
@@ -45,7 +46,6 @@ function harness() {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'wire4',
 			idempotencyKey: `k-${n}`,
 			payload

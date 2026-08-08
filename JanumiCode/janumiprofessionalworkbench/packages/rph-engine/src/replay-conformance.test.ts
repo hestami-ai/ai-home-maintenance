@@ -32,18 +32,44 @@
 // NOT the right bar and is not attempted. The bar here is coverage of event TYPES: the engine should eventually
 // be able to emit every kind of event the corpus's worked example says this undertaking produces.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, loadExpectedEvents } from './index.js';
 
+// ── THE SESSION THE DRIVE MUST RUN IN, AND WHY IT IS NOT THE SHARED CREDENTIAL ────────────────────────────────
+// `driveReferenceUndertaking` AUTHORS ITS ACTING PARTY into the payloads it sends, and `authority` on its two
+// `ProposeDecision` commands is load-bearing: REG-F-014 requires the declared authority to EQUAL the issuing
+// actor, and the engine now stamps the issuer from the authenticated session. So the session's principal must
+// BE that party — `owner-1`, the Undertaking Owner. Under any other principal the drive is refused at
+// ProposeDecision with RPH_AUTHORITY_INSUFFICIENT, its fail-loud `send` throws, and every PIN in this file
+// would go red for a reason that has nothing to do with the §26 gap it exists to measure.
+//
+// ⚠ The literal is duplicated from `reference-undertaking.ts`'s module-private ACTOR, which is not exported.
+// `executionInstanceId` is carried for the same reason it exists there: with it, the stamped `issuedBy` is the
+// exact value the envelope carried before the trust boundary landed — which is what keeps the 332-event
+// characterization below a statement about the DRIVE rather than about the fixture's choice of session.
+const DIR = testDirectory([
+	{
+		actorId: 'owner-1',
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
+const OWNER = DIR.credentialFor('owner-1');
+
 function driveLive(): string[] {
 	const engine = createEngine({
+		authenticate: DIR.authenticate,
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
 		newEventId: (() => {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(OWNER);
 	driveReferenceUndertaking(engine);
 	return engine.readAllEvents().map((e) => e.eventType);
 }

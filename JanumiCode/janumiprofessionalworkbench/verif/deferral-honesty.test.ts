@@ -29,6 +29,8 @@
 // `testFile` cite's job, and the enforcement register's. This gate closes one direction of two instruments, which
 // is exactly the direction that failed silently.
 import { describe, expect, it } from 'vitest';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { coverageFor } from '@janumipwb/rph-domain';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
@@ -45,10 +47,28 @@ import {
 /** `RPH-FIX-003a` and `RPH-FIX-003b` both discharge rule `RPH-FIX-003`. */
 const ruleIdOf = (checkId: string): string => checkId.replace(/^(RPH-[A-Z0-9]+-\d+)[a-z]$/, '$1');
 
+// ── THE SESSION THE DRIVE RUNS UNDER ────────────────────────────────────────────────────────────────────────
+// The engine stamps `issuedBy` from the authenticated principal (REG-D-027), so the drive no longer names its
+// own actor and this file must. The identity is FORCED, not chosen: `driveReferenceUndertaking` sends
+// `ProposeDecision` carrying `authority: { actorId: 'owner-1', actorType: 'HUMAN' }` as a PRODUCTION literal,
+// and REG-F-014's guard rejects a Decision whose declared authority is not its issuer — so only an
+// Undertaking-Owner session can complete the drive. That coupling is reported as a production defect, not
+// papered over here; `executionInstanceId` reproduces the actor the drive stamped for itself pre-boundary.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+
 /** The object graph the engine builds when it drives the Reference Undertaking through the real pipeline. */
 function drivenGraph(): { store: SqliteStorageAdapter } {
 	const store = new SqliteStorageAdapter({ now: () => '2026-07-12T00:00:00Z' });
 	const engine = createEngine({
+		authenticate: DIR.authenticate,
 		store,
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
@@ -56,7 +76,7 @@ function drivenGraph(): { store: SqliteStorageAdapter } {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(DIR.credentialFor(OWNER.actorId));
 	driveReferenceUndertaking(engine);
 	return { store };
 }

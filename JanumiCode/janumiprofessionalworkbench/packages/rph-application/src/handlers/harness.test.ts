@@ -4,6 +4,8 @@
 // while waiting") for the harness OBJECT: any status the harness holds, including a durable WAITING state a
 // later increment introduces, survives a close/reopen by the same mechanism proven here.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,7 +14,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-19T00:00:00Z';
-const human = { actorId: 'coord-1', actorType: 'HUMAN' as const, displayName: 'Coordinator' };
 const authority = {
 	authorityId: 'auth_coord',
 	authorityType: 'ORGANIZATIONAL_ROLE' as const,
@@ -22,7 +23,7 @@ const authority = {
 const RPH_ID = 'rph_01ARZ3NDEKTSV4RRFFQ69G5H00';
 const PWU_A = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5H0A';
 
-function dispatch(engine: Engine, seq: { n: number }, id: string, type: string, payload: unknown) {
+function dispatch(engine: AuthedEngine, seq: { n: number }, id: string, type: string, payload: unknown) {
 	const n = ++seq.n;
 	const command: DomainCommand = {
 		commandId: `c-${n}`,
@@ -31,7 +32,6 @@ function dispatch(engine: Engine, seq: { n: number }, id: string, type: string, 
 		targetAggregateType: type,
 		targetAggregateId: id,
 		issuedAt: TS,
-		issuedBy: human,
 		correlationId: 'corr',
 		idempotencyKey: `k-${n}`,
 		payload
@@ -53,7 +53,7 @@ describe('ProposeHarness mints a durable RecursiveProfessionalHarness (JAN-IRP C
 	it('mints in FRAMING carrying objective/scope/authority/coordinated PWUs', () => {
 		const store = new SqliteStorageAdapter({ now: () => TS });
 		const seq = { n: 0 };
-		const engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq.n}` });
+		const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq.n}` }).as(TEST_CRED.human);
 		const r = dispatch(engine, seq, RPH_ID, HARNESS, {
 			objective: 'Coordinate the product realization program',
 			scopeStatement: 'intent through architecture baseline',
@@ -74,7 +74,7 @@ describe('ProposeHarness mints a durable RecursiveProfessionalHarness (JAN-IRP C
 		path = join(tmpdir(), `rph-irp-c7-${process.pid}-${Date.now()}.db`);
 		const seq = { n: 0 };
 		const store1 = new SqliteStorageAdapter({ filename: path, now: () => TS });
-		const engine1 = new Engine({ store: store1, now: () => TS, newEventId: () => `e${++seq.n}` });
+		const engine1 = new Engine({ authenticate: testAuthenticator(), store: store1, now: () => TS, newEventId: () => `e${++seq.n}` }).as(TEST_CRED.human);
 		expect(
 			dispatch(engine1, seq, RPH_ID, HARNESS, {
 				objective: 'o',

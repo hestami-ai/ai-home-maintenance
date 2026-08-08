@@ -29,7 +29,7 @@ import {
 	getObject,
 	listAssurancePolicies,
 	listPwuTypes,
-	type EngineHandle
+	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
 import {
 	catalogTemplate,
@@ -180,7 +180,7 @@ export interface ScaffoldSpec {
 
 export interface BrokerDeps {
 	/** The engine seam (Node host). Every read + command goes through it. */
-	readonly engine: EngineHandle;
+	readonly engine: AuthedEngineHandle;
 	/** The DRAFT PWA this broker authors. All proposals are scoped to it. */
 	readonly pwaId: string;
 	/** Mints a new aggregate id for the given prefix (the host owns id policy — deterministic in tests). */
@@ -225,7 +225,7 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 }
 
 export class PwaAuthoringBroker {
-	private readonly engine: EngineHandle;
+	private readonly engine: AuthedEngineHandle;
 	private readonly pwaId: string;
 	private readonly mintId: (prefix: string) => string;
 	private readonly now: () => string;

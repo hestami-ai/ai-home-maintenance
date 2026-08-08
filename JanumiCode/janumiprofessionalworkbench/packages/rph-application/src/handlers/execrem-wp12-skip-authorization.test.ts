@@ -15,6 +15,8 @@
 // by the resolver because §21.1 names it; refusing it would be the resolver inventing a narrowing the rule does
 // not state.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -30,7 +32,7 @@ const sid = (i: number) => `${PLAN}-s${i}`;
 
 describe('JAN-EXECREM WP-12c / F-30 — a bare id is not an authorization', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string, issuedAt = TS) {
@@ -42,7 +44,6 @@ describe('JAN-EXECREM WP-12c / F-30 — a bare id is not an authorization', () =
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt,
-			issuedBy: actor,
 			correlationId: 'wp12c',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -133,7 +134,7 @@ describe('JAN-EXECREM WP-12c / F-30 — a bare id is not an authorization', () =
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

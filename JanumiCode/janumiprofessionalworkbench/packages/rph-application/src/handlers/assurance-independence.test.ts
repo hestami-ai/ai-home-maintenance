@@ -10,18 +10,19 @@
 // test pins the producer-absent skip as a CHOSEN behavior (proceed, do not fabricate a pass or a violation), so it
 // cannot silently flip into either.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Owner' };
 const POLICY = 'pol_01ARZ3NDEKTSV4RRFFQ69G5IND';
 const SUBJECT = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5SUB';
 
 describe('completeAssuranceAssessment — independence enforcement (Increment I2)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	const cmd = (
@@ -38,7 +39,6 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-1',
 			idempotencyKey: `idem-${n}`,
 			payload
@@ -153,7 +153,7 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it('rejects RequestAssuranceAssessment citing a policy that does not exist (fail-closed, independence follow-up B)', () => {

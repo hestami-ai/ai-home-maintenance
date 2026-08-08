@@ -17,6 +17,7 @@
 //
 // The subject is the reference undertaking's real stream: every event this system emits in a full undertaking.
 import { EVENTS } from '@janumipwb/rph-contracts';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking } from './index.js';
@@ -26,15 +27,33 @@ interface Violation {
 	readonly detail: string;
 }
 
+// THE DRIVE NAMES ITS OWN ACTOR, and the whole sweep depends on the drive completing. Every baseline promotion
+// issues a `ProposeDecision` declaring `authority: owner-1`, which REG-F-014 refuses unless the ISSUER is that same
+// actor — under the shared `TEST_CRED.human` (`u1`) the drive throws and this file measures nothing rather than
+// failing honestly. The registered principal is the `ActorReference` the drive declared for itself before the engine
+// began stamping the issuer, so the emitted `issuedBy` — which several of these payloads carry — is unchanged.
+const OWNER = 'owner-1';
+const DIR = testDirectory([
+	{
+		actorId: OWNER,
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
+
 function driveAndCheck(): { violations: Violation[]; checked: number; types: number } {
 	const engine = createEngine({
+		authenticate: DIR.authenticate,
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
 		newEventId: (() => {
 			let s = 0;
 			return () => `evt_${++s}`;
 		})()
-	});
+	}).as(DIR.credentialFor(OWNER));
 	driveReferenceUndertaking(engine);
 
 	const registry = EVENTS as Record<string, { payload?: { safeParse: (v: unknown) => unknown } }>;

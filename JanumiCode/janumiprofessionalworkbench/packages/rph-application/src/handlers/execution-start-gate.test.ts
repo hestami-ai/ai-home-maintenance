@@ -5,13 +5,14 @@
 // ExecutionStep contract has NO `ordinal` — it is persistence-only). No cascade, no readying events, no machine
 // change: steps stay seeded at QUEUED and the plan drives itself (complete step N → step N+1 becomes startable).
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedBelowQueuedStepState_LEGACY_ONLY, seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5K00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5K10';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5K20';
@@ -19,7 +20,7 @@ const ATTEMPT = 'attempt_01ARZ3NDEKTSV4RRFFQ69G5K30';
 
 describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fork F)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string) {
@@ -31,7 +32,6 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -168,7 +168,7 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

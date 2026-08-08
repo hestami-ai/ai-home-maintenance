@@ -26,12 +26,13 @@
 // the one call site that gates the transition. (It is not imported here: rph-application does not depend on
 // rph-projections, and wiring that dependency is the production fix, not this test's job.)
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'des-1', actorType: 'HUMAN' as const, displayName: 'Designer' };
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P40';
 const ROOT_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P41';
 const CHILD_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P42';
@@ -40,13 +41,13 @@ const ORPHAN_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P44';
 
 describe('ValidatePwa gate (live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -58,7 +59,6 @@ describe('ValidatePwa gate (live pipeline)', () => {
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

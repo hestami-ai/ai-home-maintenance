@@ -8,12 +8,13 @@
 // These tests prove the LIVE handler ROUTES each kernel outcome to the right RecompositionContract.status state:
 // CONFLICTED / INSUFFICIENT / COMPOSABLE — including conflict taking precedence over an unacceptable child.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-19T00:00:00Z';
-const human = { actorId: 'arch-1', actorType: 'HUMAN' as const, displayName: 'Architect' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5V00';
 const PARENT = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V01';
 const CHILD_A = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V0A';
@@ -23,7 +24,7 @@ const CLAIM = 'clm_01ARZ3NDEKTSV4RRFFQ69G5V06';
 
 describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §14.1, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -40,7 +41,6 @@ describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-recomp',
 			idempotencyKey: `idem-${n}`,
 			payload
@@ -95,7 +95,7 @@ describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		dispatch('CaptureIntent', INTENT, 'INTENT', {
 			intentId: INTENT,
 			originatingExpression: 'x',

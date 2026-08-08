@@ -3,6 +3,8 @@
 // un-instantiated beyond PROPOSED), and ApproveExecutionPlan now runs canAuthorizeNewWork over the PWU's
 // assumptions. This drives the LIVE pipeline: an EXPIRED assumption on the PWU blocks the plan approval.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -16,7 +18,7 @@ const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5J30';
 
 describe('ApproveExecutionPlan — a dead assumption cannot authorize new work (RPH-ASM-006, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, type: string) {
@@ -28,7 +30,6 @@ describe('ApproveExecutionPlan — a dead assumption cannot authorize new work (
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -76,7 +77,7 @@ describe('ApproveExecutionPlan — a dead assumption cannot authorize new work (
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

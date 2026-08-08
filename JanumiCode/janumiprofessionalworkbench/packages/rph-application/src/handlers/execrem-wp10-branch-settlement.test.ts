@@ -18,6 +18,8 @@
 // list, or patching state but not the log). KT-3 and KT-7 below assert the DECISION-REPLAY IDENTITY instead:
 // recorded == recomputed-from-the-committed-log == the id on the settling event.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { resolveBranchSelection, buildConditionSubject, evaluateGuardExpression } from '@janumipwb/rph-domain';
 import { STEP_COMMAND_SPECS, STEP_COMMAND_TYPES } from '@janumipwb/rph-domain';
@@ -44,13 +46,13 @@ const TERMINAL_SUCCESS = new Set(['SUCCEEDED', 'SKIPPED']);
 
 describe('JAN-EXECREM WP-10 — a BRANCH decides ONCE, against the move it is making', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function mk(now = TS) {
 		store = new SqliteStorageAdapter({ now: () => now });
 		seq = 0;
-		engine = new Engine({ store, now: () => now, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => now, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	}
 
 	function dispatch(commandType: string, payload: unknown, id = PLAN, aggType = 'EXECUTION_PLAN') {
@@ -62,7 +64,6 @@ describe('JAN-EXECREM WP-10 — a BRANCH decides ONCE, against the move it is ma
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp10',
 			idempotencyKey: `k-${n}`,
 			payload

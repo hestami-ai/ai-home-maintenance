@@ -9,7 +9,7 @@
 import type { AssuranceRecordingPlan, Identity } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 
 /** The ratified DOC-007 ActorType enum. The assurance-island `Identity.actorType` is a free string by design
  *  (the island is plane-agnostic), so the seam below must coerce it to a valid contract value. */
@@ -50,9 +50,27 @@ function identityToActorReference(e: Identity): ActorReference {
 	};
 }
 
+/**
+ * ⚠ `actor` IS GONE, AND IT WAS THE LAST SELF-DECLARED ISSUER IN A PRODUCTION BUILDER (REG-F-062).
+ *
+ * It read *"the actor recording the assessments (the Assurance Service acting on behalf of the host)"* — a
+ * DELEGATION, stated in a field and backed by nothing. This repository has no delegation record (see
+ * `proposeDecision`'s guard and REG-F-014's disposition), so "on behalf of" was the same fiction that guard
+ * refuses, written one layer down where no guard was looking. Every caller passed a literal — `assurance-svc`
+ * — that no authenticator has ever issued.
+ *
+ * The issuer is now whoever the CALLER'S HANDLE is authenticated as. That is less flattering and more true:
+ * when the authoring turn runs the floor, the record says the turn's principal recorded it. Nothing is lost,
+ * because the identity that actually matters here is the EVALUATOR — the independent reviewer §8.12 checks —
+ * and that rides in `validatorResult.executionProvenance`, resolved per run, never a constant.
+ *
+ * ⚠ AND THE ISSUER MUST STAY THE CALLER'S. Recording under a dedicated assurance credential was the obvious
+ * alternative and it is WRONG HERE: a staged authoring turn replays its recorded commands through ONE session,
+ * so a command dispatched into the fork as a different principal would produce a different `createdBy` on
+ * replay and fail the commit's content-hash postcondition. Per-command principals need a mechanism this
+ * repository does not have; inventing one to make a nicer-looking `createdBy` is not a trade worth making.
+ */
 export interface RecordAssuranceOptions {
-	/** The actor recording the assessments (the Assurance Service acting on behalf of the host). */
-	readonly actor: ActorReference;
 	readonly issuedAt: string;
 	readonly correlationId: string;
 	/** A stable prefix (unique per recording run) for command bookkeeping (commandId / idempotencyKey). */
@@ -73,7 +91,7 @@ function observationTypeFor(policyId: string): string {
 }
 
 export function recordAssuranceRecordingPlan(
-	handle: EngineHandle,
+	handle: AuthedEngineHandle,
 	plan: AssuranceRecordingPlan,
 	opts: RecordAssuranceOptions
 ): RecordedAssurance {
@@ -94,7 +112,6 @@ export function recordAssuranceRecordingPlan(
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: opts.issuedAt,
-			issuedBy: opts.actor,
 			correlationId: opts.correlationId,
 			idempotencyKey: `${opts.idPrefix}-idem-${seq}`,
 			payload

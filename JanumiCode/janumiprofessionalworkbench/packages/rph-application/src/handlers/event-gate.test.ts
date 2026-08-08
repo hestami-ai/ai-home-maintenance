@@ -50,7 +50,6 @@ describe('kit (d2) event gate', () => {
 		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		targetAggregateId: PWU_ID,
 		issuedAt: TS,
-		issuedBy: actor,
 		correlationId: 'corr-1',
 		idempotencyKey: `idem-${seq}`,
 		payload: {}

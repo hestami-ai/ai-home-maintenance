@@ -5,20 +5,21 @@
 // Steps are seeded directly at their target stepState in ProposeExecutionPlan (no step handlers run — SKIPPED/
 // CANCELLED/SUPERSEDED have none, 3C), which is exactly how the allow-list is exercised against every terminal state.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedEmptyStepArray_LEGACY_ONLY, seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5J00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5J10';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5J20';
 
 describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle (DWP-01)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id: string, aggType: string) {
@@ -30,7 +31,6 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -98,7 +98,7 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

@@ -50,8 +50,10 @@ import {
 	dispatchBatch,
 	getEngine,
 	getRegisteredIntent,
-	mintUiId
+	mintUiId,
+	uiSession
 } from '$lib/server/workbench';
+import { actingActor } from '$lib/server/identity';
 import type { Actions, PageServerLoad } from './$types';
 
 type PwuRecord = ReturnType<typeof listPwus>[number];
@@ -714,9 +716,9 @@ export const actions: Actions = {
 						detail:
 							'Demo lifecycle step: it demonstrates the execution axis and authors no artifact.'
 					},
-					executionProvenance: {
-						executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }
-					}
+					// The operator who drove the demo lifecycle really did execute this step — so the record names
+					// the authenticated session, not the `ui-user` literal that used to stand in for it.
+					executionProvenance: { executedBy: actingActor(uiSession()) }
 				}
 			],
 			// Earned, and cited: the plan whose step actually succeeded now backs executionState=SUCCEEDED.
@@ -825,7 +827,10 @@ export const actions: Actions = {
 						originType: 'MODEL_GENERATION',
 						executedBy: { actorId: 'agent-x', actorType: 'AGENT', displayName: 'Authoring Agent' }
 					}
-				: { executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' } };
+				: // The HUMAN arm is the session itself. The AGENT arm above stays a DECLARED third party on purpose:
+					// it is the demo's way of saying "a model produced this output", and that actor is genuinely
+					// not the operator pressing the button. Only the arm that claims to be the operator is derived.
+					{ executedBy: actingActor(uiSession()) };
 		return dispatchResult('CompleteExecutionStep', str(f, 'planId'), {
 			executionStepId: str(f, 'stepId'),
 			executionAttemptId: mintUiId('attempt'),
@@ -860,7 +865,9 @@ export const actions: Actions = {
 		const pwuId = await pwuIdFrom(request);
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
 		const assessmentId = mintUiId('asm');
-		const evaluator = { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' };
+		// Independence NONE, and the operator IS the reviewer — so the evaluator must be the real session, or the
+		// assessment records a sign-off by nobody.
+		const evaluator = actingActor(uiSession());
 		// Create + activate the demo policy only once; CreateAssurancePolicy on an existing object CONFLICTS.
 		const policySteps: Step[] = getObject(engine, DEMO_POLICY_ID)
 			? []

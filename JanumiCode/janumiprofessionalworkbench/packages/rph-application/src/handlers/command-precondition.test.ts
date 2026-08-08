@@ -7,7 +7,9 @@
 // advanceStatus actually hands a predicate the loaded state + payload + a working (and copy-on-read) reader —
 // the critique-B4 signature, which stays unused by production predicates until DWP-08, so an untested wiring
 // would be a promise, not a ruling.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { Logger } from '@janumipwb/rph-ports';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -23,7 +25,6 @@ import {
 import { advanceStatus, preconditionReader, type HandlerContext } from './kit.js';
 
 const TS = '2026-07-23T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'User' };
 
 const command = (commandType = 'AdvanceThing', targetAggregateId = 'thing-1'): DomainCommand => ({
 	commandId: 'c-1',
@@ -32,7 +33,6 @@ const command = (commandType = 'AdvanceThing', targetAggregateId = 'thing-1'): D
 	targetAggregateType: 'THING',
 	targetAggregateId,
 	issuedAt: TS,
-	issuedBy: HUMAN,
 	correlationId: 'corr',
 	idempotencyKey: 'k-1',
 	payload: { note: 'p' }
@@ -130,7 +130,7 @@ describe('allOf — ordered conjunction, first refusal wins', () => {
 
 describe('preconditionReader — the critique-B4 read-only surface, against the real store', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 
 	const silent: Logger = {
 		log: () => {},
@@ -145,7 +145,7 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		let seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it('reads a committed object state and an aggregate event stream', () => {
@@ -157,7 +157,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 			targetAggregateType: 'INTENT',
 			targetAggregateId: INTENT,
 			issuedAt: TS,
-			issuedBy: HUMAN,
 			correlationId: 'corr',
 			idempotencyKey: 'k-cap',
 			payload: {
@@ -196,7 +195,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-cap2',
 				payload: {
@@ -227,7 +225,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-adv',
 				payload: { note: 'from-the-command' }
@@ -260,7 +257,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-cap3',
 				payload: {
@@ -287,7 +283,6 @@ describe('preconditionReader — the critique-B4 read-only surface, against the 
 				targetAggregateType: 'INTENT',
 				targetAggregateId: INTENT,
 				issuedAt: TS,
-				issuedBy: HUMAN,
 				correlationId: 'corr',
 				idempotencyKey: 'k-adv2',
 				payload: {}

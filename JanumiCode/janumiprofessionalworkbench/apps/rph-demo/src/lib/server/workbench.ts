@@ -14,6 +14,7 @@ import {
 	listPwuTypes,
 	seedPolicyLibrary,
 	seedWorkbench,
+	type AuthedEngineHandle,
 	type EngineHandle
 } from '@janumipwb/rph-engine';
 import { ontology, validateOntology } from '@janumipwb/rph-product-realization-pwa';
@@ -22,6 +23,13 @@ import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { monotonicFactory } from 'ulid';
+import {
+	AGENT_CREDENTIAL,
+	REFERENCE_OWNER_CREDENTIAL,
+	SESSION_CREDENTIAL,
+	SYSTEM_CREDENTIAL,
+	standaloneAuthenticator
+} from './identity.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 const productionUlid = monotonicFactory();
@@ -85,8 +93,15 @@ function newEngine(dbPath?: string): EngineHandle {
 	const base = {
 		ontology,
 		validateOntology,
+		// THE TRUST BOUNDARY. Standalone still AUTHENTICATES — the sponsor's own framing — so this is a real
+		// local identity table, not a bypass (REG-D-027; `./identity.ts`).
+		authenticate: standaloneAuthenticator(),
 		...(dbPath ? { store: new SqliteStorageAdapter({ filename: dbPath }) } : {})
 	};
+	// ⚠ THE HOST RETURNS AN UNAUTHENTICATED HANDLE, DELIBERATELY. Callers open their own session with the
+	// credential that matches WHO THEY ARE — SESSION for the surface, AGENT for the broker, SYSTEM for the
+	// seed. Binding one here would give every caller the same identity, which is REG-F-054's defect restored
+	// one layer up. (A codemod briefly wired the TEST authenticator into this production path; it is removed.)
 	return createEngine(TEST_MODE ? { ...base, now: testNow } : base);
 }
 
@@ -106,7 +121,10 @@ function newEngine(dbPath?: string): EngineHandle {
  */
 export function openWorkbench(dbPath?: string): EngineHandle {
 	const engine = newEngine(dbPath);
-	if (engine.readAllEvents().length === 0) seedWorkbench(engine);
+	// ⚠ SYSTEM, NOT THE USER. Seeding runs at construction before any session exists, and it is ~80% of all
+	// dispatches by volume. Handing it the human's credential would put a fiction into `createdBy` on every
+	// seeded object and would defeat D-2 at the largest site in the system.
+	if (engine.readAllEvents().length === 0) seedWorkbench(engine.as(REFERENCE_OWNER_CREDENTIAL));
 	// A DURABLE HOST SHALL RECOVER ITS PENDING OUTBOX AT STARTUP — `EngineHandle.recoverOutbox`, WP-2-007. The
 	// obligation has existed since the engine gained a durable store; until W-2 the demo had none, so it bound
 	// nothing and no one noticed. Measured before this line existed: a restart left **300** entries PENDING and
@@ -141,8 +159,9 @@ export function resetEngine(seed: 'reference' | 'empty'): void {
 	handle = newEngine();
 	// Always seed the policy library (floor + additive) so the policy manager + picker are populated even in the
 	// authoring-from-scratch ('empty') flow; 'reference' additionally authors the published Product Realization PWA.
-	if (seed === 'reference') seedWorkbench(handle);
-	else seedPolicyLibrary(handle);
+	// SYSTEM, for the same reason as the boot seed: this runs with no user session in scope.
+	if (seed === 'reference') seedWorkbench(handle.as(REFERENCE_OWNER_CREDENTIAL));
+	else seedPolicyLibrary(handle.as(SYSTEM_CREDENTIAL));
 }
 
 /** The command fields a UI action supplies; this host owns the common command envelope. */
@@ -168,7 +187,9 @@ function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
 		targetAggregateType: input.targetAggregateType,
 		targetAggregateId: input.targetAggregateId,
 		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
-		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
+		// NO `issuedBy`. The engine stamps the authenticated principal (REG-D-027). This line used to
+		// hardcode `ui-user` — the SIXTH such site, and the one that would have refused every action in
+		// the running app once the session became `local-professional`.
 		correlationId,
 		idempotencyKey: TEST_MODE
 			? `ui-idem-${cmdSeq}`
@@ -215,14 +236,26 @@ export function dispatch(
 	payload: unknown,
 	expectedRevision?: number
 ) {
-	return getEngine().dispatch(
+	return uiSession().dispatch(
 		uiCommand({ commandType, targetAggregateType, targetAggregateId, payload, expectedRevision })
 	);
 }
 
 /** Dispatch a multi-command UI operation atomically. A rejection rolls the entire operation back. */
 export function dispatchBatch(commands: readonly UiCommandInput[]) {
-	return getEngine().dispatchBatch(commands.map((command) => uiCommand(command)));
+	return uiSession().dispatchBatch(commands.map((command) => uiCommand(command)));
+}
+
+/**
+ * The workbench user's authenticated session — the ONE place `SESSION_CREDENTIAL` is presented for UI work.
+ *
+ * Routes need it for more than dispatch: a handful of ratified payloads must NAME the acting professional
+ * (`authority`, `executedBy`, `evaluator`), and `actingActor()` reads that off this session rather than letting
+ * each route write a literal. Exported so those routes derive the identity from the same authenticated context
+ * their commands are stamped from — two sources for one actor is how they drift apart (REG-F-061).
+ */
+export function uiSession(): AuthedEngineHandle {
+	return getEngine().as(SESSION_CREDENTIAL);
 }
 
 /** A PwaAuthoringBroker scoped to one DRAFT PWA, wired to the shared engine + this host's id/clock policy. Both the
@@ -234,7 +267,11 @@ export function makeAuthoringBroker(
 	sessionId: string = mintUiId('sess')
 ): PwaAuthoringBroker {
 	return new PwaAuthoringBroker({
-		engine,
+		// ⚠ THE AGENT'S OWN SESSION, and this line is why D-1 does not make forgeability live. The broker used
+		// to carry `actorType: 'AGENT'` as a DEFAULT FIELD; once the engine stamps from the session, that field
+		// falls dead and an agent's commands would silently acquire the human's identity unless the broker
+		// holds its own credential. REG-E-027 keeps delegation human-to-deputy; this keeps agents out of it.
+		engine: engine.as(AGENT_CREDENTIAL),
 		pwaId,
 		mintId: mintUiId,
 		now: TEST_MODE ? testNow : undefined,
@@ -257,7 +294,13 @@ export interface ConversationEntry {
 export function recordConversation(
 	pwaId: string,
 	entries: ConversationEntry[],
-	engine: EngineHandle = getEngine(),
+	// ⚠ AN AUTHED HANDLE, AND THE CALLER'S SESSION IS THE POINT (D-1, defect C).
+	// This used to re-bind to SESSION_CREDENTIAL. Inside an authoring turn that is WRONG: the turn's fork runs
+	// as the AGENT, so the conversation object would be created in the fork by the agent and re-created on
+	// canonical by the human — and `commitAuthoringTurn` guards the replay with per-object CONTENT HASHES, so
+	// the two would diverge and the turn would fail its own postcondition. Dispatching through the handle it is
+	// GIVEN keeps the fork write and the canonical replay under one principal.
+	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL),
 	correlationId = 'ui'
 ): void {
 	if (entries.length === 0) return;

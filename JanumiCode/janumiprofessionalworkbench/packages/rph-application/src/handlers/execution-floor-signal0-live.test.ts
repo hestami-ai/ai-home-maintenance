@@ -5,12 +5,13 @@
 // If execution.ts stopped threading p.executionProvenance, this step would look human, admit itself, and this test
 // would fail — which the signal-0 unit test (function-level) cannot catch.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-17T00:00:00Z';
-const human = { actorId: 'u-1', actorType: 'HUMAN' as const, displayName: 'Operator' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5S00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S10';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5S20';
@@ -20,7 +21,7 @@ const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5S50';
 
 describe('CompleteExecutionStep floor gate — signal 0 wiring (a human-completed non-model step, AI by provenance)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -31,8 +32,7 @@ describe('CompleteExecutionStep floor gate — signal 0 wiring (a human-complete
 			commandSchemaVersion: 1,
 			targetAggregateType: type,
 			targetAggregateId: id,
-			issuedAt: TS,
-			issuedBy: human, // a HUMAN completes the step — heuristic 2 (AGENT/MODEL completer) cannot fire
+			issuedAt: TS, // a HUMAN completes the step — heuristic 2 (AGENT/MODEL completer) cannot fire
 			correlationId: 'sig0',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -76,7 +76,7 @@ describe('CompleteExecutionStep floor gate — signal 0 wiring (a human-complete
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		d(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

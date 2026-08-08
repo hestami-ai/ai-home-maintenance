@@ -13,6 +13,8 @@
 // and is called only by its own tests. The authoring plane never bumps semanticVersion, so floor-gate.ts:95's
 // version comparison has nothing to compare and the kernel's ruling is never asked for.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -37,7 +39,7 @@ const FLOOR = ['floor.schema-invariant', 'floor.identity-provenance', 'floor.rea
 
 describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize the edited graph', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	let asmtSeq = 0;
 
@@ -45,7 +47,7 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmtSeq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // the floor assessment below cites floor.* policies — now they must exist
 	});
 
@@ -64,7 +66,6 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'stale-floor',
 			idempotencyKey: `k-${n}`,
 			payload

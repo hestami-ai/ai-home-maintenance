@@ -6,12 +6,13 @@
 // the commands mint objects that carry `strength` (the field the conservation gates key on), through the live
 // engine pipeline (schema validation + event gate + commit).
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-19T00:00:00Z';
-const human = { actorId: 'arch-1', actorType: 'HUMAN' as const, displayName: 'Architect' };
 const authority = {
 	authorityId: 'auth_arch',
 	authorityType: 'ORGANIZATIONAL_ROLE' as const,
@@ -24,7 +25,7 @@ const CON_ID = 'con_01ARZ3NDEKTSV4RRFFQ69G5V03';
 
 describe('AssertObligation / AssertConstraint mint first-class objects (WP-1-005/006, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -41,7 +42,6 @@ describe('AssertObligation / AssertConstraint mint first-class objects (WP-1-005
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: human,
 			correlationId: 'corr-obl-con',
 			idempotencyKey: `idem-${n}`,
 			payload
@@ -52,7 +52,7 @@ describe('AssertObligation / AssertConstraint mint first-class objects (WP-1-005
 	function freshEngine() {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 	}
 
 	it('AssertObligation creates an OBLIGATION carrying its MANDATORY strength', () => {

@@ -2,6 +2,8 @@
 // remaining runtime commands are wired: a step advances QUEUED -> RUNNING -> SUCCEEDED inside the plan aggregate
 // (and a completed step must record a result), and a runtime binding advances REQUESTED -> AUTHORIZED.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -9,7 +11,6 @@ import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtu
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5FAV';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5FB0';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5FC0';
@@ -23,7 +24,7 @@ const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5FG0';
 
 describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(
@@ -40,7 +41,6 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -160,7 +160,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // floor assessments below cite floor.* policies — now they must exist
 		dispatch(
 			'CaptureIntent',

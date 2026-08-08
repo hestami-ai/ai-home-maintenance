@@ -15,17 +15,18 @@
 // result carries a classified code, and a well-formed command is still accepted. A fix that returned the wrong
 // code would still be a fix for the defect this file is about; a fix that kept throwing would not.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
 
 const TS = '2026-08-02T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H6500';
 
 describe('REG-F-011 — a malformed envelope is REFUSED, never thrown (Engine.dispatch returns)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 
 	const wellFormed = (): Record<string, unknown> => ({
 		commandId: 'c-1',
@@ -34,7 +35,6 @@ describe('REG-F-011 — a malformed envelope is REFUSED, never thrown (Engine.di
 		targetAggregateType: 'INTENT',
 		targetAggregateId: INTENT,
 		issuedAt: TS,
-		issuedBy: actor,
 		correlationId: 'corr-1',
 		idempotencyKey: 'k-1',
 		payload: {
@@ -60,7 +60,7 @@ describe('REG-F-011 — a malformed envelope is REFUSED, never thrown (Engine.di
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		let seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	it.each(['commandId', 'correlationId'])(

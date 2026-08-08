@@ -22,24 +22,25 @@
 // the call site's canAdvanceWorkLifecycle(...) call degrades to a bare legality check and passes. The readiness
 // contract has no kernel representation at all: the guard that SHOULD be called does not yet exist.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Alice' };
 const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5R00';
 const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5R10';
 
 describe('MarkPwuReady readiness contract (live command drive)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function cmd(
@@ -55,7 +56,6 @@ describe('MarkPwuReady readiness contract (live command drive)', () => {
 			targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 			targetAggregateId: PWU_ID,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr-1',
 			idempotencyKey: `idem-${n}`,
 			payload,

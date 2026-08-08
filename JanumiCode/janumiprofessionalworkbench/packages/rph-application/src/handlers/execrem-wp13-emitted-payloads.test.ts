@@ -22,6 +22,8 @@
 // validates every emitted step payload against its DECLARED schema regardless of ratified status — which is
 // strictly stronger than the (d2) gate and does not depend on provenance at all.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { EVENTS } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -41,7 +43,7 @@ const SAYS_NOTHING = {
 
 describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their declared shapes', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown, id = PLAN, aggType = 'EXECUTION_PLAN') {
@@ -53,7 +55,6 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'wp13',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -80,7 +81,7 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

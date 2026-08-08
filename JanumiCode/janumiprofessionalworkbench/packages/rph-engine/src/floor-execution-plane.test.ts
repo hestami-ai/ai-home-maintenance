@@ -17,9 +17,10 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ActorReference } from '@janumipwb/rph-contracts';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
-import type { EngineHandle } from './engine.js';
+import type { AuthedEngineHandle } from './engine.js';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
@@ -93,9 +94,22 @@ const goodCtx: ValidatorContext = {
 	}
 };
 
-function engine(): EngineHandle {
+// ONE ACTOR, AND IT MUST BE THE ASSURANCE SERVICE — not the shared human credential.
+// The recorder no longer declares an issuer (REG-F-062); it takes one from the session, so SVC is what every
+// recorded assessment here is attributed to. `seedFloorPolicies` likewise declares nothing and runs as whoever
+// holds the session — the assurance service standing up the policies it goes on to cite is the honest reading of
+// who acts here. This file asserts the CROSS-PLANE composition, not the attribution; the assertion that the issuer
+// comes from the session and not from a parameter lives in `record-assurance.test.ts`, once, where it belongs.
+const DIR = testDirectory([{ ...SVC, tenantId: 'tenant-test', organizationId: 'org-test' }]);
+
+function engine(): AuthedEngineHandle {
 	let s = 0;
-	return createEngine({ ontology, now: () => TS, newEventId: () => `e${++s}` });
+	return createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		now: () => TS,
+		newEventId: () => `e${++s}`
+	}).as(DIR.credentialFor(SVC.actorId));
 }
 
 describe('de minimis floor is plane-agnostic (authoring + execution)', () => {
@@ -124,7 +138,6 @@ describe('de minimis floor is plane-agnostic (authoring + execution)', () => {
 
 		const pwaPlan = await runFloorAndPlanRecording(pwa, goodCtx, registry('SATISFIED'));
 		recordAssuranceRecordingPlan(eng, pwaPlan, {
-			actor: SVC,
 			issuedAt: TS,
 			correlationId: 'floor',
 			idPrefix: 'a',
@@ -132,7 +145,6 @@ describe('de minimis floor is plane-agnostic (authoring + execution)', () => {
 		});
 		const stepPlan = await runFloorAndPlanRecording(step, goodCtx, registry('REJECTED'));
 		recordAssuranceRecordingPlan(eng, stepPlan, {
-			actor: SVC,
 			issuedAt: TS,
 			correlationId: 'floor',
 			idPrefix: 'e',

@@ -2,23 +2,24 @@
 // supersede, plus the LOCK on the de minimis floor policies (§8.4 / INV-5) — they can be created (seed) but never
 // edited, suspended, or superseded. Drives the handlers LIVE through the engine.
 import { AssurancePolicyCreatedPayloadSchema, type DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
 const POLICY = 'ASSURANCE_POLICY';
 
 describe('Assurance Policy lifecycle handlers (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	function d(commandType: string, payload: unknown, id: string) {
@@ -30,7 +31,6 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 			targetAggregateType: POLICY,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'corr',
 			idempotencyKey: `k-${n}`,
 			payload

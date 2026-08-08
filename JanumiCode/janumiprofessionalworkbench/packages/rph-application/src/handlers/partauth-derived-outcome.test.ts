@@ -14,20 +14,21 @@
 // THE MONOTONICITY LIMB IS HERE BECAUSE THIS WORK PACKAGE CREATES ITS CASE. `mutate` writes the granted set
 // wholesale and the precondition already admits PARTIALLY_AUTHORIZED, so making that state reachable makes a
 // silent privilege REDUCTION reachable with it — recorded as an authorization rather than as the revocation it is.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-26T00:00:00Z';
-const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const BINDING = 'bind_01ARZ3NDEKTSV4RRFFQ69HB400';
 const STEP = 'plan_01ARZ3NDEKTSV4RRFFQ69HB410-s1';
 const cap = (c: string) => ({ capability: c });
 
 describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function dispatch(commandType: string, payload: unknown) {
@@ -39,7 +40,6 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 			targetAggregateType: 'RUNTIME_BINDING',
 			targetAggregateId: BINDING,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'partauth',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -72,7 +72,7 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 	});
 
 	describe('the two outcomes, both driven through the bus', () => {
@@ -296,7 +296,7 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 // is about status — and it runs LAST, so a DENIED binding still reports DENIED rather than "grants nothing".
 describe('N-18 — a binding that confers nothing does not authorize a start', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 	const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69HB500';
 	const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69HB510';
@@ -313,7 +313,6 @@ describe('N-18 — a binding that confers nothing does not authorize a start', (
 			targetAggregateType: aggType,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: actor,
 			correlationId: 'n18',
 			idempotencyKey: `n18k-${n}`,
 			payload
@@ -328,7 +327,7 @@ describe('N-18 — a binding that confers nothing does not authorize a start', (
 	function arrange(caps: string[], granted: string[]) {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `n18e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `n18e${++seq}` }).as(TEST_CRED.human);
 		send('CaptureIntent', { intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' }, INTENT, 'INTENT');
 		send('ProposePwu', {
 			pwuId: PWU, pwuKind: 'ARCHITECTURE', title: 'Arch', description: 'd', intentId: INTENT,

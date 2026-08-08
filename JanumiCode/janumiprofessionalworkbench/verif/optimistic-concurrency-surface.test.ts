@@ -19,13 +19,13 @@
 // performed BEFORE the intervening write, exactly as a rendered page would.
 
 import { createEngine, getObjectRevision } from '@janumipwb/rph-engine';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const TS = '2026-08-07T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' };
 
 describe('PER-4 — a surface command declares the revision it was rendered from', () => {
 	let store: SqliteStorageAdapter;
@@ -53,7 +53,6 @@ describe('PER-4 — a surface command declares the revision it was rendered from
 		targetAggregateType,
 		targetAggregateId,
 		issuedAt: TS,
-		issuedBy: HUMAN,
 		correlationId: 'ui',
 		idempotencyKey: `ui-idem-${seq}`,
 		...(expectedRevision === undefined ? {} : { expectedRevision }),
@@ -68,7 +67,7 @@ describe('PER-4 — a surface command declares the revision it was rendered from
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = createEngine({ ontology, store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		engine = createEngine({ authenticate: testAuthenticator(), ontology, store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
 		expect(
 			engine.dispatch(
 				cmd('AssertClaim', 'CLAIM', CLAIM, {

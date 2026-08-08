@@ -2,7 +2,9 @@
 // whose output is AI-produced but which has NO recorded floor at all. That sibling proves the gate blocks once a
 // non-SATISFIED floor EXISTS; the complement — nothing was ever assessed — is the one an unassessed agent actually
 // takes, and it is the path §8.4 says must resolve to material rather than to silent admission.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -10,11 +12,6 @@ import { Engine } from '../index.js';
 const TS = '2026-07-15T00:00:00Z';
 // Every command here is issued by an AGENT, and the step is a MODEL_INVOCATION whose provenance names a MODEL: the
 // producer is AI on every axis the pipeline can observe, so no reading of "AI-produced" is left to ambiguity.
-const AGENT: ActorReference = {
-	actorId: 'agent-7',
-	actorType: 'AGENT',
-	displayName: 'Executor Agent'
-};
 const MODEL_ACTOR = { actorId: 'model-7', actorType: 'MODEL', displayName: 'gpt-oss:20b' };
 
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5T00';
@@ -27,7 +24,7 @@ const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5T50';
 
 describe('CompleteExecutionStep floor gate — an AI-produced step with NO recorded floor (§8.4)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: Engine;
+	let engine: AuthedEngine;
 	let seq = 0;
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -39,7 +36,6 @@ describe('CompleteExecutionStep floor gate — an AI-produced step with NO recor
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			issuedBy: AGENT,
 			correlationId: 'exec-floor',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -53,7 +49,7 @@ describe('CompleteExecutionStep floor gate — an AI-produced step with NO recor
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
 
 		d(
 			'CaptureIntent',

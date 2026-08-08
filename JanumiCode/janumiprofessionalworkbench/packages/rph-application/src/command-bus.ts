@@ -15,10 +15,17 @@ import {
 	validateAgainst,
 	type CommandResult,
 	type DomainCommand,
-	type DomainEvent
+	type DomainEvent,
+	type StampedCommand
 } from '@janumipwb/rph-contracts';
 import { contentHash } from '@janumipwb/rph-contracts/hash';
-import type { Logger, StorageAdapter } from '@janumipwb/rph-ports';
+import type {
+	AuthenticationPort,
+	Credential,
+	Logger,
+	Principal,
+	StorageAdapter
+} from '@janumipwb/rph-ports';
 import { NoopLogger } from '@janumipwb/rph-ports';
 import type { ZodType } from 'zod';
 import type { HandlerContext } from './handlers/kit.js';
@@ -26,6 +33,14 @@ import { HANDLERS } from './handlers/registry.js';
 
 export interface EngineDeps {
 	readonly store: StorageAdapter;
+	/**
+	 * THE TRUST BOUNDARY, AND IT IS REQUIRED (DOC-003 §9 PER-3; DOC-004 §5; REG-D-027).
+	 *
+	 * Not optional, because PER-3's SCOPE clause makes *"the existence and completeness of the gate"* the
+	 * semantic requirement: an optional port turns "no gate" from a compile error into a runtime condition,
+	 * and every permissive default in this repository's history became the live path.
+	 */
+	readonly authenticate: AuthenticationPort;
 	readonly now?: () => string;
 	readonly newEventId?: () => string;
 	readonly logger?: Logger;
@@ -72,6 +87,49 @@ export interface ObjectPostconditionConflict {
 	readonly actualContentHash: string | undefined;
 }
 
+/**
+ * A dispatcher bound to ONE authenticated principal. The only way to reach a command.
+ *
+ * ⚠ THE SEAM IS A RECEIVER, NOT A PARAMETER (REG-D-028), and that closes two hazards by construction rather
+ * than by remembering:
+ *   - the authoring broker HOLDS one bound to an AGENT credential, so its agent identity is what it IS rather
+ *     than a default field that falls dead once the engine stamps;
+ *   - a recorded turn REPLAYS through the session that recorded it, so accepting an agent's work cannot
+ *     re-attribute it to the human who pressed accept.
+ * There is also no positional credential to append, and therefore none to silently drop.
+ */
+export interface AuthedEngine {
+	/**
+	 * WHO THIS SESSION IS — resolved from the credential, `undefined` when it did not resolve.
+	 *
+	 * This exists because some ratified PAYLOADS must NAME an actor: a Decision's `authority` (ASR-15), an
+	 * ExecutionAttempt's `executedBy` (§20 execution provenance), an assessment's evaluator. Stamping
+	 * `issuedBy` does not reach any of them, and before this the surfaces filled them with a hardcoded literal
+	 * — `ui-user`, an identity no authenticator has ever issued (REG-F-061). Reading the resolved principal is
+	 * JPWB-DOC-004 §5 performed rather than quoted: "derive tenant and principal context from authenticated
+	 * context, never from a payload's claim about itself."
+	 *
+	 * ⚠ IT IS NOT A CAPABILITY. A caller can only learn who it ALREADY is — it needs the credential to get
+	 * here, and it cannot construct a session for anyone else. `undefined` must be treated as a refusal, never
+	 * as a licence to substitute a default: a surface that cannot name its actor has nothing true to write.
+	 */
+	readonly principal: Principal | undefined;
+	dispatch(command: DomainCommand): CommandResult;
+	dispatchBatch(commands: readonly DomainCommand[]): BatchResult;
+	dispatchBatchGuarded(
+		commands: readonly DomainCommand[],
+		preconditions: readonly RevisionPrecondition[],
+		expectedEventCount?: number,
+		postconditions?: readonly ObjectPostcondition[]
+	): BatchResult;
+	// The read/lifecycle surface rides along so a caller that dispatches does not need to hold two references.
+	// These need no credential and are unchanged by it; carrying them here weakens nothing and removes the
+	// temptation to keep an ungated engine in scope beside the gated one.
+	subscribe(handler: EventSubscriber): void;
+	drainOutbox(): number;
+	recoverOutbox(): number;
+}
+
 /** Internal marker to roll back a guarded batch whose deterministic replay diverged from its candidate. */
 class PostconditionAbort extends Error {}
 
@@ -80,6 +138,7 @@ export class Engine {
 	private readonly now: () => string;
 	private readonly newEventId: () => string;
 	private readonly logger: Logger;
+	private readonly authenticate: AuthenticationPort;
 	private readonly subscribers: EventSubscriber[] = [];
 
 	constructor(deps: EngineDeps) {
@@ -87,13 +146,131 @@ export class Engine {
 		this.now = deps.now ?? (() => new Date().toISOString());
 		this.newEventId = deps.newEventId ?? (() => mintId('EVENT'));
 		this.logger = deps.logger ?? new NoopLogger();
+		// No `??` fallback, deliberately. There is no default authenticator and there must not be one.
+		this.authenticate = deps.authenticate;
+	}
+
+	/**
+	 * Bind a credential and obtain the only object that can dispatch.
+	 *
+	 * Resolution happens HERE, once per session — an unresolvable credential yields a session whose every
+	 * dispatch refuses with `RPH_AUTHENTICATION_REQUIRED`. It fails CLOSED rather than throwing, because a
+	 * refusal is a governed outcome the caller must be able to record and a throw is not.
+	 */
+	as(credential: Credential): AuthedEngine {
+		const outcome = this.authenticate.authenticate(credential);
+		const principal = outcome.ok ? outcome.principal : undefined;
+		const reason = outcome.ok ? undefined : outcome.reason;
+		return {
+			principal,
+			dispatch: (command) => this.dispatchAs(principal, reason, command),
+			dispatchBatch: (commands) => this.dispatchBatchAs(principal, reason, commands),
+			dispatchBatchGuarded: (commands, preconditions, expectedEventCount, postconditions) =>
+				this.dispatchBatchGuardedAs(
+					principal,
+					reason,
+					commands,
+					preconditions,
+					expectedEventCount,
+					postconditions
+				),
+			subscribe: (handler) => this.subscribe(handler),
+			drainOutbox: () => this.drainOutbox(),
+			recoverOutbox: () => this.recoverOutbox()
+		};
 	}
 
 	subscribe(handler: EventSubscriber): void {
 		this.subscribers.push(handler);
 	}
 
-	dispatch(command: DomainCommand): CommandResult {
+	/**
+	 * The authenticated dispatch. `principal` is set iff the session's credential resolved.
+	 *
+	 * ⚠ A DECLARED `issuedBy` THAT DISAGREES IS REFUSED, NOT SILENTLY CORRECTED. Overwriting quietly would
+	 * make a forgery attempt invisible — the record would show the true actor and no trace that anyone claimed
+	 * otherwise. Refusing turns the attempt into a recorded refusal, which is the difference between an audit
+	 * trail and a tidy one.
+	 */
+	private dispatchAs(
+		principal: Principal | undefined,
+		reason: string | undefined,
+		rawCommand: DomainCommand
+	): CommandResult {
+		const gated = this.stampOrRefuse(principal, reason, rawCommand);
+		return 'error' in gated ? gated.error : this.dispatchStamped(gated.command);
+	}
+
+	/** Resolve the acting identity onto the command, or produce the refusal. Shared by all three entry points. */
+	private stampOrRefuse(
+		principal: Principal | undefined,
+		reason: string | undefined,
+		command: DomainCommand
+	): { command: StampedCommand } | { error: CommandResult } {
+		const base = {
+			commandId: typeof command.commandId === 'string' ? command.commandId : '',
+			producedEventIds: [] as string[]
+		};
+		const correlationId = typeof command.correlationId === 'string' ? command.correlationId : '';
+		const targetObjectIds =
+			typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : [];
+		const refuse = (message: string): { error: CommandResult } => ({
+			error: {
+				...base,
+				status: 'UNAUTHORIZED',
+				error: makeRphError('RPH_AUTHENTICATION_REQUIRED', {
+					message,
+					correlationId,
+					targetObjectIds
+				})
+			}
+		});
+
+		if (!principal) {
+			return refuse(
+				`The acting principal could not be established from authenticated context ` +
+					`(${reason ?? 'NO_SESSION'}), so this command cannot be attributed and is refused before ` +
+					`any effect (DOC-003 §9 PER-3; DOC-004 §5).`
+			);
+		}
+
+		// A DECLARED ISSUER IS A CHECKED CLAIM (REG-D-027(b)). Most callers now declare nothing and are simply
+		// stamped; one that DOES declare is compared, and a disagreement is refused rather than corrected — so
+		// an attempt to act as someone else is a recorded refusal instead of an invisible overwrite.
+		const declared = command.issuedBy as { actorId?: string; actorType?: string } | undefined;
+		if (
+			declared &&
+			(declared.actorId !== principal.actorId || declared.actorType !== principal.actorType)
+		) {
+			return refuse(
+				`This command declares an issuer it is not: it names ${String(declared.actorType)} ` +
+					`${String(declared.actorId)} while the authenticated principal is ${principal.actorType} ` +
+					`${principal.actorId}. Refused rather than corrected, so the attempt is recorded (DOC-004 §5).`
+			);
+		}
+
+		// THE STAMP — a total function onto the ratified `ActorReference` shape. `tenantId`/`organizationId`
+		// live on the Principal but have no home on ActorReference; carrying them onto the OBJECT ENVELOPE is
+		// REG-D-026's work in D-3, and it is not smuggled in here.
+		return {
+			command: {
+				...command,
+				issuedBy: {
+					actorId: principal.actorId,
+					actorType: principal.actorType,
+					displayName: principal.displayName,
+					...(principal.roleId === undefined ? {} : { roleId: principal.roleId }),
+					...(principal.modelId === undefined ? {} : { modelId: principal.modelId }),
+					...(principal.providerId === undefined ? {} : { providerId: principal.providerId }),
+					...(principal.executionInstanceId === undefined
+						? {}
+						: { executionInstanceId: principal.executionInstanceId })
+				}
+			} as StampedCommand
+		};
+	}
+
+	private dispatchStamped(command: StampedCommand): CommandResult {
 		// ── REG-F-011, THE CRASH HALF ────────────────────────────────────────────────────────────────────────
 		//
 		// `commandId` and `correlationId` are the two envelope fields the STORE requires NOT NULL
@@ -331,13 +508,17 @@ export class Engine {
 	 * non-mutating DUPLICATE (idempotency replay) counts as success. A multi-step authoring sequence (or the agent
 	 * proposing several linked commands) uses this so a mid-sequence failure can't strand a half-built DRAFT.
 	 */
-	dispatchBatch(commands: readonly DomainCommand[]): BatchResult {
+	private dispatchBatchAs(
+		principal: Principal | undefined,
+		reason: string | undefined,
+		commands: readonly DomainCommand[]
+	): BatchResult {
 		const results: CommandResult[] = [];
 		let failedIndex: number | undefined;
 		try {
 			this.store.transaction(() => {
 				for (let i = 0; i < commands.length; i += 1) {
-					const r = this.dispatch(commands[i]!);
+					const r = this.dispatchAs(principal, reason, commands[i]!);
 					results.push(r);
 					if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') {
 						failedIndex = i;
@@ -357,7 +538,9 @@ export class Engine {
 	 * transaction. This closes the check/commit race that an application-level preflight followed by
 	 * `dispatchBatch` would leave open. The command batch retains the ordinary all-or-nothing semantics.
 	 */
-	dispatchBatchGuarded(
+	private dispatchBatchGuardedAs(
+		principal: Principal | undefined,
+		reason: string | undefined,
 		commands: readonly DomainCommand[],
 		preconditions: readonly RevisionPrecondition[],
 		expectedEventCount?: number,
@@ -392,7 +575,7 @@ export class Engine {
 						return;
 					}
 				}
-				result = this.dispatchBatch(commands);
+				result = this.dispatchBatchAs(principal, reason, commands);
 				if (!result.ok) return;
 				for (const postcondition of postconditions) {
 					const actual = this.store.loadObject(postcondition.aggregateId);

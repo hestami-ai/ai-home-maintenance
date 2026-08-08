@@ -5,20 +5,40 @@
 // of the honest contract: the fields the log genuinely sources ARE populated and correct, and the fields it does
 // NOT source are visibly absent (undefined), never faked into a reassuring value.
 import { buildAssuranceView } from '@janumipwb/rph-projections';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING } from './index.js';
 
+// THE DRIVE NAMES ITS OWN ACTOR, so the session has to BE that actor rather than a convenient stand-in.
+// `driveReferenceUndertaking` issues `ProposeDecision` with `authority: { actorId: 'owner-1', actorType: 'HUMAN' }`
+// when it promotes each baseline, and REG-F-014 refuses a Decision whose declared authority is not its issuer. Under
+// the shared credential (`TEST_CRED.human` -> `u1`) the drive throws at its first promotion. This registers the
+// undertaking owner the drive carried in its own `issuedBy` until the engine took over the stamping — same actorId,
+// actorType, displayName and executionInstanceId — so the stamped `ActorReference` is what it always was.
+const OWNER = 'owner-1';
+const DIR = testDirectory([
+	{
+		actorId: OWNER,
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
+
 describe('Assurance View (DOC-004 §38) over the live log', () => {
 	function build() {
 		const engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		});
+		}).as(DIR.credentialFor(OWNER));
 		driveReferenceUndertaking(engine);
 		return buildAssuranceView(engine.readAllEvents());
 	}
