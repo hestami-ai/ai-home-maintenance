@@ -215,6 +215,14 @@ export interface BaselinePromotionInput {
 	readonly baselineStatus: string;
 	/** The PROMOTE_BASELINE / APPROVAL decision authorizing promotion; must be an effective approval. */
 	readonly promotionDecision?: DecisionView;
+	/**
+	 * The baseline being promoted — REQUIRED, because the decision must NAME it (REG-F-073).
+	 *
+	 * Added after `decisionOk` was found to check kind, status and authority and NOT subject scope, so **any**
+	 * effective promotion decision in the store authorized **any** promotion. Driven through the real bus: a
+	 * decision whose only subject was an unrelated PWU promoted a different PWU's baseline, ACCEPTED.
+	 */
+	readonly baselineId: string;
 	/** The exact item versions the candidate baseline freezes (RPH-BAS-001). */
 	readonly candidateItems: readonly BaselineItemVersionView[];
 	/** The item versions/hashes that were reviewed (RPH-BAS-002: promoted must match reviewed exactly). */
@@ -228,6 +236,7 @@ export interface BaselinePromotionInput {
 
 export type BaselinePromotionFindingCode =
 	| 'NO_EFFECTIVE_PROMOTION_DECISION' // §23.2 / RPH-BAS-006: promotion needs an explicit effective decision
+	| 'PROMOTION_DECISION_OUT_OF_SCOPE' // REG-F-073 / RPH-GOV-005: the decision does not name THIS baseline
 	| 'ILLEGAL_PROMOTION_TRANSITION' // baseline not in a promotable (APPROVED) state
 	| 'MISSING_ITEM_VERSION' // RPH-BAS-001: an item lacks a semantic version
 	| 'BASELINE_VERSION_MISMATCH' // RPH-BAS-002: promoted item version/hash != reviewed (RPH_BASELINE_VERSION_MISMATCH)
@@ -370,6 +379,31 @@ export function canPromoteBaseline(input: BaselinePromotionInput): BaselinePromo
 		findings.push({
 			code: 'NO_EFFECTIVE_PROMOTION_DECISION',
 			detail: 'promotion requires an effective, authority-backed PROMOTE_BASELINE/APPROVAL decision'
+		});
+	// ── SCOPE, AND ITS ABSENCE MADE EVERY PROMOTION DECISION UNIVERSAL (REG-F-073) ────────────────────────────
+	//
+	// The four conditions above are kind, status and authority. None of them asks WHAT the decision was about,
+	// and nothing downstream did either: the call site resolves the decision by id and `decisionAuthorizesVersions`
+	// iterates the DECISION'S OWN subjects, so an unrelated decision satisfies it vacuously. Measured on the live
+	// bus: a PROMOTE_BASELINE decision whose only subject was an unrelated PWU promoted a different PWU's
+	// baseline — ACCEPTED, AUTHORITATIVE.
+	//
+	// It also silently weakened `rejectUnbackedBaselining`, which gates PWU SATISFIED -> BASELINED on a cited
+	// baseline being AUTHORITATIVE — a status this hole handed out on an off-topic decision.
+	//
+	// THE RULE IS NOT INVENTED HERE. `resolveSkipAuthorization` already does exactly this for skips, refusing
+	// with "an authorization does not bleed to another step (RPH-GOV-005)", whose ratified text is "a waiver does
+	// not bleed to another criterion, another object, or another version". Promotion is the act
+	// JPWB-DOC-001 §5.2 reserves to Governance BY NAME, and it was the one without the discipline.
+	//
+	// The repository's own correct usage already satisfies it: the reference Undertaking's promotion decision
+	// names `[pwuId, baselineId]`.
+	if (decisionOk && !d.subjectObjectIds.includes(input.baselineId))
+		findings.push({
+			code: 'PROMOTION_DECISION_OUT_OF_SCOPE',
+			detail:
+				`decision ${d.decisionId} does not name baseline ${input.baselineId} among its subjectObjectIds — ` +
+				`an authorization does not bleed to another object (RPH-GOV-005)`
 		});
 
 	// Promotion transition legality (APPROVED -> AUTHORITATIVE).

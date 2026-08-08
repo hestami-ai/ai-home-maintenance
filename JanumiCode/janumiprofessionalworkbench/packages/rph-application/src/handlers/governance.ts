@@ -892,6 +892,9 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 			);
 			const result = canPromoteBaseline({
 				baselineStatus: String(state.status),
+				// REG-F-073: the kernel now requires the decision to NAME this baseline. Without it, any effective
+				// promotion decision in the store authorized any promotion.
+				baselineId: command.targetAggregateId,
 				promotionDecision,
 				candidateItems,
 				reviewedItems: candidateItems,

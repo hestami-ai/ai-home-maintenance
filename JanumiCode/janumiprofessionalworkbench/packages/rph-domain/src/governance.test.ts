@@ -150,9 +150,16 @@ describe('M10 baseline promotion gate (RPH-BAS-001..004, RPH-GOV-006; §24.2, §
 		{ objectId: 'art_fsm_architecture_002', semanticVersion: 2, contentHash: 'h1' },
 		{ objectId: 'art_fsm_context_001', semanticVersion: 1, contentHash: 'h2' }
 	];
+	const BASE_ID = 'base_fsm_arch_001';
 	const base = (over: Partial<BaselinePromotionInput> = {}): BaselinePromotionInput => ({
 		baselineStatus: 'APPROVED',
-		promotionDecision: decision({ decisionType: 'PROMOTE_BASELINE' }),
+		baselineId: BASE_ID,
+		// REG-F-073: the decision must NAME the baseline. The fixture's decision previously named only the PWU
+		// and an artifact — which is exactly the arrangement that used to authorize any promotion at all.
+		promotionDecision: decision({
+			decisionType: 'PROMOTE_BASELINE',
+			subjectObjectIds: ['pwu_fsm_arch', 'art_fsm_architecture_002', BASE_ID]
+		}),
 		candidateItems: items,
 		reviewedItems: items,
 		requiredAssessments: [
@@ -167,6 +174,45 @@ describe('M10 baseline promotion gate (RPH-BAS-001..004, RPH-GOV-006; §24.2, §
 		contestedClaims: [],
 		requiredWaivers: [],
 		...over
+	});
+
+	// ── REG-F-073: AN AUTHORIZATION DOES NOT BLEED TO ANOTHER OBJECT ─────────────────────────────────────────
+	// `decisionOk` checked kind, status and authority and NOT subject scope, so ANY effective promotion decision
+	// in the store authorized ANY promotion — driven on the live bus, a decision whose only subject was an
+	// unrelated PWU promoted a different PWU's baseline. The rule is not invented here: `resolveSkipAuthorization`
+	// already refuses an out-of-scope skip citing RPH-GOV-005, "a waiver does not bleed to another criterion,
+	// another object, or another version". Promotion is the act JPWB-DOC-001 §5.2 reserves to Governance BY NAME.
+	it('refuses a promotion whose decision does not name THIS baseline (RPH-GOV-005)', () => {
+		const r = canPromoteBaseline(
+			base({
+				promotionDecision: decision({
+					decisionType: 'PROMOTE_BASELINE',
+					subjectObjectIds: ['pwu_somewhere_else']
+				})
+			})
+		);
+		expect(r.ok).toBe(false);
+		expect(r.findings.map((f) => f.code)).toContain('PROMOTION_DECISION_OUT_OF_SCOPE');
+	});
+
+	// CONTROL, with its own failure mode: the case above passes if the gate refuses everything. This one fails
+	// in that world, and it is the arrangement the reference Undertaking actually uses — its promotion decision
+	// names [pwuId, baselineId], so the repository's own correct usage already satisfies the new rule.
+	it('CONTROL — admits a promotion whose decision DOES name the baseline', () => {
+		const r = canPromoteBaseline(base());
+		expect(r.findings.map((f) => f.code)).not.toContain('PROMOTION_DECISION_OUT_OF_SCOPE');
+		expect(r.ok).toBe(true);
+	});
+
+	// The scope check must not fire when the decision is ALREADY refused for a different reason — a finding that
+	// piles on top of an unrelated refusal makes the real cause harder to read.
+	it('CONTROL — reports only NO_EFFECTIVE_PROMOTION_DECISION when the decision is not effective', () => {
+		const r = canPromoteBaseline(
+			base({ promotionDecision: decision({ decisionType: 'PROMOTE_BASELINE', status: 'PROPOSED' }) })
+		);
+		const codes = r.findings.map((f) => f.code);
+		expect(codes).toContain('NO_EFFECTIVE_PROMOTION_DECISION');
+		expect(codes).not.toContain('PROMOTION_DECISION_OUT_OF_SCOPE');
 	});
 
 	it('promotes when every precondition holds (fixture happy path)', () => {

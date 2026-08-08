@@ -169,7 +169,7 @@ describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10,
 			'ProposeDecision',
 			{
 				decisionType: 'PROMOTE_BASELINE',
-				subjectObjectIds: [PWU_ID],
+				subjectObjectIds: [PWU_ID, BASE],
 				selectedOption: 'promote',
 				rationale: 'ready',
 				authority: human

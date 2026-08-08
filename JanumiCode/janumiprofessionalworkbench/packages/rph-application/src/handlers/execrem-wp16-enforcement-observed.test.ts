@@ -513,7 +513,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						// The INTENT joins the subjects for the stale-version arrangement ONLY, because it is one of the
 						// three aggregates whose semanticVersion can move (REG-F-017). The other three defects are
 						// untouched, so their probes keep the exact decision they had.
-						subjectObjectIds: defect === 'stale-version' ? [v.pwu, INT2] : [v.pwu],
+						// REG-F-073: `v.base` joins every arrangement because a promotion decision must NAME the
+						// baseline it authorizes (RPH-GOV-005 scope). Before that rule any effective promotion
+						// decision authorized any promotion, which is why these probes did not need it.
+						subjectObjectIds:
+							defect === 'stale-version' ? [v.pwu, INT2, v.base] : [v.pwu, v.base],
 						selectedOption: 'promote',
 						rationale: 'ready',
 						authority: actor

@@ -292,12 +292,14 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		);
 	}
 
-	function makeEffectivePromotionDecision(id: string): void {
+	/** REG-F-073: a promotion decision must NAME the baseline it authorizes, so callers pass it. Before that
+	 *  rule any effective promotion decision authorized any promotion, which is why this helper took none. */
+	function makeEffectivePromotionDecision(id: string, baselineId?: string): void {
 		dispatch(
 			'ProposeDecision',
 			{
 				decisionType: 'PROMOTE_BASELINE',
-				subjectObjectIds: [PWU_ID],
+				subjectObjectIds: baselineId ? [PWU_ID, baselineId] : [PWU_ID],
 				selectedOption: 'promote',
 				rationale: 'ready',
 				authority: human
@@ -380,7 +382,7 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69G5FH0';
 		makeSatisfiedAssessment(ASSESS);
 		expect(statusOf(ASSESS, 'assessmentState')).toBe('SATISFIED');
-		makeEffectivePromotionDecision(DEC);
+		makeEffectivePromotionDecision(DEC, BASE);
 		expect(statusOf(DEC)).toBe('EFFECTIVE');
 		createApprovedBaseline(BASE, ASSESS);
 		expect(statusOf(BASE)).toBe('APPROVED');

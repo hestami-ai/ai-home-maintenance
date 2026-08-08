@@ -147,7 +147,7 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 				decisionType: 'PROMOTE_BASELINE',
 				// The INTENT is a co-subject precisely because it is one of the three aggregates whose semantic
 				// version can move; the PWU is the baselined item and its version is 1 forever.
-				subjectObjectIds: [PWU_ID, INTENT_ID],
+				subjectObjectIds: [PWU_ID, INTENT_ID, BASE],
 				selectedOption: 'promote',
 				rationale: 'ready',
 				authority: human

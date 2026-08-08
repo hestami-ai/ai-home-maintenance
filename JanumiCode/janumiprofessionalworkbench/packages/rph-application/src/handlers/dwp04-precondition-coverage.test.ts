@@ -247,7 +247,7 @@ describe('DWP-04 Baseline — PromoteBaseline fromStates(APPROVED) + code change
 		expect(
 			h.d('ProposeDecision', DEC, 'DECISION', {
 				decisionType: 'PROMOTE_BASELINE',
-				subjectObjectIds: [PWU],
+				subjectObjectIds: [PWU, BASE],
 				selectedOption: 'promote',
 				rationale: 'ready',
 				authority: HUMAN

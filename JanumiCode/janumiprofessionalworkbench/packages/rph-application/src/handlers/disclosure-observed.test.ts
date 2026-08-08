@@ -496,7 +496,8 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 				'ProposeDecision',
 				{
 					decisionType: 'PROMOTE_BASELINE',
-					subjectObjectIds: [pwu],
+					// REG-F-073: the promotion decision must NAME the baseline it authorizes (RPH-GOV-005 scope).
+					subjectObjectIds: [pwu, baseline],
 					selectedOption: 'promote',
 					rationale: 'ready',
 					// ProposeDecision.authority is an ActorReference, NOT the AuthorityReference that
@@ -891,7 +892,8 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 							'ProposeDecision',
 							{
 								decisionType: 'PROMOTE_BASELINE',
-								subjectObjectIds: [v.pwu],
+								// REG-F-073: the promotion decision must NAME the baseline it authorizes (RPH-GOV-005 scope).
+						subjectObjectIds: [v.pwu, v.base],
 								selectedOption: 'promote',
 								rationale: 'ready',
 								authority: actor
@@ -1270,7 +1272,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 						'ProposeDecision',
 						{
 							decisionType: 'PROMOTE_BASELINE',
-							subjectObjectIds: [PWU],
+							subjectObjectIds: [PWU, BASE],
 							selectedOption: 'promote',
 							rationale: 'ready',
 							authority: actor
@@ -1456,7 +1458,10 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 						'ProposeDecision',
 						{
 							decisionType: 'PROMOTE_BASELINE',
-							subjectObjectIds: [PWU],
+							// REG-F-073: a promotion decision must NAME each baseline it authorizes (RPH-GOV-005).
+							// BOTH are named deliberately: this disclosure's subject is TWO baselines freezing the
+							// SAME ITEM, not decision scope, so the arrangement it measures survives the rule intact.
+							subjectObjectIds: [PWU, B1, B2],
 							selectedOption: 'promote',
 							rationale: 'ready',
 							authority: actor

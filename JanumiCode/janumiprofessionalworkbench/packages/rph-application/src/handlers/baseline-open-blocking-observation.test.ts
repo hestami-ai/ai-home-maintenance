@@ -145,7 +145,7 @@ describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, liv
 			'ProposeDecision',
 			{
 				decisionType: 'PROMOTE_BASELINE',
-				subjectObjectIds: [PWU_ID],
+				subjectObjectIds: [PWU_ID, BASE],
 				selectedOption: 'promote',
 				rationale: 'ready',
 				authority: human
