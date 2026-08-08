@@ -85,18 +85,38 @@ describe('REG-F-021 increment 1: the assessment lifecycle contracts', () => {
 		]);
 	});
 
-	it('the REQUESTED -> EVIDENCE_PENDING arrow is bound to the request, which therefore emits TWO events', () => {
+	// ⚠ THIS TEST'S TRANSITION ASSERTION WAS FALSIFIED BY THE INCREMENT IT WAS WRITTEN TO ANTICIPATE.
+	//
+	// It read `expect([b?.from, b?.to]).toEqual(['REQUESTED', 'EVIDENCE_PENDING'])`, pinning the §30 arrow to the
+	// second event — written at increment 1, when its own comment said the two-event commit was *"not yet
+	// expressible through kit.ts's commitState, which increment 3 extends."* Increment 3 landed, and what it
+	// built settled the question the other way: `requestAssuranceAssessment` BIRTHS the assessment at
+	// EVIDENCE_PENDING or READY (`assurance.ts:1295`, a declared birth `createObject` checks at runtime) and
+	// never writes REQUESTED at all. So the arrow this line pinned CANNOT FIRE — confirmed independently by a
+	// control with a different witness, C-0, whose baseline lists `AssuranceAssessment.state REQUESTED ->
+	// CANCELLED` among the arrows that can never fire for the same reason. The vocab row was corrected under
+	// REG-F-068; this assertion had pinned the defect in place.
+	//
+	// WHAT THE TEST WAS ACTUALLY FOR SURVIVES INTACT AND IS NOW STRONGER: one command, two events, both really
+	// committed — and the second one's honesty about moving nothing is the part that is newly checkable.
+	it('the request emits TWO events, and only the FIRST of them moves the machine', () => {
 		const b = (vocab.bindings ?? []).find((x) => x.eventType === 'AssuranceEvidenceRequired');
 		expect(b?.commandType).toBe('RequestAssuranceAssessment');
-		expect([b?.from, b?.to]).toEqual(['REQUESTED', 'EVIDENCE_PENDING']);
-		// The same command is separately bound to AssuranceAssessmentRequested. One command, two events — legal at
-		// the storage layer (CommitInput.events is an array) and not yet expressible through kit.ts's commitState,
-		// which increment 3 extends. Asserted so the two-event requirement is a recorded fact rather than a
-		// surprise discovered while implementing.
+		// Co-emitted inside the createObject commit, on BOTH arms of the landing rule — so it cannot be what
+		// distinguishes an EVIDENCE_PENDING landing from a READY one, and it is recorded as driving no state.
+		expect(b?.from).toBe('(initial)');
+		expect(b?.to, 'the second event must not claim a transition it does not perform').toMatch(/^\(none/);
+		// The same command is separately bound to AssuranceAssessmentRequested, and THAT row carries the birth.
+		// One command, two events — legal at the storage layer (CommitInput.events is an array) and, since
+		// increment 3, actually emitted through kit's `alsoEvents`.
 		const requested = (vocab.bindings ?? []).find(
 			(x) => x.eventType === 'AssuranceAssessmentRequested'
 		);
 		expect(requested?.commandType).toBe('RequestAssuranceAssessment');
+		expect([requested?.from, requested?.to], 'the birth belongs to the request event').toEqual([
+			'(initial)',
+			'EVIDENCE_PENDING | READY'
+		]);
 	});
 
 	// ── THE PROVENANCE PIN ────────────────────────────────────────────────────────────────────────────────────

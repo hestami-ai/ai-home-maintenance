@@ -31,13 +31,20 @@ export const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
 		'machine describes (assurance.ts:1826, :1898). ' +
 		'NOT AN EXEMPTION: an EXEMPT entry would record "deliberately unbuilt", which is false — this cannot be ' +
 		'built without adding a field the ratified schema forbids. ' +
-		'⚠ THE ARROWS STAY IN transitions.data.ts DELIBERATELY. That file is GENERATED from the vocab, so a ' +
-		'marker placed in it would be erased by the next `bun run gen`; and the vocab still carries the error ' +
-		'one layer up — two ratified event rows name this axis as the machine they drive, both wrong twice over ' +
-		'(RequestAssuranceAssessment recorded as `(initial) -> PENDING` when the handler BIRTHS at ' +
-		'READY/EVIDENCE_PENDING, and CompleteAssuranceAssessment recorded here when assurance.ts:1898 names ' +
-		'`AssuranceAssessment.state`). Correcting those rows is the remaining half of REG-F-068 and moves ' +
-		"C-0's arrow total, which is a deliberate edit."
+		'⚠ THE ARROWS STAY IN transitions.data.ts DELIBERATELY. That file is GENERATED from ' +
+		'rph-domain/vocab/m2-transitions.json, so a marker placed in it would be erased by the next ' +
+		'`bun run gen`. ' +
+		'THE VOCAB ROWS ONE LAYER UP ARE NOW CORRECTED (2026-08-08, REG-F-068 second half): two command entries ' +
+		'and two binding rows in rph-contracts/vocab/m3-commands-events.json named this dead axis as the machine ' +
+		'they drive, both wrong twice over — RequestAssuranceAssessment recorded `(initial) -> PENDING` when the ' +
+		'handler BIRTHS at EVIDENCE_PENDING/READY, and CompleteAssuranceAssessment was recorded here when ' +
+		'assurance.ts:1898 names `AssuranceAssessment.state`. ' +
+		"⚠ CORRECTION TO THIS NOTE'S OWN EARLIER TEXT: it said correcting those rows moves C-0's arrow total. IT " +
+		'DOES NOT. The total is computed over STATE_MACHINES, generated from m2-transitions.json; the corrected ' +
+		'rows are in m3-commands-events.json, which feeds messages.ts and nothing else. Measured: the ' +
+		'regeneration touched messages.ts alone and the baseline needed no edit. ' +
+		'THE GENERAL FORM OF THE MISTAKE — asked on closing it — found two MORE rows of the same family and is ' +
+		'now a standing control: see REG-F-074 and verif/binding-row-truth.ts.'
 };
 
 /** True when `machine` is a declared key that no control should treat as a lifecycle. */

@@ -587,11 +587,11 @@
 			"alsoEmitsEvents": [
 				"AssuranceEvidenceRequired"
 			],
-			"drivesMachine": "AssuranceAssessment.disposition",
+			"drivesMachine": "AssuranceAssessment.state",
 			"drivesFrom": "(initial)",
-			"drivesTo": "PENDING",
+			"drivesTo": "EVIDENCE_PENDING | READY",
 			"schematized": true,
-			"sourceSection": "DOC-007 §19.1 (cmd); machine/state per DOC-002 §26.5 (DOC-007: assessmentState (initial)->REQUESTED)",
+			"sourceSection": "DOC-007 §19.1 (cmd). CORRECTED 2026-08-08 (REG-F-068): this row read 'AssuranceAssessment.disposition (initial) -> PENDING'. Both halves were wrong. The machine names a field the ratified AssuranceAssessment object schema does not have -- retired, see machine-exclusions.ts -- and PENDING is not a state of the live axis at all. What the handler actually does is DECLARED and runtime-checked, not inferred: assurance.ts:1295 births on `assessmentState` at EVIDENCE_PENDING when required evidence is outstanding and READY when it is not. Prior text kept as the record of what was reconciled: 'machine/state per DOC-002 §26.5 (DOC-007: assessmentState (initial)->REQUESTED)'.",
 			"payloadFields": [
 				{
 					"field": "assessmentId",
@@ -661,11 +661,11 @@
 			"commandType": "CompleteAssuranceAssessment",
 			"targetAggregateType": "ASSURANCE_ASSESSMENT",
 			"emitsEvent": "AssuranceAssessmentCompleted",
-			"drivesMachine": "AssuranceAssessment.disposition",
+			"drivesMachine": "AssuranceAssessment.state",
 			"drivesFrom": "ASSESSING",
 			"drivesTo": "SATISFIED | CONDITIONALLY_SATISFIED | REJECTED | INCONCLUSIVE | ESCALATED",
 			"schematized": true,
-			"sourceSection": "DOC-007 §19.2 / §19.3",
+			"sourceSection": "DOC-007 §19.2 / §19.3. MACHINE CORRECTED 2026-08-08 (REG-F-068): recorded on the retired 'AssuranceAssessment.disposition' axis while assurance.ts:1898 names 'AssuranceAssessment.state'. The five target states are unchanged -- they are states of BOTH axes, which is exactly why the wrong machine name survived this long.",
 			"payloadFields": [
 				{
 					"field": "validatorResult",
@@ -1395,7 +1395,7 @@
 			"emitsEvent": "BaselineCreated",
 			"drivesMachine": "Baseline.status",
 			"drivesFrom": "(initial)",
-			"drivesTo": "DRAFT",
+			"drivesTo": "CANDIDATE",
 			"schematized": false,
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (no createBaseline in DOC-002 §34; event DOC-002 §26.6)",
 			"payloadFields": [
@@ -1536,7 +1536,7 @@
 			"emitsEvent": "DecompositionProposed",
 			"drivesMachine": "DecompositionContract.status",
 			"drivesFrom": "(initial)",
-			"drivesTo": "DRAFT",
+			"drivesTo": "UNDER_REVIEW",
 			"schematized": false,
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (proposeDecomposition)",
 			"payloadFields": [
@@ -7498,18 +7498,18 @@
 		{
 			"commandType": "RequestAssuranceAssessment",
 			"eventType": "AssuranceAssessmentRequested",
-			"machine": "AssuranceAssessment.disposition",
+			"machine": "AssuranceAssessment.state",
 			"from": "(initial)",
-			"to": "PENDING",
-			"note": "MACHINE DRIFT: DOC-007 uses AssuranceAssessment.assessmentState (initial)->REQUESTED; DOC-002 uses disposition (initial)->PENDING. CROSS-PLANE: PWU EVIDENCE_PENDING->UNDER_ASSURANCE"
+			"to": "EVIDENCE_PENDING | READY",
+			"note": "CORRECTED 2026-08-08 (REG-F-068). Was 'AssuranceAssessment.disposition (initial) -> PENDING' -- a retired axis over a field the ratified object schema does not have, landing in a state the live axis does not contain. assurance.ts:1295 births at EVIDENCE_PENDING (required evidence outstanding) or READY (none), declared and runtime-checked. STRUCK, kept as the record of what was reconciled: 'MACHINE DRIFT: DOC-007 uses AssuranceAssessment.assessmentState (initial)->REQUESTED; DOC-002 uses disposition (initial)->PENDING.' The unresolved third reading was the one shipped. CROSS-PLANE (unchanged): PWU EVIDENCE_PENDING->UNDER_ASSURANCE"
 		},
 		{
 			"commandType": "CompleteAssuranceAssessment",
 			"eventType": "AssuranceAssessmentCompleted",
-			"machine": "AssuranceAssessment.disposition",
+			"machine": "AssuranceAssessment.state",
 			"from": "ASSESSING",
 			"to": "SATISFIED | CONDITIONALLY_SATISFIED | REJECTED | INCONCLUSIVE | ESCALATED",
-			"note": "NAME/CARDINALITY DRIFT: DOC-007 emits one AssuranceAssessmentCompleted (disposition in payload); DOC-002 emits five outcome events (AssuranceAssessmentSatisfied/ConditionallySatisfied/Rejected/Inconclusive/Escalated). Each drives PWU to the matching state"
+			"note": "MACHINE CORRECTED 2026-08-08 (REG-F-068): named the retired disposition axis; assurance.ts:1898 names AssuranceAssessment.state. The five targets are states of BOTH axes, which is why the wrong machine name went unnoticed. NAME/CARDINALITY DRIFT: DOC-007 emits one AssuranceAssessmentCompleted (disposition in payload); DOC-002 emits five outcome events (AssuranceAssessmentSatisfied/ConditionallySatisfied/Rejected/Inconclusive/Escalated). Each drives PWU to the matching state"
 		},
 		{
 			"commandType": "ApproveDecision",
@@ -7669,8 +7669,8 @@
 			"eventType": "BaselineCreated",
 			"machine": "Baseline.status",
 			"from": "(initial)",
-			"to": "DRAFT",
-			"note": "DOC-007 §32 command; DOC-002 event init=DRAFT|CANDIDATE and has NO createBaseline command in §34"
+			"to": "CANDIDATE",
+			"note": "CORRECTED 2026-08-08 (REG-F-068 general form): recorded 'to: DRAFT', which is the machine's declared `initialState`, NOT the state this command produces. Both other records disagree with it and AGREE with each other -- m2's first arrow is DRAFT -> CANDIDATE triggered by 'BaselineCreated / nominated as candidate', and governance.ts:732 births at CANDIDATE. So no side had to be picked: the row transcribed the arrow's SOURCE as its TARGET. Prior text: 'DOC-007 §32 command; DOC-002 event init=DRAFT|CANDIDATE and has NO createBaseline command in §34' -- the DRAFT|CANDIDATE latitude is real and CANDIDATE is the arm taken."
 		},
 		{
 			"commandType": "ReviseIntent",
@@ -7717,8 +7717,8 @@
 			"eventType": "DecompositionProposed",
 			"machine": "DecompositionContract.status",
 			"from": "(initial)",
-			"to": "DRAFT",
-			"note": "DOC-002-only"
+			"to": "UNDER_REVIEW",
+			"note": "CORRECTED 2026-08-08 (REG-F-068 general form): recorded 'to: DRAFT', the machine's declared `initialState` rather than the state this command produces -- the same transcription error as CreateBaseline, and again both other records agree against it. m2's first arrow is DRAFT -> UNDER_REVIEW triggered by 'proposeDecomposition / DecompositionProposed', and decomposition.ts:72 births at UNDER_REVIEW. Prior text: 'DOC-002-only'."
 		},
 		{
 			"commandType": "ValidateDecomposition",
@@ -7948,9 +7948,9 @@
 			"commandType": "RequestAssuranceAssessment",
 			"eventType": "AssuranceEvidenceRequired",
 			"machine": "AssuranceAssessment.state",
-			"from": "REQUESTED",
-			"to": "EVIDENCE_PENDING",
-			"note": "The §30 REQUESTED -> EVIDENCE_PENDING arrow, whose trigger prose puts BOTH acts under the request: 'AssuranceAssessmentRequested; claims instantiated, evidence requirements evaluated, missing evidence requested (AssuranceEvidenceRequired)'. So ONE command produces TWO events. The storage layer already supports that (CommitInput.events is an array); kit.ts's commitState wraps a single event and is extended in increment 3. Recorded HERE, unemitted, so the census NAMES the gap instead of hiding it."
+			"from": "(initial)",
+			"to": "(none -- co-emitted at the birth commit; the landing state is driven by AssuranceAssessmentRequested)",
+			"note": "CORRECTED 2026-08-08 (REG-F-068). This recorded the §30 arrow REQUESTED -> EVIDENCE_PENDING, and NOTHING CAN EVER PERFORM IT: no handler writes REQUESTED, so the source state is unoccupied (REG-F-071 measures the same fiction on three other machines). The event is real and IS emitted -- increment 3 landed -- but it is co-emitted with AssuranceAssessmentRequested in the single createObject commit, and it moves no state: assurance.ts emits it on BOTH arms, so it cannot be what distinguishes the EVIDENCE_PENDING landing from the READY one. STRUCK, kept because it names why the row was written: 'The §30 REQUESTED -> EVIDENCE_PENDING arrow, whose trigger prose puts BOTH acts under the request: `AssuranceAssessmentRequested; claims instantiated, evidence requirements evaluated, missing evidence requested (AssuranceEvidenceRequired)`. So ONE command produces TWO events. The storage layer already supports that (CommitInput.events is an array); kit.ts's commitState wraps a single event and is extended in increment 3. Recorded HERE, unemitted, so the census NAMES the gap instead of hiding it.' Two events under one trigger was RIGHT and shipped; the transition attributed to the second one was not."
 		},
 		{
 			"commandType": "SelectAssuranceEvaluator",
@@ -7995,8 +7995,8 @@
 			"resolution": "DOC-007 emits DecisionEffective (PROPOSED->EFFECTIVE); DOC-002 approveDecision emits DecisionApproved (PROPOSED->EFFECTIVE) AND separately defines a time-gated DecisionEffective event. Decision.status has NO distinct APPROVED value. Recommend: DecisionApproved for the authority act, DecisionEffective only when effectiveAt is time-gated apart from approval; if not time-gating, collapse to one."
 		},
 		{
-			"topic": "AssuranceAssessment machine name + initial state",
-			"resolution": "DOC-007 machine = AssuranceAssessment.assessmentState with (initial)->REQUESTED; DOC-002 machine = AssuranceAssessment.disposition with (initial)->PENDING. Pick one field name + one initial value. Binding table used DOC-002 (disposition/PENDING) as the transition authority."
+			"topic": "AssuranceAssessment machine name + initial state (RESOLVED 2026-08-08, REG-F-068 -- and the resolution went to NEITHER side)",
+			"resolution": "STRUCK AND SUPERSEDED. The prior ruling read: 'DOC-007 machine = AssuranceAssessment.assessmentState with (initial)->REQUESTED; DOC-002 machine = AssuranceAssessment.disposition with (initial)->PENDING. Pick one field name + one initial value. Binding table used DOC-002 (disposition/PENDING) as the transition authority.' Picking DOC-002 was the wrong call and it was decidable at the time: the ratified AssuranceAssessment object schema has NO `disposition` property (z.strictObject, validated by commitState), so the axis the binding table elected as authority is MECHANICALLY UN-WRITABLE. The machine name is settled by the schema, not by a doc preference: 'AssuranceAssessment.state', whose backing field is `assessmentState` -- DOC-007's field, DOC-002 having none available. THE INITIAL VALUE IS SETTLED DIFFERENTLY, and neither doc supplies it: creation lands at EVIDENCE_PENDING or READY per a declared rule (assurance.ts:1295), so BOTH doc answers -- REQUESTED and PENDING -- name a state no object ever occupies. This is the shape the register keeps recording: silence read as conflict, then a winner picked (cf. the withdrawn MarkPwuReady ruling in this same list)."
 		},
 		{
 			"topic": "ExecutionStep machine name + state set",

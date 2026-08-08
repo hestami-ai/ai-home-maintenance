@@ -2836,14 +2836,14 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 	{
 		commandType: 'RequestAssuranceAssessment',
 		eventType: 'AssuranceAssessmentRequested',
-		machine: 'AssuranceAssessment.disposition',
+		machine: 'AssuranceAssessment.state',
 		from: '(initial)',
-		to: 'PENDING'
+		to: 'EVIDENCE_PENDING | READY'
 	},
 	{
 		commandType: 'CompleteAssuranceAssessment',
 		eventType: 'AssuranceAssessmentCompleted',
-		machine: 'AssuranceAssessment.disposition',
+		machine: 'AssuranceAssessment.state',
 		from: 'ASSESSING',
 		to: 'SATISFIED | CONDITIONALLY_SATISFIED | REJECTED | INCONCLUSIVE | ESCALATED'
 	},
@@ -2992,7 +2992,7 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		eventType: 'BaselineCreated',
 		machine: 'Baseline.status',
 		from: '(initial)',
-		to: 'DRAFT'
+		to: 'CANDIDATE'
 	},
 	{
 		commandType: 'ReviseIntent',
@@ -3034,7 +3034,7 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		eventType: 'DecompositionProposed',
 		machine: 'DecompositionContract.status',
 		from: '(initial)',
-		to: 'DRAFT'
+		to: 'UNDER_REVIEW'
 	},
 	{
 		commandType: 'ValidateDecomposition',
@@ -3250,8 +3250,8 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		commandType: 'RequestAssuranceAssessment',
 		eventType: 'AssuranceEvidenceRequired',
 		machine: 'AssuranceAssessment.state',
-		from: 'REQUESTED',
-		to: 'EVIDENCE_PENDING'
+		from: '(initial)',
+		to: '(none -- co-emitted at the birth commit; the landing state is driven by AssuranceAssessmentRequested)'
 	},
 	{
 		commandType: 'SelectAssuranceEvaluator',
