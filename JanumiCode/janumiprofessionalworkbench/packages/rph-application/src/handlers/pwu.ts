@@ -25,6 +25,7 @@ import type {
 	ReshapePwuPayload,
 	SupersedePwuPayload
 } from '@janumipwb/rph-contracts';
+import { BLOCKING_SEVERITIES } from '@janumipwb/rph-assurance';
 import {
 	canAdvanceWorkLifecycle,
 	checkPwuShapeReadiness,
@@ -45,6 +46,7 @@ import {
 } from './kit.js';
 import { evaluatePrecondition, predicate } from './command-precondition.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
+import { resolveRejectAuthorization } from './reject-authorization.js';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -817,6 +819,94 @@ function rejectUnbackedExecutionSuccess(
 }
 
 /**
+ * REJECTING GOVERNED WORK MAY NOT BE ASSERTED — the fifth guard, and the only one requiring BOTH an authority
+ * and a fact, because canon requires both of it.
+ *
+ * ⚠ THE CORPUS ANTICIPATED THE OBJECTION AND ANSWERED IT IN ONE SENTENCE. The tempting reading is that
+ * `workLifecycleState -> REJECTED` just mirrors an assurance verdict, so authority was settled upstream at the
+ * assessment. DOC-001's provenance file names *"Governance outside the six: Guide L336"*, and Guide L336 reads:
+ * *"**Assurance may record a `REJECTED` Assessment disposition under policy;** Governance is an authority
+ * function outside the six engineering disciplines and **alone authorizes waiver, risk acceptance, rejection or
+ * abandonment of governed work**, and promotion."* Both clauses, one sentence: the disposition is carved OUT of
+ * the reserved act. DOC-002 puts it operationally — *"Assurance evaluates; governance decides. The two
+ * vocabularies never substitute for each other."*
+ *
+ * AND THE TWO AXES WERE MEASURABLY UNCOUPLED: before this guard the work axis could be driven to REJECTED with
+ * `supportingObjectIds: []` while the assurance axis sat at ASSESSING and no assessment object existed at all.
+ * `rejectUnbackedDisposition` guards `assuranceState`, so DECLINING to move the assurance axis was enough to
+ * evade it — the existing guard was on the wrong axis to stop the lifecycle act.
+ *
+ * ⚠ WHY BOTH CONJUNCTS, when abandonment needs only authority. The two arrows differ in their VERBATIM corpus
+ * trigger: abandonment's reads "Authorized abandonment", rejection's reads **"Blocking finding"** — a fact — and
+ * `PWU.workLifecycleState`'s vocab records §8.2 as VERBATIM rather than reconstructed, so that word is the
+ * corpus's own. DOC-001 then requires both of governance dispositions generally: *"Governance disposes: approval,
+ * rejection, waiver, risk acceptance, deferral — version-bound, **evidence-backed**."* Authority without the
+ * finding would let a decision reject work nothing had found fault with; the finding without authority is the
+ * hole this closes.
+ *
+ * WHY NOT MINT A `RejectPwu` COMMAND, which PER-3 would otherwise want. The Guide's own instruction for exactly
+ * this situation: *"when the required semantic Command is absent, **stop for a contract Decision rather than
+ * inventing one**."* `PwuRejectedPayloadSchema` is a `z.strictObject` with no decision field, so minting would
+ * force a contract amendment on an already-UNRATIFIED shape — authoring atop authoring. Adding `REJECTED` to
+ * `PWU_SEMANTIC_LIFECYCLE_COMMANDS` without a handler would be worse still: the ownership guard would redirect
+ * callers to a command that does not exist, deleting the capability rather than closing the route.
+ */
+function rejectUnauthorizedRejection(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	currentWorkLifecycleState: string,
+	currentSemanticVersion: number
+): CommandResult | undefined {
+	if (p.newState !== 'REJECTED' || currentWorkLifecycleState === 'REJECTED') return undefined;
+	const cited = p.supportingObjectIds ?? [];
+	const failures: string[] = [];
+
+	// CONJUNCT A — AUTHORITY. An EFFECTIVE REJECTION Decision naming this PWU at this version.
+	const authorized = cited.some((oid) => {
+		const verdict = resolveRejectAuthorization(ctx, {
+			pwuId: id,
+			authorizationId: oid,
+			pwuSemanticVersion: currentSemanticVersion
+		});
+		if (!verdict.ok) failures.push(`${oid}: ${verdict.reason}`);
+		return verdict.ok;
+	});
+
+	// CONJUNCT B — THE FINDING. A blocking AssuranceObservation ABOUT THIS PWU. Severity is read off the STORED
+	// object, never taken from the payload: a caller asserting its own finding is severe is the shape every
+	// "may not be asserted" guard in this file exists to refuse.
+	const found = cited.some((oid) => {
+		const obj = ctx.store.loadObject(oid);
+		if (obj?.objectType !== 'ASSURANCE_OBSERVATION') return false;
+		const s = obj.state as { severity?: unknown; subjectObjectIds?: string[] };
+		return (
+			BLOCKING_SEVERITIES.has(String(s.severity) as never) &&
+			(s.subjectObjectIds ?? []).includes(id)
+		);
+	});
+
+	if (authorized && found) return undefined;
+	const unmet = [
+		...(authorized ? [] : ['no EFFECTIVE REJECTION Decision naming this PWU at version ' + currentSemanticVersion]),
+		...(found ? [] : ['no BLOCKING or CRITICAL AssuranceObservation whose subjectObjectIds include this PWU'])
+	];
+	const detail = failures.length ? ` Cited object(s) rejected — ${failures.join('; ')}.` : '';
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`ChangePwuState would reject PWU ${id} without ${unmet.join(' and ')}. Rejection of governed work is ` +
+			`reserved to Governance ("It alone authorizes waiver, risk acceptance, rejection or abandonment of ` +
+			`governed work, and promotion" — JPWB-DOC-001 §5.2) and its dispositions are "version-bound, ` +
+			`evidence-backed" (§6). Recording a REJECTED Assessment disposition is Assurance's to do under policy ` +
+			`and is a different act. Cite BOTH in supportingObjectIds. Supplied: ` +
+			`[${cited.join(', ') || 'nothing'}].${detail}`,
+		[id]
+	);
+}
+
+/**
  * THE GENERIC SETTER MAY NOT PERFORM AN ARROW A SEMANTIC COMMAND OWNS (REG-F-072).
  *
  * Not a guard about a fact or an authority — a guard about the WRITE PATH, which is what PER-3 legislates. The
@@ -1047,6 +1137,20 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		p.newState
 	);
 	if (ownedArrow) return ownedArrow;
+	// REG-F-078 — AFTER legality and ownership, for the same reason those two are ordered as they are: a
+	// caller attempting REJECTED from one of the nineteen states that has no such arrow should be told the
+	// arrow does not exist, not sent to find a governance decision that would not help. Its three siblings in
+	// the `unearned` chain run earlier and DO mis-message this way; that is precedent, not justification, and
+	// REJECTED is the sharpest case because it is legal from exactly one of twenty states.
+	const unauthorizedRejection = rejectUnauthorizedRejection(
+		ctx,
+		command,
+		id,
+		p,
+		current.workLifecycleState,
+		loaded.semanticVersion
+	);
+	if (unauthorizedRejection) return unauthorizedRejection;
 	const newRevision = loaded.revision + 1;
 	const next = {
 		...nextEnvelope(loaded.state, command, newRevision),
