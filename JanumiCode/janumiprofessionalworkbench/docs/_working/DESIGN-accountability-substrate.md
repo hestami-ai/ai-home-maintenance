@@ -103,7 +103,32 @@ built.)
 
 ---
 
-## 2. ⚠ The foreseeable race the directive names
+## 2. ⚠ ~~The foreseeable race the directive names~~ — REFUTED 2026-08-08, AND THE CITATION WAS BACKWARDS
+
+**⚠ READ THIS BEFORE READING §2. Struck, not deleted, because it was cited as settled for a day and
+a reader who finds it must see what was believed and how it was cleared.** A thirteen-agent
+adversarial survey put all eight verified candidates to independent refuters; **eight were refuted**,
+and *not* on the single-process grounds AX-10 rejects (which I had pre-loaded into their prompts) but
+on **serializability** — the interleaved outcome is byte-identical to a legal serial history, so a
+second writer changes no professional meaning and there is nothing topology-dependent to design out.
+
+**And the ASR-8 citation below is INVERTED.** §2 says a claim left SUPPORTED on invalidated evidence
+is *"the precise state ASR-8 exists to forbid."* ASR-8 (DOC-003 §8.3, L271/L273) **requires the link
+to persist**: *"Contradicting evidence remains attached and visible; the record never self-curates
+toward support… Retention is dependency-driven."* Dropping it would be the violation. I borrowed a
+ratified rule's authority for its opposite.
+
+**What ASR-8 does require — its first sentence, "every dependent supported claim becomes
+contested" — IS unmet**, but as an unbuilt cascade, not a race: canonical state never contests the
+claim, the PROJECTION does, and the publication gate reads canonical.
+
+**Superseded by `DESIGN-coordination-and-read-dependencies.md`**, which also records that the general
+read-dependency rule this section treats as absent is ratified as **ASR-12** (§8.4, L289), and that
+the coordinator it calls for is already a declared nine-state machine with one command.
+
+---
+
+### ~~The foreseeable race the directive names~~ (original text, retained)
 
 The sponsor: *"Race conditions… we should make every attempt to avoid when it is foreseeable that a
 design path might cause such a situation."*
