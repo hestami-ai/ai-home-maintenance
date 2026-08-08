@@ -13,7 +13,7 @@ decorative.**
 
 ## C-0 — The arrow × command control
 
-**The finding it generalises (REG-F-063):** `Harness.status` declares nine states and eight arrows;
+**The finding it generalises (REG-F-063):** `Harness.status` declares nine states and fifteen arrows;
 `registry.ts` has one Harness command, writing `FRAMING`. Zero arrows are traversable. The existing
 `state-reachability.test.ts` reports zero stranded because it walks the machine's **own declared
 arrows** — it reads the same artifact the defect is written in.
