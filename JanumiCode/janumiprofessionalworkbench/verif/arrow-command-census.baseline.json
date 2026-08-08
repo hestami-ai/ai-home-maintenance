@@ -8,15 +8,6 @@
 		"Assumption.status  UNDER_VERIFICATION -> ACCEPTED",
 		"Assumption.status  UNDER_VERIFICATION -> SUPERSEDED",
 		"Assumption.status  UNDER_VERIFICATION -> VERIFIED",
-		"AssuranceAssessment.disposition  ASSESSING -> CONDITIONALLY_SATISFIED",
-		"AssuranceAssessment.disposition  ASSESSING -> ESCALATED",
-		"AssuranceAssessment.disposition  ASSESSING -> INCONCLUSIVE",
-		"AssuranceAssessment.disposition  ASSESSING -> REJECTED",
-		"AssuranceAssessment.disposition  ASSESSING -> SATISFIED",
-		"AssuranceAssessment.disposition  ASSESSING -> WAIVED",
-		"AssuranceAssessment.disposition  ESCALATED -> WAIVED",
-		"AssuranceAssessment.disposition  INCONCLUSIVE -> WAIVED",
-		"AssuranceAssessment.disposition  PENDING -> ASSESSING",
 		"AssuranceAssessment.state  ASSESSING -> EVIDENCE_PENDING",
 		"AssuranceAssessment.state  ASSESSING -> VALIDATOR_FAILED",
 		"AssuranceAssessment.state  ASSESSING -> WAIVED",
@@ -213,8 +204,6 @@
 		"Undertaking.status  MIGRATING -> ACTIVE"
 	],
 	"orphans": [
-		"AggregateAssuranceDisposition",
-		"AssuranceAssessment.disposition",
 		"AssuranceObservation.disposition",
 		"Constraint.status",
 		"Harness.status",
@@ -227,7 +216,7 @@
 		"PwuType.status",
 		"Undertaking.status"
 	],
-	"total": 304,
+	"total": 295,
 	"dead": [
 		"Assumption.status  ACCEPTED -> EXPIRED",
 		"Assumption.status  ACCEPTED -> FALSIFIED",

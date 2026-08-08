@@ -17,6 +17,7 @@
 // blind reader: an instrument that can silently see nothing must be able to prove it sees something.
 import { describe, expect, it } from 'vitest';
 import { getMachine, machineNames } from './stateMachine.js';
+import { NOT_STATE_MACHINES } from './machine-exclusions.js';
 
 interface Unreachable {
 	readonly machine: string;
@@ -56,12 +57,8 @@ const key = (u: Unreachable) => `${u.machine}.${u.state}`;
  * shape and were dispositioned differently by judgement. This list therefore cites a ruling rather than computing
  * one, and any addition to it needs the same: a citation, not a resemblance.
  */
-const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
-	AggregateAssuranceDisposition:
-		'JAN-CMDPRE-SPEC-001 §2 — a computed disposition rollup with no transitions, out of transition-legality ' +
-		'scope. Its six states are outcomes DERIVED from the assessments it summarises, not states an object is ' +
-		'moved between, so they have no in-arrows by construction rather than by omission.'
-};
+// Moved to `machine-exclusions.ts` so the C-0 arrow census reads the SAME list — two censuses over one
+// table must not each keep their own idea of what the table contains.
 
 /**
  * States reachable from a machine's OWN initial state, following arrows transitively.

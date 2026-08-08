@@ -14,7 +14,7 @@
 // luck, not method. `typescript` is already a dependency; parsing properly removes the whole class.
 import { readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
-import { STATE_MACHINES, STEP_COMMAND_SPECS } from '@janumipwb/rph-domain';
+import { isExcludedMachine, STATE_MACHINES, STEP_COMMAND_SPECS } from '@janumipwb/rph-domain';
 import * as CONTRACT_SCHEMAS from '@janumipwb/rph-contracts';
 
 const HANDLERS = new URL('../packages/rph-application/src/handlers/', import.meta.url).pathname.replace(
@@ -426,6 +426,11 @@ export function census(): { uncovered: string[]; orphans: string[]; total: numbe
 	const uncovered: string[] = [];
 	let total = 0;
 	for (const [machine, def] of Object.entries(STATE_MACHINES)) {
+		// EXCLUDED KEYS ARE NOT PART OF THE POPULATION AT ALL — see `machine-exclusions.ts`. They are keys the
+		// controls should never have been asked about (a computed rollup; a machine over a field the ratified
+		// schema does not have), not machines whose arrows are unbuilt. Counting their arrows in `total` would
+		// also make the anti-deletion pin defend a number that includes nine impossible transitions.
+		if (isExcludedMachine(machine)) continue;
 		for (const t of def.transitions) {
 			total += 1;
 			const k = arrowKey(machine, t.from, t.to);
@@ -436,7 +441,7 @@ export function census(): { uncovered: string[]; orphans: string[]; total: numbe
 	return {
 		uncovered: uncovered.sort(),
 		orphans: Object.keys(STATE_MACHINES)
-			.filter((m) => !declared.has(m))
+			.filter((m) => !declared.has(m) && !isExcludedMachine(m))
 			.sort(),
 		total
 	};

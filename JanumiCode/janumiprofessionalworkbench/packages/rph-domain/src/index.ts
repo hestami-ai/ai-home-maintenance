@@ -3,6 +3,7 @@
 export const RPH_DOMAIN_VERSION = '0.0.0';
 
 export * from './transitions.data.js';
+export * from './machine-exclusions.js';
 export * from './stateMachine.js';
 export * from './pwuGuards.js';
 export * from './traceability.js';
