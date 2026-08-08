@@ -146,7 +146,7 @@ RPH behavior."*
 **And it is hollow.** `packages/rph-application/src/handlers/harness.ts` is **49 lines** with **one**
 handler, `proposeHarness`, which writes `status: 'FRAMING'`. `registry.ts:200` registers exactly one
 command, `ProposeHarness`. **No command traverses a single arrow.** One state of nine is reachable;
-zero of eight arrows are.
+zero of FIFTEEN arrows are. (This document first said "eight" — counted from an excerpt, not the machine; corrected against the C-0 census, which reads `transitions.data.ts` directly.)
 
 This is the fifth hollow of the programme, and the one that matters most: **the mechanism AGG-1
 requires and REG-E-029 says the cascade needs is already declared, and nothing can move it.**
@@ -266,7 +266,7 @@ fixing that would produce a cascade that reports success and delivers nothing.
 
 After four false-absence corrections, three remain, and they are narrow:
 
-1. **A command set that moves a Harness.** The states, arrows and object exist; eight arrows have no
+1. **A command set that moves a Harness.** The states, arrows and object exist; fifteen arrows have no
    command. This is authoring, and it is the bulk of the work.
 2. **The actor who may SELECT a control action.** DOC-002 §4 (L168) reserves it explicitly —
    a Validator *"MUST NOT authorize or select them for execution"* — and REG-E-030 answers it. The

@@ -601,6 +601,20 @@ export function advanceStatus(
 		 * Every literal call site is unaffected.
 		 */
 		readonly target: string | ((state: Record<string, unknown>) => string);
+		/**
+		 * The DECLARED RANGE of a derived `target`. Required when `target` is a function, meaningless when it
+		 * is a literal.
+		 *
+		 * ⚠ IT IS CHECKED AT RUNTIME, not merely read by a census (C-0). A deriver that returns a state
+		 * outside its declared range REFUSES rather than proceeding — so this is a live guard on the one
+		 * construct in the handler layer whose outcome is not visible in its own call site, and not a field
+		 * that exists to make a static tool happy. A field only a census reads is the hollow this programme
+		 * keeps finding; this one fails a command.
+		 *
+		 * The census needs it because a function's range is not statically knowable, and the alternative —
+		 * letting the extractor skip what it cannot parse — is how an arrow gets quietly reported unreachable.
+		 */
+		readonly targetStates?: readonly string[];
 		readonly eventType: string;
 		readonly setLifecycleStatus?: boolean;
 		readonly guard?: (state: Record<string, unknown>, ctx: HandlerContext) => CommandResult | null;
@@ -666,6 +680,20 @@ export function advanceStatus(
 	// status contradicts the arrow that was checked.
 	const target =
 		typeof args.target === 'function' ? args.target(structuredClone(loaded.state)) : args.target;
+	// A DERIVER MUST LAND INSIDE ITS DECLARED RANGE. `checkTransition` below already validates the arrow
+	// against the ratified machine, so this is not about legality — it is about the DECLARATION being true.
+	// An undeclared outcome means the site's stated range no longer describes what it does, and the census
+	// that reads that range (C-0) would then certify an arrow set the code has left behind.
+	if (typeof args.target !== 'string' && args.targetStates && !args.targetStates.includes(target)) {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`${command.commandType}: the derived target ${target} is outside the declared range ` +
+				`[${args.targetStates.join(', ')}] for ${args.machine}. Refused rather than committed, because a ` +
+				`deriver that has outgrown its declaration makes every reader of that declaration wrong.`,
+			[id]
+		);
+	}
 	const illegal = checkTransition(command, args.machine, from, target);
 	if (illegal) return illegal;
 	const newRevision = loaded.revision + 1;
