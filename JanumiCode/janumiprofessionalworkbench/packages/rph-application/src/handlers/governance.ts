@@ -725,6 +725,11 @@ export const createBaseline: CommandHandler = (ctx, command, payload) => {
 		objectType: BASELINE,
 		aggregateId: id,
 		state,
+		// REG-F-071, FIFTH CASE: the machine declares `initialState: 'DRAFT'` and nothing writes it. Worse, its
+		// DRAFT->CANDIDATE arrow is triggered by 'BaselineCreated' — the event THIS creation emits at revision 0,
+		// landing directly in CANDIDATE. So the arrow the machine attributes to this act is never traversed, and
+		// DRAFT is occupied by nothing.
+		births: [{ machine: 'Baseline.status', statusField: 'status', values: ['CANDIDATE'] }],
 		eventType: 'BaselineCreated',
 		// The event records the RESULTING state. BaselineCreated declares `{ baselineType, itemObjectIds, status }`
 		// (+ optional assuranceAssessmentIds); the raw command payload omits the created `status: 'CANDIDATE'`. Emit

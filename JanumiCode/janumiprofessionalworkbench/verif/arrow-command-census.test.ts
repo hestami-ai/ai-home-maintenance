@@ -33,7 +33,7 @@
 // the failure output is the LIST — a reader must see WHICH capability is missing, not how many.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { census, declaredArrows } from './arrow-command-census.js';
+import { census, deadCovered, declaredArrows } from './arrow-command-census.js';
 
 /**
  * The baseline is DATA, in a committed JSON file, not a literal in this test.
@@ -49,13 +49,19 @@ const BASELINE_PATH = new URL('./arrow-command-census.baseline.json', import.met
 );
 
 if (process.env.PIN_ARROW_BASELINE === '1') {
-	writeFileSync(BASELINE_PATH, `${JSON.stringify(census(), null, '\t')}\n`, 'utf8');
+	writeFileSync(
+		BASELINE_PATH,
+		`${JSON.stringify({ ...census(), ...deadCovered() }, null, '\t')}\n`,
+		'utf8'
+	);
 }
 
 const BASELINE = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
 	uncovered: string[];
 	orphans: string[];
 	total: number;
+	dead: string[];
+	unanalysed: string[];
 };
 
 describe('C-0 — every declared arrow can be performed by some command', () => {
@@ -79,6 +85,29 @@ describe('C-0 — every declared arrow can be performed by some command', () => 
 		const { orphans } = census();
 		expect(orphans, `machines with no advanceStatus site:\n${orphans.join('\n')}`).toEqual(
 			BASELINE.orphans
+		);
+	});
+
+	// ── C-0a: OCCUPANCY. "Covered" is not the same as "can fire" ─────────────────────────────────────────────
+	//
+	// An arrow whose SOURCE STATE is never occupied is dead however many commands declare it — and the three
+	// assertions above would all score it COVERED. REG-F-067 found the first instance; REG-F-069 then walked
+	// straight into it, registering a FalsifyAssumption whose four source states nothing could produce.
+	//
+	// Occupancy is seeded from BIRTHS DECLARED AT THE CREATION SITES, not from `initialState`, which lies for at
+	// least six machines (REG-F-071) — and not from the arrow graph, which cannot see a birth at all.
+	it('lists every COVERED arrow whose source state can never be occupied', () => {
+		const { dead } = deadCovered();
+		expect(dead, `covered arrows that can never fire:\n${dead.join('\n')}`).toEqual(BASELINE.dead);
+	});
+
+	// A machine with no `births` declaration cannot be analysed: every state would look unoccupiable and every
+	// covered arrow dead — a 100% false-positive rate dressed as a finding. Skipping them silently would be the
+	// census narrowing its own population, so the unanalysed set is PINNED and shrinks deliberately.
+	it('pins which machines are NOT yet occupancy-analysed, so the scope cannot quietly widen or narrow', () => {
+		const { unanalysed } = deadCovered();
+		expect(unanalysed, `machines with no declared birth:\n${unanalysed.join('\n')}`).toEqual(
+			BASELINE.unanalysed
 		);
 	});
 

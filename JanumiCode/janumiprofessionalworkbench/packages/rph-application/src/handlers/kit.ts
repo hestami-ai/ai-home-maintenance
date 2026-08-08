@@ -537,8 +537,47 @@ export function createObject(
 		 *  the same trigger that creates the assessment, and the required set it computes is a governed fact with
 		 *  its own event. Each gets the next contiguous aggregateRevision. */
 		readonly alsoEvents?: readonly { eventType: string; payload: unknown }[];
+		/**
+		 * THE STATE MACHINES THIS CREATION BIRTHS, and it is CHECKED against the state actually committed.
+		 *
+		 * ⚠ NEITHER OF THE TWO OBVIOUS SOURCES FOR THIS IS TRUSTWORTHY (REG-F-071). The arrow graph cannot
+		 * supply it — a birth has no in-arrow by definition. And `StateMachineSpec.initialState` LIES: four
+		 * machines declare an initial state the engine never writes (`DecompositionContract` declares DRAFT
+		 * and births UNDER_REVIEW; `RecompositionContract` DRAFT/READY; `ExecutionPlan` PROPOSED/UNDER_REVIEW;
+		 * `AssuranceAssessment` REQUESTED/READY|EVIDENCE_PENDING). So the birth is declared at the site that
+		 * performs it, which is the only place that knows.
+		 *
+		 * WHY IT IS A RUNTIME CHECK AND NOT A COMMENT. The occupancy census (C-0a) reads these declarations to
+		 * decide which states can ever be occupied, and therefore which "covered" arrows are dead. A
+		 * declaration that drifts from the code would make the census confidently wrong — so a mismatch
+		 * REFUSES THE COMMAND. This is the same posture as `advanceStatus`'s `targetStates`: a field that only
+		 * a census reads is the hollow this programme keeps finding.
+		 *
+		 * `values` carries MORE THAN ONE only for a genuinely conditional birth (`requestAssuranceAssessment`
+		 * lands EVIDENCE_PENDING or READY on the same command). Listing extras to be safe would widen the
+		 * occupancy claim, which is the direction that hides dead arrows.
+		 */
+		readonly births?: readonly {
+			readonly machine: string;
+			readonly statusField: string;
+			readonly values: readonly string[];
+		}[];
 	}
 ): CommandResult {
+	for (const b of args.births ?? []) {
+		const actual = args.state[b.statusField];
+		if (typeof actual !== 'string' || !b.values.includes(actual)) {
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`${command.commandType}: declared birth for ${b.machine} is [${b.values.join(', ')}] at ` +
+					`\`${b.statusField}\`, but the created object carries ${JSON.stringify(actual)}. Refused rather ` +
+					`than committed: the occupancy census trusts this declaration to decide which states can ever ` +
+					`be reached, so a declaration that has drifted from the code makes that census confidently wrong.`,
+				[args.aggregateId]
+			);
+		}
+	}
 	const event = makeEvent(ctx, command, {
 		eventType: args.eventType,
 		aggregateType: args.objectType,

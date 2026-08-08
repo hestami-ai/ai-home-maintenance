@@ -68,6 +68,10 @@ export const proposeDecomposition: CommandHandler = (ctx, command, payload) => {
 	return createObject(ctx, command, {
 		objectType: DECOMP,
 		aggregateId: id,
+		// REG-F-071: the machine declares `initialState: 'DRAFT'` and nothing writes it. Born UNDER_REVIEW.
+		births: [
+			{ machine: 'DecompositionContract.status', statusField: 'status', values: ['UNDER_REVIEW'] }
+		],
 		state,
 		eventType: 'DecompositionProposed',
 		// The event records the RESULTING state. DecompositionProposed declares the decomposition + the created
@@ -500,6 +504,8 @@ export const proposeRecomposition: CommandHandler = (ctx, command, payload) => {
 	return createObject(ctx, command, {
 		objectType: RECOMP,
 		aggregateId: id,
+		// REG-F-071: the machine declares `initialState: 'DRAFT'` and nothing writes it. Born READY.
+		births: [{ machine: 'RecompositionContract.status', statusField: 'status', values: ['READY'] }],
 		state,
 		eventType: 'RecompositionProposed',
 		eventPayload: {

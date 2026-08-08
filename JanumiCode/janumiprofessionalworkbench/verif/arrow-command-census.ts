@@ -297,6 +297,119 @@ export function declaredArrows(): DeclaredArrow[] {
 	return arrows;
 }
 
+/**
+ * The states a CREATION can bring an object into existence in, read from the `births` declarations at the
+ * `createObject` sites (`kit.ts`), which `createObject` also checks at runtime.
+ *
+ * ⚠ READ FROM THE DECLARATIONS AND NOT FROM `initialState`, WHICH LIES (REG-F-071). Four machines declare an
+ * initial state the engine never writes. Seeding occupancy from `initialState` would mark a state occupied
+ * because a diagram says so — the exact substitution of declaration for behaviour this whole file exists to
+ * refuse.
+ */
+export function birthStates(): Map<string, Set<string>> {
+	const out = new Map<string, Set<string>>();
+	let declarations = 0;
+	for (const file of handlerFiles()) {
+		const source = readFileSync(HANDLERS + file, 'utf8');
+		if (!source.includes('births:')) continue;
+		const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
+		const visit = (node: ts.Node): void => {
+			ts.forEachChild(node, visit);
+			if (!ts.isCallExpression(node)) return;
+			if (!ts.isIdentifier(node.expression) || node.expression.text !== 'createObject') return;
+			const spec = node.arguments[2];
+			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
+			const p = prop(spec, 'births');
+			if (!p || !ts.isPropertyAssignment(p)) return;
+			const site = `${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
+			if (!ts.isArrayLiteralExpression(p.initializer)) {
+				return fail(site, '`births` must be an array literal so the census can read it');
+			}
+			for (const entry of p.initializer.elements) {
+				if (!ts.isObjectLiteralExpression(entry)) fail(site, 'each `births` entry must be an object literal');
+				const obj = entry as ts.ObjectLiteralExpression;
+				const machineProp = prop(obj, 'machine');
+				const valuesProp = prop(obj, 'values');
+				if (
+					!machineProp ||
+					!ts.isPropertyAssignment(machineProp) ||
+					!ts.isStringLiteral(machineProp.initializer)
+				) {
+					return fail(site, '`births[].machine` must be a string literal');
+				}
+				const machine = machineProp.initializer.text;
+				if (!STATE_MACHINES[machine]) fail(site, `births names unknown machine \`${machine}\``);
+				if (!valuesProp || !ts.isPropertyAssignment(valuesProp)) {
+					return fail(site, '`births[].values` is required');
+				}
+				const values = literalsIn(valuesProp.initializer);
+				if (values.length === 0) fail(site, '`births[].values` yielded no string literals');
+				for (const v of values) {
+					if (!STATE_MACHINES[machine]?.states.includes(v)) {
+						fail(site, `births declares \`${v}\`, which is not a state of ${machine}`);
+					}
+					const set = out.get(machine) ?? new Set<string>();
+					set.add(v);
+					out.set(machine, set);
+					declarations += 1;
+				}
+			}
+		};
+		visit(sf);
+	}
+	if (declarations === 0) {
+		fail('births', 'no `births` declarations found at all — the occupancy census would be vacuous');
+	}
+	return out;
+}
+
+/**
+ * The states an object can actually BE IN: born, or reached from an occupiable state by an arrow some command
+ * can perform. A least-fixed-point, because occupancy propagates.
+ */
+export function occupiable(): Map<string, Set<string>> {
+	const births = birthStates();
+	const covered = declaredArrows();
+	const out = new Map<string, Set<string>>();
+	for (const [machine, seeds] of births) out.set(machine, new Set(seeds));
+	let grew = true;
+	while (grew) {
+		grew = false;
+		for (const a of covered) {
+			const set = out.get(a.machine);
+			if (!set?.has(a.from) || set.has(a.to)) continue;
+			set.add(a.to);
+			grew = true;
+		}
+	}
+	return out;
+}
+
+/**
+ * Arrows a command CAN perform but that can never fire, because their source state is never occupied.
+ *
+ * ⚠ SCOPED TO MACHINES WITH A DECLARED BIRTH, AND THE UNSCOPED SET IS RETURNED RATHER THAN IGNORED. A machine
+ * with no `births` declaration cannot be analysed — every state would look unoccupiable and every covered arrow
+ * dead, which is a 100% false-positive rate dressed as a finding. Silently skipping them would be the census
+ * narrowing its own population again, so `unanalysed` is an output the test pins.
+ */
+export function deadCovered(): { dead: string[]; unanalysed: string[] } {
+	const occ = occupiable();
+	const arrows = declaredArrows();
+	const dead: string[] = [];
+	for (const a of arrows) {
+		const set = occ.get(a.machine);
+		if (!set) continue; // no declared birth — reported as unanalysed, never as dead
+		if (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));
+	}
+	const analysed = new Set(occ.keys());
+	const unanalysed = [...new Set(arrows.map((a) => a.machine))].filter((m) => !analysed.has(m));
+	return {
+		dead: [...new Set(dead)].sort((x, y) => x.localeCompare(y)),
+		unanalysed: unanalysed.sort((x, y) => x.localeCompare(y))
+	};
+}
+
 export const arrowKey = (machine: string, from: string, to: string) => `${machine}  ${from} -> ${to}`;
 
 /**

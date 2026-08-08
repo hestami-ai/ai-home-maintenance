@@ -227,5 +227,26 @@
 		"PwuType.status",
 		"Undertaking.status"
 	],
-	"total": 304
+	"total": 304,
+	"dead": [
+		"Assumption.status  ACCEPTED -> EXPIRED",
+		"Assumption.status  ACCEPTED -> FALSIFIED",
+		"Assumption.status  UNDER_VERIFICATION -> EXPIRED",
+		"Assumption.status  UNDER_VERIFICATION -> FALSIFIED",
+		"Assumption.status  VERIFIED -> FALSIFIED",
+		"AssuranceAssessment.state  REQUESTED -> CANCELLED",
+		"Claim.status  CONDITIONALLY_SUPPORTED -> CONTESTED",
+		"Claim.status  CONDITIONALLY_SUPPORTED -> REJECTED",
+		"Claim.status  CONDITIONALLY_SUPPORTED -> SUPPORTED",
+		"Claim.status  CONDITIONALLY_SUPPORTED -> UNDER_ASSESSMENT"
+	],
+	"unanalysed": [
+		"AssurancePolicy.status",
+		"Decision.status",
+		"ExecutionPlan.status",
+		"ExecutionStep.stepState",
+		"PWA.publicationStatus",
+		"RuntimeBinding.authorizationStatus",
+		"ValidatorRegistryEntry.status"
+	]
 }

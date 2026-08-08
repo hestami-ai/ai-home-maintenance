@@ -469,6 +469,7 @@ export const proposeEvidence: CommandHandler = (ctx, command, payload) => {
 	return createObject(ctx, command, {
 		objectType: EVIDENCE,
 		aggregateId: p.evidenceId,
+		births: [{ machine: 'Evidence.status', statusField: 'status', values: ['PROPOSED'] }],
 		state,
 		eventType: 'EvidenceProposed',
 		// The event records the RESULTING state. EvidenceProposed declares the evidence + the created `status`
@@ -647,6 +648,7 @@ export const assertClaim: CommandHandler = (ctx, command, payload) => {
 	return createObject(ctx, command, {
 		objectType: CLAIM,
 		aggregateId: id,
+		births: [{ machine: 'Claim.status', statusField: 'status', values: ['OPEN'] }],
 		state,
 		eventType: 'ClaimAsserted',
 		eventPayload: {
@@ -869,6 +871,7 @@ export const detectAssumption: CommandHandler = (ctx, command, payload) => {
 	return createObject(ctx, command, {
 		objectType: ASSUMPTION,
 		aggregateId: p.assumptionId,
+		births: [{ machine: 'Assumption.status', statusField: 'status', values: ['PROPOSED'] }],
 		state,
 		eventType: 'AssumptionDetected',
 		eventPayload: {
@@ -1285,6 +1288,17 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	return createObject(ctx, command, {
 		objectType: ASSESSMENT,
 		aggregateId: p.assessmentId,
+		// CONDITIONAL, and both arms are real: `landingState` is EVIDENCE_PENDING when blocking evidence is
+		// outstanding, READY otherwise. Declaring only READY would mark EVIDENCE_PENDING unoccupiable and
+		// report its out-arrows dead; declaring extras would hide dead arrows. Neither value is the machine's
+		// declared `initialState` (REQUESTED), which nothing writes — REG-F-071's fourth case.
+		births: [
+			{
+				machine: 'AssuranceAssessment.state',
+				statusField: 'assessmentState',
+				values: ['EVIDENCE_PENDING', 'READY']
+			}
+		],
 		state,
 		// THE REQUEST MOMENT, recorded at last. Its payload was corrected in increment 1: the authored shape
 		// REQUIRED `evaluator` and `disposition` — chosen two arrows later and produced at the very end — so no
