@@ -215,12 +215,7 @@
 		"RecompositionContract.status  READY -> SUPERSEDED",
 		"Undertaking.status  ACTIVE -> ARCHIVED",
 		"Undertaking.status  ACTIVE -> MIGRATING",
-		"Undertaking.status  MIGRATING -> ACTIVE",
-		"ValidatorRegistryEntry.status  ACTIVE -> DEGRADED",
-		"ValidatorRegistryEntry.status  ACTIVE -> DISABLED",
-		"ValidatorRegistryEntry.status  DEGRADED -> ACTIVE",
-		"ValidatorRegistryEntry.status  DEGRADED -> DISABLED",
-		"ValidatorRegistryEntry.status  DISABLED -> ACTIVE"
+		"Undertaking.status  MIGRATING -> ACTIVE"
 	],
 	"orphans": [
 		"AggregateAssuranceDisposition",
@@ -235,7 +230,7 @@
 		"PWU.shapeIntegrityState",
 		"PWU.workLifecycleState",
 		"PwuType.status",
-		"Undertaking.status",
-		"ValidatorRegistryEntry.status"
-	]
+		"Undertaking.status"
+	],
+	"total": 304
 }
