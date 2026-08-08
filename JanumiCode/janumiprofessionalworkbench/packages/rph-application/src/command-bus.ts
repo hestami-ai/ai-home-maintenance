@@ -600,9 +600,40 @@ export class Engine {
 		return result!;
 	}
 
-	/** Deliver pending outbox events to subscribers and mark them published. Returns the count drained. */
+	/**
+	 * Deliver pending outbox events to subscribers and mark them published. Returns the count DELIVERED.
+	 *
+	 * ── ⚠ A DRAIN WITH NO SUBSCRIBER DELIVERS NOTHING, AND USED TO MARK EVERYTHING PUBLISHED ANYWAY ───────────
+	 *
+	 * The loop over `this.subscribers` is a no-op when the list is empty, and `markOutboxPublished` then ran
+	 * unconditionally over every pending id. In production the list IS empty — nothing registers an event
+	 * subscriber anywhere in the app, and `enforcement-register.ts` already recorded that — so every event this
+	 * engine has ever committed was marked delivered to nobody.
+	 *
+	 * THE WRITE IT CORRUPTS IS THE `status` COLUMN, AND THE DAMAGE IS PERMANENT. `recoverOutbox` re-drives only
+	 * PENDING rows, by design, so that a restart cannot duplicate an external side effect. A row wrongly marked
+	 * PUBLISHED is therefore invisible to every future subscriber forever: the moment anyone wires a projection,
+	 * it silently starts from the present with no way to learn it missed the past.
+	 *
+	 * It also falsifies this class's own stated contract two methods down — *"Delivery is therefore
+	 * at-least-once; subscribers SHALL be idempotent."* With no subscriber it was at-most-zero, and the row said
+	 * otherwise.
+	 *
+	 * SO NOTHING IS MARKED WHEN THERE IS NOBODY TO DELIVER TO. The rows stay PENDING, which is what they are, and
+	 * a growing outbox becomes the visible form of "no consumer exists" instead of a silent discard. This is
+	 * deliberately NOT a throw: a host legitimately has no subscribers before it wires them, and refusing there
+	 * would break startup for a condition that is not an error — only a lie about it is.
+	 */
 	drainOutbox(): number {
 		const pending = this.store.readPendingOutbox();
+		if (pending.length === 0) return 0;
+		if (this.subscribers.length === 0) {
+			this.logger.warn('outbox.undelivered', {
+				pending: pending.length,
+				reason: 'no subscriber is registered; rows are left PENDING rather than marked published'
+			});
+			return 0;
+		}
 		for (const record of pending) {
 			for (const subscriber of this.subscribers) subscriber(record.event);
 		}

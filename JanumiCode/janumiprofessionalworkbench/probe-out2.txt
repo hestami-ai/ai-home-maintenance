@@ -1,0 +1,28 @@
+PROBE   (setup) RequestAssuranceAssessment: ACCEPTED  
+PROBE   (setup) BeginAssuranceAssessment: ACCEPTED  
+PROBE   (setup) CompleteAssuranceAssessment evidenceConsideredIds=[] claimResults=[]: ACCEPTED  
+PROBE P7 ASSESSING->SATISFIED citing an empty-evidence assessment: ACCEPTED  
+PROBE P7 final: SATISFIED  
+PROBE P8 ASSESSING->SATISFIED citing nothing: REJECTED RPH_EVIDENCE_MISSING ChangePwuState would set PWU pwu_01ARZ3NDEKTSV4RRFFQ69G5FB0 assuranceState=SATISFIED with nothing to back it. A disposition is the verdict of an assessment, not a property the controller may assign (§37: every control action must record the evidence considered and the objects affected; RPH-PWU-006 p
+PROBE   (setup) RecordAssuranceObservation BLOCKING against the PWU: REJECTED RPH_VALIDATION_SCHEMA_FAILED Schema validation failed
+PROBE   (setup) CreateBaseline: ACCEPTED  
+PROBE   (setup) SubmitBaselineForReview: ACCEPTED  
+PROBE P9 UNDER_REVIEW->APPROVED with an open BLOCKING observation: ACCEPTED  
+PROBE P9 final: APPROVED  
+PROBE   (setup) CreateBaseline: ACCEPTED  
+PROBE   (setup) SubmitBaselineForReview: ACCEPTED  
+PROBE   (setup) ApproveBaseline: ACCEPTED  
+PROBE   (setup) ProposeDecision: ACCEPTED  
+PROBE   (setup) ApproveDecision: ACCEPTED  
+PROBE   (setup) PromoteBaseline: ACCEPTED  
+PROBE   (setup) baseline status: AUTHORITATIVE  
+PROBE P10 AUTHORITATIVE->SUPERSEDED naming a nonexistent successor: ACCEPTED  
+PROBE P10 final: SUPERSEDED  
+PROBE   (setup) CreateBaseline: ACCEPTED  
+PROBE   (setup) SubmitBaselineForReview: ACCEPTED  
+PROBE   (setup) baseline before revoke: AUTHORITATIVE  
+PROBE P11 RevokeDecision on the promotion decision: ACCEPTED  
+PROBE P11 baseline AFTER revoke (RPH-GOV-007 says review-required or revoked): AUTHORITATIVE  
+PROBE P11 baseline events after revoke: BaselineCreated,BaselineSubmittedForReview,BaselineApproved,BaselinePromoted  
+PROBE   (setup) ProposeDecision: ACCEPTED  
+PROBE P12 ApproveDecision issued by AGENT: ACCEPTED  

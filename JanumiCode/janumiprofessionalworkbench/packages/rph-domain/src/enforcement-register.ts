@@ -2287,10 +2287,16 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'its census is recorded because it is not what the rule is about and could be mistaken for it: exactly ' +
 			'ONE production caller (`openWorkbench` in apps/rph-demo), invoked once per server process. TWO ' +
 			'STRUCTURAL FACTS ABOUT THAT PATH, stated because they bound what "eventually updated" can mean here: ' +
-			'nothing in production ever registers an event SUBSCRIBER, and `drainOutbox` marks every pending row ' +
-			'PUBLISHED after the subscriber loop whether or not any subscriber exists. There is also no timer, ' +
-			'poller or scheduled task anywhere that would drain the outbox after startup. Nothing is lost today ' +
-			'because nothing consumes the delivery; that is a property of the current wiring, not a guarantee.'
+			'nothing in production ever registers an event SUBSCRIBER, and ~~`drainOutbox` marks every pending ' +
+			'row PUBLISHED after the subscriber loop whether or not any subscriber exists~~ — CORRECTED ' +
+			'2026-08-08 (C-3): a drain with no subscriber now delivers nothing, reports 0, and LEAVES THE ROWS ' +
+			'PENDING. The struck clause was TRUE, and its consequence was understated right here: `recoverOutbox` ' +
+			're-drives only PENDING rows, so a row wrongly marked PUBLISHED was invisible to every FUTURE ' +
+			'subscriber permanently — wire a projection tomorrow and it starts from the present, unable to learn ' +
+			'it missed the past. There is still no timer, poller or scheduled task anywhere that would drain the ' +
+			'outbox after startup. ~~Nothing is lost today because nothing consumes the delivery~~ — that reading ' +
+			'held only while the discard was invisible; the outbox now GROWS, which is the visible form of "no ' +
+			'consumer exists".'
 	},
 	// ── THE DS-001 DEFECT, FOUND FOR THE FOURTH TIME BY THE REGISTER'S OWN GATES ─────────────────────────────
 	//
