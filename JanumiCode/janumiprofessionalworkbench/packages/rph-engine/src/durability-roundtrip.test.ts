@@ -4,7 +4,7 @@
 // round-trip byte-for-byte (plus the whole event log). This is the durability half of RPH-PER; the in-memory
 // replay-equivalence half is RPH-PER-006/007.
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,6 +13,24 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking } from './index.js';
 
 const TS = '2026-07-12T00:00:00Z';
+
+// THE DRIVE NAMES ITS OWN ACTOR. `driveReferenceUndertaking` promotes each baseline with a `ProposeDecision` whose
+// `authority` is `owner-1`, and REG-F-014 refuses a Decision declaring an authority its issuer is not — so the
+// session must BE the undertaking owner, not the shared `TEST_CRED.human` (`u1`), or the drive throws before this
+// test has anything to persist. The principal reproduces the `ActorReference` the drive used to declare itself, which
+// matters HERE more than anywhere: this test asserts canonical state survives a round trip byte-for-byte, and
+// `issuedBy` is written into every object's `createdBy`/`updatedBy`.
+const OWNER = 'owner-1';
+const DIR = testDirectory([
+	{
+		actorId: OWNER,
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
 
 describe('W2-INC-1 reference-fixture durability round-trip', () => {
 	let path = '';
@@ -29,7 +47,13 @@ describe('W2-INC-1 reference-fixture durability round-trip', () => {
 		let counter = 1;
 
 		const store1 = new SqliteStorageAdapter({ filename: path, now: () => TS });
-		const engine1 = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId, store: store1 }).as(TEST_CRED.human);
+		const engine1 = createEngine({
+			authenticate: DIR.authenticate,
+			ontology,
+			now: () => TS,
+			newEventId,
+			store: store1
+		}).as(DIR.credentialFor(OWNER));
 		driveReferenceUndertaking(engine1);
 
 		// Every aggregate that received an event, captured before the store is closed.

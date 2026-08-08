@@ -9,7 +9,6 @@ import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
-const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Alice' };
 
 describe('Intent lifecycle handlers (live command drive)', () => {
 	let store: SqliteStorageAdapter;

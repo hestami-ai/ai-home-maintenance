@@ -15,10 +15,10 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
-import type { AuthedEngineHandle } from './engine.js';
+import type { EngineHandle } from './engine.js';
 import { createEngine, recordAssuranceRecordingPlan } from './index.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
@@ -66,17 +66,46 @@ const rrSatisfied: Validator = {
 		)
 };
 
+// TWO ACTORS, AND THE AGENT IS THE ONE THE HEADLINE DEPENDS ON.
+//
+// ⚠ `send`'s `actor` PARAMETER IS LOAD-BEARING, NOT VESTIGIAL. It used to be written onto the envelope as
+// `issuedBy`; now the SESSION carries it and the parameter SELECTS that session. The difference is not cosmetic
+// — a codemod that dropped the envelope field left the parameter dead, and dead is wrong here: `pwaFloorGate`
+// derives `aiProduced` from the PWA's `createdBy.actorType`, which is the stamped issuer of `CreatePwa`. Author the
+// PWA as a HUMAN and `aiProduced` is false, no floor has been recorded yet so `latestFloorDispositions` is empty,
+// and `floorGateBlock` returns null — the FIRST assertion in this file, that publish is blocked, would go green
+// against a PWA the floor never governed. The test would still pass its last line and prove nothing, which is
+// exactly the shape of vacuity this suite exists to refuse.
+//
+// SVC is the second: `recordAssuranceRecordingPlan` still DECLARES `issuedBy: opts.actor`, and a declared issuer
+// that disagrees with the session's principal is refused (RPH_AUTHENTICATION_REQUIRED) — the recorder throws on any
+// non-ACCEPTED result, so a mismatched session aborts the test rather than failing an assertion. It also seeds the
+// floor policies it then cites.
+const DIR = testDirectory([
+	{ ...AGENT, tenantId: 'tenant-test', organizationId: 'org-test' },
+	{ ...SVC, tenantId: 'tenant-test', organizationId: 'org-test' }
+]);
+
+/** The session for one of the two registered actors. `credentialFor` throws for anyone else — the cast is fixed. */
+const asActor = (eng: EngineHandle, actor: ActorReference) =>
+	eng.as(DIR.credentialFor(actor.actorId));
+
 let seq = 0;
-function build(): AuthedEngineHandle {
+function build(): EngineHandle {
 	let s = 0;
 	seq = 0;
-	return createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId: () => `e${++s}` }).as(TEST_CRED.human);
+	return createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		now: () => TS,
+		newEventId: () => `e${++s}`
+	});
 }
 
 // Every command gets a UNIQUE idempotency key (a colliding key returns the prior receipt as DUPLICATE — so a
 // blocked publish would otherwise mask a legitimate retry, and the recorder's commands would be skipped).
 function send(
-	eng: AuthedEngineHandle,
+	eng: EngineHandle,
 	actor: ActorReference,
 	commandType: string,
 	id: string,
@@ -95,10 +124,12 @@ function send(
 		idempotencyKey: `g-idem-${seq}`,
 		payload
 	};
-	return eng.dispatch(command);
+	// The envelope declares NO issuer — the session is the claim, and declaring it again would only add something
+	// the engine could disagree with.
+	return asActor(eng, actor).dispatch(command);
 }
 
-function authorValidated(eng: AuthedEngineHandle) {
+function authorValidated(eng: EngineHandle) {
 	send(eng, AGENT, 'CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
 		pwaId: PWA,
 		name: 'Agent PWA',
@@ -118,13 +149,14 @@ function authorValidated(eng: AuthedEngineHandle) {
 	send(eng, AGENT, 'ValidatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {});
 }
 
-const publish = (eng: AuthedEngineHandle) =>
+const publish = (eng: EngineHandle) =>
 	send(eng, AGENT, 'PublishPwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', { rootPwuTypeId: ROOT });
 
 describe('floor gate + recorder compose (3b + 3c)', () => {
 	it('an AGENT PWA is blocked until the real recorded floor is SATISFIED, then publishes', async () => {
 		const eng = build();
-		seedFloorPolicies(eng); // the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
+		// the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
+		seedFloorPolicies(asActor(eng, SVC));
 		authorValidated(eng);
 
 		// Gate blocks: no floor recorded yet.
@@ -165,7 +197,7 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 		const plan = await runFloorAndPlanRecording(subject, ctx, registry);
 		expect(plan.gatePermitsTransition).toBe(true);
 		let idn = 0;
-		recordAssuranceRecordingPlan(eng, plan, {
+		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
 			actor: SVC,
 			issuedAt: TS,
 			correlationId: 'floor',

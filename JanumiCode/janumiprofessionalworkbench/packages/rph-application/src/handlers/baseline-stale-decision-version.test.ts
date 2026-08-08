@@ -9,7 +9,7 @@
 // enforces it, not just the kernel.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -17,6 +17,11 @@ import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js'
 
 const TS = '2026-07-19T00:00:00Z';
 const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
+// ONE governor issues everything, and it must be `gov-1`: the PROMOTE_BASELINE decision declares
+// `authority: human`, and since REG-F-014 a declared authority that is not the authenticated principal is
+// refused. The shared `TEST_CRED.human` resolves to `u1`, which would refuse the proposal and leave the
+// staleness assertion below true about a decision that was never made.
+const DIR = testDirectory([{ ...human, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5V00';
 const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V01';
 const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5V02';
@@ -68,7 +73,12 @@ describe('PromoteBaseline call site: stale decision version binding (RPH-GOV-003
 	function setup(staleAfterApproval: boolean) {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `evt_${++seq}`
+		}).as(DIR.credentialFor(human.actorId));
 		seedPolicy(engine, 'pol_arch');
 		dispatch(
 			'CaptureIntent',

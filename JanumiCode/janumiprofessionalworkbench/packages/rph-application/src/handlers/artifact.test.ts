@@ -16,7 +16,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-16T00:00:00Z';
-const AGENT = { actorId: 'agent-1', actorType: 'AGENT' as const, displayName: 'Producing Agent' };
 const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5A10';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A20';
 const ATTEMPT = 'attempt_01ARZ3NDEKTSV4RRFFQ69G5A30';

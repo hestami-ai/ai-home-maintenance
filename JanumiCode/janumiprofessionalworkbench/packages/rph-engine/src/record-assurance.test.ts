@@ -16,7 +16,7 @@ import {
 	type ValidatorRegistry
 } from '@janumipwb/rph-assurance';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import type { ActorReference } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
@@ -39,6 +39,17 @@ const ACTOR: ActorReference = {
 	actorType: 'SERVICE',
 	displayName: 'Assurance Service'
 };
+
+// ONE ACTOR, AND IT MUST BE THE ASSURANCE SERVICE — not the shared human credential.
+// `recordAssuranceRecordingPlan` is the one production seam that still DECLARES its issuer
+// (`issuedBy: opts.actor`), and every command it sends here declares `ACTOR`. Under the trust boundary that is
+// no longer a free-form stamp but a CHECKED CLAIM: a declared issuer disagreeing with the session's principal
+// is refused with RPH_AUTHENTICATION_REQUIRED, and the recorder throws on any non-ACCEPTED result — so a
+// `TEST_CRED.human` session (`u1`, HUMAN) would not fail an assertion, it would abort the test before a single
+// assessment was recorded. `seedFloorPolicies` declares no issuer and is content to run as whoever holds the
+// session; the assurance service standing up the policies it goes on to cite is the honest reading of who acts
+// here. (Same shape as `floor-execution-plane.test.ts`, deliberately — two fixtures over the same seam.)
+const DIR = testDirectory([{ ...ACTOR, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 
 /** Deterministic ULID-format id minter (`<prefix>_<26 digits>`) — digits are valid Crockford base32. */
 function ulidGen() {
@@ -75,7 +86,12 @@ function registry(): ValidatorRegistry {
 
 function engine() {
 	let s = 0;
-	return createEngine({ authenticate: testAuthenticator(), ontology, now: () => '2026-07-14T00:00:00Z', newEventId: () => `e${++s}` }).as(TEST_CRED.human);
+	return createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		now: () => '2026-07-14T00:00:00Z',
+		newEventId: () => `e${++s}`
+	}).as(DIR.credentialFor(ACTOR.actorId));
 }
 
 const subject: AssuranceSubject = {

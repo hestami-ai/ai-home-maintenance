@@ -13,7 +13,6 @@ import { Engine } from '../index.js';
 import { seedBelowQueuedStepState_LEGACY_ONLY, seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5K00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5K10';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5K20';

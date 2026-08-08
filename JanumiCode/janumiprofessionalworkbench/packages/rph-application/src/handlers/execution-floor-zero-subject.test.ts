@@ -20,7 +20,6 @@
 // `noOutputResult`, i.e. a payload limb A ACCEPTS. Omit it and limb A refuses these inputs first, the limb-B
 // mutation "aiProduced && ... -> false && ..." survives GREEN, and neither limb is actually killed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
-import type { AuthedEngine } from '@janumipwb/rph-application';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';

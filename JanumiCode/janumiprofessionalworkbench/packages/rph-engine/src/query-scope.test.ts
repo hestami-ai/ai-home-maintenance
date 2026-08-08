@@ -6,7 +6,7 @@
 // carry an e2e victim — the runner is vitest-only — so a guard proved ONLY end to end is a guard the mutation gate
 // cannot measure. This spec puts the same rule where the ledger can reach it.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import {
 	createEngine,
@@ -19,13 +19,37 @@ import {
 	SEED_UNDERTAKING
 } from './index.js';
 
+// ── THE SESSION THE SEED MUST RUN IN, AND WHY IT IS NOT THE SHARED CREDENTIAL ─────────────────────────────────
+// `seedWorkbench` delegates the Undertaking's graph to `driveReferenceUndertaking`, which AUTHORS ITS ACTING
+// PARTY into the payloads it sends — `producedBy`, `producer`, `introducedBy`, and, load-bearing here,
+// `authority` on `ProposeDecision`. REG-F-014 requires that declared authority to EQUAL the issuing actor, and
+// the engine now stamps the issuer from the authenticated session. So the session's principal must BE that
+// party — `owner-1`, the Undertaking Owner. Under any other principal the drive is refused at ProposeDecision
+// with RPH_AUTHORITY_INSUFFICIENT and its fail-loud `send` throws before the seed finishes.
+//
+// ⚠ The literal is duplicated from `reference-undertaking.ts`'s module-private ACTOR, which is not exported.
+// `executionInstanceId` is carried for the same reason it exists there: with it, the stamped `issuedBy` is the
+// exact value the envelope carried before the trust boundary landed, so nothing downstream of the gate moves.
+const DIR = testDirectory([
+	{
+		actorId: 'owner-1',
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
+const OWNER = DIR.credentialFor('owner-1');
+
 function build() {
 	let s = 0;
-	const engine = createEngine({ authenticate: testAuthenticator(),
+	const engine = createEngine({
+		authenticate: DIR.authenticate,
 		ontology,
 		now: () => '2026-07-12T00:00:00Z',
 		newEventId: () => `e${++s}`
-	}).as(TEST_CRED.human);
+	}).as(OWNER);
 	seedWorkbench(engine);
 	return engine;
 }

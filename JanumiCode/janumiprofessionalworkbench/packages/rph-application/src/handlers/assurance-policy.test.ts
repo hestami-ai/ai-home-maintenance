@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
 const POLICY = 'ASSURANCE_POLICY';
 
 describe('Assurance Policy lifecycle handlers (live)', () => {

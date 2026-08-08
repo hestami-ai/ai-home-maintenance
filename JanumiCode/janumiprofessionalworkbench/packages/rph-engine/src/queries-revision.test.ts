@@ -14,7 +14,7 @@
 // shaped so that a NEW helper which forgets the field is caught too, rather than only the one that forgot first.
 
 import { createEngine } from './engine.js';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { listByType, getObject, getObjectRevision } from './queries.js';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { seedWorkbench } from './seed-workbench.js';
@@ -23,6 +23,29 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 const TS = '2026-08-07T00:00:00Z';
 
+// ── THE SESSION THE SEED MUST RUN IN, AND WHY IT IS NOT THE SHARED CREDENTIAL ─────────────────────────────────
+// `seedWorkbench` delegates the Undertaking's graph to `driveReferenceUndertaking`, which AUTHORS ITS ACTING
+// PARTY into the payloads it sends — `producedBy`, `producer`, `introducedBy`, and, load-bearing here,
+// `authority` on `ProposeDecision`. REG-F-014 requires that declared authority to EQUAL the issuing actor, and
+// the engine now stamps the issuer from the authenticated session. So the session's principal must BE that
+// party — `owner-1`, the Undertaking Owner. Under any other principal the drive is refused at ProposeDecision
+// with RPH_AUTHORITY_INSUFFICIENT and its fail-loud `send` throws before the seed finishes.
+//
+// ⚠ The literal is duplicated from `reference-undertaking.ts`'s module-private ACTOR, which is not exported.
+// `executionInstanceId` is carried for the same reason it exists there: with it, the stamped `issuedBy` is the
+// exact value the envelope carried before the trust boundary landed, so nothing downstream of the gate moves.
+const DIR = testDirectory([
+	{
+		actorId: 'owner-1',
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
+const OWNER = DIR.credentialFor('owner-1');
+
 describe('PER-4 — the read boundary carries the revision it read at', () => {
 	let store: SqliteStorageAdapter;
 	let engine: ReturnType<ReturnType<typeof createEngine>['as']>;
@@ -30,7 +53,13 @@ describe('PER-4 — the read boundary carries the revision it read at', () => {
 	beforeAll(() => {
 		let n = 0;
 		store = new SqliteStorageAdapter({ now: () => TS });
-		engine = createEngine({ authenticate: testAuthenticator(), ontology, store, now: () => TS, newEventId: () => `evt_${++n}` }).as(TEST_CRED.human);
+		engine = createEngine({
+			authenticate: DIR.authenticate,
+			ontology,
+			store,
+			now: () => TS,
+			newEventId: () => `evt_${++n}`
+		}).as(OWNER);
 		seedWorkbench(engine);
 	});
 

@@ -14,6 +14,7 @@ import {
 	listPwuTypes,
 	seedPolicyLibrary,
 	seedWorkbench,
+	type AuthedEngineHandle,
 	type EngineHandle
 } from '@janumipwb/rph-engine';
 import { ontology, validateOntology } from '@janumipwb/rph-product-realization-pwa';
@@ -24,6 +25,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { monotonicFactory } from 'ulid';
 import {
 	AGENT_CREDENTIAL,
+	REFERENCE_OWNER_CREDENTIAL,
 	SESSION_CREDENTIAL,
 	SYSTEM_CREDENTIAL,
 	standaloneAuthenticator
@@ -122,7 +124,7 @@ export function openWorkbench(dbPath?: string): EngineHandle {
 	// ⚠ SYSTEM, NOT THE USER. Seeding runs at construction before any session exists, and it is ~80% of all
 	// dispatches by volume. Handing it the human's credential would put a fiction into `createdBy` on every
 	// seeded object and would defeat D-2 at the largest site in the system.
-	if (engine.readAllEvents().length === 0) seedWorkbench(engine.as(SYSTEM_CREDENTIAL));
+	if (engine.readAllEvents().length === 0) seedWorkbench(engine.as(REFERENCE_OWNER_CREDENTIAL));
 	// A DURABLE HOST SHALL RECOVER ITS PENDING OUTBOX AT STARTUP — `EngineHandle.recoverOutbox`, WP-2-007. The
 	// obligation has existed since the engine gained a durable store; until W-2 the demo had none, so it bound
 	// nothing and no one noticed. Measured before this line existed: a restart left **300** entries PENDING and
@@ -158,7 +160,7 @@ export function resetEngine(seed: 'reference' | 'empty'): void {
 	// Always seed the policy library (floor + additive) so the policy manager + picker are populated even in the
 	// authoring-from-scratch ('empty') flow; 'reference' additionally authors the published Product Realization PWA.
 	// SYSTEM, for the same reason as the boot seed: this runs with no user session in scope.
-	if (seed === 'reference') seedWorkbench(handle.as(SYSTEM_CREDENTIAL));
+	if (seed === 'reference') seedWorkbench(handle.as(REFERENCE_OWNER_CREDENTIAL));
 	else seedPolicyLibrary(handle.as(SYSTEM_CREDENTIAL));
 }
 
@@ -185,7 +187,9 @@ function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
 		targetAggregateType: input.targetAggregateType,
 		targetAggregateId: input.targetAggregateId,
 		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
-		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
+		// NO `issuedBy`. The engine stamps the authenticated principal (REG-D-027). This line used to
+		// hardcode `ui-user` — the SIXTH such site, and the one that would have refused every action in
+		// the running app once the session became `local-professional`.
 		correlationId,
 		idempotencyKey: TEST_MODE
 			? `ui-idem-${cmdSeq}`
@@ -282,13 +286,19 @@ export interface ConversationEntry {
 export function recordConversation(
 	pwaId: string,
 	entries: ConversationEntry[],
-	engine: EngineHandle = getEngine(),
+	// ⚠ AN AUTHED HANDLE, AND THE CALLER'S SESSION IS THE POINT (D-1, defect C).
+	// This used to re-bind to SESSION_CREDENTIAL. Inside an authoring turn that is WRONG: the turn's fork runs
+	// as the AGENT, so the conversation object would be created in the fork by the agent and re-created on
+	// canonical by the human — and `commitAuthoringTurn` guards the replay with per-object CONTENT HASHES, so
+	// the two would diverge and the turn would fail its own postcondition. Dispatching through the handle it is
+	// GIVEN keeps the fork write and the canonical replay under one principal.
+	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL),
 	correlationId = 'ui'
 ): void {
 	if (entries.length === 0) return;
 	const existing = getConversation(engine, pwaId);
 	const conversationId = existing?.id ?? mintUiId('conv');
-	const result = engine.as(SESSION_CREDENTIAL).dispatch(
+	const result = engine.dispatch(
 		uiCommand(
 			{
 				commandType: 'AppendConversationEntries',

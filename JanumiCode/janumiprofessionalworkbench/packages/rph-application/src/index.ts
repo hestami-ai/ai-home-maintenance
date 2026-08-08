@@ -1,4 +1,3 @@
-import type { AuthedEngine } from '@janumipwb/rph-application';
 // @janumipwb/rph-application — the command/query core. Depends on the StorageAdapter port, not on any
 // concrete store.
 export const RPH_APPLICATION_VERSION = '0.0.0';

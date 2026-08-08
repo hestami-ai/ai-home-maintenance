@@ -25,11 +25,30 @@
 // This census does not fix it. It pins the size of it so the number can only fall, and so the next author sees
 // the mismatch as a measured fact rather than rediscovering it through a refusal three layers away.
 import { MAPPED_PWU_KINDS } from '@janumipwb/rph-projections';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createEngine, getObject, type AuthedEngineHandle } from './index.js';
 import { seedWorkbench } from './seed-workbench.js';
+
+// ── THE SEED RUNS AS THE UNDERTAKING OWNER (D-1) ─────────────────────────────────────────────────────────────
+// `seedWorkbench` -> `driveReferenceUndertaking` proposes each promotion Decision with
+// `authority: { actorId: 'owner-1', actorType: 'HUMAN' }`, and REG-F-014 refuses a Decision whose declared
+// authority is not its issuer. The drive used to assert that identity in the envelope (`issuedBy: ACTOR`); the
+// SESSION carries it now, so only a session that IS `owner-1` can seed. As `u1` the first `ProposeDecision`
+// refuses RPH_AUTHORITY_INSUFFICIENT and the fail-loud drive throws inside `beforeAll` — which for a CENSUS is
+// the worst failure mode available, since every count below would then be read off a half-built store.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+const OWNER_CRED = DIR.credentialFor(OWNER.actorId);
 
 /** Every PWU kind the CATALOG scopes a policy to. */
 function catalogKinds(): string[] {
@@ -70,11 +89,12 @@ describe('PWU kind vocabulary: catalog vs seeded work (REG-F-028)', () => {
 
 	beforeAll(() => {
 		let n = 0;
-		engine = createEngine({ authenticate: testAuthenticator(),
+		engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		}).as(TEST_CRED.human);
+		}).as(OWNER_CRED);
 		seedWorkbench(engine);
 		seeded = seededKinds(engine);
 		typeIds = pwuTypeIds(engine);

@@ -22,7 +22,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
 
 const TS = '2026-08-02T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H6500';
 
 describe('REG-F-011 — a malformed envelope is REFUSED, never thrown (Engine.dispatch returns)', () => {

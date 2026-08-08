@@ -31,7 +31,7 @@
 //   4. A list invented for §20, or for a floor policy       -> the "carries NEITHER" assertion reddens.
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { createEngine, getObject, seedAdditivePolicies, seedFloorPolicies } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { readFileSync } from 'node:fs';
@@ -40,7 +40,6 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
-const ACTOR: ActorReference = { actorId: 'census', actorType: 'HUMAN', displayName: 'Census' };
 
 /** A seeded engine plus a raw dispatcher, so the CONTROL can create a policy the seeds cannot. */
 function seededEngine() {

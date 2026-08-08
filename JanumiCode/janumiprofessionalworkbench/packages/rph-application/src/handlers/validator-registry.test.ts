@@ -8,7 +8,7 @@
 //   1. An arrow removed from `m2-transitions.json`  -> its ACCEPTED case reddens.
 //   2. A source state widened (e.g. DEGRADED -> ACTIVE allowed from DISABLED) -> the matching refusal reddens.
 //   3. The whole registry reverted -> every case here reddens, and `state-reachability` un-closes.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -16,7 +16,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const actor: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const VID = 'vld_01ARZ3NDEKTSV4RRFFQ69G5V10';
 
 describe('ValidatorRegistryEntry.status — the five declared arrows', () => {

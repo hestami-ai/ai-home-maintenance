@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-19T00:00:00Z';
-const human = { actorId: 'arch-1', actorType: 'HUMAN' as const, displayName: 'Architect' };
 const authority = {
 	authorityId: 'auth_arch',
 	authorityType: 'ORGANIZATIONAL_ROLE' as const,

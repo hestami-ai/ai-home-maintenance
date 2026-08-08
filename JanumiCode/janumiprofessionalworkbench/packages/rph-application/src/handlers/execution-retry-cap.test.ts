@@ -11,7 +11,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5M00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5M10';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5M20';

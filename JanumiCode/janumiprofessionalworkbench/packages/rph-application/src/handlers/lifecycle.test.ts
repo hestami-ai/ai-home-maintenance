@@ -3,9 +3,8 @@
 // (GOV-001/002); (2) a baseline promotes to AUTHORITATIVE only through the full canPromoteBaseline gate
 // (effective promotion decision + a SATISFIED required assessment + version pinning) and is rejected when the
 // required assessment is not satisfied ("no green without assurance", INV-20).
-import type { DomainCommand } from '@janumipwb/rph-contracts';
-import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -14,19 +13,31 @@ import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js'
 const TS = '2026-07-12T00:00:00Z';
 const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
 const agent = { actorId: 'agent-1', actorType: 'AGENT' as const, displayName: 'Agent' };
+// This suite dispatches AS BOTH actors: the GOV-001/002 proof needs an AGENT-authored Decision (REG-F-014 means
+// the issuer IS the recorded authority), while everything else is the governor's work. A two-principal
+// directory is therefore the fixture, not the single shared credential.
+const DIR = testDirectory([
+	{ ...human, tenantId: 't', organizationId: 'o' },
+	{ ...agent, tenantId: 't', organizationId: 'o' }
+]);
 const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5FAV';
 const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5FB0';
 
 describe('Execution / assurance / governance / decomposition handlers (live)', () => {
 	let store: SqliteStorageAdapter;
-	let engine: AuthedEngine;
+	let engine: Engine;
 	let seq = 0;
+
+	/** The dispatching session for an actor. The identity is the SESSION now, never a command field. */
+	function sessionFor(actor: ActorReference) {
+		return engine.as(DIR.credentialFor(actor.actorId));
+	}
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
-		seedPolicy(engine, 'pol_arch'); // makeSatisfiedAssessment cites pol_arch — now it must exist
+		engine = new Engine({ authenticate: DIR.authenticate, store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		seedPolicy(sessionFor(human), 'pol_arch'); // makeSatisfiedAssessment cites pol_arch — now it must exist
 		// Seed an intent + PWU (the PWU is the assessment subject + baseline item).
 		dispatch(
 			'CaptureIntent',
@@ -36,7 +47,7 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 				ontologyId: 'o',
 				ontologyVersion: '1'
 			},
-			{ targetAggregateId: INTENT_ID, targetAggregateType: 'INTENT', issuedBy: human }
+			{ targetAggregateId: INTENT_ID, targetAggregateType: 'INTENT' }
 		);
 		dispatch(
 			'ProposePwu',
@@ -64,7 +75,15 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		);
 	});
 
-	function dispatch(commandType: string, payload: unknown, over: Partial<DomainCommand> = {}) {
+	// `issuedBy` is the ACTOR THIS SCENARIO ACTS AS — it selects the SESSION, and is deliberately not written
+	// onto the envelope: the engine stamps the authenticated principal, and a declared issuer that disagreed
+	// with it would be refused (which is the rule this suite relies on, not one it may weaken).
+	function dispatch(
+		commandType: string,
+		payload: unknown,
+		over: Partial<DomainCommand> = {},
+		issuedBy: ActorReference = human
+	) {
 		const n = ++seq;
 		const command: DomainCommand = {
 			commandId: `cmd-${n}`,
@@ -78,7 +97,7 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 			payload,
 			...over
 		};
-		return engine.dispatch(command);
+		return sessionFor(issuedBy).dispatch(command);
 	}
 
 	function statusOf(id: string, field = 'status'): string {
@@ -219,7 +238,8 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 				rationale: 'r',
 				authority: agent
 			},
-			{ targetAggregateId: DEC, targetAggregateType: 'DECISION', issuedBy: agent }
+			{ targetAggregateId: DEC, targetAggregateType: 'DECISION' },
+			agent
 		);
 		expect(proposed.status, JSON.stringify(proposed.error)).toBe('ACCEPTED');
 		const r = dispatch(

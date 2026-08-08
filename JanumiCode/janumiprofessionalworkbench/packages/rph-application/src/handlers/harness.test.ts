@@ -14,7 +14,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-19T00:00:00Z';
-const human = { actorId: 'coord-1', actorType: 'HUMAN' as const, displayName: 'Coordinator' };
 const authority = {
 	authorityId: 'auth_coord',
 	authorityType: 'ORGANIZATIONAL_ROLE' as const,

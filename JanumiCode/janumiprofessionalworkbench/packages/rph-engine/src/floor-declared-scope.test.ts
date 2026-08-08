@@ -26,7 +26,7 @@ import {
 	ProfessionalWorkObjectTypeSchema
 } from '@janumipwb/rph-contracts';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEngine, getObject, type AuthedEngineHandle } from './index.js';
@@ -34,6 +34,25 @@ import { driveReferenceUndertaking } from './reference-undertaking.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
 const FLOOR_IDS = Object.values(FLOOR_POLICY_IDS);
+
+// THE SECOND CREATION PATH NAMES ITS OWN ACTOR, and that decides the session for both.
+// `driveReferenceUndertaking` promotes baselines with a `ProposeDecision` declaring `authority: owner-1`, and
+// REG-F-014 refuses a Decision whose declared authority is not its issuer — so under the shared `TEST_CRED.human`
+// (`u1`) the drive throws in `beforeEach` and this gate never runs on the path it was written to cover. Which is the
+// failure this file already documents once: a gate that reaches one of two writers is not a gate. `seedFloorPolicies`
+// declares no issuer and is indifferent, so ONE registered principal — the undertaking owner, exactly the
+// `ActorReference` the drive used to declare for itself — serves both paths.
+const OWNER = 'owner-1';
+const DIR = testDirectory([
+	{
+		actorId: OWNER,
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
+		executionInstanceId: 'exec-production',
+		tenantId: 'tenant-test',
+		organizationId: 'org-test'
+	}
+]);
 
 /**
  * EVERY PATH THAT CREATES THE FLOOR POLICIES — and there are two, which is the correction this file needed.
@@ -63,11 +82,12 @@ describe.each(CREATION_PATHS)(
 
 		beforeEach(() => {
 			let n = 0;
-			engine = createEngine({ authenticate: testAuthenticator(),
+			engine = createEngine({
+				authenticate: DIR.authenticate,
 				ontology,
 				now: () => '2026-08-05T00:00:00Z',
 				newEventId: () => `evt_${++n}`
-			}).as(TEST_CRED.human);
+			}).as(DIR.credentialFor(OWNER));
 			run(engine);
 		});
 

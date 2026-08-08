@@ -25,7 +25,6 @@ interface DispatchLike {
 	dispatch(command: DomainCommand): { readonly status: string; readonly error?: unknown };
 }
 
-const SEED_ACTOR = { actorId: 'seed-1', actorType: 'HUMAN' as const, displayName: 'Policy Seeder' };
 const SEED_TS = '2026-07-12T00:00:00Z';
 
 function policyCommand(
@@ -239,7 +238,22 @@ export interface RecordFloorArgs {
  */
 export function recordFloorAssessment(engine: DispatchLike, args: RecordFloorArgs): void {
 	const now = args.now ?? SEED_TS;
-	const actor = args.actor ?? SEED_ACTOR;
+	// ⚠ `args.actor` IS NOW A DEAD KNOB AND MUST NOT BE SILENTLY IGNORED (D-1). Before the trust boundary this
+	// helper stamped `issuedBy: actor`, so a caller could record an assessment AS a distinct assessor — which is
+	// exactly what an ASR-13 independence arrangement needs. The engine now takes the actor from the SESSION, so
+	// the knob does nothing, and a test passing a separate assessor would silently get the caller's own
+	// principal: an independence check could pass with assessor == producer, which is the control-that-cannot-
+	// fail shape this repository keeps recording.
+	//
+	// Refusing loudly rather than dropping it: the caller must hand in an `engine` already bound to the
+	// assessor's session instead. Removing the field would have hidden the requirement.
+	if (args.actor) {
+		throw new Error(
+			'recordFloorAssessment: `actor` no longer selects the issuer — the engine stamps it from the ' +
+				'session. Pass an `engine` bound to that assessor (engine.as(cred)) instead, or the independence ' +
+				'arrangement you intend will not exist.'
+		);
+	}
 	let n = 0;
 	const send = (
 		commandType: string,

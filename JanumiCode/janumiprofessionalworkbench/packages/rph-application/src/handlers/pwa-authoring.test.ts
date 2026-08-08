@@ -3,15 +3,17 @@
 // Undertaking can only instantiate a PUBLISHED PWA. Also proves the CON-009 ownership binding on ProposePwu.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { TEST_CRED, testAuthenticator, testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
+// Three of the four suites below act as ONE human and never assert who that is, so they take the shared
+// operator credential. The floor-gate suite is the exception — WHO authored the PWA is the variable its whole
+// rule turns on — and it registers its own three-principal directory.
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'des-1', actorType: 'HUMAN' as const, displayName: 'Designer' };
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
 const ROOT_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P10';
 const UND = 'und_01ARZ3NDEKTSV4RRFFQ69G5P30';
@@ -612,6 +614,19 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		actorType: 'SERVICE',
 		displayName: 'Assurance'
 	};
+	// Declared here rather than beside the waiver helpers that use them: the directory below has to name every
+	// principal this suite acts as, and a `const` referenced before its initializer is a TDZ error.
+	const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
+	const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5R20';
+	// THE ACTOR IS THE VARIABLE UNDER TEST HERE. §8.4's floor applies to an AI-produced PWA — `createdBy`
+	// AGENT/MODEL — so the agent that authors, the service that assesses it, and the human that waives must each
+	// dispatch through their OWN session. One shared credential would make every PWA human-authored and the
+	// gate would never fire; the suite would pass by never arranging the thing it names.
+	const DIR = testDirectory([
+		{ ...AGENT, tenantId: 't', organizationId: 'o' },
+		{ ...SVC, tenantId: 't', organizationId: 'o' },
+		{ ...HUMAN, tenantId: 't', organizationId: 'o' }
+	]);
 	const AI_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5R00';
 	const AI_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R10';
 	const SCHEMA = 'floor.schema-invariant';
@@ -619,16 +634,20 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	const REVIEW = 'floor.reasoning-review';
 
 	let store: SqliteStorageAdapter;
-	let engine: AuthedEngine;
+	let engine: Engine;
 	let seq = 0;
 	let asmtSeq = 0;
+
+	/** The dispatching session for an actor — the identity is now the session, never a command field. */
+	const as = (a: ActorReference) => engine.as(DIR.credentialFor(a.actorId));
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmtSeq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
-		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — now they must exist
+		engine = new Engine({ authenticate: DIR.authenticate, store, now: () => TS, newEventId: () => `e${++seq}` });
+		// Seeded by the human: policy creation is workbench setup, not part of the AI-authored graph under test.
+		seedFloorPolicies(as(HUMAN)); // the floor assessments below cite floor.* policies — now they must exist
 	});
 
 	function d(
@@ -650,7 +669,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			idempotencyKey: `k-${n}`,
 			payload
 		};
-		return engine.dispatch(command);
+		return as(actor).dispatch(command);
 	}
 	const pub = () =>
 		(store.loadObject(AI_PWA)?.state as { publicationStatus: string }).publicationStatus;
@@ -856,8 +875,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		expect(pub()).toBe('VALIDATED');
 	});
 
-	const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
-	const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5R20';
+	// (HUMAN and WAIVER are declared at the top of this describe — the credential directory has to name them.)
 
 	/** Request + grant an EFFECTIVE waiver naming an exact (policy, criterion) per DOC-004 §12.2. */
 	function grantWaiver(over: { policyId: string; criterionId: string; findingIds: string[] }) {

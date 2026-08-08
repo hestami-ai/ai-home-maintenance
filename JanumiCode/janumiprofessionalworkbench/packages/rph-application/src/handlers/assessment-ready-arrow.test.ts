@@ -27,7 +27,6 @@ import { commitState, makeEvent, type HandlerContext } from './kit.js';
 
 const TS = '2026-08-04T00:00:00Z';
 const LATER = '2026-08-05T12:00:00Z';
-const human: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const REVIEWER: ActorReference = {
 	actorId: 'reviewer-7',
 	actorType: 'AGENT',

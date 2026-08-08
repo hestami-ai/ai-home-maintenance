@@ -24,21 +24,43 @@
 // events. If the fold and the write-side disagree, one of them is wrong — and that is a real finding either way.
 // The Work view's whole job is to describe those objects to a surface.
 import { rebuildProjection, workProjector, type WorkView } from '@janumipwb/rph-projections';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING } from './index.js';
 
+// ── THE DRIVE RUNS AS THE UNDERTAKING OWNER (D-1) ────────────────────────────────────────────────────────────
+// `driveReferenceUndertaking` proposes each promotion Decision with `authority: { actorId: 'owner-1',
+// actorType: 'HUMAN' }`, and REG-F-014 refuses a Decision whose declared authority is not its issuer. The drive
+// used to assert that identity in the envelope (`issuedBy: ACTOR`); the SESSION carries it now, so only a
+// session that IS `owner-1` can drive it. As `u1` the first `ProposeDecision` refuses
+// RPH_AUTHORITY_INSUFFICIENT, the fail-loud drive throws, and there is no event log to fold.
+//
+// It is load-bearing HERE beyond just getting green: the two baselines this file's `qualifiedSuccess` assertion
+// depends on are promoted by exactly those decisions.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+const OWNER_CRED = DIR.credentialFor(OWNER.actorId);
+
 describe('RPH-PER-007 — projection rebuild', () => {
 	function build() {
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: (() => {
 				let s = 0;
 				return () => `evt_${++s}`;
 			})()
-		}).as(TEST_CRED.human);
+		}).as(OWNER_CRED);
 		driveReferenceUndertaking(engine);
 		return engine;
 	}

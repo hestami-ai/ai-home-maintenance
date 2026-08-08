@@ -27,7 +27,7 @@ function harness() {
 	const store = new SqliteStorageAdapter({ now: () => TS });
 	let seq = 0;
 	const engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
-	const d = (commandType: string, id: string, type: string, payload: unknown, by: ActorReference = HUMAN) => {
+	const d = (commandType: string, id: string, type: string, payload: unknown, _by: ActorReference = HUMAN) => {
 		const n = ++seq;
 		const command: DomainCommand = {
 			commandId: `c-${n}`,

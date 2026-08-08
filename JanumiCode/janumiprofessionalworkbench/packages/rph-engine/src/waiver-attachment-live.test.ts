@@ -13,7 +13,7 @@
 //
 // This drives a REAL `RequestWaiver` through the command bus and folds the REAL event log, so the projection is
 // tested against what the engine actually emits. It is the control the hand-built test cannot be.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { Engine,
 	type AuthedEngine
@@ -23,7 +23,6 @@ import { buildAssuranceView } from '@janumipwb/rph-projections';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const TS = '2026-08-04T00:00:00Z';
-const ACTOR: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Lead' };
 const POLICY_A = 'pol_01ARZ3NDEKTSV4RRFFQ69JB100';
 const POLICY_B = 'pol_01ARZ3NDEKTSV4RRFFQ69JB200';
 const SUBJECT = 'pwu_01ARZ3NDEKTSV4RRFFQ69JB300';

@@ -2,7 +2,7 @@
 // Proves every READ + PROPOSE path and the governance guards — this is the surface the Pi agent will call, so if
 // these pass, the agent's tools are exercising a verified layer and only the LLM wiring remains to test live.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { createEngine, type AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { monotonicFactory } from 'ulid';
@@ -12,8 +12,34 @@ import { PwaAuthoringBroker } from './broker.js';
 const TS = '2026-07-12T00:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
 
+// TWO SESSIONS, BECAUSE THE SEAM THIS FILE EXERCISES IS "AGENT PROPOSES, HUMAN PUBLISHES".
+//
+// The broker holds an engine bound to an AGENT credential — that identity is what the broker IS, and the last
+// test here turns on the split: a PWA whose `createdBy` is an AGENT is AI-produced, so §8.4's de minimis floor
+// would refuse its publication. The setup human creates the PWA and drives the publication FSM (which the
+// broker deliberately does not expose); the broker authors under it.
+const TENANCY = { tenantId: 'tenant-test', organizationId: 'org-test' } as const;
+/** The human who owns the workbench — the `raw()` dispatcher's identity, unchanged from this file's original. */
+const SETUP = { actorId: 'setup', actorType: 'HUMAN' as const, displayName: 'Setup', ...TENANCY };
+/**
+ * ⚠ THE BROKER'S OWN IDENTITY, AND IT MUST MATCH EXACTLY. `PwaAuthoringBroker` still writes
+ * `issuedBy: this.actor` onto every command it builds, defaulting to precisely this actor. A session bound to
+ * anyone else would be REFUSED — the broker would be declaring an issuer it is not — so this fixture registers
+ * the actor the production default names rather than papering over it with a permissive credential.
+ */
+const AUTHORING_AGENT = {
+	actorId: 'jpwb-authoring-agent',
+	actorType: 'AGENT' as const,
+	displayName: 'JPWB Authoring Agent',
+	...TENANCY
+};
+const DIR = testDirectory([SETUP, AUTHORING_AGENT]);
+
 describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer', () => {
+	/** The broker's session: the authoring AGENT. */
 	let engine: AuthedEngineHandle;
+	/** The setup/publication session: the human. `raw()` dispatches through this one. */
+	let setup: AuthedEngineHandle;
 	let broker: PwaAuthoringBroker;
 	let mintSeq: number;
 	let evtSeq: number;
@@ -24,7 +50,8 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		return `${prefix}_${String(mintSeq).padStart(26, '0')}`;
 	}
 
-	/** Dispatch a raw command (used to set up a DRAFT PWA and to drive the publication FSM the broker won't). */
+	/** Dispatch a raw command AS THE HUMAN (used to set up a DRAFT PWA and to drive the publication FSM the
+	 *  broker won't). The identity is the session — no `issuedBy` on the envelope. */
 	function raw(commandType: string, id: string, type: string, payload: unknown) {
 		evtSeq += 1;
 		const command: DomainCommand = {
@@ -38,13 +65,20 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 			idempotencyKey: `setup-idem-${evtSeq}`,
 			payload
 		};
-		return engine.dispatch(command);
+		return setup.dispatch(command);
 	}
 
 	beforeEach(() => {
 		mintSeq = 0;
 		evtSeq = 0;
-		engine = createEngine({ authenticate: testAuthenticator(), ontology, now: () => TS, newEventId: () => `e${++evtSeq}` }).as(TEST_CRED.human);
+		const core = createEngine({
+			authenticate: DIR.authenticate,
+			ontology,
+			now: () => TS,
+			newEventId: () => `e${++evtSeq}`
+		});
+		setup = core.as(DIR.credentialFor(SETUP.actorId));
+		engine = core.as(DIR.credentialFor(AUTHORING_AGENT.actorId));
 		raw('CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
 			pwaId: PWA,
 			name: 'Ops PWA',

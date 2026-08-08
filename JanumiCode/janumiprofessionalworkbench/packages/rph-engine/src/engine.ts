@@ -6,17 +6,12 @@
 // ONLY this seam; they never reach into the individual packages.
 import {
 	Engine,
-	type BatchResult,
 	type EventSubscriber,
-	type ObjectPostcondition,
-	type AuthedEngine,
-	type RevisionPrecondition
+	type AuthedEngine
 } from '@janumipwb/rph-application';
 import type {
 	AssessmentCriterion,
 	EvidenceRequirement,
-	CommandResult,
-	DomainCommand,
 	DomainEvent,
 	Frozen
 } from '@janumipwb/rph-contracts';

@@ -13,7 +13,7 @@
 // suite twice. So every refusal case below arranges: an ACTIVE plan, an open PWU, no binding (out of scope) or an
 // authorized one, a QUEUED step, and no unfinished predecessor. The ONLY thing left that can refuse is the input
 // readiness limb, and the mutants named in the enforcement register prove it.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -22,7 +22,6 @@ import { STEP_COMMAND_SPECS } from '@janumipwb/rph-domain';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-26T00:00:00.000Z';
-const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69HC100';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69HC110';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69HC120';

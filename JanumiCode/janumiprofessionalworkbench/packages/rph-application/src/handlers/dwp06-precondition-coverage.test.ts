@@ -4,7 +4,7 @@
 // `submitBaselineForReview` (a Baseline.status NONE site, outside DWP-04's six) — which this file covers. The flip
 // itself needed ZERO edits to existing assertions; this is the one gap it revealed, now closed with the same
 // kill-test + mutation-red-proof discipline as every other JAN-CMDPRE site.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -12,7 +12,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-24T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'User' };
 
 describe('DWP-06 — submitBaselineForReview (the gap the required-precondition flip surfaced)', () => {
 	let store: SqliteStorageAdapter;

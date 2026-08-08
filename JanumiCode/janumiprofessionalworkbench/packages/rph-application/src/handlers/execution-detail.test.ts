@@ -11,7 +11,6 @@ import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtu
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5FAV';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5FB0';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5FC0';

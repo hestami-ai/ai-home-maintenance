@@ -32,7 +32,7 @@
 // the guard's CONTENT_AVAILABLE limb is a null-check that `{}` passes.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import {
 	ENFORCEMENT_REGISTER,
@@ -48,6 +48,11 @@ import { floorValidatorResult } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-01T00:00:00Z';
 const actor: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
+// ONE PRINCIPAL, AND IT MUST BE `actor` ITSELF. Every promotion arrangement here proposes a Decision recording
+// `authority: actor`, and REG-F-014 refuses a declared authority that is not the issuer — so a session for some
+// other operator would refuse the ARRANGING step and every probe below would report a refusal it never reached
+// the site to earn. Registering the Governor as the scenario's cast keeps the arrangement the one it claims.
+const DIR = testDirectory([{ ...actor, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5V00';
 const PARENT = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V01';
@@ -91,7 +96,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			commandSchemaVersion: 1,
 			targetAggregateType: aggType,
 			targetAggregateId: id,
-			issuedAt: TS,
+			issuedAt: TS,
 			correlationId: 'evd-disclosure',
 			idempotencyKey: `k-${n}`,
 			payload
@@ -115,7 +120,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			commandSchemaVersion: 1,
 			targetAggregateType: aggType,
 			targetAggregateId: id,
-			issuedAt: TS,
+			issuedAt: TS,
 			correlationId: 'evd-disclosure',
 			idempotencyKey: `k-${n}`,
 			payload,
@@ -647,7 +652,12 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `evt_${++seq}`
+		}).as(DIR.credentialFor(actor.actorId));
 		ok(
 			dispatch(
 				'CaptureIntent',

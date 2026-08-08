@@ -7,7 +7,7 @@
 // advanceStatus actually hands a predicate the loaded state + payload + a working (and copy-on-read) reader —
 // the critique-B4 signature, which stays unused by production predicates until DWP-08, so an untested wiring
 // would be a promise, not a ruling.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -25,7 +25,6 @@ import {
 import { advanceStatus, preconditionReader, type HandlerContext } from './kit.js';
 
 const TS = '2026-07-23T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'User' };
 
 const command = (commandType = 'AdvanceThing', targetAggregateId = 'thing-1'): DomainCommand => ({
 	commandId: 'c-1',

@@ -10,7 +10,6 @@ import { Engine } from './index.js';
 
 const ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
 const INTENT_ID = `int_${ULID}`;
-const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Alice' };
 
 function captureIntent(over: Partial<DomainCommand> = {}): DomainCommand {
 	return {

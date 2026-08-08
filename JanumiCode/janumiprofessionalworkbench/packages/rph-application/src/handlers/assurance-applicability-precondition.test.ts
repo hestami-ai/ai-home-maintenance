@@ -9,7 +9,7 @@
 // It is now wired. Which means the whole suite passing proves nothing on its own: an enforced check that never
 // fires and an unenforced one are indistinguishable from a green run. This file is the predicted red — it asserts
 // the refusal HAPPENS, names the outcome that causes it, and asserts the two outcomes that must NOT cause it.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -18,7 +18,6 @@ import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const human: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5N10';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5N11';
 

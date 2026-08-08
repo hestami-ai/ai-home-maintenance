@@ -19,18 +19,49 @@
 // distinct: `issuedBy` is WHO IT IS ATTRIBUTED TO, `causationId` is WHAT CAUSED IT.
 
 import { createEngine, seedWorkbench } from '@janumipwb/rph-engine';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 
 const TS = '2026-08-07T00:00:00Z';
 
+// ── WHO THE SEED RUNS AS, AND WHY IT IS NOT A FREE CHOICE ───────────────────────────────────────────────────
+// The engine now stamps `issuedBy` from the authenticated session (REG-D-027), so this file must name the
+// identity the seed acts under instead of letting the seed author one. It is CONSTRAINED, not arbitrary:
+// `seedWorkbench` runs the Reference Undertaking drive, which sends `ProposeDecision` with
+// `authority: { actorId: 'owner-1', actorType: 'HUMAN' }` — a literal in PRODUCTION
+// (`packages/rph-engine/src/reference-undertaking.ts`) — and REG-F-014's guard REJECTS a Decision whose
+// declared authority is not its issuer. So the drive completes only under a session that IS the Undertaking
+// Owner — a production literal now dictating who may seed. That coupling is a defect in the SEED, not in this
+// file, and it is reported rather than patched here (the demo seeds as SERVICE `jpwb-seed` and cannot satisfy
+// it at all).
+//
+// `executionInstanceId` is carried so the stamped actor is byte-identical to the `ActorReference` the drive
+// used to stamp for itself before the trust boundary landed — nothing this file observes moves.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+
 /** Drive the shipped seed and return its committed events. */
 function drive() {
 	let n = 0;
 	const store = new SqliteStorageAdapter({ now: () => TS });
-	seedWorkbench(createEngine({ authenticate: testAuthenticator(), ontology, store, now: () => TS, newEventId: () => `evt_${++n}` }).as(TEST_CRED.human));
+	const engine = createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		store,
+		now: () => TS,
+		newEventId: () => `evt_${++n}`
+	}).as(DIR.credentialFor(OWNER.actorId));
+	seedWorkbench(engine);
 	return store.readAllEvents() as unknown as {
 		eventType: string;
 		commandId?: string;

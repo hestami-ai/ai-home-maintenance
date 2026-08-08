@@ -17,7 +17,7 @@
 // THE SHAPING MIRRORS THE PRODUCTION LOADER deliberately, including calling `attemptsMadeFrom` per step: if this
 // test built the count its own way it would prove that MY arithmetic agrees with the engine, not that the shipped
 // read-model does.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -27,7 +27,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-26T00:00:00Z';
-const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69HB300';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69HB310';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69HB320';

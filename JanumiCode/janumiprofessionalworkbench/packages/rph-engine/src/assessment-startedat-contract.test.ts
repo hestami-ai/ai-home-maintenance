@@ -25,13 +25,12 @@
 // `commitState` — the single seam every write passes through — so no handler can opt out by omission.
 import { AssuranceAssessmentSchema } from '@janumipwb/rph-contracts';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import { createEngine, getObject } from './index.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
-const ACTOR: ActorReference = { actorId: 'inc0', actorType: 'HUMAN', displayName: 'Increment 0' };
 const FLOOR_POLICY = 'floor.schema-invariant';
 const ASSESSMENT = 'asmt_01ARZ3NDEKTSV4RRFFQ69G5Z90';
 const SUBJECT = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Z91';

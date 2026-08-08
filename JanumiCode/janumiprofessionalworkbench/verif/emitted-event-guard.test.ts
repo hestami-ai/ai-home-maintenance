@@ -14,13 +14,12 @@
 import { readFileSync } from 'node:fs';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { Engine } from '@janumipwb/rph-application';
 import { LEDGER, liveness } from './emitted-event-guard.js';
 
 const TS = '2026-08-04T00:00:00Z';
-const ACTOR: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69JA001';
 
 describe('the emitted-event guard is alive', () => {

@@ -15,23 +15,47 @@
 // This file executes them, against the REAL seeded workbench rather than a hand-built fixture, so what it proves
 // is a property of the shipping data and not of a mock.
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createEngine, type AuthedEngineHandle } from './index.js';
 import { requireGoverningPolicies, selectGoverningPolicies } from './governing-policies.js';
 import { REFERENCE_UNDERTAKING } from './reference-undertaking.js';
 import { seedWorkbench } from './seed-workbench.js';
 
+// ── THE SEED RUNS AS THE UNDERTAKING OWNER, AND NOT AS THE DEFAULT TEST HUMAN (D-1) ──────────────────────────
+// `seedWorkbench` -> `driveReferenceUndertaking` proposes each promotion Decision with
+// `authority: { actorId: 'owner-1', actorType: 'HUMAN' }`, and REG-F-014 refuses a Decision whose declared
+// authority is not its issuer. Until the trust boundary landed the drive asserted that identity in the envelope
+// (`issuedBy: ACTOR`) so the two agreed by construction; the SESSION carries the claim now, so the drive is
+// dispatchable only by a session that IS `owner-1`. Seeded as `u1` the first `ProposeDecision` refuses
+// RPH_AUTHORITY_INSUFFICIENT and the fail-loud drive throws — every test below dies in `beforeAll`.
+//
+// The fields mirror `reference-undertaking.ts`'s `ACTOR` exactly (including `executionInstanceId`, which the
+// stamp carries through) so the recorded issuer is the identity this fixture has always had rather than a
+// near-miss of it. `owner-1` is not exported, so a change to it reddens here loudly rather than silently.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+const OWNER_CRED = DIR.credentialFor(OWNER.actorId);
+
 describe('selectGoverningPolicies — the exclusions actually fire (REG-F-029 review finding (b))', () => {
 	let engine: AuthedEngineHandle;
 
 	beforeAll(() => {
 		let n = 0;
-		engine = createEngine({ authenticate: testAuthenticator(),
+		engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		}).as(TEST_CRED.human);
+		}).as(OWNER_CRED);
 		seedWorkbench(engine);
 	});
 
@@ -135,11 +159,12 @@ describe('a promotion cites EVERY assessment that permitted it (REG-F-029 review
 		// which carries `assuranceAssessmentIds` — and reported 0 for both. A blind reader, one more time; the
 		// numbers below are from the field the event actually has.)
 		let n = 0;
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: DIR.authenticate,
 			ontology,
 			now: () => '2026-08-05T00:00:00Z',
 			newEventId: () => `evt_${++n}`
-		}).as(TEST_CRED.human);
+		}).as(OWNER_CRED);
 		seedWorkbench(engine);
 		const cited = engine
 			.readAllEvents()

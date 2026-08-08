@@ -25,7 +25,7 @@
 // The four literal rows below are still the right fix, and NOT because the quantifier was unspelled: teaching the
 // matcher to accept `ANY_ACTIVE` would have expanded it to every NON-TERMINAL state, which here includes the
 // SATISFIED / CONDITIONALLY_SATISFIED / WAIVED verdicts — minting the very transition the last test forbids.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -35,7 +35,6 @@ import { classifyTransition } from '@janumipwb/rph-domain';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const human: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5N00';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5N01';
 const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5N02';

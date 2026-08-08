@@ -1,11 +1,31 @@
+// ── WHY THIS FILE USES THE DEMO'S OWN AUTHENTICATOR AND NOT THE SHARED TEST FIXTURE ─────────────────────────
+// D-1 moved the acting identity out of the command envelope and behind `engine.as(credential)`. The production
+// code this suite drives NAMES ITS OWN CREDENTIALS: `makeAuthoringBroker` opens `engine.as(AGENT_CREDENTIAL)`
+// and `recordConversation` opens `engine.as(SESSION_CREDENTIAL)`, both imported from `./identity.ts`. A
+// `testAuthenticator()`/`testDirectory()` engine resolves NEITHER token — those fixtures mint their own opaque
+// credentials — so every broker call and every transcript write would come back UNAUTHORIZED and this suite
+// would be testing the refusal path instead of the authoring turn. `standaloneAuthenticator()` is the demo's
+// own CLOSED directory (unknown credential ⇒ `{ ok: false }`, never a default), so nothing is weakened by
+// using it: it is the same gate the running app passes through.
+//
+// TWO ACTORS, AND THE SPLIT IS LOAD-BEARING FOR THE COMMIT.
+//   • SESSION_CREDENTIAL (HUMAN `local-professional`) — the canonical setup dispatches and every read below.
+//   • AGENT_CREDENTIAL  (AGENT `jpwb-authoring-agent`) — the turn's CANONICAL handle, mirroring
+//     `beginAuthoringTurn`'s own default (`getEngine().as(AGENT_CREDENTIAL)`).
+// The turn's canonical handle must be the AGENT because `commitAuthoringTurn` REPLAYS the broker's recorded
+// commands through it, and those commands still declare `issuedBy: { jpwb-authoring-agent, AGENT }`
+// (`PwaAuthoringBroker`'s default `actor`). Replaying them through the human session would be a declared-issuer
+// DISAGREEMENT and the engine would refuse the batch — so handing the turn a human canonical here would produce
+// a red that says nothing about authoring.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import {
 	createEngine,
 	getConversation,
 	listPwuTypes,
-	type AuthedEngineHandle
+	type AuthedEngineHandle,
+	type EngineHandle
 } from '@janumipwb/rph-engine';
+import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -22,6 +42,9 @@ const TS = '2026-07-18T12:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
 
 describe('isolated authoring turn and guarded commit', () => {
+	/** The UNAUTHENTICATED host, kept so each caller can open the session that matches WHO IT IS. */
+	let host: EngineHandle;
+	/** The workbench human's session: canonical setup + every assertion read below. */
 	let engine: AuthedEngineHandle;
 	let sequence: number;
 
@@ -54,13 +77,18 @@ describe('isolated authoring turn and guarded commit', () => {
 		return engine.dispatch(command(commandType, targetAggregateType, targetAggregateId, payload));
 	}
 
+	/** The turn's canonical handle — the AGENT, for the replay reason in the header note. */
+	const beginTurn = () => beginAuthoringTurn(PWA, host.as(AGENT_CREDENTIAL));
+
 	beforeEach(() => {
 		sequence = 0;
-		engine = createEngine({ authenticate: testAuthenticator(),
+		host = createEngine({
+			authenticate: standaloneAuthenticator(),
 			ontology,
 			now: () => TS,
 			newEventId: () => `evt_${++sequence}`
-		}).as(TEST_CRED.human);
+		});
+		engine = host.as(SESSION_CREDENTIAL);
 		expect(
 			dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', PWA, {
 				pwaId: PWA,
@@ -79,7 +107,7 @@ describe('isolated authoring turn and guarded commit', () => {
 
 	it('keeps tools, transcript, and assurance candidate-only until exact human acceptance', () => {
 		const beforeEvents = engine.readAllEvents().length;
-		const turn = beginAuthoringTurn(PWA, engine);
+		const turn = beginTurn();
 		const defined = turn.broker.defineType({
 			name: 'Full SDLC',
 			pwuKind: 'SOFTWARE_DELIVERY',
@@ -136,7 +164,7 @@ describe('isolated authoring turn and guarded commit', () => {
 			).toBe('ACCEPTED');
 		}
 
-		const turn = beginAuthoringTurn(PWA, engine);
+		const turn = beginTurn();
 		expect(turn.broker.editType(firstId, { purpose: 'Understand the governed intent' }).ok).toBe(
 			true
 		);
@@ -150,7 +178,7 @@ describe('isolated authoring turn and guarded commit', () => {
 	});
 
 	it('rejects a stale acceptance hash before entering COMMITTING', () => {
-		const turn = beginAuthoringTurn(PWA, engine);
+		const turn = beginTurn();
 		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
 		const candidateHash = markAuthoringTurnAssured(turn, markAuthoringTurnValid(turn));
 		expect(() => commitAuthoringTurn(turn, `${candidateHash}-stale`)).toThrow(
@@ -161,7 +189,7 @@ describe('isolated authoring turn and guarded commit', () => {
 	});
 
 	it('closes mutation after assurance so unreviewed commands cannot enter the accepted package', () => {
-		const turn = beginAuthoringTurn(PWA, engine);
+		const turn = beginTurn();
 		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
 		markAuthoringTurnAssured(turn, markAuthoringTurnValid(turn));
 		expect(() => turn.broker.defineType({ name: 'Unreviewed', pwuKind: 'BUILD' })).toThrow(
@@ -171,7 +199,7 @@ describe('isolated authoring turn and guarded commit', () => {
 	});
 
 	it('detects a concurrent canonical revision and lands none of the candidate commands', () => {
-		const turn = beginAuthoringTurn(PWA, engine);
+		const turn = beginTurn();
 		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
 		const candidateHash = markAuthoringTurnAssured(turn, markAuthoringTurnValid(turn));
 		expect(
@@ -191,7 +219,7 @@ describe('isolated authoring turn and guarded commit', () => {
 
 	it('discards an isolated candidate without compensation or canonical mutation', () => {
 		const before = engine.readAllEvents();
-		const turn = beginAuthoringTurn(PWA, engine);
+		const turn = beginTurn();
 		expect(turn.broker.defineType({ name: 'Wrong node', pwuKind: 'PLAN', isRoot: true }).ok).toBe(
 			true
 		);

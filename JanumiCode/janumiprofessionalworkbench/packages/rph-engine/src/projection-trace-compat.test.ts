@@ -9,13 +9,36 @@ import {
 	traceabilityProjector
 } from '@janumipwb/rph-projections';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import type { Principal } from '@janumipwb/rph-ports';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import { createEngine, driveReferenceUndertaking, REFERENCE_UNDERTAKING as R } from './index.js';
 
+// ── THE DRIVE RUNS AS THE UNDERTAKING OWNER (D-1) ────────────────────────────────────────────────────────────
+// `driveReferenceUndertaking` proposes each promotion Decision with `authority: { actorId: 'owner-1',
+// actorType: 'HUMAN' }`, and REG-F-014 refuses a Decision whose declared authority is not its issuer. The drive
+// used to assert that identity in the envelope (`issuedBy: ACTOR`); the SESSION carries it now, so only a
+// session that IS `owner-1` can drive it. As `u1` the first `ProposeDecision` refuses
+// RPH_AUTHORITY_INSUFFICIENT and the fail-loud drive throws before `build()` can return an event log.
+const OWNER: Principal = {
+	actorId: 'owner-1',
+	actorType: 'HUMAN',
+	displayName: 'Undertaking Owner',
+	tenantId: 'tenant-test',
+	organizationId: 'org-test',
+	executionInstanceId: 'exec-production'
+};
+const DIR = testDirectory([OWNER]);
+const OWNER_CRED = DIR.credentialFor(OWNER.actorId);
+
 function build() {
 	let s = 0;
-	const engine = createEngine({ authenticate: testAuthenticator(), ontology, now: () => '2026-07-12T00:00:00Z', newEventId: () => `evt_${++s}` }).as(TEST_CRED.human);
+	const engine = createEngine({
+		authenticate: DIR.authenticate,
+		ontology,
+		now: () => '2026-07-12T00:00:00Z',
+		newEventId: () => `evt_${++s}`
+	}).as(OWNER_CRED);
 	driveReferenceUndertaking(engine);
 	return engine.readAllEvents();
 }

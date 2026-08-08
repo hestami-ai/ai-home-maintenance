@@ -14,7 +14,7 @@
 // THE DRIVE CANNOT REACH THIS CASE. The only PWU it gives observations to is the one architecture concern, and
 // that kind is governed by exactly ONE policy — so N = 1 and the primary IS the whole set. A green drive proves
 // nothing here, which is precisely why this test exists rather than a drive assertion.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -23,7 +23,6 @@ import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const human: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5P10';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5P11';
 const PEER = 'asm_01ARZ3NDEKTSV4RRFFQ69G5P12';

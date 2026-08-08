@@ -24,7 +24,7 @@
 // error, which is the property that makes the register an instrument rather than a document.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import {
 	classifyRefusal,
@@ -44,6 +44,17 @@ import {
 
 const TS = '2026-07-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
+/**
+ * RPH-GOV-001's SECOND actor. That probe's whole arrangement is a Decision whose recorded authority is an AGENT,
+ * and since REG-F-014 a Decision records the authority of its ISSUER — so the agent has to actually issue it.
+ * Under the trust boundary the issuer is the session, which makes this a second registered principal rather than
+ * a second envelope field. Hoisted to module scope because the directory has to be built before the engine is.
+ */
+const AGENT_ACTOR: ActorReference = { actorId: 'a1', actorType: 'AGENT', displayName: 'Agent' };
+const DIR = testDirectory([
+	{ ...actor, tenantId: 'tenant-test', organizationId: 'org-test' },
+	{ ...AGENT_ACTOR, tenantId: 'tenant-test', organizationId: 'org-test' }
+]);
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H6100';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6110';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69H6120';
@@ -83,16 +94,23 @@ interface Probe {
 
 describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not asserted', () => {
 	let store: SqliteStorageAdapter;
+	/** The unauthenticated engine. Nothing dispatches through it — `engine`/`sessionFor` bind a credential first. */
+	let core: Engine;
+	/** The default session: everything here acts as `actor` unless a probe names someone else. */
 	let engine: AuthedEngine;
 	let seq = 0;
 	/** Distinct id space per decompositionProbe() call — three probes share one engine per test. */
 	let probeSeq = 0;
 
+	/** A session for one of the two registered principals. Throws for anyone the fixture did not declare. */
+	const sessionFor = (a: ActorReference): AuthedEngine => core.as(DIR.credentialFor(a.actorId));
+
 	function dispatch(
 		commandType: string,
 		payload: unknown,
 		id = PLAN,
-		aggType = 'EXECUTION_PLAN'
+		aggType = 'EXECUTION_PLAN',
+		issuedBy: ActorReference = actor
 	): Outcome {
 		const n = ++seq;
 		const command: DomainCommand = {
@@ -101,12 +119,14 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			commandSchemaVersion: 1,
 			targetAggregateType: aggType,
 			targetAggregateId: id,
-			issuedAt: TS,
+			issuedAt: TS,
 			correlationId: 'wp16',
 			idempotencyKey: `k-${n}`,
 			payload
 		};
-		const r = engine.dispatch(command);
+		// `issuedBy` picks the SESSION rather than filling an envelope field — the engine stamps the acting
+		// identity itself, and a command that also declared one would be refused the moment the two disagreed.
+		const r = sessionFor(issuedBy).dispatch(command);
 		const issues = (r.error?.details as { issues?: { path: string; code: string }[] } | undefined)
 			?.issues;
 		return { status: r.status, code: r.error?.code, message: r.error?.message, issues };
@@ -132,7 +152,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			commandSchemaVersion: 1,
 			targetAggregateType: aggType,
 			targetAggregateId: id,
-			issuedAt: TS,
+			issuedAt: TS,
 			correlationId: 'wp16',
 			idempotencyKey: `k-${n}`,
 			payload,
@@ -833,7 +853,13 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		core = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
+		engine = sessionFor(actor);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
@@ -1320,17 +1346,17 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const SUBJ = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6600';
 				const OK_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6610';
 				const BAD_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6611';
-				const AGENT: ActorReference = {
-					actorId: 'a1',
-					actorType: 'AGENT',
-					displayName: 'Agent'
-				};
+				const AGENT = AGENT_ACTOR;
 				// ISSUED BY THE ACTOR IT NAMES (REG-F-014, 2026-08-03). This used to declare an AGENT authority on a
 				// HUMAN-issued command; `proposeDecision` now refuses that disagreement, so the agent proposes as
 				// itself. The arrangement is strictly more honest — the decision's authority is an AGENT because an
 				// agent made it — and it is the sequence RPH-GOV-001's statement actually describes.
+				//
+				// AND THE ISSUER IS NOW THE SESSION, not a declared envelope field: the agent dispatches through its
+				// own credential, so nothing here can name an actor it is not. `dispatchWith` is no longer needed —
+				// the only envelope field it was carrying was the claim the engine now stamps.
 				const propose = (id: string, authority: ActorReference) =>
-					dispatchWith(
+					dispatch(
 						'ProposeDecision',
 						{
 							decisionType: 'APPROVAL',
@@ -1341,7 +1367,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						},
 						id,
 						'DECISION',
-						{ issuedBy: authority }
+						authority
 					);
 				const approve = (id: string) =>
 					dispatch(

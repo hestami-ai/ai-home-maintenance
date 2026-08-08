@@ -3,7 +3,7 @@
 // Undertaking, and drive that Undertaking's Professional Work Graph. This gives the UI a real PWA (PWA Design
 // context) AND a real Undertaking with a live graph (Undertaking context) to render — the RPH-DOC-010 separation,
 // demonstrated end to end. It is deterministic: it drives commands; no fixture event log is replayed.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import {
 	FLOOR_POLICY_DEFINITIONS,
@@ -14,11 +14,6 @@ import {
 import type { AuthedEngineHandle, EngineSeedPolicy } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
-const ACTOR: ActorReference = {
-	actorId: 'workbench',
-	actorType: 'HUMAN',
-	displayName: 'Workbench'
-};
 
 export const SEED_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Z00';
 export const SEED_PWA_VERSION = '1.3.0';

@@ -25,13 +25,18 @@
 // the third test, and it is the only discriminating case for the immutability half.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-08-03T00:00:00Z';
 const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
+// One actor, but not one of the shared three. `propose` declares `authority: HUMAN`, and REG-F-014's sibling
+// rule refuses a declared authority the authenticated principal is not — so the session has to BE `lead`.
+// Dispatching as `TEST_CRED.human` (`u1`) would refuse every proposal, and `pinOf()` would then read
+// `undefined` rather than the pin these tests exist to describe.
+const DIR = testDirectory([{ ...HUMAN, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69J7001';
 const GHOST = 'pwu_01ARZ3NDEKTSV4RRFFQ69J7009';
 const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69J7002';
@@ -44,7 +49,12 @@ describe('REG-F-017: a Decision pins its subject versions at PROPOSAL', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(DIR.credentialFor(HUMAN.actorId));
 	});
 
 	const dispatch = (commandType: string, payload: unknown, id: string, aggType: string) => {

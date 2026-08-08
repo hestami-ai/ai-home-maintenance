@@ -7,7 +7,7 @@
 // drive the LIVE pipeline and assert the CALL SITE blocks a promotion that rests on invalidated evidence.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -15,6 +15,12 @@ import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js'
 
 const TS = '2026-07-19T00:00:00Z';
 const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
+// ONE governor issues everything here, and it has to be THIS one. `gov-1` is not merely the fixture's label:
+// it is the `producedBy` of the evidence and the `authority` the promotion decision declares, and since
+// REG-F-014 a ProposeDecision whose declared authority is not the authenticated principal is REFUSED. The
+// shared `TEST_CRED.human` resolves to `u1`, so borrowing it would make every setup() fail at proposal and the
+// promotion assertions below would then be true about a refusal that never reached the evidence gate.
+const DIR = testDirectory([{ ...human, tenantId: 'tenant-test', organizationId: 'org-test' }]);
 const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5V00';
 const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V01';
 const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5V02';
@@ -61,7 +67,12 @@ describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10,
 	function setup(opts: SetupOpts) {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `evt_${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `evt_${++seq}`
+		}).as(DIR.credentialFor(human.actorId));
 		seedPolicy(engine, 'pol_arch');
 		dispatch(
 			'CaptureIntent',

@@ -32,7 +32,7 @@
 // skips any vocab entry annotated UNRATIFIED-AUTHORED, and this one is. Removing that annotation would be a
 // RATIFICATION CLAIM and is the sponsor's to make; asserting the shape in a test achieves the same guarantee and
 // claims nothing.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { DecompositionRevisedPayloadSchema } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -40,7 +40,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-29T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'User' };
 
 const INT = 'int_01ARZ3NDEKTSV4RRFFQ69G6W00';
 const PARENT = 'pwu_01ARZ3NDEKTSV4RRFFQ69G6W31';

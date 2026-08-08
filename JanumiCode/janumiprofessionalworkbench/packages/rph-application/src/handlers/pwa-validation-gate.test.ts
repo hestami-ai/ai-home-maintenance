@@ -33,7 +33,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'des-1', actorType: 'HUMAN' as const, displayName: 'Designer' };
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P40';
 const ROOT_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P41';
 const CHILD_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P42';

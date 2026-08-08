@@ -26,7 +26,7 @@
 // SURVEYED BEFORE CHANGING BEHAVIOUR. Instrumented across the whole suite: exactly TWO dispatches ever reach the
 // duplicate path, and BOTH are true replays (same command type, same target). No caller anywhere reuses a key
 // across commands, so this refuses nothing the engine accepts today.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { createSqliteDriver, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -34,7 +34,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
 
 const TS = '2026-08-04T00:00:00Z';
-const ACTOR: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const INTENT_A = 'int_01ARZ3NDEKTSV4RRFFQ69J8001';
 const INTENT_B = 'int_01ARZ3NDEKTSV4RRFFQ69J8002';
 const KEY = 'the-one-key';

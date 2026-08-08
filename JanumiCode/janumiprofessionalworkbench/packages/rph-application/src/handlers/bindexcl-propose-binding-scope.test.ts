@@ -21,7 +21,7 @@
 //
 // A refusal-only battery would pass under a check that refused every plan naming any binding, which is the failure
 // this file exists to make impossible.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -29,7 +29,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-26T00:00:00Z';
-const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69HB200';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69HB210';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69HB220';

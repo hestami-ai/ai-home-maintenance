@@ -13,7 +13,7 @@
 //
 // Found by adversarial review, not by the suite — every test here would have passed before the fix except the
 // ones below, which is the point of writing them.
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -22,7 +22,6 @@ import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-08-05T00:00:00Z';
-const human: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
 const POLICY = 'pol_scope_edit';
 
 describe('EditAssurancePolicy keeps the two scope representations in step (review finding (c))', () => {

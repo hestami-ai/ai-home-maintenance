@@ -31,6 +31,16 @@ export const SESSION_CREDENTIAL = asCredential('jpwb.session.local');
 export const AGENT_CREDENTIAL = asCredential('jpwb.session.agent');
 /** Seeding and recovery, which run at construction before any user session exists. */
 export const SYSTEM_CREDENTIAL = asCredential('jpwb.session.system');
+/**
+ * The reference Undertaking's owner. The seeded workbench REPLAYS WORK A PROFESSIONAL DID — it proposes and
+ * approves governance Decisions, and `makeDecisionEffective` grants EFFECTIVE only on a HUMAN authority. A
+ * SERVICE seeder therefore cannot produce that fixture at all, and authenticating one as HUMAN to get past the
+ * guard would put back exactly the fiction SYSTEM_CREDENTIAL exists to avoid.
+ *
+ * So the demonstration data is seeded AS ITS OWNER, and the record says so. `owner-1` is not invented here: it
+ * is the identity `reference-undertaking.ts` has always named as the actor of that work.
+ */
+export const REFERENCE_OWNER_CREDENTIAL = asCredential('jpwb.session.reference-owner');
 
 const PRINCIPALS: Readonly<Record<string, Principal>> = {
 	[SESSION_CREDENTIAL]: {
@@ -44,6 +54,13 @@ const PRINCIPALS: Readonly<Record<string, Principal>> = {
 		actorId: 'jpwb-authoring-agent',
 		actorType: 'AGENT',
 		displayName: 'JPWB Authoring Agent',
+		tenantId: STANDALONE_TENANT,
+		organizationId: STANDALONE_ORG
+	},
+	[REFERENCE_OWNER_CREDENTIAL]: {
+		actorId: 'owner-1',
+		actorType: 'HUMAN',
+		displayName: 'Undertaking Owner',
 		tenantId: STANDALONE_TENANT,
 		organizationId: STANDALONE_ORG
 	},

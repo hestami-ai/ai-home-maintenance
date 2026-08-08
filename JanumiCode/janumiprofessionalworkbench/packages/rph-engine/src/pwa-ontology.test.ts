@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import { createEngine, engineOntologyForPwa } from './index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const actor = { actorId: 'des', actorType: 'HUMAN' as const, displayName: 'D' };
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Q00';
 const ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q10';
 const CHILD = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q20';

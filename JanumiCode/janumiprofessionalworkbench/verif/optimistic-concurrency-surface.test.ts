@@ -22,11 +22,10 @@ import { createEngine, getObjectRevision } from '@janumipwb/rph-engine';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const TS = '2026-08-07T00:00:00Z';
-const HUMAN: ActorReference = { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' };
 
 describe('PER-4 — a surface command declares the revision it was rendered from', () => {
 	let store: SqliteStorageAdapter;
