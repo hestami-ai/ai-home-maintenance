@@ -55,7 +55,9 @@ import {
 	cancelAssuranceAssessment,
 	completeAssuranceAssessment,
 	detectAssumption,
+	discloseAssumption,
 	expireAssumption,
+	falsifyAssumption,
 	createAssurancePolicy,
 	editAssurancePolicy,
 	invalidateEvidence,
@@ -162,7 +164,12 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	AssertClaim: assertClaim,
 	RecordClaimAssessment: recordClaimAssessment,
 	DetectAssumption: detectAssumption,
+	// The only route into the middle of the Assumption lifecycle — without it FALSIFIED is unreachable.
+	DiscloseAssumption: discloseAssumption,
 	ExpireAssumption: expireAssumption,
+	// REG-F-069: the join between OBJ-4, the ratified AssumptionFalsified event, the orphan kernel
+	// `assessFalsification`, and `canAuthorizeNewWork` — which already refused FALSIFIED and could never see it.
+	FalsifyAssumption: falsifyAssumption,
 	CreateAssurancePolicy: createAssurancePolicy,
 	EditAssurancePolicy: editAssurancePolicy,
 	SupersedeAssurancePolicy: supersedeAssurancePolicy,

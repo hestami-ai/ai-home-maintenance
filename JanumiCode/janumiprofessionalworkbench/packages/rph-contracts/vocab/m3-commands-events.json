@@ -1082,6 +1082,35 @@
 			]
 		},
 		{
+			"commandType": "FalsifyAssumption",
+			"targetAggregateType": "ASSUMPTION",
+			"emitsEvent": "AssumptionFalsified",
+			"drivesMachine": "Assumption.status",
+			"drivesFrom": "DISCLOSED|UNDER_VERIFICATION|ACCEPTED|VERIFIED",
+			"drivesTo": "FALSIFIED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED COMMAND OVER A RATIFIED EVENT (2026-08-08, sponsor delegated authority REG-D-025; closes REG-F-069). THE COMMAND NAME IS AUTHORED; NOTHING ELSE HERE IS. JPWB-DOC-003 \u00a73 OBJ-4 obliges the act \u2014 'falsification triggers impact analysis' \u2014 and \u00a76 STA-7 the consequence. The EVENT is RATIFIED: AssumptionFalsifiedPayloadSchema is a member of RATIFIED_EVENT_PAYLOADS and was the ONLY member no handler emitted. The kernel already computes the outcome (assessFalsification, rph-domain/decomposition.ts:451) and had no caller. The consumer is already wired and already REFUSES FALSIFIED (canAuthorizeNewWork \u2192 approveExecutionPlan), which the enforcement register records as 'enforced on one third of its own predicate'. So this is the missing JOIN between four existing parts, not a new capability \u2014 and ExpireAssumption's own row names it as owed: 'the falsification transition + the full reshape/reassessment loop are the remaining WP-3-008 sub-program'. THE CASCADE IS DELIBERATELY NOT BUILT: STA-7 says 'Automatic invalidation is conservative where consequences are high \u2014 flag for review rather than cascade destructively', making flag-not-cascade the canon-PREFERRED shape rather than a shortfall. Do NOT treat the command name as ratification. Cited: JPWB-DOC-003 \u00a73 OBJ-4, \u00a76 STA-7, \u00a78.3 ASR-8.",
+			"payloadFields": [
+				{
+					"field": "contradictingEvidenceIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[]; the evidence that falsifies the assumption (RPH-ASM-004 / \u00a712.2 / \u00a729.1). REQUIRED, non-empty, and every id must resolve to an EVIDENCE object: contradicting evidence is CONSTITUTIVE of falsification, so a falsification citing none \u2014 or citing ids that do not exist \u2014 would be an unfounded status change wearing a governed name. ASR-8 requires the contradicting artifact to stay 'attached and visible', which is why the ids are retained on the OBJECT and not only on the event."
+				}
+			]
+		},
+		{
+			"commandType": "DiscloseAssumption",
+			"targetAggregateType": "ASSUMPTION",
+			"emitsEvent": "AssumptionDisclosed",
+			"drivesMachine": "Assumption.status",
+			"drivesFrom": "PROPOSED",
+			"drivesTo": "DISCLOSED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED COMMAND OVER A RATIFIED EVENT (2026-08-08, sponsor delegated authority REG-D-025; closes the reachability half of REG-F-069). AUTHORED BECAUSE FalsifyAssumption WOULD OTHERWISE BE DEAD ON ARRIVAL, and that is the whole reason this row exists. Assumption.status reaches FALSIFIED only from DISCLOSED|UNDER_VERIFICATION|ACCEPTED|VERIFIED; every one of those traces back to DISCLOSED; and DISCLOSED's only in-arrow is from PROPOSED, which NO command drove. DetectAssumption creates in PROPOSED and ExpireAssumption leaves for EXPIRED, so the entire middle of the ratified lifecycle was unoccupiable \u2014 a command targeting FALSIFIED would have been registered, scored COVERED by the C-0 arrow census, and unable to fire. That failure mode is REG-F-067's finding: an arrow out of an unoccupied source is dead however many commands declare it. The EVENT is RATIFIED (AssumptionDisclosedPayloadSchema, RATIFIED_EVENT_PAYLOADS) and DOC-002 names the transition PROPOSED->DISCLOSED explicitly \u2014 see this file's own AssumptionDetected note recording the DOC-002/DOC-007 value drift. Only the command NAME is authored. Cited: JPWB-DOC-003 \u00a73 OBJ-4 (assumptions are reified and disclosed before dependent work reaches readiness).",
+			"payloadFields": []
+		},
+		{
 			"commandType": "AssertClaim",
 			"targetAggregateType": "CLAIM",
 			"emitsEvent": "ClaimAsserted",
@@ -7552,6 +7581,22 @@
 			"from": "PROPOSED|DISCLOSED|UNDER_VERIFICATION|ACCEPTED",
 			"to": "EXPIRED",
 			"note": "AUTHORED W3 WP-3-008 — assumption expiry (RPH-ASM-006: an expired assumption cannot authorize new work)"
+		},
+		{
+			"commandType": "FalsifyAssumption",
+			"eventType": "AssumptionFalsified",
+			"machine": "Assumption.status",
+			"from": "DISCLOSED|UNDER_VERIFICATION|ACCEPTED|VERIFIED",
+			"to": "FALSIFIED",
+			"note": "AUTHORED 2026-08-08 (REG-F-069) \u2014 joins the ratified AssumptionFalsified event to the orphan kernel assessFalsification and to canAuthorizeNewWork, which already refuses FALSIFIED. The four sources are the machine's own in-arrows, not a choice: PROPOSED is excluded because the machine excludes it."
+		},
+		{
+			"commandType": "DiscloseAssumption",
+			"eventType": "AssumptionDisclosed",
+			"machine": "Assumption.status",
+			"from": "PROPOSED",
+			"to": "DISCLOSED",
+			"note": "AUTHORED 2026-08-08 (REG-F-069) \u2014 the only in-arrow to DISCLOSED, and therefore the only route into the entire middle of the Assumption lifecycle. Without it FALSIFIED is unreachable and FalsifyAssumption is a command that can never fire."
 		},
 		{
 			"commandType": "AssertClaim",

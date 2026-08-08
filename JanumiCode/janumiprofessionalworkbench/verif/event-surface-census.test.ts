@@ -58,6 +58,13 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-08-08, REG-F-069: both acquired their FIRST emitter. `AssumptionFalsified` was the only
+	// member of RATIFIED_EVENT_PAYLOADS that no handler emitted; `AssumptionDisclosed` had to land with
+	// it, because without `DiscloseAssumption` every FALSIFIED source state is unoccupiable and the
+	// falsification command could never fire. Added here for the same reason the note below gives: this
+	// set is a PINNED SNAPSHOT, so a new emitter must be recorded or the census calls it unemitted.
+	'AssumptionDisclosed',
+	'AssumptionFalsified',
 	// + 2026-08-05, REG-E-024(c): the validator registry. §35 ratified three statuses and no transition table,
 	// so these five events had no commands to be emitted by; the table is now declared (§0.3 authored
 	// clarification) and `validator-registry.test.ts` drives every arrow. Added HERE because this set is a

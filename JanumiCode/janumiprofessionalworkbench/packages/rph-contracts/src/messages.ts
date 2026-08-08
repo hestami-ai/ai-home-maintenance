@@ -312,6 +312,12 @@ export const ExpireAssumptionPayloadSchema = z.strictObject({
 	expirationCondition: z.string().optional()
 });
 export type ExpireAssumptionPayload = z.infer<typeof ExpireAssumptionPayloadSchema>;
+export const FalsifyAssumptionPayloadSchema = z.strictObject({
+	contradictingEvidenceIds: z.array(z.string())
+});
+export type FalsifyAssumptionPayload = z.infer<typeof FalsifyAssumptionPayloadSchema>;
+export const DiscloseAssumptionPayloadSchema = z.strictObject({});
+export type DiscloseAssumptionPayload = z.infer<typeof DiscloseAssumptionPayloadSchema>;
 export const AssertClaimPayloadSchema = z.strictObject({
 	statement: z.string(),
 	claimType: ClaimTypeSchema,
@@ -1954,6 +1960,18 @@ export const COMMANDS = {
 		emitsEvent: 'AssumptionExpired',
 		firstSlice: false
 	},
+	FalsifyAssumption: {
+		payload: FalsifyAssumptionPayloadSchema,
+		targetAggregateType: 'ASSUMPTION',
+		emitsEvent: 'AssumptionFalsified',
+		firstSlice: false
+	},
+	DiscloseAssumption: {
+		payload: DiscloseAssumptionPayloadSchema,
+		targetAggregateType: 'ASSUMPTION',
+		emitsEvent: 'AssumptionDisclosed',
+		firstSlice: false
+	},
 	AssertClaim: {
 		payload: AssertClaimPayloadSchema,
 		targetAggregateType: 'CLAIM',
@@ -2891,6 +2909,20 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Assumption.status',
 		from: 'PROPOSED|DISCLOSED|UNDER_VERIFICATION|ACCEPTED',
 		to: 'EXPIRED'
+	},
+	{
+		commandType: 'FalsifyAssumption',
+		eventType: 'AssumptionFalsified',
+		machine: 'Assumption.status',
+		from: 'DISCLOSED|UNDER_VERIFICATION|ACCEPTED|VERIFIED',
+		to: 'FALSIFIED'
+	},
+	{
+		commandType: 'DiscloseAssumption',
+		eventType: 'AssumptionDisclosed',
+		machine: 'Assumption.status',
+		from: 'PROPOSED',
+		to: 'DISCLOSED'
 	},
 	{
 		commandType: 'AssertClaim',

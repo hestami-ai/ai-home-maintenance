@@ -1,18 +1,13 @@
 {
 	"uncovered": [
-		"Assumption.status  ACCEPTED -> FALSIFIED",
 		"Assumption.status  ACCEPTED -> SUPERSEDED",
 		"Assumption.status  DISCLOSED -> ACCEPTED",
-		"Assumption.status  DISCLOSED -> FALSIFIED",
 		"Assumption.status  DISCLOSED -> SUPERSEDED",
 		"Assumption.status  DISCLOSED -> UNDER_VERIFICATION",
-		"Assumption.status  PROPOSED -> DISCLOSED",
 		"Assumption.status  PROPOSED -> SUPERSEDED",
 		"Assumption.status  UNDER_VERIFICATION -> ACCEPTED",
-		"Assumption.status  UNDER_VERIFICATION -> FALSIFIED",
 		"Assumption.status  UNDER_VERIFICATION -> SUPERSEDED",
 		"Assumption.status  UNDER_VERIFICATION -> VERIFIED",
-		"Assumption.status  VERIFIED -> FALSIFIED",
 		"AssuranceAssessment.disposition  ASSESSING -> CONDITIONALLY_SATISFIED",
 		"AssuranceAssessment.disposition  ASSESSING -> ESCALATED",
 		"AssuranceAssessment.disposition  ASSESSING -> INCONCLUSIVE",

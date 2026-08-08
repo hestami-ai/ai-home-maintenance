@@ -15,6 +15,7 @@ import {
 } from '@janumipwb/rph-assurance';
 import {
 	applicabilityPermitsAssessment,
+	assessFalsification,
 	classifyEvidenceInvalidation,
 	policyApplicability,
 	TraceGraph
@@ -28,6 +29,7 @@ import type {
 	DetectAssumptionPayload,
 	DomainCommand,
 	ExpireAssumptionPayload,
+	FalsifyAssumptionPayload,
 	EditAssurancePolicyPayload,
 	ProposeEvidencePayload,
 	RecordClaimAssessmentPayload,
@@ -53,7 +55,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
+import { allOf, fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 
 /** Non-object primitive union: the cast that keeps String() off Object's default stringification (S6551). */
 type Stringifiable = string | number | boolean;
@@ -892,6 +894,151 @@ export const detectAssumption: CommandHandler = (ctx, command, payload) => {
  * could never fire. This instantiates the expiry transition; the RPH-ASM-006 guard is then wired at
  * ApproveExecutionPlan (execution.ts). The event is UNRATIFIED-AUTHORED (ungated), like DetectAssumption.
  */
+/**
+ * DiscloseAssumption — PROPOSED -> DISCLOSED. THE ONLY ROUTE INTO THE MIDDLE OF THE LIFECYCLE.
+ *
+ * ⚠ AUTHORED BECAUSE `FalsifyAssumption` WOULD OTHERWISE HAVE SHIPPED DEAD, and that is worth stating plainly
+ * because I nearly shipped it. `Assumption.status` reaches FALSIFIED only from
+ * DISCLOSED|UNDER_VERIFICATION|ACCEPTED|VERIFIED; every one of those traces back to DISCLOSED; and DISCLOSED's
+ * only in-arrow is from PROPOSED, which **no command drove**. `DetectAssumption` creates in PROPOSED and
+ * `ExpireAssumption` leaves for EXPIRED, so the entire middle of the ratified lifecycle was unoccupiable.
+ *
+ * A `FalsifyAssumption` registered without this would have been scored **COVERED** by the C-0 arrow census and
+ * been unable to fire — which is REG-F-067's finding arriving in practice within the hour: **an arrow out of an
+ * unoccupied source is dead however many commands declare it**, and neither C-0 nor `state-reachability` asks
+ * whether a state is ever actually occupied.
+ *
+ * The EVENT is ratified (`AssumptionDisclosedPayloadSchema`); only the command name is authored.
+ */
+export const discloseAssumption: CommandHandler = (ctx, command) =>
+	advanceStatus(ctx, command, {
+		objectType: ASSUMPTION,
+		statusField: 'status',
+		machine: 'Assumption.status',
+		target: 'DISCLOSED',
+		// The machine's single in-arrow. A re-issue against an already-DISCLOSED assumption would append a
+		// second AssumptionDisclosed for a disclosure that already happened.
+		precondition: fromStates('PROPOSED'),
+		eventType: 'AssumptionDisclosed',
+		eventPayload: () => ({ status: 'DISCLOSED' })
+	});
+
+/**
+ * The contradicting evidence must EXIST, and be EVIDENCE. RPH-ASM-004 / §12.2 / §29.1 make contradicting
+ * evidence CONSTITUTIVE of falsification — it is not a note attached to the act, it is the act's basis. So a
+ * falsification citing ids that resolve to nothing would be an unfounded status change wearing a governed name,
+ * which is the same fiction D-1 removed from `issuedBy` one layer up.
+ *
+ * Non-empty is checked here rather than in the payload schema because the schema is GENERATED from the vocab
+ * and `string[]` is its only array spelling; putting the arity in a hand-edited schema would put a rule
+ * somewhere `bun run gen` would silently revert.
+ */
+const contradictingEvidenceExists = predicate(
+	'every cited contradicting evidence id resolves to an EVIDENCE object, and at least one is cited',
+	({ payload, read }) => {
+		const p = payload as FalsifyAssumptionPayload;
+		if (p.contradictingEvidenceIds.length === 0) {
+			return (
+				'FalsifyAssumption cites no contradicting evidence. Contradicting evidence is what falsifies an ' +
+				'assumption (RPH-ASM-004 / §12.2); a falsification with no basis is an unfounded status change.'
+			);
+		}
+		const missing = p.contradictingEvidenceIds.filter(
+			(id) => read.objectState(id)?.objectType !== EVIDENCE
+		);
+		return missing.length === 0
+			? null
+			: `FalsifyAssumption cites contradicting evidence that does not exist as EVIDENCE: ${missing.join(', ')}. ` +
+					`ASR-8 requires the contradicting artifact to remain attached and visible, which an unresolvable id cannot be.`;
+	}
+);
+
+/**
+ * FalsifyAssumption — DISCLOSED|UNDER_VERIFICATION|ACCEPTED|VERIFIED -> FALSIFIED (REG-F-069).
+ *
+ * ── THIS IS A JOIN, NOT A NEW CAPABILITY, AND ALL FOUR PARTS PREDATE IT ──────────────────────────────────────
+ *   1. CANON obliges the act — JPWB-DOC-003 §3 OBJ-4: *"falsification triggers impact analysis"*; §6 STA-7
+ *      routes falsified premises into reshaping or invalidation.
+ *   2. The EVENT is RATIFIED — `AssumptionFalsifiedPayloadSchema` is a member of `RATIFIED_EVENT_PAYLOADS`,
+ *      and was the ONLY member of that set no handler emitted.
+ *   3. The KERNEL already computes the outcome — `assessFalsification` (rph-domain) returns the status, the
+ *      impacted objects and the event name, and had NO CALLER. It is called below rather than reimplemented.
+ *   4. The CONSUMER is already wired and already refuses FALSIFIED — `canAuthorizeNewWork` via
+ *      `approveExecutionPlan`. The enforcement register records RPH-ASM-006 as *"enforced on one third of its
+ *      own predicate"* precisely because FALSIFIED and SUPERSEDED were unreachable. This closes one third.
+ *
+ * ── ⚠ THE CASCADE IS DELIBERATELY NOT BUILT, AND THAT IS THE RATIFIED SHAPE — NOT A SHORTFALL ────────────────
+ * STA-7's own conservatism clause: *"Automatic invalidation is conservative where consequences are high —
+ * **flag for review rather than cascade destructively**."* That is a CEILING on this increment, not a floor: it
+ * licenses raising a flag and withholds licence for a destructive cascade. `impactAnalysisRequired: true` on
+ * the ratified event IS the flag, and ASR-15 states the purpose in the only operational terms canon offers —
+ * dependent work *"cannot keep standing on it silently."* Recording the fact loudly is the discharge available;
+ * a routing engine is not, and inventing one would be the convenient interpretation §0.3 forbids.
+ *
+ * ── AND THE PRIOR SATISFACTION IS NOT REWRITTEN ──────────────────────────────────────────────────────────────
+ * STA-7 SCOPE: *"History is never rewritten by invalidation — the record of prior satisfaction stands (PER-2)."*
+ * `priorStatus` is carried on the event for exactly that reason, and nothing here touches a dependent object.
+ */
+export const falsifyAssumption: CommandHandler = (ctx, command, payload) => {
+	const p = payload as FalsifyAssumptionPayload;
+	// PRIOR STATUS IS READ HERE, NOT STASHED FROM `mutate`. `eventPayload` receives only the NEXT state, and the
+	// obvious trick — capture it in the `mutate` closure, which currently runs first — would silently yield ''
+	// the day anyone reorders `advanceStatus`. A wrong `priorStatus` on a ratified event is worse than a second
+	// read of an object this dispatch has already loaded synchronously. If the object is absent, `advanceStatus`
+	// rejects below and this value is never used.
+	const priorStatus = String(
+		(ctx.store.loadObject(command.targetAggregateId)?.state as Record<string, unknown> | undefined)
+			?.status ?? ''
+	);
+	return advanceStatus(ctx, command, {
+		objectType: ASSUMPTION,
+		statusField: 'status',
+		machine: 'Assumption.status',
+		target: 'FALSIFIED',
+		// The machine's OWN in-arrows, read from transitions.data.ts rather than chosen. PROPOSED is absent
+		// there and therefore absent here: an assumption not yet disclosed has authorized nothing.
+		precondition: allOf(
+			fromStates('DISCLOSED', 'UNDER_VERIFICATION', 'ACCEPTED', 'VERIFIED'),
+			contradictingEvidenceExists
+		),
+		eventType: 'AssumptionFalsified',
+		// ⚠ THE IDS RIDE THE EVENT ONLY, AND I TRIED TO PUT THEM ON THE OBJECT FIRST.
+		// I wrote a `mutate` adding `contradictingEvidenceIds` to the Assumption, citing ASR-8's "contradicting
+		// evidence remains attached and visible". The ratified `AssumptionObject` is a strictObject with 23
+		// fields and no such key, so the write was REFUSED by schema validation — the gate working.
+		//
+		// And the citation was an OVER-REACH, which is the part worth keeping: ASR-8 sits in §8.3 *Evidence*
+		// and its subject is evidence invalidation propagating to CLAIMS. `contradictingEvidenceIds` IS a
+		// ratified field — on CLAIM, not on Assumption. Stretching a rule from the aggregate it governs to a
+		// neighbouring one is exactly REG-F-065's shape, caught here by the schema instead of by me.
+		//
+		// The ratified home is the EVENT: `AssumptionFalsifiedPayloadSchema.contradictingEvidenceIds` exists
+		// for precisely this, and PER-1 SCOPE names an invalidation as event-backed domain history. Adding the
+		// field to a ratified object to match my own citation would have been the invention.
+		eventPayload: (nextState) => {
+			// THE KERNEL DECIDES, NOT THIS HANDLER. `assessFalsification` already encapsulates the outcome; calling
+			// it is what stops a second, drifting copy of the rule appearing here (REG-F-027's shape).
+			const outcome = assessFalsification(
+				{
+					assumptionId: command.targetAggregateId,
+					materiality: String(nextState.materiality ?? ''),
+					status: String(nextState.status ?? ''),
+					affectedObjectIds: (nextState.affectedObjectIds as string[] | undefined) ?? []
+				},
+				p.contradictingEvidenceIds
+			);
+			return {
+				assumptionId: command.targetAggregateId,
+				priorStatus,
+				newStatus: outcome.newStatus,
+				contradictingEvidenceIds: [...outcome.contradictingEvidenceIds],
+				affectedObjectIds: [...outcome.impactedObjectIds],
+				impactAnalysisRequired: outcome.impactAnalysisRequired
+			};
+		}
+	});
+};
+
 export const expireAssumption: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ExpireAssumptionPayload;
 	return advanceStatus(ctx, command, {

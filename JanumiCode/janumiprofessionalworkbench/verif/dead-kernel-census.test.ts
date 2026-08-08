@@ -226,10 +226,16 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 		kind: 'DEFERRED',
 		why: 'Triage §4, W2. Acceptance assessment over a decomposition; no command surface produces its input.'
 	},
-	assessFalsification: {
-		kind: 'DEFERRED',
-		why: 'Triage §4, W2. Falsification assessment; same missing surface as assessAcceptance.'
-	},
+	// ~~assessFalsification~~ REMOVED 2026-08-08 (REG-F-069). It read: DEFERRED, "same missing surface as
+	// assessAcceptance" — and it acquired a production caller, `falsifyAssumption`. This census's own failure
+	// message calls that "DECLARED DEAD BUT NOW CALLED — this is the good failure", and deleting the row is the
+	// only response it permits: the symbol is not dead, so the row would be a false claim.
+	//
+	// ⚠ AND ITS SIBLING IS NOW THE STRONGER FINDING. `assessAcceptance` is still uncalled, and the two were
+	// deferred together on ONE stated reason — the missing command surface. That reason no longer holds for
+	// half the pair, so the remaining row's `why` is now the survivor of a premise that was disproved next to
+	// it: OBJ-4's other limb, "a critical assumption must be verified or explicitly accepted by authority",
+	// has the same shape as the limb just closed. Left DEFERRED deliberately rather than quietly rewritten.
 	canStartStep: {
 		kind: 'DEFERRED',
 		why: 'Triage §4, W3 execution harness (WP-3-005). The live start gate is canStartStepUnderPlan\'s wired sibling path; this bare form has no caller.'

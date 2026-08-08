@@ -117,6 +117,11 @@ describe('validate', () => {
 		// (ValidatorRegistryStatus / CostClass / LatencyClass), five commands and five events, less the two
 		// helper shapes that resolve rather than register.
 		// 341 -> 343 (2026-08-06, REG-D-024): `RecordClaimAssessmentPayload` and `ClaimUnderAssessmentPayload`.
-		expect(buildContractRegistry().ids()).toHaveLength(343);
+		// 343 -> 345 (2026-08-08, REG-F-069): `FalsifyAssumptionPayload` and `DiscloseAssumptionPayload`. Both
+		// COMMANDS are authored; both EVENTS were already ratified and already registered — `AssumptionFalsified`
+		// was the only member of RATIFIED_EVENT_PAYLOADS no handler emitted. The pair is indivisible: without
+		// DiscloseAssumption every source state of FALSIFIED is unoccupiable, so the falsification command would
+		// have registered, scored COVERED by the C-0 arrow census, and been unable to fire.
+		expect(buildContractRegistry().ids()).toHaveLength(345);
 	});
 });
