@@ -82,6 +82,58 @@ CLOSED.
 
 **Gate:** full. **Register:** closes the C-0 half of REG-F-063; the Harness itself stays OPEN.
 
+### ✅ LANDED 2026-08-08 — and the triage of its output changed what comes next
+
+Built on the TypeScript AST, not regexes: every failure the regex version produced was a PARSE
+failure, and the fourth patch shipped a silent drop (REG-F-063's commit records it). Baseline: **304
+declared arrows, 216 uncovered, 13 of 26 machines with no `advanceStatus` site**. Mutation measured —
+deleting an arrow reddens the total pin AND shrinks the uncovered list, which is the case the pin
+exists for.
+
+**A twelve-agent triage then read the output, and 58% of it is C-0's own blind spot** (REG-F-067):
+BLIND_SPOT 107 · UNBUILT_CAPABILITY 67 · DEFECT 2 · DEAD_ARROW 9, over the 185 largest. So **C-0's
+baseline is a WORKING LIST, not a defect count**, and nothing may quote a total from it as "N missing
+capabilities" until C-0a lands.
+
+#### C-0a — close the blind spot DECLARATIVELY, and add the occupancy check
+
+Two additions, and the second is the one C-0 could not have found in itself:
+
+1. **A `PWU_LIFECYCLE_COMMAND_SPECS` table in `rph-domain`**, modelled on `STEP_COMMAND_SPECS` — the
+   idiom C-0 already reads as data. Total over the seven commands, so an eighth cannot ship without a
+   row. Rows are `NARROWED` (six commands, fixed target, sources = the machine's in-arrows) or
+   `MACHINE_WIDE` (`ChangePwuState`, resolved through `WorkLifecycleStateSchema.options` — the
+   `Schema.options` path C-0 already supports). **The table must be the ENFORCEMENT POINT, not
+   documentation**: `advancePwuLifecycle` reads its target FROM the row, so a row that lies breaks the
+   handler rather than only the census. That is the WP-8 → WP-12 move this repository already made
+   once for step commands.
+2. **An initial-state OCCUPANCY check.** C-0 asks whether a COMMAND can perform an arrow;
+   `state-reachability.test.ts` asks whether a STATE is reachable in the DIAGRAM. **Neither asks
+   whether a state is ever actually written**, and an arrow out of an unoccupied source is dead
+   however many commands declare it. `AssuranceAssessment.state` proves it: `initialState:
+   'REQUESTED'` is never written (births land in `READY`/`EVIDENCE_PENDING`), so the census
+   simultaneously under-reports `REQUESTED → EVIDENCE_PENDING` and scores `REQUESTED → CANCELLED`
+   COVERED for a command that can never fire. Third instance of the pattern `dacabc0d` fixed.
+
+#### C-0b — the arrow-GUARD census (REG-F-070's general form)
+
+C-0 asks whether an arrow can be performed. It is **structurally blind to an arrow that can be
+performed by too many actors.** All seventeen `→ ABANDONED` arrows declare the guard *"Authorized
+decision (Decision.decisionType=ABANDON)"*; nothing enforces it, and a shipped test abandons a PWU
+with `reasonCode: 'fixture'`. **A declared guard on an arrow is a claim, and no control in this
+repository checks that arrow guards are enforced.** Canon names this one specifically —
+JPWB-DOC-001 §5.2, *"[Governance] alone authorizes … abandonment of governed work"*.
+
+#### Two defects the triage surfaced, now scheduled on their own merits
+
+- **REG-F-069 — Assumption falsification.** Canon-obliged (DOC-003 §3 OBJ-4, §6 STA-7),
+  contract-ratified (`AssumptionFalsifiedPayloadSchema`, the ONLY member of `RATIFIED_EVENT_PAYLOADS`
+  no handler emits), kernel-implemented (`assessFalsification`, no caller) — **and no command**. All
+  three halves exist and nothing joins them. Cheapest real capability in this list.
+- **REG-F-068 — `AssuranceAssessment.disposition`** is a nine-arrow machine over a field the ratified
+  schema does not have. Retire the machine declaratively; an EXEMPT entry would be a lie, because
+  this cannot be built without a field the schema forbids.
+
 ---
 
 ## ~~C-1 — DECISION joins the authoring turn's revision vector~~ WITHDRAWN 2026-08-08: VACUOUS
