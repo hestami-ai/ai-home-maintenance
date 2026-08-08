@@ -2192,5 +2192,51 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/evidence-invalidation-impact.test.ts'],
 		why: 'W1 WIRE #4: a partial disclosure leaves the un-named claims exactly as unre-contested as no disclosure',
 		source: 'W1 hollow-kernel triage — WIRE #4'
+	},
+
+	// ── D-1, THE TRUST BOUNDARY (REG-D-027, REG-D-028; REG-F-054..056, REG-F-061, REG-F-062) ────────────────────
+	//
+	// The guarantee D-1 buys is that NO SURFACE CAN AUTHOR AN ACTING IDENTITY. That is not one guard, it is four
+	// separable ones, and the four mutants below are one per limb. They were all applied and measured by hand at
+	// the point of landing — which, by this ledger's own founding argument, makes them CLAIMS until they are
+	// re-runnable. Recorded here the same day so they never become the eighty this file was built to replace.
+	{
+		id: 'D1-authenticator-defaults-instead-of-refusing',
+		file: 'apps/rph-demo/src/lib/server/identity.ts',
+		find: "\t\t\treturn principal ? { ok: true, principal } : { ok: false, reason: 'UNKNOWN_CREDENTIAL' };",
+		replace:
+			'\t\t\treturn { ok: true, principal: principal ?? PRINCIPALS[SESSION_CREDENTIAL]! }; // MUTANT: open directory',
+		expectRed: ['apps/rph-demo/src/lib/server/floor-recording.test.ts'],
+		why: "THE WHOLE GATE IS ON THIS SIDE OF THE PORT. `?? { ok: false }` rather than `?? SOME_PRINCIPAL` is the entire standalone adapter's contribution — a default here makes every refusal path in the engine unreachable FROM THE APP, and D-1 becomes decorative while every test that exercises the happy path stays green. The victim's third case is a purpose-built CONTROL with its own failure mode: it drives an unresolvable credential and asserts the floor records NOTHING. Observed: reddens that ONE case and leaves the two recording cases green, which is the right sensitivity — a mutant that reddened all three would be measuring the recording path over again rather than the directory.",
+		source: 'REG-D-027; DOC-004 §5; measured at 71573265'
+	},
+	{
+		id: 'D1-recorder-declares-its-own-issuer-again',
+		file: 'packages/rph-engine/src/record-assurance.ts',
+		find: '\t\t\tissuedAt: opts.issuedAt,\n\t\t\tcorrelationId: opts.correlationId,',
+		replace:
+			"\t\t\tissuedAt: opts.issuedAt,\n\t\t\tissuedBy: { actorId: 'assurance-svc', actorType: 'SERVICE', displayName: 'MUTANT' },\n\t\t\tcorrelationId: opts.correlationId,",
+		expectRed: ['apps/rph-demo/src/lib/server/floor-recording.test.ts'],
+		why: "THE REGRESSION THAT ACTUALLY HAPPENED, PRESERVED AS A MUTANT (REG-F-062). This exact line shipped and took nine e2e specs down while the product blamed the reviewer. It is a REINSTATEMENT mutant rather than a deletion one: the defect was an ADDED declaration, so the only faithful mutation is to add it back. Observed: reddens BOTH recording cases with the engine's own refusal text — `declares an issuer it is not: it names SERVICE assurance-svc while the authenticated principal is HUMAN local-professional` and the AGENT equivalent — and leaves the unauthenticated control green.",
+		source: 'REG-F-062; REG-D-027(b); measured at 71573265'
+	},
+	{
+		id: 'D1-stamp-corrects-a-disagreeing-issuer-instead-of-refusing',
+		file: 'packages/rph-application/src/command-bus.ts',
+		find: '\t\t\treturn refuse(\n\t\t\t\t`This command declares an issuer it is not:',
+		replace: '\t\t\tvoid refuse(\n\t\t\t\t`This command declares an issuer it is not:',
+		expectRed: ['verif/trust-boundary.test.ts'],
+		why: "SILENT CORRECTION IS THE FLATTERING FAILURE, AND IT LOOKS LIKE A FIX. Overwriting a disagreeing `issuedBy` produces a record showing the TRUE actor and no trace that anyone claimed otherwise — the audit trail is tidy and the forgery attempt is gone from it. Refusing is what makes the attempt observable, which is why the guarantee is 'refused, not corrected' rather than merely 'correct'. ⚠ THE OPERATOR IS THE CONSEQUENCE, NOT THE CONDITION, AND I LEARNED THAT THE HARD WAY HERE: the first version replaced the `if` test with `false` and reported NO_COMPILE — `declared &&` narrows `declared` for the refusal body's `String(declared.actorType)`, and TypeScript does not narrow inside statically dead code. That is the V-2c lesson firing on the very entry whose comment cited it, so the citation is kept as a warning rather than deleted. `void refuse(...)` keeps the check, keeps the narrowing, discards the refusal, and falls through to the stamp — which is exactly the silent overwrite.",
+		source: 'REG-D-027(b); DOC-004 §5; V-2c mutation-operator rule'
+	},
+	{
+		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
+		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
+		find: '\t\t\tauthority: actingActor(uiSession()),',
+		replace:
+			"\t\t\tauthority: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }, // MUTANT",
+		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
+		why: "REG-F-061 EXACTLY AS IT SHIPPED. Stamping covers the envelope and reaches no payload field that names an actor in its own right, so this literal survived the whole D-1 migration and refused every governance Decision the workbench proposed — `proposeDecision` compares payload authority to the stamped issuer (ASR-15) and `ui-user` is neither the issuer nor an identity any authenticator issues. THE VICTIM IS AN E2E, DELIBERATELY: no unit test drives this route's action, and naming a unit victim that does not exist is how a declared mutant becomes an unrunnable claim. If the e2e leg is not part of a given run this reports UNANCHORED-by-absence rather than a false KILL.",
+		source: 'REG-F-061; DOC-004 §5; measured at 71573265'
 	}
 ];
