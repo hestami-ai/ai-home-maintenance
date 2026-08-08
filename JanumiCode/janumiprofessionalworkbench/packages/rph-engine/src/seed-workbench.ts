@@ -202,7 +202,6 @@ function sender(handle: AuthedEngineHandle, prefix: string) {
 			targetAggregateType,
 			targetAggregateId,
 			issuedAt: '2026-07-12T00:00:00Z',
-			issuedBy: ACTOR,
 			correlationId: 'seed-workbench',
 			idempotencyKey: `${prefix}-idem-${n}`,
 			payload

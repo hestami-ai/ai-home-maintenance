@@ -42,9 +42,9 @@ export const UNKNOWN_CRED = 'ffffffff-x' as Credential;
 
 const DIRECTORY: Readonly<Record<string, Principal>> = {
 	[TEST_CRED.human]: {
-		actorId: 'user-1',
+		actorId: 'u1',
 		actorType: 'HUMAN',
-		displayName: 'Test Human',
+		displayName: 'Operator',
 		tenantId: TENANT,
 		organizationId: ORG
 	},
