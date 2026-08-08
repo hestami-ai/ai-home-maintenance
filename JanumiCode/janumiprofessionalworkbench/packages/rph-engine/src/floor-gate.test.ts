@@ -77,10 +77,12 @@ const rrSatisfied: Validator = {
 // against a PWA the floor never governed. The test would still pass its last line and prove nothing, which is
 // exactly the shape of vacuity this suite exists to refuse.
 //
-// SVC is the second: `recordAssuranceRecordingPlan` still DECLARES `issuedBy: opts.actor`, and a declared issuer
-// that disagrees with the session's principal is refused (RPH_AUTHENTICATION_REQUIRED) — the recorder throws on any
-// non-ACCEPTED result, so a mismatched session aborts the test rather than failing an assertion. It also seeds the
-// floor policies it then cites.
+// SVC is the second, and the REASON CHANGED under it — worth stating, because the parameter surviving a change in
+// why it matters is how a knob quietly becomes dead. It used to matter because `recordAssuranceRecordingPlan`
+// DECLARED `issuedBy: opts.actor`, so a session that disagreed was refused outright. That declaration is gone
+// (REG-F-062): the recorder now takes its issuer FROM the session, which means SVC is what lands in every recorded
+// assessment's `createdBy` — the assurance-recording arm is a different actor from the PWA's AGENT author, and this
+// suite reads `createdBy.actorType` to decide `aiProduced`. Collapse the two and the separation stops being tested.
 const DIR = testDirectory([
 	{ ...AGENT, tenantId: 'tenant-test', organizationId: 'org-test' },
 	{ ...SVC, tenantId: 'tenant-test', organizationId: 'org-test' }
@@ -198,7 +200,6 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 		expect(plan.gatePermitsTransition).toBe(true);
 		let idn = 0;
 		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
-			actor: SVC,
 			issuedAt: TS,
 			correlationId: 'floor',
 			idPrefix: 'rec',

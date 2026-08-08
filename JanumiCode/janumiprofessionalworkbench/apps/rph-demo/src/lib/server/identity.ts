@@ -15,6 +15,7 @@
 // record could not answer "who did what". Giving the agent its own credential is also what stops D-1 from
 // making forgeability LIVE: without it the broker's AGENT identity would fall dead the moment the engine began
 // stamping, and every agent-authored command would silently acquire the human's identity (REG-F-056).
+import type { ActorReference } from '@janumipwb/rph-contracts';
 import { asCredential, type AuthenticationPort, type Principal } from '@janumipwb/rph-ports';
 
 /**
@@ -74,6 +75,45 @@ const PRINCIPALS: Readonly<Record<string, Principal>> = {
 		organizationId: STANDALONE_ORG
 	}
 };
+
+/**
+ * The acting identity FOR A PAYLOAD THAT MUST NAME ONE — derived from authenticated context, never authored.
+ *
+ * Stamping covers the envelope (`issuedBy`); it does not reach the ratified payload fields that name an actor
+ * in their own right — a Decision's `authority` (ASR-15), an ExecutionAttempt's `executedBy`, an assessment's
+ * `evaluator`. Those surfaces filled them with the literal `{ actorId: 'ui-user', actorType: 'HUMAN' }`
+ * (REG-F-061): an identity no authenticator issues, no credential resolves to, and nothing could ever hold to
+ * account. `proposeDecision` compares its payload authority to the stamped issuer, so the fiction did not merely
+ * sit in the record — it refused every governance Decision the workbench tried to propose.
+ *
+ * ⚠ THROWS RATHER THAN DEFAULTS. An unresolved session has no true actor to name, and the two wrong answers
+ * are equally available: invent one, or reuse the last one. §13.3 names this case — "Fail closed on missing
+ * identity, tenant, POLICY, schema, or authority context" — and a surface that cannot say who is acting has
+ * nothing it is entitled to write.
+ */
+export function actingActor(session: { readonly principal: Principal | undefined }): ActorReference {
+	const p = session.principal;
+	if (!p) {
+		throw new Error(
+			'Fail-closed (§13.3): this action must name its acting professional in the command payload, and the ' +
+				'session credential did not resolve to a principal. No identity is substituted (DOC-004 §5).'
+		);
+	}
+	// A projection of the resolved principal onto the ratified wire shape — never a widening. `tenantId` /
+	// `organizationId` have no home on `ActorReference`; carrying them onto the record is D-3's work (REG-D-026)
+	// and is not smuggled through here.
+	return {
+		actorId: p.actorId,
+		actorType: p.actorType,
+		displayName: p.displayName,
+		...(p.roleId === undefined ? {} : { roleId: p.roleId }),
+		...(p.modelId === undefined ? {} : { modelId: p.modelId }),
+		...(p.providerId === undefined ? {} : { providerId: p.providerId }),
+		...(p.executionInstanceId === undefined
+			? {}
+			: { executionInstanceId: p.executionInstanceId })
+	};
+}
 
 /**
  * The standalone authenticator. CLOSED: an unrecognised credential is refused, never defaulted.

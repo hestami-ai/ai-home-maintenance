@@ -236,18 +236,26 @@ export function dispatch(
 	payload: unknown,
 	expectedRevision?: number
 ) {
-	return getEngine()
-		.as(SESSION_CREDENTIAL)
-		.dispatch(
-			uiCommand({ commandType, targetAggregateType, targetAggregateId, payload, expectedRevision })
-		);
+	return uiSession().dispatch(
+		uiCommand({ commandType, targetAggregateType, targetAggregateId, payload, expectedRevision })
+	);
 }
 
 /** Dispatch a multi-command UI operation atomically. A rejection rolls the entire operation back. */
 export function dispatchBatch(commands: readonly UiCommandInput[]) {
-	return getEngine()
-		.as(SESSION_CREDENTIAL)
-		.dispatchBatch(commands.map((command) => uiCommand(command)));
+	return uiSession().dispatchBatch(commands.map((command) => uiCommand(command)));
+}
+
+/**
+ * The workbench user's authenticated session — the ONE place `SESSION_CREDENTIAL` is presented for UI work.
+ *
+ * Routes need it for more than dispatch: a handful of ratified payloads must NAME the acting professional
+ * (`authority`, `executedBy`, `evaluator`), and `actingActor()` reads that off this session rather than letting
+ * each route write a literal. Exported so those routes derive the identity from the same authenticated context
+ * their commands are stamped from — two sources for one actor is how they drift apart (REG-F-061).
+ */
+export function uiSession(): AuthedEngineHandle {
+	return getEngine().as(SESSION_CREDENTIAL);
 }
 
 /** A PwaAuthoringBroker scoped to one DRAFT PWA, wired to the shared engine + this host's id/clock policy. Both the

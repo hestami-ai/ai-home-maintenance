@@ -85,11 +85,16 @@ export type ObjectEnvelope = z.infer<typeof ObjectEnvelopeSchema>;
  * WHAT IS ACTUALLY TRUE: `expectedRevision` is optional here, the engine honours it **when present**, and
  * supplying it is a SURFACE obligation the routes discharge one at a time.
  *
- * ── `issuedBy` IS REQUIRED HERE AND THAT IS SCHEDULED TO CHANGE (REG-D-027) ──────────────────────────────────
- * It becomes `.optional()` in the same increment that gives the engine an authenticated principal to stamp
- * from — not before. Widening it earlier would make every handler read of `command.issuedBy` optional while
- * the only correct replacement (the stamped principal) does not yet exist, so the field would be softened
- * with nothing standing behind it. The order is: stamp first, then widen.
+ * ── ~~`issuedBy` IS REQUIRED HERE AND THAT IS SCHEDULED TO CHANGE (REG-D-027)~~ IT IS NOW OPTIONAL ───────────
+ * ~~It becomes `.optional()` in the same increment that gives the engine an authenticated principal to stamp
+ * from — not before.~~ That increment landed; the field is `.optional()` below and the reasoning moved onto it.
+ * Struck rather than deleted: the sequencing constraint it records (stamp first, then widen — never the
+ * reverse) is the part a future reader needs, and it stopped being a plan the moment the stamp existed.
+ *
+ * ⚠ THIS HEADING WAS LEFT ASSERTING THE OPPOSITE OF THE SCHEMA BELOW FOR THE LENGTH OF ONE INCREMENT. In a
+ * file CON-000 B1 designates SHAPE AUTHORITY, that is the same defect the `expectedRevision` paragraph above
+ * records, committed in the act of fixing it — a caller reading the prose here would have concluded it must
+ * author an issuer, which is precisely the laundering shape REG-D-027 removed.
  */
 export function domainCommandSchema<T extends z.ZodTypeAny>(payload: T) {
 	return z.strictObject({

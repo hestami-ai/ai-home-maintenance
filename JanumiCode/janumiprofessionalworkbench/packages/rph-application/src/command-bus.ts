@@ -99,6 +99,21 @@ export interface ObjectPostconditionConflict {
  * There is also no positional credential to append, and therefore none to silently drop.
  */
 export interface AuthedEngine {
+	/**
+	 * WHO THIS SESSION IS — resolved from the credential, `undefined` when it did not resolve.
+	 *
+	 * This exists because some ratified PAYLOADS must NAME an actor: a Decision's `authority` (ASR-15), an
+	 * ExecutionAttempt's `executedBy` (§20 execution provenance), an assessment's evaluator. Stamping
+	 * `issuedBy` does not reach any of them, and before this the surfaces filled them with a hardcoded literal
+	 * — `ui-user`, an identity no authenticator has ever issued (REG-F-061). Reading the resolved principal is
+	 * JPWB-DOC-004 §5 performed rather than quoted: "derive tenant and principal context from authenticated
+	 * context, never from a payload's claim about itself."
+	 *
+	 * ⚠ IT IS NOT A CAPABILITY. A caller can only learn who it ALREADY is — it needs the credential to get
+	 * here, and it cannot construct a session for anyone else. `undefined` must be treated as a refusal, never
+	 * as a licence to substitute a default: a surface that cannot name its actor has nothing true to write.
+	 */
+	readonly principal: Principal | undefined;
 	dispatch(command: DomainCommand): CommandResult;
 	dispatchBatch(commands: readonly DomainCommand[]): BatchResult;
 	dispatchBatchGuarded(
@@ -147,6 +162,7 @@ export class Engine {
 		const principal = outcome.ok ? outcome.principal : undefined;
 		const reason = outcome.ok ? undefined : outcome.reason;
 		return {
+			principal,
 			dispatch: (command) => this.dispatchAs(principal, reason, command),
 			dispatchBatch: (commands) => this.dispatchBatchAs(principal, reason, commands),
 			dispatchBatchGuarded: (commands, preconditions, expectedEventCount, postconditions) =>

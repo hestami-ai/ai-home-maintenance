@@ -21,7 +21,7 @@ import {
 	recordAssuranceRecordingPlan,
 	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
-import type { ActorReference, AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { createFloorRegistry } from './assurance/index.js';
 import { SESSION_CREDENTIAL } from './identity.js';
 import { buildPwaExport, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
@@ -61,11 +61,17 @@ function reasoningReviewCriteria(engine: AuthedEngineHandle): readonly Assessmen
 	return criteria as AssessmentCriterion[];
 }
 
-const FLOOR_ACTOR: ActorReference = {
-	actorId: 'assurance-svc',
-	actorType: 'SERVICE',
-	displayName: 'Assurance Service'
-};
+// ⚠ `FLOOR_ACTOR` WAS HERE — `{ actorId: 'assurance-svc', actorType: 'SERVICE' }`, passed to
+// `recordAssuranceRecordingPlan` as the declared issuer of every assessment/observation command.
+//
+// It was a string, not an identity. No authenticator issued `assurance-svc`, no credential resolves to it, and
+// once the engine began stamping the authenticated principal the declaration became a DISAGREEMENT — refused
+// (REG-D-027(b)), which surfaced as `BLOCKED_EXTERNAL · the reviewer call failed` on every authoring turn that
+// reached assurance. The floor was not failing; recording its result was.
+//
+// The issuer is now the caller's authenticated handle, and the identity that carries assurance meaning — the
+// independent EVALUATOR §8.12 checks — was never this field: it rides in `validatorResult.executionProvenance`.
+
 /** The ACTUAL producer of the graph under review. §8.12 checks independence against real model/provider identity —
  *  "not a role label such as 'Verifier'" — so this is resolved per run and never a compile-time constant. It was
  *  previously the literal `authoring-executor`, which made `checkIndependence(DIFFERENT_MODEL, …)` a comparison of
@@ -322,7 +328,6 @@ export async function runPwaFloor(
 		createFloorRegistry({ testMode: isTestMode() })
 	);
 	recordAssuranceRecordingPlan(engine, plan, {
-		actor: FLOOR_ACTOR,
 		issuedAt: hostNow(),
 		correlationId: opts.candidateSubjectHash
 			? `authoring-floor:${opts.candidateSubjectHash}`

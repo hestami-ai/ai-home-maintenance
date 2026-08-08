@@ -181,6 +181,9 @@ function recordingEngine(
 		turn.detail = undefined;
 	};
 	const recorder: AuthedEngineHandle = {
+		// The recorder IS the delegate's identity, not a second one. Anything else would let a surface read one
+		// actor off this handle and have its commands recorded as another.
+		principal: delegate.principal,
 		/**
 		 * Re-binding produces a recorder bound to the NEW identity, never this one wearing another name.
 		 * Returning `recorder` unchanged would let a caller present any credential and still have the acts
