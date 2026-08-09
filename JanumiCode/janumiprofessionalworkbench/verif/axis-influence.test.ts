@@ -97,7 +97,7 @@ describe('which PWU axes actually gate a lifecycle transition', () => {
 		expect(M['PWU.workLifecycleState']!.transitions.length, 'the arrow set must be real').toBe(57);
 		expect(M['PWU.shapeIntegrityState']!.states.length, 'the varied value set must be real').toBe(7);
 		expect(
-			inf.executionState.length + inf.assuranceState.length,
+			inf.executionState!.length + inf.assuranceState!.length,
 			'if NO axis registers influence, the probe is broken and the pinned zero above means nothing'
 		).toBeGreaterThan(0);
 	});

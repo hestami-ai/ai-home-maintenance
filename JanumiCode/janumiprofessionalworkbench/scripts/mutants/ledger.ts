@@ -2238,5 +2238,40 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
 		why: "REG-F-061 EXACTLY AS IT SHIPPED. Stamping covers the envelope and reaches no payload field that names an actor in its own right, so this literal survived the whole D-1 migration and refused every governance Decision the workbench proposed — `proposeDecision` compares payload authority to the stamped issuer (ASR-15) and `ui-user` is neither the issuer nor an identity any authenticator issues. THE VICTIM IS AN E2E, DELIBERATELY: no unit test drives this route's action, and naming a unit victim that does not exist is how a declared mutant becomes an unrunnable claim. If the e2e leg is not part of a given run this reports UNANCHORED-by-absence rather than a false KILL.",
 		source: 'REG-F-061; DOC-004 §5; measured at 71573265'
+	},
+	// ── REG-F-096, THE EVIDENCE GATE'S REACHABILITY ─────────────────────────────────────────────────────────────
+	//
+	// ONE FIELD decides whether an assessment is born waiting for evidence or ready to be judged, and no production
+	// policy sets it to the value that gates. These three prove the census, the claim and the control each fail on
+	// their own — which is the property the split into separate `it`s exists to give them.
+	{
+		id: 'F096-catalog-requirement-gates-assessing',
+		file: 'packages/rph-product-realization-pwa/src/ontology.data.ts',
+		find: "\t\t\t\t\trequiredForDispositions: 'SATISFIED_ONLY',\n\t\t\t\t\tmayBeWaived: false\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\tid: 'EV-15-02',",
+		replace:
+			"\t\t\t\t\trequiredForDispositions: 'ALL',\n\t\t\t\t\tmayBeWaived: false\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\tid: 'EV-15-02',",
+		expectRed: ['verif/evidence-gate-reachability.test.ts'],
+		why: "THE CENSUS IS THE MECHANISM, so it must fail the moment the catalog stops being uniform. ⚠ THE BLAST RADIUS IS WIDER THAN THE NAMED VICTIM AND IS DISCLOSED RATHER THAN NARROWED: measured over `verif` + `rph-product-realization-pwa`, this reddens SIX tests in THREE files — the two census-reading tests here, `doc004-conformance.test.ts`'s uniformity assertion (which already guarded the field), and three in `causation-provenance.test.ts`, because an EVIDENCE_PENDING birth changes which commands the drive synthesizes. That third file is the useful surprise: it is independent corroboration that this field reaches the lifecycle, found by mutating rather than by reading. The victim is named narrowly so the verdict is attributable to THIS guard; the others are recorded here so the kill is not mistaken for exclusive.",
+		source: 'REG-F-096; DOC-004 §6.1 + §15.9; REG-E-026'
+	},
+	{
+		id: 'F096-blocking-set-stops-filtering-on-ALL',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		find:
+			"\t\t\t(r) =>\n\t\t\t\t(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'\n\t\t)\n\t\t.filter(demandsAnInstance)\n\t\t.map((r) => r?.id)\n\t\t.filter((id): id is string => typeof id === 'string');\n\t//\n\t// ── THE FLIP",
+		replace:
+			"\t\t\t(r) =>\n\t\t\t\t(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions !== undefined\n\t\t)\n\t\t.filter(demandsAnInstance)\n\t\t.map((r) => r?.id)\n\t\t.filter((id): id is string => typeof id === 'string');\n\t//\n\t// ── THE FLIP",
+		expectRed: ['verif/evidence-gate-reachability.test.ts'],
+		why: "THE CLAIM'S OWN MUTANT. Widening `blockingEvidenceIds` to every declared requirement makes the 13 catalog `SATISFIED_ONLY` items gate ASSESSING, so the production shape is born EVIDENCE_PENDING instead of READY. Observed: reddens the production-shape test ALONE — the census stays green (the catalog did not move) and the CONTROL stays green (an `ALL` requirement still lands EVIDENCE_PENDING, which this mutant cannot change). That one-test kill is what makes `READY` mean *this field decided it* rather than *nothing ever lands elsewhere*. ⚠ The anchor runs past the closing `.filter(...)` to `── THE FLIP` because the same `=== 'ALL'` predicate appears twice in this file — the second is `submitEvidenceForAssessment`'s outstanding-set — and a two-occurrence anchor reports UNANCHORED.",
+		source: 'REG-F-096; assurance.ts `blockingEvidenceIds`; DOC-004 §6.1'
+	},
+	{
+		id: 'F096-control-asks-for-the-production-shape',
+		file: 'verif/evidence-gate-reachability.test.ts',
+		find: "expect(birthStateFor('ALL')).toBe('EVIDENCE_PENDING');",
+		replace: "expect(birthStateFor('SATISFIED_ONLY')).toBe('EVIDENCE_PENDING');",
+		expectRed: ['verif/evidence-gate-reachability.test.ts'],
+		why: "THE CONTROL'S OWN MUTANT, which this repository has shipped three controls without. A control that only ever reddens alongside the test it guards proves nothing about the test; asking the control for the production shape removes its discriminating power and MUST redden it and nothing else. Observed: reddens the CONTROL alone, the production-shape test and both census tests staying green. Mutating a test file is deliberate here — the guarantee under test is *the probe can see the other outcome*, and that guarantee lives in the probe.",
+		source: 'REG-F-096; feedback: a control needs its own mutant'
 	}
 ];

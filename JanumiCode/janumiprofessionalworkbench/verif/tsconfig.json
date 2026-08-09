@@ -1,0 +1,24 @@
+{
+  // WHY THIS FILE EXISTS (REG-F-097, 2026-08-09).
+  //
+  // `bun run check-types` is `turbo run check-types`, which covers the WORKSPACES — `packages/*` and `apps/*`.
+  // `verif/` is neither, no tsconfig included it, and the root tsconfig has `include: []`. So the entire
+  // verification harness — C-0/C-0a/C-0b/C-0c/C-0d, the absence-claims gate, the mutant ledger's own integrity
+  // test, and the vitest setup files wired into every project — was typechecked by NOTHING. Vitest transpiles
+  // with esbuild, which strips types without checking them, so a control could call a method that no longer
+  // exists and still run green.
+  //
+  // That is not hypothetical: `unread-refusal-guard.ts` patched `Engine.prototype.dispatch`, the D-1 trust
+  // boundary removed that method on 2026-08-07, and REG-F-015's standing ratchet caught nothing for two days.
+  // The diagnostic naming the cause — "Property 'dispatch' does not exist on type 'Engine'" — was in the file
+  // the whole time.
+  //
+  // The root `check-types` script runs this leg AFTER turbo, because these files import `@janumipwb/*` from
+  // `dist`, which turbo's `^build` dependency produces.
+  "extends": "@janumipwb/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

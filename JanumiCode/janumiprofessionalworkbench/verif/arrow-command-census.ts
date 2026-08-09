@@ -169,7 +169,10 @@ function declaredRange(
 	// guard and this census together.
 	if (ts.isPropertyAccessExpression(init) && init.name.text === 'options' && ts.isIdentifier(init.expression)) {
 		const name = init.expression.text;
-		const schema = (CONTRACT_SCHEMAS as Record<string, { options?: readonly string[] }>)[name];
+		// `as unknown as` rather than a direct cast: the contracts module's type has no overlap with an index
+		// signature (it carries `RPH_CONTRACTS_VERSION: '0.0.0'` among the schemas), so tsc rejects the one-step
+		// form. The runtime guard on the next line is what makes the widening safe.
+		const schema = (CONTRACT_SCHEMAS as unknown as Record<string, { options?: readonly string[] }>)[name];
 		if (!schema?.options) fail(site, `targetStates reads ${name}.options, which is not an enum schema`);
 		return [...(schema as { options: readonly string[] }).options];
 	}

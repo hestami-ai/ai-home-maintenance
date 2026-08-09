@@ -27,7 +27,17 @@ import { seedPolicy } from './__tests__/floor-fixtures.js';
 import { commitState, makeEvent, type HandlerContext } from './kit.js';
 
 const TS = '2026-08-04T00:00:00Z';
-const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
+// ⚠ THIS MUST BE THE SESSION'S OWN PRINCIPAL, and it was `gov-1 / Governor` until 2026-08-09.
+//
+// REG-F-014's fix refuses a `ProposeDecision` whose declared `authority` is not the issuing actor, and this file
+// dispatches as `TEST_CRED.human` = `u1 / Operator`. So both governance dispatches in the arrangement below were
+// REFUSED, the authorizing decision never existed, and all four tests passed anyway — the two positive arms
+// legitimately (they assert the refusal GROUND, which promotion still reaches) and the CONTROL VACUOUSLY: it
+// asserts only that the message does not say `INCOMPLETE`, and a refusal about a missing decision does not.
+//
+// Found by the unread-refusal ratchet the moment it was revived (REG-F-097). This is REG-F-015's own shape,
+// caught by REG-F-015's own instrument, in a file written after both.
+const human = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'Operator' };
 const INTENT_ID = 'int_01ARZ3NDEKTSV4RRFFQ69G5J00';
 const PWU_ID = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5J01';
 const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5J02';
@@ -228,6 +238,21 @@ describe('PromoteBaseline: an assessment that has not concluded blocks promotion
 		);
 		dispatch('SubmitBaselineForReview', {}, { targetAggregateId: BASE });
 		dispatch('ApproveBaseline', {}, { targetAggregateId: BASE });
+
+		// ── THE ARRANGEMENT MUST HAVE HAPPENED, ASSERTED POSITIVELY ──────────────────────────────────────────
+		// Not "each dispatch was ACCEPTED" but "the state those dispatches exist to produce is here" — the same
+		// judgement `recordFloorAssessment` makes. For two days the two governance dispatches above were refused
+		// and this block arranged a baseline with NO authorizing decision; every test still passed, because each
+		// asserts a REFUSAL and a differently-caused refusal looks identical. A promotion test whose decision does
+		// not exist is testing the decision check, not the assessment check.
+		expect(
+			(store.loadObject(DEC)?.state as Record<string, string> | undefined)?.status,
+			'the promotion authority must be EFFECTIVE, or every refusal below could be about its absence'
+		).toBe('EFFECTIVE');
+		expect(
+			(store.loadObject(BASE)?.state as Record<string, string> | undefined)?.status,
+			'the baseline must be APPROVED and awaiting promotion, or `promote()` refuses on its status instead'
+		).toBe('APPROVED');
 	});
 
 	// THE TWO STATES THE OLD EXCLUSION MISSED. Each would have been reported COMPLETE, with the state name itself

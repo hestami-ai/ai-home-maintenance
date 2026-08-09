@@ -50,13 +50,8 @@ function testFrame(): string {
 		.join(' <- ');
 }
 
-const original = Engine.prototype.dispatch;
-
-Engine.prototype.dispatch = function patchedDispatch(
-	this: Engine,
-	command: DomainCommand
-): CommandResult {
-	const result = original.call(this, command);
+/** Wrap one refused result so the first property read marks it seen. ACCEPTED results are returned untouched. */
+function watch(result: CommandResult, command: DomainCommand): CommandResult {
 	if (result.status === 'ACCEPTED') return result;
 	const entry: PendingRefusal = {
 		read: false,
@@ -71,6 +66,34 @@ Engine.prototype.dispatch = function patchedDispatch(
 			return Reflect.get(target, key, receiver);
 		}
 	}) as CommandResult;
+}
+
+// ⚠ THE SEAM IS `as`, NOT `dispatch`, AND THIS GUARD WAS DEAD FOR TWO DAYS BECAUSE IT WAS THE OTHER WAY ROUND.
+//
+// As written on 2026-08-03 this file patched `Engine.prototype.dispatch`. On 2026-08-07 the D-1 trust boundary
+// (REG-D-027/REG-D-028) made the SESSION the only thing that can dispatch: `Engine` no longer has a public
+// `dispatch` at all — `as(credential)` returns a handle whose `dispatch` is a CLOSURE over the private
+// `dispatchAs`. So the prototype patch became an assignment to a property nobody calls, `original` became
+// `undefined`, and the ratchet caught nothing while every test stayed green. Measured, not inferred: a probe that
+// left a refusal wholly unread PASSED.
+//
+// AND THE ALARM EXISTED AND NOBODY HEARD IT. `Engine.prototype.dispatch` is a TYPE ERROR after that refactor —
+// *"Property 'dispatch' does not exist on type 'Engine'"* — sitting in this file the whole time. `verif/` was
+// outside `check-types` (no tsconfig included it; the root one has `include: []`), and vitest transpiles without
+// typechecking. See REG-F-097: the missing type gate is what let a standing ratchet die silently.
+//
+// Wrapping `as` is also the more durable seam: it is PUBLIC and it is the documented way to obtain a dispatcher,
+// so a further refactor of the internals cannot silently detach the guard again — and if `as` itself moves, the
+// type gate now reddens.
+const originalAs = Engine.prototype.as;
+
+Engine.prototype.as = function patchedAs(this: Engine, credential: Parameters<Engine['as']>[0]) {
+	const session = originalAs.call(this, credential);
+	const dispatch = session.dispatch;
+	return {
+		...session,
+		dispatch: (command: DomainCommand): CommandResult => watch(dispatch(command), command)
+	};
 };
 
 afterEach(() => {

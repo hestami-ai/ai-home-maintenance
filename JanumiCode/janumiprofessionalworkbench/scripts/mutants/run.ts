@@ -307,8 +307,21 @@ function runMutant(m: DeclaredMutant): Result {
 	}
 }
 
-/** `packages/rph-domain/src/x.ts` -> `packages/rph-domain`. */
-const pkgOf = (file: string): string => file.split('/').slice(0, 2).join('/');
+/**
+ * `packages/rph-domain/src/x.ts` -> `packages/rph-domain`; `verif/x.test.ts` -> `verif`.
+ *
+ * ⚠ THE SECOND CASE WAS MISSING AND IT REPORTED NO_COMPILE, WHICH READS LIKE A VERDICT. Blind two-segment slicing
+ * turns `verif/x.test.ts` into `verif/x.test.ts`, so the preflight typecheck ran `tsc -p verif/x.test.ts/tsconfig.json`
+ * and failed with TS5058 — a path error dressed as a compile verdict, on a mutant that in fact kills cleanly.
+ * `packages` and `apps` are the workspace roots and nest one level; every other top-level directory is its own
+ * project. Named explicitly rather than inferred from the presence of a tsconfig, because a MISSING tsconfig must
+ * stay loud: it means the mutated file is under no type gate at all, which is REG-F-097's whole subject.
+ */
+const NESTED_ROOTS = ['packages', 'apps'];
+const pkgOf = (file: string): string => {
+	const parts = file.split('/');
+	return NESTED_ROOTS.includes(parts[0] ?? '') ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
+};
 
 /** The app that owns the Playwright project. Its config, its webServer, its `bunx playwright test`. */
 const E2E_APP = 'apps/rph-demo';

@@ -29,7 +29,10 @@ const TS = '2026-08-07T00:00:00Z';
 
 describe('PER-4 — a surface command declares the revision it was rendered from', () => {
 	let store: SqliteStorageAdapter;
-	let engine: ReturnType<typeof createEngine>;
+	// The SESSION, not the handle: `createEngine(...)` yields an EngineHandle, and only what `.as()` returns
+	// can dispatch (D-1, REG-D-028). Typed as `ReturnType<typeof createEngine>` this file called a method the
+	// type does not have — invisible until `verif/` came under `check-types` (REG-F-097).
+	let engine: ReturnType<ReturnType<typeof createEngine>['as']>;
 	let seq = 0;
 
 	// THE SUBJECT IS A CLAIM, and the choice is deliberate rather than convenient. The seeded PWU Types cannot
