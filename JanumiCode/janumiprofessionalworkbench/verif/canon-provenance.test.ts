@@ -30,11 +30,13 @@ describe('P-2 — canon clause provenance and ratifying acts', () => {
 			ratifyingActs: ['REG-D-015'],
 			divergenceWouldBePermitted: true
 		});
-		for (const defective of ['ASR-14', 'ASR-16']) {
-			expect(b3Standing(defective), `${defective} is distilled with no act`).toMatchObject({
+		// ⚠ THESE TWO MOVED, LEGITIMATELY, AND THE MOVE IS THE POINT. Until REG-D-036 they were DISTILLED with no
+		// act — defective under B3, source controlling. REG-D-036 repaired both to match their sources, so they now
+		// carry an act. **The control below reddened the moment that happened**, which is what it is for.
+		for (const repaired of ['ASR-14', 'ASR-16']) {
+			expect(b3Standing(repaired), `${repaired} was repaired by REG-D-036`).toMatchObject({
 				provenance: 'DISTILLED',
-				ratifyingActs: [],
-				divergenceWouldBePermitted: false
+				ratifyingActs: ['REG-D-036']
 			});
 		}
 	});
@@ -57,7 +59,8 @@ describe('P-2 — canon clause provenance and ratifying acts', () => {
 		const acts = ratifyingActsFor('ASR-14');
 		expect(acts.every((a) => a.startsWith('REG-D-')), 'only decisions confer').toBe(true);
 		expect(acts).not.toContain('REG-F-094');
-		expect(acts).toEqual([]);
+		// REG-D-036 (the repair) is the ONLY act naming it; REG-F-094 merely diagnosed it.
+		expect(acts).toEqual(['REG-D-036']);
 	});
 
 	// ── TRAP 2: NOR IS BEING MENTIONED BY A DECISION ─────────────────────────────────────────────────────────
@@ -65,7 +68,9 @@ describe('P-2 — canon clause provenance and ratifying acts', () => {
 	// ASR-16 and PER-12 while merging into `JPWB-CON-000 B1 / B3 / B8` — it ratifies none of the three it
 	// discusses. The discriminator is the **Merge target** line, not the section body.
 	it('CONTROL — a decision that MENTIONS a clause has not ratified it; only its merge target counts', () => {
-		expect(ratifyingActsFor('ASR-16'), 'discussed by REG-D-034, merged by nothing').toEqual([]);
+		// REG-D-034 DISCUSSES ASR-16 and merges into B1/B3/B8; REG-D-036 MERGES INTO ASR-16. Only the
+		// second counts, and that distinction is the whole control.
+		expect(ratifyingActsFor('ASR-16')).toEqual(['REG-D-036']);
 		// And the positive half, so the filter is not simply rejecting everything: REG-D-015 DOES merge into
 		// PER-12, and must still be found.
 		expect(ratifyingActsFor('PER-12')).toEqual(['REG-D-015']);
@@ -84,16 +89,26 @@ describe('P-2 — canon clause provenance and ratifying acts', () => {
 	});
 
 	// ── CONTROL: THE SYSTEMIC READING, WHICH IS THE POINT OF THE WHOLE EXERCISE ──────────────────────────────
-	// Of 69 indexed clauses, NOT ONE carries a clause-level ratifying act. Under B3 that means essentially every
-	// canon clause is defective-if-divergent — its source controls unless someone rules otherwise. That is a
-	// large claim, so it is asserted rather than left implicit: if a future act ever ratifies a clause, this
-	// reddens and the systemic statement must be re-read rather than quietly outliving its truth.
-	it('CONTROL — no indexed clause yet carries a clause-level ratifying act', () => {
+	// Of 69 indexed clauses, exactly TWO carry a clause-level ratifying act — and both got theirs today, from the
+	// repair that closed their divergences. For the other 67, B3 means the clause is defective-if-divergent and
+	// its source controls unless someone rules otherwise. That is a large claim, so it is asserted rather than
+	// left implicit, and the list is pinned BY NAME: a clause gaining an act is a governance event, and the next
+	// one must be explained rather than absorbed into a count.
+	it('CONTROL — which clauses carry a clause-level ratifying act, by name', () => {
 		const idx = provenanceIndex();
 		const withActs = [...idx.keys()].filter((c) => ratifyingActsFor(c).length > 0);
-		expect(withActs, 'if this is no longer empty, B3 now permits a divergence somewhere — say where').toEqual(
-			[]
-		);
+		// WAS `[]` when this control shipped. REG-D-036 repaired ASR-14/ASR-16 and named them in its merge target,
+		// so both now carry an act — and the control reddened within the hour, exactly as its message demanded.
+		//
+		// ⚠ A LIMITATION THIS EXPOSED, RECORDED RATHER THAN ENGINEERED AWAY: an act that ALIGNS a clause with its
+		// source is not the same as an act AUTHORISING a divergence, but B3 says only "a ratifying act naming it"
+		// and this reader implements exactly that. So a FUTURE divergence of ASR-14 would read as permitted on the
+		// strength of the act that repaired it. B3 does not currently distinguish the two; that is a question for
+		// the sponsor, not a thing to paper over with a cleverer heuristic.
+		expect(withActs, 'a clause gaining an act is a real event — say which act and why').toEqual([
+			'ASR-14',
+			'ASR-16'
+		]);
 		expect(idx.size, 'and the population must be real for that zero to mean anything').toBeGreaterThan(60);
 	});
 });

@@ -3420,8 +3420,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor:
-				'no unresolved blocking or critical finding except through a policy-permitted scoped waiver',
-			note: 'JPWB-DOC-003 §8 ASR-16. Canon states the general form; the ratified rule instantiates it with tenant isolation, which the engine does NOT key on — see declaredMutations.'
+				'no unresolved critical finding, and blocking findings resolved or authorized through a policy-permitted scoped waiver',
+			note:
+				'JPWB-DOC-003 §8 ASR-16. Canon states the general form; the ratified rule instantiates it with tenant isolation, which the engine does NOT key on — see declaredMutations. ' +
+				'⚠ RE-ANCHORED 2026-08-09 (P-4): the previous anchor quoted ASR-16 BEFORE its repair — "no unresolved blocking OR CRITICAL finding EXCEPT through a policy-permitted scoped waiver" — which extended the waiver exception to critical findings, something the source forbids. This row therefore carried its rule on canon text that was DEFECTIVE under CON-000 B3. The repaired sentence separates the two and carries RPH-BAS-003 better, not worse. ' +
+				'AND THE ENGINE WAS ALREADY STRICTER THAN THE OLD TEXT: the gate keys on severity for BLOCKING and CRITICAL alike, and the waiver arm is starved of its argument (see the neighbour note below), so no code path ever waived a critical finding. The repair closed a canon defect, not a behaviour gap.'
 		},
 		enforcedAt:
 			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline, the OPEN_BLOCKING_FINDING arm. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline\'s guard, fed by observationsAgainstBaselineItems, which walks the event log for ASSURANCE_OBSERVATION objects whose subjectObjectIds intersect the baseline\'s OWN frozen item set and maps severity/disposition through BLOCKING_SEVERITIES and UNSETTLED_DISPOSITIONS.',

@@ -102,9 +102,20 @@ export function ratifyingActsFor(clause: string): string[] {
 			continue;
 		}
 		if (!current) continue;
-		if (!/^-\s+\*\*Merge target/.test(line.trim())) continue;
+		// Literal, not tolerant: censused across the register as 180 × `- **Merge target:** ` and 1 ×
+		// `- **Merge targets (a…`. Optional quantifiers here only bought SonarLint S8786 backtracking, and the
+		// paired test pins the population so a narrowing that loses lines fails there rather than silently.
+		const merge = /^- \*\*Merge targets?[:*]{0,3} ?(.*)$/.exec(line.trim());
+		if (!merge) continue;
+		// ⚠ TRAP 2, THIRD FORM — and I caused this one myself, minutes after gating against the first two.
+		// A register line is `- **Merge target:** <target>. **Status:** … **Next:** …`, and REG-D-035's own
+		// Merge-target line ended with "Next: P-4 (ASR-14/ASR-16 repairs)". Matching the whole LINE therefore
+		// reported REG-D-035 as ratifying the two clauses it merely scheduled — inverting the verdict for
+		// exactly the clauses the ruling is about, for the third distinct reason. Only the text BEFORE the next
+		// bold field label is the target.
+		const target = merge[1]!.split(/\*\*/)[0]!;
 		// Word-boundary match so `PER-1` does not match `PER-12`.
-		if (new RegExp(String.raw`\b${clause}\b`).test(line)) acts.push(current);
+		if (new RegExp(String.raw`\b${clause}\b`).test(target)) acts.push(current);
 	}
 	return [...new Set(acts)];
 }
