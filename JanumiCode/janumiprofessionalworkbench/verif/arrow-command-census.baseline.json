@@ -227,15 +227,10 @@
 		"Claim.status  CONDITIONALLY_SUPPORTED -> CONTESTED",
 		"Claim.status  CONDITIONALLY_SUPPORTED -> REJECTED",
 		"Claim.status  CONDITIONALLY_SUPPORTED -> SUPPORTED",
-		"Claim.status  CONDITIONALLY_SUPPORTED -> UNDER_ASSESSMENT"
+		"Claim.status  CONDITIONALLY_SUPPORTED -> UNDER_ASSESSMENT",
+		"ExecutionPlan.status  PROPOSED -> SUPERSEDED"
 	],
 	"unanalysed": [
-		"AssurancePolicy.status",
-		"Decision.status",
-		"ExecutionPlan.status",
-		"ExecutionStep.stepState",
-		"PWA.publicationStatus",
-		"RuntimeBinding.authorizationStatus",
-		"ValidatorRegistryEntry.status"
+		"ExecutionStep.stepState"
 	]
 }

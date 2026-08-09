@@ -242,6 +242,9 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: PWA,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// ⚠ NOTE THE FIELD: `publicationStatus`, not `status`.
+		births: [{ machine: 'PWA.publicationStatus', statusField: 'publicationStatus', values: ['DRAFT'] }],
 		aggregateId: p.pwaId,
 		state,
 		eventType: 'PwaCreated',
@@ -480,6 +483,8 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	return withPwaVersionBump(ctx, command, p.pwaId, () =>
 		createObject(ctx, command, {
 			objectType: PWU_TYPE,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		births: [{ machine: 'PwuType.status', statusField: 'status', values: ['DRAFT'] }],
 			aggregateId: p.pwuTypeId,
 			state,
 			eventType: 'PwuTypeDefined',
@@ -1072,6 +1077,8 @@ export const createUndertaking: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: UNDERTAKING,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		births: [{ machine: 'Undertaking.status', statusField: 'status', values: ['ACTIVE'] }],
 		aggregateId: p.undertakingId,
 		state,
 		eventType: 'UndertakingCreated',

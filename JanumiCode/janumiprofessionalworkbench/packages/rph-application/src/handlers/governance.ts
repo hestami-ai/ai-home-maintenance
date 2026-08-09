@@ -224,6 +224,8 @@ export const proposeDecision: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: DECISION,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		births: [{ machine: 'Decision.status', statusField: 'status', values: ['PROPOSED'] }],
 		aggregateId: id,
 		state,
 		eventType: 'DecisionProposed',
@@ -575,6 +577,11 @@ export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: DECISION,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// RequestWaiver mints a DECISION too, and it is born PROPOSED like ProposeDecision above — NOT EFFECTIVE.
+		// Making a decision effective is `makeDecisionEffective` (governance.ts:274) with `fromStates('PROPOSED')`:
+		// an ARROW, not a birth. Adding EFFECTIVE here 'to be safe' would falsely widen the occupancy claim.
+		births: [{ machine: 'Decision.status', statusField: 'status', values: ['PROPOSED'] }],
 		aggregateId: id,
 		state,
 		// REG-F-020 — CLOSED by widening the AUTHORED shape, which is what was actually wrong.

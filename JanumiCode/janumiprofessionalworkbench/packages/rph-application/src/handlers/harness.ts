@@ -33,6 +33,10 @@ export const proposeHarness: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: HARNESS,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// ⚠ THE MACHINE KEY IS NOT INFERABLE FROM THE OBJECT TYPE: objectType is RECURSIVE_PROFESSIONAL_HARNESS and
+		// the machine is `Harness.status`. This is the first machine-name reference in this file.
+		births: [{ machine: 'Harness.status', statusField: 'status', values: ['FRAMING'] }],
 		aggregateId: id,
 		state,
 		eventType: 'HarnessProposed',

@@ -232,6 +232,12 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 	};
 	return createObject(ctx, command, {
 		objectType: POLICY,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// TWO VALUES, AND THE SECOND IS NOT DEFENSIVE PADDING: `bornStatus` at assurance.ts:178 is
+		// `FLOOR_POLICY_ID_SET.has(p.policyId) ? 'ACTIVE' : 'DRAFT'`. Catalog policies are born DRAFT and must be
+		// activated; the three de minimis FLOOR policies are LOCKED and cannot be activated, so they MUST be born
+		// ACTIVE. Declaring only one would make the other genuinely-occupied state look unoccupiable.
+		births: [{ machine: 'AssurancePolicy.status', statusField: 'status', values: ['ACTIVE', 'DRAFT'] }],
 		aggregateId: p.policyId,
 		state,
 		eventType: 'AssurancePolicyCreated'
@@ -2175,6 +2181,10 @@ export const recordAssuranceObservation: CommandHandler = (ctx, command, payload
 	// it rather than inventing a second, differently-wrong value.
 	return createObject(ctx, command, {
 		objectType: OBSERVATION,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// ⚠ NOTE THE FIELD: `disposition`, not `status`. The envelope's `lifecycleStatus` is also 'OPEN' here, which
+		// is a coincidence of this handler and not the machine's field.
+		births: [{ machine: 'AssuranceObservation.disposition', statusField: 'disposition', values: ['OPEN'] }],
 		aggregateId: id,
 		state,
 		eventType: 'AssuranceObservationRecorded',

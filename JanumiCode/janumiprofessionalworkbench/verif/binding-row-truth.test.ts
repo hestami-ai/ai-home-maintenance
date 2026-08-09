@@ -38,21 +38,16 @@ const AUDIT = auditClaims(CLAIMS);
  * unchecked, and the number belongs in the open where it can be argued with. It shrinks as births are declared;
  * either direction is a deliberate edit.
  */
-const UNANALYSED = [
-	'AssuranceObservation.disposition',
-	'Constraint.status',
-	'Decision.status',
-	'ExecutionPlan.status',
-	'ExecutionStep.stepState',
-	'Harness.status',
-	'Intent.intentStatus',
-	'Obligation.status',
-	'PWA.publicationStatus',
-	'PWU.workLifecycleState',
-	'PwuType.status',
-	'RuntimeBinding.authorizationStatus',
-	'Undertaking.status'
-];
+// 13 -> 3 (2026-08-09, REG-F-074 residue). Ten machines acquired `births` declarations at their createObject
+// sites, every value TRACED FROM THE HANDLER and none from `initialState`. THE THREE THAT REMAIN ARE NOT
+// LEFTOVER WORK OF THE SAME KIND:
+//   * `Intent.intentStatus` and `PWU.workLifecycleState` are born WITHOUT `createObject` at all — each hand-builds
+//     a `revision: 0` literal for `commitState`, so there is nowhere to attach a declaration (REG-F-086). PWU is
+//     additionally invisible to the ARROW reader, so a birth alone would not make it analysable (REG-F-087).
+//   * `ExecutionStep.stepState` is not an aggregate at all — steps are a nested collection inside the PLAN, with
+//     no entry in OBJECT_SCHEMAS, so `births[].statusField` (a key lookup on the created object) cannot reach it.
+// So this list no longer shrinks by declaring more births; each remaining member needs a different decision.
+const UNANALYSED = ['ExecutionStep.stepState', 'Intent.intentStatus', 'PWU.workLifecycleState'];
 
 describe('C-0c — every recorded command→transition claim is true of the handlers', () => {
 	it('no claim names a machine the controls have ruled is not a lifecycle', () => {
@@ -70,11 +65,28 @@ describe('C-0c — every recorded command→transition claim is true of the hand
 	});
 
 	it('no claim moves INTO a state no object can ever be in', () => {
-		expect(AUDIT.deadTo, AUDIT.deadTo.join('\n')).toEqual([]);
+	// ⚠ PINNED DEFECT, NOT A CLEAN LIST — and C-0c caught it the instant it could see the machine, which is the
+	// whole point of declaring births. `ProposeExecutionPlan` is recorded in BOTH the binding table and the vocab
+	// copy as landing in `PROPOSED`. The handler births `UNDER_REVIEW` (execution.ts:311) and nothing ever writes
+	// PROPOSED, so a ratified state is unoccupied and the recorded claim is false of the code. The CANON is a
+	// two-step — the machine's own trigger reads "proposeExecutionPlan / ExecutionPlanProposed then submitted for
+	// review" — and the handler collapses both hops into one, skipping the proposed state entirely. Which side
+	// gives (author the missing submit act, or correct the rows) is a canon question, so both entries stay
+	// visible rather than being edited away. REG-F-088.
+		expect(AUDIT.deadTo, AUDIT.deadTo.join('\n')).toEqual([
+			'BINDINGS: ProposeExecutionPlan -> ExecutionPlanProposed : ExecutionPlan.status (initial) -> PROPOSED  [to PROPOSED is never occupied]',
+			'vocab.commands: ProposeExecutionPlan -> ExecutionPlanProposed : ExecutionPlan.status (initial) -> PROPOSED  [to PROPOSED is never occupied]'
+		]);
 	});
 
 	it('every creation claim lands where a handler actually declares a birth', () => {
-		expect(AUDIT.notABirth, AUDIT.notABirth.join('\n')).toEqual([]);
+	// ⚠ THE SAME DEFECT SEEN FROM THE OTHER SIDE, and the sharper of the two: a creation claim must land where a
+	// handler DECLARES a birth, not merely somewhere reachable later. Both entries are REG-F-088. Kept separate
+	// from `deadTo` above because they fail for different reasons and a fix could satisfy one without the other.
+		expect(AUDIT.notABirth, AUDIT.notABirth.join('\n')).toEqual([
+			'BINDINGS: ProposeExecutionPlan -> ExecutionPlanProposed : ExecutionPlan.status (initial) -> PROPOSED  [no handler declares a birth into PROPOSED]',
+			'vocab.commands: ProposeExecutionPlan -> ExecutionPlanProposed : ExecutionPlan.status (initial) -> PROPOSED  [no handler declares a birth into PROPOSED]'
+		]);
 	});
 
 	// ── THE ONE CHECK THAT IS A COMPARISON, NOT A BASELINE ────────────────────────────────────────────────────

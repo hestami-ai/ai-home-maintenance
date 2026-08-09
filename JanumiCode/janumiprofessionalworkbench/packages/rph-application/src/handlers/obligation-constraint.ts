@@ -35,6 +35,8 @@ export const assertObligation: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: OBLIGATION,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		births: [{ machine: 'Obligation.status', statusField: 'status', values: ['PROPOSED'] }],
 		aggregateId: id,
 		state,
 		eventType: 'ObligationAsserted',
@@ -70,6 +72,10 @@ export const assertConstraint: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: CONSTRAINT,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// Same literal as Obligation above, and traced independently rather than inherited — these are DIFFERENT
+		// machines with different state sets that happen to share this initial value.
+		births: [{ machine: 'Constraint.status', statusField: 'status', values: ['PROPOSED'] }],
 		aggregateId: id,
 		state,
 		eventType: 'ConstraintAsserted',

@@ -70,6 +70,10 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 	};
 	return createObject(ctx, command, {
 		objectType: BINDING,
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// ⚠ NOTE THE FIELD: `authorizationStatus`, not `status`. `lifecycleStatus` mirrors the same value here, so a
+		// wrong statusField would still parse — createObject's own birth check (kit.ts:567) is what catches it.
+		births: [{ machine: 'RuntimeBinding.authorizationStatus', statusField: 'authorizationStatus', values: ['REQUESTED'] }],
 		aggregateId: p.runtimeBindingId,
 		state,
 		eventType: 'RuntimeBindingRequested',

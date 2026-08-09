@@ -37,6 +37,13 @@ export const registerValidator: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RegisterValidatorPayload;
 	return createObject(ctx, command, {
 		objectType: ENTRY,
+		// JAN-PWUWP / REG-F-074 residue: traced from validator-registry.ts:51 (`status: 'ACTIVE'`, unconditional),
+		// not from the machine's `initialState` — which happens to agree here, but is a fiction on four machines
+		// (REG-F-071), so agreement is corroboration and never the source.
+		// ⚠ THE LITERAL, NOT THE `MACHINE` CONST: the census requires `births[].machine` to be a string literal so
+		// it can be read from the AST without evaluating the module. Using the const threw outright — a loud
+		// failure, which is the right one; a reader that silently skipped it would have left this machine blind.
+		births: [{ machine: 'ValidatorRegistryEntry.status', statusField: 'status', values: ['ACTIVE'] }],
 		aggregateId: p.validatorId,
 		state: {
 			...newEnvelope(command, ENTRY, p.validatorId, { lifecycleStatus: 'ACTIVE' }),
