@@ -27,6 +27,7 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { expectPwuReplayEquivalence } from './__tests__/pwu-fixtures.js';
 import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
 
 const TS = '2026-08-08T00:00:00Z';
@@ -293,6 +294,10 @@ describe('REG-F-078 — rejecting governed work requires an authorized decision 
 		const dec = decision('REJECTION', [PWU]);
 		ok(rejectWork(dec, [obs]), 'authorized, evidenced rejection');
 		expect(lifecycle()).toBe('REJECTED');
+		// REG-F-084: a fold entry is load-bearing only where a test EMITS the event. This is the one place in
+		// the repository that emits `PwuRejected` — the reference undertaking never rejects — so without this line
+		// `pwu-replay.ts` could drop the case and stay green, which is exactly what W-5's mutant proved.
+		expectPwuReplayEquivalence(store, PWU);
 	});
 
 	// ── ONE REJECT PER CONJUNCT ───────────────────────────────────────────────────────────────────────────────

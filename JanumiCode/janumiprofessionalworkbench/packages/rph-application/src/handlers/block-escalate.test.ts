@@ -12,10 +12,12 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
-import { replayPwuAxes } from '@janumipwb/rph-projections';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
+import {
+	expectPwuReplayEquivalence,
+	seedPwuWorkLifecycleState_FIXTURE
+} from './__tests__/pwu-fixtures.js';
 
 const TS = '2026-08-09T00:00:00Z';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H9100';
@@ -51,23 +53,7 @@ describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 		store.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU).map((e) => e.eventType);
 
 
-	/**
-	 * The materialized object vs. the SAME object rebuilt from its own event stream. RPH-PER-006's property,
-	 * asserted where the events actually occur rather than only over the reference seed.
-	 */
-	const replayMatchesMaterialized = () => {
-		const replayed = replayPwuAxes(store.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU));
-		const materialized = store.loadObject(PWU)!.state as Record<string, string>;
-		expect(replayed, 'the stream did not rebuild at all').toBeDefined();
-		for (const axis of [
-			'workLifecycleState',
-			'executionState',
-			'assuranceState',
-			'shapeIntegrityState'
-		] as const) {
-			expect(replayed![axis], `${axis} diverged on rebuild`).toBe(materialized[axis]);
-		}
-	};
+	const replayMatchesMaterialized = () => expectPwuReplayEquivalence(store, PWU);
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;

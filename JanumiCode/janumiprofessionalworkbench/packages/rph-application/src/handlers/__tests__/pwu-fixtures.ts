@@ -19,6 +19,8 @@
 import { ProfessionalWorkUnitSchema } from '@janumipwb/rph-contracts';
 import { getMachine } from '@janumipwb/rph-domain';
 import type { StorageAdapter } from '@janumipwb/rph-ports';
+import { replayPwuAxes } from '@janumipwb/rph-projections';
+import { expect } from 'vitest';
 
 let seq = 0;
 
@@ -73,4 +75,33 @@ export function seedPwuWorkLifecycleState_FIXTURE(
 		throw new Error(
 			`seedPwuWorkLifecycleState_FIXTURE: commit refused for ${pwuId} (${result.reason}, actual revision ${String(result.actualRevision)})`
 		);
+}
+
+/**
+ * The materialized PWU vs. the SAME PWU rebuilt from its own event stream — RPH-PER-006's property, asserted
+ * WHERE THE EVENTS OCCUR.
+ *
+ * ⚠ THIS EXISTS BECAUSE CO-LOCATION WAS NOT ENOUGH, twice. W-1 added `PwuAbandoned`/`PwuRejected` to the emitters
+ * and to nothing else; W-4.5 derived the rule "fold the event in the commit that mints it" and W-5 obeyed it — and
+ * a mutant still deleted BOTH of W-5's fold cases with 1203 tests staying green. The entries were dead code,
+ * because `replay-equivalence.test.ts` walks the reference undertaking and the seed neither blocks nor escalates.
+ *
+ * The corrected rule, and the reason this is a shared helper rather than three copies: A FOLD ENTRY IS
+ * LOAD-BEARING ONLY WHEN A TEST EMITS THE EVENT. Being in the right commit proves nothing; only a drive does.
+ * `verif/pwu-fold-drive-sites.test.ts` names the site for every owned arrow and fails when a new command
+ * arrives without one. (REG-F-084)
+ */
+export function expectPwuReplayEquivalence(store: StorageAdapter, pwuId: string): void {
+	const replayed = replayPwuAxes(store.readAggregateEvents('PROFESSIONAL_WORK_UNIT', pwuId));
+	const materialized = store.loadObject(pwuId)?.state as Record<string, string> | undefined;
+	expect(materialized, `PWU ${pwuId} is not materialized`).toBeDefined();
+	expect(replayed, `PWU ${pwuId} did not rebuild from its own stream at all`).toBeDefined();
+	for (const axis of [
+		'workLifecycleState',
+		'executionState',
+		'assuranceState',
+		'shapeIntegrityState'
+	] as const) {
+		expect(replayed![axis], `${pwuId}.${axis} diverged on rebuild`).toBe(materialized![axis]);
+	}
 }

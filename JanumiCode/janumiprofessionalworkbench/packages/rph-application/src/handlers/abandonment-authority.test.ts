@@ -27,6 +27,7 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { expectPwuReplayEquivalence } from './__tests__/pwu-fixtures.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import type { HandlerContext } from './kit.js';
 
@@ -236,6 +237,10 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 		expect(
 			(store.loadObject(PWU)!.state as { workLifecycleState: string }).workLifecycleState
 		).toBe('ABANDONED');
+		// REG-F-084: a fold entry is load-bearing only where a test EMITS the event. This is the one place in
+		// the repository that emits `PwuAbandoned` — the reference undertaking never abandons — so without this line
+		// `pwu-replay.ts` could drop the case and stay green, which is exactly what W-5's mutant proved.
+		expectPwuReplayEquivalence(store, PWU);
 	});
 
 	// ── ONE REJECT PER CONJUNCT ───────────────────────────────────────────────────────────────────────────────

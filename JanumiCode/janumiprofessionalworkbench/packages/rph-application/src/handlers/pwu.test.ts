@@ -9,6 +9,7 @@ import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
+import { expectPwuReplayEquivalence } from './__tests__/pwu-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Alice' };
@@ -940,6 +941,9 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			'ACCEPTED'
 		);
 		expect(lifecycle()).toBe('SUPERSEDED');
+		// REG-F-084: folding `PwuSuperseded` proves nothing unless a test EMITS it. The reference undertaking does not
+		// reach this arrow, so this is the drive site `pwu-fold-drive-sites.test.ts` names for it.
+		expectPwuReplayEquivalence(store, PWU_ID);
 	});
 
 	// ── THE THREE COMMANDS NOTHING HAD EVER DISPATCHED (2026-08-03) ───────────────────────────────────────────
@@ -973,6 +977,9 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(lifecycle()).toBe('CHALLENGED');
 		expect(eventsOfType('PwuChallenged')).toHaveLength(1);
+		// REG-F-084: folding `PwuChallenged` proves nothing unless a test EMITS it. The reference undertaking does not
+		// reach this arrow, so this is the drive site `pwu-fold-drive-sites.test.ts` names for it.
+		expectPwuReplayEquivalence(store, PWU_ID);
 	});
 
 	it('ReshapePwu drives UNDER_ASSURANCE -> RESHAPING', () => {
@@ -983,6 +990,9 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(lifecycle()).toBe('RESHAPING');
 		expect(eventsOfType('PwuReshapingStarted')).toHaveLength(1);
+		// REG-F-084: folding `PwuReshapingStarted` proves nothing unless a test EMITS it. The reference undertaking does not
+		// reach this arrow, so this is the drive site `pwu-fold-drive-sites.test.ts` names for it.
+		expectPwuReplayEquivalence(store, PWU_ID);
 	});
 
 	// ── AN INVALIDATION MUST NAME WHAT TRIGGERED IT (2026-08-04) ──────────────────────────────────────────────
@@ -1074,6 +1084,9 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		);
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(lifecycle()).toBe('INVALIDATED');
+		// REG-F-084: folding `PwuInvalidated` proves nothing unless a test EMITS it. The reference undertaking
+		// does not reach this arrow, so this is the drive site `pwu-fold-drive-sites.test.ts` names for it.
+		expectPwuReplayEquivalence(store, PWU_ID);
 		const emitted = eventsOfType('PwuInvalidated');
 		expect(emitted).toHaveLength(1);
 		expect(
