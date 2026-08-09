@@ -70,6 +70,35 @@ function commandsNamedIn(trigger: string): string[] {
  */
 export type TriggerProvenance = 'VERBATIM' | 'RECONSTRUCTED' | 'OTHER';
 
+/**
+ * ARROW-LEVEL provenance, which is finer and more accurate than the machine-level answer below.
+ *
+ * ⚠ THE VOCAB CARRIES A `note` ON EVERY TRANSITION, and I missed it twice. First I asserted provenance without
+ * reading any; then, correcting that, I read only the machine's `sourceSection` and reported the agent who
+ * pointed at a per-transition `note` as having cited something that did not exist. It does exist — in the VOCAB.
+ * The GENERATED `transitions.data.ts` drops the field, which is why grepping there found zero.
+ *
+ * MULTI-SOURCE ROWS USE `/`, NOT `|` (e.g. `PRESERVED/AT_RISK -> VIOLATED`), and the generator expands them —
+ * which is why the vocab has 211 rows and the machines expose 304 arrows. Expanded here so an arrow resolves to
+ * the row it came from. My first scan for multi-source rows checked `|`, `(` and `,` and missed every one.
+ */
+export function provenanceOfArrow(machine: string, from: string, to: string): TriggerProvenance {
+	const spec = JSON.parse(readFileSync(M2_VOCAB, 'utf8')) as {
+		machines: { name: string; transitions?: { from?: string; to?: string; note?: string }[] }[];
+	};
+	const rows = spec.machines.find((m) => m.name === machine)?.transitions ?? [];
+	const row = rows.find(
+		(t) => (t.from ?? '').split('/').includes(from) && t.to === to
+	);
+	// A row with no note falls back to the machine's own sourceSection rather than being called OTHER — absence of
+	// a per-arrow note is not evidence the arrow is unsourced.
+	if (!row) return provenanceOf(machine);
+	const note = row.note ?? '';
+	if (/RECONSTRUCT/i.test(note)) return 'RECONSTRUCTED';
+	if (/§\s*\d/.test(note)) return 'VERBATIM';
+	return provenanceOf(machine);
+}
+
 export function provenanceOf(machine: string): TriggerProvenance {
 	// `machines` is an ARRAY of { name, sourceSection, … }, not a map. The first version of this read it as a map
 	// and returned 'OTHER' for EVERY machine — including `PWU.workLifecycleState`, which is known VERBATIM. That

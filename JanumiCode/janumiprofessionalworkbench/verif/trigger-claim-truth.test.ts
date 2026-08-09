@@ -16,7 +16,7 @@
 import { STATE_MACHINES } from '@janumipwb/rph-domain';
 import { describe, expect, it } from 'vitest';
 import { auditClaims } from './binding-row-truth.js';
-import { provenanceOf, triggerClaims, triggerCoverage } from './trigger-claim-truth.js';
+import { provenanceOf, provenanceOfArrow, triggerClaims, triggerCoverage } from './trigger-claim-truth.js';
 
 const AUDIT = auditClaims(triggerClaims());
 
@@ -95,10 +95,27 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	// Shipped asserting the trigger is "the corpus itself" and outranks the authored rows. `m2-transitions.json`
 	// records provenance per machine, and for 18 of 27 the transitions are an author's RECONSTRUCTION — the states
 	// verbatim, the arrows and triggers inferred from events + commands + invariants, with "NO explicit matrix".
-	it('PINNED — how many machines actually carry VERBATIM transitions', () => {
-		const counts: Record<string, number> = { VERBATIM: 0, RECONSTRUCTED: 0, OTHER: 0 };
-		for (const m of Object.keys(STATE_MACHINES as Record<string, unknown>)) counts[provenanceOf(m)]! += 1;
-		expect(counts).toEqual({ VERBATIM: 3, RECONSTRUCTED: 18, OTHER: 6 });
+	it('PINNED — how many machines carry VERBATIM transitions, and how many ARROWS do', () => {
+		const byMachine: Record<string, number> = { VERBATIM: 0, RECONSTRUCTED: 0, OTHER: 0 };
+		for (const m of Object.keys(STATE_MACHINES as Record<string, unknown>)) byMachine[provenanceOf(m)]! += 1;
+		expect(byMachine, 'machine-level, from each machine sourceSection').toEqual({
+			VERBATIM: 3,
+			RECONSTRUCTED: 18,
+			OTHER: 6
+		});
+
+		// ⚠ ARROW-LEVEL IS THE HONEST NUMBER, and it is finer than the machine-level one: a machine whose
+		// sourceSection says RECONSTRUCTED can still carry individually-cited arrows, and vice versa. 60% of the
+		// ratified arrow surface is an author's reconstruction.
+		const M = STATE_MACHINES as unknown as Record<string, { transitions: { from: string; to: string }[] }>;
+		const byArrow: Record<string, number> = { VERBATIM: 0, RECONSTRUCTED: 0, OTHER: 0 };
+		for (const [name, m] of Object.entries(M))
+			for (const t of m.transitions) byArrow[provenanceOfArrow(name, t.from, t.to)]! += 1;
+		expect(byArrow, 'arrow-level, from each transition note').toEqual({
+			VERBATIM: 97,
+			RECONSTRUCTED: 182,
+			OTHER: 25
+		});
 	});
 
 	// ⚠ THE FINDING THAT MATTERS MORE THAN THE FOUR ROWS THEMSELVES: **not one of the divergences C-0d found sits
@@ -123,6 +140,16 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	// whose answer I already knew. Fourth instrument failure of the day — same remedy each time.
 	it('CONTROL — provenanceOf returns VERBATIM for a machine known to be verbatim', () => {
 		expect(provenanceOf('PWU.workLifecycleState'), 'source: "§8.1 primary (VERBATIM)"').toBe('VERBATIM');
+		// The arrow-level reader needs its OWN control: it resolves a row by splitting `from` on '/', and a bug
+		// there would silently fall back to the machine answer for every multi-source arrow.
+		expect(
+			provenanceOfArrow('PWU.workLifecycleState', 'SHAPING', 'READY'),
+			'an individually-cited arrow'
+		).toBe('VERBATIM');
+		expect(
+			provenanceOfArrow('PWU.shapeIntegrityState', 'AT_RISK', 'VIOLATED'),
+			"a MULTI-SOURCE row ('PRESERVED/AT_RISK -> VIOLATED') must resolve, not fall through"
+		).toBe('RECONSTRUCTED');
 		expect(provenanceOf('ExecutionPlan.status'), 'source says transitions RECONSTRUCTED').toBe('RECONSTRUCTED');
 	});
 

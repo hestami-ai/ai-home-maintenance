@@ -64,6 +64,27 @@ describe('which PWU axes actually gate a lifecycle transition', () => {
 		]);
 	});
 
+	// ── THE TOPOLOGY W-4'S BLOCK RESTS ON (REG-F-092) ────────────────────────────────────────────────────────
+	// W-4 is blocked because ONE undefined predicate kills seven arrows, and that conclusion depends entirely on
+	// the machine's SHAPE: `AT_RISK` has exactly two exits and both are blocked (so flagging it would build a
+	// third one-way door), and the reshape path is a single unbranched chain entered only from `VIOLATED` (so an
+	// unreachable `VIOLATED` kills four states at once). Pinned because the reasoning is invisible in the verdict:
+	// if canon ever adds a recovery arrow or a second entrance, W-4's block may lift and nothing else would say so.
+	it('PINNED — the shape machine topology that makes W-4 one question rather than nine', () => {
+		const m = M['PWU.shapeIntegrityState']!;
+		const out = (s: string) => m.transitions.filter((t) => t.from === s).map((t) => t.to).sort();
+		const inn = (s: string) => m.transitions.filter((t) => t.to === s).map((t) => t.from).sort();
+
+		// Both exits blocked => an entrance without an exit.
+		expect(out('AT_RISK')).toEqual(['PRESERVED', 'VIOLATED']);
+		// A single unbranched chain: each link has exactly one way in.
+		expect(inn('RESHAPING_REQUIRED')).toEqual(['VIOLATED']);
+		expect(inn('RESHAPING_IN_PROGRESS')).toEqual(['RESHAPING_REQUIRED']);
+		expect(inn('RESTORED')).toEqual(['RESHAPING_IN_PROGRESS']);
+		// And the chain's only entrance is the state whose predicate canon leaves undefined.
+		expect(inn('VIOLATED')).toEqual(['AT_RISK', 'PRESERVED']);
+	});
+
 	// ── CONTROL: THE PROBE IS REAL ───────────────────────────────────────────────────────────────────────────
 	// ⚠ THIS CONTROL EXISTS BECAUSE THE FAILURE IT CATCHES HAPPENED TODAY. A probe of the arrow census returned
 	// "0 arrows" for EVERY machine — healthy ones included — because it filtered objects with a string method.
