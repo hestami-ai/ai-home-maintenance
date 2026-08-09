@@ -102,8 +102,18 @@ while the `DOC-002 §7.5` the code cites lives in the RPH Canonical Domain Model
 
 ## 7. Decisions this design does NOT make — for the sponsor
 
-- **D-1 · Does canon outrank its own source on a PRINCIPLE conflict?** Recommendation: **yes, operationally, and
-  register the conflict**. Ruling otherwise makes canon advisory, which contradicts REG-D-010.
+- ~~**D-1 · Does canon outrank its own source on a PRINCIPLE conflict?** Recommendation: **yes, operationally, and
+  register the conflict**. Ruling otherwise makes canon advisory, which contradicts REG-D-010.~~
+  **SUPERSEDED SAME DAY BY REG-F-094 — THE QUESTION WAS ALREADY DECIDED AND I DID NOT FIND IT.** **REG-D-006** /
+  **CON-000 B8** already rule that retired sources *"have no authority and must not be consulted as authority"*, so
+  "canon outranks" is the RATIFIED position, not my proposal; the sponsor's inclination is a **reversal**, which
+  must be recorded as one. The rule was never fully executed (16 + 13 top-level source docs remain agent-visible
+  beside populated `retired/` folders), and canon's own sidecars cite documents inside `retired/` — **so B8 as
+  written makes canon unauditable and must be amended whichever way D-1 is ruled.** Revised recommendation:
+  **divergence must be TRACEABLE** — canon governs only where its divergence carries a ratifying act (the
+  `PER-12`/REG-D-015 model); a silent divergence makes the canon clause defective, not governing. Measured basis:
+  87 clauses audited — 49 FAITHFUL, 23 LOSSY, 10 UNSOURCED, 5 DIVERGENT, and the unratified divergences all
+  **weaken prohibitions** (`ASR-14`, `ASR-16`).
 - **D-2 · Do the SOURCE OF RECORD corpora need ratification?** Recommendation: **no.** They are authoritative for
   detail as source material; ratifying 60+ exploratory documents would be a large act for little gain. But this is
   a governance question, not a build one.
