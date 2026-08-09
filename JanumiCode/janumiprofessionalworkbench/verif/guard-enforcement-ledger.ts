@@ -18,6 +18,7 @@
 //
 // ⚠ AND THE EXCLUSION LIST IS SHARED, not re-invented here — `machine-exclusions.ts`, the same table C-0 and C-0c
 // read. Two censuses over one table must not each keep their own idea of the table.
+import { readFileSync } from 'node:fs';
 import { STATE_MACHINES, isExcludedMachine } from '@janumipwb/rph-domain';
 
 /** What a declared guard text turned out to be, once someone read the code that performs its arrows. */
@@ -37,8 +38,25 @@ export interface GuardRow {
 	readonly disposition: GuardDisposition;
 	/** Why — file:line and what the code does. Never a bare assertion. */
 	readonly evidence: string;
-	/** ENFORCED only: the handler line that REFUSES. Required, and the test enforces that it is. */
+	/**
+	 * ENFORCED only: the handler site. Required, and the test enforces that it is.
+	 *
+	 * ⚠ THE LINE NUMBER IS A NAVIGATION HINT AND NOTHING MORE. Six of the fourteen went stale within two days of
+	 * being written — pointing at `({`, at `/**`, at a doc comment — because every edit above them shifts them,
+	 * and the first version of this control only checked the string was non-empty. **That is a control that
+	 * cannot fail on the thing it claims.** What is CHECKED is `enforcingAnchor`.
+	 */
 	readonly enforcingSite?: string;
+	/**
+	 * ENFORCED only: a distinctive fragment that must appear EXACTLY ONCE in the file named by `enforcingSite`.
+	 *
+	 * Text, not a line number, for the same reason `scripts/mutants/ledger.ts` anchors on text: a line number
+	 * rots on the next edit and rots SILENTLY, whereas a moved anchor either still exists (and the row is fine)
+	 * or does not (and the row reddens). Exactly-once, because an anchor matching twice cannot say which site
+	 * the row means — and an auto-derivation that took the NEAREST refusal to each stale line mapped three
+	 * cross-axis rows onto an unrelated staleness check before this uniqueness rule caught it.
+	 */
+	readonly enforcingAnchor?: string;
 }
 
 /** One arrow that carries a guard, as the exported machine data holds it. */
@@ -81,13 +99,39 @@ export interface LedgerAudit {
 	readonly unclassified: string[];
 	/** Ledger rows naming a text no arrow declares — a stale row, left behind by an edit upstream. */
 	readonly stale: string[];
-	/** ENFORCED rows that name no enforcing site. "Enforced" without a line is the claim, not the evidence. */
+	/** ENFORCED rows that name no enforcing site. "Enforced" without a site is the claim, not the evidence. */
 	readonly enforcedWithoutSite: string[];
+	/** ENFORCED rows whose anchor is missing, absent from its file, or matches more than once. */
+	readonly enforcedAnchorBroken: string[];
 	/** How many texts fell in each disposition. */
 	readonly counts: Readonly<Record<string, number>>;
 	/** Arrows and texts, so the ledger cannot be "improved" by deleting guards from the machine table. */
 	readonly arrowCount: number;
 	readonly textCount: number;
+}
+
+/**
+ * Why an ENFORCED row's anchor does not hold, or `undefined` when it does.
+ *
+ * Reads the file off disk deliberately: the claim is about the SOURCE the ledger cites, and a check that read
+ * anything else would be checking a copy of itself.
+ */
+function anchorFault(row: GuardRow): string | undefined {
+	const site = row.enforcingSite;
+	const anchor = row.enforcingAnchor;
+	if (!anchor) return 'no enforcingAnchor';
+	if (!site) return 'no enforcingSite';
+	const file = site.replace(/:\d+$/, '');
+	let text: string;
+	try {
+		text = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+	} catch {
+		return `cannot read ${file}`;
+	}
+	const hits = text.split(anchor).length - 1;
+	if (hits === 0) return `anchor absent from ${file}`;
+	if (hits > 1) return `anchor matches ${hits} times in ${file} — ambiguous`;
+	return undefined;
 }
 
 export function auditLedger(ledger: Readonly<Record<string, GuardRow>>): LedgerAudit {
@@ -105,6 +149,12 @@ export function auditLedger(ledger: Readonly<Record<string, GuardRow>>): LedgerA
 			.sort((a, b) => a.localeCompare(b)),
 		enforcedWithoutSite: texts
 			.filter((t) => ledger[t]?.disposition === 'ENFORCED' && !ledger[t]?.enforcingSite)
+			.sort((a, b) => a.localeCompare(b)),
+		enforcedAnchorBroken: texts
+			.filter((t) => ledger[t]?.disposition === 'ENFORCED')
+			.map((t) => ({ t, why: anchorFault(ledger[t]!) }))
+			.filter((r) => r.why !== undefined)
+			.map((r) => `${r.t}  [${r.why}]`)
 			.sort((a, b) => a.localeCompare(b)),
 		counts,
 		arrowCount: guardedArrows().length,

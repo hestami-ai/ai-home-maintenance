@@ -79,6 +79,18 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 		).toEqual([]);
 	});
 
+	// ⚠ THE CHECK THE FIRST VERSION OF THIS FILE WAS MISSING, and its absence was a control that could not fail.
+	// `enforcedWithoutSite` asks only that the string is non-empty. Six of the fourteen sites went stale within
+	// two days — `pwu.ts:746` pointing at `({`, three rows at `/**`, one at a doc comment — and nothing reddened,
+	// because a line number that has drifted is still a non-empty string. The anchor is TEXT and must appear
+	// EXACTLY ONCE in the cited file, so a moved guard either still exists or reddens here.
+	it('requires every ENFORCED row to carry an anchor that still resolves, uniquely', () => {
+		expect(
+			AUDIT.enforcedAnchorBroken,
+			AUDIT.enforcedAnchorBroken.join(' | ')
+		).toEqual([]);
+	});
+
 	it('pins the disposition census', () => {
 		expect(AUDIT.counts, JSON.stringify(AUDIT.counts)).toEqual(COUNTS);
 	});
@@ -123,5 +135,24 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 			[enforced!]: { disposition: 'ENFORCED', evidence: 'stripped for the control' }
 		});
 		expect(audit.enforcedWithoutSite).toEqual([enforced]);
+	});
+
+	// ── CONTROL 4: THE ANCHOR CHECK CAN ACTUALLY FAIL ───────────────────────────────────────────────────────
+	// `enforcedAnchorBroken: []` is also what a check that never opens a file returns. These synthetic rows
+	// redden it in exactly the three ways a real row can break, and in no other world.
+	it('CONTROL — a missing, absent, or ambiguous anchor is each caught', () => {
+		const victim = guardTexts().find((t) => GUARD_LEDGER[t]?.disposition === 'ENFORCED')!;
+		const base = GUARD_LEDGER[victim]!;
+		const audit = (over: Partial<typeof base>) =>
+			auditLedger({ ...GUARD_LEDGER, [victim]: { ...base, ...over } }).enforcedAnchorBroken;
+		expect(audit({ enforcingAnchor: undefined })[0], 'a row with no anchor').toContain('no enforcingAnchor');
+		expect(
+			audit({ enforcingAnchor: 'this text appears in no source file anywhere' })[0],
+			'an anchor that no longer exists — the stale-line case, now caught'
+		).toContain('anchor absent');
+		// `import` appears many times in any handler: the ambiguity arm, which is what stops a lazy anchor.
+		expect(audit({ enforcingAnchor: 'import' })[0], 'an anchor matching more than once').toContain(
+			'ambiguous'
+		);
 	});
 });

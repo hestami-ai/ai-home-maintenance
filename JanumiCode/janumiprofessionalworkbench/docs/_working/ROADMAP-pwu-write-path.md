@@ -18,19 +18,23 @@ are settled here.
 The design said the caller "cannot assert" but never drew the line. It is:
 
 > **A command may let the caller name WHICH object grounds a transition. It may never let the caller name WHAT
-> STATE results. The resulting state is computed by the handler from the named object's committed state.**
+> STATE results. The resulting state is computed by the handler from the named object's committed state **and its committed event stream** (amended 2026-08-09, REG-F-080: `RETRYING` is producible from `ExecutionStepRetried` and invisible in object state, and `attemptsMadeFrom` already folds events precisely to stay replay-stable).**
 
 This is exactly what the three existing "unbacked" guards already do, minus the assertion they exist to check:
 `rejectUnbackedBaselining` reads a cited BASELINE and checks `status === 'AUTHORITATIVE'`. Inverted, it *is* the
 derivation. **Citing an id is not asserting a state**, and the distinction matters because the PWU does not
 carry links to everything that governs it.
 
-**Measured, and it decides two increments:** `ProfessionalWorkUnitSchema` carries `activeExecutionPlanId`
-(optional) — so the execution axis can be derived from a link the PWU already holds. It carries **no baseline
-field** — so baselining must be citation-grounded. One rule covers both.
+**Measured:** `ProfessionalWorkUnitSchema` carries **no baseline field**, so baselining must be
+citation-grounded (R3). It carries `activeExecutionPlanId` — but see the correction below.
 
-⚠ **`activeExecutionPlanId` has no production writer today.** W-2 must give it one or read the plan by citation
-like the rest. Named here because the design assumed the link was live.
+⚠ **CORRECTED 2026-08-09 (REG-F-080). `activeExecutionPlanId` has ZERO writers AND ZERO readers**, verified at
+runtime across the 13-PWU reference drive: not one carries it, before or after Propose → Approve → Activate →
+Supersede. An earlier reader was deleted when `canActivatePlan` was rewritten to derive. **Nothing would notice
+if the field were removed.** Giving it a writer is not available either: the only candidate act belongs to the
+EXECUTION aggregate, so writing the PWU there is the cross-aggregate write AGG-1 forbids — and the repository
+already considered and rejected exactly that, in terms, at `execution.ts:397-402`. Citation (R1) is the
+mechanism; the pointer is not.
 
 ### R2 · `rejectUnbackedBaselining` is NOT retired. It is relocated, and C-0b keeps its ENFORCED row
 
@@ -110,13 +114,13 @@ its listed blocker is open.
 | # | increment | blocker | notes |
 |---|---|---|---|
 | ✅ **W-0** | correct both rollup assertions; record REG-D-029 | — | **SHIPPED** (`c1920dac`) |
-| **W-1** | `AbandonPwu` + `RejectPwu`; migrate the two authority guards; emit `PwuAbandoned`/`PwuRejected`; **add both targets to `PWU_SEMANTIC_LIFECYCLE_COMMANDS` in the same commit** | none | ⚠ without the table conjunct this RE-OPENS REG-F-070 and REG-F-078 for six increments. The red-first test is: the setter must refuse `→ ABANDONED` *before* the guard is moved off it |
-| **W-2** | `executionState` derived; `activeExecutionPlanId` given a writer or replaced by citation | R1 | `planEvidencesExecutionSuccess` answers ONE boolean; `FAILED`, `RETRYING`, `WAITING`, `CANCELLED` need stated rules. **Recording FAILURE must not become harder than recording success** — the retiring guard says so in terms |
+| ✅ **W-1** | `AbandonPwu` + `RejectPwu`; migrate the two authority guards; emit `PwuAbandoned`/`PwuRejected`; **add both targets to `PWU_SEMANTIC_LIFECYCLE_COMMANDS` in the same commit** | none | ⚠ without the table conjunct this RE-OPENS REG-F-070 and REG-F-078 for six increments. The red-first test is: the setter must refuse `→ ABANDONED` *before* the guard is moved off it. **SHIPPED** (`390b3fa1`, REG-D-030) |
+| ~~**W-2**~~ | ~~`executionState` derived~~ — **BLOCKED, see REG-F-080; resequenced after W-6** | — | `planEvidencesExecutionSuccess` answers ONE boolean; `FAILED`, `RETRYING`, `WAITING`, `CANCELLED` need stated rules. **Recording FAILURE must not become harder than recording success** — the retiring guard says so in terms |
 | **W-3** | `assuranceState` derived | **BLOCKED on the value mapping** | 6-value fold vs 11-value axis; `INCONCLUSIVE` is not an axis value and is the fold's fail-closed default. Needs an authored total mapping with the lossy cases named, or the fold widened. `rejectUnbackedDisposition` STAYS until then |
 | **W-4.5** | `BaselinePwu`, `BeginPwuRecomposition`, `CompletePwuRecomposition` | R2, R3 | must precede W-7 or `BASELINED` becomes unreachable |
 | **W-5** | `BlockPwu` / `UnblockPwu` / `EscalatePwu`; author `PwuEscalated` | none | `ESCALATE` is a **ratified** §37 act; only its command/event shape is absent, which strengthens this |
 | **W-4** | `shapeIntegrityState` — the arrows that have owners | R6 | the Assumption-triggered arrows split out; they need the cascade decision the assumption handler deliberately deferred |
-| **W-6** | the six §8.1 middles | W-2, W-3 | **fail-closed default stands: if advancing the lifecycle axis inside another discipline's command is judged a collapse, mint six commands instead.** More commands is the safe error |
+| **W-6** | the six §8.1 middles, **carrying the execution axis as a consequence** (REG-F-080 inverts W-2 into this) | W-3 | **fail-closed default stands: if advancing the lifecycle axis inside another discipline's command is judged a collapse, mint six commands instead.** More commands is the safe error |
 | **W-7** | retire `ChangePwuState`; delete only the ownership *guard* | R5, R7, and all of W-1..W-6 | keeps the table + type tripwire; carries the `PwuStateChanged` disposition and its new test |
 | **W-8** | C-0b delta reconciliation across the whole program | R4 | per-row table, four outcomes, `UNREACHABLE_BY_DELETION` needs a register note |
 

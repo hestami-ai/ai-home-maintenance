@@ -23,7 +23,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["a PWU may have only ONE active plan at a time; an active plan references exactly one PWU (§20.2)"]: {
 		disposition: "ENFORCED",
 		evidence: "packages/rph-application/src/handlers/execution.ts:484 — `return reject(` inside `activateExecutionPlan`'s `guard`, entered at :483 `if (!check.ok) {` where `check = canActivatePlan({ planStatus, otherActivePlanExists })` (:482). The sibling-plan fact is RESOLVED from the store by `otherActivePlanExistsForPwu` (execution.ts:404-420), which folds all PLAN aggregates and returns true when another plan on the same `workUnitId` is ACTIVE; the kernel refuses at packages/rph-domain/src/execution.ts:49-54 with errorCode RPH_ACTIVE_PLAN_CONFLICT. Handler-invoked, not a dead predicate. The second clause ('an active plan references exactly one PWU') is structural rather than checked — the plan aggregate carries a single scalar `workUnitId` (read at execution.ts:479), so a plan cannot name two. Ran execution-plan-activation-guard.test.ts at HEAD: green, including :135 'rejects activating a SECOND plan while the PWU already has an ACTIVE one'.",
-		enforcingSite: "packages/rph-application/src/handlers/execution.ts:484"
+		enforcingSite: "packages/rph-application/src/handlers/execution.ts:484",
+		enforcingAnchor: "Cannot activate plan ${command.targetAggregateId}"
 	},
 	["a recomposed result requires an explicit assessment (§14.1)"]: {
 		disposition: "ARROW_UNREACHABLE",
@@ -72,7 +73,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["approval requires authority; an agent may recommend but cannot exercise authority unless delegated (§23.2)"]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow: Decision.status PROPOSED -> EFFECTIVE, performed by `makeDecisionEffective` (governance.ts:274), the shared advanceStatus literal behind BOTH approveDecision (governance.ts:363) and grantWaiver (governance.ts:627). governance.ts:313 derives `const authorityHeld = authority?.actorType === 'HUMAN';` from the RECORDED authority and hands it to `authorizeDecisionEffective`; packages/rph-domain/src/governance.ts:56 `if (!d.authorityHeld)` returns not-ok; governance.ts:323 REFUSES with 'RPH_AUTHORITY_INSUFFICIENT'. The 'unless delegated' half is closed at the other end — proposeDecision REFUSES at governance.ts:192 when the declared `authority` is not `command.issuedBy`, saying 'no delegation record exists to carry one actor's authority for another'. DRIVEN THROUGH THE REAL BUS: an AGENT credential proposed a decision on its own authority (ACCEPTED, status PROPOSED), then issued ApproveDecision -> UNAUTHORIZED / RPH_AUTHORITY_INSUFFICIENT 'actor lacks sufficient authority to make this decision effective'; the decision stayed PROPOSED. Pinned suite: decision-authority-provenance.test.ts:151 ('an AGENT cannot reach an EFFECTIVE decision by either route').",
-		enforcingSite: "packages/rph-application/src/handlers/governance.ts:323"
+		enforcingSite: "packages/rph-application/src/handlers/governance.ts:323",
+		enforcingAnchor: "cannot become effective: ${check.reason ??"
 	},
 	["assurance observations must REMAIN VISIBLE after remediation — the observation is not deleted (§18.1)"]: {
 		disposition: "ARROW_UNREACHABLE",
@@ -85,7 +87,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["Authorized decision (Decision.decisionType=ABANDON)"]: {
 		disposition: "ENFORCED",
 		evidence: "All 17 arrows -> ABANDONED. ABANDONED is not in PWU_SEMANTIC_LIFECYCLE_COMMANDS, so changePwuState is the only writer, and rejectUnauthorizedAbandonment (pwu.ts:977) is source-state-independent — it keys on `p.newState !== 'ABANDONED'` (pwu.ts:987) alone, so one disposition genuinely covers all 17. RELOCATED 2026-08-09 by JAN-PWUWP W-1 (REG-D-029) — a RELOCATED delta row, not ENFORCED_NEW and not UNREACHABLE_BY_DELETION: the guard did not weaken, it acquired the semantically named command PER-3 requires. The refusing line is now pwu.ts:678 inside `abandonPwu`, and `changePwuState` refuses the arrow outright via PWU_SEMANTIC_LIFECYCLE_COMMANDS rather than adjudicating it. Re-driven through the bus: AbandonPwu naming a dangling id, a non-DECISION, an APPROVAL, a PROPOSED decision, another PWU's decision, and an unpinned subject are each REJECTED; the ownership refusal is asserted by its own control. THE PRIOR TEXT, kept because the site moved and the reasoning did not: the refusing line WAS pwu.ts:1003 (`return reject(command, 'RPH_INVARIANT_VIOLATION', ...` — \"would abandon PWU ... with no authorized decision to back it\"), called from the handler at pwu.ts:1110. The per-limb checks live in packages/rph-application/src/handlers/abandon-authorization.ts:88 (decisionType !== 'ABANDON' refused), :96 (status !== 'EFFECTIVE' refused) and :111 (subjectSemanticVersions bind). RAN THE ENGINE: ChangePwuState BLOCKED->ABANDONED with supportingObjectIds:[] => REJECTED RPH_INVARIANT_VIOLATION; citing a non-DECISION object (the Intent) => REJECTED the same way.",
-		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:678"
+		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:678",
+		enforcingAnchor: "AbandonPwu ${id}: ${verdict.reason}"
 	},
 	["Authorized decision exists"]: {
 		disposition: "UNENFORCED",
@@ -94,7 +97,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["Authorized promotion decision"]: {
 		disposition: "ENFORCED",
 		evidence: "Arrows SATISFIED->BASELINED and RECOMPOSED->BASELINED. BASELINED is not in PWU_SEMANTIC_LIFECYCLE_COMMANDS, so changePwuState is the only writer, and rejectUnbackedBaselining (pwu.ts:721) keys on `p.newState !== 'BASELINED'` (pwu.ts:728) alone, so both arrows are covered identically. THE REFUSING LINE IS pwu.ts:746 (`return reject(command, 'RPH_EVIDENCE_MISSING', ...` — \"would baseline PWU ... with no promoted baseline to back it\"), called from the handler at pwu.ts:1108. It requires a cited BASELINE whose status is AUTHORITATIVE and whose itemObjectVersions include this PWU (pwu.ts:741-743). That grounds the DECISION transitively and the chain was checked: the sole route to Baseline.status=AUTHORITATIVE is promoteBaseline (packages/rph-application/src/handlers/governance.ts:841), whose guard loads p.promotionDecisionId and passes it to canPromoteBaseline requiring an EFFECTIVE decision that NAMES this baseline (governance.ts:854-908, REG-F-073), plus a decisionAuthorizesVersions currency bind (governance.ts:925+). RAN THE ENGINE: SATISFIED->BASELINED with supportingObjectIds:[] => REJECTED RPH_EVIDENCE_MISSING; RECOMPOSED->BASELINED with supportingObjectIds:[] => REJECTED RPH_EVIDENCE_MISSING.",
-		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:746"
+		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:746",
+		enforcingAnchor: "would baseline PWU ${id} with no promoted baseline to back it"
 	},
 	["authorized reinstatement"]: {
 		disposition: "UNENFORCED",
@@ -119,7 +123,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["Conditional disposition exists"]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow UNDER_ASSURANCE->CONDITIONALLY_SATISFIED. Predicate at packages/rph-domain/src/pwuGuards.ts:22 — `'UNDER_ASSURANCE->CONDITIONALLY_SATISFIED': (a) => a.assuranceState === 'CONDITIONALLY_SATISFIED'` — reached from changePwuState (the only writer; the target is not in PWU_SEMANTIC_LIFECYCLE_COMMANDS) via canAdvanceWorkLifecycle at pwu.ts:1039, refusal at pwu.ts:1041. The conditional disposition it demands cannot itself be asserted: rejectUnbackedDisposition (pwu.ts:678, refusal at pwu.ts:697) requires a cited ASSURANCE_ASSESSMENT whose assessmentState is CONDITIONALLY_SATISFIED and whose subjectObjectIds include this PWU. RAN THE ENGINE, both routes: (a) seeded UNDER_ASSURANCE, ChangePwuState -> CONDITIONALLY_SATISFIED with assuranceState=UNASSESSED => REJECTED \"cross-axis guard failed for UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED\"; (b) walked the assurance axis legally to ASSESSING then ASSESSING->CONDITIONALLY_SATISFIED with supportingObjectIds:[] => REJECTED RPH_EVIDENCE_MISSING \"assuranceState=CONDITIONALLY_SATISFIED with nothing to back it\".",
-		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:1041"
+		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:1041",
+		enforcingAnchor: "Cannot advance PWU ${id} ${currentWorkLifecycleState}"
 	},
 	["contradicting evidence must remain visible (§15.2)"]: {
 		disposition: "UNENFORCED",
@@ -132,17 +137,20 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["CROSS-AXIS guard: assuranceState=SATISFIED. This is the ONLY legal path into workLifecycle SATISFIED (P1/INV-5)."]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow UNDER_ASSURANCE->SATISFIED. The predicate is packages/rph-domain/src/pwuGuards.ts:21 — `'UNDER_ASSURANCE->SATISFIED': (a) => a.assuranceState === 'SATISFIED'` — and it is NOT an orphan kernel predicate: canAdvanceWorkLifecycle (pwuGuards.ts:155, guard lookup at :159-162) is called from the handler at pwu.ts:1039 inside rejectIllegalWorkLifecycleMove, whose refusal is pwu.ts:1041 ('RPH_ILLEGAL_STATE_TRANSITION', \"cross-axis guard failed for ...\"), reached from changePwuState at pwu.ts:1122. A second independent refusal backs it on the same command: satisfiesP1 (pwuGuards.ts:171) at pwu.ts:1030 blocks a HOLD in SATISFIED without assurance. RAN THE ENGINE: seeded PWU at UNDER_ASSURANCE, ChangePwuState -> SATISFIED with assuranceState=UNASSESSED => REJECTED \"cross-axis guard failed for UNDER_ASSURANCE -> SATISFIED\"; and the evasion route (asserting assuranceState=SATISFIED in the same command) is separately refused — the assurance sub-axis matrix rejects UNASSESSED->SATISFIED, and from a legitimately ASSESSING axis rejectUnbackedDisposition (pwu.ts:697) refuses with RPH_EVIDENCE_MISSING unless a real ASSURANCE_ASSESSMENT is cited.",
-		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:1041"
+		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:1041",
+		enforcingAnchor: "Cannot advance PWU ${id} ${currentWorkLifecycleState}"
 	},
 	["CROSS-AXIS guard: executionState=SUCCEEDED. Success does NOT auto-satisfy assurance (P1/INV-5)."]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow EXECUTING->EVIDENCE_PENDING. Predicate at packages/rph-domain/src/pwuGuards.ts:20 — `'EXECUTING->EVIDENCE_PENDING': (a) => a.executionState === 'SUCCEEDED'` — reached from the handler by the same path as the SATISFIED guard: canAdvanceWorkLifecycle (pwuGuards.ts:159-162) called at pwu.ts:1039, refusal at pwu.ts:1041, from changePwuState (pwu.ts:1122). EVIDENCE_PENDING is not in PWU_SEMANTIC_LIFECYCLE_COMMANDS so changePwuState is the only writer. RAN THE ENGINE: seeded a PWU at workLifecycleState=EXECUTING with executionState=NOT_PLANNED, ChangePwuState -> EVIDENCE_PENDING => REJECTED RPH_ILLEGAL_STATE_TRANSITION \"cross-axis guard failed for EXECUTING -> EVIDENCE_PENDING\". The premise itself is separately defended: asserting executionState=SUCCEEDED requires citing an EXECUTION_PLAN for this PWU that planEvidencesExecutionSuccess accepts (rejectUnbackedExecutionSuccess, refusal at pwu.ts:809).",
-		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:1041"
+		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:1041",
+		enforcingAnchor: "Cannot advance PWU ${id} ${currentWorkLifecycleState}"
 	},
 	["evidence must have provenance and state scope + limitations (§16.2)"]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow: Evidence.status PROPOSED -> ADMISSIBLE. `admitEvidence`'s advanceStatus `guard` (assurance.ts:527) calls the kernel `evidenceAdmissibility` and at assurance.ts:541-548 returns `verdict.admissible ? null : reject(...)` — the REFUSING line is assurance.ts:543, code 'RPH_VALIDATION_SEMANTIC_FAILED'. All three limbs of this guard text are live in the kernel: packages/rph-assurance/src/assurance-rules.ts:152 `if (!namesAnActor(e.producedBy)) failed.push('PROVENANCE_PRESENT');`, :154 `if (!e.scope) failed.push('SCOPE_STATED');`, :155 `if (e.limitations === undefined) failed.push('LIMITATIONS_RECORDED');`. Each reads the field the rule is about (REG-F-008 replaced two limbs that could never fail). DRIVEN: evidence proposed with `scope: ''` -> AdmitEvidence REJECTED, 'is inadmissible (§8.11) — failed SCOPE_STATED', and the evidence stayed PROPOSED.",
-		enforcingSite: "packages/rph-application/src/handlers/assurance.ts:543"
+		enforcingSite: "packages/rph-application/src/handlers/assurance.ts:543",
+		enforcingAnchor: "is inadmissible"
 	},
 	["expirationCondition met; expired assumptions cannot continue authorizing work (§12.2)"]: {
 		disposition: "UNENFORCED",
@@ -175,12 +183,14 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["must record outputs or an explicit no-output result; step success does NOT imply PWU success (§21.1)"]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow: ExecutionStep.stepState RUNNING -> SUCCEEDED via `completeExecutionStep` (execution.ts:1275). Its `precheck` calls the kernel `validateStepCompletion` and REFUSES at execution.ts:1351; the guard's own case is packages/rph-domain/src/execution.ts:590 `if (!input.hasOutput && !input.explicitNoOutput)` -> RPH_STEP_RESULT_MISSING, mapped to 'RPH_INVARIANT_VIOLATION' at the call site. Load-bearing detail: `explicitNoOutput: noOutput !== undefined` is the CALLER'S ASSERTION read from the payload, not `!hasOutput` — the handler comment records that the earlier form made the kernel's disjunction `b || !b`. RAN THE SUITE: execution-exe006-explicit-result.test.ts, 10/10 green, including 'MISSING: a completion naming nothing and asserting nothing is REFUSED, and moves nothing' (step stays RUNNING, zero ExecutionStepSucceeded appended, no revision bump). Second clause holds structurally: this handler moves only stepState, and on the PWU side satisfiesP1 refuses a SATISFIED hold without assuranceState=SATISFIED (pwu.ts:1034) while rejectUnbackedExecutionSuccess guards executionState=SUCCEEDED.",
-		enforcingSite: "packages/rph-application/src/handlers/execution.ts:1351"
+		enforcingSite: "packages/rph-application/src/handlers/execution.ts:1351",
+		enforcingAnchor: "CompleteExecutionStep blocked (${check.errorCode})"
 	},
 	["must reference admissible evidence; confidence values must not replace evidence (§15.2)"]: {
 		disposition: "ENFORCED",
 		evidence: "Arrow: Claim.status UNDER_ASSESSMENT -> SUPPORTED via `recordClaimAssessment` (assurance.ts:737). Its advanceStatus `guard` (assurance.ts:777) returns null unless target is SUPPORTED, then REFUSES at assurance.ts:780 with 'RPH_INVARIANT_VIOLATION' when `claimsWithAdmissibleEvidence(hctx)` does not contain the claim (RPH-EVD-002). The set is folded from COMMITTED state, never the payload, and tests `String(st.status) !== 'ADMISSIBLE'` at assurance.ts:686 — so merely PROPOSED evidence does not count and a caller cannot assert admissibility on the command that consumes it. That is also the second clause: nothing but an ADMITTED Evidence object is accepted, so no confidence value can substitute. DRIVEN: claim -> UNDER_ASSESSMENT -> SUPPORTED with no evidence -> REJECTED, 'Claim … cannot be SUPPORTED: no ADMISSIBLE evidence supports it (RPH-DOC-008 §13 RPH-EVD-002)'; the same command after AdmitEvidence -> ACCEPTED with supportingEvidenceIds populated.",
-		enforcingSite: "packages/rph-application/src/handlers/assurance.ts:780"
+		enforcingSite: "packages/rph-application/src/handlers/assurance.ts:780",
+		enforcingAnchor: "cannot be SUPPORTED: no ADMISSIBLE evidence"
 	},
 	["no assurance policy applies to this PWU"]: {
 		disposition: "UNENFORCED",
@@ -241,7 +251,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["producer and evaluator share invocation/agent/model/provider/hidden-context/prompt-lineage/authority in violation of policy's IndependenceRequirement (§8.2)"]: {
 		disposition: "ENFORCED",
 		evidence: "TRIGGER-SHAPED GUARD, and it is genuinely computed on the write path from the STORE: `completeAssuranceAssessment` reads `policyState?.independenceRequirement` off the loaded ASSURANCE_POLICY (packages/rph-application/src/handlers/assurance.ts:1918), calls the kernel `checkIndependence` (packages/rph-assurance/src/assurance-rules.ts:184, which compares invocationId/contextInstanceId/agentId/modelId/providerId/actorType/orgId per the policy's requirement) at assurance.ts:1923-1927, and performs the arrow ONLY inside `if (!verdict.independent)` at assurance.ts:1928 -> advanceStatus to INDEPENDENCE_VIOLATION at :1929. When the condition is FALSE the arrow is not performed at all (control flow falls through to Gates D/A/C and a normal disposition) — a caller cannot assert this state. Live pipeline proof, both directions: packages/rph-application/src/handlers/assurance-independence.test.ts:216 (DIFFERENT_AGENT, producer===evaluator -> INDEPENDENCE_VIOLATION), :263 (the discriminating CONTROL — producer!==evaluator completes normally), :318 (DIFFERENT_MODEL dimension), :365 (both operands recorded). DISCLOSED RESIDUALS, so this is not overstated: (a) the gate is skipped when the policy names no requirement, names NONE, or the caller supplies no producer — a chosen fail-through pinned at :290, so a caller can DODGE the check by omitting `producer`; (b) 'prompt-lineage' has no corresponding Identity field, so that named dimension is not comparable.",
-		enforcingSite: "packages/rph-application/src/handlers/assurance.ts:1928"
+		enforcingSite: "packages/rph-application/src/handlers/assurance.ts:1928",
+		enforcingAnchor: "if (!verdict.independent)"
 	},
 	["Recomposition contract satisfied"]: {
 		disposition: "UNENFORCED",
@@ -262,7 +273,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["requested capability is NOT granted capability; capability scope must be explicit (§22.1)"]: {
 		disposition: "ENFORCED",
 		evidence: "Both limbs are evaluated on the write path of this exact arrow. LIMB 1 ('requested is NOT granted'): the granted set is read from the command payload SEPARATELY from the request (packages/rph-application/src/handlers/runtime-binding.ts:184-185) and `grantedWithinRequest` (packages/rph-domain/src/execution.ts:393) REFUSES at runtime-binding.ts:204 with 'AuthorizeRuntimeBinding blocked (RPH_CAPABILITY_NOT_REQUESTED)'; and the arrow's TARGET is derived by `authorizationOutcome` (:124-129, `targetStates: ['AUTHORIZED','PARTIALLY_AUTHORIZED']`), so REQUESTED -> AUTHORIZED is reachable only when the grant actually COVERS the request — a narrower grant lands PARTIALLY_AUTHORIZED instead. LIMB 2 ('scope must be explicit'): a capability-less request is refused at creation, runtime-binding.ts:48-54 ('the request names no capability'), so the granted set is always compared against a non-empty explicit request. Live pipeline coverage: packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts:88 (kill), :103 (no partial write), :114/:122/:132 (three CONTROLs proving it discriminates), :166 (names every unrequested capability); packages/rph-application/src/handlers/partauth-derived-outcome.test.ts:86 (a covering grant yields AUTHORIZED).",
-		enforcingSite: "packages/rph-application/src/handlers/runtime-binding.ts:204"
+		enforcingSite: "packages/rph-application/src/handlers/runtime-binding.ts:204",
+		enforcingAnchor: "AuthorizeRuntimeBinding blocked (${check.errorCode})"
 	},
 	["Required evidence available or deficit explicitly recorded"]: {
 		disposition: "UNENFORCED",
@@ -279,7 +291,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["requires an explicit EFFECTIVE promotion decision (§23.2, §24.2); promotion evidence must be retained; promotion is a governance event, not an execution step (§24.2)"]: {
 		disposition: "ENFORCED",
 		evidence: "THE ONE REFUSABLE LIMB IS REFUSED, ON THIS ARROW, FROM STORE FACTS. `promoteBaseline` (packages/rph-application/src/handlers/governance.ts:841) resolves the cited decision by id from the store and reads its real status/decisionType/authority (:854-868), passes it into `canPromoteBaseline` (packages/rph-domain/src/governance.ts:368) at governance.ts:893, and REFUSES at packages/rph-application/src/handlers/governance.ts:910-914 `return reject(command, 'RPH_INVARIANT_VIOLATION', 'Cannot promote baseline ...: ' + codes)`. The kernel arm is explicit: `d.status === 'EFFECTIVE' && d.authorityHeld && (decisionType === 'PROMOTE_BASELINE' || 'APPROVAL')` else NO_EFFECTIVE_PROMOTION_DECISION (rph-domain/src/governance.ts:373-382), plus REG-F-073's scope arm PROMOTION_DECISION_OUT_OF_SCOPE (:402-408) requiring the decision to NAME this baseline. Independently corroborated by packages/rph-domain/src/enforcement-register.ts:3520, which records ENFORCEMENT as 'promoteBaseline's guard' with `refusalMarker: 'NO_EFFECTIVE_PROMOTION_DECISION'` (:3522) — a probe that runs live. The same reject line is proven reachable from the bus by packages/rph-application/src/handlers/baseline-open-blocking-observation.test.ts:191. LIMBS 2 AND 3 ARE NOT REFUSABLE CONDITIONS and are noted rather than counted: 'promotion evidence must be retained' is an EFFECT the handler performs unconditionally (`mutate: (base) => ({ ...base, promotionDecisionId: p.promotionDecisionId })` at governance.ts:966 + the BaselinePromoted event), and 'promotion is a governance event, not an execution step' is a categorisation, not a testable precondition.",
-		enforcingSite: "packages/rph-application/src/handlers/governance.ts:910"
+		enforcingSite: "packages/rph-application/src/handlers/governance.ts:910",
+		enforcingAnchor: "Cannot promote baseline ${command.targetAggregateId}: ${codes}"
 	},
 	["Revised intent receives authorization"]: {
 		disposition: "UNENFORCED",
@@ -300,7 +313,8 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["Shape readiness policy satisfied (§9 Shape Readiness Profile)"]: {
 		disposition: "ENFORCED",
 		evidence: "packages/rph-application/src/handlers/pwu.ts:496 — `return reject(` inside `markPwuReady`, guarded by `if (!readiness.ok) {` at :495, after `const readiness = checkPwuShapeReadiness(readinessFactsOf(ctx, loaded.state));` at :494. Code RPH_VALIDATION_SEMANTIC_FAILED; message names every unmet limb. The kernel predicate is packages/rph-domain/src/pwuGuards.ts:125 `checkPwuShapeReadiness`, and it IS called by a handler (pwu.ts:494) — not a dead predicate. The only OTHER route to READY is closed: READY is in PWU_SEMANTIC_LIFECYCLE_COMMANDS (pwu.ts:330) so `changePwuState` refuses it at pwu.ts:945, proven by generic-setter-scope.test.ts:153. DISCLOSED PARTIALITY: 4 of the 10 §9.1 limbs are deliberately withheld and the withholding is documented at pwuGuards.ts:50-59 — the completion-claim, mandatory-constraints, current-assumptions and identified-authority limbs are not checked. Ran pwu-readiness-contract.test.ts + generic-setter-scope.test.ts at HEAD: 42 tests green.",
-		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:496"
+		enforcingSite: "packages/rph-application/src/handlers/pwu.ts:496",
+		enforcingAnchor: "does not satisfy the shape readiness contract"
 	},
 	["step outputs recorded or explicit no-output"]: {
 		disposition: "UNENFORCED",
