@@ -31,7 +31,31 @@
 // left on the action name would match no Decision that can exist and would deny everything, silently — a gate
 // that refuses for the wrong reason is not a working gate.
 import { DecisionObjectSchema } from '@janumipwb/rph-contracts';
+import { BLOCKING_SEVERITIES } from '@janumipwb/rph-assurance';
 import type { HandlerContext } from './kit.js';
+
+/**
+ * THE FACT LIMB, extracted so the command and the (now-retiring) setter guard cannot drift apart.
+ *
+ * A blocking `ASSURANCE_OBSERVATION` about THIS PWU. ⚠ Severity is read off the STORED object, never taken from
+ * a payload: a caller asserting that its own finding is severe is the shape every "may not be asserted" guard in
+ * this repository exists to refuse.
+ */
+export function hasBlockingObservationFor(
+	ctx: HandlerContext,
+	pwuId: string,
+	citedIds: readonly string[]
+): boolean {
+	return citedIds.some((oid) => {
+		const obj = ctx.store.loadObject(oid);
+		if (obj?.objectType !== 'ASSURANCE_OBSERVATION') return false;
+		const s = obj.state as { severity?: unknown; subjectObjectIds?: string[] };
+		return (
+			BLOCKING_SEVERITIES.has(String(s.severity) as never) &&
+			(s.subjectObjectIds ?? []).includes(pwuId)
+		);
+	});
+}
 
 export interface RejectAuthorizationQuery {
 	/** The PWU being rejected. */

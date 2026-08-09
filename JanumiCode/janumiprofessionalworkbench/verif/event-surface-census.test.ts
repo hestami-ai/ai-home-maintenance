@@ -58,6 +58,15 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-08-09, JAN-PWUWP W-1 (REG-D-029): both acquired their FIRST emitter. `PwuAbandoned` and
+	// `PwuRejected` had been declared, registered and bound while NOTHING produced them — the two acts
+	// JPWB-DOC-001 §5.2 reserves to Governance were performed by a generic setter that emitted the generic
+	// `PwuStateChanged` instead. `AbandonPwu` and `RejectPwu` now emit them. `PwuAbandoned`'s required
+	// `abandonmentDecisionId` is the very id its command demands: the contract had been asking for it with no
+	// command able to supply one. Recorded by hand because this set is a PINNED SNAPSHOT — a live count cannot
+	// cross vitest workers — so a new emitter must be written down or the census calls it unemitted.
+	'PwuAbandoned',
+	'PwuRejected',
 	// + 2026-08-08, REG-F-069: both acquired their FIRST emitter. `AssumptionFalsified` was the only
 	// member of RATIFIED_EVENT_PAYLOADS that no handler emitted; `AssumptionDisclosed` had to land with
 	// it, because without `DiscloseAssumption` every FALSIFIED source state is unoccupiable and the

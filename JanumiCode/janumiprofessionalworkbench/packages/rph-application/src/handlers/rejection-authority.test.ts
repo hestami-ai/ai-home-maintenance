@@ -1,5 +1,12 @@
 // REG-F-078 — REJECTING GOVERNED WORK NEEDS BOTH A GOVERNANCE DECISION AND THE FINDING THAT CAUSED IT.
 //
+// ⚠ MOVED ONTO `RejectPwu` BY JAN-PWUWP W-1 (REG-D-029). Both conjuncts survive intact; only the caller
+// changes. Two things get stronger: `rejectionDecisionId` and `blockingObservationIds` are REQUIRED
+// payload fields, so the bare case is refused by the CONTRACT rather than the guard; and the axis
+// gymnastics below are gone — the old battery had to hold `assuranceState` by hand so
+// `rejectUnbackedDisposition` would not fire first, which is exactly the sort of ordering hazard a
+// generic four-axis setter creates and a named command does not.
+//
 // The dissolving re-reading — "REJECTED just mirrors the assurance verdict, so authority was settled upstream" —
 // is refuted by the SOURCE of the clause it would reinterpret. DOC-001's provenance file records "Governance
 // outside the six: Guide L336", and Guide L336 says both things in one sentence:
@@ -88,18 +95,15 @@ describe('REG-F-078 — rejecting governed work requires an authorized decision 
 			'PROFESSIONAL_WORK_UNIT'
 		);
 
-	/** Move only the WORK axis to `newState`; the assurance axis is held (see the header). */
-	const rejectWork = (supportingObjectIds: string[], id = PWU) =>
+	/** The act, through the command that owns it. The caller NAMES a decision and the findings; the handler
+	 *  derives whether either qualifies (JAN-PWUWP R1 derive-on-read). */
+	const rejectWork = (decisionId: string, observationIds: string[], id = PWU) =>
 		dispatch(
-			'ChangePwuState',
+			'RejectPwu',
 			{
-				previousState: 'UNDER_ASSURANCE',
-				newState: 'REJECTED',
-				executionState: 'NOT_PLANNED',
-				assuranceState: 'UNASSESSED',
-				shapeIntegrityState: 'PRESERVED',
-				reasonCode: 'CONTROLLER',
-				supportingObjectIds
+				rejectionDecisionId: decisionId,
+				blockingObservationIds: observationIds,
+				reasonCode: 'CONTROLLER'
 			},
 			id,
 			'PROFESSIONAL_WORK_UNIT'
@@ -202,6 +206,7 @@ describe('REG-F-078 — rejecting governed work requires an authorized decision 
 		expect(r.error?.message, 'the refusal must come from the rejection guard').toContain(
 			'JPWB-DOC-001 §5.2'
 		);
+		expect(r.error?.message, 'and from RejectPwu, not from some earlier gate').toContain('RejectPwu');
 		expect(r.error?.message, because).toContain(because);
 	};
 
@@ -286,93 +291,96 @@ describe('REG-F-078 — rejecting governed work requires an authorized decision 
 	it('ACCEPTS with an EFFECTIVE REJECTION decision AND a blocking observation about this PWU', () => {
 		const obs = observation(OBS, PWU, 'BLOCKING');
 		const dec = decision('REJECTION', [PWU]);
-		ok(rejectWork([dec, obs]), 'authorized, evidenced rejection');
+		ok(rejectWork(dec, [obs]), 'authorized, evidenced rejection');
 		expect(lifecycle()).toBe('REJECTED');
 	});
 
 	// ── ONE REJECT PER CONJUNCT ───────────────────────────────────────────────────────────────────────────────
-	it('REJECTS with nothing cited — the hole, measured before the guard', () => {
-		refusedByTheRejectGuard(rejectWork([]), 'Supplied: [nothing]');
+	it('REJECTS with nothing named — now refused by the CONTRACT, which is stronger than the guard', () => {
+		// Both citations are REQUIRED fields of RejectPwuPayload, so the bare case never reaches either conjunct.
+		// The hole this file was written for — the work axis driven to REJECTED with nothing cited at all — is
+		// now unrepresentable rather than merely refused.
+		const r = dispatch('RejectPwu', { reasonCode: 'CONTROLLER' }, PWU, 'PROFESSIONAL_WORK_UNIT');
+		expect(r.status).toBe('VALIDATION_FAILED');
 		expect(lifecycle(), 'a refused rejection must not have moved the PWU').toBe('UNDER_ASSURANCE');
 	});
 
 	it('REJECTS a decision WITHOUT a finding — authority alone does not reject work', () => {
 		const dec = decision('REJECTION', [PWU]);
-		refusedByTheRejectGuard(rejectWork([dec]), 'no BLOCKING or CRITICAL AssuranceObservation');
+		refusedByTheRejectGuard(rejectWork(dec, []), 'is a BLOCKING or CRITICAL AssuranceObservation');
 	});
 
 	it('REJECTS a finding WITHOUT a decision — the finding is the trigger, not the authority', () => {
 		const obs = observation(OBS, PWU, 'BLOCKING');
-		refusedByTheRejectGuard(rejectWork([obs]), 'no EFFECTIVE REJECTION Decision');
+		refusedByTheRejectGuard(rejectWork('dec_does_not_exist', [obs]), 'names no recorded object');
 	});
 
 	it('REJECTS an APPROVAL standing in for a REJECTION decision', () => {
 		const obs = observation(OBS, PWU, 'BLOCKING');
 		const dec = decision('APPROVAL', [PWU]);
-		refusedByTheRejectGuard(rejectWork([dec, obs]), 'requires decisionType=REJECTION');
+		refusedByTheRejectGuard(rejectWork(dec, [obs]), 'requires decisionType=REJECTION');
 	});
 
 	it('REJECTS a PROPOSED (unapproved) REJECTION decision', () => {
 		const obs = observation(OBS, PWU, 'BLOCKING');
 		const dec = decision('REJECTION', [PWU], false);
-		refusedByTheRejectGuard(rejectWork([dec, obs]), 'not EFFECTIVE');
+		refusedByTheRejectGuard(rejectWork(dec, [obs]), 'not EFFECTIVE');
 	});
 
 	it('REJECTS a decision scoped to a DIFFERENT PWU (RPH-GOV-005)', () => {
 		const obs = observation(OBS, PWU, 'BLOCKING');
 		const dec = decision('REJECTION', [OTHER_PWU]);
-		refusedByTheRejectGuard(rejectWork([dec, obs]), 'does not bleed to another object');
+		refusedByTheRejectGuard(rejectWork(dec, [obs]), 'does not bleed to another object');
 	});
 
 	it('REJECTS an ADVISORY observation — severity is read off the stored object, not asserted', () => {
 		const obs = observation(OBS, PWU, 'ADVISORY');
 		const dec = decision('REJECTION', [PWU]);
-		refusedByTheRejectGuard(rejectWork([dec, obs]), 'no BLOCKING or CRITICAL AssuranceObservation');
+		refusedByTheRejectGuard(rejectWork(dec, [obs]), 'is a BLOCKING or CRITICAL AssuranceObservation');
 	});
 
 	it('REJECTS a blocking observation about a DIFFERENT PWU', () => {
 		const obs = observation(OBS, OTHER_PWU, 'BLOCKING');
 		const dec = decision('REJECTION', [PWU]);
-		refusedByTheRejectGuard(rejectWork([dec, obs]), 'no BLOCKING or CRITICAL AssuranceObservation');
+		refusedByTheRejectGuard(rejectWork(dec, [obs]), 'is a BLOCKING or CRITICAL AssuranceObservation');
 	});
 
-	// ── CONTROL 1: THE ALREADY-REJECTED LIMB, WHICH HAS A FAILURE MODE OF ITS OWN ────────────────────────────
-	// Once REJECTED, moving an orthogonal axis is not a second rejection and must not demand a second decision.
-	// Predicted red for the mutant dropping `|| currentWorkLifecycleState === 'REJECTED'`, and ONLY for it: every
-	// other row rejects from UNDER_ASSURANCE, where that disjunct is false and therefore invisible.
-	it('CONTROL — moving another axis on an ALREADY-rejected PWU needs no second decision', () => {
-		const obs = observation(OBS, PWU, 'BLOCKING');
-		const dec = decision('REJECTION', [PWU]);
-		ok(rejectWork([dec, obs]), 'the rejection itself');
-		ok(
-			dispatch(
-				'ChangePwuState',
-				{
-					previousState: 'REJECTED',
-					newState: 'REJECTED',
-					executionState: 'PLANNED',
-					assuranceState: 'UNASSESSED',
-					shapeIntegrityState: 'PRESERVED',
-					reasonCode: 'CONTROLLER',
-					supportingObjectIds: []
-				},
-				PWU,
-				'PROFESSIONAL_WORK_UNIT'
-			),
-			'recording an orthogonal axis on rejected work is not a second governance act'
+	// ── CONTROL 1: THE OWNERSHIP CONJUNCT LANDED IN THIS SAME COMMIT ────────────────────────────────────────
+	// W-1 moves the guard OFF `ChangePwuState`. Had the ownership row not landed with it, the setter would still
+	// perform `-> REJECTED` with nothing checking authority — re-opening this file's own finding. Predicted red
+	// for the mutant deleting `REJECTED` from `PWU_SEMANTIC_LIFECYCLE_COMMANDS`, and only for it.
+	it('CONTROL — the generic setter refuses the arrow outright and names the command', () => {
+		const r = dispatch(
+			'ChangePwuState',
+			{
+				previousState: 'UNDER_ASSURANCE',
+				newState: 'REJECTED',
+				executionState: 'NOT_PLANNED',
+				assuranceState: 'UNASSESSED',
+				shapeIntegrityState: 'PRESERVED',
+				reasonCode: 'CONTROLLER',
+				supportingObjectIds: []
+			},
+			PWU,
+			'PROFESSIONAL_WORK_UNIT'
 		);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message, 'the setter must redirect, not adjudicate').toContain(
+			'Dispatch RejectPwu instead'
+		);
+		expect(lifecycle()).toBe('UNDER_ASSURANCE');
 	});
 
-	// ── CONTROL 2: THE TWO CITATIONS ARE THE ONLY DIFFERENCE ────────────────────────────────────────────────
-	// Proves the guard DECIDES rather than refusing everything: the same dispatch, same PWU, same state, differs
-	// only by what is cited. A refusal actually coming from the vacuity precondition, a sibling guard, the
-	// legality check or the ownership guard could not be cured by adding a decision and an observation.
-	it('CONTROL — the identical dispatch is refused bare and accepted with both citations', () => {
-		expect(rejectWork([]).status).toBe('REJECTED');
-		expect(lifecycle()).toBe('UNDER_ASSURANCE');
+	// ── CONTROL 2: BOTH CITATIONS ARE THE ONLY DIFFERENCE ───────────────────────────────────────────────────
+	// Proves the command DECIDES rather than refusing everything: same dispatch, same PWU, same state, differing
+	// only in what is named. A refusal from the schema, the machine or an earlier gate could not be cured by
+	// naming a valid decision and a real blocking finding.
+	it('CONTROL — the identical dispatch is refused on a bad decision and accepted on a good one', () => {
 		const obs = observation(OBS, PWU, 'BLOCKING');
+		expect(rejectWork('dec_does_not_exist', [obs]).status).toBe('REJECTED');
+		expect(lifecycle()).toBe('UNDER_ASSURANCE');
 		const dec = decision('REJECTION', [PWU]);
-		ok(rejectWork([dec, obs]), 'the same dispatch, now authorized and evidenced');
+		ok(rejectWork(dec, [obs]), 'the same dispatch, now authorized and evidenced');
 		expect(lifecycle()).toBe('REJECTED');
 	});
 });

@@ -389,6 +389,19 @@ export const ChallengePwuPayloadSchema = z.strictObject({
 	observationIds: z.array(z.string()).optional()
 });
 export type ChallengePwuPayload = z.infer<typeof ChallengePwuPayloadSchema>;
+export const AbandonPwuPayloadSchema = z.strictObject({
+	abandonmentDecisionId: z.string(),
+	reasonCode: z.string().optional(),
+	supportingObjectIds: z.array(z.string()).optional()
+});
+export type AbandonPwuPayload = z.infer<typeof AbandonPwuPayloadSchema>;
+export const RejectPwuPayloadSchema = z.strictObject({
+	rejectionDecisionId: z.string(),
+	blockingObservationIds: z.array(z.string()),
+	reasonCode: z.string().optional(),
+	supportingObjectIds: z.array(z.string()).optional()
+});
+export type RejectPwuPayload = z.infer<typeof RejectPwuPayloadSchema>;
 export const ReshapePwuPayloadSchema = z.strictObject({
 	reason: z.string(),
 	triggeringObjectId: z.string().optional()
@@ -2027,6 +2040,18 @@ export const COMMANDS = {
 		emitsEvent: 'PwuChallenged',
 		firstSlice: false
 	},
+	AbandonPwu: {
+		payload: AbandonPwuPayloadSchema,
+		targetAggregateType: 'ProfessionalWorkUnit',
+		emitsEvent: 'PwuAbandoned',
+		firstSlice: false
+	},
+	RejectPwu: {
+		payload: RejectPwuPayloadSchema,
+		targetAggregateType: 'ProfessionalWorkUnit',
+		emitsEvent: 'PwuRejected',
+		firstSlice: false
+	},
 	ReshapePwu: {
 		payload: ReshapePwuPayloadSchema,
 		targetAggregateType: 'ProfessionalWorkUnit',
@@ -3273,5 +3298,19 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'AssuranceAssessment.state',
 		from: 'ASSESSING',
 		to: 'CANCELLED'
+	},
+	{
+		commandType: 'AbandonPwu',
+		eventType: 'PwuAbandoned',
+		machine: 'PWU.workLifecycleState',
+		from: '(any active)',
+		to: 'ABANDONED'
+	},
+	{
+		commandType: 'RejectPwu',
+		eventType: 'PwuRejected',
+		machine: 'PWU.workLifecycleState',
+		from: 'UNDER_ASSURANCE',
+		to: 'REJECTED'
 	}
 ];

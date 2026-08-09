@@ -11,12 +11,14 @@ import {
 	reviseIntent
 } from './intent.js';
 import {
+	abandonPwu,
 	beginPwuShaping,
 	challengePwu,
 	changePwuState,
 	invalidatePwu,
 	markPwuReady,
 	proposePwu,
+	rejectPwu,
 	reshapePwu,
 	supersedePwu
 } from './pwu.js';
@@ -132,6 +134,10 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ReshapePwu: reshapePwu,
 	InvalidatePwu: invalidatePwu,
 	SupersedePwu: supersedePwu,
+	// JAN-PWUWP W-1 (REG-D-029): the two acts JPWB-DOC-001 §5.2 reserves to Governance finally have the
+	// semantically named commands PER-3 requires, and their authority guards moved off the generic setter.
+	AbandonPwu: abandonPwu,
+	RejectPwu: rejectPwu,
 	// Execution plan + steps + runtime bindings (DOC-002 §20, §21, §22)
 	ProposeExecutionPlan: proposeExecutionPlan,
 	ApproveExecutionPlan: approveExecutionPlan,

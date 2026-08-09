@@ -1467,6 +1467,72 @@
 			]
 		},
 		{
+			"commandType": "AbandonPwu",
+			"targetAggregateType": "ProfessionalWorkUnit",
+			"emitsEvent": "PwuAbandoned",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "(any active)",
+			"drivesTo": "ABANDONED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-08, under REG-D-029 - the sponsor grant discharging Coding Agent Guide L1097 'when the required semantic Command is absent, stop for a contract Decision rather than inventing one' for the PWU write path). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. The EVENT it emits already existed - declared, registered, and emitted by NOTHING - and this command is its first emitter. Do NOT treat this sourceSection as proof the shape is ratified: REG-D-029 grants authoring, NOT ratification. Cited for the act: JPWB-DOC-001 §5.2, which reserves abandonment of governed work to Governance.",
+			"payloadFields": [
+				{
+					"field": "abandonmentDecisionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref - the EFFECTIVE Decision with decisionType=ABANDON authorizing this. The caller names WHICH decision; the handler DERIVES whether it authorizes (JAN-PWUWP R1 derive-on-read). Required because PwuAbandonedPayload requires it and, until now, had no emitter to supply it."
+				},
+				{
+					"field": "reasonCode",
+					"required": false,
+					"type": "string",
+					"note": "DOC-002 §37 control-action record: the triggering condition."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
+			"commandType": "RejectPwu",
+			"targetAggregateType": "ProfessionalWorkUnit",
+			"emitsEvent": "PwuRejected",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "UNDER_ASSURANCE",
+			"drivesTo": "REJECTED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-08, under REG-D-029 - the sponsor grant discharging Coding Agent Guide L1097 'when the required semantic Command is absent, stop for a contract Decision rather than inventing one' for the PWU write path). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. The EVENT it emits already existed - declared, registered, and emitted by NOTHING - and this command is its first emitter. Do NOT treat this sourceSection as proof the shape is ratified: REG-D-029 grants authoring, NOT ratification. Cited for the act: JPWB-DOC-001 §5.2, which reserves rejection of governed work to Governance.",
+			"payloadFields": [
+				{
+					"field": "rejectionDecisionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref - the EFFECTIVE Decision with decisionType=REJECTION. NOT 'REJECT', which is the §37 ControlAction spelling - the trap REG-F-078 records. Caller names which; handler derives whether."
+				},
+				{
+					"field": "blockingObservationIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[] - the AssuranceObservations whose recorded severity makes them blocking. Required because the arrow's VERBATIM corpus trigger is 'Blocking finding' and PwuRejectedPayload requires them. Severity is read off the STORED observation, never from this payload."
+				},
+				{
+					"field": "reasonCode",
+					"required": false,
+					"type": "string",
+					"note": "DOC-002 §37 control-action record: the triggering condition."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
 			"commandType": "ReshapePwu",
 			"targetAggregateType": "ProfessionalWorkUnit",
 			"emitsEvent": "PwuReshapingStarted",
@@ -7975,6 +8041,22 @@
 			"from": "ASSESSING",
 			"to": "CANCELLED",
 			"note": "§30's `ANY ACTIVE → CANCELLED` has FOUR arms; the binding table holds one row per command and records the widest. The four arms are in m2-transitions.json."
+		},
+		{
+			"commandType": "AbandonPwu",
+			"eventType": "PwuAbandoned",
+			"machine": "PWU.workLifecycleState",
+			"from": "(any active)",
+			"to": "ABANDONED",
+			"note": "JAN-PWUWP W-1 under REG-D-029. The seventeen '-> ABANDONED' arrows are ONE act; the umbrella from-token matches how the source table records it. Authority is enforced by resolveAbandonAuthorization (REG-F-070), which moved here from the generic setter."
+		},
+		{
+			"commandType": "RejectPwu",
+			"eventType": "PwuRejected",
+			"machine": "PWU.workLifecycleState",
+			"from": "UNDER_ASSURANCE",
+			"to": "REJECTED",
+			"note": "JAN-PWUWP W-1 under REG-D-029. One in-arrow only. Requires BOTH an EFFECTIVE REJECTION Decision and a blocking observation about this PWU (REG-F-078)."
 		}
 	],
 	"conflicts": [

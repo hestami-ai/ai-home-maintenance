@@ -77,6 +77,9 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 	/**
 	 * An EFFECTIVE `ABANDON` Decision naming THIS PWU at its CURRENT semantic version, returned as the id to cite.
 	 *
+	 * ⚠ JAN-PWUWP W-1: the abandonment now goes through `AbandonPwu`, the semantically named command
+	 * PER-3 requires. `ChangePwuState` refuses the arrow outright and names the command to use.
+	 *
 	 * ⚠ THIS HELPER IS THE REPAIR OF A DEMONSTRATED HOLE, NOT FIXTURE CEREMONY. Until REG-F-070 the three
 	 * abandonments below carried `reasonCode: 'fixture'` and an empty `supportingObjectIds` and were ACCEPTED —
 	 * this file was the register's own evidence that the one act JPWB-DOC-001 §5.2 reserves to Governance could be
@@ -134,26 +137,9 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 		stepState: 'QUEUED'
 	});
 
-	const chg = (
-		previousState: string,
-		newState: string,
-		executionState: string,
-		supportingObjectIds: string[] = []
-	) =>
-		dispatch(
-			'ChangePwuState',
-			{
-				previousState,
-				newState,
-				executionState,
-				assuranceState: 'UNASSESSED',
-				shapeIntegrityState: 'PRESERVED',
-				reasonCode: 'fixture',
-				supportingObjectIds
-			},
-			PWU,
-			'PROFESSIONAL_WORK_UNIT'
-		);
+	// JAN-PWUWP W-1 — the local `chg` helper is GONE, not merely unused. With ABANDONED owned by
+	// `AbandonPwu`, this file no longer dispatches `ChangePwuState` for the PWU at all; its absence is the
+	// tell that the arrangement now takes the same route production does.
 
 	/**
 	 * REG-F-072 — SHAPING and READY through the commands that OWN those arrows. This file WAS the finding's
@@ -455,7 +441,15 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 		//
 		// REG-F-070: the abandonment now cites an EFFECTIVE ABANDON Decision. Before that guard these three lines
 		// closed a governed unit of work on `reasonCode: 'fixture'` alone.
-		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
+		ok(
+			dispatch(
+				'AbandonPwu',
+				{ abandonmentDecisionId: authorizeAbandon(), reasonCode: 'CONTROLLER' },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'abandon'
+		);
 		expect(pwuLifecycle()).toBe('ABANDONED');
 	}
 
@@ -510,7 +504,15 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 			'propose'
 		);
 		ok(dispatch('ApproveExecutionPlan', {}), 'approve');
-		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
+		ok(
+			dispatch(
+				'AbandonPwu',
+				{ abandonmentDecisionId: authorizeAbandon(), reasonCode: 'CONTROLLER' },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'abandon'
+		);
 		const r = dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] });
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
@@ -522,7 +524,15 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 		// The over-refusal guard. §20.2 is explicit that approval grants no runtime privileges, so neither
 		// authoring nor approving is gated — only the acts that actually open or credit execution.
 		toReady();
-		ok(chg('READY', 'ABANDONED', 'NOT_PLANNED', [authorizeAbandon()]), 'abandon');
+		ok(
+			dispatch(
+				'AbandonPwu',
+				{ abandonmentDecisionId: authorizeAbandon(), reasonCode: 'CONTROLLER' },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'abandon'
+		);
 		ok(
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,

@@ -122,6 +122,9 @@ describe('validate', () => {
 		// was the only member of RATIFIED_EVENT_PAYLOADS no handler emitted. The pair is indivisible: without
 		// DiscloseAssumption every source state of FALSIFIED is unoccupiable, so the falsification command would
 		// have registered, scored COVERED by the C-0 arrow census, and been unable to fire.
-		expect(buildContractRegistry().ids()).toHaveLength(345);
+		// 345 -> 347 (2026-08-09, JAN-PWUWP W-1 under REG-D-029): `AbandonPwuPayload` and `RejectPwuPayload`.
+		// The two acts JPWB-DOC-001 §5.2 reserves to Governance finally have the semantically named commands
+		// PER-3 requires; their authority guards moved off the generic setter onto them.
+		expect(buildContractRegistry().ids()).toHaveLength(347);
 	});
 });

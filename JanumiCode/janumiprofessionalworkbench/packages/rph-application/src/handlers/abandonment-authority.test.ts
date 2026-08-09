@@ -1,5 +1,12 @@
 // REG-F-070 — ABANDONMENT IS A GOVERNANCE ACT, AND ANY CONTROLLER COULD PERFORM IT.
 //
+// ⚠ MOVED ONTO `AbandonPwu` BY JAN-PWUWP W-1 (REG-D-029). The guard these cases exercise used to be
+// bolted onto the generic setter because the act had no command; PER-3 requires a semantically named
+// one, and it now exists. Two consequences visible below: the decision id is a REQUIRED payload field,
+// so "nothing cited" is refused by the CONTRACT rather than by the guard — strictly stronger — and a
+// new control asserts the setter refuses the arrow and names the command, which is the conjunct that
+// stops this increment re-opening the very finding this file exists for.
+//
 // JPWB-DOC-001 §5.2 (L168): *"**Governance is an authority function outside the six disciplines.** It alone
 // authorizes waiver, risk acceptance, rejection or abandonment of governed work, and promotion. No discipline may
 // absorb it."* All seventeen `-> ABANDONED` arrows declared the guard *"Authorized decision
@@ -125,8 +132,15 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 			'PROFESSIONAL_WORK_UNIT'
 		);
 
-	const abandon = (supportingObjectIds: string[] = []) =>
-		chgOn(PWU, 'READY', 'ABANDONED', supportingObjectIds);
+	/** The act, through the command that owns it. `authorizationId` is what the caller NAMES; the handler
+	 *  derives whether it authorizes (JAN-PWUWP R1 derive-on-read). */
+	const abandon = (authorizationId: string, id = PWU) =>
+		dispatch(
+			'AbandonPwu',
+			{ abandonmentDecisionId: authorizationId, reasonCode: 'CONTROLLER' },
+			id,
+			'PROFESSIONAL_WORK_UNIT'
+		);
 
 	/** Propose a decision of `decisionType` over `subjects`; approve it only when `approve`. */
 	const decision = (
@@ -183,8 +197,12 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 		expect(r.error?.message, 'the refusal must come from the abandonment guard').toContain(
 			'JPWB-DOC-001 §5.2'
 		);
+		expect(r.error?.message, 'and from AbandonPwu, not from some earlier gate').toContain('AbandonPwu');
 		expect(r.error?.message, because).toContain(because);
 	};
+
+	const pwuState = (id = PWU) =>
+		(store.loadObject(id)!.state as { workLifecycleState: string }).workLifecycleState;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
@@ -214,23 +232,28 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 	// ── THE ACCEPT CASE ───────────────────────────────────────────────────────────────────────────────────────
 	it('ACCEPTS when an EFFECTIVE ABANDON decision names this PWU at its current semantic version', () => {
 		const dec = decision('ABANDON', [PWU], true, { [PWU]: 1 });
-		ok(abandon([dec]), 'authorized abandonment');
+		ok(abandon(dec), 'authorized abandonment');
 		expect(
 			(store.loadObject(PWU)!.state as { workLifecycleState: string }).workLifecycleState
 		).toBe('ABANDONED');
 	});
 
 	// ── ONE REJECT PER CONJUNCT ───────────────────────────────────────────────────────────────────────────────
-	it('REJECTS with nothing cited — the demonstrated hole (reasonCode alone closed a unit of work)', () => {
-		refusedByTheAbandonGuard(abandon(), 'Supplied: [nothing]');
+	it('REJECTS with no decision named — now refused by the CONTRACT, which is stronger than the guard', () => {
+		// `abandonmentDecisionId` is a REQUIRED field of AbandonPwuPayload, so the empty case never reaches the
+		// authority check: it is refused at the schema. That is the improvement W-1 buys — the hole this file was
+		// written for (a governed unit of work closed on `reasonCode: 'fixture'` alone) is now unrepresentable.
+		const r = dispatch('AbandonPwu', { reasonCode: 'CONTROLLER' }, PWU, 'PROFESSIONAL_WORK_UNIT');
+		expect(r.status).toBe('VALIDATION_FAILED');
+		expect(pwuState()).toBe('READY');
 	});
 
 	it('REJECTS a dangling id — the cheapest possible forgery', () => {
-		refusedByTheAbandonGuard(abandon(['dec_does_not_exist']), 'names no recorded object');
+		refusedByTheAbandonGuard(abandon('dec_does_not_exist'), 'names no recorded object');
 	});
 
 	it('REJECTS an object that is not a DECISION — a category error, told as one', () => {
-		refusedByTheAbandonGuard(abandon([INTENT]), 'not a DECISION');
+		refusedByTheAbandonGuard(abandon(INTENT), 'not a DECISION');
 	});
 
 	it('REJECTS an EFFECTIVE APPROVAL — a general approval does not authorize abandonment', () => {
@@ -238,18 +261,18 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 		// canon licenses one decisionType standing in for another, CON-000 AX-2 defaults authority to denied, and
 		// `resolveSkipAuthorization` already refuses the same substitution. Registered as REG-F-076.
 		const dec = decision('APPROVAL', [PWU], true, { [PWU]: 1 });
-		refusedByTheAbandonGuard(abandon([dec]), 'requires decisionType=ABANDON');
+		refusedByTheAbandonGuard(abandon(dec), 'requires decisionType=ABANDON');
 	});
 
 	it('REJECTS a PROPOSED ABANDON decision — a decision somebody drafted is not one anybody made', () => {
 		const dec = decision('ABANDON', [PWU], false);
-		refusedByTheAbandonGuard(abandon([dec]), 'not EFFECTIVE');
+		refusedByTheAbandonGuard(abandon(dec), 'not EFFECTIVE');
 	});
 
 	it('REJECTS an ABANDON decision scoped to a DIFFERENT PWU (RPH-GOV-005)', () => {
 		ok(proposePwu(OTHER_PWU), 'other pwu');
 		const dec = decision('ABANDON', [OTHER_PWU], true, { [OTHER_PWU]: 1 });
-		refusedByTheAbandonGuard(abandon([dec]), 'does not bleed to another object');
+		refusedByTheAbandonGuard(abandon(dec), 'does not bleed to another object');
 	});
 
 	it('REJECTS an ABANDON decision that pins NO version for the PWU being closed (ASR-15)', () => {
@@ -271,10 +294,7 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 		// Now bring it into existence and try to close it on that decision.
 		ok(proposePwu(UNBORN_PWU), 'the work now exists');
 		toReady(UNBORN_PWU);
-		refusedByTheAbandonGuard(
-			chgOn(UNBORN_PWU, 'READY', 'ABANDONED', [dec]),
-			'at semantic version nothing'
-		);
+		refusedByTheAbandonGuard(abandon(dec, UNBORN_PWU), 'at semantic version nothing');
 	});
 
 	// ── THE VERSION-DRIFT LIMB, DEFENDED AHEAD OF A CAPABILITY THAT DOES NOT EXIST YET ───────────────────────
@@ -327,7 +347,7 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 	// invisible. This is the limb `beforeEach` cannot reach.
 	it('CONTROL — moving another axis on an ALREADY-abandoned PWU needs no second decision', () => {
 		const dec = decision('ABANDON', [PWU], true, { [PWU]: 1 });
-		ok(abandon([dec]), 'the abandonment itself');
+		ok(abandon(dec), 'the abandonment itself');
 		// An axis MUST actually move: an all-axes-equal re-issue is refused earlier by the DWP-02 vacuity
 		// precondition, which would make this control pass for the wrong reason.
 		ok(
@@ -355,16 +375,31 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 	// actually came from `checkTransition`, the vacuity precondition or a sibling guard could not be cured by
 	// adding one. Predicted red for any mutant that makes the guard refuse unconditionally.
 	it('CONTROL — the identical abandonment is refused without the decision and accepted with it', () => {
-		const refused = abandon();
+		const refused = abandon('dec_does_not_exist');
 		expect(refused.status).toBe('REJECTED');
 		expect(
 			(store.loadObject(PWU)!.state as { workLifecycleState: string }).workLifecycleState,
 			'a refused abandonment must not have moved the PWU'
 		).toBe('READY');
 		const dec = decision('ABANDON', [PWU], true, { [PWU]: 1 });
-		ok(abandon([dec]), 'the same dispatch, now authorized');
+		ok(abandon(dec), 'the same dispatch, now authorized');
 		expect(
 			(store.loadObject(PWU)!.state as { workLifecycleState: string }).workLifecycleState
 		).toBe('ABANDONED');
+	});
+
+	// ── CONTROL 3: THE OWNERSHIP CONJUNCT LANDED IN THIS SAME COMMIT ─────────────────────────────────────────
+	// W-1 moves the authority guard OFF `ChangePwuState`. If the ownership row had not landed with it, the setter
+	// would still perform `-> ABANDONED` — now with nothing checking authority at all — re-opening the exact
+	// finding this file exists for, for six increments. This is the test that makes the coupling enforced rather
+	// than merely intended. Predicted red for the mutant that deletes `ABANDONED` from
+	// `PWU_SEMANTIC_LIFECYCLE_COMMANDS`, and ONLY for it.
+	it('CONTROL — the generic setter refuses the arrow outright and names the command', () => {
+		const r = chgOn(PWU, 'READY', 'ABANDONED', []);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message, 'the setter must redirect, not adjudicate').toContain(
+			'Dispatch AbandonPwu instead'
+		);
+		expect(pwuState(), 'and must not have moved the PWU').toBe('READY');
 	});
 });
