@@ -52,35 +52,35 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 - **Statement:** The canon synthesis program exists to solve seven diagnosed problems and honor one constraint. **P1** status flattening (every source doc speaks in the same settled register regardless of layer and ratification state; genre unmarked). **P2** authority without conferral (canonical status claimed at authoring time, never conferred by an act; only the M0 sheet was ratified). **P3** missing layers (doctrine and CONOP/CONEMP never separated out). **P4** non-traveling adjudication (the Coding Agent Guide's rulings lived only in the Guide while unmarked primaries outranked it in voice). **P5** undeclared authority direction between docs and code. **P6** rules without edges (proven failure: two agents over-applied Guide §9.7 into disabling model reasoning — vacuous compliance). **P7** scale/consumption mismatch. **C1:** the canonical voice is load-bearing and preserved in body text; it is the voice of commitment, not finality — rigor is justified by experimental validity, because a hypothesis implemented sloppily teaches nothing.
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-CON-000 (preamble rationale); JPWB-DOC-001 (dual stance); JPWB-DOC-004 (P6 edge rule).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **✅ CLOSED 2026-08-09 (P-5): the ratification act was REG-D-010 on 2026-07-24 and the merge target was VERIFIED PRESENT before closing. This status was stale for six weeks — see REG-F-095.**
 
 ### REG-D-002 — The six-artifact architecture
 - **Date:** 2026-07-16 · **Type:** DECISION
 - **Statement:** The recognized corpus is exactly six artifacts — JPWB-CON-000 Constitution; JPWB-DOC-001 Doctrine and Concept of Operations; JPWB-DOC-002 Canonical Vocabulary; JPWB-DOC-003 Semantic Model and Invariant Catalog; JPWB-DOC-004 Agent Operating Protocol; JPWB-REG-005 this register — plus the repository's generated contracts, schemas, and conformance tests as shape authority. Nothing else governs. A document not in this registry, whatever its title or voice, is historical material.
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-CON-000 Part B (rule of recognition, clause 1).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **✅ CLOSED 2026-08-09 (P-5): the ratification act was REG-D-010 on 2026-07-24 and the merge target was VERIFIED PRESENT before closing. This status was stale for six weeks — see REG-F-095.**
 
 ### REG-D-003 — The settledness ladder
 - **Date:** 2026-07-16 · **Type:** DECISION
 - **Statement:** Settledness descends the abstraction stack; the entire system is pre-Baseline. Level 0 **CONSTITUTIONAL** (vision, worldview, thesis, values, axioms, first principles; genuinely settled; relitigation by sponsor decision only). Level 1 **PRESUMPTIVE** (canonical vocabulary; operating protocol; strong rebuttable default; relitigation by governed refinement act — REG-005 entry, sponsor ratification, never casual drift). Level 2 **HYPOTHESIS** (doctrine details, semantic model, invariants, specifications; committed hypotheses under test — implement faithfully, treat friction as evidence; relitigation via the divergence protocol). Level 3 **EXPERIMENT** (the code: first implementation of the first principles, written without benefit of this canon; normal engineering under the protocol). **LIVING** (this register; append-only; continuous).
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-CON-000 Part B (clause 4).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **✅ CLOSED 2026-08-09 (P-5): the ratification act was REG-D-010 on 2026-07-24 and the merge target was VERIFIED PRESENT before closing. This status was stale for six weeks — see REG-F-095.**
 
 ### REG-D-004 — The authority partition: docs carry meaning, the repository carries shapes
 - **Date:** 2026-07-16 · **Type:** DECISION
 - **Statement:** The canon is authoritative for meaning, intent, doctrine, vocabulary, invariants, and protocol. The repository — generated contracts, schemas, migrations, conformance tests — is authoritative for exact shapes: wire envelopes, JSON schemas, enum spellings, ID prefixes, error codes. The canon never restates a shape the repository can express; it states the semantic requirement and defers. Precedence is by concern, not by document.
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-CON-000 Part B (clause 3); JPWB-DOC-003 (authority partition).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **✅ CLOSED 2026-08-09 (P-5): the ratification act was REG-D-010 on 2026-07-24 and the merge target was VERIFIED PRESENT before closing. This status was stale for six weeks — see REG-F-095.**
 
 ### REG-D-005 — Convergence-phase authority: docs are the sole semantic authority
 - **Date:** 2026-07-16 · **Type:** DECISION
 - **Statement:** During the convergence phase (now, until closure), the canon is the sole semantic authority and the code is the first experiment being brought into conformance. Dual run never means dual semantic authority. Divergence is expected and is evidence, not scandal. The docs-win presumption is a property of this phase, not a permanent fact; settledness is thereafter earned bottom-up through real-world operation.
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-CON-000 Part B (convergence clause); JPWB-DOC-004 (divergence protocol).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **✅ CLOSED 2026-08-09 (P-5): the ratification act was REG-D-010 on 2026-07-24 and the merge target was VERIFIED PRESENT before closing. This status was stale for six weeks — see REG-F-095.**
 
 ### REG-D-006 — Source corpus retirement upon ratification
 - **Date:** 2026-07-16 · **Type:** DECISION
@@ -95,7 +95,7 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 - **Statement:** Constitutional layer: the agent never adjudicates, always escalates. Vocabulary: the agent may propose a refinement with a finding; it never applies one. Hypothesis layer: the agent classifies divergences; autonomously fixes `DOCS_STRONGER` and `ACCIDENTAL_CODE_BEHAVIOR`; escalates reality-taught candidates and semantic conflicts. Canon edits are always drafted-by-agent, ratified-by-sponsor. Code: full agency within the protocol.
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-DOC-004 (divergence protocol, delegation section).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **✅ CLOSED 2026-08-09 (P-5): the ratification act was REG-D-010 on 2026-07-24 and the merge target was VERIFIED PRESENT before closing. This status was stale for six weeks — see REG-F-095.**
 
 ### REG-D-008 — The reference/experiment split and the shape-survivorship audit
 - **Date:** 2026-07-16 · **Type:** DECISION (sponsor-directed: "Proceed" on the drafted amendment)
@@ -174,7 +174,10 @@ All Section B entries: **Date:** 2026-07-16 (carried from Guide §16) · **Type:
 - **Statement:** Pre-canon sources claimed normativity at authoring time (transcripts called CPCO/JSDL/JEM/JSRP normative; the Guide was itself only proposed). Which text is actually authority was never conferred by an act.
 - **Safe default:** Until the canon is ratified, treat the draft canon, the repository's generated contracts, and accepted repository ADRs as working authority. Draft and transcript language is rationale or candidate design; repeating it never ratifies it.
 - **Disposition:** Designed closure: REG-D-002/D-005/D-006 and the rule of recognition replace document-level authority claims entirely.
-- **Merge target:** JPWB-CON-000 Part B. **Status:** OPEN — closes automatically at the canon ratification act.
+- ~~**Merge target:** JPWB-CON-000 Part B. **Status:** OPEN — closes automatically at the canon ratification act.~~
+- **✅ CLOSED 2026-08-09 (P-5) — AND IT SHOULD HAVE CLOSED ON 2026-07-24, SIX WEEKS EARLIER.** Its own status says *"closes automatically at the canon ratification act"*. **That act happened**: REG-D-010, 2026-07-24, *"the sponsor's founding ratification act"*. **Nothing is automatic in a markdown file** — the entry sat OPEN for six weeks describing a condition that had already been met, and every count of "open questions" since has been wrong by at least one.
+- **⚠ AND ITS DESIGNED CLOSURE CITES A DECISION THAT IS NOW REVERSED.** The disposition reads *"REG-D-002/D-005/D-006 and the rule of recognition replace document-level authority claims entirely"*. **REG-D-006 was reversed yesterday by REG-D-034** (sponsor ruling): the source corpora are admitted to B1's registry as SOURCE OF RECORD. The closure still holds — authority IS conferred by act rather than claimed at authoring time, which is the question this entry asked — but it now rests on REG-D-002/D-005 plus the AMENDED B1, not on retirement.
+- **AND THE SAFE DEFAULT IS SPENT, NOT MERELY STALE.** It reads *"Until the canon is ratified, treat the draft canon … as working authority."* Canon is ratified; the condition is discharged and the default no longer governs anything. **A safe default whose precondition has lapsed is worse than none — work proceeds on it without anyone re-reading the sentence that scoped it.**
 
 ### REG-Q-002 — Public root, ownership, and PWA composition
 - **Statement:** JanumiCode is a domain product containing multiple PWAs, with PWA-version-owned PWU Types and Undertaking-owned PWU Instances. The ontology permits one Undertaking under multiple compatible PWAs; current contracts serialize exactly one selected binding. Stray names (`JCPWA`, `Professional Endeavor`) exist in drafts. Multi-PWA compatibility, conflict precedence, ownership, migration, and projection rules are uncontracted.
@@ -2090,6 +2093,9 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 | `RecompositionContract.status` | `DRAFT` | `READY` (`decomposition.ts:498`) |
 | `ExecutionPlan.status` | `PROPOSED` | `UNDER_REVIEW` (`execution.ts:264`) |
 | `AssuranceAssessment.state` | `REQUESTED` | `READY` / `EVIDENCE_PENDING` (`assurance.ts:1263`) |
+| `Baseline.status` | `DRAFT` | `CANDIDATE` (`governance.ts:724`) | **⚠ ADDED 2026-08-09 (P-5) — THE COUNT WAS FIVE, NOT FOUR.** |
+
+> **⚠ AMENDED 2026-08-09: THIS ENTRY SAYS FOUR AND THE ANSWER IS FIVE.** `Baseline.status` declares `DRAFT` and births `CANDIDATE` — a fact already commented at its own creation site when this entry was written, so the fifth row was visible and simply not swept in. Found today by DERIVING the comparison (every machine with a declared birth, checked against its `initialState`) rather than by extending the list, which is the same correction `kit.ts` needed: its warning also said *four* and now says FIVE, naming Baseline. **A hand-enumerated count in a finding is a claim about the enumeration** — the general form recorded at [[REG-F-089]].
 
   **In every case the declared initial state is written NOWHERE in production** — verified by grepping for the literal in the owning handler, which returns nothing.
 - **⚠ SO `state-reachability.test.ts` COMPUTES ITS ANSWER FROM A ROOT THAT DOES NOT EXIST.** Its `strandedFrom` walks the arrow graph outward from `m.initialState`. For these four machines that root is never occupied, so *"reachable from the initial state"* is a claim about a diagram whose entry point the engine does not use. The control is not merely blind here (REG-F-063); its premise is false. **Both controls over these machines are now known to be measuring something other than what they say.**
@@ -2680,3 +2686,14 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **⚠ WHY IT TOOK THREE DAYS, AND WHAT ACTUALLY SURFACED IT.** REG-F-045 recorded the remedy on 2026-08-06 and nothing acted on it. It surfaced only because REG-F-091 — my own DUPLICATE of it — sent me back to read the register. **A recorded remedy is not a scheduled one**, and the thing that found it was an accident.
 - **AND IT IS NOW CONSTITUTIONALLY LOAD-BEARING, WHICH IT WAS NOT WHEN FILED.** CON-000 B3, as amended by REG-D-034, makes canon govern a principle *only where a divergence carries a ratifying act* — so whether a trigger is corpus text or an author's inference decides what a divergence means. **`provenanceOfArrow` reads the vocab directly as a workaround; with the annotation now generated, every consumer can read it from the generated data instead.**
 - **Merge target:** Repository — landed. Full gate: check-types, lint, 2643 vitest / 3 skipped across 257 files, `test:dist` parity.
+
+---
+
+### REG-F-095 — Seven entries were still "MERGE PENDING (closes on canon ratification)" six weeks AFTER ratification
+- **Date:** 2026-08-09 · **Type:** FINDING (P-5 sweep) · **Status:** ✅ CLOSED for six; the seventh was reversed yesterday.
+- **THE GENERAL FORM OF REG-Q-001, AND FINDING IT COST ONE GREP.** REG-Q-001's status read *"OPEN — closes automatically at the canon ratification act"*. Canon ratified on **2026-07-24** (REG-D-010). Asking whether any OTHER entry closes on a condition already met returned **seven**: `REG-D-001` … `REG-D-007`, every one of the FOUNDING decisions, all reading *"DECIDED — MERGE PENDING (closes on canon ratification)"*.
+- **⚠ NOTHING IS AUTOMATIC IN A MARKDOWN FILE.** Each of these entries describes its own closure as a consequence of an event, and the event happened. **Six weeks of every "open items" count in this register has been wrong**, and each of my own sweeps sized its work from those counts.
+- **THE MERGES DID LAND — VERIFIED BEFORE CLOSING, NOT ASSUMED.** `REG-D-002` → CON-000 **B1**; `REG-D-003` → **B4**; `REG-D-004` → **B3**; `REG-D-005` → **B6**; `REG-D-007` → DOC-004's divergence/delegation material; `REG-D-001` → CON-000 preamble + DOC-001. Each target was grepped and found present. **I amended B1, B3 and B6 myself today, which is the strongest evidence they exist.**
+- **⚠ AND THE SEVENTH IS EXACTLY WHY "VERIFY, DO NOT ASSUME" MATTERS HERE.** `REG-D-006` carried the identical status — and its merge landed in TEXT (B8 existed) while its EXECUTION never happened: the retirement it ordered was never carried out, which is how the source corpora sat in limbo for six weeks until REG-D-034 reversed it. **A "pending" status hid one genuinely-unexecuted decision among six merely-unrecorded ones.** Closing the batch without checking each target would have buried it a second time.
+- **THE DISTINCTION WORTH KEEPING: MERGED ≠ EXECUTED.** Five of these merged text into canon, which is the whole of what they ordered. REG-D-006 ordered a text change AND a file movement; the text landed and the movement did not. **A merge target naming a document is discharged by editing it; a merge target implying an action is not.** Nothing in the register's format distinguishes those, and that is the residue this finding leaves.
+- **Merge target:** Repository — the six statuses corrected in place, struck rather than rewritten. **Residue:** no control asserts that an entry whose closure condition is met is actually closed. Cheap to state, hard to derive — a closure condition is prose. Recorded rather than built.
