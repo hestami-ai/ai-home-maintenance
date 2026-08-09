@@ -1,0 +1,18 @@
+{
+  // WHY THIS FILE EXISTS (REG-F-097's named residue, discharged 2026-08-09).
+  //
+  // `scripts/` is not a workspace, so `turbo run check-types` never saw it. Only `mutants/ledger.ts` was
+  // typechecked, and then incidentally — `verif/mutant-ledger.test.ts` imports it, so it entered verif's program
+  // as a dependency. `run.ts` and `show.ts`, the mutation runner itself, were checked by nothing.
+  //
+  // The first run of this project found a real one: `run.ts` called `Array.prototype.findLast`, which is ES2023
+  // while the shared base declares `"lib": ["ES2022"]`. It worked under Bun and would have failed anywhere held
+  // to the level the packages promise. Rewritten to `filter(...).at(-1)` rather than raising `lib` here, because
+  // a second lib level in tooling is what later gets copied into a package.
+  "extends": "@janumipwb/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

@@ -89,16 +89,28 @@ const sh = (cmd: string, args: readonly string[], cwd: string = ROOT) =>
  * change as the mutant that proves it. That is a bad trade, because a harness which refuses to run until the tree is
  * pristine is a harness that gets run less often, and this one earns its keep by being run.
  */
-function treeIsClean(): boolean {
-	const r = sh('git', [
-		'status',
-		'--porcelain',
-		'--untracked-files=no',
-		'--',
+/**
+ * The paths cleanliness is judged over: the three source trees, PLUS every directory a declared mutant actually
+ * targets — DERIVED from the ledger rather than listed.
+ *
+ * ⚠ THE HARDCODED LIST HAD A HOLE AND WIDENING IT BY HAND WOULD HAVE BEEN THE WRONG FIX. `scripts` was absent, so
+ * a mutant declared against the runner or the ledger could leak and nothing would notice. But simply adding
+ * `scripts` would forbid running the harness while a NEW ledger entry is uncommitted — and that is the workflow
+ * that found REG-F-097 (a run over an edited ledger reported the NO_COMPILE that exposed the missing type gate).
+ * Deriving from `m.file` gets both: no mutant target can be outside the check, and a directory nothing mutates
+ * imposes nothing. Today it adds none; the day someone declares a mutant on `scripts/mutants/run.ts` it adds one.
+ */
+const CLEANLINESS_PATHS = [
+	...new Set([
 		'packages',
 		'apps',
-		'verif'
-	]);
+		'verif',
+		...DECLARED_MUTANTS.map((m) => m.file.split('/')[0] ?? '').filter((d) => d !== '')
+	])
+];
+
+function treeIsClean(): boolean {
+	const r = sh('git', ['status', '--porcelain', '--untracked-files=no', '--', ...CLEANLINESS_PATHS]);
 	return (r.stdout ?? '').trim() === '';
 }
 
@@ -417,8 +429,16 @@ const errorLines = (s: string): string =>
 		.slice(0, 3)
 		.map((l) => l.trim().slice(0, 150))
 		.join(' ⏎ ');
+// `filter(...).at(-1)` rather than `findLast`: the shared tsconfig targets ES2022 and `findLast` is ES2023, so
+// this line did not typecheck. It ran anyway under Bun — `scripts/` was outside every type gate until 2026-08-09
+// (REG-F-097), which is the same reason the unread-refusal ratchet could die unnoticed. Kept at the repo's one
+// declared lib level rather than raising a second one for two lines: a divergent `lib` in tooling is the kind of
+// thing that gets copied into a package.
 const summarise = (s: string): string =>
-	(s.split('\n').findLast((l) => l.includes('Tests ')) ?? '')
+	(s
+		.split('\n')
+		.filter((l) => l.includes('Tests '))
+		.at(-1) ?? '')
 		.replaceAll(new RegExp(String.raw`\[[0-9;]*m`, 'g'), '')
 		.trim();
 
