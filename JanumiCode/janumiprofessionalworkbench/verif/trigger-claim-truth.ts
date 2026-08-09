@@ -1,10 +1,26 @@
-// C-0d — the RATIFIED TRIGGER TEXT is a third record of what each command does, and nothing has ever audited it.
+// C-0d — the TRANSITION TRIGGER TEXT is a third record of what each command does, and nothing had ever audited it.
 //
-// ⚠ WHY THIS SOURCE IS DIFFERENT FROM THE OTHER TWO, AND WHY IT IS THE AUTHORITATIVE ONE. C-0c audits `BINDINGS`
-// and the vocab `commands[].drives*` copy. Both are AUTHORED records of what a command does — written by someone
-// reading the corpus. The `trigger` string on a ratified transition is the CORPUS ITSELF naming the command that
-// performs that arrow, e.g. `"Begin recomposition (beginRecomposition; RecompositionStarted)"`. When an authored
-// row and the ratified trigger disagree, the trigger wins.
+// ⚠⚠ CORRECTED HOURS AFTER SHIPPING. THIS FILE CLAIMED THE TRIGGER IS "THE CORPUS ITSELF" AND THEREFORE OUTRANKS
+// THE AUTHORED ROWS. THAT HOLDS FOR 3 MACHINES OUT OF 27.
+//
+// `m2-transitions.json` records provenance per machine in its own `sourceSection`, and for EIGHTEEN of the
+// twenty-seven it reads like `ExecutionPlan.status`'s, byte-exact:
+//     "core-model doc §20.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.4 events + §34.3 commands +
+//      §20.2 invariants. NO explicit matrix."
+// The STATES are verbatim; THE ARROWS AND THEIR TRIGGERS ARE AN AUTHOR'S RECONSTRUCTION. For those machines a
+// trigger is exactly as authored as a `BINDINGS` row, and "the trigger wins" is unfounded. Only
+// `PWU.workLifecycleState` ("§8.1 primary (VERBATIM)"), `Intent.intentStatus` and `ValidatorRegistryEntry.status`
+// carry verbatim transitions; `AssuranceAssessment.state` is a third case, "the ONLY object with a drawn FSM in
+// that doc" — drawn, not reconstructed, and not claimed verbatim either.
+//
+// ⚠ AND THE PROVENANCE WAS SITTING IN THE VOCAB THE WHOLE TIME. I asserted an authority without reading the
+// field that records it, in a control whose entire purpose is to stop records being trusted unchecked.
+//
+// SO THE CONTROL NOW PARTITIONS BY PROVENANCE INSTEAD OF ASSERTING AUTHORITY. A divergence on a VERBATIM machine
+// indicts the handler. A divergence on a RECONSTRUCTED machine indicts the handler OR the reconstruction, and a
+// build agent may not say which — which is a WEAKER but honest finding, and changes what is owed to Governance.
+//
+// WHY IT IS STILL WORTH AUDITING: three records disagreeing is evidence even when none of them is authoritative.
 //
 // THIS IS THE DERIVED GENERAL FORM OF THREE FINDINGS IN ONE WEEK. REG-F-082 (recomposition rows attribute PWU
 // arrows to commands that only move the contract), REG-F-085 (the PWU `-> RECOMPOSED` guard names a contract state
@@ -19,7 +35,10 @@
 // detect total death.
 import { COMMANDS } from '@janumipwb/rph-contracts';
 import { STATE_MACHINES } from '@janumipwb/rph-domain';
+import { readFileSync } from 'node:fs';
 import type { TransitionClaim } from './binding-row-truth.js';
+
+const M2_VOCAB = new URL('../packages/rph-domain/vocab/m2-transitions.json', import.meta.url);
 
 type Machine = { transitions: readonly { from: string; to: string; trigger?: string }[] };
 
@@ -42,6 +61,29 @@ function commandsNamedIn(trigger: string): string[] {
 		if (Object.prototype.hasOwnProperty.call(registry, commandType)) out.add(commandType);
 	}
 	return [...out];
+}
+
+/**
+ * Per-machine transition provenance, read from the vocab's own `sourceSection` — DERIVED, never listed. A
+ * hand-written table of which machines are verbatim would rot the moment a sourceSection is edited, and the
+ * reason this correction was needed is precisely that I asserted provenance instead of reading it.
+ */
+export type TriggerProvenance = 'VERBATIM' | 'RECONSTRUCTED' | 'OTHER';
+
+export function provenanceOf(machine: string): TriggerProvenance {
+	// `machines` is an ARRAY of { name, sourceSection, … }, not a map. The first version of this read it as a map
+	// and returned 'OTHER' for EVERY machine — including `PWU.workLifecycleState`, which is known VERBATIM. That
+	// uniform negative is the tell, and it is the fourth instrument failure of the day; the control case is the
+	// only thing that distinguishes it from a real answer.
+	const spec = JSON.parse(readFileSync(M2_VOCAB, 'utf8')) as {
+		machines: { name: string; sourceSection?: string }[];
+	};
+	const src = spec.machines.find((m) => m.name === machine)?.sourceSection ?? '';
+	// Order matters: a source can say BOTH ("enum (VERBATIM). Transitions RECONSTRUCTED…"), and it is the
+	// TRANSITIONS whose provenance this control depends on, so RECONSTRUCTED wins the tie.
+	if (/RECONSTRUCT/i.test(src)) return 'RECONSTRUCTED';
+	if (/VERBATIM/i.test(src)) return 'VERBATIM';
+	return 'OTHER';
 }
 
 /** Every (command, machine, from, to) the RATIFIED trigger text asserts. */

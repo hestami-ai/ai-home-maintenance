@@ -1,17 +1,22 @@
-// C-0d — audit the RATIFIED TRIGGER TEXT, the third record of what each command does and the only authoritative one.
+// C-0d — audit the TRANSITION TRIGGER TEXT, a third record of what each command does that nothing had compared.
 //
-// C-0c audits two AUTHORED records (`BINDINGS` and the vocab `commands[].drives*` copy). This audits the corpus
-// itself: the `trigger` string on a ratified transition, which names the command that performs that arrow. When an
-// authored row and a ratified trigger disagree, the trigger wins — so this source outranks both of C-0c's and had
-// never been compared to anything.
+// ⚠⚠ THIS HEADER CLAIMED THE TRIGGER IS "the only authoritative one" AND THAT "the trigger wins". CORRECTED THE
+// SAME DAY: that holds for 3 machines of 27. `m2-transitions.json` records provenance per machine, and for 18 the
+// transitions are an author's RECONSTRUCTION — states verbatim, arrows and triggers inferred from events +
+// commands + invariants, with "NO explicit matrix". See the provenance pins below and `trigger-claim-truth.ts`.
+//
+// C-0c audits two AUTHORED records (`BINDINGS` and the vocab `commands[].drives*` copy). This audits a third. On
+// the 3 VERBATIM machines it is the corpus speaking and it does outrank them; on the other 24 it is a third
+// opinion — still worth auditing, because three records disagreeing is evidence even when none is authoritative.
 //
 // ⚠ IT REDISCOVERED TWO KNOWN FINDINGS ON ITS FIRST RUN, FROM THE OTHER DIRECTION. REG-F-085 (`CompleteRecomposition`
 // COMPOSABLE -> SATISFIED, a target nothing can reach) and REG-F-088 (`ProposeExecutionPlan` skipping PROPOSED) were
 // both found by hand, by tripping over them, from the HANDLER side. C-0d derives both from the CORPUS side without
 // being told they exist — which is the strongest available evidence that the control measures what it claims to.
+import { STATE_MACHINES } from '@janumipwb/rph-domain';
 import { describe, expect, it } from 'vitest';
 import { auditClaims } from './binding-row-truth.js';
-import { triggerClaims, triggerCoverage } from './trigger-claim-truth.js';
+import { provenanceOf, triggerClaims, triggerCoverage } from './trigger-claim-truth.js';
 
 const AUDIT = auditClaims(triggerClaims());
 
@@ -42,8 +47,13 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	});
 
 	// ── THE FINDING THIS CONTROL EXISTS TO HOLD ──────────────────────────────────────────────────────────────
-	// ⚠ PINNED DEFECTS. Each row is a ratified arrow whose trigger names a REAL command, and whose SOURCE STATE
-	// no object can ever occupy — so canon assigns a command an arrow the command cannot perform.
+	// ⚠ PINNED DEFECTS. Each row is a DECLARED arrow whose trigger names a REAL command, and whose SOURCE STATE no
+	// object can ever occupy — so the machine assigns a command an arrow the command cannot perform.
+	//
+	// ⚠ ORIGINALLY WRITTEN AS "canon assigns". IT DOES NOT: all three sit on machines whose transitions are
+	// RECONSTRUCTED or merely drawn, never VERBATIM (see the provenance pins below). The dead arrow is REAL either
+	// way — the source state is measurably unoccupiable — but WHO IS WRONG is undecided: the handler, or the
+	// reconstruction that posited a state the handler never uses.
 	//
 	// The cause is REG-F-071, already known: `initialState` is a fiction on several machines because creation
 	// births PAST the first state (DecompositionContract DRAFT->born UNDER_REVIEW, ExecutionPlan PROPOSED->born
@@ -58,7 +68,7 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 		]);
 	});
 
-	// REG-F-085, derived here from the corpus rather than from the handler. `CompleteRecomposition`'s ratified
+	// REG-F-085, derived here from the machine rather than from the handler. `CompleteRecomposition`'s declared
 	// arrow lands in a contract state no command can produce — which is precisely why W-4.6's
 	// `CompletePwuRecomposition` cannot cite "Recomposition contract satisfied" and stays blocked.
 	it('PINNED DEFECT — ratified arrows landing in a state nothing can occupy', () => {
@@ -79,6 +89,41 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 			'PWU.executionState',
 			'PWU.workLifecycleState'
 		]);
+	});
+
+	// ── PROVENANCE: THE CORRECTION THAT COST THIS CONTROL ITS AUTHORITY CLAIM ────────────────────────────────
+	// Shipped asserting the trigger is "the corpus itself" and outranks the authored rows. `m2-transitions.json`
+	// records provenance per machine, and for 18 of 27 the transitions are an author's RECONSTRUCTION — the states
+	// verbatim, the arrows and triggers inferred from events + commands + invariants, with "NO explicit matrix".
+	it('PINNED — how many machines actually carry VERBATIM transitions', () => {
+		const counts: Record<string, number> = { VERBATIM: 0, RECONSTRUCTED: 0, OTHER: 0 };
+		for (const m of Object.keys(STATE_MACHINES as Record<string, unknown>)) counts[provenanceOf(m)]! += 1;
+		expect(counts).toEqual({ VERBATIM: 3, RECONSTRUCTED: 18, OTHER: 6 });
+	});
+
+	// ⚠ THE FINDING THAT MATTERS MORE THAN THE FOUR ROWS THEMSELVES: **not one of the divergences C-0d found sits
+	// on a VERBATIM machine.** So none of them indicts canon. Each indicts either the handler or the reconstruction,
+	// and a build agent cannot say which — which is a weaker claim than REG-F-088/089 originally made, and the
+	// honest one. If a divergence EVER appears on a verbatim machine this reddens, and that one WOULD indict the
+	// handler outright: it is the case worth waking someone for.
+	it('PINNED — no current divergence sits on a machine whose transitions are VERBATIM', () => {
+		const offending = [...AUDIT.deadFrom, ...AUDIT.deadTo]
+			.map((row) => /: ([A-Za-z]+\.[A-Za-z]+) /.exec(row)?.[1])
+			.filter((m): m is string => Boolean(m));
+		expect(offending.length, 'if this is 0 the row-parse broke and the assertion below is vacuous').toBe(4);
+		expect(
+			offending.filter((m) => provenanceOf(m) === 'VERBATIM'),
+			'a divergence on a VERBATIM machine indicts the handler outright — escalate it, do not just pin it'
+		).toEqual([]);
+	});
+
+	// ── CONTROL: THE PROVENANCE READER WORKS ─────────────────────────────────────────────────────────────────
+	// ⚠ ITS FIRST VERSION RETURNED 'OTHER' FOR ALL 27, because `machines` is an ARRAY and it read it as a map. A
+	// uniform negative is indistinguishable from a real one; the ONLY thing that caught it was checking a machine
+	// whose answer I already knew. Fourth instrument failure of the day — same remedy each time.
+	it('CONTROL — provenanceOf returns VERBATIM for a machine known to be verbatim', () => {
+		expect(provenanceOf('PWU.workLifecycleState'), 'source: "§8.1 primary (VERBATIM)"').toBe('VERBATIM');
+		expect(provenanceOf('ExecutionPlan.status'), 'source says transitions RECONSTRUCTED').toBe('RECONSTRUCTED');
 	});
 
 	// ── CONTROL 1: THE POPULATION IS REAL ────────────────────────────────────────────────────────────────────
