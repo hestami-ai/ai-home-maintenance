@@ -29,7 +29,11 @@ const VOCAB = new URL('../packages/rph-contracts/vocab/m3-commands-events.json',
 /** One recorded claim that a command drives a machine from one state to another. */
 export interface TransitionClaim {
 	/** Which of the two copies this came from — a failure must say which record to correct. */
-	readonly source: 'BINDINGS' | 'vocab.commands';
+	// 'ratified.trigger' is the THIRD source, added 2026-08-09 (C-0d). The first two are AUTHORED records of
+	// what a command does; the trigger text on the ratified transition is the CORPUS saying so, and until C-0d
+	// nothing compared it to anything. It is deliberately audited by its own control rather than folded into
+	// C-0c's population, so the two record types keep separate pins and a failure names which record is wrong.
+	readonly source: 'BINDINGS' | 'vocab.commands' | 'ratified.trigger';
 	readonly commandType: string;
 	readonly eventType: string;
 	readonly machine: string;

@@ -541,11 +541,17 @@ export function createObject(
 		 * THE STATE MACHINES THIS CREATION BIRTHS, and it is CHECKED against the state actually committed.
 		 *
 		 * ⚠ NEITHER OF THE TWO OBVIOUS SOURCES FOR THIS IS TRUSTWORTHY (REG-F-071). The arrow graph cannot
-		 * supply it — a birth has no in-arrow by definition. And `StateMachineSpec.initialState` LIES: four
+		 * supply it — a birth has no in-arrow by definition. And `StateMachineSpec.initialState` LIES: FIVE
 		 * machines declare an initial state the engine never writes (`DecompositionContract` declares DRAFT
 		 * and births UNDER_REVIEW; `RecompositionContract` DRAFT/READY; `ExecutionPlan` PROPOSED/UNDER_REVIEW;
-		 * `AssuranceAssessment` REQUESTED/READY|EVIDENCE_PENDING). So the birth is declared at the site that
-		 * performs it, which is the only place that knows.
+		 * `AssuranceAssessment` REQUESTED/READY|EVIDENCE_PENDING; `Baseline` DRAFT/CANDIDATE). So the birth is
+		 * declared at the site that performs it, which is the only place that knows.
+		 *
+		 * ⚠ THIS SAID `four` UNTIL 2026-08-09 AND LISTED FOUR. `Baseline.status` is the fifth and was already
+		 * commented on at its own creation site — the count was never re-derived after that one was found.
+		 * Corrected by DERIVING it: every machine with a declared birth, compared against its `initialState`.
+		 * The consequence nobody had chased is REG-F-089: the fiction kills ratified arrows whose triggers name
+		 * real commands, and C-0d now holds three of them.
 		 *
 		 * WHY IT IS A RUNTIME CHECK AND NOT A COMMENT. The occupancy census (C-0a) reads these declarations to
 		 * decide which states can ever be occupied, and therefore which "covered" arrows are dead. A
