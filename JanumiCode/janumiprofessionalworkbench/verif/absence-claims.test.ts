@@ -53,10 +53,14 @@ function unevidencedAbsenceClaims(): string[] {
 		.map((e) => e.id);
 }
 
-// ⚠ GRANDFATHERED, NOT FORGIVEN. These 13 predate the rule. They are pinned BY NAME rather than by count so the
-// list can only shrink deliberately — repairing one reddens this test and forces the removal to be a decision.
-// A rule applied retroactively to 184 entries would be a red wall nobody clears, which is how a control becomes
-// wallpaper; a rule enforced from today forward is one that actually binds.
+// ⚠ GRANDFATHERED, NOT FORGIVEN. These predate the rule, and are pinned BY NAME rather than by count so the list
+// can only shrink deliberately. A rule applied retroactively to 184 entries would be a red wall nobody clears,
+// which is how a control becomes wallpaper; enforced from today forward, it binds.
+//
+// **13 at P-3; 12 since REG-F-049 was amended under P-5.** The list shrank because an entry was REPAIRED — its
+// premise (the RPH docs are historical material) was reversed by REG-D-034, and the amendment states its search.
+// This test reddened the moment that happened, making the removal a decision rather than a side effect. **That is
+// the mechanism working, not maintenance.**
 const GRANDFATHERED = [
 	'REG-Q-028',
 	'REG-Q-030',
@@ -66,7 +70,6 @@ const GRANDFATHERED = [
 	'REG-F-037',
 	'REG-F-038',
 	'REG-F-040',
-	'REG-F-049',
 	'REG-D-021',
 	'REG-F-074',
 	'REG-F-078',
