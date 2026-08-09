@@ -1,0 +1,135 @@
+# ROADMAP — PWU write path (JAN-PWUWP)
+
+**Authority:** REG-D-029 (sponsor grant discharging Guide L1097 for this program).
+**Design:** `DESIGN-pwu-write-path.md`, whose §8 recorded eight findings from a four-lens adversarial review and
+declared everything from W-2 onward blocked on them. **This roadmap's first job is to resolve those eight.**
+A roadmap that inherited them would be a schedule for building on open questions.
+
+**Status of the design's conclusion:** unchanged — `workLifecycleState` is **commanded, not derived** (four
+orthogonal axes; eleven of twenty states are not functions of the others). Only the mechanism and the sequence
+are settled here.
+
+---
+
+## Part A — Resolving the design's §8 blockers
+
+### R1 · DERIVE-ON-READ, stated precisely enough to build against
+
+The design said the caller "cannot assert" but never drew the line. It is:
+
+> **A command may let the caller name WHICH object grounds a transition. It may never let the caller name WHAT
+> STATE results. The resulting state is computed by the handler from the named object's committed state.**
+
+This is exactly what the three existing "unbacked" guards already do, minus the assertion they exist to check:
+`rejectUnbackedBaselining` reads a cited BASELINE and checks `status === 'AUTHORITATIVE'`. Inverted, it *is* the
+derivation. **Citing an id is not asserting a state**, and the distinction matters because the PWU does not
+carry links to everything that governs it.
+
+**Measured, and it decides two increments:** `ProfessionalWorkUnitSchema` carries `activeExecutionPlanId`
+(optional) — so the execution axis can be derived from a link the PWU already holds. It carries **no baseline
+field** — so baselining must be citation-grounded. One rule covers both.
+
+⚠ **`activeExecutionPlanId` has no production writer today.** W-2 must give it one or read the plan by citation
+like the rest. Named here because the design assumed the link was live.
+
+### R2 · `rejectUnbackedBaselining` is NOT retired. It is relocated, and C-0b keeps its ENFORCED row
+
+The design's §4 claimed retiring three guards was a strengthening. It is true of one. This guard checks a
+**cross-aggregate** fact — a cited BASELINE that is AUTHORITATIVE and whose `itemObjectVersions` include this
+PWU at its frozen version — that no propagation from the three named planes would check, because its owning
+discipline is **Governance**, which §3.1–3.3 has no plane for. It becomes the derivation inside `BaselinePwu`
+(R3), unchanged in substance, and its ledger row moves with it rather than lapsing.
+
+### R3 · The three unaddressed states get commands — W-4.5, and it is not optional
+
+`RECOMPOSING`, `RECOMPOSED` and `BASELINED` appear in no table in the design, and their four arrows have no
+owner. `completeRecomposition` and `promoteBaseline` each advance their OWN aggregate and say so in comment;
+the reference seed must separately dispatch the setter to move the PWU. **After W-7 as designed, `BASELINED`
+becomes unreachable** — a declared terminal state with ratified RPH-PWU-010 over it.
+
+| command | arrow | derives from |
+|---|---|---|
+| `BaselinePwu` | `SATISFIED\|RECOMPOSED → BASELINED` | cited BASELINE: AUTHORITATIVE + `itemObjectVersions` include this PWU at version (R2's predicate) |
+| `BeginPwuRecomposition` | `SATISFIED → RECOMPOSING` | cited RECOMPOSITION_CONTRACT exists and names this PWU as parent |
+| `CompletePwuRecomposition` | `RECOMPOSING → RECOMPOSED` | that contract's committed `status` |
+
+### R4 · W-8's success criterion is a per-row delta table, never a count
+
+An arrow whose enforcing site is deleted with no writer replacing it becomes `ARROW_UNREACHABLE`, not
+`ENFORCED`. Under a count, **capability deletion scores as enforcement.** Every increment touching a guard must
+emit rows classified `ENFORCED_NEW` · `UNCHANGED` · `RELOCATED` · `UNREACHABLE_BY_DELETION`, and the last
+requires its own register note saying what capability went away and why that is intended.
+
+### R5 · W-7 keeps `PWU_SEMANTIC_LIFECYCLE_COMMANDS` and its type narrowing
+
+Only `rejectArrowOwnedBySemanticCommand` becomes dead when the setter goes. The **table** and
+`OwnedLifecycleTarget = keyof typeof …` are REG-F-072's anti-rot tripwire — a new lifecycle command cannot be
+added without a row, or `check-types` fails — and this program mints five or more. Deleting the tripwire while
+minting its subjects is precisely backwards.
+
+### R6 · W-4 is resequenced: it is the largest owner-gap, not the smallest surface
+
+`shapeIntegrityState` has nine arrows. `reshapePwu` owns one. Two are triggered from the **Assumption**
+aggregate (falsification → AT_RISK/VIOLATED) — cross-aggregate, and the assumption handler's own header says
+*"⚠ THE CASCADE IS DELIBERATELY NOT BUILT"*. One names the controller lever being retired. Three name no command
+at all. It moves after the assurance work and splits into the arrows that have owners and the arrows that need
+a cascade decision.
+
+### R7 · `PwuStateChanged` gets an explicit disposition, not a silent death
+
+It is on DOC-007 §33's **Required First-Slice Events** list, `changePwuState` is its only emitter, and **no test
+would redden** when it stops being emitted — the §26 fixture never contains it and the conformance test only
+checks events that ARE emitted. W-7 must therefore carry a register entry recording either its retirement as a
+deliberate divergence from §33, or a residual emitter. **Whichever is chosen, a test must be added that fails if
+the event disappears unannounced**, because today nothing would.
+
+### R8 · §37's six records ride on every new command
+
+DOC-002 §37 ratifies an 18-value `ControlAction` menu and requires every control action to record triggering
+condition, evidence/observations considered, authorizing policy, actor, affected objects, expected outcome.
+`pwu.ts` already cites it as the basis for `reasonCode` + `supportingObjectIds`. Each new command carries both,
+plus its derived citation; the "authorizing policy" record remains the one with no carrier and stays an open
+item rather than being quietly dropped. **§37 also spells the act `REJECT` where `DecisionTypeSchema` spells it
+`REJECTION`** — the trap REG-F-078 already hit once.
+
+### R9 · The One Rule binds outside the PWU; that is registered, not fixed here
+
+`RecordClaimAssessment` and `completeAssuranceAssessment` both take caller-supplied target states, and C-0b
+already records the resulting arrows as UNENFORCED. So §3.2 would propagate the PWU's assurance axis *from* a
+state the ledger says nothing checks. **The scope boundary is therefore justified by increment size, not by
+principle**, and W-3 must not be described as making the assurance axis trustworthy — only as making it no
+longer *asserted at the PWU*. The upstream instances are a follow-on program.
+
+---
+
+## Part B — The sequence
+
+Each increment: red-first test → implement → full gate → C-0b delta rows → commit. No increment starts while
+its listed blocker is open.
+
+| # | increment | blocker | notes |
+|---|---|---|---|
+| ✅ **W-0** | correct both rollup assertions; record REG-D-029 | — | **SHIPPED** (`c1920dac`) |
+| **W-1** | `AbandonPwu` + `RejectPwu`; migrate the two authority guards; emit `PwuAbandoned`/`PwuRejected`; **add both targets to `PWU_SEMANTIC_LIFECYCLE_COMMANDS` in the same commit** | none | ⚠ without the table conjunct this RE-OPENS REG-F-070 and REG-F-078 for six increments. The red-first test is: the setter must refuse `→ ABANDONED` *before* the guard is moved off it |
+| **W-2** | `executionState` derived; `activeExecutionPlanId` given a writer or replaced by citation | R1 | `planEvidencesExecutionSuccess` answers ONE boolean; `FAILED`, `RETRYING`, `WAITING`, `CANCELLED` need stated rules. **Recording FAILURE must not become harder than recording success** — the retiring guard says so in terms |
+| **W-3** | `assuranceState` derived | **BLOCKED on the value mapping** | 6-value fold vs 11-value axis; `INCONCLUSIVE` is not an axis value and is the fold's fail-closed default. Needs an authored total mapping with the lossy cases named, or the fold widened. `rejectUnbackedDisposition` STAYS until then |
+| **W-4.5** | `BaselinePwu`, `BeginPwuRecomposition`, `CompletePwuRecomposition` | R2, R3 | must precede W-7 or `BASELINED` becomes unreachable |
+| **W-5** | `BlockPwu` / `UnblockPwu` / `EscalatePwu`; author `PwuEscalated` | none | `ESCALATE` is a **ratified** §37 act; only its command/event shape is absent, which strengthens this |
+| **W-4** | `shapeIntegrityState` — the arrows that have owners | R6 | the Assumption-triggered arrows split out; they need the cascade decision the assumption handler deliberately deferred |
+| **W-6** | the six §8.1 middles | W-2, W-3 | **fail-closed default stands: if advancing the lifecycle axis inside another discipline's command is judged a collapse, mint six commands instead.** More commands is the safe error |
+| **W-7** | retire `ChangePwuState`; delete only the ownership *guard* | R5, R7, and all of W-1..W-6 | keeps the table + type tripwire; carries the `PwuStateChanged` disposition and its new test |
+| **W-8** | C-0b delta reconciliation across the whole program | R4 | per-row table, four outcomes, `UNREACHABLE_BY_DELETION` needs a register note |
+
+---
+
+## Part C — What this roadmap does not claim
+
+- **It does not claim W-3 is buildable.** It is blocked on a value-mapping decision this document does not make.
+- **It does not claim the assurance axis becomes trustworthy** (R9). It becomes un-asserted at the PWU, which is
+  less than it sounds.
+- **It does not settle whether W-6 propagates or mints six commands.** The fail-closed default is stated so the
+  question cannot be resolved by drift.
+- **It does not extend beyond the PWU write path.** Two caller-supplied-target instances upstream are registered
+  as a follow-on, and the boundary is admitted to be one of size rather than principle.
+- **Every shape authored under this roadmap is `UNRATIFIED-AUTHORED`** and must be annotated so. REG-D-029
+  grants authoring, not ratification.
