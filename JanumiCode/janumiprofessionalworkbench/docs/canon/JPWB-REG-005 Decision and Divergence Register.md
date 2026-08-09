@@ -84,10 +84,11 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 
 ### REG-D-006 — Source corpus retirement upon ratification
 - **Date:** 2026-07-16 · **Type:** DECISION
-- **Statement:** Upon canon ratification, the pre-canon corpus (~200k+ words under `docs/`) is retired: moved out of the agent-visible tree, preserved in history. Retired documents have no authority and must not be consulted as authority; reading them requires treating them as historical evidence only. Consequently any load-bearing content not carried into the six artifacts, or explicitly ceded to the repository, is lost — survivorship was a drafting obligation. Retirement of a source document is a sponsor act, recorded here.
+- ⚠ **REVERSED 2026-08-09 BY REG-D-034 (sponsor ruling). NEVER EXECUTED IN THE SIX WEEKS IT STOOD.** Struck, not deleted — the reasoning below remains the best statement of why a retirement was wanted.
+- ~~**Statement:** Upon canon ratification, the pre-canon corpus (~200k+ words under `docs/`) is retired: moved out of the agent-visible tree, preserved in history. Retired documents have no authority and must not be consulted as authority; reading them requires treating them as historical evidence only. Consequently any load-bearing content not carried into the six artifacts, or explicitly ceded to the repository, is lost — survivorship was a drafting obligation. Retirement of a source document is a sponsor act, recorded here.
 - **Disposition:** Decided (sponsor + drafting agent).
 - **Merge target:** JPWB-CON-000 Part B (retirement clause).
-- **Status:** DECIDED — MERGE PENDING (closes on canon ratification).
+- ~~**Status:** DECIDED — MERGE PENDING (closes on canon ratification).~~ **REVERSED AND SUPERSEDED BY REG-D-034 (2026-08-09).**
 
 ### REG-D-007 — Delegation boundaries
 - **Date:** 2026-07-16 · **Type:** DECISION
@@ -2541,3 +2542,26 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **Two named defects to fix on their own merits**, independent of D-1: `ASR-14`'s weakened prohibition and `ASR-16`'s permission of what its source forbids. Both have instrumented NONE FOUND for a ratifying act.
 
 - **Merge target:** Corpus (CON-000 B8 + REG-D-006) then Repository. **Safe default:** until ruled, treat a canon clause that diverges from its source WITHOUT a ratifying act as **defective rather than governing**, and record the divergence. That is the fail-closed reading: it never launders away a prohibition, and its only cost is a finding.
+
+---
+
+### REG-D-034 — SPONSOR RULING: the source corpora are operative; canon's authority over a principle is conditional on fidelity
+- **Date:** 2026-08-09 · **Type:** DECISION — **sponsor ruling, given directly** on three questions put in plain terms. · **Reverses:** REG-D-006. · **Amends:** CON-000 **B1**, **B3**, **B8**. · **Occasioned by:** REG-F-093 and REG-F-094.
+- **⚠ THIS IS A REVERSAL, RECORDED AS ONE.** REG-D-006 (2026-07-16) retired the pre-canon corpus wholesale and CON-000 B8 carried it. The sponsor has ruled the other way. Recording it as a clarification would leave two rules pointing in opposite directions with nothing saying which is current — the failure mode this register exists to prevent.
+
+**RULING 1 — the provenance exception** (put as: *the old documents are off-limits, but canon's footnotes point straight at them*). **ADOPTED: carve out the exception.** Consulting any document, retired or not, **to check whether a canon clause faithfully distils it**, is not consulting it as authority. **Ground:** canon's own provenance sidecars cite documents inside `retired/` (`PER-7` resolves to `Constitution Discussion/retired/…L8577-8590`), so the prohibition made canon unauditable — and `ASR-14` and `ASR-16` are what that unauditability admitted. **Merged:** CON-000 B8.
+
+**RULING 2 — the half-finished retirement** (put as: *29 documents in limbo for six weeks*). **ADOPTED: abandon the retirement; keep the sources visible with a declared role.** The source corpora — `docs/Recursive Professional Harness/`, `docs/Constitution Discussion/`, the Coding Agent Guide — are **admitted to B1's registry** as **SOURCE OF RECORD**, authoritative for **DETAIL** (state values, field semantics, transition matrices, worked scenarios) and subordinate to canon by concern per B3. Retirement survives only as an act naming individual documents. **Ground:** four of six questions escalated as *"canon does not define this"* were answered in these files. **Merged:** CON-000 B1 and B8.
+- **⚠ NOTE FOR THE IMPLEMENTER: B1, NOT ONLY B8, WAS THE OPERATIVE BARRIER.** B1 is the rule of recognition — *"A document not in this registry — whatever its title or voice — is historical material"*. Amending B8 alone would have lifted the retirement while leaving the sources non-governing: the same outcome by another route. **Anyone re-reading this ruling should check B1 first.**
+
+**RULING 3 — canon vs source on a principle** (put as: *your inclination contradicts a decision already on the books*). **ADOPTED: option C — traceability, not either pole.** Canon governs a principle **only where its divergence from source carries a ratifying act naming it**; a silent divergence makes the canon clause **DEFECTIVE, not governing**, and the source controls until ruled. **Ground:** REG-D-010 conferred authority on a distillation, and an unfaithful distillation is not the artifact ratified. **AND THE MEASURED DIRECTION DECIDED IT** — in the 87-clause audit the one ratified divergence (`PER-12` / REG-D-015) was a deliberate amendment, while every unratified one **weakened a prohibition**. Preferring canon on silent conflict would launder constraints away systematically. **Merged:** CON-000 B3.
+
+- **EVIDENCE BASE, so the ruling is auditable.** 87 canon clauses checked against the exact source lines their provenance sidecars cite: **FAITHFUL 49 · LOSSY 23 · UNSOURCED 10 · DIVERGENT 5**. **Five of six families were refuted in BOTH directions** — `PER-7` and `ASR-3` demoted from DIVERGENT (compression mistaken for contradiction), `ASR-16` promoted from FAITHFUL and `AX-2` from LOSSY. **A single-pass audit would have been wrong about four clauses in two opposite directions**, which is itself an argument for the traceability rule over any judgement made by reading once.
+
+- **CONSEQUENCES THAT NOW FOLLOW WITHOUT FURTHER RULING.**
+  1. **`ASR-14` and `ASR-16` are DEFECTIVE clauses**, not governing: both diverge from source with an instrumented NONE FOUND for a ratifying act, and both weaken a prohibition. Their sources control until ruled. Remediation is now unblocked.
+  2. **An absence recorded against `docs/canon/` alone is not a finding** (REG-F-093) — now constitutionally grounded in B3's silence clause rather than resting on practice.
+  3. **Canon becomes an INDEX WITH TEETH.** *"Canon says X"* is no longer a sufficient citation; it must be *"canon says X, sourced at Y"*. Making the sidecar mapping reachable at the point of use is promoted from convenience to a requirement of B3's operation.
+- **STILL OPEN.** DESIGN-corpus-precedence §7 **D-2** (need the source corpora be ratified? recommendation: no) and **D-4** (where the precedence statement lives) were not put to the sponsor. **D-4 is answered de facto** by this merge into CON-000 B1/B3/B8; recorded so a later reader does not treat the placement as unconsidered. **D-3** (M0's formal retirement) is unaffected: under Ruling 1, M0 remains readable for provenance regardless.
+- **Ratify Sheet R1 rows 22 (B1), 24 (B3) and 29 (B8)** are the clause-level rows these amendments touch — all three unchecked, which is precisely the clause-level amendment R1 remains open for. **Rows 22 and 29 were SYNCHRONISED in the same commit:** row 22's summary (*"Exactly six artifacts … nothing else governs"*) had been made false by the B1 amendment, and leaving the tracking sheet contradicting the clause it tracks is the defect this register exists to catch.
+- **Merge target:** JPWB-CON-000 B1 / B3 / B8 — **APPLIED 2026-08-09**. **Status:** EFFECTIVE — MERGED.

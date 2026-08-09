@@ -48,14 +48,14 @@ Every clause earned its place by deciding a dispute; the middle column names it.
 | 19 | AX-10 Semantics precede technology | **Decides the wire-envelope case** — shapes belong to the repository | ☐ |
 | 20 | AX-11 One primitive, many topologies | **Decides the JanumiCode-collapse case** — a domain product is never one PWA | ☐ |
 | 21 | AX-12 Self-hosting | JPWB must be able to host its own construction | ☐ |
-| 22 | B1 The canon | Exactly six artifacts + repository shapes; nothing else governs | ☐ |
+| 22 | B1 The canon | ~~Exactly six artifacts + repository shapes; nothing else governs~~ — **AMENDED 2026-08-09 (REG-D-034): the SOURCE CORPORA (RPH set, Constitution Discussion, the Coding Agent Guide) are admitted to the registry as SOURCE OF RECORD, authoritative for DETAIL and subordinate to canon by concern. "Nothing else governs" still holds — the registry itself grew.** | ☐ |
 | 23 | B2 Status is conferred, not authored | **Decides the self-canonization case**; agent ratification = proposal (REG-E-004) | ☐ |
-| 24 | B3 Precedence is by concern | **Decides the Guide-vs-Charter case** — concern ownership, then settledness | ☐ |
+| 24 | B3 Precedence is by concern **(+ traceability clause, REG-D-034)** | **Decides the Guide-vs-Charter case** — concern ownership, then settledness | ☐ |
 | 25 | B4 The settledness ladder | Pre-Baseline system; settledness descends the stack | ☐ |
 | 26 | B5 Change procedure | **Decides the floating-ruling case** — a conversational ruling is ineffective until merged | ☐ |
 | 27 | B6 The convergence clause | **Decides the docs-vs-code direction case** — canon is sole semantic authority, for this phase | ☐ |
 | 28 | B7 Anti-vacuity clause | **Decides the hollow-governed-layer case** — asserted status must be performed status | ☐ |
-| 29 | B8 Retirement | Retirement is a sponsor act; retired docs have no authority | ☐ |
+| 29 | B8 Retirement | ~~Retirement is a sponsor act; retired docs have no authority~~ — **AMENDED 2026-08-09 (REG-D-034): REG-D-006's wholesale retirement REVERSED; retirement now applies only to individually named documents; and PROVENANCE VERIFICATION is always permitted — reading a source to check a canon clause's fidelity is not consulting it as authority.** | ☐ |
 
 ## Part 2 — Section-level dispositions
 
