@@ -68,6 +68,11 @@ const EMITTED_2026_08_04 = new Set([
 	// + 2026-08-09, JAN-PWUWP W-4.5: `PwuBaselined` acquires its FIRST emitter, `BaselinePwu`. Declared and
 	// registered since 2026-07-16 and produced by nothing; the reference seed reached BASELINED through the
 	// generic setter, which emitted `PwuStateChanged` in its place.
+	// + 2026-08-09, JAN-PWUWP W-5. `PwuBlocked` gets its first emitter; `PwuEscalated` did not exist at all
+	// until this increment authored it. Neither act is §5.2-reserved — the commands exist because PER-3
+	// wants every arrow NAMED, not because either needs authorizing.
+	'PwuBlocked',
+	'PwuEscalated',
 	'PwuBaselined',
 	'PwuAbandoned',
 	'PwuRejected',

@@ -27,9 +27,13 @@ import type {
 	MarkPwuReadyPayload,
 	AbandonPwuPayload,
 	BaselinePwuPayload,
+	BlockPwuPayload,
 	ProposePwuPayload,
 	PwuAbandonedPayload,
+	EscalatePwuPayload,
 	PwuBaselinedPayload,
+	PwuBlockedPayload,
+	PwuEscalatedPayload,
 	PwuRejectedPayload,
 	RejectPwuPayload,
 	PwuChallengedPayload,
@@ -358,7 +362,11 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
 	// W-4.5. Same coupling rule as W-1: the row lands in the commit that mints the command, never
 	// later. And note the asymmetry with the two above — those moved an AUTHORITY guard, this moves an
 	// EVIDENCE one, so `rejectUnbackedBaselining` leaves `changePwuState` here too.
-	BASELINED: 'BaselinePwu'
+	BASELINED: 'BaselinePwu',
+	// W-5. Neither is a §5.2 act — the rows exist because PER-3 wants a NAMED command for every
+	// arrow, not because either needs authority.
+	BLOCKED: 'BlockPwu',
+	ESCALATED: 'EscalatePwu'
 } as const satisfies Readonly<Record<string, string>>;
 
 /**
@@ -676,6 +684,69 @@ function baselineBacksPwu(ctx: HandlerContext, pwuId: string, baselineId: string
 	const s = obj.state as { status?: string; itemObjectVersions?: { objectId?: string }[] };
 	return s.status === 'AUTHORITATIVE' && (s.itemObjectVersions ?? []).some((v) => v.objectId === pwuId);
 }
+
+/**
+ * BlockPwu — SHAPING | PLANNED | EXECUTING -> BLOCKED. JAN-PWUWP W-5, under REG-D-029.
+ *
+ * ⚠ NO AUTHORITY GUARD, AND THAT IS THE DESIGN RATHER THAN AN OMISSION. JPWB-DOC-001 §5.2 reserves waiver, risk
+ * acceptance, rejection, abandonment and promotion to Governance — **it does not reserve blocking**. The three
+ * arrows' VERBATIM corpus triggers are facts: "Missing information" and "Runtime dependency unavailable". This
+ * repository states the consequence in terms elsewhere: *"a system that makes failure harder to report than
+ * success is worse than one that checks neither"*. A block is how trouble gets reported; gating it would be
+ * that defect wearing a governance costume.
+ *
+ * WHAT IT DOES REQUIRE is `blockReason`, which is the whole substantive contract: an unexplained halt is not a
+ * governed record of anything. `missingObjectIds` is OPTIONAL on purpose — the trigger is an ABSENCE, and
+ * "missing information" frequently cannot enumerate what is missing. Requiring the list would make the honest
+ * case unreportable, which is the same failure one level down.
+ *
+ * ⚠ AND BLOCKING IS A ONE-WAY DOOR, which the caller cannot discover from the machine's `terminalStates`.
+ * BLOCKED is NOT declared terminal, yet its only out-arrows are ABANDONED and SUPERSEDED — there is no recovery
+ * arrow. The roadmap's W-5 named an `UnblockPwu`; no such arrow exists to perform. Registered rather than
+ * invented (REG-F-083).
+ */
+export const blockPwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as BlockPwuPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'BLOCKED',
+		eventType: 'PwuBlocked',
+		eventPayload: (next) =>
+			({
+				blockReason: p.blockReason,
+				...(p.missingObjectIds ? { missingObjectIds: p.missingObjectIds } : {}),
+				workLifecycleState: next.workLifecycleState as PwuBlockedPayload['workLifecycleState']
+			}) satisfies PwuBlockedPayload
+	});
+};
+
+/**
+ * EscalatePwu — EVIDENCE_PENDING -> ESCALATED. JAN-PWUWP W-5, under REG-D-029.
+ *
+ * THE ACT IS RATIFIED; ONLY ITS SHAPE WAS MISSING. `ESCALATE` is a member of the §37 ControlAction menu, and
+ * JPWB-CON-000 AX-8 calls escalation *"the responsible transfer of unresolved professional responsibility"*.
+ * What did not exist was any `PwuEscalated` event — unlike `PwuBlocked`, `PwuAbandoned`, `PwuRejected` and
+ * `PwuBaselined`, which were all declared and registered and produced by nothing. This is the first PWU
+ * lifecycle event in the programme authored from scratch rather than given a first emitter.
+ *
+ * `escalationReason` is required for AX-8's reason: a transfer of responsibility with no stated reason
+ * transfers nothing. `unobtainableEvidenceIds` is optional on the same absence argument as `BlockPwu`'s —
+ * the trigger is *"Evidence impossible to obtain"*, and impossibility is often not itemisable.
+ */
+export const escalatePwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as EscalatePwuPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'ESCALATED',
+		eventType: 'PwuEscalated',
+		eventPayload: (next) =>
+			({
+				escalationReason: p.escalationReason,
+				...(p.unobtainableEvidenceIds
+					? { unobtainableEvidenceIds: p.unobtainableEvidenceIds }
+					: {}),
+				workLifecycleState: next.workLifecycleState as PwuEscalatedPayload['workLifecycleState']
+			}) satisfies PwuEscalatedPayload
+	});
+};
 
 /**
  * BaselinePwu — SATISFIED | RECOMPOSED -> BASELINED. JAN-PWUWP W-4.5, under REG-D-029.

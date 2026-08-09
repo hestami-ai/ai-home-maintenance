@@ -13,11 +13,13 @@ import {
 import {
 	abandonPwu,
 	baselinePwu,
+	blockPwu,
 	beginPwuShaping,
 	challengePwu,
 	changePwuState,
 	invalidatePwu,
 	markPwuReady,
+	escalatePwu,
 	proposePwu,
 	rejectPwu,
 	reshapePwu,
@@ -140,6 +142,9 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	AbandonPwu: abandonPwu,
 	// JAN-PWUWP W-4.5: BASELINED had no command at all — promoteBaseline advances the Baseline, never the PWU.
 	BaselinePwu: baselinePwu,
+	// W-5: neither is a §5.2 act — PER-3 wants every arrow named, not every arrow authorized.
+	BlockPwu: blockPwu,
+	EscalatePwu: escalatePwu,
 	RejectPwu: rejectPwu,
 	// Execution plan + steps + runtime bindings (DOC-002 §20, §21, §22)
 	ProposeExecutionPlan: proposeExecutionPlan,

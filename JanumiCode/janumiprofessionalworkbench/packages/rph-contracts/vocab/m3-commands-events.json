@@ -1497,6 +1497,66 @@
 			]
 		},
 		{
+			"commandType": "BlockPwu",
+			"targetAggregateType": "ProfessionalWorkUnit",
+			"emitsEvent": "PwuBlocked",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "SHAPING | PLANNED | EXECUTING",
+			"drivesTo": "BLOCKED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-09, under REG-D-029 / JAN-PWUWP W-5). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. Do NOT treat this sourceSection as proof the shape is ratified: REG-D-029 grants authoring, NOT ratification. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT. JPWB-DOC-001 §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion — not blocking and not escalation. The arrow's own VERBATIM corpus trigger is a FACT (\"Missing information\" / \"Runtime dependency unavailable\"), so this command carries NO authority guard by design: a system that makes trouble harder to report than progress is worse than one that checks neither, which this repository states in terms about FailExecutionStep.",
+			"payloadFields": [
+				{
+					"field": "blockReason",
+					"required": true,
+					"type": "string",
+					"note": "Required, and it is the whole substantive contract of this command: a block with no stated reason is an unexplained halt. Matches the required field of the PwuBlocked payload, which had no emitter."
+				},
+				{
+					"field": "missingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "id-ref[] — what is missing, when the caller can name it. OPTIONAL because the arrow's trigger is an ABSENCE: \"Missing information\" often cannot enumerate what it is missing, and requiring the list would make the honest case unreportable."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
+			"commandType": "EscalatePwu",
+			"targetAggregateType": "ProfessionalWorkUnit",
+			"emitsEvent": "PwuEscalated",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "EVIDENCE_PENDING",
+			"drivesTo": "ESCALATED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-09, under REG-D-029 / JAN-PWUWP W-5). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. Do NOT treat this sourceSection as proof the shape is ratified: REG-D-029 grants authoring, NOT ratification. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT. JPWB-DOC-001 §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion — not blocking and not escalation. The arrow's own VERBATIM corpus trigger is a FACT (\"Evidence impossible to obtain\"), so this command carries NO authority guard by design: a system that makes trouble harder to report than progress is worse than one that checks neither, which this repository states in terms about FailExecutionStep.",
+			"payloadFields": [
+				{
+					"field": "escalationReason",
+					"required": true,
+					"type": "string",
+					"note": "Required. CON-000 AX-8 makes escalation \"the responsible transfer of unresolved professional responsibility\" — a transfer with no stated reason transfers nothing."
+				},
+				{
+					"field": "unobtainableEvidenceIds",
+					"required": false,
+					"type": "string[]",
+					"note": "id-ref[] — the EvidenceRequirements judged unobtainable, when nameable. Optional for the same reason as missingObjectIds above."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
 			"commandType": "BaselinePwu",
 			"targetAggregateType": "ProfessionalWorkUnit",
 			"emitsEvent": "PwuBaselined",
@@ -5849,6 +5909,32 @@
 			]
 		},
 		{
+			"eventType": "PwuEscalated",
+			"aggregateType": "ProfessionalWorkUnit",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-09, under REG-D-029 / JAN-PWUWP W-5) — and unlike every other PWU lifecycle event this one is authored FROM SCRATCH rather than acquiring a first emitter: PwuBlocked, PwuAbandoned, PwuRejected and PwuBaselined all already existed, declared and registered and produced by nothing. No PwuEscalated existed at all. The ACT is nevertheless ratified — 'ESCALATE' is a member of the §37 ControlAction menu — so what was missing is the contract shape, not the authority to escalate. Do NOT treat this sourceSection as proof the shape is ratified.",
+			"payloadFields": [
+				{
+					"field": "escalationReason",
+					"required": true,
+					"type": "string",
+					"note": "Why responsibility is being transferred (CON-000 AX-8)."
+				},
+				{
+					"field": "unobtainableEvidenceIds",
+					"required": false,
+					"type": "string[]",
+					"note": "id-ref[] — named when nameable."
+				},
+				{
+					"field": "workLifecycleState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "EVIDENCE_PENDING -> ESCALATED. Mirrors how every other named PWU event records its resulting axis — except PwuBaselined, which uses `newState` and cost a replay divergence to discover."
+				}
+			]
+		},
+		{
 			"eventType": "PwuBaselined",
 			"aggregateType": "ProfessionalWorkUnit",
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)",
@@ -8095,6 +8181,22 @@
 			"from": "SATISFIED | RECOMPOSED",
 			"to": "BASELINED",
 			"note": "JAN-PWUWP W-4.5. Both in-arrows are one act. There was NO binding for -> BASELINED at all before this: the arrow was performed only by the generic setter, whose rejectUnbackedBaselining guard has moved here."
+		},
+		{
+			"commandType": "BlockPwu",
+			"eventType": "PwuBlocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "SHAPING | PLANNED | EXECUTING",
+			"to": "BLOCKED",
+			"note": "JAN-PWUWP W-5. Three in-arrows, one act. No authority guard: the triggers are facts, and §5.2 does not reserve blocking."
+		},
+		{
+			"commandType": "EscalatePwu",
+			"eventType": "PwuEscalated",
+			"machine": "PWU.workLifecycleState",
+			"from": "EVIDENCE_PENDING",
+			"to": "ESCALATED",
+			"note": "JAN-PWUWP W-5. One in-arrow. ESCALATE is a ratified §37 ControlAction whose event had to be authored."
 		}
 	],
 	"conflicts": [

@@ -110,6 +110,9 @@ export function applyPwuAxisEvent(
 		// and diverged from the object. Nothing caught it because the reference seed abandons and rejects
 		// NOTHING — the rebuild tests only see the events the seed happens to emit. `PwuRejected` also carries
 		// `assuranceState`, folded below.
+		// `PwuBlocked`/`PwuEscalated` are added HERE, in the commit that mints their commands — W-4.5 discovered
+		// what happens otherwise: an emitter with no fold diverges the rebuild from the object, and the seed
+		// exercises too little to notice.
 		case 'PwuMarkedReady':
 		case 'PwuShapingStarted':
 		case 'PwuChallenged':
@@ -117,7 +120,9 @@ export function applyPwuAxisEvent(
 		case 'PwuInvalidated':
 		case 'PwuSuperseded':
 		case 'PwuAbandoned':
-		case 'PwuRejected': {
+		case 'PwuRejected':
+		case 'PwuBlocked':
+		case 'PwuEscalated': {
 			// The named single-axis events. Each declares `workLifecycleState`; two also carry
 			// shapeIntegrityState. Absent axes carry forward — they were not part of this transition.
 			if (!axes) return axes;

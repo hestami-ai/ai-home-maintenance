@@ -128,6 +128,9 @@ describe('validate', () => {
 		// 347 -> 348 (2026-08-09, JAN-PWUWP W-4.5): `BaselinePwuPayload`. BASELINED is a declared TERMINAL
 		// state with ratified RPH-PWU-010 over it and had NO command able to reach it — promoteBaseline
 		// advances the Baseline, never the PWU.
-		expect(buildContractRegistry().ids()).toHaveLength(348);
+		// 348 -> 351 (2026-08-09, JAN-PWUWP W-5): `BlockPwuPayload`, `EscalatePwuPayload` and
+		// `PwuEscalatedPayload`. THREE, not two — `PwuEscalated` is the first PWU lifecycle event in this
+		// programme authored from scratch; every other one already existed with no emitter.
+		expect(buildContractRegistry().ids()).toHaveLength(351);
 	});
 });
