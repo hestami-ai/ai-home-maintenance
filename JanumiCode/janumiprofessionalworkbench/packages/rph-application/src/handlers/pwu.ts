@@ -68,6 +68,7 @@ import {
 import { evaluatePrecondition, predicate } from './command-precondition.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
+import { resolveWaiverAuthorization } from './waiver-authorization.js';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -995,6 +996,74 @@ function rejectUnbackedDisposition(
  * scheduling facts the controller legitimately owns, and FAILED in particular must never need permission to
  * record — a system that makes failure harder to report than success is worse than one that checks neither.
  */
+/**
+ * WAIVED requires a granted WAIVER decision bound to this PWU at this version. JAN-PWUWP W-3, under REG-D-029.
+ *
+ * ⚠ THIS CLOSES A HOLE THE FILE ITSELF NAMED AND LEFT OPEN. `rejectUnbackedDisposition` short-circuits on
+ * `WAIVED` because `ASSESSMENT_BACKED_DISPOSITIONS` deliberately excludes it, and the comment above that set
+ * says why: *"WAIVED is authorized by a WAIVER, not an assessment (§18.1 …). Both need their own citation and
+ * their own guard."* C-0b then measured the consequence live — `ChangePwuState` reached `WAIVED` from three
+ * source states with `supportingObjectIds: []` and no authority of any kind.
+ *
+ * DOC-001 §5.2 reserves waiver to Governance, and its provenance source names it FIRST: *"Governance … alone
+ * authorizes **waiver**, risk acceptance, rejection or abandonment of governed work, and promotion."* Third and
+ * last of §5.2's acts to reach the PWU, after REG-F-070's abandonment and REG-F-078's rejection.
+ *
+ * DERIVE-ON-READ (roadmap R1): the caller names WHICH decision authorizes the waiver; the handler reads that
+ * decision's type, status, subjects and version pin. The caller never asserts that a waiver exists.
+ *
+ * ⚠ WHAT THIS DOES NOT CHECK, STATED SO THE GAP IS NOT MISTAKEN FOR SATISFIED: ASR-14 (repaired 2026-08-09)
+ * holds that *"Critical integrity failures … cannot be waived by ordinary product authority — waiver authority
+ * is tiered."* **No field on the Decision records an authority tier**, so the tier limb is unenforceable here
+ * and is left to a future increment rather than faked with a check that always passes.
+ */
+function rejectUnauthorizedWaiver(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	currentAssuranceState: string,
+	currentSemanticVersion: number
+): CommandResult | undefined {
+	if (p.assuranceState !== 'WAIVED') return undefined;
+	if (currentAssuranceState === 'WAIVED') return undefined;
+	const cited = p.supportingObjectIds ?? [];
+	const authorized = cited.some(
+		(oid) =>
+			resolveWaiverAuthorization(ctx, {
+				authorizationId: oid,
+				pwuId: id,
+				pwuSemanticVersion: currentSemanticVersion
+			}).ok
+	);
+	if (authorized) return undefined;
+	const why = cited
+		.map(
+			(oid) =>
+				`${oid}: ${
+					(
+						resolveWaiverAuthorization(ctx, {
+							authorizationId: oid,
+							pwuId: id,
+							pwuSemanticVersion: currentSemanticVersion
+						}) as { ok: false; reason: string }
+					).reason
+				}`
+		)
+		.join('; ');
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`ChangePwuState would set PWU ${id} assuranceState=WAIVED with no authorized waiver to back it. ` +
+			`JPWB-DOC-001 §5.2 reserves WAIVER to Governance, and REG-Q-030 (closed 2026-08-09) records that WAIVED ` +
+			`enters only through the waiver flow: a version-bound waiver Decision, with the finding preserved. Cite ` +
+			`an EFFECTIVE DECISION whose decisionType is WAIVER, whose subjectObjectIds include ${id}, and whose ` +
+			`subjectSemanticVersions pin ${id} at ${currentSemanticVersion}. ` +
+			`Supplied: [${why || 'nothing'}].`,
+		[id, ...cited]
+	);
+}
+
 function rejectUnbackedExecutionSuccess(
 	ctx: HandlerContext,
 	command: DomainCommand,
@@ -1200,6 +1269,14 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	// being asked for a decision the setter should never have been adjudicating.
 	const unearned =
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
+		rejectUnauthorizedWaiver(
+			ctx,
+			command,
+			id,
+			p,
+			current.assuranceState,
+			loaded.semanticVersion
+		) ??
 		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
 	if (unearned) return unearned;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or

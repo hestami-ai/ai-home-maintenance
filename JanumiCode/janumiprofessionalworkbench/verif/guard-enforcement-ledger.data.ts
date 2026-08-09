@@ -354,6 +354,19 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	},
 	["waiver authority separately defined (§18.1)"]: {
 		disposition: "UNENFORCED",
+		// ⚠ PARTIALLY CLOSED 2026-08-09 BY JAN-PWUWP W-3, AND DELIBERATELY NOT PROMOTED TO ENFORCED. The hole this
+		// row MEASURED — `ChangePwuState` reaching WAIVED with `supportingObjectIds: []` and no authority of any
+		// kind — is closed: `rejectUnauthorizedWaiver` (pwu.ts) now requires an EFFECTIVE decisionType=WAIVER
+		// Decision naming this PWU at its current semanticVersion. RE-DRIVEN through the bus: nothing cited, a
+		// dangling id, a non-DECISION, an APPROVAL, and a PROPOSED waiver are each REJECTED, and the identical
+		// dispatch is ACCEPTED once a granted waiver is cited (waiver-authority.test.ts).
+		//
+		// BUT THE ROW'S OWN RULE IS NARROWER THAN THE HOLE, WHICH IS WHY THE DISPOSITION STANDS. §18.1 / ASR-14's
+		// last sentence says *"A policy cannot waive its own blocking finding unless waiver authority is
+		// separately defined"* — a SELF-WAIVER check keyed on the relationship between the waiving policy and the
+		// finding it waives. Nothing checks that, and no field records a waiver authority TIER for it to check
+		// against (the same gap `waiver-authorization.ts` records for ASR-14's tiering clause). Promoting this to
+		// ENFORCED on the strength of the general guard would be the false-ENFORCED this ledger exists to catch.
 		evidence: "3 arrows: PWU.assuranceState {ASSESSING, EVIDENCE_REQUIRED, CONDITIONALLY_SATISFIED} -> WAIVED. The arrow-command census calls PWU.assuranceState an `orphan` — that is an ARTEFACT of the census only walking advanceStatus call sites; pwu.ts moves this axis by a different idiom and the arrow is REAL. I drove it: ChangePwuState UNASSESSED -> EVIDENCE_REQUIRED (ACCEPTED), then ChangePwuState assuranceState -> WAIVED with `supportingObjectIds: []`, `reasonCode: 'CONTROLLER'`, no Decision, no WaiverGranted event, no authority of any kind → ACCEPTED, and the committed PWU object reads `assuranceState: 'WAIVED'`. The write path is changePwuState (pwu.ts:1057); the sub-axis check at pwu.ts:1093 is `checkTransition` only (pure machine legality); the substance guard at pwu.ts:1107 is rejectUnbackedDisposition, which SHORT-CIRCUITS on this exact value at pwu.ts:686 — `if (!ASSESSMENT_BACKED_DISPOSITIONS.has(p.assuranceState)) return undefined;` — because pwu.ts:642-647's set is {SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, ESCALATED}. The repository states the gap itself at pwu.ts:636-639: 'NOT here, deliberately: WAIVED is authorized by a WAIVER, not an assessment (§18.1 ...). Both need their own citation and their own guard'. GrantWaiver (governance.ts:627) writes only the DECISION aggregate and is never consulted here. One arrow proven live; all three share the identical code path with no per-source branch."
 	},
 	["waiver includes scope, rationale, authority, duration; human override must not erase prior findings (§23.2, Scenario 4)"]: {
