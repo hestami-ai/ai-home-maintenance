@@ -2,10 +2,22 @@
 // (workLifecycleState / executionState / assuranceState / shapeIntegrityState). The authored lifecycle commands
 // (propose / begin-shaping / mark-ready / challenge / reshape / invalidate / supersede) move the workLifecycle
 // axis and are gated by canAdvanceWorkLifecycle — which enforces BOTH legality AND the cross-axis guards (e.g. the
-// only path to SATISFIED requires assuranceState=SATISFIED; INV-5 / property P1). The derived lifecycle states
-// that fall out of execution/assurance/governance (PLANNED, EXECUTING, EVIDENCE_PENDING, UNDER_ASSURANCE,
-// SATISFIED, ...) are set by the controller via ChangePwuState, keeping workLifecycleState a computed rollup of
-// the independently-commanded sub-axes (DOC-002 §5, §7).
+// only path to SATISFIED requires assuranceState=SATISFIED; INV-5 / property P1). The middle lifecycle states
+// (PLANNED, EXECUTING, EVIDENCE_PENDING, UNDER_ASSURANCE, SATISFIED, ...) are set by the controller via
+// ChangePwuState.
+//
+// ⚠ CORRECTED 2026-08-08 (REG-D-029 / DESIGN-pwu-write-path). This sentence used to end: *"keeping
+// workLifecycleState a computed rollup of the independently-commanded sub-axes (DOC-002 §5, §7)."* **It is not a
+// rollup, and canon says so twice.** JPWB-DOC-003 §6 L171: *"Every PWU carries four ORTHOGONAL state axes … At
+// birth the axes initialize INDEPENDENTLY."* A total function of the other three is not a fourth orthogonal
+// axis. And the state list settles it empirically: eleven of the twenty values — BLOCKED, CHALLENGED, RESHAPING,
+// ESCALATED, INVALIDATED, REJECTED, ABANDONED, SUPERSEDED, RECOMPOSING, RECOMPOSED, BASELINED — are not
+// functions of execution, assurance or shape integrity under any reading, so no derivation rule could produce
+// them.
+//
+// THE PROSE MATTERED. Read as a description of intent it made "derive these arrows instead of commanding them"
+// look like the design's own plan, and REG-F-079 recorded that as a live option on its strength. The same
+// assertion sat in `rph-domain/src/pwuGuards.ts` and is corrected there too.
 import type {
 	ChallengePwuPayload,
 	ChangePwuStatePayload,

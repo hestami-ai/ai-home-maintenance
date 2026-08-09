@@ -1,6 +1,13 @@
 // PWU cross-axis guards — the load-bearing part of the domain kernel. A PWU carries FOUR independent state
-// axes (workLifecycleState / executionState / assuranceState / shapeIntegrityState). workLifecycleState is a
-// controller-computed rollup (docs §5): some of its transitions have GUARDS that reference the OTHER axes.
+// axes (workLifecycleState / executionState / assuranceState / shapeIntegrityState). Some workLifecycleState
+// transitions have GUARDS that reference the OTHER axes.
+//
+// ⚠ CORRECTED 2026-08-08 (REG-D-029). This said `workLifecycleState` "is a controller-computed rollup (docs
+// §5)". **It is not a rollup.** JPWB-DOC-003 §6 L171 calls the four axes ORTHOGONAL and independently
+// initialized, and eleven of workLifecycleState's twenty values are not functions of the other three under any
+// reading. A guard REFERENCING another axis is not the same as an axis DERIVED from it — and the difference is
+// exactly what these three entries protect: they let the lifecycle axis be refused on another axis's value
+// without making it a function of one.
 // This is where property P1 / INV-5 is enforced structurally: execution success NEVER implies assurance.
 import { canTransition } from './stateMachine.js';
 
