@@ -62,7 +62,11 @@ function transitionLit(t: RawTransition): string {
 		['from', j(t.from)],
 		['to', j(t.to)],
 		['trigger', t.trigger ? j(t.trigger) : undefined],
-		['guard', t.guard ? j(t.guard) : undefined]
+		['guard', t.guard ? j(t.guard) : undefined],
+		// REG-F-045's remedy. The vocab annotates 120 of 211 rows `RECONSTRUCTED`, and this generator
+		// DROPPED the annotation — so 120 authored arrows shipped wearing the same face as ratified ones,
+		// and every downstream consumer read a file whose header calls itself *grounded* and *reconciled*.
+		['note', t.note ? j(t.note) : undefined]
 	]);
 }
 function illegalLit(i: RawIllegal): string {
@@ -203,7 +207,8 @@ function emitMachine(m: RawMachine): string {
 		`\t\tterminalStates: [${terminal.map(j).join(', ')}],`,
 		`\t\ttransitions: [${dedupedLegal.map(transitionLit).join(', ')}],`,
 		`\t\tillegal: [${illegal.map(illegalLit).join(', ')}],`,
-		`\t\tguarded: [${guarded.map(illegalLit).join(', ')}]`,
+		`\t\tguarded: [${guarded.map(illegalLit).join(', ')}],`,
+		`\t\tsourceSection: ${m.sourceSection ? j(m.sourceSection) : 'undefined'}`,
 		`\t}`
 	].join('\n');
 }
@@ -219,6 +224,16 @@ export interface TransitionSpec {
 	readonly to: string;
 	readonly trigger?: string;
 	readonly guard?: string;
+	/**
+	 * The vocab's own provenance note for THIS arrow — typically \`RECONSTRUCTED\`, or a §-citation.
+	 *
+	 * ⚠ ADDED 2026-08-09 (REG-F-045's recorded remedy, filed 2026-08-06). Without it, an arrow the
+	 * vocab marks as an author's reconstruction was INDISTINGUISHABLE from a verbatim one downstream.
+	 * CON-000 B3, as amended by REG-D-034, now turns on exactly that distinction: canon governs a
+	 * principle only where a divergence carries a ratifying act, and whether a trigger is corpus text
+	 * or an inference decides what a divergence even means.
+	 */
+	readonly note?: string;
 }
 export interface IllegalSpec {
 	readonly from: string;
@@ -234,6 +249,12 @@ export interface StateMachineSpec {
 	readonly illegal: readonly IllegalSpec[];
 	/** Legal edges carrying a guard condition; the guard is enforced by the owning subsystem (e.g. M7 assurance). */
 	readonly guarded: readonly IllegalSpec[];
+	/**
+	 * The vocab's machine-level provenance, e.g. *"core-model doc §20.1 enum (VERBATIM). Transitions
+	 * RECONSTRUCTED from §26.4 events + §34.1 commands. NO explicit matrix."* Same remedy, same reason:
+	 * the states can be verbatim while the arrows are inferred, and only this string says which.
+	 */
+	readonly sourceSection?: string;
 }
 
 /** A cross-axis rule the generic same-axis engine cannot represent (e.g. property P1 / INV-5). */
