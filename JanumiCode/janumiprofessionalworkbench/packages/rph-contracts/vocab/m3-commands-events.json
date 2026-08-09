@@ -1497,6 +1497,36 @@
 			]
 		},
 		{
+			"commandType": "BaselinePwu",
+			"targetAggregateType": "ProfessionalWorkUnit",
+			"emitsEvent": "PwuBaselined",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "SATISFIED | RECOMPOSED",
+			"drivesTo": "BASELINED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-09, under REG-D-029 / JAN-PWUWP W-4.5). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. The EVENT it emits already existed - declared and registered and emitted by NOTHING - and this command is its first emitter. Do NOT treat this sourceSection as proof the shape is ratified: REG-D-029 grants authoring, NOT ratification. WHY THIS COMMAND EXISTS: `promoteBaseline` advances Baseline.status and says so in comment; nothing moved the PWU, so the reference seed had to dispatch the generic setter separately. Without a named command here, retiring that setter at W-7 would make BASELINED - a declared TERMINAL state with ratified RPH-PWU-010 over it - unreachable.",
+			"payloadFields": [
+				{
+					"field": "baselineId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref - the AUTHORITATIVE Baseline whose itemObjectVersions freeze this PWU. The caller names WHICH baseline; the handler DERIVES whether it backs the transition (JAN-PWUWP R1 derive-on-read). The PWU carries no baseline link, so citation is the only mechanism available - see R1."
+				},
+				{
+					"field": "reasonCode",
+					"required": false,
+					"type": "string",
+					"note": "DOC-002 §37 control-action record: the triggering condition."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
 			"commandType": "RejectPwu",
 			"targetAggregateType": "ProfessionalWorkUnit",
 			"emitsEvent": "PwuRejected",
@@ -8057,6 +8087,14 @@
 			"from": "UNDER_ASSURANCE",
 			"to": "REJECTED",
 			"note": "JAN-PWUWP W-1 under REG-D-029. One in-arrow only. Requires BOTH an EFFECTIVE REJECTION Decision and a blocking observation about this PWU (REG-F-078)."
+		},
+		{
+			"commandType": "BaselinePwu",
+			"eventType": "PwuBaselined",
+			"machine": "PWU.workLifecycleState",
+			"from": "SATISFIED | RECOMPOSED",
+			"to": "BASELINED",
+			"note": "JAN-PWUWP W-4.5. Both in-arrows are one act. There was NO binding for -> BASELINED at all before this: the arrow was performed only by the generic setter, whose rejectUnbackedBaselining guard has moved here."
 		}
 	],
 	"conflicts": [

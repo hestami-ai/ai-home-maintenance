@@ -65,6 +65,10 @@ const EMITTED_2026_08_04 = new Set([
 	// `abandonmentDecisionId` is the very id its command demands: the contract had been asking for it with no
 	// command able to supply one. Recorded by hand because this set is a PINNED SNAPSHOT — a live count cannot
 	// cross vitest workers — so a new emitter must be written down or the census calls it unemitted.
+	// + 2026-08-09, JAN-PWUWP W-4.5: `PwuBaselined` acquires its FIRST emitter, `BaselinePwu`. Declared and
+	// registered since 2026-07-16 and produced by nothing; the reference seed reached BASELINED through the
+	// generic setter, which emitted `PwuStateChanged` in its place.
+	'PwuBaselined',
 	'PwuAbandoned',
 	'PwuRejected',
 	// + 2026-08-08, REG-F-069: both acquired their FIRST emitter. `AssumptionFalsified` was the only

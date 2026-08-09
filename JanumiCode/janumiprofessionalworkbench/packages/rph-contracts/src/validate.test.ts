@@ -125,6 +125,9 @@ describe('validate', () => {
 		// 345 -> 347 (2026-08-09, JAN-PWUWP W-1 under REG-D-029): `AbandonPwuPayload` and `RejectPwuPayload`.
 		// The two acts JPWB-DOC-001 §5.2 reserves to Governance finally have the semantically named commands
 		// PER-3 requires; their authority guards moved off the generic setter onto them.
-		expect(buildContractRegistry().ids()).toHaveLength(347);
+		// 347 -> 348 (2026-08-09, JAN-PWUWP W-4.5): `BaselinePwuPayload`. BASELINED is a declared TERMINAL
+		// state with ratified RPH-PWU-010 over it and had NO command able to reach it — promoteBaseline
+		// advances the Baseline, never the PWU.
+		expect(buildContractRegistry().ids()).toHaveLength(348);
 	});
 });

@@ -1303,10 +1303,14 @@ export function driveReferenceUndertaking(
 		'Architecture Baseline',
 		[...archAssessments]
 	);
-	chg(R.architecture, 'SATISFIED', 'BASELINED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
-		archBaseline!,
-		archDecision!
-	]);
+	// JAN-PWUWP W-4.5: through `BaselinePwu`, the command that OWNS this arrow. It used to be the generic
+	// setter citing the baseline and the decision — which is how BASELINED came to be the one terminal state
+	// with a ratified rule over it and no command able to reach it.
+	send('BaselinePwu', 'PROFESSIONAL_WORK_UNIT', R.architecture, {
+		baselineId: archBaseline!,
+		reasonCode: 'CONTROLLER',
+		supportingObjectIds: [archBaseline!, archDecision!]
+	});
 
 	// Architecture concerns: all satisfied except Mobile & Offline, which is only CONDITIONALLY satisfied
 	// (the offline residual is deferred) — so it is NOT qualified-green (Property P1 made visible).

@@ -12,6 +12,7 @@ import {
 } from './intent.js';
 import {
 	abandonPwu,
+	baselinePwu,
 	beginPwuShaping,
 	challengePwu,
 	changePwuState,
@@ -137,6 +138,8 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// JAN-PWUWP W-1 (REG-D-029): the two acts JPWB-DOC-001 §5.2 reserves to Governance finally have the
 	// semantically named commands PER-3 requires, and their authority guards moved off the generic setter.
 	AbandonPwu: abandonPwu,
+	// JAN-PWUWP W-4.5: BASELINED had no command at all — promoteBaseline advances the Baseline, never the PWU.
+	BaselinePwu: baselinePwu,
 	RejectPwu: rejectPwu,
 	// Execution plan + steps + runtime bindings (DOC-002 §20, §21, §22)
 	ProposeExecutionPlan: proposeExecutionPlan,

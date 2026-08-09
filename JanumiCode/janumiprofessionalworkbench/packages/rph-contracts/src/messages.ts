@@ -395,6 +395,12 @@ export const AbandonPwuPayloadSchema = z.strictObject({
 	supportingObjectIds: z.array(z.string()).optional()
 });
 export type AbandonPwuPayload = z.infer<typeof AbandonPwuPayloadSchema>;
+export const BaselinePwuPayloadSchema = z.strictObject({
+	baselineId: z.string(),
+	reasonCode: z.string().optional(),
+	supportingObjectIds: z.array(z.string()).optional()
+});
+export type BaselinePwuPayload = z.infer<typeof BaselinePwuPayloadSchema>;
 export const RejectPwuPayloadSchema = z.strictObject({
 	rejectionDecisionId: z.string(),
 	blockingObservationIds: z.array(z.string()),
@@ -2046,6 +2052,12 @@ export const COMMANDS = {
 		emitsEvent: 'PwuAbandoned',
 		firstSlice: false
 	},
+	BaselinePwu: {
+		payload: BaselinePwuPayloadSchema,
+		targetAggregateType: 'ProfessionalWorkUnit',
+		emitsEvent: 'PwuBaselined',
+		firstSlice: false
+	},
 	RejectPwu: {
 		payload: RejectPwuPayloadSchema,
 		targetAggregateType: 'ProfessionalWorkUnit',
@@ -3312,5 +3324,12 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'PWU.workLifecycleState',
 		from: 'UNDER_ASSURANCE',
 		to: 'REJECTED'
+	},
+	{
+		commandType: 'BaselinePwu',
+		eventType: 'PwuBaselined',
+		machine: 'PWU.workLifecycleState',
+		from: 'SATISFIED | RECOMPOSED',
+		to: 'BASELINED'
 	}
 ];

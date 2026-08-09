@@ -111,7 +111,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(driveLive()).toContain('IntentCaptured');
 	});
 
-	it('DEFICIENCY: the engine emits none of these 14 §26 event types (28 -> 23 -> 16 -> 14 as the loops were wired)', () => {
+	it('DEFICIENCY: the engine emits none of these 13 §26 event types (28 -> 23 -> 16 -> 14 -> 13 as the loops were wired)', () => {
 		const actual = new Set(driveLive());
 		const expected = [...new Set(loadExpectedEvents().map((e) => e.event))];
 		const missing = expected.filter((n) => !actual.has(n)).sort();
@@ -139,7 +139,6 @@ describe('the §26 oracle pointed at the live engine', () => {
 			'ClarificationRequested',
 			'ExecutionPlanRevised',
 			'IntentConstraintRefined',
-			'PwuBaselined',
 			'PwuChallenged',
 			'PwuSatisfied',
 			'RecompositionCompleted',
@@ -150,7 +149,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		]);
 	});
 
-	it('PROGRESS: 12 of the 17 chain-of-custody links now fire — claim to evidence to assessment to decision to baseline', () => {
+	it('PROGRESS: 13 of the 17 chain-of-custody links now fire — claim to evidence to assessment to decision to baseline', () => {
 		const actual = new Set(driveLive());
 		const emitted = ASSURANCE_CHAIN.filter((n) => actual.has(n));
 		// Was []. Every assurance fact in the terminal graph used to be asserted; a claim is now asserted,
@@ -178,11 +177,12 @@ describe('the §26 oracle pointed at the live engine', () => {
 			'BaselineCreated',
 			'BaselineSubmittedForReview',
 			'BaselineApproved',
-			'BaselinePromoted'
+			'BaselinePromoted',
+			'PwuBaselined'
 		]);
 	});
 
-	it('DEFICIENCY: 67 generic PwuStateChanged still carry the axes the trace expects zero of', () => {
+	it('DEFICIENCY: 66 generic PwuStateChanged still carry the axes the trace expects zero of', () => {
 		const actual = driveLive();
 		const generic = actual.filter((n) => n === 'PwuStateChanged').length;
 		const expectedGeneric = loadExpectedEvents().filter(
@@ -199,7 +199,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// What remains is the naming: the trace would spell the arrival at SATISFIED `PwuSatisfied`. That is the
 		// same primary-vs-generic question Increment 23 settled for markPwuReady, unresolved for the rest.
 		expect(expectedGeneric, 'the §26 trace never emits the generic event').toBe(0);
-		expect(generic).toBe(67);
+		expect(generic).toBe(66);
 	});
 
 	it("CHARACTERIZATION: the engine emits 260 events to the trace's 72, and is still not a superset", () => {

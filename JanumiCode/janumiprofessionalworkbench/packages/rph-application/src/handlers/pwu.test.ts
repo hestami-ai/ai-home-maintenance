@@ -719,7 +719,10 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 
 		// Fully assured, evidence admitted, verdict cited — and STILL not entitled to call itself authoritative.
 		// Baselining is a governance act (§8.1: "Authorized promotion decision"), not a reward for being assured.
-		const r = engine.dispatch(
+		//
+		// ⚠ JAN-PWUWP W-4.5 MOVED THIS GUARD, so the case now proves two things instead of one: the generic
+		// setter no longer performs the arrow AT ALL, and `BaselinePwu` refuses it for the original reason.
+		const viaSetter = engine.dispatch(
 			change({
 				previousState: 'SATISFIED',
 				newState: 'BASELINED',
@@ -728,9 +731,13 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 				supportingObjectIds: [assessmentId]
 			})
 		);
+		expect(viaSetter.status, 'the setter may not perform an arrow a command owns').toBe('REJECTED');
+		expect(viaSetter.error?.message).toContain('Dispatch BaselinePwu instead');
+
+		const r = engine.dispatch(cmd('BaselinePwu', { baselineId: assessmentId }));
 		expect(r.status, 'assurance is not authority; a PWU may not baseline itself').toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
-		expect(r.error?.message).toContain('no promoted baseline');
+		expect(r.error?.message).toContain('is not an AUTHORITATIVE BASELINE');
 		expect(lifecycle(), 'the PWU must not have moved').toBe('SATISFIED');
 	});
 

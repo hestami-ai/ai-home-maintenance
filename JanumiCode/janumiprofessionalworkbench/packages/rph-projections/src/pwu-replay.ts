@@ -97,19 +97,35 @@ export function applyPwuAxisEvent(
 				shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState
 			};
 		}
+		case 'PwuBaselined': {
+			// JAN-PWUWP W-4.5. ⚠ IT CARRIES `newState`, NOT `workLifecycleState` — the only named PWU event that
+			// does. Folding it with the group below would read `undefined` and carry the old axis forward, and
+			// the rebuild would report SATISFIED for a BASELINED object. That is precisely how it failed before
+			// this case existed; the field-name difference is a fact of the ratified-ish payload, not a choice.
+			if (!axes) return axes;
+			return { ...axes, workLifecycleState: str(p.newState) ?? axes.workLifecycleState };
+		}
+		// ⚠ ADDED 2026-08-09, AND THEY WERE A LATENT W-1 GAP. `AbandonPwu`/`RejectPwu` began emitting these
+		// in W-1 and this fold was never told, so a replay of either would have carried the old axis forward
+		// and diverged from the object. Nothing caught it because the reference seed abandons and rejects
+		// NOTHING — the rebuild tests only see the events the seed happens to emit. `PwuRejected` also carries
+		// `assuranceState`, folded below.
 		case 'PwuMarkedReady':
 		case 'PwuShapingStarted':
 		case 'PwuChallenged':
 		case 'PwuReshapingStarted':
 		case 'PwuInvalidated':
-		case 'PwuSuperseded': {
+		case 'PwuSuperseded':
+		case 'PwuAbandoned':
+		case 'PwuRejected': {
 			// The named single-axis events. Each declares `workLifecycleState`; two also carry
 			// shapeIntegrityState. Absent axes carry forward — they were not part of this transition.
 			if (!axes) return axes;
 			return {
 				...axes,
 				workLifecycleState: str(p.workLifecycleState) ?? axes.workLifecycleState,
-				shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState
+				shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState,
+				assuranceState: str(p.assuranceState) ?? axes.assuranceState
 			};
 		}
 		default:

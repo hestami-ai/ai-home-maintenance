@@ -26,8 +26,10 @@ import type {
 	InvalidatePwuPayload,
 	MarkPwuReadyPayload,
 	AbandonPwuPayload,
+	BaselinePwuPayload,
 	ProposePwuPayload,
 	PwuAbandonedPayload,
+	PwuBaselinedPayload,
 	PwuRejectedPayload,
 	RejectPwuPayload,
 	PwuChallengedPayload,
@@ -352,7 +354,11 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
 	// which re-opens REG-F-070 and REG-F-078 until W-7. The review caught that; it is written here so the
 	// coupling cannot be undone by deleting one side.
 	ABANDONED: 'AbandonPwu',
-	REJECTED: 'RejectPwu'
+	REJECTED: 'RejectPwu',
+	// W-4.5. Same coupling rule as W-1: the row lands in the commit that mints the command, never
+	// later. And note the asymmetry with the two above — those moved an AUTHORITY guard, this moves an
+	// EVIDENCE one, so `rejectUnbackedBaselining` leaves `changePwuState` here too.
+	BASELINED: 'BaselinePwu'
 } as const satisfies Readonly<Record<string, string>>;
 
 /**
@@ -650,6 +656,70 @@ export const supersedePwu: CommandHandler = (ctx, command) => {
 };
 
 /**
+ * Does this cited object BACK a baselining of `pwuId`? — the predicate `rejectUnbackedBaselining` carried,
+ * relocated verbatim in substance by JAN-PWUWP W-4.5 (roadmap R2).
+ *
+ * ⚠ IT IS NOT RETIRED, AND THE DESIGN WAS WRONG TO SAY IT WOULD BE. §4 of DESIGN-pwu-write-path claimed
+ * retiring three "may not be asserted" guards was a strengthening; that is true of one. This one checks a
+ * CROSS-AGGREGATE fact — an AUTHORITATIVE Baseline whose `itemObjectVersions` freeze THIS PWU — whose owning
+ * discipline is Governance, which none of the design's three propagating planes covers. Retiring it would have
+ * turned C-0b's `"Authorized promotion decision"` row from ENFORCED into nothing.
+ *
+ * Both field names here were GUESSED WRONG on first writing (`baselineStatus`, `itemObjectIds`) and a live drive
+ * caught it. Kept as a comment because the real shape is better than the guess: `itemObjectVersions` pins the
+ * exact semanticVersion each item was frozen AT, so this proves the baseline froze THIS PWU rather than merely
+ * mentioning it.
+ */
+function baselineBacksPwu(ctx: HandlerContext, pwuId: string, baselineId: string): boolean {
+	const obj = ctx.store.loadObject(baselineId);
+	if (obj?.objectType !== 'BASELINE') return false;
+	const s = obj.state as { status?: string; itemObjectVersions?: { objectId?: string }[] };
+	return s.status === 'AUTHORITATIVE' && (s.itemObjectVersions ?? []).some((v) => v.objectId === pwuId);
+}
+
+/**
+ * BaselinePwu — SATISFIED | RECOMPOSED -> BASELINED. JAN-PWUWP W-4.5, under REG-D-029.
+ *
+ * ⚠ WHY THIS COMMAND HAD TO EXIST BEFORE THE SETTER RETIRES. `promoteBaseline` advances `Baseline.status` and
+ * says so in its own comment; NOTHING moved the PWU. The reference undertaking has to dispatch the generic
+ * setter separately after promoting, and there was no binding row for `-> BASELINED` at all. Retiring the setter
+ * at W-7 without this would make `BASELINED` — a declared TERMINAL state with ratified RPH-PWU-010 over it —
+ * unreachable. The design had no table row for it; the adversarial review found the gap.
+ *
+ * DERIVE-ON-READ (roadmap R1): the caller names WHICH baseline; this handler derives whether it backs the
+ * transition. Citation rather than a stored link is not a shortcut — the PWU carries no baseline field, so
+ * there is nothing to read but what the caller names.
+ */
+export const baselinePwu: CommandHandler = (ctx, command) => {
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const p = command.payload as BaselinePwuPayload;
+	if (!baselineBacksPwu(ctx, id, p.baselineId)) {
+		return reject(
+			command,
+			'RPH_EVIDENCE_MISSING',
+			`BaselinePwu ${id}: ${p.baselineId} is not an AUTHORITATIVE BASELINE whose itemObjectVersions ` +
+				`include ${id}. DOC-002 §8.1 permits SATISFIED -> BASELINED only on an "Authorized promotion ` +
+				`decision", and RPH-BAS-004 rejects promotion with a missing required assessment — so the ` +
+				`baseline must already have been promoted, which is what makes this citation an authorization ` +
+				`rather than an assertion.`,
+			[id, p.baselineId]
+		);
+	}
+	return advancePwuLifecycle(ctx, command, {
+		target: 'BASELINED',
+		eventType: 'PwuBaselined',
+		eventPayload: (next) =>
+			({
+				pwuId: id,
+				baselineId: p.baselineId,
+				newState: String(next.workLifecycleState)
+			}) satisfies PwuBaselinedPayload
+	});
+};
+
+/**
  * AbandonPwu — (any active) -> ABANDONED. JAN-PWUWP W-1, under REG-D-029.
  *
  * ⚠ THE ACT FINALLY HAS A COMMAND, and the guard that was bolted onto the generic setter moves onto it. Canon
@@ -828,53 +898,14 @@ function rejectUnbackedDisposition(
 }
 
 /**
- * BASELINED MAY NOT BE ASSERTED EITHER — the same defect as an asserted disposition, one axis over.
+ * ⚠ `rejectUnbackedBaselining` LIVED HERE AND HAS MOVED (JAN-PWUWP W-4.5) — relocated, not retired.
  *
- * DOC-002 §8.1: "SATISFIED/RECOMPOSED | Promote baseline | BASELINED | **Authorized promotion decision**". That
- * Required condition is the Given, and until this guard nothing checked it: the demo seed drove its Architecture
- * PWU to BASELINED with no Baseline object, no decision, and no promotion — colliding with ratified RPH-BAS-004
- * ("Missing required assessment prevents promotion"), while the test asserting "freezes the Architecture PWU
- * into an authoritative baseline" stayed green throughout.
- *
- * So: reaching BASELINED requires citing a BASELINE that has actually been PROMOTED and that contains this PWU
- * among its items. PromoteBaseline's own payload already demanded the promotionDecisionId, the exact expected
- * semantic version of every item, and the requiredAssessmentIds — the contract always asked for the Given;
- * nobody was answering it. Citing the promoted baseline is what connects the two.
+ * Its predicate is `baselineBacksPwu` above and its refusal is inside `baselinePwu`. The DESIGN said this
+ * guard would be retired as a "strengthening"; the adversarial review showed that was wrong — it checks a
+ * cross-aggregate Governance fact no propagating plane would check, and retiring it would have turned one of
+ * C-0b's fourteen ENFORCED rows into nothing. The roadmap records the correction as R2.
  */
-function rejectUnbackedBaselining(
-	ctx: HandlerContext,
-	command: DomainCommand,
-	id: string,
-	p: ChangePwuStatePayload,
-	currentWorkLifecycleState: string
-): CommandResult | undefined {
-	if (p.newState !== 'BASELINED' || currentWorkLifecycleState === 'BASELINED') return undefined;
-	const cited = p.supportingObjectIds ?? [];
-	const backed = cited.some((oid) => {
-		const obj = ctx.store.loadObject(oid);
-		if (obj?.objectType !== 'BASELINE') return false;
-		// Both field names below were GUESSED WRONG on the first attempt (`baselineStatus`, `itemObjectIds`) and
-		// the drive caught it. A field name is a fact to look up, not to infer — even in one's own codebase.
-		// The real shape is better than the guess: `itemObjectVersions` pins the exact semanticVersion each item
-		// was frozen AT, so this checks the baseline froze THIS PWU rather than merely mentioning it.
-		const s = obj.state as {
-			status?: string;
-			itemObjectVersions?: { objectId?: string }[];
-		};
-		return (
-			s.status === 'AUTHORITATIVE' && (s.itemObjectVersions ?? []).some((v) => v.objectId === id)
-		);
-	});
-	if (backed) return undefined;
-	return reject(
-		command,
-		'RPH_EVIDENCE_MISSING',
-		`ChangePwuState would baseline PWU ${id} with no promoted baseline to back it. DOC-002 §8.1 permits ` +
-			`SATISFIED -> BASELINED only on an "Authorized promotion decision", and RPH-BAS-004 rejects promotion ` +
-			`with a missing required assessment. Cite a BASELINE in supportingObjectIds that is AUTHORITATIVE and ` +
-			`whose itemObjectVersions include ${id}. Supplied: [${cited.join(', ') || 'nothing'}].`
-	);
-}
+
 
 /**
  * EXECUTION SUCCESS MAY NOT BE ASSERTED — the third and last axis that was assigned rather than earned.
@@ -1088,7 +1119,7 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		const illegal = checkTransition(command, machine, from, to);
 		if (illegal) return illegal;
 	}
-	// THE THREE "MAY NOT BE ASSERTED" GUARDS. checkTransition above answers only "is this an arrow on the
+	// THE TWO "MAY NOT BE ASSERTED" GUARDS. checkTransition above answers only "is this an arrow on the
 	// machine". Three of these answer "is the fact true": a disposition needs an assessment, a baselining needs a
 	// promoted baseline, an execution success needs a succeeded step. The fourth answers "WHO SAID SO" —
 	// JAN-PWUWP W-1 REMOVED THE FOURTH AND FIFTH. `rejectUnauthorizedAbandonment` and
@@ -1098,7 +1129,6 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	// being asked for a decision the setter should never have been adjudicating.
 	const unearned =
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
-		rejectUnbackedBaselining(ctx, command, id, p, current.workLifecycleState) ??
 		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
 	if (unearned) return unearned;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
