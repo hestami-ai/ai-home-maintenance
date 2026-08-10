@@ -74,7 +74,7 @@ evidence extended to name the corpus as the cause, and REG-F-105 escalating the 
 
 ---
 
-## S-3 · Retire the `/decisions` propose form, or scope it
+## S-3 · Retire the `/decisions` propose form, or scope it — ⚠ ESCALATED (REG-F-106); disclosure shipped
 
 Once S-0..S-2 land, `/decisions` is the only place that mints a Decision with **no** subject. Two options, and the
 design recommends the first:
@@ -82,8 +82,20 @@ design recommends the first:
 1. **Remove propose** and leave the route listing + approving. Its own header already argues this for waivers.
 2. Keep it, offering only `decisionType`s that no scope gate reads.
 
-Either way: **delete `subjectObjectIds: []`** rather than leaving it, and fix `subjectSemanticVersions: {}` at
-`:85` in the same commit (§7 — benign today, and the next reader will meet it).
+~~Either way: **delete `subjectObjectIds: []`** rather than leaving it, and fix `subjectSemanticVersions: {}` at
+`:85` in the same commit (§7 — benign today, and the next reader will meet it).~~
+
+**⚠ CORRECTED: THOSE ARE ONE DEFECT, AND `{}` IS THE CORRECT VALUE.** `approveDecision` compares the stated
+versions against the pin taken at propose, filtering on `pinned[id] !== undefined`. A decision with NO
+SUBJECTS has an empty pin, so there is nothing to state — the vacuity is entirely downstream of the
+subjectless propose, and fixing `:85` first would be a change with no meaning. S-0 could state true versions
+only because its decision has a subject.
+
+**NOT DECIDED BY ME.** The design said this was *"recommended but not decided here"*, and deleting a
+user-facing capability on my own recommendation is the shape CON-000 AX-2 warns about. The argument is also
+circular: if propose goes, `approve` has almost nothing left to act on, because after S-0/S-1a the
+authorizations that matter are minted-and-approved beside their objects and waivers use grant/deny — removal
+does not simplify the route, it empties it. **Shipped instead: the disclosure, in the form itself.**
 
 ---
 

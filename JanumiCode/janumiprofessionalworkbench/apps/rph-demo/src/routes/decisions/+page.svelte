@@ -64,6 +64,18 @@
 {/if}
 
 {#if showProposeForm}
+	<!-- ⚠ THE DISCLOSURE IS PART OF THE FORM, NOT A FOOTNOTE (S-3, REG-F-077 / REG-F-106). A decision minted here
+	     carries NO SUBJECT, and DOC-003 §8.7 ASR-15 binds a decision to exact subjects and versions — so it can
+	     authorize nothing, and five of the eight offerable types are read by scope gates that will refuse it. The
+	     register's safe default already forbids describing this surface as producing authorizations; saying so
+	     where the professional is about to act is the honest form of that. The two authorizations the workbench
+	     genuinely performs are authored next to their objects (Baseline Manager, Undertaking Workbench). -->
+	<p class="notice" role="note">
+		A decision proposed here records a judgement and <strong>authorizes nothing</strong> — it names no
+		subject, and an authorization is bound to exact subjects and versions (ASR-15). Promotion is
+		authorized in the Baseline Manager; abandonment in the Undertaking Workbench, each beside the object
+		it is about.
+	</p>
 	<form method="POST" action="?/propose" use:enhance class="proposeform">
 		<label class="field">
 			<span class="flabel">Decision type</span>
@@ -160,6 +172,20 @@
 		color: var(--error);
 		font-size: 12.5px;
 		margin: 0 0 14px;
+	}
+	.notice {
+		color: var(--on-variant);
+		background: var(--surface-low);
+		border-left: 3px solid var(--outline-faint);
+		border-radius: 6px;
+		font-size: 12.5px;
+		line-height: 1.55;
+		padding: 10px 14px;
+		margin: 0 0 12px;
+		max-width: 760px;
+	}
+	.notice strong {
+		color: var(--on);
 	}
 	.proposeform {
 		display: flex;
