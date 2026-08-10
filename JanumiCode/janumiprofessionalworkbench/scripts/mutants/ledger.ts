@@ -2318,5 +2318,17 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/mutant-ledger.test.ts'],
 		why: "THE CONTROL'S OWN MUTANT. An empty population makes the census pass VACUOUSLY — zero entries checked, zero offenders, green — which is the exact shape the census exists to prevent elsewhere. Emptying the SHARED `MEASURABLE` must therefore redden the CONTROL and nothing else. Observed: 1 failed / 8 passed, the failure being `CONTROL — the anchor census has a population and a reader that resolves`. Mutating a test file is deliberate: the guarantee under test is that the census has something to census, and that lives in the census.",
 		source: 'REG-F-100; feedback: a control needs its own mutant'
+	},
+	// ── REG-F-102, THE CATEGORY-ERROR HOLE IN `authorityBasis` ──────────────────────────────────────────────────
+	{
+		id: 'F102-authority-basis-accepts-any-EFFECTIVE-object-again',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		find:
+			"\t\tconst stored = ctx.store.loadObject(id);\n\t\tif (stored?.objectType !== 'DECISION') return undefined;\n\t\tconst parsed = DecisionObjectSchema.safeParse(stored.state);\n\t\treturn parsed.success && parsed.data.status === 'EFFECTIVE' ? id : undefined;",
+		replace:
+			"\t\tconst stored = ctx.store.loadObject(id);\n\t\tif (stored === undefined) return undefined;\n\t\tconst parsed = { success: true, data: stored.state as { status?: string } } as const;\n\t\treturn parsed.success && parsed.data.status === 'EFFECTIVE' ? id : undefined;",
+		expectRed: ['packages/rph-application/src/handlers/decomposition-conservation.test.ts'],
+		why: "THE DEFECT EXACTLY AS IT SHIPPED, and it is a COMBINED mutant because neither limb is independently killable — measured, not assumed. Dropping ONLY the objectType check leaves all 24 green (an Artifact's state fails DecisionObjectSchema anyway); dropping ONLY the parse leaves all 24 green (the objectType check already refused it). Each limb alone catches the ARTIFACT forgery, so a single-limb mutant reports SURVIVED and would read as an unguarded hole. Both together redden exactly one test — REG-F-015's shape, where a combined mutant was likewise the only honest instrument. ⚠ AND THE REDUNDANCY IS NOT SYMMETRIC: the PARSE is the operative limb for anything the store can actually hold, because `createObject` validates produced state, so a DECISION-typed object whose state does not parse is currently unconstructible. The objectType check is defence in depth AND the semantically correct question — 'is this a Decision?' — which is why it leads.",
+		source: 'REG-F-102; the pre-fix behaviour, driven to ACCEPTED before the repair'
 	}
 ];

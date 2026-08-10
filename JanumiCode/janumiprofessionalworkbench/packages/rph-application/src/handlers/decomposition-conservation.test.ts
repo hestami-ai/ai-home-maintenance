@@ -294,6 +294,37 @@ describe('ValidateDecomposition conservation gate (WP-1-005/006, P2/P3, live pip
 		expect(r.error?.message).toContain('INAPPLICABLE_WITHOUT_RATIONALE');
 	});
 
+	// ⚠ THE CATEGORY ERROR, AND IT WAS LIVE (REG-F-102). The two tests above check a DANGLING id and a PROPOSED
+	// decision — both about a Decision. Neither asks whether the cited object is a Decision AT ALL, and
+	// `authorityBasis` did not either: it loaded any object by id and accepted it on `state.status === 'EFFECTIVE'`
+	// alone. ARTIFACT is the only object schema whose `status` is a free-text `z.string()` (objects.ts:622), and
+	// `recordArtifact` writes it verbatim from the caller (artifact.ts:68) — so a caller could mint their own
+	// authority in one command. DRIVEN BEFORE THE FIX: this test read ACCEPTED.
+	//
+	// The four §5.2 resolvers already refuse this by name — `resolveAbandonAuthorization` says "Naming an Artifact
+	// or a PWU is a category error, not a scope failure" — so the repair is to make this boundary do what its
+	// siblings do, not to invent a rule.
+	it('a constraint declared INAPPLICABLE on an ARTIFACT whose status is EFFECTIVE is refused', () => {
+		parentWithConstraint();
+		const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5V77';
+		dispatch('RecordArtifact', ART, 'ARTIFACT', {
+			artifactId: ART,
+			artifactType: 'DOCUMENT',
+			mediaType: 'text/plain',
+			storageProvider: 'local',
+			storageKey: 'k',
+			contentHash: 'h',
+			securityClassification: 'INTERNAL',
+			retentionClass: 'STANDARD',
+			// The forgery is one field, and the schema permits it: `status: z.string()`.
+			status: 'EFFECTIVE'
+		});
+		const r = inapplicableCiting(ART);
+		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
+		expect(r.error?.message).toContain('INAPPLICABLE_WITHOUT_RATIONALE');
+		expect(statusOf(DCP)).not.toBe('VALID');
+	});
+
 	// CONTROL. Without it the boundary could drop EVERY authority and both tests above would still pass.
 	it('CONTROL: the same disposition citing a real EFFECTIVE decision is ACCEPTED', () => {
 		parentWithConstraint();

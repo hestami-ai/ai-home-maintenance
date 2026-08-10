@@ -12,6 +12,8 @@ import type {
 	ProposeRecompositionPayload,
 	ValidateDecompositionPayload
 } from '@janumipwb/rph-contracts';
+// REG-F-102: the value import, so `authorityBasis` can establish DECISION-ness the way the §5.2 resolvers do.
+import { DecisionObjectSchema } from '@janumipwb/rph-contracts';
 import {
 	evaluateRecomposition,
 	validateConstraintPropagation,
@@ -214,12 +216,34 @@ function buildConstraintInput(
 	 * unresolvable authority is told the rationale is missing. The code name was already wrong for that half
 	 * before this change; it is recorded rather than silently widened.
 	 */
+	// ⚠ REG-F-102 — THIS CHECKED A STRING FIELD, NOT A DECISION, AND THE HOLE WAS LIVE.
+	//
+	// As written it loaded ANY object by id and returned it on `state.status === 'EFFECTIVE'` alone: no
+	// objectType, no parse, no establishment of Decision-ness. `ArtifactObjectSchema.status` is a free-text
+	// `z.string()` — the only object schema of which that is true — and `recordArtifact` writes it verbatim from
+	// the caller. So `RecordArtifact { status: 'EFFECTIVE' }` minted an authority in ONE command, and citing that
+	// artifact let a MANDATORY constraint be declared INAPPLICABLE. Driven, not reasoned: the probe read ACCEPTED.
+	//
+	// REG-F-014 item 3 records this site as CLOSED and says the id must "load as an EFFECTIVE Decision". The
+	// three tests that closed it check a DANGLING id and a PROPOSED decision — both already Decisions. Nothing
+	// asked whether the object was a Decision at all, so the closure's own words were never enforced.
+	//
+	// THE REPAIR IS TO DO WHAT THE SIBLINGS DO, NOT TO INVENT A RULE. `resolveAbandonAuthorization` refuses this
+	// by name — "Naming an Artifact or a PWU is a category error, not a scope failure" — in three ordered steps:
+	// exists, IS a DECISION, PARSES as one. Same three here, then the effectiveness check that was always here.
+	//
+	// ⚠ AND `decisionType` IS DELIBERATELY NOT CHECKED. The §5.2 resolvers each demand a specific type; this
+	// boundary never has, and its passing CONTROL cites an `APPROVAL`. Adding a type conjunct would either break
+	// that control or pick a winner in the disagreement REG-F-076 records as OPEN — where CON-000 AX-2 breaks the
+	// tie in one direction only: "approval and exception authority default to denied; no scenario, agent,
+	// validator, or registry grants itself authority." Narrowing here is a ratification act, not a repair, so the
+	// gap is recorded at REG-F-102 rather than closed by preference.
 	const authorityBasis = (id: string | undefined): string | undefined => {
 		if (!id) return undefined;
-		const decision = ctx.store.loadObject(id)?.state as
-			| { status?: string; decisionType?: string }
-			| undefined;
-		return decision?.status === 'EFFECTIVE' ? id : undefined;
+		const stored = ctx.store.loadObject(id);
+		if (stored?.objectType !== 'DECISION') return undefined;
+		const parsed = DecisionObjectSchema.safeParse(stored.state);
+		return parsed.success && parsed.data.status === 'EFFECTIVE' ? id : undefined;
 	};
 	const propagations = (state.constraintPropagations as ConstraintPropagation[] | undefined) ?? [];
 	const dispositions: ConstraintDispositionRecord[] = propagations.map((r) => ({
