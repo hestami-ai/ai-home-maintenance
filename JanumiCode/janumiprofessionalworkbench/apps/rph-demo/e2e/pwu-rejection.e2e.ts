@@ -160,8 +160,29 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 			.fill('This one is broken.');
 		await page.getByRole('row', { name: faulted }).getByTestId('record-finding').click();
 
-		// The faulted PWU offers rejection; the other one does not, though a blocking finding now exists.
+		// ⚠ THE INNOCENT PWU MUST REACH THE SAME LIFECYCLE STATE, AND MY FIRST VERSION OF THIS CONTROL DID NOT
+		// BOTHER. It left the other PWU at PROPOSED — where the reject affordance is not rendered AT ALL, because
+		// the template only offers it in the UNDER_ASSURANCE branch. So `toHaveCount(0)` passed on the LIFECYCLE
+		// STATE and asserted nothing about subject scope, and the mutation runner said so:
+		// `B3-rejection-stops-checking-the-subject` SURVIVED against it. A control that passes for a reason other
+		// than the one in its name is the defect this repository has now recorded four times.
+		//
+		// Signing this one off puts it at UNDER_ASSURANCE with NO blocking finding — the same branch, the same
+		// buttons, differing ONLY in whether a finding names it.
+		await page.getByRole('row', { name: innocent }).getByRole('button', { name: 'Begin & Execute' }).click();
+		await page
+			.getByRole('row', { name: innocent })
+			.getByRole('button', { name: 'Record Assurance' })
+			.click();
+		await expect(
+			page.getByRole('row', { name: innocent }).getByRole('button', { name: 'Mark Satisfied' })
+		).toBeVisible();
+
+		// Both are UNDER_ASSURANCE. A blocking finding exists in this undertaking. Only one of them is its subject.
 		await expect(page.getByRole('row', { name: faulted }).getByTestId('reject-pwu')).toHaveCount(1);
-		await expect(page.getByRole('row', { name: innocent }).getByTestId('reject-pwu')).toHaveCount(0);
+		await expect(
+			page.getByRole('row', { name: innocent }).getByTestId('reject-pwu'),
+			'a finding against another PWU must not license rejecting this one'
+		).toHaveCount(0);
 	});
 });
