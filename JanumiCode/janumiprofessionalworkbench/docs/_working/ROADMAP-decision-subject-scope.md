@@ -1,0 +1,86 @@
+# ROADMAP — Decision subject scope (REG-F-077)
+
+Implements `DESIGN-decision-subject-scope.md`. **Each increment is separately acceptable and separately
+gate-able.** The order is chosen so that **the act end is reachable before the write end is widened** — the
+inverse order would ship H-1 (§6) by construction.
+
+**Standing rule for every increment:** red-first, then the fix, then a named mutant whose predicted victim is
+written down *before* it runs. A green with no predicted red is not evidence.
+
+---
+
+## S-0 · Make one act reachable, on the path that already works — `PROMOTE_BASELINE`
+
+**Why first.** §4: promotion is the **only** path whose version limb can fire, and §6: its sibling floor path is
+already demo-reachable. So it is the one increment that can prove scope *and* staleness against the real engine.
+
+- Drive `PromoteBaseline` from the demo — measured today: **zero** dispatches anywhere in `apps/rph-demo`.
+- Red-first: an e2e that promotes and is **refused** for want of an authorizing Decision.
+- **The staleness arrangement, and it belongs here or nowhere:** approve at v1, revise the subject (an INTENT or
+  DECOMPOSITION_CONTRACT — the two that can `bumpSemanticVersion`), promote, observe refusal.
+- **Gate:** the e2e performs the ACT, not a render. **Mutant:** neutralise `decisionAuthorizesVersions`; predicted
+  victim is the staleness case alone, with the scope case staying green.
+
+**⚠ Do not widen to the other acts here.** If S-0 cannot be made to work, the design's premise is wrong and the
+rest must be re-thought rather than pushed.
+
+---
+
+## S-1 · Author abandonment and rejection next to the PWU
+
+- Add the two acts to the undertaking/PWU surface, deriving `subjectObjectIds: [pwuId]` from the route parameter —
+  the idiom already used at `undertakings/[id]:933`.
+- The Decision must be minted **and made EFFECTIVE** by the same flow, or the act is unreachable for a second
+  reason (`ProposeDecision` alone decides nothing — ASR-15 checks authority *before* effect).
+- Red-first per act: dispatch without the decision → refused, naming the scope conjunct.
+- **Assert on the STORED decision's `subjectObjectIds`** (H-3), never on the form.
+- **Do NOT assert a staleness case here** — §4 proves it is unconstructible on PWU subjects. Record that in the
+  test file rather than leaving a reader to wonder why the coverage is asymmetric.
+
+---
+
+## S-2 · Make the skip gate honest
+
+`SkipExecutionStep` is dispatched today with `mandatory: false` (`undertakings/[id]:762`), which is the flag that
+switches its authorization off — C-0b already records the rule as escapable by exactly that boolean.
+
+- Drive at least one skip with `mandatory: true` and observe the refusal.
+- **This is a test increment, not a behaviour change**, unless the survey shows the demo should be sending `true`.
+- **⚠ Read C-0b's row first**: it classifies this rule UNENFORCED with recorded evidence. If S-2 makes it
+  enforceable, **the ledger row moves in the same commit** — the same-commit discipline REG-F-101 found missing.
+
+---
+
+## S-3 · Retire the `/decisions` propose form, or scope it
+
+Once S-0..S-2 land, `/decisions` is the only place that mints a Decision with **no** subject. Two options, and the
+design recommends the first:
+
+1. **Remove propose** and leave the route listing + approving. Its own header already argues this for waivers.
+2. Keep it, offering only `decisionType`s that no scope gate reads.
+
+Either way: **delete `subjectObjectIds: []`** rather than leaving it, and fix `subjectSemanticVersions: {}` at
+`:85` in the same commit (§7 — benign today, and the next reader will meet it).
+
+---
+
+## S-4 · Close the census hole the design exposed
+
+REG-F-102 showed a gate census rooted at `subjectObjectIds` is structurally blind. Build the derivation of §3 as a
+**control**, not a document:
+
+- Enumerate decision-resolving sites by all four selectors **plus** the authority root (`status`/`objectType`/parse).
+- Pin the set. A new resolver that reads a Decision and checks no subject **reddens on arrival**.
+- **Predicted red, named in advance:** re-introducing REG-F-102's pre-fix `authorityBasis` must redden this
+  control *as well as* its own test — if it reddens only the latter, the control is not measuring what it claims.
+
+---
+
+## Sequencing notes
+
+- **S-0 before everything.** It is the only increment that can fail informatively.
+- **S-4 may run in parallel** — it touches `verif/` only.
+- **S-3 last**, because removing the propose form before its replacements exist would remove the only way to mint
+  a Decision at all.
+- **Governance is not blocking any of this**: REG-F-076 (the `APPROVAL` disjunct) and the `decisionType` conjunct
+  on `authorityBasis` are named in DESIGN §7 and touch none of S-0..S-4.
