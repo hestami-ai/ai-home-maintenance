@@ -70,26 +70,33 @@
 	     replaces it is what remains true and is the harder thing to know — an approved decision is a STANDING,
 	     version-bound authority which the acting surfaces will find and honour, and which stops resolving the
 	     moment its subject changes version (ASR-15). -->
-	<p class="notice" role="note">
-		A decision names <strong>exact subjects and versions</strong> (ASR-15). Once approved it becomes a
-		standing authority that the acting surfaces — Baseline Manager, Undertaking Workbench — will find and
-		honour, and it <strong>stops resolving</strong> the moment a subject changes version.
-	</p>
 	{#if !data.subjects.length}
-		<!-- AN EMPTY WORKSPACE HAS NOTHING TO DECIDE ABOUT, and saying so beats rendering an empty picker beside a
-		     live Propose button. The form would post, the action would refuse, and the professional would have
-		     learned that the surface offers acts it cannot perform — which is the REG-F-106 defect in miniature.
+		<!-- A WORKBENCH WITH NOTHING IN IT HAS NOTHING TO DECIDE ABOUT, and saying so beats rendering an empty
+		     picker beside a live Propose button. The form would post, the action would refuse, and the
+		     professional would have learned that the surface offers acts it cannot perform — the REG-F-106 defect
+		     in miniature.
 
-		     ⚠ THIS BRANCH HAS NO TEST, AND THE ABSENCE IS DISCLOSED (REG-F-108). Neither demo seed can reach it:
-		     `reset('empty')` still creates PWU_TYPEs and ASSURANCE_POLICYs, which are governed objects and so are
-		     selectable subjects. I wrote the e2e, watched it fail for that reason, and removed it rather than
-		     relax the locator until it went green — a control that cannot fail is worse than no control.
-		     Fail-safe, unread, and recorded as such. -->
+		     ⚠ EXACTLY ONE NOTICE RENDERS, and that is a fix rather than a tidy-up (REG-F-108). The ASR-15 notice
+		     used to sit ABOVE this branch, so a cold-start workbench showed BOTH — explaining what an approved
+		     decision goes on to authorize directly above a line saying no decision can be made. Two `role="note"`
+		     elements is also what the e2e tripped over, which is the accessibility tree reporting the same
+		     incoherence the reader would have felt. -->
 		<p class="notice" role="note">
 			There is nothing to decide about yet. A decision binds exact subjects and versions, so this workspace
 			needs at least one governed object before a decision can be proposed.
 		</p>
 	{:else}
+		<!-- ⚠ THE NOTICE IS REWRITTEN, NOT KEPT (REG-F-106, ruled REG-D-041). It used to read "authorizes nothing
+		     — it names no subject", which was true and is now false: the form REQUIRES a subject. A stale warning
+		     on a repaired surface is worse than none, because it teaches the professional to disbelieve the
+		     surface. What replaces it is what remains true and is the harder thing to know — an approved decision
+		     is a STANDING, version-bound authority which the acting surfaces will find and honour, and which stops
+		     resolving the moment its subject changes version (ASR-15). -->
+		<p class="notice" role="note">
+			A decision names <strong>exact subjects and versions</strong> (ASR-15). Once approved it becomes a
+			standing authority that the acting surfaces — Baseline Manager, Undertaking Workbench — will find and
+			honour, and it <strong>stops resolving</strong> the moment a subject changes version.
+		</p>
 	<form method="POST" action="?/propose" use:enhance class="proposeform">
 		<label class="field">
 			<span class="flabel">Decision type</span>

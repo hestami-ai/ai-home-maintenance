@@ -147,9 +147,25 @@ export function isTestMode(): boolean {
 }
 
 /** TEST MODE ONLY — tear down and recreate the engine so each E2E spec starts from a known state.
- *  `reference` re-seeds the FSM reference workbench (published PWA + Undertaking + graph); `empty` leaves a bare
- *  engine (no authored PWAs/Undertakings) so authoring flows can be driven from scratch. Throws outside test mode. */
-export function resetEngine(seed: 'reference' | 'empty'): void {
+ *
+ *  - `reference` re-seeds the FSM reference workbench (published PWA + Undertaking + graph);
+ *  - `empty` seeds the POLICY LIBRARY only, so authoring flows can be driven from scratch against a populated
+ *    policy manager and picker;
+ *  - `bare` seeds NOTHING.
+ *
+ *  ⚠ `bare` EXISTS BECAUSE `empty` IS NOT EMPTY (REG-F-108). It seeds the policy library, so an `empty` workbench
+ *  still holds ASSURANCE_POLICY and PWU_TYPE objects — which are GOVERNED OBJECTS, and therefore selectable
+ *  subjects for a Decision. `/decisions` guards against rendering a propose form with an empty subject catalog,
+ *  and that branch was unreachable from either seed: I wrote its e2e, watched it fail for that reason, and
+ *  deleted the test rather than relax it into one that passed for a different reason than its name claimed.
+ *
+ *  AND IT IS NOT A TEST-ONLY FICTION, which is why it is worth adding rather than working around. A workbench
+ *  with no authored objects and no installed policy library is the genuine COLD-START state of a standalone
+ *  install — day one, before anyone has done anything. A branch that only that state can reach is a branch a real
+ *  first-time user meets first.
+ *
+ *  Throws outside test mode. */
+export function resetEngine(seed: 'reference' | 'empty' | 'bare'): void {
 	if (!TEST_MODE) throw new Error('resetEngine is only available when RPH_DEMO_MODE=test');
 	handle?.close();
 	cmdSeq = 0;
@@ -157,11 +173,9 @@ export function resetEngine(seed: 'reference' | 'empty'): void {
 	clockTick = 0;
 	undertakingIntent.clear();
 	handle = newEngine();
-	// Always seed the policy library (floor + additive) so the policy manager + picker are populated even in the
-	// authoring-from-scratch ('empty') flow; 'reference' additionally authors the published Product Realization PWA.
 	// SYSTEM, for the same reason as the boot seed: this runs with no user session in scope.
 	if (seed === 'reference') seedWorkbench(handle.as(REFERENCE_OWNER_CREDENTIAL));
-	else seedPolicyLibrary(handle.as(SYSTEM_CREDENTIAL));
+	else if (seed === 'empty') seedPolicyLibrary(handle.as(SYSTEM_CREDENTIAL));
 }
 
 /** The command fields a UI action supplies; this host owns the common command envelope. */

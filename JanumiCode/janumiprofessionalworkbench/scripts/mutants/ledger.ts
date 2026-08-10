@@ -2390,5 +2390,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/mutant-ledger.test.ts'],
 		why: "THE TEMPTING FIX, WHICH IS THE DEFECT. REG-F-110's symptom was four declared CONTROLS blocking the gate because the anchor census cannot pass while a mutation is applied. The one-line 'fix' is to skip the census whenever the runner is driving — exactly this mutation. It makes the gate GREEN and makes `F100-a-a-refactor-rewrites-an-anchored-line` UNKILLABLE, because a mechanical rewrite that detaches two OTHER mutants' anchors would no longer be seen. A control that cannot fail, produced by curing a control that always did. ⚠ SELF-REFERENTIAL AND SOUND: with this mutant applied the runner sets RPH_MUTANT_APPLIED to its own id, the widened predicate exempts EVERY row, the census passes VACUOUSLY — and the narrowness control is the one thing that reddens. Predicted red: 'CONTROL — exempting the applied mutant exempts THAT ONE ONLY', alone.",
 		source: 'REG-F-110'
+	},
+	{
+		id: 'F108-the-cold-start-guard-stops-guarding',
+		file: 'apps/rph-demo/src/routes/decisions/+page.svelte',
+		find: "	{#if !data.subjects.length}",
+		replace: "	{#if false}",
+		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
+		why: "THE GUARD THIS ENTRY EXISTS TO GIVE A READER. `/decisions` declines to render the propose form when the subject catalog is empty; without it a cold-start workbench shows an EMPTY PICKER beside a live Propose button, the form posts, the action refuses, and the professional learns that the surface offers acts it cannot perform — REG-F-106 in miniature. ⚠ THIS MUTANT WAS UNDECLARABLE UNTIL THE `bare` RESET MODE EXISTED (REG-F-108). Neither demo seed could reach the branch: `empty` still seeds the policy library, and an ASSURANCE_POLICY is a governed object and therefore a selectable subject. A mutant over a branch no test can enter reports SURVIVED and reads as an unguarded hole; declaring it before the reader existed would have been recording a defect I had manufactured. The victim also carries the CONTROL that the picker IS offered on a populated workbench, so a mutation that simply deleted the picker cannot pass either.",
+		source: 'REG-F-108'
 	}
 ];

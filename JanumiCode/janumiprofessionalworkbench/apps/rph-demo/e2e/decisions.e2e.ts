@@ -166,10 +166,37 @@ test.describe('Decision Center — propose and approve a governance Decision', (
 		expect(after?.state.status, 'a stale approval must not take effect').toBe('PROPOSED');
 	});
 
-	// ⚠ NO TEST FOR THE EMPTY-CATALOG BRANCH, AND THE ABSENCE IS DISCLOSED RATHER THAN QUIET. The page guards
-	// against rendering an empty picker beside a live Propose button, but NEITHER demo seed can reach that branch:
-	// the 'empty' seed still creates PWU_TYPEs and ASSURANCE_POLICYs, which are governed objects and therefore
-	// selectable subjects. I wrote a test for it, watched it fail for that reason, and removed it rather than
-	// weaken it into one that passes for a different reason than its name claims. The guard stays as a fail-safe
-	// with no reader — recorded in REG-F-108, not hidden behind a green tick.
+	// ⚠ THIS TEST WAS DELETED ONCE AND IS BACK ON A REAL FOOTING (REG-F-108). The first version reset to 'empty'
+	// and failed — because 'empty' is not empty: it seeds the policy library, and an ASSURANCE_POLICY is a governed
+	// object and therefore a selectable subject. I removed it rather than relax the locator until it passed, and
+	// recorded the guard as having no reader. It has one now: `bare` seeds NOTHING, which is not a test-only
+	// fiction but the genuine cold-start state of a standalone install — the state a first-time user meets first.
+	test('a workbench with nothing in it offers no propose form — there is nothing to decide about', async ({
+		page,
+		request
+	}) => {
+		await resetEngine(request, 'bare');
+		await gotoHydrated(page, '/decisions');
+		// The catalog really is empty — asserted against the ENGINE, so the UI assertions below cannot pass
+		// because the page failed to load its subjects for some unrelated reason.
+		const snap = await introspect(request);
+		expect(snap.decisions, 'a bare workbench holds no decisions').toHaveLength(0);
+		expect(snap.pwus, 'nor any PWUs').toHaveLength(0);
+
+		await page.getByRole('button', { name: '+ Propose Decision' }).click();
+		await expect(page.getByTestId('subject-picker')).toHaveCount(0);
+		await expect(page.getByRole('note')).toContainText('nothing to decide about yet');
+	});
+
+	// CONTROL — the same click on a POPULATED workbench DOES offer the picker. Without it, `toHaveCount(0)` above
+	// would pass equally if the picker had been renamed, removed, or never rendered on any seed.
+	test('CONTROL — the same surface DOES offer the picker once the workbench holds something', async ({
+		page,
+		request
+	}) => {
+		await resetEngine(request, 'reference');
+		await gotoHydrated(page, '/decisions');
+		await page.getByRole('button', { name: '+ Propose Decision' }).click();
+		await expect(page.getByTestId('subject-picker')).toHaveCount(1);
+	});
 });

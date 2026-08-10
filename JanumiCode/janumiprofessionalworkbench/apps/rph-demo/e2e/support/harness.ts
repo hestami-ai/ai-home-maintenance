@@ -37,7 +37,9 @@ export interface EngineSnapshot {
  *  'reference' for the seeded FSM workbench used by visualization flows. */
 export async function resetEngine(
 	request: APIRequestContext,
-	seed: 'reference' | 'empty'
+	// `bare` seeds NOTHING — `empty` still seeds the policy library, so it is not empty of governed objects. See
+	// resetEngine in $lib/server/workbench and REG-F-108.
+	seed: 'reference' | 'empty' | 'bare'
 ): Promise<void> {
 	const res = await request.post('/test-api/reset', { data: { seed } });
 	expect(res.ok(), `reset(${seed}) should succeed`).toBeTruthy();
