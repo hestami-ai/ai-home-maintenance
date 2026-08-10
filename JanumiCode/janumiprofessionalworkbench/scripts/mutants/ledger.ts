@@ -708,8 +708,11 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/transition-gate.ts',
 		// THE ORDER PROOF. Never reporting BRANCH_DECISION means a settled branch's recorded selection is discarded and
 		// the cut is attributed to the branch merely being terminal — the more specific fact lost to the less.
-		find: "\t\t\t\tif (step.stepType === 'BRANCH')",
-		replace: '\t\t\t\tif (false as boolean)',
+		// RE-ANCHORED 2026-08-09 (REG-F-100): `2bda6423` (sonar decompose pruneProvenance, S3776) dedented this
+		// line from four tabs to one. The CODE is unchanged — only its indentation moved — which is the ledger's
+		// own rule #4 firing: leading whitespace disambiguates and rots on reindent. Content alone is unique here.
+		find: "\tif (step.stepType === 'BRANCH')",
+		replace: '\tif (false as boolean)',
 		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
 		why: 'ORDER: BRANCH must be checked FIRST, so a CANCELLED branch still reports its recorded selection rather than being downgraded to DEAD_PREDECESSOR',
 		source: 'RW-7 inline'
@@ -1415,8 +1418,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// WP12B-M9's sibling pair. `if (false) continue;` cost `step` its narrowing for `step.selectedTransitionId`
 		// two lines down; `if (step === undefined) continue;` keeps `step` proven and admits every non-BRANCH source,
 		// which is precisely what the title claims.
-		find: "\t\t\t\tif (step.stepType === 'BRANCH')",
-		replace: "\t\t\t\tif (step.stepType !== '__never__')",
+		// RE-ANCHORED 2026-08-09 (REG-F-100) — same dedent by `2bda6423`. Shares its `find` with P2 and differs in
+		// `replace`, so the ledger's one-declaration-per-mutation rule is satisfied by the mutations being distinct.
+		find: "\tif (step.stepType === 'BRANCH')",
+		replace: "\tif (step.stepType !== '__never__')",
 		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
 		why: 'a non-BRANCH source is named as the deciding branch — exclusive first-match belongs to a BRANCH and to nothing else (D2)',
 		source: 'wp14_mutants.py (reformulated V-2c)'
