@@ -1995,9 +1995,29 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// recorded, so it is not — and the reasoning is kept here because the next person will have the same idea.
 		find: '\tif (dbPath) engine.recoverOutbox();',
 		replace: '\t// MUTANT: startup recovery is skipped',
-		expectRed: ['apps/rph-demo/src/lib/server/workbench-durability.test.ts'],
-		why: 'DR-002 W-2: work enqueued before a restart must be re-driven after it, not stranded PENDING forever',
-		source: 'JPWB-SPEC-001-DR-002 W-2'
+		// ⚠ RECLASSIFIED 2026-08-09 (REG-F-099) — IT REPORTED **SURVIVED**, AND THE REASON IS THE FINDING.
+		//
+		// The victim asserted `restarted.recoverOutbox() === 0`, on the reasoning "if startup already recovered
+		// them, a second call finds nothing left." But `drainOutbox` returns 0 AND LEAVES EVERY ROW PENDING when no
+		// subscriber is registered, and `openWorkbench` registers none. **0 is the pass value for both worlds.**
+		//
+		// SO THE MUTATED LINE IS INERT, MEASURED: on a real restart the startup call returns 0 and delivers 0;
+		// attach a subscriber and the same call recovers **446** messages that were stranded the whole time.
+		// Deleting a no-op cannot be observed, so no honest victim exists TODAY — and recording KILLED by finding
+		// some suite that happens to redden would be the manufactured verdict this ledger exists to prevent.
+		//
+		// DECLARED `expectSurvive` WITH THE INVARIANT PINNED, which is this file's own prescription for an inert
+		// mutation: the victim now asserts the invariant (no subscriber ⇒ work stays stranded) as an ADMISSION, so
+		// **the day a subscriber is wired at startup the admission reddens, this becomes killable, and its verdict
+		// flips to a build-failing SURVIVED.** The entry stops lying and starts waiting.
+		expectRed: [],
+		why: 'DR-002 W-2: work enqueued before a restart must be re-driven after it, not stranded PENDING forever. The obligation is real; the CALL is currently inert — see expectSurvive.',
+		source: 'JPWB-SPEC-001-DR-002 W-2; reclassified by REG-F-099',
+		expectSurvive:
+			'Provably inert while the demo host registers no event subscriber: `drainOutbox` leaves rows PENDING and ' +
+			'returns 0 with nobody to deliver to, so removing the startup call changes no observable. Pinned by ' +
+			"workbench-durability.test.ts's ADMISSION case, which fails the moment a subscriber is wired — at which " +
+			'point this mutation becomes observable and must be re-declared with a real victim.'
 	},
 	{
 		id: 'W3-a-every-permitted-child-becomes-mandatory',

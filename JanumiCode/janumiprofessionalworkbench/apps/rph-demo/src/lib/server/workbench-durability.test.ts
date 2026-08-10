@@ -149,16 +149,31 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 		}
 	});
 
-	it('CONTROL — a durable host recovers its PENDING outbox at startup, as the engine requires', () => {
-		// `AuthedEngineHandle.recoverOutbox` states the obligation in its own doc comment: "WP-2-007 restart recovery:
-		// re-drive PENDING outbox on (re)open of a durable store, idempotently … A DURABLE HOST SHALL CALL THIS AT
-		// STARTUP." Until W-2 the demo had no durable store, so the SHALL bound nothing and no one noticed it. The
-		// work package that makes the host durable is the work package that activates it — a new obligation is a
-		// consequence of the change, not a separate concern to be filed.
-		//
-		// Observable because `recoverOutbox()` returns the number it re-drove: if startup already recovered them, a
-		// second call finds nothing left. The pre-fix red measured 300 pending entries here, which is also the
-		// arrangement assertion — it is what proves the store had anything to recover.
+	// ⚠ THIS TEST WAS A CONTROL THAT COULD NOT FAIL, AND THE MUTATION LEDGER IS WHAT SAID SO (REG-F-099).
+	//
+	// AS WRITTEN it asserted `restarted.recoverOutbox() === 0`, reasoning: "if startup already recovered them, a
+	// second call finds nothing left." `W2-b-the-durable-host-never-recovers-its-outbox` deletes the startup call
+	// — and SURVIVED, all four tests green.
+	//
+	// WHY, measured rather than reasoned: `drainOutbox` returns 0 AND LEAVES EVERY ROW PENDING when no subscriber
+	// is registered (command-bus.ts — "nothing is marked when there is nobody to deliver to … a growing outbox
+	// becomes the visible form of 'no consumer exists' instead of a silent discard"). `openWorkbench` registers
+	// none. So **0 is the pass value for both worlds**: recovered-everything and delivered-nothing return the same
+	// number, and the assertion could never tell them apart.
+	//
+	// AND THE REMEDY IT GUARDS IS ITSELF INERT TODAY. Probed on a real restart: the startup call returns **0** and
+	// delivers **0**; register a subscriber and the very same call recovers **446** messages that had been sitting
+	// PENDING the whole time. `workbench.ts`'s own comment — "Measured before this line existed: a restart left 300
+	// entries PENDING and never re-drove them" — is still true AFTER the line exists. The enabling fact was already
+	// in the register (`enforcement-register.ts`: *"nothing in production ever registers an event SUBSCRIBER"*);
+	// W-2 shipped a recovery call that depends on one, and a control that reads its absence as success.
+	//
+	// SO THE ASSERTION IS NOW RELATIONAL, AND IT IS THE THING THAT CANNOT BE TRUE OF BOTH WORLDS: with a subscriber
+	// attached, a restarted host must find work still PENDING **iff** startup did not deliver it. Today it does,
+	// which is the admission this test now carries in place of a false reassurance. The day a subscriber is wired
+	// at startup, this reddens and becomes the refusal — and `W2-b` becomes killable, which is why that entry is
+	// declared `expectSurvive` with this invariant named rather than left reporting a bare SURVIVED.
+	it('ADMISSION — startup recovery delivers nothing, because the host registers no subscriber', () => {
 		const path = tempDbPath();
 		const first = openWorkbench(path).as(SESSION_CREDENTIAL);
 		captureIntent(first, rphId('int', 'W2XBX'));
@@ -166,10 +181,25 @@ describe('W-2 — the demo workbench is durable across a restart', () => {
 
 		const restarted = openWorkbench(path).as(SESSION_CREDENTIAL);
 		try {
+			// What startup's own call reports, and what it is worth.
 			expect(
 				restarted.recoverOutbox(),
-				'startup must leave nothing PENDING — a durable host SHALL recover its outbox on reopen'
+				'with no subscriber, drainOutbox reports 0 whether or not anything was delivered'
 			).toBe(0);
+			// THE DISCRIMINATOR. Give the host somewhere to deliver and ask again: anything returned here is work
+			// startup left stranded. A count is asserted rather than a threshold on both sides, because ">0" would
+			// also pass if the store re-seeded (which the test above forbids) — the pairing is what makes it mean
+			// "stranded" rather than merely "non-empty".
+			let delivered = 0;
+			restarted.subscribe(() => {
+				delivered += 1;
+			});
+			const stranded = restarted.recoverOutbox();
+			expect(
+				{ stranded: stranded > 0, delivered: delivered === stranded },
+				'if `stranded` is 0 a subscriber has been wired at startup — delete this admission and restore the ' +
+					'CONTROL, and make `W2-b` a KILLED mutant again'
+			).toEqual({ stranded: true, delivered: true });
 		} finally {
 			restarted.close();
 		}
