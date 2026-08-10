@@ -16,8 +16,18 @@
 //
 // These are checks on the LEDGER, not on the product, which is why they live in `verif/` beside the source-resolution
 // proof rather than in any package's suite.
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DECLARED_MUTANTS } from '../scripts/mutants/ledger.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+
+/** The entries a run actually measures. Shared by the anchor census and its control, so that a population which
+ *  shrinks to nothing reddens the CONTROL rather than being absorbed by the census passing vacuously. */
+const MEASURABLE = DECLARED_MUTANTS.filter(
+	(m) => m.supersededBy === undefined && m.duplicateOf === undefined
+);
 
 /**
  * The mutation itself, independent of who declared it or what they expected.
@@ -123,6 +133,59 @@ describe('the mutant ledger is internally coherent', () => {
 			measurable.filter((m) => m.expectRed.length === 0).map((m) => m.id),
 			'mutant(s) with NO NAMED VICTIM — run `bun run mutants:harvest`, then CHOOSE against what the candidate suites assert'
 		).toEqual([]);
+	});
+
+	// ── EVERY ANCHOR STILL LANDS (REG-F-100) ──────────────────────────────────────────────────────────────────
+	//
+	// WHY THIS IS HERE AND NOT IN `gate:fast` AS A NEW STEP. The obvious fix to REG-F-100 was "add
+	// `bun run mutants:preflight` to gate:fast". It does not work, for three measured reasons:
+	//
+	//   1. **PREFLIGHT ABORTS ON A DIRTY TREE.** `treeIsClean()` runs at `run.ts` module scope, BEFORE any
+	//      preflight branching, and exits 2. `gate:fast` is the thing you run on uncommitted work — the one
+	//      condition under which preflight refuses to start.
+	//   2. **PREFLIGHT MUTATES THE TREE.** It APPLIES each mutant and runs `tsc` on the mutated project before
+	//      stopping. That is ~154 file writes and ~154 typechecks, and a killed process can strand a mutation
+	//      (which is why `run.ts` carries crash recovery at all). A pre-commit gate must not be able to leave a
+	//      guard disabled in the working tree.
+	//   3. **IT COSTS MINUTES, AND SLOW GATES GET RUN LESS.** `run.ts` makes that argument itself about its
+	//      cleanliness check; it applies here with more force, because gate:fast is the gate people actually run.
+	//
+	// AND NONE OF THAT IS NEEDED FOR THE CLASS THAT ACTUALLY OCCURRED. **Anchoring is a pure string count.** All
+	// TEN mutants the SonarQube remediation detached were UNANCHORED, not NO_COMPILE — so the check that would
+	// have caught them at the commit that caused them needs no mutation, no typecheck and no clean tree. It reads
+	// files and counts. Preflight keeps the other half, where applying really is required.
+	//
+	// So gate:fast gains this protection with NO new step: `bun run test` includes `test:dist`, which runs the
+	// root vitest config, which includes `verif`. The cost is milliseconds.
+	it('anchors: every measurable mutant still occurs EXACTLY ONCE in its file', () => {
+		const offenders = MEASURABLE.flatMap((m) => {
+			const path = `${REPO_ROOT}${m.file}`;
+			if (!existsSync(path)) return [`${m.id}: FILE MISSING — ${m.file}`];
+			const n = readFileSync(path, 'utf8').split(m.find).length - 1;
+			return n === 1 ? [] : [`${m.id}: ${n} occurrence(s) in ${m.file}`];
+		});
+		expect(
+			offenders,
+			'UNANCHORED mutant(s). A claim someone cited as evidence can no longer be performed. If you moved or ' +
+				'reindented this code, re-anchor IN THIS COMMIT (ledger rule #5) — anchor on CONTENT, without leading ' +
+				'whitespace wherever content alone is unique (rule #4). If the guard genuinely went away, set ' +
+				'`supersededBy` naming the entry that now proves it. See REG-F-100.'
+		).toEqual([]);
+	});
+
+	// CONTROL — and it is a SEPARATE `it` on purpose, over a population computed ONCE at module scope.
+	//
+	// Written inside the census above, both assertions redden on every mutation and the control proves nothing
+	// about the census — measured: emptying the population and restoring a rotted anchor each reddened the same
+	// single test. That is the defect this repository has shipped three times and recorded at REG-F-099. Split,
+	// and sharing `MEASURABLE`, a population that silently shrinks to nothing makes the census pass VACUOUSLY and
+	// reddens THIS test alone.
+	it('CONTROL — the anchor census has a population and a reader that resolves', () => {
+		expect(MEASURABLE.length, 'the ledger must contain measurable mutants to check').toBeGreaterThan(100);
+		expect(
+			existsSync(`${REPO_ROOT}${MEASURABLE[0]!.file}`),
+			"the first measurable mutant's file must resolve, or REPO_ROOT is wrong and every count is a fiction"
+		).toBe(true);
 	});
 
 	it('names exactly ONE victim per mutant, because a longer list is a LOWER bar', () => {

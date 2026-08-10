@@ -2295,5 +2295,28 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/evidence-gate-reachability.test.ts'],
 		why: "THE CONTROL'S OWN MUTANT, which this repository has shipped three controls without. A control that only ever reddens alongside the test it guards proves nothing about the test; asking the control for the production shape removes its discriminating power and MUST redden it and nothing else. Observed: reddens the CONTROL alone, the production-shape test and both census tests staying green. Mutating a test file is deliberate here — the guarantee under test is *the probe can see the other outcome*, and that guarantee lives in the probe.",
 		source: 'REG-F-096; feedback: a control needs its own mutant'
+	},
+	// ── REG-F-100, THE ANCHOR GATE ITSELF ───────────────────────────────────────────────────────────────────────
+	//
+	// The census that stops this ledger rotting silently needs its own proof, and its CONTROL needs a separate
+	// one. Written as one test they reddened together, which is no control at all — the defect recorded at
+	// REG-F-099 and fixed here by splitting them over a shared `MEASURABLE`.
+	{
+		id: 'F100-a-a-refactor-rewrites-an-anchored-line',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		find: "if (step.stepType === 'BRANCH')",
+		replace: "if ('BRANCH' === step.stepType)",
+		expectRed: ['verif/mutant-ledger.test.ts'],
+		why: "THE REAL INCIDENT, REPRODUCED. A behaviour-identical mechanical rewrite — the kind a linter suggests and the kind `6992b7b0` performed — detaches every mutant anchored on that text. Observed: reddens the census ALONE, naming both victims by id (`P2-branch-source-reported-as-dead-predecessor: 0 occurrence(s)` and `WP14-M6 …: 0 occurrence(s)`), with the CONTROL green. ⚠ A PURE REINDENT WAS TRIED FIRST AND DID NOT WORK, which is a property of the instrument worth knowing: anchoring is SUBSTRING matching, so a one-tab anchor is still contained in two tabs — a DEDENT rots an anchor and an INDENT does not. Rewriting the line's content is what breaks it, and that is also what actually happened.",
+		source: 'REG-F-100; the ledger gate added to verif/mutant-ledger.test.ts'
+	},
+	{
+		id: 'F100-b-the-anchor-census-loses-its-population',
+		file: 'verif/mutant-ledger.test.ts',
+		find: ') => m.supersededBy === undefined && m.duplicateOf === undefined\n);',
+		replace: ') => m.supersededBy === undefined && m.duplicateOf === undefined\n).slice(0, 0);',
+		expectRed: ['verif/mutant-ledger.test.ts'],
+		why: "THE CONTROL'S OWN MUTANT. An empty population makes the census pass VACUOUSLY — zero entries checked, zero offenders, green — which is the exact shape the census exists to prevent elsewhere. Emptying the SHARED `MEASURABLE` must therefore redden the CONTROL and nothing else. Observed: 1 failed / 8 passed, the failure being `CONTROL — the anchor census has a population and a reader that resolves`. Mutating a test file is deliberate: the guarantee under test is that the census has something to census, and that lives in the census.",
+		source: 'REG-F-100; feedback: a control needs its own mutant'
 	}
 ];
