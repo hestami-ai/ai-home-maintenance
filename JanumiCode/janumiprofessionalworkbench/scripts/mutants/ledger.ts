@@ -2437,5 +2437,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/src/lib/server/assurance/blocking-finding-forecloses-signoff.test.ts'],
 		why: "THE DE MINIMIS ASSURANCE FLOOR BECOMES AN OPT-IN AGAIN — the state this repository shipped in until 2026-08-10, and the one JPWB-DOC-001 forbids in terms: 'core correctness and the de minimis assurance floor are not enterprise features'. With the floor removed, a policy that declares no `dispositionRules` gets NO §10.3 foreclosure, so a CRITICAL or BLOCKING finding can stand open while the assessment completes SATISFIED. REG-F-111 fixed one policy by declaring the rule on it; this line is what fixes the CLASS, and this mutant is what holds the class. ⚠ IT ALSO RE-OPENS A DISCLOSED ENFORCEMENT GAP: RPH-ASR-008's completion site was UNENFORCED_DISCLOSED until this landed, and `disclosure-observed.test.ts` is a SECOND, independent reader that would notice — the victim named here is the one whose assertions are ABOUT the floor. Supersedes `B1-the-signoff-forecloses-nothing`, whose edit the system now ignores.",
 		source: 'REG-D-042 / DESIGN-tier-tailoring-is-a-ratchet T-1'
+	},
+	{
+		id: 'F113-prose-about-a-status-counts-as-a-status',
+		file: 'verif/register-status.test.ts',
+		find: "			.map((l) => l.replace(/`[^`]*`/g, ''))",
+		replace: "			.map((l) => l)",
+		expectRed: ['verif/register-status.test.ts'],
+		why: "THE FALSE POSITIVE THAT WOULD GET THE GATE LOOSENED. Without the code-span strip, any entry that DESCRIBES the status convention — quoting the marker inside backticks — is counted as carrying extra live statuses and is reported as an offender. REG-F-113 is exactly such an entry, so the gate's first act was to reject the entry announcing it. ⚠ THE DANGER IS THE OBVIOUS REPAIR, NOT THE FAILURE: faced with a false positive on a correct entry, the tempting fix is to relax the rule (ignore lines containing backticks, or drop the exactly-one requirement), and either would let a genuinely statusless entry through forever. Prose about a status is not a status, and stripping code spans is the narrowest rule that separates them — narrower than ignoring backticked lines, because a real status line may cite a rule id in code. Predicted red: the offender limb names REG-F-113 itself.",
+		source: 'REG-F-113'
 	}
 ];
