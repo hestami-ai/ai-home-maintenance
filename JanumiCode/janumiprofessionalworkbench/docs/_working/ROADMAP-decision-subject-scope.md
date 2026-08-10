@@ -87,7 +87,7 @@ Either way: **delete `subjectObjectIds: []`** rather than leaving it, and fix `s
 
 ---
 
-## S-4 · Close the census hole the design exposed
+## S-4 · Close the census hole the design exposed — ✅ SHIPPED
 
 REG-F-102 showed a gate census rooted at `subjectObjectIds` is structurally blind. Build the derivation of §3 as a
 **control**, not a document:
@@ -96,6 +96,20 @@ REG-F-102 showed a gate census rooted at `subjectObjectIds` is structurally blin
 - Pin the set. A new resolver that reads a Decision and checks no subject **reddens on arrival**.
 - **Predicted red, named in advance:** re-introducing REG-F-102's pre-fix `authorityBasis` must redden this
   control *as well as* its own test — if it reddens only the latter, the control is not measuring what it claims.
+
+**OUTCOME.** `verif/authority-resolution-census.test.ts`. It roots at what ESTABLISHES authority — the
+pairing of a `loadObject` with an `'EFFECTIVE'` test — rather than at `subjectObjectIds`, because a census
+shaped like the strong gates cannot see the weak one. Rule: **a site that loads an object and treats
+EFFECTIVE as authority must establish WHAT it loaded** (objectType check, schema parse, or aggregateType);
+sites that establish type by a typed parameter or a typed query never call `loadObject` and so never appear.
+
+The detector is a WINDOW, not a parser, and says so: it can miss a pairing spread further apart than 14
+lines and cannot invent one. Its catch is PROVED, not asserted — CONTROL 1 runs the verbatim pre-fix text as
+a fixture, CONTROL 2 proves it does not over-flag the repair, CONTROL 3 proves the walk reaches 157 files.
+**Predicted red confirmed on LIVE code:** reintroducing the pre-fix shape reddens the census alone, naming
+`decomposition.ts:243`, with all three controls green. Declared as a second ledger entry over the same edit
+as F102's — the B4/B5 shape — because *"the behaviour test catches it"* and *"the class is detectable"* are
+two claims, and for four days the first was true while the second was not.
 
 ---
 

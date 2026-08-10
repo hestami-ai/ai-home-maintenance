@@ -2330,5 +2330,16 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/decomposition-conservation.test.ts'],
 		why: "THE DEFECT EXACTLY AS IT SHIPPED, and it is a COMBINED mutant because neither limb is independently killable — measured, not assumed. Dropping ONLY the objectType check leaves all 24 green (an Artifact's state fails DecisionObjectSchema anyway); dropping ONLY the parse leaves all 24 green (the objectType check already refused it). Each limb alone catches the ARTIFACT forgery, so a single-limb mutant reports SURVIVED and would read as an unguarded hole. Both together redden exactly one test — REG-F-015's shape, where a combined mutant was likewise the only honest instrument. ⚠ AND THE REDUNDANCY IS NOT SYMMETRIC: the PARSE is the operative limb for anything the store can actually hold, because `createObject` validates produced state, so a DECISION-typed object whose state does not parse is currently unconstructible. The objectType check is defence in depth AND the semantically correct question — 'is this a Decision?' — which is why it leads.",
 		source: 'REG-F-102; the pre-fix behaviour, driven to ACCEPTED before the repair'
+	},
+	{
+		id: 'F102-authority-basis-again-asked-of-the-S4-census',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		find:
+			"\t\tconst stored = ctx.store.loadObject(id);\n\t\tif (stored?.objectType !== 'DECISION') return undefined;\n\t\tconst parsed = DecisionObjectSchema.safeParse(stored.state);\n\t\treturn parsed.success && parsed.data.status === 'EFFECTIVE' ? id : undefined;",
+		replace:
+			"\t\tconst stored = ctx.store.loadObject(id);\n\t\tif (stored === undefined) return undefined;\n\t\tconst parsed = { success: true, data: stored.state as { status?: string } } as const;\n\t\treturn parsed.success && parsed.data.status === 'EFFECTIVE' ? id : undefined;",
+		expectRed: ['verif/authority-resolution-census.test.ts'],
+		why: "THE SAME EDIT, ASKED OF A DIFFERENT INSTRUMENT — the B4/B5 shape this ledger explicitly admits, and the reason it is worth a second entry is that the two verdicts mean different things. `F102-authority-basis-accepts-any-EFFECTIVE-object-again` asks the BEHAVIOUR test whether an Artifact can still authorize; this asks the S-4 CENSUS whether the defect is still DETECTABLE AS A CLASS. A repository can pass the first and fail the second — that is exactly what happened for the four days REG-F-102 was live under a register entry recording it CLOSED, with three behaviour tests passing and no census able to see it. Observed: reddens the census alone, naming `decomposition.ts:243`; its three controls (catches the pre-fix fixture, does not flag the repaired fixture, the walk reaches 157 files) stay green.",
+		source: 'REG-F-102 + S-4 of ROADMAP-decision-subject-scope'
 	}
 ];
