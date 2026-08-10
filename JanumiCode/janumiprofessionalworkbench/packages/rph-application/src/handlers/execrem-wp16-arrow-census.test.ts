@@ -173,7 +173,12 @@ describe('JAN-EXECREM WP-16 (a) — the arrow census over STEP_COMMAND_SPECS', (
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates the SOURCE-STATE axis of the arrow census
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 
 	/**
@@ -181,7 +186,7 @@ describe('JAN-EXECREM WP-16 (a) — the arrow census over STEP_COMMAND_SPECS', (
 	 *
 	 * This is the isolation WP-0's seam exists for, expressed once: Complete carries the explicit no-output result
 	 * RPH-EXE-006 now demands (its precheck runs BEFORE the source set, so a bare completion would be refused by the
-	 * result rule and the case would assert a refusal it did not isolate); Skip declares `mandatory: false` so the
+	 * result rule and the case would assert a refusal it did not isolate); the plan declares its steps ADVISORY so the
 	 * waiver rule passes; Cancel carries its reason.
 	 */
 	function payloadFor(commandType: StepCommandType, i: number): Record<string, unknown> {
@@ -202,7 +207,6 @@ describe('JAN-EXECREM WP-16 (a) — the arrow census over STEP_COMMAND_SPECS', (
 			};
 		const base: Record<string, unknown> = { stepId: sid(i) };
 		if (commandType === 'FailExecutionStep') base.failureReason = 'boom';
-		if (commandType === 'SkipExecutionStep') base.mandatory = false;
 		if (commandType === 'CancelExecutionStep')
 			base.reason = 'census fixture: an explicit abandonment';
 		return base;

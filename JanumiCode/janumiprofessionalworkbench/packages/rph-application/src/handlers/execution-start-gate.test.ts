@@ -47,7 +47,13 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 
 	/** A TRANSFORMATION step (NOT MODEL_INVOCATION) so a no-output completion clears the floor gate — the gate has no
 	 *  result subject to judge, keeping this suite focused on SEQUENCING, not assurance. */
-	const step = (i: number, stepState: string) => ({
+	// `strength` is a PER-STEP argument here rather than a file-wide default, and that is deliberate: this file
+	// contains BOTH kinds of case. The DWP-07 test at "REFUSES to prune a REACHABLE step" asserts that an unwaived
+	// skip is refused — it needs the default, MANDATORY. The DWP-08/09 plans below need their arms skippable to
+	// reach the deadness and branch-settlement questions they are actually about. Before REG-F-105 the difference
+	// was expressed by the SKIPPER, in `mandatory:` on the request; it is now expressed by the PLAN, which is the
+	// whole of the ruling.
+	const step = (i: number, stepState: string, strength?: string) => ({
 		id: stepId(i),
 		executionPlanId: PLAN,
 		stepType: 'TRANSFORMATION',
@@ -56,7 +62,8 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState
+		stepState,
+		...(strength === undefined ? {} : { strength })
 	});
 
 	/** Propose + approve + activate a plan whose steps sit at the given states.
@@ -467,9 +474,9 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 					workUnitId: PWU,
 					steps: [
 						{ ...step(1, 'QUEUED'), stepType: 'PARALLEL_GROUP' },
-						step(2, 'QUEUED'),
-						step(3, 'QUEUED'),
-						step(4, 'QUEUED')
+						step(2, 'QUEUED', 'ADVISORY'),
+						step(3, 'QUEUED', 'ADVISORY'),
+						step(4, 'QUEUED', 'ADVISORY')
 					],
 					transitions: [gedge(1, 2), gedge(1, 3), gedge(2, 4), gedge(3, 4)],
 					retryPolicy: {},
@@ -768,9 +775,9 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 					workUnitId: PWU,
 					steps: [
 						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
-						step(2, 'QUEUED'),
-						step(3, 'QUEUED'),
-						step(4, 'QUEUED')
+						step(2, 'QUEUED', 'ADVISORY'),
+						step(3, 'QUEUED', 'ADVISORY'),
+						step(4, 'QUEUED', 'ADVISORY')
 					],
 					transitions: [
 						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }), // never true
@@ -825,9 +832,9 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 					workUnitId: PWU,
 					steps: [
 						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
-						step(2, 'QUEUED'),
-						step(3, 'QUEUED'),
-						step(4, 'QUEUED') // seeded to NOT_READY below — propose now refuses to AUTHOR that state (WP-6)
+						step(2, 'QUEUED', 'ADVISORY'),
+						step(3, 'QUEUED', 'ADVISORY'),
+						step(4, 'QUEUED', 'ADVISORY') // seeded to NOT_READY below — propose now refuses to AUTHOR that state (WP-6)
 					],
 					transitions: [
 						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }), // never true → s2 excluded
@@ -876,7 +883,7 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 	describe('DWP-08 — deadness is structural, not command-keyed', () => {
 		const prune = (i: number) => dispatch('PruneExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
 		const skip = (i: number) =>
-			dispatch('SkipExecutionStep', { stepId: stepId(i), mandatory: false }, PLAN, 'EXECUTION_PLAN');
+			dispatch('SkipExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
 
 		/** s1 BRANCH --COND(never true)--> s2 --> s4 ; s1 --SEQ default--> s3. s4 is INTERIOR to the excluded arm. */
 		function activeExcludedArmPlan() {
@@ -887,9 +894,9 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 					workUnitId: PWU,
 					steps: [
 						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
-						step(2, 'QUEUED'),
-						step(3, 'QUEUED'),
-						step(4, 'QUEUED')
+						step(2, 'QUEUED', 'ADVISORY'),
+						step(3, 'QUEUED', 'ADVISORY'),
+						step(4, 'QUEUED', 'ADVISORY')
 					],
 					transitions: [
 						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }),
@@ -982,9 +989,9 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 					workUnitId: PWU,
 					steps: [
 						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
-						step(2, 'QUEUED'),
-						step(3, 'QUEUED'),
-						step(4, 'QUEUED')
+						step(2, 'QUEUED', 'ADVISORY'),
+						step(3, 'QUEUED', 'ADVISORY'),
+						step(4, 'QUEUED', 'ADVISORY')
 					],
 					transitions: [
 						cedge(1, 2, { op: 'STEP_STATE', stepId: stepId(4), state: 'SKIPPED' }),
@@ -1026,7 +1033,7 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			// Now make the guard TRUE after the fact: s4 becomes SKIPPED. Under re-derivation the branch would
 			// re-resolve to s2, making the LOSING arm live while the winning arm has already run — both arms.
 			expect(
-				dispatch('SkipExecutionStep', { stepId: stepId(4), mandatory: false }, PLAN, 'EXECUTION_PLAN').status
+				dispatch('SkipExecutionStep', { stepId: stepId(4) }, PLAN, 'EXECUTION_PLAN').status
 			).toBe('ACCEPTED');
 			expect(stepStateOf(4)).toBe('SKIPPED');
 

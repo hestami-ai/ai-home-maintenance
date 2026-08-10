@@ -75,7 +75,12 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates emitted payload conformance
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 
 	beforeEach(() => {
@@ -162,7 +167,7 @@ describe('JAN-EXECREM WP-13 / F-25 — emitted step payloads conform to their de
 			'complete s1'
 		);
 		// s2: skipped. s3: started then cancelled.
-		ok(dispatch('SkipExecutionStep', { stepId: sid(2), mandatory: false }), 'skip s2');
+		ok(dispatch('SkipExecutionStep', { stepId: sid(2) }), 'skip s2');
 		ok(dispatch('StartExecutionStep', { stepId: sid(3) }), 'start s3');
 		ok(dispatch('CancelExecutionStep', { stepId: sid(3), reason: 'operator aborted' }), 'cancel s3');
 	}

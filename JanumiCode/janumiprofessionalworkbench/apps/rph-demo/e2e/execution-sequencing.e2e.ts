@@ -11,7 +11,7 @@ const PLAN_ID = 'plan_01ARZ3NDEKTSV4RRFFQ69GS310';
 const STEP1 = 'step_01ARZ3NDEKTSV4RRFFQ69GS320';
 const STEP2 = 'step_01ARZ3NDEKTSV4RRFFQ69GS330';
 
-const mkStep = (id: string, purpose: string) => ({
+const mkStep = (id: string, purpose: string, strength?: string) => ({
 	id,
 	executionPlanId: PLAN_ID,
 	stepType: 'TRANSFORMATION',
@@ -20,7 +20,9 @@ const mkStep = (id: string, purpose: string) => ({
 	outputBindings: [],
 	preconditions: [],
 	postconditions: [],
-	stepState: 'QUEUED'
+	stepState: 'QUEUED',
+	// REG-F-105 (ruled REG-D-041): the PLAN declares how mandatory each step is. Omitted => MANDATORY.
+	...(strength === undefined ? {} : { strength })
 });
 
 async function stage2StepPlan(
@@ -78,7 +80,12 @@ async function stage2StepPlan(
 					{
 						executionPlanId: PLAN_ID,
 						workUnitId: PWU_ID,
-						steps: [mkStep(STEP1, 'first step'), mkStep(STEP2, 'second step')],
+						// s1 ADVISORY, s2 declaring nothing (i.e. MANDATORY). The two skip cases below turn on THIS
+						// difference and on nothing the browser sends — which is the point of REG-F-105.
+						steps: [
+							mkStep(STEP1, 'first step', 'ADVISORY'),
+							mkStep(STEP2, 'second step')
+						],
 						transitions: [],
 						retryPolicy: {},
 						tacticalChangePolicy: {},
@@ -143,12 +150,37 @@ test.describe('Execution tab — linear sequencing (DWP-03)', () => {
 		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Tier-3C seq PWU' });
 		const steps = grp.getByTestId('exec-step');
 
-		// Skip step 1 (optional skip, mandatory:false) → SKIPPED.
+		// Skip step 1 — the PLAN declares it ADVISORY, and the browser sends only the stepId. → SKIPPED.
 		await steps.nth(0).getByTestId('step-action-skip').click();
 		await expect(steps.nth(0).getByTestId('step-state')).toHaveText('SKIPPED');
 		// Start moves to step 2 (the skip advanced the frontier).
 		await expect(steps.nth(1).getByTestId('step-action-start')).toBeVisible();
 		await expect(grp.getByTestId('step-action-start')).toHaveCount(1);
+	});
+
+	// ⚠ THE OTHER HALF, AND THE ONE THAT WAS UNREACHABLE FROM A BROWSER UNTIL 2026-08-10 (REG-F-105 / REG-D-041).
+	// `skipStep` used to post `mandatory: false` with every click, so NO step was mandatory as far as this surface
+	// was concerned and the §21.1 refusal could not be provoked through the UI at all. The two tests differ in one
+	// thing only — which step the professional clicks — because the difference now lives on the approved plan.
+	test('the surface CANNOT skip a step the plan declares mandatory — §21.1 refuses it, verbatim', async ({
+		page,
+		request
+	}) => {
+		const undertakingId = await stage2StepPlan(request);
+		await gotoHydrated(page, `/undertakings/${undertakingId}`);
+		await page.getByRole('button', { name: 'execution' }).click();
+		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Tier-3C seq PWU' });
+		const steps = grp.getByTestId('exec-step');
+
+		// Clear step 1 out of the way so step 2 is the one being acted on, not the one being blocked by the gate.
+		await steps.nth(0).getByTestId('step-action-skip').click();
+		await expect(steps.nth(0).getByTestId('step-state')).toHaveText('SKIPPED');
+
+		// Step 2 declares no strength, so it is MANDATORY. The click is refused and the step does not move.
+		await steps.nth(1).getByTestId('step-action-skip').click();
+		await expect(page.getByRole('alert')).toContainText('§21.1');
+		await expect(steps.nth(1).getByTestId('step-state')).toHaveText('QUEUED');
+		expect(await step2State(request)).toBe('QUEUED');
 	});
 
 	test('an out-of-order start is not offered, and is rejected verbatim if forced through the engine', async ({

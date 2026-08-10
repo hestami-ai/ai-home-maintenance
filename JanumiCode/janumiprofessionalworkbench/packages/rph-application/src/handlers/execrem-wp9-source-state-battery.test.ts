@@ -57,8 +57,7 @@ const CASES: readonly KillCase[] = [
 	{
 		commandType: 'SkipExecutionStep',
 		from: 'NOT_READY',
-		why: 'WP-3 added NOT_READY->SKIPPED for prune, so the machine now admits this arrow; canSkipStep passes with mandatory:false, leaving the source set alone',
-		payload: { mandatory: false }
+		why: 'WP-3 added NOT_READY->SKIPPED for prune, so the machine now admits this arrow; the plan declares the step ADVISORY so canSkipStep passes, leaving the source set alone (REG-F-105: it used to say mandatory:false in the payload)',
 	},
 	{
 		commandType: 'ResolveExecutionStepWait',
@@ -113,7 +112,12 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates the SOURCE-STATE axis
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 
 	/** One step per case, so each is arranged independently. Plan is ACTIVE so every plan-ACTIVE precheck PASSES. */

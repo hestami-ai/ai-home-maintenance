@@ -2341,5 +2341,27 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/authority-resolution-census.test.ts'],
 		why: "THE SAME EDIT, ASKED OF A DIFFERENT INSTRUMENT — the B4/B5 shape this ledger explicitly admits, and the reason it is worth a second entry is that the two verdicts mean different things. `F102-authority-basis-accepts-any-EFFECTIVE-object-again` asks the BEHAVIOUR test whether an Artifact can still authorize; this asks the S-4 CENSUS whether the defect is still DETECTABLE AS A CLASS. A repository can pass the first and fail the second — that is exactly what happened for the four days REG-F-102 was live under a register entry recording it CLOSED, with three behaviour tests passing and no census able to see it. Observed: reddens the census alone, naming `decomposition.ts:243`; its three controls (catches the pre-fix fixture, does not flag the repaired fixture, the walk reaches 157 files) stay green.",
 		source: 'REG-F-102 + S-4 of ROADMAP-decision-subject-scope'
+	},
+	{
+		id: 'F105-mandatoriness-goes-back-to-the-skippers-payload',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find:
+			"\t\t\t\tmandatory: step.strength !== 'ADVISORY',",
+		replace:
+			"\t\t\t\tmandatory: (p as { mandatory?: boolean }).mandatory ?? true,",
+		expectRed: ['packages/rph-application/src/handlers/step-strength-authority.test.ts'],
+		why: "THE REGRESSION MUTANT — the defect exactly as it shipped for the whole life of SkipExecutionStep, restored in one line. `p.mandatory ?? true` is fail-closed on ABSENCE and powerless against ASSERTION: the party §21.1 constrains supplied the fact deciding whether §21.1 applied to them, which Guide §8.4 L844 forbids in terms ('the producer cannot exempt its own output'). ⚠ THE PREDICTED RED IS THE **ACCEPT** CASE, NOT A REFUSAL, and that is what makes this mutant honest: under the mutation the three refusals (MANDATORY, CONDITIONAL, LEGACY) all still pass, because `?? true` refuses everything. Only 'ACCEPTS an unauthorized skip of a step the plan declares ADVISORY' can tell the two worlds apart — a repository that kept only the negative cases would grade this SURVIVED and read as enforced. The `as` cast is required because the payload field is GONE from the contract; that the mutant does not even compile without it is itself the guarantee.",
+		source: 'REG-F-105, ruled REG-D-041; the pre-2026-08-10 handler line'
+	},
+	{
+		id: 'F105-absent-and-conditional-strength-fall-open',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find:
+			"\t\t\t\tmandatory: step.strength !== 'ADVISORY',",
+		replace:
+			"\t\t\t\tmandatory: step.strength === 'MANDATORY',",
+		expectRed: ['packages/rph-application/src/handlers/step-strength-authority.test.ts'],
+		why: "THE NAIVE READ, and the likeliest future regression — it is what anyone adding this field would write first. Reading the enum positively ('is it MANDATORY?') instead of negatively ('is it anything but ADVISORY?') silently fails OPEN on the two values that carry no explicit MANDATORY: an ABSENT strength (every plan authored before 2026-08-10, including the seeded reference undertaking) and CONDITIONAL (which has no ratified applicability predicate to evaluate, so Guide §8.4 L844 fixes it at material). Distinct from the regression mutant above and deliberately so: that one flips the SOURCE of the fact, this one flips its DEFAULT, and a repository can hold either while failing the other. ⚠ ONE VICTIM NAMED, DELIBERATELY, AND THE LEDGER'S OWN CONTROL IS WHY. I first named two — this census AND `execution-step-skip-cancel.test.ts`, on the reasoning that duplicate coverage of the unauthored cases was 'the point'. `verif/mutant-ledger.test.ts` refused it: a longer victim list is a LOWER bar, because it passes if ANY named suite reddens. The DWP-02 suite does also carry the absent and CONDITIONAL cases and will also redden; that is coverage, not the assertion. The assertion is the suite whose reason for existing is this guard.",
+		source: 'REG-F-105, ruled REG-D-041; DESIGN-step-strength-and-decision-subjects §2.3 items 3-4'
 	}
 ];

@@ -90,7 +90,12 @@ describe('JAN-EXECREM WP-10 — a BRANCH decides ONCE, against the move it is ma
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates branch settlement
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 	const gedge = (from: number, to: number) => ({
 		id: tid(from, to),
@@ -125,7 +130,7 @@ describe('JAN-EXECREM WP-10 — a BRANCH decides ONCE, against the move it is ma
 		});
 	};
 	const start = (i: number) => dispatch('StartExecutionStep', { stepId: sid(i) });
-	const skip = (i: number) => dispatch('SkipExecutionStep', { stepId: sid(i), mandatory: false });
+	const skip = (i: number) => dispatch('SkipExecutionStep', { stepId: sid(i) });
 
 	function activate(steps: unknown[], transitions: unknown[]) {
 		dispatch(

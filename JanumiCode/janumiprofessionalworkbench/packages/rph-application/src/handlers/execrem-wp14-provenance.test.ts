@@ -224,7 +224,10 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 	/** s1 BRANCH -> s2 (guarded, FALSE) | s3 (default, taken); s2 -> s4 so the dead arm has a downstream. */
 	function branchPlan() {
 		activate(
-			[mkStep(1, { stepType: 'BRANCH' }), mkStep(2), mkStep(3), mkStep(4)],
+			// s3 is the LIVE arm this file SKIPS to prove a skip records no prune provenance. The plan declares it
+			// ADVISORY because the request can no longer claim it (REG-F-105): the other three stay MANDATORY, so
+			// the declaration is scoped to the one step the file actually needs skippable.
+			[mkStep(1, { stepType: 'BRANCH' }), mkStep(2), mkStep(3, { strength: 'ADVISORY' }), mkStep(4)],
 			[
 				{
 					id: tid(1, 2),
@@ -354,7 +357,7 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 		// DR-004 §19-M1 minted ExecutionStepPruned so a system prune could not be confused with a user waiver.
 		// That is only true if the two carry different content.
 		branchPlan();
-		ok(dispatch('SkipExecutionStep', { stepId: sid(3), mandatory: false }), 'skip the LIVE arm');
+		ok(dispatch('SkipExecutionStep', { stepId: sid(3) }), 'skip the LIVE arm');
 		const skipped = eventsOf('ExecutionStepSkipped')[0]!.payload as object;
 		expect(Object.hasOwn(skipped, 'selectedByBranchStepId')).toBe(false);
 		expect(Object.hasOwn(skipped, 'excludedEdgeId')).toBe(false);

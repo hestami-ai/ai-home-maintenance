@@ -1548,9 +1548,10 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 
 /**
  * SkipExecutionStep — a step READY|QUEUED -> SKIPPED (JAN-EXECPLAN-DR-003 DWP-02 / §21.1). Routed through the ratified
- * `canSkipStep` kernel, FAIL-CLOSED: `mandatory` is CALLER-ASSERTED (no step-level mandatory field is ratified) and
- * defaults to TRUE when omitted, so an unmarked step is treated as MANDATORY and REQUIRES an authorized plan revision
- * or waiver (waiverOrRevisionId) — a mandatory-no-waiver skip is REJECTED, never fail-open (§19 L3-B2). A plan-ACTIVE
+ * `canSkipStep` kernel, FAIL-CLOSED: mandatoriness is `ExecutionStep.strength`, DECLARED BY THE PLAN AUTHOR and read
+ * from the loaded step (REG-F-105, ruled REG-D-041 — it used to be asserted by the skipper in the payload, which is a
+ * producer exempting its own output). Absent or CONDITIONAL is treated as MANDATORY and REQUIRES an authorized plan
+ * revision or waiver (waiverOrRevisionId) — a mandatory-no-waiver skip is REJECTED, never fail-open (§19 L3-B2). A plan-ACTIVE
  * precheck mirrors start/retry (a superseded/terminal plan opens no new work, RPH-EXE-002). SKIPPED is terminal-success
  * for the start-gate (execution-view.ts startableStepId), so skipping the startable step advances the sequence — no
  * deadlock (§19 L3-M6). Exec ≠ assurance (INV-5): the skip moves only stepState.
@@ -1567,7 +1568,9 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 			...(p.waiverOrRevisionId ? { waiverOrRevisionId: p.waiverOrRevisionId } : {}),
 			stepState: 'SKIPPED'
 		},
-		precheck: () => {
+		// The AUTHORED STEP, which `advanceStep` has already located in the approved plan. Taking `strength` from
+		// here rather than from `p` is the whole of REG-F-105's repair.
+		precheck: (step) => {
 			// §21.1 RESOLVED, not assumed (JAN-EXECREM WP-12 / F-30). `hasAuthorizedWaiverOrRevision` used to be
 			// `!!p.waiverOrRevisionId`, so a governed act was satisfied by ANY NON-EMPTY STRING — `'x'` retired a
 			// mandatory step. The id is now resolved to an EFFECTIVE REPLAN/WAIVER decision that names this plan
@@ -1591,18 +1594,36 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 						[p.stepId, p.waiverOrRevisionId]
 					);
 			}
-			// FAIL-CLOSED: an unmarked step defaults to MANDATORY (mandatory ?? true), so it needs an authorized
-			// waiver/revision to be skipped — never fail-open. `canSkipStep` is the ratified kernel (rph-domain).
-			// Its second input is now a RESOLVED fact rather than a truthiness test.
+			// ⚠ MANDATORINESS IS READ FROM THE APPROVED PLAN, NOT FROM THE REQUEST (REG-F-105, ruled REG-D-041).
+			//
+			// This was `p.mandatory ?? true` — fail-closed on ABSENCE, and powerless against ASSERTION, because the
+			// caller supplied it. **The party §21.1 constrains declared whether §21.1 applied to them**, which Guide
+			// §8.4 L844 forbids in terms: "the producer cannot exempt its own output, and ambiguity resolves to
+			// material". The payload field is now GONE, so a caller still asserting its own exemption is refused by
+			// the strictObject schema rather than silently ignored.
+			//
+			// The carrier is `ExecutionStep.strength`, and the ratified rule's own REMEDY chose it: §21.1 says an
+			// authorized "plan REVISION or waiver", and revising the plan is a coherent remedy only if the
+			// mandatoriness is a fact OF THE PLAN. This is the same move `runtimeBindingId` made — see advanceStep's
+			// eventPayload note: taking such a fact from the command "would create a second, later, unauthorized
+			// source of truth for a fact the approved plan already settled."
+			//
+			// STILL FAIL-CLOSED, now defeasibly: absent => MANDATORY, so every plan authored before this field (and
+			// the seeded reference undertaking) keeps exactly the posture `?? true` gave it. CONDITIONAL gates as
+			// MANDATORY does — no ratified applicability predicate exists to evaluate the condition against, and
+			// ambiguity resolves to material — so ONLY an ADVISORY declaration admits an unauthorized skip.
+			//
+			// `canSkipStep` is the ratified kernel (rph-domain) and its signature is untouched: what changed is that
+			// BOTH its inputs are now resolved facts rather than things the caller said.
 			const check = canSkipStep({
-				mandatory: p.mandatory ?? true,
+				mandatory: step.strength !== 'ADVISORY',
 				hasAuthorizedWaiverOrRevision: !!p.waiverOrRevisionId
 			});
 			if (!check.ok)
 				return reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',
-					`Cannot skip step ${p.stepId}: ${check.reason ?? 'skipping a mandatory step requires an authorized plan revision or waiver'} (§21.1). Provide waiverOrRevisionId, or assert mandatory:false only for a genuinely optional step.`
+					`Cannot skip step ${p.stepId}: ${check.reason ?? 'skipping a mandatory step requires an authorized plan revision or waiver'} (§21.1). The step declares strength=${String(step.strength ?? 'MANDATORY (absent)')}, and only an ADVISORY step may be skipped unauthorized. Provide waiverOrRevisionId, or revise the plan to declare the step ADVISORY — which is itself a governed act.`
 				);
 			return null;
 		}

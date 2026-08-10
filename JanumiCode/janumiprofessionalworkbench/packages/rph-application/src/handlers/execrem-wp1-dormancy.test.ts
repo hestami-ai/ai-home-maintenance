@@ -72,7 +72,12 @@ describe('JAN-EXECREM WP-1 — the new contract fields are DORMANT (no emitter p
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates field dormancy
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 
 	beforeEach(() => {
@@ -256,7 +261,7 @@ describe('JAN-EXECREM WP-1 — the new contract fields are DORMANT (no emitter p
 	it('a SKIPPED step emits no selectedTransitionId (WP-10 switches it on)', () => {
 		const skip = dispatch(
 			'SkipExecutionStep',
-			{ stepId: S1, mandatory: false },
+			{ stepId: S1 },
 			PLAN,
 			'EXECUTION_PLAN'
 		);

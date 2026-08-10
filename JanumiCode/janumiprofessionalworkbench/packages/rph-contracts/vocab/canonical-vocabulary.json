@@ -288,7 +288,7 @@
     },
     {
       "name": "ObligationStrength",
-      "appliesTo": "ObligationObject.strength",
+      "appliesTo": "ObligationObject.strength; ExecutionStep.strength",
       "values": [
         "MANDATORY",
         "CONDITIONAL",

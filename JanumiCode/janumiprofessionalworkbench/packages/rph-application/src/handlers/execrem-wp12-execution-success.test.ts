@@ -104,7 +104,12 @@ describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVI
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates the execution-success allow-list
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 
 	beforeEach(() => {
@@ -231,7 +236,7 @@ describe('JAN-EXECREM WP-12 / F-08 — a PWU success claim needs a plan that EVI
 					`complete ${i}`
 				);
 			} else if (skip.includes(i)) {
-				ok(onPlan('SkipExecutionStep', { stepId: sid(i), mandatory: false }), `skip ${i}`);
+				ok(onPlan('SkipExecutionStep', { stepId: sid(i) }), `skip ${i}`);
 			}
 		}
 

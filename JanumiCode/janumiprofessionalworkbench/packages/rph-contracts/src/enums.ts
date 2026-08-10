@@ -538,7 +538,7 @@ export const ObligationStatusSchema = z.enum([
 ]);
 export type ObligationStatus = z.infer<typeof ObligationStatusSchema>;
 
-/** ObligationObject.strength — RPH-DOC-002 §10.1 */
+/** ObligationObject.strength; ExecutionStep.strength — RPH-DOC-002 §10.1 */
 export const ObligationStrengthSchema = z.enum(['MANDATORY', 'CONDITIONAL', 'ADVISORY']);
 export type ObligationStrength = z.infer<typeof ObligationStrengthSchema>;
 

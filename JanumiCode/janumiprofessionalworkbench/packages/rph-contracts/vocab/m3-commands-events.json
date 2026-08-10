@@ -891,19 +891,13 @@
 			"drivesFrom": "READY|QUEUED",
 			"drivesTo": "SKIPPED",
 			"schematized": false,
-			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-21 under sponsor grant, JAN-EXECPLAN-DR-003 3C-iii): the ExecutionStep READY|QUEUED->SKIPPED arrows + the §21.1 canSkipStep rule (a MANDATORY step may be skipped only under an authorized plan revision or waiver) + the ExecutionStepSkipped EVENT are ratified/pre-authored, but DOC-007 schematizes NO Skip-Step command interface (§16 item 6 leaves the granular vocabulary unschematized) — so this command shape was AUTHORED, not derived. `mandatory` is CALLER-ASSERTED (no step-level mandatory field is ratified) and defaults FAIL-CLOSED to TRUE in the handler, so an unmarked step needs waiverOrRevisionId. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §21.1 (canSkipStep), ExecutionStep.stepState machine.",
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-21 under sponsor grant, JAN-EXECPLAN-DR-003 3C-iii): the ExecutionStep READY|QUEUED->SKIPPED arrows + the §21.1 canSkipStep rule (a MANDATORY step may be skipped only under an authorized plan revision or waiver) + the ExecutionStepSkipped EVENT are ratified/pre-authored, but DOC-007 schematizes NO Skip-Step command interface (§16 item 6 leaves the granular vocabulary unschematized) — so this command shape was AUTHORED, not derived. ⚠ THE PAYLOAD CARRIED `mandatory: boolean` UNTIL 2026-08-10 AND NO LONGER DOES (REG-D-041, ruling on REG-F-105): the skipper declared whether §21.1 applied to them, which is a producer exempting its own output (Guide §8.4 L844). Mandatoriness is now `ExecutionStep.strength`, declared by the plan author and read by the handler from the LOADED STEP; absent => MANDATORY, so an unmarked step still needs waiverOrRevisionId. A caller that still sends `mandatory` is refused by the strictObject schema — the loud failure, not a silent no-op. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §21.1 (canSkipStep), ExecutionStep.stepState machine.",
 			"payloadFields": [
 				{
 					"field": "stepId",
 					"required": true,
 					"type": "string",
 					"note": "id-ref"
-				},
-				{
-					"field": "mandatory",
-					"required": false,
-					"type": "boolean",
-					"note": "caller-asserted; omitted => TRUE (fail-closed) — a mandatory step then requires waiverOrRevisionId (canSkipStep, §21.1). No step-level mandatory field is ratified, so this rides the command."
 				},
 				{
 					"field": "waiverOrRevisionId",

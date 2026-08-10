@@ -134,7 +134,12 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 		outputBindings: [],
 		preconditions: [],
 		postconditions: [],
-		stepState: 'QUEUED'
+		stepState: 'QUEUED',
+		// §21.1 IS NOT ON TRIAL IN THIS FILE (REG-F-105, ruled REG-D-041). Skipping used to be granted by
+		// `mandatory: false` inside the SKIP PAYLOAD — the skipper's own word. That field is gone, so the PLAN now
+		// declares what the request used to assert. Marking these steps ADVISORY isolates declared plan/PWU authority
+		// exactly as the boolean did, with the difference that a declaration is a fact of the approved plan.
+		strength: 'ADVISORY'
 	});
 
 	// JAN-PWUWP W-1 — the local `chg` helper is GONE, not merely unused. With ABANDONED owned by
@@ -409,7 +414,7 @@ describe('JAN-EXECREM WP-12b — declared authority: plan liveness (F-26) + PWU 
 					executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 				},
 				RetryExecutionStep: { stepId: sid(1) },
-				SkipExecutionStep: { stepId: sid(1), mandatory: false },
+				SkipExecutionStep: { stepId: sid(1) },
 				PruneExecutionStep: { stepId: sid(1) },
 				ResolveExecutionStepWait: { stepId: sid(1) }
 			};

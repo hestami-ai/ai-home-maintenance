@@ -274,7 +274,6 @@ export const FailExecutionStepPayloadSchema = z.strictObject({
 export type FailExecutionStepPayload = z.infer<typeof FailExecutionStepPayloadSchema>;
 export const SkipExecutionStepPayloadSchema = z.strictObject({
 	stepId: z.string(),
-	mandatory: z.boolean().optional(),
 	waiverOrRevisionId: z.string().optional()
 });
 export type SkipExecutionStepPayload = z.infer<typeof SkipExecutionStepPayloadSchema>;

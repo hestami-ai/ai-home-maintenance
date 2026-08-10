@@ -333,6 +333,14 @@
           },
           "selectedTransitionId": {
             "type": "string"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "MANDATORY",
+              "CONDITIONAL",
+              "ADVISORY"
+            ]
           }
         },
         "required": [

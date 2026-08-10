@@ -163,7 +163,13 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,
 				workUnitId: PWU,
-				steps: [mkStep(AI_STEP, 'MODEL_INVOCATION'), mkStep(HUMAN_STEP, 'TRANSFORMATION')],
+				steps: [
+					// The AI step is SKIPPED by one case here to show the zero-subject floor rule does not fire on a
+					// skip. The plan declares it ADVISORY because the skip request can no longer say so itself
+					// (REG-F-105); HUMAN_STEP is left MANDATORY so the declaration is not blanket.
+					{ ...mkStep(AI_STEP, 'MODEL_INVOCATION'), strength: 'ADVISORY' },
+					mkStep(HUMAN_STEP, 'TRANSFORMATION')
+				],
 				transitions: [],
 				retryPolicy: {},
 				tacticalChangePolicy: {},
@@ -218,7 +224,7 @@ describe('JAN-EXECREM WP-11 / F-01 limb B — the zero-subject floor', () => {
 		expect(
 			dispatch(
 				'SkipExecutionStep',
-				{ stepId: AI_STEP, mandatory: false },
+				{ stepId: AI_STEP },
 				PLAN,
 				'EXECUTION_PLAN',
 				HUMAN

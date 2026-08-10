@@ -751,16 +751,22 @@ export const actions: Actions = {
 			retryReason: str(f, 'reason') || 'Operator retry.'
 		});
 	},
-	// JAN-EXECPLAN-DR-003 DWP-02/03 — the terminal step-lifecycle actions. Skip asserts mandatory:false (an OPTIONAL
-	// skip): the fail-closed mandatory/waiver path is DOMAIN-tested, not a demo button, so the UI never silently skips
-	// a mandatory step. A SKIPPED step is terminal-success, so the start-gate advances to the next step. Cancel is
-	// CLEANUP (permitted even post-supersession). Both dispatch one allowlisted command; a rejection surfaces verbatim.
+	// JAN-EXECPLAN-DR-003 DWP-02/03 — the terminal step-lifecycle actions.
+	//
+	// ⚠ THIS ACTION USED TO SEND `mandatory: false` ON EVERY SKIP (REG-F-105, ruled REG-D-041). The comment it
+	// carried claimed "the UI never silently skips a mandatory step" — and the line beneath it declared every step
+	// the UI skipped to be optional, which is the only way the claim could be false. The surface was exempting its
+	// own output, one layer above the handler that was doing the same thing.
+	//
+	// It now sends the stepId alone. Whether the step may be skipped is `ExecutionStep.strength`, declared by the
+	// plan author and read by the engine from the approved plan; a MANDATORY or CONDITIONAL step is REFUSED, and the
+	// refusal names the declared strength and the two lawful routes (an authorized waiver/revision, or a plan
+	// revision declaring the step ADVISORY — itself a governed act). A SKIPPED step is terminal-success, so the
+	// start-gate advances. Cancel is CLEANUP (permitted even post-supersession). Both dispatch one allowlisted
+	// command; a rejection surfaces verbatim, and for the first time that rejection is informative.
 	skipStep: async ({ request }) => {
 		const f = await request.formData();
-		return dispatchResult('SkipExecutionStep', str(f, 'planId'), {
-			stepId: str(f, 'stepId'),
-			mandatory: false
-		});
+		return dispatchResult('SkipExecutionStep', str(f, 'planId'), { stepId: str(f, 'stepId') });
 	},
 	cancelStep: async ({ request }) => {
 		const f = await request.formData();
