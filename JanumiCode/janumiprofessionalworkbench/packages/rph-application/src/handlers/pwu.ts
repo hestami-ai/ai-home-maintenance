@@ -516,10 +516,22 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 	const p = command.payload as MarkPwuReadyPayload;
 	// Optimistic-concurrency precondition on the SEMANTIC version — distinct from the envelope's expectedRevision
 	// (loadOrReject checks that). MarkPwuReady attests readiness of a SPECIFIC shape; expectedSemanticVersion is the
-	// caller's assertion of WHICH shape version it reviewed. If the PWU was materially reshaped since (semanticVersion
-	// moved), the attestation is stale and must not silently apply to a shape the caller never saw. Contract-drift
-	// fix: the command REQUIRED this field yet the handler never compared it, so the intended staleness guard was
-	// dead — a caller believed MarkPwuReady was version-guarded when it was not.
+	// caller's assertion of WHICH shape version it reviewed. Contract-drift fix: the command REQUIRED this field yet
+	// the handler never compared it, so the intended guard was dead — a caller believed MarkPwuReady was
+	// version-guarded when it was not.
+	//
+	// ⚠ AND THE PURPOSE THIS COMMENT USED TO CLAIM IS UNREACHABLE (REG-F-109, corrected 2026-08-10). It read: "if
+	// the PWU was materially reshaped since (semanticVersion moved), the attestation is stale". **A PWU's
+	// semanticVersion CANNOT move.** No command writes a PWU's shape after `ProposePwu` — every later PWU command
+	// is a lifecycle move, `ReshapePwu` included (it enters RESHAPING and writes no shape field), and RESHAPING's
+	// only exits are ABANDONED and SUPERSEDED. The ratified model supersedes a PWU with a replacement rather than
+	// revising it in place (§8.2), and CDM L342's rule — semanticVersion "increments only when the meaning,
+	// obligations, assurance requirements, or authority of the object changes" — therefore never fires here.
+	//
+	// The check still EARNS ITS PLACE: it refuses a caller that states a version this PWU is not at, which is a
+	// caller reasoning about the wrong object or the wrong build. What it does NOT do is catch a reshape, and
+	// saying so was a guarantee the code could not deliver. It becomes live the day PWUs become revisable, which
+	// is an open governance question and not a thing this handler should assume.
 	if (p.expectedSemanticVersion !== loaded.semanticVersion) {
 		return reject(
 			command,
