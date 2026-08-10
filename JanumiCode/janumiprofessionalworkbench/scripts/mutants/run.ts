@@ -77,8 +77,20 @@ interface Result {
 }
 
 /** `cwd` defaults to the repo root; an e2e victim overrides it with the app that owns the Playwright config. */
-const sh = (cmd: string, args: readonly string[], cwd: string = ROOT) =>
-	spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: true });
+/**
+ * ⚠ `env` IS PASSED EXPLICITLY, NOT INHERITED (REG-F-110, second attempt).
+ *
+ * The first fix set `process.env.RPH_MUTANT_APPLIED` in the parent and relied on `spawnSync` inheriting it. Under
+ * Bun it did not reach the child: the full suite passed by hand with the variable exported in the shell, and the
+ * SAME suite under this runner still failed. Measured, not reasoned — the mechanism was right and the delivery was
+ * silent. `env: { ...process.env, ...env }` makes the hand-run and the runner-run the same run.
+ */
+const sh = (
+	cmd: string,
+	args: readonly string[],
+	cwd: string = ROOT,
+	env: NodeJS.ProcessEnv = {}
+) => spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: true, env: { ...process.env, ...env } });
 
 /**
  * Is the working tree free of MODIFICATIONS? The harness must never leave a mutant behind.
@@ -294,8 +306,10 @@ function runMutant(m: DeclaredMutant): Result {
 
 		// HARVEST asks vitest for the machine-readable report as WELL as the human one, so `summarise` keeps
 		// working unchanged and the two views cannot disagree about the same run.
+		// The applied mutant's id travels to the child so REG-F-100's anchor census can exempt EXACTLY it.
+		const mutantEnv = { RPH_MUTANT_APPLIED: m.id };
 		const run = isE2eTarget(target)
-			? runPlaywright(target)
+			? runPlaywright(target, mutantEnv)
 			: sh(
 					'bunx',
 					HARVEST
@@ -307,7 +321,9 @@ function runMutant(m: DeclaredMutant): Result {
 								`--outputFile=${HARVEST_REPORT}`,
 								...target
 							]
-						: ['vitest', 'run', ...target]
+						: ['vitest', 'run', ...target],
+					ROOT,
+					mutantEnv
 				);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
 		const victims = HARVEST ? readVictims() : undefined;
@@ -391,9 +407,9 @@ function isE2eTarget(target: readonly string[]): boolean {
  * while `playwright test` resolves against its own config root. The translation is done here rather than in the
  * ledger so that a future second Playwright app needs a table entry, not a different victim spelling.
  */
-function runPlaywright(target: readonly string[]): ReturnType<typeof sh> {
+function runPlaywright(target: readonly string[], env: NodeJS.ProcessEnv): ReturnType<typeof sh> {
 	const rel = target.map((t) => (t.startsWith(`${E2E_APP}/`) ? t.slice(E2E_APP.length + 1) : t));
-	return sh('bunx', ['playwright', 'test', ...rel, '--reporter=line'], `${ROOT}${E2E_APP}`);
+	return sh('bunx', ['playwright', 'test', ...rel, '--reporter=line'], `${ROOT}${E2E_APP}`, env);
 }
 
 /**
