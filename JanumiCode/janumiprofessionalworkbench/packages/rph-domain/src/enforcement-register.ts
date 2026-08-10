@@ -1163,16 +1163,16 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Open critical findings block satisfaction',
-			note: 'JPWB-DOC-003 §7 states it unconditionally — "block", with no policy predicate — which is exactly the gap: the engine performs it only when a policy opts in.'
+			note: 'JPWB-DOC-003 §7 states it unconditionally — "block", with no policy predicate. ⚠ AS OF 2026-08-10 (REG-D-042) THE COMPLETION SITE MATCHES CANON: Gate C unions the de minimis floor (BLOCKING, CRITICAL) into every POSITIVE disposition, so a policy that declares nothing no longer opts out. The row stays UNENFORCED_DISCLOSED for the SECOND site only.'
 		},
 		why:
-			'THE ENGINE HAS NO DEFAULT, and that is the whole finding. A CRITICAL observation recorded OPEN against a ' +
+			'⚠ SITE 1 CLOSED 2026-08-10 (REG-D-042); THIS ROW NOW RECORDS SITE 2 ALONE. What follows is kept struck-in-place because the reasoning is what produced the fix. ~~THE ENGINE HAS NO DEFAULT, and that is the whole finding. A CRITICAL observation recorded OPEN against a ' +
 			'live assessment does not by itself prevent that assessment from completing SATISFIED. The refusal ' +
 			'machinery exists and works — completeAssuranceAssessment forecloses a positive disposition while an ' +
 			'observation of a forbidden severity is OPEN — but it fires only when the POLICY declares ' +
 			'`dispositionRules.forbiddenOpenSeverities`, and it skips entirely when that set is empty. Canon states ' +
 			'the rule with no policy predicate at all. So every policy that simply omits the clause silently opts out ' +
-			'of a rule canon states absolutely, and the engine supplies nothing in its place. ' +
+			'of a rule canon states absolutely, and the engine supplies nothing in its place.~~ THE ENGINE NOW SUPPLIES THE DEFAULT: `rejectForeclosedDisposition` unions BLOCKING_SEVERITIES into the forbidden set for SATISFIED and CONDITIONALLY_SATISFIED, so silence no longer waives §10.3 and no policy field can switch the floor off. Canon required exactly this and no less — JPWB-DOC-001: "core correctness and the de minimis assurance floor are not enterprise features". ' +
 			'A SECOND SITE, added 2026-08-03 and driven live in `packages/rph-application/src/handlers/pwu.test.ts`: ' +
 			'the gap is not confined to assessment completion. A CRITICAL observation filed AFTER a satisfied ' +
 			'assessment does not stop the PWU itself advancing to workLifecycleState SATISFIED — the satisfaction ' +
@@ -1186,9 +1186,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
 			arrangement:
-				'a policy declaring NO dispositionRules, activated and assessed, a CRITICAL observation recorded OPEN against the assessment, then completion with dispositionRecommendation SATISFIED — accepted',
+				'a CRITICAL observation recorded OPEN against a PWU AFTER its assessment settled SATISFIED, then that PWU advanced to workLifecycleState SATISFIED citing the satisfied assessment — accepted',
 			control:
-				'THE SAME arrangement with one field added to the policy — dispositionRules forbidding SATISFIED while a CRITICAL observation is OPEN — which IS refused. The strongest control available here: same site, same command, same CRITICAL observation, and the only delta is whether the policy declares the rule. It proves what is missing is the ENGINE\'S OWN DEFAULT, not the mechanism.',
+				'THE BYTE-IDENTICAL command with ONE field changed — assuranceState left at ASSESSING rather than SATISFIED — which IS refused, by the cross-axis guard that owns this arrow. So the SITE is alive and simply never looks at findings; the arrangement is not failing somewhere upstream. ⚠ THE PREVIOUS CONTROL RETIRED ON 2026-08-10 (REG-D-042): it added dispositionRules to the policy and watched the completion be refused, proving that what was missing was THE ENGINE\'S OWN DEFAULT rather than the mechanism. That default now exists, and a control whose point has been conceded is no longer a control.',
 			whyNoPredicate:
 				'`dispositionFromFindings` implements the rule correctly and its census does exclude the command ' +
 				'layer, so a DEAD_PREDICATE row would pass the precondition gate — and would still be false, because ' +

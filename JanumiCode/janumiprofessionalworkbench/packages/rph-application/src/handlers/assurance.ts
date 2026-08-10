@@ -6,6 +6,7 @@
 // (§8.11) is enforced at AdmitEvidence by @janumipwb/rph-assurance's evidenceAdmissibility — the kernel rule,
 // called, not a copy of it. Validator-independence scoring still lives there uncalled; that is the next increment.
 import {
+	BLOCKING_SEVERITIES,
 	checkIndependence,
 	evaluateApplicability,
 	evidenceAdmissibility,
@@ -93,6 +94,17 @@ function rejectIfFloorLocked(command: DomainCommand): () => ReturnType<typeof re
  *  override the corpus routes through a different, ratified mechanism. Widen ONLY if a machine-evaluable multi-severity
  *  escalation mapping is later ratified. */
 const ESCALATABLE_SEVERITIES: ReadonlySet<string> = new Set(['CRITICAL']);
+
+/**
+ * The dispositions the de minimis assurance floor forecloses while a BLOCKING or CRITICAL finding is OPEN.
+ *
+ * POSITIVE ONLY, and the exclusion is the load-bearing half. REJECTED, ESCALATED and INCONCLUSIVE are where a
+ * blocking finding is SUPPOSED to lead — foreclosing them too would leave an assessment carrying such a finding
+ * unresolvable in every direction, which is a deadlock wearing a gate's clothes. DOC-004 §10.3's ladder maps an
+ * open BLOCKING finding TO the REJECTED disposition; a rule that refused it would be refusing the ladder's own
+ * answer.
+ */
+const POSITIVE_DISPOSITIONS: ReadonlySet<string> = new Set(['SATISFIED', 'CONDITIONALLY_SATISFIED']);
 
 /** Reject a policy whose escalationRules use the `escalateOnOpenSeverities` shortcut for a severity outside
  *  ESCALATABLE_SEVERITIES — fail closed at authoring rather than persist a silently-inert rule (Gate D would never act
@@ -1751,7 +1763,28 @@ function rejectForeclosedDisposition(
 	openSeverities: () => Set<string>
 ): CommandResult | null {
 	const dispositionRule = (dispositionRules ?? []).find((r) => r?.disposition === disposition);
-	const forbidden = new Set(dispositionRule?.forbiddenOpenSeverities ?? []);
+	// ⚠ THE FLOOR IS UNIONED IN, NOT DEFAULTED TO (REG-D-042 / DESIGN-tier-tailoring-is-a-ratchet T-1).
+	//
+	// This was `new Set(dispositionRule?.forbiddenOpenSeverities ?? [])` followed by `if (size === 0) return
+	// null`. So a policy that declared no `dispositionRules` — and the field is `.optional()` on the ratified
+	// create payload — got NO foreclosure at all. REG-F-111 fixed one policy by declaring the rule on it; every
+	// other policy in the system, including any a user authors tomorrow, still had an inert Gate C. **An optional
+	// policy field that defaults to "no constraint" is a gate switched off by silence**, and fixing the instance
+	// left the class.
+	//
+	// CANON FORECLOSES THE ALTERNATIVES. JPWB-DOC-001: *"core correctness and the de minimis assurance floor are
+	// not enterprise features"* and *"the constitution does not vary with deployment scale"*. DOC-004 §10.3's
+	// ladder IS that floor — so it can be neither opted out of by an author's silence nor sold as a tier. UNION
+	// rather than `??` is what makes that structural: **there is no value an author can write — not `[]`, not
+	// omission, not a wrong disposition key — that removes it.** A policy may only ADD severities it will not
+	// tolerate.
+	//
+	// ⚠ AND THE FLOOR APPLIES TO POSITIVE DISPOSITIONS ONLY. Unioning it into every rule would foreclose
+	// REJECTED and ESCALATED as well — the dispositions a blocking finding LEADS TO — leaving an assessment with
+	// a blocking finding unresolvable in any direction. That is not a stricter gate, it is a deadlock, and the
+	// "a REJECTED disposition is ACCEPTED for the same finding" case is the control that holds this line.
+	const floor = POSITIVE_DISPOSITIONS.has(disposition) ? BLOCKING_SEVERITIES : new Set<string>();
+	const forbidden = new Set([...floor, ...(dispositionRule?.forbiddenOpenSeverities ?? [])]);
 	if (forbidden.size === 0) return null;
 	const openForbiddenSeverities = [...openSeverities()].filter((s) => forbidden.has(s));
 	if (openForbiddenSeverities.length === 0) return null;

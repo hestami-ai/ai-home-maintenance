@@ -2407,7 +2407,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace: "			forbiddenOpenSeverities: []",
 		expectRed: ['apps/rph-demo/src/lib/server/assurance/blocking-finding-forecloses-signoff.test.ts'],
 		why: "THE STATE THIS SURFACE SHIPPED IN UNTIL 2026-08-10, and the reason S-1b could not simply add a reject button. DOC-004 §10.3's foreclosure IS implemented and IS reachable — GATE C, `rejectForeclosedDisposition` — but it reads the POLICY's own rule and returns null the moment the policy has nothing to say (`if (forbidden.size === 0) return null`). `dispositionRules` is `.optional()` on CreateAssurancePolicyPayload and the demo policy declared none, so an operator could record a BLOCKING finding and sign the work off SATISFIED in the same breath. ⚠ AN OPTIONAL POLICY FIELD THAT DEFAULTS TO 'NO CONSTRAINT' IS A GATE SWITCHED OFF BY SILENCE — nothing is missing, nothing is broken, and nothing fires. Measured before committing by deleting the rule: EXACTLY ONE test reddens (the foreclosure), and all three controls stay green — including the ADVISORY control, which is what proves the gate is severity-sensitive rather than refusing every observation.",
-		source: 'S-1b / DESIGN-blocking-finding-capability §2'
+		supersededBy: 'D042-the-signoff-floor-becomes-opt-in-again',
+		source:
+			'S-1b / DESIGN-blocking-finding-capability §2 — SUPERSEDED 2026-08-10: emptying this policy\'s declaration no longer weakens anything, because the floor is unioned in at the gate. A mutant whose edit the system now ignores is not a weaker mutant, it is a mutant measuring nothing.'
 	},
 	{
 		id: 'B2-the-finding-is-recorded-as-advisory',
@@ -2426,5 +2428,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/pwu-rejection.e2e.ts'],
 		why: "THE AFFORDANCE STOPS ASKING WHAT THE FINDING IS ABOUT. Offered on every PWU the moment ANY blocking finding exists anywhere in the undertaking — so a professional is invited to reject work nobody faulted, and the engine's refusal (`hasBlockingObservationFor` checks subjectObjectIds) becomes a dead end reached by clicking a button the surface offered. ⚠ THE HAPPY PATH STAYS GREEN UNDER THIS MUTATION, which is exactly why the subject-scope CONTROL exists: it stands up two PWUs, faults one, and asserts the other offers nothing. A repository with only the chain test would grade this SURVIVED. The predicate is deliberately the SAME question the engine asks of the same field, so affordance and gate cannot drift apart.",
 		source: 'S-1b / B-3'
+	},
+	{
+		id: 'D042-the-signoff-floor-becomes-opt-in-again',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		find: "	const floor = POSITIVE_DISPOSITIONS.has(disposition) ? BLOCKING_SEVERITIES : new Set<string>();",
+		replace: "	const floor = new Set<string>();",
+		expectRed: ['apps/rph-demo/src/lib/server/assurance/blocking-finding-forecloses-signoff.test.ts'],
+		why: "THE DE MINIMIS ASSURANCE FLOOR BECOMES AN OPT-IN AGAIN — the state this repository shipped in until 2026-08-10, and the one JPWB-DOC-001 forbids in terms: 'core correctness and the de minimis assurance floor are not enterprise features'. With the floor removed, a policy that declares no `dispositionRules` gets NO §10.3 foreclosure, so a CRITICAL or BLOCKING finding can stand open while the assessment completes SATISFIED. REG-F-111 fixed one policy by declaring the rule on it; this line is what fixes the CLASS, and this mutant is what holds the class. ⚠ IT ALSO RE-OPENS A DISCLOSED ENFORCEMENT GAP: RPH-ASR-008's completion site was UNENFORCED_DISCLOSED until this landed, and `disclosure-observed.test.ts` is a SECOND, independent reader that would notice — the victim named here is the one whose assertions are ABOUT the floor. Supersedes `B1-the-signoff-forecloses-nothing`, whose edit the system now ignores.",
+		source: 'REG-D-042 / DESIGN-tier-tailoring-is-a-ratchet T-1'
 	}
 ];

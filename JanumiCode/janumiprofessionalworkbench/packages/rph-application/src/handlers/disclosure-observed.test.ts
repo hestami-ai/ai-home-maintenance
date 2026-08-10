@@ -2273,14 +2273,71 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			}
 		},
 
+		// ⚠ THIS PROBE MOVED SITES ON 2026-08-10, AND THE MOVE IS THE NEWS (REG-D-042 T-1).
+		//
+		// It used to drive SITE 1 — a CRITICAL observation open against a live assessment, that assessment then
+		// completed SATISFIED under a policy declaring no dispositionRules — and that arrangement WAS admitted.
+		// It is now REFUSED: Gate C unions the de minimis floor (BLOCKING, CRITICAL) into every positive
+		// disposition, so a policy's silence no longer opts out of DOC-004 §10.3. **This row's own words asked for
+		// exactly that** — *"what is missing is the ENGINE'S OWN DEFAULT, not the mechanism"* — and the harness
+		// caught the change by going red on a disclosure that had become false, which is what it is for.
+		//
+		// THE ROW STAYS UNENFORCED_DISCLOSED BECAUSE THE RULE HAS TWO SITES AND ONLY ONE CLOSED. Site 2 — a
+		// CRITICAL finding filed AFTER a satisfied assessment does not stop the PWU advancing to
+		// workLifecycleState SATISFIED — is untouched, and is INEXPRESSIBLE rather than merely absent: nothing on
+		// the satisfaction path reads findings at any severity, and `PwuAxes` has no field that could carry one.
+		// So the ADMISSION re-points at the site that is still open. Flipping the row to ENFORCED would have been
+		// the easy read of a green-ish result and would have claimed a rule this engine performs at one of the two
+		// places canon states it.
 		'RPH-ASR-008': {
 			arrangement:
-				'a CRITICAL observation recorded OPEN against a live assessment, then that assessment completed SATISFIED under a policy that declares no dispositionRules',
+				'a CRITICAL observation recorded OPEN against a PWU AFTER its assessment settled SATISFIED, then that PWU advanced to workLifecycleState SATISFIED citing the satisfied assessment',
 			run: () => {
 				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5A08';
 				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A08';
+				const PWU8 = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5D08';
+				const INT8 = 'int_01ARZ3NDEKTSV4RRFFQ69G5E08';
 				seedPolicy(POL);
-				requestAssessment(ASM, POL);
+				// A DEDICATED PROVISIONAL INTENT and a DEDICATED PWU, for the reason RPH-PWU-007 states beside its
+				// own: `checkPwuShapeReadiness` requires a root PWU's intent to be at least PROVISIONAL, the shared
+				// fixture intent is deliberately left RAW for another probe, and driving a PWU another row owns
+				// would couple two disclosures that must be able to fail independently.
+				ok(
+					dispatch(
+						'CaptureIntent',
+						{ intentId: INT8, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+						INT8,
+						'INTENT'
+					),
+					'capture intent 8'
+				);
+				ok(dispatch('BeginIntentDiscovery', {}, INT8, 'INTENT'), 'discover 8');
+				ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INT8, 'INTENT'), 'provision 8');
+				proposePwu(PWU8, { intentId: INT8 });
+
+				// A settled, SATISFIED assessment for the PWU — recorded BEFORE the finding exists, so no
+				// completion-time gate (including the floor unioned in today) could have seen it.
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: ASM,
+							assurancePolicyId: POL,
+							policyVersion: '1.0.0',
+							subjectObjectIds: [PWU8],
+							subjectSemanticVersions: { [PWU8]: 1 },
+							claimIds: []
+						},
+						ASM,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'request the satisfying assessment'
+				);
+				dispatch('BeginAssuranceAssessment', {}, ASM, 'ASSURANCE_ASSESSMENT');
+				ok(completeAssessmentFor(ASM, POL, PWU8), 'complete it SATISFIED');
+
+				// THE FINDING ARRIVES AFTERWARDS — the realistic case, and the one no completion-time check can
+				// reach. It inherits the assessment's subjects, so this PWU is genuinely its subject.
 				ok(
 					dispatch(
 						'RecordAssuranceObservation',
@@ -2289,45 +2346,71 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 							observationType: 'FINDING',
 							findingCode: 'UNFIT',
 							severity: 'CRITICAL',
-							statement: 'a critical finding, left open'
+							statement: 'a critical finding, filed after the assessment settled'
 						},
 						'obs_01ARZ3NDEKTSV4RRFFQ69G5B08',
 						'ASSURANCE_OBSERVATION'
 					),
 					'record CRITICAL observation'
 				);
-				const admitted = completeAssessment(ASM, POL);
 
-				// THE STRONGEST CONTROL IN EITHER TRANCHE, and it is specific to this row rather than the shared
-				// parse-guard one: the SAME command, the SAME site, the SAME still-open CRITICAL observation — and
-				// it IS refused, once the policy declares the rule. The only delta is `dispositionRules`. So what
-				// is missing is not the mechanism but THE ENGINE'S OWN DEFAULT, which is precisely the finding.
-				const POL2 = 'pol_01ARZ3NDEKTSV4RRFFQ69G5A09';
-				const ASM2 = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A0A';
-				seedPolicy(POL2, {
-					dispositionRules: [
-						{ disposition: 'SATISFIED', condition: 'no open critical', forbiddenOpenSeverities: ['CRITICAL'] }
-					]
-				});
-				requestAssessment(ASM2, POL2);
+				succeededPlanFor(PWU8, 'pln_01ARZ3NDEKTSV4RRFFQ69G5C08');
+				const hop = (over: Record<string, unknown>) =>
+					ok(pwuState(PWU8, String(over.previousState), String(over.newState), over), 'hop');
+				ok(dispatch('BeginPwuShaping', {}, PWU8, 'PROFESSIONAL_WORK_UNIT'), 'shape');
 				ok(
 					dispatch(
-						'RecordAssuranceObservation',
-						{
-							assessmentId: ASM2,
-							observationType: 'FINDING',
-							findingCode: 'UNFIT',
-							severity: 'CRITICAL',
-							statement: 'a critical finding, left open'
-						},
-						'obs_01ARZ3NDEKTSV4RRFFQ69G5B09',
-						'ASSURANCE_OBSERVATION'
+						'MarkPwuReady',
+						{ shapeReadinessAssessmentId: ASM, expectedSemanticVersion: 1 },
+						PWU8,
+						'PROFESSIONAL_WORK_UNIT'
 					),
-					'record CRITICAL observation (control)'
+					'ready'
 				);
-				return { admitted, control: completeAssessment(ASM2, POL2) };
+				hop({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+				hop({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+				hop({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+				hop({
+					previousState: 'EXECUTING',
+					newState: 'EVIDENCE_PENDING',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'EVIDENCE_REQUIRED',
+					supportingObjectIds: ['pln_01ARZ3NDEKTSV4RRFFQ69G5C08']
+				});
+				hop({
+					previousState: 'EVIDENCE_PENDING',
+					newState: 'UNDER_ASSURANCE',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'READY_FOR_ASSESSMENT'
+				});
+				hop({
+					previousState: 'UNDER_ASSURANCE',
+					newState: 'UNDER_ASSURANCE',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'ASSESSING'
+				});
+
+				// THE ADMISSION: SATISFIED, with a CRITICAL finding standing open against this very PWU.
+				const admitted = pwuState(PWU8, 'UNDER_ASSURANCE', 'SATISFIED', {
+					executionState: 'SUCCEEDED',
+					assuranceState: 'SATISFIED',
+					supportingObjectIds: [ASM],
+					reasonCode: 'controller satisfies'
+				});
+
+				// CONTROL — the byte-identical command with ONE field changed: assuranceState left at ASSESSING.
+				// Refused by the cross-axis guard that owns this arrow, which proves the SITE is alive and simply
+				// never looks at findings — rather than the arrangement failing somewhere upstream.
+				const control = pwuState(PWU8, 'UNDER_ASSURANCE', 'SATISFIED', {
+					executionState: 'SUCCEEDED',
+					assuranceState: 'ASSESSING',
+					supportingObjectIds: [],
+					reasonCode: 'controller satisfies'
+				});
+				return { admitted, control };
 			}
 		},
+
 
 		'RPH-ASR-010': {
 			arrangement:

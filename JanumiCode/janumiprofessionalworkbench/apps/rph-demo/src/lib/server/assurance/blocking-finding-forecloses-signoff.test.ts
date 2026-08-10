@@ -43,6 +43,7 @@ const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69GB110';
 const OBS_A = 'obs_01ARZ3NDEKTSV4RRFFQ69GB1A0';
 const OBS_B = 'obs_01ARZ3NDEKTSV4RRFFQ69GB1B0';
 const OBS_C = 'obs_01ARZ3NDEKTSV4RRFFQ69GB1C0';
+const OBS_D = 'obs_01ARZ3NDEKTSV4RRFFQ69GB1D0';
 /** The operator IS the reviewer here (the policy declares independence NONE), so the evaluator must be real. */
 const EVALUATOR = { actorId: 'demo-operator', actorType: 'HUMAN' as const, displayName: 'Operator' };
 
@@ -212,6 +213,74 @@ describe('§10.3 — a BLOCKING finding forecloses a SATISFIED sign-off on the d
 		const assessmentId = 'asm_01ARZ3NDEKTSV4RRFFQ69GB140';
 		openAssessment(assessmentId);
 		ok(complete(assessmentId, 'SATISFIED'), 'CompleteAssuranceAssessment(SATISFIED)');
+	});
+
+	// ── THE CLASS, NOT THE INSTANCE (T-1 of ROADMAP-tier-tailoring-is-a-ratchet) ───────────────────────────────
+	//
+	// REG-F-111 fixed ONE policy by declaring `dispositionRules` on it. Every OTHER policy — including any a user
+	// authors tomorrow — still had an inert Gate C, because `forbidden.size === 0` returned `null`. That is the
+	// same defect with a different subject, and the register recorded the class while the fix covered the case.
+	//
+	// ⚠ CANON FORECLOSES THE TIERED ANSWER, which is why this is a floor and not an enterprise feature.
+	// JPWB-DOC-001: *"core correctness and the de minimis assurance floor are not enterprise features."* §10.3's
+	// ladder IS that floor, so it cannot be something a policy author switches off by silence, and it cannot be
+	// something one deployment tier gets and another does not. The floor is UNIONED IN at the point of use:
+	// there is no value an author can write — not `[]`, not omission, not a wrong disposition key — that removes
+	// it. A policy may only ADD.
+	it('a policy that declares NO dispositionRules STILL forecloses a blocking sign-off — the floor is not opt-in', () => {
+		const assessmentId = 'asm_01ARZ3NDEKTSV4RRFFQ69GB160';
+		const silentPolicyId = 'pol_01ARZ3NDEKTSV4RRFFQ69GBSIL';
+		const { dispositionRules: _omitted, ...silent } = DEMO_POLICY_PAYLOAD;
+		ok(
+			send('CreateAssurancePolicy', 'ASSURANCE_POLICY', silentPolicyId, {
+				...silent,
+				policyId: silentPolicyId
+			}),
+			'CreateAssurancePolicy(no dispositionRules)'
+		);
+		ok(
+			send('ActivateAssurancePolicy', 'ASSURANCE_POLICY', silentPolicyId, {
+				policyId: silentPolicyId
+			}),
+			'ActivateAssurancePolicy'
+		);
+		driveAssessmentToAssessing(
+			(commandType, aggType, aggId, payload) => {
+				ok(send(commandType, aggType, aggId, payload), commandType);
+			},
+			{
+				assessmentId,
+				assurancePolicyId: silentPolicyId,
+				policyVersion: DEMO_POLICY_VERSION,
+				subjectObjectIds: [PWU],
+				subjectSemanticVersions: { [PWU]: 1 },
+				claimIds: []
+			}
+		);
+		ok(recordObservation(assessmentId, 'BLOCKING', OBS_D), 'RecordAssuranceObservation');
+		const r = send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			validatorResult: {
+				validatorId: 'workbench.demo-signoff',
+				validatorVersion: '1',
+				policyId: silentPolicyId,
+				policyVersion: DEMO_POLICY_VERSION,
+				assessmentId,
+				subjectObjectIds: [PWU],
+				subjectSemanticVersions: { [PWU]: 1 },
+				claimResults: [],
+				evidenceConsideredIds: [],
+				evidenceRejected: [],
+				observations: [],
+				dispositionRecommendation: 'SATISFIED',
+				recommendedControlActions: [],
+				residualUncertainty: [],
+				limitations: [],
+				executionProvenance: { evaluator: EVALUATOR }
+			},
+			producer: EVALUATOR
+		});
+		expect(r.status, 'the floor applies to a policy that declares nothing').toBe('REJECTED');
+		expect(r.error?.message).toContain('§10.3');
 	});
 
 	// CONTROL — the foreclosure is SEVERITY-SENSITIVE, not "any observation blocks". An ADVISORY finding is a
