@@ -21,6 +21,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DECLARED_MUTANTS } from '../scripts/mutants/ledger.js';
 
+/** The three fields the anchor census reads — narrowed so the control below can build fixtures. */
+interface Anchored {
+	readonly id: string;
+	readonly file: string;
+	readonly find: string;
+}
+
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 /** The entries a run actually measures. Shared by the anchor census and its control, so that a population which
@@ -157,13 +164,31 @@ describe('the mutant ledger is internally coherent', () => {
 	//
 	// So gate:fast gains this protection with NO new step: `bun run test` includes `test:dist`, which runs the
 	// root vitest config, which includes `verif`. The cost is milliseconds.
-	it('anchors: every measurable mutant still occurs EXACTLY ONCE in its file', () => {
-		const offenders = MEASURABLE.flatMap((m) => {
+	// ⚠ ONE MUTANT MAY BE EXEMPT, AND ONLY WHILE THE RUNNER HAS IT APPLIED (REG-F-110).
+	//
+	// This census reads the WORKING TREE, which is right at `gate:fast` and unsatisfiable inside
+	// `scripts/mutants/run.ts` — the runner has just replaced one of the very strings it counts. The cost was a
+	// BLOCKING FALSE VERDICT rather than noise: a CONTROL declares `expectRed: []`, so the runner invokes the
+	// WHOLE suite, which includes this file, so all four declared controls reported "declared a CONTROL, but a
+	// test FAILED on it" and the mutation gate blocked on its own instrument. The census I added to close
+	// REG-F-100 had silently broken the gate that consumes it — [[check the instrument itself]] again.
+	//
+	// THE EXEMPTION IS ONE ID, NOT "SKIP UNDER THE RUNNER". A mutation that rots a DIFFERENT mutant's anchor must
+	// still be caught here — that is the whole of `F100-a-a-refactor-rewrites-an-anchored-line`, which reddens
+	// this census by breaking two OTHER anchors. Exempting only the applied id makes that mutant strictly sharper:
+	// it can no longer be killed by the trivial fact of its own `find` having been replaced.
+	function unanchored(population: readonly Anchored[], appliedId?: string): string[] {
+		return population.flatMap((m) => {
+			if (m.id === appliedId) return [];
 			const path = `${REPO_ROOT}${m.file}`;
 			if (!existsSync(path)) return [`${m.id}: FILE MISSING — ${m.file}`];
 			const n = readFileSync(path, 'utf8').split(m.find).length - 1;
 			return n === 1 ? [] : [`${m.id}: ${n} occurrence(s) in ${m.file}`];
 		});
+	}
+
+	it('anchors: every measurable mutant still occurs EXACTLY ONCE in its file', () => {
+		const offenders = unanchored(MEASURABLE, process.env.RPH_MUTANT_APPLIED);
 		expect(
 			offenders,
 			'UNANCHORED mutant(s). A claim someone cited as evidence can no longer be performed. If you moved or ' +
@@ -186,6 +211,21 @@ describe('the mutant ledger is internally coherent', () => {
 			existsSync(`${REPO_ROOT}${MEASURABLE[0]!.file}`),
 			"the first measurable mutant's file must resolve, or REPO_ROOT is wrong and every count is a fiction"
 		).toBe(true);
+	});
+
+	// CONTROL — THE EXEMPTION IS NARROW (REG-F-110). Without this, `RPH_MUTANT_APPLIED` could be widened to skip
+	// the whole census under the runner — which would make the gate green and make `F100-a` unkillable — and
+	// nothing would say so. Two rotted anchors, one of them the applied mutant: EXACTLY ONE must be reported, and
+	// it must be the other one.
+	it('CONTROL — exempting the applied mutant exempts THAT ONE ONLY', () => {
+		const rotted: Anchored[] = [
+			{ id: 'applied', file: 'package.json', find: '__no_such_string_applied__' },
+			{ id: 'other', file: 'package.json', find: '__no_such_string_other__' }
+		];
+		expect(unanchored(rotted, 'applied').map((s) => s.split(':')[0])).toEqual(['other']);
+		// And with nothing applied, BOTH are reported — otherwise the first assertion would also pass on a reader
+		// that silently drops rows.
+		expect(unanchored(rotted, undefined).map((s) => s.split(':')[0])).toEqual(['applied', 'other']);
 	});
 
 	it('names exactly ONE victim per mutant, because a longer list is a LOWER bar', () => {

@@ -2381,5 +2381,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
 		why: "THE VACUITY, REPRODUCED EXACTLY. `approve` sent `subjectSemanticVersions: {}`; with `stored` forced to undefined the subject list is empty, the map stays empty, and the payload is `{}` again. `approveDecision` compares the stated versions against the pin taken at propose, so `{}` compares nothing against nothing and CANNOT refuse \u2014 the check was present, reachable, and incapable of failing. \u26a0 THE PREDICTED RED IS THE STALENESS CASE, AND IT ONLY EXISTS BECAUSE THE SUBJECT IS AN INTENT: measured while writing it, a PWU's semanticVersion is 1 FOREVER (only INTENT, DECOMPOSITION_CONTRACT and PWA bump), so the same test written against a PWU subject would stay green under this mutation and would have proved the pin works by choosing the one subject type that cannot move. Recorded as REG-F-109.",
 		source: 'REG-F-106, ruled REG-D-041; ASR-15 (DOC-003 L307) \u2014 a decision approving version n never authorizes version n+1'
+	},
+	{
+		id: 'F110-the-exemption-widens-to-skip-everything',
+		file: 'verif/mutant-ledger.test.ts',
+		find: "			if (m.id === appliedId) return [];",
+		replace: "			if (appliedId !== undefined) return [];",
+		expectRed: ['verif/mutant-ledger.test.ts'],
+		why: "THE TEMPTING FIX, WHICH IS THE DEFECT. REG-F-110's symptom was four declared CONTROLS blocking the gate because the anchor census cannot pass while a mutation is applied. The one-line 'fix' is to skip the census whenever the runner is driving — exactly this mutation. It makes the gate GREEN and makes `F100-a-a-refactor-rewrites-an-anchored-line` UNKILLABLE, because a mechanical rewrite that detaches two OTHER mutants' anchors would no longer be seen. A control that cannot fail, produced by curing a control that always did. ⚠ SELF-REFERENTIAL AND SOUND: with this mutant applied the runner sets RPH_MUTANT_APPLIED to its own id, the widened predicate exempts EVERY row, the census passes VACUOUSLY — and the narrowness control is the one thing that reddens. Predicted red: 'CONTROL — exempting the applied mutant exempts THAT ONE ONLY', alone.",
+		source: 'REG-F-110'
 	}
 ];

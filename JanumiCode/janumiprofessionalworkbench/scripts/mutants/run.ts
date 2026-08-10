@@ -270,6 +270,24 @@ function runMutant(m: DeclaredMutant): Result {
 
 	writeFileSync(JOURNAL, m.file, 'utf8');
 	writeFileSync(`${ROOT}${m.file}`, original.replace(m.find, m.replace), 'utf8');
+	// ⚠ TELL THE ANCHOR CENSUS WHICH MUTANT IS CURRENTLY APPLIED (REG-F-110).
+	//
+	// REG-F-100's census reads the WORKING TREE and requires every measurable mutant's `find` to occur exactly
+	// once. That is exactly right at `gate:fast`, where nothing is mutated — and it is unsatisfiable HERE, because
+	// this runner has just replaced one of those strings. The consequence was not a nuisance, it was a BLOCKING
+	// FALSE VERDICT: a CONTROL declares `expectRed: []`, so `targetSuites` is empty and vitest runs the WHOLE
+	// suite, which includes the census, which fails on every mutation — so all four declared controls reported
+	// "SURVIVED: declared a CONTROL, but a test FAILED on it" and the gate blocked on the instrument rather than
+	// on the code. Every KILLED verdict whose victim is the census was equally suspect for the same reason.
+	//
+	// The exemption is exactly ONE id, and it is deliberately not "skip the census under the runner": a mutation
+	// that rots a DIFFERENT mutant's anchor must still be caught, which is precisely what
+	// `F100-a-a-refactor-rewrites-an-anchored-line` exists to prove. Narrowing the exemption to the applied id
+	// makes that mutant sharper, not weaker — it can now only be killed by the two anchors it really breaks.
+	//
+	// `spawnSync` inherits `process.env`, so this reaches both the vitest and the Playwright child. Cleared in the
+	// same `finally` that restores the file, for the same reason: a leaked exemption is a disabled guard.
+	process.env.RPH_MUTANT_APPLIED = m.id;
 	try {
 		const settled = compileVerdict(m, target);
 		if (settled) return settled;
@@ -316,6 +334,7 @@ function runMutant(m: DeclaredMutant): Result {
 	} finally {
 		writeFileSync(`${ROOT}${m.file}`, original, 'utf8');
 		rmSync(JOURNAL, { force: true });
+		delete process.env.RPH_MUTANT_APPLIED;
 	}
 }
 
