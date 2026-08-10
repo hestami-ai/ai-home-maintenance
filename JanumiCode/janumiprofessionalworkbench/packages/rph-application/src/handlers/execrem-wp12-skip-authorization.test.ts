@@ -337,6 +337,48 @@ describe('JAN-EXECREM WP-12c / F-30 — a bare id is not an authorization', () =
 		expect(stepStateOf(1)).toBe('SKIPPED');
 	});
 
+	// ── ADMISSION: THE RULE IS CALLER-ASSERTED, AND THE CORPUS IS WHY (REG-F-105) ─────────────────────────────
+	//
+	// The two tests above are each correct and, read apart, each looks like enforcement. Together they are the
+	// finding: THE SAME STEP, in the same plan, with no authorization anywhere, is REFUSED or ACCEPTED according
+	// to one boolean the skipper puts in their own payload. C-0b classifies §21.1 UNENFORCED for exactly this,
+	// and the reason is not sloppy wiring:
+	//
+	//   **`ExecutionStep` HAS NO MANDATORY FIELD, AND NEITHER DOES THE CORPUS.** RPH-DOC-002's `interface
+	//   ExecutionStep` (L1264-1299) declares twelve fields — id, executionPlanId, stepType, purpose, in/out
+	//   bindings, runtimeBindingId, pre/postconditions, stepState — and NONE of them is optionality. Searched:
+	//   `mandatory:` as a field appears NOWHERE in the RPH corpus; positive control, `preconditions: Condition[]`
+	//   in the same document with the same grep shape, returns 1. The repository transcribed the object
+	//   faithfully.
+	//
+	// So the corpus STATES the rule (*"A skipped mandatory step requires an authorized plan revision or waiver"*,
+	// RPH-DOC-002 L1308; canon STA-8) and defines NO FACT that makes a step mandatory. The only available source
+	// is the party the rule constrains. **This is a ratification gap, not a defect to fix here** — inventing a
+	// field would be authoring the contract, so it is escalated instead.
+	//
+	// THIS TEST IS AN ADMISSION, NOT A GUARANTEE. The day `ExecutionStep` gains an optionality field and this
+	// handler reads it, the second arm stops being ACCEPTED and this reddens — which is the point of pinning it.
+	it('ADMISSION — the same step is refused or skipped on the SKIPPER\'S OWN boolean (§21.1 is caller-asserted)', () => {
+		const asMandatory = dispatch(
+			'SkipExecutionStep',
+			{ stepId: sid(1), mandatory: true },
+			PLAN,
+			'EXECUTION_PLAN'
+		);
+		expect(asMandatory.status, 'declaring the step MANDATORY demands an authorization').toBe('REJECTED');
+		expect(stepStateOf(1), 'the refusal left the step where it was').toBe('QUEUED');
+
+		// Same step. Same plan. No authorization has appeared. Only the caller's own claim changed.
+		const asOptional = dispatch(
+			'SkipExecutionStep',
+			{ stepId: sid(1), mandatory: false },
+			PLAN,
+			'EXECUTION_PLAN'
+		);
+		expect(asOptional.status, JSON.stringify(asOptional.error)).toBe('ACCEPTED');
+		expect(stepStateOf(1), 'and the mandatory step is retired, unauthorized').toBe('SKIPPED');
+	});
+
 	it('an OPTIONAL step that supplies a GARBAGE id is still refused — the id is checked whenever present', () => {
 		// Otherwise `mandatory: false` would be a way to launder an unresolvable authorization into the record.
 		const r = dispatch(

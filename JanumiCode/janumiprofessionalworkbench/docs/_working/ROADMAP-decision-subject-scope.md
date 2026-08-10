@@ -54,7 +54,7 @@ it is not in this roadmap's scope. Recorded rather than quietly dropped.
 
 ---
 
-## S-2 · Make the skip gate honest
+## S-2 · Make the skip gate honest — ✅ DONE, and the answer was a CORPUS gap (REG-F-105)
 
 `SkipExecutionStep` is dispatched today with `mandatory: false` (`undertakings/[id]:762`), which is the flag that
 switches its authorization off — C-0b already records the rule as escapable by exactly that boolean.
@@ -63,6 +63,14 @@ switches its authorization off — C-0b already records the rule as escapable by
 - **This is a test increment, not a behaviour change**, unless the survey shows the demo should be sending `true`.
 - **⚠ Read C-0b's row first**: it classifies this rule UNENFORCED with recorded evidence. If S-2 makes it
   enforceable, **the ledger row moves in the same commit** — the same-commit discipline REG-F-101 found missing.
+
+**OUTCOME: THE ROW CANNOT MOVE, AND THAT IS THE FINDING.** Both arms were already driven at unit level. What
+was missing is why they can both be true: **`ExecutionStep` has no mandatory field, and neither does the
+corpus** — RPH-DOC-002's interface declares twelve fields and none is optionality (`mandatory:` as a field:
+zero hits corpus-wide; positive control `preconditions: Condition[]`: 1). The corpus states the rule and
+defines no fact that could enforce it, so **no repository change can move the C-0b row**. Shipped instead: a
+single ADMISSION test driving the SAME step refused-then-skipped on the caller's own boolean, the C-0b row's
+evidence extended to name the corpus as the cause, and REG-F-105 escalating the ratification question.
 
 ---
 
