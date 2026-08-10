@@ -3,6 +3,7 @@
 // event log and returns their current materialized state; the typed wrappers name the RPH-DOC-010 view sources
 // (PWA Library, PWU Types, Undertaking Portfolio, and the Undertaking's execution/assurance/decision/baseline
 // working sets). The Professional Work Graph itself is built by professionalWorkGraph() (see that module).
+import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import type { EngineHandle } from './engine.js';
 
 export interface ObjectRow {
@@ -228,4 +229,90 @@ export function getObject(handle: EngineHandle, id: string): Record<string, unkn
  */
 export function getObjectRevision(handle: EngineHandle, id: string): number | undefined {
 	return handle.loadObject(id)?.revision;
+}
+
+/** One selectable subject for a governance Decision — what it is, what to call it, and the version to pin. */
+export interface GovernedObjectRow {
+	readonly id: string;
+	readonly objectType: string;
+	/** A human label. Objects do not agree on a name field, so this is best-effort and falls back to the id. */
+	readonly label: string;
+	/** The subject version a Decision must bind (ASR-15). Absent where the object carries none. */
+	readonly semanticVersion?: number;
+	readonly revision?: number;
+}
+
+/**
+ * Every governed object in scope, as candidate SUBJECTS for a Decision (REG-F-106, ruled REG-D-041).
+ *
+ * ── WHY THIS EXISTS ───────────────────────────────────────────────────────────────────────────────────────────
+ * `/decisions` proposed with `subjectObjectIds: []`. `subjectObjectIds` is a REQUIRED field of `DecisionObject` in
+ * BOTH ratified contracts (CDM §23.1, Contract Package §22), for all nine decision types — and OBJ-1 forbids
+ * reading meaning into an empty array: *"No semantic state may be inferred from null values, empty arrays,
+ * missing rows…"*. So a subjectless decision is not "a decision about nothing"; per ASR-15 it is *"not authority
+ * — it is provenance at best"*. The surface could not do better because it had no way to LIST what a decision
+ * might be about. This is that list.
+ *
+ * ⚠ THE TYPE SET IS DERIVED FROM THE CONTRACT, NOT ENUMERATED HERE. `ProfessionalWorkObjectTypeSchema.options` is
+ * the registry; hand-listing the types is the enumeration defect one level up, and is exactly how I got REG-F-106
+ * wrong the first time — I claimed three decision types were "exempt" because no gate of OURS read them, which
+ * was a fact about our gates and not about the corpus. A new object type reaches this catalog by existing.
+ *
+ * ── SCOPE IS AN ARGUMENT, NOT A DEFAULT (JPWB-SPEC-001 INV-02 / FORK-9) ───────────────────────────────────────
+ * WORKSPACE passes everything through — the Decision Center IS the workspace-wide register, which SPEC-001 L2915
+ * blesses by name. UNDERTAKING filters on the object's OWN id being in the undertaking's closure: these are
+ * candidate SUBJECTS, so membership is OWNERSHIP, not the subject-field intersection `withinScope` performs for
+ * subject-bindable rows. Taking the scope in the signature rather than defaulting it is the repair this file
+ * already records at `QueryScope` — fixing it at the call site is what was tried before, four times.
+ */
+export function listGovernedObjects(handle: EngineHandle, scope: QueryScope): GovernedObjectRow[] {
+	const owned = scope.kind === 'WORKSPACE' ? undefined : undertakingObjectIds(handle, scope.undertakingId);
+	const rows: GovernedObjectRow[] = [];
+	for (const [objectType, ids] of governedIdsByType(handle))
+		for (const id of ids) {
+			if (owned && !owned.has(id)) continue;
+			const row = governedRow(handle, objectType, id);
+			if (row) rows.push(row);
+		}
+	// Stable ordering so the picker does not reshuffle between loads (event-log order is insertion order per type).
+	return rows.sort((a, b) => a.objectType.localeCompare(b.objectType) || a.label.localeCompare(b.label));
+}
+
+/**
+ * `aggregateType -> ids`, in ONE pass over the log. `listByType` rescans the whole history per type, so calling it
+ * once per governed type would read the event log 23 times to answer one page load.
+ */
+function governedIdsByType(handle: EngineHandle): Map<string, Set<string>> {
+	const governedTypes = new Set<string>(ProfessionalWorkObjectTypeSchema.options);
+	const idsByType = new Map<string, Set<string>>();
+	for (const e of handle.readAllEvents()) {
+		if (!governedTypes.has(e.aggregateType)) continue;
+		const bucket = idsByType.get(e.aggregateType) ?? new Set<string>();
+		bucket.add(e.aggregateId);
+		idsByType.set(e.aggregateType, bucket);
+	}
+	return idsByType;
+}
+
+/** One catalog row, or undefined if the id has events but no materialized state (a tombstone, a failed birth). */
+function governedRow(
+	handle: EngineHandle,
+	objectType: string,
+	id: string
+): GovernedObjectRow | undefined {
+	const loaded = handle.loadObject(id);
+	if (!loaded?.state) return undefined;
+	const state = loaded.state as Record<string, unknown>;
+	// Objects do not agree on a name field, so the label is best-effort and falls back to the id. It is a LABEL,
+	// never an identifier: the form posts ids.
+	const named = [state.title, state.name, state.displayName, state.selectedOption].find(
+		(v) => typeof v === 'string' && v.length > 0
+	);
+	return {
+		id,
+		objectType,
+		label: typeof named === 'string' ? named : id,
+		...(typeof state.semanticVersion === 'number' ? { semanticVersion: state.semanticVersion } : {}),
+		revision: loaded.revision
+	};
 }

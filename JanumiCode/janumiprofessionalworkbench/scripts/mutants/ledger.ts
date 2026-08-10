@@ -2363,5 +2363,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/step-strength-authority.test.ts'],
 		why: "THE NAIVE READ, and the likeliest future regression — it is what anyone adding this field would write first. Reading the enum positively ('is it MANDATORY?') instead of negatively ('is it anything but ADVISORY?') silently fails OPEN on the two values that carry no explicit MANDATORY: an ABSENT strength (every plan authored before 2026-08-10, including the seeded reference undertaking) and CONDITIONAL (which has no ratified applicability predicate to evaluate, so Guide §8.4 L844 fixes it at material). Distinct from the regression mutant above and deliberately so: that one flips the SOURCE of the fact, this one flips its DEFAULT, and a repository can hold either while failing the other. ⚠ ONE VICTIM NAMED, DELIBERATELY, AND THE LEDGER'S OWN CONTROL IS WHY. I first named two — this census AND `execution-step-skip-cancel.test.ts`, on the reasoning that duplicate coverage of the unauthored cases was 'the point'. `verif/mutant-ledger.test.ts` refused it: a longer victim list is a LOWER bar, because it passes if ANY named suite reddens. The DWP-02 suite does also carry the absent and CONDITIONAL cases and will also redden; that is coverage, not the assertion. The assertion is the suite whose reason for existing is this guard.",
 		source: 'REG-F-105, ruled REG-D-041; DESIGN-step-strength-and-decision-subjects §2.3 items 3-4'
+	},
+	{
+		id: 'F106-decisions-propose-stops-requiring-a-subject',
+		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
+		find: "\t\tif (subjectObjectIds.length === 0)\n\t\t\treturn fail(400, {\n\t\t\t\terror:\n\t\t\t\t\t'A decision must name what it is about — an authorization is bound to exact subjects and versions (ASR-15). Select at least one subject.'\n\t\t\t});\n",
+		replace: "",
+		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
+		why: "THE DEFECT AS IT SHIPPED, minus one refusal. `/decisions` proposed every Decision with `subjectObjectIds: []` for the whole life of the route. `subjectObjectIds` is a REQUIRED field of DecisionObject in BOTH ratified contracts (CDM \u00a723.1 L1373; Contract Package \u00a722 L1632) for all nine decision types, and OBJ-1 (DOC-003 L105) forbids reading meaning into the empty case \u2014 'No semantic state may be inferred from null values, empty arrays, missing rows'. So the record was not a decision about nothing; per ASR-15 it was 'not authority \u2014 provenance at best', while the surface offered eight decision types as though it were. \u26a0 THE CLIENT-SIDE `required` ON THE PICKER DOES NOT COVER THIS, which is why the victim test posts to the action directly: a validation that only the browser performs is one a curl request walks past, and deleting this server guard leaves the page looking identical.",
+		source: 'REG-F-106, ruled REG-D-041; the pre-2026-08-10 route'
+	},
+	{
+		id: 'F106-approve-goes-back-to-an-empty-version-pin',
+		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
+		find: "\t\tconst stored = getObject(getEngine(), id)?.subjectObjectIds;",
+		replace: "\t\tconst stored = undefined;",
+		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
+		why: "THE VACUITY, REPRODUCED EXACTLY. `approve` sent `subjectSemanticVersions: {}`; with `stored` forced to undefined the subject list is empty, the map stays empty, and the payload is `{}` again. `approveDecision` compares the stated versions against the pin taken at propose, so `{}` compares nothing against nothing and CANNOT refuse \u2014 the check was present, reachable, and incapable of failing. \u26a0 THE PREDICTED RED IS THE STALENESS CASE, AND IT ONLY EXISTS BECAUSE THE SUBJECT IS AN INTENT: measured while writing it, a PWU's semanticVersion is 1 FOREVER (only INTENT, DECOMPOSITION_CONTRACT and PWA bump), so the same test written against a PWU subject would stay green under this mutation and would have proved the pin works by choosing the one subject type that cannot move. Recorded as REG-F-109.",
+		source: 'REG-F-106, ruled REG-D-041; ASR-15 (DOC-003 L307) \u2014 a decision approving version n never authorizes version n+1'
 	}
 ];

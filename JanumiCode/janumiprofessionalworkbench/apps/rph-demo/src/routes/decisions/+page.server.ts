@@ -7,7 +7,7 @@
 // mirror the engine's own preconditions (JAN-CMDPRE DWP-01a): ApproveDecision refuses a WAIVER target, and
 // GrantWaiver/DenyWaiver refuse a non-WAIVER target, so each row offers only the command the engine will accept.
 import { fail } from '@sveltejs/kit';
-import { listDecisions } from '@janumipwb/rph-engine';
+import { getObject, listDecisions, listGovernedObjects } from '@janumipwb/rph-engine';
 import { dispatch, getEngine, mintUiId, uiSession } from '$lib/server/workbench';
 import { actingActor } from '$lib/server/identity';
 // The PER-4 surface guard lives in ONE module (`$lib/server/optimistic-concurrency`), not inline here. It was
@@ -30,9 +30,18 @@ export const load: PageServerLoad = () => {
 		type: String((d.state.decisionType ?? '') as string),
 		status: String((d.state.status ?? '') as string),
 		selectedOption: String((d.state.selectedOption ?? '') as string),
-		rationale: String((d.state.rationale ?? '') as string)
+		rationale: String((d.state.rationale ?? '') as string),
+		// What the decision is ABOUT. Rendered because a governance register whose rows do not say what they
+		// govern is a list of verbs (REG-F-106 / ASR-15).
+		subjectObjectIds: Array.isArray(d.state.subjectObjectIds)
+			? (d.state.subjectObjectIds as unknown[]).map(String)
+			: []
 	}));
-	return { decisions };
+	// THE SUBJECTS A PROPOSAL MAY NAME (REG-F-106, ruled REG-D-041). Same WORKSPACE scope as the register above:
+	// RPH-DOC-010 §4.7 says this surface is "used to exercise authority over versions, waivers, escalations, and
+	// acceptance", and SPEC-001 L2915 confirms a workbench-wide Decision Center is legitimate and conformant.
+	const subjects = listGovernedObjects(getEngine(), { kind: 'WORKSPACE' });
+	return { decisions, subjects };
 };
 
 export const actions: Actions = {
@@ -44,10 +53,28 @@ export const actions: Actions = {
 		const rationale = String((form.get('rationale') ?? '') as string).trim();
 		if (!decisionType) return fail(400, { error: 'A decision type is required.' });
 		if (!selectedOption) return fail(400, { error: 'A selected option is required.' });
+		// ⚠ A DECISION MUST NAME WHAT IT IS ABOUT (REG-F-106, ruled REG-D-041). This used to send `[]`.
+		//
+		// `subjectObjectIds` is a REQUIRED field of DecisionObject in BOTH ratified contracts (CDM §23.1,
+		// Contract Package §22), for all nine decision types — and OBJ-1 forbids reading meaning into the empty
+		// case: "No semantic state may be inferred from null values, empty arrays, missing rows…". A subjectless
+		// decision is not a decision about nothing; per ASR-15 it "is not authority — it is provenance at best",
+		// which made this form look like it was authorizing while being incapable of it. Refused HERE, with a
+		// reason, rather than left to fail at whichever downstream gate happens to check.
+		const subjectObjectIds = form
+			.getAll('subjectObjectIds')
+			.filter((v): v is string => typeof v === 'string')
+			.map((v) => v.trim())
+			.filter(Boolean);
+		if (subjectObjectIds.length === 0)
+			return fail(400, {
+				error:
+					'A decision must name what it is about — an authorization is bound to exact subjects and versions (ASR-15). Select at least one subject.'
+			});
 		const id = mintUiId('dec');
 		const r = dispatch('ProposeDecision', 'DECISION', id, {
 			decisionType,
-			subjectObjectIds: [],
+			subjectObjectIds,
 			selectedOption,
 			rationale,
 			// THE AUTHORITY IS THE SESSION, READ FROM AUTHENTICATED CONTEXT. `proposeDecision` refuses a payload
@@ -73,6 +100,26 @@ export const actions: Actions = {
 		if (expectedRevision === null) return fail(400, { error: STALE_FORM });
 		const selectedOption = String((form.get('selectedOption') ?? '') as string).trim();
 		const rationale = String((form.get('rationale') ?? '') as string).trim();
+		// ⚠ THE VERSIONS THE APPROVER IS ACTUALLY APPROVING, READ FROM THE STORE. This used to be `{}`.
+		//
+		// `{}` was not a shortcut — it was VACUOUS, and only harmlessly so because the decisions this route minted
+		// had no subjects to disagree about. `approveDecision` compares the stated versions against the pin taken
+		// at propose; with no subjects the pin is empty and there is nothing to compare. Now that a proposal names
+		// its subjects, stating their CURRENT versions makes that comparison live: if a subject moved between
+		// proposal and approval, the approval is REFUSED as stale. That is ASR-15 becoming operative on this route
+		// for the first time — "a decision approving version n never authorizes version n+1".
+		//
+		// Read at APPROVAL time on purpose. Re-reading the pin instead would agree with itself always — the
+		// tautology REG-F-050 records, and the same shape as re-reading a revision inside its own action.
+		const subjectSemanticVersions: Record<string, number> = {};
+		const stored = getObject(getEngine(), id)?.subjectObjectIds;
+		const subjectIds = Array.isArray(stored)
+			? (stored as unknown[]).filter((v): v is string => typeof v === 'string')
+			: [];
+		for (const subjectId of subjectIds) {
+			const version = getObject(getEngine(), subjectId)?.semanticVersion;
+			if (typeof version === 'number') subjectSemanticVersions[subjectId] = version;
+		}
 		const r = dispatch(
 			'ApproveDecision',
 			'DECISION',
@@ -82,7 +129,7 @@ export const actions: Actions = {
 				rationale,
 				consideredEvidenceIds: [],
 				consideredObservationIds: [],
-				subjectSemanticVersions: {}
+				subjectSemanticVersions
 			},
 			expectedRevision
 		);

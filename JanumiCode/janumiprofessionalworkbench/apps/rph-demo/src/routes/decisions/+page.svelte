@@ -64,24 +64,53 @@
 {/if}
 
 {#if showProposeForm}
-	<!-- ⚠ THE DISCLOSURE IS PART OF THE FORM, NOT A FOOTNOTE (S-3, REG-F-077 / REG-F-106). A decision minted here
-	     carries NO SUBJECT, and DOC-003 §8.7 ASR-15 binds a decision to exact subjects and versions — so it can
-	     authorize nothing, and five of the eight offerable types are read by scope gates that will refuse it. The
-	     register's safe default already forbids describing this surface as producing authorizations; saying so
-	     where the professional is about to act is the honest form of that. The two authorizations the workbench
-	     genuinely performs are authored next to their objects (Baseline Manager, Undertaking Workbench). -->
+	<!-- ⚠ THE NOTICE IS REWRITTEN, NOT KEPT (REG-F-106, ruled REG-D-041). It used to read "authorizes nothing — it
+	     names no subject", which was true and is now false: the form REQUIRES a subject. A stale warning on a
+	     repaired surface is worse than none, because it teaches the professional to disbelieve the surface. What
+	     replaces it is what remains true and is the harder thing to know — an approved decision is a STANDING,
+	     version-bound authority which the acting surfaces will find and honour, and which stops resolving the
+	     moment its subject changes version (ASR-15). -->
 	<p class="notice" role="note">
-		A decision proposed here records a judgement and <strong>authorizes nothing</strong> — it names no
-		subject, and an authorization is bound to exact subjects and versions (ASR-15). Promotion is
-		authorized in the Baseline Manager; abandonment in the Undertaking Workbench, each beside the object
-		it is about.
+		A decision names <strong>exact subjects and versions</strong> (ASR-15). Once approved it becomes a
+		standing authority that the acting surfaces — Baseline Manager, Undertaking Workbench — will find and
+		honour, and it <strong>stops resolving</strong> the moment a subject changes version.
 	</p>
+	{#if !data.subjects.length}
+		<!-- AN EMPTY WORKSPACE HAS NOTHING TO DECIDE ABOUT, and saying so beats rendering an empty picker beside a
+		     live Propose button. The form would post, the action would refuse, and the professional would have
+		     learned that the surface offers acts it cannot perform — which is the REG-F-106 defect in miniature.
+
+		     ⚠ THIS BRANCH HAS NO TEST, AND THE ABSENCE IS DISCLOSED (REG-F-108). Neither demo seed can reach it:
+		     `reset('empty')` still creates PWU_TYPEs and ASSURANCE_POLICYs, which are governed objects and so are
+		     selectable subjects. I wrote the e2e, watched it fail for that reason, and removed it rather than
+		     relax the locator until it went green — a control that cannot fail is worse than no control.
+		     Fail-safe, unread, and recorded as such. -->
+		<p class="notice" role="note">
+			There is nothing to decide about yet. A decision binds exact subjects and versions, so this workspace
+			needs at least one governed object before a decision can be proposed.
+		</p>
+	{:else}
 	<form method="POST" action="?/propose" use:enhance class="proposeform">
 		<label class="field">
 			<span class="flabel">Decision type</span>
 			<select name="decisionType">
 				{#each DECISION_TYPES as t (t)}
 					<option value={t}>{t}</option>
+				{/each}
+			</select>
+		</label>
+		<label class="field grow">
+			<span class="flabel">Subject(s) — what this decision is about</span>
+			<!-- The catalog is DERIVED from the object-type registry, not a hand-written list of "things a decision
+			     can be about". Hand-listing is how I got REG-F-106 wrong the first time: I called three decision
+			     types exempt because no gate of OURS read them. -->
+			<select name="subjectObjectIds" multiple size="6" required data-testid="subject-picker">
+				{#each data.subjects as s (s.id)}
+					<option value={s.id}
+						>{s.objectType} · {s.label}{s.semanticVersion === undefined
+							? ''
+							: ` · v${s.semanticVersion}`}</option
+					>
 				{/each}
 			</select>
 		</label>
@@ -95,12 +124,14 @@
 		</label>
 		<button class="primary" type="submit">Propose</button>
 	</form>
+	{/if}
 {/if}
 
 <table>
 	<thead
 		><tr
-			><th>Decision</th><th>Type</th><th>Status</th><th>Option</th><th>Rationale</th><th></th></tr
+			><th>Decision</th><th>Type</th><th>Subject</th><th>Status</th><th>Option</th><th>Rationale</th
+			><th></th></tr
 		></thead
 	>
 	<tbody>
@@ -108,6 +139,19 @@
 			<tr>
 				<td class="mono">{d.id.slice(0, 16)}…</td>
 				<td>{d.type}</td>
+				<!-- WHAT THE ROW GOVERNS. A governance register whose rows do not say what they are about is a list
+				     of verbs — and for as long as every row here was subjectless, this column would have been empty
+				     and would have shown that (REG-F-106). Legacy subjectless rows render "—" rather than blank, so
+				     the absence reads as a fact and not as a rendering gap (OBJ-1). -->
+				<td class="subj">
+					{#if d.subjectObjectIds.length}
+						{#each d.subjectObjectIds as sid (sid)}
+							<span class="mono">{data.subjects.find((s) => s.id === sid)?.label ?? sid}</span>
+						{/each}
+					{:else}
+						<span class="none" title="Proposed before a subject was required (REG-F-106)">—</span>
+					{/if}
+				</td>
 				<td><span class="tag" class:eff={d.status === 'EFFECTIVE'}>{d.status}</span></td>
 				<td>{d.selectedOption}</td>
 				<td>{d.rationale}</td>
@@ -146,7 +190,7 @@
 				</td>
 			</tr>
 		{/each}
-		{#if !data.decisions.length}<tr><td colspan="6" class="none">No decisions yet.</td></tr>{/if}
+		{#if !data.decisions.length}<tr><td colspan="7" class="none">No decisions yet.</td></tr>{/if}
 	</tbody>
 </table>
 
@@ -280,6 +324,18 @@
 	.mono {
 		font-family: 'Source Code Pro', monospace;
 		color: var(--outline);
+	}
+	td.subj {
+		max-width: 220px;
+	}
+	td.subj .mono {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.proposeform select[multiple] {
+		min-width: 260px;
 	}
 	.tag {
 		font-size: 10px;
