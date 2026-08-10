@@ -15,14 +15,16 @@
 			created?: string;
 			submitted?: string;
 			approved?: string;
+			authorized?: string;
+			promoted?: string;
 		} | null;
 	} = $props();
 
 	/** A revision conflict is not a refusal — the act was legal and the page was simply out of date. */
 	const isStale = $derived(form?.code === 'RPH_REVISION_CONFLICT');
 
-	// The 6 BaselineType values (RPH-DOC-007 §23). Promotion to AUTHORITATIVE is a documented follow-up — it needs
-	// an effective promotion Decision + satisfied assessments (canPromoteBaseline) and is out of this surface's scope.
+	// The 6 BaselineType values (RPH-DOC-007 §23). Promotion to AUTHORITATIVE is live as of S-0 (REG-F-077): it
+	// needs an effective PROMOTE_BASELINE Decision NAMING this baseline, authored by the row's own action.
 	const BASELINE_TYPES = [
 		'INTENT',
 		'REQUIREMENTS',
@@ -100,6 +102,22 @@
 							<input type="hidden" name="id" value={b.id} />
 							<input type="hidden" name="expectedRevision" value={b.revision} />
 							<button class="primary small" type="submit">Approve</button>
+						</form>
+					{:else if b.status === 'APPROVED'}
+						<!-- TWO ACTS, SHOWN AS TWO, because they are two (S-0, REG-F-077). Authorizing is a
+						     governance Decision reserved to Governance by DOC-001 §5.2; promoting is the act it
+						     permits. Folding them into one button would make the gate invisible at the surface
+						     and unobservable in a test — the promotion would simply always succeed. -->
+						{#if b.authorized}<span class="tag auth">AUTHORIZED</span>{:else}
+							<form method="POST" action="?/authorize" use:enhance>
+								<input type="hidden" name="id" value={b.id} />
+								<button class="ghost small" type="submit">Authorize promotion</button>
+							</form>
+						{/if}
+						<form method="POST" action="?/promote" use:enhance>
+							<input type="hidden" name="id" value={b.id} />
+							<input type="hidden" name="expectedRevision" value={b.revision} />
+							<button class="primary small" type="submit">Promote</button>
 						</form>
 					{:else}
 						<span class="dash">—</span>

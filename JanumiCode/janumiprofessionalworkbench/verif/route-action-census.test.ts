@@ -122,7 +122,10 @@ function census(): Record<string, string[]> {
  */
 const PINNED: Readonly<Record<string, readonly string[]>> = {
 	'+page.server.ts': ['create', 'delete'],
-	'baselines/+page.server.ts': ['create', 'submit', 'approve'],
+	// `authorize` + `promote` added by S-0 of ROADMAP-decision-subject-scope (REG-F-103). This census reddened on
+	// arrival, which is the whole of its job — the surface gained two MUTATING acts, one of which mints a
+	// governance Decision, and that must never happen unremarked.
+	'baselines/+page.server.ts': ['create', 'submit', 'approve', 'authorize', 'promote'],
 	'decisions/+page.server.ts': ['propose', 'approve', 'grant', 'deny'],
 	'pwa/[id]/+page.server.ts': [
 		'acceptAgentCandidate',
