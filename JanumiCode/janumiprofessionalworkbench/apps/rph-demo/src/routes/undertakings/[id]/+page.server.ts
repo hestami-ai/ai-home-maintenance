@@ -54,6 +54,7 @@ import {
 	uiSession
 } from '$lib/server/workbench';
 import { actingActor } from '$lib/server/identity';
+import type { ActorReference } from '@janumipwb/rph-contracts';
 import type { Actions, PageServerLoad } from './$types';
 
 type PwuRecord = ReturnType<typeof listPwus>[number];
@@ -350,7 +351,14 @@ export const load: PageServerLoad = ({ params }) => {
 		id: o.id,
 		severity: String((o.state.severity ?? '') as string),
 		statement: String((o.state.statement ?? '') as string),
-		disposition: String((o.state.disposition ?? '') as string)
+		disposition: String((o.state.disposition ?? '') as string),
+		// WHAT THE FINDING IS ABOUT (S-1b / B-3). Dropped until now, so the surface could list findings and could
+		// not say which work they faulted — and the reject affordance must be offered ONLY where a blocking
+		// finding actually stands. This is the same field `hasBlockingObservationFor` reads in the engine, so the
+		// affordance and the gate now ask the same question of the same data instead of two different ones.
+		subjectObjectIds: Array.isArray(o.state.subjectObjectIds)
+			? (o.state.subjectObjectIds as unknown[]).map(String)
+			: []
 	}));
 	const decisions = listDecisions(engine, undertakingScope).map((dc) => ({
 		id: dc.id,
@@ -502,12 +510,77 @@ type Step = [command: string, aggType: string, aggId: string, payload: unknown];
 // + activated once, lazily (below), then reused.
 // The demo sign-off policy lives in ONE module now (S-1b): a second assurance act needs the same policy, and
 // copying a governed object's definition is how four restatements of AssessmentCriterion came to disagree.
-import { DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD } from '$lib/server/assurance/demo-policy';
+import {
+	DEMO_FINDING_CODE,
+	DEMO_POLICY_ID,
+	DEMO_POLICY_PAYLOAD,
+	DEMO_POLICY_VERSION
+} from '$lib/server/assurance/demo-policy';
 
 /** A ChangePwuState step (the controller lever) that moves the four PWU axes together. `supportingObjectIds` cites
  *  the objects that BACK the transition (DOC-007 §11.5) — the EXECUTION_PLAN whose step succeeded for
  *  executionState=SUCCEEDED, and the SATISFIED ASSURANCE_ASSESSMENT for assuranceState=SATISFIED — which the
  *  RPH-PWU-006 Given guards (pwu.ts) now require. */
+/**
+ * The steps every assurance act on this surface shares: the demo policy (created once) and the ratified §30 drive
+ * to ASSESSING. Extracted for S-1b, because the SECOND assurance act needed exactly the same prelude and copying
+ * it would have produced two definitions of one governed lifecycle — the shape that let four restatements of
+ * `AssessmentCriterion` disagree with each other and with the ratified contract.
+ *
+ * Dispatch-agnostic by construction: `driveAssessmentToAssessing`'s `send` COLLECTS into this array rather than
+ * dispatching, so the caller's batch keeps its all-or-nothing error handling and the §30 sequence stays written
+ * in exactly one place (REG-F-021 increment 4).
+ */
+function assurancePrelude(pwuId: string, assessmentId: string): Step[] {
+	// CreateAssurancePolicy on an existing object CONFLICTS, so the policy is authored once per workbench.
+	const steps: Step[] = getObject(getEngine(), DEMO_POLICY_ID)
+		? []
+		: [
+				['CreateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD],
+				['ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID }]
+			];
+	driveAssessmentToAssessing(
+		(commandType, targetAggregateType, targetAggregateId, payload) =>
+			steps.push([commandType, targetAggregateType, targetAggregateId, payload]),
+		{
+			assessmentId,
+			assurancePolicyId: DEMO_POLICY_ID,
+			policyVersion: DEMO_POLICY_VERSION,
+			subjectObjectIds: [pwuId],
+			subjectSemanticVersions: { [pwuId]: 1 },
+			claimIds: []
+		}
+	);
+	return steps;
+}
+
+/** The DOC-007 §20 ValidatorResult for a demo assessment — sixteen fields, one shape, both dispositions. */
+function demoValidatorResult(
+	assessmentId: string,
+	pwuId: string,
+	dispositionRecommendation: string,
+	evaluator: ActorReference
+) {
+	return {
+		validatorId: 'workbench.demo-signoff',
+		validatorVersion: '1',
+		policyId: DEMO_POLICY_ID,
+		policyVersion: DEMO_POLICY_VERSION,
+		assessmentId,
+		subjectObjectIds: [pwuId],
+		subjectSemanticVersions: { [pwuId]: 1 },
+		claimResults: [],
+		evidenceConsideredIds: [],
+		evidenceRejected: [],
+		observations: [],
+		dispositionRecommendation,
+		recommendedControlActions: [],
+		residualUncertainty: [],
+		limitations: [],
+		executionProvenance: { evaluator }
+	};
+}
+
 function chg(
 	pwuId: string,
 	previousState: string,
@@ -869,72 +942,22 @@ export const actions: Actions = {
 	// it. The PWU is NOT yet green: workLifecycle stays UNDER_ASSURANCE until Mark Satisfied — exec != assurance
 	// (INV-5). This mirrors the reference seed's earnAssurance, minus the evidence/claim/independence apparatus.
 	recordAssurance: async ({ request }) => {
-		const engine = getEngine();
+		// The engine handle is no longer read here: `assurancePrelude` owns the policy/§30 setup both assurance
+		// arms share, and reaches for it itself.
 		const pwuId = await pwuIdFrom(request);
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
 		const assessmentId = mintUiId('asm');
 		// Independence NONE, and the operator IS the reviewer — so the evaluator must be the real session, or the
 		// assessment records a sign-off by nobody.
 		const evaluator = actingActor(uiSession());
-		// Create + activate the demo policy only once; CreateAssurancePolicy on an existing object CONFLICTS.
-		const policySteps: Step[] = getObject(engine, DEMO_POLICY_ID)
-			? []
-			: [
-					[
-						'CreateAssurancePolicy',
-						'ASSURANCE_POLICY',
-						DEMO_POLICY_ID,
-						DEMO_POLICY_PAYLOAD
-					],
-					[
-						'ActivateAssurancePolicy',
-						'ASSURANCE_POLICY',
-						DEMO_POLICY_ID,
-						{ policyId: DEMO_POLICY_ID }
-					]
-				];
-		// The ratified §30 sequence, built by the one helper that knows it (REG-F-021 increment 4). It is
-		// dispatch-agnostic: here its `send` COLLECTS steps into this route's batch rather than dispatching, so the
-		// batch keeps its all-or-nothing error handling and the lifecycle is still written in exactly one place.
-		const assessmentSteps: Step[] = [];
-		driveAssessmentToAssessing(
-			(commandType, targetAggregateType, targetAggregateId, payload) =>
-				assessmentSteps.push([commandType, targetAggregateType, targetAggregateId, payload]),
-			{
-				assessmentId,
-				assurancePolicyId: DEMO_POLICY_ID,
-				policyVersion: '1.0.0',
-				subjectObjectIds: [pwuId],
-				subjectSemanticVersions: { [pwuId]: 1 },
-				claimIds: []
-			}
-		);
 		const err = runSteps([
-			...policySteps,
-			...assessmentSteps,
+			...assurancePrelude(pwuId, assessmentId),
 			[
 				'CompleteAssuranceAssessment',
 				'ASSURANCE_ASSESSMENT',
 				assessmentId,
 				{
-					validatorResult: {
-						validatorId: 'workbench.demo-signoff',
-						validatorVersion: '1',
-						policyId: DEMO_POLICY_ID,
-						policyVersion: '1.0.0',
-						assessmentId,
-						subjectObjectIds: [pwuId],
-						subjectSemanticVersions: { [pwuId]: 1 },
-						claimResults: [],
-						evidenceConsideredIds: [],
-						evidenceRejected: [],
-						observations: [],
-						dispositionRecommendation: 'SATISFIED',
-						recommendedControlActions: [],
-						residualUncertainty: [],
-						limitations: [],
-						executionProvenance: { evaluator }
-					},
+					validatorResult: demoValidatorResult(assessmentId, pwuId, 'SATISFIED', evaluator),
 					producer: evaluator
 				}
 			],
@@ -957,6 +980,93 @@ export const actions: Actions = {
 		]);
 		if (err) return fail(400, { error: `Assurance failed: ${err}` });
 		return { advanced: 'assured' };
+	},
+
+	// ── THE ADVERSE ARM: RECORD A BLOCKING FINDING (S-1b / B-2) ────────────────────────────────────────────────
+	//
+	// ⚠ WHY THIS EXISTS AT ALL. `RejectPwu` requires a real ASSURANCE_OBSERVATION of BLOCKING or CRITICAL severity
+	// naming the PWU — and `RecordAssuranceObservation` was dispatched ZERO times anywhere in this app. **The
+	// workbench could sign work off and could not fault it.** Rejection was therefore unreachable, and the
+	// tempting fix — letting `rejectPwu` mint its own observation in the same batch — is MANUFACTURING THE
+	// GUARD'S OWN INPUT (REG-F-022's Gate A: "the logic is right and its population is supplied by the party it
+	// judges"). It would have been green, reachable, and worth nothing.
+	//
+	// So the finding is recorded HERE, as an ASSURANCE act, at the assurance surface, in its own transaction —
+	// and rejection later FINDS it. Two acts, minuted separately: INV-5 (exec ≠ assurance) applied to the surface,
+	// and the same shape as REG-F-106's ruling that an authorization is minted beside its object and found by the
+	// gate that needs it.
+	//
+	// ⚠ AND THE OPERATOR DOES NOT CHOOSE THE DISPOSITION. They supply a STATEMENT — a professional judgement about
+	// the work. `REJECTED` is not this action's opinion: with a BLOCKING observation open, DOC-004 §10.3's Gate C
+	// REFUSES every other disposition (see `demo-policy.ts`'s `forbiddenOpenSeverities`, and
+	// `blocking-finding-forecloses-signoff.test.ts` which drives that refusal). The professional judges; the
+	// ratified ladder disposes.
+	recordBlockingFinding: async ({ request }) => {
+		const form = await request.formData();
+		const pwuId = String((form.get('pwuId') ?? '') as string).trim();
+		const statement = String((form.get('statement') ?? '') as string).trim();
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		// A finding with no statement is not a judgement, it is a refusal to say why — and `statement` is the only
+		// part of this act a later reader can use. Refused here rather than stored empty (OBJ-1).
+		if (!statement)
+			return fail(400, {
+				error: 'A blocking finding must say what is wrong — the statement is the finding.'
+			});
+		const assessmentId = mintUiId('asm');
+		const observationId = mintUiId('obs');
+		// Independence NONE on this policy, and it is disclosed there: the operator IS the reviewer, so the
+		// evaluator must be the real session or the assessment records a judgement by nobody.
+		const evaluator = actingActor(uiSession());
+		const err = runSteps([
+			...assurancePrelude(pwuId, assessmentId),
+			// The observation is its OWN aggregate carrying `assessmentId` as a reference — not a write to the
+			// assessment. Severity BLOCKING is what `hasBlockingObservationFor` will later read off the STORED
+			// object; `RejectPwu` never takes severity from its own payload.
+			[
+				'RecordAssuranceObservation',
+				'ASSURANCE_OBSERVATION',
+				observationId,
+				{
+					assessmentId,
+					observationType: 'FINDING',
+					findingCode: DEMO_FINDING_CODE,
+					severity: 'BLOCKING',
+					statement
+				}
+			],
+			[
+				'CompleteAssuranceAssessment',
+				'ASSURANCE_ASSESSMENT',
+				assessmentId,
+				{
+					validatorResult: demoValidatorResult(assessmentId, pwuId, 'REJECTED', evaluator),
+					producer: evaluator
+				}
+			],
+			// The PWU reaches UNDER_ASSURANCE and STOPS THERE, carrying assuranceState REJECTED. It does not move to
+			// workLifecycleState REJECTED: §8.2's "UNDER_ASSURANCE --Blocking finding--> REJECTED" is a GOVERNANCE
+			// act needing an EFFECTIVE REJECTION Decision (resolveRejectAuthorization), which is a different act by
+			// a possibly different party. Doing it here would collapse the assurance judgement and the governance
+			// decision into one click — the collapse this whole increment exists to avoid.
+			chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', 'SUCCEEDED', 'EVIDENCE_REQUIRED', 'PRESERVED'),
+			chg(
+				pwuId,
+				'EVIDENCE_PENDING',
+				'UNDER_ASSURANCE',
+				'SUCCEEDED',
+				'READY_FOR_ASSESSMENT',
+				'PRESERVED'
+			),
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
+				assessmentId
+			]),
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED', 'PRESERVED', [
+				assessmentId,
+				observationId
+			])
+		]);
+		if (err) return fail(400, { error: `Recording the finding failed: ${err}` });
+		return { advanced: 'faulted' };
 	},
 
 	// Promote to SATISFIED (green). Allowed ONLY because assuranceState is SATISFIED — "no green without assurance"
@@ -1034,5 +1144,79 @@ export const actions: Actions = {
 		]);
 		if (err) return fail(400, { error: `Abandonment refused: ${err}` });
 		return { advanced: 'abandoned' };
+	},
+
+	// ── REJECTION, WHICH CITES A FINDING IT DID NOT MAKE (S-1b / B-3) ──────────────────────────────────────────
+	//
+	// §8.2: "UNDER_ASSURANCE --Blocking finding--> REJECTED". `RejectPwu` demands BOTH an EFFECTIVE REJECTION
+	// Decision naming this PWU **and** a stored ASSURANCE_OBSERVATION of BLOCKING/CRITICAL severity whose
+	// subjectObjectIds include it — and the engine reads severity off the STORED OBSERVATION, never off this
+	// payload.
+	//
+	// ⚠ WHAT THIS ACTION DELIBERATELY DOES NOT DO IS MINT THAT OBSERVATION. It could: three commands in one batch
+	// would satisfy the gate and go green. That is manufacturing the guard's own input (REG-F-022 Gate A), and it
+	// is the reason S-1b was deferred twice rather than shortcut. The finding is recorded EARLIER, by
+	// `recordBlockingFinding`, as an assurance act in its own transaction — and this action FINDS it.
+	//
+	// The Decision IS minted here, atomically with the rejection, for S-1a's reason: an EFFECTIVE rejection
+	// authority left standing is a permission to close someone's work later, and nothing in this surface would
+	// show it. The FINDING outlives the rejection (it is the record of WHY); the AUTHORITY does not outlive its
+	// use. That asymmetry is the design, not an inconsistency.
+	rejectPwu: async ({ request }) => {
+		const form = await request.formData();
+		const pwuId = str(form, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const observationId = str(form, 'observationId');
+		// FAIL-CLOSED ON THE SURFACE TOO. The engine would refuse an empty list, but a form that posts one is a
+		// form offering an act it knows cannot be performed — REG-F-106's defect in miniature.
+		if (!observationId)
+			return fail(400, {
+				error:
+					'Rejection must cite the blocking finding it rests on — record the finding first (§8.2 "Blocking finding").'
+			});
+		const reason = str(form, 'reason') || 'A blocking finding stands against this work.';
+		const decisionId = mintUiId('dec');
+		const err = runSteps([
+			[
+				'ProposeDecision',
+				'DECISION',
+				decisionId,
+				{
+					decisionType: 'REJECTION',
+					subjectObjectIds: [pwuId],
+					selectedOption: 'Reject this work unit',
+					rationale: reason,
+					authority: actingActor(uiSession()),
+					// The decision CITES the finding it rests on. `consideredObservationIds` is what makes the
+					// governance act traceable to the assurance judgement that prompted it, rather than an
+					// assertion that happens to coincide with one.
+					consideredObservationIds: [observationId]
+				}
+			],
+			[
+				'ApproveDecision',
+				'DECISION',
+				decisionId,
+				{
+					selectedOption: 'Reject this work unit',
+					rationale: reason,
+					consideredEvidenceIds: [],
+					consideredObservationIds: [observationId],
+					subjectSemanticVersions: { [pwuId]: 1 }
+				}
+			],
+			[
+				'RejectPwu',
+				PWU,
+				pwuId,
+				{
+					rejectionDecisionId: decisionId,
+					blockingObservationIds: [observationId],
+					reasonCode: 'BLOCKING_FINDING'
+				}
+			]
+		]);
+		if (err) return fail(400, { error: `Rejection refused: ${err}` });
+		return { advanced: 'rejected' };
 	}
 };

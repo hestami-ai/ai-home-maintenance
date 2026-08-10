@@ -235,6 +235,24 @@
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini" type="submit">Record Assurance</button>
 											</form>
+											<!-- ⚠ THE ADVERSE ARM SITS BESIDE THE SIGN-OFF, NOT BEHIND IT (S-1b / B-2). Until now this
+											     surface could sign work off and could not fault it — `RecordAssuranceObservation` was
+											     dispatched ZERO times in the whole app — which is why RejectPwu was unreachable. The two
+											     assurance outcomes are siblings because they are the same kind of act: a professional
+											     judgement about the work. The operator supplies the STATEMENT; §10.3's Gate C supplies
+											     the disposition, by refusing every other one while the finding is open. -->
+											<form method="POST" action="?/recordBlockingFinding" use:enhance class="findingform">
+												<input type="hidden" name="pwuId" value={p.id} />
+												<input
+													name="statement"
+													placeholder="What is wrong?"
+													required
+													data-testid="finding-statement"
+												/>
+												<button class="mini" type="submit" data-testid="record-finding"
+													>Record Blocking Finding</button
+												>
+											</form>
 											<form method="POST" action="?/markSatisfied" use:enhance>
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini" type="submit">Mark Satisfied</button>
@@ -244,6 +262,21 @@
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini primary" type="submit">Mark Satisfied</button>
 											</form>
+											<!-- REJECTION IS OFFERED ONLY WHERE A BLOCKING FINDING ACTUALLY STANDS (S-1b / B-3).
+											     The predicate is the SAME question the engine's `hasBlockingObservationFor` asks —
+											     a BLOCKING/CRITICAL observation whose subjectObjectIds include this PWU — so the
+											     affordance and the gate cannot disagree about whether the act is available. The
+											     form CITES the finding; it does not create one. -->
+											{#each data.observations.filter((o) => (o.severity === 'BLOCKING' || o.severity === 'CRITICAL') && o.subjectObjectIds.includes(p.id)) as o (o.id)}
+												<form method="POST" action="?/rejectPwu" use:enhance>
+													<input type="hidden" name="pwuId" value={p.id} />
+													<input type="hidden" name="observationId" value={o.id} />
+													<input type="hidden" name="reason" value={o.statement} />
+													<button class="mini" type="submit" data-testid="reject-pwu"
+														>Reject (cite finding)</button
+													>
+												</form>
+											{/each}
 										{:else if p.workLifecycleState === 'SATISFIED'}
 											<span class="done">✓ satisfied</span>
 										{:else if p.workLifecycleState === 'ABANDONED'}
@@ -1148,6 +1181,21 @@
 	}
 	.acts form {
 		margin: 0;
+	}
+	/* The adverse arm carries a required statement, so it needs a row rather than a bare button. */
+	.findingform {
+		display: inline-flex;
+		gap: 6px;
+		align-items: center;
+	}
+	.findingform input {
+		background: var(--sc-highest);
+		border: 1px solid var(--outline-faint);
+		color: var(--on);
+		border-radius: 6px;
+		padding: 5px 9px;
+		font-size: 11.5px;
+		min-width: 150px;
 	}
 	button.mini {
 		background: var(--sc-highest);

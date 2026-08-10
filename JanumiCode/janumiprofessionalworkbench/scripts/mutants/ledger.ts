@@ -2408,5 +2408,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/src/lib/server/assurance/blocking-finding-forecloses-signoff.test.ts'],
 		why: "THE STATE THIS SURFACE SHIPPED IN UNTIL 2026-08-10, and the reason S-1b could not simply add a reject button. DOC-004 §10.3's foreclosure IS implemented and IS reachable — GATE C, `rejectForeclosedDisposition` — but it reads the POLICY's own rule and returns null the moment the policy has nothing to say (`if (forbidden.size === 0) return null`). `dispositionRules` is `.optional()` on CreateAssurancePolicyPayload and the demo policy declared none, so an operator could record a BLOCKING finding and sign the work off SATISFIED in the same breath. ⚠ AN OPTIONAL POLICY FIELD THAT DEFAULTS TO 'NO CONSTRAINT' IS A GATE SWITCHED OFF BY SILENCE — nothing is missing, nothing is broken, and nothing fires. Measured before committing by deleting the rule: EXACTLY ONE test reddens (the foreclosure), and all three controls stay green — including the ADVISORY control, which is what proves the gate is severity-sensitive rather than refusing every observation.",
 		source: 'S-1b / DESIGN-blocking-finding-capability §2'
+	},
+	{
+		id: 'B2-the-finding-is-recorded-as-advisory',
+		file: 'apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts',
+		find: "					severity: 'BLOCKING',",
+		replace: "					severity: 'ADVISORY',",
+		expectRed: ['apps/rph-demo/e2e/pwu-rejection.e2e.ts'],
+		why: "THE ADVERSE ARM STOPS BEING ADVERSE. `hasBlockingObservationFor` reads severity OFF THE STORED OBSERVATION, never off RejectPwu's payload — so downgrading what the assurance act records makes rejection unreachable again while every screen still looks right: a finding is listed, the statement is there, and the act it exists to license silently disappears. ⚠ THE VICTIM IS AN E2E BY NECESSITY, not by preference: the guarantee spans an ASSURANCE act and a later GOVERNANCE act in two separate transactions, and any unit test that drove both would have to construct the observation itself — which is the manufactured-evidence shortcut this whole increment refuses. Observed before declaring: reddens BOTH specs in the victim file (the chain, and the subject-scope control), because the affordance predicate reads the same severity the engine does.",
+		source: 'S-1b / B-2, DESIGN-blocking-finding-capability §3.2'
+	},
+	{
+		id: 'B3-rejection-stops-checking-the-subject',
+		file: 'apps/rph-demo/src/routes/undertakings/[id]/+page.svelte',
+		find: "o.subjectObjectIds.includes(p.id)",
+		replace: "o.subjectObjectIds.length >= 0",
+		expectRed: ['apps/rph-demo/e2e/pwu-rejection.e2e.ts'],
+		why: "THE AFFORDANCE STOPS ASKING WHAT THE FINDING IS ABOUT. Offered on every PWU the moment ANY blocking finding exists anywhere in the undertaking — so a professional is invited to reject work nobody faulted, and the engine's refusal (`hasBlockingObservationFor` checks subjectObjectIds) becomes a dead end reached by clicking a button the surface offered. ⚠ THE HAPPY PATH STAYS GREEN UNDER THIS MUTATION, which is exactly why the subject-scope CONTROL exists: it stands up two PWUs, faults one, and asserts the other offers nothing. A repository with only the chain test would grade this SURVIVED. The predicate is deliberately the SAME question the engine asks of the same field, so affordance and gate cannot drift apart.",
+		source: 'S-1b / B-3'
 	}
 ];

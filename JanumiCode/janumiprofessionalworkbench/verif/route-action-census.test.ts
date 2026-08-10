@@ -167,10 +167,17 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		'failPlan',
 		'completeStep',
 		'recordAssurance',
+		// S-1b (REG-F-112): the ADVERSE assurance act. Until it landed the workbench could sign work off and
+		// could not fault it — `RecordAssuranceObservation` was dispatched nowhere in the app — which is why
+		// rejection was unreachable. It is an ASSURANCE act, deliberately separate from the governance act below.
+		'recordBlockingFinding',
 		'markSatisfied',
 		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
 		// had no caller from any surface. This census reddened on arrival, which is its job.
-		'abandonPwu'
+		'abandonPwu',
+		// S-1b (REG-F-112): the third governance act of DOC-001 §5.2. It CITES the blocking finding recorded by
+		// `recordBlockingFinding` in an earlier transaction; it never mints one, which is the whole increment.
+		'rejectPwu'
 	]
 };
 
