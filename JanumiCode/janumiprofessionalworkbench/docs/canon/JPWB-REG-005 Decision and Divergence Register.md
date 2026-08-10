@@ -2234,6 +2234,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **THIS IS THE HOLLOW SHAPE ONE LAYER OUT.** The usual instance is a field declared and never read; here the field is read by four gates and never *written* by the only writer. Same defect, opposite end — and it means REG-F-073's fix, which this session recorded as closed, is closed at the engine and unreachable from the surface.
 - **NOT FIXED HERE, DELIBERATELY.** Choosing subjects needs a UI affordance and a decision about which objects are selectable in which context — a design question, not a guard. Fixing it inside an abandonment increment would have shipped an unreviewed surface change.
 - **Merge target:** `apps/rph-demo` — subject selection on the decision form, plus version pinning at propose time. **Status:** OPEN. **Safe default:** no document or demo narration may describe the decisions surface as producing authorizations; until subjects are selectable it produces records that every scope gate refuses.
+- **✅ RE-VERIFIED 2026-08-09 (P-5) — STILL TRUE, and recorded because the sweep must show its negatives.** `subjectObjectIds: []` remains hardcoded at `apps/rph-demo/src/routes/decisions/+page.server.ts:50`. Five of the seven entries re-read in this sweep had been closed without anyone striking them (REG-F-101); **this one and REG-F-092 had not**, which is what makes the other five a measurement rather than a habit of closing whatever is looked at. It is also now load-bearing for a second entry: REG-F-070's surviving limb is this.
 
 ---
 
