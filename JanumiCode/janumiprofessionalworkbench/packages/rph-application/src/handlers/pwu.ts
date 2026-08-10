@@ -69,6 +69,11 @@ import { evaluatePrecondition, predicate } from './command-precondition.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
+import {
+	checkDeclaredSource,
+	PWU_LIFECYCLE_COMMAND_SPECS,
+	type PwuLifecycleCommandSpec
+} from '@janumipwb/rph-domain';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -383,8 +388,15 @@ function advancePwuLifecycle(
 	ctx: HandlerContext,
 	command: DomainCommand,
 	args: {
-		readonly target: OwnedLifecycleTarget;
-		readonly eventType: string;
+		/**
+		 * The command's DECLARED ARROW (REG-F-114) — target, event, and the source states it CLAIMS.
+		 *
+		 * ⚠ THIS USED TO BE A BARE `target`, AND THAT WAS THE FINDING. A lifecycle command declared a
+		 * DESTINATION and never an arrow, so it accepted whatever `canAdvanceWorkLifecycle` happened to allow
+		 * and no reader or test could enumerate the source set it intended. That is the state the STEP commands
+		 * were in before `STEP_COMMAND_SPECS`; this is the same settlement applied to the other machine.
+		 */
+		readonly spec: PwuLifecycleCommandSpec;
 		readonly mutate?: (current: Record<string, unknown>) => Record<string, unknown>;
 		/** Build the EVENT payload from the committed next state. Without this the event carries
 		 * `command.payload` — a command payload masquerading as an event payload, which is the defect
@@ -396,20 +408,26 @@ function advancePwuLifecycle(
 	const loaded = loadOrReject(ctx, command, id);
 	if (!loaded.ok) return loaded.result;
 	const axes = axesOf(loaded.state);
-	const advance = canAdvanceWorkLifecycle(axes.workLifecycleState, args.target, axes);
+	// DECLARED SOURCE SET FIRST, MACHINE SECOND — the order carries the meaning. A state the machine allows but
+	// this command does not claim is an UNDECLARED ARROW (the caller reached for the wrong command); a state the
+	// machine forbids is an ILLEGAL TRANSITION. Asking the machine first would report the second for both, and
+	// send the caller to read a state diagram when the answer is "a different command owns this".
+	const declared = checkDeclaredSource(args.spec, axes.workLifecycleState);
+	if (!declared.ok) return reject(command, 'RPH_ILLEGAL_STATE_TRANSITION', declared.reason!);
+	const advance = canAdvanceWorkLifecycle(axes.workLifecycleState, args.spec.target, axes);
 	if (!advance.ok) {
 		return reject(
 			command,
 			'RPH_ILLEGAL_STATE_TRANSITION',
-			`Cannot advance PWU ${id} ${axes.workLifecycleState} -> ${args.target}${advance.reason ? ': ' + advance.reason : ''}`
+			`Cannot advance PWU ${id} ${axes.workLifecycleState} -> ${args.spec.target}${advance.reason ? ': ' + advance.reason : ''}`
 		);
 	}
 	const newRevision = loaded.revision + 1;
 	const base = nextEnvelope(loaded.state, command, newRevision);
 	const mutated = args.mutate ? args.mutate(base) : base;
-	const next = { ...mutated, lifecycleStatus: args.target, workLifecycleState: args.target };
+	const next = { ...mutated, lifecycleStatus: args.spec.target, workLifecycleState: args.spec.target };
 	const event = makeEvent(ctx, command, {
-		eventType: args.eventType,
+		eventType: args.spec.eventType,
 		aggregateType: PWU,
 		aggregateId: id,
 		aggregateRevision: newRevision,
@@ -441,8 +459,7 @@ function advancePwuLifecycle(
 /** BeginPwuShaping — PROPOSED -> SHAPING. */
 export const beginPwuShaping: CommandHandler = (ctx, command) =>
 	advancePwuLifecycle(ctx, command, {
-		target: 'SHAPING',
-		eventType: 'PwuShapingStarted',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.BeginPwuShaping,
 		eventPayload: (next) =>
 			({
 				workLifecycleState:
@@ -548,8 +565,7 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 		);
 	}
 	return advancePwuLifecycle(ctx, command, {
-		target: 'READY',
-		eventType: 'PwuMarkedReady',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.MarkPwuReady,
 		// DOC-007 §11.4 names it shapeReadinessAssessmentId; DOC-002 §34.1 names it shapeReadinessAttestationId.
 		// The field-name drift is recorded in the vocab's conflicts[] and is NOT resolved here — this maps the
 		// one we receive onto the one the event declares, and does not pretend the two docs agree.
@@ -569,8 +585,7 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 export const challengePwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as ChallengePwuPayload;
 	return advancePwuLifecycle(ctx, command, {
-		target: 'CHALLENGED',
-		eventType: 'PwuChallenged',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.ChallengePwu,
 		eventPayload: (next) =>
 			({
 				challengeReason: p.challengeReason,
@@ -584,8 +599,7 @@ export const challengePwu: CommandHandler = (ctx, command) => {
 export const reshapePwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as ReshapePwuPayload;
 	return advancePwuLifecycle(ctx, command, {
-		target: 'RESHAPING',
-		eventType: 'PwuReshapingStarted',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.ReshapePwu,
 		eventPayload: (next) =>
 			({
 				reason: p.reason,
@@ -651,8 +665,7 @@ export const invalidatePwu: CommandHandler = (ctx, command) => {
 	// Captured after the guards so the closure below sees a `string`, not `string | undefined`.
 	const triggeringObjectId = p.triggeringObjectId;
 	return advancePwuLifecycle(ctx, command, {
-		target: 'INVALIDATED',
-		eventType: 'PwuInvalidated',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.InvalidatePwu,
 		eventPayload: (next) =>
 			({
 				invalidationReason: p.invalidationReason,
@@ -666,8 +679,7 @@ export const invalidatePwu: CommandHandler = (ctx, command) => {
 export const supersedePwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as SupersedePwuPayload;
 	return advancePwuLifecycle(ctx, command, {
-		target: 'SUPERSEDED',
-		eventType: 'PwuSuperseded',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.SupersedePwu,
 		eventPayload: (next) =>
 			({
 				supersedingWorkUnitId: p.supersedingWorkUnitId,
@@ -721,8 +733,7 @@ function baselineBacksPwu(ctx: HandlerContext, pwuId: string, baselineId: string
 export const blockPwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as BlockPwuPayload;
 	return advancePwuLifecycle(ctx, command, {
-		target: 'BLOCKED',
-		eventType: 'PwuBlocked',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.BlockPwu,
 		eventPayload: (next) =>
 			({
 				blockReason: p.blockReason,
@@ -748,8 +759,7 @@ export const blockPwu: CommandHandler = (ctx, command) => {
 export const escalatePwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as EscalatePwuPayload;
 	return advancePwuLifecycle(ctx, command, {
-		target: 'ESCALATED',
-		eventType: 'PwuEscalated',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.EscalatePwu,
 		eventPayload: (next) =>
 			({
 				escalationReason: p.escalationReason,
@@ -792,8 +802,7 @@ export const baselinePwu: CommandHandler = (ctx, command) => {
 		);
 	}
 	return advancePwuLifecycle(ctx, command, {
-		target: 'BASELINED',
-		eventType: 'PwuBaselined',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.BaselinePwu,
 		eventPayload: (next) =>
 			({
 				pwuId: id,
@@ -839,8 +848,7 @@ export const abandonPwu: CommandHandler = (ctx, command) => {
 		);
 	}
 	return advancePwuLifecycle(ctx, command, {
-		target: 'ABANDONED',
-		eventType: 'PwuAbandoned',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.AbandonPwu,
 		eventPayload: (next) =>
 			({
 				abandonmentDecisionId: p.abandonmentDecisionId,
@@ -894,8 +902,7 @@ export const rejectPwu: CommandHandler = (ctx, command) => {
 		);
 	}
 	return advancePwuLifecycle(ctx, command, {
-		target: 'REJECTED',
-		eventType: 'PwuRejected',
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.RejectPwu,
 		eventPayload: (next) =>
 			({
 				blockingObservationIds: p.blockingObservationIds,

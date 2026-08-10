@@ -19,7 +19,7 @@
 // semantic command owns. Filing them as UNIMPLEMENTED would invent a coverage gap; folding them into CLAIMED
 // would hide a real one. So every arrow resolves to exactly one of: **CLAIMED** by a spec, **GENERIC** (the
 // setter's), or **UNIMPLEMENTED** (nothing performs it).
-import { STATE_MACHINES } from '@janumipwb/rph-domain';
+import { PWU_LIFECYCLE_COMMAND_SPECS, STATE_MACHINES } from '@janumipwb/rph-domain';
 import { describe, expect, it } from 'vitest';
 
 const MACHINE = 'PWU.workLifecycleState';
@@ -58,23 +58,22 @@ const GENERIC_TARGETS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Targets a semantic `advancePwuLifecycle` command owns. **Measured from the call sites, not assumed** — 11
- * sites in `pwu.ts`. Until A-2 lands the table, this is the claim the gate holds the machine against; A-2
- * replaces it with `PWU_LIFECYCLE_COMMAND_SPECS` and this constant goes away.
+ * Targets a semantic `advancePwuLifecycle` command owns — **read from the table, not restated here** (A-2).
+ *
+ * A-1 held this as a hand-written constant for exactly one commit, which was the point: the gate was written
+ * before the table so its red output would be the worksheet. Now the table exists, restating the set here would
+ * make the gate agree with a copy of the thing it audits instead of with the thing itself.
  */
-const COMMAND_TARGETS: ReadonlySet<string> = new Set([
-	'SHAPING',
-	'READY',
-	'CHALLENGED',
-	'RESHAPING',
-	'INVALIDATED',
-	'SUPERSEDED',
-	'BLOCKED',
-	'ESCALATED',
-	'BASELINED',
-	'ABANDONED',
-	'REJECTED'
-]);
+const COMMAND_TARGETS: ReadonlySet<string> = new Set(
+	Object.values(PWU_LIFECYCLE_COMMAND_SPECS).map((s) => s.target)
+);
+
+/** Every arrow the TABLE claims, as `FROM->TO`. */
+function claimedArrows(): string[] {
+	return Object.values(PWU_LIFECYCLE_COMMAND_SPECS).flatMap((s) =>
+		s.sourceStates.map((from) => `${from}->${s.target}`)
+	);
+}
 
 describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () => {
 	const arrows = ratifiedArrows();
@@ -100,6 +99,37 @@ describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () 
 				'setter no longer performs an arrow a semantic command owns, so a target in both lists means one ' +
 				'of the two declarations is false.'
 		).toEqual([]);
+	});
+
+	// ── A-2: THE TABLE AND THE MACHINE MUST AGREE, IN BOTH DIRECTIONS ─────────────────────────────────────────
+	// One direction alone is half a gate. A table that only had to be a SUBSET could claim nothing and pass; a
+	// table that only had to be a SUPERSET could claim arrows the machine does not have — a command that can
+	// never fire, which is the hollow arriving inside the fix for a hollow.
+	it('no spec claims an arrow the machine does not declare', () => {
+		const ratified = new Set(arrows);
+		expect(
+			claimedArrows().filter((a) => !ratified.has(a)),
+			'spec(s) claiming a source state the machine has no in-edge for. That command can never fire from ' +
+				'that state, so the declaration is fiction — check it against STATE_MACHINES rather than against ' +
+				'what the handler looks like it does.'
+		).toEqual([]);
+	});
+
+	it('every command-owned arrow is claimed by its spec', () => {
+		const claimed = new Set(claimedArrows());
+		expect(
+			arrows.filter((a) => COMMAND_TARGETS.has(a.split('->')[1]!) && !claimed.has(a)),
+			'ratified arrow(s) whose target a command owns, but which that command does not claim. Either the ' +
+				'command should perform it — add the source state — or it should not, in which case the machine ' +
+				'and the handler disagree and THAT is the finding.'
+		).toEqual([]);
+	});
+
+	// CONTROL 3 — THE TABLE IS THE MEASURED ONE. Both A-2 assertions are satisfied by an EMPTY table: nothing
+	// claimed is trivially a subset, and `COMMAND_TARGETS` would be empty so nothing is expected to be claimed.
+	it('CONTROL — the table claims the 49 arrows this slice is sized against', () => {
+		expect(Object.keys(PWU_LIFECYCLE_COMMAND_SPECS).length, 'command specs').toBe(11);
+		expect(claimedArrows().length, 'arrows claimed by the table').toBe(49);
 	});
 
 	// CONTROL 1 — THE POPULATION IS REAL. Every assertion above is satisfied by a reader that returns nothing:

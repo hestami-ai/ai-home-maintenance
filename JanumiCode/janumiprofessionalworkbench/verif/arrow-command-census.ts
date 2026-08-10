@@ -14,7 +14,10 @@
 // luck, not method. `typescript` is already a dependency; parsing properly removes the whole class.
 import { readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
-import { isExcludedMachine, STATE_MACHINES, STEP_COMMAND_SPECS } from '@janumipwb/rph-domain';
+import { isExcludedMachine, STATE_MACHINES, STEP_COMMAND_SPECS,
+	PWU_LIFECYCLE_COMMAND_SPECS,
+	PWU_LIFECYCLE_MACHINE
+} from '@janumipwb/rph-domain';
 import * as CONTRACT_SCHEMAS from '@janumipwb/rph-contracts';
 
 const HANDLERS = new URL('../packages/rph-application/src/handlers/', import.meta.url).pathname.replace(
@@ -294,6 +297,25 @@ export function declaredArrows(): DeclaredArrow[] {
 				from,
 				to: spec.target,
 				site: `STEP_COMMAND_SPECS.${spec.commandType}`
+			});
+		}
+	}
+	// THE THIRD IDIOM, AND IT IS ALSO DATA (REG-F-114). `PWU.workLifecycleState` is driven by
+	// `advancePwuLifecycle`, which took a bare `target` and resolved the source at RUNTIME — so its call sites
+	// declared a DESTINATION and never an arrow, and 49 of this machine's 57 arrows were invisible here.
+	//
+	// ⚠ THE FIX WAS NOT TO TEACH THIS READER A NEW AST IDIOM, and that distinction is the whole ruling. To read
+	// `advancePwuLifecycle` syntactically the census would have had to INFER the from-half from `STATE_MACHINES`
+	// — reporting arrows the code never declared, turning an honest 38% into a dishonest 100%. Instead the
+	// COMMANDS now declare their source sets, exactly as step commands do, and this reads the declaration.
+	// **Reading a declaration cannot fabricate one; inferring a missing half can.**
+	for (const spec of Object.values(PWU_LIFECYCLE_COMMAND_SPECS)) {
+		for (const from of spec.sourceStates) {
+			arrows.push({
+				machine: PWU_LIFECYCLE_MACHINE,
+				from,
+				to: spec.target,
+				site: `PWU_LIFECYCLE_COMMAND_SPECS.${spec.commandType}`
 			});
 		}
 	}

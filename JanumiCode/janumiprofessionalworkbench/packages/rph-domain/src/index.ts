@@ -13,6 +13,7 @@ export * from './execution.js';
 export * from './transition-gate.js';
 export * from './plan-proposal.js';
 export * from './step-command-spec.js';
+export * from './pwu-lifecycle-command-spec.js';
 export * from './condition-grammar.js';
 export * from './presentation.js';
 export * from './conformance-manifest.js';

@@ -1,4 +1,11 @@
-// REG-F-087 — the arrow census describes ~38% of the ratified arrow surface, and nothing said so.
+// REG-F-087 — how much of the ratified arrow surface the census sees. **164 of 304 (54%) as of 2026-08-10;
+// it was 115 (38%) until PWU lifecycle commands began declaring their arrows.**
+//
+// ⚠ THIS PIN DID ITS JOB, WHICH IS WORTH RECORDING BECAUSE PINS USUALLY ONLY ANNOY. It was written to redden
+// the moment coverage moved in either direction, and it reddened on exactly the +49 the design predicted —
+// 115 -> 164, 14 -> 15 machines, `PWU.workLifecycleState` leaving the blind set. The numbers here are
+// MEASURED FROM THE RUN, never written first and then made true: REG-F-114's whole subject is a census that
+// could have been made to agree with itself.
 //
 // ⚠ THE CONTROL THIS REPLACES COULD NOT FAIL. `arrow-command-census.ts:283` reads
 // `if (sites === 0) fail('extractor', 'found no advanceStatus call sites at all — it is broken')`. That detects
@@ -27,7 +34,7 @@ const MACHINES = STATE_MACHINES as unknown as Record<string, Machine>;
 const seenMachines = () => new Set(([...declaredArrows()] as Arrow[]).map((a) => a.machine));
 
 describe('REG-F-087 — how much of the ratified arrow surface the census actually sees', () => {
-	it('PINNED — 115 of 304 ratified arrows, across 14 of 27 machines', () => {
+	it('PINNED — 164 of 304 ratified arrows, across 15 of 27 machines', () => {
 		const declared = Object.keys(MACHINES);
 		const ratifiedArrows = declared.reduce((n, m) => n + MACHINES[m]!.transitions.length, 0);
 		expect(
@@ -39,7 +46,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			},
 			'if coverage MOVED, an idiom was fixed or a new unread one was introduced — either way REG-F-087 ' +
 				'and every conclusion drawn from this census need re-reading, so update them with this pin'
-		).toEqual({ machinesDeclared: 27, machinesSeen: 14, arrowsRatified: 304, arrowsSeen: 115 });
+		).toEqual({ machinesDeclared: 27, machinesSeen: 15, arrowsRatified: 304, arrowsSeen: 164 });
 	});
 
 	// Two causes live in this list and MUST NOT be conflated, which is why it is pinned by name and not by count:
@@ -63,7 +70,6 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			'PWU.assuranceState',
 			'PWU.executionState',
 			'PWU.shapeIntegrityState',
-			'PWU.workLifecycleState',
 			'PwuType.status',
 			'Undertaking.status'
 		]);
