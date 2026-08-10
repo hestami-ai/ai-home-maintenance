@@ -500,7 +500,9 @@ type Step = [command: string, aggType: string, aggId: string, payload: unknown];
 // it minimal — independence NONE, so completeAssuranceAssessment skips the independence check (assurance.ts) and a
 // SATISFIED disposition backs the PWU's assuranceState=SATISFIED hop without a separate reviewer identity. Created
 // + activated once, lazily (below), then reused.
-const DEMO_POLICY_ID = 'pol_01ARZ3NDEKTSV4RRFFQ69GDEM0';
+// The demo sign-off policy lives in ONE module now (S-1b): a second assurance act needs the same policy, and
+// copying a governed object's definition is how four restatements of AssessmentCriterion came to disagree.
+import { DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD } from '$lib/server/assurance/demo-policy';
 
 /** A ChangePwuState step (the controller lever) that moves the four PWU axes together. `supportingObjectIds` cites
  *  the objects that BACK the transition (DOC-007 §11.5) — the EXECUTION_PLAN whose step succeeded for
@@ -882,41 +884,7 @@ export const actions: Actions = {
 						'CreateAssurancePolicy',
 						'ASSURANCE_POLICY',
 						DEMO_POLICY_ID,
-						{
-							policyId: DEMO_POLICY_ID,
-							version: '1.0.0',
-							name: 'Workbench Demo Sign-off',
-							purpose: 'Operator sign-off that the demo PWU produced its expected output.',
-							rationale:
-								'The interactive demo drives the assurance axis; this assessment backs a SATISFIED disposition. Independence NONE — the operator is the reviewer.',
-							applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
-							evaluatedClaimTypes: ['FITNESS'],
-							criteria: [
-								{
-									id: 'DEMO-01',
-									name: 'Expected output present',
-									description: 'The PWU has produced its declared expected output.',
-									criterionType: 'QUALITATIVE',
-									evaluationMethod: 'HUMAN_JUDGMENT',
-									requiredEvidenceIds: [],
-									severityIfNotMet: 'MATERIAL',
-									mayBeNotApplicable: false
-								}
-							],
-							evaluatorRole: 'REVIEWER',
-							independenceRequirement: 'NONE',
-							findingDefinitions: [
-								{
-									code: 'DEMO_UNFIT',
-									name: 'Output not fit for the approved need',
-									description: 'The declared expected output is absent or does not serve the need.',
-									defaultSeverity: 'MATERIAL',
-									affectedClaimTypes: ['FITNESS'],
-									defaultControlActions: ['GATHER_CONTEXT']
-								}
-							],
-							permittedControlActions: ['CONTINUE', 'GATHER_CONTEXT']
-						}
+						DEMO_POLICY_PAYLOAD
 					],
 					[
 						'ActivateAssurancePolicy',

@@ -2399,5 +2399,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/decisions.e2e.ts'],
 		why: "THE GUARD THIS ENTRY EXISTS TO GIVE A READER. `/decisions` declines to render the propose form when the subject catalog is empty; without it a cold-start workbench shows an EMPTY PICKER beside a live Propose button, the form posts, the action refuses, and the professional learns that the surface offers acts it cannot perform — REG-F-106 in miniature. ⚠ THIS MUTANT WAS UNDECLARABLE UNTIL THE `bare` RESET MODE EXISTED (REG-F-108). Neither demo seed could reach the branch: `empty` still seeds the policy library, and an ASSURANCE_POLICY is a governed object and therefore a selectable subject. A mutant over a branch no test can enter reports SURVIVED and reads as an unguarded hole; declaring it before the reader existed would have been recording a defect I had manufactured. The victim also carries the CONTROL that the picker IS offered on a populated workbench, so a mutation that simply deleted the picker cannot pass either.",
 		source: 'REG-F-108'
+	},
+	{
+		id: 'B1-the-signoff-forecloses-nothing',
+		file: 'apps/rph-demo/src/lib/server/assurance/demo-policy.ts',
+		find: "			forbiddenOpenSeverities: [...DEMO_FORBIDDEN_OPEN_SEVERITIES]",
+		replace: "			forbiddenOpenSeverities: []",
+		expectRed: ['apps/rph-demo/src/lib/server/assurance/blocking-finding-forecloses-signoff.test.ts'],
+		why: "THE STATE THIS SURFACE SHIPPED IN UNTIL 2026-08-10, and the reason S-1b could not simply add a reject button. DOC-004 §10.3's foreclosure IS implemented and IS reachable — GATE C, `rejectForeclosedDisposition` — but it reads the POLICY's own rule and returns null the moment the policy has nothing to say (`if (forbidden.size === 0) return null`). `dispositionRules` is `.optional()` on CreateAssurancePolicyPayload and the demo policy declared none, so an operator could record a BLOCKING finding and sign the work off SATISFIED in the same breath. ⚠ AN OPTIONAL POLICY FIELD THAT DEFAULTS TO 'NO CONSTRAINT' IS A GATE SWITCHED OFF BY SILENCE — nothing is missing, nothing is broken, and nothing fires. Measured before committing by deleting the rule: EXACTLY ONE test reddens (the foreclosure), and all three controls stay green — including the ADVISORY control, which is what proves the gate is severity-sensitive rather than refusing every observation.",
+		source: 'S-1b / DESIGN-blocking-finding-capability §2'
 	}
 ];
