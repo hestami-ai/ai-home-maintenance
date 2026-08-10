@@ -151,11 +151,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'MU-FRESH-18-A-neutralise-revision-check',
 		file: 'packages/rph-application/src/handlers/kit.ts',
-		find:
-			'if (command.expectedRevision !== undefined && command.expectedRevision !== existing.revision)',
-		replace:
-			'if (false && command.expectedRevision !== undefined && command.expectedRevision !== existing.revision)',
-		expectRed: ['verif/optimistic-concurrency-surface.test.ts'],
+		find: "return {\n\t\t\tok: false,\n\t\t\tresult: reject(\n\t\t\t\tcommand,\n\t\t\t\t'RPH_REVISION_CONFLICT',\n\t\t\t\t`Revision conflict on ${id}: command expected revision ${command.expectedRevision}, actual is ${existing.revision}`,\n\t\t\t\t[id]\n\t\t\t)\n\t\t};",
+		replace: "return {\n\t\t\tok: true,\n\t\t\tstate: existing.state as Record<string, unknown>,\n\t\t\trevision: existing.revision,\n\t\t\tsemanticVersion: existing.semanticVersion\n\t\t};",
+		expectRed: ["verif/optimistic-concurrency-surface.test.ts"],
 		why: 'PER-4 fail-open: neutralising the compare-and-swap reproduces last-write-wins, which is what all 28 surface dispatch sites did before FORK-22 item 2. Observed: reddens ONLY the stale-page test; the control and the tautology control stay green.',
 		source: 'SPEC-001 §11.4.22 item 2'
 	},
@@ -260,18 +258,18 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'M4-classifyRefusal-always-killed',
 		file: 'packages/rph-domain/src/enforcement-register.ts',
-		find: "\tif (observed.status !== 'REJECTED') return 'ADMITTED';",
-		replace: "\tif (observed.status === '__never__') return 'ADMITTED';\n\treturn 'KILLED';",
-		expectRed: ['packages/rph-domain/src/enforcement-register.test.ts'],
+		find: "if (observed.status !== (expected.refusalStatus ?? 'REJECTED')) return 'ADMITTED';",
+		replace: "if (observed.status !== (expected.refusalStatus ?? 'REJECTED')) return 'KILLED';",
+		expectRed: ["packages/rph-domain/src/enforcement-register.test.ts"],
 		why: 'the primitive SELFTEST: a classifier that greens everything',
 		source: 'wp16_mutants.py'
 	},
 	{
 		id: 'M5-layerOfTestFile-fail-open',
 		file: 'packages/rph-domain/src/enforcement-register.ts',
-		find: "\treturn 'UNKNOWN';\n}",
-		replace: "\treturn 'COMMAND';\n}",
-		expectRed: ['packages/rph-domain/src/enforcement-register.test.ts'],
+		find: "return 'UNKNOWN';",
+		replace: "return 'COMMAND';",
+		expectRed: ["packages/rph-domain/src/enforcement-register.test.ts"],
 		why: 'the primitive SELFTEST: fail-open layer classification',
 		source: 'wp16_mutants.py'
 	},
@@ -287,9 +285,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'M7-unenforced-certified-covered',
 		file: 'packages/rph-domain/src/conformance-manifest.ts',
-		find: "\t'RPH-EXE': {\n\t\tstatus: 'PARTIAL',",
-		replace: "\t'RPH-EXE': {\n\t\tstatus: 'COVERED',",
-		expectRed: ['packages/rph-domain/src/enforcement-register.test.ts'],
+		find: "'RPH-EXE': {",
+		replace: "'RPH-EXE': { status: 'COVERED' }, '__M7_SHUNTED_ROW': {",
+		expectRed: ["packages/rph-domain/src/enforcement-register.test.ts"],
 		why: 'an UNENFORCED rule certified COVERED \u2014 the original defect (RPH-EXE-004/005 are enforced nowhere). REFORMULATED by JAN-VERIF V-1: the harvested form added a DUPLICATE object key, which TypeScript rejects, so it reported NO_COMPILE and proved nothing. A mutant that does not compile never reaches the code.',
 		source: 'wp16_mutants.py (reformulated V-1)'
 	},
@@ -697,9 +695,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/transition-gate.ts',
 		// THE PRE-RW-7 BEHAVIOUR, restored exactly: `continue` instead of reporting the cause. If this survives, N-8
 		// can return silently — a prune event once again indistinguishable in content from a waived skip.
-		find: "\t\t\t\tif (IRRECOVERABLE_TERMINAL.has(step.stepState))\n\t\t\t\t\treturn {\n\t\t\t\t\t\tcause: 'DEAD_PREDECESSOR',\n\t\t\t\t\t\tdeadStepId: source,\n\t\t\t\t\t\tdeadStepState: step.stepState,\n\t\t\t\t\t\t...excluded\n\t\t\t\t\t};\n\t\t\t\tcontinue;",
-		replace: '\t\t\t\tcontinue;',
-		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
+		find: "return { kind: 'return', provenance: deadPredecessorCutProvenance(source, step, edge) };",
+		replace: "return PRUNE_EDGE_SKIP;",
+		expectRed: ["packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts"],
 		why: 'N-8 ITSELF: a step cut by a CANCELLED/SUPERSEDED predecessor emits provenance-free ExecutionStepPruned, byte-identical in content to a waived skip',
 		source: 'RW-7 inline'
 	},
@@ -732,8 +730,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// that and went red on the next run, so the check was restored.
 		//
 		// The gate's real victim is therefore the BRANCH arm, and the victim named below is the suite that proves it.
-		find: "\t\t\t\tif (ctx.localOf(edge) !== 'NEUTRALIZED') continue;",
-		replace: "\t\t\t\tif (ctx.localOf(edge) === 'SATISFIED') continue;",
+		find: "if (ctx.localOf(edge) !== 'NEUTRALIZED') return PRUNE_EDGE_SKIP;",
+		replace: "if (ctx.localOf(edge) === 'SATISFIED') return PRUNE_EDGE_SKIP;",
 		expectRed: [],
 		why: 'A DECLARED CONTROL over a PROVABLY UNREACHABLE fail-safe — see expectSurvive. Kept because unreachable-BY-INVARIANT is not the same as unnecessary, and RW-4 already corrected one wrongly-declared-dead floor in this lineage.',
 		source: 'RW-7 inline',
@@ -1387,9 +1385,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// the block dead, so `source` (string | undefined) stopped narrowing inside it — three type errors about the
 		// mutation, none about the walk. Dropping only the `frontier.push` keeps the visited-set bookkeeping and stops
 		// the backward walk after one hop, which is exactly "reads the step's OWN in-edges".
-		find: '\t\t\tif (!seen.has(source)) {\n\t\t\t\tseen.add(source);\n\t\t\t\tfrontier.push(source); // keep walking back through the dead subgraph\n\t\t\t}',
-		replace: '\t\t\tif (!seen.has(source)) {\n\t\t\t\tseen.add(source);\n\t\t\t}',
-		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
+		find: "frontier.push(action.source); // keep walking back through the dead subgraph",
+		replace: "seen.add(action.source); // MUTANT WP14-M4: the enqueue is dropped \u2014 the walk stops after one hop",
+		expectRed: ["packages/rph-domain/src/transition-gate-prune-provenance.test.ts"],
 		why: 'the TRANSITIVE case: a step cut off two or more hops below the branch gets no provenance at all',
 		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
@@ -1401,9 +1399,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// a comparison of two identical calls is always true at runtime and is NOT constant-folded by the compiler, so
 		// the code below stays reachable and narrowed. Deliberately degenerate — a mutant should read as obviously
 		// wrong; the point is that a test must notice.
-		find: '\t\t\tif (live.has(source)) {',
-		replace: '\t\t\tif (live.has(source) === live.has(source)) {',
-		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
+		find: "if (!live.has(source)) return { kind: 'walk', source };",
+		replace: "if (live.has(source) !== live.has(source)) return { kind: 'walk', source };",
+		expectRed: ["packages/rph-domain/src/transition-gate-prune-provenance.test.ts"],
 		why: 'a DEAD source is attributed as the cut, so a JOIN below two dead branches names the wrong decision',
 		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
@@ -1447,9 +1445,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// RE-ANCHORED BY RW-7: the inline spread became a `const excluded` shared by both provenance arms, so dropping
 		// the field is now one edit that must redden BOTH causes rather than only the BRANCH one.
 		file: 'packages/rph-domain/src/transition-gate.ts',
-		find: '\t\t\t\tconst excluded = edge.id === undefined ? {} : { excludedEdgeId: edge.id };',
-		replace: '\t\t\t\tconst excluded = edge.id === undefined ? {} : {};',
-		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
+		find: "return edge.id === undefined ? {} : { excludedEdgeId: edge.id };",
+		replace: "return edge.id === undefined ? {} : {};",
+		expectRed: ["packages/rph-domain/src/transition-gate-prune-provenance.test.ts"],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py'
 	},
@@ -1506,9 +1504,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		// The fail-OPEN half: the verdict is still consulted, still returns, and can never say WRONG_STEP because it
 		// is asked whether the step is itself. Indistinguishable from the fix at every call site and in every type.
-		find: "\t\t\tboundStepId: String(state.executionStepId ?? '')\n\t\t});",
-		replace: '\t\t\tboundStepId: s.id\n\t\t});',
-		expectRed: ['packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'],
+		find: "boundStepId: String((state.executionStepId ?? '') as string | number | boolean)\n",
+		replace: "boundStepId: s.id\n",
+		expectRed: ["packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts"],
 		why: 'the store half must read what the BINDING says it authorizes — comparing the step to itself makes the check total and vacuous',
 		source: 'JAN-BINDEXCL WP-1'
 	},
@@ -1524,10 +1522,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// the fix and would SURVIVE for a correct reason. Declaring a mutant known to survive would be the false
 		// record this ledger exists to prevent, so the mutant removes both guards at once, which is the only edit
 		// that actually expresses the defect.
-		find: "\t\t\tboundStepId: String(state.executionStepId ?? '')\n\t\t});\n\t\tif (verdict.limb !== 'WRONG_STEP') continue;",
-		replace:
-			"\t\t\tboundStepId: String(state.executionStepId ?? ''),\n\t\t\tauthorizationStatus: String((state as { authorizationStatus?: unknown }).authorizationStatus)\n\t\t});\n\t\tif (verdict.ok) continue;",
-		expectRed: ['packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'],
+		find: "boundStepId: String((state.executionStepId ?? '') as string | number | boolean)\n\t\t});\n\t\tif (verdict.limb !== 'WRONG_STEP') continue;",
+		replace: "boundStepId: String((state.executionStepId ?? '') as string | number | boolean),\n\t\t\tauthorizationStatus: String((binding.state as { authorizationStatus?: unknown }).authorizationStatus)\n\t\t});\n\t\tif (verdict.ok) continue;",
+		expectRed: ["packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts"],
 		why: 'propose-time asks exactly ONE question — is this binding somebody else’s? — because every other question it could ask is about an act that has not happened yet',
 		source: 'JAN-BINDEXCL WP-1'
 	},
@@ -2167,9 +2164,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// complete — the headline case refuses — while obligation conservation went on being silently unperformed.
 		// DEC-3 is the rule whose whole subject is that mandatory obligations do not disappear quietly, so it is
 		// the one that must not fall out of the list unnoticed.
-		find: "	['obligationAllocations', 'DOC-003 DEC-3 — obligation conservation across a revision'],",
-		replace: '\t// MUTANT: the DEC-3 carrier is no longer refused',
-		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],
+		find: "const HONOURED_REVISION_FIELDS = ['obligationAllocations', 'constraintPropagations'] as const;",
+		replace: "const HONOURED_REVISION_FIELDS = ['constraintPropagations'] as const; // MUTANT: the DEC-3 carrier is neither gated nor applied",
+		expectRed: ["packages/rph-application/src/handlers/decomposition-revise-conservation.test.ts"],
 		why: 'F-I: a partial guard refuses the obvious field and leaves the obligation carrier silently dropped',
 		source: 'JPWB-SPEC-001-DR-002 F-I'
 	},
@@ -2186,9 +2183,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// the gate runs: this mutation is now refused by the ENGINE at dispatch (VALIDATION_FAILED), and the victim
 		// reddens on the dispatch assertion rather than on the payload assertion. Two independent kills, which is
 		// what ratification bought.
-		find: "\t\t\tstatus: String(next.status ?? '')",
-		replace: "\t\t\tstatus: '' // MUTANT: the resulting status is not recorded",
-		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],
+		find: "status: String((next.status ?? '') as string | number | boolean)",
+		replace: "status: '' // MUTANT: the resulting status is not recorded",
+		expectRed: ["packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts"],
 		why: 'F-I: an audit record that omits the transition it records is not an audit record',
 		source: 'JPWB-SPEC-001-DR-002 F-I'
 	},
