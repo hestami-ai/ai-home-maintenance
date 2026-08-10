@@ -995,5 +995,70 @@ export const actions: Actions = {
 		]);
 		if (err) return fail(400, { error: `No green without assurance: ${err}` });
 		return { advanced: 'satisfied' };
+	},
+
+	// ── ABANDON — S-1 of ROADMAP-decision-subject-scope (REG-F-077) ──────────────────────────────────────────
+	//
+	// Abandonment is one of the three acts JPWB-DOC-001 §5.2 reserves to Governance BY NAME, and W-1 gave it a
+	// guard (`resolveAbandonAuthorization`) that demands an EFFECTIVE `ABANDON` Decision NAMING this PWU at its
+	// current semantic version. Measured before this action existed: `AbandonPwu` was dispatched NOWHERE in
+	// `apps/rph-demo`, so that guard had no caller from the surface and the workbench could not perform an act
+	// canon reserves — while REG-F-070's residue said the reachability limb was still open.
+	//
+	// THE SUBJECT IS DERIVED FROM THE ROW, never picked: `subjectObjectIds: [pwuId]`. That is the design's whole
+	// answer to REG-F-077 — the authorization is sited next to the object it is about, so it cannot name an
+	// object the professional is not looking at.
+	//
+	// ⚠ ATOMIC BY CONSTRUCTION, and `runSteps` is why that is not a slogan. Propose, approve and abandon go
+	// through ONE `dispatchBatch`: a partial application would leave an EFFECTIVE abandonment authority attached
+	// to a PWU that was never abandoned — a standing permission nobody asked for. SPEC-001-INV-14 already
+	// requires multi-command actions here to be atomic; this is that rule applied to a governance act.
+	//
+	// ⚠ AND NO STALENESS CASE IS OFFERED OR TESTED, deliberately (DESIGN §4). `resolveAbandonAuthorization`
+	// checks the pinned version against the PWU's current one, but `bumpSemanticVersion: true` exists at exactly
+	// two sites — `decomposition.ts` and `intent.ts` — and NEITHER is in `pwu.ts`, so a PWU's semanticVersion is
+	// 1 at creation and never moves. That conjunct is therefore INERT on this path and no test here may pretend
+	// otherwise; only the promotion path (S-0) has subjects that can version.
+	abandonPwu: async ({ request }) => {
+		const form = await request.formData();
+		const pwuId = str(form, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const reason = str(form, 'reason') || 'The work is no longer required.';
+		const decisionId = mintUiId('dec');
+		const err = runSteps([
+			[
+				'ProposeDecision',
+				'DECISION',
+				decisionId,
+				{
+					decisionType: 'ABANDON',
+					subjectObjectIds: [pwuId],
+					selectedOption: 'Abandon this work unit',
+					rationale: reason,
+					// The session's own identity — `proposeDecision` refuses a declared authority that is not the
+					// stamped issuer (REG-F-014), so this is the only value that can be correct.
+					authority: actingActor(uiSession()),
+					consideredObservationIds: []
+				}
+			],
+			[
+				'ApproveDecision',
+				'DECISION',
+				decisionId,
+				{
+					selectedOption: 'Abandon this work unit',
+					rationale: reason,
+					consideredEvidenceIds: [],
+					consideredObservationIds: [],
+					// STATED, NOT OMITTED. `{}` passes the pin-agreement predicate vacuously (it filters on
+					// `pinned[id] !== undefined`); the true value makes it live. Fail-closed either way, because
+					// this is CHECKED against the engine's own pin and can only cause a refusal — see S-0.
+					subjectSemanticVersions: { [pwuId]: 1 }
+				}
+			],
+			['AbandonPwu', PWU, pwuId, { abandonmentDecisionId: decisionId, reasonCode: 'NO_LONGER_REQUIRED' }]
+		]);
+		if (err) return fail(400, { error: `Abandonment refused: ${err}` });
+		return { advanced: 'abandoned' };
 	}
 };

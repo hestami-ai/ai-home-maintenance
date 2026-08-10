@@ -246,8 +246,22 @@
 											</form>
 										{:else if p.workLifecycleState === 'SATISFIED'}
 											<span class="done">✓ satisfied</span>
+										{:else if p.workLifecycleState === 'ABANDONED'}
+											<span class="muted">abandoned</span>
 										{:else}
 											<span class="muted">{p.workLifecycleState}</span>
+										{/if}
+										<!-- ABANDON is offered wherever the work is still ACTIVE — the machine's own
+										     `Any active -> ABANDONED` (S-1, REG-F-077). One button performs three
+										     commands atomically: it AUTHORIZES (a governance Decision naming this
+										     PWU) and then abandons. Two buttons would be wrong here, unlike
+										     promotion: an abandonment authority that outlived a cancelled click
+										     would be a standing permission to discard someone's work. -->
+										{#if !['SATISFIED', 'ABANDONED', 'REJECTED', 'SUPERSEDED', 'INVALIDATED'].includes(p.workLifecycleState)}
+											<form method="POST" action="?/abandonPwu" use:enhance>
+												<input type="hidden" name="pwuId" value={p.id} />
+												<button class="mini" type="submit">Abandon</button>
+											</form>
 										{/if}
 									</div>
 								</td>

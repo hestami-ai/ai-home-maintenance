@@ -167,7 +167,10 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		'failPlan',
 		'completeStep',
 		'recordAssurance',
-		'markSatisfied'
+		'markSatisfied',
+		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
+		// had no caller from any surface. This census reddened on arrival, which is its job.
+		'abandonPwu'
 	]
 };
 

@@ -26,16 +26,31 @@ rest must be re-thought rather than pushed.
 
 ---
 
-## S-1 · Author abandonment and rejection next to the PWU
+## S-1a · Author abandonment next to the PWU — ✅ SHIPPED (REG-F-104)
 
-- Add the two acts to the undertaking/PWU surface, deriving `subjectObjectIds: [pwuId]` from the route parameter —
-  the idiom already used at `undertakings/[id]:933`.
-- The Decision must be minted **and made EFFECTIVE** by the same flow, or the act is unreachable for a second
-  reason (`ProposeDecision` alone decides nothing — ASR-15 checks authority *before* effect).
-- Red-first per act: dispatch without the decision → refused, naming the scope conjunct.
-- **Assert on the STORED decision's `subjectObjectIds`** (H-3), never on the form.
-- **Do NOT assert a staleness case here** — §4 proves it is unconstructible on PWU subjects. Record that in the
-  test file rather than leaving a reader to wonder why the coverage is asymmetric.
+- The act is on the undertaking surface, deriving `subjectObjectIds: [pwuId]` from the row.
+- Propose, approve and abandon go through **one `dispatchBatch`**: a partial application would leave an EFFECTIVE
+  abandonment authority attached to a PWU that was never abandoned — a standing permission nobody asked for.
+- **The engine's refusal is driven**, which S-0's spec could not do: the unauthorized attempt is posted at
+  `/test-api/dispatch` (the same bus the UI uses), so `resolveAbandonAuthorization` is what refuses it, not a form.
+- Asserted on the **stored** decision's `subjectObjectIds` (H-3), never on the form.
+- **No staleness case**, per §4, with the reason written in the spec.
+
+## S-1b · Rejection — DEFERRED, and on a reason of substance rather than effort
+
+`RejectPwu` requires **both** an EFFECTIVE `REJECTION` Decision **and** a real `ASSURANCE_OBSERVATION` of BLOCKING
+or CRITICAL severity naming the PWU (`hasBlockingObservationFor`). **Measured: `RecordAssuranceObservation` is
+dispatched ZERO times anywhere in `apps/rph-demo`** — the workbench cannot record a blocking finding at all, and
+`recordAssurance` drives only a SATISFIED disposition with `observations: []`.
+
+**⚠ AND THE OBVIOUS SHORTCUT IS THE DEFECT.** A `rejectPwu` action could mint its own assessment and its own
+BLOCKING observation inside the same batch, satisfying the gate. **That is manufacturing the guard's own input** —
+REG-F-022's Gate A shape (*"the logic is right and its population is supplied by the party it judges"*) and
+REG-F-014's `detectedConflicts`. It would ship green and prove nothing.
+
+**So S-1b needs a capability first: the professional records a blocking finding as its own deliberate act**, and
+rejection then cites a finding somebody actually made. That is a product increment, not authorization wiring, and
+it is not in this roadmap's scope. Recorded rather than quietly dropped.
 
 ---
 
