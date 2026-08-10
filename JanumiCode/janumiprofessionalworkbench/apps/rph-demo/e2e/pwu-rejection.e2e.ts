@@ -174,9 +174,22 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 			.getByRole('row', { name: innocent })
 			.getByRole('button', { name: 'Record Assurance' })
 			.click();
+
+		// ⚠ ASSERTED AGAINST THE ENGINE, NOT AGAINST A BUTTON — and the second attempt at this control is why.
+		// I first asserted "Mark Satisfied" was visible and called that proof of UNDER_ASSURANCE. It is not:
+		// `markSatisfied` is offered in BOTH the EXECUTING and UNDER_ASSURANCE branches, so the assertion held
+		// while the PWU sat in the wrong one, the reject block never rendered for either reason, and
+		// `B3-rejection-stops-checking-the-subject` SURVIVED a SECOND time. Two rounds of a control that could
+		// not fail, each fixed by looking at what the mutation runner said rather than at what I expected.
+		// ⚠ WAITED FOR ON THE ROW, NOT READ FROM THE ENGINE. My second attempt asserted `introspect()` said
+		// UNDER_ASSURANCE and moved on — and it DID, while the row still rendered EXECUTING. The affordance
+		// is a function of what the PAGE shows, so a server-side truth-check cannot establish that the branch
+		// under test is even on screen. `B3-rejection-stops-checking-the-subject` SURVIVED twice on that gap.
+		await expect(page.getByRole('row', { name: faulted })).toContainText('UNDER_ASSURANCE');
 		await expect(
-			page.getByRole('row', { name: innocent }).getByRole('button', { name: 'Mark Satisfied' })
-		).toBeVisible();
+			page.getByRole('row', { name: innocent }),
+			'the innocent PWU must reach the SAME branch, or this control proves nothing about subject scope'
+		).toContainText('UNDER_ASSURANCE');
 
 		// Both are UNDER_ASSURANCE. A blocking finding exists in this undertaking. Only one of them is its subject.
 		await expect(page.getByRole('row', { name: faulted }).getByTestId('reject-pwu')).toHaveCount(1);
