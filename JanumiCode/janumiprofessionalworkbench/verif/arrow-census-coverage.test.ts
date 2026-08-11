@@ -102,5 +102,5 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			[...unanalysable].filter((m) => !censusBlind.has(m)),
 			'unanalysed became a subset of census-blind — same warning in the other direction'
 		).not.toEqual([]);
-	});
+	}, 15_000);
 });

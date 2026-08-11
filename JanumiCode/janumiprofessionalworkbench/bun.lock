@@ -14,7 +14,7 @@
         "globals": "^15.0.0",
         "prettier": "^3.7.4",
         "turbo": "^2.10.4",
-        "typescript": "^5.9.2",
+        "typescript": "5.9.3",
         "typescript-eslint": "^8.0.0",
         "vitest": "^4.0.0",
       },
@@ -47,8 +47,18 @@
         "@sveltejs/vite-plugin-svelte": "^6.0.0",
         "svelte": "^5.0.0",
         "svelte-check": "^4.0.0",
-        "typescript": "^5.9.2",
+        "typescript": "5.9.3",
         "vite": "^7.0.0",
+      },
+    },
+    "packages/csaa": {
+      "name": "@janumipwb/csaa",
+      "version": "0.1.0",
+      "dependencies": {
+        "typescript": "5.9.3",
+      },
+      "devDependencies": {
+        "@janumipwb/typescript-config": "workspace:*",
       },
     },
     "packages/rph-application": {
@@ -347,6 +357,8 @@
     "@humanwhocodes/module-importer": ["@humanwhocodes/module-importer@1.0.1", "", {}, "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA=="],
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
+
+    "@janumipwb/csaa": ["@janumipwb/csaa@workspace:packages/csaa"],
 
     "@janumipwb/rph-application": ["@janumipwb/rph-application@workspace:packages/rph-application"],
 

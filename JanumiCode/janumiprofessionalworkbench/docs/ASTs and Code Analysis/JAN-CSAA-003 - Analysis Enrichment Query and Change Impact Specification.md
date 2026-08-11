@@ -6,13 +6,13 @@
 
 **Canonical title:** Analysis Enrichment, Query, and Change-Impact Specification
 
-**Version:** `0.1.1`
+**Version:** `0.2.0`
 
 **Status:** Draft
 
 **Settledness:** HYPOTHESIS
 
-**Classification:** Correction-only controlled-CSAA member candidate; non-authoritative Draft. This `0.1.1` successor corrects the exact predecessor lifecycle presentation and capability-vector delimiter grammar without inheriting the predecessor objective PASS or claiming a completed author review. `JAN-CSAA-000@0.3.0` remains the adopted authority and manifest baseline; later working-status records carry construction state. No intermediate sponsor response, repository change, provider result, objective record, or authoring assertion promotes this member
+**Classification:** Substantive controlled-CSAA member candidate; non-authoritative Draft. This `0.2.0` successor closes the query-algebra defect identified by independent review by defining exact four-valued conjunction, disjunction, negation, applicability, folding, short-circuit, and explanation semantics. It carries forward the `0.1.1` lifecycle and capability-vector corrections but inherits no earlier objective PASS. `JAN-CSAA-000@0.3.0` remains the adopted authority and manifest baseline
 
 **Governing status:** Documentation-only Wave 2 entry is recorded by `JAN-CSAA-W1-SEMANTIC-READINESS-001@0.1.0` under `JPWB-REG-005 REG-D-021` as corrected by `REG-D-022`; this document has no member authority
 
@@ -58,7 +58,7 @@
 
 **Structural exemplars:** [RPH document-set README](<../Recursive Professional Harness/README.md>); [RPH assurance-policy catalog](<../Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract.md>); [RPH executable invariant specification](<../Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification.md>)
 
-**Supersedes:** `JAN-CSAA-003@0.1.0 / Draft`; 169,676 bytes; SHA-256 `65b3a9379dd47a25de1693ed709eafd11f7a9063db1cfd80b5da2bba01b46d10`; immutable archive preservation is a publication predicate and is not claimed by this off-path candidate
+**Supersedes:** `JAN-CSAA-003@0.1.1 / Draft`; 175,310 bytes; SHA-256 `ac48a0828419eb5096ef9ec0025c0e6fb6c8a6ad40671cd51f594f6c1e318fce`. No new archive or process record is created by this implementation-readiness correction; predecessor recovery relies on repository history
 
 **Superseded by:** None
 
@@ -285,7 +285,7 @@ Sections 5.1 through 5.4 are a navigational summary. This section is the normati
 
 Within every `F11` cell, a bare capability reference, `source capabilities`, `queried profiles`, `contributing profiles`, or `named capabilities` means the exact materialized set of **required predecessors** for that Analysis Invocation unless the cell expressly says **optional prior-result enrichment**. Parameterized sets SHALL be enumerated in the invocation record before execution. `Optional`, `may consume`, or `already completed` means optional prior-result enrichment under §4.3. No `F08` or `F26` phrase may create an input dependency absent from `F11`: `feeds` names an outbound consumer only, and every actual consumed capability must be typed in `F11`. The materialized required-predecessor graph SHALL be acyclic and SHALL contain no self-reference.
 
-`LIFE` means: `0.1.1 / Draft; predecessor JAN-CSAA-003@0.1.0 / Draft; successor none; semantic change requires a successor version; no profile authority exists before exact enclosing-member conferral`.
+`LIFE` means: `0.2.0 / Draft; predecessor JAN-CSAA-003@0.1.1 / Draft; successor none; semantic change requires a successor version; no profile authority exists before exact enclosing-member conferral`.
 
 `PROV` means: exact static subject; exact dynamic-evidence subject or explicit not-applicable status for a static-only profile; profile version; Analysis Run and Analysis Invocation; provider, method, and configuration; inputs and raw-result references; project, resolver, build, framework, and runtime contexts; locations and mapping health; coverage and epistemic states; times, assumptions, limits, invalidation dependencies, and access treatment.
 
@@ -307,7 +307,7 @@ Within every `F11` cell, a bare capability reference, `source capabilities`, `qu
 
 `CF-B` means: candidate or inferred states disclose method, reference or calibration population, granularity, and limits; an uncalibrated scalar is prohibited and confidence never means certainty.
 
-`ORACLE(nnn)` means: the exact current `JAN-CSAA-006@0.1.1 / Draft` provisional fixture-judgment allocation for `JAN-CSAA-CAP-nnn`, currently `DOCUMENTED / NOT_CONFERRED / NOT_EXECUTED`, plus the exact `JAN-CSAA-008@0.2.2 / Draft` conformance specification, whose executable result remains `NOT_RUN`; authored specifications are not executed evidence, and the provider or implementation author does not own the judgment.
+`ORACLE(nnn)` means: the exact current `JAN-CSAA-006@0.1.1 / Draft` provisional fixture-judgment allocation for `JAN-CSAA-CAP-nnn`, currently `DOCUMENTED / NOT_CONFERRED / NOT_EXECUTED`, plus the exact current `JAN-CSAA-008@0.3.0 / Draft` conformance specification, whose executable result remains `NOT_RUN`; authored specifications are not executed evidence, and the provider or implementation author does not own the judgment.
 
 #### 5.5.2 Exact source-binding clauses
 
@@ -648,7 +648,7 @@ F15=forced rename or move, identity collision, and provider or configuration mis
 F22=FAIL+incompatible or partial inputs and pairing or lineage failure; F23=compatibility reasoning plus paired, unmatched, and ambiguous witness; F24=RES; F25=INFO; F26=uses the required relevant profiles typed in F11 and may consume an already completed CAP021 result only as optional prior-result enrichment under an acyclic invocation plan; no input forces compatibility; F27=ORACLE(032)+identical, changed, incompatible, ambiguous-lineage, and swapped-subject cases; F28=AUTH.
 ```
 
-The `JAN-CSAA-003-VER-CPF-001` acceptance predicate SHALL require exactly thirty-two profile vectors; exactly one binding for each `F01` through `F28`; successful resolution of all 896 cells; no blank, literal ellipsis, unresolved alias, or unjustified not-applicable value; unique contiguous `F01` identities; the exact `0.1.1 / Draft` lifecycle with the exact `0.1.0 / Draft` predecessor in every `F02`; `SRC-BASE` plus the profile-specific clause in every `F03`; the exact current capability-specific `JAN-CSAA-006@0.1.1 / Draft` allocation at `DOCUMENTED / NOT_CONFERRED / NOT_EXECUTED` plus the authored `JAN-CSAA-008@0.2.2 / Draft` allocation with executable result `NOT_RUN` in every `F27`; valid cross-profile identities in `F11` and `F26`; and agreement between the §5.1 through §5.4 summaries and the complete purpose, subject, input, output, soundness, completeness, coverage, and limitation facets.
+The `JAN-CSAA-003-VER-CPF-001` acceptance predicate SHALL require exactly thirty-two profile vectors; exactly one binding for each `F01` through `F28`; successful resolution of all 896 cells; no blank, literal ellipsis, unresolved alias, or unjustified not-applicable value; unique contiguous `F01` identities; the exact `0.2.0 / Draft` lifecycle with the exact `0.1.1 / Draft` predecessor in every `F02`; `SRC-BASE` plus the profile-specific clause in every `F03`; the exact current capability-specific `JAN-CSAA-006@0.1.1 / Draft` allocation at `DOCUMENTED / NOT_CONFERRED / NOT_EXECUTED` plus the authored `JAN-CSAA-008@0.3.0 / Draft` allocation with executable result `NOT_RUN` in every `F27`; valid cross-profile identities in `F11` and `F26`; and agreement between the §5.1 through §5.4 summaries and the complete purpose, subject, input, output, soundness, completeness, coverage, and limitation facets.
 
 ---
 
@@ -790,9 +790,74 @@ Exact enum spelling and serialization belong to `JAN-CSAA-007`. Implementations 
 
 ### 9.3 Logical rules
 
-Negation SHALL preserve unknown and conflict. It SHALL NOT convert unknown to true or false.
+Predicate truth SHALL use the following evidence-pair interpretation. The pair is a semantic definition; implementations MAY represent it internally in another lossless form:
+
+| Predicate truth | True support | False support |
+| --- | ---: | ---: |
+| Supported true (`T`) | 1 | 0 |
+| Supported false (`F`) | 0 | 1 |
+| Unknown (`U`) | 0 | 0 |
+| Conflicting (`C`) | 1 | 1 |
+
+Negation swaps true and false support. It therefore maps `T→F`, `F→T`, `U→U`, and `C→C`; it SHALL NOT convert unknown or conflict into an unsupported binary answer.
+
+Conjunction and disjunction SHALL operate on support independently:
+
+- for conjunction, output true support exists only when every child has true support, and output false support exists when any child has false support;
+- for disjunction, output true support exists when any child has true support, and output false support exists only when every child has false support.
+
+The resulting truth tables are exact and symmetric:
+
+| `AND` | `T` | `F` | `U` | `C` |
+| --- | --- | --- | --- | --- |
+| `T` | `T` | `F` | `U` | `C` |
+| `F` | `F` | `F` | `F` | `F` |
+| `U` | `U` | `F` | `U` | `F` |
+| `C` | `C` | `F` | `F` | `C` |
+
+| `OR` | `T` | `F` | `U` | `C` |
+| --- | --- | --- | --- | --- |
+| `T` | `T` | `T` | `T` | `T` |
+| `F` | `T` | `F` | `U` | `C` |
+| `U` | `T` | `U` | `U` | `T` |
+| `C` | `T` | `C` | `T` | `C` |
+
+These tables define only the predicate-truth projection. A child whose applicability is reasoned not-applicable, excluded, unsupported, or not evaluated contributes neither true nor false support to that projection, but its actual applicability, coverage, and execution state SHALL remain explicit. Such a child SHALL NOT be relabeled as supported true, supported false, or ordinary unknown merely to supply an identity value. A decisive supported-false child may still determine conjunction, and a decisive supported-true child may still determine disjunction, while the non-evaluated or not-applicable child remains visible in its owning dimension.
+
+An `and` or `or` expression SHALL contain at least one child. N-ary expressions fold the exact rules above over their ordered children. Predicate truth is associative and commutative under this algebra, but evaluation order, health, cost, and provenance are not; the query definition therefore retains deterministic child order.
+
+Evaluation MAY short-circuit conjunction only after a supported-false result is decisive and MAY short-circuit disjunction only after a supported-true result is decisive. It SHALL NOT short-circuit on unknown, conflict, not-applicable, unsupported, excluded, or failed evidence. Every skipped child SHALL be recorded as not evaluated, and the explanation SHALL identify the decisive child, rule, intermediate truth, skipped children, and retained orthogonal states. A request requiring complete child evidence, diagnostics, or provenance disables short-circuit evaluation.
+
+Logical composition SHALL retain every contributing child truth, evidence reference, orthogonal epistemic dimension, and applied composition rule. Predicate-truth resolution SHALL NOT erase a contributing conflict: for example, `U OR C` projects to `T`, but the conflict dimension and contradictory evidence from the `C` child remain present. The algebra satisfies both De Morgan transformations over all four truth values; implementations SHALL NOT substitute a two-valued or three-valued Boolean library that loses these results.
+
+Every normalized expression node has exactly one evaluation disposition:
+
+| Disposition | Required content | Prohibited interpretation |
+| --- | --- | --- |
+| `applicable-result` | Predicate truth, support pair, six-dimensional epistemic state, child contributions, and provenance | Applicability or execution success does not imply truth |
+| `not-applicable` | Semantic-owner reference, reason code, rationale, and applicability basis | No predicate truth, support pair, or Boolean identity may be fabricated |
+| `short-circuited` | Decisive ancestor evaluation, skipped-node path, stored child order, and exact algebra version | No truth, support, conflict, freshness, provider result, or complete-evaluation claim may be fabricated for the skipped node |
+
+`NOT(not-applicable)` is `not-applicable`. If every child is reasoned not-applicable, the parent is reasoned not-applicable. Otherwise the parent is applicable; every not-applicable child contributes neither true nor false support while retaining its separate disposition. Consequently `F AND N/A = F`, `T OR N/A = T`, `T AND N/A = U`, `F OR N/A = U`, `C AND N/A = F`, and `C OR N/A = T`, with every contributing conflict preserved in the conflict dimension.
+
+Before evaluating any node, the implementation SHALL validate the complete normalized AST, including every subtree that might later be skipped, against shape, node-count, depth, fanout, traversal, and resource-budget rules. Short-circuiting SHALL NOT allow an invalid or over-budget subtree to evade refusal.
+
+Logical composition of the six epistemic dimensions is deterministic and retains both the effective parent value and the ordered child contribution vector:
+
+| Dimension | Parent composition rule |
+| --- | --- |
+| Support basis | An applicable logical result is `derived`, binds the exact algebra method/version, and retains every evaluated child-result plus positive and negative evidence reference. An entirely not-applicable expression uses the not-applicable disposition instead. |
+| Capability coverage | `supported` requires every applicable required child to be supported and evaluated. `excluded` requires every child to be inapplicable or excluded. `not analyzed` applies when no applicable child was analyzed. `unsupported` applies when every applicable child is unsupported. Every other combination is `partial`; a skipped required child makes coverage partial even when predicate truth is decisive. |
+| Execution health | Parent health reports execution of the logical operator, not a scalar reduction of child health. A completed fold may be succeeded while every attempted failure and every short-circuited not-run child remains separately retained; no child failure may become successful emptiness. |
+| Freshness | For truth-determining evidence, invalidated dominates stale, which dominates unknown. `current for subject` requires every determining support item to be current. A result with no determining support has unknown freshness. Nondetermining child states remain retained. |
+| Conflict | Any unresolved conflicting evaluated child makes the parent conflict dimension conflicting even when predicate truth projects to `T` or `F`. Otherwise exact correction or supersession lineage is applied before corroborated or unopposed classification. |
+| Inference | Every logical-operator result is `derived`, never direct. Candidate, bounded-inference, unknown, and not-applicable child states remain separately visible. |
+
+Deterministic left-to-right node evaluation is required for trace reproducibility even though projected conjunction and disjunction truth is commutative. Every node trace SHALL bind its normalized node path or ordinal, operator, input dispositions, evaluated child order, intermediate truth, decisive child when present, skipped child paths, composition-rule version, six-dimension contributions, and evidence references.
 
 An existential predicate MAY be supported false only when its search population is closed, relevant capability coverage is complete, and every candidate region was successfully evaluated. Absence of a witness under an open, partial, stale, unsupported, timed-out, truncated, or failed search is unknown.
+
+A closed, completely evaluated empty population yields supported false for existential quantification and supported true for universal quantification. Without demonstrated closure and complete evaluation, an empty population yields unknown rather than either vacuous conclusion.
 
 A universal predicate MAY be supported true only when its population is closed and completely evaluated. One supported counterexample is sufficient for supported false within its basis. An unknown member prevents universal truth.
 
@@ -815,7 +880,9 @@ Every Query Result SHALL retain:
 - one exact Static Semantic Snapshot Identity and zero or one exact Execution Evidence Set Identity;
 - capability-profile and provider-invocation references;
 - supported matches and supported non-matches;
-- predicate-truth projection plus orthogonal support-basis, capability-coverage, execution-health, freshness, conflict, and inference dimensions for every region;
+- applicable unknown regions, predicate-projection conflicting regions, reasoned not-applicable regions, and omitted or unevaluated regions as separate populations;
+- predicate-truth projection only for applicable evaluated regions, plus orthogonal support-basis, capability-coverage, execution-health, freshness, conflict, and inference dimensions and ordered contribution vectors;
+- one evaluation disposition and node-total evaluation trace for every normalized expression node;
 - population, coverage, denominator, budgets, truncation, and ordering;
 - witness paths or explanations sufficient to inspect each material result;
 - raw-result and transformation provenance;
@@ -1251,6 +1318,28 @@ Requirement identifiers are permanent within `JAN-CSAA-003`. Retirement creates 
 | `CSAA-003-REQ-152` | Every Query Result SHALL expose population, coverage, denominator, budgets, truncation, and ordering. |
 | `CSAA-003-REQ-153` | Every material Query Result SHALL carry sufficient witness or explanation for inspection. |
 | `CSAA-003-REQ-154` | An empty supported-match set SHALL carry evidence distinguishing supported absence from inability to determine. |
+| `CSAA-003-REQ-291` | Predicate truth SHALL preserve the exact evidence-pair meanings `T=(1,0)`, `F=(0,1)`, `U=(0,0)`, and `C=(1,1)`. |
+| `CSAA-003-REQ-292` | Negation SHALL swap true and false support and preserve unknown and conflict. |
+| `CSAA-003-REQ-293` | Conjunction SHALL derive true support from all-child true support and false support from any-child false support. |
+| `CSAA-003-REQ-294` | Disjunction SHALL derive true support from any-child true support and false support from all-child false support. |
+| `CSAA-003-REQ-295` | A reasoned not-applicable, excluded, unsupported, or not-evaluated child SHALL contribute no truth support while remaining explicit in its owning dimension. |
+| `CSAA-003-REQ-296` | Every conjunction and disjunction SHALL contain at least one deterministically ordered child. |
+| `CSAA-003-REQ-297` | Logical evaluation SHALL short-circuit only on decisive supported false for conjunction or decisive supported true for disjunction. |
+| `CSAA-003-REQ-298` | Every short-circuit SHALL retain the decisive child, applied rule, intermediate truth, skipped-child identities, and explicit not-evaluated states. |
+| `CSAA-003-REQ-299` | Logical composition SHALL retain contributing truth, conflict, epistemic dimensions, provenance, and the applied composition rule even when the projected truth is decisive. |
+| `CSAA-003-REQ-300` | Every normalized expression node SHALL carry exactly one `applicable-result`, `not-applicable`, or `short-circuited` evaluation disposition. |
+| `CSAA-003-REQ-301` | A not-applicable or short-circuited node SHALL NOT carry fabricated predicate truth or support. |
+| `CSAA-003-REQ-302` | An all-not-applicable logical expression SHALL remain not applicable, while a mixed expression uses zero truth support for each not-applicable child without erasing that disposition. |
+| `CSAA-003-REQ-303` | The complete normalized AST SHALL pass shape and budget validation before any child evaluation or short-circuit. |
+| `CSAA-003-REQ-304` | Logical support-basis composition SHALL produce a derived result while retaining algebra version and child evidence references. |
+| `CSAA-003-REQ-305` | Logical capability-coverage composition SHALL follow the supported, excluded, not-analyzed, unsupported, and partial rules in §9.3. |
+| `CSAA-003-REQ-306` | Logical execution-health composition SHALL retain attempted failures and skipped-child not-run states independently from operator completion. |
+| `CSAA-003-REQ-307` | Logical freshness composition SHALL evaluate truth-determining evidence without discarding nondetermining child freshness. |
+| `CSAA-003-REQ-308` | Logical conflict composition SHALL preserve every unresolved conflicting evaluated child despite a decisive truth projection. |
+| `CSAA-003-REQ-309` | Logical inference composition SHALL classify the operator result as derived while retaining child inference states. |
+| `CSAA-003-REQ-310` | Every normalized expression node SHALL retain deterministic evaluation order and a node-total provenance trace. |
+| `CSAA-003-REQ-311` | A closed completely evaluated empty population SHALL yield supported false for existential and supported true for universal quantification. |
+| `CSAA-003-REQ-312` | Every Query Result SHALL partition supported true, supported false, applicable unknown, projected conflict, not-applicable, and omitted or unevaluated regions without coercion. |
 
 ### 18.7 Slicing
 
@@ -1414,7 +1503,7 @@ Requirement identifiers are permanent within `JAN-CSAA-003`. Retirement creates 
 | `CSAA-003-REQ-275` | All thirty-two `JAN-CSAA-000` §10.3 source requirements SHALL be imported and reconciled individually. |
 | `CSAA-003-REQ-276` | Applicable canon, `JAN-CSAA-001`, and `JAN-CSAA-002` requirements SHALL be imported individually rather than by aggregate citation. |
 | `CSAA-003-REQ-277` | All thirty-two capability profiles SHALL be checked against all twenty-eight required facets. |
-| `CSAA-003-REQ-278` | Query semantics SHALL be verified with truth tables covering true, false, unknown, conflict, negation, quantifiers, joins, aggregation, and truncation. |
+| `CSAA-003-REQ-278` | Query semantics SHALL be verified with exhaustive negation, conjunction, disjunction, applicability, short-circuit, dimension-composition, quantifier, join, aggregation, and truncation cases over true, false, unknown, and conflict. |
 | `CSAA-003-REQ-279` | Slicing SHALL be verified with forward, backward, and chop cases including dynamic and unsupported frontiers. |
 | `CSAA-003-REQ-280` | Comparison SHALL be verified with identical, changed, incompatible, ambiguous-lineage, and swapped-subject cases. |
 | `CSAA-003-REQ-281` | Impact SHALL be verified with direct, transitive, configuration, generated, framework, reflection, and runtime cases. |
@@ -1457,8 +1546,8 @@ Requirement identifiers are permanent within `JAN-CSAA-003`. Retirement creates 
 | Evidence need | Owner | Current meaning |
 | --- | --- | --- |
 | Independently reviewed scenario judgments | `JAN-CSAA-006` | `DOCUMENTED / NOT_CONFERRED / NOT_EXECUTED`; individual expected judgments remain `PROPOSED / NOT_CONFERRED / NOT_EXECUTED` |
-| Exact profile, query, result, and error shapes | `JAN-CSAA-007@1.0.1 / Draft` | Documentation specification authored; executable schemas, generated derivatives, and adapters remain unmaterialized and unexecuted |
-| Executable requirement and property conformance | `JAN-CSAA-008@0.2.2 / Draft` | Documentation specification authored; executable conformance remains `NOT_RUN` |
+| Exact profile, query, result, and error shapes | `JAN-CSAA-007@1.1.0 / Draft` | Documentation specification authored; executable schemas, generated derivatives, and adapters remain unmaterialized and unexecuted |
+| Executable requirement and property conformance | `JAN-CSAA-008@0.3.0 / Draft` | Documentation specification authored; executable conformance remains `NOT_RUN` |
 | Persistence, recovery, and incremental/full operational evidence | `JAN-CSAA-009@0.2.1 / Draft` | Documentation design authored; mechanism selection, implementation, and operational evidence remain `NOT_RUN` |
 | Coding-agent use and stop/escalation evidence | `JAN-CSAA-010` | Not performed |
 | Concrete provider differential qualification | `JAN-CSAA-011` | Not performed |
@@ -1493,11 +1582,11 @@ The fifteen `NOT_RUN` values above are preserved as the exact `0.1.0` as-authore
 
 The exact `0.1.0` predecessor received bounded objective verification and named-commission ledger closure, then its preliminary author self-review found `JAN-CSAA-003-SR-001 / MAJOR` and `JAN-CSAA-003-SR-002 / MINOR`. Those event-time records remain true only for their exact predecessor surfaces.
 
-This correction-only `0.1.1` Draft addresses the mixed lifecycle presentation and the 96 capability-vector delimiter defects while retaining all 290 local requirements and every later executable or lifecycle nonpass. Because its bytes changed, it carries no inherited objective PASS. Before this successor can complete author review or become an exact Proposed candidate:
+This substantive `0.2.0` Draft addresses the mixed lifecycle presentation, the 96 capability-vector delimiter defects, and the previously unmodeled conjunction/disjunction semantics. It contains 312 local requirements and carries no inherited objective PASS. Before this successor can complete author review or become an exact Proposed candidate:
 
-1. every `JAN-CSAA-000` §10.3 obligation and all 290 local requirements must reproduce bidirectionally;
+1. every `JAN-CSAA-000` §10.3 obligation and all 312 local requirements must reproduce bidirectionally;
 2. all thirty-two profiles must pass the exact 28-facet, 896-cell, 864-internal-delimiter audit;
-3. direct-current corrective objective verification and ledger closure must bind the exact `0.1.1` bytes;
+3. direct-current executable query-algebra verification must bind the exact `0.2.0` bytes and treat every predecessor PASS as historical;
 4. affected cross-package reconciliation must bind every changed exact input and downstream consumer without rewriting historical reviewed bytes;
 5. the full planned documentation corpus must be authored and internally assured;
 6. the one consolidated implementation refresh and affected repository-currentness reconciliation must then be performed;

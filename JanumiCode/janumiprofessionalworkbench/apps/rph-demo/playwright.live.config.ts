@@ -27,9 +27,13 @@ export default defineConfig({
 	},
 	projects: [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' } }],
 	webServer: {
-		command: 'bun run e2e:server:live',
-		url: `http://127.0.0.1:${PORT}`,
-		reuseExistingServer: true,
+		// Keep the server as Playwright's direct child so Windows teardown cannot strand a Vite listener. A live
+		// calibration still requires the test harness mode and therefore must not reuse an arbitrary dev server.
+		command:
+			'node ../../node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4321 --strictPort',
+		// Readiness is itself a harness-mode assertion: this route is 404 outside RPH_DEMO_MODE=test.
+		url: `http://127.0.0.1:${PORT}/test-api/introspect`,
+		reuseExistingServer: false,
 		timeout: 120_000,
 		// Test-mode harness (reset/introspect) but the LIVE Pi agent. JPWB_AGENT_MODEL can override the model.
 		env: { RPH_DEMO_MODE: 'test', JPWB_AGENT: 'pi' }

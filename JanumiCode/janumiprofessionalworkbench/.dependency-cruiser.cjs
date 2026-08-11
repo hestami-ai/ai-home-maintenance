@@ -60,6 +60,13 @@ module.exports = {
 			severity: 'error',
 			from: { path: '^packages/rph-' },
 			to: { path: '^apps/' }
+		},
+		{
+			name: 'product-does-not-import-csaa',
+			comment: 'CSAA observes product source as data; product packages and apps must not depend on the analyzer.',
+			severity: 'error',
+			from: { path: '^(packages/rph-|apps/)' },
+			to: { path: '^packages/csaa/' }
 		}
 	],
 	options: {

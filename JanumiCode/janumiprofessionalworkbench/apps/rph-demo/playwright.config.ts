@@ -38,9 +38,14 @@ export default defineConfig({
 	},
 	projects: [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' } }],
 	webServer: {
-		command: 'bun run e2e:server',
-		url: `http://127.0.0.1:${PORT}`,
-		reuseExistingServer: true,
+		// Playwright owns the Vite process directly so teardown can terminate the complete server process on
+		// Windows. Reusing an arbitrary dev server would silently bypass RPH_DEMO_MODE=test and invalidate the
+		// deterministic reset/introspection contract.
+		command:
+			'node ../../node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4319 --strictPort',
+		// Readiness is itself a test-mode assertion: this route is 404 outside RPH_DEMO_MODE=test.
+		url: `http://127.0.0.1:${PORT}/test-api/introspect`,
+		reuseExistingServer: false,
 		timeout: 120_000,
 		env: { RPH_DEMO_MODE: 'test' }
 	}

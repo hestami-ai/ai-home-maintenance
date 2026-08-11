@@ -6,15 +6,15 @@
 
 **Canonical title:** Semantic Snapshot, Graph, Query, Analysis-Record, and Adapter Contract Package
 
-**Version:** `1.0.1`
+**Version:** `1.1.0`
 
 **Status:** Draft
 
 **Settledness:** HYPOTHESIS
 
-**Prepared time:** `2026-07-30T07:37:49.3078452-04:00`
+**Prepared time:** `2026-08-10T14:32:08-04:00`
 
-**Classification:** Prepared controlled-CSAA member candidate; non-authoritative documentation-only machine-contract specification, including the affected operational wire closure required by `JAN-CSAA-009@0.1.0`. No executable schema, generated type, validator, adapter, API implementation, fixture, test, provider result, persistence mechanism, or enforced reference artifact is created by this Draft
+**Classification:** Substantive controlled-CSAA member candidate; non-authoritative documentation-only machine-contract specification. This `1.1.0` successor carries the operational wire closure from `1.0.1` and adds the exact query-expression and explanation shape obligations needed to realize `JAN-CSAA-003@0.2.0` four-valued conjunction, disjunction, applicability, and short-circuit semantics. No executable schema, generated type, validator, adapter, API implementation, fixture, test, provider result, persistence mechanism, or enforced reference artifact is created by this Draft
 
 **Governing status:** Documentation-only Wave 3 authoring is commissioned by `JPWB-REG-005 REG-D-021`, corrected by `REG-D-022`, and conditionally activated by `JAN-CSAA-W2-SEMANTIC-READINESS-001@0.1.0`; this document has no member or shape authority
 
@@ -32,7 +32,7 @@
 
 **Effective adopted and canonical authorities:** `JAN-CSAA-000@0.3.0`, `JPWB-CON-000@1.3.0`, `JPWB-DOC-001@1.1.0`, `JPWB-DOC-002@1.2.0`, `JPWB-DOC-003@1.3.0`, `JPWB-DOC-004@1.3.0`, and `JPWB-REG-005@1.0.0 REG-D-021` and `REG-D-022`, each only for its owned concern
 
-**Exact provisional non-authoritative inputs:** `JAN-CSAA-001@0.3.0 / Draft`, `JAN-CSAA-002@0.3.0 / Draft`, `JAN-CSAA-003@0.1.0 / Draft`, `JAN-CSAA-004@0.1.0 / Draft`, `JAN-CSAA-005@0.3.0 / Draft`, `JAN-CSAA-006@0.1.0 / Draft`, `JAN-CSAA-008@0.1.1 / Draft`, and `JAN-CSAA-009@0.1.0 / Draft`. Their exact identities and qualifications appear in §4. They confer no authority; a change to an exact bound input triggers affected source reconciliation and review
+**Exact provisional non-authoritative inputs:** `JAN-CSAA-001@0.3.0 / Draft`, `JAN-CSAA-002@0.3.0 / Draft`, `JAN-CSAA-003@0.2.0 / Draft`, `JAN-CSAA-004@0.1.0 / Draft`, `JAN-CSAA-005@0.3.0 / Draft`, `JAN-CSAA-006@0.1.0 / Draft`, `JAN-CSAA-008@0.2.2 / Draft`, and `JAN-CSAA-009@0.1.0 / Draft`. Their exact identities and qualifications appear in §4. They confer no authority; a change to an exact bound input triggers affected source reconciliation and review
 
 **Precedence and conflict routing:** Canon retains professional-semantic authority and `JAN-CSAA-000` retains program scope. `JAN-CSAA-001` owns logical architecture; `JAN-CSAA-002` owns semantic identity; `JAN-CSAA-003` owns analysis, query, slice, comparison, and impact meaning; `JAN-CSAA-004` owns technical rule, result, finding, treatment, provider-declaration, and gate meaning; `JAN-CSAA-005` owns dated repository description; and `JAN-CSAA-006` owns fixture and proposed expected-judgment meaning. This Draft specifies candidate shapes only. Apparent conflicts are recorded and routed to the concern owner under `JPWB-DOC-004`; shape convenience never changes semantic meaning
 
@@ -46,7 +46,7 @@
 
 **Exact historical pre-review evidence:** [`JAN-CSAA-007-LEDGER-001@1.0.2`](<records/archive/JAN-CSAA-007-LEDGER@1.0.2.Closed.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>), 3,220,206 bytes, SHA-256 `9502246d8a8947013a461b9812045fbd22c4fe87448b643a1df988404216a04b`; [`JAN-CSAA-007-VERIFICATION-001@0.2.0`](<records/archive/JAN-CSAA-007-VERIFICATION@0.2.0.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>), 17,264 bytes, SHA-256 `49fe0cc99332daf9be61583e0eb5e720243b8d7d34c1b317e3b5a6cb5cd5618e`; [`JAN-CSAA-007-LEDGER-CLOSURE-INTEGRITY-001@0.2.0`](<records/archive/JAN-CSAA-007-LEDGER-CLOSURE-INTEGRITY@0.2.0.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>), 8,054 bytes, SHA-256 `07d0c90a67f83d74fbb6982b16dab1d8a624b5119ce7db145cad693ef12d946d`; [`JAN-CSAA-W3-TRIPLET-RECONCILIATION-001@0.1.0`](<records/JAN-CSAA-W3 - Wave 3 Exact Triplet Reconciliation and Synchronized Ledger State Record.md>), 22,856 bytes, SHA-256 `6031e1e7d4f7cfca027957a7c4a25c5b28333637e393054bec2403e7663696b7`; [`JAN-CSAA-007-SELF-REVIEW-001@0.1.0`](<records/archive/JAN-CSAA-007-SELF-REVIEW@0.1.0.PRELIMINARY.snapshot>), 15,885 bytes, SHA-256 `58be2761b9a82eb90fb601a5ea126ee2ea22ffd288daa95fb34f6b873457e6be`; and [`JAN-CSAA-WORKING-STATUS-001@0.10.0`](<records/JAN-CSAA - Working Corpus Authoring Status 010.md>), 14,133 bytes, SHA-256 `56d48fc90cff8d37b5ab151eb1fd2f067d46b7f85ebfe5e0cafd5f0c52dc2531`
 
-**Corrective-successor evidence boundary:** Exact `JAN-CSAA-007@1.0.0` objective closure and exact-triplet reconciliation are complete, and its preliminary author self-review was performed but remains nonpass with `JAN-CSAA-007-SR-001 / MINOR` open. This `JAN-CSAA-007@1.0.1` successor corrects controlled lifecycle-currentness metadata, document self-identity, immediate-supersession provenance, and one optional spelling defect only. It carries the `1.0.0` machine-contract package version, semantic meanings, registries, requirement obligations, allocations, execution states, and authority boundaries unchanged. A successor ledger, objective record, closure-integrity record, exact-triplet reconciliation, and eighteen-question self-review rerun against exact `1.0.1` bytes remain required before Proposed freeze
+**Successor evidence boundary:** Earlier objective and review records do not evaluate this `1.1.0` query-algebra correction and remain historical only. The prior query verification PASS cannot establish conjunction or disjunction conformance because the governing semantic source did not define either operation. Direct executable truth-table, provenance, applicability, and short-circuit evidence against this successor remains required
 
 **Companion enforced artifacts:** `NONE — NOT_AUTHORED / NOT_ENFORCED`
 
@@ -54,7 +54,7 @@
 
 **Generated TypeScript types:** Future derivative locations are specified in §6.4; every file remains `NOT_GENERATED / NOT_VERIFIED`
 
-**Conformance-test references:** Exact `JAN-CSAA-008@0.1.1 / Draft` is the predecessor conformance input for this affected shape successor; a versioned 008 affected successor must consume these exact operational shapes and the six `JAN-CSAA-009` phase/digest cases. Executable schema compilation, generation-parity checks, fixtures, validators, tests, adapter executions, provider qualification, and results remain separately unauthorized and unperformed
+**Conformance-test references:** Exact `JAN-CSAA-008@0.2.2 / Draft` is the predecessor conformance input for this query-algebra successor; a versioned 008 successor must consume these shapes, the exact `JAN-CSAA-003@0.2.0` truth algebra, and the six `JAN-CSAA-009` phase/digest cases. Executable schema compilation, generation-parity checks, fixtures, validators, tests, adapter executions, provider qualification, and results remain unperformed
 
 **Repository-evidence boundary:** Repository observations are dated evidence only. No statement in this Draft asserts continuously current implementation coverage. One consolidated implementation-subject refresh remains mandatory before final corpus freeze
 
@@ -64,7 +64,7 @@
 
 **Structural exemplars:** [RPH document-set README](<../Recursive Professional Harness/README.md>); [RPH assurance-policy catalog](<../Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract.md>); [RPH executable invariant specification](<../Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification.md>)
 
-**Supersedes:** [JAN-CSAA-007@1.0.0 / Draft](<records/archive/JAN-CSAA-007@1.0.0.Draft.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>); 1,340,805 bytes; SHA-256 `e6f635ca42e5d74cbe0ec942a4f6b7793fa15e54acca1098be62e8086dee8e5e`; exact predecessor and its synchronized ledger, objective, closure-integrity, W3-reconciliation, and preliminary-self-review evidence remain immutable historical evidence; patch scope is controlled document self-identity carriage, post-review lifecycle-currentness correction, immediate-supersession provenance, and one optional spelling correction only; machine-contract package version `1.0.0`, every semantic distinction, registry, requirement obligation, allocation, nonperformance state, authority boundary, and the earlier `0.1.0` predecessor chain remain unchanged
+**Supersedes:** `JAN-CSAA-007@1.0.1 / Draft`; 1,343,092 bytes; SHA-256 `b2d034ac20ddca2a3676e152770b28fbccee83ab4a5c882d5a581bd33f1186b6`. No new archive or process record is created by this implementation-readiness correction; predecessor recovery relies on repository history
 
 **Superseded by:** None
 
@@ -165,12 +165,12 @@ If a semantic source and a candidate field table appear incompatible, the semant
 | --- | ---: | --- | --- |
 | `JAN-CSAA-001@0.3.0 / Draft` | 109,420 | `cda7defe7fa310f912bceb8b355952e1159bebc05528fc51c310578ede26237b` | Logical boundaries, flows, threats, publication, allocation `ALLOC-007` |
 | `JAN-CSAA-002@0.3.0 / Draft` | 162,179 | `9bcaa9f9a2212d66ae7c417af84c4f0e14672d282c04e73d719f7f9cceda1911` | Semantic objects, relations, profiles, epistemic dimensions, invariants |
-| `JAN-CSAA-003@0.1.0 / Draft` | 169,676 | `65b3a9379dd47a25de1693ed709eafd11f7a9063db1cfd80b5da2bba01b46d10` | Capability, query, slice, comparison, delta, and impact meanings |
+| `JAN-CSAA-003@0.2.0 / Draft` | 186,716 | `7112228c65a8f36953bc24b56fbc434aaab09f26fad7817ea44dc4010f3d7c9e` | Capability, four-valued query algebra, slice, comparison, delta, and impact meanings |
 | `JAN-CSAA-004@0.1.0 / Draft` | 176,071 | `8812dc55c05167223341b08d3d5bc85b8b1e5ad085c9a0e198a13512af69dc89` | Rule, result, finding, treatment, gate, provider, and failure meanings |
 | `JAN-CSAA-005@0.3.0 / Draft` | 119,118 | `3a9f49a492ca0b73cb50413bf694cf90e0608d73d6248db9df7cb45804b80625` | Dated repository evidence and candidate package context only |
 | `JAN-CSAA-006@0.1.0 / Draft` | 138,584 | `7d6804b0198ba19285903f53ac5053971310b0278bd5a6c7f6946e3265814361` | Fixture, scenario, proposed expected-judgment, mutation, and degradation meanings |
 | `JAN-CSAA-W2-SEMANTIC-READINESS-001@0.1.0` | 15,435 | `4966e308024fd451bcc7f2378810389fda0d4446e0738f2b9663e4974c46ba18` | Conditional Wave 3 documentation-entry boundary |
-| `JAN-CSAA-008@0.1.1 / Draft` | 206,705 | `a15488930e16769d3ed63d1ca8e9f89c0531b4e43c1b80065a9a0d034e345663` | Exact predecessor conformance method and operation/error/test population input |
+| `JAN-CSAA-008@0.2.2 / Draft` | 261,544 | `f4bbe60c8edc67ac70ddf89e7c3963725252c8915dfceefd5e9d46bd70ef082a` | Exact predecessor conformance method and operation/error/test population input |
 | `JAN-CSAA-009@0.1.0 / Draft` | 372,913 | `13c61cf36920b4d5cd804a9a0be09e32013b810f12ebd2a09708bb1c1562447d` | Exact operational semantic owner and affected-shape source |
 | `JAN-CSAA-009-LEDGER-001@0.1.1 / CLOSED_FOR_NAMED_COMMISSION` | 2,861,853 | `31b9232f012df5950cb0ce3851e1b2e84cd71a237477b88c93aaed8b741f36ec` | Exact objective-closure state; activates affected 007/008 reconciliation only |
 | `JAN-CSAA-009-VERIFICATION-001@0.1.0` | 23,690 | `87da6aa9dbdd19b7621f4f6f8cfa6eea268620d17df11d2296b19c225aa0b1a5` | Objective documentation-verification evidence only |
@@ -193,7 +193,7 @@ If a semantic source and a candidate field table appear incompatible, the semant
 | Final-corpus condition | Perform one consolidated implementation refresh and affected reconciliation before exact corpus freeze |
 | `JAN-CSAA-009` objective closure | Activate only affected 007/008 documentation reconciliation; preserve every implementation, executable, oracle, provider, topology, sponsor, and full-wave nonpass |
 | Affected-shape condition | Add versioned operational shapes and typed errors; do not overload or reinterpret exact `JAN-CSAA-007@0.1.0` bytes |
-| Affected-test condition | Preserve exact `JAN-CSAA-008@0.1.1` test ownership while allocating the later `@0.2.0` reconciliation |
+| Affected-test condition | Preserve exact `JAN-CSAA-008@0.2.2` test ownership while allocating this later query-algebra correction |
 
 The exact `JAN-CSAA-001` through `JAN-CSAA-006` successor ledgers control each predecessor's objective evidence. The exact `JAN-CSAA-003-LEDGER-001@0.1.1`, `JAN-CSAA-004-LEDGER-001@0.1.1`, and `JAN-CSAA-006-LEDGER-001@0.1.1` states, their exact `@0.1.2` objective records, and the Wave 2 closure/reconciliation records control performed Wave 2 author-side evidence. Status 009 preserves the exact pre-entry preliminary-review snapshot, while the Wave 3 Entry Record controls documentation entry. Every predecessor `VER-SELF-001` method remains nonpass; seven major findings and two minor findings remain open; and no embedded initial `NOT_RUN` or acceptance table is treated as current evidence.
 
@@ -877,7 +877,7 @@ The only remaining materiality uncertainty is `ImpactCandidateRecord`, resolved 
 
 ### 7.12 Major-version operational registry routing
 
-Appendix F is the normative `JAN-CSAA-007@1.0.1` operational wire-closure registry. It adds one `DefinitionEnvelope` assignment for `OperationalProfileDefinitionRecord` and 31 immutable operational occurrence assignments without altering the exact Appendix E proof for the 144 legacy material definitions. The complete `1.0.0` package therefore contains 176 top-level material-definition assignments: 144 preserved legacy assignments plus 32 operational assignments.
+Appendix F is the normative `JAN-CSAA-007@1.1.0` operational wire-closure registry. It adds one `DefinitionEnvelope` assignment for `OperationalProfileDefinitionRecord` and 31 immutable operational occurrence assignments without altering the exact Appendix E proof for the 144 legacy material definitions. The complete `1.1.0` package therefore contains 176 top-level material-definition assignments: 144 preserved legacy assignments plus 32 operational assignments.
 
 Operational records use the closed `OperationalRecordEnvelope`, operational target, identity, canonical-key, collection, digest-profile, and finalization registries in Appendix F. They do not silently widen `JAN-CSAA-007-ERT-R-T068`, reuse a legacy record name, extend the common creation-role lifecycle vocabulary, or add a state to the closed operation-response union. Cross-family references are permitted only through the exact directional bridge rows in Appendix F.
 ## 8. Subject, snapshot, change, publication, freshness, and invalidation contracts
@@ -1400,7 +1400,7 @@ Each comparison records `equivalent`, `permitted-difference`, `different`, `not-
 
 ### 12.1 Query Definition, Reference, and Request
 
-`QueryDefinitionRecord` contains stable identity/version, purpose, subject/evidence binding policy, population, perimeter, graph/relation families, typed predicate expression, joins, traversal directions and bounds, project/build/environment/workload contexts, capability prerequisites, ordering policy, budgets, pagination, cancellation, truncation policy, access/redaction policy, and explanation obligations.
+`QueryDefinitionRecord` contains stable identity/version, purpose, subject/evidence binding policy, population, perimeter, graph/relation families, typed predicate expression, joins, traversal directions and bounds, project/build/environment/workload contexts, capability prerequisites, ordering policy, budgets, pagination, cancellation, truncation policy, access/redaction policy, and explanation obligations. It binds the exact query-algebra semantic-owner ID/version, evaluation mode, node-trace policy, and complete-evidence policy; those fields participate in Query Definition identity.
 
 `QueryReferenceRecord` binds one definition and materialized parameters to exactly one Static Semantic Snapshot Identity and either one compatible Execution Evidence Set Identity or explicit `not-applicable`.
 
@@ -1417,8 +1417,8 @@ The candidate query expression is a closed abstract syntax tree, not a provider-
 | `attribute-predicate` | registered field path, typed operator, typed value |
 | `has-relation` | relation kind, direction, endpoint predicate |
 | `traverse` | relation kinds, direction, depth/path bounds, node predicate |
-| `and` / `or` | ordered nonempty child expressions |
-| `not` | one child expression |
+| `and` / `or` | ordered nonempty child expressions and `complete` or `decisive-short-circuit` evaluation mode |
+| `not` | exactly one child expression |
 | `exists` | closed population and child expression |
 | `for-all` | closed population and child expression |
 | `join` | left/right population, key expressions, join kind, loss policy |
@@ -1427,6 +1427,24 @@ The candidate query expression is a closed abstract syntax tree, not a provider-
 Provider-specific syntax is an adapter input only. The adapter retains both native query and normalized AST plus transformation evidence.
 
 `QueryExpression` is a registered same-document recursive definition. Every root expression carries one `ExpressionBudget` with positive safe-integer `maxNodes`, `maxDepth`, and `maxFanout`, plus an exact `resourceBudgetRef`. Traversal depth, aggregate-group, result-size, and execution-time bounds remain separate typed query and resource-budget fields. A validator counts the fully materialized normalized AST, rejects a root that exceeds any expression bound, and rejects a recursive reference outside the registered `QueryExpression` definition. An adapter cannot replace, relax, or bypass these bounds through provider-native syntax.
+
+`predicateTruth` serializes one of `supported-true`, `supported-false`, `unknown`, or `conflicting`. Its fixed semantic projection is the exact evidence pair `trueSupport`/`falseSupport`: `(1,0)`, `(0,1)`, `(0,0)`, or `(1,1)` respectively. The pair is derived and need not be duplicated on the wire. `not` swaps its two support coordinates. `and` derives true support with all-child conjunction and false support with any-child disjunction. `or` derives true support with any-child disjunction and false support with all-child conjunction. Validators SHALL reject a provider-native mapping or adapter result that produces a different table.
+
+Applicability, coverage, health, freshness, conflict, and inference remain outside `predicateTruth`. A reasoned not-applicable, excluded, unsupported, or not-evaluated child contributes neither support coordinate, retains its exact owning state, and is never serialized as a Boolean identity. The fixed projection may nevertheless be decided by another child under the `JAN-CSAA-003@0.2.0` rules.
+
+Every normalized AST node carries exactly one closed evaluation-disposition variant:
+
+| Variant | Required fields | Forbidden fields |
+| --- | --- | --- |
+| `applicable-result` | node path or ordinal, operator, `predicateTruth`, epistemic state, evaluated child references, support-evidence references, determining-child references, composition-rule reference | not-applicable reason; skipped-node fabrication |
+| `not-applicable` | node path or ordinal, semantic-owner reference, reason code, rationale, applicability basis | `predicateTruth`, support pair, provider result, ordinary unknown substitution |
+| `short-circuited` | node path or ordinal, decisive ancestor/node reference, decisive child and truth, previously evaluated children, skipped child paths, algebra version | `predicateTruth`, support pair, conflict/freshness/provider fabrication, complete-evaluation claim |
+
+If every child is `not-applicable`, the parent uses `not-applicable`. Otherwise the parent uses `applicable-result` and projects each not-applicable child as zero true and false support while retaining its separate disposition. The root Query Result partitions applicable `supported-true`, `supported-false`, `unknown`, and `conflicting` regions from `not-applicable` and omitted-or-unevaluated regions; no collection membership substitutes for the six-dimensional epistemic state.
+
+`complete` evaluates every child. `decisive-short-circuit` evaluates children in stored order and may stop `and` only after supported false or `or` only after supported true. It cannot stop on unknown, conflicting, not-applicable, excluded, unsupported, failed, or resource-refused state. The evaluation mode is part of Query Definition identity. A request whose explanation, diagnostic, or evidence policy requires complete child material rejects or overrides short-circuit mode explicitly rather than silently omitting evidence.
+
+Framing and shape validation validate the fully materialized normalized AST and all expression budgets before evaluation begins. A subtree that would be skipped during lawful short-circuiting still participates in `maxNodes`, `maxDepth`, `maxFanout`, traversal, and resource-bound validation and cannot hide an invalid discriminator or recursive reference.
 
 ### 12.3 Query Result and explanation
 
@@ -1437,7 +1455,8 @@ Provider-specific syntax is an adapter input only. The adapter retains both nati
 - materialized parameters;
 - declared population, included/excluded/unknown regions, and closure basis;
 - supported matches and supported non-matches as separate collections;
-- predicate-truth projection per material region;
+- applicable unknown, projected-conflict, reasoned-not-applicable, and omitted-or-unevaluated regions as separate collections;
+- predicate-truth projection only for applicable evaluated regions;
 - the six-dimensional epistemic state per region;
 - counts, numerators, denominators, lower-bound markers, and grouping context;
 - ordering, page, cursor, truncation, traversal, and resource state;
@@ -1447,7 +1466,7 @@ Provider-specific syntax is an adapter input only. The adapter retains both nati
 
 `predicateTruth` is `supported-true`, `supported-false`, `unknown`, or `conflicting`. Coverage, health, freshness, and perimeter states remain in their own fields.
 
-`QueryExplanationRecord` contains material claim, supporting and contradicting records, witness paths, composition rules, omitted/unknown regions, semantic-loss disclosures, and safe human-readable rendering. If parent correlation is required, it uses an identity-only Query Result reference under §7.2; the finalized Query Result content-binds the explanation. Rendering never substitutes for the typed explanation graph.
+`QueryExplanationRecord` contains material claim, supporting and contradicting records, witness paths, composition rules, omitted/unknown regions, semantic-loss disclosures, and safe human-readable rendering. Its `nodeEvaluations` member is a flat, canonically ordered list with exactly one entry for every normalized AST node. Each entry carries the closed evaluation-disposition union above, node path or ordinal, operator, deterministic child order, evaluated child truths and epistemic-state references, intermediate and final truth where applicable, evaluation mode, decisive child when present, skipped child identities, exact composition rule and algebra version, support references, and provenance. The parent entry also carries an effective value and ordered contribution vector for support basis, capability coverage, execution health, freshness, conflict, and inference. A projected decisive truth never removes a contributing conflict, failure, stale item, contradictory record, or previously evaluated provenance. If parent correlation is required, it uses an identity-only Query Result reference under §7.2; the finalized Query Result content-binds the explanation. Rendering never substitutes for the typed explanation graph.
 
 ### 12.4 Pagination and ordering
 
@@ -2595,7 +2614,7 @@ Requirement identifiers are permanent within `JAN-CSAA-007`. Retirement creates 
 | `CSAA-007-OWN-011` | `JAN-CSAA-011` SHALL retain ownership of concrete provider and adapter qualification, selection, configuration, and operation. |
 | `CSAA-007-OWN-012` | Canonical assurance records and authority meanings SHALL remain owned by their applicable canonical services and authorities. |
 | `CSAA-007-OWN-013` | `JAN-CSAA-009` SHALL retain exclusive concern ownership of operational state, persistence, publication, cache, concurrency, recovery, migration, retention, health, and physical-action meaning. |
-| `CSAA-007-OWN-014` | `JAN-CSAA-007@1.0.1` SHALL own only the lossless candidate wire representation of the exact `JAN-CSAA-009@0.1.0` operational meaning. |
+| `CSAA-007-OWN-014` | `JAN-CSAA-007@1.1.0` SHALL own only the lossless candidate wire representation of the exact `JAN-CSAA-009@0.1.0` operational meaning. |
 
 ### 24.3 Exact source constraints and provisional-state preservation
 
@@ -2612,7 +2631,7 @@ Requirement identifiers are permanent within `JAN-CSAA-007`. Retirement creates 
 | `CSAA-007-SRC-009` | The current contract baseline SHALL contain zero permanent Repository Gate Profile instances. |
 | `CSAA-007-SRC-010` | Every imported expected judgment SHALL retain `proposed / not-conferred / not-executed`. |
 | `CSAA-007-SRC-011` | Analysis Rule Profile interim transition carrier SHALL retain the explicit meaning `N/A — no instantiated RGP or protected transition` for the exact provisional source baseline. |
-| `CSAA-007-SRC-012` | The affected successor SHALL bind exact `JAN-CSAA-008@0.1.1` and `JAN-CSAA-009@0.1.0` main-document identities, bytes, and digests. |
+| `CSAA-007-SRC-012` | The affected successor SHALL bind exact `JAN-CSAA-008@0.2.2` and `JAN-CSAA-009@0.1.0` main-document identities, bytes, and digests. |
 | `CSAA-007-SRC-013` | The affected successor SHALL bind the exact closed `JAN-CSAA-009` ledger, objective-verification record, and closure-integrity record. |
 | `CSAA-007-SRC-014` | Exact `JAN-CSAA-007@0.1.0` bytes SHALL remain immutable historical evidence, free from retroactive reinterpretation as the operational shape family. |
 | `CSAA-007-SRC-015` | `JAN-CSAA-009` objective closure SHALL activate only affected documentation reconciliation without implying implementation, execution, oracle, provider, topology, sponsor, or full-wave authority. |
@@ -2842,6 +2861,21 @@ Requirement identifiers are permanent within `JAN-CSAA-007`. Retirement creates 
 | `CSAA-007-QRY-033` | `ChangeSeedRecord` SHALL use the closed seven-variant seed registry with exact change-set, range, semantic-identity, mapping, derivation, coverage, and epistemic fields. |
 | `CSAA-007-QRY-034` | `ReachabilitySurfaceDefinitionRecord` SHALL bind every registered applicable entry mechanism, entry population, closure rule, capability, and invalidation dependency. |
 | `CSAA-007-QRY-035` | A negative reachability conclusion SHALL remain inconclusive unless every applicable entry population is closed, current, compatible, completely analyzed, and successfully resolved without a positive entry. |
+| `CSAA-007-QRY-036` | Predicate truth SHALL serialize the exact four evidence-pair states defined by `JAN-CSAA-003@0.2.0`. |
+| `CSAA-007-QRY-037` | `not` SHALL swap true and false support without collapsing unknown or conflict. |
+| `CSAA-007-QRY-038` | `and` SHALL derive true support from all children and false support from any child. |
+| `CSAA-007-QRY-039` | `or` SHALL derive true support from any child and false support from all children. |
+| `CSAA-007-QRY-040` | Applicability, coverage, health, freshness, conflict, and inference SHALL remain independently represented through logical evaluation. |
+| `CSAA-007-QRY-041` | Every `and` and `or` SHALL carry a nonempty deterministic child order and an identity-bearing evaluation mode. |
+| `CSAA-007-QRY-042` | Decisive short-circuit SHALL occur only for supported-false `and` or supported-true `or` while exposing every skipped child as not evaluated. |
+| `CSAA-007-QRY-043` | Every logical Query Explanation SHALL retain child inputs, intermediate truth, decisive and skipped children, composition rule, conflict, epistemic state, and provenance. |
+| `CSAA-007-QRY-044` | Every Query Definition SHALL bind the exact query-algebra owner/version, evaluation mode, node-trace policy, and complete-evidence policy. |
+| `CSAA-007-QRY-045` | Every normalized AST node SHALL use exactly one `applicable-result`, `not-applicable`, or `short-circuited` disposition. |
+| `CSAA-007-QRY-046` | A not-applicable or short-circuited node SHALL prohibit fabricated predicate truth, support, conflict, freshness, or provider results. |
+| `CSAA-007-QRY-047` | Every Query Explanation SHALL contain one canonically ordered node-evaluation entry for every normalized AST node. |
+| `CSAA-007-QRY-048` | Every Query Result SHALL partition applicable truth states, not-applicable regions, and omitted or unevaluated regions separately. |
+| `CSAA-007-QRY-049` | Full normalized-AST shape and budget validation SHALL precede evaluation and short-circuiting. |
+| `CSAA-007-QRY-050` | Every logical parent evaluation SHALL retain an effective value and ordered child-contribution vector for all six epistemic dimensions. |
 
 ### 24.11 Test, coverage, runtime, and trace evidence
 
@@ -3164,7 +3198,7 @@ Requirement identifiers are permanent within `JAN-CSAA-007`. Retirement creates 
 | `CSAA-007-VFY-037` | Author-side verification SHALL reproduce H01–H14, closed no-current standing, five-axis preservation, and no aggregate healthy Boolean. |
 | `CSAA-007-VFY-038` | Author-side verification SHALL prove operational envelope, target, reference, canonical-key, collection, digest, and finalization registries are total and acyclic. |
 | `CSAA-007-VFY-039` | Later conformance allocation SHALL include all six phase/digest-cycle negatives as distinct independently reported cases without conferring an oracle. |
-| `CSAA-007-VFY-040` | Mechanical verification SHALL account for exactly 637 local requirements and every changed exact registry count in this major successor. |
+| `CSAA-007-VFY-040` | Mechanical verification SHALL account for exactly 652 local requirements and every changed exact registry count in this minor successor. |
 
 ### 24.22 Operational profile definition
 
@@ -3336,7 +3370,7 @@ The requirement ledger and objective verification record carry execution state. 
 | `JAN-CSAA-007-VER-COM-001` | Common values, references, and envelopes | Purpose-specific digests; identity/content-bound references; field/cardinality/enums; location; all 144 preserved legacy envelope assignments plus 32 operational assignments; closed Observation Scope variants; envelope and collection totality; predecessor-only lifecycle; structured support basis |
 | `JAN-CSAA-007-VER-SEM-001` | Semantic catalogs and invariants | 127 object rows, 137 relation rows, complete profile-facet maps, exact per-variant envelope/subject policies, unique discriminators, `INV-001`–`014` |
 | `JAN-CSAA-007-VER-CAP-001` | Capability carriers | 32 profiles × 28 ordered labels = 896 cells, no punctuation parser, acyclic dependencies |
-| `JAN-CSAA-007-VER-QRY-001` | Query/slice/comparison/impact/reachability | Truth/epistemic separation, ExpressionBudget, population closure, entry-mechanism registry, reachability closure, witnesses/frontiers, graph-delta direction, no false empty |
+| `JAN-CSAA-007-VER-QRY-001` | Query/slice/comparison/impact/reachability | Exact four-valued negation/conjunction/disjunction tables, applicability preservation, complete and decisive-short-circuit modes, truth/epistemic separation, ExpressionBudget, population closure, entry-mechanism registry, reachability closure, witnesses/frontiers, graph-delta direction, no false empty |
 | `JAN-CSAA-007-VER-ANA-001` | Analysis health, equivalence, and model exchange | Provider-health dimensions; eight incremental-equivalence dimensions and derivation; ModelExchange and raw lineage |
 | `JAN-CSAA-007-VER-EXE-001` | Build/test/coverage/runtime/trace | Exact build, instrumentation, provider method, input, selection, workload, environment, schema/collector, observation-limit, and mapping bindings |
 | `JAN-CSAA-007-VER-RUL-001` | Rule/finding/treatment/gate | Complete eighteen-facet ARPs/RGTs, exact registries, two state products, immutable treatment axes, RGT inertness, zero RGP, no authority fabrication |
@@ -3353,7 +3387,7 @@ The requirement ledger and objective verification record carry execution state. 
 | `JAN-CSAA-007-VER-PUB-001` | Publication and replay finalization | Distinct lifecycle/content/decision/read records; three self-excluding preimages; nine-step acyclic DAG; six negative allocations |
 | `JAN-CSAA-007-VER-HLT-001` | Operational errors, health, and security | Twelve gap/code/payload mappings; H01–H14; no-current view; five-axis preservation; non-disclosure |
 | `JAN-CSAA-007-VER-A009-001` | Exact affected-source reconciliation | Exact 008 predecessor and 009 package identities, source allocations, nonperformance, and no-authority boundary |
-| `JAN-CSAA-007-VER-REQ-001` | Requirement accounting | Exactly 637 unique contiguous local IDs, mechanical mandatory-keyword extraction, and bidirectional ledger reconciliation |
+| `JAN-CSAA-007-VER-REQ-001` | Requirement accounting | Exactly 652 unique contiguous local IDs, mechanical mandatory-keyword extraction, and bidirectional reconciliation |
 | `JAN-CSAA-007-VER-INTEGRITY-001` | Controlled bytes | Headings, links, tables, fences, encoding, terminal newline, exact bytes/digest |
 | `JAN-CSAA-007-VER-SELF-001` | Post-ledger author self-review | Complete applicable adversarial-question record against exact frozen candidate |
 
@@ -3380,7 +3414,7 @@ No row in this table is current execution evidence. Later results remain nonpass
 This Draft is structurally eligible for author-side closure only when:
 
 1. every applicable inherited obligation is extracted and bidirectionally traced;
-2. all 637 local atomic requirements are uniquely ledgered;
+2. all 652 local atomic requirements are uniquely accounted for;
 3. every designated family, source, derivative, status, dependency, digest, reference, envelope, collection, operation, error, and other closed registry is accounted for;
 4. all 127 object and 137 relationship variants are present exactly once with unique discriminators and exact field definitions;
 5. all 14 cross-graph invariants map to validation and later conformance;
@@ -3877,7 +3911,7 @@ OBJ-010 is finalized under `ScopedObservationEnvelope`. Its `/scope` is a closed
 | Assignment | Exact value |
 | --- | --- |
 | `/ownerRef` for every `OBJ-001`–`OBJ-127` | `DocumentMemberIdentityRef(JAN-CSAA-002@0.3.0 / Draft / sha256:9bcaa9f9a2212d66ae7c417af84c4f0e14672d282c04e73d719f7f9cceda1911)` |
-| Serialization-owner designation for every `OBJ-001`–`OBJ-127` | Candidate documentation designates `JAN-CSAA-007@1.0.1 / Draft` without embedding this document's digest in its own bytes. The finalized Contract Package or Integrity Manifest externally binds that designation to the frozen document digest. Every later instantiated Semantic Object carries `/serializationOwnerRef` as an exact `ContractRef` to the separately designated schema artifact, never a self-referential documentation hash. |
+| Serialization-owner designation for every `OBJ-001`–`OBJ-127` | Candidate documentation designates `JAN-CSAA-007@1.1.0 / Draft` without embedding this document's digest in its own bytes. The finalized Contract Package or Integrity Manifest externally binds that designation to the frozen document digest. Every later instantiated Semantic Object carries `/serializationOwnerRef` as an exact `ContractRef` to the separately designated schema artifact, never a self-referential documentation hash. |
 | `/invariantIds` | The exact profile baseline in §C.2.2, plus the variant addition below; sets are canonical by invariant ID |
 
 The sole variant-specific invariant addition is `OBJ-004 → INV-011`. Every other variant's exact invariant set equals its profile baseline. This rule makes all 127 assignments deterministic rather than leaving them to an absent manifest.
@@ -4065,9 +4099,9 @@ The following paths have one authoritative storage location:
 Owner and serialization-owner tokens in the tables are closed registry shorthand, not bare serialized strings. They resolve as follows:
 
 - `JAN-CSAA-002` resolves to the exact content-bound source-owner reference for `JAN-CSAA-002@0.3.0 / Draft`, path `JAN-CSAA-002 - TypeScript Semantic Model and Invariant Catalog.md`, and 162,179 exact stored bytes, as frozen by `JAN-CSAA-007` §4.1. Its digest descriptor is `{ algorithm: sha256, value: 9bcaa9f9a2212d66ae7c417af84c4f0e14672d282c04e73d719f7f9cceda1911, profileId: urn:janumi:csaa:digest-profile:raw-bytes:1.0.0, profileVersion: 1.0.0, representation: raw-bytes }`. Materialization uses the exact typed owner-reference and digest fields registered by §7.2; the shorthand never serializes as a document-ID string.
-- `JAN-CSAA-003` resolves analogously to exact bound input `JAN-CSAA-003@0.1.0 / Draft`, path `JAN-CSAA-003 - Analysis Enrichment Query and Change Impact Specification.md`, and 169,676 exact stored bytes. Its digest descriptor uses the same raw-byte profile with value `65b3a9379dd47a25de1693ed709eafd11f7a9063db1cfd80b5da2bba01b46d10`.
+- `JAN-CSAA-003` resolves analogously to exact bound input `JAN-CSAA-003@0.2.0 / Draft`, path `JAN-CSAA-003 - Analysis Enrichment Query and Change Impact Specification.md`, and 186,716 exact stored bytes. Its digest descriptor uses the same raw-byte profile with value `7112228c65a8f36953bc24b56fbc434aaab09f26fad7817ea44dc4010f3d7c9e`.
 - `JAN-CSAA-004` resolves analogously to exact bound input `JAN-CSAA-004@0.1.0 / Draft`, path `JAN-CSAA-004 - Code Analysis Rule Gate and Analyzer Provider Contract.md`, and 176,071 exact stored bytes. Its digest descriptor uses the same raw-byte profile with value `8812dc55c05167223341b08d3d5bc85b8b1e5ad085c9a0e198a13512af69dc89`.
-- `JAN-CSAA-007` in a candidate-registry row designates candidate identity `JAN-CSAA-007@1.0.1` and path `JAN-CSAA-007 - Semantic Snapshot Graph Query Analysis Record and Adapter Contract Package.md`. This candidate does not embed its own content digest. Finalized package and integrity evidence bind the final document and schema digest externally; every later material record uses the resulting exact finalized `ContractRef`, including `schemaId` and the complete typed `contractContentDigest`.
+- `JAN-CSAA-007` in a candidate-registry row designates candidate identity `JAN-CSAA-007@1.1.0` and path `JAN-CSAA-007 - Semantic Snapshot Graph Query Analysis Record and Adapter Contract Package.md`. This candidate does not embed its own content digest. Finalized package and integrity evidence bind the final document and schema digest externally; every later material record uses the resulting exact finalized `ContractRef`, including `schemaId` and the complete typed `contractContentDigest`.
 - An advisory or other external concern owner resolves to the exact applicable `AuthorityRef`, `ExternalRef`, or `ContractRef` carried or content-bound by the relation endpoint and provenance. An owner without the complete fields of its selected §7.2 reference type is invalid. The owner union is closed; a display label, URI, organization name, or bare document ID is not an owner reference.
 
 All `/ownerRef = …` and `/serializationOwnerRef = …` cells below resolve through these rules. This document therefore neither embeds a self-digest nor permits a future record to omit its finalized contract digest.
@@ -4322,7 +4356,7 @@ An integrated Appendix D passes this registry only when:
 
 ## Appendix E — Exact auxiliary-type, reference, key, and substitution closure registry
 
-This appendix is a preserved legacy-family serialization decision carried into `JAN-CSAA-007@1.0.1 / Draft`. It closes the object-side auxiliary vocabulary used by Appendix C without transferring semantic ownership from `JAN-CSAA-002@0.3.0 / Draft`. The registry contains exactly 89 PascalCase leaf types, the one `RepositorySnapshotConstructionScope` composition token, and 82 `EnumRef` registry IDs. A conforming schema generator treats every row as closed. An undeclared member, branch, literal, null, extension point, generic property bag, or residual reference is a validation failure.
+This appendix is a preserved legacy-family serialization decision carried into `JAN-CSAA-007@1.1.0 / Draft`. It closes the object-side auxiliary vocabulary used by Appendix C without transferring semantic ownership from `JAN-CSAA-002@0.3.0 / Draft`. The registry contains exactly 89 PascalCase leaf types, the one `RepositorySnapshotConstructionScope` composition token, and 82 `EnumRef` registry IDs. A conforming schema generator treats every row as closed. An undeclared member, branch, literal, null, extension point, generic property bag, or residual reference is a validation failure.
 
 The source-owned rows below are local wire projections of already named JAN-CSAA-002 meaning. They do not add authority, correctness, completeness, or behavioral claims. A row labelled `CONSERVATIVE_CANDIDATE_REPAIR` closes a former documentation gap only for this candidate Contract Package; it is not attributed to an external source and is displaced by any later, valid concern-owner definition through an explicit successor and compatibility decision.
 
@@ -4362,7 +4396,7 @@ Each row has one basis:
 | `SOURCE_PROJECTION` | JAN-CSAA-002 owns the named semantic facet; JAN-CSAA-007 owns only the closed local serialization selected here. |
 | `CONSERVATIVE_CANDIDATE_REPAIR` | Current source and core text leave the shape or values underdefined. This appendix selects the smallest operationally useful closed candidate, states the limit, and claims no external authority for the selection. |
 
-The serialization owner of every row is `JAN-CSAA-007@1.0.1 / Draft`; the exact source-projection rows are unchanged from the preserved predecessor. The semantic-owner/source column identifies meaning, not wire ownership. A source projection is invalidated when a source subject, bound record, tool/provider identity or version, governing configuration, source mapping, observation cutoff, or named semantic-owner definition on which its value depends changes. A candidate repair is additionally invalidated by a conflicting concern-owner definition; replacement requires an explicit successor and compatibility treatment. A core alias follows the invalidation and compatibility rules of its aliased core contract. These common rules are supplemented, not weakened, by each row's limit/invalidation cell.
+The serialization owner of every row is `JAN-CSAA-007@1.1.0 / Draft`; the exact source-projection rows are unchanged from the preserved predecessor. The semantic-owner/source column identifies meaning, not wire ownership. A source projection is invalidated when a source subject, bound record, tool/provider identity or version, governing configuration, source mapping, observation cutoff, or named semantic-owner definition on which its value depends changes. A candidate repair is additionally invalidated by a conflicting concern-owner definition; replacement requires an explicit successor and compatibility treatment. A core alias follows the invalidation and compatibility rules of its aliased core contract. These common rules are supplemented, not weakened, by each row's limit/invalidation cell.
 
 #### E.1.4 Prohibited widenings
 
@@ -4584,7 +4618,7 @@ The four empty enum registries `typescript-script-kind`, `typescript-symbol-flag
 
 #### E.4.3 Conservative candidate-repair ledger
 
-The following are exactly the 34 formerly underdefined tokens. Every entry has basis `CONSERVATIVE_CANDIDATE_REPAIR`, is serialized only by `JAN-CSAA-007@1.0.1 / Draft` as a preserved legacy-family projection, carries the row-specific limit and invalidation rule cited below, and claims no external authority. A conflicting concern-owner definition invalidates the candidate entry and requires an explicit successor plus compatibility treatment; silent widening or reinterpretation is not permitted.
+The following are exactly the 34 formerly underdefined tokens. Every entry has basis `CONSERVATIVE_CANDIDATE_REPAIR`, is serialized only by `JAN-CSAA-007@1.1.0 / Draft` as a preserved legacy-family projection, carries the row-specific limit and invalidation rule cited below, and claims no external authority. A conflicting concern-owner definition invalidates the candidate entry and requires an explicit successor plus compatibility treatment; silent widening or reinterpretation is not permitted.
 
 | Repair ordinal | Token | Governing closure row | Conservative decision boundary |
 | ---: | --- | --- | --- |
@@ -4663,7 +4697,7 @@ This appendix closes serialization only. It does not establish implementation co
 
 ### E.RL Relation logical-type and bounded-substitution registry
 
-This fragment is a preserved legacy-family serialization decision carried into `JAN-CSAA-007@1.0.1 / Draft`. It closes the relation-side logical types used by Appendix D after the exact core types, Appendix C object aliases, inline-closed tokens, and the separately registered reference, subtype-predicate, and canonical-key rows are excluded. Semantic ownership remains with `JAN-CSAA-002@0.3.0 / Draft`; `JAN-CSAA-007` owns only the closed serialization projection. A schema generator rejects an undeclared member, branch, literal, null, extension member, generic property bag, unbounded integer, or unresolved leaf.
+This fragment is a preserved legacy-family serialization decision carried into `JAN-CSAA-007@1.1.0 / Draft`. It closes the relation-side logical types used by Appendix D after the exact core types, Appendix C object aliases, inline-closed tokens, and the separately registered reference, subtype-predicate, and canonical-key rows are excluded. Semantic ownership remains with `JAN-CSAA-002@0.3.0 / Draft`; `JAN-CSAA-007` owns only the closed serialization projection. A schema generator rejects an undeclared member, branch, literal, null, extension member, generic property bag, unbounded integer, or unresolved leaf.
 
 #### E.RL.1 Closed-shape grammar and common rules
 
@@ -4675,7 +4709,7 @@ The notation is the Appendix E object-registry notation:
 - `ordered(T; members=m..n; key=(...))` and `set(T; members=m..n; key=(...))` are the only collection forms.
 - `lit(a,b,...)` is a finite literal set. `NotApplicable` is the existing singleton and is never encoded as `null`, an empty string, or absence.
 
-Every row has owner `JAN-CSAA-002@0.3.0`; every serialized projection has serialization owner `JAN-CSAA-007@1.0.1`; its legacy-family representation is unchanged. `SOURCE_PROJECTION` means the source catalog supplies the concern and the row makes its package representation exact. `CONSERVATIVE_CANDIDATE_REPAIR` means the source names the concept but does not close its representation; the row supplies the narrowest representation that preserves the stated distinction and evidence boundary. `CORE_REUSE` and `OBJECT_REGISTRY_REUSE` introduce no new values.
+Every row has owner `JAN-CSAA-002@0.3.0`; every serialized projection has serialization owner `JAN-CSAA-007@1.1.0`; its legacy-family representation is unchanged. `SOURCE_PROJECTION` means the source catalog supplies the concern and the row makes its package representation exact. `CONSERVATIVE_CANDIDATE_REPAIR` means the source names the concept but does not close its representation; the row supplies the narrowest representation that preserves the stated distinction and evidence boundary. `CORE_REUSE` and `OBJECT_REGISTRY_REUSE` introduce no new values.
 
 References named in a representation resolve only through the companion `JAN-CSAA-007-ERT-R-*` reference/predicate registry. Canonical keys named in a representation resolve only through the companion `JAN-CSAA-007-ECK-*` registry. This fragment does not define or widen either family. All string comparison uses exact Unicode scalar values after NFC normalization unless a cited core type or key row specifies a stricter representation. Every digest uses the complete `DigestDescriptor`; every reference uses its complete registered canonical key.
 
@@ -4976,7 +5010,7 @@ Failure of any item is a blocking closure defect. Local success is recorded as `
 
 ### E.R Exact reference-target, semantic-subtype, and finalization registry
 
-This section is the preserved legacy-family reference closure carried into `JAN-CSAA-007@1.0.1 / Draft`. It closes the reference semantics present in Appendices C and D, the frozen object-auxiliary and relation-auxiliary Appendix E fragments, and the core-side EAT-C rows without changing semantic ownership held by `JAN-CSAA-002`, `JAN-CSAA-003`, or `JAN-CSAA-004`. Its whole-Appendix-E proof state is recorded solely in §E.V.
+This section is the preserved legacy-family reference closure carried into `JAN-CSAA-007@1.1.0 / Draft`. It closes the reference semantics present in Appendices C and D, the frozen object-auxiliary and relation-auxiliary Appendix E fragments, and the core-side EAT-C rows without changing semantic ownership held by `JAN-CSAA-002`, `JAN-CSAA-003`, or `JAN-CSAA-004`. Its whole-Appendix-E proof state is recorded solely in §E.V.
 
 The pre-substitution C/D baseline consists of exactly 181 bare-reference field consumers: 163 in §C.4, fourteen transitive consumers in §§C.1–C.2, and four in §D.3. EOT-SUB-001 and EOT-SUB-006 retire three direct §C.4 paths without adding a direct bare-reference descriptor, so the integrated direct C/D surface contains exactly 178 consumers: 160 in §C.4, fourteen transitive consumers in §§C.1–C.2, and four in §D.3. The permanent ERT-R-C namespace preserves the three retired source-path IDs as non-consumer tombstones and closes their nested replacement references through V009 and V011. The frozen Appendix E auxiliary representations add exactly 335 standalone lexical reference occurrences, and the seven core EAT-C rows add twenty lexical occurrences on seventeen normalized reference-bearing paths. The registries below close every reference alias, source-owned reference target, semantic-subtype predicate, reuse edge, substitution output, and finalization direction in those surfaces.
 
@@ -5896,7 +5930,7 @@ All registry identifiers are unique and contiguous within their stated families.
 ## Appendix F — Exact operational wire-closure registry
 ### F.1 Authority, closure grammar, and package boundary
 
-This appendix is the exact candidate wire closure required by `JAN-CSAA-009@0.1.0`. `JAN-CSAA-009` retains operational meaning. `JAN-CSAA-007@1.0.1` owns only the serialization decisions below. No row instantiates an operational profile, creates a schema, authorizes persistence or execution, selects a storage or orchestration mechanism, reports a runtime observation, or changes an executable state.
+This appendix is the exact candidate wire closure required by `JAN-CSAA-009@0.1.0`. `JAN-CSAA-009` retains operational meaning. `JAN-CSAA-007@1.1.0` owns only the serialization decisions below. No row instantiates an operational profile, creates a schema, authorizes persistence or execution, selects a storage or orchestration mechanism, reports a runtime observation, or changes an executable state.
 
 The operational family is deliberately disjoint from the 144-definition legacy material universe closed by Appendix E:
 

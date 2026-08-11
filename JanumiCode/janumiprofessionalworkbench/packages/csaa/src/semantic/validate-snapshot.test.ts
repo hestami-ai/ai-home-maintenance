@@ -1,0 +1,5267 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import ts from 'typescript';
+import type {
+	CompilerInputObservation,
+	SemanticAstStructuralRole,
+	SemanticCapability,
+	SemanticDiagnosticFamily,
+	SemanticDiagnosticMessage,
+	SemanticDiagnosticRecord,
+	SemanticFactProvenanceRecord,
+	SemanticPopulationKind,
+	SemanticProvenanceId,
+	SemanticProviderIdentity,
+	SemanticSnapshotId,
+	SemanticSourceId,
+	StaticSemanticSnapshot
+} from '../contracts/semantic.js';
+import { SUBJECT_POLICY_VERSION, SUBJECT_SCHEMA_VERSION } from '../contracts/subject.js';
+import {
+	FULL_JAN_CSAA_007_CONFORMANCE,
+	SEMANTIC_AST_TRAVERSAL_PROFILE,
+	SEMANTIC_CANONICAL_PROFILE,
+	SEMANTIC_EXTRACTION_VERSION,
+	SEMANTIC_OPERATION_VERSION,
+	SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+	TYPESCRIPT_PROVIDER_VERSION
+} from '../contracts/semantic.js';
+import { sha256 } from '../inventory/canonical.js';
+import { canonicalSemanticJson, encodeSemanticDiagnosticText } from './canonical.js';
+import {
+	compilerInputClosureDigest,
+	compilerInputResultDigest,
+	semanticNodeId,
+	programRecipeDigest,
+	semanticContextInputId,
+	semanticDeclarationCandidateId,
+	semanticDiagnosticId,
+	semanticInvocationSiteId,
+	semanticProgramId,
+	semanticProjectId,
+	semanticProvenanceId,
+	semanticSnapshotId,
+	semanticSourceId
+} from './ids.js';
+import { semanticPopulation, type SemanticPopulationMembers } from './population.js';
+import {
+	AST_STRUCTURAL_ROLES,
+	literalLexemeDigest,
+	literalValueDigest
+} from './syntax-projection.js';
+import {
+	validateStaticSemanticSnapshot,
+	type SemanticValidationContext,
+	type SemanticValidationOptions
+} from './validate-snapshot.js';
+
+const PROVIDER: SemanticProviderIdentity = {
+	api: 'PUBLIC_COMPILER_API',
+	id: 'typescript',
+	version: TYPESCRIPT_PROVIDER_VERSION
+};
+const SUBJECT_ID = '1'.repeat(64);
+const CONTENT_DIGEST = sha256('');
+const BASE_FROZEN_READ = readFileObservation('src/index.ts', 'PRESENT', '', 'FROZEN_SUBJECT');
+const CONTEXT_DIGEST = compilerInputClosureDigest([BASE_FROZEN_READ]);
+const BUDGETS = {
+	maxAstDepth: 100,
+	maxAstNodes: 100,
+	maxCompilerInputMetadataBytes: 100_000,
+	maxCompilerQueries: 100,
+	maxCompilerQueryInvocations: 100,
+	maxContextBytes: 1_000,
+	maxContextFileBytes: 1_000,
+	maxContextFiles: 100,
+	maxDiagnosticCharacters: 100_000,
+	maxDiagnostics: 100,
+	maxDirectoryEntries: 100,
+	maxDurationMs: 1_000,
+	maxLiteralCharacters: 100,
+	maxPathCharacters: 1_000,
+	maxProjects: 10,
+	maxSnapshotBytes: 1_000_000,
+	maxSources: 100
+} as const;
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
+
+function members(
+	analyzed: readonly string[] = [],
+	contextOnly: readonly string[] = []
+): SemanticPopulationMembers {
+	return {
+		analyzed,
+		contextOnly,
+		excluded: [],
+		excludedByPolicy: [],
+		failed: [],
+		unknown: [],
+		unsupported: []
+	};
+}
+
+function provenance(
+	snapshotId: SemanticSnapshotId,
+	projectId: ReturnType<typeof semanticProjectId>,
+	capability: 'TS_PROJECT' | 'TS_SYNTAX',
+	recipeDigest: string,
+	sourceId: SemanticSourceId | null = null,
+	parentProvenanceId: SemanticProvenanceId | null = null,
+	contextDigest = CONTEXT_DIGEST,
+	contextInputIds: readonly string[] = [BASE_FROZEN_READ.id]
+): SemanticFactProvenanceRecord {
+	const programId = semanticProgramId({ contextDigest, projectId });
+	const preimage: Omit<SemanticFactProvenanceRecord, 'id'> = {
+		capability,
+		epistemic: {
+			capabilityCoverage: 'supported',
+			conflict: 'unopposed',
+			executionHealth: 'succeeded',
+			freshness: 'current-for-subject',
+			inference: capability === 'TS_PROJECT' ? 'derived' : 'direct',
+			rationale: 'Fixture fact is completely extracted.',
+			supportBasis: {
+				kind: capability === 'TS_PROJECT' ? 'derived' : 'direct-extraction',
+				method: 'typescript-public-compiler-api',
+				rationale: 'Fixture extraction.',
+				sourceRefs:
+					sourceId === null
+						? [SUBJECT_ID, snapshotId, projectId, programId, ...contextInputIds].sort()
+						: [parentProvenanceId!, sourceId].sort()
+			},
+			unresolvedRegions: []
+		},
+		extractionVersion: SEMANTIC_EXTRACTION_VERSION,
+		invalidationDependencies: [
+			{ digest: contextDigest, kind: 'CONTEXT_INPUT' },
+			{ digest: sha256(canonicalSemanticJson(SEMANTIC_EXTRACTION_VERSION)), kind: 'EXTRACTION' },
+			{ digest: recipeDigest, kind: 'PROJECT_RECIPE' },
+			{ digest: sha256(canonicalSemanticJson(PROVIDER)), kind: 'PROVIDER' },
+			{ digest: SUBJECT_ID, kind: 'SUBJECT' }
+		],
+		limitations: [],
+		parentProvenanceId,
+		projectId,
+		provider: PROVIDER,
+		snapshotId,
+		sourceId,
+		subjectId: SUBJECT_ID
+	};
+	return { ...preimage, id: semanticProvenanceId(preimage) };
+}
+
+function reidentifyProvenance(record: SemanticFactProvenanceRecord): SemanticFactProvenanceRecord {
+	const { id: _id, ...preimage } = record;
+	return { ...preimage, id: semanticProvenanceId(preimage) };
+}
+
+function reviseProvenance(
+	snapshot: StaticSemanticSnapshot,
+	provenanceId: SemanticProvenanceId,
+	revise: (record: SemanticFactProvenanceRecord) => SemanticFactProvenanceRecord
+): StaticSemanticSnapshot {
+	const original = snapshot.provenances.find((record) => record.id === provenanceId)!;
+	const revised = reidentifyProvenance(revise(original));
+	const ids = new Map<SemanticProvenanceId, SemanticProvenanceId>([[original.id, revised.id]]);
+	const records = snapshot.provenances
+		.map((record) => (record.id === original.id ? revised : record))
+		.map((record) => {
+			if (record.parentProvenanceId !== original.id) return record;
+			const child = reidentifyProvenance({
+				...record,
+				epistemic: {
+					...record.epistemic,
+					supportBasis: {
+						...record.epistemic.supportBasis,
+						sourceRefs: [revised.id, record.sourceId!].sort()
+					}
+				},
+				parentProvenanceId: revised.id
+			});
+			ids.set(record.id, child.id);
+			return child;
+		})
+		.sort((left, right) => (left.id < right.id ? -1 : 1));
+	const replaceId = (id: SemanticProvenanceId): SemanticProvenanceId => ids.get(id) ?? id;
+	return {
+		...snapshot,
+		diagnostics: snapshot.diagnostics.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'PROVENANCE'
+				? semanticPopulation('PROVENANCE', members(records.map((record) => record.id)))
+				: population
+		),
+		programs: snapshot.programs.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
+		projects: snapshot.projects.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
+		provenances: records,
+		sources: snapshot.sources.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId),
+			syntaxProvenanceId:
+				record.syntaxProvenanceId === null ? null : replaceId(record.syntaxProvenanceId)
+		}))
+	};
+}
+
+function fixture(
+	logicalPath = 'src/index.ts',
+	contents = '',
+	compilerOptions: Readonly<Record<string, unknown>> = { module: 199, strict: true }
+): StaticSemanticSnapshot {
+	const contentDigest = sha256(contents);
+	const frozenRead =
+		logicalPath === 'src/index.ts' && contents === ''
+			? BASE_FROZEN_READ
+			: readFileObservation(logicalPath, 'PRESENT', contents, 'FROZEN_SUBJECT');
+	const contextDigest = compilerInputClosureDigest([frozenRead]);
+	const requestedCapabilities: readonly SemanticCapability[] = ['TS_PROJECT', 'TS_SYNTAX'];
+	const recipeBase = {
+		compilerOptions,
+		configClosureDigest: '2'.repeat(64),
+		configPath: 'tsconfig.json',
+		kind: 'PROJECT' as const,
+		projectReferences: [],
+		provider: { id: 'typescript' as const, version: TYPESCRIPT_PROVIDER_VERSION },
+		rootNames: [logicalPath]
+	};
+	const recipe = { ...recipeBase, projectResolutionDigest: programRecipeDigest(recipeBase) };
+	const id = semanticSnapshotId({
+		astTraversalProfile: SEMANTIC_AST_TRAVERSAL_PROFILE,
+		budgets: BUDGETS,
+		canonicalProfile: SEMANTIC_CANONICAL_PROFILE,
+		contextDigest,
+		expectedEmpty: false,
+		extractionVersion: SEMANTIC_EXTRACTION_VERSION,
+		operationVersion: SEMANTIC_OPERATION_VERSION,
+		projectRecipeDigests: [recipe.projectResolutionDigest],
+		provider: PROVIDER,
+		requestedCapabilities,
+		schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+		subjectId: SUBJECT_ID
+	});
+	const projectId = semanticProjectId({
+		configPath: recipe.configPath,
+		projectResolutionDigest: recipe.projectResolutionDigest,
+		snapshotId: id
+	});
+	const programId = semanticProgramId({ contextDigest, projectId });
+	const sourceId = semanticSourceId({ contentSha256: contentDigest, logicalPath, programId });
+	const nodeId = semanticNodeId({
+		end: contents.length,
+		fullStart: 0,
+		kind: 308,
+		parentId: null,
+		siblingOrdinal: 0,
+		sourceId,
+		start: 0,
+		structuralRoles: ['source-file']
+	});
+	const projectProvenance = provenance(
+		id,
+		projectId,
+		'TS_PROJECT',
+		recipe.projectResolutionDigest,
+		null,
+		null,
+		contextDigest,
+		[frozenRead.id]
+	);
+	const sourceProjectProvenance = provenance(
+		id,
+		projectId,
+		'TS_PROJECT',
+		recipe.projectResolutionDigest,
+		sourceId,
+		projectProvenance.id,
+		contextDigest,
+		[frozenRead.id]
+	);
+	const syntaxProvenance = provenance(
+		id,
+		projectId,
+		'TS_SYNTAX',
+		recipe.projectResolutionDigest,
+		null,
+		null,
+		contextDigest,
+		[frozenRead.id]
+	);
+	const sourceSyntaxProvenance = provenance(
+		id,
+		projectId,
+		'TS_SYNTAX',
+		recipe.projectResolutionDigest,
+		sourceId,
+		syntaxProvenance.id,
+		contextDigest,
+		[frozenRead.id]
+	);
+	const provenances = [
+		projectProvenance,
+		sourceProjectProvenance,
+		syntaxProvenance,
+		sourceSyntaxProvenance
+	].sort((left, right) => (left.id < right.id ? -1 : 1));
+	const populationOrder: readonly SemanticPopulationKind[] = [
+		'PROJECT',
+		'PROGRAM',
+		'SOURCE',
+		'AST_NODE',
+		'DECLARATION_CANDIDATE',
+		'LITERAL',
+		'INVOCATION_SITE',
+		'ASSIGNMENT',
+		'DIAGNOSTIC',
+		'PROVENANCE',
+		'FRAMEWORK_CANDIDATE',
+		'CONTEXT_INPUT'
+	];
+	const analyzedByKind: Readonly<Record<SemanticPopulationKind, readonly string[]>> = {
+		PROJECT: [projectId],
+		PROGRAM: [programId],
+		SOURCE: [sourceId],
+		AST_NODE: [nodeId],
+		DECLARATION_CANDIDATE: [],
+		LITERAL: [],
+		INVOCATION_SITE: [],
+		ASSIGNMENT: [],
+		DIAGNOSTIC: [],
+		PROVENANCE: provenances.map((record) => record.id),
+		FRAMEWORK_CANDIDATE: [],
+		CONTEXT_INPUT: []
+	};
+
+	return {
+		assignments: [],
+		astNodes: [
+			{
+				end: contents.length,
+				publicFlags: 0,
+				fullStart: 0,
+				hasAssignmentInitializer: false,
+				id: nodeId,
+				kind: 308,
+				kindName: 'SourceFile',
+				operatorKind: null,
+				operatorName: null,
+				parentId: null,
+				siblingOrdinal: 0,
+				sourceId,
+				start: 0,
+				structuralRoles: ['source-file'],
+				syntacticIdentifierText: null
+			}
+		],
+		astTraversalProfile: SEMANTIC_AST_TRAVERSAL_PROFILE,
+		budgets: BUDGETS,
+		canonicalProfile: SEMANTIC_CANONICAL_PROFILE,
+		capabilities: [
+			{ capability: 'TS_PROJECT', reason: 'Implemented by Slice 3A.', state: 'SUPPORTED' },
+			{ capability: 'TS_SYMBOL', reason: 'Not implemented in Slice 3A.', state: 'UNSUPPORTED' },
+			{ capability: 'TS_SYNTAX', reason: 'Implemented by Slice 3A.', state: 'SUPPORTED' },
+			{ capability: 'TS_TYPE', reason: 'Not implemented in Slice 3A.', state: 'UNSUPPORTED' }
+		],
+		compilerInputs: [frozenRead],
+		contextDigest,
+		declarationCandidates: [],
+		diagnostics: [],
+		expectedEmpty: false,
+		extractionVersion: SEMANTIC_EXTRACTION_VERSION,
+		fullJanCsaa007Conformance: FULL_JAN_CSAA_007_CONFORMANCE,
+		health: 'COMPLETE',
+		id,
+		invocations: [],
+		limitations: [],
+		literals: [],
+		operationVersion: SEMANTIC_OPERATION_VERSION,
+		populations: populationOrder.map((kind) =>
+			kind === 'CONTEXT_INPUT'
+				? semanticPopulation(kind, members([], [frozenRead.id]))
+				: semanticPopulation(kind, members(analyzedByKind[kind]), analyzedByKind[kind].length === 0)
+		),
+		programs: [
+			{
+				checkerState: 'CREATED',
+				contextDigest,
+				diagnosticFamilies: (
+					[
+						'CONFIGURATION',
+						'OPTIONS',
+						'GLOBAL',
+						'SYNTACTIC',
+						'SEMANTIC',
+						'DECLARATION'
+					] as readonly SemanticDiagnosticFamily[]
+				).map((family) => ({
+					coverage: 'COMPLETE',
+					diagnosticIds: [],
+					family,
+					manifestDigest: sha256(canonicalSemanticJson([])),
+					occurrenceCount: 0,
+					reason: 'Family ran and returned zero diagnostics.',
+					recordCount: 0,
+					state: 'RUN'
+				})),
+				diagnosticIds: [],
+				id: programId,
+				projectId,
+				provenanceId: projectProvenance.id,
+				rootSourceIds: [sourceId],
+				sourceIds: [sourceId]
+			}
+		],
+		projects: [
+			{
+				configPath: recipe.configPath,
+				contextInputIds: [frozenRead.id],
+				diagnosticIds: [],
+				frameworkCandidates: [],
+				health: 'COMPLETE',
+				id: projectId,
+				kind: 'PROJECT',
+				partialityReasons: [],
+				programId,
+				programRecipe: recipe,
+				projectReferences: [],
+				provenanceId: projectProvenance.id,
+				rootDisposition: 'COMPILER_ROOTS',
+				rootNames: [logicalPath],
+				sourceIds: [sourceId]
+			}
+		],
+		provenances,
+		provider: PROVIDER,
+		requestedCapabilities,
+		schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+		sources: [
+			{
+				analysisDisposition: 'DEEP_INDEXED',
+				artifactClass: 'PRODUCTION_SOURCE',
+				artifactRoles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION'],
+				bytes: contents.length,
+				contentSha256: contentDigest,
+				declarationFile: false,
+				diagnosticIds: [],
+				id: sourceId,
+				languageVariant: 'Standard',
+				logicalPath,
+				mapping: {
+					reason: 'Authored TypeScript is already in source coordinates.',
+					state: 'NOT_APPLICABLE'
+				},
+				origin: 'AUTHORED',
+				programId,
+				projectId,
+				provenanceId: sourceProjectProvenance.id,
+				rootFile: true,
+				rootNodeId: nodeId,
+				scriptKind: 3,
+				scriptKindName: 'TS',
+				syntaxProvenanceId: sourceSyntaxProvenance.id,
+				textLength: contents.length
+			}
+		],
+		subjectId: SUBJECT_ID
+	};
+}
+
+function withAstNode(
+	snapshot: StaticSemanticSnapshot,
+	overrides: Partial<StaticSemanticSnapshot['astNodes'][number]> &
+		Pick<StaticSemanticSnapshot['astNodes'][number], 'kind' | 'kindName'>,
+	root = false
+): StaticSemanticSnapshot {
+	const source = snapshot.sources[0]!;
+	const rootNode = snapshot.astNodes.find((node) => node.id === source.rootNodeId)!;
+	const parentId = root ? null : rootNode.id;
+	const start = overrides.start ?? 0;
+	const fullStart = overrides.fullStart ?? start;
+	const end = overrides.end ?? start;
+	const structuralRoles: SemanticAstStructuralRole[] = [
+		...new Set(
+			root
+				? [AST_STRUCTURAL_ROLES.sourceFile]
+				: [AST_STRUCTURAL_ROLES.genericChild, ...(overrides.structuralRoles ?? [])]
+		)
+	].sort();
+	const siblingOrdinal = root
+		? 1
+		: snapshot.astNodes.filter((node) => node.parentId === rootNode.id).length;
+	const id = semanticNodeId({
+		end,
+		fullStart,
+		kind: overrides.kind,
+		parentId,
+		siblingOrdinal,
+		sourceId: source.id,
+		start,
+		structuralRoles
+	});
+	const node = {
+		...rootNode,
+		end,
+		fullStart,
+		hasAssignmentInitializer: false,
+		id,
+		operatorKind: null,
+		operatorName: null,
+		parentId,
+		siblingOrdinal,
+		start,
+		syntacticIdentifierText:
+			overrides.kind === ts.SyntaxKind.Identifier
+				? 'value'
+				: overrides.kind === ts.SyntaxKind.PrivateIdentifier
+					? '#value'
+					: null,
+		...overrides,
+		structuralRoles
+	};
+	const astNodes = [...snapshot.astNodes, node].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const nodeIds = astNodes.map((record) => record.id);
+	return {
+		...snapshot,
+		astNodes,
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'AST_NODE' ? semanticPopulation('AST_NODE', members(nodeIds)) : population
+		)
+	};
+}
+
+function withAstChild(
+	snapshot: StaticSemanticSnapshot,
+	parentId: StaticSemanticSnapshot['astNodes'][number]['id'],
+	overrides: Partial<StaticSemanticSnapshot['astNodes'][number]> &
+		Pick<StaticSemanticSnapshot['astNodes'][number], 'kind' | 'kindName'>,
+	structuralRoleOrRoles:
+		| SemanticAstStructuralRole
+		| readonly SemanticAstStructuralRole[] = AST_STRUCTURAL_ROLES.genericChild,
+	siblingOrdinal = 0
+): StaticSemanticSnapshot {
+	const parent = snapshot.astNodes.find((node) => node.id === parentId)!;
+	const start = overrides.start ?? parent.start;
+	const fullStart = overrides.fullStart ?? start;
+	const end = overrides.end ?? parent.end;
+	const structuralRoles: SemanticAstStructuralRole[] = [
+		...new Set([
+			AST_STRUCTURAL_ROLES.genericChild,
+			...(typeof structuralRoleOrRoles === 'string'
+				? [structuralRoleOrRoles]
+				: structuralRoleOrRoles)
+		])
+	].sort();
+	const id = semanticNodeId({
+		end,
+		fullStart,
+		kind: overrides.kind,
+		parentId,
+		siblingOrdinal,
+		sourceId: parent.sourceId,
+		start,
+		structuralRoles
+	});
+	const child = {
+		...parent,
+		hasAssignmentInitializer: false,
+		id,
+		...overrides,
+		end,
+		fullStart,
+		kind: overrides.kind,
+		kindName: overrides.kindName,
+		operatorKind: null,
+		operatorName: null,
+		parentId,
+		siblingOrdinal,
+		structuralRoles,
+		start,
+		syntacticIdentifierText:
+			overrides.syntacticIdentifierText ??
+			(overrides.kind === ts.SyntaxKind.Identifier
+				? 'value'
+				: overrides.kind === ts.SyntaxKind.PrivateIdentifier
+					? '#value'
+					: null)
+	};
+	const astNodes = [...snapshot.astNodes, child].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	return {
+		...snapshot,
+		astNodes,
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'AST_NODE'
+				? semanticPopulation('AST_NODE', members(astNodes.map((node) => node.id)))
+				: population
+		)
+	};
+}
+
+function withContextSource(
+	snapshot: StaticSemanticSnapshot,
+	logicalPath: string,
+	contents = ''
+): StaticSemanticSnapshot {
+	const source = snapshot.sources[0]!;
+	const contentSha256 = sha256(contents);
+	const id = semanticSourceId({ contentSha256, logicalPath, programId: source.programId });
+	const sourceProvenance = snapshot.provenances.find(
+		(record) => record.id === source.provenanceId
+	)!;
+	const contextProvenance = reidentifyProvenance({
+		...sourceProvenance,
+		epistemic: {
+			...sourceProvenance.epistemic,
+			supportBasis: {
+				...sourceProvenance.epistemic.supportBasis,
+				sourceRefs: [sourceProvenance.parentProvenanceId!, id].sort()
+			}
+		},
+		sourceId: id
+	});
+	const contextSource = {
+		...source,
+		analysisDisposition: 'CONTEXT_ONLY' as const,
+		artifactClass: 'CONTEXT_ONLY' as const,
+		bytes: contents.length,
+		contentSha256,
+		declarationFile: true,
+		diagnosticIds: [],
+		id,
+		logicalPath,
+		provenanceId: contextProvenance.id,
+		rootFile: false,
+		rootNodeId: null,
+		syntaxProvenanceId: null,
+		textLength: contents.length
+	};
+	const sources = [...snapshot.sources, contextSource].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const sourceIds = sources.map((record) => record.id).sort();
+	const provenances = [...snapshot.provenances, contextProvenance].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	return {
+		...snapshot,
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'PROVENANCE'
+				? semanticPopulation('PROVENANCE', members(provenances.map((record) => record.id)))
+				: population.kind === 'SOURCE'
+					? semanticPopulation(
+							'SOURCE',
+							members(
+								sources
+									.filter((record) => record.analysisDisposition === 'DEEP_INDEXED')
+									.map((record) => record.id)
+									.sort(),
+								sources
+									.filter((record) => record.analysisDisposition === 'CONTEXT_ONLY')
+									.map((record) => record.id)
+									.sort()
+							)
+						)
+					: population
+		),
+		programs: snapshot.programs.map((program) => ({ ...program, sourceIds })),
+		projects: snapshot.projects.map((project) => ({ ...project, sourceIds })),
+		provenances,
+		sources
+	};
+}
+
+function readFileObservation(
+	logicalPath: string,
+	result: 'ABSENT' | 'PRESENT',
+	contents = '',
+	byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT' = 'LIVE_COMPILER_CONTEXT',
+	invocationCount = 1
+): CompilerInputObservation {
+	if (result === 'PRESENT') {
+		const observed = {
+			byteBudgetClass,
+			contentBytes: contents.length,
+			contentSha256: sha256(contents),
+			invocationCount,
+			logicalPath,
+			operation: 'READ_FILE' as const,
+			origin: 'AUTHORED' as const,
+			result
+		};
+		const resultDigest = compilerInputResultDigest(observed);
+		return {
+			...observed,
+			id: semanticContextInputId({ ...observed, resultDigest, subjectId: SUBJECT_ID }),
+			resultDigest
+		};
+	}
+	const observed = {
+		invocationCount,
+		logicalPath,
+		operation: 'READ_FILE' as const,
+		origin: 'AUTHORED' as const,
+		result
+	};
+	const resultDigest = compilerInputResultDigest(observed);
+	return {
+		...observed,
+		id: semanticContextInputId({ ...observed, resultDigest, subjectId: SUBJECT_ID }),
+		resultDigest
+	};
+}
+
+function subjectProject(
+	project: StaticSemanticSnapshot['projects'][number],
+	status: 'COMPLETE' | 'PARTIAL' = 'COMPLETE'
+): NonNullable<SemanticValidationContext['frozenSubject']>['projects'][number] {
+	return {
+		configClosure: [],
+		configPath: project.configPath,
+		effectiveCompilerOptions: project.programRecipe.compilerOptions,
+		fileNames: project.rootNames,
+		frameworkCandidates: project.frameworkCandidates,
+		kind: project.kind,
+		programRecipe: project.programRecipe,
+		projectReferences: project.projectReferences,
+		rawCompilerOptions: project.programRecipe.compilerOptions,
+		rawExclude: null,
+		rawExtends: null,
+		rawFiles: null,
+		rawInclude: null,
+		rootDisposition: project.rootDisposition,
+		status,
+		typescriptDiagnostics: []
+	};
+}
+
+const FROZEN_CONTEXT: SemanticValidationContext = {
+	frozenSubject: {
+		artifacts: [
+			{
+				bytes: 0,
+				canonicalPathKey: 'src/index.ts',
+				disposition: 'ANALYZED',
+				path: 'src/index.ts',
+				primaryClass: 'PRODUCTION_SOURCE',
+				reason: 'Fixture source.',
+				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION'],
+				sha256: CONTENT_DIGEST
+			}
+		],
+		descriptor: {
+			configurationDigest: '2'.repeat(64),
+			dirtyState: 'UNKNOWN',
+			excludedClasses: [],
+			exclusionPolicyIds: [],
+			fileManifestDigest: '3'.repeat(64),
+			operationVersion: 'fixture/1',
+			parentRevision: null,
+			perimeter: [],
+			policyVersion: SUBJECT_POLICY_VERSION,
+			repositoryRoot: '.',
+			revision: null,
+			schemaVersion: SUBJECT_SCHEMA_VERSION,
+			subjectId: SUBJECT_ID,
+			subjectKind: 'WORKTREE'
+		},
+		projects: [subjectProject(fixture().projects[0]!)],
+		workspaces: []
+	}
+};
+
+function contextForSnapshot(
+	snapshot: StaticSemanticSnapshot,
+	artifactPath = snapshot.sources[0]!.logicalPath,
+	workspaces: NonNullable<SemanticValidationContext['frozenSubject']>['workspaces'] = []
+): SemanticValidationContext {
+	const source = snapshot.sources[0]!;
+	return {
+		frozenSubject: {
+			artifacts: [
+				{
+					bytes: source.bytes,
+					canonicalPathKey: artifactPath,
+					disposition: 'ANALYZED',
+					path: artifactPath,
+					primaryClass: 'PRODUCTION_SOURCE',
+					reason: 'Fixture source.',
+					roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION'],
+					sha256: source.contentSha256
+				}
+			],
+			descriptor: FROZEN_CONTEXT.frozenSubject!.descriptor,
+			projects: snapshot.projects.map((project) => subjectProject(project)),
+			workspaces
+		}
+	};
+}
+
+function validateSnapshot(
+	value: unknown,
+	overrides: Partial<SemanticValidationOptions> = {},
+	context: SemanticValidationContext = FROZEN_CONTEXT
+) {
+	return validateStaticSemanticSnapshot(value, overrides, context);
+}
+
+function diagnosticMessage(
+	text: string,
+	next: readonly SemanticDiagnosticMessage[] = [],
+	category: SemanticDiagnosticMessage['category'] = null,
+	code: number | null = null
+): SemanticDiagnosticMessage {
+	return { category, code, next, ...encodeSemanticDiagnosticText(text) };
+}
+
+function directoryObservation(
+	logicalPath: string,
+	operation: 'DIRECTORY_EXISTS' | 'GET_DIRECTORIES' | 'READ_DIRECTORY',
+	result: 'DIRECTORY' | 'NOT_DIRECTORY',
+	resultEntries: readonly string[] = [],
+	scannedEntries = result === 'NOT_DIRECTORY' ? 0 : resultEntries.length,
+	invocationCount = 1
+): CompilerInputObservation {
+	const common = { invocationCount, logicalPath, operation, origin: 'AUTHORED' as const, result };
+	const observed =
+		operation === 'READ_DIRECTORY'
+			? {
+					...common,
+					depth: null,
+					excludes: [],
+					extensions: ['.ts'],
+					includes: ['**/*'],
+					operation,
+					resultEntries,
+					scannedEntries
+				}
+			: operation === 'GET_DIRECTORIES'
+				? { ...common, operation, resultEntries, scannedEntries }
+				: common;
+	const resultDigest = compilerInputResultDigest(observed);
+	return {
+		...observed,
+		id: semanticContextInputId({ ...observed, resultDigest, subjectId: SUBJECT_ID }),
+		resultDigest
+	} as CompilerInputObservation;
+}
+
+function realpathObservation(
+	logicalPath: string,
+	result: 'ABSENT' | 'RESOLVED',
+	resolvedLogicalPath?: string
+): CompilerInputObservation {
+	const observed =
+		result === 'ABSENT'
+			? {
+					invocationCount: 1,
+					logicalPath,
+					operation: 'REALPATH' as const,
+					origin: 'AUTHORED' as const,
+					result
+				}
+			: {
+					invocationCount: 1,
+					logicalPath,
+					operation: 'REALPATH' as const,
+					origin: 'AUTHORED' as const,
+					resolvedLogicalPath: resolvedLogicalPath ?? logicalPath,
+					result
+				};
+	const resultDigest = compilerInputResultDigest(observed);
+	return {
+		...observed,
+		id: semanticContextInputId({ ...observed, resultDigest, subjectId: SUBJECT_ID }),
+		resultDigest
+	};
+}
+
+function withSourceDiagnostics(
+	snapshot: StaticSemanticSnapshot,
+	codes: readonly string[],
+	includeSourceManifest: boolean
+): StaticSemanticSnapshot {
+	const project = snapshot.projects[0]!;
+	const source = snapshot.sources[0]!;
+	const diagnostics = codes
+		.map((code) => {
+			const message = diagnosticMessage(`TypeScript ${code}`);
+			const diagnosticBase = {
+				category: 'ERROR' as const,
+				code: `TS${code}`,
+				end: 0,
+				family: 'SEMANTIC' as const,
+				locationKind: 'SOURCE' as const,
+				message,
+				path: source.logicalPath,
+				projectId: project.id,
+				related: [],
+				sourceId: source.id,
+				start: 0
+			};
+			return {
+				...diagnosticBase,
+				id: semanticDiagnosticId(diagnosticBase),
+				multiplicity: 1,
+				provenanceId: source.provenanceId
+			};
+		})
+		.sort((left, right) => (left.id < right.id ? -1 : 1));
+	const diagnosticIds = diagnostics.map((diagnostic) => diagnostic.id);
+	return {
+		...snapshot,
+		diagnostics,
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'DIAGNOSTIC'
+				? semanticPopulation('DIAGNOSTIC', members(diagnosticIds))
+				: population
+		),
+		programs: snapshot.programs.map((program) => ({
+			...program,
+			diagnosticFamilies: program.diagnosticFamilies.map((family) =>
+				family.family === 'SEMANTIC'
+					? {
+							...family,
+							diagnosticIds,
+							manifestDigest: sha256(
+								canonicalSemanticJson(
+									diagnostics.map(({ id, multiplicity }) => ({ id, multiplicity }))
+								)
+							),
+							occurrenceCount: diagnostics.reduce(
+								(total, diagnostic) => total + diagnostic.multiplicity,
+								0
+							),
+							recordCount: diagnosticIds.length
+						}
+					: family
+			),
+			diagnosticIds
+		})),
+		projects: snapshot.projects.map((record) => ({ ...record, diagnosticIds })),
+		sources: snapshot.sources.map((record) =>
+			record.id === source.id
+				? { ...record, diagnosticIds: includeSourceManifest ? diagnosticIds : [] }
+				: record
+		)
+	};
+}
+
+function replaceDiagnostics(
+	snapshot: StaticSemanticSnapshot,
+	diagnosticsInput: readonly SemanticDiagnosticRecord[]
+): StaticSemanticSnapshot {
+	const diagnostics = [...diagnosticsInput].sort((left, right) => (left.id < right.id ? -1 : 1));
+	const diagnosticIds = diagnostics.map((diagnostic) => diagnostic.id);
+	return {
+		...snapshot,
+		diagnostics,
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'DIAGNOSTIC'
+				? semanticPopulation('DIAGNOSTIC', members(diagnosticIds))
+				: population
+		),
+		programs: snapshot.programs.map((program) => ({
+			...program,
+			diagnosticFamilies: program.diagnosticFamilies.map((coverage) => {
+				const records = diagnostics.filter(
+					(diagnostic) =>
+						diagnostic.projectId === program.projectId && diagnostic.family === coverage.family
+				);
+				return {
+					...coverage,
+					diagnosticIds: records.map((diagnostic) => diagnostic.id).sort(),
+					manifestDigest: sha256(
+						canonicalSemanticJson(records.map(({ id, multiplicity }) => ({ id, multiplicity })))
+					),
+					occurrenceCount: records.reduce(
+						(total, diagnostic) => total + diagnostic.multiplicity,
+						0
+					),
+					recordCount: records.length
+				};
+			}),
+			diagnosticIds
+		})),
+		projects: snapshot.projects.map((project) => ({
+			...project,
+			diagnosticIds: diagnostics
+				.filter((diagnostic) => diagnostic.projectId === project.id)
+				.map((diagnostic) => diagnostic.id)
+				.sort()
+		})),
+		sources: snapshot.sources.map((source) => ({
+			...source,
+			diagnosticIds: diagnostics
+				.filter((diagnostic) => diagnostic.sourceId === source.id)
+				.map((diagnostic) => diagnostic.id)
+				.sort()
+		}))
+	};
+}
+
+describe('bounded semantic snapshot validation', () => {
+	it('accepts a closed non-vacuous Slice 3A project and rejects unknown schema majors', () => {
+		const snapshot = fixture();
+		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({ ...snapshot, schemaVersion: 'jan-csaa-semantic-snapshot/3.0.0' })
+		).toMatchObject({ state: 'INVALID', issues: [{ code: 'UNSUPPORTED_SCHEMA_VERSION' }] });
+	});
+
+	it('enforces content-addressed provenance references and their exact one-level transitive closure', () => {
+		const snapshot = fixture();
+		for (const record of snapshot.provenances) {
+			const { id, ...preimage } = record;
+			expect(semanticProvenanceId(preimage)).toBe(id);
+		}
+		expect(fixture().provenances).toEqual(snapshot.provenances);
+
+		const danglingId = `analysis:provenance-${'f'.repeat(64)}` as SemanticProvenanceId;
+		const danglingFact = {
+			...snapshot,
+			sources: snapshot.sources.map((source) => ({ ...source, syntaxProvenanceId: danglingId }))
+		};
+		expect(validateSnapshot(danglingFact).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					path: '$.sources[0].syntaxProvenanceId'
+				})
+			])
+		);
+
+		const sourceSyntax = snapshot.provenances.find(
+			(record) => record.capability === 'TS_SYNTAX' && record.sourceId !== null
+		)!;
+		const staleContent = {
+			...snapshot,
+			provenances: snapshot.provenances.map((record) =>
+				record.id === sourceSyntax.id
+					? {
+							...record,
+							epistemic: {
+								...record.epistemic,
+								rationale: 'Content changed without re-identification.'
+							}
+						}
+					: record
+			)
+		};
+		expect(validateSnapshot(staleContent).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					path: expect.stringMatching(/^\$\.provenances\[\d+\]\.id$/u)
+				})
+			])
+		);
+
+		const withoutParentRecords = snapshot.provenances.filter(
+			(record) => record.id !== sourceSyntax.parentProvenanceId
+		);
+		const withoutParent = {
+			...snapshot,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'PROVENANCE'
+					? semanticPopulation(
+							'PROVENANCE',
+							members(withoutParentRecords.map((record) => record.id))
+						)
+					: population
+			),
+			provenances: withoutParentRecords
+		};
+		expect(validateSnapshot(withoutParent).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'CROSS_PROJECT_REFERENCE',
+					path: expect.stringMatching(/^\$\.provenances\[\d+\]\.parentProvenanceId$/u)
+				})
+			])
+		);
+
+		const projectSyntax = snapshot.provenances.find(
+			(record) => record.capability === 'TS_SYNTAX' && record.sourceId === null
+		)!;
+		const orphan = reidentifyProvenance({
+			...projectSyntax,
+			epistemic: {
+				...projectSyntax.epistemic,
+				rationale: 'Valid but unreferenced provenance is forbidden.'
+			}
+		});
+		const orphanRecords = [...snapshot.provenances, orphan].sort((left, right) =>
+			left.id < right.id ? -1 : 1
+		);
+		const withOrphan = {
+			...snapshot,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'PROVENANCE'
+					? semanticPopulation('PROVENANCE', members(orphanRecords.map((record) => record.id)))
+					: population
+			),
+			provenances: orphanRecords
+		};
+		expect(validateSnapshot(withOrphan).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: expect.stringContaining('transitive closure'),
+					path: '$.provenances'
+				})
+			])
+		);
+	});
+
+	it('requires source-scoped syntax provenance and rejects syntax facts that cross sources', () => {
+		const snapshot = fixture();
+		const source = snapshot.sources[0]!;
+		expect(
+			validateSnapshot({
+				...snapshot,
+				sources: [{ ...source, syntaxProvenanceId: null }]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					path: '$.sources[0].syntaxProvenanceId'
+				})
+			])
+		);
+
+		const projectSyntaxProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_SYNTAX' && record.sourceId === null
+		)!;
+		expect(
+			validateSnapshot({
+				...snapshot,
+				sources: [{ ...source, syntaxProvenanceId: projectSyntaxProvenance.id }]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'CROSS_PROJECT_REFERENCE',
+					path: '$.sources[0].syntaxProvenanceId'
+				})
+			])
+		);
+
+		const withContext = withContextSource(snapshot, 'context/other.d.ts');
+		const contextSourceIndex = withContext.sources.findIndex(
+			(candidate) => candidate.analysisDisposition === 'CONTEXT_ONLY'
+		);
+		const contextSource = withContext.sources[contextSourceIndex]!;
+		expect(
+			validateSnapshot({
+				...withContext,
+				sources: withContext.sources.map((candidate) =>
+					candidate.id === contextSource.id
+						? { ...candidate, syntaxProvenanceId: source.syntaxProvenanceId }
+						: candidate
+				)
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: `$.sources[${contextSourceIndex}].syntaxProvenanceId`
+				})
+			])
+		);
+
+		const ast = withAstNode(snapshot, {
+			kind: ts.SyntaxKind.StringLiteral,
+			kindName: 'StringLiteral'
+		});
+		const literalNode = ast.astNodes.find((node) => node.kind === ts.SyntaxKind.StringLiteral)!;
+		const astWithContext = withContextSource(ast, 'context/other.d.ts');
+		const otherSource = astWithContext.sources.find(
+			(candidate) => candidate.analysisDisposition === 'CONTEXT_ONLY'
+		)!;
+		const crossingLiteral = {
+			lexemeLength: 0,
+			lexemeSha256: literalLexemeDigest(''),
+			nodeId: literalNode.id,
+			sourceId: otherSource.id,
+			value: '',
+			valueEncoding: 'JSON_SCALAR' as const,
+			valueLength: 0,
+			valueSha256: literalValueDigest('JSON_SCALAR', 'STRING', ''),
+			valueState: 'EXACT' as const,
+			valueType: 'STRING' as const
+		};
+		const crossingSnapshot: StaticSemanticSnapshot = {
+			...astWithContext,
+			literals: [crossingLiteral],
+			populations: astWithContext.populations.map((population) =>
+				population.kind === 'LITERAL'
+					? semanticPopulation('LITERAL', members([crossingLiteral.nodeId]))
+					: population
+			)
+		};
+		expect(validateSnapshot(crossingSnapshot).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'CROSS_PROJECT_REFERENCE', path: '$.literals[0].nodeId' })
+			])
+		);
+	});
+
+	it('binds the literal operation, traversal profile, and expected-empty decision into the snapshot identity', () => {
+		const snapshot = fixture();
+		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/2.0.0');
+		for (const probe of [
+			{ ...snapshot, astTraversalProfile: 'typescript-private-traversal/1' },
+			{ ...snapshot, operationVersion: 'jan-csaa-build-static-semantic-snapshot/0.9.0' }
+		])
+			expect(validateSnapshot(probe).issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+			);
+		expect(validateSnapshot({ ...snapshot, expectedEmpty: true }).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'IDENTITY_MISMATCH', path: '$.id' })])
+		);
+	});
+
+	it('detects identity, population, path, unsupported-capability, and validation-budget defects', () => {
+		const snapshot = fixture();
+		expect(
+			validateSnapshot({ ...snapshot, id: `static:ts-snapshot-${'0'.repeat(64)}` }).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'IDENTITY_MISMATCH' })]));
+		expect(
+			validateSnapshot({
+				...snapshot,
+				populations: snapshot.populations.map((population) =>
+					population.kind === 'AST_NODE' ? { ...population, discovered: 0 } : population
+				)
+			}).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'POPULATION_MISMATCH' })]));
+		expect(
+			validateSnapshot({
+				...snapshot,
+				sources: snapshot.sources.map((source) => ({ ...source, logicalPath: 'C:\\escape.ts' }))
+			}).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'ABSOLUTE_PATH' })]));
+		expect(
+			validateSnapshot({
+				...snapshot,
+				capabilities: snapshot.capabilities.map((capability) =>
+					capability.capability === 'TS_SYMBOL'
+						? { ...capability, state: 'SUPPORTED' as const }
+						: capability
+				)
+			}).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'CONFORMANCE_OVERCLAIM' })]));
+		expect(validateSnapshot(snapshot, { maxRecords: 1 })).toMatchObject({
+			state: 'BUDGET_EXHAUSTED'
+		});
+	});
+
+	it('never throws for missing, null, wrong-type, wrong-enum, or unknown nested wire members', () => {
+		const snapshot = fixture();
+		const probes: unknown[] = [
+			{
+				schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+				assignments: [],
+				astNodes: [],
+				capabilities: [],
+				compilerInputs: [],
+				declarationCandidates: [],
+				diagnostics: [],
+				invocations: [],
+				limitations: [],
+				literals: [],
+				populations: [],
+				programs: [],
+				projects: [],
+				provenances: [],
+				requestedCapabilities: [],
+				sources: []
+			},
+			{ ...snapshot, provider: null },
+			{ ...snapshot, projects: [null] },
+			{ ...snapshot, calls: [] },
+			{ ...snapshot, expectedEmpty: 'yes' },
+			{ ...snapshot, health: 'BANANA' },
+			{
+				...snapshot,
+				sources: snapshot.sources.map((source) => ({
+					...source,
+					unexpected: { absolutePath: 'C:\\escape.ts' }
+				}))
+			},
+			{
+				...snapshot,
+				sources: snapshot.sources.map((source) => ({ ...source, origin: 'INVENTED' }))
+			}
+		];
+		for (const probe of probes) {
+			expect(() => validateSnapshot(probe)).not.toThrow();
+			expect(validateSnapshot(probe).state).toBe('INVALID');
+		}
+	});
+
+	it('bounds deep/open compiler-option input before canonicalization and counts diagnostic input', () => {
+		const snapshot = fixture();
+		let nested: unknown = 'leaf';
+		for (let depth = 0; depth < 32; depth += 1) nested = { nested };
+		const deep = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({
+				...project,
+				programRecipe: { ...project.programRecipe, compilerOptions: { nested } }
+			}))
+		};
+		expect(validateSnapshot(deep, { maxDepth: 8 })).toMatchObject({ state: 'BUDGET_EXHAUSTED' });
+		expect(
+			validateSnapshot({ ...snapshot, diagnostics: [null, null] }, { maxDiagnostics: 1 })
+		).toMatchObject({ state: 'BUDGET_EXHAUSTED' });
+	});
+
+	it('independently rechecks recipes, context closure, population witnesses, families, and health', () => {
+		const snapshot = fixture();
+		const mutatedRecipe = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({
+				...project,
+				programRecipe: {
+					...project.programRecipe,
+					compilerOptions: { ...project.programRecipe.compilerOptions, strict: false }
+				}
+			}))
+		};
+		expect(validateSnapshot(mutatedRecipe).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'IDENTITY_MISMATCH' })])
+		);
+		expect(validateSnapshot({ ...snapshot, contextDigest: '0'.repeat(64) }).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'IDENTITY_MISMATCH' })])
+		);
+		const forgedPopulation = {
+			...snapshot,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'AST_NODE'
+					? { ...population, members: { ...population.members, analyzed: [] } }
+					: population
+			)
+		};
+		expect(validateSnapshot(forgedPopulation).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'POPULATION_MISMATCH' })])
+		);
+		const missingFamily = {
+			...snapshot,
+			programs: snapshot.programs.map((program) => ({
+				...program,
+				diagnosticFamilies: program.diagnosticFamilies.slice(1)
+			}))
+		};
+		expect(validateSnapshot(missingFamily).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+		expect(validateSnapshot({ ...snapshot, health: 'PARTIAL' }).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+	});
+
+	it('rejects duplicate vocabularies, unsupported requests, context ASTs, unsafe numbers, and unregistered path options', () => {
+		const snapshot = fixture();
+		expect(
+			validateSnapshot({
+				...snapshot,
+				capabilities: [...snapshot.capabilities, snapshot.capabilities[0]]
+			}).state
+		).toBe('INVALID');
+		expect(
+			validateSnapshot({
+				...snapshot,
+				populations: [...snapshot.populations, snapshot.populations[0]]
+			}).state
+		).toBe('INVALID');
+		expect(
+			validateSnapshot({ ...snapshot, requestedCapabilities: ['TS_PROJECT', 'TS_SYMBOL'] }).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'CONFORMANCE_OVERCLAIM' })]));
+		const contextAst = {
+			...snapshot,
+			sources: snapshot.sources.map((source) => ({
+				...source,
+				analysisDisposition: 'CONTEXT_ONLY',
+				artifactClass: 'CONTEXT_ONLY'
+			}))
+		};
+		expect(validateSnapshot(contextAst).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				sources: snapshot.sources.map((source) => ({
+					...source,
+					bytes: Number.MAX_SAFE_INTEGER + 1
+				}))
+			}).state
+		).toBe('INVALID');
+		const compilerOptions = (value: unknown) => ({
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({
+				...project,
+				programRecipe: {
+					...project.programRecipe,
+					compilerOptions: value as Readonly<Record<string, unknown>>
+				}
+			}))
+		});
+		expect(validateSnapshot(compilerOptions({ rootDir: 'C:\\escape' })).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+		expect(validateSnapshot(compilerOptions({ mysteryPath: 'relative' })).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+	});
+
+	it('derives syntax projection closure and root reachability from the retained AST', () => {
+		const snapshot = fixture();
+		for (const mutated of [
+			withAstNode(snapshot, { kind: ts.SyntaxKind.CallExpression, kindName: 'CallExpression' }),
+			withAstNode(snapshot, {
+				kind: ts.SyntaxKind.VariableDeclaration,
+				kindName: 'VariableDeclaration'
+			}),
+			withAstNode(snapshot, { kind: ts.SyntaxKind.StringLiteral, kindName: 'StringLiteral' }),
+			withAstNode(snapshot, {
+				kind: ts.SyntaxKind.BinaryExpression,
+				kindName: 'BinaryExpression',
+				operatorKind: ts.SyntaxKind.EqualsToken,
+				operatorName: 'EqualsToken'
+			})
+		]) {
+			expect(validateSnapshot(mutated).issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code: 'POPULATION_MISMATCH' })])
+			);
+		}
+		expect(
+			validateSnapshot(
+				withAstNode(snapshot, { kind: ts.SyntaxKind.SourceFile, kindName: 'SourceFile' }, true)
+			).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'DANGLING_REFERENCE' })]));
+	});
+
+	it('requires one contiguous absolute child ordinal independent of structural role', () => {
+		const parentSnapshot = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.CallExpression,
+			kindName: 'CallExpression'
+		});
+		const parent = parentSnapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.CallExpression
+		)!;
+		const withCallee = withAstChild(
+			parentSnapshot,
+			parent.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee,
+			0
+		);
+		const duplicateOrdinal = withAstChild(
+			withCallee,
+			parent.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationArgument,
+			0
+		);
+		expect(validateSnapshot(duplicateOrdinal).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DUPLICATE_ID',
+					message: expect.stringContaining('Absolute sibling ordinal')
+				})
+			])
+		);
+		const gapOrdinal = withAstChild(
+			withCallee,
+			parent.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationArgument,
+			2
+		);
+		expect(validateSnapshot(gapOrdinal).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('named AST traversal profile')
+				})
+			])
+		);
+	});
+
+	it('rejects honest-degradation, applicability, path, recipe, and validator-option escape hatches', () => {
+		const snapshot = fixture();
+		const unknownFreshness = reviseProvenance(
+			snapshot,
+			snapshot.projects[0]!.provenanceId,
+			(record) => ({
+				...record,
+				epistemic: { ...record.epistemic, freshness: 'unknown' }
+			})
+		);
+		expect(validateSnapshot(unknownFreshness).state).toBe('INVALID');
+		const notApplicable = {
+			...snapshot,
+			programs: snapshot.programs.map((program) => ({
+				...program,
+				diagnosticFamilies: program.diagnosticFamilies.map((family) => ({
+					...family,
+					reason: '',
+					state: 'NOT_APPLICABLE'
+				}))
+			}))
+		};
+		expect(validateSnapshot(notApplicable).state).toBe('INVALID');
+		const incomplete = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({ ...project, rootDisposition: 'INCOMPLETE' }))
+		};
+		expect(validateSnapshot(incomplete).state).toBe('INVALID');
+		expect(
+			validateSnapshot({
+				...snapshot,
+				capabilities: snapshot.capabilities.map((capability) =>
+					capability.capability === 'TS_PROJECT'
+						? { ...capability, reason: 'compiler at C:\\secret\\typescript.js' }
+						: capability
+				)
+			})
+		).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...snapshot,
+				projects: snapshot.projects.map((project) => ({
+					...project,
+					frameworkCandidates: ['../escape.svelte']
+				}))
+			}).state
+		).toBe('INVALID');
+		expect(
+			validateSnapshot({
+				...snapshot,
+				projects: snapshot.projects.map((project) => ({
+					...project,
+					programRecipe: { ...project.programRecipe, configClosureDigest: 'not-a-digest' }
+				}))
+			}).state
+		).toBe('INVALID');
+		expect(validateSnapshot(snapshot, { maxIssues: 0 })).toMatchObject({ state: 'INVALID' });
+		expect(validateSnapshot(snapshot, { maxDepth: Number.NaN })).toMatchObject({
+			state: 'INVALID'
+		});
+	});
+
+	it('closes every compiler-input operation and result discriminator combination', () => {
+		const snapshot = fixture();
+		const base = {
+			id: `analysis:context-input-${'3'.repeat(64)}`,
+			invocationCount: 1,
+			logicalPath: 'src/index.ts',
+			origin: 'AUTHORED',
+			resultDigest: '4'.repeat(64)
+		};
+		const malformed: readonly unknown[] = [
+			{ ...base, operation: 'READ_FILE', result: 'PRESENT' },
+			{
+				...base,
+				contentBytes: 0,
+				contentSha256: CONTENT_DIGEST,
+				operation: 'READ_FILE',
+				result: 'ABSENT'
+			},
+			{ ...base, operation: 'FILE_EXISTS', result: 'DIRECTORY' },
+			{ ...base, operation: 'READ_DIRECTORY', result: 'DIRECTORY', resultEntries: [] }
+		];
+		for (const observation of malformed) {
+			const result = validateSnapshot({ ...snapshot, compilerInputs: [observation] });
+			expect(result.state).toBe('INVALID');
+			expect(result.issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code: 'INVALID_SHAPE' })])
+			);
+		}
+	});
+
+	it('represents a negative REALPATH observation without fabricating an identity mapping', () => {
+		const snapshot = fixture();
+		const absent = realpathObservation('missing/module.ts', 'ABSENT');
+		const acceptedShape = validateSnapshot({ ...snapshot, compilerInputs: [absent] });
+		expect(acceptedShape.issues).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_SHAPE', path: '$.compilerInputs[0]' })
+			])
+		);
+		const fabricated = { ...absent, resolvedLogicalPath: absent.logicalPath };
+		expect(validateSnapshot({ ...snapshot, compilerInputs: [fabricated] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_SHAPE',
+					path: '$.compilerInputs[0].resolvedLogicalPath'
+				})
+			])
+		);
+		const contradictory = [absent, readFileObservation(absent.logicalPath, 'PRESENT')].sort(
+			(left, right) => (left.id < right.id ? -1 : 1)
+		);
+		expect(validateSnapshot({ ...snapshot, compilerInputs: contradictory }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('path kind')
+				})
+			])
+		);
+		const redactedDirectoryRealpath = [
+			realpathObservation('node_modules/example', 'ABSENT'),
+			directoryObservation('node_modules/example', 'DIRECTORY_EXISTS', 'DIRECTORY')
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		expect(
+			validateSnapshot({ ...snapshot, compilerInputs: redactedDirectoryRealpath }).issues
+		).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('path kind')
+				})
+			])
+		);
+	});
+
+	it('reconciles exact and digest-only literal states against type, length, digest, and budget', () => {
+		const astSnapshot = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.StringLiteral,
+			kindName: 'StringLiteral'
+		});
+		const literalNode = astSnapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.StringLiteral
+		)!;
+		const literal = {
+			lexemeLength: 0,
+			lexemeSha256: literalLexemeDigest(''),
+			nodeId: literalNode.id,
+			sourceId: literalNode.sourceId,
+			value: '',
+			valueEncoding: 'JSON_SCALAR' as const,
+			valueLength: 0,
+			valueSha256: literalValueDigest('JSON_SCALAR', 'STRING', ''),
+			valueState: 'EXACT' as const,
+			valueType: 'STRING' as const
+		};
+		const snapshot: StaticSemanticSnapshot = {
+			...astSnapshot,
+			literals: [literal],
+			populations: astSnapshot.populations.map((population) =>
+				population.kind === 'LITERAL'
+					? semanticPopulation('LITERAL', members([literalNode.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		for (const malformed of [
+			{ ...literal, lexemeLength: 1 },
+			{ ...literal, lexemeSha256: 'not-a-digest' },
+			{ ...literal, valueLength: 1 },
+			{ ...literal, valueSha256: '5'.repeat(64) },
+			{ ...literal, value: null, valueType: 'STRING' },
+			{
+				...literal,
+				value: 'Infinity',
+				valueEncoding: 'JSON_SCALAR',
+				valueLength: 8,
+				valueSha256: literalValueDigest('JSON_SCALAR', 'NUMBER', 'Infinity'),
+				valueType: 'NUMBER'
+			},
+			{
+				...literal,
+				value: null,
+				valueState: 'DIGEST_ONLY',
+				valueLength: snapshot.budgets.maxLiteralCharacters
+			}
+		]) {
+			expect(validateSnapshot({ ...snapshot, literals: [malformed] }).issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+			);
+		}
+	});
+
+	it('enforces every observable extraction budget including actual AST depth', () => {
+		const astCount = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.Identifier,
+			kindName: 'Identifier'
+		});
+		const parent = astCount.astNodes.find((node) => node.kind === ts.SyntaxKind.Identifier)!;
+		const astDepth = withAstChild(astCount, parent.id, {
+			kind: ts.SyntaxKind.EndOfFileToken,
+			kindName: 'EndOfFileToken'
+		});
+		const sourceCount = withContextSource(fixture(), 'node_modules/example/index.d.ts');
+		const diagnosticCount = withSourceDiagnostics(fixture(), ['1000', '1001'], true);
+		const contextFiles = [
+			readFileObservation('context/a.d.ts', 'PRESENT'),
+			readFileObservation('context/b.d.ts', 'PRESENT')
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		const contextBytes = [readFileObservation('context/large.d.ts', 'PRESENT', 'xx')];
+		const compilerQueries = [
+			readFileObservation('context/a.d.ts', 'ABSENT'),
+			readFileObservation('context/b.d.ts', 'ABSENT')
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		const compilerQueryInvocations = [
+			readFileObservation('context/repeated.d.ts', 'ABSENT', '', 'LIVE_COMPILER_CONTEXT', 2)
+		];
+		const directoryEntries = [
+			directoryObservation('context', 'GET_DIRECTORIES', 'DIRECTORY', ['context/a', 'context/b'])
+		];
+		const projectCount = {
+			...fixture(),
+			projects: [fixture().projects[0]!, fixture().projects[0]!]
+		};
+		const probes: readonly [unknown, string][] = [
+			[{ ...astCount, budgets: { ...astCount.budgets, maxAstNodes: 1 } }, '$.budgets.maxAstNodes'],
+			[{ ...astDepth, budgets: { ...astDepth.budgets, maxAstDepth: 1 } }, '$.budgets.maxAstDepth'],
+			[
+				{ ...sourceCount, budgets: { ...sourceCount.budgets, maxSources: 1 } },
+				'$.budgets.maxSources'
+			],
+			[
+				{ ...diagnosticCount, budgets: { ...diagnosticCount.budgets, maxDiagnostics: 1 } },
+				'$.budgets.maxDiagnostics'
+			],
+			[
+				{ ...diagnosticCount, budgets: { ...diagnosticCount.budgets, maxDiagnosticCharacters: 1 } },
+				'$.budgets.maxDiagnosticCharacters'
+			],
+			[
+				{ ...fixture(), budgets: { ...fixture().budgets, maxSnapshotBytes: 1 } },
+				'$.budgets.maxSnapshotBytes'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: contextFiles,
+					budgets: { ...fixture().budgets, maxContextFiles: 1 }
+				},
+				'$.budgets.maxContextFiles'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: contextBytes,
+					budgets: { ...fixture().budgets, maxContextBytes: 1 }
+				},
+				'$.budgets.maxContextBytes'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: contextBytes,
+					budgets: { ...fixture().budgets, maxContextFileBytes: 1 }
+				},
+				'$.compilerInputs[0].contentBytes'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: compilerQueries,
+					budgets: { ...fixture().budgets, maxCompilerQueries: 1 }
+				},
+				'$.budgets.maxCompilerQueries'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: compilerQueryInvocations,
+					budgets: { ...fixture().budgets, maxCompilerQueryInvocations: 1 }
+				},
+				'$.budgets.maxCompilerQueryInvocations'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: directoryEntries,
+					budgets: { ...fixture().budgets, maxDirectoryEntries: 1 }
+				},
+				'$.budgets.maxDirectoryEntries'
+			],
+			[
+				{
+					...fixture(),
+					compilerInputs: [readFileObservation('context/a.d.ts', 'ABSENT')],
+					budgets: { ...fixture().budgets, maxCompilerInputMetadataBytes: 1 }
+				},
+				'$.budgets.maxCompilerInputMetadataBytes'
+			],
+			[
+				{
+					...fixture(),
+					budgets: { ...fixture().budgets, maxPathCharacters: 5 },
+					sources: fixture().sources.map((source) => ({
+						...source,
+						logicalPath: 'src/long-name.ts'
+					}))
+				},
+				'$.sources[0].logicalPath'
+			],
+			[
+				{ ...projectCount, budgets: { ...projectCount.budgets, maxProjects: 1 } },
+				'$.budgets.maxProjects'
+			]
+		];
+		for (const [probe, path] of probes)
+			expect(validateSnapshot(probe).issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE', path })])
+			);
+	});
+
+	it('charges live compiler context but not already-frozen subject bytes to context budgets', () => {
+		const snapshot = fixture();
+		const frozen = readFileObservation(
+			'src/shared.ts',
+			'PRESENT',
+			'x'.repeat(100),
+			'FROZEN_SUBJECT'
+		);
+		const live = readFileObservation(
+			'src/shared.ts',
+			'PRESENT',
+			'x'.repeat(100),
+			'LIVE_COMPILER_CONTEXT'
+		);
+		expect(frozen.id).not.toBe(live.id);
+		const budgets = { ...snapshot.budgets, maxContextBytes: 1, maxContextFileBytes: 1 };
+		const frozenResult = validateSnapshot({ ...snapshot, budgets, compilerInputs: [frozen] });
+		expect(frozenResult.issues).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.budgets.maxContextBytes' })])
+		);
+		expect(frozenResult.issues).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: '$.compilerInputs[0].contentBytes' })
+			])
+		);
+		const liveResult = validateSnapshot({ ...snapshot, budgets, compilerInputs: [live] });
+		expect(liveResult.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.budgets.maxContextBytes' }),
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.compilerInputs[0].contentBytes' })
+			])
+		);
+	});
+
+	it('binds compiler-query multiplicity and records the full scanned directory effort', () => {
+		const snapshot = fixture();
+		const once = readFileObservation('context/repeated.d.ts', 'ABSENT');
+		const twice = readFileObservation(
+			'context/repeated.d.ts',
+			'ABSENT',
+			'',
+			'LIVE_COMPILER_CONTEXT',
+			2
+		);
+		expect(twice.id).not.toBe(once.id);
+		expect(twice.resultDigest).not.toBe(once.resultDigest);
+		const retainedMultiplicity = validateSnapshot({ ...snapshot, compilerInputs: [twice] });
+		expect(retainedMultiplicity.issues).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ message: expect.stringContaining('exactly one deterministic') })
+			])
+		);
+		expect(
+			validateSnapshot({ ...snapshot, compilerInputs: [{ ...once, invocationCount: 2 }] }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					path: '$.compilerInputs[0].resultDigest'
+				}),
+				expect.objectContaining({ code: 'IDENTITY_MISMATCH', path: '$.compilerInputs[0].id' })
+			])
+		);
+		expect(
+			validateSnapshot({ ...snapshot, compilerInputs: [{ ...once, invocationCount: 0 }] }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.compilerInputs[0].invocationCount'
+				})
+			])
+		);
+
+		const underreported = directoryObservation(
+			'context/underreported',
+			'READ_DIRECTORY',
+			'DIRECTORY',
+			['context/a.ts', 'context/b.ts'],
+			1
+		);
+		expect(validateSnapshot({ ...snapshot, compilerInputs: [underreported] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.compilerInputs[0].scannedEntries'
+				})
+			])
+		);
+		const missing = directoryObservation(
+			'context/missing',
+			'GET_DIRECTORIES',
+			'NOT_DIRECTORY',
+			[],
+			1
+		);
+		expect(validateSnapshot({ ...snapshot, compilerInputs: [missing] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.compilerInputs[0].scannedEntries'
+				})
+			])
+		);
+		const malformed = {
+			...directoryObservation('context/malformed', 'GET_DIRECTORIES', 'DIRECTORY'),
+			scannedEntries: -1
+		};
+		expect(validateSnapshot({ ...snapshot, compilerInputs: [malformed] })).toMatchObject({
+			state: 'INVALID',
+			issues: [
+				expect.objectContaining({
+					code: 'INVALID_SHAPE',
+					path: '$.compilerInputs[0].scannedEntries'
+				})
+			]
+		});
+
+		const aggregate = [
+			directoryObservation('context/one', 'GET_DIRECTORIES', 'DIRECTORY', ['context/one/a'], 2),
+			directoryObservation('context/two', 'GET_DIRECTORIES', 'DIRECTORY', ['context/two/a'], 2)
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		expect(
+			validateSnapshot({
+				...snapshot,
+				budgets: { ...snapshot.budgets, maxDirectoryEntries: 3 },
+				compilerInputs: aggregate
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.budgets.maxDirectoryEntries' })
+			])
+		);
+	});
+
+	it('derives TypeScript names and declaration-candidate identity from retained public enum codes', () => {
+		const snapshot = fixture();
+		expect(
+			validateSnapshot({
+				...snapshot,
+				astNodes: snapshot.astNodes.map((node) => ({ ...node, kindName: 'BogusNode' }))
+			}).issues
+		).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.astNodes[0].kindName' })])
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				sources: snapshot.sources.map((source) => ({ ...source, scriptKindName: 'JS' }))
+			}).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })]));
+		const declarationParentAst = withAstNode(snapshot, {
+			kind: ts.SyntaxKind.VariableDeclaration,
+			kindName: 'VariableDeclaration'
+		});
+		const declarationParent = declarationParentAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+		)!;
+		const declarationAst = withAstChild(
+			declarationParentAst,
+			declarationParent.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName
+		);
+		const declarationNode = declarationAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+		)!;
+		const nameNode = declarationAst.astNodes.find((node) => node.parentId === declarationNode.id)!;
+		const declarationCandidate = {
+			ambientSyntax: false,
+			candidateRole: 'BINDING' as const,
+			candidateState: 'SYNTAX_ONLY' as const,
+			exportCarrierNodeId: null,
+			exportSyntax: 'NONE' as const,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'BINDING',
+				nodeId: declarationNode.id,
+				syntaxKind: declarationNode.kind
+			}),
+			localModifiers: [],
+			nameNodeId: nameNode.id,
+			nameState: 'ATOMIC' as const,
+			nodeId: declarationNode.id,
+			sourceId: declarationNode.sourceId,
+			syntacticName: 'value',
+			syntaxKind: declarationNode.kind,
+			syntaxKindName: declarationNode.kindName
+		};
+		const declarationSnapshot: StaticSemanticSnapshot = {
+			...declarationAst,
+			declarationCandidates: [declarationCandidate],
+			populations: declarationAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation('DECLARATION_CANDIDATE', members([declarationCandidate.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(declarationSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		const wrongKind = ts.SyntaxKind.FunctionDeclaration;
+		expect(
+			validateSnapshot({
+				...declarationSnapshot,
+				declarationCandidates: [
+					{
+						...declarationCandidate,
+						id: semanticDeclarationCandidateId({
+							candidateRole: declarationCandidate.candidateRole,
+							nodeId: declarationCandidate.nodeId,
+							syntaxKind: wrongKind
+						}),
+						syntaxKind: wrongKind,
+						syntaxKindName: 'FunctionDeclaration'
+					}
+				]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.declarationCandidates[0]' })
+			])
+		);
+	});
+
+	it('rejects unsafe, negative, unknown, or non-public AST numeric values', () => {
+		const snapshot = fixture();
+		for (const probe of [
+			{ ...snapshot, astNodes: snapshot.astNodes.map((node) => ({ ...node, kind: -1 })) },
+			{ ...snapshot, astNodes: snapshot.astNodes.map((node) => ({ ...node, operatorKind: -1 })) },
+			{
+				...snapshot,
+				astNodes: snapshot.astNodes.map((node) => ({
+					...node,
+					siblingOrdinal: Number.MAX_SAFE_INTEGER + 1
+				}))
+			}
+		])
+			expect(validateSnapshot(probe).state).toBe('INVALID');
+		expect(
+			validateSnapshot({
+				...snapshot,
+				astNodes: snapshot.astNodes.map((node) => ({
+					...node,
+					kind: 999_999,
+					kindName: 'InventedKind'
+				}))
+			}).issues
+		).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.astNodes[0].kindName' })])
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				astNodes: snapshot.astNodes.map((node) => ({ ...node, publicFlags: 4_194_304 }))
+			}).issues
+		).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.astNodes[0].publicFlags' })])
+		);
+	});
+
+	it('allows one const binding child to carry declaration-name and assignment-target roles', () => {
+		const declarationAst = withAstNode(fixture(), {
+			hasAssignmentInitializer: true,
+			kind: ts.SyntaxKind.VariableDeclaration,
+			kindName: 'VariableDeclaration'
+		});
+		const declarationNode = declarationAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+		)!;
+		const withName = withAstChild(
+			declarationAst,
+			declarationNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			[AST_STRUCTURAL_ROLES.assignmentTarget, AST_STRUCTURAL_ROLES.declarationName],
+			0
+		);
+		const completeAst = withAstChild(
+			withName,
+			declarationNode.id,
+			{ kind: ts.SyntaxKind.NumericLiteral, kindName: 'NumericLiteral' },
+			AST_STRUCTURAL_ROLES.assignmentValue,
+			1
+		);
+		const nameNode = completeAst.astNodes.find(
+			(node) =>
+				node.parentId === declarationNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName)
+		)!;
+		const valueNode = completeAst.astNodes.find(
+			(node) =>
+				node.parentId === declarationNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentValue)
+		)!;
+		const candidate = {
+			ambientSyntax: false,
+			candidateRole: 'BINDING' as const,
+			candidateState: 'SYNTAX_ONLY' as const,
+			exportCarrierNodeId: null,
+			exportSyntax: 'NONE' as const,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'BINDING',
+				nodeId: declarationNode.id,
+				syntaxKind: declarationNode.kind
+			}),
+			localModifiers: [],
+			nameNodeId: nameNode.id,
+			nameState: 'ATOMIC' as const,
+			nodeId: declarationNode.id,
+			sourceId: declarationNode.sourceId,
+			syntacticName: 'value',
+			syntaxKind: declarationNode.kind,
+			syntaxKindName: declarationNode.kindName
+		};
+		const literal = {
+			lexemeLength: 0,
+			lexemeSha256: literalLexemeDigest(''),
+			nodeId: valueNode.id,
+			sourceId: valueNode.sourceId,
+			value: '1',
+			valueEncoding: 'TYPESCRIPT_TEXT' as const,
+			valueLength: 1,
+			valueSha256: literalValueDigest('TYPESCRIPT_TEXT', 'NUMBER', '1'),
+			valueState: 'EXACT' as const,
+			valueType: 'NUMBER' as const
+		};
+		const assignment = {
+			assignmentKind: 'INITIALIZER' as const,
+			nodeId: declarationNode.id,
+			operatorKind: ts.SyntaxKind.EqualsToken,
+			operatorName: 'EqualsToken',
+			sourceId: declarationNode.sourceId,
+			targetNodeId: nameNode.id,
+			valueNodeId: valueNode.id
+		};
+		const snapshot: StaticSemanticSnapshot = {
+			...completeAst,
+			assignments: [assignment],
+			declarationCandidates: [candidate],
+			literals: [literal],
+			populations: completeAst.populations.map((population) =>
+				population.kind === 'ASSIGNMENT'
+					? semanticPopulation('ASSIGNMENT', members([assignment.nodeId]))
+					: population.kind === 'DECLARATION_CANDIDATE'
+						? semanticPopulation('DECLARATION_CANDIDATE', members([candidate.id]))
+						: population.kind === 'LITERAL'
+							? semanticPopulation('LITERAL', members([literal.nodeId]))
+							: population
+			)
+		};
+		expect(nameNode.structuralRoles).toEqual([
+			AST_STRUCTURAL_ROLES.assignmentTarget,
+			AST_STRUCTURAL_ROLES.declarationName,
+			AST_STRUCTURAL_ROLES.genericChild
+		]);
+		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		for (const structuralRoles of [
+			[AST_STRUCTURAL_ROLES.declarationName, AST_STRUCTURAL_ROLES.assignmentTarget],
+			[
+				AST_STRUCTURAL_ROLES.assignmentTarget,
+				AST_STRUCTURAL_ROLES.assignmentTarget,
+				AST_STRUCTURAL_ROLES.declarationName
+			],
+			[]
+		]) {
+			const malformed = {
+				...snapshot,
+				astNodes: snapshot.astNodes.map((node) =>
+					node.id === nameNode.id ? { ...node, structuralRoles } : node
+				)
+			};
+			expect(validateSnapshot(malformed).issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: 'NONCANONICAL_ORDER',
+						path: expect.stringContaining('structuralRoles')
+					})
+				])
+			);
+		}
+	});
+
+	it('binds export syntax to the exact local or enclosing declaration carrier', () => {
+		function exportedVariableAst(
+			nameKind: number,
+			nameKindName: string
+		): {
+			readonly ast: StaticSemanticSnapshot;
+			readonly declaration: StaticSemanticSnapshot['astNodes'][number];
+			readonly name: StaticSemanticSnapshot['astNodes'][number];
+			readonly statement: StaticSemanticSnapshot['astNodes'][number];
+		} {
+			const statementAst = withAstNode(fixture(), {
+				kind: ts.SyntaxKind.VariableStatement,
+				kindName: 'VariableStatement'
+			});
+			const statement = statementAst.astNodes.find(
+				(node) => node.kind === ts.SyntaxKind.VariableStatement
+			)!;
+			const withExport = withAstChild(
+				statementAst,
+				statement.id,
+				{ kind: ts.SyntaxKind.ExportKeyword, kindName: 'ExportKeyword' },
+				AST_STRUCTURAL_ROLES.genericChild,
+				0
+			);
+			const withList = withAstChild(
+				withExport,
+				statement.id,
+				{ kind: ts.SyntaxKind.VariableDeclarationList, kindName: 'VariableDeclarationList' },
+				AST_STRUCTURAL_ROLES.genericChild,
+				1
+			);
+			const list = withList.astNodes.find(
+				(node) => node.kind === ts.SyntaxKind.VariableDeclarationList
+			)!;
+			const withDeclaration = withAstChild(
+				withList,
+				list.id,
+				{ kind: ts.SyntaxKind.VariableDeclaration, kindName: 'VariableDeclaration' },
+				AST_STRUCTURAL_ROLES.genericChild,
+				0
+			);
+			const declaration = withDeclaration.astNodes.find(
+				(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+			)!;
+			const ast = withAstChild(
+				withDeclaration,
+				declaration.id,
+				{ kind: nameKind, kindName: nameKindName },
+				AST_STRUCTURAL_ROLES.declarationName,
+				0
+			);
+			return {
+				ast,
+				declaration,
+				name: ast.astNodes.find((node) => node.parentId === declaration.id)!,
+				statement
+			};
+		}
+
+		function candidate(
+			node: StaticSemanticSnapshot['astNodes'][number],
+			nameNode: StaticSemanticSnapshot['astNodes'][number],
+			candidateRole: 'BINDING' | 'MEMBER',
+			nameState: 'ATOMIC' | 'PATTERN',
+			syntacticName: string | null,
+			exportCarrierNodeId: StaticSemanticSnapshot['astNodes'][number]['id'] | null,
+			exportSyntax: 'EXPLICIT' | 'NONE'
+		): StaticSemanticSnapshot['declarationCandidates'][number] {
+			return {
+				ambientSyntax: false,
+				candidateRole,
+				candidateState: 'SYNTAX_ONLY',
+				exportCarrierNodeId,
+				exportSyntax,
+				id: semanticDeclarationCandidateId({
+					candidateRole,
+					nodeId: node.id,
+					syntaxKind: node.kind
+				}),
+				localModifiers: [],
+				nameNodeId: nameNode.id,
+				nameState,
+				nodeId: node.id,
+				sourceId: node.sourceId,
+				syntacticName,
+				syntaxKind: node.kind,
+				syntaxKindName: node.kindName
+			};
+		}
+
+		const scalar = exportedVariableAst(ts.SyntaxKind.Identifier, 'Identifier');
+		const scalarCandidate = candidate(
+			scalar.declaration,
+			scalar.name,
+			'BINDING',
+			'ATOMIC',
+			'value',
+			scalar.statement.id,
+			'EXPLICIT'
+		);
+		const scalarSnapshot: StaticSemanticSnapshot = {
+			...scalar.ast,
+			declarationCandidates: [scalarCandidate],
+			populations: scalar.ast.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation('DECLARATION_CANDIDATE', members([scalarCandidate.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(scalarSnapshot)).toEqual({ issues: [], state: 'VALID' });
+
+		const destructured = exportedVariableAst(
+			ts.SyntaxKind.ObjectBindingPattern,
+			'ObjectBindingPattern'
+		);
+		const withBinding = withAstChild(
+			destructured.ast,
+			destructured.name.id,
+			{ kind: ts.SyntaxKind.BindingElement, kindName: 'BindingElement' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const binding = withBinding.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.BindingElement
+		)!;
+		const destructuredAst = withAstChild(
+			withBinding,
+			binding.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName,
+			0
+		);
+		const bindingName = destructuredAst.astNodes.find((node) => node.parentId === binding.id)!;
+		const destructuredCandidates = [
+			candidate(
+				destructured.declaration,
+				destructured.name,
+				'BINDING',
+				'PATTERN',
+				null,
+				destructured.statement.id,
+				'EXPLICIT'
+			),
+			candidate(
+				binding,
+				bindingName,
+				'BINDING',
+				'ATOMIC',
+				'value',
+				destructured.statement.id,
+				'EXPLICIT'
+			)
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		const destructuredSnapshot: StaticSemanticSnapshot = {
+			...destructuredAst,
+			declarationCandidates: destructuredCandidates,
+			populations: destructuredAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation(
+							'DECLARATION_CANDIDATE',
+							members(destructuredCandidates.map((record) => record.id))
+						)
+					: population
+			)
+		};
+		expect(validateSnapshot(destructuredSnapshot)).toEqual({ issues: [], state: 'VALID' });
+
+		const withObject = withAstChild(
+			scalarSnapshot,
+			scalar.declaration.id,
+			{ kind: ts.SyntaxKind.ObjectLiteralExpression, kindName: 'ObjectLiteralExpression' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			1
+		);
+		const objectNode = withObject.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.ObjectLiteralExpression
+		)!;
+		const withProperty = withAstChild(
+			withObject,
+			objectNode.id,
+			{ kind: ts.SyntaxKind.PropertyAssignment, kindName: 'PropertyAssignment' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const property = withProperty.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.PropertyAssignment
+		)!;
+		const nestedAst = withAstChild(
+			withProperty,
+			property.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName,
+			0
+		);
+		const propertyName = nestedAst.astNodes.find((node) => node.parentId === property.id)!;
+		const nestedCandidates = [
+			scalarCandidate,
+			candidate(property, propertyName, 'MEMBER', 'ATOMIC', 'value', null, 'NONE')
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		const nestedSnapshot: StaticSemanticSnapshot = {
+			...nestedAst,
+			declarationCandidates: nestedCandidates,
+			populations: nestedAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation(
+							'DECLARATION_CANDIDATE',
+							members(nestedCandidates.map((record) => record.id))
+						)
+					: population
+			)
+		};
+		expect(validateSnapshot(nestedSnapshot)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('derives ambient syntax exactly for declaration files, declare carriers, and ordinary sources', () => {
+		function ordinaryVariable(ambientSyntax: boolean): StaticSemanticSnapshot {
+			const parentAst = withAstNode(fixture(), {
+				kind: ts.SyntaxKind.VariableDeclaration,
+				kindName: 'VariableDeclaration'
+			});
+			const declaration = parentAst.astNodes.find(
+				(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+			)!;
+			const ast = withAstChild(
+				parentAst,
+				declaration.id,
+				{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+				AST_STRUCTURAL_ROLES.declarationName
+			);
+			const name = ast.astNodes.find((node) => node.parentId === declaration.id)!;
+			const candidate: StaticSemanticSnapshot['declarationCandidates'][number] = {
+				ambientSyntax,
+				candidateRole: 'BINDING' as const,
+				candidateState: 'SYNTAX_ONLY' as const,
+				exportCarrierNodeId: null,
+				exportSyntax: 'NONE' as const,
+				id: semanticDeclarationCandidateId({
+					candidateRole: 'BINDING',
+					nodeId: declaration.id,
+					syntaxKind: declaration.kind
+				}),
+				localModifiers: [],
+				nameNodeId: name.id,
+				nameState: 'ATOMIC' as const,
+				nodeId: declaration.id,
+				sourceId: declaration.sourceId,
+				syntacticName: 'value',
+				syntaxKind: declaration.kind,
+				syntaxKindName: declaration.kindName
+			};
+			return {
+				...ast,
+				declarationCandidates: [candidate],
+				populations: ast.populations.map((population) =>
+					population.kind === 'DECLARATION_CANDIDATE'
+						? semanticPopulation('DECLARATION_CANDIDATE', members([candidate.id]))
+						: population
+				)
+			};
+		}
+
+		const ordinary = ordinaryVariable(false);
+		expect(validateSnapshot(ordinary)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...ordinary,
+				declarationCandidates: ordinary.declarationCandidates.map((candidate) => ({
+					...candidate,
+					ambientSyntax: true
+				}))
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: '$.declarationCandidates[0].ambientSyntax' })
+			])
+		);
+		const declarationFile = {
+			...ordinaryVariable(true),
+			sources: ordinaryVariable(true).sources.map((source) => ({
+				...source,
+				declarationFile: true
+			}))
+		};
+		expect(validateSnapshot(declarationFile)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...declarationFile,
+				declarationCandidates: declarationFile.declarationCandidates.map((candidate) => ({
+					...candidate,
+					ambientSyntax: false
+				}))
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: '$.declarationCandidates[0].ambientSyntax' })
+			])
+		);
+
+		const moduleAst = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.ModuleDeclaration,
+			kindName: 'ModuleDeclaration'
+		});
+		const moduleNode = moduleAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.ModuleDeclaration
+		)!;
+		const withDeclare = withAstChild(
+			moduleAst,
+			moduleNode.id,
+			{ kind: ts.SyntaxKind.DeclareKeyword, kindName: 'DeclareKeyword' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const withModuleName = withAstChild(
+			withDeclare,
+			moduleNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName,
+			1
+		);
+		const withModuleBlock = withAstChild(
+			withModuleName,
+			moduleNode.id,
+			{ kind: ts.SyntaxKind.ModuleBlock, kindName: 'ModuleBlock' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			2
+		);
+		const moduleName = withModuleBlock.astNodes.find(
+			(node) => node.parentId === moduleNode.id && node.kind === ts.SyntaxKind.Identifier
+		)!;
+		const moduleBlock = withModuleBlock.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.ModuleBlock
+		)!;
+		const withStatement = withAstChild(
+			withModuleBlock,
+			moduleBlock.id,
+			{ kind: ts.SyntaxKind.VariableStatement, kindName: 'VariableStatement' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const statement = withStatement.astNodes.find((node) => node.parentId === moduleBlock.id)!;
+		const withList = withAstChild(
+			withStatement,
+			statement.id,
+			{ kind: ts.SyntaxKind.VariableDeclarationList, kindName: 'VariableDeclarationList' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const list = withList.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclarationList
+		)!;
+		const withDeclaration = withAstChild(
+			withList,
+			list.id,
+			{ kind: ts.SyntaxKind.VariableDeclaration, kindName: 'VariableDeclaration' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const declaration = withDeclaration.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+		)!;
+		const completeAst = withAstChild(
+			withDeclaration,
+			declaration.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName,
+			0
+		);
+		const declarationName = completeAst.astNodes.find((node) => node.parentId === declaration.id)!;
+		const candidates: StaticSemanticSnapshot['declarationCandidates'][number][] = [
+			{
+				ambientSyntax: true,
+				candidateRole: 'BINDING' as const,
+				candidateState: 'SYNTAX_ONLY' as const,
+				exportCarrierNodeId: null,
+				exportSyntax: 'NONE' as const,
+				id: semanticDeclarationCandidateId({
+					candidateRole: 'BINDING',
+					nodeId: moduleNode.id,
+					syntaxKind: moduleNode.kind
+				}),
+				localModifiers: [{ code: ts.SyntaxKind.DeclareKeyword, name: 'DeclareKeyword' }],
+				nameNodeId: moduleName.id,
+				nameState: 'ATOMIC' as const,
+				nodeId: moduleNode.id,
+				sourceId: moduleNode.sourceId,
+				syntacticName: 'value',
+				syntaxKind: moduleNode.kind,
+				syntaxKindName: moduleNode.kindName
+			},
+			{
+				ambientSyntax: true,
+				candidateRole: 'BINDING' as const,
+				candidateState: 'SYNTAX_ONLY' as const,
+				exportCarrierNodeId: null,
+				exportSyntax: 'NONE' as const,
+				id: semanticDeclarationCandidateId({
+					candidateRole: 'BINDING',
+					nodeId: declaration.id,
+					syntaxKind: declaration.kind
+				}),
+				localModifiers: [],
+				nameNodeId: declarationName.id,
+				nameState: 'ATOMIC' as const,
+				nodeId: declaration.id,
+				sourceId: declaration.sourceId,
+				syntacticName: 'value',
+				syntaxKind: declaration.kind,
+				syntaxKindName: declaration.kindName
+			}
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		const ambientModule: StaticSemanticSnapshot = {
+			...completeAst,
+			declarationCandidates: candidates,
+			populations: completeAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation(
+							'DECLARATION_CANDIDATE',
+							members(candidates.map((candidate) => candidate.id))
+						)
+					: population
+			)
+		};
+		expect(validateSnapshot(ambientModule)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('binds invocation and assignment projections to exact retained structural children', () => {
+		const callParentSnapshot = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.CallExpression,
+			kindName: 'CallExpression'
+		});
+		const callNode = callParentSnapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.CallExpression
+		)!;
+		const callAst = withAstChild(
+			callParentSnapshot,
+			callNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee
+		);
+		const expressionNode = callAst.astNodes.find((node) => node.parentId === callNode.id)!;
+		const call = {
+			argumentNodeIds: [],
+			calleeNodeId: expressionNode.id,
+			id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: callNode.id }),
+			invocationKind: 'CALL' as const,
+			nodeId: callNode.id,
+			optional: false,
+			sourceId: callNode.sourceId,
+			targetState: 'SYNTAX_ONLY' as const,
+			templateNodeId: null
+		};
+		const callSnapshot: StaticSemanticSnapshot = {
+			...callAst,
+			invocations: [call],
+			populations: callAst.populations.map((population) =>
+				population.kind === 'INVOCATION_SITE'
+					? semanticPopulation('INVOCATION_SITE', members([call.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(callSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		const withFirstArgument = withAstChild(
+			callAst,
+			callNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationArgument,
+			1
+		);
+		const withArguments = withAstChild(
+			withFirstArgument,
+			callNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationArgument,
+			2
+		);
+		const argumentIds = withArguments.astNodes
+			.filter(
+				(node) =>
+					node.parentId === callNode.id &&
+					node.structuralRoles.includes(AST_STRUCTURAL_ROLES.invocationArgument)
+			)
+			.sort((left, right) => left.siblingOrdinal - right.siblingOrdinal)
+			.map((node) => node.id);
+		const callWithArguments = { ...call, argumentNodeIds: argumentIds };
+		const argumentSnapshot: StaticSemanticSnapshot = {
+			...withArguments,
+			invocations: [callWithArguments],
+			populations: withArguments.populations.map((population) =>
+				population.kind === 'INVOCATION_SITE'
+					? semanticPopulation('INVOCATION_SITE', members([call.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(argumentSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({ ...callSnapshot, invocations: [{ ...call, optional: true }] }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.invocations[0]' })
+			])
+		);
+		const optionalAst: StaticSemanticSnapshot = {
+			...callSnapshot,
+			astNodes: callSnapshot.astNodes.map((node) =>
+				node.id === callNode.id ? { ...node, publicFlags: ts.NodeFlags.OptionalChain } : node
+			)
+		};
+		const optionalSnapshot: StaticSemanticSnapshot = {
+			...optionalAst,
+			invocations: [{ ...call, optional: true }]
+		};
+		expect(validateSnapshot(optionalSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(validateSnapshot({ ...optionalSnapshot, invocations: [call] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.invocations[0]' })
+			])
+		);
+		expect(
+			validateSnapshot({
+				...callSnapshot,
+				invocations: [
+					{ ...call, calleeNodeId: callAst.astNodes.find((node) => node.parentId === null)!.id }
+				]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.invocations[0]' })
+			])
+		);
+
+		const assignmentParentSnapshot = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.BinaryExpression,
+			kindName: 'BinaryExpression',
+			operatorKind: ts.SyntaxKind.EqualsToken,
+			operatorName: 'EqualsToken'
+		});
+		const assignmentNode = assignmentParentSnapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.BinaryExpression
+		)!;
+		const withTarget = withAstChild(
+			assignmentParentSnapshot,
+			assignmentNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.assignmentTarget
+		);
+		const assignmentAst = withAstChild(
+			withTarget,
+			assignmentNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.assignmentValue,
+			1
+		);
+		const targetNode = assignmentAst.astNodes.find(
+			(node) =>
+				node.parentId === assignmentNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentTarget)
+		)!;
+		const valueNode = assignmentAst.astNodes.find(
+			(node) =>
+				node.parentId === assignmentNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentValue)
+		)!;
+		const assignment = {
+			assignmentKind: 'BINARY' as const,
+			nodeId: assignmentNode.id,
+			operatorKind: ts.SyntaxKind.EqualsToken,
+			operatorName: 'EqualsToken',
+			sourceId: assignmentNode.sourceId,
+			targetNodeId: targetNode.id,
+			valueNodeId: valueNode.id
+		};
+		const assignmentSnapshot: StaticSemanticSnapshot = {
+			...assignmentAst,
+			assignments: [assignment],
+			populations: assignmentAst.populations.map((population) =>
+				population.kind === 'ASSIGNMENT'
+					? semanticPopulation('ASSIGNMENT', members([assignment.nodeId]))
+					: population
+			)
+		};
+		expect(validateSnapshot(assignmentSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...assignmentSnapshot,
+				assignments: [{ ...assignment, valueNodeId: null }]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.assignments[0]' })
+			])
+		);
+		expect(
+			validateSnapshot({
+				...assignmentSnapshot,
+				assignments: [{ ...assignment, valueNodeId: targetNode.id }]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.assignments[0]' })
+			])
+		);
+	});
+
+	it('distinguishes call, new, and tagged-template invocation variants', () => {
+		const newParentSnapshot = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.NewExpression,
+			kindName: 'NewExpression'
+		});
+		const newNode = newParentSnapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.NewExpression
+		)!;
+		const newAst = withAstChild(
+			newParentSnapshot,
+			newNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee
+		);
+		const constructorNode = newAst.astNodes.find((node) => node.parentId === newNode.id)!;
+		const newInvocation = {
+			argumentNodeIds: [],
+			calleeNodeId: constructorNode.id,
+			id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: newNode.id }),
+			invocationKind: 'NEW' as const,
+			nodeId: newNode.id,
+			optional: false as const,
+			sourceId: newNode.sourceId,
+			targetState: 'SYNTAX_ONLY' as const,
+			templateNodeId: null
+		};
+		const newSnapshot: StaticSemanticSnapshot = {
+			...newAst,
+			invocations: [newInvocation],
+			populations: newAst.populations.map((population) =>
+				population.kind === 'INVOCATION_SITE'
+					? semanticPopulation('INVOCATION_SITE', members([newInvocation.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(newSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({ ...newSnapshot, invocations: [{ ...newInvocation, optional: true }] })
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.invocations[0]' })
+			])
+		);
+
+		const taggedParentSnapshot = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.TaggedTemplateExpression,
+			kindName: 'TaggedTemplateExpression'
+		});
+		const taggedNode = taggedParentSnapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.TaggedTemplateExpression
+		)!;
+		const withTag = withAstChild(
+			taggedParentSnapshot,
+			taggedNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee,
+			0
+		);
+		const taggedAst = withAstChild(
+			withTag,
+			taggedNode.id,
+			{ kind: ts.SyntaxKind.TemplateExpression, kindName: 'TemplateExpression' },
+			AST_STRUCTURAL_ROLES.invocationTemplate,
+			1
+		);
+		const tagNode = taggedAst.astNodes.find(
+			(node) =>
+				node.parentId === taggedNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.invocationCallee)
+		)!;
+		const templateNode = taggedAst.astNodes.find(
+			(node) =>
+				node.parentId === taggedNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.invocationTemplate)
+		)!;
+		const taggedInvocation = {
+			argumentNodeIds: [] as const,
+			calleeNodeId: tagNode.id,
+			id: semanticInvocationSiteId({ invocationKind: 'TAGGED_TEMPLATE', nodeId: taggedNode.id }),
+			invocationKind: 'TAGGED_TEMPLATE' as const,
+			nodeId: taggedNode.id,
+			optional: false as const,
+			sourceId: taggedNode.sourceId,
+			targetState: 'SYNTAX_ONLY' as const,
+			templateNodeId: templateNode.id
+		};
+		const taggedSnapshot: StaticSemanticSnapshot = {
+			...taggedAst,
+			invocations: [taggedInvocation],
+			populations: taggedAst.populations.map((population) =>
+				population.kind === 'INVOCATION_SITE'
+					? semanticPopulation('INVOCATION_SITE', members([taggedInvocation.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(taggedSnapshot)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('orders invocation records by invocation identity without imposing node-identity order', () => {
+		const withCall = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.CallExpression,
+			kindName: 'CallExpression'
+		});
+		let withCallAndNew: StaticSemanticSnapshot | undefined;
+		for (let attempt = 0; attempt < 128 && withCallAndNew === undefined; attempt += 1) {
+			const candidate = withAstNode(withCall, {
+				kind: ts.SyntaxKind.NewExpression,
+				kindName: 'NewExpression',
+				structuralRoles: [AST_STRUCTURAL_ROLES.genericChild]
+			});
+			const candidateCall = candidate.astNodes.find(
+				(node) => node.kind === ts.SyntaxKind.CallExpression
+			)!;
+			const candidateNew = candidate.astNodes.find(
+				(node) => node.kind === ts.SyntaxKind.NewExpression
+			)!;
+			const byInvocationId = [
+				{
+					id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: candidateCall.id }),
+					nodeId: candidateCall.id
+				},
+				{
+					id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: candidateNew.id }),
+					nodeId: candidateNew.id
+				}
+			].sort((left, right) => (left.id < right.id ? -1 : 1));
+			if (byInvocationId[0]!.nodeId > byInvocationId[1]!.nodeId) withCallAndNew = candidate;
+		}
+		expect(withCallAndNew).toBeDefined();
+		const mixedAst = withCallAndNew!;
+		const callNode = mixedAst.astNodes.find((node) => node.kind === ts.SyntaxKind.CallExpression)!;
+		const newNode = mixedAst.astNodes.find((node) => node.kind === ts.SyntaxKind.NewExpression)!;
+		const withCallCallee = withAstChild(
+			mixedAst,
+			callNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee
+		);
+		const completeAst = withAstChild(
+			withCallCallee,
+			newNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee
+		);
+		const callCallee = completeAst.astNodes.find((node) => node.parentId === callNode.id)!;
+		const newCallee = completeAst.astNodes.find((node) => node.parentId === newNode.id)!;
+		const invocations = [
+			{
+				argumentNodeIds: [],
+				calleeNodeId: callCallee.id,
+				id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: callNode.id }),
+				invocationKind: 'CALL' as const,
+				nodeId: callNode.id,
+				optional: false,
+				sourceId: callNode.sourceId,
+				targetState: 'SYNTAX_ONLY' as const,
+				templateNodeId: null
+			},
+			{
+				argumentNodeIds: [],
+				calleeNodeId: newCallee.id,
+				id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: newNode.id }),
+				invocationKind: 'NEW' as const,
+				nodeId: newNode.id,
+				optional: false as const,
+				sourceId: newNode.sourceId,
+				targetState: 'SYNTAX_ONLY' as const,
+				templateNodeId: null
+			}
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		const snapshot: StaticSemanticSnapshot = {
+			...completeAst,
+			invocations,
+			populations: completeAst.populations.map((population) =>
+				population.kind === 'INVOCATION_SITE'
+					? semanticPopulation(
+							'INVOCATION_SITE',
+							members(invocations.map((invocation) => invocation.id))
+						)
+					: population
+			)
+		};
+		const nodeIdsInRecordOrder = invocations.map((invocation) => invocation.nodeId);
+		expect(
+			nodeIdsInRecordOrder.every(
+				(nodeId, index) => index === 0 || nodeIdsInRecordOrder[index - 1]! < nodeId
+			)
+		).toBe(false);
+		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('rejects conflicting compiler queries and unbound or duplicate Program source paths', () => {
+		const present = readFileObservation('context/shared.d.ts', 'PRESENT');
+		const absent = readFileObservation('context/shared.d.ts', 'ABSENT');
+		const compilerInputs = [present, absent].sort((left, right) => (left.id < right.id ? -1 : 1));
+		expect(validateSnapshot({ ...fixture(), compilerInputs }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('exactly one deterministic')
+				})
+			])
+		);
+		const conflictingDirectories = [
+			directoryObservation('context', 'GET_DIRECTORIES', 'DIRECTORY'),
+			directoryObservation('context', 'READ_DIRECTORY', 'NOT_DIRECTORY')
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		expect(
+			validateSnapshot({ ...fixture(), compilerInputs: conflictingDirectories }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('path kind')
+				})
+			])
+		);
+		const fileAndDirectory = [
+			readFileObservation('context/collision', 'PRESENT'),
+			directoryObservation('context/collision', 'DIRECTORY_EXISTS', 'DIRECTORY')
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		expect(validateSnapshot({ ...fixture(), compilerInputs: fileAndDirectory }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('path kind')
+				})
+			])
+		);
+		expect(validateSnapshot(withContextSource(fixture(), 'context/unbound.d.ts')).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					message: expect.stringContaining('PRESENT READ_FILE')
+				})
+			])
+		);
+		expect(validateSnapshot(withContextSource(fixture(), 'src/index.ts', 'x')).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'DUPLICATE_ID', path: '$.sources' })])
+		);
+		expect(
+			validateSnapshot({ ...fixture(), projects: [fixture().projects[0]!, fixture().projects[0]!] })
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'DUPLICATE_ID', path: '$.projects' })
+			])
+		);
+	});
+
+	it('closes diagnostic manifests, capability rollups, and structured limitation effects', () => {
+		const missingSourceManifest = withSourceDiagnostics(fixture(), ['2000'], false);
+		expect(validateSnapshot(missingSourceManifest).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: expect.stringContaining('exactly cover')
+				})
+			])
+		);
+		const snapshot = fixture();
+		const partialSyntax = {
+			...reviseProvenance(snapshot, snapshot.sources[0]!.syntaxProvenanceId!, (record) => ({
+				...record,
+				epistemic: { ...record.epistemic, capabilityCoverage: 'partial', freshness: 'unknown' }
+			})),
+			health: 'PARTIAL' as const
+		};
+		expect(validateSnapshot(partialSyntax).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.capabilities' })
+			])
+		);
+		const nonDegrading = {
+			capability: 'TS_PROJECT' as const,
+			closureEffect: 'NONE' as const,
+			reason: 'Full JAN-CSAA-007 conformance is outside Slice 3A.',
+			region: 'full-conformance'
+		};
+		expect(validateSnapshot({ ...snapshot, limitations: [nonDegrading] })).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(validateSnapshot({ ...snapshot, limitations: ['known gap'] }).state).toBe('INVALID');
+		const degrading = {
+			...nonDegrading,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason: 'A bounded region could not be extracted.',
+			region: 'bounded-region'
+		};
+		const fatal = {
+			...nonDegrading,
+			closureEffect: 'FATAL' as const,
+			reason: 'Extraction cannot produce a trustworthy snapshot.',
+			region: 'fatal-region'
+		};
+		expect(validateSnapshot({ ...snapshot, limitations: [fatal] }).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.limitations[0].closureEffect' })])
+		);
+		expect(validateSnapshot({ ...snapshot, limitations: [degrading] }).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE', path: '$.health' })])
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				capabilities: snapshot.capabilities.map((capability) =>
+					capability.capability === 'TS_PROJECT'
+						? { ...capability, state: 'PARTIAL' as const }
+						: capability
+				),
+				health: 'PARTIAL',
+				limitations: [degrading]
+			})
+		).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('reconciles diagnostic records, occurrences, full-payload identity, and bounded coverage', () => {
+		const base = withSourceDiagnostics(fixture(), ['2000'], true);
+		const diagnostic = { ...base.diagnostics[0]!, multiplicity: 3 };
+		const diagnostics = [diagnostic];
+		const multiplicitySnapshot: StaticSemanticSnapshot = {
+			...base,
+			diagnostics,
+			programs: base.programs.map((program) => ({
+				...program,
+				diagnosticFamilies: program.diagnosticFamilies.map((family) =>
+					family.family === 'SEMANTIC'
+						? {
+								...family,
+								manifestDigest: sha256(
+									canonicalSemanticJson(
+										diagnostics.map(({ id, multiplicity }) => ({ id, multiplicity }))
+									)
+								),
+								occurrenceCount: 3
+							}
+						: family
+				)
+			}))
+		};
+		expect(validateSnapshot(multiplicitySnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...multiplicitySnapshot,
+				budgets: { ...multiplicitySnapshot.budgets, maxDiagnostics: 2 }
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.budgets.maxDiagnostics' })
+			])
+		);
+		expect(
+			validateSnapshot({
+				...multiplicitySnapshot,
+				budgets: {
+					...multiplicitySnapshot.budgets,
+					maxDiagnosticCharacters: diagnostic.message.text.length * 2
+				}
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.budgets.maxDiagnosticCharacters'
+				})
+			])
+		);
+		expect(
+			validateSnapshot({ ...base, diagnostics: [{ ...base.diagnostics[0]!, multiplicity: 0 }] })
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.diagnostics[0].multiplicity' })
+			])
+		);
+		expect(
+			validateSnapshot({ ...base, diagnostics: [{ ...base.diagnostics[0]!, category: 'WARNING' }] })
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'IDENTITY_MISMATCH', path: '$.diagnostics[0].id' })
+			])
+		);
+
+		const boundedWithoutRollup = {
+			...fixture(),
+			programs: fixture().programs.map((program) => ({
+				...program,
+				diagnosticFamilies: program.diagnosticFamilies.map((family) =>
+					family.family === 'CONFIGURATION' ? { ...family, coverage: 'BOUNDED' } : family
+				)
+			}))
+		};
+		expect(validateSnapshot(boundedWithoutRollup).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('project partiality')
+				})
+			])
+		);
+		const boundedBase: StaticSemanticSnapshot = {
+			...(boundedWithoutRollup as StaticSemanticSnapshot),
+			capabilities: boundedWithoutRollup.capabilities.map((capability) =>
+				capability.capability === 'TS_PROJECT'
+					? { ...capability, state: 'PARTIAL' as const }
+					: capability
+			),
+			health: 'PARTIAL',
+			projects: boundedWithoutRollup.projects.map((project) => ({
+				...project,
+				health: 'PARTIAL' as const,
+				partialityReasons: [
+					{
+						capability: 'TS_PROJECT' as const,
+						code: 'SEMANTIC_VALIDATION_FAILED' as const,
+						message: 'Configuration diagnostics were captured with bounded coverage.',
+						path: project.configPath
+					}
+				]
+			}))
+		};
+		const bounded = reviseProvenance(
+			boundedBase,
+			boundedBase.projects[0]!.provenanceId,
+			(record) => ({
+				...record,
+				epistemic: { ...record.epistemic, capabilityCoverage: 'partial' as const }
+			})
+		);
+		expect(validateSnapshot(bounded)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('rejects Proxies and accessors without executing traps or getters and fails closed on ordinary non-scalar strings', () => {
+		const snapshot = fixture();
+		let traps = 0;
+		const hostile = new Proxy(snapshot, {
+			get: () => {
+				traps += 1;
+				return undefined;
+			},
+			getOwnPropertyDescriptor: () => {
+				traps += 1;
+				return undefined;
+			},
+			getPrototypeOf: () => {
+				traps += 1;
+				return Object.prototype;
+			},
+			ownKeys: () => {
+				traps += 1;
+				return [];
+			}
+		});
+		expect(validateStaticSemanticSnapshot(hostile, {}, FROZEN_CONTEXT)).toMatchObject({
+			state: 'INVALID',
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })]
+		});
+		expect(traps).toBe(0);
+
+		let nestedTraps = 0;
+		const provider = new Proxy(snapshot.provider, {
+			get: () => {
+				nestedTraps += 1;
+				return undefined;
+			},
+			getOwnPropertyDescriptor: () => {
+				nestedTraps += 1;
+				return undefined;
+			},
+			getPrototypeOf: () => {
+				nestedTraps += 1;
+				return Object.prototype;
+			},
+			ownKeys: () => {
+				nestedTraps += 1;
+				return [];
+			}
+		});
+		expect(validateSnapshot({ ...snapshot, provider })).toMatchObject({
+			state: 'INVALID',
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })]
+		});
+		expect(nestedTraps).toBe(0);
+
+		let getterCalls = 0;
+		const accessor = { ...snapshot };
+		Object.defineProperty(accessor, 'provider', {
+			enumerable: true,
+			get: () => {
+				getterCalls += 1;
+				return snapshot.provider;
+			}
+		});
+		const accessorResult = validateSnapshot(accessor);
+		expect(accessorResult.state).toBe('INVALID');
+		expect(accessorResult.issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_SHAPE' })])
+		);
+		expect(getterCalls).toBe(0);
+		expect(() => validateSnapshot({ ...snapshot, health: '\ud800' })).not.toThrow();
+		const surrogateResult = validateSnapshot({ ...snapshot, health: '\ud800' });
+		expect(surrogateResult.state).toBe('INVALID');
+		expect(surrogateResult.issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_SHAPE' })])
+		);
+	});
+
+	it('materializes validation-option overrides from closed enumerable data descriptors without executing hostile code', () => {
+		const snapshot = fixture();
+		const validateOptions = (options: unknown) =>
+			validateStaticSemanticSnapshot(
+				snapshot,
+				options as Partial<SemanticValidationOptions>,
+				FROZEN_CONTEXT
+			);
+		expect(validateOptions({ maxIssues: 500, maxReferenceChecks: 10_000 })).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const benignProxy = new Proxy({ maxIssues: 500 }, {});
+		expect(() => validateOptions(benignProxy)).not.toThrow();
+		expect(validateOptions(benignProxy)).toMatchObject({
+			state: 'INVALID',
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE', path: '$validationOptions' })]
+		});
+
+		let proxyTraps = 0;
+		const throwingProxy = new Proxy(
+			{},
+			{
+				get: () => {
+					proxyTraps += 1;
+					throw new Error('get trap');
+				},
+				getOwnPropertyDescriptor: () => {
+					proxyTraps += 1;
+					throw new Error('descriptor trap');
+				},
+				getPrototypeOf: () => {
+					proxyTraps += 1;
+					throw new Error('prototype trap');
+				},
+				ownKeys: () => {
+					proxyTraps += 1;
+					throw new Error('ownKeys trap');
+				}
+			}
+		);
+		expect(() => validateOptions(throwingProxy)).not.toThrow();
+		expect(validateOptions(throwingProxy)).toMatchObject({
+			state: 'INVALID',
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })]
+		});
+		expect(proxyTraps).toBe(0);
+
+		let getterCalls = 0;
+		const accessorOptions = {};
+		Object.defineProperty(accessorOptions, 'maxIssues', {
+			enumerable: true,
+			get: () => {
+				getterCalls += 1;
+				throw new Error('option getter');
+			}
+		});
+		expect(() => validateOptions(accessorOptions)).not.toThrow();
+		expect(validateOptions(accessorOptions)).toMatchObject({
+			state: 'INVALID',
+			issues: [
+				expect.objectContaining({ code: 'INVALID_SHAPE', path: '$validationOptions.maxIssues' })
+			]
+		});
+		expect(getterCalls).toBe(0);
+
+		const hiddenOptions = {};
+		Object.defineProperty(hiddenOptions, 'maxIssues', { enumerable: false, value: 500 });
+		expect(validateOptions(hiddenOptions)).toMatchObject({
+			state: 'INVALID',
+			issues: [
+				expect.objectContaining({ code: 'INVALID_SHAPE', path: '$validationOptions.maxIssues' })
+			]
+		});
+		expect(validateOptions({ [Symbol('maxIssues')]: 500 })).toMatchObject({
+			state: 'INVALID',
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE', path: '$validationOptions' })]
+		});
+		expect(validateOptions({ maxIssuez: 500 })).toMatchObject({
+			state: 'INVALID',
+			issues: [
+				expect.objectContaining({ code: 'INVALID_SHAPE', path: '$validationOptions.maxIssuez' })
+			]
+		});
+	});
+
+	it('requires exact FrozenSubject artifacts and projects, including workspace-alias source binding', () => {
+		const snapshot = fixture();
+		expect(validateStaticSemanticSnapshot(snapshot).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'FROZEN_EVIDENCE_REQUIRED' })])
+		);
+		const wrongArtifact: SemanticValidationContext = {
+			frozenSubject: {
+				...FROZEN_CONTEXT.frozenSubject!,
+				artifacts: FROZEN_CONTEXT.frozenSubject!.artifacts.map((artifact) => ({
+					...artifact,
+					sha256: 'f'.repeat(64)
+				}))
+			}
+		};
+		expect(validateSnapshot(snapshot, {}, wrongArtifact).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'FROZEN_EVIDENCE_REQUIRED' })])
+		);
+
+		const forgedRecipe = fixture('src/index.ts', '', { module: 199, strict: false });
+		expect(validateSnapshot(forgedRecipe).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'FROZEN_EVIDENCE_REQUIRED', path: '$.projects' })
+			])
+		);
+		expect(validateSnapshot({ ...snapshot, projects: [] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'FROZEN_EVIDENCE_REQUIRED', path: '$.projects' })
+			])
+		);
+		expect(
+			validateSnapshot({ ...snapshot, projects: [...snapshot.projects, snapshot.projects[0]!] })
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'FROZEN_EVIDENCE_REQUIRED', path: '$.projects' })
+			])
+		);
+
+		const aliasPath = 'node_modules/@scope/example/src/index.ts';
+		const artifactPath = 'packages/example/src/index.ts';
+		const aliasSnapshot = fixture(aliasPath);
+		const aliasContext = contextForSnapshot(aliasSnapshot, artifactPath, [
+			{
+				exports: [],
+				kind: 'PACKAGE',
+				manifestPath: 'packages/example/package.json',
+				name: '@scope/example',
+				path: 'packages/example',
+				private: false,
+				provenance: ['packages/example/package.json'],
+				workspacePatterns: ['packages/*']
+			}
+		]);
+		expect(validateSnapshot(aliasSnapshot, {}, aliasContext)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const incompleteProject = {
+			...snapshot.projects[0]!,
+			health: 'PARTIAL' as const,
+			partialityReasons: [
+				{
+					capability: 'TS_PROJECT' as const,
+					code: 'TYPESCRIPT_PROJECT_PARTIAL' as const,
+					message: 'Frozen project resolution is incomplete.',
+					path: snapshot.projects[0]!.configPath
+				}
+			],
+			rootDisposition: 'INCOMPLETE' as const
+		};
+		const incompleteBaseSnapshot: StaticSemanticSnapshot = {
+			...snapshot,
+			capabilities: snapshot.capabilities.map((capability) =>
+				capability.capability === 'TS_PROJECT'
+					? { ...capability, state: 'PARTIAL' as const }
+					: capability
+			),
+			health: 'PARTIAL',
+			projects: [incompleteProject]
+		};
+		const incompleteSnapshot = reviseProvenance(
+			incompleteBaseSnapshot,
+			incompleteProject.provenanceId,
+			(record) => ({
+				...record,
+				epistemic: { ...record.epistemic, capabilityCoverage: 'partial' as const }
+			})
+		);
+		const revisedIncompleteProject = incompleteSnapshot.projects[0]!;
+		const incompleteBaseContext = contextForSnapshot(incompleteSnapshot);
+		const incompleteContext: SemanticValidationContext = {
+			frozenSubject: {
+				...incompleteBaseContext.frozenSubject!,
+				projects: [subjectProject(revisedIncompleteProject, 'PARTIAL')]
+			}
+		};
+		expect(validateSnapshot(incompleteSnapshot, {}, incompleteContext)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+	});
+
+	it('represents cooked lone-surrogate string and template literals without admitting them to canonical JSON', () => {
+		for (const [kind, kindName, valueType, cooked] of [
+			[ts.SyntaxKind.StringLiteral, 'StringLiteral', 'STRING', '\ud800'],
+			[
+				ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+				'NoSubstitutionTemplateLiteral',
+				'NO_SUBSTITUTION_TEMPLATE',
+				'\udc00'
+			],
+			[ts.SyntaxKind.TemplateHead, 'TemplateHead', 'TEMPLATE_HEAD', '\ud800'],
+			[ts.SyntaxKind.TemplateTail, 'TemplateTail', 'TEMPLATE_TAIL', '\udc00']
+		] as const) {
+			const ast = withAstNode(fixture(), { kind, kindName });
+			const node = ast.astNodes.find((candidate) => candidate.kind === kind)!;
+			const literal = {
+				lexemeLength: 0,
+				lexemeSha256: literalLexemeDigest(''),
+				nodeId: node.id,
+				sourceId: node.sourceId,
+				value: null,
+				valueEncoding: 'UTF16_CODE_UNITS_LE' as const,
+				valueLength: 1,
+				valueSha256: literalValueDigest('UTF16_CODE_UNITS_LE', valueType, cooked),
+				valueState: 'DIGEST_ONLY' as const,
+				valueType
+			};
+			const snapshot: StaticSemanticSnapshot = {
+				...ast,
+				literals: [literal],
+				populations: ast.populations.map((population) =>
+					population.kind === 'LITERAL'
+						? semanticPopulation('LITERAL', members([node.id]))
+						: population
+				)
+			};
+			expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		}
+	});
+
+	it('binds literal declaration names to scalar-safe source lexemes and preserves recovered missing names', () => {
+		const sourceLexeme = '"\\uD800"';
+		const contents = `const o = {${sourceLexeme}: 1};`;
+		const start = contents.indexOf(sourceLexeme);
+		const parentAst = withAstNode(fixture('src/index.ts', contents), {
+			end: start + sourceLexeme.length,
+			kind: ts.SyntaxKind.PropertyAssignment,
+			kindName: 'PropertyAssignment',
+			start
+		});
+		const parent = parentAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.PropertyAssignment
+		)!;
+		const namedAst = withAstChild(
+			parentAst,
+			parent.id,
+			{
+				end: start + sourceLexeme.length,
+				kind: ts.SyntaxKind.StringLiteral,
+				kindName: 'StringLiteral',
+				start
+			},
+			AST_STRUCTURAL_ROLES.declarationName
+		);
+		const name = namedAst.astNodes.find((node) => node.parentId === parent.id)!;
+		const literal = {
+			lexemeLength: sourceLexeme.length,
+			lexemeSha256: literalLexemeDigest(sourceLexeme),
+			nodeId: name.id,
+			sourceId: name.sourceId,
+			value: null,
+			valueEncoding: 'UTF16_CODE_UNITS_LE' as const,
+			valueLength: 1,
+			valueSha256: literalValueDigest('UTF16_CODE_UNITS_LE', 'STRING', '\ud800'),
+			valueState: 'DIGEST_ONLY' as const,
+			valueType: 'STRING' as const
+		};
+		const candidate = {
+			ambientSyntax: false,
+			candidateRole: 'MEMBER' as const,
+			candidateState: 'SYNTAX_ONLY' as const,
+			exportCarrierNodeId: null,
+			exportSyntax: 'NONE' as const,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'MEMBER',
+				nodeId: parent.id,
+				syntaxKind: parent.kind
+			}),
+			localModifiers: [],
+			nameNodeId: name.id,
+			nameState: 'ATOMIC' as const,
+			nodeId: parent.id,
+			sourceId: parent.sourceId,
+			syntacticName: sourceLexeme,
+			syntaxKind: parent.kind,
+			syntaxKindName: parent.kindName
+		};
+		const namedSnapshot: StaticSemanticSnapshot = {
+			...namedAst,
+			declarationCandidates: [candidate],
+			literals: [literal],
+			populations: namedAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation('DECLARATION_CANDIDATE', members([candidate.id]))
+					: population.kind === 'LITERAL'
+						? semanticPopulation('LITERAL', members([literal.nodeId]))
+						: population
+			)
+		};
+		expect(validateSnapshot(namedSnapshot, {}, contextForSnapshot(namedSnapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const declarationAst = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.VariableDeclaration,
+			kindName: 'VariableDeclaration'
+		});
+		const declaration = declarationAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+		)!;
+		const missingAst = withAstChild(
+			declarationAst,
+			declaration.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier', syntacticIdentifierText: '' },
+			AST_STRUCTURAL_ROLES.declarationName
+		);
+		const missingName = missingAst.astNodes.find((node) => node.parentId === declaration.id)!;
+		const missingCandidate = {
+			...candidate,
+			candidateRole: 'BINDING' as const,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'BINDING',
+				nodeId: declaration.id,
+				syntaxKind: declaration.kind
+			}),
+			nameNodeId: missingName.id,
+			nameState: 'MISSING' as const,
+			nodeId: declaration.id,
+			sourceId: declaration.sourceId,
+			syntacticName: null,
+			syntaxKind: declaration.kind,
+			syntaxKindName: declaration.kindName
+		};
+		const missingSnapshot: StaticSemanticSnapshot = {
+			...missingAst,
+			declarationCandidates: [missingCandidate],
+			populations: missingAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation('DECLARATION_CANDIDATE', members([missingCandidate.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(missingSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...missingSnapshot,
+				declarationCandidates: [
+					{ ...missingCandidate, nameState: 'ATOMIC', syntacticName: 'forged' }
+				]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: '$.declarationCandidates[0].nameState' })
+			])
+		);
+	});
+
+	it('deduplicates repeated modifier syntax while retaining the compiler diagnostic', () => {
+		const parentAst = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.PropertyDeclaration,
+			kindName: 'PropertyDeclaration'
+		});
+		const parent = parentAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.PropertyDeclaration
+		)!;
+		const first = withAstChild(
+			parentAst,
+			parent.id,
+			{ kind: ts.SyntaxKind.PublicKeyword, kindName: 'PublicKeyword' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const second = withAstChild(
+			first,
+			parent.id,
+			{ kind: ts.SyntaxKind.PublicKeyword, kindName: 'PublicKeyword' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			1
+		);
+		const named = withAstChild(
+			second,
+			parent.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName,
+			2
+		);
+		const name = named.astNodes.find(
+			(node) => node.parentId === parent.id && node.kind === ts.SyntaxKind.Identifier
+		)!;
+		const candidate = {
+			ambientSyntax: false,
+			candidateRole: 'MEMBER' as const,
+			candidateState: 'SYNTAX_ONLY' as const,
+			exportCarrierNodeId: null,
+			exportSyntax: 'NONE' as const,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'MEMBER',
+				nodeId: parent.id,
+				syntaxKind: parent.kind
+			}),
+			localModifiers: [{ code: ts.SyntaxKind.PublicKeyword, name: 'PublicKeyword' }],
+			nameNodeId: name.id,
+			nameState: 'ATOMIC' as const,
+			nodeId: parent.id,
+			sourceId: parent.sourceId,
+			syntacticName: 'value',
+			syntaxKind: parent.kind,
+			syntaxKindName: parent.kindName
+		};
+		const snapshot = withSourceDiagnostics(
+			{
+				...named,
+				declarationCandidates: [candidate],
+				populations: named.populations.map((population) =>
+					population.kind === 'DECLARATION_CANDIDATE'
+						? semanticPopulation('DECLARATION_CANDIDATE', members([candidate.id]))
+						: population
+				)
+			},
+			['1030'],
+			true
+		);
+		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(snapshot.declarationCandidates[0]!.localModifiers).toHaveLength(1);
+
+		const withReadonly = withAstChild(
+			second,
+			parent.id,
+			{ kind: ts.SyntaxKind.ReadonlyKeyword, kindName: 'ReadonlyKeyword' },
+			AST_STRUCTURAL_ROLES.genericChild,
+			2
+		);
+		const withDistinctName = withAstChild(
+			withReadonly,
+			parent.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.declarationName,
+			3
+		);
+		const distinctName = withDistinctName.astNodes.find(
+			(node) => node.parentId === parent.id && node.kind === ts.SyntaxKind.Identifier
+		)!;
+		const modifiers = [
+			{ code: ts.SyntaxKind.PublicKeyword, name: 'PublicKeyword' },
+			{ code: ts.SyntaxKind.ReadonlyKeyword, name: 'ReadonlyKeyword' }
+		].sort((left, right) => (`${left.code}:${left.name}` < `${right.code}:${right.name}` ? -1 : 1));
+		const distinctCandidate = {
+			...candidate,
+			localModifiers: modifiers,
+			nameNodeId: distinctName.id
+		};
+		const distinctSnapshot: StaticSemanticSnapshot = {
+			...withDistinctName,
+			declarationCandidates: [distinctCandidate],
+			populations: withDistinctName.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation('DECLARATION_CANDIDATE', members([distinctCandidate.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(distinctSnapshot)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('preserves non-scalar and path-bearing diagnostic text, PATH locations, and duplicate related information', () => {
+		const base = withSourceDiagnostics(fixture(), ['2322'], true);
+		const original = base.diagnostics[0]!;
+		const nonScalarMessage = diagnosticMessage('\ud800');
+		const nonScalarIdentity = {
+			category: original.category,
+			code: original.code,
+			end: original.end,
+			family: original.family,
+			locationKind: original.locationKind,
+			message: nonScalarMessage,
+			path: original.path,
+			projectId: original.projectId,
+			related: original.related,
+			sourceId: original.sourceId,
+			start: original.start
+		};
+		const nonScalar = replaceDiagnostics(base, [
+			{ ...original, ...nonScalarIdentity, id: semanticDiagnosticId(nonScalarIdentity) }
+		]);
+		expect(nonScalarMessage).toMatchObject({
+			text: 'd800',
+			textEncoding: 'UTF16_CODE_UNITS_HEX',
+			textLength: 1
+		});
+		expect(validateSnapshot(nonScalar)).toEqual({ issues: [], state: 'VALID' });
+		const tightBudget = validateSnapshot({
+			...nonScalar,
+			budgets: { ...nonScalar.budgets, maxDiagnosticCharacters: 1 }
+		});
+		expect(tightBudget.issues).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: '$.budgets.maxDiagnosticCharacters' })
+			])
+		);
+
+		const pathText = diagnosticMessage(
+			'Source reported C:\\repo\\x.ts but retained a logical path.'
+		);
+		const pathTextIdentity = { ...nonScalarIdentity, message: pathText };
+		const withPathText = replaceDiagnostics(base, [
+			{ ...original, ...pathTextIdentity, id: semanticDiagnosticId(pathTextIdentity) }
+		]);
+		expect(validateSnapshot(withPathText)).toEqual({ issues: [], state: 'VALID' });
+
+		const project = base.projects[0]!;
+		const configMessage = diagnosticMessage('Unknown compiler option.');
+		const configIdentity = {
+			category: 'ERROR' as const,
+			code: 'TS5023',
+			end: 5,
+			family: 'CONFIGURATION' as const,
+			locationKind: 'PATH' as const,
+			message: configMessage,
+			path: project.configPath,
+			projectId: project.id,
+			related: [],
+			sourceId: null,
+			start: 0
+		};
+		const configDiagnostic: SemanticDiagnosticRecord = {
+			...configIdentity,
+			id: semanticDiagnosticId(configIdentity),
+			multiplicity: 1,
+			provenanceId: project.provenanceId
+		};
+		const configSnapshot = replaceDiagnostics(fixture(), [configDiagnostic]);
+		expect(validateSnapshot(configSnapshot)).toEqual({ issues: [], state: 'VALID' });
+
+		const related = {
+			category: 'MESSAGE' as const,
+			code: 'TS100',
+			end: null,
+			message: diagnosticMessage('same related information'),
+			path: null,
+			start: null
+		};
+		const duplicateRelatedIdentity = {
+			...nonScalarIdentity,
+			message: original.message,
+			related: [related, related]
+		};
+		const duplicateRelated = replaceDiagnostics(base, [
+			{
+				...original,
+				...duplicateRelatedIdentity,
+				id: semanticDiagnosticId(duplicateRelatedIdentity)
+			}
+		]);
+		expect(validateSnapshot(duplicateRelated)).toEqual({ issues: [], state: 'VALID' });
+		expect(
+			validateSnapshot({
+				...duplicateRelated,
+				diagnostics: duplicateRelated.diagnostics.map((diagnostic) => ({
+					...diagnostic,
+					code: '2322'
+				}))
+			}).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ path: '$.diagnostics[0].code' })]));
+	});
+
+	it('keeps unsupported framework syntax independent from TS_PROJECT capability', () => {
+		const snapshot = fixture();
+		const frameworkMember = `${snapshot.projects[0]!.id}\0apps/demo/App.svelte`;
+		const project = {
+			...snapshot.projects[0]!,
+			frameworkCandidates: ['apps/demo/App.svelte'],
+			health: 'PARTIAL' as const,
+			partialityReasons: [
+				{
+					capability: 'TS_SYNTAX' as const,
+					code: 'FRAMEWORK_CANDIDATES_UNSUPPORTED' as const,
+					message: 'Framework syntax is outside Slice 3A.',
+					path: 'apps/demo/App.svelte'
+				}
+			]
+		};
+		const frameworkMembers: SemanticPopulationMembers = {
+			analyzed: [frameworkMember],
+			contextOnly: [],
+			excluded: [],
+			excludedByPolicy: [],
+			failed: [],
+			unknown: [],
+			unsupported: [frameworkMember]
+		};
+		const frameworkSnapshot: StaticSemanticSnapshot = {
+			...snapshot,
+			capabilities: snapshot.capabilities.map((capability) =>
+				capability.capability === 'TS_SYNTAX'
+					? { ...capability, state: 'PARTIAL' as const }
+					: capability
+			),
+			health: 'PARTIAL',
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'FRAMEWORK_CANDIDATE'
+					? semanticPopulation('FRAMEWORK_CANDIDATE', frameworkMembers)
+					: population
+			),
+			projects: [project]
+		};
+		const context = contextForSnapshot(frameworkSnapshot);
+		const frameworkPartialContext: SemanticValidationContext = {
+			frozenSubject: {
+				...context.frozenSubject!,
+				projects: context.frozenSubject!.projects.map((authoritative) => ({
+					...authoritative,
+					status: 'PARTIAL' as const
+				}))
+			}
+		};
+		expect(
+			frameworkSnapshot.capabilities.find((capability) => capability.capability === 'TS_PROJECT')!
+				.state
+		).toBe('SUPPORTED');
+		expect(
+			frameworkSnapshot.provenances.find((record) => record.id === project.provenanceId)!.epistemic
+				.capabilityCoverage
+		).toBe('supported');
+		expect(validateSnapshot(frameworkSnapshot, {}, context)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(validateSnapshot(frameworkSnapshot, {}, frameworkPartialContext)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(
+			validateSnapshot(
+				{
+					...frameworkSnapshot,
+					capabilities: frameworkSnapshot.capabilities.map((capability) =>
+						capability.capability === 'TS_SYNTAX'
+							? { ...capability, state: 'SUPPORTED' as const }
+							: capability
+					)
+				},
+				{},
+				context
+			).issues
+		).toEqual(expect.arrayContaining([expect.objectContaining({ path: '$.capabilities' })]));
+	});
+
+	it('enforces the closed structural-role algebra', () => {
+		const ast = withAstNode(fixture(), { kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' });
+		const child = ast.astNodes.find((node) => node.kind === ts.SyntaxKind.Identifier)!;
+		for (const roles of [
+			['bogus-role'],
+			[AST_STRUCTURAL_ROLES.invocationCallee],
+			[
+				AST_STRUCTURAL_ROLES.genericChild,
+				AST_STRUCTURAL_ROLES.invocationArgument,
+				AST_STRUCTURAL_ROLES.invocationCallee
+			],
+			[
+				AST_STRUCTURAL_ROLES.assignmentTarget,
+				AST_STRUCTURAL_ROLES.assignmentValue,
+				AST_STRUCTURAL_ROLES.genericChild
+			]
+		]) {
+			const malformed = {
+				...ast,
+				astNodes: ast.astNodes.map((node) =>
+					node.id === child.id ? { ...node, structuralRoles: [...roles].sort() } : node
+				)
+			};
+			expect(validateSnapshot(malformed).issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: 'INVALID_VALUE',
+						path: expect.stringContaining('structuralRoles')
+					})
+				])
+			);
+		}
+		const root = ast.astNodes.find((node) => node.parentId === null)!;
+		const rootAndChild = {
+			...ast,
+			astNodes: ast.astNodes.map((node) =>
+				node.id === root.id
+					? {
+							...node,
+							structuralRoles: [AST_STRUCTURAL_ROLES.genericChild, AST_STRUCTURAL_ROLES.sourceFile]
+						}
+					: node
+			)
+		};
+		expect(validateSnapshot(rootAndChild).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: expect.stringContaining('structuralRoles')
+				})
+			])
+		);
+	});
+
+	it('rejects absolute compiler-option keys and bounds sparse arrays before expansion', () => {
+		const snapshot = fixture();
+		const absoluteKey = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({
+				...project,
+				programRecipe: {
+					...project.programRecipe,
+					compilerOptions: { paths: { 'C:\\secret\\*': ['src/*'] } }
+				}
+			}))
+		};
+		expect(validateSnapshot(absoluteKey).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+		const hugeSparse: unknown[] = [];
+		hugeSparse.length = 1_000_000;
+		expect(
+			validateSnapshot({ ...snapshot, astNodes: hugeSparse }, { maxRecords: 100 })
+		).toMatchObject({ state: 'BUDGET_EXHAUSTED' });
+		const smallSparse = Array<unknown>(2);
+		expect(validateSnapshot({ ...snapshot, astNodes: smallSparse })).toMatchObject({
+			state: 'INVALID'
+		});
+	});
+
+	it('closes remaining bounded validator failure paths with discriminating mutations', () => {
+		const snapshot = fixture();
+		const budgetResult = validateSnapshot(
+			{
+				...snapshot,
+				canonicalProfile: 'wrong-profile',
+				extractionVersion: 'wrong-version'
+			},
+			{ maxIssues: 1 }
+		);
+		expect(budgetResult).toMatchObject({
+			state: 'BUDGET_EXHAUSTED',
+			issues: [expect.objectContaining({ path: '$.canonicalProfile' })]
+		});
+
+		for (const options of [null, [], new Date(0)]) {
+			expect(
+				validateStaticSemanticSnapshot(snapshot, options as never, FROZEN_CONTEXT)
+			).toMatchObject({
+				state: 'INVALID',
+				issues: [expect.objectContaining({ path: '$validationOptions' })]
+			});
+		}
+
+		const unsupportedImplemented = {
+			...snapshot,
+			capabilities: snapshot.capabilities.map((entry) =>
+				entry.capability === 'TS_PROJECT' ? { ...entry, state: 'UNSUPPORTED' as const } : entry
+			)
+		};
+		expect(validateSnapshot(unsupportedImplemented).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.capabilities' })
+			])
+		);
+
+		const recipeProviderMismatch = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({
+				...project,
+				programRecipe: {
+					...project.programRecipe,
+					provider: { ...project.programRecipe.provider, version: '5.9.2' }
+				}
+			}))
+		};
+		expect(validateSnapshot(recipeProviderMismatch).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'IDENTITY_MISMATCH', path: '$.projects[0].programRecipe' })
+			])
+		);
+
+		const diagnosticBase = withSourceDiagnostics(snapshot, ['2000'], true);
+		const diagnostic = diagnosticBase.diagnostics[0]!;
+		const diagnosticProbes = [
+			{ ...diagnostic, message: { ...diagnostic.message, text: 'changed' } },
+			{
+				...diagnostic,
+				message: {
+					...diagnostic.message,
+					text: '0061',
+					textEncoding: 'UTF16_CODE_UNITS_HEX' as const,
+					textLength: 1
+				}
+			},
+			{ ...diagnostic, locationKind: 'SOURCE' as const, path: null, sourceId: null },
+			{ ...diagnostic, multiplicity: Number.MAX_SAFE_INTEGER }
+		];
+		for (const changedDiagnostic of diagnosticProbes) {
+			const result = validateSnapshot({ ...diagnosticBase, diagnostics: [changedDiagnostic] });
+			expect(result.state).toBe('INVALID');
+			expect(result.issues.length).toBeGreaterThan(0);
+		}
+
+		const projectProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_PROJECT' && record.sourceId === null
+		)!;
+		const epistemicallyInvalid = {
+			...snapshot,
+			provenances: snapshot.provenances.map((record) =>
+				record.id === projectProvenance.id
+					? {
+							...record,
+							epistemic: {
+								...record.epistemic,
+								capabilityCoverage: 'unsupported' as const,
+								conflict: 'conflicting' as const,
+								executionHealth: 'failed' as const,
+								freshness: 'stale' as const,
+								inference: 'candidate' as const,
+								rationale: '',
+								supportBasis: {
+									...record.epistemic.supportBasis,
+									kind: 'unknown' as const,
+									method: null,
+									rationale: '',
+									sourceRefs: []
+								}
+							}
+						}
+					: record
+			)
+		};
+		expect(validateSnapshot(epistemicallyInvalid).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: expect.stringContaining('.epistemic')
+				})
+			])
+		);
+
+		const limitation = {
+			capability: 'TS_PROJECT' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason: 'Bounded project evidence.',
+			region: 'project-region'
+		};
+		const limitedProvenance = {
+			...snapshot,
+			provenances: snapshot.provenances.map((record) =>
+				record.id === projectProvenance.id ? { ...record, limitations: [limitation] } : record
+			)
+		};
+		expect(validateSnapshot(limitedProvenance).state).toBe('INVALID');
+
+		const ast = withAstNode(snapshot, { kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' });
+		const root = ast.astNodes.find((node) => node.parentId === null)!;
+		const child = ast.astNodes.find((node) => node.kind === ts.SyntaxKind.Identifier)!;
+		const cyclic = {
+			...ast,
+			astNodes: ast.astNodes.map((node) =>
+				node.id === root.id ? { ...node, parentId: child.id } : node
+			)
+		};
+		expect(validateSnapshot(cyclic).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: expect.stringContaining('cycle')
+				})
+			])
+		);
+
+		const danglingChain = {
+			...ast,
+			astNodes: ast.astNodes.map((node) =>
+				node.id === child.id ? { ...node, parentId: `semantic:node-${'f'.repeat(64)}` } : node
+			)
+		};
+		expect(validateSnapshot(danglingChain).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					path: expect.stringContaining('.parentId')
+				})
+			])
+		);
+
+		const partialContext = contextForSnapshot(snapshot);
+		const authoritativeProject = partialContext.frozenSubject!.projects[0]!;
+		const contextWithPartialDiagnostic: SemanticValidationContext = {
+			frozenSubject: {
+				...partialContext.frozenSubject!,
+				projects: [
+					{
+						...authoritativeProject,
+						typescriptDiagnostics: [
+							{
+								code: 'TYPESCRIPT_PROJECT_PARTIAL',
+								message: 'Compiler project is partial.',
+								path: authoritativeProject.configPath,
+								phase: 'RESOLVE',
+								severity: 'WARNING'
+							}
+						]
+					}
+				]
+			}
+		};
+		expect(validateSnapshot(snapshot, {}, contextWithPartialDiagnostic).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'FROZEN_EVIDENCE_REQUIRED', path: '$.projects' })
+			])
+		);
+	});
+
+	it('rejects every remaining reachable manifest, provenance, diagnostic, and compiler-input inconsistency', () => {
+		const snapshot = fixture();
+		const assertInvalidAt = (
+			value: unknown,
+			path: unknown,
+			context: SemanticValidationContext = FROZEN_CONTEXT
+		): void => {
+			const result = validateSnapshot(value, {}, context);
+			expect(result.state).toBe('INVALID');
+			expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ path })]));
+		};
+
+		assertInvalidAt(
+			{ ...snapshot, fullJanCsaa007Conformance: true },
+			'$.fullJanCsaa007Conformance'
+		);
+		assertInvalidAt(
+			{ ...snapshot, provider: { ...snapshot.provider, api: 'PRIVATE_COMPILER_API' } },
+			'$.provider'
+		);
+		assertInvalidAt({ ...snapshot, subjectId: 'BAD' }, '$.subjectId');
+		assertInvalidAt({ ...snapshot, budgets: { ...snapshot.budgets, maxSources: 0 } }, '$.budgets');
+		const firstLimitation = {
+			capability: 'TS_PROJECT' as const,
+			closureEffect: 'NONE' as const,
+			reason: 'z reason',
+			region: 'z-region'
+		};
+		const secondLimitation = {
+			capability: 'TS_PROJECT' as const,
+			closureEffect: 'NONE' as const,
+			reason: 'a reason',
+			region: 'a-region'
+		};
+		assertInvalidAt(
+			{ ...snapshot, limitations: [firstLimitation, secondLimitation] },
+			'$.limitations'
+		);
+		assertInvalidAt(
+			{ ...snapshot, limitations: [{ ...firstLimitation, reason: '' }] },
+			'$.limitations[0]'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				limitations: [
+					{ ...firstLimitation, capability: 'TS_SYMBOL', closureEffect: 'DEGRADES_CLOSURE' }
+				]
+			},
+			'$.limitations[0]'
+		);
+		assertInvalidAt(
+			{ ...snapshot, requestedCapabilities: ['TS_SYNTAX', 'TS_PROJECT'] },
+			'$.requestedCapabilities'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				capabilities: snapshot.capabilities.map((entry) =>
+					entry.capability === 'TS_PROJECT' ? { ...entry, reason: '' } : entry
+				)
+			},
+			'$.capabilities'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				projects: snapshot.projects.map((project) => ({ ...project, id: 'semantic:wrong-project' }))
+			},
+			'$.projects[0].id'
+		);
+		assertInvalidAt(
+			{ ...snapshot, programs: [snapshot.programs[0]!, snapshot.programs[0]!] },
+			'$.programs'
+		);
+
+		assertInvalidAt(snapshot, '$validationContext.frozenSubject.descriptor.subjectId', {
+			frozenSubject: {
+				...FROZEN_CONTEXT.frozenSubject!,
+				descriptor: { ...FROZEN_CONTEXT.frozenSubject!.descriptor, subjectId: 'f'.repeat(64) }
+			}
+		});
+		const twoWorkspaceContext: SemanticValidationContext = {
+			frozenSubject: {
+				...FROZEN_CONTEXT.frozenSubject!,
+				workspaces: [
+					{
+						exports: [],
+						kind: 'PACKAGE',
+						manifestPath: 'packages/long/package.json',
+						name: '@fixture/long',
+						path: 'packages/long',
+						private: true,
+						provenance: [],
+						workspacePatterns: ['packages/*']
+					},
+					{
+						exports: [],
+						kind: 'PACKAGE',
+						manifestPath: 'packages/x/package.json',
+						name: 'x',
+						path: 'packages/x',
+						private: true,
+						provenance: [],
+						workspacePatterns: ['packages/*']
+					}
+				]
+			}
+		};
+		expect(validateSnapshot(snapshot, {}, twoWorkspaceContext).state).toBe('VALID');
+
+		const diagnosticSnapshot = withSourceDiagnostics(snapshot, ['2322'], true);
+		const diagnostic = diagnosticSnapshot.diagnostics[0]!;
+		for (const [changed, path] of [
+			[
+				{ ...diagnostic, message: { ...diagnostic.message, text: '', textLength: 0 } },
+				'$.diagnostics[0].message'
+			],
+			[
+				{ ...diagnostic, message: { ...diagnostic.message, category: 'ERROR', code: null } },
+				'$.diagnostics[0].message'
+			],
+			[
+				{ ...diagnostic, message: { ...diagnostic.message, textSha256: 'bad' } },
+				'$.diagnostics[0].message.textSha256'
+			],
+			[
+				{ ...diagnostic, message: { ...diagnostic.message, next: [diagnosticMessage('nested')] } },
+				'$.diagnostics[0].id'
+			],
+			[{ ...diagnostic, projectId: 'semantic:project-missing' }, '$.diagnostics[0].projectId'],
+			[{ ...diagnostic, start: 2, end: 1 }, '$.diagnostics[0]']
+		] as const)
+			assertInvalidAt({ ...diagnosticSnapshot, diagnostics: [changed] }, path);
+
+		const projectProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_PROJECT' && record.sourceId === null
+		)!;
+		const sourceProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_PROJECT' && record.sourceId !== null
+		)!;
+		const mutateProvenance = (
+			targetId: string,
+			mutate: (record: SemanticFactProvenanceRecord) => SemanticFactProvenanceRecord
+		) => ({
+			...snapshot,
+			provenances: snapshot.provenances.map((record) =>
+				record.id === targetId ? mutate(record) : record
+			)
+		});
+		assertInvalidAt(
+			mutateProvenance(projectProvenance.id, (record) => ({
+				...record,
+				provider: { ...record.provider, version: '5.9.2' } as unknown as typeof record.provider
+			})),
+			expect.stringMatching(/^\$\.provenances\[\d+\]\.provider$/u)
+		);
+		assertInvalidAt(
+			mutateProvenance(projectProvenance.id, (record) => ({
+				...record,
+				invalidationDependencies: record.invalidationDependencies.slice(1)
+			})),
+			expect.stringMatching(
+				/^\$\.provenances\[\d+\]\.invalidationDependencies$/u
+			) as unknown as string
+		);
+		assertInvalidAt(
+			mutateProvenance(projectProvenance.id, (record) => ({
+				...record,
+				parentProvenanceId: sourceProvenance.id
+			})),
+			expect.stringMatching(/^\$\.provenances\[\d+\]\.parentProvenanceId$/u) as unknown as string
+		);
+		assertInvalidAt(
+			mutateProvenance(sourceProvenance.id, (record) => ({
+				...record,
+				sourceId: `semantic:source-${'f'.repeat(64)}` as typeof record.sourceId
+			})),
+			expect.stringMatching(/^\$\.provenances\[\d+\]\.sourceId$/u)
+		);
+
+		const project = snapshot.projects[0]!;
+		assertInvalidAt(
+			{ ...snapshot, projects: [{ ...project, projectReferences: ['missing/tsconfig.json'] }] },
+			'$.projects[0].projectReferences'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				projects: [{ ...project, rootNames: [...project.rootNames, ...project.rootNames] }]
+			},
+			'$.projects[0]'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				projects: [{ ...project, kind: 'PROJECT', rootDisposition: 'INTENTIONAL_EMPTY_SOLUTION' }]
+			},
+			'$.projects[0].rootDisposition'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				projects: [
+					{
+						...project,
+						partialityReasons: [
+							{
+								capability: 'TS_PROJECT',
+								code: 'TYPESCRIPT_PROJECT_PARTIAL',
+								message: 'partial',
+								path: project.configPath
+							}
+						]
+					}
+				]
+			},
+			'$.projects[0].partialityReasons'
+		);
+		assertInvalidAt(
+			{ ...snapshot, projects: [{ ...project, programId: `semantic:program-${'f'.repeat(64)}` }] },
+			'$.projects[0].programId'
+		);
+
+		const program = snapshot.programs[0]!;
+		assertInvalidAt(
+			{ ...snapshot, programs: [{ ...program, projectId: `semantic:project-${'f'.repeat(64)}` }] },
+			'$.programs[0].id'
+		);
+		assertInvalidAt(
+			{ ...snapshot, programs: [{ ...program, sourceIds: [] }] },
+			'$.programs[0].sourceIds'
+		);
+		assertInvalidAt(
+			{ ...snapshot, programs: [{ ...program, rootSourceIds: [] }] },
+			'$.programs[0].rootSourceIds'
+		);
+
+		const present = snapshot.compilerInputs[0]!;
+		assertInvalidAt(
+			{ ...snapshot, compilerInputs: [{ ...present, resultDigest: 'bad' }] },
+			'$.compilerInputs[0].resultDigest'
+		);
+		assertInvalidAt(
+			{ ...snapshot, compilerInputs: [{ ...present, contentSha256: 'bad' }] },
+			'$.compilerInputs[0]'
+		);
+		const directory = directoryObservation(
+			'src',
+			'READ_DIRECTORY',
+			'DIRECTORY',
+			['src/index.ts'],
+			1
+		);
+		assertInvalidAt(
+			{ ...snapshot, compilerInputs: [{ ...directory, resultEntries: ['z.ts', 'a.ts'] }] },
+			'$.compilerInputs[0].resultEntries'
+		);
+		assertInvalidAt(
+			{ ...snapshot, compilerInputs: [{ ...directory, excludes: ['z', 'a'] }] },
+			'$.compilerInputs[0]'
+		);
+		assertInvalidAt(
+			{
+				...snapshot,
+				compilerInputs: [
+					{ ...directory, includes: ['x'.repeat(snapshot.budgets.maxPathCharacters + 1)] }
+				]
+			},
+			'$.compilerInputs[0]'
+		);
+
+		const compilerObservation = (payload: Record<string, unknown>): CompilerInputObservation => {
+			const resultDigest = compilerInputResultDigest(payload as never);
+			return {
+				...payload,
+				id: semanticContextInputId({ ...payload, resultDigest, subjectId: SUBJECT_ID } as never),
+				resultDigest
+			} as unknown as CompilerInputObservation;
+		};
+		const currentDirectory = compilerObservation({
+			invocationCount: 1,
+			logicalPath: 'src',
+			operation: 'CURRENT_DIRECTORY',
+			origin: 'CONFIGURATION',
+			resolvedLogicalPath: 'src',
+			result: 'RESOLVED'
+		});
+		assertInvalidAt({ ...snapshot, compilerInputs: [currentDirectory] }, '$.compilerInputs[0]');
+		const caseSensitivity = compilerObservation({
+			invocationCount: 1,
+			logicalPath: 'src',
+			operation: 'USE_CASE_SENSITIVE_FILE_NAMES',
+			origin: 'CONFIGURATION',
+			result: 'CASE_INSENSITIVE'
+		});
+		assertInvalidAt(
+			{ ...snapshot, compilerInputs: [caseSensitivity] },
+			'$.compilerInputs[0].logicalPath'
+		);
+	});
+
+	it('fails closed when option, wire, or semantic inspection throws', () => {
+		const snapshot = fixture();
+		const actualByteLength = Buffer.byteLength.bind(Buffer);
+
+		const ownKeys = vi.spyOn(Reflect, 'ownKeys').mockImplementationOnce(() => {
+			throw new Error('option keys unavailable');
+		});
+		const optionResult = validateStaticSemanticSnapshot(
+			snapshot,
+			{ maxIssues: 10 },
+			FROZEN_CONTEXT
+		);
+		ownKeys.mockRestore();
+		expect(optionResult).toEqual({
+			issues: [
+				{
+					code: 'INVALID_SHAPE',
+					message: 'Semantic validation option inspection failed closed: option keys unavailable',
+					path: '$validationOptions'
+				}
+			],
+			state: 'INVALID'
+		});
+
+		const wireBytes = vi.spyOn(Buffer, 'byteLength').mockImplementationOnce(() => {
+			throw new Error('wire bytes unavailable');
+		});
+		const wireResult = validateSnapshot({
+			...snapshot,
+			capabilities: snapshot.capabilities.map((capability) =>
+				capability.capability === 'TS_PROJECT'
+					? { ...capability, reason: 'Unicode \u00e9vidence.' }
+					: capability
+			)
+		});
+		wireBytes.mockRestore();
+		expect(wireResult).toEqual({
+			issues: [
+				{
+					code: 'INVALID_SHAPE',
+					message: 'Semantic wire inspection failed closed: wire bytes unavailable',
+					path: '$'
+				}
+			],
+			state: 'INVALID'
+		});
+
+		const compilerInputJson = canonicalSemanticJson(snapshot.compilerInputs);
+		vi.spyOn(Buffer, 'byteLength').mockImplementation((value, encoding) => {
+			if (value === compilerInputJson) throw new Error('semantic bytes unavailable');
+			return actualByteLength(value, encoding);
+		});
+		expect(validateSnapshot(snapshot)).toEqual({
+			issues: [
+				{
+					code: 'INVALID_SHAPE',
+					message: 'Malformed semantic snapshot: semantic bytes unavailable',
+					path: '$'
+				}
+			],
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects reachable provenance, recipe, project, Program, and source inconsistencies', () => {
+		const snapshot = fixture();
+		const expectIssue = (value: unknown, path: string | RegExp, message?: string): void => {
+			const result = validateSnapshot(value);
+			expect(result.state).toBe('INVALID');
+			expect(result.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						...(message === undefined ? {} : { message }),
+						path: typeof path === 'string' ? path : expect.stringMatching(path)
+					})
+				])
+			);
+		};
+		const absentProvenanceId = snapshot.provenances[0]!.id.replace(
+			/[0-9a-f]{64}$/u,
+			'f'.repeat(64)
+		) as SemanticProvenanceId;
+		expectIssue(
+			{
+				...snapshot,
+				projects: snapshot.projects.map((project) => ({
+					...project,
+					provenanceId: absentProvenanceId
+				}))
+			},
+			'$.projects[0].provenanceId',
+			'Fact references absent provenance.'
+		);
+
+		const projectProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_PROJECT' && record.sourceId === null
+		)!;
+		const limitationZ = {
+			capability: 'TS_PROJECT' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason: 'Z limitation.',
+			region: 'z-region'
+		};
+		const limitationA = {
+			capability: 'TS_PROJECT' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason: 'A limitation.',
+			region: 'a-region'
+		};
+		expectIssue(
+			{
+				...snapshot,
+				provenances: snapshot.provenances.map((record) =>
+					record.id === projectProvenance.id
+						? { ...record, limitations: [limitationZ, limitationA] }
+						: record
+				)
+			},
+			/^\$\.provenances\[\d+\]\.limitations$/u,
+			'Provenance limitations must be a canonical set.'
+		);
+		expectIssue(
+			{
+				...snapshot,
+				provenances: snapshot.provenances.map((record) =>
+					record.id === projectProvenance.id
+						? {
+								...record,
+								limitations: [
+									{ capability: 'TS_SYNTAX', closureEffect: 'FATAL', reason: '', region: '' }
+								]
+							}
+						: record
+				)
+			},
+			/^\$\.provenances\[\d+\]\.limitations\[0\]$/u,
+			'Provenance limitation must name the capability and non-empty region and reason.'
+		);
+		expectIssue(
+			{
+				...snapshot,
+				provenances: snapshot.provenances.map((record) =>
+					record.id === projectProvenance.id
+						? {
+								...record,
+								limitations: [
+									{
+										capability: 'TS_PROJECT',
+										closureEffect: 'FATAL',
+										reason: 'Fatal.',
+										region: 'project'
+									}
+								]
+							}
+						: record
+				)
+			},
+			/^\$\.provenances\[\d+\]\.limitations\[0\]\.closureEffect$/u,
+			'Fatal provenance must not be emitted.'
+		);
+
+		const project = snapshot.projects[0]!;
+		expectIssue(
+			{
+				...snapshot,
+				projects: [
+					{
+						...project,
+						programRecipe: { ...project.programRecipe, rootNames: ['z.ts', 'a.ts'] }
+					}
+				]
+			},
+			'$.projects[0].programRecipe',
+			'ProgramRecipe roots and references must be canonical sets.'
+		);
+		expectIssue(
+			{
+				...snapshot,
+				projects: [
+					{
+						...project,
+						partialityReasons: [
+							{
+								capability: 'TS_SYNTAX',
+								code: 'FRAMEWORK_CANDIDATES_UNSUPPORTED',
+								message: 'Z syntax limitation.',
+								path: null
+							},
+							{
+								capability: 'TS_PROJECT',
+								code: 'COMPILER_CONTEXT_UNAVAILABLE',
+								message: '',
+								path: null
+							}
+						]
+					}
+				]
+			},
+			'$.projects[0].partialityReasons',
+			'Project partiality reasons must be a canonical set.'
+		);
+		expectIssue(
+			{
+				...snapshot,
+				projects: [
+					{
+						...project,
+						partialityReasons: [
+							{
+								capability: 'TS_TYPE',
+								code: 'CAPABILITY_UNSUPPORTED',
+								message: '',
+								path: null
+							}
+						]
+					}
+				]
+			},
+			'$.projects[0].partialityReasons[0]',
+			'Partiality reason must name a requested capability and a non-empty message.'
+		);
+
+		const program = snapshot.programs[0]!;
+		expectIssue(
+			{
+				...snapshot,
+				programs: [{ ...program, sourceIds: [...program.sourceIds, ...program.sourceIds] }]
+			},
+			'$.programs[0]',
+			'Program manifests must be canonical sets.'
+		);
+		const source = snapshot.sources[0]!;
+		expectIssue(
+			{
+				...snapshot,
+				sources: [
+					{
+						...source,
+						artifactRoles: [...source.artifactRoles].reverse(),
+						contentSha256: 'not-a-digest',
+						mapping: { reason: 'Mapping is incomplete.', state: 'PARTIAL' }
+					}
+				]
+			},
+			'$.sources[0]',
+			'Source byte and digest metadata is invalid.'
+		);
+		expectIssue(
+			{
+				...snapshot,
+				sources: [{ ...source, artifactRoles: [...source.artifactRoles].reverse() }]
+			},
+			'$.sources[0]',
+			'Source roles and diagnostic manifests must be closed canonical sets.'
+		);
+		expectIssue(
+			{
+				...snapshot,
+				sources: [{ ...source, mapping: { reason: 'Mapping is incomplete.', state: 'PARTIAL' } }]
+			},
+			'$.sources[0].provenanceId',
+			'Unknown origin or lossy mapping requires partial source coverage.'
+		);
+	});
+
+	it('accepts a compiler source bound to an exact workspace-package root alias', () => {
+		const aliasPath = 'node_modules/@scope/example';
+		const artifactPath = 'packages/example';
+		const snapshot = fixture(aliasPath);
+		const context = contextForSnapshot(snapshot, artifactPath, [
+			{
+				exports: [],
+				kind: 'PACKAGE',
+				manifestPath: 'packages/example/package.json',
+				name: '@scope/example',
+				path: artifactPath,
+				private: false,
+				provenance: ['packages/example/package.json'],
+				workspacePatterns: ['packages/*']
+			}
+		]);
+		expect(validateSnapshot(snapshot, {}, context)).toEqual({ issues: [], state: 'VALID' });
+	});
+
+	it('rejects reachable AST and declaration-candidate semantic inconsistencies', () => {
+		const ast = withAstNode(fixture('src/index.ts', 'x'), {
+			end: 1,
+			kind: ts.SyntaxKind.Identifier,
+			kindName: 'Identifier'
+		});
+		const child = ast.astNodes.find((node) => node.kind === ts.SyntaxKind.Identifier)!;
+		const root = ast.astNodes.find((node) => node.parentId === null)!;
+		const expectAstIssue = (value: unknown, message: string, code = 'INVALID_VALUE'): void => {
+			expect(validateSnapshot(value, {}, contextForSnapshot(ast)).issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code, message })])
+			);
+		};
+		expectAstIssue(
+			{
+				...ast,
+				astNodes: ast.astNodes.map((node) =>
+					node.id === child.id ? { ...node, fullStart: 1, start: 0 } : node
+				)
+			},
+			'Node UTF-16 span is invalid.'
+		);
+		expectAstIssue(
+			{
+				...ast,
+				astNodes: ast.astNodes.map((node) =>
+					node.id === child.id ? { ...node, syntacticIdentifierText: null } : node
+				)
+			},
+			'Syntactic identifier text, including a recovered empty text, must be present exactly for Identifier and PrivateIdentifier nodes.'
+		);
+		expectAstIssue(
+			{
+				...ast,
+				astNodes: ast.astNodes.map((node) =>
+					node.id === child.id ? { ...node, operatorName: 'EqualsToken' } : node
+				)
+			},
+			'AST operator code and name must be present together and agree with the public TypeScript enum.'
+		);
+		expectAstIssue(
+			{
+				...ast,
+				astNodes: ast.astNodes.map((node) =>
+					node.id === child.id ? { ...node, hasAssignmentInitializer: true } : node
+				)
+			},
+			'Only the exact TypeScript syntax kinds with assignment initializers may assert one.'
+		);
+		expectAstIssue(
+			{
+				...ast,
+				astNodes: ast.astNodes.map((node) =>
+					node.id === child.id
+						? { ...node, operatorKind: ts.SyntaxKind.EqualsToken, operatorName: 'EqualsToken' }
+						: node
+				)
+			},
+			'Only retained operator-bearing expression nodes may carry an operator.'
+		);
+		expectAstIssue(
+			{
+				...ast,
+				astNodes: ast.astNodes.map((node) => (node.id === root.id ? { ...node, end: 0 } : node))
+			},
+			'Parent is from another source or does not contain the child.',
+			'CROSS_PROJECT_REFERENCE'
+		);
+
+		const binaryAst = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.BinaryExpression,
+			kindName: 'BinaryExpression',
+			operatorKind: ts.SyntaxKind.EqualsToken,
+			operatorName: 'EqualsToken'
+		});
+		const binary = binaryAst.astNodes.find((node) => node.kind === ts.SyntaxKind.BinaryExpression)!;
+		expect(
+			validateSnapshot({
+				...binaryAst,
+				astNodes: binaryAst.astNodes.map((node) =>
+					node.id === binary.id ? { ...node, operatorKind: null, operatorName: null } : node
+				)
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'Retained operator-bearing expression nodes require their public SyntaxKind operator.'
+				})
+			])
+		);
+		const misplacedName = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.Identifier,
+			kindName: 'Identifier',
+			structuralRoles: [AST_STRUCTURAL_ROLES.declarationName]
+		});
+		expect(validateSnapshot(misplacedName).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message: 'Declaration-name roles require a declaration-candidate parent.'
+				})
+			])
+		);
+
+		const declarationAst = withAstNode(fixture(), {
+			kind: ts.SyntaxKind.VariableDeclaration,
+			kindName: 'VariableDeclaration'
+		});
+		const declaration = declarationAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+		)!;
+		const namedAst = withAstChild(
+			declarationAst,
+			declaration.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier', syntacticIdentifierText: 'value' },
+			AST_STRUCTURAL_ROLES.declarationName
+		);
+		const name = namedAst.astNodes.find((node) => node.parentId === declaration.id)!;
+		const candidate = {
+			ambientSyntax: false,
+			candidateRole: 'BINDING' as const,
+			candidateState: 'SYNTAX_ONLY' as const,
+			exportCarrierNodeId: null,
+			exportSyntax: 'NONE' as const,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'BINDING',
+				nodeId: declaration.id,
+				syntaxKind: declaration.kind
+			}),
+			localModifiers: [],
+			nameNodeId: name.id,
+			nameState: 'ATOMIC' as const,
+			nodeId: declaration.id,
+			sourceId: declaration.sourceId,
+			syntacticName: 'value',
+			syntaxKind: declaration.kind,
+			syntaxKindName: declaration.kindName
+		};
+		const candidateSnapshot: StaticSemanticSnapshot = {
+			...namedAst,
+			declarationCandidates: [candidate],
+			populations: namedAst.populations.map((population) =>
+				population.kind === 'DECLARATION_CANDIDATE'
+					? semanticPopulation('DECLARATION_CANDIDATE', members([candidate.id]))
+					: population
+			)
+		};
+		expect(validateSnapshot(candidateSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		const absentNodeId = semanticNodeId({
+			end: 0,
+			fullStart: 0,
+			kind: ts.SyntaxKind.VariableDeclaration,
+			parentId: candidateSnapshot.astNodes.find((node) => node.parentId === null)!.id,
+			siblingOrdinal: 99,
+			sourceId: declaration.sourceId,
+			start: 0,
+			structuralRoles: [AST_STRUCTURAL_ROLES.genericChild]
+		});
+		const candidateProbes = [
+			{
+				candidate: { ...candidate, nodeId: absentNodeId },
+				message: 'Declaration-candidate node belongs elsewhere or is absent.'
+			},
+			{
+				candidate: {
+					...candidate,
+					id: candidate.id.replace(/[0-9a-f]{64}$/u, 'f'.repeat(64)) as typeof candidate.id
+				},
+				message: 'Declaration-candidate identity mismatch.'
+			},
+			{
+				candidate: { ...candidate, nameState: 'ANONYMOUS' as const },
+				message: 'Candidate name state must agree with its retained name node.'
+			},
+			{
+				candidate: { ...candidate, syntacticName: '' },
+				message: 'Only atomic candidate names carry non-empty syntactic text.'
+			},
+			{
+				candidate: {
+					...candidate,
+					localModifiers: [
+						{ code: ts.SyntaxKind.ExportKeyword, name: 'ExportKeyword' },
+						{ code: ts.SyntaxKind.AsyncKeyword, name: 'AsyncKeyword' }
+					]
+				},
+				message: 'Declaration-candidate local modifiers must be a canonical set.'
+			},
+			{
+				candidate: {
+					...candidate,
+					localModifiers: [{ code: ts.SyntaxKind.ExportKeyword, name: 'DefaultKeyword' }]
+				},
+				message: 'Local modifier code and name must agree with the public TypeScript enum.'
+			},
+			{
+				candidate: {
+					...candidate,
+					exportCarrierNodeId: declaration.id,
+					exportSyntax: 'EXPLICIT' as const
+				},
+				message:
+					'Export syntax and carrier must distinguish node-local syntax from the exact enclosing variable-statement carrier.'
+			}
+		];
+		for (const probe of candidateProbes) {
+			expect(
+				validateSnapshot({ ...candidateSnapshot, declarationCandidates: [probe.candidate] }).issues
+			).toEqual(expect.arrayContaining([expect.objectContaining({ message: probe.message })]));
+		}
+	});
+
+	it('rejects reachable related-diagnostic and syntax-population inconsistencies', () => {
+		const snapshot = fixture();
+		const diagnosticSnapshot = withSourceDiagnostics(snapshot, ['2322'], true);
+		const diagnostic = diagnosticSnapshot.diagnostics[0]!;
+		const relatedA = {
+			category: 'MESSAGE' as const,
+			code: 'TS100',
+			end: null,
+			message: diagnosticMessage('A related diagnostic.'),
+			path: null,
+			start: null
+		};
+		const relatedZ = {
+			category: 'MESSAGE' as const,
+			code: 'TS900',
+			end: null,
+			message: diagnosticMessage('Z related diagnostic.'),
+			path: null,
+			start: null
+		};
+		const relatedProbes = [
+			{
+				diagnostic: { ...diagnostic, related: [{ ...relatedA, code: 'BAD' }] },
+				message:
+					'Related diagnostic code must be exactly TS followed by a positive decimal TypeScript code.'
+			},
+			{
+				diagnostic: { ...diagnostic, related: [{ ...relatedA, end: 0, start: 0 }] },
+				message: 'A related diagnostic span requires a logical path.'
+			},
+			{
+				diagnostic: {
+					...diagnostic,
+					related: [{ ...relatedA, end: 0, path: 'src/index.ts', start: 1 }]
+				},
+				message: 'Related diagnostic span is invalid or outside its project source.'
+			},
+			{
+				diagnostic: { ...diagnostic, related: [relatedZ, relatedA] },
+				message:
+					'Related diagnostic payloads must form a canonical sorted multiset; duplicates are retained.'
+			}
+		];
+		for (const probe of relatedProbes) {
+			expect(
+				validateSnapshot({ ...diagnosticSnapshot, diagnostics: [probe.diagnostic] }).issues
+			).toEqual(expect.arrayContaining([expect.objectContaining({ message: probe.message })]));
+		}
+
+		const root = snapshot.astNodes[0]!;
+		const absentLiteralNodeId = semanticNodeId({
+			end: 0,
+			fullStart: 0,
+			kind: ts.SyntaxKind.StringLiteral,
+			parentId: root.id,
+			siblingOrdinal: 99,
+			sourceId: root.sourceId,
+			start: 0,
+			structuralRoles: [AST_STRUCTURAL_ROLES.genericChild]
+		});
+		const absentLiteral = {
+			lexemeLength: 0,
+			lexemeSha256: literalLexemeDigest(''),
+			nodeId: absentLiteralNodeId,
+			sourceId: root.sourceId,
+			value: null,
+			valueEncoding: 'UTF16_CODE_UNITS_LE' as const,
+			valueLength: 0,
+			valueSha256: literalValueDigest('UTF16_CODE_UNITS_LE', 'STRING', '\ud800'),
+			valueState: 'DIGEST_ONLY' as const,
+			valueType: 'STRING' as const
+		};
+		const absentLiteralResult = validateSnapshot({ ...snapshot, literals: [absentLiteral] });
+		expect(absentLiteralResult.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Referenced node is absent.'
+				}),
+				expect.objectContaining({
+					message:
+						'UTF-16-code-unit literals must redact a non-scalar cooked string and retain its original code-unit length and digest.'
+				})
+			])
+		);
+
+		const callAst = withAstNode(snapshot, {
+			kind: ts.SyntaxKind.CallExpression,
+			kindName: 'CallExpression'
+		});
+		const callNode = callAst.astNodes.find((node) => node.kind === ts.SyntaxKind.CallExpression)!;
+		const withCallee = withAstChild(
+			callAst,
+			callNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.invocationCallee
+		);
+		const callee = withCallee.astNodes.find((node) => node.parentId === callNode.id)!;
+		const call = {
+			argumentNodeIds: [],
+			calleeNodeId: callee.id,
+			id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: callNode.id }),
+			invocationKind: 'CALL' as const,
+			nodeId: callNode.id,
+			optional: false,
+			sourceId: callNode.sourceId,
+			targetState: 'SYNTAX_ONLY' as const,
+			templateNodeId: null
+		};
+		const callSnapshot: StaticSemanticSnapshot = {
+			...withCallee,
+			invocations: [call],
+			populations: withCallee.populations.map((population) =>
+				population.kind === 'INVOCATION_SITE'
+					? semanticPopulation('INVOCATION_SITE', members([call.id]))
+					: population
+			)
+		};
+		expect(
+			validateSnapshot({
+				...callSnapshot,
+				invocations: [
+					{ ...call, id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: call.nodeId }) }
+				]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'IDENTITY_MISMATCH', path: '$.invocations[0].id' })
+			])
+		);
+		const duplicateNodeInvocations = [
+			call,
+			{
+				...call,
+				id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: call.nodeId }),
+				invocationKind: 'NEW' as const
+			}
+		].sort((left, right) => (left.id < right.id ? -1 : 1));
+		expect(
+			validateSnapshot({ ...callSnapshot, invocations: duplicateNodeInvocations }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'DUPLICATE_ID', path: '$.invocations' })
+			])
+		);
+
+		const assignmentAst = withAstNode(snapshot, {
+			kind: ts.SyntaxKind.BinaryExpression,
+			kindName: 'BinaryExpression',
+			operatorKind: ts.SyntaxKind.EqualsToken,
+			operatorName: 'EqualsToken'
+		});
+		const assignmentNode = assignmentAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.BinaryExpression
+		)!;
+		const withTarget = withAstChild(
+			assignmentAst,
+			assignmentNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.assignmentTarget,
+			0
+		);
+		const target = withTarget.astNodes.find((node) => node.parentId === assignmentNode.id)!;
+		const withValue = withAstChild(
+			withTarget,
+			assignmentNode.id,
+			{ kind: ts.SyntaxKind.Identifier, kindName: 'Identifier' },
+			AST_STRUCTURAL_ROLES.assignmentValue,
+			1
+		);
+		const value = withValue.astNodes.find(
+			(node) => node.parentId === assignmentNode.id && node.id !== target.id
+		)!;
+		const assignment = {
+			assignmentKind: 'BINARY' as const,
+			nodeId: assignmentNode.id,
+			operatorKind: ts.SyntaxKind.EqualsToken,
+			operatorName: 'EqualsToken',
+			sourceId: assignmentNode.sourceId,
+			targetNodeId: target.id,
+			valueNodeId: value.id
+		};
+		const assignmentSnapshot: StaticSemanticSnapshot = {
+			...withValue,
+			assignments: [assignment],
+			populations: withValue.populations.map((population) =>
+				population.kind === 'ASSIGNMENT'
+					? semanticPopulation('ASSIGNMENT', members([assignment.nodeId]))
+					: population
+			)
+		};
+		expect(
+			validateSnapshot({
+				...assignmentSnapshot,
+				assignments: [{ ...assignment, assignmentKind: 'PREFIX_UPDATE' }]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.assignments[0].assignmentKind' })])
+		);
+		expect(
+			validateSnapshot({ ...assignmentSnapshot, assignments: [assignment, assignment] }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'NONCANONICAL_ORDER',
+					message: 'Node-backed syntax projections must be unique canonical sets.'
+				})
+			])
+		);
+
+		const noncanonicalPopulation = {
+			...snapshot,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'AST_NODE'
+					? { ...population, members: { ...population.members, analyzed: [root.id, root.id] } }
+					: population
+			)
+		};
+		expect(validateSnapshot(noncanonicalPopulation).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'NONCANONICAL_ORDER',
+					path: expect.stringContaining('.members.analyzed')
+				})
+			])
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				populations: snapshot.populations.filter((population) => population.kind !== 'LITERAL')
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'POPULATION_MISMATCH', path: '$.populations' })
+			])
+		);
+	});
+});

@@ -1,0 +1,31 @@
+{
+	"name": "@janumipwb/csaa",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Deterministic code-semantic analysis and assurance tooling for JPWB.",
+	"license": "AGPL-3.0-only",
+	"exports": {
+		".": {
+			"source": "./src/index.ts",
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"dependencies": {
+		"typescript": "5.9.3"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"check-types": "tsc --noEmit -p tsconfig.json"
+	},
+	"devDependencies": {
+		"@janumipwb/typescript-config": "workspace:*"
+	}
+}

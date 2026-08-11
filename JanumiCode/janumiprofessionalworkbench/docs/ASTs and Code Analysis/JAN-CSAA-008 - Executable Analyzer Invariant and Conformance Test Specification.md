@@ -2,13 +2,13 @@
 
 **Document ID:** `JAN-CSAA-008`
 
-**Version:** `0.2.2`
+**Version:** `0.3.0`
 
 **Status:** `Draft`
 
 **Settledness:** `HYPOTHESIS`
 
-**Classification:** Prepared controlled-CSAA member candidate; non-authoritative, documentation-only executable-conformance and verification-and-validation specification, including the affected operational test closure required by exact `JAN-CSAA-007@1.0.1` and `JAN-CSAA-009@0.1.0`; no test implementation, physical fixture, conferred oracle, schema, generated type, provider execution, qualification, persistence mechanism, topology, gate effect, or result
+**Classification:** Substantive controlled-CSAA member candidate; non-authoritative, documentation-only executable-conformance and verification-and-validation specification. This `0.3.0` successor adds exhaustive and mutation-resistant tests for the exact `JAN-CSAA-003@0.2.0` four-valued query algebra and `JAN-CSAA-007@1.1.0` query-expression contracts while carrying the operational test closure required by `JAN-CSAA-009@0.1.0`; no physical fixture, conferred oracle, generated schema, provider qualification, persistence mechanism, topology, or gate effect is created by this Draft
 
 **Governing status:** Documentation-only Wave 3 entry under `JAN-CSAA-W2-SEMANTIC-READINESS-001@0.1.0`, `JPWB-REG-005 REG-D-021`, and the correction at `REG-D-022`
 
@@ -26,15 +26,15 @@
 
 **Oracle state:** Every inherited `JAN-CSAA-006@0.1.0` expected judgment remains `PROPOSED / NOT_CONFERRED / NOT_EXECUTED`
 
-**Affected reconciliation state:** Exact `JAN-CSAA-007@1.0.1` operational wire contracts and exact `JAN-CSAA-009@0.1.0` operational semantics are consumed by this successor without transfer of ownership. Dedicated conformance-catalog wire records remain allocated to a later affected 007 successor; `JAN-CSAA-010` and `JAN-CSAA-011` remain unauthored downstream handoffs.
+**Affected reconciliation state:** Exact `JAN-CSAA-003@0.2.0` query semantics, exact `JAN-CSAA-007@1.1.0` wire contracts, and exact `JAN-CSAA-009@0.1.0` operational semantics are consumed by this successor without transfer of ownership. Dedicated conformance-catalog wire records remain allocated to a later executable-contract increment
 
 **Exact historical pre-review evidence:** [`JAN-CSAA-008-LEDGER-001@0.2.3`](<records/archive/JAN-CSAA-008-LEDGER@0.2.3.Closed.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>), 3,971,581 bytes, SHA-256 `3ac616c21f159ea072f83c44079012430decaa2467c00f4d0f5e07c36daab02d`; [`JAN-CSAA-008-VERIFICATION-001@0.2.1`](<records/archive/JAN-CSAA-008-VERIFICATION@0.2.1.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>), 32,424 bytes, SHA-256 `b080e0fc0e62e2bb77501ba29bc665dc434aa8b6c275a7e2c367a599aba08242`; [`JAN-CSAA-008-LEDGER-CLOSURE-INTEGRITY-001@0.2.0`](<records/archive/JAN-CSAA-008-LEDGER-CLOSURE-INTEGRITY@0.2.0.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>), 9,028 bytes, SHA-256 `cc98ed25bf5c25fd2ac05c257551760136d895f77ca26e7b71b56b80613d4e02`; [`JAN-CSAA-W3-TRIPLET-RECONCILIATION-001@0.1.0`](<records/JAN-CSAA-W3 - Wave 3 Exact Triplet Reconciliation and Synchronized Ledger State Record.md>), 22,856 bytes, SHA-256 `6031e1e7d4f7cfca027957a7c4a25c5b28333637e393054bec2403e7663696b7`; [`JAN-CSAA-008-SELF-REVIEW-001@0.1.0`](<records/archive/JAN-CSAA-008-SELF-REVIEW@0.1.0.PRELIMINARY.snapshot>), 17,022 bytes, SHA-256 `4bc970980fbbca956b00e84cc7953d7fe1a6f0154956001e3ccbb05716f35278`; and [`JAN-CSAA-WORKING-STATUS-001@0.10.0`](<records/JAN-CSAA - Working Corpus Authoring Status 010.md>), 14,133 bytes, SHA-256 `56d48fc90cff8d37b5ab151eb1fd2f067d46b7f85ebfe5e0cafd5f0c52dc2531`
 
-**Corrective-successor evidence boundary:** Exact `JAN-CSAA-008@0.2.1` objective closure and exact-triplet reconciliation are complete, and its preliminary author self-review was performed but remains nonpass with `JAN-CSAA-008-SR-001 / MAJOR` open. This `JAN-CSAA-008@0.2.2` successor applies exactly seven controlled historical-link retargets—five already-mismatched mutable links plus two deterministic prospective-conflict links—rebinds every current 007 source identity to exact corrective `JAN-CSAA-007@1.0.1`, distinguishes exact historical `JAN-CSAA-009@0.1.0` intake under the finite cutoff from later 009 state, and corrects controlled lifecycle-currentness metadata, document self-identity, preparation time, and immediate-supersession provenance only. It carries the `0.2.1` conformance method, all 999 requirement IDs and modalities, semantic meanings, populations, allocations, execution states, and authority boundaries unchanged. A successor ledger, objective record, closure-integrity record, exact-triplet reconciliation, and eighteen-question self-review rerun against exact `0.2.2` bytes remain required before Proposed freeze
+**Successor evidence boundary:** Earlier objective records are historical and do not establish query-algebra conformance. In particular, the earlier query-method PASS tested the presence of a typed AST but not the semantics of conjunction or disjunction. This successor contains 1,016 local requirements and requires direct executable truth-table, property, provenance, applicability, short-circuit, and mutation evidence before any query-algebra PASS
 
-**Prepared time:** `2026-07-30T07:37:49.3078452-04:00`
+**Prepared time:** `2026-08-10T14:32:08-04:00`
 
-**Supersedes:** [JAN-CSAA-008@0.2.1 / Draft](<records/archive/JAN-CSAA-008@0.2.1.Draft.PRE-W3-SELF-REVIEW-CORRECTION.snapshot>); 257,899 bytes; SHA-256 `45df0e0ae04ec0ece60d5f560c90c396de9bd92950029050490317a09b43e45b`; exact predecessor and its synchronized ledger, objective, closure-integrity, W3-reconciliation, and preliminary-self-review evidence remain immutable historical evidence; patch scope is controlled document self-identity carriage, exactly seven controlled historical-link retargets, exact current `JAN-CSAA-007@1.0.1` rebinding, finite-cutoff wording, post-review lifecycle-currentness correction, preparation time, and immediate-supersession provenance only; all 999 requirement IDs and modalities, test-method ownership, test populations, semantic meanings, allocations, nonperformance states, authority boundaries, and the earlier `0.2.0` and `0.1.1` predecessor chain remain unchanged
+**Supersedes:** `JAN-CSAA-008@0.2.2 / Draft`; 261,544 bytes; SHA-256 `f4bbe60c8edc67ac70ddf89e7c3963725252c8915dfceefd5e9d46bd70ef082a`. No new archive or process record is created by this implementation-readiness correction; predecessor recovery relies on repository history
 
 **Superseded by:** None
 
@@ -66,11 +66,11 @@ This Draft may specialize each concern into an executable test obligation only b
 | [JAN-CSAA-000@0.3.0](<README.md>) | 102,164 bytes; SHA-256 `833b97d9fe12ae5e245b6c2920216ec3271e59f68dc24c54d0efd9a1efdf32a1` | Adopted program authority; reserved filename and §10.8 commission |
 | [JAN-CSAA-001@0.3.0](<JAN-CSAA-001 - Codebase Semantic Analysis and Assurance Architecture.md>) | 109,420 bytes; SHA-256 `cda7defe7fa310f912bceb8b355952e1159bebc05528fc51c310578ede26237b` | Provisional architecture and trust-boundary input |
 | [JAN-CSAA-002@0.3.0](<JAN-CSAA-002 - TypeScript Semantic Model and Invariant Catalog.md>) | 162,179 bytes; SHA-256 `9bcaa9f9a2212d66ae7c417af84c4f0e14672d282c04e73d719f7f9cceda1911` | Provisional semantic and invariant input |
-| [JAN-CSAA-003@0.1.0](<JAN-CSAA-003 - Analysis Enrichment Query and Change Impact Specification.md>) | 169,676 bytes; SHA-256 `65b3a9379dd47a25de1693ed709eafd11f7a9063db1cfd80b5da2bba01b46d10` | Provisional capability, query, and impact input |
+| [JAN-CSAA-003@0.2.0](<JAN-CSAA-003 - Analysis Enrichment Query and Change Impact Specification.md>) | 186,716 bytes; SHA-256 `7112228c65a8f36953bc24b56fbc434aaab09f26fad7817ea44dc4010f3d7c9e` | Provisional capability, exact four-valued query algebra, and impact input |
 | [JAN-CSAA-004@0.1.0](<JAN-CSAA-004 - Code Analysis Rule Gate and Analyzer Provider Contract.md>) | 176,071 bytes; SHA-256 `8812dc55c05167223341b08d3d5bc85b8b1e5ad085c9a0e198a13512af69dc89` | Provisional rule, finding, treatment, gate, and provider-obligation input |
 | [JAN-CSAA-005@0.3.0](<JAN-CSAA-005 - JPWB TypeScript Repository Semantic Inventory and Conformance Mapping.md>) | 119,118 bytes; SHA-256 `3a9f49a492ca0b73cb50413bf694cf90e0608d73d6248db9df7cb45804b80625` | Provisional dated repository-description input |
 | [JAN-CSAA-006@0.1.0](<JAN-CSAA-006 - Golden Repository and Change Scenario Fixture.md>) | 138,584 bytes; SHA-256 `7d6804b0198ba19285903f53ac5053971310b0278bd5a6c7f6946e3265814361` | Provisional fixture and non-conferred expected-judgment input |
-| [JAN-CSAA-007@1.0.1](<JAN-CSAA-007 - Semantic Snapshot Graph Query Analysis Record and Adapter Contract Package.md>) | 1,343,092 bytes; SHA-256 `b2d034ac20ddca2a3676e152770b28fbccee83ab4a5c882d5a581bd33f1186b6` | Exact provisional candidate shape, operational wire, health, phase-identity, digest-preimage, and adapter-contract input |
+| [JAN-CSAA-007@1.1.0](<JAN-CSAA-007 - Semantic Snapshot Graph Query Analysis Record and Adapter Contract Package.md>) | 1,349,212 bytes; SHA-256 `60618b2da0b0ee1b103f3d72404d7de4419f69630848a59ff835e8185d6ad49d` | Exact provisional candidate shape, query-expression algebra carrier, operational wire, health, phase-identity, digest-preimage, and adapter-contract input |
 | [JAN-CSAA-009@0.1.0](<records/archive/JAN-CSAA-009@0.1.0.Draft.PRE-AFFECTED-008.snapshot>) | 372,913 bytes; SHA-256 `13c61cf36920b4d5cd804a9a0be09e32013b810f12ebd2a09708bb1c1562447d` | Exact historical provisional operational-semantic and required affected-test input under the finite cutoff |
 
 ### 3.2 Objective and sequencing evidence
@@ -95,18 +95,18 @@ This Draft may specialize each concern into an executable test obligation only b
 | [JAN-CSAA-008@0.1.1 archive](<records/archive/JAN-CSAA-008@0.1.1.Draft.PRE-AFFECTED-009.snapshot>) | 206,705 bytes; SHA-256 `a15488930e16769d3ed63d1ca8e9f89c0531b4e43c1b80065a9a0d034e345663` | Immutable predecessor subject |
 | [JAN-CSAA-008 predecessor closed-ledger archive](<records/archive/JAN-CSAA-008-LEDGER@0.1.4.Closed.PRE-AFFECTED-009.snapshot>) | 2,010,342 bytes; SHA-256 `da450aa690022d7aaf3ba84440dff9921c2fa6733d98c45338a687add876085a` | Exact predecessor allocation and lifecycle evidence |
 
-The current 001, 002, and 005 ledgers and objective records are also inherited by exact identity in the requirement ledger. Their objective closures do not make the Draft members authoritative. The affected successor carries exactly 2,568 unaffected inherited rows, reproduces all 637 local rows from exact current `JAN-CSAA-007@1.0.1` and all 1,100 local rows from exact historical `JAN-CSAA-009@0.1.0` under the finite cutoff, and replaces rather than silently reuses the superseded 007 and predecessor-local populations. The exact current 007 source, exact historical 009 intake archive, byte counts, SHA-256 digests, controlled identities, links, and semantic invariants are the authoring evidence surface. During this current exclusively owned documentation-authoring subphase, Git status, diff, branch, revision, and repository-wide polling are not concurrency or currentness inputs for this documentation subtree. This temporary authoring rule does not replace later executable subject/revision binding. A final consolidated implementation refresh remains mandatory before exact-corpus freeze.
+The affected successor carries exactly 2,568 unaffected inherited rows, consumes all 652 local rows from exact current `JAN-CSAA-007@1.1.0` and all 1,100 local rows from exact historical `JAN-CSAA-009@0.1.0` under the finite cutoff, and replaces rather than silently reuses the superseded 007 and predecessor-local populations. Earlier ledgers and objective records remain historical and do not confer a current result. The exact current 003 and 007 sources, exact historical 009 intake, byte counts, SHA-256 digests, controlled identities, and semantic invariants are the authoring evidence surface. A final implementation refresh and executable conformance run remain mandatory before a current implementation claim.
 
 ### 3.3 Mandatory provisional constraints
 
-1. The ordered labels `F01` through `F28`, not punctuation splitting, define the exact Capability Profile facet boundaries in `JAN-CSAA-003@0.1.0`.
+1. The ordered labels `F01` through `F28`, not punctuation splitting, define the exact Capability Profile facet boundaries in `JAN-CSAA-003@0.2.0`.
 2. A negative test shall reject a missing, duplicate, reordered, or ambiguously parsed capability-facet label without representing that test specification as resolution of `JAN-CSAA-003-SR-002`.
 3. Every inherited `JAN-CSAA-006` expected judgment remains proposed, non-conferred, and non-executed. It may define a planned case but cannot make an execution pass.
 4. All seventeen Analysis Rule Profiles retain `UNASSIGNED` binding authority and both definitive and interim ARP transition carriers retain `N/A — no instantiated RGP or protected transition`; all twelve Repository Gate Templates remain `UNDESIGNATED_TEMPLATE / NOT_A_PROFILE`; no Repository Gate Profile exists.
 5. Provider disagreement, raw provenance, limitations, failure, timeout, unsupported, partial, conflict, and stale state remain visible and non-green.
-6. Recovery, persistence, publication, cache, concurrency, migration, retention, health, and operational tests bind exact `JAN-CSAA-009@0.1.0` semantics and exact `JAN-CSAA-007@1.0.1` representations; every physical case remains unauthorized and unexecuted.
+6. Recovery, persistence, publication, cache, concurrency, migration, retention, health, and operational tests bind exact `JAN-CSAA-009@0.1.0` semantics and exact `JAN-CSAA-007@1.1.0` representations; every physical case remains unexecuted.
 7. Agent-trajectory tests remain abstract allocations pending `JAN-CSAA-010`; concrete provider qualification tests remain abstract allocations pending `JAN-CSAA-011`.
-8. Candidate machine shapes in `JAN-CSAA-007@1.0.1` are documentation, not enforced schemas or generated types. Their executable validation cannot occur until separately authorized artifacts exist.
+8. Candidate machine shapes in `JAN-CSAA-007@1.1.0` are documentation, not enforced schemas or generated types. Their executable validation requires implemented artifacts and tests.
 9. The exact 31 operational roles, 37-row/40-name identity registry, P01–P12 projections, H01–H14 dimensions, 77 typed errors, and six phase/digest cases are closed test populations; their presence in documentation is not execution.
 10. This Draft creates no executable file, physical fixture, test runner, provider invocation, failure injection, database, service, topology, gate, or result.
 
@@ -161,7 +161,7 @@ The following logical artifacts are distinct:
 
 The ownership column never creates joint ownership of one concern. `JAN-CSAA-008` controls conformance case structure and method; the cited semantic document controls the meaning under test; the independently authorized oracle owner controls judgment standing and conferral. A case binds these three distinct references without allowing any one to overwrite another.
 
-`JAN-CSAA-007@1.0.1` defines the exact affected operational wire family consumed by this specification but still does not define explicit wire records for `ConformanceCatalogDefinition`, `ConformanceTestSpecification`, `ConformanceCaseDefinition`, or `ConformanceEligibilityAssessment`. This Draft owns their conformance semantics and allocates any future serialization to a later affected `JAN-CSAA-007` successor. Existing source-level `TestRecord`, operational records, and execution-result records shall not be silently overloaded.
+`JAN-CSAA-007@1.1.0` defines the exact affected wire family consumed by this specification but still does not define explicit wire records for `ConformanceCatalogDefinition`, `ConformanceTestSpecification`, `ConformanceCaseDefinition`, or `ConformanceEligibilityAssessment`. This Draft owns their conformance semantics and allocates any future serialization to an executable-contract increment. Existing source-level `TestRecord`, operational records, and execution-result records shall not be silently overloaded.
 
 ## 6. Twenty-four-facet conformance test specification
 
@@ -245,13 +245,13 @@ The test family is the top-level catalog partition. Every applicable inherited r
 | `JAN-CSAA-008-TF-007` / `REL` | Semantic relation variants and graph closure | 137 exact relation variants, endpoint roles/cardinalities, metadata, graph node/edge closure |
 | `JAN-CSAA-008-TF-008` / `INV` | Semantic invariants and cross-graph identity | `INV-001` through `INV-014` plus 9 graph layers × 3 case modes, positive and hostile invalid cases |
 | `JAN-CSAA-008-TF-009` / `CAP` | Capability profiles and dependency plan | 32 profiles × 28 ordered facets, 896 cells, dependency DAG, prerequisites, support and limitation truth |
-| `JAN-CSAA-008-TF-010` / `QRY` | Query, slice, comparison, delta, impact, and reachability | Expression budgets, truth/epistemic separation, paging, witnesses/frontiers, 12 entry mechanisms |
+| `JAN-CSAA-008-TF-010` / `QRY` | Query, slice, comparison, delta, impact, and reachability | Full-AST expression budgets; exhaustive four-valued evidence-pair algebra; N/A and evaluation-disposition separation; node-total explanation; lawful short-circuiting; paging, witnesses/frontiers, and 12 entry mechanisms |
 | `JAN-CSAA-008-TF-011` / `EXE` | Test, coverage, build, runtime, and trace evidence | Run/attempt/assertion states, denominator and granularity, build/environment/workload/collector/schema binding |
 | `JAN-CSAA-008-TF-012` / `RUL` | Rules, application results, findings, and treatments | 17 ARPs, exact N/A carrier state, non-bypassability, five-dimensional result state, immutable evidence and treatment history |
 | `JAN-CSAA-008-TF-013` / `GAT` | Gate-template inertness and misuse rejection | 12 inert RGTs × 2 modes = 24 cells; zero invented RGPs or transition effects |
 | `JAN-CSAA-008-TF-014` / `ORC` | Fixture, scenario, expected judgment, oracle, and coverage matrices | 30 facets; 20 families/40 cases; 9 ZSC; 256 CAP, 187 ARP, and 24 RGT cells |
-| `JAN-CSAA-008-TF-015` / `PRP` | Property and metamorphic conformance | Closed metamorphic-relation registry; generator/shrinker/replay and applicability controls |
-| `JAN-CSAA-008-TF-016` / `MUT` | Subject mutation, harness mutation, and tests-of-tests | 18 inherited subject-mutation classes plus 38 closed suite-mutation operators and critical kills |
+| `JAN-CSAA-008-TF-015` / `PRP` | Property and metamorphic conformance | Closed 30-relation metamorphic registry; generator/shrinker/replay and applicability controls |
+| `JAN-CSAA-008-TF-016` / `MUT` | Subject mutation, harness mutation, and tests-of-tests | 18 inherited subject-mutation classes plus 43 closed suite-mutation operators and critical kills |
 | `JAN-CSAA-008-TF-017` / `DIF` | Provider-adapter contract and differential behavior | Mapping fidelity, raw/model lineage, health, loss, disagreement, substitution and removal |
 | `JAN-CSAA-008-TF-018` / `INC` | Incremental invalidation, dependency-observation, cache correctness, and clean-full equivalence | 18 mutation classes and all 8 equivalence dimensions; resolved-dependency, lockfile-delta, advisory-correlation, vulnerability-observation, cold/warm, and cache-poison controls |
 | `JAN-CSAA-008-TF-019` / `OPS` | Logical operations, errors, partiality, cancellation, and response envelopes | 17 valid operation-policy pairs, 272 invalid cross-pairs, 77 typed errors, V01–V07, success-empty and non-disclosure cases |
@@ -380,7 +380,7 @@ A suite shall fail closed when any required registry, schema source, generated d
 
 ### 10.1 Nineteen schema-source coordinates
 
-The `PKG` family binds the exact `SCHEMA-INDEX`, `SCHEMA-PACKAGE`, `SCHEMA-COMMON`, `SCHEMA-SUBJECT`, `SCHEMA-ARTIFACT`, `SCHEMA-SEMANTIC`, `SCHEMA-RELATION`, `SCHEMA-GRAPH`, `SCHEMA-ANALYSIS`, `SCHEMA-QUERY`, `SCHEMA-EXECUTION`, `SCHEMA-RULE`, `SCHEMA-ORACLE`, `SCHEMA-API`, `SCHEMA-DIAGNOSTIC`, `SCHEMA-COMPATIBILITY`, `SCHEMA-ADAPTER`, `SCHEMA-SECURITY`, and `SCHEMA-OPERATIONS` identities from `JAN-CSAA-007@1.0.1` §6.3. All currently remain `NOT_CREATED / NOT_ENFORCED`.
+The `PKG` family binds the exact `SCHEMA-INDEX`, `SCHEMA-PACKAGE`, `SCHEMA-COMMON`, `SCHEMA-SUBJECT`, `SCHEMA-ARTIFACT`, `SCHEMA-SEMANTIC`, `SCHEMA-RELATION`, `SCHEMA-GRAPH`, `SCHEMA-ANALYSIS`, `SCHEMA-QUERY`, `SCHEMA-EXECUTION`, `SCHEMA-RULE`, `SCHEMA-ORACLE`, `SCHEMA-API`, `SCHEMA-DIAGNOSTIC`, `SCHEMA-COMPATIBILITY`, `SCHEMA-ADAPTER`, `SCHEMA-SECURITY`, and `SCHEMA-OPERATIONS` identities from `JAN-CSAA-007@1.1.0` §6.3. All currently remain `NOT_CREATED / NOT_ENFORCED`.
 
 For every applicable schema, later tests shall cover:
 
@@ -515,8 +515,15 @@ Query tests cover:
 
 - definition/reference/request subject and capability compatibility;
 - expression discriminators, type rules, operands, operators, and locally bounded recursion;
-- `ExpressionBudget` depth, nodes, fanout, path, result, time, and resource refusal;
+- complete normalized-AST validation before evaluation, including every later-skipped branch, for shape plus `ExpressionBudget` depth, nodes, fanout, traversal, path, result, time, and resource refusal;
 - truth projection independent from completeness, freshness, support, conflict, and other epistemic dimensions;
+- all four negation cases plus the exact sixteen conjunction and sixteen disjunction cells from `JAN-CSAA-003@0.2.0`;
+- n-ary fold associativity, commutativity of projected truth, deterministic stored evaluation order, and both De Morgan transformations over every four-valued input pair;
+- reasoned not-applicable, excluded, unsupported, and not-evaluated children without Boolean coercion or loss of their owning state, including `NOT(N/A)=N/A`, an all-N/A parent remaining N/A, and the exact `F AND N/A=F`, `T OR N/A=T`, `T AND N/A=U`, `F OR N/A=U`, `C AND N/A=F`, and `C OR N/A=T` cases with conflict retained;
+- complete evaluation and decisive short-circuit equivalence for projected truth, with short-circuit permitted only on supported-false conjunction or supported-true disjunction;
+- complete-child-evidence, diagnostic-completeness, and provenance-completeness policies that disable short-circuiting and require every applicable child to be evaluated;
+- decisive-child, intermediate-truth, skipped-child, conflict, orthogonal-state, and provenance retention in every logical explanation;
+- branch-complete verification of the exact support-basis, capability-coverage, execution-health, freshness, conflict, and inference composition algorithms, including both each effective parent value and its ordered child contribution vector;
 - deterministic ordering and complete ordering keys;
 - cursor identity bound to subject, query, order, page size, and result basis;
 - pagination concatenation without duplication, loss, reorder, or cross-revision mixing;
@@ -524,6 +531,8 @@ Query tests cover:
 - explicit partial, unsupported, conflicting, stale, timeout, cancelled, and resource-refused outcomes;
 - explanation, witness, raw evidence, limitations, and unresolved frontier retention; and
 - query definition and result invalidation after any applicable dependency change.
+
+The algebra suite has independent non-vacuity controls. It SHALL fail if `and` is implemented as `or`, if unknown or conflict is coerced to a Boolean, if not-applicable is used as an identity value, if a decisive result erases conflicting evidence, if short-circuit occurs on any non-decisive state, if a skipped child is represented as evaluated, or if a two-valued implementation passes only the `T/F` subset. Mutation tests SHALL kill each of those defects independently.
 
 ### 12.3 Slices, comparisons, deltas, and impact
 
@@ -607,6 +616,11 @@ Every byte-changing shrink step creates a new exact successor subject identity. 
 | `JAN-CSAA-008-MR-023` | Freshness degradation | Invalidating an applicable dependency cannot preserve a current or green disposition |
 | `JAN-CSAA-008-MR-024` | Reset reversibility | Fixture reset restores the exact immutable initial-state identity and removes mutation residue |
 | `JAN-CSAA-008-MR-025` | Treatment preservation | Adding exception or suppression changes treatment state but never erases the underlying result, finding, or evidence |
+| `JAN-CSAA-008-MR-026` | Double negation | Applying negation twice preserves the original four-valued evidence pair and every separately carried epistemic dimension |
+| `JAN-CSAA-008-MR-027` | De Morgan duality | Negating conjunction equals disjoining the negated children, and negating disjunction equals conjoining the negated children, for every four-valued input combination |
+| `JAN-CSAA-008-MR-028` | Truth-only commutativity and idempotence | Reordering children or duplicating an identical child preserves projected truth while deterministic trace order and duplicate provenance remain explicit |
+| `JAN-CSAA-008-MR-029` | Associative n-ary fold equivalence | Every permitted regrouping and its ordered nonempty n-ary fold produce the same projected truth without losing child identity or provenance |
+| `JAN-CSAA-008-MR-030` | Eager and lawful short-circuit equivalence | Complete evaluation and a lawful decisive short-circuit produce the same projected truth over the same available evidence while their attempted, skipped, cost, and explanation evidence remains honestly different |
 
 Each relation is applicable only under its exact cited semantic owner and preconditions. An inapplicable relation carries rationale and does not count as passed coverage. Any permitted difference binds an exact policy ID/version and a difference manifest.
 
@@ -657,6 +671,11 @@ All eighteen `JAN-CSAA-006-MUT-001` through `018` classes receive at least one e
 | `JAN-CSAA-008-HMUT-036` | Reuse a predecessor subject identity after changed or shrunken bytes |
 | `JAN-CSAA-008-HMUT-037` | Hide cache-hit, cache-miss, reused, or recomputed provenance |
 | `JAN-CSAA-008-HMUT-038` | Map a diagnostic through the wrong generated, virtual, build, execution, or source-map artifact |
+| `JAN-CSAA-008-HMUT-039` | Alter one conjunction or disjunction cell involving unknown or conflict |
+| `JAN-CSAA-008-HMUT-040` | Coerce not-applicable into ordinary unknown, binary truth, null, omission, unsupported, or not-run |
+| `JAN-CSAA-008-HMUT-041` | Short-circuit conjunction or disjunction on unknown, conflict, or not-applicable |
+| `JAN-CSAA-008-HMUT-042` | Drop decisive-child or skipped-node provenance from a short-circuited explanation |
+| `JAN-CSAA-008-HMUT-043` | Apply structural, traversal, depth, node, fanout, path, time, or resource validation only to nodes that evaluation visits |
 
 Every critical rule, invariant, no-false-green predicate, oracle-independence control, subject-binding control, and security boundary maps to at least one applicable harness mutant. Every critical applicable mutant must be killed. A survivor, unexecuted mutant, equivalent-mutant claim without proof, flaky kill, or kill caused only by an unrelated harness crash is nonpass. The result retains the mutant implementation digest, changed location, expected detection path, executing case IDs, assertion IDs, actual evidence, and survivor disposition.
 
@@ -834,7 +853,7 @@ The twelve affected operational additions are exact and independently tested:
 | `JAN-CSAA-009-A007-ERR-GAP-011` | `CSAA-E-EXTERNAL-EFFECT-OUTCOME-UNKNOWN` | uncertain or partial external effect requires reconciliation |
 | `JAN-CSAA-009-A007-ERR-GAP-012` | `CSAA-E-ISOLATION-BASIS-MISMATCH` | cross-partition or time-of-check/time-of-use mismatch refuses safely |
 
-Each case validates the exact code-discriminated `safeDetails` fields from `JAN-CSAA-007@1.0.1` Appendix F.8. A source gap identifier, neighboring code, generic internal error, provider-native string, or success outcome cannot replace the registered code when the distinction is known.
+Each case validates the exact code-discriminated `safeDetails` fields from `JAN-CSAA-007@1.1.0` Appendix F.8. A source gap identifier, neighboring code, generic internal error, provider-native string, or success outcome cannot replace the registered code when the distinction is known.
 An error payload cannot expose source text, secrets, unauthorized paths, raw provider material, counts, shapes, existence, stack data, or identities beyond the exact information-control binding.
 
 Cancellation tests bind request, accepted cancellation identity, target operation, observed point, child attempts, provider/process propagation, retained partial/raw material, cleanup, and final state. Cancellation is never success. A late cancellation after immutable completion remains a separately observed event and does not rewrite the completed record.
@@ -936,7 +955,7 @@ Each case requires exact prior publication, candidate successor, operation/invoc
 
 An incomplete successor never becomes current. Prior valid publication is not relabeled as fresh output from the failed attempt. Uncertain external effect is reconciled before retry. Recovery preserves history, prevents duplicate material records or effects, and either completes one exact successor or remains explicitly non-green.
 
-These behavior obligations now bind exact topology-neutral semantics in `JAN-CSAA-009@0.1.0` and exact candidate representations in `JAN-CSAA-007@1.0.1`. Every future operational profile maps all sixteen recovery coordinates to concrete injection points, durable materials, before/after states, observable probes, cleanup checks, audit evidence, and independently reported cases. This reconciliation chooses no database, graph store, queue, filesystem layout, scheduler, lock, transaction, deployment, or crash mechanism and performs no failure injection.
+These behavior obligations now bind exact topology-neutral semantics in `JAN-CSAA-009@0.1.0` and exact candidate representations in `JAN-CSAA-007@1.1.0`. Every future operational profile maps all sixteen recovery coordinates to concrete injection points, durable materials, before/after states, observable probes, cleanup checks, audit evidence, and independently reported cases. This reconciliation chooses no database, graph store, queue, filesystem layout, scheduler, lock, transaction, deployment, or crash mechanism and performs no failure injection.
 
 ## 23. Deterministic replay and reproducibility
 
@@ -1022,9 +1041,9 @@ Reverse trace resolves every case and result back to all governing requirements,
 | Direct canon intake | 53 exact rows sourced from `JAN-CSAA-004-LEDGER-001@0.1.1` and preserved through the immutable 008 predecessor allocation |
 | Wave 3 readiness constraints | 53 exact rows preserved through the immutable 008 predecessor allocation |
 | Unaffected inherited subtotal | 2,568 individually retained rows: 302 + 2,160 + 53 + 53 |
-| Exact current `JAN-CSAA-007@1.0.1` source | 637 individually reproduced local-catalog rows |
+| Exact current `JAN-CSAA-007@1.1.0` source | 652 individually reproduced local-catalog rows |
 | Exact historical `JAN-CSAA-009@0.1.0` finite-cutoff source | 1,100 individually reproduced local-catalog rows |
-| Pre-local affected-ledger total | 4,305 rows: 2,568 + 637 + 1,100 |
+| Pre-local affected-ledger total | 4,320 rows: 2,568 + 652 + 1,100 |
 | Contract families | 19 of 19 including the operational family |
 | Future schema sources | 19 of 19 including `SCHEMA-OPERATIONS` |
 | Generated derivatives | 5 of 5 |
@@ -1042,8 +1061,8 @@ Reverse trace resolves every case and result back to all governing requirements,
 | ARP matrix | 187 of 187 |
 | RGT matrix | 24 of 24; exactly zero current RGPs |
 | Subject mutations | 18 of 18 |
-| Harness mutations | 38 of 38 applicability-evaluated; every critical applicable mutant killed |
-| Metamorphic relations | 25 of 25 applicability-evaluated |
+| Harness mutations | 43 of 43 applicability-evaluated; every critical applicable mutant killed |
+| Metamorphic relations | 30 of 30 applicability-evaluated |
 | Degradation/no-green | 20 classes × 8 surfaces = 160 cells |
 | Incremental equivalence | 18 subject mutation classes × 8 dimension assessments at minimum |
 | Supply-chain dependency/advisory | 16 stable coordinates × 2 mandatory lanes = 32 independently reported assignments |
@@ -1098,11 +1117,11 @@ These unresolved surfaces block their corresponding executable or final claims. 
 
 ### 27.3 Exact affected-source and ownership boundary
 
-This successor binds the exact current `JAN-CSAA-007@1.0.1` shape source and the exact historical `JAN-CSAA-009@0.1.0` operational-semantic intake under the finite cutoff below. The 007 package owns candidate serialization; the 009 package owns operational meaning; this 008 package owns only executable conformance method. A test case may bind all three without transferring, merging, or duplicating ownership.
+This successor binds the exact current `JAN-CSAA-007@1.1.0` shape source and the exact historical `JAN-CSAA-009@0.1.0` operational-semantic intake under the finite cutoff below. The 007 package owns candidate serialization; the 009 package owns operational meaning; this 008 package owns only executable conformance method. A test case may bind all three without transferring, merging, or duplicating ownership.
 
 | Surface | Exact source | Test use | Prohibited inference |
 | --- | --- | --- | --- |
-| Operational machine contracts | `JAN-CSAA-007@1.0.1`; 1,343,092 bytes; SHA-256 `b2d034ac20ddca2a3676e152770b28fbccee83ab4a5c882d5a581bd33f1186b6` | Shape-valid, shape-invalid, phase, reference, identity, digest, collection, health, and error cases | Enforced schema, generated type, implementation, or runtime instance |
+| Operational machine contracts | `JAN-CSAA-007@1.1.0`; 1,349,212 bytes; SHA-256 `60618b2da0b0ee1b103f3d72404d7de4419f69630848a59ff835e8185d6ad49d` | Shape-valid, shape-invalid, query-algebra, phase, reference, identity, digest, collection, health, and error cases | Enforced schema, generated type, implementation, or runtime instance |
 | Operational semantics | `JAN-CSAA-009@0.1.0`; 372,913 bytes; SHA-256 `13c61cf36920b4d5cd804a9a0be09e32013b810f12ebd2a09708bb1c1562447d` | Persistence, publication, invalidation, cache, concurrency, recovery, migration, retention, security, health, and capacity expectations | Selected topology, mechanism, provider, budget, or performed operation |
 | Conformance method | `JAN-CSAA-008@0.2.2` | Catalog, cases, coverage, mutations, eligibility, evidence, and no-false-green derivation | Oracle conferral, provider qualification, assurance disposition, or implementation authority |
 
@@ -1269,7 +1288,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-SRC-002` | The requirement ledger SHALL retain all 2,160 unaffected JAN-CSAA-001 through JAN-CSAA-006 predecessor local-catalog rows individually. |
 | `CSAA-008-SRC-003` | The requirement ledger SHALL retain all 53 direct-canon rows individually. |
 | `CSAA-008-SRC-004` | The requirement ledger SHALL retain all 53 Wave 3 readiness rows individually. |
-| `CSAA-008-SRC-005` | The unaffected inherited subtotal SHALL equal exactly 2,568 before the exact current `JAN-CSAA-007@1.0.1` source, the exact historical `JAN-CSAA-009@0.1.0` finite-cutoff source, and local successor rows. |
+| `CSAA-008-SRC-005` | The unaffected inherited subtotal SHALL equal exactly 2,568 before the exact current `JAN-CSAA-007@1.1.0` source, the exact historical `JAN-CSAA-009@0.1.0` finite-cutoff source, and local successor rows. |
 | `CSAA-008-SRC-006` | Semantic overlap MAY map multiple source rows to one test specification. |
 | `CSAA-008-SRC-007` | Semantic overlap SHALL NOT delete, merge, or renumber inherited source identities. |
 | `CSAA-008-SRC-008` | Every source row SHALL map to at least one applicability or later-allocation conclusion. |
@@ -1281,7 +1300,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-SRC-014` | The evidence-priority rows `CSAA-000-REQ-606`, `608`, `610`, `612`, `614`, `616`, and `618` SHALL remain individually traceable. |
 | `CSAA-008-SRC-015` | The red-first readiness rows `CSAA-000-REQ-704` through `707` SHALL remain individually traceable. |
 | `CSAA-008-SRC-016` | `CSAA-000-REQ-577` and `629` SHALL retain their source-text-only `JAN-CSAA-008` handoffs. |
-| `CSAA-008-SRC-017` | The exact current `JAN-CSAA-007@1.0.1` 637-row local catalog SHALL replace the archived 454-row source population without erasing predecessor evidence. |
+| `CSAA-008-SRC-017` | The exact current `JAN-CSAA-007@1.1.0` 652-row local catalog SHALL replace the archived 637-row predecessor source population without erasing predecessor evidence. |
 | `CSAA-008-SRC-018` | Current predecessor objective closure SHALL NOT be interpreted as executable completion. |
 | `CSAA-008-SRC-019` | Open predecessor self-review findings SHALL remain visible until affected successor evidence closes them. |
 | `CSAA-008-SRC-020` | A changed predecessor SHALL invalidate only the affected allocations and conclusions, not erase prior evidence. |
@@ -1409,7 +1428,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 
 | ID | Requirement |
 | --- | --- |
-| `CSAA-008-PKG-001` | The future schema-source test population SHALL contain exactly the nineteen `JAN-CSAA-007@1.0.1` schema-source IDs. |
+| `CSAA-008-PKG-001` | The future schema-source test population SHALL contain exactly the nineteen `JAN-CSAA-007@1.1.0` schema-source IDs. |
 | `CSAA-008-PKG-002` | Every future schema source SHALL receive an exact meta-schema validity case. |
 | `CSAA-008-PKG-003` | Every future schema source SHALL receive accepted minimal and populated instance cases. |
 | `CSAA-008-PKG-004` | Every future schema source SHALL receive missing-required-field and extra-closed-field cases. |
@@ -1654,6 +1673,23 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-QRY-024` | An observed unregistered entry mechanism SHALL create an unsupported frontier. |
 | `CSAA-008-QRY-025` | `candidate-unreachable-within-closed-surface` SHALL require every applicable mechanism and population to be closed and successfully resolved. |
 | `CSAA-008-QRY-026` | Zero static callers SHALL NOT produce deadness, safe removal, approval, or permission. |
+| `CSAA-008-QRY-027` | Query tests SHALL exercise all four negation cases and every one of the sixteen conjunction and sixteen disjunction cells. |
+| `CSAA-008-QRY-028` | Query properties SHALL verify associative and commutative projected truth for conjunction and disjunction across all four values. |
+| `CSAA-008-QRY-029` | Query properties SHALL verify both De Morgan transformations across all four-valued input pairs. |
+| `CSAA-008-QRY-030` | Query validation SHALL reject empty conjunction and disjunction expressions. |
+| `CSAA-008-QRY-031` | Query cases SHALL preserve reasoned not-applicable, excluded, unsupported, and not-evaluated child states without Boolean coercion and SHALL verify `NOT(N/A)=N/A`, the all-N/A parent rule, and the exact six mixed N/A outcomes owned by `JAN-CSAA-003@0.2.0`, including retained conflict. |
+| `CSAA-008-QRY-032` | Complete and decisive-short-circuit evaluation SHALL produce equivalent projected truth over the same available child evidence. |
+| `CSAA-008-QRY-033` | Short-circuit cases SHALL stop only on supported-false conjunction or supported-true disjunction. |
+| `CSAA-008-QRY-034` | Every short-circuit case SHALL retain decisive-child, intermediate-truth, skipped-child, and not-evaluated evidence. |
+| `CSAA-008-QRY-035` | A decisive projected truth SHALL NOT erase contributing conflict, epistemic state, or provenance. |
+| `CSAA-008-QRY-036` | A two-valued or three-valued implementation SHALL fail the four-valued non-vacuity controls. |
+| `CSAA-008-QRY-037` | Query-algebra mutation tests SHALL kill operator swap, unknown/conflict collapse, not-applicable coercion, invalid short-circuit, and skipped-child fabrication defects. |
+| `CSAA-008-QRY-038` | Query validation SHALL apply structural, depth, node-count, fanout, traversal, path, time, and resource checks to the complete normalized AST before evaluation so that a skipped branch cannot evade any budget or shape constraint. |
+| `CSAA-008-QRY-039` | Every normalized AST node SHALL receive exactly one `applicable-result`, `not-applicable`, or `short-circuited` evaluation disposition, with truth prohibited on the latter two dispositions. |
+| `CSAA-008-QRY-040` | Root-result tests SHALL independently partition supported-true matches, supported-false nonmatches, applicable unknown regions, predicate-projection conflict regions, not-applicable regions, and omitted-or-unevaluated regions. |
+| `CSAA-008-QRY-041` | Branch-complete tests SHALL verify the exact `JAN-CSAA-003@0.2.0` parent-composition algorithm for support basis, capability coverage, execution health, freshness, conflict, and inference, including each effective value and its canonically ordered child contribution vector. |
+| `CSAA-008-QRY-042` | Closed, completely evaluated empty populations SHALL yield supported-false for existential quantification and supported-true for universal quantification; absent demonstrated closure and complete evaluation, each SHALL yield unknown. |
+| `CSAA-008-QRY-043` | A complete-child-evidence, diagnostic-completeness, or provenance-completeness request SHALL disable short-circuiting and SHALL require every applicable child to receive an attempted evaluation. |
 
 ### 28.17 Test, coverage, runtime, and trace evidence
 
@@ -1787,7 +1823,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-PRP-022` | A permitted metamorphic difference SHALL bind an exact owner-governed policy. |
 | `CSAA-008-PRP-023` | An inapplicable metamorphic relation SHALL carry exact rationale. |
 | `CSAA-008-PRP-024` | An inapplicable metamorphic relation SHALL NOT count as passed coverage. |
-| `CSAA-008-PRP-025` | All twenty-five registered metamorphic relations SHALL receive applicability evaluation. |
+| `CSAA-008-PRP-025` | All thirty registered metamorphic relations SHALL receive applicability evaluation. |
 | `CSAA-008-PRP-026` | Deterministic replay SHALL retain seed, clock, order, environment, and raw inputs. |
 | `CSAA-008-PRP-027` | A generated-case timeout SHALL NOT be silently discarded from the population. |
 
@@ -1800,7 +1836,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-MUT-003` | Every subject mutation SHALL bind affected facts, graphs, queries, rules, findings, matrices, and judgments as applicable. |
 | `CSAA-008-MUT-004` | Every subject mutation SHALL bind expected invalidation closure. |
 | `CSAA-008-MUT-005` | Every subject mutation SHALL bind reset identity and replay data. |
-| `CSAA-008-MUT-006` | All thirty-eight harness-mutation operators SHALL receive applicability evaluation. |
+| `CSAA-008-MUT-006` | All forty-three harness-mutation operators SHALL receive applicability evaluation. |
 | `CSAA-008-MUT-007` | `JAN-CSAA-008-HMUT-029` through `032` SHALL be mandatory killed supply-chain controls. |
 | `CSAA-008-MUT-008` | `JAN-CSAA-008-HMUT-033` and `034` SHALL be mandatory killed applicability-and-criticality controls. |
 | `CSAA-008-MUT-009` | `JAN-CSAA-008-HMUT-035` SHALL be a mandatory killed affected-author bypass control. |
@@ -1907,7 +1943,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-INC-044` | Every Vulnerability Observation case SHALL bind the exact repository revision and dependency identity. |
 | `CSAA-008-INC-045` | Absence of a Vulnerability Observation SHALL NOT establish no vulnerability without a qualified complete closed basis. |
 | `CSAA-008-INC-046` | An empty Vulnerability Observation population SHALL fail when a planted affected component requires an observation. |
-| `CSAA-008-INC-047` | Operational incremental semantics SHALL bind exact `JAN-CSAA-009@0.1.0` behavior and exact `JAN-CSAA-007@1.0.1` representations. |
+| `CSAA-008-INC-047` | Operational incremental semantics SHALL bind exact `JAN-CSAA-009@0.1.0` behavior and exact `JAN-CSAA-007@1.1.0` representations. |
 
 ### 28.25 Operations, validation, typed errors, partiality, and cancellation
 
@@ -2157,13 +2193,13 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 | `CSAA-008-VFY-004` | Author-side verification SHALL reproduce the 302-row adopted-program intake. |
 | `CSAA-008-VFY-005` | Author-side verification SHALL reproduce the 2,160-row unaffected predecessor local-catalog intake. |
 | `CSAA-008-VFY-006` | Author-side verification SHALL reproduce the 53-row canon and 53-row readiness intakes. |
-| `CSAA-008-VFY-007` | Author-side verification SHALL reproduce the exact 2,568 unaffected subtotal and 4,305 pre-local affected total. |
+| `CSAA-008-VFY-007` | Author-side verification SHALL reproduce the exact 2,568 unaffected subtotal and 4,320 pre-local affected total. |
 | `CSAA-008-VFY-008` | Author-side verification SHALL reproduce every local requirement ID and family count. |
 | `CSAA-008-VFY-009` | Author-side verification SHALL prove every local ID is unique and contiguous within its family. |
 | `CSAA-008-VFY-010` | Author-side verification SHALL reproduce all twenty-seven test-family IDs. |
 | `CSAA-008-VFY-011` | Author-side verification SHALL reproduce all twenty-four Test Specification facets. |
-| `CSAA-008-VFY-012` | Author-side verification SHALL reproduce all twenty-five metamorphic relations. |
-| `CSAA-008-VFY-013` | Author-side verification SHALL reproduce all thirty-eight harness mutants. |
+| `CSAA-008-VFY-012` | Author-side verification SHALL reproduce all thirty metamorphic relations. |
+| `CSAA-008-VFY-013` | Author-side verification SHALL reproduce all forty-three harness mutants. |
 | `CSAA-008-VFY-014` | Author-side verification SHALL reproduce all twenty hostile classes and sixteen recovery points. |
 | `CSAA-008-VFY-015` | Author-side verification SHALL reproduce every exact minimum coverage count in §26.1. |
 | `CSAA-008-VFY-016` | Author-side verification SHALL verify no green current execution claim exists. |
@@ -2186,7 +2222,7 @@ Requirement identifiers are permanent within `JAN-CSAA-008`. Retirement preserve
 
 | ID | Requirement |
 | --- | --- |
-| `CSAA-008-WIR-001` | This successor SHALL bind exact `JAN-CSAA-007@1.0.1` bytes and digest as its operational machine-contract source. |
+| `CSAA-008-WIR-001` | This successor SHALL bind exact `JAN-CSAA-007@1.1.0` bytes and digest as its operational machine-contract source. |
 | `CSAA-008-WIR-002` | Operational wire conformance SHALL preserve `JAN-CSAA-007` serialization ownership without transferring operational meaning. |
 | `CSAA-008-WIR-003` | The suite SHALL cover the one Operational Profile Definition with O01 through O30 exactly once and in order. |
 | `CSAA-008-WIR-004` | The suite SHALL cover all thirty-one runtime operational record roles independently. |
@@ -2413,7 +2449,7 @@ The requirement ledger and objective verification record carry mutable execution
 | Method | Subject | Required evidence |
 | --- | --- | --- |
 | `JAN-CSAA-008-VER-CTL-001` | Control and lifecycle | Metadata, exact status, authority, prohibited-claim, no-executable, and currentness-boundary scans |
-| `JAN-CSAA-008-VER-SRC-001` | Exact source intake | Exact bytes/digests/links plus 2,568 unaffected inherited rows, 637 exact current `JAN-CSAA-007@1.0.1` rows, 1,100 exact historical `JAN-CSAA-009@0.1.0` finite-cutoff rows, and exact successor-local extraction |
+| `JAN-CSAA-008-VER-SRC-001` | Exact source intake | Exact bytes/digests/links plus 2,568 unaffected inherited rows, 652 exact current `JAN-CSAA-007@1.1.0` rows, 1,100 exact historical `JAN-CSAA-009@0.1.0` finite-cutoff rows, and exact successor-local extraction |
 | `JAN-CSAA-008-VER-OWN-001` | Concern ownership | Single-owner matrix, excluded concerns, five-role separation, and no semantic overwrite |
 | `JAN-CSAA-008-VER-MOD-001` | Test model | 27 families, 24 facets, governed applicability/criticality, identity grammar, case kinds, logical artifact separation, consumed operational wires, and remaining dedicated conformance-wire allocation |
 | `JAN-CSAA-008-VER-ELG-001` | Eligibility and no false green | Closed total axes, exact provider-health mappings, H01–H14 and health-view admission, complete blocking-reason set, fixed primary precedence, sole green conjunction, prohibited coercions, and non-vacuity sentinels |
@@ -2427,13 +2463,13 @@ The requirement ledger and objective verification record carry mutable execution
 | `JAN-CSAA-008-VER-REL-001` | Relation variants and graphs | 137 exact variants, endpoint closure, metadata, inference classes, graph populations, and invariants |
 | `JAN-CSAA-008-VER-INV-001` | Semantic invariants | INV-001–014 plus 9 graph layers × 3 modes, isolated negative, incomplete, cross-graph, and mutation coverage |
 | `JAN-CSAA-008-VER-CAP-001` | Capability profiles | 32 × 28 = 896 exact labeled cells, negative label parsing, dependency DAG, and 256 outcomes |
-| `JAN-CSAA-008-VER-QRY-001` | Query and reachability | Truth/epistemic separation, budgets, paging, slices, deltas, impact, witnesses, and 12 mechanisms |
+| `JAN-CSAA-008-VER-QRY-001` | Query and reachability | Exhaustive four-valued NOT/AND/OR and exact N/A tables, six-dimension composition semantics, complete/short-circuit equivalence and complete-evidence disablement, explanation provenance, mutation controls, full-AST budgets, paging, slices, deltas, impact, witnesses, and 12 mechanisms |
 | `JAN-CSAA-008-VER-EXE-001` | Execution evidence | Run/attempt/retry, coverage denominator, build/environment/workload/trace identities, and cutoff negatives |
 | `JAN-CSAA-008-VER-RUL-001` | Rules and findings | 17 ARPs, exact N/A carriers, non-bypassability, provider-substitution requalification, five dimensions, findings, immutable treatments, aggregation, and no self approval |
 | `JAN-CSAA-008-VER-GAT-001` | Gate-template inertness | 12 RGTs × 2 = 24, zero RGPs, misuse rejection, exact definitive non-bypassable future-carrier prerequisite, and no transition effect |
 | `JAN-CSAA-008-VER-ORC-001` | Fixture and oracle | 30 facets, 20/40 scenarios, 9 ZSC, 256/187/24 matrices, independence, divergence, and reset |
-| `JAN-CSAA-008-VER-PRP-001` | Property/metamorphic | Generator/shrinker successor identity, owner-proven transformations, bounded monotonicity, honest cache provenance, and all 25 metamorphic relations |
-| `JAN-CSAA-008-VER-MUT-001` | Mutation/tests-of-tests | 18 subject classes, 38 harness operators, governed applicability/criticality, kill and survivor rules |
+| `JAN-CSAA-008-VER-PRP-001` | Property/metamorphic | Generator/shrinker successor identity, owner-proven transformations, bounded monotonicity, honest cache provenance, and all 30 metamorphic relations |
+| `JAN-CSAA-008-VER-MUT-001` | Mutation/tests-of-tests | 18 subject classes, 43 harness operators, governed applicability/criticality, kill and survivor rules |
 | `JAN-CSAA-008-VER-DIF-001` | Adapter/differential | Raw-to-normalized lineage, Model Exchange, health/loss, closed differential lattice, source-governed not-applicable, shortage outcomes, substitution/removal |
 | `JAN-CSAA-008-VER-INC-001` | Incremental equivalence | Exact post-change successor, wrong-successor negatives, 18 × 8 = 144 assessments, 16 × 2 supply-chain assignments, CAC-P01–P16 controls, reuse/recompute/invalidation evidence, allowed differences, and clean-full evidence |
 | `JAN-CSAA-008-VER-OPS-001` | Operations and errors | 17 valid and 272 invalid pairings, exact operational behaviors, V01–V07, 77 errors, response invariants, partiality, timeout, cancellation, uncertainty, and isolation |
@@ -2445,7 +2481,7 @@ The requirement ledger and objective verification record carry mutable execution
 | `JAN-CSAA-008-VER-DAT-001` | Dated JPWB | Exact cutoff, all 16 supply-chain coordinates, representative realistic concerns, no floating currentness, and refresh/rebinding |
 | `JAN-CSAA-008-VER-AGT-001` | Agent trajectory | Required loading/invocation/evidence/stopping/no-bypass semantics and 010 reconciliation |
 | `JAN-CSAA-008-VER-XPK-001` | Handoffs | Exact affected 007/009 consumption, remaining dedicated 007 conformance wires, 010/011, implementation/oracle/execution, authority, and nonperformance |
-| `JAN-CSAA-008-VER-REQ-001` | Requirement accounting | 999 unique local rows, 41-family contiguity, exact one-modal extraction, 2,568 + 637 + 1,100 + 999 population arithmetic, and ledger reconciliation |
+| `JAN-CSAA-008-VER-REQ-001` | Requirement accounting | 1,016 unique local rows, 41-family contiguity, exact one-modal extraction, 2,568 + 652 + 1,100 + 1,016 population arithmetic, and source reconciliation |
 | `JAN-CSAA-008-VER-WIR-001` | Affected 007 wire conformance | Exact profile/role/assignment/identity/projection/digest/target/reference/finalization/key/preimage/health/error populations, closed grammar, source trace, and nonperformance |
 | `JAN-CSAA-008-VER-OPR-001` | Affected 009 operational semantics | Five planes, thirty facets, persistence/publication/invalidation/cache/concurrency/recovery/migration/retention/security/audit/capacity populations, ownership, topology neutrality, and nonperformance |
 | `JAN-CSAA-008-VER-OID-001` | Operational identity and preimages | P01–P12, role/record/state/content separation, applicability, canonical keys, reference directions, finalization DAG, candidate/replay preimages, and mismatch negatives |
@@ -2478,8 +2514,8 @@ This Draft is eligible for objective author-side closure only when:
 
 1. every exact source identity and provisional constraint is reproduced;
 2. the unaffected inherited population contains exactly 2,568 individually retained source rows;
-3. all 637 exact current `JAN-CSAA-007@1.0.1` rows and all 1,100 exact historical `JAN-CSAA-009@0.1.0` finite-cutoff rows are individually reproduced and allocated;
-4. all 999 local requirement rows are unique, contiguous within forty-one families, and bidirectionally allocated;
+3. all 652 exact current `JAN-CSAA-007@1.1.0` rows and all 1,100 exact historical `JAN-CSAA-009@0.1.0` finite-cutoff rows are individually reproduced and allocated;
+4. all 1,016 local requirement rows are unique, contiguous within forty-one families, and bidirectionally allocated;
 5. all twenty-seven test families and twenty-four test-specification facets are complete;
 6. every exact affected operational population in §§20, 22, 26, and 27 reconciles;
 7. the eligibility conjunction proves that no false empty, false current, false healthy, or false green state can satisfy conformance;
@@ -2493,7 +2529,7 @@ The declaration table below is the immutable `@0.2.0` affected-successor initial
 | Predicate | Initial-publication declaration (historical pre-ledger preimage) |
 | --- | --- |
 | Local atomic requirements | `PRESENT / OBJECTIVE_VERIFICATION_PENDING` |
-| Unaffected plus exact affected source rows | `2,568 + 637 + 1,100 PLANNED / LEDGER_NOT_YET_AUTHORED` |
+| Unaffected plus exact affected source rows | `2,568 + 652 + 1,100 SPECIFIED / EXECUTABLE_RECONCILIATION_NOT_RUN` |
 | Twenty-seven test families | `DOCUMENTED / NOT_IMPLEMENTED` |
 | Twenty-four test-specification facets | `DOCUMENTED / NOT_SERIALIZED` |
 | Schemas and generated derivatives | `NOT_CREATED / NOT_ENFORCED / NOT_VERIFIED` |
