@@ -30,7 +30,9 @@ export function projectSubjectForInventory(repositoryRoot: string): FrozenSubjec
 		subjectKind: 'WORKTREE'
 	});
 	if (outcome.outcome !== 'resolved') {
-		throw new Error(`CSAA subject resolution ${outcome.outcome}: ${outcome.diagnostics.map((item) => `${item.code}: ${item.message}`).join('; ')}`);
+		throw new Error(
+			`CSAA subject resolution ${outcome.outcome}: ${outcome.diagnostics.map((item) => `${item.code}: ${item.message}`).join('; ')}`
+		);
 	}
 	return outcome.subject;
 }

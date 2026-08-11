@@ -21,10 +21,19 @@ import {
 } from './canonical.js';
 import {
 	hasSemanticIdPrefix,
+	semanticAliasId,
+	semanticDeclarationId,
+	semanticDurableDeclarationId,
 	semanticDiagnosticId,
+	semanticModuleExportId,
+	semanticModuleResolutionId,
 	semanticProgramId,
 	semanticProjectId,
-	semanticSnapshotId
+	semanticReferenceId,
+	semanticScopeId,
+	semanticSnapshotId,
+	semanticSourceId,
+	semanticSymbolId
 } from './ids.js';
 import { semanticPopulation, type SemanticPopulationMembers } from './population.js';
 
@@ -43,6 +52,7 @@ const BUDGETS = {
 	maxAstNodes: 10,
 	maxCompilerInputMetadataBytes: 10,
 	maxCompilerQueries: 10,
+	maxCompilerFacts: 10,
 	maxCompilerQueryInvocations: 10,
 	maxContextBytes: 10,
 	maxContextFileBytes: 10,
@@ -55,13 +65,34 @@ const BUDGETS = {
 	maxPathCharacters: 10,
 	maxProjects: 10,
 	maxSnapshotBytes: 10,
+	maxScopes: 10,
 	maxSources: 10
 } as const;
 
 describe('semantic canonical identity profile', () => {
 	it('publishes one canonical closed budget vocabulary', () => {
-		expect(SEMANTIC_BUDGET_KEYS).toEqual([...SEMANTIC_BUDGET_KEYS].sort());
-		expect(Object.keys(BUDGETS).sort()).toEqual(SEMANTIC_BUDGET_KEYS);
+		expect(SEMANTIC_BUDGET_KEYS).toEqual([
+			'maxAstDepth',
+			'maxAstNodes',
+			'maxCompilerInputMetadataBytes',
+			'maxCompilerQueries',
+			'maxCompilerFacts',
+			'maxCompilerQueryInvocations',
+			'maxContextBytes',
+			'maxContextFileBytes',
+			'maxContextFiles',
+			'maxDiagnosticCharacters',
+			'maxDiagnostics',
+			'maxDirectoryEntries',
+			'maxDurationMs',
+			'maxLiteralCharacters',
+			'maxPathCharacters',
+			'maxProjects',
+			'maxScopes',
+			'maxSnapshotBytes',
+			'maxSources'
+		]);
+		expect(Object.keys(BUDGETS).sort()).toEqual([...SEMANTIC_BUDGET_KEYS].sort());
 	});
 
 	it('uses compact Unicode-aware JCS ordering independently of inventory JSON', () => {
@@ -196,6 +227,7 @@ describe('semantic canonical identity profile', () => {
 
 	it('mints registered outer prefixes with domain-separated family identities', () => {
 		const snapshot = semanticSnapshotId({
+			assignabilityRequests: [],
 			astTraversalProfile: SEMANTIC_AST_TRAVERSAL_PROFILE,
 			budgets: BUDGETS,
 			canonicalProfile: SEMANTIC_CANONICAL_PROFILE,
@@ -209,17 +241,18 @@ describe('semantic canonical identity profile', () => {
 				id: 'typescript',
 				version: TYPESCRIPT_PROVIDER_VERSION
 			},
-			requestedCapabilities: ['TS_PROJECT', 'TS_SYNTAX'],
+			requestedCapabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'],
 			schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
 			subjectId: '2'.repeat(64)
 		});
 		const reordered = semanticSnapshotId({
+			assignabilityRequests: [],
 			operationVersion: SEMANTIC_OPERATION_VERSION,
 			astTraversalProfile: SEMANTIC_AST_TRAVERSAL_PROFILE,
 			budgets: BUDGETS,
 			subjectId: '2'.repeat(64),
 			schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
-			requestedCapabilities: ['TS_PROJECT', 'TS_SYNTAX'],
+			requestedCapabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'],
 			provider: {
 				version: TYPESCRIPT_PROVIDER_VERSION,
 				id: 'typescript',
@@ -242,8 +275,42 @@ describe('semantic canonical identity profile', () => {
 		expect(hasSemanticIdPrefix(project, 'semantic', 'project')).toBe(true);
 		expect(hasSemanticIdPrefix(program, 'semantic', 'program')).toBe(true);
 		expect(project).not.toBe(program);
+		const scriptSource = semanticSourceId({
+			contentSha256: '4'.repeat(64),
+			logicalPath: 'src/input.ts',
+			moduleKind: 'SCRIPT',
+			programId: program
+		});
+		const moduleSource = semanticSourceId({
+			contentSha256: '4'.repeat(64),
+			logicalPath: 'src/input.ts',
+			moduleKind: 'MODULE',
+			programId: program
+		});
+		expect(moduleSource).not.toBe(scriptSource);
+		const lexicalScope = semanticScopeId({
+			domain: 'LEXICAL',
+			end: 1,
+			kind: 'BLOCK',
+			ownerKind: 242,
+			programId: program,
+			sourceId: scriptSource,
+			start: 0
+		});
+		expect(
+			semanticScopeId({
+				domain: 'MEMBER',
+				end: 1,
+				kind: 'BLOCK',
+				ownerKind: 242,
+				programId: program,
+				sourceId: scriptSource,
+				start: 0
+			})
+		).not.toBe(lexicalScope);
 		expect(
 			semanticSnapshotId({
+				assignabilityRequests: [],
 				astTraversalProfile: SEMANTIC_AST_TRAVERSAL_PROFILE,
 				budgets: BUDGETS,
 				canonicalProfile: SEMANTIC_CANONICAL_PROFILE,
@@ -257,11 +324,142 @@ describe('semantic canonical identity profile', () => {
 					id: 'typescript',
 					version: TYPESCRIPT_PROVIDER_VERSION
 				},
-				requestedCapabilities: ['TS_PROJECT', 'TS_SYNTAX'],
+				requestedCapabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'],
 				schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
 				subjectId: '2'.repeat(64)
 			})
 		).not.toBe(snapshot);
+	});
+
+	it('binds declaration identity to its source span, kind, and normalized node', () => {
+		const base = {
+			end: 10,
+			kind: 263,
+			nodeId: `semantic:node-${'1'.repeat(64)}` as never,
+			sourceId: `semantic:source-${'2'.repeat(64)}` as never,
+			start: 1
+		};
+		const declaration = semanticDeclarationId(base);
+		expect(hasSemanticIdPrefix(declaration, 'semantic', 'declaration')).toBe(true);
+		expect(semanticDeclarationId({ ...base, start: 2 })).not.toBe(declaration);
+		expect(semanticDeclarationId({ ...base, nodeId: null })).not.toBe(declaration);
+	});
+
+	it('binds durable declaration identity to source-version coordinates without local IDs', () => {
+		const base = {
+			ambient: false,
+			contentSha256: '3'.repeat(64),
+			declarationFile: false,
+			end: 10,
+			kind: 263,
+			languageVariant: 'Standard',
+			logicalPath: 'src/index.ts',
+			name: 'answer',
+			nameState: 'ATOMIC' as const,
+			scriptKind: 3,
+			start: 1,
+			typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
+		};
+		const durable = semanticDurableDeclarationId(base);
+		expect(hasSemanticIdPrefix(durable, 'semantic', 'declaration-durable')).toBe(true);
+		expect(semanticDurableDeclarationId({ ...base })).toBe(durable);
+		expect(semanticDurableDeclarationId({ ...base, contentSha256: '4'.repeat(64) })).not.toBe(
+			durable
+		);
+	});
+
+	it('canonicalizes symbol member sets while enforcing the selected identity basis', () => {
+		const declarationA = `semantic:declaration-${'1'.repeat(64)}` as never;
+		const declarationB = `semantic:declaration-${'2'.repeat(64)}` as never;
+		const base = {
+			declarationIds: [declarationB, declarationA],
+			fallbackReferenceNodeIds: [],
+			flags: 16,
+			identityBasis: 'DECLARATIONS' as const,
+			name: 'merged',
+			programId: `semantic:program-${'3'.repeat(64)}` as never,
+			projectId: `semantic:project-${'4'.repeat(64)}` as never
+		};
+		const symbol = semanticSymbolId(base);
+		expect(hasSemanticIdPrefix(symbol, 'semantic', 'symbol')).toBe(true);
+		expect(semanticSymbolId({ ...base, declarationIds: [declarationA, declarationB] })).toBe(
+			symbol
+		);
+		expect(semanticSymbolId({ ...base, flags: 32 })).not.toBe(symbol);
+		expect(() =>
+			semanticSymbolId({ ...base, declarationIds: [declarationA, declarationA] })
+		).toThrow('unique sets');
+		expect(() =>
+			semanticSymbolId({
+				...base,
+				declarationIds: [],
+				identityBasis: 'REFERENCE_FALLBACK'
+			})
+		).toThrow('basis and members disagree');
+	});
+
+	it('binds alias identity to resolution state and target chain', () => {
+		const base = {
+			aliasSymbolId: `semantic:symbol-${'1'.repeat(64)}` as never,
+			state: 'RESOLVED' as const,
+			targetSymbolId: `semantic:symbol-${'2'.repeat(64)}` as never,
+			terminalSymbolId: `semantic:symbol-${'3'.repeat(64)}` as never
+		};
+		const alias = semanticAliasId(base);
+		expect(hasSemanticIdPrefix(alias, 'semantic', 'alias')).toBe(true);
+		expect(semanticAliasId({ ...base, state: 'CIRCULAR' })).not.toBe(alias);
+		expect(semanticAliasId({ ...base, terminalSymbolId: null })).not.toBe(alias);
+	});
+
+	it('binds reference identity to node, role, direct symbol, and resolved symbol', () => {
+		const base = {
+			nodeId: `semantic:node-${'1'.repeat(64)}` as never,
+			resolvedSymbolId: `semantic:symbol-${'2'.repeat(64)}` as never,
+			resolutionState: 'RESOLVED_ALIAS' as const,
+			role: 'IMPORT_EXPORT_BINDING' as const,
+			symbolId: `semantic:symbol-${'3'.repeat(64)}` as never
+		};
+		const reference = semanticReferenceId(base);
+		expect(hasSemanticIdPrefix(reference, 'semantic', 'reference')).toBe(true);
+		expect(semanticReferenceId({ ...base, role: 'SYMBOL_USE' })).not.toBe(reference);
+		expect(semanticReferenceId({ ...base, resolvedSymbolId: null })).not.toBe(reference);
+	});
+
+	it('binds module-resolution identity to occurrence, result, specifier, and target', () => {
+		const base = {
+			moduleSymbolId: `semantic:symbol-${'1'.repeat(64)}` as never,
+			nodeId: `semantic:node-${'2'.repeat(64)}` as never,
+			occurrenceKind: 'IMPORT' as const,
+			resolutionState: 'RESOLVED_SOURCE' as const,
+			specifier: '@fixture/base',
+			specifierState: 'LITERAL' as const,
+			targetSourceId: `semantic:source-${'3'.repeat(64)}` as never,
+			typeOnly: false
+		};
+		const resolution = semanticModuleResolutionId(base);
+		expect(hasSemanticIdPrefix(resolution, 'semantic', 'module-resolution')).toBe(true);
+		expect(semanticModuleResolutionId({ ...base, occurrenceKind: 'DYNAMIC_IMPORT' })).not.toBe(
+			resolution
+		);
+		expect(semanticModuleResolutionId({ ...base, targetSourceId: null })).not.toBe(resolution);
+		expect(semanticModuleResolutionId({ ...base, typeOnly: true })).not.toBe(resolution);
+		expect(
+			semanticModuleResolutionId({ ...base, specifier: null, specifierState: 'NON_LITERAL' })
+		).not.toBe(resolution);
+	});
+
+	it('binds module-export identity to source, name, state, symbol, and target', () => {
+		const base = {
+			exportName: 'answer',
+			sourceId: `semantic:source-${'1'.repeat(64)}` as never,
+			state: 'ALIAS' as const,
+			symbolId: `semantic:symbol-${'2'.repeat(64)}` as never,
+			targetSymbolId: `semantic:symbol-${'3'.repeat(64)}` as never
+		};
+		const exported = semanticModuleExportId(base);
+		expect(hasSemanticIdPrefix(exported, 'semantic', 'module-export')).toBe(true);
+		expect(semanticModuleExportId({ ...base, exportName: 'other' })).not.toBe(exported);
+		expect(semanticModuleExportId({ ...base, state: 'DIRECT' })).not.toBe(exported);
 	});
 
 	it('binds diagnostic category, source, and lossless canonicalized related payload while excluding multiplicity', () => {

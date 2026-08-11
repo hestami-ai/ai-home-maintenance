@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync
+} from 'node:fs';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -6,7 +14,10 @@ import ts from 'typescript';
 import type { ProgramRecipe } from '../../contracts/subject.js';
 import { TYPESCRIPT_PROVIDER_VERSION } from '../../contracts/semantic.js';
 import { programRecipeDigest } from '../../semantic/ids.js';
-import { materializeProgramRecipe, ProgramRecipeMaterializationError } from './materialize-program-recipe.js';
+import {
+	materializeProgramRecipe,
+	ProgramRecipeMaterializationError
+} from './materialize-program-recipe.js';
 
 const temporaryRoots: string[] = [];
 
@@ -25,7 +36,10 @@ function repository(): string {
 	return root;
 }
 
-function recipe(compilerOptions: Readonly<Record<string, unknown>>, overrides: Readonly<Record<string, unknown>> = {}): ProgramRecipe {
+function recipe(
+	compilerOptions: Readonly<Record<string, unknown>>,
+	overrides: Readonly<Record<string, unknown>> = {}
+): ProgramRecipe {
 	const input = {
 		compilerOptions,
 		configClosureDigest: '1'.repeat(64),
@@ -36,10 +50,18 @@ function recipe(compilerOptions: Readonly<Record<string, unknown>>, overrides: R
 		rootNames: ['packages/example/src/index.ts'],
 		...overrides
 	};
-	return { ...input, projectResolutionDigest: programRecipeDigest(input as Omit<ProgramRecipe, 'projectResolutionDigest'>) } as ProgramRecipe;
+	return {
+		...input,
+		projectResolutionDigest: programRecipeDigest(
+			input as Omit<ProgramRecipe, 'projectResolutionDigest'>
+		)
+	} as ProgramRecipe;
 }
 
-function expectTypedFailure(action: () => unknown, code: ProgramRecipeMaterializationError['code'] = 'INVALID_RECIPE'): void {
+function expectTypedFailure(
+	action: () => unknown,
+	code: ProgramRecipeMaterializationError['code'] = 'INVALID_RECIPE'
+): void {
 	try {
 		action();
 		throw new Error('Expected materialization to fail.');
@@ -68,7 +90,9 @@ describe('ProgramRecipe runtime materialization', () => {
 		});
 		const materialized = materializeProgramRecipe(input, repositoryRoot);
 		expect(materialized.rootNames).toEqual([join(repositoryRoot, 'packages/example/src/index.ts')]);
-		expect(materialized.projectReferences).toEqual([{ path: join(repositoryRoot, 'packages/base/tsconfig.json') }]);
+		expect(materialized.projectReferences).toEqual([
+			{ path: join(repositoryRoot, 'packages/base/tsconfig.json') }
+		]);
 		expect(materialized.compilerOptions).toMatchObject({
 			configFilePath: join(repositoryRoot, 'packages/example/tsconfig.json'),
 			customConditions: ['browser'],
@@ -80,7 +104,10 @@ describe('ProgramRecipe runtime materialization', () => {
 			paths: { '@example/*': ['packages/example/src/*'] },
 			pathsBasePath: repositoryRoot,
 			rootDir: join(repositoryRoot, 'packages/example/src'),
-			rootDirs: [join(repositoryRoot, 'packages/example/generated'), join(repositoryRoot, 'packages/example/src')],
+			rootDirs: [
+				join(repositoryRoot, 'packages/example/generated'),
+				join(repositoryRoot, 'packages/example/src')
+			],
 			types: ['node']
 		});
 		expect(isAbsolute(materialized.configFilePath)).toBe(true);
@@ -91,71 +118,182 @@ describe('ProgramRecipe runtime materialization', () => {
 		const repositoryRoot = repository();
 		mkdirSync(join(repositoryRoot, 'apps/rph-demo/.svelte-kit'), { recursive: true });
 		mkdirSync(join(repositoryRoot, 'apps/rph-demo/src/lib'), { recursive: true });
-		const sveltePaths = { '$app/types': ['./types/index.d.ts'], '$lib': ['../src/lib'], '$lib/*': ['../src/lib/*'] };
+		const sveltePaths = {
+			'$app/types': ['./types/index.d.ts'],
+			$lib: ['../src/lib'],
+			'$lib/*': ['../src/lib/*']
+		};
 		const input = recipe({ paths: sveltePaths, pathsBasePath: 'apps/rph-demo/.svelte-kit' });
-		expect(materializeProgramRecipe(input, repositoryRoot).compilerOptions.paths).toEqual(sveltePaths);
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ paths: { x: ['../../../../outside/*'] }, pathsBasePath: 'packages/example' }), repositoryRoot), 'PATH_ESCAPE');
+		expect(materializeProgramRecipe(input, repositoryRoot).compilerOptions.paths).toEqual(
+			sveltePaths
+		);
+		expectTypedFailure(
+			() =>
+				materializeProgramRecipe(
+					recipe({ paths: { x: ['../../../../outside/*'] }, pathsBasePath: 'packages/example' }),
+					repositoryRoot
+				),
+			'PATH_ESCAPE'
+		);
+		for (const substitution of [
+			'',
+			'packages\\example',
+			'/packages/example',
+			'packages//example'
+		]) {
+			expectTypedFailure(
+				() =>
+					materializeProgramRecipe(
+						recipe({ paths: { invalid: [substitution] }, pathsBasePath: '.' }),
+						repositoryRoot
+					),
+				'INVALID_RECIPE'
+			);
+		}
 	});
 
 	it('synthesizes a runtime-only config-directory paths base and resolves with public TypeScript semantics', () => {
 		const repositoryRoot = repository();
 		mkdirSync(join(repositoryRoot, 'apps/rph-demo/src'), { recursive: true });
-		writeFileSync(join(repositoryRoot, 'apps/rph-demo/src/app.d.ts'), 'export declare const app: true;\n');
-		const input = recipe({ moduleResolution: ts.ModuleResolutionKind.Node10, paths: { 'x/*': ['./src/*'] } }, { configPath: 'apps/rph-demo/tsconfig.json' });
+		writeFileSync(
+			join(repositoryRoot, 'apps/rph-demo/src/app.d.ts'),
+			'export declare const app: true;\n'
+		);
+		const input = recipe(
+			{ moduleResolution: ts.ModuleResolutionKind.Node10, paths: { 'x/*': ['./src/*'] } },
+			{ configPath: 'apps/rph-demo/tsconfig.json' }
+		);
 		const materialized = materializeProgramRecipe(input, repositoryRoot);
 		expect(materialized.compilerOptions.pathsBasePath).toBe(join(repositoryRoot, 'apps/rph-demo'));
 		expect(input.compilerOptions.pathsBasePath).toBeUndefined();
-		const resolution = ts.resolveModuleName('x/app', join(repositoryRoot, 'apps/rph-demo/src/use.ts'), materialized.compilerOptions, {
-			fileExists: existsSync,
-			readFile: (path) => existsSync(path) ? readFileSync(path, 'utf8') : undefined
-		});
-		expect(resolution.resolvedModule?.resolvedFileName.replaceAll('\\', '/')).toBe(join(repositoryRoot, 'apps/rph-demo/src/app.d.ts').replaceAll('\\', '/'));
+		const resolution = ts.resolveModuleName(
+			'x/app',
+			join(repositoryRoot, 'apps/rph-demo/src/use.ts'),
+			materialized.compilerOptions,
+			{
+				fileExists: existsSync,
+				readFile: (path) => (existsSync(path) ? readFileSync(path, 'utf8') : undefined)
+			}
+		);
+		expect(resolution.resolvedModule?.resolvedFileName.replaceAll('\\', '/')).toBe(
+			join(repositoryRoot, 'apps/rph-demo/src/app.d.ts').replaceAll('\\', '/')
+		);
 	});
 
-	it.each(['generateCpuProfile', 'generateTrace', 'project'])('rejects command-line path option %s even under a recomputed valid digest', (key) => {
-		const repositoryRoot = repository();
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ [key]: 'packages/example/output' }), repositoryRoot));
-	});
+	it.each(['generateCpuProfile', 'generateTrace', 'project'])(
+		'rejects command-line path option %s even under a recomputed valid digest',
+		(key) => {
+			const repositoryRoot = repository();
+			expectTypedFailure(() =>
+				materializeProgramRecipe(recipe({ [key]: 'packages/example/output' }), repositoryRoot)
+			);
+		}
+	);
 
 	it('rejects digest drift, traversal, internal dot segments, and unknown path-like options', () => {
 		const repositoryRoot = repository();
-		expectTypedFailure(() => materializeProgramRecipe({ ...recipe({}), projectResolutionDigest: '0'.repeat(64) }, repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ rootDir: '../escape' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ rootDir: 'packages/./example' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ mysteryPath: 'relative' }), repositoryRoot));
+		expectTypedFailure(() =>
+			materializeProgramRecipe(
+				{ ...recipe({}), projectResolutionDigest: '0'.repeat(64) },
+				repositoryRoot
+			)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ rootDir: '../escape' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ rootDir: 'packages/./example' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ mysteryPath: 'relative' }), repositoryRoot)
+		);
 	});
 
 	it('rejects noncanonical roots, references, and config path mirrors', () => {
 		const repositoryRoot = repository();
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { configPath: '.' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { rootNames: ['.'] }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { projectReferences: ['.'] }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { rootNames: ['z.ts', 'a.ts'] }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { rootNames: ['a.ts', 'a.ts'] }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { rootNames: ['A.ts', 'a.ts'] }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { projectReferences: ['z.json', 'a.json'] }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ configFilePath: 'packages/base/tsconfig.json' }), repositoryRoot));
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { configPath: '.' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { rootNames: ['.'] }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { projectReferences: ['.'] }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { rootNames: ['z.ts', 'a.ts'] }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { rootNames: ['a.ts', 'a.ts'] }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { rootNames: ['A.ts', 'a.ts'] }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(
+				recipe({}, { projectReferences: ['z.json', 'a.json'] }),
+				repositoryRoot
+			)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(
+				recipe({ configFilePath: 'packages/base/tsconfig.json' }),
+				repositoryRoot
+			)
+		);
 	});
 
 	it('validates top-level fields and compiler-option shapes without leaking raw exceptions', () => {
 		const repositoryRoot = repository();
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { kind: 'UNKNOWN' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { configClosureDigest: 'not-a-digest' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { provider: null }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { rootNames: null }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({}, { projectReferences: null }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe(null as unknown as Readonly<Record<string, unknown>>), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe([] as unknown as Readonly<Record<string, unknown>>), repositoryRoot));
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { kind: 'UNKNOWN' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { configClosureDigest: 'not-a-digest' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { provider: null }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { rootNames: null }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({}, { projectReferences: null }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(
+				recipe(null as unknown as Readonly<Record<string, unknown>>),
+				repositoryRoot
+			)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(
+				recipe([] as unknown as Readonly<Record<string, unknown>>),
+				repositoryRoot
+			)
+		);
 		expectTypedFailure(() => materializeProgramRecipe(recipe({ rootDir: 7 }), repositoryRoot));
 		expectTypedFailure(() => materializeProgramRecipe(recipe({ lib: 'es2022' }), repositoryRoot));
 		expectTypedFailure(() => materializeProgramRecipe(recipe({ paths: [] }), repositoryRoot));
 		expectTypedFailure(() => materializeProgramRecipe(recipe({ strict: 'yes' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ jsxFactory: '\ud800' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ module: 'ESNext' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ mysteryFile: 'packages/example/input.ts' }), repositoryRoot));
-		expectTypedFailure(() => materializeProgramRecipe(null as unknown as ProgramRecipe, repositoryRoot));
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ jsxFactory: '\ud800' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ module: 'ESNext' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ mysteryFile: 'packages/example/input.ts' }), repositoryRoot)
+		);
+		expectTypedFailure(() =>
+			materializeProgramRecipe(null as unknown as ProgramRecipe, repositoryRoot)
+		);
 
-		const hostile = new Proxy(recipe({}), { ownKeys() { throw new TypeError('hostile proxy'); } });
+		const hostile = new Proxy(recipe({}), {
+			ownKeys() {
+				throw new TypeError('hostile proxy');
+			}
+		});
 		expectTypedFailure(() => materializeProgramRecipe(hostile, repositoryRoot));
 	});
 
@@ -176,7 +314,18 @@ describe('ProgramRecipe runtime materialization', () => {
 		temporaryRoots.push(outside);
 		const alias = join(repositoryRoot, 'packages/example/escape');
 		symlinkSync(outside, alias, process.platform === 'win32' ? 'junction' : 'dir');
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ rootDir: 'packages/example/escape' }), repositoryRoot), 'PATH_ESCAPE');
-		expectTypedFailure(() => materializeProgramRecipe(recipe({ outDir: 'packages/example/escape/not-created' }), repositoryRoot), 'PATH_ESCAPE');
+		expectTypedFailure(
+			() =>
+				materializeProgramRecipe(recipe({ rootDir: 'packages/example/escape' }), repositoryRoot),
+			'PATH_ESCAPE'
+		);
+		expectTypedFailure(
+			() =>
+				materializeProgramRecipe(
+					recipe({ outDir: 'packages/example/escape/not-created' }),
+					repositoryRoot
+				),
+			'PATH_ESCAPE'
+		);
 	});
 });

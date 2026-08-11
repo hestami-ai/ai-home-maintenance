@@ -2,7 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { CapturedArtifactRecord, FrozenSubject, WorkspaceExportRecord, WorkspaceSubjectRecord } from '../../contracts/subject.js';
+import type {
+	CapturedArtifactRecord,
+	FrozenSubject,
+	WorkspaceExportRecord,
+	WorkspaceSubjectRecord
+} from '../../contracts/subject.js';
 import { CompilerPathError, FrozenCompilerPathResolver } from './compiler-paths.js';
 
 const temporaryRoots: string[] = [];
@@ -25,7 +30,10 @@ function write(root: string, path: string, content = ''): string {
 	return absolute;
 }
 
-function artifact(path: string, primaryClass: CapturedArtifactRecord['primaryClass'] = 'PRODUCTION_SOURCE'): CapturedArtifactRecord {
+function artifact(
+	path: string,
+	primaryClass: CapturedArtifactRecord['primaryClass'] = 'PRODUCTION_SOURCE'
+): CapturedArtifactRecord {
 	return {
 		bytes: 0,
 		canonicalPathKey: path.toLowerCase(),
@@ -38,7 +46,11 @@ function artifact(path: string, primaryClass: CapturedArtifactRecord['primaryCla
 	};
 }
 
-function workspace(name: string, path: string, exports: readonly WorkspaceExportRecord[] = []): WorkspaceSubjectRecord {
+function workspace(
+	name: string,
+	path: string,
+	exports: readonly WorkspaceExportRecord[] = []
+): WorkspaceSubjectRecord {
 	return {
 		exports,
 		kind: 'PACKAGE',
@@ -51,11 +63,17 @@ function workspace(name: string, path: string, exports: readonly WorkspaceExport
 	};
 }
 
-function project(compilerOptions: Readonly<Record<string, unknown>>): FrozenSubject['projects'][number] {
+function project(
+	compilerOptions: Readonly<Record<string, unknown>>
+): FrozenSubject['projects'][number] {
 	return { programRecipe: { compilerOptions } } as unknown as FrozenSubject['projects'][number];
 }
 
-function generatedContext(path: string, selectedInput: boolean, sha256 = DIGEST): FrozenSubject['generatedContexts'][number] {
+function generatedContext(
+	path: string,
+	selectedInput: boolean,
+	sha256 = DIGEST
+): FrozenSubject['generatedContexts'][number] {
 	return {
 		consumerProject: 'tsconfig.json',
 		freshness: 'CURRENT',
@@ -77,7 +95,15 @@ function subject(
 		diagnostics: [],
 		excludedArtifacts: [],
 		generatedContexts: overrides.generatedContexts ?? [],
-		population: { analyzed: artifacts.length, discovered: artifacts.length, excluded: 0, failed: 0, included: artifacts.length, inventoryOnly: 0, reconciles: true },
+		population: {
+			analyzed: artifacts.length,
+			discovered: artifacts.length,
+			excluded: 0,
+			failed: 0,
+			included: artifacts.length,
+			inventoryOnly: 0,
+			reconciles: true
+		},
 		projects: overrides.projects ?? [],
 		request: {},
 		workspaces: overrides.workspaces ?? []
@@ -118,10 +144,16 @@ describe('FrozenCompilerPathResolver', () => {
 			{ conditions: ['types'], exportName: './drive', target: 'C:/escape.d.ts' }
 		];
 		const resolver = new FrozenCompilerPathResolver(
-			subject(originCases.map(([path, primaryClass]) => artifact(path, primaryClass)), {
-				projects: [project({ declarationDir: 'global-types', outDir: '.' }), project({ outDir: 'packages/shared/dist' })],
-				workspaces: [workspace('@fixture/shared', 'packages/shared', exports)]
-			}),
+			subject(
+				originCases.map(([path, primaryClass]) => artifact(path, primaryClass)),
+				{
+					projects: [
+						project({ declarationDir: 'global-types', outDir: '.' }),
+						project({ outDir: 'packages/shared/dist' })
+					],
+					workspaces: [workspace('@fixture/shared', 'packages/shared', exports)]
+				}
+			),
 			root,
 			true
 		);
@@ -149,14 +181,25 @@ describe('FrozenCompilerPathResolver', () => {
 		write(root, 'generated/context.d.ts', 'export {};\n');
 		mkdirSync(join(root, 'packages/empty'), { recursive: true });
 		mkdirSync(join(root, 'node_modules/@fixture'), { recursive: true });
-		symlinkSync(join(root, 'packages/shared'), join(root, aliasRoot), process.platform === 'win32' ? 'junction' : 'dir');
-		symlinkSync(join(root, 'packages/empty'), join(root, 'node_modules/@fixture/empty'), process.platform === 'win32' ? 'junction' : 'dir');
+		symlinkSync(
+			join(root, 'packages/shared'),
+			join(root, aliasRoot),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
+		symlinkSync(
+			join(root, 'packages/empty'),
+			join(root, 'node_modules/@fixture/empty'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
 		const frozen = subject([artifact(targetFile), artifact('top.ts')], {
 			generatedContexts: [
 				generatedContext('selected/ignored.d.ts', true, 'not-a-digest'),
 				generatedContext('generated/context.d.ts', false)
 			],
-			workspaces: [workspace('@fixture/shared', 'packages/shared'), workspace('@fixture/empty', 'packages/empty')]
+			workspaces: [
+				workspace('@fixture/shared', 'packages/shared'),
+				workspace('@fixture/empty', 'packages/empty')
+			]
 		});
 		const resolver = new FrozenCompilerPathResolver(frozen, root, false);
 
@@ -173,26 +216,32 @@ describe('FrozenCompilerPathResolver', () => {
 		expect(resolver.toLogical(join(root, ...aliasFile.split('/')))).toBe(aliasFile);
 		expect(resolver.toRecordedLogical(join(root, ...aliasFile.split('/')))).toBe(aliasFile);
 		expect(resolver.canonicalLogical('PACKAGES/SHARED/SRC/INDEX.TS')).toBe(targetFile);
-		expect(resolver.canonicalRecordedLogical('NODE_MODULES/@FIXTURE/SHARED/SRC/INDEX.TS')).toBe(aliasFile);
+		expect(resolver.canonicalRecordedLogical('NODE_MODULES/@FIXTURE/SHARED/SRC/INDEX.TS')).toBe(
+			aliasFile
+		);
 		expect(resolver.isExplicitContextFile('generated/context.d.ts')).toBe(true);
 		expect(resolver.explicitContextDigest('generated/context.d.ts')).toBe(DIGEST);
 
 		const directories = [...resolver.virtualDirectoryCandidates('.')].sort();
-		expect(directories).toEqual(expect.arrayContaining([
-			'generated',
-			'node_modules',
-			'node_modules/@fixture',
-			'node_modules/@fixture/empty',
-			aliasRoot,
-			`${aliasRoot}/src`,
-			'packages',
-			'packages/shared',
-			'packages/shared/src'
-		]));
+		expect(directories).toEqual(
+			expect.arrayContaining([
+				'generated',
+				'node_modules',
+				'node_modules/@fixture',
+				'node_modules/@fixture/empty',
+				aliasRoot,
+				`${aliasRoot}/src`,
+				'packages',
+				'packages/shared',
+				'packages/shared/src'
+			])
+		);
 		expect(directories).not.toContain('.');
 		expect([...resolver.virtualDirectoryCandidates(aliasRoot)]).toEqual([`${aliasRoot}/src`]);
 		expect([...resolver.virtualDirectoryCandidates('absent')]).toEqual([]);
-		expect([...resolver.virtualFileCandidates('.')].sort()).toEqual(expect.arrayContaining([aliasFile, 'generated/context.d.ts', targetFile, 'top.ts']));
+		expect([...resolver.virtualFileCandidates('.')].sort()).toEqual(
+			expect.arrayContaining([aliasFile, 'generated/context.d.ts', targetFile, 'top.ts'])
+		);
 		expect([...resolver.virtualFileCandidates(aliasRoot)]).toEqual([aliasFile]);
 		expect([...resolver.virtualFileCandidates('absent')]).toEqual([]);
 		expect(resolver.virtualChildren('node_modules/@fixture/empty')).toEqual([]);
@@ -204,34 +253,133 @@ describe('FrozenCompilerPathResolver', () => {
 		const outside = temporaryRoot('csaa-compiler-paths-outside-');
 		const missingRoot = join(root, 'missing-root');
 		const fileRoot = write(root, 'not-a-directory', 'file');
-		expectPathError(() => new FrozenCompilerPathResolver(subject(), 'relative-root', true), 'PATH_ESCAPE');
+		expectPathError(
+			() => new FrozenCompilerPathResolver(subject(), 'relative-root', true),
+			'PATH_ESCAPE'
+		);
 		expectPathError(() => new FrozenCompilerPathResolver(subject(), fileRoot, true), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject(), missingRoot, true), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([artifact('../escape.ts')]), root, true), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([artifact('Src/A.ts'), artifact('src/a.ts')]), root, false), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([], { generatedContexts: [generatedContext('generated/a.d.ts', false, 'invalid')] }), root, true), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([artifact('generated/a.d.ts')], { generatedContexts: [generatedContext('generated/a.d.ts', false)] }), root, true), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([], { generatedContexts: [generatedContext('generated/A.d.ts', false), generatedContext('generated/a.d.ts', false)] }), root, false), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([], { workspaces: [workspace('@fixture/pkg', 'packages/a'), workspace('@FIXTURE/PKG', 'packages/b')] }), root, false), 'PATH_ESCAPE');
-		expectPathError(() => new FrozenCompilerPathResolver(subject([], { projects: [project({ outDir: '../escape' })] }), root, true), 'PATH_ESCAPE');
+		expectPathError(
+			() => new FrozenCompilerPathResolver(subject(), missingRoot, true),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() => new FrozenCompilerPathResolver(subject([artifact('../escape.ts')]), root, true),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([artifact('Src/A.ts'), artifact('src/a.ts')]),
+					root,
+					false
+				),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([], {
+						generatedContexts: [generatedContext('generated/a.d.ts', false, 'invalid')]
+					}),
+					root,
+					true
+				),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([artifact('generated/a.d.ts')], {
+						generatedContexts: [generatedContext('generated/a.d.ts', false)]
+					}),
+					root,
+					true
+				),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([], {
+						generatedContexts: [
+							generatedContext('generated/A.d.ts', false),
+							generatedContext('generated/a.d.ts', false)
+						]
+					}),
+					root,
+					false
+				),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([], {
+						workspaces: [
+							workspace('@fixture/pkg', 'packages/a'),
+							workspace('@FIXTURE/PKG', 'packages/b')
+						]
+					}),
+					root,
+					false
+				),
+			'PATH_ESCAPE'
+		);
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([], { projects: [project({ outDir: '../escape' })] }),
+					root,
+					true
+				),
+			'PATH_ESCAPE'
+		);
 
 		mkdirSync(join(root, 'packages/dangling'), { recursive: true });
 		mkdirSync(join(root, 'node_modules/@fixture'), { recursive: true });
-		symlinkSync(join(root, 'packages/dangling'), join(root, 'node_modules/@fixture/dangling'), process.platform === 'win32' ? 'junction' : 'dir');
+		symlinkSync(
+			join(root, 'packages/dangling'),
+			join(root, 'node_modules/@fixture/dangling'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
 		rmSync(join(root, 'packages/dangling'), { force: true, recursive: true });
-		expectPathError(() => new FrozenCompilerPathResolver(subject([], { workspaces: [workspace('@fixture/dangling', 'packages/dangling')] }), root, true), 'PATH_ESCAPE');
+		expectPathError(
+			() =>
+				new FrozenCompilerPathResolver(
+					subject([], { workspaces: [workspace('@fixture/dangling', 'packages/dangling')] }),
+					root,
+					true
+				),
+			'PATH_ESCAPE'
+		);
 
-		const resolver = new FrozenCompilerPathResolver(subject([artifact('src/index.ts')]), root, true);
-		for (const value of ['', 'src/../escape.ts', '/absolute.ts', 'C:/drive.ts', 'src\\backslash.ts']) {
+		const resolver = new FrozenCompilerPathResolver(
+			subject([artifact('src/index.ts')]),
+			root,
+			true
+		);
+		for (const value of [
+			'',
+			'src/../escape.ts',
+			'/absolute.ts',
+			'C:/drive.ts',
+			'src\\backslash.ts'
+		]) {
 			expectPathError(() => resolver.canonicalLogical(value), 'PATH_ESCAPE');
 		}
 		for (const child of ['', '.', '..', 'nested/child', 'nested\\child']) {
 			expectPathError(() => resolver.enumeratedChildIdentity('.', child), 'PATH_ESCAPE');
 		}
-		expectPathError(() => resolver.toAbsolute('@toolchain/typescript/lib/../typescript.js'), 'PATH_ESCAPE');
+		expectPathError(
+			() => resolver.toAbsolute('@toolchain/typescript/lib/../typescript.js'),
+			'PATH_ESCAPE'
+		);
 		expectPathError(() => resolver.toLogical(join(outside, 'escaped.ts')), 'PATH_ESCAPE');
 		expectPathError(() => resolver.toRecordedLogical(join(outside, 'escaped.ts')), 'PATH_ESCAPE');
-		expectPathError(() => resolver.assertLiveFilePermitted('src/unselected.ts'), 'CONTEXT_FORBIDDEN');
+		expectPathError(
+			() => resolver.assertLiveFilePermitted('src/unselected.ts'),
+			'CONTEXT_FORBIDDEN'
+		);
 	});
 
 	it('maps repository, toolchain, boundary, and live-context paths without widening policy', () => {
@@ -243,10 +391,17 @@ describe('FrozenCompilerPathResolver', () => {
 		write(root, 'node_modules/pkg/package.json', '{}\n');
 		write(root, 'node_modules/pkg/runtime.js', 'module.exports = {};\n');
 		write(root, 'generated/context.js', 'export {};\n');
-		const resolver = new FrozenCompilerPathResolver(subject([artifact('src/index.ts')], {
-			generatedContexts: [generatedContext('generated/context.js', false), generatedContext('generated/types.d.ts', false)],
-			projects: [project({ outDir: 'dist' })]
-		}), root, true);
+		const resolver = new FrozenCompilerPathResolver(
+			subject([artifact('src/index.ts')], {
+				generatedContexts: [
+					generatedContext('generated/context.js', false),
+					generatedContext('generated/types.d.ts', false)
+				],
+				projects: [project({ outDir: 'dist' })]
+			}),
+			root,
+			true
+		);
 
 		expect(resolver.toLogical(root)).toBe('.');
 		expect(resolver.toLogical('src/index.ts')).toBe('src/index.ts');
@@ -260,8 +415,12 @@ describe('FrozenCompilerPathResolver', () => {
 		expect(resolver.toRecordedLogical(library)).toBe('@toolchain/typescript/lib/lib.d.ts');
 		expect(resolver.toAbsolute('@toolchain/typescript')).toBe(resolver.typescriptPackageRoot);
 		expect(resolver.toRecordedAbsolute('@toolchain/typescript/lib/lib.d.ts')).toBe(library);
-		expect(resolver.canonicalLogical('@toolchain/typescript/lib/lib.d.ts')).toBe('@toolchain/typescript/lib/lib.d.ts');
-		expect(resolver.canonicalRecordedLogical('@toolchain/typescript/lib/lib.d.ts')).toBe('@toolchain/typescript/lib/lib.d.ts');
+		expect(resolver.canonicalLogical('@toolchain/typescript/lib/lib.d.ts')).toBe(
+			'@toolchain/typescript/lib/lib.d.ts'
+		);
+		expect(resolver.canonicalRecordedLogical('@toolchain/typescript/lib/lib.d.ts')).toBe(
+			'@toolchain/typescript/lib/lib.d.ts'
+		);
 
 		const boundaryAbsolute = join(parent, 'node_modules/pkg/index.d.ts');
 		const boundaryLogical = '@boundary/ancestor-1/node_modules/pkg/index.d.ts';
@@ -273,8 +432,15 @@ describe('FrozenCompilerPathResolver', () => {
 		expect(resolver.isBoundaryPath('@boundary/ancestor-0/node_modules/pkg')).toBe(false);
 
 		const authorized = resolver.authorizeEnumeratedChild('node_modules/pkg', 'index.d.ts');
-		expect(authorized).toEqual({ absolutePath: resolve(root, 'node_modules/pkg/index.d.ts'), logicalPath: 'node_modules/pkg/index.d.ts', observedLogicalPath: 'node_modules/pkg/index.d.ts' });
-		expect(resolver.enumeratedChildIdentity('.', 'src')).toEqual({ logicalPath: 'src', observedLogicalPath: 'src' });
+		expect(authorized).toEqual({
+			absolutePath: resolve(root, 'node_modules/pkg/index.d.ts'),
+			logicalPath: 'node_modules/pkg/index.d.ts',
+			observedLogicalPath: 'node_modules/pkg/index.d.ts'
+		});
+		expect(resolver.enumeratedChildIdentity('.', 'src')).toEqual({
+			logicalPath: 'src',
+			observedLogicalPath: 'src'
+		});
 
 		expect(resolver.isLiveDirectoryPermitted('@toolchain/typescript/lib')).toBe(true);
 		expect(resolver.isLiveDirectoryPermitted('node_modules/pkg')).toBe(true);

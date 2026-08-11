@@ -27,6 +27,49 @@ import { projectSubjectForInventory } from './project-subject-for-inventory.js';
 
 type JsonObject = Record<string, unknown>;
 
+const TYPESCRIPT_AST_PROVENANCE = [
+	'packages/csaa/src/contracts/semantic.ts',
+	'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
+	'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+	'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
+	'packages/csaa/src/semantic/build-static-semantic-snapshot.ts'
+] as const;
+
+const TYPESCRIPT_SYMBOL_PROVENANCE = [
+	'packages/csaa/src/providers/typescript/extract-symbols.ts',
+	'packages/csaa/src/semantic/raw-semantic-model.ts',
+	'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+	'packages/csaa/src/semantic/validate-snapshot.ts'
+] as const;
+
+const TYPESCRIPT_TYPE_PROVENANCE = [
+	'packages/csaa/src/providers/typescript/extract-types.ts'
+] as const;
+
+const TYPESCRIPT_MODULE_GRAPH_PROVENANCE = [
+	'packages/csaa/src/contracts/graph.ts',
+	'packages/csaa/src/graph/build-module-dependency-graph.ts',
+	'packages/csaa/src/graph/ids.ts',
+	'packages/csaa/src/graph/module-dependency-content.ts',
+	'packages/csaa/src/graph/module-dependency-input.ts',
+	'packages/csaa/src/graph/validate-graph.ts'
+] as const;
+
+const TYPESCRIPT_SEMANTIC_PROVENANCE = [
+	...TYPESCRIPT_AST_PROVENANCE,
+	...TYPESCRIPT_SYMBOL_PROVENANCE,
+	...TYPESCRIPT_TYPE_PROVENANCE
+] as const;
+
+const TYPESCRIPT_ADAPTER_CAPABILITIES = [
+	'TS_PROJECT',
+	'TS_SYMBOL',
+	'TS_SYNTAX',
+	'TS_TYPE',
+	'configuration-ast-parse',
+	'frozen-program-construction'
+] as const;
+
 export interface CollectInventoryOptions {
 	readonly repositoryRoot: string;
 	readonly requireJpwbPopulations?: boolean;
@@ -74,7 +117,10 @@ function sortedRecord(value: unknown, description: string): Record<string, strin
 	return out;
 }
 
-function dependencyDeclarations(manifest: JsonObject, manifestPath: string): DependencyDeclaration[] {
+function dependencyDeclarations(
+	manifest: JsonObject,
+	manifestPath: string
+): DependencyDeclaration[] {
 	const scopes = [
 		'dependencies',
 		'devDependencies',
@@ -84,31 +130,41 @@ function dependencyDeclarations(manifest: JsonObject, manifestPath: string): Dep
 	const declarations: DependencyDeclaration[] = [];
 	for (const scope of scopes) {
 		const values = sortedRecord(manifest[scope], `${manifestPath}#/${scope}`);
-		for (const [name, specifier] of Object.entries(values)) declarations.push({ name, scope, specifier });
+		for (const [name, specifier] of Object.entries(values))
+			declarations.push({ name, scope, specifier });
 	}
 	return declarations.sort((left, right) =>
 		compareText(`${left.scope}\0${left.name}`, `${right.scope}\0${right.name}`)
 	);
 }
 
-function inventoryArtifactClass(primaryClass: FrozenSubject['artifacts'][number]['primaryClass']): ArtifactClass {
+function inventoryArtifactClass(
+	primaryClass: FrozenSubject['artifacts'][number]['primaryClass']
+): ArtifactClass {
 	switch (primaryClass) {
 		case 'MANIFEST':
 		case 'LOCKFILE':
 		case 'TOOL_CONFIGURATION':
 		case 'PROJECT_CONFIGURATION':
-		case 'GENERATED_CONFIGURATION': return 'CONFIGURATION';
-		case 'PRODUCTION_SOURCE': return 'SOURCE';
-		case 'TEST_SOURCE': return 'TEST';
-		case 'GENERATED_SOURCE': return 'GENERATED_SOURCE';
+		case 'GENERATED_CONFIGURATION':
+			return 'CONFIGURATION';
+		case 'PRODUCTION_SOURCE':
+			return 'SOURCE';
+		case 'TEST_SOURCE':
+			return 'TEST';
+		case 'GENERATED_SOURCE':
+			return 'GENERATED_SOURCE';
 		case 'GENERATOR_SOURCE':
-		case 'SCRIPT': return 'SCRIPT';
-		case 'VERIFICATION': return 'VERIFICATION';
+		case 'SCRIPT':
+			return 'SCRIPT';
+		case 'VERIFICATION':
+			return 'VERIFICATION';
 		case 'BUILD_OUTPUT':
 		case 'CACHE':
 		case 'EXTERNAL_DEPENDENCY':
 		case 'VENDOR':
-		case 'OTHER': return 'OTHER';
+		case 'OTHER':
+			return 'OTHER';
 	}
 }
 
@@ -124,7 +180,11 @@ function projectSelectedFiles(subject: FrozenSubject): SelectedFileRecord[] {
 
 function projectWorkspaces(subject: FrozenSubject): WorkspaceInventory[] {
 	return subject.workspaces.map((workspace) => {
-		const manifest = readJsonObject(subject, workspace.manifestPath, `workspace manifest ${workspace.manifestPath}`);
+		const manifest = readJsonObject(
+			subject,
+			workspace.manifestPath,
+			`workspace manifest ${workspace.manifestPath}`
+		);
 		return {
 			dependencies: dependencyDeclarations(manifest, workspace.manifestPath),
 			exportsState: manifest.exports === undefined ? 'NOT_DECLARED' : 'DECLARED',
@@ -142,43 +202,57 @@ function projectWorkspaces(subject: FrozenSubject): WorkspaceInventory[] {
 
 function projectTypeScriptProjects(subject: FrozenSubject): TypeScriptProjectInventory[] {
 	return subject.projects.map((project) => {
-		const generatedContexts = subject.generatedContexts.filter((context) => context.consumerProject === project.configPath);
+		const generatedContexts = subject.generatedContexts.filter(
+			(context) => context.consumerProject === project.configPath
+		);
 		const generatedPaths = new Set(generatedContexts.map((context) => context.path));
-		const generatedDiagnostics = subject.diagnostics.filter((diagnostic) =>
-			diagnostic.code === 'GENERATED_CONTEXT_ABSENT' && diagnostic.path === project.configPath
-			|| diagnostic.phase === 'FRESHNESS' && diagnostic.path !== null && generatedPaths.has(diagnostic.path)
+		const generatedDiagnostics = subject.diagnostics.filter(
+			(diagnostic) =>
+				(diagnostic.code === 'GENERATED_CONTEXT_ABSENT' &&
+					diagnostic.path === project.configPath) ||
+				(diagnostic.phase === 'FRESHNESS' &&
+					diagnostic.path !== null &&
+					generatedPaths.has(diagnostic.path))
 		);
 		const partialityReasons: TypeScriptProjectInventory['partialityReasons'][number][] = [];
-		if (project.rootDisposition === 'INCOMPLETE') partialityReasons.push({
-			code: 'ROOT_DISPOSITION_INCOMPLETE',
-			message: 'TypeScript did not produce a complete compiler-root disposition for this project.',
-			path: project.configPath,
-			provenance: ['project.rootDisposition']
-		});
-		if (project.frameworkCandidates.length > 0) partialityReasons.push({
-			code: 'FRAMEWORK_CANDIDATES_PRESENT',
-			message: `${project.frameworkCandidates.length} framework candidate(s) remain outside the DWP-002 TypeScript compiler-root model.`,
-			path: project.configPath,
-			provenance: ['project.frameworkCandidates']
-		});
-		for (const diagnostic of project.typescriptDiagnostics.filter((item) => item.severity === 'ERROR' || item.code === 'TYPESCRIPT_PROJECT_PARTIAL')) partialityReasons.push({
-			code: diagnostic.code,
-			message: diagnostic.message,
-			path: diagnostic.path,
-			provenance: ['project.typescriptDiagnostics']
-		});
-		for (const diagnostic of generatedDiagnostics) partialityReasons.push({
-			code: diagnostic.code,
-			message: diagnostic.message,
-			path: diagnostic.path,
-			provenance: ['subject.diagnostics', 'subject.generatedContexts']
-		});
-		for (const context of generatedContexts.filter((item) => item.freshness === 'STALE')) partialityReasons.push({
-			code: 'GENERATED_CONTEXT_STALE',
-			message: context.freshnessBasis,
-			path: context.path,
-			provenance: ['subject.generatedContexts']
-		});
+		if (project.rootDisposition === 'INCOMPLETE')
+			partialityReasons.push({
+				code: 'ROOT_DISPOSITION_INCOMPLETE',
+				message:
+					'TypeScript did not produce a complete compiler-root disposition for this project.',
+				path: project.configPath,
+				provenance: ['project.rootDisposition']
+			});
+		if (project.frameworkCandidates.length > 0)
+			partialityReasons.push({
+				code: 'FRAMEWORK_CANDIDATES_PRESENT',
+				message: `${project.frameworkCandidates.length} framework candidate(s) remain outside the DWP-002 TypeScript compiler-root model.`,
+				path: project.configPath,
+				provenance: ['project.frameworkCandidates']
+			});
+		for (const diagnostic of project.typescriptDiagnostics.filter(
+			(item) => item.severity === 'ERROR' || item.code === 'TYPESCRIPT_PROJECT_PARTIAL'
+		))
+			partialityReasons.push({
+				code: diagnostic.code,
+				message: diagnostic.message,
+				path: diagnostic.path,
+				provenance: ['project.typescriptDiagnostics']
+			});
+		for (const diagnostic of generatedDiagnostics)
+			partialityReasons.push({
+				code: diagnostic.code,
+				message: diagnostic.message,
+				path: diagnostic.path,
+				provenance: ['subject.diagnostics', 'subject.generatedContexts']
+			});
+		for (const context of generatedContexts.filter((item) => item.freshness === 'STALE'))
+			partialityReasons.push({
+				code: 'GENERATED_CONTEXT_STALE',
+				message: context.freshnessBasis,
+				path: context.path,
+				provenance: ['subject.generatedContexts']
+			});
 		return {
 			candidateArtifactCount: project.fileNames.length + project.frameworkCandidates.length,
 			compilerOptions: project.rawCompilerOptions,
@@ -223,7 +297,10 @@ function commandCategories(name: string): string[] {
 	return categories.length > 0 ? categories : ['OTHER'];
 }
 
-function commands(rootManifest: JsonObject, workspaces: readonly WorkspaceInventory[]): CommandInventory[] {
+function commands(
+	rootManifest: JsonObject,
+	workspaces: readonly WorkspaceInventory[]
+): CommandInventory[] {
 	const out: CommandInventory[] = [];
 	const add = (owner: string, manifestPath: string, scripts: Readonly<Record<string, string>>) => {
 		for (const [name, command] of Object.entries(scripts)) {
@@ -238,13 +315,15 @@ function commands(rootManifest: JsonObject, workspaces: readonly WorkspaceInvent
 		}
 	};
 	add('.', 'package.json', sortedRecord(rootManifest.scripts, 'package.json#/scripts'));
-	for (const workspace of workspaces) add(workspace.path, workspace.manifestPath, workspace.scripts);
+	for (const workspace of workspaces)
+		add(workspace.path, workspace.manifestPath, workspace.scripts);
 	return sortUniqueBy(out, (entry) => `${entry.owner}\0${entry.name}`, 'configured command');
 }
 
 function propertyName(name: ts.PropertyName | undefined): string | undefined {
 	if (!name) return undefined;
-	if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+	if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name))
+		return name.text;
 	return undefined;
 }
 
@@ -273,7 +352,11 @@ function literalValue(node: ts.Expression): unknown {
 	return undefined;
 }
 
-function findObjectProperty(source: string, fileName: string, wanted: string): JsonObject | undefined {
+function findObjectProperty(
+	source: string,
+	fileName: string,
+	wanted: string
+): JsonObject | undefined {
 	const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
 	let result: JsonObject | undefined;
 	const visit = (node: ts.Node) => {
@@ -311,7 +394,9 @@ function assuranceSurfaces(
 	files: readonly SelectedFileRecord[],
 	rootCommands: readonly CommandInventory[]
 ): AssuranceSurfaceInventory {
-	const unitTests = files.filter((file) => /\.test\.[cm]?[jt]sx?$/.test(file.path)).map((file) => file.path);
+	const unitTests = files
+		.filter((file) => /\.test\.[cm]?[jt]sx?$/.test(file.path))
+		.map((file) => file.path);
 	const e2e = files
 		.filter((file) => /(?:\/e2e(?:-live)?\/|\.e2e\.)/.test(file.path))
 		.map((file) => file.path);
@@ -379,7 +464,8 @@ function dependencyBoundary(
 	const configurationPath = files.some((file) => file.path === '.dependency-cruiser.cjs')
 		? '.dependency-cruiser.cjs'
 		: null;
-	const boundaryCommand = sortedRecord(rootManifest.scripts, 'package.json#/scripts').boundary ?? null;
+	const boundaryCommand =
+		sortedRecord(rootManifest.scripts, 'package.json#/scripts').boundary ?? null;
 	if (!configurationPath) {
 		return {
 			analyzedPerimeter: [],
@@ -397,7 +483,13 @@ function dependencyBoundary(
 		};
 	}
 	const source = frozenText(subject, configurationPath);
-	const sourceFile = ts.createSourceFile(configurationPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+	const sourceFile = ts.createSourceFile(
+		configurationPath,
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.JS
+	);
 	const names = new Set<string>();
 	const visit = (node: ts.Node) => {
 		if (
@@ -476,15 +568,22 @@ function providerInventory(
 	const lock = files.find((file) => file.path === 'bun.lock');
 	const text = lock ? frozenText(subject, lock.path) : '';
 	const rootScripts = new Map(
-		configuredCommands.filter((command) => command.owner === '.').map((command) => [command.name, command.command])
+		configuredCommands
+			.filter((command) => command.owner === '.')
+			.map((command) => [command.name, command.command])
 	);
 	const gateReachable = gateReachableScriptNames(rootScripts);
 	return PROVIDERS.map(([name, potentialCapabilities]) => {
 		const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		const version = new RegExp(`^\\s*"${escaped}": \\["${escaped}@([^"\\s]+)"`, 'm').exec(text)?.[1] ?? null;
+		const version =
+			new RegExp(`^\\s*"${escaped}": \\["${escaped}@([^"\\s]+)"`, 'm').exec(text)?.[1] ?? null;
 		const configurationPaths: Record<(typeof PROVIDERS)[number][0], readonly string[]> = {
-			'@playwright/test': files.filter((file) => /playwright\.config\.ts$/.test(file.path)).map((file) => file.path),
-			'@vitest/coverage-v8': files.some((file) => file.path === 'vitest.config.ts') ? ['vitest.config.ts'] : [],
+			'@playwright/test': files
+				.filter((file) => /playwright\.config\.ts$/.test(file.path))
+				.map((file) => file.path),
+			'@vitest/coverage-v8': files.some((file) => file.path === 'vitest.config.ts')
+				? ['vitest.config.ts']
+				: [],
 			'dependency-cruiser': files.some((file) => file.path === '.dependency-cruiser.cjs')
 				? ['.dependency-cruiser.cjs']
 				: [],
@@ -492,8 +591,12 @@ function providerInventory(
 			sonar: files.some((file) => file.path === 'sonar-project.properties')
 				? ['sonar-project.properties']
 				: [],
-			typescript: files.filter((file) => /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file.path)).map((file) => file.path),
-			vitest: files.filter((file) => /^vitest(?:\.[^.]+)?\.(?:config|projects)\.ts$/.test(file.path)).map((file) => file.path)
+			typescript: files
+				.filter((file) => /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file.path))
+				.map((file) => file.path),
+			vitest: files
+				.filter((file) => /^vitest(?:\.[^.]+)?\.(?:config|projects)\.ts$/.test(file.path))
+				.map((file) => file.path)
 		};
 		const gateEvidence: Record<(typeof PROVIDERS)[number][0], readonly string[]> = {
 			'@playwright/test': gateReachable.has('e2e') ? ['package.json#/scripts/gate:fast'] : [],
@@ -504,15 +607,16 @@ function providerInventory(
 			eslint: gateReachable.has('lint') ? ['package.json#/scripts/lint'] : [],
 			sonar: gateReachable.has('sonar') ? ['package.json#/scripts/sonar'] : [],
 			typescript: gateReachable.has('check-types') ? ['package.json#/scripts/check-types'] : [],
-			vitest: gateReachable.has('test:src') || gateReachable.has('test')
-				? ['package.json#/scripts/test']
-				: []
+			vitest:
+				gateReachable.has('test:src') || gateReachable.has('test')
+					? ['package.json#/scripts/test']
+					: []
 		};
 		const configured = configurationPaths[name].length > 0;
 		const gateWired = gateEvidence[name].length > 0;
 		const inventoryIntegrated = name === 'typescript';
 		return {
-			adapterCapabilities: inventoryIntegrated ? ['configuration-ast-parse'] : [],
+			adapterCapabilities: inventoryIntegrated ? TYPESCRIPT_ADAPTER_CAPABILITIES : [],
 			adapterState: inventoryIntegrated ? 'INVENTORY_INTEGRATED' : 'UNIMPLEMENTED',
 			configurationState: configured ? 'CONFIGURED' : 'NOT_CONFIGURED',
 			configuredState: configured ? 'CONFIGURED_NOT_RUN' : 'NOT_CONFIGURED',
@@ -523,7 +627,8 @@ function providerInventory(
 			provenance: [
 				...(lock ? [lock.path] : []),
 				...configurationPaths[name],
-				...gateEvidence[name]
+				...gateEvidence[name],
+				...(inventoryIntegrated ? TYPESCRIPT_SEMANTIC_PROVENANCE : [])
 			].sort(compareText),
 			version
 		};
@@ -549,7 +654,8 @@ function verificationAssets(
 		: '';
 	return assetPaths.map((path) => {
 		const selectedFile = files.find((file) => file.path === path);
-		if (!selectedFile) throw new Error(`Verification asset is absent from selected-file manifest: ${path}`);
+		if (!selectedFile)
+			throw new Error(`Verification asset is absent from selected-file manifest: ${path}`);
 		const text = frozenText(subject, path);
 		const stem = basename(path).replace(/\.test\.ts$|\.data\.ts$|\.ts$/, '');
 		const isTest = path.endsWith('.test.ts');
@@ -588,7 +694,8 @@ function verificationAssets(
 				carriers.push(...command.provenance);
 			}
 		}
-		if (!isTest && projectsText.includes(basename(path))) carriers.push('vitest.projects.ts#setupFiles');
+		if (!isTest && projectsText.includes(basename(path)))
+			carriers.push('vitest.projects.ts#setupFiles');
 		if (carriers.length === 0) carriers.push('UNMAPPED');
 		const extractionMethod = text.match(/from ['"]typescript['"]|require\(['"]typescript['"]\)/)
 			? 'TYPESCRIPT_AST'
@@ -618,6 +725,15 @@ function verificationAssets(
 }
 
 function capabilities(): CapabilityInventory[] {
+	const unimplemented = [
+		'call-graph',
+		'code-property-graph',
+		'control-flow',
+		'data-flow',
+		'runtime-traces',
+		'security-query',
+		'test-coverage-ingestion'
+	];
 	return [
 		{
 			explanation: 'DWP-001 deterministically derives and verifies the repository inventory.',
@@ -626,30 +742,53 @@ function capabilities(): CapabilityInventory[] {
 			provenance: ['packages/csaa/src/inventory/collect-inventory.ts'],
 			state: 'IMPLEMENTED'
 		},
-		...[
-			'call-graph',
-			'code-property-graph',
-			'control-flow',
-			'data-flow',
-			'runtime-traces',
-			'security-query',
-			'symbol-table',
-			'test-coverage-ingestion',
-			'type-graph',
-			'typescript-ast'
-		].map(
-			(id): CapabilityInventory => ({
-				explanation: 'Scheduled after the generated-inventory increment; no support is inferred from installed tools.',
-				id,
-				provider: null,
-				provenance: ['packages/csaa/src/contracts/inventory.ts'],
-				state: 'UNIMPLEMENTED'
-			})
-		)
+		{
+			explanation:
+				'The first bounded DWP-004 increment projects every compiler-observed module occurrence into a validated TypeScript module-dependency graph with distinct occurrence relations, explicit non-source targets, provenance, limitations, and reconciled forward/reverse indexes. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, depcruise comparison, calls, flow, and cross-Program composition are not implemented by this increment.',
+			id: 'dependency-graph',
+			provider: 'typescript',
+			provenance: [...TYPESCRIPT_MODULE_GRAPH_PROVENANCE, ...TYPESCRIPT_SYMBOL_PROVENANCE],
+			state: 'PARTIAL'
+		},
+		...unimplemented.map((id): CapabilityInventory => ({
+			explanation:
+				'Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.',
+			id,
+			provider: null,
+			provenance: ['packages/csaa/src/contracts/inventory.ts'],
+			state: 'UNIMPLEMENTED'
+		})),
+		{
+			explanation:
+				'The current DWP-003 provider constructs frozen TypeScript Programs and implements TS_PROJECT and TS_SYNTAX semantic snapshot capabilities.',
+			id: 'typescript-ast',
+			provider: 'typescript',
+			provenance: TYPESCRIPT_AST_PROVENANCE,
+			state: 'IMPLEMENTED'
+		},
+		{
+			explanation:
+				'The current DWP-003 provider implements Program-scoped TS_SYMBOL declarations, symbols, aliases, references, module resolutions, and module exports with normalized provenance and validation. Cross-Program symbol identity and binding reconciliation is not implemented for multi-project snapshots.',
+			id: 'symbol-table',
+			provider: 'typescript',
+			provenance: TYPESCRIPT_SYMBOL_PROVENANCE,
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The current DWP-003 provider implements Program-local TS_TYPE records for types, type parameters, call and construct signatures, signature parameters, overload sets, declared type relations, and request-scoped checker assignability. Cross-Program type reconciliation, exhaustive all-pairs assignability, and DWP-004 composed graph projection are not implemented.',
+			id: 'type-graph',
+			provider: 'typescript',
+			provenance: [...TYPESCRIPT_TYPE_PROVENANCE, ...TYPESCRIPT_SYMBOL_PROVENANCE],
+			state: 'PARTIAL'
+		}
 	];
 }
 
-function artifactPopulations(files: readonly SelectedFileRecord[], subject: FrozenSubject): ArtifactPopulation[] {
+function artifactPopulations(
+	files: readonly SelectedFileRecord[],
+	subject: FrozenSubject
+): ArtifactPopulation[] {
 	const classes: ArtifactClass[] = [
 		'CONFIGURATION',
 		'GENERATED_SOURCE',
@@ -661,17 +800,25 @@ function artifactPopulations(files: readonly SelectedFileRecord[], subject: Froz
 	];
 	return classes.map((artifactClass) => {
 		const count = files.filter((file) => file.artifactClass === artifactClass).length;
-		const excludedRecords = subject.excludedArtifacts.filter((artifact) => inventoryArtifactClass(artifact.primaryClass) === artifactClass);
+		const excludedRecords = subject.excludedArtifacts.filter(
+			(artifact) => inventoryArtifactClass(artifact.primaryClass) === artifactClass
+		);
 		const excluded = excludedRecords.some((artifact) => artifact.physicalFileCount === 'UNKNOWN')
-			? 'UNKNOWN' as const
-			: excludedRecords.reduce((total, artifact) => total + (artifact.physicalFileCount as number), 0);
+			? ('UNKNOWN' as const)
+			: excludedRecords.reduce(
+					(total, artifact) => total + (artifact.physicalFileCount as number),
+					0
+				);
 		return {
 			artifactClass,
-			discovered: excluded === 'UNKNOWN' ? 'UNKNOWN' as const : count + excluded,
+			discovered: excluded === 'UNKNOWN' ? ('UNKNOWN' as const) : count + excluded,
 			excluded,
 			failed: 0,
 			included: count,
-			provenance: [`subject.selectedFiles#artifactClass=${artifactClass}`, 'subject.excludedArtifacts[*].physicalFileCount'],
+			provenance: [
+				`subject.selectedFiles#artifactClass=${artifactClass}`,
+				'subject.excludedArtifacts[*].physicalFileCount'
+			],
 			successfullyInventoried: count
 		};
 	});
@@ -684,18 +831,28 @@ function projectExclusionRecords(subject: FrozenSubject): ExclusionRecord[] {
 		records.push(artifact);
 		byPolicy.set(artifact.policyId, records);
 	}
-	return [...byPolicy].map(([id, records]) => {
-		const physicalPopulationKnown = records.every((record) => record.physicalFileCount !== 'UNKNOWN');
-		return {
-			countState: physicalPopulationKnown ? 'PHYSICAL_POPULATION_ENUMERATED' as const : 'PHYSICAL_POPULATION_NOT_ENUMERATED' as const,
-			excludedPhysicalFileCount: physicalPopulationKnown ? records.reduce((total, record) => total + (record.physicalFileCount as number), 0) : null,
-			id,
-			includedFileCount: 0 as const,
-			physicalPopulationState: physicalPopulationKnown ? 'EXCLUDED_AFTER_ENUMERATION' as const : 'EXCLUDED_BEFORE_ENUMERATION' as const,
-			policyRuleCount: new Set(records.map((record) => record.reason)).size,
-			rules: [...new Set(records.map((record) => record.reason))].sort(compareText)
-		};
-	}).sort((left, right) => compareText(left.id, right.id));
+	return [...byPolicy]
+		.map(([id, records]) => {
+			const physicalPopulationKnown = records.every(
+				(record) => record.physicalFileCount !== 'UNKNOWN'
+			);
+			return {
+				countState: physicalPopulationKnown
+					? ('PHYSICAL_POPULATION_ENUMERATED' as const)
+					: ('PHYSICAL_POPULATION_NOT_ENUMERATED' as const),
+				excludedPhysicalFileCount: physicalPopulationKnown
+					? records.reduce((total, record) => total + (record.physicalFileCount as number), 0)
+					: null,
+				id,
+				includedFileCount: 0 as const,
+				physicalPopulationState: physicalPopulationKnown
+					? ('EXCLUDED_AFTER_ENUMERATION' as const)
+					: ('EXCLUDED_BEFORE_ENUMERATION' as const),
+				policyRuleCount: new Set(records.map((record) => record.reason)).size,
+				rules: [...new Set(records.map((record) => record.reason))].sort(compareText)
+			};
+		})
+		.sort((left, right) => compareText(left.id, right.id));
 }
 
 function assertJpwbNonVacuity(
@@ -715,15 +872,38 @@ function assertJpwbNonVacuity(
 	if (!files.some((file) => file.path.startsWith('scripts/') && file.path.endsWith('.ts'))) {
 		throw new Error('JPWB scripts TypeScript population is empty');
 	}
-	const rootNames = new Set(configuredCommands.filter((entry) => entry.owner === '.').map((entry) => entry.name));
-	for (const required of ['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage']) {
-		if (!rootNames.has(required)) throw new Error(`Required JPWB assurance command is absent: ${required}`);
+	const rootNames = new Set(
+		configuredCommands.filter((entry) => entry.owner === '.').map((entry) => entry.name)
+	);
+	for (const required of [
+		'boundary',
+		'check-types',
+		'gate',
+		'gate:fast',
+		'lint',
+		'test',
+		'test:coverage'
+	]) {
+		if (!rootNames.has(required))
+			throw new Error(`Required JPWB assurance command is absent: ${required}`);
+	}
+	const selectedPaths = new Set(files.map((file) => file.path));
+	for (const required of TYPESCRIPT_SEMANTIC_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB TypeScript semantic implementation source is absent: ${required}`
+			);
+		}
 	}
 }
 
 export function collectInventory(options: CollectInventoryOptions): InventoryDocument {
 	const resolvedSubject = projectSubjectForInventory(options.repositoryRoot);
-	const rootManifest = readJsonObject(resolvedSubject, 'package.json', 'root manifest package.json');
+	const rootManifest = readJsonObject(
+		resolvedSubject,
+		'package.json',
+		'root manifest package.json'
+	);
 	const workspaces = projectWorkspaces(resolvedSubject);
 	const perimeter = resolvedSubject.descriptor.perimeter;
 	const selectedFiles = projectSelectedFiles(resolvedSubject);
@@ -744,7 +924,12 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 		schemaVersion: INVENTORY_SCHEMA_VERSION,
 		subject: {
 			configurationDigest: resolvedSubject.descriptor.configurationDigest,
-			configurationPreimage: subjectConfigurationPreimage(resolvedSubject.artifacts, resolvedSubject.generatedContexts, resolvedSubject.projects, resolvedSubject.workspaces),
+			configurationPreimage: subjectConfigurationPreimage(
+				resolvedSubject.artifacts,
+				resolvedSubject.generatedContexts,
+				resolvedSubject.projects,
+				resolvedSubject.workspaces
+			),
 			dirtyState: 'UNKNOWN',
 			exclusionPolicyIds: resolvedSubject.descriptor.exclusionPolicyIds,
 			excludedClasses: projectExclusionRecords(resolvedSubject),
@@ -754,7 +939,11 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 			perimeter,
 			repositoryRoot: '.',
 			revision: null,
-			resolutionCompleteness: resolvedSubject.projects.some((project) => project.status === 'PARTIAL') || resolvedSubject.diagnostics.some((item) => item.severity !== 'INFO') ? 'PARTIAL' : 'COMPLETE',
+			resolutionCompleteness:
+				resolvedSubject.projects.some((project) => project.status === 'PARTIAL') ||
+				resolvedSubject.diagnostics.some((item) => item.severity !== 'INFO')
+					? 'PARTIAL'
+					: 'COMPLETE',
 			resolutionDiagnostics: resolvedSubject.diagnostics,
 			schemaVersion: resolvedSubject.descriptor.schemaVersion,
 			selectedFileCount: selectedFiles.length,
@@ -766,27 +955,39 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 		unknowns: [
 			{
 				provenance: ['subject.dirtyState'],
-				statement: 'Git revision and dirty-state classification are not used as a generation prerequisite and remain UNKNOWN.'
+				statement:
+					'Git revision and dirty-state classification are not used as a generation prerequisite and remain UNKNOWN.'
 			},
 			{
 				provenance: ['commands[*].state'],
 				statement: 'Configured commands are inventoried but NOT_RUN by inventory generation.'
 			},
 			{
-				provenance: ['typescriptProjects[*].resolvedRootState'],
-				statement: 'TypeScript compiler roots are resolved by DWP-002; semantic Program construction remains deferred to DWP-003.'
+				provenance: [
+					...TYPESCRIPT_SEMANTIC_PROVENANCE,
+					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+					'capabilities#dependency-graph',
+					'capabilities#symbol-table',
+					'capabilities#typescript-ast',
+					'capabilities#type-graph'
+				],
+				statement:
+					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first bounded DWP-004 increment implements only the validated compiler module-dependency projection; cross-Program semantic reconciliation, depcruise comparison, call/flow/state-machine graphs, and composed graph projections remain UNIMPLEMENTED.'
 			},
 			{
 				provenance: ['subject.excludedClasses'],
-				statement: 'Physical files under excluded build, cache, dependency, and generated-output trees are intentionally not enumerated; their included count is zero and their physical count remains UNKNOWN.'
+				statement:
+					'Physical files under excluded build, cache, dependency, and generated-output trees are intentionally not enumerated; their included count is zero and their physical count remains UNKNOWN.'
 			},
 			{
 				provenance: ['assuranceSurfaces.coverage.outputIdentity'],
-				statement: 'Coverage output identity is UNKNOWN until a coverage adapter explicitly ingests an output.'
+				statement:
+					'Coverage output identity is UNKNOWN until a coverage adapter explicitly ingests an output.'
 			},
 			{
 				provenance: ['capabilities'],
-				statement: 'Runtime, network, security-query, and external-provider health remain NOT_RUN or UNIMPLEMENTED.'
+				statement:
+					'Runtime, network, security-query, and external-provider health remain NOT_RUN or UNIMPLEMENTED.'
 			}
 		],
 		verificationAssets: assets,

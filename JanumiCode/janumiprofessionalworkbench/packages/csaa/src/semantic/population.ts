@@ -18,7 +18,8 @@ function sortedUnique(values: readonly string[]): readonly string[] | null {
 		if (values[index - 1]! > values[index]!) canonical = false;
 	}
 	const sorted = canonical ? values : [...values].sort();
-	for (let index = 1; index < sorted.length; index += 1) if (sorted[index - 1] === sorted[index]) return null;
+	for (let index = 1; index < sorted.length; index += 1)
+		if (sorted[index - 1] === sorted[index]) return null;
 	return sorted;
 }
 
@@ -48,26 +49,52 @@ export function semanticPopulation(
 	members: SemanticPopulationMembers,
 	expectedZero = false
 ): SemanticPopulationRecord {
-	const normalized = Object.fromEntries(Object.entries(members).map(([name, values]) => [name, sortedUnique(values)])) as Record<keyof SemanticPopulationMembers, readonly string[] | null>;
-	const includedUnion = normalized.analyzed && normalized.contextOnly ? union(normalized.analyzed, normalized.contextOnly) : null;
-	const discoveredUnion = includedUnion && normalized.excluded && normalized.failed ? union(includedUnion, normalized.excluded, normalized.failed) : null;
+	const normalized = Object.fromEntries(
+		Object.entries(members).map(([name, values]) => [name, sortedUnique(values)])
+	) as Record<keyof SemanticPopulationMembers, readonly string[] | null>;
+	const includedUnion =
+		normalized.analyzed && normalized.contextOnly
+			? union(normalized.analyzed, normalized.contextOnly)
+			: null;
+	const discoveredUnion =
+		includedUnion && normalized.excluded && normalized.failed
+			? union(includedUnion, normalized.excluded, normalized.failed)
+			: null;
 	const allUnique = Object.values(normalized).every((values) => values !== null);
-	const reconciles = allUnique
-		&& includedUnion !== null && discoveredUnion !== null
-		&& normalized.excludedByPolicy !== null && normalized.excluded !== null && isSubset(normalized.excludedByPolicy, normalized.excluded)
-		&& normalized.unsupported !== null && normalized.unknown !== null && normalized.analyzed !== null
-		&& isSubset(normalized.unsupported, normalized.analyzed) && isSubset(normalized.unknown, normalized.analyzed)
-		&& areDisjoint(normalized.unsupported, normalized.unknown)
-		&& normalized.excluded !== null && normalized.failed !== null
-		&& areDisjoint(includedUnion, normalized.excluded) && areDisjoint(includedUnion, normalized.failed) && areDisjoint(normalized.excluded, normalized.failed)
-		&& (!expectedZero || discoveredUnion.length === 0);
-	const safe = Object.fromEntries(Object.entries(normalized).map(([name, values]) => [name, values ?? []])) as unknown as Record<keyof SemanticPopulationMembers, readonly string[]>;
+	const reconciles =
+		allUnique &&
+		includedUnion !== null &&
+		discoveredUnion !== null &&
+		normalized.excludedByPolicy !== null &&
+		normalized.excluded !== null &&
+		isSubset(normalized.excludedByPolicy, normalized.excluded) &&
+		normalized.unsupported !== null &&
+		normalized.unknown !== null &&
+		normalized.analyzed !== null &&
+		isSubset(normalized.unsupported, normalized.analyzed) &&
+		isSubset(normalized.unknown, normalized.analyzed) &&
+		areDisjoint(normalized.unsupported, normalized.unknown) &&
+		normalized.excluded !== null &&
+		normalized.failed !== null &&
+		areDisjoint(includedUnion, normalized.excluded) &&
+		areDisjoint(includedUnion, normalized.failed) &&
+		areDisjoint(normalized.excluded, normalized.failed) &&
+		(!expectedZero || discoveredUnion.length === 0);
+	const safe = Object.fromEntries(
+		Object.entries(normalized).map(([name, values]) => [name, values ?? []])
+	) as unknown as Record<keyof SemanticPopulationMembers, readonly string[]>;
 	const safeIncluded = includedUnion ?? [];
 	const safeDiscovered = discoveredUnion ?? [];
 	const analyzedManifest = digest(safe.analyzed);
 	const contextOnlyManifest = digest(safe.contextOnly);
-	const includedManifest = safeIncluded === safe.analyzed ? analyzedManifest : safeIncluded === safe.contextOnly ? contextOnlyManifest : digest(safeIncluded);
-	const discoveredManifest = safeDiscovered === safeIncluded ? includedManifest : digest(safeDiscovered);
+	const includedManifest =
+		safeIncluded === safe.analyzed
+			? analyzedManifest
+			: safeIncluded === safe.contextOnly
+				? contextOnlyManifest
+				: digest(safeIncluded);
+	const discoveredManifest =
+		safeDiscovered === safeIncluded ? includedManifest : digest(safeDiscovered);
 	return {
 		analyzed: safe.analyzed.length,
 		contextOnly: safe.contextOnly.length,

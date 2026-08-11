@@ -1,0 +1,1277 @@
+import {
+	FULL_JAN_CSAA_007_CONFORMANCE,
+	type SemanticModuleOccurrenceKind,
+	type SemanticModuleResolutionRecord,
+	type SemanticProvenanceId,
+	type StaticSemanticSnapshot
+} from '../contracts/semantic.js';
+import {
+	MODULE_DEPENDENCY_GRAPH_CANONICAL_PROFILE,
+	MODULE_DEPENDENCY_GRAPH_METHOD,
+	MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
+	MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION,
+	type ModuleDependencyGraphCoverage,
+	type ModuleDependencyGraphEdge,
+	type ModuleDependencyGraphEpistemicState,
+	type ModuleDependencyGraphIndexEntry,
+	type ModuleDependencyGraphLimitation,
+	type ModuleDependencyGraphNode,
+	type ModuleDependencyGraphSnapshot
+} from '../contracts/graph.js';
+import { canonicalSemanticJson, isUnicodeScalarString } from '../semantic/canonical.js';
+import { assertCanonicalRelativePath } from '../subject/paths.js';
+import {
+	moduleDependencyGraphEdgeId,
+	moduleDependencyGraphId,
+	moduleDependencyGraphLayerId,
+	moduleDependencyGraphResolutionTargetNodeId,
+	moduleDependencyGraphSourceNodeId
+} from './ids.js';
+import { moduleDependencyGraphContentDigest } from './module-dependency-content.js';
+import { moduleDependencyGraphInputDigest } from './module-dependency-input.js';
+
+const SHA256 = /^[a-f0-9]{64}$/u;
+const DEFAULT_MAX_ISSUES = 1_000;
+
+const RELATION_KIND_BY_OCCURRENCE = {
+	DYNAMIC_IMPORT: 'DYNAMIC_IMPORT_OCCURRENCE',
+	EXPORT: 'EXPORT_OCCURRENCE',
+	IMPORT: 'IMPORT_OCCURRENCE',
+	IMPORT_EQUALS: 'IMPORT_EQUALS_OCCURRENCE',
+	IMPORT_TYPE: 'IMPORT_TYPE_OCCURRENCE'
+} as const satisfies Readonly<Record<SemanticModuleOccurrenceKind, string>>;
+
+const TOP_LEVEL_KEYS = [
+	'canonicalProfile',
+	'contentDigest',
+	'coverage',
+	'edges',
+	'epistemic',
+	'forwardIndex',
+	'fullJanCsaa007Conformance',
+	'graphInputDigest',
+	'graphKind',
+	'health',
+	'id',
+	'layers',
+	'limitations',
+	'method',
+	'nodes',
+	'operationVersion',
+	'producer',
+	'reverseIndex',
+	'schemaVersion',
+	'semanticExtractionVersion',
+	'semanticSchemaVersion',
+	'semanticSnapshotId',
+	'subjectId'
+] as const;
+
+const COVERAGE_KEYS = [
+	'closure',
+	'expectedModuleResolutions',
+	'expectedSources',
+	'graphNativeTargets',
+	'reconciles',
+	'representedModuleResolutions',
+	'representedSources',
+	'resolvedAmbientTargets',
+	'resolvedExternalTargets',
+	'resolvedSourceTargets',
+	'unresolvedTargets',
+	'unsupportedTargets'
+] as const;
+
+const LIMITATION_KEYS = [
+	'closureEffect',
+	'kind',
+	'moduleResolutionId',
+	'reason',
+	'sourceId'
+] as const;
+
+const LAYER_KEYS = [
+	'coverage',
+	'edgeIds',
+	'epistemic',
+	'graphId',
+	'id',
+	'kind',
+	'limitations',
+	'method',
+	'nodeIds',
+	'ordinal',
+	'provenanceIds',
+	'producer',
+	'semanticSnapshotId',
+	'subjectId'
+] as const;
+
+const SOURCE_NODE_KEYS = [
+	'analysisDisposition',
+	'epistemic',
+	'graphId',
+	'id',
+	'kind',
+	'layerId',
+	'logicalPath',
+	'programId',
+	'projectId',
+	'provenanceIds',
+	'semanticSnapshotId',
+	'semanticSourceId',
+	'sourceLocations',
+	'subjectId'
+] as const;
+
+const RESOLUTION_TARGET_NODE_KEYS = [
+	'epistemic',
+	'graphId',
+	'id',
+	'kind',
+	'layerId',
+	'moduleResolutionId',
+	'moduleSymbolId',
+	'provenanceIds',
+	'resolutionState',
+	'semanticSnapshotId',
+	'sourceLocations',
+	'specifier',
+	'specifierState',
+	'subjectId'
+] as const;
+
+const EDGE_KEYS = [
+	'epistemic',
+	'graphId',
+	'id',
+	'layerId',
+	'method',
+	'moduleResolutionId',
+	'occurrenceKind',
+	'occurrenceNodeId',
+	'provenanceIds',
+	'relationKind',
+	'resolutionState',
+	'semanticSnapshotId',
+	'source',
+	'sourceLocations',
+	'specifier',
+	'specifierState',
+	'subjectId',
+	'target',
+	'typeOnly'
+] as const;
+
+const INDEX_ENTRY_KEYS = ['edgeIds', 'nodeId'] as const;
+const ENDPOINT_KEYS = ['kind', 'nodeId'] as const;
+const PROVIDER_KEYS = ['api', 'id', 'version'] as const;
+const SOURCE_LOCATION_KEYS = ['end', 'sourceId', 'start'] as const;
+
+export type ModuleDependencyGraphValidationIssueCode =
+	| 'ABSOLUTE_PATH'
+	| 'CONFORMANCE_OVERCLAIM'
+	| 'CONTENT_DIGEST_MISMATCH'
+	| 'DANGLING_REFERENCE'
+	| 'DUPLICATE_ID'
+	| 'GRAPH_INPUT_MISMATCH'
+	| 'IDENTITY_MISMATCH'
+	| 'INVALID_SHAPE'
+	| 'INVALID_VALUE'
+	| 'LIMITATION_MISMATCH'
+	| 'NONCANONICAL_ORDER'
+	| 'POPULATION_MISMATCH'
+	| 'UNSUPPORTED_SCHEMA_VERSION'
+	| 'VALIDATION_BUDGET_EXHAUSTED';
+
+export interface ModuleDependencyGraphValidationIssue {
+	readonly code: ModuleDependencyGraphValidationIssueCode;
+	readonly message: string;
+	readonly path: string;
+}
+
+export interface ModuleDependencyGraphValidationOptions {
+	readonly maxIssues: number;
+}
+
+export type ModuleDependencyGraphValidationResult =
+	| { readonly issues: readonly []; readonly state: 'VALID' }
+	| {
+			readonly issues: readonly ModuleDependencyGraphValidationIssue[];
+			readonly state: 'BUDGET_EXHAUSTED' | 'INVALID';
+	  };
+
+class IssueCollector {
+	readonly issues: ModuleDependencyGraphValidationIssue[] = [];
+	exhausted = false;
+
+	constructor(readonly maxIssues: number) {}
+
+	add(code: ModuleDependencyGraphValidationIssueCode, path: string, message: string): void {
+		if (this.exhausted) return;
+		if (this.issues.length >= this.maxIssues) {
+			this.exhausted = true;
+			return;
+		}
+		this.issues.push({ code, message, path });
+	}
+
+	result(): ModuleDependencyGraphValidationResult {
+		if (this.issues.length === 0 && !this.exhausted) return { issues: [], state: 'VALID' };
+		return {
+			issues: this.issues,
+			state: this.exhausted ? 'BUDGET_EXHAUSTED' : 'INVALID'
+		};
+	}
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function plainRecord(value: unknown): value is JsonRecord {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+}
+
+function exactKeys(
+	value: unknown,
+	expected: readonly string[],
+	path: string,
+	issues: IssueCollector
+): value is JsonRecord {
+	if (!plainRecord(value)) {
+		issues.add('INVALID_SHAPE', path, 'Expected a plain object.');
+		return false;
+	}
+	const actual = Object.keys(value).sort();
+	const wanted = [...expected].sort();
+	if (canonicalSemanticJson(actual) !== canonicalSemanticJson(wanted)) {
+		issues.add(
+			'INVALID_SHAPE',
+			path,
+			`Expected exact fields ${wanted.join(', ')}; received ${actual.join(', ')}.`
+		);
+		return false;
+	}
+	return true;
+}
+
+function scalarString(value: unknown): value is string {
+	return typeof value === 'string' && isUnicodeScalarString(value);
+}
+
+function nullableString(value: unknown): value is string | null {
+	return value === null || scalarString(value);
+}
+
+function nonnegativeInteger(value: unknown): value is number {
+	return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function stringArray(value: unknown): value is readonly string[] {
+	return Array.isArray(value) && value.every(scalarString);
+}
+
+function shapeCoverage(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, COVERAGE_KEYS, path, issues)) return false;
+	let valid = true;
+	for (const key of COVERAGE_KEYS) {
+		const field = value[key];
+		if (key === 'closure') valid = (field === 'CLOSED' || field === 'OPEN') && valid;
+		else if (key === 'reconciles') valid = typeof field === 'boolean' && valid;
+		else valid = nonnegativeInteger(field) && valid;
+	}
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Coverage fields have invalid primitive values.');
+	return valid;
+}
+
+function shapeLimitation(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, LIMITATION_KEYS, path, issues)) return false;
+	const valid =
+		(value.closureEffect === 'NONE' || value.closureEffect === 'DEGRADES_CLOSURE') &&
+		[
+			'DEPCRUISE_NOT_RUN',
+			'NON_SOURCE_MODULE_TARGET',
+			'SEMANTIC_INPUT_PARTIAL',
+			'UNRESOLVED_MODULE',
+			'UNSUPPORTED_MODULE_RESOLUTION'
+		].includes(value.kind as never) &&
+		nullableString(value.moduleResolutionId) &&
+		scalarString(value.reason) &&
+		value.reason.length > 0 &&
+		nullableString(value.sourceId);
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Limitation fields have invalid primitive values.');
+	return valid;
+}
+
+function shapeLocation(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, SOURCE_LOCATION_KEYS, path, issues)) return false;
+	const valid =
+		nonnegativeInteger(value.start) &&
+		nonnegativeInteger(value.end) &&
+		(value.start as number) <= (value.end as number) &&
+		scalarString(value.sourceId);
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Source location fields are invalid.');
+	return valid;
+}
+
+function shapeEndpoint(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, ENDPOINT_KEYS, path, issues)) return false;
+	const valid =
+		(value.kind === 'SOURCE' || value.kind === 'RESOLUTION_TARGET') && scalarString(value.nodeId);
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Endpoint fields are invalid.');
+	return valid;
+}
+
+function shapeIndexEntry(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, INDEX_ENTRY_KEYS, path, issues)) return false;
+	const valid = scalarString(value.nodeId) && stringArray(value.edgeIds);
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Index entry fields are invalid.');
+	return valid;
+}
+
+function shapeProvider(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, PROVIDER_KEYS, path, issues)) return false;
+	const valid =
+		value.api === 'PUBLIC_COMPILER_API' &&
+		value.id === 'typescript' &&
+		scalarString(value.version) &&
+		value.version.length > 0;
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Provider identity fields are invalid.');
+	return valid;
+}
+
+function shapeNode(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!plainRecord(value)) {
+		issues.add('INVALID_SHAPE', path, 'Expected a graph node object.');
+		return false;
+	}
+	const expected = value.kind === 'SOURCE' ? SOURCE_NODE_KEYS : RESOLUTION_TARGET_NODE_KEYS;
+	if (!exactKeys(value, expected, path, issues)) return false;
+	let valid =
+		(value.epistemic === 'SUPPORTED' ||
+			value.epistemic === 'UNKNOWN' ||
+			value.epistemic === 'UNSUPPORTED' ||
+			value.epistemic === 'CONFLICTING') &&
+		scalarString(value.graphId) &&
+		scalarString(value.id) &&
+		scalarString(value.layerId) &&
+		stringArray(value.provenanceIds) &&
+		scalarString(value.semanticSnapshotId) &&
+		Array.isArray(value.sourceLocations) &&
+		scalarString(value.subjectId);
+	if (Array.isArray(value.sourceLocations))
+		for (const [index, location] of value.sourceLocations.entries())
+			valid = shapeLocation(location, `${path}.sourceLocations[${index}]`, issues) && valid;
+	if (value.kind === 'SOURCE') {
+		valid =
+			(value.analysisDisposition === 'DEEP_INDEXED' ||
+				value.analysisDisposition === 'CONTEXT_ONLY') &&
+			scalarString(value.logicalPath) &&
+			scalarString(value.programId) &&
+			scalarString(value.projectId) &&
+			scalarString(value.semanticSourceId) &&
+			valid;
+	} else {
+		valid =
+			value.kind === 'RESOLUTION_TARGET' &&
+			scalarString(value.moduleResolutionId) &&
+			nullableString(value.moduleSymbolId) &&
+			['RESOLVED_AMBIENT', 'RESOLVED_EXTERNAL', 'UNRESOLVED', 'UNSUPPORTED'].includes(
+				value.resolutionState as never
+			) &&
+			nullableString(value.specifier) &&
+			(value.specifierState === 'LITERAL' || value.specifierState === 'NON_LITERAL') &&
+			valid;
+	}
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Graph node fields have invalid primitive values.');
+	return valid;
+}
+
+function shapeEdge(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, EDGE_KEYS, path, issues)) return false;
+	let valid =
+		(value.epistemic === 'SUPPORTED' ||
+			value.epistemic === 'UNKNOWN' ||
+			value.epistemic === 'UNSUPPORTED' ||
+			value.epistemic === 'CONFLICTING') &&
+		scalarString(value.graphId) &&
+		scalarString(value.id) &&
+		scalarString(value.layerId) &&
+		value.method === MODULE_DEPENDENCY_GRAPH_METHOD &&
+		scalarString(value.moduleResolutionId) &&
+		['IMPORT', 'EXPORT', 'IMPORT_EQUALS', 'IMPORT_TYPE', 'DYNAMIC_IMPORT'].includes(
+			value.occurrenceKind as never
+		) &&
+		scalarString(value.occurrenceNodeId) &&
+		stringArray(value.provenanceIds) &&
+		Object.values(RELATION_KIND_BY_OCCURRENCE).includes(value.relationKind as never) &&
+		[
+			'RESOLVED_SOURCE',
+			'RESOLVED_AMBIENT',
+			'RESOLVED_EXTERNAL',
+			'UNRESOLVED',
+			'UNSUPPORTED'
+		].includes(value.resolutionState as never) &&
+		scalarString(value.semanticSnapshotId) &&
+		Array.isArray(value.sourceLocations) &&
+		nullableString(value.specifier) &&
+		(value.specifierState === 'LITERAL' || value.specifierState === 'NON_LITERAL') &&
+		scalarString(value.subjectId) &&
+		typeof value.typeOnly === 'boolean';
+	valid = shapeEndpoint(value.source, `${path}.source`, issues) && valid;
+	valid = shapeEndpoint(value.target, `${path}.target`, issues) && valid;
+	if (Array.isArray(value.sourceLocations))
+		for (const [index, location] of value.sourceLocations.entries())
+			valid = shapeLocation(location, `${path}.sourceLocations[${index}]`, issues) && valid;
+	if (!valid) issues.add('INVALID_SHAPE', path, 'Graph edge fields have invalid primitive values.');
+	return valid;
+}
+
+function shapeGraph(
+	value: unknown,
+	issues: IssueCollector
+): value is ModuleDependencyGraphSnapshot {
+	if (!exactKeys(value, TOP_LEVEL_KEYS, '$', issues)) return false;
+	let valid =
+		scalarString(value.canonicalProfile) &&
+		scalarString(value.contentDigest) &&
+		Array.isArray(value.edges) &&
+		(value.epistemic === 'SUPPORTED' ||
+			value.epistemic === 'UNKNOWN' ||
+			value.epistemic === 'UNSUPPORTED' ||
+			value.epistemic === 'CONFLICTING') &&
+		Array.isArray(value.forwardIndex) &&
+		scalarString(value.fullJanCsaa007Conformance) &&
+		scalarString(value.graphInputDigest) &&
+		value.graphKind === 'TYPESCRIPT_MODULE_DEPENDENCY' &&
+		(value.health === 'COMPLETE' || value.health === 'PARTIAL') &&
+		scalarString(value.id) &&
+		Array.isArray(value.layers) &&
+		Array.isArray(value.limitations) &&
+		scalarString(value.method) &&
+		Array.isArray(value.nodes) &&
+		scalarString(value.operationVersion) &&
+		plainRecord(value.producer) &&
+		Array.isArray(value.reverseIndex) &&
+		scalarString(value.schemaVersion) &&
+		scalarString(value.semanticExtractionVersion) &&
+		scalarString(value.semanticSchemaVersion) &&
+		scalarString(value.semanticSnapshotId) &&
+		scalarString(value.subjectId);
+	valid = shapeCoverage(value.coverage, '$.coverage', issues) && valid;
+	valid = shapeProvider(value.producer, '$.producer', issues) && valid;
+	if (Array.isArray(value.limitations))
+		for (const [index, limitation] of value.limitations.entries())
+			valid = shapeLimitation(limitation, `$.limitations[${index}]`, issues) && valid;
+	if (Array.isArray(value.layers)) {
+		for (const [index, layer] of value.layers.entries()) {
+			const path = `$.layers[${index}]`;
+			if (!exactKeys(layer, LAYER_KEYS, path, issues)) {
+				valid = false;
+				continue;
+			}
+			let layerValid =
+				stringArray(layer.edgeIds) &&
+				(layer.epistemic === 'SUPPORTED' ||
+					layer.epistemic === 'UNKNOWN' ||
+					layer.epistemic === 'UNSUPPORTED' ||
+					layer.epistemic === 'CONFLICTING') &&
+				scalarString(layer.graphId) &&
+				scalarString(layer.id) &&
+				layer.kind === 'TYPESCRIPT_MODULE_RESOLUTION' &&
+				Array.isArray(layer.limitations) &&
+				layer.method === MODULE_DEPENDENCY_GRAPH_METHOD &&
+				stringArray(layer.nodeIds) &&
+				layer.ordinal === 0 &&
+				stringArray(layer.provenanceIds) &&
+				plainRecord(layer.producer) &&
+				scalarString(layer.semanticSnapshotId) &&
+				scalarString(layer.subjectId);
+			layerValid = shapeCoverage(layer.coverage, `${path}.coverage`, issues) && layerValid;
+			layerValid = shapeProvider(layer.producer, `${path}.producer`, issues) && layerValid;
+			if (Array.isArray(layer.limitations))
+				for (const [limitationIndex, limitation] of layer.limitations.entries())
+					layerValid =
+						shapeLimitation(limitation, `${path}.limitations[${limitationIndex}]`, issues) &&
+						layerValid;
+			if (!layerValid)
+				issues.add('INVALID_SHAPE', path, 'Graph layer fields have invalid primitive values.');
+			valid = layerValid && valid;
+		}
+	}
+	if (Array.isArray(value.nodes))
+		for (const [index, node] of value.nodes.entries())
+			valid = shapeNode(node, `$.nodes[${index}]`, issues) && valid;
+	if (Array.isArray(value.edges))
+		for (const [index, edge] of value.edges.entries())
+			valid = shapeEdge(edge, `$.edges[${index}]`, issues) && valid;
+	for (const [field, entries] of [
+		['forwardIndex', value.forwardIndex],
+		['reverseIndex', value.reverseIndex]
+	] as const)
+		if (Array.isArray(entries))
+			for (const [index, entry] of entries.entries())
+				valid = shapeIndexEntry(entry, `$.${field}[${index}]`, issues) && valid;
+	if (!valid) issues.add('INVALID_SHAPE', '$', 'Graph fields have invalid primitive values.');
+	return valid;
+}
+
+function compareText(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function sortedUniqueStrings(
+	values: readonly string[],
+	path: string,
+	issues: IssueCollector
+): void {
+	for (let index = 1; index < values.length; index += 1) {
+		const comparison = compareText(values[index - 1]!, values[index]!);
+		if (comparison > 0)
+			issues.add('NONCANONICAL_ORDER', path, 'String identities must be in canonical order.');
+		if (comparison === 0) issues.add('DUPLICATE_ID', path, `Duplicate identity ${values[index]}.`);
+		if (issues.exhausted) return;
+	}
+}
+
+function canonicalObjectArray(
+	values: readonly unknown[],
+	path: string,
+	issues: IssueCollector
+): void {
+	const keys = values.map((value) => canonicalSemanticJson(value));
+	sortedUniqueStrings(keys, path, issues);
+}
+
+function validateIdPopulation<T extends { readonly id: string }>(
+	values: readonly T[],
+	path: string,
+	issues: IssueCollector
+): Map<string, T> {
+	const result = new Map<string, T>();
+	for (const [index, value] of values.entries()) {
+		if (result.has(value.id)) issues.add('DUPLICATE_ID', `${path}[${index}].id`, value.id);
+		else result.set(value.id, value);
+		if (index > 0 && compareText(values[index - 1]!.id, value.id) > 0)
+			issues.add('NONCANONICAL_ORDER', path, 'Records must be ordered by canonical identity.');
+		if (issues.exhausted) break;
+	}
+	return result;
+}
+
+function same(left: unknown, right: unknown): boolean {
+	return canonicalSemanticJson(left) === canonicalSemanticJson(right);
+}
+
+function exactLocation(sourceId: string, start: number, end: number) {
+	return [{ end, sourceId, start }];
+}
+
+function expectedEpistemic(
+	state: SemanticModuleResolutionRecord['resolutionState']
+): ModuleDependencyGraphEpistemicState {
+	if (state === 'UNSUPPORTED') return 'UNSUPPORTED';
+	if (state === 'UNRESOLVED') return 'UNKNOWN';
+	return 'SUPPORTED';
+}
+
+function aggregateEpistemic(
+	resolutions: readonly SemanticModuleResolutionRecord[]
+): ModuleDependencyGraphEpistemicState {
+	if (resolutions.some((record) => record.resolutionState === 'UNSUPPORTED')) return 'UNSUPPORTED';
+	if (resolutions.some((record) => record.resolutionState === 'UNRESOLVED')) return 'UNKNOWN';
+	return 'SUPPORTED';
+}
+
+function expectedCoverage(snapshot: StaticSemanticSnapshot): ModuleDependencyGraphCoverage {
+	const count = (state: SemanticModuleResolutionRecord['resolutionState']): number =>
+		snapshot.moduleResolutions.filter((record) => record.resolutionState === state).length;
+	const graphNativeTargets = snapshot.moduleResolutions.filter(
+		(record) => record.resolutionState !== 'RESOLVED_SOURCE'
+	).length;
+	return {
+		closure: snapshot.health === 'PARTIAL' || graphNativeTargets > 0 ? 'OPEN' : 'CLOSED',
+		expectedModuleResolutions: snapshot.moduleResolutions.length,
+		expectedSources: snapshot.sources.length,
+		graphNativeTargets,
+		reconciles: true,
+		representedModuleResolutions: snapshot.moduleResolutions.length,
+		representedSources: snapshot.sources.length,
+		resolvedAmbientTargets: count('RESOLVED_AMBIENT'),
+		resolvedExternalTargets: count('RESOLVED_EXTERNAL'),
+		resolvedSourceTargets: count('RESOLVED_SOURCE'),
+		unresolvedTargets: count('UNRESOLVED'),
+		unsupportedTargets: count('UNSUPPORTED')
+	};
+}
+
+function limitationOrderKey(limitation: ModuleDependencyGraphLimitation): string {
+	return `${limitation.kind}\0${limitation.moduleResolutionId ?? ''}\0${limitation.sourceId ?? ''}`;
+}
+
+function expectedLimitations(snapshot: StaticSemanticSnapshot): ModuleDependencyGraphLimitation[] {
+	const limitations: ModuleDependencyGraphLimitation[] = [
+		{
+			closureEffect: 'NONE',
+			kind: 'DEPCRUISE_NOT_RUN',
+			moduleResolutionId: null,
+			reason:
+				'Dependency-cruiser corroboration was not run by this compiler-native graph increment.',
+			sourceId: null
+		}
+	];
+	if (snapshot.health === 'PARTIAL')
+		limitations.push({
+			closureEffect: 'DEGRADES_CLOSURE',
+			kind: 'SEMANTIC_INPUT_PARTIAL',
+			moduleResolutionId: null,
+			reason: 'The bound static semantic snapshot is partial.',
+			sourceId: null
+		});
+	for (const resolution of snapshot.moduleResolutions) {
+		if (
+			resolution.resolutionState === 'RESOLVED_AMBIENT' ||
+			resolution.resolutionState === 'RESOLVED_EXTERNAL'
+		)
+			limitations.push({
+				closureEffect: 'DEGRADES_CLOSURE',
+				kind: 'NON_SOURCE_MODULE_TARGET',
+				moduleResolutionId: resolution.id,
+				reason: `The ${resolution.resolutionState} module target is represented as an explicit graph-native endpoint outside the source-node population.`,
+				sourceId: resolution.sourceId
+			});
+		else if (resolution.resolutionState === 'UNRESOLVED')
+			limitations.push({
+				closureEffect: 'DEGRADES_CLOSURE',
+				kind: 'UNRESOLVED_MODULE',
+				moduleResolutionId: resolution.id,
+				reason: 'The compiler did not resolve this module occurrence.',
+				sourceId: resolution.sourceId
+			});
+		else if (resolution.resolutionState === 'UNSUPPORTED')
+			limitations.push({
+				closureEffect: 'DEGRADES_CLOSURE',
+				kind: 'UNSUPPORTED_MODULE_RESOLUTION',
+				moduleResolutionId: resolution.id,
+				reason: 'This module occurrence is outside the supported compiler resolution surface.',
+				sourceId: resolution.sourceId
+			});
+	}
+	return limitations.sort((left, right) =>
+		compareText(limitationOrderKey(left), limitationOrderKey(right))
+	);
+}
+
+function validateLimitations(
+	limitations: readonly ModuleDependencyGraphLimitation[],
+	snapshot: StaticSemanticSnapshot,
+	path: string,
+	issues: IssueCollector
+): void {
+	const orderKeys = limitations.map(limitationOrderKey);
+	sortedUniqueStrings(orderKeys, path, issues);
+	if (!same(limitations, expectedLimitations(snapshot)))
+		issues.add(
+			'LIMITATION_MISMATCH',
+			path,
+			'Limitations do not exactly disclose dependency-cruiser status, non-source targets, semantic partiality, and unresolved or unsupported resolutions.'
+		);
+}
+
+function validateProvenanceIds(
+	ids: readonly SemanticProvenanceId[],
+	snapshot: StaticSemanticSnapshot,
+	path: string,
+	issues: IssueCollector
+): void {
+	sortedUniqueStrings(ids, path, issues);
+	const provenanceById = new Map(snapshot.provenances.map((record) => [record.id, record]));
+	for (const [index, id] of ids.entries()) {
+		const record = provenanceById.get(id);
+		if (record === undefined)
+			issues.add('DANGLING_REFERENCE', `${path}[${index}]`, `Absent semantic provenance ${id}.`);
+		else if (record.snapshotId !== snapshot.id || record.subjectId !== snapshot.subjectId)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}[${index}]`,
+				'Provenance does not belong to the bound semantic snapshot and subject.'
+			);
+		if (issues.exhausted) return;
+	}
+}
+
+function expectedIndex(
+	nodes: readonly ModuleDependencyGraphNode[],
+	edges: readonly ModuleDependencyGraphEdge[],
+	direction: 'FORWARD' | 'REVERSE'
+): ModuleDependencyGraphIndexEntry[] {
+	return nodes
+		.map((node) => ({
+			edgeIds: edges
+				.filter((edge) =>
+					direction === 'FORWARD' ? edge.source.nodeId === node.id : edge.target.nodeId === node.id
+				)
+				.map((edge) => edge.id)
+				.sort(compareText),
+			nodeId: node.id
+		}))
+		.sort((left, right) => compareText(left.nodeId, right.nodeId));
+}
+
+function graphWideReference(
+	record: {
+		readonly graphId: string;
+		readonly layerId?: string;
+		readonly semanticSnapshotId: string;
+		readonly subjectId: string;
+	},
+	graph: ModuleDependencyGraphSnapshot,
+	layerId: string,
+	path: string,
+	issues: IssueCollector
+): void {
+	if (record.graphId !== graph.id)
+		issues.add('DANGLING_REFERENCE', `${path}.graphId`, 'Record references another graph.');
+	if (record.layerId !== undefined && record.layerId !== layerId)
+		issues.add('DANGLING_REFERENCE', `${path}.layerId`, 'Record references another graph layer.');
+	if (record.semanticSnapshotId !== graph.semanticSnapshotId)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.semanticSnapshotId`,
+			'Record references another semantic snapshot.'
+		);
+	if (record.subjectId !== graph.subjectId)
+		issues.add('DANGLING_REFERENCE', `${path}.subjectId`, 'Record references another subject.');
+}
+
+function validateGraphSemantics(
+	graph: ModuleDependencyGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
+	if (graph.schemaVersion !== MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION)
+		issues.add('UNSUPPORTED_SCHEMA_VERSION', '$.schemaVersion', graph.schemaVersion);
+	if (graph.operationVersion !== MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION)
+		issues.add('INVALID_VALUE', '$.operationVersion', 'Unsupported graph operation version.');
+	if (graph.canonicalProfile !== MODULE_DEPENDENCY_GRAPH_CANONICAL_PROFILE)
+		issues.add('INVALID_VALUE', '$.canonicalProfile', 'Unsupported graph canonical profile.');
+	if (graph.method !== MODULE_DEPENDENCY_GRAPH_METHOD)
+		issues.add('INVALID_VALUE', '$.method', 'Unsupported graph construction method.');
+	if (graph.fullJanCsaa007Conformance !== FULL_JAN_CSAA_007_CONFORMANCE)
+		issues.add(
+			'CONFORMANCE_OVERCLAIM',
+			'$.fullJanCsaa007Conformance',
+			'This bounded graph kernel must retain the explicit NOT_CLAIMED conformance state.'
+		);
+	if (graph.semanticSnapshotId !== snapshot.id)
+		issues.add(
+			'DANGLING_REFERENCE',
+			'$.semanticSnapshotId',
+			'Graph does not bind the supplied semantic snapshot.'
+		);
+	if (graph.subjectId !== snapshot.subjectId)
+		issues.add('DANGLING_REFERENCE', '$.subjectId', 'Graph does not bind the supplied subject.');
+	if (graph.semanticExtractionVersion !== snapshot.extractionVersion)
+		issues.add(
+			'INVALID_VALUE',
+			'$.semanticExtractionVersion',
+			'Graph does not disclose the bound semantic extraction version.'
+		);
+	if (graph.semanticSchemaVersion !== snapshot.schemaVersion)
+		issues.add(
+			'INVALID_VALUE',
+			'$.semanticSchemaVersion',
+			'Graph does not disclose the bound semantic schema version.'
+		);
+	if (!same(graph.producer, snapshot.provider))
+		issues.add(
+			'INVALID_VALUE',
+			'$.producer',
+			'Graph producer does not match the semantic provider.'
+		);
+	if (!SHA256.test(graph.graphInputDigest))
+		issues.add(
+			'INVALID_VALUE',
+			'$.graphInputDigest',
+			'Graph input digest must be lowercase SHA-256.'
+		);
+	if (!SHA256.test(graph.contentDigest))
+		issues.add('INVALID_VALUE', '$.contentDigest', 'Content digest must be lowercase SHA-256.');
+	try {
+		const expectedInputDigest = moduleDependencyGraphInputDigest(snapshot);
+		if (graph.graphInputDigest !== expectedInputDigest)
+			issues.add(
+				'GRAPH_INPUT_MISMATCH',
+				'$.graphInputDigest',
+				'Graph input digest does not reproduce the exact consumed semantic projection.'
+			);
+	} catch (error) {
+		issues.add(
+			'GRAPH_INPUT_MISMATCH',
+			'$.graphInputDigest',
+			error instanceof Error ? error.message : 'Graph input projection failed closed.'
+		);
+	}
+
+	const expectedGraphId = moduleDependencyGraphId({
+		canonicalProfile: graph.canonicalProfile,
+		graphInputDigest: graph.graphInputDigest,
+		graphKind: graph.graphKind,
+		method: graph.method,
+		operationVersion: graph.operationVersion,
+		schemaVersion: graph.schemaVersion,
+		semanticSnapshotId: graph.semanticSnapshotId,
+		subjectId: graph.subjectId
+	});
+	if (graph.id !== expectedGraphId)
+		issues.add(
+			'IDENTITY_MISMATCH',
+			'$.id',
+			'Graph identity does not match its request-bound preimage.'
+		);
+
+	if (graph.layers.length !== 1) {
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.layers',
+			'Exactly one module-resolution layer is required.'
+		);
+		return;
+	}
+	const layer = graph.layers[0];
+	const expectedLayerId = moduleDependencyGraphLayerId(graph.id, layer.kind, layer.ordinal);
+	if (layer.id !== expectedLayerId)
+		issues.add('IDENTITY_MISMATCH', '$.layers[0].id', 'Graph layer identity mismatch.');
+	graphWideReference(layer, graph, layer.id, '$.layers[0]', issues);
+	if (!same(layer.producer, snapshot.provider))
+		issues.add(
+			'INVALID_VALUE',
+			'$.layers[0].producer',
+			'Layer producer does not match the semantic provider.'
+		);
+
+	const nodeById = validateIdPopulation(graph.nodes, '$.nodes', issues);
+	const edgeById = validateIdPopulation(graph.edges, '$.edges', issues);
+	const sourceById = new Map(snapshot.sources.map((record) => [record.id, record]));
+	const resolutionById = new Map(snapshot.moduleResolutions.map((record) => [record.id, record]));
+	const occurrenceById = new Map(snapshot.astNodes.map((record) => [record.id, record]));
+
+	const sourceNodes = graph.nodes.filter(
+		(node): node is Extract<ModuleDependencyGraphNode, { readonly kind: 'SOURCE' }> =>
+			node.kind === 'SOURCE'
+	);
+	const targetNodes = graph.nodes.filter(
+		(node): node is Extract<ModuleDependencyGraphNode, { readonly kind: 'RESOLUTION_TARGET' }> =>
+			node.kind === 'RESOLUTION_TARGET'
+	);
+	const sourceNodeBySemanticId = new Map<string, (typeof sourceNodes)[number]>();
+	const targetNodeByResolutionId = new Map<string, (typeof targetNodes)[number]>();
+
+	for (const [index, node] of graph.nodes.entries()) {
+		const path = `$.nodes[${index}]`;
+		graphWideReference(node, graph, layer.id, path, issues);
+		validateProvenanceIds(node.provenanceIds, snapshot, `${path}.provenanceIds`, issues);
+		canonicalObjectArray(node.sourceLocations, `${path}.sourceLocations`, issues);
+		for (const [locationIndex, location] of node.sourceLocations.entries()) {
+			const source = sourceById.get(location.sourceId);
+			if (source === undefined)
+				issues.add(
+					'DANGLING_REFERENCE',
+					`${path}.sourceLocations[${locationIndex}].sourceId`,
+					'Location references an absent source.'
+				);
+			else if (location.end > source.textLength)
+				issues.add(
+					'INVALID_VALUE',
+					`${path}.sourceLocations[${locationIndex}].end`,
+					'Location exceeds its semantic source.'
+				);
+		}
+		if (node.kind === 'SOURCE') {
+			if (sourceNodeBySemanticId.has(node.semanticSourceId))
+				issues.add(
+					'DUPLICATE_ID',
+					`${path}.semanticSourceId`,
+					'A semantic source is represented by more than one graph node.'
+				);
+			else sourceNodeBySemanticId.set(node.semanticSourceId, node);
+			const source = sourceById.get(node.semanticSourceId);
+			if (source === undefined) {
+				issues.add('DANGLING_REFERENCE', `${path}.semanticSourceId`, 'Absent semantic source.');
+				continue;
+			}
+			if (
+				node.analysisDisposition !== source.analysisDisposition ||
+				node.logicalPath !== source.logicalPath ||
+				node.programId !== source.programId ||
+				node.projectId !== source.projectId
+			)
+				issues.add(
+					'INVALID_VALUE',
+					path,
+					'Source node does not reproduce its semantic source fields.'
+				);
+			try {
+				assertCanonicalRelativePath(node.logicalPath);
+			} catch {
+				issues.add(
+					'ABSOLUTE_PATH',
+					`${path}.logicalPath`,
+					'Graph source paths must be canonical repository-relative paths.'
+				);
+			}
+			if (node.id !== moduleDependencyGraphSourceNodeId(graph.id, source.id))
+				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Source-node identity mismatch.');
+			if (!same(node.provenanceIds, [source.provenanceId]))
+				issues.add(
+					'DANGLING_REFERENCE',
+					`${path}.provenanceIds`,
+					'Source-node provenance must be exactly the semantic source provenance.'
+				);
+			if (!same(node.sourceLocations, exactLocation(source.id, 0, source.textLength)))
+				issues.add(
+					'INVALID_VALUE',
+					`${path}.sourceLocations`,
+					'Source-node location must cover its exact semantic source.'
+				);
+			if (node.epistemic !== 'SUPPORTED')
+				issues.add(
+					'INVALID_VALUE',
+					`${path}.epistemic`,
+					'Semantic source nodes are supported facts.'
+				);
+		} else {
+			if (targetNodeByResolutionId.has(node.moduleResolutionId))
+				issues.add(
+					'DUPLICATE_ID',
+					`${path}.moduleResolutionId`,
+					'A module resolution has more than one graph-native endpoint.'
+				);
+			else targetNodeByResolutionId.set(node.moduleResolutionId, node);
+			const resolution = resolutionById.get(node.moduleResolutionId);
+			if (resolution === undefined) {
+				issues.add('DANGLING_REFERENCE', `${path}.moduleResolutionId`, 'Absent module resolution.');
+				continue;
+			}
+			if (resolution.resolutionState === 'RESOLVED_SOURCE')
+				issues.add(
+					'INVALID_VALUE',
+					`${path}.resolutionState`,
+					'Resolved-source facts must target a SOURCE node, not a graph-native endpoint.'
+				);
+			if (
+				node.moduleSymbolId !== resolution.moduleSymbolId ||
+				node.resolutionState !== resolution.resolutionState ||
+				node.specifier !== resolution.specifier ||
+				node.specifierState !== resolution.specifierState
+			)
+				issues.add(
+					'INVALID_VALUE',
+					path,
+					'Graph-native target does not reproduce its module-resolution fact.'
+				);
+			if (node.id !== moduleDependencyGraphResolutionTargetNodeId(graph.id, resolution.id))
+				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Resolution-target identity mismatch.');
+			if (!same(node.provenanceIds, [resolution.provenanceId]))
+				issues.add(
+					'DANGLING_REFERENCE',
+					`${path}.provenanceIds`,
+					'Resolution-target provenance must be exactly the semantic resolution provenance.'
+				);
+			const occurrence = occurrenceById.get(resolution.nodeId);
+			if (
+				occurrence !== undefined &&
+				!same(
+					node.sourceLocations,
+					exactLocation(occurrence.sourceId, occurrence.start, occurrence.end)
+				)
+			)
+				issues.add(
+					'INVALID_VALUE',
+					`${path}.sourceLocations`,
+					'Resolution target must cite the exact module occurrence.'
+				);
+			if (node.epistemic !== expectedEpistemic(resolution.resolutionState))
+				issues.add(
+					'INVALID_VALUE',
+					`${path}.epistemic`,
+					'Resolution-target epistemic state mismatch.'
+				);
+		}
+		if (issues.exhausted) return;
+	}
+
+	const edgesByResolution = new Map<string, ModuleDependencyGraphEdge[]>();
+	for (const [index, edge] of graph.edges.entries()) {
+		const path = `$.edges[${index}]`;
+		graphWideReference(edge, graph, layer.id, path, issues);
+		validateProvenanceIds(edge.provenanceIds, snapshot, `${path}.provenanceIds`, issues);
+		canonicalObjectArray(edge.sourceLocations, `${path}.sourceLocations`, issues);
+		const grouped = edgesByResolution.get(edge.moduleResolutionId) ?? [];
+		grouped.push(edge);
+		edgesByResolution.set(edge.moduleResolutionId, grouped);
+		const resolution = resolutionById.get(edge.moduleResolutionId);
+		if (resolution === undefined) {
+			issues.add('DANGLING_REFERENCE', `${path}.moduleResolutionId`, 'Absent module resolution.');
+			continue;
+		}
+		const occurrence = occurrenceById.get(resolution.nodeId);
+		if (occurrence === undefined) {
+			issues.add('DANGLING_REFERENCE', `${path}.occurrenceNodeId`, 'Absent occurrence AST node.');
+			continue;
+		}
+		if (occurrence.sourceId !== resolution.sourceId)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.occurrenceNodeId`,
+				'Module-resolution occurrence and importer source differ.'
+			);
+		if (
+			edge.occurrenceKind !== resolution.occurrenceKind ||
+			edge.occurrenceNodeId !== resolution.nodeId ||
+			edge.relationKind !== RELATION_KIND_BY_OCCURRENCE[resolution.occurrenceKind] ||
+			edge.resolutionState !== resolution.resolutionState ||
+			edge.specifier !== resolution.specifier ||
+			edge.specifierState !== resolution.specifierState ||
+			edge.typeOnly !== resolution.typeOnly
+		)
+			issues.add(
+				'INVALID_VALUE',
+				path,
+				'Graph edge collapses or changes its supporting module-resolution occurrence.'
+			);
+		if (edge.method !== MODULE_DEPENDENCY_GRAPH_METHOD)
+			issues.add('INVALID_VALUE', `${path}.method`, 'Edge method mismatch.');
+		if (!same(edge.provenanceIds, [resolution.provenanceId]))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.provenanceIds`,
+				'Edge provenance must be exactly its module-resolution provenance.'
+			);
+		if (
+			!same(
+				edge.sourceLocations,
+				exactLocation(occurrence.sourceId, occurrence.start, occurrence.end)
+			)
+		)
+			issues.add(
+				'INVALID_VALUE',
+				`${path}.sourceLocations`,
+				'Edge must cite the exact module occurrence location.'
+			);
+		const sourceNode = nodeById.get(edge.source.nodeId);
+		if (
+			edge.source.kind !== 'SOURCE' ||
+			sourceNode?.kind !== 'SOURCE' ||
+			sourceNode.semanticSourceId !== resolution.sourceId
+		)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.source`,
+				'Edge source must be the exact importer SOURCE node.'
+			);
+		let expectedTarget: ModuleDependencyGraphNode | undefined;
+		if (resolution.resolutionState === 'RESOLVED_SOURCE') {
+			expectedTarget =
+				resolution.targetSourceId === null
+					? undefined
+					: sourceNodeBySemanticId.get(resolution.targetSourceId);
+			if (edge.target.kind !== 'SOURCE' || expectedTarget?.kind !== 'SOURCE')
+				issues.add(
+					'DANGLING_REFERENCE',
+					`${path}.target`,
+					'Resolved-source dependency must target its semantic SOURCE node.'
+				);
+		} else {
+			expectedTarget = targetNodeByResolutionId.get(resolution.id);
+			if (edge.target.kind !== 'RESOLUTION_TARGET' || expectedTarget?.kind !== 'RESOLUTION_TARGET')
+				issues.add(
+					'DANGLING_REFERENCE',
+					`${path}.target`,
+					'Non-source resolution must retain its explicit graph-native endpoint.'
+				);
+		}
+		if (expectedTarget === undefined || edge.target.nodeId !== expectedTarget.id)
+			issues.add('DANGLING_REFERENCE', `${path}.target.nodeId`, 'Edge target identity mismatch.');
+		const expectedEdgeId = moduleDependencyGraphEdgeId({
+			graph: graph.id,
+			moduleResolutionId: resolution.id,
+			relationKind: edge.relationKind,
+			source: edge.source,
+			target: edge.target
+		});
+		if (edge.id !== expectedEdgeId)
+			issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module-dependency edge identity mismatch.');
+		if (edge.epistemic !== expectedEpistemic(resolution.resolutionState))
+			issues.add('INVALID_VALUE', `${path}.epistemic`, 'Edge epistemic state mismatch.');
+		if (issues.exhausted) return;
+	}
+
+	for (const resolution of snapshot.moduleResolutions) {
+		const count = edgesByResolution.get(resolution.id)?.length ?? 0;
+		if (count !== 1)
+			issues.add(
+				'POPULATION_MISMATCH',
+				'$.edges',
+				`Module resolution ${resolution.id} must support exactly one distinct edge; received ${count}.`
+			);
+		const targetCount = targetNodes.filter(
+			(node) => node.moduleResolutionId === resolution.id
+		).length;
+		if (
+			(resolution.resolutionState === 'RESOLVED_SOURCE' && targetCount !== 0) ||
+			(resolution.resolutionState !== 'RESOLVED_SOURCE' && targetCount !== 1)
+		)
+			issues.add(
+				'POPULATION_MISMATCH',
+				'$.nodes',
+				`Module resolution ${resolution.id} has an invalid graph-native endpoint population.`
+			);
+		if (issues.exhausted) return;
+	}
+	if (
+		sourceNodes.length !== snapshot.sources.length ||
+		sourceNodeBySemanticId.size !== sourceById.size
+	)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			'Every semantic source must have exactly one SOURCE node.'
+		);
+	if (targetNodes.length !== expectedCoverage(snapshot).graphNativeTargets)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			'Graph-native target population does not match non-source module resolutions.'
+		);
+
+	const nodeIds = graph.nodes.map((node) => node.id).sort(compareText);
+	const edgeIds = graph.edges.map((edge) => edge.id).sort(compareText);
+	if (!same(layer.nodeIds, nodeIds))
+		issues.add('POPULATION_MISMATCH', '$.layers[0].nodeIds', 'Layer node manifest mismatch.');
+	if (!same(layer.edgeIds, edgeIds))
+		issues.add('POPULATION_MISMATCH', '$.layers[0].edgeIds', 'Layer edge manifest mismatch.');
+	sortedUniqueStrings(layer.nodeIds, '$.layers[0].nodeIds', issues);
+	sortedUniqueStrings(layer.edgeIds, '$.layers[0].edgeIds', issues);
+
+	for (const [name, index, expected] of [
+		['forwardIndex', graph.forwardIndex, expectedIndex(graph.nodes, graph.edges, 'FORWARD')],
+		['reverseIndex', graph.reverseIndex, expectedIndex(graph.nodes, graph.edges, 'REVERSE')]
+	] as const) {
+		sortedUniqueStrings(
+			index.map((entry) => entry.nodeId),
+			`$.${name}`,
+			issues
+		);
+		for (const [entryIndex, entry] of index.entries()) {
+			if (!nodeById.has(entry.nodeId))
+				issues.add(
+					'DANGLING_REFERENCE',
+					`$.${name}[${entryIndex}].nodeId`,
+					'Index entry references an absent graph node.'
+				);
+			sortedUniqueStrings(entry.edgeIds, `$.${name}[${entryIndex}].edgeIds`, issues);
+			for (const [edgeIndex, edgeId] of entry.edgeIds.entries())
+				if (!edgeById.has(edgeId))
+					issues.add(
+						'DANGLING_REFERENCE',
+						`$.${name}[${entryIndex}].edgeIds[${edgeIndex}]`,
+						'Index entry references an absent graph edge.'
+					);
+		}
+		if (!same(index, expected))
+			issues.add(
+				'POPULATION_MISMATCH',
+				`$.${name}`,
+				`${name} does not exactly reconcile graph endpoint navigation.`
+			);
+	}
+
+	const coverage = expectedCoverage(snapshot);
+	if (!same(graph.coverage, coverage))
+		issues.add('POPULATION_MISMATCH', '$.coverage', 'Graph coverage does not reconcile inputs.');
+	if (!same(layer.coverage, coverage))
+		issues.add('POPULATION_MISMATCH', '$.layers[0].coverage', 'Layer coverage mismatch.');
+	validateLimitations(graph.limitations, snapshot, '$.limitations', issues);
+	validateLimitations(layer.limitations, snapshot, '$.layers[0].limitations', issues);
+	if (!same(layer.limitations, graph.limitations))
+		issues.add('LIMITATION_MISMATCH', '$.layers[0].limitations', 'Layer limitations differ.');
+	const epistemic = aggregateEpistemic(snapshot.moduleResolutions);
+	if (graph.epistemic !== epistemic)
+		issues.add('INVALID_VALUE', '$.epistemic', 'Aggregate graph epistemic state is dishonest.');
+	if (layer.epistemic !== epistemic)
+		issues.add('INVALID_VALUE', '$.layers[0].epistemic', 'Layer epistemic state mismatch.');
+	const expectedHealth = coverage.closure === 'CLOSED' ? 'COMPLETE' : 'PARTIAL';
+	if (graph.health !== expectedHealth)
+		issues.add('INVALID_VALUE', '$.health', 'Graph health must reflect its exact closure state.');
+
+	const expectedLayerProvenance = [
+		...new Set(
+			graph.nodes
+				.flatMap((node) => [...node.provenanceIds])
+				.concat(graph.edges.flatMap((edge) => [...edge.provenanceIds]))
+		)
+	].sort(compareText);
+	validateProvenanceIds(layer.provenanceIds, snapshot, '$.layers[0].provenanceIds', issues);
+	if (!same(layer.provenanceIds, expectedLayerProvenance))
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.layers[0].provenanceIds',
+			'Layer provenance manifest does not reconcile node and edge support.'
+		);
+
+	try {
+		if (graph.contentDigest !== moduleDependencyGraphContentDigest(graph))
+			issues.add(
+				'CONTENT_DIGEST_MISMATCH',
+				'$.contentDigest',
+				'Graph content digest does not bind the exact finalized graph content.'
+			);
+	} catch (error) {
+		issues.add(
+			'CONTENT_DIGEST_MISMATCH',
+			'$.contentDigest',
+			error instanceof Error ? error.message : 'Graph content digest failed closed.'
+		);
+	}
+
+	// Keep these maps live through validation: an extra unknown ID may otherwise
+	// be hidden by a correct-looking manifest or index.
+	if (nodeById.size !== graph.nodes.length || edgeById.size !== graph.edges.length)
+		issues.add('DUPLICATE_ID', '$', 'Graph populations contain duplicate identities.');
+}
+
+export function validateModuleDependencyGraph(
+	value: unknown,
+	semanticSnapshot: StaticSemanticSnapshot,
+	overrides: Partial<ModuleDependencyGraphValidationOptions> = {}
+): ModuleDependencyGraphValidationResult {
+	const maxIssues = overrides.maxIssues ?? DEFAULT_MAX_ISSUES;
+	if (!Number.isSafeInteger(maxIssues) || maxIssues < 1 || maxIssues > 100_000)
+		return {
+			issues: [
+				{
+					code: 'INVALID_VALUE',
+					message: 'maxIssues must be a positive safe integer no greater than 100000.',
+					path: '$validationOptions.maxIssues'
+				}
+			],
+			state: 'INVALID'
+		};
+	const issues = new IssueCollector(maxIssues);
+	try {
+		if (!shapeGraph(value, issues)) return issues.result();
+		validateGraphSemantics(value, semanticSnapshot, issues);
+		return issues.result();
+	} catch (error) {
+		issues.add(
+			'INVALID_SHAPE',
+			'$',
+			error instanceof Error
+				? `Graph validation failed closed: ${error.message}`
+				: 'Graph validation failed closed.'
+		);
+		return issues.result();
+	}
+}

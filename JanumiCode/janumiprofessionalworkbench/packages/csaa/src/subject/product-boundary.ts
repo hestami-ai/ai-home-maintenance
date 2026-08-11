@@ -34,7 +34,11 @@ function slash(path: string): string {
 
 function moduleSpecifiers(source: string): string[] {
 	const preprocessed = ts.preProcessFile(source, true, true);
-	return [...preprocessed.importedFiles, ...preprocessed.referencedFiles, ...preprocessed.typeReferenceDirectives]
+	return [
+		...preprocessed.importedFiles,
+		...preprocessed.referencedFiles,
+		...preprocessed.typeReferenceDirectives
+	]
 		.map((reference) => reference.fileName)
 		.sort(compareText);
 }
@@ -64,7 +68,9 @@ export function inspectProductBoundary(repositoryRootInput: string): ProductBoun
 		if (info.isSymbolicLink()) {
 			const target = realpathSync(path);
 			if (!isInsideRoot(repositoryRoot, target)) {
-				throw new Error(`Product-boundary symlink escapes repository root: ${slash(relative(repositoryRoot, path))}`);
+				throw new Error(
+					`Product-boundary symlink escapes repository root: ${slash(relative(repositoryRoot, path))}`
+				);
 			}
 			walk(target);
 			return;

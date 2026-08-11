@@ -28,7 +28,9 @@ if (selected.length !== 1 || selected.length !== flags.length) {
 			if (!result.ok) process.exitCode = 1;
 		}
 	} catch (error) {
-		process.stderr.write(`${JSON.stringify({ error: 'inventory-failed', message: String(error) })}\n`);
+		process.stderr.write(
+			`${JSON.stringify({ error: 'inventory-failed', message: String(error) })}\n`
+		);
 		process.exitCode = 1;
 	}
 }

@@ -10,7 +10,10 @@ function slash(path: string): string {
 
 function inside(root: string, candidate: string): boolean {
 	const fromRoot = relative(root, candidate);
-	return fromRoot === '' || (!isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`));
+	return (
+		fromRoot === '' ||
+		(!isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`))
+	);
 }
 
 function declarationPath(path: string): boolean {
@@ -19,22 +22,32 @@ function declarationPath(path: string): boolean {
 
 function selectedOrigin(artifact: CapturedArtifactRecord): SourceOrigin {
 	switch (artifact.primaryClass) {
-		case 'TEST_SOURCE': return 'TEST';
-		case 'VERIFICATION': return 'VERIFICATION';
-		case 'SCRIPT': return 'SCRIPT';
-		case 'GENERATOR_SOURCE': return 'GENERATOR';
-		case 'GENERATED_SOURCE': return declarationPath(artifact.path) ? 'GENERATED_DECLARATION' : 'GENERATED';
+		case 'TEST_SOURCE':
+			return 'TEST';
+		case 'VERIFICATION':
+			return 'VERIFICATION';
+		case 'SCRIPT':
+			return 'SCRIPT';
+		case 'GENERATOR_SOURCE':
+			return 'GENERATOR';
+		case 'GENERATED_SOURCE':
+			return declarationPath(artifact.path) ? 'GENERATED_DECLARATION' : 'GENERATED';
 		case 'GENERATED_CONFIGURATION':
 		case 'PROJECT_CONFIGURATION':
 		case 'TOOL_CONFIGURATION':
 		case 'MANIFEST':
-		case 'LOCKFILE': return 'CONFIGURATION';
-		default: return 'AUTHORED';
+		case 'LOCKFILE':
+			return 'CONFIGURATION';
+		default:
+			return 'AUTHORED';
 	}
 }
 
 export class CompilerPathError extends Error {
-	constructor(readonly code: 'CONTEXT_FORBIDDEN' | 'PATH_ESCAPE', message: string) {
+	constructor(
+		readonly code: 'CONTEXT_FORBIDDEN' | 'PATH_ESCAPE',
+		message: string
+	) {
 		super(message);
 		this.name = 'CompilerPathError';
 	}
@@ -45,9 +58,14 @@ function failPath(message: string): never {
 }
 
 function canonicalLogicalSyntax(value: string, allowRoot = true): string {
-	if (value.length === 0 || value.includes('\\') || value.startsWith('/') || /^[A-Za-z]:/u.test(value)
-		|| value === '.' && !allowRoot
-		|| (value !== '.' && value.split('/').some((part) => part === '' || part === '.' || part === '..'))) {
+	if (
+		value.length === 0 ||
+		value.includes('\\') ||
+		value.startsWith('/') ||
+		/^[A-Za-z]:/u.test(value) ||
+		(value === '.' && !allowRoot) ||
+		(value !== '.' && value.split('/').some((part) => part === '' || part === '.' || part === '..'))
+	) {
 		failPath('Compiler logical path is not canonical.');
 	}
 	return value;
@@ -64,8 +82,13 @@ function existingDirectoryRoot(value: string, field: string): string {
 	}
 }
 
-function canonicalizeCandidate(authorizationRoot: string, lexicalCandidate: string, field: string): string {
-	if (!inside(authorizationRoot, lexicalCandidate)) failPath(`${field} escaped its physical authorization root.`);
+function canonicalizeCandidate(
+	authorizationRoot: string,
+	lexicalCandidate: string,
+	field: string
+): string {
+	if (!inside(authorizationRoot, lexicalCandidate))
+		failPath(`${field} escaped its physical authorization root.`);
 	let existingAncestor = lexicalCandidate;
 	const tail: string[] = [];
 	while (existingAncestor !== authorizationRoot) {
@@ -74,7 +97,8 @@ function canonicalizeCandidate(authorizationRoot: string, lexicalCandidate: stri
 			break;
 		} catch (error) {
 			const code = (error as NodeJS.ErrnoException).code;
-			if (code !== 'ENOENT' && code !== 'ENOTDIR') failPath(`${field} could not be inspected for physical confinement.`);
+			if (code !== 'ENOENT' && code !== 'ENOTDIR')
+				failPath(`${field} could not be inspected for physical confinement.`);
 			tail.unshift(basename(existingAncestor));
 			existingAncestor = dirname(existingAncestor);
 		}
@@ -86,14 +110,16 @@ function canonicalizeCandidate(authorizationRoot: string, lexicalCandidate: stri
 		failPath(`${field} is dangling or could not be canonicalized for physical confinement.`);
 	}
 	const canonicalCandidate = resolve(canonicalAncestor, ...tail);
-	if (!inside(authorizationRoot, canonicalCandidate)) failPath(`${field} escaped its physical authorization root through filesystem indirection.`);
+	if (!inside(authorizationRoot, canonicalCandidate))
+		failPath(`${field} escaped its physical authorization root through filesystem indirection.`);
 	return canonicalCandidate;
 }
 
 function parentDirectories(path: string): string[] {
 	const parts = path.split('/');
 	const directories = ['.'];
-	for (let index = 1; index < parts.length; index += 1) directories.push(parts.slice(0, index).join('/'));
+	for (let index = 1; index < parts.length; index += 1)
+		directories.push(parts.slice(0, index).join('/'));
 	return directories;
 }
 
@@ -128,61 +154,99 @@ export class FrozenCompilerPathResolver {
 	private readonly typescriptPackageLocatorRoot: string;
 	private readonly artifactsByKey = new Map<string, CapturedArtifactRecord>();
 	private readonly buildOutputPrefixes: readonly string[];
-	private readonly explicitContextFiles = new Map<string, { readonly path: string; readonly sha256: string }>();
+	private readonly explicitContextFiles = new Map<
+		string,
+		{ readonly path: string; readonly sha256: string }
+	>();
 	private readonly explicitContextDirectoryKeys = new Set<string>();
 	private readonly virtualDirectoriesByKey = new Map<string, string>();
 	private readonly virtualFilesByKey = new Map<string, string>();
-	private readonly virtualChildrenByDirectoryKey = new Map<string, Map<string, VirtualCompilerPathChild>>();
+	private readonly virtualChildrenByDirectoryKey = new Map<
+		string,
+		Map<string, VirtualCompilerPathChild>
+	>();
 	private readonly workspaceAliases: readonly WorkspaceAliasState[];
 
-	constructor(readonly subject: FrozenSubject, repositoryRoot: string, readonly caseSensitive: boolean) {
-		if (ts.version !== TYPESCRIPT_PROVIDER_VERSION) failPath(`TypeScript provider version ${ts.version} does not match the pinned ${TYPESCRIPT_PROVIDER_VERSION} authority.`);
+	constructor(
+		readonly subject: FrozenSubject,
+		repositoryRoot: string,
+		readonly caseSensitive: boolean
+	) {
+		if (ts.version !== TYPESCRIPT_PROVIDER_VERSION)
+			failPath(
+				`TypeScript provider version ${ts.version} does not match the pinned ${TYPESCRIPT_PROVIDER_VERSION} authority.`
+			);
 		this.repositoryRoot = existingDirectoryRoot(repositoryRoot, 'Compiler repository root');
 		this.typescriptPackageLocatorRoot = resolve(dirname(dirname(ts.getDefaultLibFilePath({}))));
-		this.typescriptPackageRoot = existingDirectoryRoot(this.typescriptPackageLocatorRoot, 'Pinned TypeScript package root');
-		this.typescriptLibraryRoot = existingDirectoryRoot(resolve(this.typescriptPackageRoot, 'lib'), 'Pinned TypeScript library root');
+		this.typescriptPackageRoot = existingDirectoryRoot(
+			this.typescriptPackageLocatorRoot,
+			'Pinned TypeScript package root'
+		);
+		this.typescriptLibraryRoot = existingDirectoryRoot(
+			resolve(this.typescriptPackageRoot, 'lib'),
+			'Pinned TypeScript library root'
+		);
 		this.addVirtualDirectory('.');
 		for (const artifact of subject.artifacts) {
 			canonicalLogicalSyntax(artifact.path, false);
 			const key = this.pathKey(artifact.path);
-			if (this.artifactsByKey.has(key)) failPath(`Frozen artifacts collide under the compiler case policy: ${artifact.path}.`);
+			if (this.artifactsByKey.has(key))
+				failPath(`Frozen artifacts collide under the compiler case policy: ${artifact.path}.`);
 			this.artifactsByKey.set(key, artifact);
 			this.addVirtualFile(artifact.path);
 		}
 		for (const record of subject.generatedContexts) {
 			if (record.selectedInput) continue;
 			const path = canonicalLogicalSyntax(record.path, false);
-			if (!/^[a-f0-9]{64}$/u.test(record.sha256)) failPath(`Generated compiler context digest is invalid: ${path}.`);
+			if (!/^[a-f0-9]{64}$/u.test(record.sha256))
+				failPath(`Generated compiler context digest is invalid: ${path}.`);
 			const key = this.pathKey(path);
-			if (this.artifactsByKey.has(key)) failPath(`Unselected generated compiler context overlaps a frozen artifact: ${path}.`);
-			if (this.explicitContextFiles.has(key)) failPath(`Generated compiler contexts collide under the compiler case policy: ${path}.`);
+			if (this.artifactsByKey.has(key))
+				failPath(`Unselected generated compiler context overlaps a frozen artifact: ${path}.`);
+			if (this.explicitContextFiles.has(key))
+				failPath(`Generated compiler contexts collide under the compiler case policy: ${path}.`);
 			this.explicitContextFiles.set(key, { path, sha256: record.sha256 });
 			this.addVirtualFile(path);
-			for (const directory of parentDirectories(path)) this.explicitContextDirectoryKeys.add(this.pathKey(directory));
+			for (const directory of parentDirectories(path))
+				this.explicitContextDirectoryKeys.add(this.pathKey(directory));
 		}
-		const aliasDefinitions = subject.workspaces.map((workspace) => {
-			const workspacePath = canonicalLogicalSyntax(workspace.path, false);
-			const aliasPath = canonicalLogicalSyntax(`node_modules/${workspace.name}`, false);
-			return { aliasPath, name: workspace.name, path: workspacePath };
-		}).sort((left, right) => right.name.length - left.name.length || (left.name < right.name ? -1 : 1));
+		const aliasDefinitions = subject.workspaces
+			.map((workspace) => {
+				const workspacePath = canonicalLogicalSyntax(workspace.path, false);
+				const aliasPath = canonicalLogicalSyntax(`node_modules/${workspace.name}`, false);
+				return { aliasPath, name: workspace.name, path: workspacePath };
+			})
+			.sort(
+				(left, right) => right.name.length - left.name.length || (left.name < right.name ? -1 : 1)
+			);
 		const aliasKeys = new Set<string>();
 		this.workspaceAliases = aliasDefinitions.map((alias) => {
 			const key = this.pathKey(alias.aliasPath);
-			if (aliasKeys.has(key)) failPath(`Workspace aliases collide under the compiler case policy: ${alias.name}.`);
+			if (aliasKeys.has(key))
+				failPath(`Workspace aliases collide under the compiler case policy: ${alias.name}.`);
 			aliasKeys.add(key);
 			return this.captureWorkspaceAliasState(alias);
 		});
-		for (const alias of this.workspaceAliases) if (alias.present) this.addWorkspaceAliasVirtualView(alias);
+		for (const alias of this.workspaceAliases)
+			if (alias.present) this.addWorkspaceAliasVirtualView(alias);
 		const outputRoots = new Set<string>();
 		for (const project of subject.projects) {
 			for (const key of ['declarationDir', 'outDir'] as const) {
 				const value = project.programRecipe.compilerOptions[key];
-				if (typeof value === 'string' && value !== '.') outputRoots.add(canonicalLogicalSyntax(value, false));
+				if (typeof value === 'string' && value !== '.')
+					outputRoots.add(canonicalLogicalSyntax(value, false));
 			}
 		}
 		for (const workspace of subject.workspaces) {
 			for (const record of workspace.exports) {
-				if (record.target === null || record.target.length === 0 || record.target.includes('\\') || record.target.startsWith('/') || /^[A-Za-z]:/u.test(record.target)) continue;
+				if (
+					record.target === null ||
+					record.target.length === 0 ||
+					record.target.includes('\\') ||
+					record.target.startsWith('/') ||
+					/^[A-Za-z]:/u.test(record.target)
+				)
+					continue;
 				if (!record.conditions.includes('types') && !declarationPath(record.target)) continue;
 				const target = posix.normalize(posix.join(workspace.path, record.target));
 				if (target === '.' || target === '..' || target.startsWith('../')) continue;
@@ -199,7 +263,9 @@ export class FrozenCompilerPathResolver {
 
 	private addVirtualChild(parent: string, child: VirtualCompilerPathChild): void {
 		const parentKey = this.pathKey(parent);
-		const children = this.virtualChildrenByDirectoryKey.get(parentKey) ?? new Map<string, VirtualCompilerPathChild>();
+		const children =
+			this.virtualChildrenByDirectoryKey.get(parentKey) ??
+			new Map<string, VirtualCompilerPathChild>();
 		children.set(this.pathKey(child.logicalPath), Object.freeze(child));
 		this.virtualChildrenByDirectoryKey.set(parentKey, children);
 	}
@@ -211,7 +277,11 @@ export class FrozenCompilerPathResolver {
 			const key = this.pathKey(normalized);
 			if (!this.virtualDirectoriesByKey.has(key)) {
 				this.virtualDirectoriesByKey.set(key, normalized);
-				if (normalized !== '.') this.addVirtualChild(posix.dirname(normalized), { kind: 'DIRECTORY', logicalPath: normalized });
+				if (normalized !== '.')
+					this.addVirtualChild(posix.dirname(normalized), {
+						kind: 'DIRECTORY',
+						logicalPath: normalized
+					});
 			}
 		}
 	}
@@ -236,8 +306,16 @@ export class FrozenCompilerPathResolver {
 		}
 	}
 
-	private inspectWorkspaceAlias(alias: { readonly aliasPath: string; readonly name: string; readonly path: string }): { readonly present: boolean; readonly targetAbsolute: string } {
-		const targetAbsolute = canonicalizeCandidate(this.repositoryRoot, resolve(this.repositoryRoot, ...alias.path.split('/')), `Workspace ${alias.name}`);
+	private inspectWorkspaceAlias(alias: {
+		readonly aliasPath: string;
+		readonly name: string;
+		readonly path: string;
+	}): { readonly present: boolean; readonly targetAbsolute: string } {
+		const targetAbsolute = canonicalizeCandidate(
+			this.repositoryRoot,
+			resolve(this.repositoryRoot, ...alias.path.split('/')),
+			`Workspace ${alias.name}`
+		);
 		const absoluteAlias = resolve(this.repositoryRoot, ...alias.aliasPath.split('/'));
 		try {
 			lstatSync(absoluteAlias);
@@ -252,21 +330,32 @@ export class FrozenCompilerPathResolver {
 		} catch {
 			failPath(`Workspace alias ${alias.name} is dangling or could not be canonicalized.`);
 		}
-		if (!inside(this.repositoryRoot, actual) || this.pathKey(actual) !== this.pathKey(targetAbsolute)) failPath(`Workspace alias ${alias.name} does not resolve to its frozen workspace target.`);
+		if (
+			!inside(this.repositoryRoot, actual) ||
+			this.pathKey(actual) !== this.pathKey(targetAbsolute)
+		)
+			failPath(`Workspace alias ${alias.name} does not resolve to its frozen workspace target.`);
 		return { present: true, targetAbsolute };
 	}
 
-	private captureWorkspaceAliasState(alias: { readonly aliasPath: string; readonly name: string; readonly path: string }): WorkspaceAliasState {
+	private captureWorkspaceAliasState(alias: {
+		readonly aliasPath: string;
+		readonly name: string;
+		readonly path: string;
+	}): WorkspaceAliasState {
 		return Object.freeze({ ...alias, ...this.inspectWorkspaceAlias(alias) });
 	}
 
-	private workspaceAlias(repositoryPath: string): (WorkspaceAliasState & { readonly tail: string }) | undefined {
+	private workspaceAlias(
+		repositoryPath: string
+	): (WorkspaceAliasState & { readonly tail: string }) | undefined {
 		if (!repositoryPath.startsWith('node_modules/')) return undefined;
 		const tail = repositoryPath.slice('node_modules/'.length);
 		for (const workspace of this.workspaceAliases) {
 			const matches = this.caseSensitive
 				? tail === workspace.name || tail.startsWith(`${workspace.name}/`)
-				: tail.toLowerCase() === workspace.name.toLowerCase() || tail.toLowerCase().startsWith(`${workspace.name.toLowerCase()}/`);
+				: tail.toLowerCase() === workspace.name.toLowerCase() ||
+					tail.toLowerCase().startsWith(`${workspace.name.toLowerCase()}/`);
 			if (matches) return { ...workspace, tail: tail.slice(workspace.name.length) };
 		}
 		return undefined;
@@ -306,7 +395,8 @@ export class FrozenCompilerPathResolver {
 		while (true) {
 			if (inside(ancestor, absolutePath)) {
 				const tail = slash(relative(ancestor, absolutePath));
-				if (tail === 'node_modules' || tail.startsWith('node_modules/')) return this.canonicalCase(`@boundary/ancestor-${level}/${tail}`);
+				if (tail === 'node_modules' || tail.startsWith('node_modules/'))
+					return this.canonicalCase(`@boundary/ancestor-${level}/${tail}`);
 			}
 			const parent = dirname(ancestor);
 			if (parent === ancestor) break;
@@ -333,7 +423,11 @@ export class FrozenCompilerPathResolver {
 	assertWorkspaceAliasTopologyUnchanged(): boolean {
 		for (const expected of this.workspaceAliases) {
 			const actual = this.inspectWorkspaceAlias(expected);
-			if (actual.present !== expected.present || this.pathKey(actual.targetAbsolute) !== this.pathKey(expected.targetAbsolute)) return false;
+			if (
+				actual.present !== expected.present ||
+				this.pathKey(actual.targetAbsolute) !== this.pathKey(expected.targetAbsolute)
+			)
+				return false;
 		}
 		return true;
 	}
@@ -342,11 +436,19 @@ export class FrozenCompilerPathResolver {
 		const lexical = isAbsolute(path) ? resolve(path) : resolve(this.repositoryRoot, path);
 		if (inside(this.typescriptPackageLocatorRoot, lexical)) {
 			const relativePath = slash(relative(this.typescriptPackageLocatorRoot, lexical));
-			const physical = canonicalizeCandidate(this.typescriptPackageRoot, resolve(this.typescriptPackageRoot, ...relativePath.split('/')), 'TypeScript package query');
+			const physical = canonicalizeCandidate(
+				this.typescriptPackageRoot,
+				resolve(this.typescriptPackageRoot, ...relativePath.split('/')),
+				'TypeScript package query'
+			);
 			return this.toolchainLogical(slash(relative(this.typescriptPackageRoot, physical)));
 		}
 		if (inside(this.typescriptPackageRoot, lexical)) {
-			const physical = canonicalizeCandidate(this.typescriptPackageRoot, lexical, 'TypeScript package query');
+			const physical = canonicalizeCandidate(
+				this.typescriptPackageRoot,
+				lexical,
+				'TypeScript package query'
+			);
 			return this.toolchainLogical(slash(relative(this.typescriptPackageRoot, physical)));
 		}
 		if (inside(this.repositoryRoot, lexical)) {
@@ -357,7 +459,9 @@ export class FrozenCompilerPathResolver {
 		}
 		const boundary = this.boundaryLogical(lexical);
 		if (boundary !== undefined) return boundary;
-		failPath('Compiler filesystem query escaped the repository and pinned TypeScript package roots.');
+		failPath(
+			'Compiler filesystem query escaped the repository and pinned TypeScript package roots.'
+		);
 	}
 
 	toAbsolute(logicalPath: string): string {
@@ -365,7 +469,11 @@ export class FrozenCompilerPathResolver {
 		const toolchainPrefix = '@toolchain/typescript/';
 		if (logicalPath.startsWith(toolchainPrefix)) {
 			const suffix = canonicalLogicalSyntax(logicalPath.slice(toolchainPrefix.length), false);
-			return canonicalizeCandidate(this.typescriptPackageRoot, resolve(this.typescriptPackageRoot, ...suffix.split('/')), 'Recorded TypeScript package path');
+			return canonicalizeCandidate(
+				this.typescriptPackageRoot,
+				resolve(this.typescriptPackageRoot, ...suffix.split('/')),
+				'Recorded TypeScript package path'
+			);
 		}
 		const canonical = canonicalLogicalSyntax(logicalPath);
 		if (canonical === '.') return this.repositoryRoot;
@@ -378,7 +486,8 @@ export class FrozenCompilerPathResolver {
 
 	canonicalLogical(logicalPath: string): string {
 		if (this.isBoundaryPath(logicalPath)) return this.canonicalCase(logicalPath);
-		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/')) return this.toLogical(this.toAbsolute(logicalPath));
+		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/'))
+			return this.toLogical(this.toAbsolute(logicalPath));
 		const canonical = canonicalLogicalSyntax(logicalPath);
 		if (canonical === '.') return '.';
 		return this.canonicalCase(this.canonicalWorkspaceAlias(canonical));
@@ -386,15 +495,21 @@ export class FrozenCompilerPathResolver {
 
 	toRecordedLogical(path: string): string {
 		const lexical = isAbsolute(path) ? resolve(path) : resolve(this.repositoryRoot, path);
-		if (inside(this.typescriptPackageLocatorRoot, lexical)) return this.toolchainLogical(slash(relative(this.typescriptPackageLocatorRoot, lexical)));
-		if (inside(this.typescriptPackageRoot, lexical)) return this.toolchainLogical(slash(relative(this.typescriptPackageRoot, lexical)));
+		if (inside(this.typescriptPackageLocatorRoot, lexical))
+			return this.toolchainLogical(slash(relative(this.typescriptPackageLocatorRoot, lexical)));
+		if (inside(this.typescriptPackageRoot, lexical))
+			return this.toolchainLogical(slash(relative(this.typescriptPackageRoot, lexical)));
 		if (!inside(this.repositoryRoot, lexical)) {
 			const boundary = this.boundaryLogical(lexical);
 			if (boundary !== undefined) return boundary;
-			failPath('Recorded compiler path escaped the repository and pinned TypeScript package roots.');
+			failPath(
+				'Recorded compiler path escaped the repository and pinned TypeScript package roots.'
+			);
 		}
 		const repositoryPath = slash(relative(this.repositoryRoot, lexical));
-		return repositoryPath === '' ? '.' : this.canonicalCase(this.canonicalWorkspaceAlias(repositoryPath));
+		return repositoryPath === ''
+			? '.'
+			: this.canonicalCase(this.canonicalWorkspaceAlias(repositoryPath));
 	}
 
 	toRecordedAbsolute(logicalPath: string): string {
@@ -403,7 +518,8 @@ export class FrozenCompilerPathResolver {
 		if (logicalPath.startsWith(toolchainPrefix)) {
 			const suffix = canonicalLogicalSyntax(logicalPath.slice(toolchainPrefix.length), false);
 			const lexical = resolve(this.typescriptPackageRoot, ...suffix.split('/'));
-			if (!inside(this.typescriptPackageRoot, lexical)) failPath('Recorded TypeScript path escaped its pinned package root.');
+			if (!inside(this.typescriptPackageRoot, lexical))
+				failPath('Recorded TypeScript path escaped its pinned package root.');
 			return lexical;
 		}
 		const canonical = canonicalLogicalSyntax(logicalPath);
@@ -412,13 +528,15 @@ export class FrozenCompilerPathResolver {
 		const lexical = alias?.present
 			? resolve(alias.targetAbsolute, ...alias.tail.replace(/^\//u, '').split('/').filter(Boolean))
 			: resolve(this.repositoryRoot, ...canonical.split('/'));
-		if (!inside(this.repositoryRoot, lexical)) failPath('Recorded repository path escaped its root.');
+		if (!inside(this.repositoryRoot, lexical))
+			failPath('Recorded repository path escaped its root.');
 		return lexical;
 	}
 
 	canonicalRecordedLogical(logicalPath: string): string {
 		if (this.isBoundaryPath(logicalPath)) return this.canonicalCase(logicalPath);
-		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/')) return this.toRecordedLogical(this.toRecordedAbsolute(logicalPath));
+		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/'))
+			return this.toRecordedLogical(this.toRecordedAbsolute(logicalPath));
 		const canonical = canonicalLogicalSyntax(logicalPath);
 		return canonical === '.' ? '.' : this.canonicalCase(this.canonicalWorkspaceAlias(canonical));
 	}
@@ -426,17 +544,36 @@ export class FrozenCompilerPathResolver {
 	authorizeEnumeratedChild(parentLogicalPath: string, entryName: string): AuthorizedCompilerPath {
 		const identity = this.enumeratedChildIdentity(parentLogicalPath, entryName);
 		const parentAbsolute = this.toAbsolute(parentLogicalPath);
-		const authorizationRoot = parentLogicalPath === '@toolchain/typescript' || parentLogicalPath.startsWith('@toolchain/typescript/')
-			? this.typescriptPackageRoot
-			: this.repositoryRoot;
+		const authorizationRoot =
+			parentLogicalPath === '@toolchain/typescript' ||
+			parentLogicalPath.startsWith('@toolchain/typescript/')
+				? this.typescriptPackageRoot
+				: this.repositoryRoot;
 		const lexicalChild = resolve(parentAbsolute, entryName);
-		const absolutePath = canonicalizeCandidate(authorizationRoot, lexicalChild, 'Enumerated compiler child');
+		const absolutePath = canonicalizeCandidate(
+			authorizationRoot,
+			lexicalChild,
+			'Enumerated compiler child'
+		);
 		return Object.freeze({ absolutePath, ...identity });
 	}
 
-	enumeratedChildIdentity(parentLogicalPath: string, entryName: string): CompilerEnumeratedPathIdentity {
-		if (entryName.length === 0 || entryName === '.' || entryName === '..' || entryName.includes('/') || entryName.includes('\\')) failPath('Compiler directory enumeration produced a non-canonical child name.');
-		const joinedLogicalPath = canonicalLogicalSyntax(parentLogicalPath === '.' ? entryName : `${parentLogicalPath}/${entryName}`, false);
+	enumeratedChildIdentity(
+		parentLogicalPath: string,
+		entryName: string
+	): CompilerEnumeratedPathIdentity {
+		if (
+			entryName.length === 0 ||
+			entryName === '.' ||
+			entryName === '..' ||
+			entryName.includes('/') ||
+			entryName.includes('\\')
+		)
+			failPath('Compiler directory enumeration produced a non-canonical child name.');
+		const joinedLogicalPath = canonicalLogicalSyntax(
+			parentLogicalPath === '.' ? entryName : `${parentLogicalPath}/${entryName}`,
+			false
+		);
 		const observedLogicalPath = this.canonicalWorkspaceAlias(joinedLogicalPath);
 		const logicalPath = this.canonicalCase(observedLogicalPath);
 		return Object.freeze({ logicalPath, observedLogicalPath });
@@ -458,7 +595,10 @@ export class FrozenCompilerPathResolver {
 	resolvedFrozenLogical(logicalPath: string): string | undefined {
 		const aliasTarget = this.workspaceAliasResolvedTarget(logicalPath);
 		if (aliasTarget !== undefined) return this.canonicalCase(aliasTarget);
-		if (this.virtualFilesByKey.has(this.pathKey(logicalPath)) || this.virtualDirectoriesByKey.has(this.pathKey(logicalPath))) {
+		if (
+			this.virtualFilesByKey.has(this.pathKey(logicalPath)) ||
+			this.virtualDirectoriesByKey.has(this.pathKey(logicalPath))
+		) {
 			const alias = this.workspaceAlias(logicalPath);
 			const target = alias?.present ? this.workspaceTarget(logicalPath) : undefined;
 			return target === undefined ? this.canonicalCase(logicalPath) : this.canonicalCase(target);
@@ -477,17 +617,30 @@ export class FrozenCompilerPathResolver {
 	private originForPath(logicalPath: string): SourceOrigin {
 		const artifact = this.artifact(logicalPath);
 		if (artifact !== undefined) return selectedOrigin(artifact);
-		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/')) return 'TOOLCHAIN_LIBRARY';
-		if (this.isExplicitContextFile(logicalPath)) return declarationPath(logicalPath) ? 'GENERATED_DECLARATION' : 'GENERATED';
-		if (this.isWorkspaceBuildOutput(logicalPath) && declarationPath(logicalPath)) return this.pathWithinWorkspace(logicalPath) ? 'WORKSPACE_BUILD_DECLARATION' : 'GENERATED_DECLARATION';
-		if (logicalPath.startsWith('node_modules/') && declarationPath(logicalPath)) return 'EXTERNAL_DECLARATION';
-		if (logicalPath.endsWith('/package.json') || logicalPath === 'package.json' || logicalPath.endsWith('.json')) return 'CONFIGURATION';
+		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/'))
+			return 'TOOLCHAIN_LIBRARY';
+		if (this.isExplicitContextFile(logicalPath))
+			return declarationPath(logicalPath) ? 'GENERATED_DECLARATION' : 'GENERATED';
+		if (this.isWorkspaceBuildOutput(logicalPath) && declarationPath(logicalPath))
+			return this.pathWithinWorkspace(logicalPath)
+				? 'WORKSPACE_BUILD_DECLARATION'
+				: 'GENERATED_DECLARATION';
+		if (logicalPath.startsWith('node_modules/') && declarationPath(logicalPath))
+			return 'EXTERNAL_DECLARATION';
+		if (
+			logicalPath.endsWith('/package.json') ||
+			logicalPath === 'package.json' ||
+			logicalPath.endsWith('.json')
+		)
+			return 'CONFIGURATION';
 		return 'UNKNOWN';
 	}
 
 	origin(logicalPath: string): SourceOrigin {
 		const alias = this.workspaceAlias(logicalPath);
-		return alias?.present ? this.originForPath(this.workspaceTarget(logicalPath)!) : this.originForPath(logicalPath);
+		return alias?.present
+			? this.originForPath(this.workspaceTarget(logicalPath)!)
+			: this.originForPath(logicalPath);
 	}
 
 	recordedOrigin(logicalPath: string): SourceOrigin {
@@ -495,46 +648,74 @@ export class FrozenCompilerPathResolver {
 	}
 
 	isWorkspaceBuildOutput(logicalPath: string): boolean {
-		const target = this.workspaceAlias(logicalPath)?.present ? this.workspaceTarget(logicalPath) ?? logicalPath : logicalPath;
+		const target = this.workspaceAlias(logicalPath)?.present
+			? (this.workspaceTarget(logicalPath) ?? logicalPath)
+			: logicalPath;
 		const key = this.pathKey(target);
-		return this.buildOutputPrefixes.some((prefix) => key === this.pathKey(prefix) || key.startsWith(`${this.pathKey(prefix)}/`));
+		return this.buildOutputPrefixes.some(
+			(prefix) => key === this.pathKey(prefix) || key.startsWith(`${this.pathKey(prefix)}/`)
+		);
 	}
 
 	isExplicitContextFile(logicalPath: string): boolean {
-		const target = this.workspaceAlias(logicalPath)?.present ? this.workspaceTarget(logicalPath) ?? logicalPath : logicalPath;
+		const target = this.workspaceAlias(logicalPath)?.present
+			? (this.workspaceTarget(logicalPath) ?? logicalPath)
+			: logicalPath;
 		return this.explicitContextFiles.has(this.pathKey(target));
 	}
 
 	explicitContextDigest(logicalPath: string): string | undefined {
-		const target = this.workspaceAlias(logicalPath)?.present ? this.workspaceTarget(logicalPath) ?? logicalPath : logicalPath;
+		const target = this.workspaceAlias(logicalPath)?.present
+			? (this.workspaceTarget(logicalPath) ?? logicalPath)
+			: logicalPath;
 		return this.explicitContextFiles.get(this.pathKey(target))?.sha256;
 	}
 
 	isLiveDirectoryPermitted(logicalPath: string): boolean {
-		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/')) return true;
+		if (logicalPath === '@toolchain/typescript' || logicalPath.startsWith('@toolchain/typescript/'))
+			return true;
 		if (logicalPath === 'node_modules' || logicalPath.startsWith('node_modules/')) return true;
-		if (this.isWorkspaceBuildOutput(logicalPath) || this.isExplicitContextFile(logicalPath)) return true;
+		if (this.isWorkspaceBuildOutput(logicalPath) || this.isExplicitContextFile(logicalPath))
+			return true;
 		return this.explicitContextDirectoryKeys.has(this.pathKey(logicalPath));
 	}
 
 	isLiveScanPermitted(logicalPath: string): boolean {
-		return logicalPath === '@toolchain/typescript'
-			|| logicalPath.startsWith('@toolchain/typescript/')
-			|| logicalPath === 'node_modules'
-			|| logicalPath.startsWith('node_modules/')
-			|| this.isWorkspaceBuildOutput(logicalPath);
+		return (
+			logicalPath === '@toolchain/typescript' ||
+			logicalPath.startsWith('@toolchain/typescript/') ||
+			logicalPath === 'node_modules' ||
+			logicalPath.startsWith('node_modules/') ||
+			this.isWorkspaceBuildOutput(logicalPath)
+		);
 	}
 
 	isLiveFilePermitted(logicalPath: string): boolean {
-		if (logicalPath.startsWith('@toolchain/typescript/') && (declarationPath(logicalPath) || logicalPath.endsWith('/package.json'))) return true;
-		if (logicalPath.startsWith('node_modules/') && (declarationPath(logicalPath) || logicalPath.endsWith('/package.json'))) return true;
-		if (this.isWorkspaceBuildOutput(logicalPath) && (declarationPath(logicalPath) || logicalPath.endsWith('/package.json'))) return true;
+		if (
+			logicalPath.startsWith('@toolchain/typescript/') &&
+			(declarationPath(logicalPath) || logicalPath.endsWith('/package.json'))
+		)
+			return true;
+		if (
+			logicalPath.startsWith('node_modules/') &&
+			(declarationPath(logicalPath) || logicalPath.endsWith('/package.json'))
+		)
+			return true;
+		if (
+			this.isWorkspaceBuildOutput(logicalPath) &&
+			(declarationPath(logicalPath) || logicalPath.endsWith('/package.json'))
+		)
+			return true;
 		return this.isExplicitContextFile(logicalPath);
 	}
 
 	isLiveRealpathPermitted(logicalPath: string): boolean {
 		if (this.isLiveFilePermitted(logicalPath)) return true;
-		return logicalPath === 'node_modules' || logicalPath === '@toolchain/typescript' || this.isVirtualDirectory(logicalPath);
+		return (
+			logicalPath === 'node_modules' ||
+			logicalPath === '@toolchain/typescript' ||
+			this.isVirtualDirectory(logicalPath)
+		);
 	}
 
 	isVirtualDirectory(logicalPath: string): boolean {
@@ -550,9 +731,13 @@ export class FrozenCompilerPathResolver {
 		if (viewPath === undefined) return Object.freeze([]);
 		const children = this.virtualChildrenByDirectoryKey.get(this.pathKey(viewPath));
 		if (children === undefined) return Object.freeze([]);
-		return Object.freeze([...children.values()]
-			.sort((left, right) => left.logicalPath < right.logicalPath ? -1 : left.logicalPath > right.logicalPath ? 1 : 0)
-			.map((child) => Object.freeze({ ...child })));
+		return Object.freeze(
+			[...children.values()]
+				.sort((left, right) =>
+					left.logicalPath < right.logicalPath ? -1 : left.logicalPath > right.logicalPath ? 1 : 0
+				)
+				.map((child) => Object.freeze({ ...child }))
+		);
 	}
 
 	*virtualDirectoryCandidates(logicalPath: string): Iterable<string> {
@@ -574,6 +759,9 @@ export class FrozenCompilerPathResolver {
 
 	assertLiveFilePermitted(logicalPath: string): void {
 		if (this.isLiveFilePermitted(logicalPath)) return;
-		throw new CompilerPathError('CONTEXT_FORBIDDEN', `Present unselected compiler file is outside the bounded declaration/configuration context: ${logicalPath}.`);
+		throw new CompilerPathError(
+			'CONTEXT_FORBIDDEN',
+			`Present unselected compiler file is outside the bounded declaration/configuration context: ${logicalPath}.`
+		);
 	}
 }

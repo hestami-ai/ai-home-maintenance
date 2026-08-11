@@ -1,4 +1,5 @@
 export * from './contracts/inventory.js';
+export * from './contracts/graph.js';
 export * from './contracts/semantic.js';
 export * from './contracts/subject.js';
 export * from './inventory/canonical.js';
@@ -7,6 +8,14 @@ export * from './inventory/project-subject-for-inventory.js';
 export * from './inventory/render-inventory.js';
 export * from './inventory/run-inventory.js';
 export { buildStaticSemanticSnapshot } from './semantic/build-static-semantic-snapshot.js';
+export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
+export { validateModuleDependencyGraph } from './graph/validate-graph.js';
+export type {
+	ModuleDependencyGraphValidationIssue,
+	ModuleDependencyGraphValidationIssueCode,
+	ModuleDependencyGraphValidationOptions,
+	ModuleDependencyGraphValidationResult
+} from './graph/validate-graph.js';
 export { canonicalSemanticJson, canonicalSemanticJsonWitness } from './semantic/canonical.js';
 export type { CanonicalSemanticJsonWitness } from './semantic/canonical.js';
 export * from './semantic/validate-snapshot.js';

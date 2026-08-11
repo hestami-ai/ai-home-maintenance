@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,7 +39,9 @@ describe('CSAA product dependency boundary', () => {
 				to: { path?: string };
 			}>;
 		};
-		const rule = config.forbidden.find((candidate) => candidate.name === 'product-does-not-import-csaa');
+		const rule = config.forbidden.find(
+			(candidate) => candidate.name === 'product-does-not-import-csaa'
+		);
 		expect(rule).toBeDefined();
 		const from = new RegExp(rule!.from.path!);
 		const to = new RegExp(rule!.to.path!);
@@ -68,5 +70,31 @@ describe('CSAA product dependency boundary', () => {
 			{ moduleSpecifier: '../../../packages/csaa/src/index.js', path: 'apps/demo/src/index.ts' },
 			{ moduleSpecifier: '@janumipwb/csaa', path: 'packages/rph-fixture/src/index.ts' }
 		]);
+	});
+
+	it('follows repository-confined directory links and rejects perimeter links that escape', () => {
+		const root = mkdtempSync(join(tmpdir(), 'csaa-boundary-links-'));
+		const outside = mkdtempSync(join(tmpdir(), 'csaa-boundary-outside-'));
+		temporaryRoots.push(outside, root);
+		write(root, 'packages/rph-fixture/src/index.ts', 'export {};\n');
+		write(root, 'apps/demo/src/index.ts', 'export {};\n');
+		write(root, 'shared/linked.ts', 'export const linked = true;\n');
+		write(outside, 'escaped.ts', 'export const escaped = true;\n');
+		symlinkSync(
+			join(root, 'shared'),
+			join(root, 'packages/rph-fixture/linked'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
+
+		expect(inspectProductBoundary(root)).toMatchObject({ inspectedFiles: 3, violations: [] });
+
+		symlinkSync(
+			outside,
+			join(root, 'packages/rph-fixture/escape'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
+		expect(() => inspectProductBoundary(root)).toThrow(
+			'Product-boundary symlink escapes repository root: packages/rph-fixture/escape'
+		);
 	});
 });

@@ -118,6 +118,98 @@ describe('inventory discovery and identity', () => {
 		});
 	});
 
+	it('reports the bounded Program-local TS_TYPE and module-dependency graph boundaries', () => {
+		const inventory = collectInventory({ repositoryRoot: fixture() });
+		const typescript = inventory.providers.find((provider) => provider.name === 'typescript');
+		expect(typescript?.adapterCapabilities).toEqual([
+			'TS_PROJECT',
+			'TS_SYMBOL',
+			'TS_SYNTAX',
+			'TS_TYPE',
+			'configuration-ast-parse',
+			'frozen-program-construction'
+		]);
+		expect(typescript?.provenance).toEqual(
+			expect.arrayContaining([
+				'packages/csaa/src/contracts/semantic.ts',
+				'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
+				'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+				'packages/csaa/src/providers/typescript/extract-symbols.ts',
+				'packages/csaa/src/providers/typescript/extract-types.ts',
+				'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
+				'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
+				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+				'packages/csaa/src/semantic/raw-semantic-model.ts',
+				'packages/csaa/src/semantic/validate-snapshot.ts'
+			])
+		);
+
+		const capabilities = new Map(
+			inventory.capabilities.map((capability) => [capability.id, capability])
+		);
+		expect(capabilities.get('typescript-ast')).toMatchObject({
+			explanation: expect.stringContaining('implements TS_PROJECT and TS_SYNTAX'),
+			provider: 'typescript',
+			state: 'IMPLEMENTED'
+		});
+		expect(capabilities.get('symbol-table')).toMatchObject({
+			explanation:
+				'The current DWP-003 provider implements Program-scoped TS_SYMBOL declarations, symbols, aliases, references, module resolutions, and module exports with normalized provenance and validation. Cross-Program symbol identity and binding reconciliation is not implemented for multi-project snapshots.',
+			provider: 'typescript',
+			provenance: [
+				'packages/csaa/src/providers/typescript/extract-symbols.ts',
+				'packages/csaa/src/semantic/raw-semantic-model.ts',
+				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+				'packages/csaa/src/semantic/validate-snapshot.ts'
+			],
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('type-graph')).toMatchObject({
+			explanation: expect.stringContaining(
+				'Program-local TS_TYPE records for types, type parameters, call and construct signatures'
+			),
+			provider: 'typescript',
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/providers/typescript/extract-types.ts',
+				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+				'packages/csaa/src/semantic/validate-snapshot.ts'
+			]),
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('dependency-graph')).toMatchObject({
+			explanation: expect.stringContaining(
+				'projects every compiler-observed module occurrence into a validated TypeScript module-dependency graph'
+			),
+			provider: 'typescript',
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/contracts/graph.ts',
+				'packages/csaa/src/graph/build-module-dependency-graph.ts',
+				'packages/csaa/src/graph/validate-graph.ts'
+			]),
+			state: 'PARTIAL'
+		});
+		for (const id of ['call-graph', 'code-property-graph', 'control-flow', 'data-flow']) {
+			expect(capabilities.get(id)).toMatchObject({
+				explanation: expect.stringContaining('no call, control-flow, data-flow'),
+				provider: null,
+				state: 'UNIMPLEMENTED'
+			});
+		}
+		expect(
+			inventory.unknowns.some((entry) =>
+				entry.statement.includes('Program construction remains deferred')
+			)
+		).toBe(false);
+		const semanticBoundary = inventory.unknowns.find((entry) =>
+			entry.statement.includes('current DWP-003 frozen Program construction')
+		)?.statement;
+		expect(semanticBoundary).toContain('TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction');
+		expect(semanticBoundary).toContain(
+			'first bounded DWP-004 increment implements only the validated compiler module-dependency projection'
+		);
+		expect(semanticBoundary).toContain('call/flow/state-machine graphs');
+	});
+
 	it('rejects malformed and duplicate workspace manifests', () => {
 		const malformed = fixture();
 		write(malformed, 'packages/demo/package.json', '{ not-json');
@@ -503,6 +595,14 @@ describe('JPWB population non-vacuity', () => {
 		expect(() =>
 			collectInventory({ repositoryRoot: missingCommand, requireJpwbPopulations: true })
 		).toThrow('Required JPWB assurance command is absent: boundary');
+
+		const noSemanticImplementation = fixture();
+		write(noSemanticImplementation, 'package.json', manifest(['packages/*', 'apps/*']));
+		expect(() =>
+			collectInventory({ repositoryRoot: noSemanticImplementation, requireJpwbPopulations: true })
+		).toThrow(
+			'Required JPWB TypeScript semantic implementation source is absent: packages/csaa/src/contracts/semantic.ts'
+		);
 	});
 
 	it('discovers every current workspace manifest and every top-level verif TypeScript asset', () => {

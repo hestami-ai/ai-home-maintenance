@@ -65,8 +65,13 @@ function assertStandaloneMarker(content: string, marker: string, offset: number)
 }
 
 export function replaceGeneratedRegion(document: string, markdown: string): string {
-	if (occurrences(document, GENERATED_REGION_BEGIN) !== 1 || occurrences(document, GENERATED_REGION_END) !== 1) {
-		throw new Error('JAN-CSAA-005 must contain exactly one begin marker and exactly one end marker');
+	if (
+		occurrences(document, GENERATED_REGION_BEGIN) !== 1 ||
+		occurrences(document, GENERATED_REGION_END) !== 1
+	) {
+		throw new Error(
+			'JAN-CSAA-005 must contain exactly one begin marker and exactly one end marker'
+		);
 	}
 	const begin = document.indexOf(GENERATED_REGION_BEGIN);
 	const end = document.indexOf(GENERATED_REGION_END);
@@ -74,7 +79,11 @@ export function replaceGeneratedRegion(document: string, markdown: string): stri
 	assertStandaloneMarker(document, GENERATED_REGION_BEGIN, begin);
 	assertStandaloneMarker(document, GENERATED_REGION_END, end);
 	const eol = document.includes('\r\n') ? '\r\n' : '\n';
-	const normalized = markdown.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trimEnd().replaceAll('\n', eol);
+	const normalized = markdown
+		.replaceAll('\r\n', '\n')
+		.replaceAll('\r', '\n')
+		.trimEnd()
+		.replaceAll('\n', eol);
 	return `${document.slice(0, begin + GENERATED_REGION_BEGIN.length)}${eol}${normalized}${eol}${document.slice(end)}`;
 }
 
@@ -112,7 +121,10 @@ function validateProducts(inventory: InventoryDocument, json: string, document: 
 	if (!document.includes(inventory.subject.subjectId)) {
 		throw new Error('Rendered JAN-CSAA-005 region does not carry the subject ID');
 	}
-	if (occurrences(document, GENERATED_REGION_BEGIN) !== 1 || occurrences(document, GENERATED_REGION_END) !== 1) {
+	if (
+		occurrences(document, GENERATED_REGION_BEGIN) !== 1 ||
+		occurrences(document, GENERATED_REGION_END) !== 1
+	) {
 		throw new Error('Rendered JAN-CSAA-005 marker cardinality is invalid');
 	}
 }
@@ -138,13 +150,19 @@ export function runInventory(options: RunInventoryOptions): RunInventoryResult {
 	}
 	const absoluteDocument = resolve(repositoryRoot, documentPath);
 	const absoluteBaseline = resolve(repositoryRoot, baselinePath);
-	if (!existsSync(absoluteDocument)) throw new Error(`JAN-CSAA-005 document is absent: ${documentPath}`);
+	if (!existsSync(absoluteDocument))
+		throw new Error(`JAN-CSAA-005 document is absent: ${documentPath}`);
 	const currentDocument = readFileSync(absoluteDocument, 'utf8');
-	const expectedDocument = replaceGeneratedRegion(currentDocument, renderInventoryMarkdown(inventory));
+	const expectedDocument = replaceGeneratedRegion(
+		currentDocument,
+		renderInventoryMarkdown(inventory)
+	);
 	validateProducts(inventory, json, expectedDocument);
 
 	if (options.mode === 'check') {
-		const currentJson = existsSync(absoluteBaseline) ? readFileSync(absoluteBaseline, 'utf8') : null;
+		const currentJson = existsSync(absoluteBaseline)
+			? readFileSync(absoluteBaseline, 'utf8')
+			: null;
 		const differences: InventoryDifference[] = [];
 		if (currentJson !== json) differences.push(difference(baselinePath, json, currentJson));
 		if (currentDocument !== expectedDocument) {
@@ -182,12 +200,20 @@ export function runInventory(options: RunInventoryOptions): RunInventoryResult {
 				renameSync(rollback, absoluteDocument);
 				documentCommitted = false;
 			} catch (rollbackError) {
-				throw new Error(`Inventory publication failed and document rollback failed: ${String(error)}; ${String(rollbackError)}`);
+				throw new Error(
+					`Inventory publication failed and document rollback failed: ${String(error)}; ${String(rollbackError)}`
+				);
 			}
 		}
 		// A baseline rename is the final operation; before it succeeds the old baseline remains intact.
-		if (currentJson === null && existsSync(absoluteBaseline) && readFileSync(absoluteBaseline, 'utf8') !== json) {
-			throw new Error(`Inventory publication failed with an unexpected baseline state: ${String(error)}`);
+		if (
+			currentJson === null &&
+			existsSync(absoluteBaseline) &&
+			readFileSync(absoluteBaseline, 'utf8') !== json
+		) {
+			throw new Error(
+				`Inventory publication failed with an unexpected baseline state: ${String(error)}`
+			);
 		}
 		throw error;
 	} finally {

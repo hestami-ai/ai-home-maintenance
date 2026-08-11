@@ -240,7 +240,9 @@ export interface FrozenSubject {
 	readonly generatedContexts: readonly GeneratedContextRecord[];
 	readonly population: PopulationReconciliation;
 	readonly projects: readonly ProjectSubjectRecord[];
-	readonly request: Omit<ResolveSubjectRequest, 'rootLocator'> & { readonly rootLocator: '<runtime>' };
+	readonly request: Omit<ResolveSubjectRequest, 'rootLocator'> & {
+		readonly rootLocator: '<runtime>';
+	};
 	readonly workspaces: readonly WorkspaceSubjectRecord[];
 }
 

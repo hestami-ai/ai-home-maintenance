@@ -20,13 +20,7 @@ export type KnowledgeState =
 	| 'UNKNOWN';
 
 export type ArtifactClass =
-	| 'SOURCE'
-	| 'TEST'
-	| 'GENERATED_SOURCE'
-	| 'CONFIGURATION'
-	| 'SCRIPT'
-	| 'VERIFICATION'
-	| 'OTHER';
+	'SOURCE' | 'TEST' | 'GENERATED_SOURCE' | 'CONFIGURATION' | 'SCRIPT' | 'VERIFICATION' | 'OTHER';
 
 export interface SelectedFileRecord {
 	readonly artifactClass: ArtifactClass;
@@ -49,8 +43,18 @@ export interface ExclusionRecord {
 export interface InventorySubjectDescriptor {
 	readonly configurationDigest: string;
 	readonly configurationPreimage: {
-		readonly artifacts: readonly { readonly artifactClass: ArtifactPrimaryClass; readonly bytes: number; readonly path: string; readonly sha256: string }[];
-		readonly generatedContexts: readonly { readonly consumerProject: string; readonly path: string; readonly selectedInput: boolean; readonly sha256: string }[];
+		readonly artifacts: readonly {
+			readonly artifactClass: ArtifactPrimaryClass;
+			readonly bytes: number;
+			readonly path: string;
+			readonly sha256: string;
+		}[];
+		readonly generatedContexts: readonly {
+			readonly consumerProject: string;
+			readonly path: string;
+			readonly selectedInput: boolean;
+			readonly sha256: string;
+		}[];
 		readonly projects: readonly ProgramRecipe[];
 		readonly workspaces: readonly WorkspaceSubjectRecord[];
 	};
@@ -115,7 +119,11 @@ export interface TypeScriptProjectInventory {
 }
 
 export interface TypeScriptProjectPartialityReason {
-	readonly code: SubjectDiagnostic['code'] | 'FRAMEWORK_CANDIDATES_PRESENT' | 'GENERATED_CONTEXT_STALE' | 'ROOT_DISPOSITION_INCOMPLETE';
+	readonly code:
+		| SubjectDiagnostic['code']
+		| 'FRAMEWORK_CANDIDATES_PRESENT'
+		| 'GENERATED_CONTEXT_STALE'
+		| 'ROOT_DISPOSITION_INCOMPLETE';
 	readonly message: string;
 	readonly path: string | null;
 	readonly provenance: readonly string[];
@@ -130,11 +138,7 @@ export interface CommandInventory {
 	readonly state: 'CONFIGURED_NOT_RUN';
 }
 
-export type AnalyzerDisposition =
-	| 'RETAIN_DELEGATED'
-	| 'WRAP'
-	| 'PORT'
-	| 'RETIRE_AFTER_EQUIVALENCE';
+export type AnalyzerDisposition = 'RETAIN_DELEGATED' | 'WRAP' | 'PORT' | 'RETIRE_AFTER_EQUIVALENCE';
 
 export interface VerificationAssetInventory {
 	readonly associatedBaselines: readonly string[];

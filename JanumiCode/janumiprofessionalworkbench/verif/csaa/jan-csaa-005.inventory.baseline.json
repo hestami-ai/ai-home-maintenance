@@ -50,27 +50,27 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 197,
+      "discovered": 211,
       "excluded": 0,
       "failed": 0,
-      "included": 197,
+      "included": 211,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 197
+      "successfullyInventoried": 211
     },
     {
       "artifactClass": "TEST",
-      "discovered": 293,
+      "discovered": 298,
       "excluded": 0,
       "failed": 0,
-      "included": 293,
+      "included": 298,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 293
+      "successfullyInventoried": 298
     },
     {
       "artifactClass": "VERIFICATION",
@@ -197,6 +197,8 @@
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
         "apps/rph-demo/src/lib/theme.test.ts",
         "apps/rph-demo/src/lib/walkthrough.test.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
+        "packages/csaa/src/graph/validate-graph.test.ts",
         "packages/csaa/src/index.test.ts",
         "packages/csaa/src/inventory/boundary-policy.test.ts",
         "packages/csaa/src/inventory/canonical.test.ts",
@@ -207,9 +209,12 @@
         "packages/csaa/src/providers/typescript/frozen-compiler-host.test.ts",
         "packages/csaa/src/providers/typescript/materialize-program-recipe.test.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
+        "packages/csaa/src/semantic/durable-declaration-id.test.ts",
         "packages/csaa/src/semantic/ids.test.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.test.ts",
+        "packages/csaa/src/semantic/operation-budget-ledger.test.ts",
         "packages/csaa/src/semantic/repository-smoke.test.ts",
+        "packages/csaa/src/semantic/static-semantic-operation-budget-session.test.ts",
         "packages/csaa/src/semantic/syntax-projection.test.ts",
         "packages/csaa/src/semantic/validate-snapshot.test.ts",
         "packages/csaa/src/semantic/validate-wire-shape.test.ts",
@@ -471,7 +476,25 @@
       "state": "IMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "The first bounded DWP-004 increment projects every compiler-observed module occurrence into a validated TypeScript module-dependency graph with distinct occurrence relations, explicit non-source targets, provenance, limitations, and reconciled forward/reverse indexes. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, depcruise comparison, calls, flow, and cross-Program composition are not implemented by this increment.",
+      "id": "dependency-graph",
+      "provenance": [
+        "packages/csaa/src/contracts/graph.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/module-dependency-content.ts",
+        "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/validate-graph.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts"
+      ],
+      "provider": "typescript",
+      "state": "PARTIAL"
+    },
+    {
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "call-graph",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -480,7 +503,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "code-property-graph",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -489,7 +512,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "control-flow",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -498,7 +521,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "data-flow",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -507,7 +530,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "runtime-traces",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -516,7 +539,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "security-query",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -525,16 +548,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
-      "id": "symbol-table",
-      "provenance": [
-        "packages/csaa/src/contracts/inventory.ts"
-      ],
-      "provider": null,
-      "state": "UNIMPLEMENTED"
-    },
-    {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
       "id": "test-coverage-ingestion",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -543,22 +557,42 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
-      "id": "type-graph",
-      "provenance": [
-        "packages/csaa/src/contracts/inventory.ts"
-      ],
-      "provider": null,
-      "state": "UNIMPLEMENTED"
-    },
-    {
-      "explanation": "Scheduled after the generated-inventory increment; no support is inferred from installed tools.",
+      "explanation": "The current DWP-003 provider constructs frozen TypeScript Programs and implements TS_PROJECT and TS_SYNTAX semantic snapshot capabilities.",
       "id": "typescript-ast",
       "provenance": [
-        "packages/csaa/src/contracts/inventory.ts"
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts"
       ],
-      "provider": null,
-      "state": "UNIMPLEMENTED"
+      "provider": "typescript",
+      "state": "IMPLEMENTED"
+    },
+    {
+      "explanation": "The current DWP-003 provider implements Program-scoped TS_SYMBOL declarations, symbols, aliases, references, module resolutions, and module exports with normalized provenance and validation. Cross-Program symbol identity and binding reconciliation is not implemented for multi-project snapshots.",
+      "id": "symbol-table",
+      "provenance": [
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts"
+      ],
+      "provider": "typescript",
+      "state": "PARTIAL"
+    },
+    {
+      "explanation": "The current DWP-003 provider implements Program-local TS_TYPE records for types, type parameters, call and construct signatures, signature parameters, overload sets, declared type relations, and request-scoped checker assignability. Cross-Program type reconciliation, exhaustive all-pairs assignability, and DWP-004 composed graph projection are not implemented.",
+      "id": "type-graph",
+      "provenance": [
+        "packages/csaa/src/providers/typescript/extract-types.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts"
+      ],
+      "provider": "typescript",
+      "state": "PARTIAL"
     }
   ],
   "commands": [
@@ -631,6 +665,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/csaa:semantic:smoke"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "CSAA_REPOSITORY_SMOKE=packages/csaa/tsconfig.json vitest run packages/csaa/src/semantic/repository-smoke.test.ts",
+      "name": "csaa:semantic:smoke:csaa",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:semantic:smoke:csaa"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -1463,7 +1509,12 @@
     },
     {
       "adapterCapabilities": [
-        "configuration-ast-parse"
+        "TS_PROJECT",
+        "TS_SYMBOL",
+        "TS_SYNTAX",
+        "TS_TYPE",
+        "configuration-ast-parse",
+        "frozen-program-construction"
       ],
       "adapterState": "INVENTORY_INTEGRATED",
       "configurationState": "CONFIGURED",
@@ -1480,6 +1531,16 @@
         "apps/rph-demo/tsconfig.json",
         "bun.lock",
         "package.json#/scripts/check-types",
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts",
         "packages/csaa/tsconfig.build.json",
         "packages/csaa/tsconfig.json",
         "packages/rph-application/tsconfig.build.json",
@@ -1531,7 +1592,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "1ebed35bd6490f44d8b2eb67516fdfe370fdcb2d914c1a6265ddbd381c7119e4",
+    "configurationDigest": "dc155c6e8f8c66514b587814a6013efcdcf1c43b004902705d7664f7f762c70e",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -1614,9 +1675,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 2174,
+          "bytes": 2320,
           "path": "package.json",
-          "sha256": "60b02de360a14119917fc7e1f6622369601f1d48f027167f0b87659f8c1aaa6b"
+          "sha256": "fcae67e916cd787414362159c143aae39e18ac820c7051a7ed17ff2b08554332"
         },
         {
           "artifactClass": "MANIFEST",
@@ -2051,15 +2112,21 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "b07cf33307316a1c584ee866f61717bb12b72a9ed68f4b9279ed6bc897cd67cd",
+          "projectResolutionDigest": "464991c354f52510fa0123b1974f8a60d6a2bd84aceda9753270eff0a34f4859",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/contracts/graph.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/semantic.ts",
             "packages/csaa/src/contracts/subject.ts",
+            "packages/csaa/src/graph/build-module-dependency-graph.ts",
+            "packages/csaa/src/graph/ids.ts",
+            "packages/csaa/src/graph/module-dependency-content.ts",
+            "packages/csaa/src/graph/module-dependency-input.ts",
+            "packages/csaa/src/graph/validate-graph.ts",
             "packages/csaa/src/index.ts",
             "packages/csaa/src/inventory/canonical.ts",
             "packages/csaa/src/inventory/collect-inventory.ts",
@@ -2069,15 +2136,23 @@
             "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
             "packages/csaa/src/providers/typescript/compiler-paths.ts",
             "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+            "packages/csaa/src/providers/typescript/extract-symbols.ts",
+            "packages/csaa/src/providers/typescript/extract-types.ts",
             "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
             "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
             "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
             "packages/csaa/src/semantic/canonical.ts",
+            "packages/csaa/src/semantic/durable-declaration-id.ts",
             "packages/csaa/src/semantic/ids.ts",
             "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+            "packages/csaa/src/semantic/operation-budget-ledger.ts",
+            "packages/csaa/src/semantic/operation-budget-provider-binding.ts",
             "packages/csaa/src/semantic/population.ts",
             "packages/csaa/src/semantic/program-recipe-policy.ts",
             "packages/csaa/src/semantic/raw-semantic-model.ts",
+            "packages/csaa/src/semantic/scope-taxonomy.ts",
+            "packages/csaa/src/semantic/scope-validation-oracle.ts",
+            "packages/csaa/src/semantic/static-semantic-operation-budget-session.ts",
             "packages/csaa/src/semantic/syntax-projection.ts",
             "packages/csaa/src/semantic/validate-snapshot.ts",
             "packages/csaa/src/semantic/validate-wire-shape.ts",
@@ -2128,15 +2203,23 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d6d716428a86b022defd9db9c0aceede2338a14a0aaccbc328428d878a7ce670",
+          "projectResolutionDigest": "0f565f06eb3ace80a6b0d52482d165206961ad86511abf12990708c454b39561",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/contracts/graph.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/semantic.ts",
             "packages/csaa/src/contracts/subject.ts",
+            "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
+            "packages/csaa/src/graph/build-module-dependency-graph.ts",
+            "packages/csaa/src/graph/ids.ts",
+            "packages/csaa/src/graph/module-dependency-content.ts",
+            "packages/csaa/src/graph/module-dependency-input.ts",
+            "packages/csaa/src/graph/validate-graph.test.ts",
+            "packages/csaa/src/graph/validate-graph.ts",
             "packages/csaa/src/index.test.ts",
             "packages/csaa/src/index.ts",
             "packages/csaa/src/inventory/boundary-policy.test.ts",
@@ -2153,6 +2236,8 @@
             "packages/csaa/src/providers/typescript/compiler-paths.ts",
             "packages/csaa/src/providers/typescript/extract-static-raw.test.ts",
             "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+            "packages/csaa/src/providers/typescript/extract-symbols.ts",
+            "packages/csaa/src/providers/typescript/extract-types.ts",
             "packages/csaa/src/providers/typescript/frozen-compiler-host.test.ts",
             "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
             "packages/csaa/src/providers/typescript/materialize-program-recipe.test.ts",
@@ -2160,14 +2245,23 @@
             "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
             "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
             "packages/csaa/src/semantic/canonical.ts",
+            "packages/csaa/src/semantic/durable-declaration-id.test.ts",
+            "packages/csaa/src/semantic/durable-declaration-id.ts",
             "packages/csaa/src/semantic/ids.test.ts",
             "packages/csaa/src/semantic/ids.ts",
             "packages/csaa/src/semantic/normalize-semantic-snapshot.test.ts",
             "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+            "packages/csaa/src/semantic/operation-budget-ledger.test.ts",
+            "packages/csaa/src/semantic/operation-budget-ledger.ts",
+            "packages/csaa/src/semantic/operation-budget-provider-binding.ts",
             "packages/csaa/src/semantic/population.ts",
             "packages/csaa/src/semantic/program-recipe-policy.ts",
             "packages/csaa/src/semantic/raw-semantic-model.ts",
             "packages/csaa/src/semantic/repository-smoke.test.ts",
+            "packages/csaa/src/semantic/scope-taxonomy.ts",
+            "packages/csaa/src/semantic/scope-validation-oracle.ts",
+            "packages/csaa/src/semantic/static-semantic-operation-budget-session.test.ts",
+            "packages/csaa/src/semantic/static-semantic-operation-budget-session.ts",
             "packages/csaa/src/semantic/syntax-projection.test.ts",
             "packages/csaa/src/semantic/syntax-projection.ts",
             "packages/csaa/src/semantic/validate-snapshot.test.ts",
@@ -3448,11 +3542,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "82ef6166b54c75bcbf2bfa917da361f930d0f1a250af0339c7af38793327fd0e",
+          "configClosureDigest": "a7a20866e07d96088f58ce3d059691252cbc9609b0492b89d202b4d13e3e0720",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "3c5d0575b134ad3f350f47af3810503fae5fbf0d205d4444a2910f413f6f1dfd",
+          "projectResolutionDigest": "c571c98037976ddda284988b94f985913a77fadb49837934ccd700d723bb872a",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3493,11 +3587,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "3125bd70f2efb4b379f1089a05bc123415223d986fb8af8dd1f37936cdda84d5",
+          "configClosureDigest": "b046454082395ff85f9a862d76fd39d6729f94e59d4e44432e586b7218e2a120",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "05f490c79ac98b6df2f8a58473f04b7a030baf33f2f56f50fe75340bc776e175",
+          "projectResolutionDigest": "6e9098037532d32bbf6b33867bba5e1f9309fa9bd52b8e0164e2db99c5f22a03",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3531,11 +3625,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "f1fc4fbb5ffb059c6f94d776dabd371f36c0ffe29918d5a4f11a1a521027b430",
+          "configClosureDigest": "e24b5a84138e9f3f3b447f9f75fb590b82f9b7d8244dc319cb57e9281e9b8b04",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d374362c89f8f63fc715858e4ee06732e974a0bdb4fa6d51718e9b0e3f7f8574",
+          "projectResolutionDigest": "e8fda0062fe77590dce7f607e50b85937ee17dba8f7ddfe6a595ac71ed98dfad",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4270,7 +4364,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "f14bf0338ed0b2bb571e6d9e23084f328a46c19c94f96b19c667f17bd27a4314",
+    "fileManifestDigest": "f7249190f92a2fa961d88e37fe9a413415c312be0cccf0e7ce43d5b2c54df5c1",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/tsconfig.json",
@@ -4317,7 +4411,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.0.0",
-    "selectedFileCount": 747,
+    "selectedFileCount": 766,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -5413,9 +5507,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 2174,
+        "bytes": 2320,
         "path": "package.json",
-        "sha256": "60b02de360a14119917fc7e1f6622369601f1d48f027167f0b87659f8c1aaa6b",
+        "sha256": "fcae67e916cd787414362159c143aae39e18ac820c7051a7ed17ff2b08554332",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -5427,44 +5521,100 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8577,
+        "bytes": 9083,
+        "path": "packages/csaa/src/contracts/graph.ts",
+        "sha256": "1651d649e37a535c43ecfb92a8649ddbf964212b6ae3a62e9a88c9be35e2c8b4",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 8603,
         "path": "packages/csaa/src/contracts/inventory.ts",
-        "sha256": "3f7347a15b6388350bf5e667300eff1d2db37542324a7703a62df5012289744c",
+        "sha256": "f99349553fdb819ec546142a413177946bd27e30166c4867456405a2bcd16912",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 19783,
+        "bytes": 36679,
         "path": "packages/csaa/src/contracts/semantic.ts",
-        "sha256": "f89c61434b485a039f20cd2206a785f2579a791c97b338d105210f698fdbe1ab",
+        "sha256": "8c5297433600c1ad6de30f287ac7f3cb336fcb093f02a82479eba3fe72da7f85",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8804,
+        "bytes": 8808,
         "path": "packages/csaa/src/contracts/subject.ts",
-        "sha256": "e5bf4c247afc860bf2dac907739886c0a61b245c634b2843bb377f4952e7d833",
+        "sha256": "ec55cf1567c33e2de39ea8a26c6a86aa6404de944e82efdd3445e68102e6b2f0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 2054,
-        "path": "packages/csaa/src/index.test.ts",
-        "sha256": "91e54c222916fb48bda9357695cfde614c77b4ad5202bdc93c613768901aa271",
+        "bytes": 9635,
+        "path": "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
+        "sha256": "9c622cadab744269cf665cacbd4138dce0e2fbd51161df84d791412c8efec42f",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 1249,
-        "path": "packages/csaa/src/index.ts",
-        "sha256": "082974ecbd5449070d9cff4a4369e1d0c8d9610e10068f316bb03557c97b271d",
+        "bytes": 20447,
+        "path": "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "sha256": "8bbffb7ea60d138c99fbf3cdeed78596899f37f4e5a283baba1ea5f3a03268b9",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 2792,
+        "path": "packages/csaa/src/graph/ids.ts",
+        "sha256": "e85348550b94097c78ef4eeb980091118e60b0c776ee6f140dd89f1ee4020d1b",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 571,
+        "path": "packages/csaa/src/graph/module-dependency-content.ts",
+        "sha256": "730a59273004dddf8841d5fd3b73a4ea7eb3478c84202066bcf4d347ed18f6d0",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 3516,
+        "path": "packages/csaa/src/graph/module-dependency-input.ts",
+        "sha256": "65805fdf84db24f00e8a46d37f1ce003dd0c9abddbeaa8f149a179957de7f84f",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 3128,
+        "bytes": 6647,
+        "path": "packages/csaa/src/graph/validate-graph.test.ts",
+        "sha256": "e207453707a614933683cf69c7dd7496fda5e8805435acaa8f5f13fc08d909dc",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 44437,
+        "path": "packages/csaa/src/graph/validate-graph.ts",
+        "sha256": "11e397ed83aa6f122caded1260de5cb7d4d2fd22617fff8871d3339bd7f264cc",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 2801,
+        "path": "packages/csaa/src/index.test.ts",
+        "sha256": "2e457a6cfb1a73dead2440b077f4f87c8d294e66d7eda082e52e579072e36827",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 1661,
+        "path": "packages/csaa/src/index.ts",
+        "sha256": "6e73afc59e7dfd432c45c356278a538a60894669e71f7b653205fd3051847dae",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 4203,
         "path": "packages/csaa/src/inventory/boundary-policy.test.ts",
-        "sha256": "02e463e0db2662e3babf16868bd67a6fda79ab2e14f9336f32b8409d0b30f409",
+        "sha256": "6f6f8357e79c63f5e8d455f0af74896cad69b87cc36159dcc87a73fd89609b4b",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5483,185 +5633,262 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 31882,
+        "bytes": 36620,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "f2c5363bde4030a05bbc9134d3168e50a29e60154689ac8cc1dc0e181762f11d",
+        "sha256": "0d8c4a20d89ffac48526d781ecb00586680abaac21bbc5c4db540ab04bea7497",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 20107,
+        "bytes": 24476,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "3aba6f26948901e0fcdcc04666bf63987f20d571258b47d70235a4d6d4e18d41",
+        "sha256": "4f3bdc77766945d4ca31ed270b77d00f3ed996eb5b71c02689ac8999b8e776da",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 1230,
+        "bytes": 1237,
         "path": "packages/csaa/src/inventory/project-subject-for-inventory.ts",
-        "sha256": "f62f3df9aa256f3621c820489d837b40d46eb1160eac7de314a3b35e792fad58",
+        "sha256": "89fceeca09c6333857e98e851fead1d37fc7b4e8d6e6f790e527f7c2c578b277",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 10155,
+        "bytes": 10360,
         "path": "packages/csaa/src/inventory/render-inventory.ts",
-        "sha256": "6ab663d7d10f9a98105cd5c5b65dc42c794b8b08c4e28177d6ef2caf59ababb8",
+        "sha256": "d46a2e5d28c88d01950179b2e99784f94fdcda94f38c612ac34c99b10ac41bf5",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 7954,
+        "bytes": 8035,
         "path": "packages/csaa/src/inventory/run-inventory.ts",
-        "sha256": "b47a0adbb1f805b52181f75b3aea373b8cd840333175715cf19dac8214bf13d4",
+        "sha256": "4b27ca30f6cc3532717f152ac7db8c4795fe4d81316ab4a9a9d4a2e0e2769ec0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 80722,
+        "bytes": 110510,
         "path": "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
-        "sha256": "e3549a2ae74a56001d1362c5cb25589050d099e1eafb98cacc4be016164f1243",
+        "sha256": "92f17ae222d198913131aefac53327dfb9189c617c05d75d5767f41a9e431ac1",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 92929,
+        "bytes": 106111,
         "path": "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
-        "sha256": "f16e5350ef559fab492a11036b51c1c71667525eef83e2b51cf9e14b71a25a55",
+        "sha256": "f3bc4f50703371f3d3bf8ac13b77bbed5193d51ebefd13c5b29a025e291b861b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 17075,
+        "bytes": 17717,
         "path": "packages/csaa/src/providers/typescript/compiler-paths.test.ts",
-        "sha256": "bf323a01df7b1215e5f788275880db35446aec63472835db286ecc92acb7c66e",
+        "sha256": "49b2c80ecadaf5a71be9fe37c719cbfed131268be1cd9af72bc68d8351d59c83",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 28493,
+        "bytes": 29137,
         "path": "packages/csaa/src/providers/typescript/compiler-paths.ts",
-        "sha256": "bf22dd95f2b4035a5c1e9b251e2ce1bf57823027fa998d0f9368cd422796877b",
+        "sha256": "c1af7f1182c83b698de5697236834b0705dc27182bd54483a6a990a69d019d19",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 30517,
+        "bytes": 91818,
         "path": "packages/csaa/src/providers/typescript/extract-static-raw.test.ts",
-        "sha256": "581b1f41069160cda06a71ea37e66c095c6d594eef2d182b0b3f956e5b633d3e",
+        "sha256": "32dc65ac81d9cdacf14ac4598aa22978e65282e540ec74218bc7fdb502cf371b",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 48555,
+        "bytes": 64043,
         "path": "packages/csaa/src/providers/typescript/extract-static-raw.ts",
-        "sha256": "a3577ce708cc08f7c5d3b75a30347c65d1a019dd285879cd3c2bdcd7c2727045",
+        "sha256": "a65527c8a99e2466478feb99abb024b93c29cb711d892df66ae848454add867b",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 56516,
+        "path": "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "sha256": "4de15610aa14143e03fc9b8420a3c497fa6960d7f9e1350e0a8f5d143beba890",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 69298,
+        "path": "packages/csaa/src/providers/typescript/extract-types.ts",
+        "sha256": "040d3fefbf0df6e4e536363f9f0b7a2b3d9193d3cb3fe038901becd16d1b2594",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 39410,
+        "bytes": 46200,
         "path": "packages/csaa/src/providers/typescript/frozen-compiler-host.test.ts",
-        "sha256": "60948b282ed0c49471630709f3ade06f98ed1877581ed077e8aa8ae062b93961",
+        "sha256": "47b804919f17d7f632854d3fbd73be2b2969954da5ece7638f46834fdfeb75ed",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 24149,
+        "bytes": 26204,
         "path": "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
-        "sha256": "9bab8a90454ccfb6e54e2e7aa6b78c544f6b091eddb091a9e94c29fcdcafa9aa",
+        "sha256": "16d29cf8e5867b195af3b42424ffda955b4afa6a63239c59ddf9f969ec6176ca",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11146,
+        "bytes": 11880,
         "path": "packages/csaa/src/providers/typescript/materialize-program-recipe.test.ts",
-        "sha256": "e87db49bf5af7c5afb8b93e3788855f7c914f3fcfd2a76964e0eb1af7e673bdb",
+        "sha256": "68355b1583dd7c4eac9fbef2ec075afbada69953761b84854ea8beffd4a55a61",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 7562,
+        "bytes": 7749,
         "path": "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
-        "sha256": "3810f91eda87da018dd234ce3f055045b6a8961eea67a984916b05cebb4588d9",
+        "sha256": "0a9c31666cafb2b9b929dfc63aeb0b2215903462acad5678c3188d773c8c21fe",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 23455,
+        "bytes": 69107,
         "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
-        "sha256": "5f7016ae5cd14aa336a0928ec9b309664095a26dc3eff8b69cde14f9e0cb4289",
+        "sha256": "a58574ca606d25cdfc420e55cde95da057f6d3e66d75581b866d9ff226b306bb",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 35282,
+        "bytes": 49394,
         "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
-        "sha256": "9af76921689bf4fc48acacaf3d2de5ac4156938ae5f68aebf4d3a7cbe4165059",
+        "sha256": "84dbfaba062e6ecbae8bb15e8e9c04d6bffbc036a5192c4256dc8635738c162b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8666,
+        "bytes": 8806,
         "path": "packages/csaa/src/semantic/canonical.ts",
-        "sha256": "07902f2a0946af2976154ca14ed62e9fb97bc5cb727ddda52206d4fbaf1c6d95",
+        "sha256": "59ac6f007af450d37e96c11648e3797f5d47ddc8202b9db15ec7fae8142b084e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 13045,
+        "bytes": 6642,
+        "path": "packages/csaa/src/semantic/durable-declaration-id.test.ts",
+        "sha256": "4def10c8694586880fdd09052cb7f96801df047082f230030d209fa261947367",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 5884,
+        "path": "packages/csaa/src/semantic/durable-declaration-id.ts",
+        "sha256": "1fa0917f831de03144c742d628b1cc72bc12a66b36fef9b4b4f280a13440213a",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 19998,
         "path": "packages/csaa/src/semantic/ids.test.ts",
-        "sha256": "969b4f92c4a316d696cef216047bccf9361283de497a6d43311f0609c014ab27",
+        "sha256": "b79bd9d5c013a2dd5172877c2dc01055ef73990f5544f9239abcabd7a77a87f3",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 6382,
+        "bytes": 15391,
         "path": "packages/csaa/src/semantic/ids.ts",
-        "sha256": "bb2088b3a676165d0926114d3cb7ded5065cc544515790d44bbd4022eaf208c6",
+        "sha256": "a092e882ec8dd88c32a3b3fb9ec56989de7bc248b845735e877395f1986f1049",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 30366,
+        "bytes": 67190,
         "path": "packages/csaa/src/semantic/normalize-semantic-snapshot.test.ts",
-        "sha256": "3a33508c14fe0b3c0ae2c61b6021942c47bee43489938297eb053110815d5144",
+        "sha256": "459ca4ca1382b6154eb0c564c5f489f0384c45e7e648348779db099c36670415",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 35845,
+        "bytes": 109746,
         "path": "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
-        "sha256": "fb7d6264444f11ec982a6db76341d2054903032670632dc0c6f79e10b70d3140",
-        "subjectArtifactClass": "PRODUCTION_SOURCE"
-      },
-      {
-        "artifactClass": "SOURCE",
-        "bytes": 4584,
-        "path": "packages/csaa/src/semantic/population.ts",
-        "sha256": "94e91fd02adcc45d90667a862c161b4bc32ef2a09d0d8e0ece9db880d2b6093f",
-        "subjectArtifactClass": "PRODUCTION_SOURCE"
-      },
-      {
-        "artifactClass": "SOURCE",
-        "bytes": 14862,
-        "path": "packages/csaa/src/semantic/program-recipe-policy.ts",
-        "sha256": "8e18a303c4b843f1994b64aaa68ff7fb8b0c9db083237d8d1a6b245e56507e41",
-        "subjectArtifactClass": "PRODUCTION_SOURCE"
-      },
-      {
-        "artifactClass": "SOURCE",
-        "bytes": 8288,
-        "path": "packages/csaa/src/semantic/raw-semantic-model.ts",
-        "sha256": "0cc2c5c5f3cf30ff5a5209133bf62e3c24e5f3110c3b9e57b8ff4211c142184d",
+        "sha256": "e5416dd566b3c5ae607b98970fd4055dd6506529ca12f71650d63b080dd1666b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 3857,
-        "path": "packages/csaa/src/semantic/repository-smoke.test.ts",
-        "sha256": "0f43bee407ec55886d260823ef358e2807be0f5896e3ef064f19ee9a03472de9",
+        "bytes": 27394,
+        "path": "packages/csaa/src/semantic/operation-budget-ledger.test.ts",
+        "sha256": "17c5c639aa88087e87593ec09d4a52e946c82f92f4f544b5f5365ea3095d5af8",
         "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 40516,
+        "path": "packages/csaa/src/semantic/operation-budget-ledger.ts",
+        "sha256": "8be23d92adf523c92b359270796724b17ea46eadd743f420244bf4e2fd55fd33",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 288,
+        "path": "packages/csaa/src/semantic/operation-budget-provider-binding.ts",
+        "sha256": "3e8a8b6db76e4725b9d7ae67828c7a959874f4af4814c6eed3008190b507b1d0",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4650,
+        "path": "packages/csaa/src/semantic/population.ts",
+        "sha256": "52c2298ae2c8232480ae8d20181a12b2fb615ca43289966420999504d0c7af22",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 15372,
+        "path": "packages/csaa/src/semantic/program-recipe-policy.ts",
+        "sha256": "9704106da08d948b6a51a2dcf679f813e7bfcf859c2d30fd0a910e89554f7801",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 19628,
+        "path": "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "sha256": "b71aca64662bee015513776185d30bb3171e27fe90ab421b9e0c83ad3859a96a",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 7032,
+        "path": "packages/csaa/src/semantic/repository-smoke.test.ts",
+        "sha256": "46aa1b7aa5ef79ff26c57b09bc27ff8794b9c3ae952a16ad00401352ad40f1a3",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 2954,
+        "path": "packages/csaa/src/semantic/scope-taxonomy.ts",
+        "sha256": "f78bad70449cd1b2847becabab0fd8ddfac988ce18b1c629817c6eaab3b317fe",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 2994,
+        "path": "packages/csaa/src/semantic/scope-validation-oracle.ts",
+        "sha256": "0773464867f31c1d55b9a62010da62051fcb1953960a65c38cd841b2c882f827",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 18864,
+        "path": "packages/csaa/src/semantic/static-semantic-operation-budget-session.test.ts",
+        "sha256": "5669589ebf926bcfe7c396551f0ef2917e8855dd87c2f5b4813e676ccb54eb6b",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 28746,
+        "path": "packages/csaa/src/semantic/static-semantic-operation-budget-session.ts",
+        "sha256": "57b37ef8baa793f20bd0eff6de576817abf2e694d3a1421514e0f6f1c4fcef93",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
@@ -5672,44 +5899,44 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 13142,
+        "bytes": 13274,
         "path": "packages/csaa/src/semantic/syntax-projection.ts",
-        "sha256": "f71e2928f12a16dd98d569febe2482b8d7d412a313a85510d11f23f071b9d5d0",
+        "sha256": "ed10f30cbf1da000a4d4122b23df190df79e604574b2baa8c68757ea3212d3a7",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 163621,
+        "bytes": 253643,
         "path": "packages/csaa/src/semantic/validate-snapshot.test.ts",
-        "sha256": "c724f13480b632a425feb40a1d65bc313d428d0e1fa58de321914c605155ff26",
+        "sha256": "9766ecfc9c9531e840c5bafccfb5291a37d88fad83d32bac152e8d0f1ef8716e",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 106896,
+        "bytes": 241734,
         "path": "packages/csaa/src/semantic/validate-snapshot.ts",
-        "sha256": "ce3a55b14825f9724799334085213e2ea5cbcb7a42dd63c5d84016939390f6c5",
+        "sha256": "a5aa08dad27d024c260d36d0954f303452b613516846cd629fe0252f3fe86943",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 6575,
+        "bytes": 18310,
         "path": "packages/csaa/src/semantic/validate-wire-shape.test.ts",
-        "sha256": "21b6e935c98c2208e45667d89c7e1f00926ee34f9158366310a4ccfd54ee58bb",
+        "sha256": "409d1b7bb4aa4cb1db01612e34529fcc3ed95eaede83a18722db8a5251425df9",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 27431,
+        "bytes": 40781,
         "path": "packages/csaa/src/semantic/validate-wire-shape.ts",
-        "sha256": "dd7cf9f2c1b756d3ec96cf098be94b8ec8e1247ac794575d1f61a684bf3030f2",
+        "sha256": "00758e87658a126f46f7cea2fd124cdeca549fedd0b94d27c976af6520d26c6f",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 6988,
+        "bytes": 7407,
         "path": "packages/csaa/src/subject/artifacts.ts",
-        "sha256": "a9da050a2f257782218df8bf6ec0dba1f74eb4c23e9d146d1292caa578af2989",
+        "sha256": "c65cf5146fcd00c7e309e2c7fcbc0ca7f50ce10fde1246b9e529ed92da9b96d6",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -5721,86 +5948,86 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 16469,
+        "bytes": 17459,
         "path": "packages/csaa/src/subject/capture.ts",
-        "sha256": "61a563faaff5833c84f018a140464adc0658af68f3a4b815b21f1b8c55d83407",
+        "sha256": "cd79630fda9e00325377dc280406bda6178faec1968ebd270e0abf3a1a3d68a0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 1464,
+        "bytes": 1502,
         "path": "packages/csaa/src/subject/freshness.ts",
-        "sha256": "64112c26fedd701e58946ce061187ef1341ec69da78f8ba70ebb32510adb76ee",
+        "sha256": "ee3bc1a97940a5fbbe26f46e828d3597ea93e175224a32ea65799b91cfc63ee0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 866,
+        "bytes": 874,
         "path": "packages/csaa/src/subject/frozen-store.ts",
-        "sha256": "e82b41f7c536d8996386d2c7ad5f18bd2ca70cceb6ac61914e5a4fd48c347938",
+        "sha256": "96ce4186be3fc14e337b2481e6168b215ce7dccf83162a4fee13ac4f9ad9c462",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 4663,
+        "bytes": 4908,
         "path": "packages/csaa/src/subject/generated-context.ts",
-        "sha256": "814f87760d902d93abca96b3d181ff7e0bee0c26f4addb7d8c2140ac73d3be10",
+        "sha256": "67cb870f38d8aaba492bc2b5e3b3efd76af3553de1f57f9ba1a29dcae70029e8",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8290,
+        "bytes": 8600,
         "path": "packages/csaa/src/subject/manifest.ts",
-        "sha256": "cc8e48672fe55919cf55197c50e7d5e2112e26201a589497137212378d0cd4b6",
+        "sha256": "fd8fbbae5827e2091cec15ebc2909722329b7cfb667dbf88ccada548e2423eda",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 3718,
+        "bytes": 3734,
         "path": "packages/csaa/src/subject/paths.ts",
-        "sha256": "1da6cf7a09a8fbd301502f0cff5637af1711856b0df199b7297098fc93377ead",
+        "sha256": "22ece033a32de09f5a834934c8fea85b8cd0a9246b05b810dc60a6f36f318eb2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 9699,
+        "bytes": 10213,
         "path": "packages/csaa/src/subject/policy.ts",
-        "sha256": "dc291d43e35d9ab4f9372d2dfe2dd98850b45d8df57b5c871cfc09d536d3705b",
+        "sha256": "9854d9e13e3236566a64703b54c475b313eea7f3b9bc0ed25d690f8170bd4cea",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 3546,
+        "bytes": 3566,
         "path": "packages/csaa/src/subject/product-boundary.ts",
-        "sha256": "10028f0cdd41dba8de43121481098fa6303b8f34b4cedd4105a7e607e89ae6cd",
+        "sha256": "22fb5cfbc2131e3720b01a85029b1c62b784e221e620833a8e06eccfdc993597",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 24711,
+        "bytes": 26153,
         "path": "packages/csaa/src/subject/projects.ts",
-        "sha256": "9a9c9fedd4f2c2796609e1744579441f4b0d0c30591a332db672d4b1355d549b",
+        "sha256": "896b1e5459a4c46e4d6f3f6bab9ee34c1df902bd8876abca3ee1dc62b4a68ea3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 5536,
+        "bytes": 5909,
         "path": "packages/csaa/src/subject/resolve-subject.ts",
-        "sha256": "859196aec24f6eaad6e8ea038c551f2b4e3b1ade9e643b9ad4ecf7d5f2a9d4e8",
+        "sha256": "e353f0aa186fbc26274e3bf323f46623b507b8d0d99285d8e6101f1cba086f1f",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 61658,
+        "bytes": 64321,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "abc7058ead3be89fbed1a2aba15f65cedea3a69ef6d39c90e23a811b3fe95154",
+        "sha256": "2037bcfbb337d02952c3d4a5e8a2c19c246a65b8ef8b2260f689e9710c31b1d3",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 6004,
+        "bytes": 6198,
         "path": "packages/csaa/src/subject/workspaces.ts",
-        "sha256": "34c217e99e69c4ef1239ae7762f67fad8b83007989183bc90881c79e174a9253",
+        "sha256": "fd71e483d9e5381943cefafe70e5ba83974b797e99ee197128333ec26b19c9c5",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9158,16 +9385,16 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 1146,
+        "bytes": 1153,
         "path": "scripts/csaa-inventory.ts",
-        "sha256": "7b75224aefa0960b29c884f52f8cf145579a9129afbe94699cb5d8785015fe4f",
+        "sha256": "01fe8027d8a47a2817dcd979e8f09118b3fc9cf9094d743d59363832c4beea17",
         "subjectArtifactClass": "SCRIPT"
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 569,
+        "bytes": 574,
         "path": "scripts/csaa-product-boundary.ts",
-        "sha256": "5016931fcdd426eecab6ee3baad54f337b255507220f0a549516da4375ab00b3",
+        "sha256": "c1f179ca241d2db5b3abc07be6ffb349934b903f9b0aa2dfbbcb22f51a29b4fd",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -9549,7 +9776,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "174edba2232b04b07c0aa632a788a12daacfd67a147d2f150c17a7b09a4fb552",
+    "subjectId": "37a40c8e7bf344c3786d815fc89fc2187a0981aae0bb55628d8fe0ed426387ef",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -9713,7 +9940,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 37,
+      "candidateArtifactCount": 51,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -9739,9 +9966,15 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/subject.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/module-dependency-content.ts",
+        "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/validate-graph.ts",
         "packages/csaa/src/index.ts",
         "packages/csaa/src/inventory/canonical.ts",
         "packages/csaa/src/inventory/collect-inventory.ts",
@@ -9751,15 +9984,23 @@
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
         "packages/csaa/src/providers/typescript/compiler-paths.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts",
         "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
         "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
         "packages/csaa/src/semantic/canonical.ts",
+        "packages/csaa/src/semantic/durable-declaration-id.ts",
         "packages/csaa/src/semantic/ids.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/operation-budget-ledger.ts",
+        "packages/csaa/src/semantic/operation-budget-provider-binding.ts",
         "packages/csaa/src/semantic/population.ts",
         "packages/csaa/src/semantic/program-recipe-policy.ts",
         "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/scope-taxonomy.ts",
+        "packages/csaa/src/semantic/scope-validation-oracle.ts",
+        "packages/csaa/src/semantic/static-semantic-operation-budget-session.ts",
         "packages/csaa/src/semantic/syntax-projection.ts",
         "packages/csaa/src/semantic/validate-snapshot.ts",
         "packages/csaa/src/semantic/validate-wire-shape.ts",
@@ -9783,7 +10024,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 54,
+      "candidateArtifactCount": 73,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -9810,9 +10051,17 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/subject.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/module-dependency-content.ts",
+        "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/validate-graph.test.ts",
+        "packages/csaa/src/graph/validate-graph.ts",
         "packages/csaa/src/index.test.ts",
         "packages/csaa/src/index.ts",
         "packages/csaa/src/inventory/boundary-policy.test.ts",
@@ -9829,6 +10078,8 @@
         "packages/csaa/src/providers/typescript/compiler-paths.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.test.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts",
         "packages/csaa/src/providers/typescript/frozen-compiler-host.test.ts",
         "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
         "packages/csaa/src/providers/typescript/materialize-program-recipe.test.ts",
@@ -9836,14 +10087,23 @@
         "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
         "packages/csaa/src/semantic/canonical.ts",
+        "packages/csaa/src/semantic/durable-declaration-id.test.ts",
+        "packages/csaa/src/semantic/durable-declaration-id.ts",
         "packages/csaa/src/semantic/ids.test.ts",
         "packages/csaa/src/semantic/ids.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.test.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/operation-budget-ledger.test.ts",
+        "packages/csaa/src/semantic/operation-budget-ledger.ts",
+        "packages/csaa/src/semantic/operation-budget-provider-binding.ts",
         "packages/csaa/src/semantic/population.ts",
         "packages/csaa/src/semantic/program-recipe-policy.ts",
         "packages/csaa/src/semantic/raw-semantic-model.ts",
         "packages/csaa/src/semantic/repository-smoke.test.ts",
+        "packages/csaa/src/semantic/scope-taxonomy.ts",
+        "packages/csaa/src/semantic/scope-validation-oracle.ts",
+        "packages/csaa/src/semantic/static-semantic-operation-budget-session.test.ts",
+        "packages/csaa/src/semantic/static-semantic-operation-budget-session.ts",
         "packages/csaa/src/semantic/syntax-projection.test.ts",
         "packages/csaa/src/semantic/syntax-projection.ts",
         "packages/csaa/src/semantic/validate-snapshot.test.ts",
@@ -11139,9 +11399,28 @@
     },
     {
       "provenance": [
-        "typescriptProjects[*].resolvedRootState"
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts",
+        "packages/csaa/src/contracts/graph.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/module-dependency-content.ts",
+        "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/validate-graph.ts",
+        "capabilities#dependency-graph",
+        "capabilities#symbol-table",
+        "capabilities#typescript-ast",
+        "capabilities#type-graph"
       ],
-      "statement": "TypeScript compiler roots are resolved by DWP-002; semantic Program construction remains deferred to DWP-003."
+      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first bounded DWP-004 increment implements only the validated compiler module-dependency projection; cross-Program semantic reconciliation, depcruise comparison, call/flow/state-machine graphs, and composed graph projections remain UNIMPLEMENTED."
     },
     {
       "provenance": [
@@ -11166,7 +11445,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-inventory.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "7b75224aefa0960b29c884f52f8cf145579a9129afbe94699cb5d8785015fe4f",
+      "contentSha256": "01fe8027d8a47a2817dcd979e8f09118b3fc9cf9094d743d59363832c4beea17",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -11182,7 +11461,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-product-boundary.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "5016931fcdd426eecab6ee3baad54f337b255507220f0a549516da4375ab00b3",
+      "contentSha256": "c1f179ca241d2db5b3abc07be6ffb349934b903f9b0aa2dfbbcb22f51a29b4fd",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [

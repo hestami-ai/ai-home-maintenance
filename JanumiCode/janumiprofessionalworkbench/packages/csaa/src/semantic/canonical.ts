@@ -23,14 +23,16 @@ export function utf16CodeUnits(text: string): Uint16Array {
 
 export function utf16CodeUnitsHex(text: string): string {
 	let encoded = '';
-	for (let index = 0; index < text.length; index += 1) encoded += text.charCodeAt(index).toString(16).padStart(4, '0');
+	for (let index = 0; index < text.length; index += 1)
+		encoded += text.charCodeAt(index).toString(16).padStart(4, '0');
 	return encoded;
 }
 
 export function parseUtf16CodeUnitsHex(encoded: string): Uint16Array | null {
 	if (encoded.length % 4 !== 0 || !/^[a-f0-9]*$/u.test(encoded)) return null;
 	const units = new Uint16Array(encoded.length / 4);
-	for (let index = 0; index < units.length; index += 1) units[index] = Number.parseInt(encoded.slice(index * 4, index * 4 + 4), 16);
+	for (let index = 0; index < units.length; index += 1)
+		units[index] = Number.parseInt(encoded.slice(index * 4, index * 4 + 4), 16);
 	return units;
 }
 
@@ -48,7 +50,11 @@ export function hasLoneUtf16CodeUnit(units: Uint16Array): boolean {
 	return false;
 }
 
-export function semanticUtf16CodeUnitsDigest(domain: string, discriminators: readonly string[], value: string | Uint16Array): string {
+export function semanticUtf16CodeUnitsDigest(
+	domain: string,
+	discriminators: readonly string[],
+	value: string | Uint16Array
+): string {
 	const units = typeof value === 'string' ? utf16CodeUnits(value) : value;
 	const bytes = new Uint8Array(units.length * 2);
 	for (let index = 0; index < units.length; index += 1) {
@@ -99,12 +105,14 @@ function writeCanonicalSemanticJson(value: unknown, write: CanonicalChunkWriter)
 	const ancestors = new Set<object>();
 
 	function assertUnicodeScalars(text: string): void {
-		if (!isUnicodeScalarString(text)) throw new TypeError('Semantic canonical JSON rejects lone UTF-16 surrogates.');
+		if (!isUnicodeScalarString(text))
+			throw new TypeError('Semantic canonical JSON rejects lone UTF-16 surrogates.');
 	}
 
 	function dataDescriptor(input: object, key: PropertyKey): PropertyDescriptor {
 		const descriptor = Reflect.getOwnPropertyDescriptor(input, key);
-		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) throw new TypeError('Semantic canonical JSON requires enumerable data properties.');
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Semantic canonical JSON requires enumerable data properties.');
 		return descriptor;
 	}
 
@@ -123,23 +131,37 @@ function writeCanonicalSemanticJson(value: unknown, write: CanonicalChunkWriter)
 			return;
 		}
 		if (typeof input === 'number') {
-			if (!Number.isFinite(input)) throw new TypeError('Semantic canonical JSON requires finite numbers.');
-			if (Number.isInteger(input) && !Number.isSafeInteger(input)) throw new TypeError('Semantic canonical JSON rejects unsafe integer values.');
+			if (!Number.isFinite(input))
+				throw new TypeError('Semantic canonical JSON requires finite numbers.');
+			if (Number.isInteger(input) && !Number.isSafeInteger(input))
+				throw new TypeError('Semantic canonical JSON rejects unsafe integer values.');
 			write(JSON.stringify(input));
 			return;
 		}
-		if (typeof input !== 'object') throw new TypeError(`Semantic canonical JSON cannot serialize ${typeof input}.`);
+		if (typeof input !== 'object')
+			throw new TypeError(`Semantic canonical JSON cannot serialize ${typeof input}.`);
 		if (isProxy(input)) throw new TypeError('Semantic canonical JSON rejects Proxy values.');
 		if (ancestors.has(input)) throw new TypeError('Semantic canonical JSON rejects cyclic values.');
 		ancestors.add(input);
 		try {
 			if (Array.isArray(input)) {
 				const ownKeys = Reflect.ownKeys(input);
-				if (ownKeys.some((key) => typeof key !== 'string' || key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))) throw new TypeError('Semantic canonical JSON rejects array expando properties.');
+				if (
+					ownKeys.some(
+						(key) =>
+							typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+					)
+				)
+					throw new TypeError('Semantic canonical JSON rejects array expando properties.');
 				const lengthDescriptor = Reflect.getOwnPropertyDescriptor(input, 'length');
-				const length = lengthDescriptor !== undefined && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
-				if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0) throw new TypeError('Semantic canonical JSON requires a valid array length.');
-				if (ownKeys.length !== length + 1) throw new TypeError('Semantic canonical JSON rejects sparse arrays.');
+				const length =
+					lengthDescriptor !== undefined && 'value' in lengthDescriptor
+						? lengthDescriptor.value
+						: undefined;
+				if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0)
+					throw new TypeError('Semantic canonical JSON requires a valid array length.');
+				if (ownKeys.length !== length + 1)
+					throw new TypeError('Semantic canonical JSON rejects sparse arrays.');
 				write('[');
 				for (let index = 0; index < length; index += 1) {
 					if (index !== 0) write(',');
@@ -149,13 +171,17 @@ function writeCanonicalSemanticJson(value: unknown, write: CanonicalChunkWriter)
 				return;
 			}
 			const prototype = Reflect.getPrototypeOf(input) as object | null;
-			if (prototype !== Object.prototype && prototype !== null) throw new TypeError('Semantic canonical JSON requires plain objects.');
+			if (prototype !== Object.prototype && prototype !== null)
+				throw new TypeError('Semantic canonical JSON requires plain objects.');
 			const ownKeys = Reflect.ownKeys(input);
-			if (ownKeys.some((key) => typeof key !== 'string')) throw new TypeError('Semantic canonical JSON rejects symbol properties.');
-			const entries = (ownKeys as string[]).map((key) => {
-				assertUnicodeScalars(key);
-				return [key, dataDescriptor(input, key).value] as const;
-			}).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+			if (ownKeys.some((key) => typeof key !== 'string'))
+				throw new TypeError('Semantic canonical JSON rejects symbol properties.');
+			const entries = (ownKeys as string[])
+				.map((key) => {
+					assertUnicodeScalars(key);
+					return [key, dataDescriptor(input, key).value] as const;
+				})
+				.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
 			write('{');
 			for (let index = 0; index < entries.length; index += 1) {
 				if (index !== 0) write(',');
@@ -194,7 +220,11 @@ export function canonicalSemanticJson(value: unknown): string {
 			output.push(chunk);
 			return;
 		}
-		if (bufferedCharacters + chunk.length > CANONICAL_BUFFER_LIMIT || buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT) flush();
+		if (
+			bufferedCharacters + chunk.length > CANONICAL_BUFFER_LIMIT ||
+			buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT
+		)
+			flush();
 		buffered.push(chunk);
 		bufferedCharacters += chunk.length;
 	});
@@ -225,7 +255,11 @@ export function canonicalSemanticJsonWitness(value: unknown): CanonicalSemanticJ
 			hash.update(chunk, 'utf8');
 			return;
 		}
-		if (bufferedBytes + chunkBytes > CANONICAL_BUFFER_LIMIT || buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT) flush();
+		if (
+			bufferedBytes + chunkBytes > CANONICAL_BUFFER_LIMIT ||
+			buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT
+		)
+			flush();
 		buffered.push(chunk);
 		bufferedBytes += chunkBytes;
 	});

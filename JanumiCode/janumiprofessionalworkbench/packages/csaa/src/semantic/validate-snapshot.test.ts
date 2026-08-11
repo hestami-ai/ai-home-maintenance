@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import type {
@@ -22,7 +23,10 @@ import {
 	SEMANTIC_CANONICAL_PROFILE,
 	SEMANTIC_EXTRACTION_VERSION,
 	SEMANTIC_OPERATION_VERSION,
+	SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE,
 	SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+	SEMANTIC_TYPE_DISPLAY_PROFILE,
+	SEMANTIC_TYPE_FINGERPRINT_PROFILE,
 	TYPESCRIPT_PROVIDER_VERSION
 } from '../contracts/semantic.js';
 import { sha256 } from '../inventory/canonical.js';
@@ -30,26 +34,45 @@ import { canonicalSemanticJson, encodeSemanticDiagnosticText } from './canonical
 import {
 	compilerInputClosureDigest,
 	compilerInputResultDigest,
-	semanticNodeId,
 	programRecipeDigest,
+	semanticAliasId,
 	semanticContextInputId,
 	semanticDeclarationCandidateId,
+	semanticDeclarationId,
+	semanticDurableDeclarationId,
 	semanticDiagnosticId,
 	semanticInvocationSiteId,
+	semanticModuleExportId,
+	semanticModuleResolutionId,
+	semanticNodeId,
+	semanticOverloadSetId,
 	semanticProgramId,
 	semanticProjectId,
 	semanticProvenanceId,
+	semanticReferenceId,
+	semanticScopeId,
+	semanticSignatureId,
 	semanticSnapshotId,
-	semanticSourceId
+	semanticSourceId,
+	semanticSymbolId,
+	semanticTypeId,
+	semanticTypeParameterId,
+	semanticTypeRelationId
 } from './ids.js';
 import { semanticPopulation, type SemanticPopulationMembers } from './population.js';
+import { semanticScopeBoundaryDescriptor } from './scope-taxonomy.js';
+import { createStaticSemanticOperationBudgetSession } from './static-semantic-operation-budget-session.js';
 import {
 	AST_STRUCTURAL_ROLES,
 	literalLexemeDigest,
 	literalValueDigest
 } from './syntax-projection.js';
 import {
+	takeStaticSemanticValidationBudgetEvidence,
 	validateStaticSemanticSnapshot,
+	validateStaticSemanticSnapshotWithBudgetEvidence,
+	type StaticSemanticValidationBudgetEvidence,
+	type StaticSemanticValidationBudgetEvidenceErrorCode,
 	type SemanticValidationContext,
 	type SemanticValidationOptions
 } from './validate-snapshot.js';
@@ -68,6 +91,7 @@ const BUDGETS = {
 	maxAstNodes: 100,
 	maxCompilerInputMetadataBytes: 100_000,
 	maxCompilerQueries: 100,
+	maxCompilerFacts: 100,
 	maxCompilerQueryInvocations: 100,
 	maxContextBytes: 1_000,
 	maxContextFileBytes: 1_000,
@@ -80,6 +104,7 @@ const BUDGETS = {
 	maxPathCharacters: 1_000,
 	maxProjects: 10,
 	maxSnapshotBytes: 1_000_000,
+	maxScopes: 100,
 	maxSources: 100
 } as const;
 
@@ -89,7 +114,9 @@ afterEach(() => {
 
 function members(
 	analyzed: readonly string[] = [],
-	contextOnly: readonly string[] = []
+	contextOnly: readonly string[] = [],
+	unsupported: readonly string[] = [],
+	unknown: readonly string[] = []
 ): SemanticPopulationMembers {
 	return {
 		analyzed,
@@ -97,22 +124,33 @@ function members(
 		excluded: [],
 		excludedByPolicy: [],
 		failed: [],
-		unknown: [],
-		unsupported: []
+		unknown,
+		unsupported
 	};
 }
 
 function provenance(
 	snapshotId: SemanticSnapshotId,
 	projectId: ReturnType<typeof semanticProjectId>,
-	capability: 'TS_PROJECT' | 'TS_SYNTAX',
+	capability: 'TS_PROJECT' | 'TS_SYMBOL' | 'TS_SYNTAX' | 'TS_TYPE',
 	recipeDigest: string,
 	sourceId: SemanticSourceId | null = null,
 	parentProvenanceId: SemanticProvenanceId | null = null,
 	contextDigest = CONTEXT_DIGEST,
-	contextInputIds: readonly string[] = [BASE_FROZEN_READ.id]
+	contextInputIds: readonly string[] = [BASE_FROZEN_READ.id],
+	factBasis: 'COMPILER' | 'SCOPE_DERIVED' = 'COMPILER'
 ): SemanticFactProvenanceRecord {
 	const programId = semanticProgramId({ contextDigest, projectId });
+	const scopeDerived = capability === 'TS_SYMBOL' && factBasis === 'SCOPE_DERIVED';
+	const method = scopeDerived
+		? 'typescript-public-ast-binding-rules'
+		: capability === 'TS_PROJECT'
+			? 'typescript-public-program-and-diagnostics'
+			: capability === 'TS_SYMBOL'
+				? 'typescript-public-type-checker-binding'
+				: capability === 'TS_TYPE'
+					? 'typescript-public-type-checker-types-and-signatures'
+					: 'typescript-public-normalized-ast';
 	const preimage: Omit<SemanticFactProvenanceRecord, 'id'> = {
 		capability,
 		epistemic: {
@@ -120,11 +158,15 @@ function provenance(
 			conflict: 'unopposed',
 			executionHealth: 'succeeded',
 			freshness: 'current-for-subject',
-			inference: capability === 'TS_PROJECT' ? 'derived' : 'direct',
+			inference: scopeDerived ? 'derived' : 'direct',
 			rationale: 'Fixture fact is completely extracted.',
 			supportBasis: {
-				kind: capability === 'TS_PROJECT' ? 'derived' : 'direct-extraction',
-				method: 'typescript-public-compiler-api',
+				kind: scopeDerived
+					? 'derived'
+					: capability === 'TS_SYNTAX'
+						? 'direct-extraction'
+						: 'compiler-confirmed',
+				method,
 				rationale: 'Fixture extraction.',
 				sourceRefs:
 					sourceId === null
@@ -187,7 +229,24 @@ function reviseProvenance(
 	const replaceId = (id: SemanticProvenanceId): SemanticProvenanceId => ids.get(id) ?? id;
 	return {
 		...snapshot,
+		aliases: snapshot.aliases.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
+		declarations: snapshot.declarations.map((record) => ({
+			...record,
+			bindingProvenanceId: replaceId(record.bindingProvenanceId),
+			structuralProvenanceId: replaceId(record.structuralProvenanceId)
+		})),
 		diagnostics: snapshot.diagnostics.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
+		moduleExports: snapshot.moduleExports.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
+		moduleResolutions: snapshot.moduleResolutions.map((record) => ({
 			...record,
 			provenanceId: replaceId(record.provenanceId)
 		})),
@@ -205,11 +264,24 @@ function reviseProvenance(
 			provenanceId: replaceId(record.provenanceId)
 		})),
 		provenances: records,
+		references: snapshot.references.map((record) => ({
+			...record,
+			resolutionProvenanceId: replaceId(record.resolutionProvenanceId),
+			structuralProvenanceId: replaceId(record.structuralProvenanceId)
+		})),
+		scopes: snapshot.scopes.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
+		})),
 		sources: snapshot.sources.map((record) => ({
 			...record,
 			provenanceId: replaceId(record.provenanceId),
 			syntaxProvenanceId:
 				record.syntaxProvenanceId === null ? null : replaceId(record.syntaxProvenanceId)
+		})),
+		symbols: snapshot.symbols.map((record) => ({
+			...record,
+			provenanceId: replaceId(record.provenanceId)
 		}))
 	};
 }
@@ -217,7 +289,8 @@ function reviseProvenance(
 function fixture(
 	logicalPath = 'src/index.ts',
 	contents = '',
-	compilerOptions: Readonly<Record<string, unknown>> = { module: 199, strict: true }
+	compilerOptions: Readonly<Record<string, unknown>> = { module: 199, strict: true },
+	requestedCapabilities: readonly SemanticCapability[] = ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX']
 ): StaticSemanticSnapshot {
 	const contentDigest = sha256(contents);
 	const frozenRead =
@@ -225,7 +298,6 @@ function fixture(
 			? BASE_FROZEN_READ
 			: readFileObservation(logicalPath, 'PRESENT', contents, 'FROZEN_SUBJECT');
 	const contextDigest = compilerInputClosureDigest([frozenRead]);
-	const requestedCapabilities: readonly SemanticCapability[] = ['TS_PROJECT', 'TS_SYNTAX'];
 	const recipeBase = {
 		compilerOptions,
 		configClosureDigest: '2'.repeat(64),
@@ -236,7 +308,13 @@ function fixture(
 		rootNames: [logicalPath]
 	};
 	const recipe = { ...recipeBase, projectResolutionDigest: programRecipeDigest(recipeBase) };
+	const parsedSource = ts.createSourceFile(logicalPath, contents, ts.ScriptTarget.Latest, true);
+	const moduleKind = ts.isExternalModule(parsedSource) ? ('MODULE' as const) : ('SCRIPT' as const);
+	const sourceScopeKind =
+		moduleKind === 'MODULE' ? ('SOURCE_MODULE' as const) : ('SOURCE_SCRIPT' as const);
+	const sourceScopeDomain = moduleKind === 'MODULE' ? ('MIXED' as const) : ('LEXICAL' as const);
 	const id = semanticSnapshotId({
+		assignabilityRequests: [],
 		astTraversalProfile: SEMANTIC_AST_TRAVERSAL_PROFILE,
 		budgets: BUDGETS,
 		canonicalProfile: SEMANTIC_CANONICAL_PROFILE,
@@ -256,7 +334,12 @@ function fixture(
 		snapshotId: id
 	});
 	const programId = semanticProgramId({ contextDigest, projectId });
-	const sourceId = semanticSourceId({ contentSha256: contentDigest, logicalPath, programId });
+	const sourceId = semanticSourceId({
+		contentSha256: contentDigest,
+		logicalPath,
+		moduleKind,
+		programId
+	});
 	const nodeId = semanticNodeId({
 		end: contents.length,
 		fullStart: 0,
@@ -307,9 +390,83 @@ function fixture(
 		contextDigest,
 		[frozenRead.id]
 	);
+	const projectScopeProvenance = provenance(
+		id,
+		projectId,
+		'TS_SYMBOL',
+		recipe.projectResolutionDigest,
+		null,
+		null,
+		contextDigest,
+		[frozenRead.id],
+		'SCOPE_DERIVED'
+	);
+	const sourceScopeProvenance = provenance(
+		id,
+		projectId,
+		'TS_SYMBOL',
+		recipe.projectResolutionDigest,
+		sourceId,
+		projectScopeProvenance.id,
+		contextDigest,
+		[frozenRead.id],
+		'SCOPE_DERIVED'
+	);
+	const globalScopeId = semanticScopeId({
+		domain: 'LEXICAL',
+		end: null,
+		kind: 'PROGRAM_GLOBAL',
+		ownerKind: null,
+		programId,
+		sourceId: null,
+		start: null
+	});
+	const sourceScopeId = semanticScopeId({
+		domain: sourceScopeDomain,
+		end: contents.length,
+		kind: sourceScopeKind,
+		ownerKind: ts.SyntaxKind.SourceFile,
+		programId,
+		sourceId,
+		start: 0
+	});
+	const scopes: StaticSemanticSnapshot['scopes'] = [
+		{
+			domain: 'LEXICAL' as const,
+			end: null,
+			id: globalScopeId,
+			kind: 'PROGRAM_GLOBAL' as const,
+			ownerKind: null,
+			ownerKindName: null,
+			ownerNodeId: null,
+			parentScopeId: null,
+			programId,
+			projectId,
+			provenanceId: projectScopeProvenance.id,
+			sourceId: null,
+			start: null
+		},
+		{
+			domain: sourceScopeDomain,
+			end: contents.length,
+			id: sourceScopeId,
+			kind: sourceScopeKind,
+			ownerKind: ts.SyntaxKind.SourceFile,
+			ownerKindName: 'SourceFile',
+			ownerNodeId: nodeId,
+			parentScopeId: globalScopeId,
+			programId,
+			projectId,
+			provenanceId: sourceScopeProvenance.id,
+			sourceId,
+			start: 0
+		}
+	].sort((left, right) => (left.id < right.id ? -1 : 1));
 	const provenances = [
 		projectProvenance,
+		projectScopeProvenance,
 		sourceProjectProvenance,
+		sourceScopeProvenance,
 		syntaxProvenance,
 		sourceSyntaxProvenance
 	].sort((left, right) => (left.id < right.id ? -1 : 1));
@@ -317,8 +474,21 @@ function fixture(
 		'PROJECT',
 		'PROGRAM',
 		'SOURCE',
+		'SCOPE',
 		'AST_NODE',
 		'DECLARATION_CANDIDATE',
+		'DECLARATION',
+		'SYMBOL',
+		'ALIAS',
+		'REFERENCE',
+		'MODULE_RESOLUTION',
+		'MODULE_EXPORT',
+		'TYPE',
+		'TYPE_PARAMETER',
+		'SIGNATURE',
+		'SIGNATURE_PARAMETER',
+		'OVERLOAD_SET',
+		'TYPE_RELATION',
 		'LITERAL',
 		'INVOCATION_SITE',
 		'ASSIGNMENT',
@@ -331,8 +501,21 @@ function fixture(
 		PROJECT: [projectId],
 		PROGRAM: [programId],
 		SOURCE: [sourceId],
+		SCOPE: scopes.map((scope) => scope.id),
 		AST_NODE: [nodeId],
 		DECLARATION_CANDIDATE: [],
+		DECLARATION: [],
+		SYMBOL: [],
+		ALIAS: [],
+		REFERENCE: [],
+		MODULE_RESOLUTION: [],
+		MODULE_EXPORT: [],
+		TYPE: [],
+		TYPE_PARAMETER: [],
+		SIGNATURE: [],
+		SIGNATURE_PARAMETER: [],
+		OVERLOAD_SET: [],
+		TYPE_RELATION: [],
 		LITERAL: [],
 		INVOCATION_SITE: [],
 		ASSIGNMENT: [],
@@ -343,6 +526,8 @@ function fixture(
 	};
 
 	return {
+		aliases: [],
+		assignabilityRequests: [],
 		assignments: [],
 		astNodes: [
 			{
@@ -367,14 +552,21 @@ function fixture(
 		budgets: BUDGETS,
 		canonicalProfile: SEMANTIC_CANONICAL_PROFILE,
 		capabilities: [
-			{ capability: 'TS_PROJECT', reason: 'Implemented by Slice 3A.', state: 'SUPPORTED' },
-			{ capability: 'TS_SYMBOL', reason: 'Not implemented in Slice 3A.', state: 'UNSUPPORTED' },
-			{ capability: 'TS_SYNTAX', reason: 'Implemented by Slice 3A.', state: 'SUPPORTED' },
-			{ capability: 'TS_TYPE', reason: 'Not implemented in Slice 3A.', state: 'UNSUPPORTED' }
+			{ capability: 'TS_PROJECT', reason: 'Implemented by Slice 3B.', state: 'SUPPORTED' },
+			{ capability: 'TS_SYMBOL', reason: 'Implemented by Slice 3B.', state: 'SUPPORTED' },
+			{ capability: 'TS_SYNTAX', reason: 'Implemented by Slice 3B.', state: 'SUPPORTED' },
+			{
+				capability: 'TS_TYPE',
+				reason: requestedCapabilities.includes('TS_TYPE')
+					? 'Implemented by the TS_TYPE fixture increment.'
+					: 'Not implemented in Slice 3B.',
+				state: requestedCapabilities.includes('TS_TYPE') ? 'SUPPORTED' : 'UNSUPPORTED'
+			}
 		],
 		compilerInputs: [frozenRead],
 		contextDigest,
 		declarationCandidates: [],
+		declarations: [],
 		diagnostics: [],
 		expectedEmpty: false,
 		extractionVersion: SEMANTIC_EXTRACTION_VERSION,
@@ -384,6 +576,9 @@ function fixture(
 		invocations: [],
 		limitations: [],
 		literals: [],
+		moduleExports: [],
+		moduleResolutions: [],
+		overloadSets: [],
 		operationVersion: SEMANTIC_OPERATION_VERSION,
 		populations: populationOrder.map((kind) =>
 			kind === 'CONTEXT_INPUT'
@@ -442,8 +637,12 @@ function fixture(
 		],
 		provenances,
 		provider: PROVIDER,
+		references: [],
 		requestedCapabilities,
 		schemaVersion: SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+		scopes,
+		signatureParameters: [],
+		signatures: [],
 		sources: [
 			{
 				analysisDisposition: 'DEEP_INDEXED',
@@ -460,6 +659,7 @@ function fixture(
 					reason: 'Authored TypeScript is already in source coordinates.',
 					state: 'NOT_APPLICABLE'
 				},
+				moduleKind,
 				origin: 'AUTHORED',
 				programId,
 				projectId,
@@ -472,7 +672,11 @@ function fixture(
 				textLength: contents.length
 			}
 		],
-		subjectId: SUBJECT_ID
+		symbols: [],
+		subjectId: SUBJECT_ID,
+		typeParameters: [],
+		typeRelations: [],
+		types: []
 	};
 }
 
@@ -610,6 +814,917 @@ function withAstChild(
 	};
 }
 
+function withScopeForNode(
+	snapshot: StaticSemanticSnapshot,
+	nodeId: StaticSemanticSnapshot['astNodes'][number]['id']
+): StaticSemanticSnapshot {
+	const node = snapshot.astNodes.find((candidate) => candidate.id === nodeId)!;
+	const source = snapshot.sources.find((candidate) => candidate.id === node.sourceId)!;
+	const descriptor = semanticScopeBoundaryDescriptor(node.kind, source.moduleKind);
+	if (descriptor === null) throw new Error('Test helper requires a supported scope boundary.');
+	let parentNode =
+		node.parentId === null
+			? undefined
+			: snapshot.astNodes.find((entry) => entry.id === node.parentId);
+	let parentScope: StaticSemanticSnapshot['scopes'][number] | undefined;
+	while (parentNode !== undefined) {
+		parentScope = snapshot.scopes.find((scope) => scope.ownerNodeId === parentNode!.id);
+		if (parentScope !== undefined) break;
+		parentNode =
+			parentNode.parentId === null
+				? undefined
+				: snapshot.astNodes.find((entry) => entry.id === parentNode!.parentId);
+	}
+	parentScope ??= snapshot.scopes.find(
+		(scope) => scope.kind === 'PROGRAM_GLOBAL' && scope.programId === source.programId
+	);
+	const id = semanticScopeId({
+		domain: descriptor.domain,
+		end: node.end,
+		kind: descriptor.kind,
+		ownerKind: node.kind,
+		programId: source.programId,
+		sourceId: source.id,
+		start: node.start
+	});
+	const scope: StaticSemanticSnapshot['scopes'][number] = {
+		domain: descriptor.domain,
+		end: node.end,
+		id,
+		kind: descriptor.kind,
+		ownerKind: node.kind,
+		ownerKindName: node.kindName,
+		ownerNodeId: node.id,
+		parentScopeId: parentScope!.id,
+		programId: source.programId,
+		projectId: source.projectId,
+		provenanceId: snapshot.provenances.find(
+			(record) =>
+				record.capability === 'TS_SYMBOL' &&
+				record.sourceId === source.id &&
+				record.epistemic.inference === 'derived'
+		)!.id,
+		sourceId: source.id,
+		start: node.start
+	};
+	const scopes = [...snapshot.scopes, scope].sort((left, right) => (left.id < right.id ? -1 : 1));
+	return {
+		...snapshot,
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'SCOPE'
+				? semanticPopulation('SCOPE', members(scopes.map((entry) => entry.id)))
+				: population
+		),
+		scopes
+	};
+}
+
+function withSymbolFacts(
+	requestedCapabilities: readonly SemanticCapability[] = ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX']
+): StaticSemanticSnapshot {
+	let snapshot = fixture(
+		'src/index.ts',
+		' '.repeat(64),
+		{ module: 199, strict: true },
+		requestedCapabilities
+	);
+	snapshot = withAstNode(snapshot, {
+		end: 10,
+		kind: ts.SyntaxKind.VariableDeclaration,
+		kindName: 'VariableDeclaration',
+		start: 0
+	});
+	const declarationNode = snapshot.astNodes.find(
+		(node) => node.kind === ts.SyntaxKind.VariableDeclaration
+	)!;
+	snapshot = withAstChild(
+		snapshot,
+		declarationNode.id,
+		{
+			end: 5,
+			kind: ts.SyntaxKind.Identifier,
+			kindName: 'Identifier',
+			start: 0,
+			syntacticIdentifierText: 'value'
+		},
+		AST_STRUCTURAL_ROLES.declarationName
+	);
+	snapshot = withAstNode(snapshot, {
+		end: 17,
+		kind: ts.SyntaxKind.Identifier,
+		kindName: 'Identifier',
+		start: 12,
+		syntacticIdentifierText: 'value'
+	});
+	snapshot = withAstNode(snapshot, {
+		end: 36,
+		kind: ts.SyntaxKind.ImportDeclaration,
+		kindName: 'ImportDeclaration',
+		start: 18
+	});
+
+	const source = snapshot.sources[0]!;
+	const nameNode = snapshot.astNodes.find(
+		(node) =>
+			node.parentId === declarationNode.id &&
+			node.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName)
+	)!;
+	const referenceNode = snapshot.astNodes.find(
+		(node) =>
+			node.kind === ts.SyntaxKind.Identifier &&
+			node.parentId === source.rootNodeId &&
+			node.start === 12
+	)!;
+	const moduleNode = snapshot.astNodes.find(
+		(node) => node.kind === ts.SyntaxKind.ImportDeclaration
+	)!;
+	const sourceScopeProvenance = snapshot.provenances.find(
+		(record) => record.capability === 'TS_SYMBOL' && record.sourceId === source.id
+	)!;
+	const projectSymbolProvenance = provenance(
+		snapshot.id,
+		source.projectId,
+		'TS_SYMBOL',
+		snapshot.projects[0]!.programRecipe.projectResolutionDigest,
+		null,
+		null,
+		snapshot.contextDigest,
+		snapshot.projects[0]!.contextInputIds
+	);
+	const sourceSymbolProvenance = provenance(
+		snapshot.id,
+		source.projectId,
+		'TS_SYMBOL',
+		snapshot.projects[0]!.programRecipe.projectResolutionDigest,
+		source.id,
+		projectSymbolProvenance.id,
+		snapshot.contextDigest,
+		snapshot.projects[0]!.contextInputIds
+	);
+	const sourceScope = snapshot.scopes.find(
+		(scope) =>
+			scope.sourceId === source.id &&
+			(scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE')
+	)!;
+	const globalScope = snapshot.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+
+	const candidate = {
+		ambientSyntax: false,
+		candidateRole: 'BINDING' as const,
+		candidateState: 'SYNTAX_ONLY' as const,
+		exportCarrierNodeId: null,
+		exportSyntax: 'NONE' as const,
+		id: semanticDeclarationCandidateId({
+			candidateRole: 'BINDING',
+			nodeId: declarationNode.id,
+			syntaxKind: declarationNode.kind
+		}),
+		localModifiers: [],
+		nameNodeId: nameNode.id,
+		nameState: 'ATOMIC' as const,
+		nodeId: declarationNode.id,
+		sourceId: source.id,
+		syntacticName: 'value',
+		syntaxKind: declarationNode.kind,
+		syntaxKindName: declarationNode.kindName
+	};
+	const declarationId = semanticDeclarationId({
+		end: declarationNode.end,
+		kind: declarationNode.kind,
+		nodeId: declarationNode.id,
+		sourceId: source.id,
+		start: declarationNode.start
+	});
+	const targetSymbolId = semanticSymbolId({
+		declarationIds: [declarationId],
+		fallbackReferenceNodeIds: [],
+		flags: ts.SymbolFlags.BlockScopedVariable,
+		identityBasis: 'DECLARATIONS',
+		name: 'value',
+		programId: source.programId,
+		projectId: source.projectId
+	});
+	const aliasSymbolId = semanticSymbolId({
+		declarationIds: [],
+		fallbackReferenceNodeIds: [referenceNode.id],
+		flags: ts.SymbolFlags.Alias,
+		identityBasis: 'REFERENCE_FALLBACK',
+		name: 'renamed',
+		programId: source.programId,
+		projectId: source.projectId
+	});
+	const declaration = {
+		ambient: false,
+		bindingProvenanceId: sourceSymbolProvenance.id,
+		candidateId: candidate.id,
+		declaringScopeId: globalScope.id,
+		durableId: semanticDurableDeclarationId({
+			ambient: false,
+			contentSha256: source.contentSha256,
+			declarationFile: source.declarationFile,
+			end: declarationNode.end,
+			kind: declarationNode.kind,
+			languageVariant: source.languageVariant,
+			logicalPath: source.logicalPath,
+			name: 'value',
+			nameState: 'ATOMIC',
+			scriptKind: source.scriptKind,
+			start: declarationNode.start,
+			typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
+		}),
+		end: declarationNode.end,
+		id: declarationId,
+		kind: declarationNode.kind,
+		kindName: declarationNode.kindName,
+		name: 'value',
+		nameState: 'ATOMIC' as const,
+		nodeId: declarationNode.id,
+		scopeLinkState: 'RESOLVED' as const,
+		sourceId: source.id,
+		start: declarationNode.start,
+		structuralProvenanceId: sourceScopeProvenance.id,
+		symbolBindingState: 'RESOLVED' as const,
+		symbolId: targetSymbolId
+	};
+	const symbols = [
+		{
+			declarationIds: [declarationId],
+			fallbackReferenceNodeIds: [],
+			flags: ts.SymbolFlags.BlockScopedVariable,
+			flagNames: ['BlockScopedVariable'],
+			id: targetSymbolId,
+			identityBasis: 'DECLARATIONS' as const,
+			mergeState: 'SINGLE' as const,
+			name: 'value',
+			programId: source.programId,
+			projectId: source.projectId,
+			provenanceId: projectSymbolProvenance.id,
+			valueDeclarationId: declarationId
+		},
+		{
+			declarationIds: [],
+			fallbackReferenceNodeIds: [referenceNode.id],
+			flags: ts.SymbolFlags.Alias,
+			flagNames: ['Alias'],
+			id: aliasSymbolId,
+			identityBasis: 'REFERENCE_FALLBACK' as const,
+			mergeState: 'DECLARATIONLESS' as const,
+			name: 'renamed',
+			programId: source.programId,
+			projectId: source.projectId,
+			provenanceId: projectSymbolProvenance.id,
+			valueDeclarationId: null
+		}
+	].sort((left, right) => (left.id < right.id ? -1 : 1));
+	const aliasPreimage = {
+		aliasSymbolId,
+		state: 'RESOLVED' as const,
+		targetSymbolId,
+		terminalSymbolId: targetSymbolId
+	};
+	const alias = {
+		...aliasPreimage,
+		id: semanticAliasId(aliasPreimage),
+		provenanceId: projectSymbolProvenance.id
+	};
+	const referencePreimage = {
+		nodeId: referenceNode.id,
+		resolvedSymbolId: targetSymbolId,
+		resolutionState: 'RESOLVED_ALIAS' as const,
+		role: 'SYMBOL_USE' as const,
+		symbolId: aliasSymbolId
+	};
+	const reference = {
+		...referencePreimage,
+		containingScopeId: sourceScope.id,
+		id: semanticReferenceId(referencePreimage),
+		resolutionProvenanceId: sourceSymbolProvenance.id,
+		scopeLinkState: 'RESOLVED' as const,
+		sourceId: source.id,
+		structuralProvenanceId: sourceScopeProvenance.id
+	};
+	const moduleResolutionPreimage = {
+		moduleSymbolId: targetSymbolId,
+		nodeId: moduleNode.id,
+		occurrenceKind: 'IMPORT' as const,
+		resolutionState: 'RESOLVED_SOURCE' as const,
+		specifier: './value.js',
+		specifierState: 'LITERAL' as const,
+		targetSourceId: source.id,
+		typeOnly: false
+	};
+	const moduleResolution = {
+		...moduleResolutionPreimage,
+		id: semanticModuleResolutionId(moduleResolutionPreimage),
+		provenanceId: sourceSymbolProvenance.id,
+		sourceId: source.id
+	};
+	const moduleExportPreimage = {
+		exportName: 'renamed',
+		sourceId: source.id,
+		state: 'ALIAS' as const,
+		symbolId: aliasSymbolId,
+		targetSymbolId
+	};
+	const moduleExport = {
+		...moduleExportPreimage,
+		id: semanticModuleExportId(moduleExportPreimage),
+		provenanceId: sourceSymbolProvenance.id
+	};
+	const provenances = [
+		...snapshot.provenances,
+		projectSymbolProvenance,
+		sourceSymbolProvenance
+	].sort((left, right) => (left.id < right.id ? -1 : 1));
+	const populations: Readonly<Record<SemanticPopulationKind, readonly string[]>> = {
+		ALIAS: [alias.id],
+		ASSIGNMENT: [],
+		AST_NODE: snapshot.astNodes.map((record) => record.id),
+		CONTEXT_INPUT: [],
+		DECLARATION: [declaration.id],
+		DECLARATION_CANDIDATE: [candidate.id],
+		DIAGNOSTIC: [],
+		FRAMEWORK_CANDIDATE: [],
+		INVOCATION_SITE: [],
+		LITERAL: [],
+		MODULE_EXPORT: [moduleExport.id],
+		MODULE_RESOLUTION: [moduleResolution.id],
+		OVERLOAD_SET: [],
+		PROGRAM: snapshot.programs.map((record) => record.id),
+		PROJECT: snapshot.projects.map((record) => record.id),
+		PROVENANCE: provenances.map((record) => record.id),
+		REFERENCE: [reference.id],
+		SOURCE: snapshot.sources.map((record) => record.id),
+		SCOPE: snapshot.scopes.map((record) => record.id),
+		SIGNATURE: [],
+		SIGNATURE_PARAMETER: [],
+		SYMBOL: symbols.map((record) => record.id),
+		TYPE: [],
+		TYPE_PARAMETER: [],
+		TYPE_RELATION: []
+	};
+
+	return {
+		...snapshot,
+		aliases: [alias],
+		declarationCandidates: [candidate],
+		declarations: [declaration],
+		moduleExports: [moduleExport],
+		moduleResolutions: [moduleResolution],
+		populations: snapshot.populations.map((population) =>
+			population.kind === 'CONTEXT_INPUT'
+				? population
+				: semanticPopulation(population.kind, members(populations[population.kind]))
+		),
+		provenances,
+		references: [reference],
+		symbols
+	};
+}
+
+function withCallAndConstructOverloadFacts(): StaticSemanticSnapshot {
+	const snapshot = withSymbolFacts(['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE']);
+	const source = snapshot.sources[0]!;
+	const project = snapshot.projects[0]!;
+	const declaration = snapshot.declarations[0]!;
+	const callableSymbol = snapshot.symbols.find((symbol) => symbol.id === declaration.symbolId)!;
+	const globalScope = snapshot.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+	const bindingProvenance = snapshot.provenances.find(
+		(record) =>
+			record.capability === 'TS_SYMBOL' &&
+			record.sourceId === source.id &&
+			record.epistemic.inference === 'direct'
+	)!;
+	const structuralProvenance = snapshot.provenances.find(
+		(record) =>
+			record.capability === 'TS_SYMBOL' &&
+			record.sourceId === source.id &&
+			record.epistemic.inference === 'derived'
+	)!;
+	const typeProvenance = provenance(
+		snapshot.id,
+		project.id,
+		'TS_TYPE',
+		project.programRecipe.projectResolutionDigest,
+		null,
+		null,
+		snapshot.contextDigest,
+		project.contextInputIds
+	);
+	const addedDeclarationSpecs = [
+		{
+			end: 47,
+			kind: ts.SyntaxKind.CallSignature,
+			kindName: 'CallSignature',
+			symbolName: '__call_signature',
+			start: 40
+		},
+		{
+			end: 57,
+			kind: ts.SyntaxKind.ConstructSignature,
+			kindName: 'ConstructSignature',
+			symbolName: '__construct_signature',
+			start: 49
+		}
+	] as const;
+	const addedDeclarationIds = addedDeclarationSpecs.map((spec) =>
+		semanticDeclarationId({
+			end: spec.end,
+			kind: spec.kind,
+			nodeId: null,
+			sourceId: source.id,
+			start: spec.start
+		})
+	);
+	const addedSymbolIds = addedDeclarationSpecs.map((spec, index) =>
+		semanticSymbolId({
+			declarationIds: [addedDeclarationIds[index]!],
+			fallbackReferenceNodeIds: [],
+			flags: ts.SymbolFlags.Signature,
+			identityBasis: 'DECLARATIONS',
+			name: spec.symbolName,
+			programId: source.programId,
+			projectId: source.projectId
+		})
+	);
+	const addedDeclarations: StaticSemanticSnapshot['declarations'] = addedDeclarationSpecs.map(
+		(spec, index) => ({
+			ambient: false,
+			bindingProvenanceId: bindingProvenance.id,
+			candidateId: null,
+			declaringScopeId: globalScope.id,
+			durableId: semanticDurableDeclarationId({
+				ambient: false,
+				contentSha256: source.contentSha256,
+				declarationFile: source.declarationFile,
+				end: spec.end,
+				kind: spec.kind,
+				languageVariant: source.languageVariant,
+				logicalPath: source.logicalPath,
+				name: null,
+				nameState: 'ANONYMOUS',
+				scriptKind: source.scriptKind,
+				start: spec.start,
+				typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
+			}),
+			end: spec.end,
+			id: addedDeclarationIds[index]!,
+			kind: spec.kind,
+			kindName: spec.kindName,
+			name: null,
+			nameState: 'ANONYMOUS',
+			nodeId: null,
+			scopeLinkState: 'RESOLVED',
+			sourceId: source.id,
+			start: spec.start,
+			structuralProvenanceId: structuralProvenance.id,
+			symbolBindingState: 'RESOLVED',
+			symbolId: addedSymbolIds[index]!
+		})
+	);
+	const addedSymbols: StaticSemanticSnapshot['symbols'] = addedDeclarationSpecs.map(
+		(spec, index) => ({
+			declarationIds: [addedDeclarationIds[index]!],
+			fallbackReferenceNodeIds: [],
+			flagNames: ['Signature'],
+			flags: ts.SymbolFlags.Signature,
+			id: addedSymbolIds[index]!,
+			identityBasis: 'DECLARATIONS',
+			mergeState: 'SINGLE',
+			name: spec.symbolName,
+			programId: source.programId,
+			projectId: source.projectId,
+			provenanceId: bindingProvenance.parentProvenanceId!,
+			valueDeclarationId: null
+		})
+	);
+	const signatureInputs = [
+		{
+			declaration,
+			declarationRole: 'CALL_SIGNATURE' as const,
+			ownerKind: 'TYPE' as const,
+			signatureKind: 'CALL' as const
+		},
+		{
+			declaration: addedDeclarations[0]!,
+			declarationRole: 'CALL_SIGNATURE' as const,
+			ownerKind: 'TYPE' as const,
+			signatureKind: 'CALL' as const
+		},
+		{
+			declaration,
+			declarationRole: 'CONSTRUCT_SIGNATURE' as const,
+			ownerKind: 'SYMBOL' as const,
+			signatureKind: 'CONSTRUCT' as const
+		},
+		{
+			declaration: addedDeclarations[1]!,
+			declarationRole: 'CONSTRUCT_SIGNATURE' as const,
+			ownerKind: 'TYPE' as const,
+			signatureKind: 'CONSTRUCT' as const
+		}
+	].map((input) => ({
+		...input,
+		id: semanticSignatureId({
+			declarationId: input.declaration.id,
+			identityBasis: 'DECLARATION_ANCHORED',
+			programId: source.programId,
+			semanticKind: 'OVERLOAD_SIGNATURE',
+			signatureKind: input.signatureKind
+		})
+	}));
+	const fingerprintSha256 = sha256('fixture-return-type-fingerprint');
+	const typeId = semanticTypeId({
+		fingerprintProfile: SEMANTIC_TYPE_FINGERPRINT_PROFILE,
+		fingerprintSha256,
+		identityBasis: 'DECLARATION_ANCHORED',
+		programId: source.programId
+	});
+	const acquisitionAnchors = signatureInputs
+		.map((input) => ({
+			componentKind: 'RETURN' as const,
+			componentOrdinal: 0,
+			kind: 'SIGNATURE_COMPONENT' as const,
+			signatureId: input.id
+		}))
+		.sort((left, right) => (canonicalSemanticJson(left) < canonicalSemanticJson(right) ? -1 : 1));
+	const type: StaticSemanticSnapshot['types'][number] = {
+		acquisitionAnchors,
+		aliasSymbolId: null,
+		category: 'INTRINSIC',
+		display: 'string',
+		displayProfile: SEMANTIC_TYPE_DISPLAY_PROFILE,
+		displaySha256: sha256('string'),
+		fingerprintProfile: SEMANTIC_TYPE_FINGERPRINT_PROFILE,
+		fingerprintSha256,
+		flagNames: ['String'],
+		flags: ts.TypeFlags.String,
+		id: typeId,
+		identityBasis: 'DECLARATION_ANCHORED',
+		objectFlagNames: [],
+		objectFlags: null,
+		programId: source.programId,
+		projectId: source.projectId,
+		provenanceId: typeProvenance.id,
+		structureState: 'COMPLETE',
+		symbolId: callableSymbol.id,
+		unsupportedStructureKinds: []
+	};
+	const signatures: StaticSemanticSnapshot['signatures'] = signatureInputs
+		.map((input) => {
+			const display = input.signatureKind === 'CALL' ? '(): string' : 'new (): string';
+			return {
+				declarationId: input.declaration.id,
+				declarationRole: input.declarationRole,
+				display,
+				displaySha256: sha256(display),
+				fingerprintProfile: SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE,
+				fingerprintSha256: sha256(`fixture-${input.signatureKind}-${input.declaration.id}`),
+				id: input.id,
+				identityBasis: 'DECLARATION_ANCHORED' as const,
+				owner:
+					input.ownerKind === 'SYMBOL'
+						? { id: callableSymbol.id, kind: 'SYMBOL' as const }
+						: { id: typeId, kind: 'TYPE' as const },
+				parameterIds: [],
+				programId: source.programId,
+				projectId: source.projectId,
+				provenanceId: typeProvenance.id,
+				providerOrdinal: null,
+				returnTypeId: typeId,
+				semanticKind: 'OVERLOAD_SIGNATURE' as const,
+				signatureKind: input.signatureKind,
+				typeParameterIds: []
+			};
+		})
+		.sort((left, right) => (left.id < right.id ? -1 : 1));
+	const overloadSetId = semanticOverloadSetId({
+		callableSymbolId: callableSymbol.id,
+		programId: source.programId
+	});
+	const overloadSet: StaticSemanticSnapshot['overloadSets'][number] = {
+		callableSymbolId: callableSymbol.id,
+		id: overloadSetId,
+		programId: source.programId,
+		projectId: source.projectId,
+		provenanceId: typeProvenance.id
+	};
+	const typeRelations = signatureInputs
+		.map((input, ordinal): StaticSemanticSnapshot['typeRelations'][number] => {
+			const preimage = {
+				kind: 'OVERLOAD_MEMBERSHIP' as const,
+				ordinal,
+				overloadSetId,
+				programId: source.programId,
+				projectId: source.projectId,
+				role: input.declarationRole,
+				signatureId: input.id,
+				state: 'CONFIRMED' as const
+			};
+			return {
+				...preimage,
+				id: semanticTypeRelationId(preimage),
+				provenanceId: typeProvenance.id
+			};
+		})
+		.sort((left, right) => (left.id < right.id ? -1 : 1));
+	const provenances = [...snapshot.provenances, typeProvenance].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const declarations = [...snapshot.declarations, ...addedDeclarations].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const symbols = [...snapshot.symbols, ...addedSymbols].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const populations = snapshot.populations.map((population) => {
+		switch (population.kind) {
+			case 'DECLARATION':
+				return semanticPopulation('DECLARATION', members(declarations.map((record) => record.id)));
+			case 'SYMBOL':
+				return semanticPopulation('SYMBOL', members(symbols.map((record) => record.id)));
+			case 'TYPE':
+				return semanticPopulation('TYPE', members([type.id]));
+			case 'SIGNATURE':
+				return semanticPopulation('SIGNATURE', members(signatures.map((record) => record.id)));
+			case 'OVERLOAD_SET':
+				return semanticPopulation('OVERLOAD_SET', members([overloadSet.id]));
+			case 'TYPE_RELATION':
+				return semanticPopulation(
+					'TYPE_RELATION',
+					members(typeRelations.map((record) => record.id))
+				);
+			case 'PROVENANCE':
+				return semanticPopulation('PROVENANCE', members(provenances.map((record) => record.id)));
+			default:
+				return population;
+		}
+	});
+	return {
+		...snapshot,
+		declarations,
+		overloadSets: [overloadSet],
+		populations,
+		provenances,
+		signatures,
+		symbols,
+		typeRelations,
+		types: [type]
+	};
+}
+
+function withDeclarationOwnedPairTypeParameters(): StaticSemanticSnapshot {
+	const snapshot = withCallAndConstructOverloadFacts();
+	const source = snapshot.sources[0]!;
+	const globalScope = snapshot.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+	const bindingProvenance = snapshot.provenances.find(
+		(record) =>
+			record.capability === 'TS_SYMBOL' &&
+			record.sourceId === source.id &&
+			record.epistemic.inference === 'direct'
+	)!;
+	const structuralProvenance = snapshot.provenances.find(
+		(record) =>
+			record.capability === 'TS_SYMBOL' &&
+			record.sourceId === source.id &&
+			record.epistemic.inference === 'derived'
+	)!;
+	const typeProvenance = snapshot.provenances.find(
+		(record) => record.capability === 'TS_TYPE' && record.sourceId === null
+	)!;
+	const specs = [
+		{
+			end: 60,
+			flags: ts.SymbolFlags.TypeAlias,
+			flagNames: ['TypeAlias'],
+			kind: ts.SyntaxKind.TypeAliasDeclaration,
+			kindName: 'TypeAliasDeclaration',
+			name: 'Pair',
+			start: 20
+		},
+		{
+			end: 30,
+			flags: ts.SymbolFlags.TypeParameter,
+			flagNames: ['TypeParameter'],
+			kind: ts.SyntaxKind.TypeParameter,
+			kindName: 'TypeParameter',
+			name: 'T',
+			start: 25
+		},
+		{
+			end: 40,
+			flags: ts.SymbolFlags.TypeParameter,
+			flagNames: ['TypeParameter'],
+			kind: ts.SyntaxKind.TypeParameter,
+			kindName: 'TypeParameter',
+			name: 'U',
+			start: 35
+		}
+	] as const;
+	const declarationIds = new Map(
+		specs.map((spec) => [
+			spec.name,
+			semanticDeclarationId({
+				end: spec.end,
+				kind: spec.kind,
+				nodeId: null,
+				sourceId: source.id,
+				start: spec.start
+			})
+		])
+	);
+	const symbolIds = new Map(
+		specs.map((spec) => {
+			const declarationId = declarationIds.get(spec.name)!;
+			return [
+				spec.name,
+				semanticSymbolId({
+					declarationIds: [declarationId],
+					fallbackReferenceNodeIds: [],
+					flags: spec.flags,
+					identityBasis: 'DECLARATIONS',
+					name: spec.name,
+					programId: source.programId,
+					projectId: source.projectId
+				})
+			] as const;
+		})
+	);
+	const addedDeclarations: StaticSemanticSnapshot['declarations'] = specs.map((spec) => {
+		const declarationId = declarationIds.get(spec.name)!;
+		return {
+			ambient: false,
+			bindingProvenanceId: bindingProvenance.id,
+			candidateId: null,
+			declaringScopeId: globalScope.id,
+			durableId: semanticDurableDeclarationId({
+				ambient: false,
+				contentSha256: source.contentSha256,
+				declarationFile: source.declarationFile,
+				end: spec.end,
+				kind: spec.kind,
+				languageVariant: source.languageVariant,
+				logicalPath: source.logicalPath,
+				name: spec.name,
+				nameState: 'ATOMIC',
+				scriptKind: source.scriptKind,
+				start: spec.start,
+				typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
+			}),
+			end: spec.end,
+			id: declarationId,
+			kind: spec.kind,
+			kindName: spec.kindName,
+			name: spec.name,
+			nameState: 'ATOMIC',
+			nodeId: null,
+			scopeLinkState: 'RESOLVED',
+			sourceId: source.id,
+			start: spec.start,
+			structuralProvenanceId: structuralProvenance.id,
+			symbolBindingState: 'RESOLVED',
+			symbolId: symbolIds.get(spec.name)!
+		};
+	});
+	const addedSymbols: StaticSemanticSnapshot['symbols'] = specs.map((spec) => {
+		const declarationId = declarationIds.get(spec.name)!;
+		return {
+			declarationIds: [declarationId],
+			fallbackReferenceNodeIds: [],
+			flagNames: [...spec.flagNames],
+			flags: spec.flags,
+			id: symbolIds.get(spec.name)!,
+			identityBasis: 'DECLARATIONS',
+			mergeState: 'SINGLE',
+			name: spec.name,
+			programId: source.programId,
+			projectId: source.projectId,
+			provenanceId: bindingProvenance.parentProvenanceId!,
+			valueDeclarationId: null
+		};
+	});
+	const owner = { id: declarationIds.get('Pair')!, kind: 'DECLARATION' as const };
+	const parameterSpecs = specs.filter((spec) => spec.name !== 'Pair');
+	const parameterTypes: StaticSemanticSnapshot['types'] = parameterSpecs.map((spec) => {
+		const fingerprintSha256 = sha256(`fixture-type-parameter-${spec.name}`);
+		const id = semanticTypeId({
+			fingerprintProfile: SEMANTIC_TYPE_FINGERPRINT_PROFILE,
+			fingerprintSha256,
+			identityBasis: 'DECLARATION_ANCHORED',
+			programId: source.programId
+		});
+		return {
+			acquisitionAnchors: [
+				{
+					declarationId: declarationIds.get(spec.name)!,
+					kind: 'DECLARATION',
+					queryMode: 'DECLARED_SYMBOL_TYPE'
+				}
+			],
+			aliasSymbolId: null,
+			category: 'TYPE_PARAMETER',
+			display: spec.name,
+			displayProfile: SEMANTIC_TYPE_DISPLAY_PROFILE,
+			displaySha256: sha256(spec.name),
+			fingerprintProfile: SEMANTIC_TYPE_FINGERPRINT_PROFILE,
+			fingerprintSha256,
+			flagNames: ['IncludesMissingType', 'TypeParameter'],
+			flags: ts.TypeFlags.TypeParameter,
+			id,
+			identityBasis: 'DECLARATION_ANCHORED',
+			objectFlagNames: [],
+			objectFlags: null,
+			programId: source.programId,
+			projectId: source.projectId,
+			provenanceId: typeProvenance.id,
+			structureState: 'COMPLETE',
+			symbolId: symbolIds.get(spec.name)!,
+			unsupportedStructureKinds: []
+		};
+	});
+	const typeParameters: StaticSemanticSnapshot['typeParameters'] = parameterSpecs.map(
+		(spec, ordinal) => {
+			const declarationId = declarationIds.get(spec.name)!;
+			const parameterTypeId = parameterTypes.find((type) => type.display === spec.name)!.id;
+			return {
+				constraintState: 'MISSING',
+				constraintTypeId: null,
+				declarationId,
+				defaultState: 'MISSING',
+				defaultTypeId: null,
+				id: semanticTypeParameterId({ declarationId, ordinal, owner }),
+				name: spec.name,
+				ordinal,
+				owner,
+				parameterTypeId,
+				programId: source.programId,
+				projectId: source.projectId,
+				provenanceId: typeProvenance.id
+			};
+		}
+	);
+	const constraintRelations: StaticSemanticSnapshot['typeRelations'] = typeParameters.map(
+		(parameter) => {
+			const preimage = {
+				constraintState: 'MISSING' as const,
+				constraintTypeId: null,
+				kind: 'PARAMETER_CONSTRAINT' as const,
+				programId: source.programId,
+				projectId: source.projectId,
+				state: 'CONFIRMED' as const,
+				typeParameterId: parameter.id
+			};
+			return {
+				...preimage,
+				id: semanticTypeRelationId(preimage),
+				provenanceId: typeProvenance.id
+			};
+		}
+	);
+	const declarations = [...snapshot.declarations, ...addedDeclarations].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const symbols = [...snapshot.symbols, ...addedSymbols].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const types = [...snapshot.types, ...parameterTypes].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	const relations = [...snapshot.typeRelations, ...constraintRelations].sort((left, right) =>
+		left.id < right.id ? -1 : 1
+	);
+	return {
+		...snapshot,
+		declarations,
+		populations: snapshot.populations.map((population) => {
+			switch (population.kind) {
+				case 'DECLARATION':
+					return semanticPopulation(
+						'DECLARATION',
+						members(declarations.map((record) => record.id))
+					);
+				case 'SYMBOL':
+					return semanticPopulation('SYMBOL', members(symbols.map((record) => record.id)));
+				case 'TYPE':
+					return semanticPopulation('TYPE', members(types.map((record) => record.id)));
+				case 'TYPE_PARAMETER':
+					return semanticPopulation(
+						'TYPE_PARAMETER',
+						members(typeParameters.map((record) => record.id))
+					);
+				case 'TYPE_RELATION':
+					return semanticPopulation('TYPE_RELATION', members(relations.map((record) => record.id)));
+				default:
+					return population;
+			}
+		}),
+		symbols,
+		typeParameters,
+		typeRelations: relations,
+		types
+	};
+}
+
 function withContextSource(
 	snapshot: StaticSemanticSnapshot,
 	logicalPath: string,
@@ -617,7 +1732,17 @@ function withContextSource(
 ): StaticSemanticSnapshot {
 	const source = snapshot.sources[0]!;
 	const contentSha256 = sha256(contents);
-	const id = semanticSourceId({ contentSha256, logicalPath, programId: source.programId });
+	const parsedSource = ts.createSourceFile(logicalPath, contents, ts.ScriptTarget.Latest, true);
+	const moduleKind = ts.isExternalModule(parsedSource) ? ('MODULE' as const) : ('SCRIPT' as const);
+	const sourceScopeKind =
+		moduleKind === 'MODULE' ? ('SOURCE_MODULE' as const) : ('SOURCE_SCRIPT' as const);
+	const sourceScopeDomain = moduleKind === 'MODULE' ? ('MIXED' as const) : ('LEXICAL' as const);
+	const id = semanticSourceId({
+		contentSha256,
+		logicalPath,
+		moduleKind,
+		programId: source.programId
+	});
 	const sourceProvenance = snapshot.provenances.find(
 		(record) => record.id === source.provenanceId
 	)!;
@@ -632,6 +1757,20 @@ function withContextSource(
 		},
 		sourceId: id
 	});
+	const projectSymbolProvenance = snapshot.provenances.find(
+		(record) => record.capability === 'TS_SYMBOL' && record.sourceId === null
+	)!;
+	const contextScopeProvenance = provenance(
+		snapshot.id,
+		source.projectId,
+		'TS_SYMBOL',
+		snapshot.projects[0]!.programRecipe.projectResolutionDigest,
+		id,
+		projectSymbolProvenance.id,
+		snapshot.contextDigest,
+		snapshot.projects[0]!.contextInputIds,
+		'SCOPE_DERIVED'
+	);
 	const contextSource = {
 		...source,
 		analysisDisposition: 'CONTEXT_ONLY' as const,
@@ -642,6 +1781,7 @@ function withContextSource(
 		diagnosticIds: [],
 		id,
 		logicalPath,
+		moduleKind,
 		provenanceId: contextProvenance.id,
 		rootFile: false,
 		rootNodeId: null,
@@ -652,33 +1792,70 @@ function withContextSource(
 		left.id < right.id ? -1 : 1
 	);
 	const sourceIds = sources.map((record) => record.id).sort();
-	const provenances = [...snapshot.provenances, contextProvenance].sort((left, right) =>
+	const globalScope = snapshot.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+	const contextScopeId = semanticScopeId({
+		domain: sourceScopeDomain,
+		end: contents.length,
+		kind: sourceScopeKind,
+		ownerKind: ts.SyntaxKind.SourceFile,
+		programId: source.programId,
+		sourceId: id,
+		start: 0
+	});
+	const contextScope: StaticSemanticSnapshot['scopes'][number] = {
+		domain: sourceScopeDomain,
+		end: contents.length,
+		id: contextScopeId,
+		kind: sourceScopeKind,
+		ownerKind: ts.SyntaxKind.SourceFile,
+		ownerKindName: 'SourceFile',
+		ownerNodeId: null,
+		parentScopeId: globalScope.id,
+		programId: source.programId,
+		projectId: source.projectId,
+		provenanceId: contextScopeProvenance.id,
+		sourceId: id,
+		start: 0
+	};
+	const scopes = [...snapshot.scopes, contextScope].sort((left, right) =>
 		left.id < right.id ? -1 : 1
+	);
+	const provenances = [...snapshot.provenances, contextProvenance, contextScopeProvenance].sort(
+		(left, right) => (left.id < right.id ? -1 : 1)
 	);
 	return {
 		...snapshot,
 		populations: snapshot.populations.map((population) =>
 			population.kind === 'PROVENANCE'
 				? semanticPopulation('PROVENANCE', members(provenances.map((record) => record.id)))
-				: population.kind === 'SOURCE'
+				: population.kind === 'SCOPE'
 					? semanticPopulation(
-							'SOURCE',
+							'SCOPE',
 							members(
-								sources
-									.filter((record) => record.analysisDisposition === 'DEEP_INDEXED')
-									.map((record) => record.id)
-									.sort(),
-								sources
-									.filter((record) => record.analysisDisposition === 'CONTEXT_ONLY')
-									.map((record) => record.id)
-									.sort()
+								scopes.filter((record) => record.sourceId !== id).map((record) => record.id),
+								[contextScope.id]
 							)
 						)
-					: population
+					: population.kind === 'SOURCE'
+						? semanticPopulation(
+								'SOURCE',
+								members(
+									sources
+										.filter((record) => record.analysisDisposition === 'DEEP_INDEXED')
+										.map((record) => record.id)
+										.sort(),
+									sources
+										.filter((record) => record.analysisDisposition === 'CONTEXT_ONLY')
+										.map((record) => record.id)
+										.sort()
+								)
+							)
+						: population
 		),
 		programs: snapshot.programs.map((program) => ({ ...program, sourceIds })),
 		projects: snapshot.projects.map((project) => ({ ...project, sourceIds })),
 		provenances,
+		scopes,
 		sources
 	};
 }
@@ -815,6 +1992,19 @@ function validateSnapshot(
 	context: SemanticValidationContext = FROZEN_CONTEXT
 ) {
 	return validateStaticSemanticSnapshot(value, overrides, context);
+}
+
+function expectValidationEvidenceCode(
+	action: () => unknown,
+	code: StaticSemanticValidationBudgetEvidenceErrorCode
+): void {
+	let thrown: unknown;
+	try {
+		action();
+	} catch (error) {
+		thrown = error;
+	}
+	expect(thrown).toMatchObject({ code });
 }
 
 function diagnosticMessage(
@@ -1013,12 +2203,982 @@ function replaceDiagnostics(
 }
 
 describe('bounded semantic snapshot validation', () => {
-	it('accepts a closed non-vacuous Slice 3A project and rejects unknown schema majors', () => {
+	it('accepts a closed non-vacuous Slice 3B project and rejects unknown schema majors', () => {
 		const snapshot = fixture();
-		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
 		expect(
-			validateSnapshot({ ...snapshot, schemaVersion: 'jan-csaa-semantic-snapshot/3.0.0' })
+			validateSnapshot({ ...snapshot, schemaVersion: 'jan-csaa-semantic-snapshot/8.0.0' })
 		).toMatchObject({ state: 'INVALID', issues: [{ code: 'UNSUPPORTED_SCHEMA_VERSION' }] });
+	});
+
+	it('accepts call and construct overload roles while rejecting kind and callable-owner drift', () => {
+		const snapshot = withCallAndConstructOverloadFacts();
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const callSignatures = snapshot.signatures.filter(
+			(signature) => signature.declarationRole === 'CALL_SIGNATURE'
+		);
+		const constructSignatures = snapshot.signatures.filter(
+			(signature) => signature.declarationRole === 'CONSTRUCT_SIGNATURE'
+		);
+		expect(callSignatures).toHaveLength(2);
+		expect(constructSignatures).toHaveLength(2);
+		expect(new Set(callSignatures.map((signature) => signature.declarationId)).size).toBe(2);
+		expect(new Set(constructSignatures.map((signature) => signature.declarationId)).size).toBe(2);
+		const callSignature = callSignatures[0]!;
+		const kindDrift = validateSnapshot(
+			{
+				...snapshot,
+				signatures: snapshot.signatures.map((signature) =>
+					signature.id === callSignature.id
+						? { ...signature, declarationRole: 'CONSTRUCT_SIGNATURE' as const }
+						: signature
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(kindDrift.state).toBe('INVALID');
+		expect(kindDrift.issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+		const unrelatedSymbol = snapshot.symbols.find(
+			(symbol) => symbol.id !== snapshot.overloadSets[0]!.callableSymbolId
+		)!;
+		const ownerDrift = validateSnapshot(
+			{
+				...snapshot,
+				signatures: snapshot.signatures.map((signature) =>
+					signature.id === callSignature.id
+						? { ...signature, owner: { id: unrelatedSymbol.id, kind: 'SYMBOL' as const } }
+						: signature
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(ownerDrift.state).toBe('INVALID');
+		expect(ownerDrift.issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_VALUE' })])
+		);
+
+		const kindCardinalityDrift = validateSnapshot(
+			{
+				...snapshot,
+				signatures: snapshot.signatures.map((signature) =>
+					signature.id === callSignatures[1]!.id
+						? { ...signature, signatureKind: 'CONSTRUCT' as const }
+						: signature
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(kindCardinalityDrift.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: `Overload set ${snapshot.overloadSets[0]!.id} Signature kind CALL must have at least two memberships.`
+				})
+			])
+		);
+
+		const duplicateDeclaration = validateSnapshot(
+			{
+				...snapshot,
+				signatures: snapshot.signatures.map((signature) =>
+					signature.id === callSignatures[1]!.id
+						? { ...signature, declarationId: callSignatures[0]!.declarationId }
+						: signature
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(duplicateDeclaration.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DUPLICATE_ID',
+					message: `Overload set ${snapshot.overloadSets[0]!.id} Signature kind CALL must use distinct declaration identities.`
+				})
+			])
+		);
+
+		const missingDeclaration = validateSnapshot(
+			{
+				...snapshot,
+				signatures: snapshot.signatures.map((signature) =>
+					signature.id === callSignatures[1]!.id ? { ...signature, declarationId: null } : signature
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(missingDeclaration.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: expect.stringContaining('must retain a non-null Signature declaration')
+				})
+			])
+		);
+	});
+
+	it('accepts Pair<T, U> declaration ownership and rejects identity, source, and containment drift', () => {
+		const snapshot = withDeclarationOwnedPairTypeParameters();
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const owner = snapshot.declarations.find((declaration) => declaration.name === 'Pair')!;
+		const parameters = snapshot.typeParameters.filter(
+			(parameter) => parameter.owner.kind === 'DECLARATION' && parameter.owner.id === owner.id
+		);
+		expect(parameters.map((parameter) => parameter.ordinal)).toEqual([0, 1]);
+		for (const parameter of parameters) {
+			expect(parameter.declarationId).not.toBeNull();
+			expect(parameter.declarationId).not.toBe(owner.id);
+			const declaration = snapshot.declarations.find(
+				(candidate) => candidate.id === parameter.declarationId
+			)!;
+			expect(declaration.sourceId).toBe(owner.sourceId);
+			expect(declaration.start).toBeGreaterThanOrEqual(owner.start);
+			expect(declaration.end).toBeLessThanOrEqual(owner.end);
+		}
+
+		const first = parameters[0]!;
+		const sameDeclaration = validateSnapshot(
+			{
+				...snapshot,
+				typeParameters: snapshot.typeParameters.map((parameter) =>
+					parameter.id === first.id ? { ...parameter, declarationId: owner.id } : parameter
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(sameDeclaration.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message:
+						'Type-parameter declaration must be distinct from its enclosing generic declaration owner.'
+				})
+			])
+		);
+
+		const parameterDeclaration = snapshot.declarations.find(
+			(declaration) => declaration.id === first.declarationId
+		)!;
+		const sourceDrift = validateSnapshot(
+			{
+				...snapshot,
+				declarations: snapshot.declarations.map((declaration) =>
+					declaration.id === parameterDeclaration.id
+						? {
+								...declaration,
+								sourceId: `semantic:source-${'f'.repeat(64)}` as typeof declaration.sourceId
+							}
+						: declaration
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(sourceDrift.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'CROSS_PROJECT_REFERENCE',
+					message:
+						'Type-parameter declaration and its generic declaration owner must belong to the same source.'
+				})
+			])
+		);
+
+		const containmentDrift = validateSnapshot(
+			{
+				...snapshot,
+				declarations: snapshot.declarations.map((declaration) =>
+					declaration.id === parameterDeclaration.id
+						? { ...declaration, start: owner.start - 1 }
+						: declaration
+				)
+			},
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(containmentDrift.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message:
+						'Type-parameter declaration span must be contained by its enclosing generic declaration owner.'
+				})
+			])
+		);
+	});
+
+	it('issues opaque single-use VALIDATE evidence bound to exact snapshot bytes and budgets', () => {
+		const snapshot = fixture();
+		const session = createStaticSemanticOperationBudgetSession(snapshot.budgets, 100, () => 100);
+		const binding = session.providerBinding();
+		const budgetsDigest = sha256(canonicalSemanticJson(snapshot.budgets));
+		const issued = validateStaticSemanticSnapshotWithBudgetEvidence(
+			snapshot,
+			binding,
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(issued.validation).toEqual({ issues: [], state: 'VALID' });
+		expect(issued.evidence).not.toBeNull();
+		if (issued.evidence === null) throw new Error('Expected validation budget evidence.');
+		expect(Object.getPrototypeOf(issued.evidence)).toBeNull();
+		expect(Object.keys(issued.evidence)).toEqual([]);
+		expect(Object.isFrozen(issued.evidence)).toBe(true);
+
+		const canonical = canonicalSemanticJson(snapshot);
+		const view = takeStaticSemanticValidationBudgetEvidence(
+			issued.evidence,
+			binding,
+			snapshot,
+			budgetsDigest
+		);
+		expect(view).toEqual({
+			budgetsDigest,
+			canonicalSnapshotBytes: Buffer.byteLength(canonical, 'utf8'),
+			phase: 'VALIDATE',
+			snapshotSha256: sha256(canonical)
+		});
+		expect(Object.isFrozen(view)).toBe(true);
+		expectValidationEvidenceCode(
+			() =>
+				takeStaticSemanticValidationBudgetEvidence(
+					issued.evidence!,
+					binding,
+					snapshot,
+					budgetsDigest
+				),
+			'EVIDENCE_REUSED'
+		);
+	});
+
+	it('rejects fake, cloned, substituted, altered, and mismatched VALIDATE evidence inputs', () => {
+		const snapshot = fixture();
+		const session = createStaticSemanticOperationBudgetSession(snapshot.budgets, 100, () => 100);
+		const binding = session.providerBinding();
+		const wrongBinding = createStaticSemanticOperationBudgetSession(
+			snapshot.budgets,
+			100,
+			() => 100
+		).providerBinding();
+		const budgetsDigest = sha256(canonicalSemanticJson(snapshot.budgets));
+		const issued = validateStaticSemanticSnapshotWithBudgetEvidence(
+			snapshot,
+			binding,
+			{},
+			contextForSnapshot(snapshot)
+		);
+		if (issued.evidence === null) throw new Error('Expected validation budget evidence.');
+		const evidence = issued.evidence;
+
+		for (const fake of [
+			Object.freeze(Object.create(null)) as StaticSemanticValidationBudgetEvidence,
+			Object.freeze({ ...evidence }) as StaticSemanticValidationBudgetEvidence
+		])
+			expectValidationEvidenceCode(
+				() => takeStaticSemanticValidationBudgetEvidence(fake, binding, snapshot, budgetsDigest),
+				'INVALID_EVIDENCE'
+			);
+		expectValidationEvidenceCode(
+			() =>
+				takeStaticSemanticValidationBudgetEvidence(evidence, wrongBinding, snapshot, budgetsDigest),
+			'BINDING_MISMATCH'
+		);
+		expectValidationEvidenceCode(
+			() =>
+				takeStaticSemanticValidationBudgetEvidence(
+					evidence,
+					binding,
+					{ ...snapshot },
+					budgetsDigest
+				),
+			'SNAPSHOT_MISMATCH'
+		);
+		expectValidationEvidenceCode(
+			() => takeStaticSemanticValidationBudgetEvidence(evidence, binding, snapshot, '0'.repeat(64)),
+			'BUDGET_MISMATCH'
+		);
+		expectValidationEvidenceCode(
+			() =>
+				validateStaticSemanticSnapshotWithBudgetEvidence(
+					snapshot,
+					null as never,
+					{},
+					contextForSnapshot(snapshot)
+				),
+			'INVALID_BINDING'
+		);
+		expect(() =>
+			takeStaticSemanticValidationBudgetEvidence(evidence, binding, snapshot, budgetsDigest)
+		).not.toThrow();
+
+		const altered = fixture();
+		const alteredBinding = createStaticSemanticOperationBudgetSession(
+			altered.budgets,
+			100,
+			() => 100
+		).providerBinding();
+		const alteredIssued = validateStaticSemanticSnapshotWithBudgetEvidence(
+			altered,
+			alteredBinding,
+			{},
+			contextForSnapshot(altered)
+		);
+		if (alteredIssued.evidence === null) throw new Error('Expected validation budget evidence.');
+		(altered as { health: 'COMPLETE' | 'PARTIAL' }).health = 'PARTIAL';
+		expectValidationEvidenceCode(
+			() =>
+				takeStaticSemanticValidationBudgetEvidence(
+					alteredIssued.evidence!,
+					alteredBinding,
+					altered,
+					sha256(canonicalSemanticJson(altered.budgets))
+				),
+			'SNAPSHOT_MISMATCH'
+		);
+	});
+
+	it('withholds VALIDATE evidence for invalid and validation-budget-exhausted snapshots', () => {
+		const snapshot = fixture();
+		const binding = createStaticSemanticOperationBudgetSession(
+			snapshot.budgets,
+			100,
+			() => 100
+		).providerBinding();
+		const invalid = validateStaticSemanticSnapshotWithBudgetEvidence(
+			{ ...snapshot, health: 'PARTIAL' },
+			binding,
+			{},
+			contextForSnapshot(snapshot)
+		);
+		expect(invalid.validation.state).toBe('INVALID');
+		expect(invalid.evidence).toBeNull();
+		const exhausted = validateStaticSemanticSnapshotWithBudgetEvidence(
+			snapshot,
+			binding,
+			{ maxRecords: 1 },
+			contextForSnapshot(snapshot)
+		);
+		expect(exhausted.validation.state).toBe('BUDGET_EXHAUSTED');
+		expect(exhausted.evidence).toBeNull();
+	});
+
+	it('uses the Program count as the exact TS_SYMBOL boundary predicate', () => {
+		const snapshot = fixture();
+		const limitation = {
+			capability: 'TS_SYMBOL' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason:
+				'TypeScript symbol extraction and resolution are Program-scoped; cross-Program symbol identity and binding reconciliation is not implemented for this multi-project snapshot.',
+			region: 'typescript-program-boundaries'
+		};
+		const program = snapshot.programs[0]!;
+		const syntheticMultiProgram = {
+			...snapshot,
+			programs: [program, { ...program, id: `semantic:program-${'f'.repeat(64)}` }].sort(
+				(left, right) => (left.id < right.id ? -1 : 1)
+			)
+		};
+		expect(validateSnapshot(syntheticMultiProgram).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'Multi-Program snapshots require the exact canonical TS_SYMBOL Program-boundary limitation once.',
+					path: '$.limitations'
+				})
+			])
+		);
+		expect(validateSnapshot({ ...snapshot, limitations: [limitation] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'The TS_SYMBOL Program-boundary limitation is forbidden unless the snapshot contains multiple Programs.',
+					path: '$.limitations'
+				})
+			])
+		);
+		const symbolProvenanceIndex = snapshot.provenances.findIndex(
+			(provenance) => provenance.capability === 'TS_SYMBOL'
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				provenances: snapshot.provenances.map((provenance, index) =>
+					index === symbolProvenanceIndex
+						? { ...provenance, limitations: [limitation] }
+						: provenance
+				)
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'The TS_SYMBOL Program-boundary provenance limitation is forbidden outside TS_SYMBOL provenance in a multi-Program snapshot.',
+					path: `$.provenances[${symbolProvenanceIndex}].limitations`
+				})
+			])
+		);
+	});
+
+	it('rejects missing and extra maxCompilerFacts wire fields and accepts the exact fact ceiling', () => {
+		const snapshot = fixture();
+		const missingCompilerFacts = Object.fromEntries(
+			Object.entries(snapshot.budgets).filter(([key]) => key !== 'maxCompilerFacts')
+		);
+		expect(validateSnapshot({ ...snapshot, budgets: missingCompilerFacts }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_SHAPE',
+					path: '$.budgets.maxCompilerFacts'
+				})
+			])
+		);
+		expect(
+			validateSnapshot({
+				...snapshot,
+				budgets: { ...snapshot.budgets, unexpectedCompilerBudget: 1 }
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_SHAPE',
+					path: '$.budgets.unexpectedCompilerBudget'
+				})
+			])
+		);
+
+		const compilerFacts = withSymbolFacts();
+		const factCount =
+			compilerFacts.aliases.length +
+			compilerFacts.declarations.length +
+			compilerFacts.moduleExports.length +
+			compilerFacts.moduleResolutions.length +
+			compilerFacts.references.length +
+			compilerFacts.symbols.length;
+		expect(factCount).toBeGreaterThan(1);
+		expect(
+			validateSnapshot({
+				...compilerFacts,
+				budgets: { ...compilerFacts.budgets, maxCompilerFacts: factCount }
+			}).issues
+		).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.budgets.maxCompilerFacts' })])
+		);
+		expect(
+			validateSnapshot({
+				...compilerFacts,
+				budgets: { ...compilerFacts.budgets, maxCompilerFacts: factCount - 1 }
+			}).issues
+		).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: '$.budgets.maxCompilerFacts' })])
+		);
+	});
+
+	it('rejects lexical-scope topology, provenance, budget, and fact-link mutations', () => {
+		const snapshot = fixture();
+		const sourceScope = snapshot.scopes.find((scope) => scope.sourceId !== null)!;
+		const globalScope = snapshot.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+		const sourceScopeIndex = snapshot.scopes.findIndex((scope) => scope.id === sourceScope.id);
+		const scopeMutation = (
+			revise: (
+				scope: StaticSemanticSnapshot['scopes'][number]
+			) => StaticSemanticSnapshot['scopes'][number]
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			scopes: snapshot.scopes.map((scope) => (scope.id === sourceScope.id ? revise(scope) : scope))
+		});
+
+		for (const [mutated, path] of [
+			[
+				scopeMutation((scope) => ({ ...scope, parentScopeId: scope.id })),
+				`$.scopes[${sourceScopeIndex}].parentScopeId`
+			],
+			[
+				scopeMutation((scope) => ({ ...scope, ownerNodeId: null })),
+				`$.scopes[${sourceScopeIndex}].ownerNodeId`
+			],
+			[
+				scopeMutation((scope) => ({ ...scope, provenanceId: globalScope.provenanceId })),
+				`$.scopes[${sourceScopeIndex}].provenanceId`
+			]
+		] as const)
+			expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated)).issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ path })])
+			);
+
+		expect(
+			validateSnapshot({ ...snapshot, budgets: { ...snapshot.budgets, maxScopes: 1 } }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.budgets.maxScopes' })
+			])
+		);
+
+		const symbolSnapshot = withSymbolFacts();
+		const declarationLinkMutation = {
+			...symbolSnapshot,
+			declarations: symbolSnapshot.declarations.map((declaration) => ({
+				...declaration,
+				declaringScopeId: null
+			}))
+		};
+		expect(
+			validateSnapshot(declarationLinkMutation, {}, contextForSnapshot(declarationLinkMutation))
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.declarations[0].declaringScopeId'
+				})
+			])
+		);
+		const referenceLinkMutation = {
+			...symbolSnapshot,
+			references: symbolSnapshot.references.map((reference) => ({
+				...reference,
+				containingScopeId: null
+			}))
+		};
+		expect(
+			validateSnapshot(referenceLinkMutation, {}, contextForSnapshot(referenceLinkMutation)).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.references[0].containingScopeId'
+				})
+			])
+		);
+	});
+
+	it('recomputes scope taxonomy, totality, nearest parents, and supported fact containment', () => {
+		let functionOnly = withAstNode(fixture('src/index.ts', ' '.repeat(64)), {
+			end: 64,
+			kind: ts.SyntaxKind.Block,
+			kindName: 'Block',
+			start: 0
+		});
+		const functionNode = functionOnly.astNodes.find((node) => node.kind === ts.SyntaxKind.Block)!;
+		functionOnly = withScopeForNode(functionOnly, functionNode.id);
+		expect(validateSnapshot(functionOnly, {}, contextForSnapshot(functionOnly))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const functionScope = functionOnly.scopes.find(
+			(scope) => scope.ownerNodeId === functionNode.id
+		)!;
+		const replaceScopes = (
+			snapshot: StaticSemanticSnapshot,
+			scopes: StaticSemanticSnapshot['scopes']
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'SCOPE'
+					? semanticPopulation('SCOPE', members(scopes.map((scope) => scope.id)))
+					: population
+			),
+			scopes: [...scopes].sort((left, right) => (left.id < right.id ? -1 : 1))
+		});
+
+		const relabeledScope = {
+			...functionScope,
+			domain: 'MIXED' as const,
+			id: semanticScopeId({
+				domain: 'MIXED',
+				end: functionScope.end,
+				kind: functionScope.kind,
+				ownerKind: functionScope.ownerKind,
+				programId: functionScope.programId,
+				sourceId: functionScope.sourceId,
+				start: functionScope.start
+			})
+		};
+		const relabeled = replaceScopes(
+			functionOnly,
+			functionOnly.scopes.map((scope) => (scope.id === functionScope.id ? relabeledScope : scope))
+		);
+		expect(validateSnapshot(relabeled).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: expect.stringContaining('.kind') })
+			])
+		);
+		const duplicateOwner = replaceScopes(functionOnly, [...functionOnly.scopes, relabeledScope]);
+		expect(validateSnapshot(duplicateOwner).issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'DUPLICATE_ID', path: '$.scopes' })])
+		);
+
+		const omitted = replaceScopes(
+			functionOnly,
+			functionOnly.scopes.filter((scope) => scope.id !== functionScope.id)
+		);
+		expect(validateSnapshot(omitted).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'POPULATION_MISMATCH', path: '$.scopes' })
+			])
+		);
+
+		let nested = withAstChild(
+			functionOnly,
+			functionNode.id,
+			{ end: 48, kind: ts.SyntaxKind.Block, kindName: 'Block', start: 8 },
+			AST_STRUCTURAL_ROLES.genericChild
+		);
+		const blockNode = nested.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.Block && node.parentId === functionNode.id
+		)!;
+		nested = withScopeForNode(nested, blockNode.id);
+		expect(validateSnapshot(nested, {}, contextForSnapshot(nested))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const blockScope = nested.scopes.find((scope) => scope.ownerNodeId === blockNode.id)!;
+		const sourceScope = nested.scopes.find(
+			(scope) => scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE'
+		)!;
+		const ancestorSkipping = replaceScopes(
+			nested,
+			nested.scopes.map((scope) =>
+				scope.id === blockScope.id ? { ...scope, parentScopeId: sourceScope.id } : scope
+			)
+		);
+		expect(validateSnapshot(ancestorSkipping).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: expect.stringContaining('.parentScopeId')
+				})
+			])
+		);
+
+		const symbolSnapshot = withSymbolFacts();
+		const globalScope = symbolSnapshot.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+		const movedReference = {
+			...symbolSnapshot,
+			references: symbolSnapshot.references.map((reference) => ({
+				...reference,
+				containingScopeId: globalScope.id
+			}))
+		};
+		expect(validateSnapshot(movedReference).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$.references[0].containingScopeId'
+				})
+			])
+		);
+	});
+
+	it('binds deep and context source-root scopes to the persisted module role', () => {
+		const deepModule = fixture('src/index.ts', 'export {};\n');
+		expect(deepModule.sources[0]).toMatchObject({ moduleKind: 'MODULE' });
+		expect(
+			deepModule.scopes.find((scope) => scope.sourceId === deepModule.sources[0]!.id)
+		).toMatchObject({ domain: 'MIXED', kind: 'SOURCE_MODULE' });
+		expect(validateSnapshot(deepModule, {}, contextForSnapshot(deepModule))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const withContextModule = withContextSource(
+			deepModule,
+			'context/module.d.ts',
+			'export interface Context {}\n'
+		);
+		const contextSource = withContextModule.sources.find(
+			(source) => source.logicalPath === 'context/module.d.ts'
+		)!;
+		expect(contextSource).toMatchObject({
+			analysisDisposition: 'CONTEXT_ONLY',
+			moduleKind: 'MODULE'
+		});
+		expect(
+			withContextModule.scopes.find((scope) => scope.sourceId === contextSource.id)
+		).toMatchObject({ domain: 'MIXED', kind: 'SOURCE_MODULE' });
+	});
+
+	it('accepts a closed Slice 3B symbol graph, including an unresolved alias reference that retains its known symbol', () => {
+		const snapshot = withSymbolFacts();
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const currentAlias = snapshot.aliases[0]!;
+		const aliasPreimage = {
+			aliasSymbolId: currentAlias.aliasSymbolId,
+			state: 'UNRESOLVED' as const,
+			targetSymbolId: null,
+			terminalSymbolId: null
+		};
+		const unresolvedAlias = {
+			...currentAlias,
+			...aliasPreimage,
+			id: semanticAliasId(aliasPreimage)
+		};
+		const currentReference = snapshot.references[0]!;
+		const referencePreimage = {
+			nodeId: currentReference.nodeId,
+			resolvedSymbolId: null,
+			resolutionState: 'UNRESOLVED' as const,
+			role: currentReference.role,
+			symbolId: currentReference.symbolId
+		};
+		const unresolvedReference = {
+			...currentReference,
+			...referencePreimage,
+			id: semanticReferenceId(referencePreimage)
+		};
+		const limitation = {
+			capability: 'TS_SYMBOL' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason: 'One alias and reference are explicitly unresolved.',
+			region: snapshot.projects[0]!.configPath
+		};
+		let partial: StaticSemanticSnapshot = {
+			...snapshot,
+			aliases: [unresolvedAlias],
+			capabilities: snapshot.capabilities.map((capability) =>
+				capability.capability === 'TS_SYMBOL'
+					? { ...capability, state: 'PARTIAL' as const }
+					: capability
+			),
+			health: 'PARTIAL' as const,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'ALIAS'
+					? semanticPopulation('ALIAS', members([unresolvedAlias.id], [], [], [unresolvedAlias.id]))
+					: population.kind === 'REFERENCE'
+						? semanticPopulation(
+								'REFERENCE',
+								members([unresolvedReference.id], [], [], [unresolvedReference.id])
+							)
+						: population
+			),
+			references: [unresolvedReference]
+		};
+		const makePartial = (record: SemanticFactProvenanceRecord): SemanticFactProvenanceRecord => ({
+			...record,
+			epistemic: {
+				...record.epistemic,
+				capabilityCoverage: 'partial',
+				unresolvedRegions: [limitation.region]
+			},
+			limitations: [limitation]
+		});
+		partial = reviseProvenance(partial, partial.aliases[0]!.provenanceId, makePartial);
+		partial = reviseProvenance(partial, partial.moduleResolutions[0]!.provenanceId, makePartial);
+		partial = reviseProvenance(partial, partial.references[0]!.resolutionProvenanceId, makePartial);
+		expect(validateSnapshot(partial, {}, contextForSnapshot(partial))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(unresolvedReference.symbolId).not.toBeNull();
+	});
+
+	it('keeps structural and checker provenance separate and rejects dishonest nullable binding states', () => {
+		const snapshot = withSymbolFacts();
+		const context = contextForSnapshot(snapshot);
+		const declaration = snapshot.declarations[0]!;
+		const reference = snapshot.references[0]!;
+		const declarationIndex = snapshot.declarations.indexOf(declaration);
+		const referenceIndex = snapshot.references.indexOf(reference);
+		const mutations: readonly {
+			readonly expected: { readonly message: string; readonly path: string };
+			readonly snapshot: StaticSemanticSnapshot;
+		}[] = [
+			{
+				expected: {
+					message: 'Pure TypeChecker facts require direct compiler-confirmed provenance.',
+					path: `$.declarations[${declarationIndex}].bindingProvenanceId`
+				},
+				snapshot: {
+					...snapshot,
+					declarations: snapshot.declarations.map((record) =>
+						record === declaration
+							? { ...record, bindingProvenanceId: record.structuralProvenanceId }
+							: record
+					)
+				}
+			},
+			{
+				expected: {
+					message:
+						'Scope and binding-placement facts require explicit derived public-AST binding-rule provenance.',
+					path: `$.declarations[${declarationIndex}].structuralProvenanceId`
+				},
+				snapshot: {
+					...snapshot,
+					declarations: snapshot.declarations.map((record) =>
+						record === declaration
+							? { ...record, structuralProvenanceId: record.bindingProvenanceId }
+							: record
+					)
+				}
+			},
+			{
+				expected: {
+					message: 'Pure TypeChecker facts require direct compiler-confirmed provenance.',
+					path: `$.references[${referenceIndex}].resolutionProvenanceId`
+				},
+				snapshot: {
+					...snapshot,
+					references: snapshot.references.map((record) =>
+						record === reference
+							? { ...record, resolutionProvenanceId: record.structuralProvenanceId }
+							: record
+					)
+				}
+			},
+			{
+				expected: {
+					message:
+						'Scope and binding-placement facts require explicit derived public-AST binding-rule provenance.',
+					path: `$.references[${referenceIndex}].structuralProvenanceId`
+				},
+				snapshot: {
+					...snapshot,
+					references: snapshot.references.map((record) =>
+						record === reference
+							? { ...record, structuralProvenanceId: record.resolutionProvenanceId }
+							: record
+					)
+				}
+			},
+			{
+				expected: {
+					message:
+						'Declaration symbol-binding state must agree exactly with nullable symbol identity.',
+					path: `$.declarations[${declarationIndex}].symbolBindingState`
+				},
+				snapshot: {
+					...snapshot,
+					declarations: snapshot.declarations.map((record) =>
+						record === declaration
+							? { ...record, symbolBindingState: 'UNSUPPORTED' as const }
+							: record
+					)
+				}
+			},
+			{
+				expected: {
+					message: 'Reference resolution state and symbol identities disagree.',
+					path: `$.references[${referenceIndex}].resolutionState`
+				},
+				snapshot: {
+					...snapshot,
+					references: snapshot.references.map((record) =>
+						record === reference ? { ...record, resolutionState: 'UNSUPPORTED' as const } : record
+					)
+				}
+			}
+		];
+
+		for (const mutation of mutations)
+			expect(validateSnapshot(mutation.snapshot, {}, context).issues).toContainEqual(
+				expect.objectContaining(mutation.expected)
+			);
+	});
+
+	it('rejects corrupt Slice 3B symbol identities, cross-references, ordering, and uniqueness', () => {
+		const snapshot = withSymbolFacts();
+		const context = contextForSnapshot(snapshot);
+		const forgedDeclarationId =
+			`semantic:declaration-${'f'.repeat(64)}` as (typeof snapshot.declarations)[number]['id'];
+		expect(
+			validateSnapshot(
+				{
+					...snapshot,
+					declarations: [{ ...snapshot.declarations[0]!, id: forgedDeclarationId }],
+					populations: snapshot.populations.map((population) =>
+						population.kind === 'DECLARATION'
+							? semanticPopulation('DECLARATION', members([forgedDeclarationId]))
+							: population
+					)
+				},
+				{},
+				context
+			).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					path: '$.declarations[0].id'
+				})
+			])
+		);
+
+		const currentExport = snapshot.moduleExports[0]!;
+		const missingSymbolId = `semantic:symbol-${'e'.repeat(64)}` as NonNullable<
+			typeof currentExport.targetSymbolId
+		>;
+		const exportPreimage = {
+			exportName: currentExport.exportName,
+			sourceId: currentExport.sourceId,
+			state: currentExport.state,
+			symbolId: currentExport.symbolId,
+			targetSymbolId: missingSymbolId
+		};
+		const danglingExport = {
+			...currentExport,
+			...exportPreimage,
+			id: semanticModuleExportId(exportPreimage)
+		};
+		expect(
+			validateSnapshot(
+				{
+					...snapshot,
+					moduleExports: [danglingExport],
+					populations: snapshot.populations.map((population) =>
+						population.kind === 'MODULE_EXPORT'
+							? semanticPopulation('MODULE_EXPORT', members([danglingExport.id]))
+							: population
+					)
+				},
+				{},
+				context
+			).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					path: '$.moduleExports[0].targetSymbolId'
+				})
+			])
+		);
+
+		expect(
+			validateSnapshot({ ...snapshot, symbols: [...snapshot.symbols].reverse() }, {}, context)
+				.issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'NONCANONICAL_ORDER', path: '$.symbols' })
+			])
+		);
+		expect(
+			validateSnapshot(
+				{ ...snapshot, aliases: [snapshot.aliases[0]!, snapshot.aliases[0]!] },
+				{},
+				context
+			).issues
+		).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'DUPLICATE_ID', path: '$.aliases' })])
+		);
 	});
 
 	it('enforces content-addressed provenance references and their exact one-level transitive closure', () => {
@@ -1222,7 +3382,7 @@ describe('bounded semantic snapshot validation', () => {
 
 	it('binds the literal operation, traversal profile, and expected-empty decision into the snapshot identity', () => {
 		const snapshot = fixture();
-		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/2.0.0');
+		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/7.0.0');
 		for (const probe of [
 			{ ...snapshot, astTraversalProfile: 'typescript-private-traversal/1' },
 			{ ...snapshot, operationVersion: 'jan-csaa-build-static-semantic-snapshot/0.9.0' }
@@ -1258,7 +3418,7 @@ describe('bounded semantic snapshot validation', () => {
 			validateSnapshot({
 				...snapshot,
 				capabilities: snapshot.capabilities.map((capability) =>
-					capability.capability === 'TS_SYMBOL'
+					capability.capability === 'TS_TYPE'
 						? { ...capability, state: 'SUPPORTED' as const }
 						: capability
 				)
@@ -1389,7 +3549,10 @@ describe('bounded semantic snapshot validation', () => {
 			}).state
 		).toBe('INVALID');
 		expect(
-			validateSnapshot({ ...snapshot, requestedCapabilities: ['TS_PROJECT', 'TS_SYMBOL'] }).issues
+			validateSnapshot({
+				...snapshot,
+				requestedCapabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE']
+			}).issues
 		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'CONFORMANCE_OVERCLAIM' })]));
 		const contextAst = {
 			...snapshot,
@@ -2399,14 +4562,15 @@ describe('bounded semantic snapshot validation', () => {
 			0
 		);
 		const propertyName = nestedAst.astNodes.find((node) => node.parentId === property.id)!;
+		const scopedNestedAst = withScopeForNode(nestedAst, objectNode.id);
 		const nestedCandidates = [
 			scalarCandidate,
 			candidate(property, propertyName, 'MEMBER', 'ATOMIC', 'value', null, 'NONE')
 		].sort((left, right) => (left.id < right.id ? -1 : 1));
 		const nestedSnapshot: StaticSemanticSnapshot = {
-			...nestedAst,
+			...scopedNestedAst,
 			declarationCandidates: nestedCandidates,
-			populations: nestedAst.populations.map((population) =>
+			populations: scopedNestedAst.populations.map((population) =>
 				population.kind === 'DECLARATION_CANDIDATE'
 					? semanticPopulation(
 							'DECLARATION_CANDIDATE',
@@ -2572,6 +4736,7 @@ describe('bounded semantic snapshot validation', () => {
 			0
 		);
 		const declarationName = completeAst.astNodes.find((node) => node.parentId === declaration.id)!;
+		const scopedCompleteAst = withScopeForNode(completeAst, moduleNode.id);
 		const candidates: StaticSemanticSnapshot['declarationCandidates'][number][] = [
 			{
 				ambientSyntax: true,
@@ -2615,9 +4780,9 @@ describe('bounded semantic snapshot validation', () => {
 			}
 		].sort((left, right) => (left.id < right.id ? -1 : 1));
 		const ambientModule: StaticSemanticSnapshot = {
-			...completeAst,
+			...scopedCompleteAst,
 			declarationCandidates: candidates,
-			populations: completeAst.populations.map((population) =>
+			populations: scopedCompleteAst.populations.map((population) =>
 				population.kind === 'DECLARATION_CANDIDATE'
 					? semanticPopulation(
 							'DECLARATION_CANDIDATE',
@@ -2907,12 +5072,12 @@ describe('bounded semantic snapshot validation', () => {
 	});
 
 	it('orders invocation records by invocation identity without imposing node-identity order', () => {
-		const withCall = withAstNode(fixture(), {
-			kind: ts.SyntaxKind.CallExpression,
-			kindName: 'CallExpression'
-		});
 		let withCallAndNew: StaticSemanticSnapshot | undefined;
 		for (let attempt = 0; attempt < 128 && withCallAndNew === undefined; attempt += 1) {
+			const withCall = withAstNode(fixture(`src/index-${attempt}.ts`), {
+				kind: ts.SyntaxKind.CallExpression,
+				kindName: 'CallExpression'
+			});
 			const candidate = withAstNode(withCall, {
 				kind: ts.SyntaxKind.NewExpression,
 				kindName: 'NewExpression',
@@ -2996,7 +5161,10 @@ describe('bounded semantic snapshot validation', () => {
 				(nodeId, index) => index === 0 || nodeIdsInRecordOrder[index - 1]! < nodeId
 			)
 		).toBe(false);
-		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
 	});
 
 	it('rejects conflicting compiler queries and unbound or duplicate Program source paths', () => {
@@ -3084,7 +5252,7 @@ describe('bounded semantic snapshot validation', () => {
 		const nonDegrading = {
 			capability: 'TS_PROJECT' as const,
 			closureEffect: 'NONE' as const,
-			reason: 'Full JAN-CSAA-007 conformance is outside Slice 3A.',
+			reason: 'Full JAN-CSAA-007 conformance is outside Slice 3B.',
 			region: 'full-conformance'
 		};
 		expect(validateSnapshot({ ...snapshot, limitations: [nonDegrading] })).toEqual({
@@ -3891,7 +6059,7 @@ describe('bounded semantic snapshot validation', () => {
 				{
 					capability: 'TS_SYNTAX' as const,
 					code: 'FRAMEWORK_CANDIDATES_UNSUPPORTED' as const,
-					message: 'Framework syntax is outside Slice 3A.',
+					message: 'Framework syntax is outside Slice 3B.',
 					path: 'apps/demo/App.svelte'
 				}
 			]
@@ -4275,7 +6443,7 @@ describe('bounded semantic snapshot validation', () => {
 			{
 				...snapshot,
 				limitations: [
-					{ ...firstLimitation, capability: 'TS_SYMBOL', closureEffect: 'DEGRADES_CLOSURE' }
+					{ ...firstLimitation, capability: 'TS_TYPE', closureEffect: 'DEGRADES_CLOSURE' }
 				]
 			},
 			'$.limitations[0]'
@@ -4792,7 +6960,7 @@ describe('bounded semantic snapshot validation', () => {
 				sources: [{ ...source, mapping: { reason: 'Mapping is incomplete.', state: 'PARTIAL' } }]
 			},
 			'$.sources[0].provenanceId',
-			'Unknown origin or lossy mapping requires partial source coverage.'
+			'Unknown or lossy source mapping requires partial TS_PROJECT provenance with its matching closure-degrading limitation and unresolved region.'
 		);
 	});
 
@@ -5261,6 +7429,705 @@ describe('bounded semantic snapshot validation', () => {
 		).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ code: 'POPULATION_MISMATCH', path: '$.populations' })
+			])
+		);
+	});
+
+	it('rejects independently corrupted scope, declaration, symbol, alias, reference, and module graphs', () => {
+		type Scope = StaticSemanticSnapshot['scopes'][number];
+		type Declaration = StaticSemanticSnapshot['declarations'][number];
+		type SymbolRecord = StaticSemanticSnapshot['symbols'][number];
+		type Alias = StaticSemanticSnapshot['aliases'][number];
+		type Reference = StaticSemanticSnapshot['references'][number];
+		type ModuleResolution = StaticSemanticSnapshot['moduleResolutions'][number];
+		type ModuleExport = StaticSemanticSnapshot['moduleExports'][number];
+
+		const absent = (family: string): never => `semantic:${family}-${'f'.repeat(64)}` as never;
+		const replaceScope = (
+			snapshot: StaticSemanticSnapshot,
+			select: (scope: Scope) => boolean,
+			patch: Partial<Scope>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			scopes: snapshot.scopes.map((scope) => (select(scope) ? { ...scope, ...patch } : scope))
+		});
+		const replaceDeclaration = (
+			snapshot: StaticSemanticSnapshot,
+			patch: Partial<Declaration>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			declarations: [{ ...snapshot.declarations[0]!, ...patch }]
+		});
+		const replaceSymbol = (
+			snapshot: StaticSemanticSnapshot,
+			select: (symbol: SymbolRecord) => boolean,
+			patch: Partial<SymbolRecord>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			symbols: snapshot.symbols.map((symbol) => (select(symbol) ? { ...symbol, ...patch } : symbol))
+		});
+		const replaceAlias = (
+			snapshot: StaticSemanticSnapshot,
+			patch: Partial<Alias>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			aliases: [{ ...snapshot.aliases[0]!, ...patch }]
+		});
+		const replaceReference = (
+			snapshot: StaticSemanticSnapshot,
+			patch: Partial<Reference>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			references: [{ ...snapshot.references[0]!, ...patch }]
+		});
+		const replaceResolution = (
+			snapshot: StaticSemanticSnapshot,
+			patch: Partial<ModuleResolution>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			moduleResolutions: [{ ...snapshot.moduleResolutions[0]!, ...patch }]
+		});
+		const replaceExport = (
+			snapshot: StaticSemanticSnapshot,
+			patch: Partial<ModuleExport>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			moduleExports: [{ ...snapshot.moduleExports[0]!, ...patch }]
+		});
+		const reparentNode = (
+			snapshot: StaticSemanticSnapshot,
+			nodeId: StaticSemanticSnapshot['astNodes'][number]['id'],
+			parentId: StaticSemanticSnapshot['astNodes'][number]['parentId']
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			astNodes: snapshot.astNodes.map((node) => (node.id === nodeId ? { ...node, parentId } : node))
+		});
+		const expectIssue = (
+			label: string,
+			snapshot: StaticSemanticSnapshot,
+			message: string,
+			overrides: Partial<SemanticValidationOptions> = {}
+		): void => {
+			const result = validateSnapshot(snapshot, overrides, contextForSnapshot(snapshot));
+			expect(result.state, label).not.toBe('VALID');
+			expect(
+				result.issues.some((issue) => issue.message === message),
+				`${label}: ${result.issues.map((issue) => issue.message).join(' | ')}`
+			).toBe(true);
+		};
+
+		const scoped = fixture('src/index.ts', ' '.repeat(64));
+		const globalScope = scoped.scopes.find((scope) => scope.kind === 'PROGRAM_GLOBAL')!;
+		const sourceScope = scoped.scopes.find((scope) => scope.sourceId !== null)!;
+		for (const probe of [
+			{
+				label: 'scope identity',
+				message: 'Scope identity mismatch.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					id: absent('scope')
+				})
+			},
+			{
+				label: 'global domain',
+				message: 'Program-global scope must use the LEXICAL domain.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === globalScope.id, {
+					domain: 'MIXED'
+				})
+			},
+			{
+				label: 'global invented span',
+				message: 'Program-global scope must not invent a source, parent, owner, or span.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === globalScope.id, { start: 0 })
+			},
+			{
+				label: 'missing scope source',
+				message: 'Lexical scope source is absent.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					sourceId: absent('source')
+				})
+			},
+			{
+				label: 'cross-project scope source and parent',
+				message: 'Lexical scope source belongs to another project or Program.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					projectId: absent('project')
+				})
+			},
+			{
+				label: 'scope span',
+				message: 'Lexical-scope UTF-16 span is invalid.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					start: 65
+				})
+			},
+			{
+				label: 'scope owner kind name',
+				message: 'Scope owner kind code and name must agree with the public TypeScript enum.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					ownerKindName: 'Identifier'
+				})
+			},
+			{
+				label: 'source file with non-root scope kind',
+				message: 'Only a source-root scope may be owned by a SourceFile.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					kind: 'FUNCTION'
+				})
+			},
+			{
+				label: 'source-root extent',
+				message:
+					'Source-root scope must reproduce the source module role and terminal source extent.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, { end: 63 })
+			},
+			{
+				label: 'missing scope parent',
+				message: 'Lexical scope parent is absent.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					parentScopeId: absent('scope')
+				})
+			},
+			{
+				label: 'cross-project scope parent',
+				message: 'Lexical scope parent belongs to another project or Program.',
+				snapshot: replaceScope(scoped, (scope) => scope.id === sourceScope.id, {
+					projectId: absent('project')
+				})
+			},
+			{
+				label: 'missing source-root scope',
+				message: 'Every Program source requires exactly one source-root lexical scope.',
+				snapshot: {
+					...scoped,
+					scopes: scoped.scopes.filter((scope) => scope.id !== sourceScope.id)
+				}
+			}
+		])
+			expectIssue(probe.label, probe.snapshot, probe.message);
+
+		const rich = withSymbolFacts();
+		const declaration = rich.declarations[0]!;
+		const candidate = rich.declarationCandidates[0]!;
+		const targetSymbol = rich.symbols.find((symbol) => symbol.identityBasis === 'DECLARATIONS')!;
+		const aliasSymbol = rich.symbols.find(
+			(symbol) => symbol.identityBasis === 'REFERENCE_FALLBACK'
+		)!;
+		const reference = rich.references[0]!;
+		const resolution = rich.moduleResolutions[0]!;
+		const moduleExport = rich.moduleExports[0]!;
+		const richSourceScope = rich.scopes.find((scope) => scope.sourceId !== null)!;
+		const crossSource = withContextSource(rich, 'context/other.d.ts', ' ');
+		const contextScope = crossSource.scopes.find(
+			(scope) => scope.sourceId !== null && scope.sourceId !== rich.sources[0]!.id
+		)!;
+		const contextSource = crossSource.sources.find((source) => source.id !== rich.sources[0]!.id)!;
+		const nestedAcrossSources = replaceScope(
+			crossSource,
+			(scope) => scope.id === richSourceScope.id,
+			{ parentScopeId: contextScope.id }
+		);
+		const nestedAcrossSourcesResult = validateSnapshot(
+			nestedAcrossSources,
+			{},
+			contextForSnapshot(nestedAcrossSources)
+		);
+		expect(nestedAcrossSourcesResult.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message: 'Nested lexical scope and parent must share a source.'
+				}),
+				expect.objectContaining({
+					message: 'Nested lexical-scope span must be contained by its parent.'
+				})
+			])
+		);
+
+		for (const probe of [
+			{
+				label: 'invalid durable declaration identity',
+				message: 'Invalid durable declaration identity.',
+				snapshot: replaceDeclaration(rich, { durableId: 'invalid' as never })
+			},
+			{
+				label: 'missing declaration source',
+				message: 'Declaration source is absent.',
+				snapshot: replaceDeclaration(rich, { sourceId: absent('source') })
+			},
+			{
+				label: 'missing declaration scope',
+				message: 'Referenced lexical scope is absent.',
+				snapshot: replaceDeclaration(rich, { declaringScopeId: absent('scope') })
+			},
+			{
+				label: 'declaration scope from another source',
+				message: 'Referenced lexical scope is outside the fact source and Program.',
+				snapshot: replaceDeclaration(crossSource, { declaringScopeId: contextScope.id })
+			},
+			{
+				label: 'declaration span',
+				message: 'Declaration UTF-16 span is invalid.',
+				snapshot: replaceDeclaration(rich, { end: 10, start: 11 })
+			},
+			{
+				label: 'declaration kind name',
+				message: 'Declaration kind code and name must agree with the public TypeScript enum.',
+				snapshot: replaceDeclaration(rich, { kindName: 'Identifier' })
+			},
+			{
+				label: 'empty atomic declaration name',
+				message: 'Only an atomic declaration name may carry non-empty text.',
+				snapshot: replaceDeclaration(rich, { name: '' })
+			},
+			{
+				label: 'missing declaration node',
+				message: 'Declaration node is absent.',
+				snapshot: replaceDeclaration(rich, { nodeId: absent('node') })
+			},
+			{
+				label: 'mismatched declaration node',
+				message: 'Declaration node must reproduce the same source, kind, and span.',
+				snapshot: replaceDeclaration(rich, { nodeId: reference.nodeId })
+			},
+			{
+				label: 'missing declaration candidate',
+				message: 'Declaration candidate is absent.',
+				snapshot: replaceDeclaration(rich, { candidateId: absent('decl-candidate') })
+			},
+			{
+				label: 'mismatched declaration candidate',
+				message: 'Declaration candidate must bind the same source, node, and name state.',
+				snapshot: {
+					...rich,
+					declarationCandidates: [
+						{
+							...candidate,
+							nameNodeId: null,
+							nameState: 'ANONYMOUS' as const,
+							syntacticName: null
+						}
+					]
+				}
+			},
+			{
+				label: 'declaration ambient state',
+				message: 'Declaration ambient state must reproduce its source and syntax candidate.',
+				snapshot: replaceDeclaration(rich, { ambient: true })
+			},
+			{
+				label: 'durable declaration digest',
+				message: 'Durable declaration identity mismatch.',
+				snapshot: replaceDeclaration(rich, { durableId: absent('declaration-durable') })
+			},
+			{
+				label: 'atomic literal candidate without literal evidence',
+				message:
+					'Atomic literal names must retain the exact scalar-safe source lexeme bound by the literal lexeme digest.',
+				snapshot: {
+					...rich,
+					astNodes: rich.astNodes.map((node) =>
+						node.id === candidate.nameNodeId ? { ...node, syntacticIdentifierText: null } : node
+					)
+				}
+			}
+		])
+			expectIssue(probe.label, probe.snapshot, probe.message);
+
+		const foreignProject = { ...rich.projects[0]!, id: absent('project') };
+		const mismatchedSymbolOwnership = replaceSymbol(
+			{
+				...rich,
+				projects: [...rich.projects, foreignProject].sort((left, right) =>
+					left.id < right.id ? -1 : 1
+				)
+			},
+			(symbol) => symbol.id === targetSymbol.id,
+			{ projectId: foreignProject.id }
+		);
+		expectIssue(
+			'symbol Program/project disagreement',
+			mismatchedSymbolOwnership,
+			'Symbol project and Program disagree.'
+		);
+
+		const fallbackCrossProject = {
+			...crossSource,
+			astNodes: crossSource.astNodes.map((node) =>
+				node.id === reference.nodeId ? { ...node, sourceId: contextSource.id } : node
+			),
+			sources: crossSource.sources.map((source) =>
+				source.id === contextSource.id ? { ...source, projectId: absent('project') } : source
+			)
+		};
+		expectIssue(
+			'fallback reference node outside project',
+			fallbackCrossProject,
+			'Symbol fallback reference node belongs to another project.'
+		);
+
+		for (const probe of [
+			{
+				label: 'symbol outside the source project',
+				message: 'Referenced symbol belongs to another project.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === targetSymbol.id, {
+					projectId: absent('project')
+				})
+			},
+			{
+				label: 'symbol missing project',
+				message: 'Symbol project or Program is absent.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === targetSymbol.id, {
+					projectId: absent('project')
+				})
+			},
+			{
+				label: 'empty symbol name',
+				message: 'Symbol name and public flag mask must be valid.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === targetSymbol.id, { name: '' })
+			},
+			{
+				label: 'noncanonical symbol sets',
+				message: 'Symbol declaration, fallback-reference, and flag-name sets must be canonical.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === aliasSymbol.id, {
+					flagNames: ['Alias', 'Alias']
+				})
+			},
+			{
+				label: 'symbol identity basis',
+				message: 'Symbol identity basis must agree with its declaration or fallback-reference set.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === aliasSymbol.id, {
+					identityBasis: 'DECLARATIONS'
+				})
+			},
+			{
+				label: 'symbol merge state',
+				message: 'Symbol merge state must be derived from its declarations.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === targetSymbol.id, {
+					mergeState: 'MERGED'
+				})
+			},
+			{
+				label: 'missing fallback node',
+				message: 'Symbol fallback reference node is absent.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === aliasSymbol.id, {
+					fallbackReferenceNodeIds: [absent('node')]
+				})
+			},
+			{
+				label: 'foreign value declaration',
+				message: 'Value declaration must belong to the symbol declaration set.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === targetSymbol.id, {
+					valueDeclarationId: absent('declaration')
+				})
+			},
+			{
+				label: 'symbol digest',
+				message: 'Symbol identity mismatch.',
+				snapshot: replaceSymbol(rich, (symbol) => symbol.id === targetSymbol.id, {
+					id: absent('symbol')
+				})
+			},
+			{
+				label: 'missing alias symbol',
+				message: 'Alias symbol is absent.',
+				snapshot: replaceAlias(rich, { aliasSymbolId: absent('symbol') })
+			},
+			{
+				label: 'non-alias owner',
+				message: 'Alias record must bind a TypeScript alias symbol.',
+				snapshot: replaceAlias(rich, { aliasSymbolId: targetSymbol.id })
+			},
+			{
+				label: 'alias state',
+				message: 'Alias state and target identities disagree.',
+				snapshot: replaceAlias(rich, { state: 'UNRESOLVED' })
+			},
+			{
+				label: 'alias digest',
+				message: 'Alias identity mismatch.',
+				snapshot: replaceAlias(rich, { id: absent('alias') })
+			}
+		])
+			expectIssue(probe.label, probe.snapshot, probe.message);
+
+		for (const probe of [
+			{
+				label: 'missing reference source',
+				message: 'Reference source is absent.',
+				snapshot: replaceReference(rich, { sourceId: absent('source') })
+			},
+			{
+				label: 'missing reference scope',
+				message: 'Referenced lexical scope is absent.',
+				snapshot: replaceReference(rich, { containingScopeId: absent('scope') })
+			},
+			{
+				label: 'reference scope from another source',
+				message: 'Referenced lexical scope is outside the fact source and Program.',
+				snapshot: replaceReference(crossSource, { containingScopeId: contextScope.id })
+			},
+			{
+				label: 'declaration-name role on an ordinary reference',
+				message: 'Declaration-name reference must bind a retained declaration-name node.',
+				snapshot: replaceReference(rich, { role: 'DECLARATION_NAME' })
+			}
+		])
+			expectIssue(probe.label, probe.snapshot, probe.message);
+
+		const crossProjectTarget = {
+			...crossSource,
+			sources: crossSource.sources.map((source) =>
+				source.id === contextSource.id ? { ...source, projectId: absent('project') } : source
+			)
+		};
+		for (const probe of [
+			{
+				label: 'missing literal specifier',
+				message: 'Literal module occurrence requires its exact specifier text.',
+				snapshot: replaceResolution(rich, { specifier: null })
+			},
+			{
+				label: 'invented nonliteral specifier',
+				message: 'Nonliteral module occurrence cannot invent a specifier text.',
+				snapshot: replaceResolution(rich, { specifierState: 'NON_LITERAL' })
+			},
+			{
+				label: 'nonliteral static import',
+				message: 'Nonliteral module occurrences must be unsupported dynamic imports.',
+				snapshot: replaceResolution(rich, { specifierState: 'NON_LITERAL' })
+			},
+			{
+				label: 'runtime import type',
+				message: 'ImportType module occurrences must be type-only.',
+				snapshot: replaceResolution(rich, {
+					occurrenceKind: 'IMPORT_TYPE',
+					typeOnly: false
+				})
+			},
+			{
+				label: 'type-only dynamic import',
+				message: 'Dynamic imports are runtime module occurrences.',
+				snapshot: replaceResolution(rich, {
+					occurrenceKind: 'DYNAMIC_IMPORT',
+					typeOnly: true
+				})
+			},
+			{
+				label: 'missing module source',
+				message: 'Module occurrence source is absent.',
+				snapshot: replaceResolution(rich, { sourceId: absent('source') })
+			},
+			{
+				label: 'missing module target',
+				message: 'Resolved module source is absent.',
+				snapshot: replaceResolution(rich, { targetSourceId: absent('source') })
+			},
+			{
+				label: 'module target outside project',
+				message: 'Resolved module source belongs to another project context.',
+				snapshot: replaceResolution(crossProjectTarget, {
+					targetSourceId: contextSource.id
+				})
+			},
+			{
+				label: 'module resolution state',
+				message: 'Module-resolution state and resolved targets disagree.',
+				snapshot: replaceResolution(rich, { resolutionState: 'UNRESOLVED' })
+			},
+			{
+				label: 'module resolution digest',
+				message: 'Module-resolution identity mismatch.',
+				snapshot: replaceResolution(rich, { id: absent('module-resolution') })
+			}
+		])
+			expectIssue(probe.label, probe.snapshot, probe.message);
+
+		for (const probe of [
+			{
+				label: 'missing module-export source',
+				message: 'Module-export source is absent.',
+				snapshot: replaceExport(rich, { sourceId: absent('source') })
+			},
+			{
+				label: 'empty export name',
+				message: 'Module-export name must be non-empty.',
+				snapshot: replaceExport(rich, { exportName: '' })
+			},
+			{
+				label: 'duplicate source export name',
+				message: 'A source may expose at most one binding per export name.',
+				snapshot: { ...rich, moduleExports: [moduleExport, moduleExport] }
+			},
+			{
+				label: 'module export target',
+				message: 'Module-export state and target symbol disagree.',
+				snapshot: replaceExport(rich, { state: 'DIRECT' })
+			},
+			{
+				label: 'module export digest',
+				message: 'Module-export identity mismatch.',
+				snapshot: replaceExport(rich, { id: absent('module-export') })
+			}
+		])
+			expectIssue(probe.label, probe.snapshot, probe.message);
+
+		const noSyntaxRequest = {
+			...rich,
+			requestedCapabilities: [
+				'TS_PROJECT',
+				'TS_SYMBOL'
+			] as StaticSemanticSnapshot['requestedCapabilities']
+		};
+		expectIssue(
+			'unknown requested capability',
+			{
+				...rich,
+				requestedCapabilities: [...rich.requestedCapabilities, 'TS_CFG'] as never
+			},
+			'Unknown capability TS_CFG.'
+		);
+		expectIssue(
+			'syntax facts without capability',
+			noSyntaxRequest,
+			'TS_SYNTAX records cannot be emitted when syntax was not requested.'
+		);
+		let conditional = withAstNode(scoped, {
+			end: 20,
+			kind: ts.SyntaxKind.ConditionalType,
+			kindName: 'ConditionalType',
+			start: 0
+		});
+		const conditionalNode = conditional.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.ConditionalType
+		)!;
+		conditional = withAstChild(conditional, conditionalNode.id, {
+			end: 10,
+			kind: ts.SyntaxKind.InferType,
+			kindName: 'InferType',
+			start: 0
+		});
+		expect(validateSnapshot(conditional, {}, contextForSnapshot(conditional))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const detachedReference = reparentNode(rich, reference.nodeId, absent('node'));
+		expectIssue('detached reference ancestry', detachedReference, 'Parent node is absent.');
+
+		let globalVariable = withAstNode(rich, {
+			end: 10,
+			kind: ts.SyntaxKind.VariableDeclarationList,
+			kindName: 'VariableDeclarationList',
+			start: 0
+		});
+		const globalVariableList = globalVariable.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclarationList
+		)!;
+		globalVariable = reparentNode(globalVariable, declaration.nodeId!, globalVariableList.id);
+		const globalVariableResult = validateSnapshot(
+			globalVariable,
+			{},
+			contextForSnapshot(globalVariable)
+		);
+		expect(globalVariableResult.state).toBe('INVALID');
+
+		let functionVariable = withAstNode(rich, {
+			end: 20,
+			kind: ts.SyntaxKind.FunctionDeclaration,
+			kindName: 'FunctionDeclaration',
+			start: 0
+		});
+		const functionNode = functionVariable.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.FunctionDeclaration
+		)!;
+		functionVariable = withScopeForNode(functionVariable, functionNode.id);
+		functionVariable = withAstChild(functionVariable, functionNode.id, {
+			end: 10,
+			kind: ts.SyntaxKind.VariableDeclarationList,
+			kindName: 'VariableDeclarationList',
+			start: 0
+		});
+		const functionVariableList = functionVariable.astNodes.find(
+			(node) =>
+				node.kind === ts.SyntaxKind.VariableDeclarationList && node.parentId === functionNode.id
+		)!;
+		functionVariable = reparentNode(functionVariable, declaration.nodeId!, functionVariableList.id);
+		expectIssue(
+			'function variable environment',
+			functionVariable,
+			'Scope link must reproduce the independently recomputed supported binding boundary.'
+		);
+
+		let detachedVariable = withAstNode(rich, {
+			end: 10,
+			kind: ts.SyntaxKind.VariableDeclarationList,
+			kindName: 'VariableDeclarationList',
+			start: 0
+		});
+		const detachedVariableList = detachedVariable.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.VariableDeclarationList
+		)!;
+		detachedVariable = reparentNode(detachedVariable, detachedVariableList.id, absent('node'));
+		detachedVariable = reparentNode(detachedVariable, declaration.nodeId!, detachedVariableList.id);
+		expectIssue('detached variable environment', detachedVariable, 'Parent node is absent.');
+
+		let evalAst = withAstNode(scoped, {
+			end: 20,
+			kind: ts.SyntaxKind.CallExpression,
+			kindName: 'CallExpression',
+			start: 0
+		});
+		const call = evalAst.astNodes.find((node) => node.kind === ts.SyntaxKind.CallExpression)!;
+		evalAst = withAstChild(
+			evalAst,
+			call.id,
+			{
+				end: 10,
+				kind: ts.SyntaxKind.TypeAssertionExpression,
+				kindName: 'TypeAssertionExpression',
+				start: 0
+			},
+			AST_STRUCTURAL_ROLES.invocationCallee
+		);
+		const assertion = evalAst.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.TypeAssertionExpression
+		)!;
+		evalAst = withAstChild(evalAst, assertion.id, {
+			end: 4,
+			kind: ts.SyntaxKind.Identifier,
+			kindName: 'Identifier',
+			start: 0,
+			syntacticIdentifierText: 'eval'
+		});
+		const evalResult = validateSnapshot(evalAst, {}, contextForSnapshot(evalAst));
+		expect(evalResult.state).toBe('INVALID');
+		expect(evalResult.issues.length).toBeGreaterThan(0);
+
+		const unsupportedResolutionPreimage = {
+			moduleSymbolId: null,
+			nodeId: resolution.nodeId,
+			occurrenceKind: resolution.occurrenceKind,
+			resolutionState: 'UNSUPPORTED' as const,
+			specifier: resolution.specifier,
+			specifierState: resolution.specifierState,
+			targetSourceId: null,
+			typeOnly: resolution.typeOnly
+		};
+		const unsupportedResolution = {
+			...resolution,
+			...unsupportedResolutionPreimage,
+			id: semanticModuleResolutionId(unsupportedResolutionPreimage)
+		};
+		const unsupportedResult = validateSnapshot(
+			{ ...rich, moduleResolutions: [unsupportedResolution] },
+			{},
+			contextForSnapshot(rich)
+		);
+		expect(unsupportedResult.state).toBe('INVALID');
+		expect(unsupportedResult.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message: 'Population emission manifests do not match serialized records.'
+				})
 			])
 		);
 	});

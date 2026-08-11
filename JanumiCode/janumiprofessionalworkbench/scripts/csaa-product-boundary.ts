@@ -9,6 +9,8 @@ try {
 	process.stdout.write(`${JSON.stringify({ ...result, ok })}\n`);
 	if (!ok) process.exitCode = 1;
 } catch (error) {
-	process.stderr.write(`${JSON.stringify({ error: 'product-boundary-failed', message: String(error) })}\n`);
+	process.stderr.write(
+		`${JSON.stringify({ error: 'product-boundary-failed', message: String(error) })}\n`
+	);
 	process.exitCode = 1;
 }

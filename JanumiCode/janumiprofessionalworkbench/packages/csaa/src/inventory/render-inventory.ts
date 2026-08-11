@@ -3,7 +3,8 @@ import type { InventoryDocument } from '../contracts/inventory.js';
 const code = (value: string | number | boolean | null): string =>
 	value === null ? '`—`' : `\`${String(value).replaceAll('`', '\\`')}\``;
 
-const cell = (value: string): string => value.replaceAll('|', '\\|').replaceAll('\r', ' ').replaceAll('\n', ' ');
+const cell = (value: string): string =>
+	value.replaceAll('|', '\\|').replaceAll('\r', ' ').replaceAll('\n', ' ');
 
 const list = (values: readonly string[]): string =>
 	values.length === 0 ? code('NONE') : values.map((value) => code(value)).join(', ');
@@ -42,7 +43,10 @@ export function renderInventoryMarkdown(inventory: InventoryDocument): string {
 			`| ${code(population.artifactClass)} | ${population.discovered} | ${population.included} | ${population.excluded} | ${population.successfullyInventoried} | ${population.failed} | ${cell(list(population.provenance))} |`
 		);
 	}
-	lines.push('', 'Excluded regions and exact generated outputs remain explicit; unenumerated physical populations stay UNKNOWN so caches and build outputs cannot create false completeness:');
+	lines.push(
+		'',
+		'Excluded regions and exact generated outputs remain explicit; unenumerated physical populations stay UNKNOWN so caches and build outputs cannot create false completeness:'
+	);
 	for (const exclusion of inventory.subject.excludedClasses) {
 		lines.push(
 			`- ${code(exclusion.id)} — included files: ${code(exclusion.includedFileCount)}; physical count: ${code(exclusion.excludedPhysicalFileCount)} (${code(exclusion.countState)}); policy rules: ${code(exclusion.policyRuleCount)}; state: ${code(exclusion.physicalPopulationState)}; rules: ${list(exclusion.rules)}`
@@ -66,21 +70,32 @@ export function renderInventoryMarkdown(inventory: InventoryDocument): string {
 		'',
 		'#### TypeScript project declarations',
 		'',
-		'Candidate counts combine the resolved compiler-root population with separately classified framework candidates; semantic Program construction remains deferred.',
+		'Candidate counts combine the resolved compiler-root population with separately classified framework candidates; frozen TypeScript Program construction is implemented, while this table remains a project/root inventory rather than evidence of downstream semantic or graph completeness.',
 		'',
 		'| Configuration | Status | Root disposition | Extends | Include | Files | References | Candidate artifacts | Framework candidates | Generated context | Partiality reasons | Diagnostics | Provenance |',
 		'| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |'
 	);
 	for (const project of inventory.typescriptProjects) {
-		const extendsCell = project.extends === null || typeof project.extends === 'string'
-			? code(project.extends)
-			: cell(list(project.extends));
-		const generatedContextCell = project.generatedContexts.length === 0
-			? code('NONE')
-			: cell(project.generatedContexts.map((context) => code(`${context.freshness}: ${context.path}`)).join(', '));
-		const partialityCell = project.partialityReasons.length === 0
-			? code('NONE')
-			: cell(project.partialityReasons.map((reason) => `${code(reason.code)}: ${reason.message}`).join('; '));
+		const extendsCell =
+			project.extends === null || typeof project.extends === 'string'
+				? code(project.extends)
+				: cell(list(project.extends));
+		const generatedContextCell =
+			project.generatedContexts.length === 0
+				? code('NONE')
+				: cell(
+						project.generatedContexts
+							.map((context) => code(`${context.freshness}: ${context.path}`))
+							.join(', ')
+					);
+		const partialityCell =
+			project.partialityReasons.length === 0
+				? code('NONE')
+				: cell(
+						project.partialityReasons
+							.map((reason) => `${code(reason.code)}: ${reason.message}`)
+							.join('; ')
+					);
 		const diagnosticsCell = code(`${project.diagnosticsState}: ${project.diagnostics.length}`);
 		lines.push(
 			`| ${code(project.path)} | ${code(project.status)} | ${code(project.rootDisposition)} | ${extendsCell} | ${cell(declaredList(project.include))} | ${cell(declaredList(project.files))} | ${cell(list(project.references))} | ${project.candidateArtifactCount} | ${project.frameworkCandidates.length} | ${generatedContextCell} | ${partialityCell} | ${diagnosticsCell} | ${cell(list(project.provenance))} |`

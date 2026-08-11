@@ -6,7 +6,10 @@ import {
 	TYPESCRIPT_PROVIDER_VERSION,
 	type BuildStaticSemanticSnapshotRequest,
 	type CompilerInputObservation,
-	type SemanticBudgets
+	type SemanticBudgets,
+	type SemanticFactProvenanceRecord,
+	type SemanticPopulationKind,
+	type StaticSemanticSnapshot
 } from '../contracts/semantic.js';
 import {
 	SUBJECT_POLICY_VERSION,
@@ -21,7 +24,8 @@ import {
 	compilerInputClosureDigest,
 	compilerInputResultDigest,
 	programRecipeDigest,
-	semanticContextInputId
+	semanticContextInputId,
+	semanticDurableDeclarationId
 } from './ids.js';
 import {
 	normalizeStaticSemanticSnapshot,
@@ -41,6 +45,7 @@ const BUDGETS: SemanticBudgets = {
 	maxAstNodes: 10_000,
 	maxCompilerInputMetadataBytes: 1_000_000,
 	maxCompilerQueries: 10_000,
+	maxCompilerFacts: 10_000,
 	maxCompilerQueryInvocations: 100_000,
 	maxContextBytes: 10_000_000,
 	maxContextFileBytes: 2_000_000,
@@ -53,6 +58,7 @@ const BUDGETS: SemanticBudgets = {
 	maxPathCharacters: 1_000,
 	maxProjects: 100,
 	maxSnapshotBytes: 10_000_000,
+	maxScopes: 100_000,
 	maxSources: 10_000
 };
 
@@ -76,6 +82,20 @@ function recipe(compilerOptions: Readonly<Record<string, unknown>> = {}): Progra
 		projectReferences: [],
 		provider: { id: 'typescript' as const, version: TYPESCRIPT_PROVIDER_VERSION },
 		rootNames: ['src/index.ts']
+	};
+	return { ...base, projectResolutionDigest: programRecipeDigest(base) };
+}
+
+function projectRecipe(configPath: string, logicalPath: string): ProgramRecipe {
+	const initial = recipe();
+	const base = {
+		compilerOptions: initial.compilerOptions,
+		configClosureDigest: sha256(`config-closure:${configPath}`),
+		configPath,
+		kind: initial.kind,
+		projectReferences: [],
+		provider: initial.provider,
+		rootNames: [logicalPath]
 	};
 	return { ...base, projectResolutionDigest: programRecipeDigest(base) };
 }
@@ -116,8 +136,9 @@ function childNode(
 
 function request(overrides: Partial<SemanticBudgets> = {}): BuildStaticSemanticSnapshotRequest {
 	return {
+		assignabilityRequests: [],
 		budgets: { ...BUDGETS, ...overrides },
-		capabilities: ['TS_PROJECT', 'TS_SYNTAX'],
+		capabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'],
 		expectEmpty: false,
 		operationVersion: SEMANTIC_OPERATION_VERSION,
 		rootLocator: 'C:/normalizer-fixture',
@@ -127,13 +148,14 @@ function request(overrides: Partial<SemanticBudgets> = {}): BuildStaticSemanticS
 }
 
 function subject(programRecipe = recipe()): FrozenSubject {
+	const logicalPath = programRecipe.rootNames[0]!;
 	return {
 		artifacts: [
 			{
 				bytes: Buffer.byteLength(CONTENT),
-				canonicalPathKey: 'src/index.ts',
+				canonicalPathKey: logicalPath,
 				disposition: 'ANALYZED',
-				path: 'src/index.ts',
+				path: logicalPath,
 				primaryClass: 'PRODUCTION_SOURCE',
 				reason: 'fixture source',
 				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION'],
@@ -210,13 +232,13 @@ function subject(programRecipe = recipe()): FrozenSubject {
 	};
 }
 
-function observation(): CompilerInputObservation {
+function observation(logicalPath = 'src/index.ts'): CompilerInputObservation {
 	const result = {
 		byteBudgetClass: 'FROZEN_SUBJECT' as const,
 		contentBytes: Buffer.byteLength(CONTENT),
 		contentSha256: CONTENT_SHA,
 		invocationCount: 1,
-		logicalPath: 'src/index.ts',
+		logicalPath,
 		operation: 'READ_FILE' as const,
 		origin: 'AUTHORED' as const,
 		result: 'PRESENT' as const
@@ -230,7 +252,9 @@ function observation(): CompilerInputObservation {
 }
 
 function raw(programRecipe = recipe()): RawStaticSemanticProjectExtraction {
+	const logicalPath = programRecipe.rootNames[0]!;
 	return {
+		aliases: [],
 		assignments: [],
 		astNodes: [
 			{
@@ -252,6 +276,7 @@ function raw(programRecipe = recipe()): RawStaticSemanticProjectExtraction {
 			}
 		],
 		declarationCandidates: [],
+		declarations: [],
 		diagnosticFamilies: (
 			['CONFIGURATION', 'OPTIONS', 'GLOBAL', 'SYNTACTIC', 'SEMANTIC', 'DECLARATION'] as const
 		).map((family) => ({
@@ -265,6 +290,9 @@ function raw(programRecipe = recipe()): RawStaticSemanticProjectExtraction {
 		evidenceState: 'VERIFIED_COMPILER_INPUT',
 		invocations: [],
 		literals: [],
+		moduleExports: [],
+		moduleResolutions: [],
+		overloadSets: [],
 		project: {
 			configPath: programRecipe.configPath,
 			frameworkCandidates: [],
@@ -276,6 +304,33 @@ function raw(programRecipe = recipe()): RawStaticSemanticProjectExtraction {
 			rootDisposition: 'COMPILER_ROOTS',
 			rootNames: programRecipe.rootNames
 		},
+		references: [],
+		scopes: [
+			{
+				domain: 'LEXICAL',
+				end: null,
+				kind: 'PROGRAM_GLOBAL',
+				ownerKind: null,
+				ownerKindName: null,
+				ownerNodeOrdinal: null,
+				parentScopeOrdinal: null,
+				scopeOrdinal: 0,
+				sourceOrdinal: null,
+				start: null
+			},
+			{
+				domain: 'LEXICAL',
+				end: CONTENT.length,
+				kind: 'SOURCE_SCRIPT',
+				ownerKind: ts.SyntaxKind.SourceFile,
+				ownerKindName: 'SourceFile',
+				ownerNodeOrdinal: 0,
+				parentScopeOrdinal: 0,
+				scopeOrdinal: 1,
+				sourceOrdinal: 0,
+				start: 0
+			}
+		],
 		sources: [
 			{
 				analysisDisposition: 'DEEP_INDEXED',
@@ -285,11 +340,12 @@ function raw(programRecipe = recipe()): RawStaticSemanticProjectExtraction {
 				contentSha256: CONTENT_SHA,
 				declarationFile: false,
 				languageVariant: 'Standard',
-				logicalPath: 'src/index.ts',
+				logicalPath,
 				mapping: {
 					reason: 'Authored TypeScript is already in source coordinates.',
 					state: 'NOT_APPLICABLE'
 				},
+				moduleKind: 'SCRIPT',
 				origin: 'AUTHORED',
 				rootFile: true,
 				rootNodeOrdinal: 0,
@@ -298,7 +354,107 @@ function raw(programRecipe = recipe()): RawStaticSemanticProjectExtraction {
 				sourceOrdinal: 0,
 				textLength: CONTENT.length
 			}
+		],
+		signatureParameters: [],
+		signatures: [],
+		symbols: [],
+		typeParameters: [],
+		typeRelations: [],
+		types: []
+	};
+}
+
+function bindingRaw(): RawStaticSemanticProjectExtraction {
+	const base = raw();
+	return {
+		...base,
+		astNodes: [
+			base.astNodes[0]!,
+			childNode(1, ts.SyntaxKind.VariableDeclaration, {
+				structuralRoles: ['generic-child']
+			}),
+			childNode(2, ts.SyntaxKind.Identifier, {
+				structuralRoles: ['generic-child'],
+				syntacticIdentifierText: 'value'
+			})
+		],
+		declarations: [
+			{
+				ambient: false,
+				candidateNodeOrdinal: null,
+				declarationOrdinal: 0,
+				declaringScopeOrdinal: 1,
+				end: 2,
+				kind: ts.SyntaxKind.VariableDeclaration,
+				kindName: 'VariableDeclaration',
+				name: 'value',
+				nameState: 'ATOMIC',
+				nodeOrdinal: 1,
+				scopeLinkState: 'RESOLVED',
+				sourceOrdinal: 0,
+				start: 1,
+				symbolBindingState: 'RESOLVED',
+				symbolOrdinal: 0
+			}
+		],
+		references: [
+			{
+				containingScopeOrdinal: 1,
+				nodeOrdinal: 2,
+				resolvedSymbolOrdinal: 0,
+				resolutionState: 'RESOLVED_DIRECT',
+				role: 'SYMBOL_USE',
+				scopeLinkState: 'RESOLVED',
+				sourceOrdinal: 0,
+				symbolOrdinal: 0
+			}
+		],
+		symbols: [
+			{
+				declarationOrdinals: [0],
+				fallbackReferenceNodes: [],
+				flags: ts.SymbolFlags.BlockScopedVariable,
+				flagNames: ['BlockScopedVariable'],
+				name: 'value',
+				symbolOrdinal: 0,
+				valueDeclarationOrdinal: 0
+			}
 		]
+	};
+}
+
+function rawDiagnostic(
+	message: RawSemanticDiagnosticMessage = diagnosticMessage('fixture diagnostic'),
+	related: RawStaticSemanticProjectExtraction['diagnostics'][number]['related'] = []
+): RawStaticSemanticProjectExtraction['diagnostics'][number] {
+	return {
+		category: 'ERROR',
+		code: 'TS1000',
+		end: null,
+		family: 'SEMANTIC',
+		locationKind: 'NONE',
+		message,
+		occurrenceOrdinal: 0,
+		path: null,
+		related,
+		sourceOrdinal: null,
+		start: null
+	};
+}
+
+function withDiagnostic(
+	project: RawStaticSemanticProjectExtraction,
+	occurrence = rawDiagnostic(),
+	covered = true
+): RawStaticSemanticProjectExtraction {
+	return {
+		...project,
+		diagnosticFamilies: project.diagnosticFamilies.map((family) =>
+			family.family === occurrence.family
+				? { ...family, diagnosticOccurrenceOrdinals: covered ? [occurrence.occurrenceOrdinal] : [] }
+				: family
+		),
+		diagnostics: [occurrence]
 	};
 }
 
@@ -332,6 +488,48 @@ function normalizationInput(
 	};
 }
 
+function multiProjectNormalizationInput(): NormalizeStaticSemanticSnapshotInput {
+	const recipes = [
+		projectRecipe('packages/a/tsconfig.json', 'packages/a/src/index.ts'),
+		projectRecipe('packages/b/tsconfig.json', 'packages/b/src/index.ts')
+	] as const;
+	const projects = recipes.map((programRecipe) => raw(programRecipe));
+	const observations = recipes.map((programRecipe) => observation(programRecipe.rootNames[0]!));
+	const firstSubject = subject(recipes[0]);
+	const secondSubject = subject(recipes[1]);
+	return {
+		capture: {
+			closureDigest: compilerInputClosureDigest(observations),
+			observations,
+			projectAttributions: projects.map((project, index) => ({
+				contextInputIds: [observations[index]!.id],
+				materializedRecipeDigest: sha256(`materialized-recipe:${project.project.configPath}`),
+				projectKey: project.project.configPath,
+				projectResolutionDigest: project.project.programRecipe.projectResolutionDigest,
+				queryInvocations: [
+					{
+						invocationCount: 1,
+						query: { logicalPath: observations[index]!.logicalPath, operation: 'READ_FILE' }
+					}
+				]
+			}))
+		},
+		projects,
+		request: request(),
+		subject: {
+			...firstSubject,
+			artifacts: [...firstSubject.artifacts, ...secondSubject.artifacts],
+			population: {
+				...firstSubject.population,
+				analyzed: 2,
+				discovered: 2,
+				included: 2
+			},
+			projects: [...firstSubject.projects, ...secondSubject.projects]
+		}
+	};
+}
+
 function normalize(rawProject = raw(), semanticRequest = request()) {
 	return normalizeStaticSemanticSnapshot(normalizationInput(rawProject, semanticRequest));
 }
@@ -346,7 +544,7 @@ describe('semantic snapshot normalization', () => {
 		expect(snapshot.health).toBe('COMPLETE');
 		expect(snapshot.projects).toHaveLength(1);
 		expect(snapshot.astNodes).toHaveLength(1);
-		expect(snapshot.provenances).toHaveLength(4);
+		expect(snapshot.provenances).toHaveLength(6);
 		expect(snapshot.programs[0]?.provenanceId).toBe(snapshot.projects[0]?.provenanceId);
 		expect(snapshot.sources[0]?.provenanceId).not.toBe(snapshot.projects[0]?.provenanceId);
 		expect(
@@ -368,6 +566,163 @@ describe('semantic snapshot normalization', () => {
 				maxStringCharacters: 1_000_000
 			})
 		).toMatchObject({ canonicalBytes: Buffer.byteLength(canonical, 'utf8'), issues: [] });
+	});
+
+	it('declares the exact Program-scoped TS_SYMBOL boundary for otherwise complete multi-Program snapshots', () => {
+		const input = multiProjectNormalizationInput();
+		const snapshot = normalizeStaticSemanticSnapshot(input);
+		const limitation = {
+			capability: 'TS_SYMBOL' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason:
+				'TypeScript symbol extraction and resolution are Program-scoped; cross-Program symbol identity and binding reconciliation is not implemented for this multi-project snapshot.',
+			region: 'typescript-program-boundaries'
+		};
+
+		expect(snapshot.programs).toHaveLength(2);
+		expect(snapshot.projects).toHaveLength(2);
+		expect(snapshot.projects).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ health: 'COMPLETE', partialityReasons: [] }),
+				expect.objectContaining({ health: 'COMPLETE', partialityReasons: [] })
+			])
+		);
+		expect(snapshot.capabilities).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ capability: 'TS_PROJECT', state: 'SUPPORTED' }),
+				expect.objectContaining({ capability: 'TS_SYMBOL', state: 'PARTIAL' }),
+				expect.objectContaining({ capability: 'TS_SYNTAX', state: 'SUPPORTED' }),
+				expect.objectContaining({ capability: 'TS_TYPE', state: 'UNSUPPORTED' })
+			])
+		);
+		expect(snapshot.health).toBe('PARTIAL');
+		expect(snapshot.limitations).toEqual([limitation]);
+		const symbolProvenances = snapshot.provenances.filter(
+			(provenance) => provenance.capability === 'TS_SYMBOL'
+		);
+		expect(symbolProvenances.length).toBeGreaterThan(0);
+		for (const provenance of symbolProvenances) {
+			expect(provenance.limitations).toContainEqual(limitation);
+			expect(provenance.epistemic.capabilityCoverage).toBe('partial');
+			expect(provenance.epistemic.unresolvedRegions).toContain('typescript-program-boundaries');
+		}
+		for (const population of snapshot.populations.filter((candidate) =>
+			[
+				'ALIAS',
+				'DECLARATION',
+				'MODULE_EXPORT',
+				'MODULE_RESOLUTION',
+				'REFERENCE',
+				'SCOPE',
+				'SYMBOL'
+			].includes(candidate.kind)
+		))
+			expect(population).toMatchObject({ failed: 0, unknown: 0, unsupported: 0 });
+		expect(validateStaticSemanticSnapshot(snapshot, {}, { frozenSubject: input.subject })).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		for (const limitations of [
+			snapshot.limitations.filter((candidate) => candidate.region !== limitation.region),
+			[{ ...limitation, capability: 'TS_PROJECT' as const }],
+			[{ ...limitation, closureEffect: 'NONE' as const }],
+			[{ ...limitation, region: 'wrong-program-boundary' }],
+			[{ ...limitation, reason: 'Incorrect Program-boundary claim.' }],
+			[
+				limitation,
+				{ ...limitation, closureEffect: 'NONE' as const, reason: 'Extra boundary claim.' }
+			].sort((left, right) =>
+				`${left.capability}\0${left.closureEffect}\0${left.region}\0${left.reason}`.localeCompare(
+					`${right.capability}\0${right.closureEffect}\0${right.region}\0${right.reason}`
+				)
+			)
+		])
+			expect(
+				validateStaticSemanticSnapshot(
+					{ ...snapshot, limitations },
+					{},
+					{ frozenSubject: input.subject }
+				).issues
+			).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						message:
+							'Multi-Program snapshots require the exact canonical TS_SYMBOL Program-boundary limitation once.',
+						path: '$.limitations'
+					})
+				])
+			);
+
+		const omittedProvenanceIndex = snapshot.provenances.findIndex(
+			(provenance) => provenance.capability === 'TS_SYMBOL'
+		);
+		const omittedProvenance = {
+			...snapshot,
+			provenances: snapshot.provenances.map((provenance, index) =>
+				index === omittedProvenanceIndex
+					? {
+							...provenance,
+							limitations: provenance.limitations.filter(
+								(candidate) => candidate.region !== limitation.region
+							)
+						}
+					: provenance
+			)
+		};
+		expect(
+			validateStaticSemanticSnapshot(omittedProvenance, {}, { frozenSubject: input.subject }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'Every TS_SYMBOL provenance in a multi-Program snapshot requires the exact canonical Program-boundary limitation once.',
+					path: `$.provenances[${omittedProvenanceIndex}].limitations`
+				})
+			])
+		);
+		const projectProvenanceIndex = snapshot.provenances.findIndex(
+			(provenance) => provenance.capability === 'TS_PROJECT'
+		);
+		expect(
+			validateStaticSemanticSnapshot(
+				{
+					...snapshot,
+					provenances: snapshot.provenances.map((provenance, index) =>
+						index === projectProvenanceIndex
+							? { ...provenance, limitations: [limitation] }
+							: provenance
+					)
+				},
+				{},
+				{ frozenSubject: input.subject }
+			).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'The TS_SYMBOL Program-boundary provenance limitation is forbidden outside TS_SYMBOL provenance in a multi-Program snapshot.',
+					path: `$.provenances[${projectProvenanceIndex}].limitations`
+				})
+			])
+		);
+
+		const singleProgram = normalize();
+		expect(
+			validateStaticSemanticSnapshot(
+				{ ...singleProgram, limitations: [limitation] },
+				{},
+				{ frozenSubject: subject() }
+			).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'The TS_SYMBOL Program-boundary limitation is forbidden unless the snapshot contains multiple Programs.',
+					path: '$.limitations'
+				})
+			])
+		);
 	});
 
 	it('collapses equal diagnostic occurrences without making occurrence order semantic', () => {
@@ -592,7 +947,7 @@ describe('semantic snapshot normalization', () => {
 			Object.fromEntries(snapshot.capabilities.map(({ capability, state }) => [capability, state]))
 		).toEqual({
 			TS_PROJECT: 'PARTIAL',
-			TS_SYMBOL: 'UNSUPPORTED',
+			TS_SYMBOL: 'SUPPORTED',
 			TS_SYNTAX: 'PARTIAL',
 			TS_TYPE: 'UNSUPPORTED'
 		});
@@ -630,7 +985,108 @@ describe('semantic snapshot normalization', () => {
 		]);
 	});
 
-	it('normalizes declarations, literals, all invocation variants, assignments, and nested recipe values', () => {
+	it('closes lossy source provenance over matching limitations and rejects dishonest source mutations', () => {
+		const base = raw();
+		const mappingReason = 'Generated coordinates could not be mapped exactly.';
+		const snapshot = normalize({
+			...base,
+			project: {
+				...base.project,
+				partialityReasons: [
+					{
+						capability: 'TS_PROJECT',
+						code: 'CONTEXT_FRESHNESS_UNKNOWN',
+						message: mappingReason,
+						path: 'src/index.ts'
+					}
+				]
+			},
+			sources: [
+				{
+					...base.sources[0]!,
+					mapping: { reason: mappingReason, state: 'PARTIAL' },
+					origin: 'AUTHORED'
+				}
+			]
+		});
+		expect(validateStaticSemanticSnapshot(snapshot, {}, { frozenSubject: subject() })).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const source = snapshot.sources[0]!;
+		const sourceProvenance = snapshot.provenances.find(
+			(record) => record.id === source.provenanceId
+		)!;
+		const parent = snapshot.provenances.find(
+			(record) => record.id === sourceProvenance.parentProvenanceId
+		)!;
+		expect(sourceProvenance).toMatchObject({
+			epistemic: {
+				capabilityCoverage: 'partial',
+				unresolvedRegions: ['src/index.ts']
+			},
+			limitations: [
+				{
+					capability: 'TS_PROJECT',
+					closureEffect: 'DEGRADES_CLOSURE',
+					reason: mappingReason,
+					region: 'src/index.ts'
+				}
+			]
+		});
+		expect(parent.limitations).toEqual(sourceProvenance.limitations);
+		expect(parent.epistemic.unresolvedRegions).toEqual(
+			sourceProvenance.epistemic.unresolvedRegions
+		);
+
+		const mutateSourceProvenance = (
+			mutate: (record: SemanticFactProvenanceRecord) => SemanticFactProvenanceRecord
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			provenances: snapshot.provenances.map((record) =>
+				record.id === source.provenanceId ? mutate(record) : record
+			)
+		});
+		const expectedMessage =
+			'Unknown or lossy source mapping requires partial TS_PROJECT provenance with its matching closure-degrading limitation and unresolved region.';
+		for (const mutation of [
+			mutateSourceProvenance((record) => ({
+				...record,
+				epistemic: { ...record.epistemic, capabilityCoverage: 'supported' }
+			})),
+			mutateSourceProvenance((record) => ({
+				...record,
+				epistemic: { ...record.epistemic, unresolvedRegions: [] },
+				limitations: []
+			}))
+		])
+			expect(
+				validateStaticSemanticSnapshot(mutation, {}, { frozenSubject: subject() }).issues
+			).toContainEqual(
+				expect.objectContaining({
+					message: expectedMessage,
+					path: '$.sources[0].provenanceId'
+				})
+			);
+		expect(
+			validateStaticSemanticSnapshot(
+				mutateSourceProvenance((record) => ({
+					...record,
+					epistemic: { ...record.epistemic, unresolvedRegions: [] },
+					limitations: []
+				})),
+				{},
+				{ frozenSubject: subject() }
+			).issues
+		).toContainEqual(
+			expect.objectContaining({
+				message:
+					'Source provenance must monotonically preserve every parent limitation and unresolved region.'
+			})
+		);
+	});
+
+	it('normalizes syntax, bindings, modules, literals, all invocation variants, assignments, and nested recipe values', () => {
 		const nestedRecipe = recipe({
 			paths: { '@fixture/*': ['src/*', 'generated/*'] },
 			plugins: [{ name: 'fixture-plugin' }]
@@ -667,10 +1123,26 @@ describe('semantic snapshot normalization', () => {
 				operatorKind: ts.SyntaxKind.PlusPlusToken,
 				operatorName: 'PlusPlusToken'
 			}),
-			childNode(16, ts.SyntaxKind.Identifier)
+			childNode(16, ts.SyntaxKind.Identifier),
+			childNode(17, ts.SyntaxKind.ImportDeclaration),
+			childNode(18, ts.SyntaxKind.ImportSpecifier),
+			childNode(19, ts.SyntaxKind.Identifier, {
+				end: CONTENT.length,
+				fullStart: CONTENT.length,
+				start: CONTENT.length,
+				syntacticIdentifierText: 'base'
+			})
 		];
-		const snapshot = normalize({
+		const rawWithFacts: RawStaticSemanticProjectExtraction = {
 			...base,
+			aliases: [
+				{
+					aliasSymbolOrdinal: 1,
+					state: 'RESOLVED',
+					targetSymbolOrdinal: 2,
+					terminalSymbolOrdinal: 2
+				}
+			],
 			assignments: [
 				{
 					assignmentKind: 'POSTFIX_UPDATE',
@@ -706,6 +1178,42 @@ describe('semantic snapshot normalization', () => {
 					syntacticName: 'run',
 					syntaxKind: ts.SyntaxKind.FunctionDeclaration,
 					syntaxKindName: 'FunctionDeclaration'
+				}
+			],
+			declarations: [
+				{
+					ambient: false,
+					candidateNodeOrdinal: 1,
+					declarationOrdinal: 0,
+					declaringScopeOrdinal: 1,
+					end: 2,
+					kind: ts.SyntaxKind.FunctionDeclaration,
+					kindName: 'FunctionDeclaration',
+					name: 'run',
+					nameState: 'ATOMIC',
+					nodeOrdinal: 1,
+					sourceOrdinal: 0,
+					scopeLinkState: 'RESOLVED',
+					start: 1,
+					symbolBindingState: 'RESOLVED',
+					symbolOrdinal: 0
+				},
+				{
+					ambient: false,
+					candidateNodeOrdinal: null,
+					declarationOrdinal: 1,
+					declaringScopeOrdinal: 1,
+					end: CONTENT.length,
+					kind: ts.SyntaxKind.ImportSpecifier,
+					kindName: 'ImportSpecifier',
+					name: 'base',
+					nameState: 'ATOMIC',
+					nodeOrdinal: 18,
+					sourceOrdinal: 0,
+					scopeLinkState: 'RESOLVED',
+					start: CONTENT.length - 1,
+					symbolBindingState: 'RESOLVED',
+					symbolOrdinal: 1
 				}
 			],
 			invocations: [
@@ -786,10 +1294,324 @@ describe('semantic snapshot normalization', () => {
 					valueState: 'EXACT',
 					valueType: 'STRING'
 				}
+			],
+			moduleExports: [
+				{
+					exportName: 'run',
+					sourceOrdinal: 0,
+					state: 'DIRECT',
+					symbolOrdinal: 0,
+					targetSymbolOrdinal: null
+				}
+			],
+			moduleResolutions: [
+				{
+					moduleSymbolOrdinal: 2,
+					nodeOrdinal: 17,
+					occurrenceKind: 'IMPORT',
+					resolutionState: 'RESOLVED_SOURCE',
+					sourceOrdinal: 0,
+					specifier: './index.js',
+					specifierState: 'LITERAL',
+					targetSourceOrdinal: 0,
+					typeOnly: false
+				}
+			],
+			references: [
+				{
+					containingScopeOrdinal: 1,
+					nodeOrdinal: 2,
+					resolvedSymbolOrdinal: 0,
+					resolutionState: 'RESOLVED_DIRECT',
+					role: 'DECLARATION_NAME',
+					sourceOrdinal: 0,
+					scopeLinkState: 'RESOLVED',
+					symbolOrdinal: 0
+				},
+				{
+					containingScopeOrdinal: 1,
+					nodeOrdinal: 19,
+					resolvedSymbolOrdinal: 2,
+					resolutionState: 'RESOLVED_ALIAS',
+					role: 'IMPORT_EXPORT_BINDING',
+					sourceOrdinal: 0,
+					scopeLinkState: 'RESOLVED',
+					symbolOrdinal: 1
+				}
+			],
+			symbols: [
+				{
+					declarationOrdinals: [0],
+					fallbackReferenceNodes: [],
+					flags: ts.SymbolFlags.Function,
+					flagNames: ['Function'],
+					name: 'run',
+					symbolOrdinal: 0,
+					valueDeclarationOrdinal: 0
+				},
+				{
+					declarationOrdinals: [1],
+					fallbackReferenceNodes: [],
+					flags: ts.SymbolFlags.Alias,
+					flagNames: ['Alias'],
+					name: 'base',
+					symbolOrdinal: 1,
+					valueDeclarationOrdinal: 1
+				},
+				{
+					declarationOrdinals: [],
+					fallbackReferenceNodes: [{ nodeOrdinal: 17, sourceOrdinal: 0 }],
+					flags: ts.SymbolFlags.ValueModule,
+					flagNames: ['ValueModule'],
+					name: '"src/index"',
+					symbolOrdinal: 2,
+					valueDeclarationOrdinal: null
+				}
 			]
+		};
+		const compilerFactCount =
+			rawWithFacts.aliases.length +
+			rawWithFacts.declarations.length +
+			rawWithFacts.moduleExports.length +
+			rawWithFacts.moduleResolutions.length +
+			rawWithFacts.references.length +
+			rawWithFacts.symbols.length;
+		expect(compilerFactCount).toBeGreaterThan(1);
+		expect(() =>
+			normalize(rawWithFacts, request({ maxCompilerFacts: compilerFactCount }))
+		).not.toThrow();
+		expect(() =>
+			normalize(rawWithFacts, request({ maxCompilerFacts: compilerFactCount - 1 }))
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({ code: 'BUDGET_EXCEEDED' })
+		);
+		const snapshot = normalize(rawWithFacts);
+		const reorderedSnapshot = normalize({
+			...rawWithFacts,
+			declarations: [...rawWithFacts.declarations].reverse()
 		});
+		const largerBudgetSnapshot = normalize(
+			rawWithFacts,
+			request({ maxAstNodes: BUDGETS.maxAstNodes + 1 })
+		);
+		const unsupportedSnapshot = normalize({
+			...rawWithFacts,
+			declarations: rawWithFacts.declarations.map((record, index) =>
+				index === 0
+					? {
+							...record,
+							declaringScopeOrdinal: null,
+							scopeLinkState: 'UNSUPPORTED' as const
+						}
+					: record
+			),
+			references: rawWithFacts.references.map((record, index) =>
+				index === 0
+					? {
+							...record,
+							containingScopeOrdinal: null,
+							scopeLinkState: 'UNSUPPORTED' as const
+						}
+					: record
+			)
+		});
+		const degradedRaw = (
+			aliasState: 'UNRESOLVED' | 'CIRCULAR' | 'UNSUPPORTED',
+			resolutionState: 'UNRESOLVED' | 'UNSUPPORTED',
+			exportUnresolved: boolean
+		): RawStaticSemanticProjectExtraction => ({
+			...rawWithFacts,
+			aliases: [
+				{
+					...rawWithFacts.aliases[0]!,
+					state: aliasState,
+					targetSymbolOrdinal: aliasState === 'CIRCULAR' ? 2 : null,
+					terminalSymbolOrdinal: null
+				}
+			],
+			moduleExports: rawWithFacts.moduleExports.map((record) =>
+				exportUnresolved
+					? { ...record, state: 'UNRESOLVED' as const, targetSymbolOrdinal: null }
+					: record
+			),
+			moduleResolutions: rawWithFacts.moduleResolutions.map((record) => ({
+				...record,
+				moduleSymbolOrdinal: null,
+				resolutionState,
+				targetSourceOrdinal: null
+			})),
+			references: rawWithFacts.references.map((record, index) =>
+				index === 1 ? { ...record, resolvedSymbolOrdinal: null, resolutionState } : record
+			)
+		});
+		const unresolvedSnapshot = normalize(degradedRaw('UNRESOLVED', 'UNRESOLVED', true));
+		const circularSnapshot = normalize(degradedRaw('CIRCULAR', 'UNRESOLVED', true));
+		const unsupportedResolutionSnapshot = normalize(
+			degradedRaw('UNSUPPORTED', 'UNSUPPORTED', false)
+		);
 		const nodeIds = new Map(snapshot.astNodes.map((node) => [node.start, node.id]));
 		const projectOptions = snapshot.projects[0]!.programRecipe.compilerOptions;
+		const durableProjection = (candidate: typeof snapshot) =>
+			candidate.declarations
+				.map(({ durableId, name }) => ({ durableId, name }))
+				.sort((left, right) => (left.name ?? '').localeCompare(right.name ?? ''));
+		const declarationPopulation = unsupportedSnapshot.populations.find(
+			(population) => population.kind === 'DECLARATION'
+		)!;
+		const referencePopulation = unsupportedSnapshot.populations.find(
+			(population) => population.kind === 'REFERENCE'
+		)!;
+		expect(declarationPopulation.members.analyzed).toEqual(
+			unsupportedSnapshot.declarations.map((record) => record.id).sort()
+		);
+		expect(declarationPopulation.members.unsupported).toEqual(
+			unsupportedSnapshot.declarations
+				.filter((record) => record.scopeLinkState === 'UNSUPPORTED')
+				.map((record) => record.id)
+				.sort()
+		);
+		expect(referencePopulation.members.analyzed).toEqual(
+			unsupportedSnapshot.references.map((record) => record.id).sort()
+		);
+		expect(referencePopulation.members.unsupported).toEqual(
+			unsupportedSnapshot.references
+				.filter((record) => record.scopeLinkState === 'UNSUPPORTED')
+				.map((record) => record.id)
+				.sort()
+		);
+		expect(declarationPopulation.reconciles).toBe(true);
+		expect(referencePopulation.reconciles).toBe(true);
+
+		const population = (candidate: StaticSemanticSnapshot, kind: SemanticPopulationKind) =>
+			candidate.populations.find((record) => record.kind === kind)!;
+		const unresolvedReference = unresolvedSnapshot.references.find(
+			(record) => record.resolutionState === 'UNRESOLVED'
+		)!;
+		for (const [kind, analyzed, unknown] of [
+			['ALIAS', unresolvedSnapshot.aliases, unresolvedSnapshot.aliases],
+			['REFERENCE', unresolvedSnapshot.references, [unresolvedReference]],
+			[
+				'MODULE_RESOLUTION',
+				unresolvedSnapshot.moduleResolutions,
+				unresolvedSnapshot.moduleResolutions
+			],
+			['MODULE_EXPORT', unresolvedSnapshot.moduleExports, unresolvedSnapshot.moduleExports]
+		] as const) {
+			const record = population(unresolvedSnapshot, kind);
+			expect(record.members.analyzed).toEqual(analyzed.map((fact) => fact.id).sort());
+			expect(record.members.unknown).toEqual(unknown.map((fact) => fact.id).sort());
+			expect(record.members.unsupported).toEqual([]);
+			expect(record.reconciles).toBe(true);
+		}
+		expect(population(circularSnapshot, 'ALIAS').members.unknown).toEqual(
+			circularSnapshot.aliases.map((record) => record.id).sort()
+		);
+		const unsupportedReference = unsupportedResolutionSnapshot.references.find(
+			(record) => record.resolutionState === 'UNSUPPORTED'
+		)!;
+		for (const [kind, analyzed, unsupported] of [
+			['ALIAS', unsupportedResolutionSnapshot.aliases, unsupportedResolutionSnapshot.aliases],
+			['REFERENCE', unsupportedResolutionSnapshot.references, [unsupportedReference]],
+			[
+				'MODULE_RESOLUTION',
+				unsupportedResolutionSnapshot.moduleResolutions,
+				unsupportedResolutionSnapshot.moduleResolutions
+			]
+		] as const) {
+			const record = population(unsupportedResolutionSnapshot, kind);
+			expect(record.members.analyzed).toEqual(analyzed.map((fact) => fact.id).sort());
+			expect(record.members.unsupported).toEqual(unsupported.map((fact) => fact.id).sort());
+			expect(record.members.unknown).toEqual([]);
+			expect(record.reconciles).toBe(true);
+		}
+
+		const degradedFacts = [
+			{
+				collection: 'aliases',
+				provenanceId: unresolvedSnapshot.aliases[0]!.provenanceId
+			},
+			{
+				collection: 'references',
+				provenanceId: unresolvedReference.resolutionProvenanceId
+			},
+			{
+				collection: 'moduleResolutions',
+				provenanceId: unresolvedSnapshot.moduleResolutions[0]!.provenanceId
+			},
+			{
+				collection: 'moduleExports',
+				provenanceId: unresolvedSnapshot.moduleExports[0]!.provenanceId
+			}
+		] as const;
+		for (const { provenanceId } of degradedFacts) {
+			const factProvenance = unresolvedSnapshot.provenances.find(
+				(record) => record.id === provenanceId
+			)!;
+			expect(factProvenance.epistemic.capabilityCoverage).toBe('partial');
+			expect(
+				factProvenance.limitations.some(
+					(limitation) =>
+						limitation.capability === 'TS_SYMBOL' &&
+						limitation.closureEffect === 'DEGRADES_CLOSURE' &&
+						factProvenance.epistemic.unresolvedRegions.includes(limitation.region)
+				)
+			).toBe(true);
+			if (factProvenance.sourceId !== null) {
+				const parent = unresolvedSnapshot.provenances.find(
+					(record) => record.id === factProvenance.parentProvenanceId
+				)!;
+				expect(parent.limitations).toEqual(factProvenance.limitations);
+				expect(parent.epistemic.unresolvedRegions).toEqual(
+					factProvenance.epistemic.unresolvedRegions
+				);
+			}
+		}
+
+		expect(
+			unsupportedSnapshot.capabilities.find((entry) => entry.capability === 'TS_SYMBOL')?.state
+		).toBe('PARTIAL');
+		for (const provenanceId of [
+			...unsupportedSnapshot.scopes.map((fact) => fact.provenanceId),
+			...unsupportedSnapshot.declarations.map((fact) => fact.structuralProvenanceId),
+			...unsupportedSnapshot.references.map((fact) => fact.structuralProvenanceId)
+		]) {
+			const factProvenance = unsupportedSnapshot.provenances.find(
+				(record) => record.id === provenanceId
+			)!;
+			expect(factProvenance.epistemic).toMatchObject({
+				inference: 'derived',
+				supportBasis: {
+					kind: 'derived',
+					method: 'typescript-public-ast-binding-rules'
+				}
+			});
+		}
+
+		for (const declaration of snapshot.declarations) {
+			const source = snapshot.sources.find((candidate) => candidate.id === declaration.sourceId)!;
+			expect(declaration.durableId).toBe(
+				semanticDurableDeclarationId({
+					ambient: declaration.ambient,
+					contentSha256: source.contentSha256,
+					declarationFile: source.declarationFile,
+					end: declaration.end,
+					kind: declaration.kind,
+					languageVariant: source.languageVariant,
+					logicalPath: source.logicalPath,
+					name: declaration.name,
+					nameState: declaration.nameState,
+					scriptKind: source.scriptKind,
+					start: declaration.start,
+					typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
+				})
+			);
+		}
+		expect(durableProjection(reorderedSnapshot)).toEqual(durableProjection(snapshot));
+		expect(durableProjection(largerBudgetSnapshot)).toEqual(durableProjection(snapshot));
+		expect(largerBudgetSnapshot.id).not.toBe(snapshot.id);
+		expect(largerBudgetSnapshot.declarations.map(({ id }) => id).sort()).not.toEqual(
+			snapshot.declarations.map(({ id }) => id).sort()
+		);
 
 		expect(nodeIds).toHaveLength(astNodes.length);
 		expect(snapshot.astNodes.find((node) => node.start === 5)?.structuralRoles).toEqual([
@@ -806,6 +1628,49 @@ describe('semantic snapshot normalization', () => {
 			],
 			nameNodeId: nodeIds.get(2),
 			nodeId: nodeIds.get(1)
+		});
+		const runDeclaration = snapshot.declarations.find((declaration) => declaration.name === 'run');
+		const importedDeclaration = snapshot.declarations.find(
+			(declaration) => declaration.name === 'base'
+		);
+		const alias = snapshot.aliases[0];
+		expect(runDeclaration).toMatchObject({
+			ambient: false,
+			candidateId: snapshot.declarationCandidates[0]?.id,
+			nodeId: nodeIds.get(1),
+			nameState: 'ATOMIC'
+		});
+		expect(importedDeclaration).toMatchObject({ candidateId: null, nodeId: nodeIds.get(18) });
+		expect(snapshot.symbols.map((symbol) => symbol.mergeState).sort()).toEqual([
+			'DECLARATIONLESS',
+			'SINGLE',
+			'SINGLE'
+		]);
+		expect(alias).toMatchObject({
+			state: 'RESOLVED',
+			targetSymbolId: alias?.terminalSymbolId
+		});
+		expect(
+			snapshot.references.find((reference) => reference.role === 'IMPORT_EXPORT_BINDING')
+		).toMatchObject({
+			resolutionState: 'RESOLVED_ALIAS',
+			resolvedSymbolId: alias?.terminalSymbolId,
+			symbolId: alias?.aliasSymbolId
+		});
+		expect(snapshot.moduleResolutions[0]).toMatchObject({
+			moduleSymbolId: alias?.terminalSymbolId,
+			occurrenceKind: 'IMPORT',
+			resolutionState: 'RESOLVED_SOURCE',
+			specifier: './index.js',
+			specifierState: 'LITERAL',
+			targetSourceId: snapshot.sources[0]?.id,
+			typeOnly: false
+		});
+		expect(snapshot.moduleExports[0]).toMatchObject({
+			exportName: 'run',
+			state: 'DIRECT',
+			symbolId: runDeclaration?.symbolId,
+			targetSymbolId: null
 		});
 		expect(
 			snapshot.invocations.find((invocation) => invocation.invocationKind === 'CALL')
@@ -865,6 +1730,29 @@ describe('semantic snapshot normalization', () => {
 		expect(
 			snapshot.populations.find((population) => population.kind === 'ASSIGNMENT')?.analyzed
 		).toBe(2);
+		expect(
+			Object.fromEntries(
+				snapshot.populations
+					.filter((population) =>
+						[
+							'DECLARATION',
+							'SYMBOL',
+							'ALIAS',
+							'REFERENCE',
+							'MODULE_RESOLUTION',
+							'MODULE_EXPORT'
+						].includes(population.kind)
+					)
+					.map((population) => [population.kind, population.analyzed])
+			)
+		).toEqual({
+			ALIAS: 1,
+			DECLARATION: 2,
+			MODULE_EXPORT: 1,
+			MODULE_RESOLUTION: 1,
+			REFERENCE: 2,
+			SYMBOL: 3
+		});
 		expect(projectOptions).toEqual(nestedRecipe.compilerOptions);
 		expect(projectOptions).not.toBe(nestedRecipe.compilerOptions);
 		expect(projectOptions.paths).not.toBe(nestedRecipe.compilerOptions.paths);
@@ -990,5 +1878,346 @@ describe('semantic snapshot normalization', () => {
 		expect(() => normalize({ ...raw(), evidenceState: 'CAPTURED_COMPILER_INPUT' })).toThrowError(
 			expect.objectContaining<Partial<SemanticNormalizationError>>({ code: 'INVALID_RAW_MODEL' })
 		);
+	});
+
+	it('rejects mismatched request, capture, project, path, and aggregate population boundaries', () => {
+		const baseInput = normalizationInput();
+		for (const [input, message, code] of [
+			[
+				{
+					...baseInput,
+					request: { ...baseInput.request, subjectId: sha256('different-subject') }
+				},
+				'Semantic request and FrozenSubject identities differ.',
+				'INVALID_RAW_MODEL'
+			],
+			[
+				{
+					...baseInput,
+					request: { ...baseInput.request, capabilities: ['TS_PROJECT'] as never }
+				},
+				'DWP-003 TS_SYMBOL normalization requires exactly TS_PROJECT, TS_SYMBOL, and TS_SYNTAX.',
+				'INVALID_RAW_MODEL'
+			],
+			[
+				{ ...baseInput, projects: [] },
+				'Raw project population does not reproduce the frozen project population.',
+				'INVALID_RAW_MODEL'
+			],
+			[
+				{
+					...baseInput,
+					capture: { ...baseInput.capture, closureDigest: sha256('wrong-closure') }
+				},
+				'Verified compiler capture closure digest is incoherent.',
+				'INVALID_RAW_MODEL'
+			]
+		] as const) {
+			expect(() =>
+				normalizeStaticSemanticSnapshot(input as NormalizeStaticSemanticSnapshotInput)
+			).toThrowError(
+				expect.objectContaining<Partial<SemanticNormalizationError>>({ code, message })
+			);
+		}
+
+		expect(() => normalize(raw(), request({ maxPathCharacters: 5 }))).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				code: 'BUDGET_EXCEEDED',
+				message: 'Source path src/index.ts exceeds the path budget.'
+			})
+		);
+
+		for (const [budgets, message] of [
+			[
+				{ maxProjects: 1 },
+				'Raw project population does not reproduce the frozen project population.'
+			],
+			[{ maxSources: 1 }, 'Raw sources exceed the snapshot source budget.'],
+			[{ maxAstNodes: 1 }, 'Raw AST nodes exceed the snapshot node budget.'],
+			[{ maxScopes: 2 }, 'Raw scopes exceed the snapshot scope budget.']
+		] as const) {
+			const multi = multiProjectNormalizationInput();
+			expect(() =>
+				normalizeStaticSemanticSnapshot({
+					...multi,
+					request: request(budgets)
+				})
+			).toThrowError(
+				expect.objectContaining<Partial<SemanticNormalizationError>>({
+					code: 'BUDGET_EXCEEDED',
+					message
+				})
+			);
+		}
+	});
+
+	it('rejects invalid and overflowed diagnostic counts and dishonest family coverage', () => {
+		const invalidMessage = {
+			...diagnosticMessage('invalid'),
+			textLength: 0
+		};
+		expect(() => normalize(withDiagnostic(raw(), rawDiagnostic(invalidMessage)))).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				message: 'Raw diagnostic character count is invalid or overflowed.'
+			})
+		);
+
+		const hugeMessage = {
+			...diagnosticMessage('huge'),
+			textLength: Number.MAX_SAFE_INTEGER
+		};
+		const related = [
+			{
+				category: 'ERROR' as const,
+				code: 'TS1001',
+				end: null,
+				message: diagnosticMessage('related'),
+				path: null,
+				start: null
+			}
+		];
+		expect(() =>
+			normalize(withDiagnostic(raw(), rawDiagnostic(hugeMessage, related)))
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				message: 'Raw diagnostic character count overflowed.'
+			})
+		);
+
+		const uncovered = withDiagnostic(raw(), rawDiagnostic(), false);
+		expect(() => normalize(uncovered)).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				message: 'Diagnostic family SEMANTIC does not cover its emitted records.'
+			})
+		);
+
+		const multi = multiProjectNormalizationInput();
+		const projects = multi.projects.map((project) => withDiagnostic(project));
+		expect(() =>
+			normalizeStaticSemanticSnapshot({
+				...multi,
+				projects,
+				request: request({ maxDiagnostics: 1 })
+			})
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				code: 'BUDGET_EXCEEDED',
+				message: 'Raw diagnostics exceed the snapshot diagnostic budget.'
+			})
+		);
+	});
+
+	it('rejects duplicate syntax and incoherent scope, declaration, symbol, and reference facts', () => {
+		const base = bindingRaw();
+		expect(() => normalize(base)).not.toThrow();
+		const declaration = base.declarations[0]!;
+		const symbol = base.symbols[0]!;
+		const reference = base.references[0]!;
+		const fallback = { nodeOrdinal: 2, sourceOrdinal: 0 };
+		const candidate = {
+			ambientSyntax: false,
+			candidateRole: 'BINDING' as const,
+			exportCarrierNodeOrdinal: null,
+			exportSyntax: 'NONE' as const,
+			localModifiers: [],
+			nameNodeOrdinal: 2,
+			nameState: 'ATOMIC' as const,
+			nodeOrdinal: 1,
+			sourceOrdinal: 0,
+			syntacticName: 'value',
+			syntaxKind: ts.SyntaxKind.VariableDeclaration,
+			syntaxKindName: 'VariableDeclaration'
+		};
+		const rejects = (project: RawStaticSemanticProjectExtraction, message: string): void => {
+			try {
+				normalize(project);
+			} catch (error) {
+				expect(error).toBeInstanceOf(SemanticNormalizationError);
+				expect((error as SemanticNormalizationError).message).toContain(message);
+				return;
+			}
+			throw new Error(`Expected normalization failure containing: ${message}`);
+		};
+
+		rejects(
+			{ ...base, declarationCandidates: [candidate, candidate] },
+			'Declaration-candidate node 1 is not unique within its source.'
+		);
+		rejects(
+			{
+				...base,
+				scopes: [...base.scopes, { ...base.scopes[1]!, scopeOrdinal: 2 }]
+			},
+			`Project tsconfig.json contains duplicate scope identity`
+		);
+		rejects(
+			{
+				...base,
+				declarations: [{ ...declaration, scopeLinkState: 'UNSUPPORTED' }]
+			},
+			'Declaration 0 scope-link state is incoherent.'
+		);
+		rejects(
+			{
+				...base,
+				declarations: [{ ...declaration, symbolBindingState: 'UNSUPPORTED' }]
+			},
+			'Declaration 0 symbol-binding state is incoherent.'
+		);
+		rejects(
+			{ ...base, declarations: [{ ...declaration, start: -1 }] },
+			'Declaration 0 has an invalid source span.'
+		);
+		rejects(
+			{
+				...base,
+				declarations: [declaration, { ...declaration, declarationOrdinal: 1 }]
+			},
+			'Project tsconfig.json contains duplicate declaration identity'
+		);
+
+		const fallbackSymbol = {
+			declarationOrdinals: [],
+			fallbackReferenceNodes: [fallback],
+			flags: ts.SymbolFlags.Variable,
+			flagNames: ['Variable'],
+			name: 'fallback',
+			symbolOrdinal: 1,
+			valueDeclarationOrdinal: null
+		};
+		rejects(
+			{
+				...base,
+				declarations: [{ ...declaration, symbolOrdinal: 1 }],
+				symbols: [symbol, fallbackSymbol]
+			},
+			'Declaration 0 is attributed to a different symbol ordinal.'
+		);
+		rejects(
+			{
+				...raw(),
+				symbols: [
+					{
+						declarationOrdinals: [],
+						fallbackReferenceNodes: [],
+						flags: ts.SymbolFlags.Variable,
+						flagNames: ['Variable'],
+						name: 'empty',
+						symbolOrdinal: 0,
+						valueDeclarationOrdinal: null
+					}
+				]
+			},
+			'Symbol 0 has neither declarations nor a stable reference fallback.'
+		);
+		rejects(
+			{
+				...base,
+				symbols: [{ ...symbol, fallbackReferenceNodes: [fallback] }]
+			},
+			'Symbol 0 mixes declaration and fallback identity bases.'
+		);
+		const duplicateSymbol = {
+			...fallbackSymbol,
+			fallbackReferenceNodes: [{ nodeOrdinal: 0, sourceOrdinal: 0 }],
+			name: 'same',
+			symbolOrdinal: 0
+		};
+		rejects(
+			{
+				...raw(),
+				symbols: [duplicateSymbol, { ...duplicateSymbol, symbolOrdinal: 1 }]
+			},
+			'Project tsconfig.json contains duplicate symbol identity'
+		);
+		rejects(
+			{
+				...base,
+				symbols: [
+					{
+						...symbol,
+						declarationOrdinals: [],
+						fallbackReferenceNodes: [fallback],
+						valueDeclarationOrdinal: null
+					}
+				]
+			},
+			'Symbol 0 does not include declaration 0.'
+		);
+
+		const secondDeclaration = {
+			...declaration,
+			declarationOrdinal: 1,
+			end: 3,
+			kind: ts.SyntaxKind.Identifier,
+			kindName: 'Identifier',
+			name: 'other',
+			nodeOrdinal: 2,
+			start: 2,
+			symbolOrdinal: 1
+		};
+		const secondSymbol = {
+			...symbol,
+			declarationOrdinals: [1],
+			name: 'other',
+			symbolOrdinal: 1,
+			valueDeclarationOrdinal: 1
+		};
+		rejects(
+			{
+				...base,
+				declarations: [declaration, secondDeclaration],
+				symbols: [{ ...symbol, valueDeclarationOrdinal: 1 }, secondSymbol]
+			},
+			'Symbol 0 value declaration is not one of its declarations.'
+		);
+		rejects(
+			{
+				...base,
+				references: [{ ...reference, scopeLinkState: 'UNSUPPORTED' }]
+			},
+			'Reference node 2 scope-link state is incoherent.'
+		);
+	});
+
+	it('partitions context-only sources and scopes into their explicit population members', () => {
+		const base = raw();
+		const contextSource = {
+			...base.sources[0]!,
+			analysisDisposition: 'CONTEXT_ONLY' as const,
+			artifactClass: 'CONTEXT_ONLY' as const,
+			artifactRoles: [],
+			bytes: 0,
+			contentSha256: sha256(''),
+			declarationFile: true,
+			logicalPath: 'lib/context.d.ts',
+			moduleKind: 'MODULE' as const,
+			origin: 'TOOLCHAIN_LIBRARY' as const,
+			rootFile: false,
+			rootNodeOrdinal: null,
+			sourceOrdinal: 1,
+			textLength: 0
+		};
+		const contextScope = {
+			...base.scopes[1]!,
+			domain: 'MIXED' as const,
+			end: 0,
+			kind: 'SOURCE_MODULE' as const,
+			ownerNodeOrdinal: null,
+			scopeOrdinal: 2,
+			sourceOrdinal: 1,
+			start: 0
+		};
+		const snapshot = normalize({
+			...base,
+			scopes: [...base.scopes, contextScope],
+			sources: [...base.sources, contextSource]
+		});
+		expect(
+			snapshot.populations.find((population) => population.kind === 'SOURCE')?.members.contextOnly
+		).toHaveLength(1);
+		expect(
+			snapshot.populations.find((population) => population.kind === 'SCOPE')?.members.contextOnly
+		).toHaveLength(1);
 	});
 });

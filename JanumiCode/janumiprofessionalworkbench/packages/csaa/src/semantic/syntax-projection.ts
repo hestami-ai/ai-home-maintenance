@@ -66,38 +66,45 @@ export const AST_STRUCTURAL_ROLES = {
 	sourceFile: 'source-file'
 } as const satisfies Readonly<Record<string, SemanticAstStructuralRole>>;
 
-export const SEMANTIC_AST_STRUCTURAL_ROLES: readonly SemanticAstStructuralRole[] = Object.values(AST_STRUCTURAL_ROLES).sort();
+export const SEMANTIC_AST_STRUCTURAL_ROLES: readonly SemanticAstStructuralRole[] =
+	Object.values(AST_STRUCTURAL_ROLES).sort();
 
 const SYNTAX_KIND_NAME_BY_CODE = new Map<number, string>();
 for (const [name, value] of Object.entries(ts.SyntaxKind)) {
-	if (typeof value !== 'number' || /^(?:First|Last)/u.test(name) || SYNTAX_KIND_NAME_BY_CODE.has(value)) continue;
+	if (
+		typeof value !== 'number' ||
+		/^(?:First|Last)/u.test(name) ||
+		SYNTAX_KIND_NAME_BY_CODE.has(value)
+	)
+		continue;
 	SYNTAX_KIND_NAME_BY_CODE.set(value, name);
 }
 
-export const PUBLIC_NODE_FLAG_MASK = ts.NodeFlags.Let
-	| ts.NodeFlags.Const
-	| ts.NodeFlags.Using
-	| ts.NodeFlags.NestedNamespace
-	| ts.NodeFlags.Synthesized
-	| ts.NodeFlags.Namespace
-	| ts.NodeFlags.OptionalChain
-	| ts.NodeFlags.ExportContext
-	| ts.NodeFlags.ContainsThis
-	| ts.NodeFlags.HasImplicitReturn
-	| ts.NodeFlags.HasExplicitReturn
-	| ts.NodeFlags.GlobalAugmentation
-	| ts.NodeFlags.HasAsyncFunctions
-	| ts.NodeFlags.DisallowInContext
-	| ts.NodeFlags.YieldContext
-	| ts.NodeFlags.DecoratorContext
-	| ts.NodeFlags.AwaitContext
-	| ts.NodeFlags.DisallowConditionalTypesContext
-	| ts.NodeFlags.ThisNodeHasError
-	| ts.NodeFlags.JavaScriptFile
-	| ts.NodeFlags.ThisNodeOrAnySubNodesHasError
-	| ts.NodeFlags.HasAggregatedChildData
-	| ts.NodeFlags.JSDoc
-	| ts.NodeFlags.JsonFile;
+export const PUBLIC_NODE_FLAG_MASK =
+	ts.NodeFlags.Let |
+	ts.NodeFlags.Const |
+	ts.NodeFlags.Using |
+	ts.NodeFlags.NestedNamespace |
+	ts.NodeFlags.Synthesized |
+	ts.NodeFlags.Namespace |
+	ts.NodeFlags.OptionalChain |
+	ts.NodeFlags.ExportContext |
+	ts.NodeFlags.ContainsThis |
+	ts.NodeFlags.HasImplicitReturn |
+	ts.NodeFlags.HasExplicitReturn |
+	ts.NodeFlags.GlobalAugmentation |
+	ts.NodeFlags.HasAsyncFunctions |
+	ts.NodeFlags.DisallowInContext |
+	ts.NodeFlags.YieldContext |
+	ts.NodeFlags.DecoratorContext |
+	ts.NodeFlags.AwaitContext |
+	ts.NodeFlags.DisallowConditionalTypesContext |
+	ts.NodeFlags.ThisNodeHasError |
+	ts.NodeFlags.JavaScriptFile |
+	ts.NodeFlags.ThisNodeOrAnySubNodesHasError |
+	ts.NodeFlags.HasAggregatedChildData |
+	ts.NodeFlags.JSDoc |
+	ts.NodeFlags.JsonFile;
 
 export function typescriptSyntaxKindName(kind: number): string | null {
 	return SYNTAX_KIND_NAME_BY_CODE.get(kind) ?? null;
@@ -154,7 +161,9 @@ export function isTypeScriptModifierKind(kind: number): boolean {
 	return MODIFIER_KINDS.has(kind);
 }
 
-export function semanticDeclarationCandidateRole(kind: number): SemanticDeclarationCandidateRole | null {
+export function semanticDeclarationCandidateRole(
+	kind: number
+): SemanticDeclarationCandidateRole | null {
 	return DECLARATION_CANDIDATE_ROLE_BY_KIND.get(kind) ?? null;
 }
 
@@ -203,7 +212,10 @@ export function declarationCandidateMatchesNode(
 	}
 }
 
-export function semanticDeclarationNameState(kind: number, syntacticIdentifierText?: string | null): SemanticDeclarationCandidateNameState | null {
+export function semanticDeclarationNameState(
+	kind: number,
+	syntacticIdentifierText?: string | null
+): SemanticDeclarationCandidateNameState | null {
 	switch (kind) {
 		case ts.SyntaxKind.Identifier:
 		case ts.SyntaxKind.PrivateIdentifier:
@@ -232,27 +244,40 @@ export function semanticLiteralDescriptor(kind: number): {
 	readonly valueType: SemanticLiteralValueType;
 } | null {
 	switch (kind) {
-		case ts.SyntaxKind.BigIntLiteral: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'BIGINT' };
+		case ts.SyntaxKind.BigIntLiteral:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'BIGINT' };
 		case ts.SyntaxKind.FalseKeyword:
-		case ts.SyntaxKind.TrueKeyword: return { valueEncoding: 'JSON_SCALAR', valueType: 'BOOLEAN' };
-		case ts.SyntaxKind.NoSubstitutionTemplateLiteral: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'NO_SUBSTITUTION_TEMPLATE' };
-		case ts.SyntaxKind.TemplateHead: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'TEMPLATE_HEAD' };
-		case ts.SyntaxKind.TemplateMiddle: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'TEMPLATE_MIDDLE' };
-		case ts.SyntaxKind.TemplateTail: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'TEMPLATE_TAIL' };
-		case ts.SyntaxKind.NullKeyword: return { valueEncoding: 'JSON_SCALAR', valueType: 'NULL' };
-		case ts.SyntaxKind.NumericLiteral: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'NUMBER' };
-		case ts.SyntaxKind.RegularExpressionLiteral: return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'REGEXP' };
-		case ts.SyntaxKind.StringLiteral: return { valueEncoding: 'JSON_SCALAR', valueType: 'STRING' };
-		default: return null;
+		case ts.SyntaxKind.TrueKeyword:
+			return { valueEncoding: 'JSON_SCALAR', valueType: 'BOOLEAN' };
+		case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'NO_SUBSTITUTION_TEMPLATE' };
+		case ts.SyntaxKind.TemplateHead:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'TEMPLATE_HEAD' };
+		case ts.SyntaxKind.TemplateMiddle:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'TEMPLATE_MIDDLE' };
+		case ts.SyntaxKind.TemplateTail:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'TEMPLATE_TAIL' };
+		case ts.SyntaxKind.NullKeyword:
+			return { valueEncoding: 'JSON_SCALAR', valueType: 'NULL' };
+		case ts.SyntaxKind.NumericLiteral:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'NUMBER' };
+		case ts.SyntaxKind.RegularExpressionLiteral:
+			return { valueEncoding: 'TYPESCRIPT_TEXT', valueType: 'REGEXP' };
+		case ts.SyntaxKind.StringLiteral:
+			return { valueEncoding: 'JSON_SCALAR', valueType: 'STRING' };
+		default:
+			return null;
 	}
 }
 
 export function isUtf16CodeUnitLiteralKind(kind: number): boolean {
-	return kind === ts.SyntaxKind.StringLiteral
-		|| kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral
-		|| kind === ts.SyntaxKind.TemplateHead
-		|| kind === ts.SyntaxKind.TemplateMiddle
-		|| kind === ts.SyntaxKind.TemplateTail;
+	return (
+		kind === ts.SyntaxKind.StringLiteral ||
+		kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral ||
+		kind === ts.SyntaxKind.TemplateHead ||
+		kind === ts.SyntaxKind.TemplateMiddle ||
+		kind === ts.SyntaxKind.TemplateTail
+	);
 }
 
 export function literalValueMatchesNodeKind(
@@ -263,7 +288,8 @@ export function literalValueMatchesNodeKind(
 ): boolean {
 	const descriptor = semanticLiteralDescriptor(kind);
 	if (descriptor?.valueType !== valueType) return false;
-	if (valueEncoding === 'UTF16_CODE_UNITS_LE') return isUtf16CodeUnitLiteralKind(kind) && value === null;
+	if (valueEncoding === 'UTF16_CODE_UNITS_LE')
+		return isUtf16CodeUnitLiteralKind(kind) && value === null;
 	if (descriptor.valueEncoding !== valueEncoding) return false;
 	if (kind === ts.SyntaxKind.FalseKeyword) return value === false;
 	if (kind === ts.SyntaxKind.TrueKeyword) return value === true;
@@ -271,7 +297,9 @@ export function literalValueMatchesNodeKind(
 	return typeof value === 'string';
 }
 
-export function semanticInvocationKind(kind: number): SemanticInvocationSiteRecord['invocationKind'] | null {
+export function semanticInvocationKind(
+	kind: number
+): SemanticInvocationSiteRecord['invocationKind'] | null {
 	if (kind === ts.SyntaxKind.CallExpression) return 'CALL';
 	if (kind === ts.SyntaxKind.NewExpression) return 'NEW';
 	if (kind === ts.SyntaxKind.TaggedTemplateExpression) return 'TAGGED_TEMPLATE';
@@ -282,15 +310,35 @@ export function canHaveAssignmentInitializer(kind: number): boolean {
 	return ASSIGNMENT_INITIALIZER_KINDS.has(kind);
 }
 
-export function semanticAssignmentKind(node: Pick<SemanticAstNodeRecord, 'hasAssignmentInitializer' | 'kind' | 'operatorKind'>): 'BINARY' | 'INITIALIZER' | 'PREFIX_UPDATE' | 'POSTFIX_UPDATE' | null {
+export function semanticAssignmentKind(
+	node: Pick<SemanticAstNodeRecord, 'hasAssignmentInitializer' | 'kind' | 'operatorKind'>
+): 'BINARY' | 'INITIALIZER' | 'PREFIX_UPDATE' | 'POSTFIX_UPDATE' | null {
 	if (node.hasAssignmentInitializer) return 'INITIALIZER';
-	if (node.kind === ts.SyntaxKind.BinaryExpression && node.operatorKind !== null && ASSIGNMENT_OPERATORS.has(node.operatorKind)) return 'BINARY';
-	if (node.kind === ts.SyntaxKind.PrefixUnaryExpression && (node.operatorKind === ts.SyntaxKind.PlusPlusToken || node.operatorKind === ts.SyntaxKind.MinusMinusToken)) return 'PREFIX_UPDATE';
-	if (node.kind === ts.SyntaxKind.PostfixUnaryExpression && (node.operatorKind === ts.SyntaxKind.PlusPlusToken || node.operatorKind === ts.SyntaxKind.MinusMinusToken)) return 'POSTFIX_UPDATE';
+	if (
+		node.kind === ts.SyntaxKind.BinaryExpression &&
+		node.operatorKind !== null &&
+		ASSIGNMENT_OPERATORS.has(node.operatorKind)
+	)
+		return 'BINARY';
+	if (
+		node.kind === ts.SyntaxKind.PrefixUnaryExpression &&
+		(node.operatorKind === ts.SyntaxKind.PlusPlusToken ||
+			node.operatorKind === ts.SyntaxKind.MinusMinusToken)
+	)
+		return 'PREFIX_UPDATE';
+	if (
+		node.kind === ts.SyntaxKind.PostfixUnaryExpression &&
+		(node.operatorKind === ts.SyntaxKind.PlusPlusToken ||
+			node.operatorKind === ts.SyntaxKind.MinusMinusToken)
+	)
+		return 'POSTFIX_UPDATE';
 	return null;
 }
 
-export function exactLiteralValueType(valueType: SemanticLiteralRecord['valueType'], value: SemanticLiteralRecord['value']): boolean {
+export function exactLiteralValueType(
+	valueType: SemanticLiteralRecord['valueType'],
+	value: SemanticLiteralRecord['value']
+): boolean {
 	if (valueType === 'NULL') return value === null;
 	if (valueType === 'BOOLEAN') return typeof value === 'boolean';
 	return typeof value === 'string';
@@ -307,8 +355,15 @@ export function literalValueDigest(
 	value: SemanticLiteralRecord['value']
 ): string {
 	if (valueEncoding === 'UTF16_CODE_UNITS_LE') {
-		if (typeof value !== 'string') throw new TypeError('UTF-16 literal digests require the exact cooked string before redaction.');
-		return semanticUtf16CodeUnitsDigest('JAN-CSAA-LITERAL-VALUE', [valueEncoding, valueType], value);
+		if (typeof value !== 'string')
+			throw new TypeError(
+				'UTF-16 literal digests require the exact cooked string before redaction.'
+			);
+		return semanticUtf16CodeUnitsDigest(
+			'JAN-CSAA-LITERAL-VALUE',
+			[valueEncoding, valueType],
+			value
+		);
 	}
 	return sha256(canonicalSemanticJson({ value, valueEncoding, valueType }));
 }
