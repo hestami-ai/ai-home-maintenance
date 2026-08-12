@@ -2542,5 +2542,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-census-coverage.test.ts'],
 		why: "THE CENSUS READS THE SOURCE SET, NOT THE SITE COUNT — and `ApproveIntent` is the only site that can tell the difference, because it is the only one declaring TWO sources. Five sites yielding six arrows is the whole claim; a reader that counted sites would report five and be indistinguishable from a correct one on every other command. Dropping REVISED also removes the ratified re-approval cycle (REVISED -> APPROVED), which the handler's own docstring says it exists to keep. ⚠ ITS `why` IS ALSO A RECORD OF A DELIBERATE WIDENING: that precondition is authored from the MACHINE and is deliberately wider than the vocab's `drivesFrom` (FORMALIZED only, DS-001 D4) — so this mutant would silently restore the vocab's narrower claim, which is the disagreement the site was written to resolve. Predicted red: `arrowsSeen` 170 -> 169 on the PINNED test.",
 		source: 'REG-F-117'
+	},
+	{
+		id: 'F117-a-replayed-revision-can-void-an-approval',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\t\tprecondition: fromStates('APPROVED'),",
+		replace: "\t\tprecondition: fromStates('APPROVED', 'REVISED'),",
+		expectRed: ['packages/rph-application/src/handlers/command-reissue-guard.test.ts'],
+		why: "THE FIFTH `advanceIntent` SITE, WHICH HAD NO MUTANT — found while checking whether DWP-03's claim to cover \"each\" site was true. It covers four; `ReviseIntent` is held elsewhere, by JAN-NOOP-01's `semanticVersion inflation cannot void an approval`. ⚠ AND THE OBVIOUS REASON TO SKIP THIS MUTANT IS FALSE, WHICH IS WHY IT EXISTS: the refusal code is `RPH_ILLEGAL_STATE_TRANSITION`, the same code `checkTransition` returns, so the precondition looks redundant — the machine has no `REVISED -> REVISED` arrow and would surely refuse anyway. **Measured: it does NOT.** With this widening the re-issue is ACCEPTED, because a self-transition is ABSORBED rather than refused — exactly the \"absorbed as a NOOP yet still bumped semanticVersion\" behaviour the handler's own comment records. Since `ApproveIntent` requires `approvedSemanticVersion === current`, that replayed no-op silently VOIDS an outstanding approval. The precondition is the only thing standing between those two facts. Predicted red: 1 test in the named victim, measured before declaring.",
+		source: 'REG-F-117 / JAN-CMDPRE DWP-03 residue'
 	}
 ];
