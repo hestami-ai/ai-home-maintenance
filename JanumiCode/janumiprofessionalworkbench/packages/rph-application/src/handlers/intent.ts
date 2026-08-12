@@ -110,6 +110,23 @@ function advanceIntent(
 		 *  replaying a command that changes nothing silently voids an outstanding approval.
 		 *  REQUIRED since JAN-CMDPRE DWP-06 (D5), matching kit.advanceStatus — every advanceIntent site declares one. */
 		readonly precondition: Precondition;
+		/**
+		 * The state machine this command drives — REG-F-117, and it is REQUIRED for the same reason `precondition`
+		 * is.
+		 *
+		 * ⚠ IT IS NOT CEREMONY: `checkTransition` reads it, so a wrong value validates the arrow against the wrong
+		 * machine. Passing it per call site rather than closing over the module constant is what makes this idiom
+		 * structurally identical to `kit.advanceStatus` in exactly the three dimensions the arrow census reads —
+		 * `machine`, `target`, and `fromStates` inside `precondition`.
+		 *
+		 * THAT CONVERGENCE IS THE POINT. REG-F-114 weighed "teach the reader every idiom" (fragile — widening a
+		 * reader is how C-0b dropped 30%) against "normalise the handlers onto one idiom" (invasive), and ruled a
+		 * third way: make the idiom SELF-DECLARING. For Intent the source set was already declared (`fromStates`)
+		 * and already enforced; the only thing the census could not recover was WHICH MACHINE, because this
+		 * primitive closed over `MACHINE` instead of being told. One required field closes that without moving any
+		 * control flow.
+		 */
+		readonly machine: string;
 	}
 ) {
 	const id = command.targetAggregateId;
@@ -133,7 +150,9 @@ function advanceIntent(
 	const precheckFailure = args.precheck?.(loaded.state);
 	if (precheckFailure) return precheckFailure;
 	const from = String(loaded.state.intentStatus);
-	const illegal = checkTransition(command, MACHINE, from, args.target);
+	// ⚠ `args.machine`, NOT the module constant — that substitution is what makes the declaration load-bearing.
+	// Closed over, the field would be a hollow: declared at five call sites, read by nothing, and unkillable.
+	const illegal = checkTransition(command, args.machine, from, args.target);
 	if (illegal) return illegal;
 	const newRevision = loaded.revision + 1;
 	const newSemanticVersion = args.bumpSemanticVersion
@@ -173,6 +192,7 @@ type CommandHandlerReject = ReturnType<typeof reject>;
 /** BeginIntentDiscovery — RAW -> UNDER_DISCOVERY. */
 export const beginIntentDiscovery: CommandHandler = (ctx, command) =>
 	advanceIntent(ctx, command, {
+		machine: MACHINE,
 		target: 'UNDER_DISCOVERY',
 		// JAN-CMDPRE DWP-03: Intent.intentStatus has a single in-arrow to UNDER_DISCOVERY, from RAW.
 		precondition: fromStates('RAW'),
@@ -186,6 +206,7 @@ export const beginIntentDiscovery: CommandHandler = (ctx, command) =>
 /** ProvisionIntent — UNDER_DISCOVERY -> PROVISIONAL (records objective + known ambiguities, DOC-002 §6.1). */
 export const provisionIntent: CommandHandler = (ctx, command, payload) =>
 	advanceIntent(ctx, command, {
+		machine: MACHINE,
 		target: 'PROVISIONAL',
 		// JAN-CMDPRE DWP-03: single in-arrow to PROVISIONAL, from UNDER_DISCOVERY.
 		precondition: fromStates('UNDER_DISCOVERY'),
@@ -200,6 +221,7 @@ export const provisionIntent: CommandHandler = (ctx, command, payload) =>
 export const formalizeIntent: CommandHandler = (ctx, command, payload) => {
 	const p = payload as FormalizeIntentPayload;
 	return advanceIntent(ctx, command, {
+		machine: MACHINE,
 		target: 'FORMALIZED',
 		// JAN-CMDPRE DWP-03: single in-arrow to FORMALIZED, from PROVISIONAL.
 		precondition: fromStates('PROVISIONAL'),
@@ -235,6 +257,7 @@ export const formalizeIntent: CommandHandler = (ctx, command, payload) => {
 export const approveIntent: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ApproveIntentPayload;
 	return advanceIntent(ctx, command, {
+		machine: MACHINE,
 		target: 'APPROVED',
 		// JAN-CMDPRE DWP-03: Intent.intentStatus has TWO in-arrows to APPROVED — FORMALIZED (first approval) and
 		// REVISED (re-approval after a revision). Authored from the MACHINE, deliberately WIDER than the vocab's
@@ -288,6 +311,7 @@ export const approveIntent: CommandHandler = (ctx, command, payload) => {
 export const reviseIntent: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ReviseIntentPayload;
 	return advanceIntent(ctx, command, {
+		machine: MACHINE,
 		target: 'REVISED',
 		// In-arrow: APPROVED only. Re-issuing from REVISED was absorbed as a NOOP yet still bumped semanticVersion, and
 		// ApproveIntent requires approvedSemanticVersion === current — so replaying a command that changed nothing

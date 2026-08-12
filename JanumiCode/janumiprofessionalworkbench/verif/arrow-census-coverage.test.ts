@@ -34,7 +34,7 @@ const MACHINES = STATE_MACHINES as unknown as Record<string, Machine>;
 const seenMachines = () => new Set(([...declaredArrows()] as Arrow[]).map((a) => a.machine));
 
 describe('REG-F-087 — how much of the ratified arrow surface the census actually sees', () => {
-	it('PINNED — 164 of 304 ratified arrows, across 15 of 27 machines', () => {
+	it('PINNED — 170 of 304 ratified arrows, across 16 of 27 machines', () => {
 		const declared = Object.keys(MACHINES);
 		const ratifiedArrows = declared.reduce((n, m) => n + MACHINES[m]!.transitions.length, 0);
 		expect(
@@ -46,13 +46,20 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			},
 			'if coverage MOVED, an idiom was fixed or a new unread one was introduced — either way REG-F-087 ' +
 				'and every conclusion drawn from this census need re-reading, so update them with this pin'
-		).toEqual({ machinesDeclared: 27, machinesSeen: 15, arrowsRatified: 304, arrowsSeen: 164 });
+		).toEqual({ machinesDeclared: 27, machinesSeen: 16, arrowsRatified: 304, arrowsSeen: 170 });
 	});
 
 	// Two causes live in this list and MUST NOT be conflated, which is why it is pinned by name and not by count:
 	//   (a) nothing performs them at all — harness.ts and obligation-constraint.ts contain zero transition calls
 	//       of ANY idiom, so Harness/Obligation/Constraint are a genuine coverage gap, not a census defect;
-	//   (b) commands exist and the census cannot read them — the four PWU axes and Intent.intentStatus.
+	//   (b) commands exist and the census cannot read them — the three remaining PWU axes.
+	//
+	// ⚠ THE (b) HALF SHRANK TWICE AND THE COMMENT LAGGED BOTH TIMES, which is the records defect this programme
+	// keeps finding in its own notes. It read "the four PWU axes and Intent.intentStatus" while the list below
+	// already held THREE PWU axes — `PWU.workLifecycleState` left when REG-F-114 gave the lifecycle commands a
+	// declared source set, and the prose was never re-read. `Intent.intentStatus` leaves here (REG-F-117), and
+	// this note is corrected in the same commit rather than left for a third reader. **A count in prose beside a
+	// list that is pinned by name is a count nothing checks.**
 	it('PINNED — exactly which machines the census is blind to', () => {
 		const seen = seenMachines();
 		expect(
@@ -65,7 +72,6 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			'AssuranceObservation.disposition',
 			'Constraint.status',
 			'Harness.status',
-			'Intent.intentStatus',
 			'Obligation.status',
 			'PWU.assuranceState',
 			'PWU.executionState',

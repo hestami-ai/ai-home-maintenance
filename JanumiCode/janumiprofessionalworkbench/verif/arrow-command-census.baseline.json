@@ -65,19 +65,13 @@
 		"Harness.status  SYNTHESIZING -> COORDINATING",
 		"Harness.status  WAITING -> COORDINATING",
 		"Harness.status  WAITING -> ESCALATED",
-		"Intent.intentStatus  APPROVED -> REVISED",
 		"Intent.intentStatus  APPROVED -> SUPERSEDED",
-		"Intent.intentStatus  FORMALIZED -> APPROVED",
 		"Intent.intentStatus  FORMALIZED -> SUPERSEDED",
-		"Intent.intentStatus  PROVISIONAL -> FORMALIZED",
 		"Intent.intentStatus  PROVISIONAL -> SUPERSEDED",
 		"Intent.intentStatus  PROVISIONAL -> WITHDRAWN",
 		"Intent.intentStatus  RAW -> SUPERSEDED",
-		"Intent.intentStatus  RAW -> UNDER_DISCOVERY",
 		"Intent.intentStatus  RAW -> WITHDRAWN",
-		"Intent.intentStatus  REVISED -> APPROVED",
 		"Intent.intentStatus  REVISED -> SUPERSEDED",
-		"Intent.intentStatus  UNDER_DISCOVERY -> PROVISIONAL",
 		"Intent.intentStatus  UNDER_DISCOVERY -> SUPERSEDED",
 		"Intent.intentStatus  UNDER_DISCOVERY -> WITHDRAWN",
 		"Obligation.status  ACTIVE -> ALLOCATED",
@@ -158,7 +152,6 @@
 		"AssuranceObservation.disposition",
 		"Constraint.status",
 		"Harness.status",
-		"Intent.intentStatus",
 		"Obligation.status",
 		"PWU.assuranceState",
 		"PWU.executionState",
@@ -182,6 +175,7 @@
 	],
 	"unanalysed": [
 		"ExecutionStep.stepState",
+		"Intent.intentStatus",
 		"PWU.workLifecycleState"
 	]
 }

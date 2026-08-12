@@ -2508,5 +2508,39 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/mutant-verdict.test.ts'],
 		why: "THE OTHER CONTROL'S OWN MUTANT, and it is the failure mode a REPAIR would introduce. Faced with a timeout the markers missed, the obvious fix is to add a loose fallback — and a loose fallback reads the WORDS IN A TEST TITLE as evidence of a timeout, so every genuine failure in a suite named after timeouts is reported INCONCLUSIVE. A gate that answers 'not measured' to everything blocks forever while proving nothing, which is strictly worse than the false KILL it was widened to prevent. ⚠ THE FIXTURE IS THE V-4a REPAIR'S OWN TEST TITLE, deliberately: the tests most likely to carry those words are the ones written to stop timeouts. Predicted red: both CONTROL cases; the three positive cases stay green because the added marker is last and the specific ones still win.",
 		source: 'REG-F-116 / feedback: a control needs its own mutant'
+	},
+	// ── REG-F-117, THE INTENT ARROWS ────────────────────────────────────────────────────────────────────────────
+	//
+	// REG-F-114 recorded `advanceIntent` as "an identical second slice" of the PWU work. It is not: all five sites
+	// ALREADY declared their source set (`precondition: fromStates(...)`, required by the type since JAN-CMDPRE
+	// DWP-06) and it was ALREADY enforced before `checkTransition`. Only the machine attribution was missing,
+	// because the primitive closed over a module constant instead of being told. These three hold the two halves
+	// that are now load-bearing — the census reading the sites, and the sites declaring truthfully.
+	{
+		id: 'F117-the-census-stops-reading-advanceIntent',
+		file: 'verif/arrow-command-census.ts',
+		find: "const ADVANCE_PRIMITIVES: ReadonlySet<string> = new Set(['advanceStatus', 'advanceIntent']);",
+		replace: "const ADVANCE_PRIMITIVES: ReadonlySet<string> = new Set(['advanceStatus']);",
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE READER GOES BACK TO ONE PRIMITIVE AND SIX ARROWS VANISH. This is the exact state the repository was in before REG-F-117: `Intent.intentStatus` invisible to the census, not because the commands failed to declare their arrows but because the reader only knew one primitive's name. ⚠ IT MUST BE KILLED BY THE COVERAGE PIN AND NOT BY A COUNT SOMEWHERE ELSE — the pin exists to make any movement in either direction loud, and this is the direction that LOOKS like nothing happened: coverage silently drops and every conclusion drawn from the census becomes wrong by six arrows. Predicted red: `arrowsSeen` 170 -> 164 and `machinesSeen` 16 -> 15 on the PINNED test, and `Intent.intentStatus` returning to the census-blind set.",
+		source: 'REG-F-117'
+	},
+	{
+		id: 'F117-a-site-declares-a-machine-it-does-not-drive',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\t\tmachine: MACHINE,\n\t\ttarget: 'UNDER_DISCOVERY',",
+		replace: "\t\tmachine: 'PWU.workLifecycleState',\n\t\ttarget: 'UNDER_DISCOVERY',",
+		expectRed: ['packages/rph-application/src/handlers/intent.test.ts'],
+		why: "THE DECLARATION IS LOAD-BEARING, AND THIS IS WHAT PROVES IT RATHER THAN ASSERTING IT. `machine` was added so the census could attribute an arrow — a field added for a reader is exactly how a hollow is born, and all five sites pass the same constant, so replacing `args.machine` with the module constant inside the primitive would change nothing any test could see. What makes it real is that `checkTransition` READS it: declaring a machine this command does not drive validates an Intent arrow against the PWU state machine, which has no RAW state, so the command is refused. ⚠ MEASURED BEFORE BEING DECLARED — applied by hand, 4 of 6 tests in the victim redden. Predicted red: `intent.test.ts` alone; the census still sees six arrows because the SITE still declares six.",
+		source: 'REG-F-117'
+	},
+	{
+		id: 'F117-the-only-multi-source-site-loses-an-arrow',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\t\tprecondition: fromStates('FORMALIZED', 'REVISED'),",
+		replace: "\t\tprecondition: fromStates('FORMALIZED'),",
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE CENSUS READS THE SOURCE SET, NOT THE SITE COUNT — and `ApproveIntent` is the only site that can tell the difference, because it is the only one declaring TWO sources. Five sites yielding six arrows is the whole claim; a reader that counted sites would report five and be indistinguishable from a correct one on every other command. Dropping REVISED also removes the ratified re-approval cycle (REVISED -> APPROVED), which the handler's own docstring says it exists to keep. ⚠ ITS `why` IS ALSO A RECORD OF A DELIBERATE WIDENING: that precondition is authored from the MACHINE and is deliberately wider than the vocab's `drivesFrom` (FORMALIZED only, DS-001 D4) — so this mutant would silently restore the vocab's narrower claim, which is the disagreement the site was written to resolve. Predicted red: `arrowsSeen` 170 -> 169 on the PINNED test.",
+		source: 'REG-F-117'
 	}
 ];

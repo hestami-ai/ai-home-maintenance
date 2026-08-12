@@ -199,6 +199,25 @@ function declaredRange(
  * SAFE BECAUSE THE INPUT IS FROZEN FOR THE RUN, and unsafe to memoize anywhere it is not — the mutation runner
  * mutates files BETWEEN vitest invocations, never during one, so a fresh process always re-reads.
  */
+/**
+ * The advance PRIMITIVES whose call sites declare an arrow — REG-F-117.
+ *
+ * ⚠ THIS IS A SET OF NAMES, NOT A SET OF IDIOMS, AND THE DIFFERENCE IS THE WHOLE POINT. Both entries are read by
+ * the SAME walk below: `machine`, `target`, and `fromStates(...)` inside `precondition`. Nothing downstream
+ * branches on which primitive it was. REG-F-114 weighed *"teach the reader every idiom"* — fragile, and how C-0b
+ * dropped 30% — against normalising the handlers, and ruled a third way: **make the idiom self-declaring.**
+ * `advanceIntent` already declared its source set (`fromStates`, REQUIRED since JAN-CMDPRE DWP-06) and already
+ * enforced it before `checkTransition`; the only thing this reader could not recover was WHICH MACHINE, because
+ * that primitive closed over a module constant instead of being told. It is now told, so the two idioms converge
+ * and this list grows by a NAME rather than by a code path.
+ *
+ * ⚠ A THIRD ENTRY MUST EARN ITS PLACE THE SAME WAY. Adding a primitive here that does NOT declare `machine`,
+ * `target` and its source set will `fail()` at its first call site rather than silently contributing partial
+ * arrows — which is the behaviour that keeps this list from becoming a way to widen coverage without widening
+ * declarations.
+ */
+const ADVANCE_PRIMITIVES: ReadonlySet<string> = new Set(['advanceStatus', 'advanceIntent']);
+
 let arrowsCache: DeclaredArrow[] | undefined;
 export function declaredArrows(): DeclaredArrow[] {
 	arrowsCache ??= computeDeclaredArrows();
@@ -217,7 +236,7 @@ function computeDeclaredArrows(): DeclaredArrow[] {
 		const visit = (node: ts.Node): void => {
 			ts.forEachChild(node, visit);
 			if (!ts.isCallExpression(node)) return;
-			if (!ts.isIdentifier(node.expression) || node.expression.text !== 'advanceStatus') return;
+			if (!ts.isIdentifier(node.expression) || !ADVANCE_PRIMITIVES.has(node.expression.text)) return;
 			const spec = node.arguments[2];
 			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
 			sites += 1;
