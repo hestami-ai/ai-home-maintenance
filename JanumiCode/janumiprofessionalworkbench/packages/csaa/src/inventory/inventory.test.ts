@@ -11,6 +11,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+	ARROW_COMMAND_CENSUS_ADAPTER_ID,
+	ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY,
+	ARROW_COMMAND_CENSUS_METHOD,
+	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
+} from '../contracts/arrow-command-census.js';
 import { collectInventory } from './collect-inventory.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
 import {
@@ -127,7 +133,8 @@ describe('inventory discovery and identity', () => {
 			'TS_SYNTAX',
 			'TS_TYPE',
 			'configuration-ast-parse',
-			'frozen-program-construction'
+			'frozen-program-construction',
+			'read-write-access-projection'
 		]);
 		expect(typescript?.provenance).toEqual(
 			expect.arrayContaining([
@@ -138,6 +145,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/providers/typescript/extract-types.ts',
 				'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
 				'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
+				'packages/csaa/src/semantic/monotonic-operation-clock.ts',
 				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
 				'packages/csaa/src/semantic/raw-semantic-model.ts',
 				'packages/csaa/src/semantic/validate-snapshot.ts'
@@ -148,10 +156,18 @@ describe('inventory discovery and identity', () => {
 			inventory.capabilities.map((capability) => [capability.id, capability])
 		);
 		expect(capabilities.get('typescript-ast')).toMatchObject({
-			explanation: expect.stringContaining('implements TS_PROJECT and TS_SYNTAX'),
+			explanation: expect.stringContaining(
+				'operation-wide duration budget is enforced from a wall-anchored monotonic elapsed-time clock'
+			),
 			provider: 'typescript',
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/semantic/monotonic-operation-clock.ts'
+			]),
 			state: 'IMPLEMENTED'
 		});
+		expect(capabilities.get('typescript-ast')?.explanation).toContain(
+			'not a benchmark, product ceiling, expected duration, or SLO'
+		);
 		expect(capabilities.get('symbol-table')).toMatchObject({
 			explanation:
 				'The current DWP-003 provider implements Program-scoped TS_SYMBOL declarations, symbols, aliases, references, module resolutions, and module exports with normalized provenance and validation. Cross-Program symbol identity and binding reconciliation is not implemented for multi-project snapshots.',
@@ -214,6 +230,48 @@ describe('inventory discovery and identity', () => {
 		expect(capabilities.get('call-graph')?.explanation).toContain(
 			'not inferred from the structural ownership edge'
 		);
+		expect(capabilities.get('arrow-command-census')).toMatchObject({
+			provider: ARROW_COMMAND_CENSUS_ADAPTER_ID,
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/contracts/arrow-command-census.ts',
+				'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
+				'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
+				'verif/arrow-command-census.ts',
+				'verif/arrow-command-census.baseline.json'
+			]),
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('arrow-command-census')?.explanation).toContain(
+			`exact adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} and method ${ARROW_COMMAND_CENSUS_METHOD}`
+		);
+		expect(capabilities.get('arrow-command-census')?.explanation).toContain(
+			`${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority`
+		);
+		expect(capabilities.get('arrow-command-census')?.explanation).toContain(
+			'process isolation rather than a hostile-code security sandbox'
+		);
+		expect(capabilities.get('read-write-access-graph')).toMatchObject({
+			explanation: expect.stringContaining(
+				'derives a validated Program-local read/write access graph'
+			),
+			provider: 'typescript',
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/contracts/read-write-access-graph.ts',
+				'packages/csaa/src/graph/build-read-write-access-graph.ts',
+				'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
+				'packages/csaa/src/graph/validate-read-write-access-graph.ts'
+			]),
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('read-write-access-graph')?.explanation).toContain(
+			'JAN-CSAA-CAP-007 data flow'
+		);
+		expect(capabilities.get('read-write-access-graph')?.explanation).toContain(
+			'broader data-flow capability therefore remains UNIMPLEMENTED'
+		);
+		expect(capabilities.get('read-write-access-graph')?.explanation).toContain(
+			'write forms absent from the normalized assignment taxonomy are not classified as supported writes'
+		);
 		for (const id of ['code-property-graph', 'control-flow', 'data-flow']) {
 			expect(capabilities.get(id)).toMatchObject({
 				explanation: expect.stringContaining('no control-flow, data-flow'),
@@ -230,13 +288,23 @@ describe('inventory discovery and identity', () => {
 			entry.statement.includes('current DWP-003 frozen Program construction')
 		)?.statement;
 		expect(semanticBoundary).toContain('TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction');
-		expect(semanticBoundary).toContain('first four bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('wall-anchored monotonic operation clock');
+		expect(semanticBoundary).toContain(
+			'maxDurationMs remains a caller-supplied operation budget and runaway guard'
+		);
+		expect(semanticBoundary).toContain(
+			'not an empirical runtime, expected duration, product ceiling, or SLO'
+		);
+		expect(semanticBoundary).toContain('first six bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
 		);
+		expect(semanticBoundary).toContain('wrapper around the retained arrow-command census');
+		expect(semanticBoundary).toContain('Program-local read/write access projection');
+		expect(semanticBoundary).toContain('JAN-CSAA-CAP-007 data-flow graphs');
 		expect(semanticBoundary).toContain(
-			'Inventory generation executes none of these analysis providers'
+			'Inventory generation executes or benchmarks none of these analysis providers'
 		);
 		expect(semanticBoundary).toContain('generalized state-machine inference');
 		const verificationAuthority = inventory.unknowns.find((entry) =>
@@ -261,10 +329,15 @@ describe('inventory discovery and identity', () => {
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither the partial call graph nor the generated state-machine topology projection ports, replaces, retires, weakens, or transfers this authority'
+			'Neither the adapter, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
-		expect(verificationAuthority?.statement).toContain('WRAP candidate');
-		expect(verificationAuthority?.statement).toContain('baseline and tests');
+		expect(verificationAuthority?.statement).toContain(
+			`${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority`
+		);
+		expect(verificationAuthority?.statement).toContain('exact baseline, tests');
 		for (const family of [
 			'arrow-command',
 			'authority-resolution',
@@ -674,6 +747,118 @@ describe('JPWB population non-vacuity', () => {
 		);
 	});
 
+	it('rejects a missing arrow-command adapter provenance path after all prior populations pass', () => {
+		const root = fixture();
+		write(
+			root,
+			'package.json',
+			JSON.stringify({
+				name: 'janumi-professional-workbench',
+				private: true,
+				scripts: Object.fromEntries(
+					['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
+						(name) => [name, 'true']
+					)
+				),
+				workspaces: ['packages/*', 'apps/*']
+			})
+		);
+		write(
+			root,
+			'packages/csaa/package.json',
+			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		const semanticPaths = [
+			'packages/csaa/src/contracts/semantic.ts',
+			'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
+			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+			'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
+			'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/monotonic-operation-clock.ts',
+			'packages/csaa/src/providers/typescript/extract-symbols.ts',
+			'packages/csaa/src/semantic/raw-semantic-model.ts',
+			'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/validate-snapshot.ts',
+			'packages/csaa/src/providers/typescript/extract-types.ts'
+		];
+		const arrowPaths = [
+			'packages/csaa/src/contracts/arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/normalize-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts',
+			'verif/arrow-command-census.ts',
+			'verif/arrow-command-census.baseline.json',
+			'verif/arrow-command-census.test.ts'
+		];
+		const readWritePaths = [
+			'packages/csaa/src/contracts/read-write-access-graph.ts',
+			'packages/csaa/src/graph/build-read-write-access-graph.ts',
+			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
+			'packages/csaa/src/graph/validate-read-write-access-graph.ts'
+		];
+		for (const path of [...semanticPaths, ...readWritePaths, ...arrowPaths])
+			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
+
+		const missing =
+			'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts';
+		rmSync(join(root, ...missing.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB arrow-command census implementation or retained-authority artifact is absent: ${missing}`
+		);
+	});
+
+	it('rejects a missing read/write access graph provenance path after semantic populations pass', () => {
+		const root = fixture();
+		write(
+			root,
+			'package.json',
+			JSON.stringify({
+				name: 'janumi-professional-workbench',
+				private: true,
+				scripts: Object.fromEntries(
+					['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
+						(name) => [name, 'true']
+					)
+				),
+				workspaces: ['packages/*', 'apps/*']
+			})
+		);
+		write(
+			root,
+			'packages/csaa/package.json',
+			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		const requiredPaths = [
+			'packages/csaa/src/contracts/semantic.ts',
+			'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
+			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+			'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
+			'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/monotonic-operation-clock.ts',
+			'packages/csaa/src/providers/typescript/extract-symbols.ts',
+			'packages/csaa/src/semantic/raw-semantic-model.ts',
+			'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/validate-snapshot.ts',
+			'packages/csaa/src/providers/typescript/extract-types.ts',
+			'packages/csaa/src/contracts/read-write-access-graph.ts',
+			'packages/csaa/src/graph/build-read-write-access-graph.ts',
+			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
+			'packages/csaa/src/graph/validate-read-write-access-graph.ts'
+		];
+		for (const path of requiredPaths) write(root, path, 'export {};\n');
+
+		const missing = 'packages/csaa/src/graph/validate-read-write-access-graph.ts';
+		rmSync(join(root, ...missing.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB TypeScript read/write access graph implementation source is absent: ${missing}`
+		);
+	});
+
 	it('discovers every current workspace manifest and every top-level verif TypeScript asset', () => {
 		const inventory = collectInventory({ repositoryRoot: ROOT, requireJpwbPopulations: true });
 		const manifestCount = ['packages', 'apps'].reduce(
@@ -694,6 +879,9 @@ describe('JPWB population non-vacuity', () => {
 		expect(verificationAssetCount).toBeGreaterThan(0);
 		expect(verificationAssets).toHaveLength(verificationAssetCount);
 		expect(verificationAssets.every((asset) => asset.disposition.length > 0)).toBe(true);
+		expect(
+			verificationAssets.find((asset) => asset.path === 'verif/arrow-command-census.ts')
+		).toMatchObject({ disposition: ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY });
 		expect(inventory.dependencyBoundary.analyzedPerimeter).toEqual(['packages']);
 		expect(inventory.dependencyBoundary.enforcementPerimeter).toEqual(['apps', 'packages']);
 	}, 30_000);

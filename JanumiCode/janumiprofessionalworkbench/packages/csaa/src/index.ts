@@ -1,5 +1,7 @@
 export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
+export * from './contracts/arrow-command-census.js';
+export * from './contracts/read-write-access-graph.js';
 export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
@@ -13,6 +15,7 @@ export * from './inventory/render-inventory.js';
 export * from './inventory/run-inventory.js';
 export { buildStaticSemanticSnapshot } from './semantic/build-static-semantic-snapshot.js';
 export { buildCallGraph } from './graph/build-call-graph.js';
+export { buildReadWriteAccessGraph } from './graph/build-read-write-access-graph.js';
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
@@ -30,6 +33,13 @@ export type {
 	CallGraphValidationOptions,
 	CallGraphValidationResult
 } from './graph/validate-call-graph.js';
+export { validateReadWriteAccessGraph } from './graph/validate-read-write-access-graph.js';
+export type {
+	ReadWriteAccessGraphValidationIssue,
+	ReadWriteAccessGraphValidationIssueCode,
+	ReadWriteAccessGraphValidationOptions,
+	ReadWriteAccessGraphValidationResult
+} from './graph/validate-read-write-access-graph.js';
 export { validateModuleDependencyGraph } from './graph/validate-graph.js';
 export type {
 	ModuleDependencyGraphValidationIssue,
@@ -53,6 +63,20 @@ export {
 	validateDependencyCruiserObservation
 } from './providers/dependency-cruiser/normalize-output.js';
 export { observeStateMachineTopology } from './providers/jpwb-state-machines/observe-state-machines.js';
+export {
+	buildArrowCommandCensusArtifactSet,
+	selectArrowCommandCensusArtifactSet,
+	validateArrowCommandCensusArtifactSet
+} from './providers/jpwb-arrow-command-census/artifact-set.js';
+export {
+	ARROW_COMMAND_CENSUS_PROGRESS_SCHEMA_VERSION,
+	observeArrowCommandCensus,
+	type ArrowCommandCensusProgressEvent,
+	type ArrowCommandCensusProgressPhase,
+	type ObserveArrowCommandCensusDependencies,
+	type ObserveArrowCommandCensusOptions
+} from './providers/jpwb-arrow-command-census/observe-arrow-command-census.js';
+export { validateArrowCommandCensusObservation } from './providers/jpwb-arrow-command-census/validate-arrow-command-census.js';
 export {
 	validateStateMachineTopologyObservation,
 	type StateMachineTopologyObservationValidationIssue,

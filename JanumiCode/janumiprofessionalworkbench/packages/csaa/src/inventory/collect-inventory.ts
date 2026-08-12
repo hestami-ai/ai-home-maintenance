@@ -1,6 +1,12 @@
 import { basename } from 'node:path';
 import ts from 'typescript';
 import {
+	ARROW_COMMAND_CENSUS_ADAPTER_ID,
+	ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY,
+	ARROW_COMMAND_CENSUS_METHOD,
+	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
+} from '../contracts/arrow-command-census.js';
+import {
 	INVENTORY_GENERATOR_ID,
 	INVENTORY_GENERATOR_VERSION,
 	INVENTORY_SCHEMA_VERSION,
@@ -32,7 +38,8 @@ const TYPESCRIPT_AST_PROVENANCE = [
 	'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
 	'packages/csaa/src/providers/typescript/extract-static-raw.ts',
 	'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
-	'packages/csaa/src/semantic/build-static-semantic-snapshot.ts'
+	'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
+	'packages/csaa/src/semantic/monotonic-operation-clock.ts'
 ] as const;
 
 const TYPESCRIPT_SYMBOL_PROVENANCE = [
@@ -64,6 +71,13 @@ const TYPESCRIPT_CALL_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/validate-call-graph.ts'
 ] as const;
 
+const TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE = [
+	'packages/csaa/src/contracts/read-write-access-graph.ts',
+	'packages/csaa/src/graph/build-read-write-access-graph.ts',
+	'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
+	'packages/csaa/src/graph/validate-read-write-access-graph.ts'
+] as const;
+
 const JPWB_STATE_MACHINE_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/state-machine-graph.ts',
 	'packages/csaa/src/graph/build-state-machine-graph.ts',
@@ -73,6 +87,24 @@ const JPWB_STATE_MACHINE_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/validate-state-machine-graph.ts',
 	'packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts',
 	'packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts'
+] as const;
+
+const JPWB_ARROW_COMMAND_CENSUS_PROVENANCE = [
+	'packages/csaa/src/contracts/arrow-command-census.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/normalize-arrow-command-census.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts'
+] as const;
+
+const JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE = [
+	'verif/arrow-command-census.ts',
+	'verif/arrow-command-census.baseline.json',
+	'verif/arrow-command-census.test.ts'
 ] as const;
 
 const EXISTING_GRAPH_RELEVANT_VERIFICATION_AUTHORITY = [
@@ -112,7 +144,8 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'TS_SYNTAX',
 	'TS_TYPE',
 	'configuration-ast-parse',
-	'frozen-program-construction'
+	'frozen-program-construction',
+	'read-write-access-projection'
 ] as const;
 
 export interface CollectInventoryOptions {
@@ -673,7 +706,9 @@ function providerInventory(
 				...(lock ? [lock.path] : []),
 				...configurationPaths[name],
 				...gateEvidence[name],
-				...(inventoryIntegrated ? TYPESCRIPT_SEMANTIC_PROVENANCE : [])
+				...(inventoryIntegrated
+					? [...TYPESCRIPT_SEMANTIC_PROVENANCE, ...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE]
+					: [])
 			].sort(compareText),
 			version
 		};
@@ -760,7 +795,12 @@ function verificationAssets(
 					? `Repository syntax and declarations selected by ${path} at execution time.`
 					: `Repository files, exports, or runtime events selected by ${path} at execution time.`,
 			contentSha256: selectedFile.sha256,
-			disposition: role === 'ANALYZER' ? 'WRAP' : 'RETAIN_DELEGATED',
+			disposition:
+				path === 'verif/arrow-command-census.ts'
+					? ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY
+					: role === 'ANALYZER'
+						? 'WRAP'
+						: 'RETAIN_DELEGATED',
 			extractionMethod,
 			gateCarriers: [...new Set(carriers)].sort(compareText),
 			path,
@@ -815,6 +855,27 @@ function capabilities(): CapabilityInventory[] {
 			provenance: [...JPWB_STATE_MACHINE_GRAPH_PROVENANCE],
 			state: 'PARTIAL'
 		},
+		{
+			explanation: `The fifth bounded DWP-004 increment implements the ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} strategy through exact adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} and method ${ARROW_COMMAND_CENSUS_METHOD}, wrapping the retained JPWB arrow-command census without changing its ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, baseline, gate effect, or source implementation. It binds an exact repository FrozenSubject artifact population, independently records the Bun/TypeScript/ULID/Zod executor environment, runs the retained analyzer in an isolated temporary byte capsule, validates post-execution subject and executor integrity, preserves exact raw evidence and baseline comparison, and publishes a canonical partial observation. This is process isolation rather than a hostile-code security sandbox; supported declaration idioms remain those of the retained verifier; runtime performability, handler-registry closure, replacement equivalence, and full JAN-CSAA-007 or JAN-CSAA-008 conformance are NOT_CLAIMED.`,
+			id: 'arrow-command-census',
+			provider: ARROW_COMMAND_CENSUS_ADAPTER_ID,
+			provenance: [
+				...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
+				...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE
+			],
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The sixth bounded DWP-004 increment derives a validated Program-local read/write access graph from normalized TypeScript reference, declaration, symbol, and assignment facts. It distinguishes reads, writes, and compound/update read-writes; retains deterministic symbol-slot and occurrence identities, forward/reverse indexes, source witnesses, population reconciliation, and explicit type-position, dynamic-element, unresolved, and unsupported frontiers. Implicit bindings, for-in/of targets, delete operations, and write forms absent from the normalized assignment taxonomy are not classified as supported writes. It does not construct control flow, reaching definitions, heap or points-to state, interprocedural flow, taint, or JAN-CSAA-CAP-007 data flow; the broader data-flow capability therefore remains UNIMPLEMENTED.',
+			id: 'read-write-access-graph',
+			provider: 'typescript',
+			provenance: [
+				...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+				...TYPESCRIPT_SYMBOL_PROVENANCE
+			],
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
 				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
@@ -825,7 +886,7 @@ function capabilities(): CapabilityInventory[] {
 		})),
 		{
 			explanation:
-				'The current DWP-003 provider constructs frozen TypeScript Programs and implements TS_PROJECT and TS_SYNTAX semantic snapshot capabilities.',
+				'The current DWP-003 provider constructs frozen TypeScript Programs and implements TS_PROJECT and TS_SYNTAX semantic snapshot capabilities. Its operation-wide duration budget is enforced from a wall-anchored monotonic elapsed-time clock, preventing later wall-clock correction from making in-flight elapsed time regress. This is an execution-control property, not a benchmark, product ceiling, expected duration, or SLO.',
 			id: 'typescript-ast',
 			provider: 'typescript',
 			provenance: TYPESCRIPT_AST_PROVENANCE,
@@ -960,6 +1021,23 @@ function assertJpwbNonVacuity(
 			);
 		}
 	}
+	for (const required of TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB TypeScript read/write access graph implementation source is absent: ${required}`
+			);
+		}
+	}
+	for (const required of [
+		...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
+		...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE
+	]) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB arrow-command census implementation or retained-authority artifact is absent: ${required}`
+			);
+		}
+	}
 }
 
 export function collectInventory(options: CollectInventoryOptions): InventoryDocument {
@@ -1032,26 +1110,30 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_SEMANTIC_PROVENANCE,
 					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
+					...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
 					...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE,
+					'capabilities#arrow-command-census',
 					'capabilities#call-graph',
 					'capabilities#dependency-graph',
+					'capabilities#read-write-access-graph',
 					'capabilities#state-machine-graph',
 					'capabilities#symbol-table',
 					'capabilities#typescript-ast',
 					'capabilities#type-graph'
 				],
 				statement:
-					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first four bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, and an implementation-local generated JPWB state-machine topology projection. Inventory generation executes none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control/data-flow graphs, generalized state-machine inference, and composed graph projections remain UNIMPLEMENTED.'
+					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first six bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, and a Program-local read/write access projection with explicit unsupported frontiers. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, and composed graph projections remain UNIMPLEMENTED.'
 			},
 			{
 				provenance: [
 					...EXISTING_GRAPH_RELEVANT_VERIFICATION_AUTHORITY,
+					...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
 				],
-				statement:
-					'Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer remains a WRAP candidate while its baseline and tests, and the authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families, remain delegated. Neither the partial call graph nor the generated state-machine topology projection ports, replaces, retires, weakens, or transfers this authority; the topology graph does not establish performability, births, occupancy, behavioral reachability, or any other specialized census conclusion.'
+				statement: `Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged; the authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families remain delegated and unwrapped. Neither the adapter, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. The adapter preserves the retained census limitations and does not establish runtime performability, handler-registry closure, replacement equivalence, or full graph-relation conformance.`
 			},
 			{
 				provenance: ['subject.excludedClasses'],

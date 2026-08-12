@@ -155,11 +155,12 @@ function session(
 	frozen: FrozenSubject,
 	caseSensitive = true,
 	budgets: SemanticBudgets = BUDGETS,
-	startedAtMs = Date.now()
+	startedAtMs = Date.now(),
+	clock: () => number = Date.now
 ) {
 	const paths = new FrozenCompilerPathResolver(frozen, root, caseSensitive);
 	const reader = new LiveCompilerInputReader(frozen, paths, caseSensitive);
-	const journal = new CompilerInputJournal(reader, budgets, startedAtMs);
+	const journal = new CompilerInputJournal(reader, budgets, startedAtMs, clock);
 	const binding = projectBinding(root);
 	journal.registerProject(PROJECT_KEY, binding.recipe, binding.materialized);
 	return {
@@ -1204,6 +1205,78 @@ describe('sealed capture, freshness, and replay', () => {
 		vi.setSystemTime(new Date(10_101));
 		expectCode(
 			() => new ReplayCompilerInputJournal(frozen, timedVerified),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+	});
+
+	it('uses one injected duration clock across capture, recheck, and replay despite wall-clock jumps', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(10_000));
+		const root = temporaryRoot();
+		const frozen = subject({});
+		let operationNow = 10_000;
+		const timed = session(
+			root,
+			frozen,
+			true,
+			{ ...BUDGETS, maxDurationMs: 100 },
+			10_000,
+			() => operationNow
+		);
+		vi.setSystemTime(new Date(9_000_000));
+		timed.capture({ logicalPath: 'missing.ts', operation: 'FILE_EXISTS' });
+		vi.setSystemTime(new Date(1));
+		const finalized = timed.finalize();
+		const verified = recheckCompilerInputJournal(finalized);
+		const replay = replayJournal(frozen, verified, timed.recipe, timed.materialized);
+		replay.replay(finalized.entries[0]!.query, PROJECT_KEY);
+		expect(() => replay.assertFullyConsumed()).not.toThrow();
+
+		const expiring = new ReplayCompilerInputJournal(frozen, verified);
+		operationNow = 10_101;
+		expectCode(
+			() => expiring.registerProject(PROJECT_KEY, timed.recipe, timed.materialized),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+	});
+
+	it('uses the injected duration clock while validating captured directory result entries', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(10_000));
+		const root = temporaryRoot();
+		const frozen = subject({ 'types/nested/a.d.ts': 'export declare const a: true;\n' });
+		let operationNow = 10_000;
+		const timed = session(
+			root,
+			frozen,
+			true,
+			{ ...BUDGETS, maxDurationMs: 100 },
+			10_000,
+			() => operationNow
+		);
+		timed.capture({ logicalPath: 'types', operation: 'GET_DIRECTORIES' });
+		timed.capture({
+			depth: null,
+			excludes: [],
+			extensions: ['.d.ts'],
+			includes: ['**/*'],
+			logicalPath: 'types',
+			operation: 'READ_DIRECTORY'
+		});
+		vi.setSystemTime(new Date(9_000_000));
+		const finalized = timed.finalize();
+		expect(
+			finalized.observations.find((observation) => observation.operation === 'GET_DIRECTORIES')
+		).toMatchObject({ resultEntries: ['types/nested'] });
+		expect(
+			finalized.observations.find((observation) => observation.operation === 'READ_DIRECTORY')
+		).toMatchObject({ resultEntries: ['types/nested/a.d.ts'] });
+		expect(() => recheckCompilerInputJournal(finalized)).not.toThrow();
+		operationNow = 10_101;
+		expectCode(
+			() => recheckCompilerInputJournal(finalized),
 			CompilerInputCaptureError,
 			'BUDGET_EXCEEDED'
 		);

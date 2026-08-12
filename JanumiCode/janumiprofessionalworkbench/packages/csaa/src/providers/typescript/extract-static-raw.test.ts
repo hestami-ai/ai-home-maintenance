@@ -728,6 +728,17 @@ const values = [4n, true, false, null, /a+/u, \`plain\`];
 				),
 			'DEADLINE_EXCEEDED'
 		);
+		expectTypedFailure(
+			() =>
+				extractStaticRaw(
+					extractionInput(testProgram, ['src/input.ts'], {
+						assertWithinDeadline: () => undefined,
+						clock: () => 101,
+						deadlineMs: 100
+					})
+				),
+			'DEADLINE_EXCEEDED'
+		);
 
 		const sourceFile = testProgram.program.getSourceFile(absolute('src/input.ts'))!;
 		const diagnostic: ts.Diagnostic = {

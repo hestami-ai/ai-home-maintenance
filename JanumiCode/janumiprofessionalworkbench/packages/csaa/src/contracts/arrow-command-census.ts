@@ -23,6 +23,8 @@ export const ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY = 'WRAP' as const;
 export const ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY = 'RETAINED_DELEGATED' as const;
 export const ARROW_COMMAND_CENSUS_AUTHORITY_TRANSFER = 'NONE' as const;
 export const ARROW_COMMAND_CENSUS_ORACLE_CHANGE = 'NONE' as const;
+export const ARROW_COMMAND_CENSUS_GATE_EFFECT = 'NONE' as const;
+export const ARROW_COMMAND_CENSUS_REPLACEMENT_EQUIVALENCE = 'NOT_CLAIMED' as const;
 export const ARROW_COMMAND_CENSUS_FULL_JAN_CSAA_007_CONFORMANCE = 'NOT_CLAIMED' as const;
 export const ARROW_COMMAND_CENSUS_FULL_JAN_CSAA_008_CONFORMANCE = 'NOT_CLAIMED' as const;
 
@@ -151,12 +153,16 @@ export interface ArrowCommandCensusBudgets {
 	readonly maxDeclaredSites: number;
 	readonly maxDiagnostics: number;
 	readonly maxExecutorDurationMs: number;
+	readonly maxExternalModuleBytes: number;
+	readonly maxExternalModuleFiles: number;
+	readonly maxMaterializedBytes: number;
 	readonly maxMachines: number;
 	readonly maxMapStates: number;
-	readonly maxOutputBytes: number;
 	readonly maxOutputStringCharacters: number;
 	readonly maxRawArrayEntries: number;
 	readonly maxRawJsonDepth: number;
+	readonly maxStderrBytes: number;
+	readonly maxStdoutBytes: number;
 }
 
 export interface ObserveArrowCommandCensusRequest {
@@ -170,11 +176,28 @@ export interface ObserveArrowCommandCensusRequest {
 export interface ArrowCommandCensusExecutorIdentity {
 	readonly adapterId: typeof ARROW_COMMAND_CENSUS_ADAPTER_ID;
 	readonly adapterVersion: typeof ARROW_COMMAND_CENSUS_OPERATION_VERSION;
-	readonly executable: string;
+	readonly executableBytes: number;
+	readonly executableSha256: string;
+	readonly externalModules: readonly ArrowCommandCensusExternalModuleIdentity[];
 	readonly retainedVerifierCanonicalPathKey: string;
 	readonly retainedVerifierSha256: string;
 	readonly runtime: 'bun';
 	readonly runtimeVersion: string;
+	readonly worker: {
+		readonly bytes: number;
+		readonly sha256: string;
+	};
+}
+
+export type ArrowCommandCensusExternalModuleName = 'typescript' | 'ulid' | 'zod';
+
+/** Installed executor inputs are bound independently from FrozenSubject evidence. */
+export interface ArrowCommandCensusExternalModuleIdentity {
+	readonly bytes: number;
+	readonly contentDigest: string;
+	readonly files: number;
+	readonly name: ArrowCommandCensusExternalModuleName;
+	readonly version: string;
 }
 
 export interface ArrowCommandCensusRawOutputIdentity {
@@ -256,7 +279,7 @@ export interface ArrowCommandCensusStateMapEntry {
 export interface ArrowCommandCensusActualFindingSet {
 	readonly deadCovered: readonly ArrowCommandCensusArrowRecord[];
 	readonly orphanMachines: readonly string[];
-	readonly totalDeclaredMachineArrows: number;
+	readonly totalInScopeTopologyArrows: number;
 	readonly unanalysedMachines: readonly string[];
 	readonly uncoveredArrows: readonly ArrowCommandCensusArrowRecord[];
 }
@@ -264,7 +287,7 @@ export interface ArrowCommandCensusActualFindingSet {
 export interface ArrowCommandCensusBaselineFindingSet {
 	readonly deadCoveredArrowKeys: readonly string[];
 	readonly orphanMachines: readonly string[];
-	readonly totalDeclaredMachineArrows: number;
+	readonly totalInScopeTopologyArrows: number;
 	readonly unanalysedMachines: readonly string[];
 	readonly uncoveredArrowKeys: readonly string[];
 }
@@ -279,7 +302,7 @@ export interface ArrowCommandCensusBaselineComparison {
 	readonly deadCovered: ArrowCommandCensusBaselineComparisonItem;
 	readonly matches: boolean;
 	readonly orphanMachines: ArrowCommandCensusBaselineComparisonItem;
-	readonly totalDeclaredMachineArrows: ArrowCommandCensusBaselineComparisonItem;
+	readonly totalInScopeTopologyArrows: ArrowCommandCensusBaselineComparisonItem;
 	readonly unanalysedMachines: ArrowCommandCensusBaselineComparisonItem;
 	readonly uncoveredArrows: ArrowCommandCensusBaselineComparisonItem;
 }
@@ -288,7 +311,7 @@ export interface ArrowCommandCensusCoverage {
 	readonly baselineMatches: boolean;
 	readonly birthMachines: number;
 	readonly birthStates: number;
-	readonly coveredDeclaredMachineArrows: number;
+	readonly coveredInScopeTopologyArrows: number;
 	readonly deadCoveredArrows: number;
 	readonly declaredArrowOccurrences: number;
 	readonly declaredSites: number;
@@ -297,7 +320,7 @@ export interface ArrowCommandCensusCoverage {
 	readonly occupiableStates: number;
 	readonly orphanMachines: number;
 	readonly reconciles: boolean;
-	readonly totalDeclaredMachineArrows: number;
+	readonly totalInScopeTopologyArrows: number;
 	readonly unanalysedMachines: number;
 	readonly uncoveredArrows: number;
 }
@@ -306,18 +329,29 @@ export interface ArrowCommandCensusEpistemicState {
 	readonly capabilityCoverage: 'PARTIAL';
 	readonly conflictState: 'NOT_EVALUATED';
 	readonly executionHealth: 'SUCCEEDED' | 'PARTIAL';
-	readonly freshness: 'SUBJECT_BOUND';
-	readonly inferenceState: 'NONE';
-	readonly supportBasis: 'RETAINED_VERIFIER_EXECUTION';
+	readonly freshness: 'SUBJECT_AND_EXECUTOR_BOUND';
+	readonly inferenceState: 'MIXED_DECLARED_AND_TOPOLOGY_INFERRED';
+	readonly supportBasis: 'RETAINED_VERIFIER_MIXED_DECLARATION_AND_TOPOLOGY';
 }
 
 export type ArrowCommandCensusLimitationCode =
+	| 'BARE_IDENTIFIER_IDIOMS_ONLY'
 	| 'BASELINE_MATCH_NOT_CORRECTNESS_PROOF'
-	| 'BIRTH_DECLARATION_SCOPE_PARTIAL'
-	| 'COMMAND_DECLARATION_CENSUS_PARTIAL'
-	| 'EXECUTION_NOT_OBSERVED'
+	| 'BIRTH_DECLARATIONS_PARTIAL'
+	| 'DECLARED_NOT_RUNTIME_PERFORMABILITY'
+	| 'DIRECT_STATE_WRITES_NOT_OBSERVED'
+	| 'EXECUTES_SUBJECT_MODULE_INITIALIZERS'
+	| 'EXTERNAL_RUNTIME_SEPARATELY_BOUND'
+	| 'LINE_NUMBER_SITE_IDENTITY'
+	| 'NO_HANDLER_REGISTRY_JOIN'
 	| 'NO_GRAPH_RELATION_CONFORMANCE_CLAIM'
-	| 'RETAINED_VERIFIER_AUTHORITY_UNCHANGED';
+	| 'POPULATION_BUDGETS_ARE_POST_EXECUTION_ACCEPTANCE_BOUNDS'
+	| 'PROCESS_ISOLATION_NOT_SECURITY_SANDBOX'
+	| 'RETAINED_VERIFIER_AUTHORITY_UNCHANGED'
+	| 'SINGLE_FILE_FACTORY_INFERENCE_ONLY'
+	| 'SOURCE_MODE_ONLY'
+	| 'STRUCTURAL_VALIDATION_NOT_EXECUTOR_REPLAY'
+	| 'TOPOLOGY_INFERRED_SOURCE_STATES';
 
 export interface ArrowCommandCensusLimitation {
 	readonly code: ArrowCommandCensusLimitationCode;
@@ -331,19 +365,44 @@ export const ARROW_COMMAND_CENSUS_LIMITATIONS = [
 			'Agreement with the retained baseline proves only exact non-regression against that baseline.'
 	},
 	{
-		code: 'BIRTH_DECLARATION_SCOPE_PARTIAL',
+		code: 'BARE_IDENTIFIER_IDIOMS_ONLY',
+		reason:
+			'The retained AST walk recognizes advanceStatus, createObject, and fromStates only when expressed through its supported bare-identifier idioms.'
+	},
+	{
+		code: 'BIRTH_DECLARATIONS_PARTIAL',
 		reason:
 			'Dead-covered analysis is supported only for machines with retained-verifier-readable birth declarations; every other covered machine remains explicitly unanalysed.'
 	},
 	{
-		code: 'COMMAND_DECLARATION_CENSUS_PARTIAL',
+		code: 'DECLARED_NOT_RUNTIME_PERFORMABILITY',
 		reason:
-			'Only command idioms understood by the retained verifier contribute declared arrows; absent or unread idioms do not establish non-performability.'
+			'Declared command arrows are static declarations and do not prove that a registered command can successfully perform them at runtime.'
 	},
 	{
-		code: 'EXECUTION_NOT_OBSERVED',
+		code: 'DIRECT_STATE_WRITES_NOT_OBSERVED',
 		reason:
-			'Declared command arrows and derived occupancy are static declarations, not observations that a transition executed at runtime.'
+			'Direct or bespoke state writes outside retained-verifier-readable command idioms are not observed and can produce conservative uncovered findings.'
+	},
+	{
+		code: 'EXECUTES_SUBJECT_MODULE_INITIALIZERS',
+		reason:
+			'The isolated retained verifier imports subject packages to read exported declarations, so their module initializers execute in the isolated process.'
+	},
+	{
+		code: 'EXTERNAL_RUNTIME_SEPARATELY_BOUND',
+		reason:
+			'The Bun executable and installed TypeScript, Zod, and ULID module trees are external to the FrozenSubject artifact set and are therefore recorded with independent exact identities.'
+	},
+	{
+		code: 'LINE_NUMBER_SITE_IDENTITY',
+		reason:
+			'Retained declaration sites use source line locators; line-only edits may change site and declared-arrow identities without changing arrow meaning.'
+	},
+	{
+		code: 'NO_HANDLER_REGISTRY_JOIN',
+		reason:
+			'The retained verifier does not join extracted transition declarations to an independently enumerated command-handler registry.'
 	},
 	{
 		code: 'NO_GRAPH_RELATION_CONFORMANCE_CLAIM',
@@ -351,9 +410,39 @@ export const ARROW_COMMAND_CENSUS_LIMITATIONS = [
 			'The adapter does not publish registered graph relations or claim full JAN-CSAA-007 or JAN-CSAA-008 conformance.'
 	},
 	{
+		code: 'POPULATION_BUDGETS_ARE_POST_EXECUTION_ACCEPTANCE_BOUNDS',
+		reason:
+			'Only process duration and transport byte budgets constrain the retained verifier while it executes; population, depth, and character budgets reject its completed output and do not prevent allocations inside retained code.'
+	},
+	{
+		code: 'PROCESS_ISOLATION_NOT_SECURITY_SANDBOX',
+		reason:
+			'The retained verifier runs in a separate process and a temporary byte capsule, but this is not an operating-system security sandbox for hostile subject module initializers.'
+	},
+	{
 		code: 'RETAINED_VERIFIER_AUTHORITY_UNCHANGED',
 		reason:
 			'The adapter wraps retained verification evidence and does not replace, weaken, retire, or assume its delegated oracle authority.'
+	},
+	{
+		code: 'SINGLE_FILE_FACTORY_INFERENCE_ONLY',
+		reason:
+			'Factory parameter ranges are inferred only from call sites or literal parameter types within the same parsed handler source file.'
+	},
+	{
+		code: 'SOURCE_MODE_ONLY',
+		reason:
+			'The wrapped census is bound to the repository source-mode package population and does not establish built-output or deployed-runtime equivalence.'
+	},
+	{
+		code: 'STRUCTURAL_VALIDATION_NOT_EXECUTOR_REPLAY',
+		reason:
+			'Observation validation reproduces canonical structure, identities, populations, and optional FrozenSubject binding; it does not rerun the retained verifier or independently prove the recorded external executor environment.'
+	},
+	{
+		code: 'TOPOLOGY_INFERRED_SOURCE_STATES',
+		reason:
+			'When a supported declaration omits fromStates, the retained verifier derives source states from declared state-machine topology for the selected target.'
 	}
 ] as const satisfies readonly ArrowCommandCensusLimitation[];
 
@@ -374,6 +463,7 @@ export interface ArrowCommandCensusObservation {
 	readonly executor: ArrowCommandCensusExecutorIdentity;
 	readonly fullJanCsaa007Conformance: typeof ARROW_COMMAND_CENSUS_FULL_JAN_CSAA_007_CONFORMANCE;
 	readonly fullJanCsaa008Conformance: typeof ARROW_COMMAND_CENSUS_FULL_JAN_CSAA_008_CONFORMANCE;
+	readonly gateEffect: typeof ARROW_COMMAND_CENSUS_GATE_EFFECT;
 	readonly id: ArrowCommandCensusObservationId;
 	readonly integrationStrategy: typeof ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY;
 	readonly limitations: typeof ARROW_COMMAND_CENSUS_LIMITATIONS;
@@ -381,7 +471,10 @@ export interface ArrowCommandCensusObservation {
 	readonly occupiable: readonly ArrowCommandCensusStateMapEntry[];
 	readonly operationVersion: typeof ARROW_COMMAND_CENSUS_OPERATION_VERSION;
 	readonly oracleChange: typeof ARROW_COMMAND_CENSUS_ORACLE_CHANGE;
+	/** Canonical retained-verifier evidence; rawOutput identifies its canonical JSON bytes. */
+	readonly rawEvidence: ArrowCommandCensusRawOutput;
 	readonly rawOutput: ArrowCommandCensusRawOutputIdentity;
+	readonly replacementEquivalence: typeof ARROW_COMMAND_CENSUS_REPLACEMENT_EQUIVALENCE;
 	readonly schemaVersion: typeof ARROW_COMMAND_CENSUS_OBSERVATION_SCHEMA_VERSION;
 	readonly subjectId: string;
 	readonly verifierAuthority: typeof ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY;

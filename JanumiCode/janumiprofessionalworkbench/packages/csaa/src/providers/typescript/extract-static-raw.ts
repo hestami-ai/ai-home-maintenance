@@ -14,6 +14,7 @@ import {
 	isUnicodeScalarString
 } from '../../semantic/canonical.js';
 import { validateProgramRecipePolicy } from '../../semantic/program-recipe-policy.js';
+import type { SemanticOperationClock } from '../../semantic/operation-budget-ledger.js';
 import type { StaticSemanticOperationBudgetProviderBinding } from '../../semantic/operation-budget-provider-binding.js';
 import type {
 	RawSemanticAssignment,
@@ -274,6 +275,7 @@ export interface ExtractStaticRawInput {
 	readonly budgetLedger?: StaticRawExtractionBudgetLedger;
 	readonly budgets: SemanticBudgets;
 	readonly checker: ts.TypeChecker;
+	readonly clock?: SemanticOperationClock;
 	readonly deadlineMs: number;
 	readonly diagnosticFamilies: readonly StaticRawDiagnosticFamilyInput[];
 	readonly evidenceState?: RawCompilerSourceBinding['verificationState'];
@@ -321,21 +323,39 @@ function fail(
 }
 
 function checkExtractionDeadline(
-	input: Pick<ExtractStaticRawInput, 'assertWithinDeadline' | 'deadlineMs'>
+	input: Pick<ExtractStaticRawInput, 'assertWithinDeadline' | 'clock' | 'deadlineMs'>
 ): void {
+	if (input.assertWithinDeadline !== undefined) {
+		try {
+			input.assertWithinDeadline();
+		} catch (error) {
+			if (error instanceof StaticRawExtractionError) throw error;
+			const detail =
+				error instanceof Error &&
+				isUnicodeScalarString(error.message) &&
+				error.message.length <= 1_000
+					? `: ${error.message}`
+					: '';
+			fail('DEADLINE_EXCEEDED', `Extraction deadline check failed closed${detail}.`);
+		}
+		if (!Number.isFinite(input.deadlineMs))
+			fail('DEADLINE_EXCEEDED', 'Static semantic extraction deadline is invalid.');
+	}
+	let now: unknown;
 	try {
-		input.assertWithinDeadline?.();
+		now = (input.clock ?? Date.now)();
 	} catch (error) {
-		if (error instanceof StaticRawExtractionError) throw error;
 		const detail =
 			error instanceof Error &&
 			isUnicodeScalarString(error.message) &&
 			error.message.length <= 1_000
 				? `: ${error.message}`
 				: '';
-		fail('DEADLINE_EXCEEDED', `Extraction deadline check failed closed${detail}.`);
+		fail('DEADLINE_EXCEEDED', `Extraction deadline clock failed closed${detail}.`);
 	}
-	if (!Number.isFinite(input.deadlineMs) || Date.now() > input.deadlineMs)
+	if (!Number.isFinite(input.deadlineMs) || !Number.isSafeInteger(now) || (now as number) < 0)
+		fail('DEADLINE_EXCEEDED', 'Static semantic extraction deadline clock is invalid.');
+	if ((now as number) > input.deadlineMs)
 		fail('DEADLINE_EXCEEDED', 'Static semantic extraction exceeded its absolute deadline.');
 }
 
@@ -346,7 +366,7 @@ class ExtractionGuard {
 	constructor(
 		private readonly input: Pick<
 			ExtractStaticRawInput,
-			'assertWithinDeadline' | 'budgetLedger' | 'budgets' | 'deadlineMs' | 'projectKey'
+			'assertWithinDeadline' | 'budgetLedger' | 'budgets' | 'clock' | 'deadlineMs' | 'projectKey'
 		>
 	) {
 		if (input.budgetLedger === undefined) {

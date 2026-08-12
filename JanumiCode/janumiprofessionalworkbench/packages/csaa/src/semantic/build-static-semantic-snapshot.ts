@@ -61,7 +61,10 @@ import {
 	normalizeStaticSemanticSnapshot,
 	SemanticNormalizationError
 } from './normalize-semantic-snapshot.js';
-import { SemanticOperationBudgetError } from './operation-budget-ledger.js';
+import {
+	SemanticOperationBudgetError,
+	type SemanticOperationClock
+} from './operation-budget-ledger.js';
 import type {
 	RawCompilerSourceBinding,
 	RawStaticSemanticProjectExtraction
@@ -72,6 +75,7 @@ import {
 	type StaticSemanticOperationBudgetProviderBinding,
 	type StaticSemanticOperationBudgetSession
 } from './static-semantic-operation-budget-session.js';
+import { createMonotonicOperationClock } from './monotonic-operation-clock.js';
 import {
 	validateStaticSemanticSnapshotWithBudgetEvidence,
 	type SemanticValidationOptions
@@ -483,8 +487,8 @@ function materializeSubjectOption(value: unknown): FrozenSubject {
 	return record.subject;
 }
 
-function assertDeadline(deadlineMs: number): void {
-	if (!Number.isSafeInteger(deadlineMs) || Date.now() > deadlineMs)
+function assertDeadline(deadlineMs: number, clock: SemanticOperationClock): void {
+	if (!Number.isSafeInteger(deadlineMs) || clock() > deadlineMs)
 		throw new StaticSemanticBuildFailure('unavailable', [
 			diagnostic(
 				'SEMANTIC_BUDGET_EXCEEDED',
@@ -497,11 +501,12 @@ function assertDeadline(deadlineMs: number): void {
 function assertCurrent(
 	subject: FrozenSubject,
 	request: BuildStaticSemanticSnapshotRequest,
-	deadlineMs: number
+	deadlineMs: number,
+	clock: SemanticOperationClock
 ): void {
-	assertDeadline(deadlineMs);
+	assertDeadline(deadlineMs, clock);
 	const freshness = verifyFrozenSubject(subject, { rootLocator: request.rootLocator });
-	assertDeadline(deadlineMs);
+	assertDeadline(deadlineMs, clock);
 	if (freshness.state === 'CURRENT') return;
 	const mapped = freshness.diagnostics.map((entry): SemanticBuildDiagnostic => ({
 		code: entry.code,
@@ -961,6 +966,7 @@ function extractProjectResult<T>(
 	includeTypes: boolean,
 	budgetLedger: ReturnType<typeof createStaticRawExtractionBudgetLedger>,
 	deadlineMs: number,
+	clock: SemanticOperationClock,
 	assertWithinDeadline: () => void,
 	evidenceForProject: (projectKey: string) => ProjectSourceEvidence,
 	projectResult: (raw: RawStaticSemanticProjectExtraction) => T
@@ -978,6 +984,7 @@ function extractProjectResult<T>(
 		budgetLedger,
 		budgets,
 		checker: constructed.checker,
+		clock,
 		deadlineMs,
 		diagnosticFamilies: constructed.diagnosticFamilies,
 		evidenceState: evidence.verificationState,
@@ -1016,6 +1023,7 @@ function extractPass<T>(
 	budgetPhase: 'CAPTURE' | 'EXTRACT',
 	providerBinding: StaticSemanticOperationBudgetProviderBinding,
 	deadlineMs: number,
+	clock: SemanticOperationClock,
 	assertWithinDeadline: () => void,
 	evidenceForProject: (projectKey: string) => ProjectSourceEvidence,
 	projectResult: (raw: RawStaticSemanticProjectExtraction) => T
@@ -1034,6 +1042,7 @@ function extractPass<T>(
 				includeTypes,
 				budgetLedger,
 				deadlineMs,
+				clock,
 				assertWithinDeadline,
 				evidenceForProject,
 				projectResult
@@ -1215,14 +1224,15 @@ export function buildStaticSemanticSnapshot(
 	requestValue: unknown,
 	optionsValue: { readonly subject: FrozenSubject }
 ): StaticSemanticSnapshotOutcome {
-	const startedAtMs = Date.now();
+	const operationClock = createMonotonicOperationClock();
+	const startedAtMs = operationClock.startedAtMs;
 	let request: BuildStaticSemanticSnapshotRequest | undefined;
 	let phase: SemanticBuildDiagnostic['phase'] = 'REQUEST';
 	try {
 		request = materializeRequest(requestValue);
 		const subject = materializeSubjectOption(optionsValue);
 		const operationBudgetSession: StaticSemanticOperationBudgetSession =
-			createStaticSemanticOperationBudgetSession(request.budgets, startedAtMs);
+			createStaticSemanticOperationBudgetSession(request.budgets, startedAtMs, operationClock.now);
 		const operationBudgetProviderBinding = operationBudgetSession.providerBinding();
 		const deadlineMs = startedAtMs + request.budgets.maxDurationMs;
 		if (!Number.isSafeInteger(startedAtMs) || !Number.isSafeInteger(deadlineMs))
@@ -1235,7 +1245,7 @@ export function buildStaticSemanticSnapshot(
 			]);
 		const assertWithinDeadline = (): void => {
 			operationBudgetSession.checkpoint(phase);
-			assertDeadline(deadlineMs);
+			assertDeadline(deadlineMs, operationClock.now);
 		};
 		assertWithinDeadline();
 		if (ts.version !== TYPESCRIPT_PROVIDER_VERSION)
@@ -1256,7 +1266,7 @@ export function buildStaticSemanticSnapshot(
 			]);
 
 		phase = 'FRESHNESS';
-		assertCurrent(subject, request, deadlineMs);
+		assertCurrent(subject, request, deadlineMs, operationClock.now);
 		phase = 'MATERIALIZE';
 		if (subject.projects.length > request.budgets.maxProjects)
 			throw new StaticSemanticBuildFailure('unavailable', [
@@ -1284,7 +1294,8 @@ export function buildStaticSemanticSnapshot(
 			subject,
 			request.rootLocator,
 			request.budgets,
-			startedAtMs
+			startedAtMs,
+			operationClock.now
 		);
 		phase = 'PROGRAM';
 		const capturePass = extractPass(
@@ -1297,6 +1308,7 @@ export function buildStaticSemanticSnapshot(
 			'CAPTURE',
 			operationBudgetProviderBinding,
 			deadlineMs,
+			operationClock.now,
 			assertWithinDeadline,
 			(projectKey) => ({
 				...captureEnvironment.currentProjectEvidence(projectKey),
@@ -1327,7 +1339,7 @@ export function buildStaticSemanticSnapshot(
 		const verifiedCapture = recheckCompilerInputJournal(frozenCapture);
 		assertWithinDeadline();
 		phase = 'FRESHNESS';
-		assertCurrent(subject, request, deadlineMs);
+		assertCurrent(subject, request, deadlineMs, operationClock.now);
 
 		phase = 'RECHECK';
 		const replayEnvironment: ReplayCompilerEnvironment = createReplayCompilerEnvironment(
@@ -1345,6 +1357,7 @@ export function buildStaticSemanticSnapshot(
 			'EXTRACT',
 			operationBudgetProviderBinding,
 			deadlineMs,
+			operationClock.now,
 			assertWithinDeadline,
 			(projectKey) => {
 				const attribution = verifiedCapture.projectAttributions.find(
@@ -1377,7 +1390,7 @@ export function buildStaticSemanticSnapshot(
 		operationBudgetSession.acceptRawExtractionEvidence('EXTRACT', replayPass.budgetEvidence);
 		assertWithinDeadline();
 		phase = 'FRESHNESS';
-		assertCurrent(subject, request, deadlineMs);
+		assertCurrent(subject, request, deadlineMs, operationClock.now);
 		phase = 'VALIDATE';
 		const replayProjectionDigests = replayRaw.map(rawProjectionDigest);
 		if (
@@ -1444,7 +1457,7 @@ export function buildStaticSemanticSnapshot(
 		operationBudgetSession.acceptValidationEvidence(finalSnapshot, validationEvidence.evidence);
 		assertWithinDeadline();
 		phase = 'FRESHNESS';
-		assertCurrent(subject, request, deadlineMs);
+		assertCurrent(subject, request, deadlineMs, operationClock.now);
 		assertWithinDeadline();
 		const diagnostics = finalSnapshot.health === 'PARTIAL' ? partialDiagnostics(finalSnapshot) : [];
 		assertWithinDeadline();

@@ -5,6 +5,7 @@ import type { SemanticBudgets } from '../../contracts/semantic.js';
 import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
 import { sha256 } from '../../inventory/canonical.js';
 import { canonicalSemanticJson } from '../../semantic/canonical.js';
+import type { SemanticOperationClock } from '../../semantic/operation-budget-ledger.js';
 import { validateProgramRecipePolicy } from '../../semantic/program-recipe-policy.js';
 import type { StaticSemanticOperationBudgetProviderBinding } from '../../semantic/operation-budget-provider-binding.js';
 import {
@@ -532,13 +533,14 @@ export function createCapturingCompilerEnvironment(
 	subject: FrozenSubject,
 	repositoryRoot: string,
 	budgetsValue: SemanticBudgets,
-	startedAtMs = Date.now()
+	startedAtMs = Date.now(),
+	clock: SemanticOperationClock = Date.now
 ): CapturingCompilerEnvironment {
 	const budgets = normalizeSemanticBudgets(budgetsValue);
 	const caseSensitive = ts.sys.useCaseSensitiveFileNames;
 	const paths = new FrozenCompilerPathResolver(subject, repositoryRoot, caseSensitive);
 	const reader = new LiveCompilerInputReader(subject, paths, caseSensitive);
-	const journal = new CompilerInputJournal(reader, budgets, startedAtMs);
+	const journal = new CompilerInputJournal(reader, budgets, startedAtMs, clock);
 	const projectKeys = new Set<string>();
 	let finalized = false;
 	let poisoned = false;
@@ -769,13 +771,15 @@ export function createCapturingCompilerHost(
 	recipe: ProgramRecipe,
 	materialized: MaterializedProgramRecipe,
 	budgets: SemanticBudgets,
-	startedAtMs = Date.now()
+	startedAtMs = Date.now(),
+	clock: SemanticOperationClock = Date.now
 ): CapturingCompilerHostSession {
 	const environment = createCapturingCompilerEnvironment(
 		subject,
 		repositoryRoot,
 		budgets,
-		startedAtMs
+		startedAtMs,
+		clock
 	);
 	return Object.freeze({
 		environment,

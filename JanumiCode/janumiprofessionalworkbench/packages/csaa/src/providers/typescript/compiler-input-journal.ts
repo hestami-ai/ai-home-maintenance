@@ -24,7 +24,10 @@ import {
 	compilerInputResultDigest,
 	semanticContextInputId
 } from '../../semantic/ids.js';
-import type { SemanticOperationPopulationClaimInput } from '../../semantic/operation-budget-ledger.js';
+import type {
+	SemanticOperationClock,
+	SemanticOperationPopulationClaimInput
+} from '../../semantic/operation-budget-ledger.js';
 import { validateProgramRecipePolicy } from '../../semantic/program-recipe-policy.js';
 import type { StaticSemanticOperationBudgetProviderBinding } from '../../semantic/operation-budget-provider-binding.js';
 import { readFrozenSubjectArtifact } from '../../subject/frozen-store.js';
@@ -143,6 +146,7 @@ export class CompilerInputCaptureError extends Error {
 
 interface CompilerInputReadLimits {
 	readonly allowPresentRead: boolean;
+	readonly clock?: SemanticOperationClock;
 	readonly deadlineMs: number;
 	readonly maxDirectoryEntries: number;
 	readonly maxPathCharacters: number;
@@ -183,6 +187,7 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_QUERY_CHARACTERS = 1_000_000;
 const DEFAULT_READ_LIMITS: CompilerInputReadLimits = {
 	allowPresentRead: true,
+	clock: Date.now,
 	deadlineMs: Number.MAX_SAFE_INTEGER,
 	maxDirectoryEntries: 100_000,
 	maxPathCharacters: MAX_QUERY_CHARACTERS,
@@ -240,7 +245,8 @@ function inertDenseArray(
 	field: string,
 	maxLength: number,
 	errorCode: CompilerInputCaptureError['code'],
-	deadlineMs = Number.MAX_SAFE_INTEGER
+	deadlineMs = Number.MAX_SAFE_INTEGER,
+	clock: SemanticOperationClock = Date.now
 ): readonly unknown[] {
 	try {
 		if (value === null || typeof value !== 'object' || isProxy(value) || !Array.isArray(value))
@@ -272,7 +278,7 @@ function inertDenseArray(
 			fail(errorCode, `${field} must not contain holes, symbols, or expando properties.`);
 		const result: unknown[] = [];
 		for (let index = 0; index < length; index += 1) {
-			checkDeadline({ deadlineMs });
+			checkDeadline({ clock, deadlineMs });
 			const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
 			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
 				fail(errorCode, `${field}[${index}] must be an enumerable data property.`);
@@ -299,7 +305,8 @@ function inertStringArray(
 	maxCharacters = MAX_QUERY_CHARACTERS,
 	maxLength = Number.MAX_SAFE_INTEGER,
 	deadlineMs = Number.MAX_SAFE_INTEGER,
-	work?: QueryParameterWork
+	work?: QueryParameterWork,
+	clock: SemanticOperationClock = Date.now
 ): readonly string[] {
 	try {
 		if (value === null || typeof value !== 'object' || isProxy(value) || !Array.isArray(value))
@@ -332,7 +339,7 @@ function inertStringArray(
 			fail(errorCode, `${field} must not contain holes, symbols, or expando properties.`);
 		const result: string[] = [];
 		for (let index = 0; index < length; index += 1) {
-			checkDeadline({ deadlineMs });
+			checkDeadline({ clock, deadlineMs });
 			const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
 			if (
 				descriptor === undefined ||
@@ -374,7 +381,8 @@ function canonicalStringSet(
 	maxLength: number,
 	deadlineMs: number,
 	errorCode: CompilerInputCaptureError['code'],
-	work?: QueryParameterWork
+	work?: QueryParameterWork,
+	clock: SemanticOperationClock = Date.now
 ): readonly string[] {
 	const result = inertStringArray(
 		value,
@@ -383,10 +391,11 @@ function canonicalStringSet(
 		maxCharacters,
 		maxLength,
 		deadlineMs,
-		work
+		work,
+		clock
 	);
 	for (let index = 1; index < result.length; index += 1) {
-		checkDeadline({ deadlineMs });
+		checkDeadline({ clock, deadlineMs });
 		if (result[index - 1]! >= result[index]!)
 			fail(errorCode, `${field} must be sorted and duplicate-free.`);
 	}
@@ -444,7 +453,7 @@ function normalizeCompilerInputQuery(
 	paths: FrozenCompilerPathResolver,
 	limits: Pick<
 		CompilerInputReadLimits,
-		'deadlineMs' | 'maxDirectoryEntries' | 'maxPathCharacters' | 'maxQueryMetadataBytes'
+		'clock' | 'deadlineMs' | 'maxDirectoryEntries' | 'maxPathCharacters' | 'maxQueryMetadataBytes'
 	> = DEFAULT_READ_LIMITS,
 	errorCode: CompilerInputCaptureError['code'] = 'INVALID_QUERY'
 ): CompilerInputQuery {
@@ -503,7 +512,8 @@ function normalizeCompilerInputQuery(
 				limits.maxDirectoryEntries,
 				limits.deadlineMs,
 				errorCode,
-				work
+				work,
+				limits.clock
 			);
 			const extensions = canonicalStringSet(
 				record.extensions,
@@ -512,7 +522,8 @@ function normalizeCompilerInputQuery(
 				limits.maxDirectoryEntries,
 				limits.deadlineMs,
 				errorCode,
-				work
+				work,
+				limits.clock
 			);
 			const includes = canonicalStringSet(
 				record.includes,
@@ -521,7 +532,8 @@ function normalizeCompilerInputQuery(
 				limits.maxDirectoryEntries,
 				limits.deadlineMs,
 				errorCode,
-				work
+				work,
+				limits.clock
 			);
 			const query = Object.freeze({
 				depth: record.depth as number | null,
@@ -661,8 +673,20 @@ function absent(error: unknown): boolean {
 	);
 }
 
-function checkDeadline(limits: Pick<CompilerInputReadLimits, 'deadlineMs'>): void {
-	if (Date.now() > limits.deadlineMs)
+function deadlineNow(clock: SemanticOperationClock): number {
+	let now: unknown;
+	try {
+		now = clock();
+	} catch {
+		return fail('BUDGET_EXCEEDED', 'Semantic extraction duration clock failed closed.');
+	}
+	if (!Number.isSafeInteger(now) || (now as number) < 0)
+		return fail('BUDGET_EXCEEDED', 'Semantic extraction duration clock is invalid.');
+	return now as number;
+}
+
+function checkDeadline(limits: Pick<CompilerInputReadLimits, 'clock' | 'deadlineMs'>): void {
+	if (deadlineNow(limits.clock ?? Date.now) > limits.deadlineMs)
 		fail('BUDGET_EXCEEDED', 'Semantic extraction duration exceeded its producing budget.');
 }
 
@@ -905,7 +929,7 @@ class TypeScriptDirectoryMatcher {
 	constructor(
 		query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>,
 		paths: FrozenCompilerPathResolver,
-		limits: Pick<CompilerInputReadLimits, 'deadlineMs'>
+		limits: Pick<CompilerInputReadLimits, 'clock' | 'deadlineMs'>
 	) {
 		const flags = paths.caseSensitive ? '' : 'i';
 		const build = (specs: readonly string[], usage: WildcardUsage): readonly string[] => {
@@ -1819,14 +1843,15 @@ export class CompilerInputJournal {
 	constructor(
 		private readonly reader: LiveCompilerInputReader,
 		budgetsValue: SemanticBudgets,
-		private readonly startedAtMs: number
+		private readonly startedAtMs: number,
+		private readonly clock: SemanticOperationClock = Date.now
 	) {
 		this.budgets = normalizeSemanticBudgets(budgetsValue);
 		this.deadlineMs = startedAtMs + this.budgets.maxDurationMs;
 		if (
 			!Number.isSafeInteger(startedAtMs) ||
 			startedAtMs < 0 ||
-			startedAtMs > Date.now() ||
+			startedAtMs > deadlineNow(clock) ||
 			!Number.isSafeInteger(this.deadlineMs)
 		)
 			fail('BUDGET_EXCEEDED', 'Semantic extraction operation start or deadline is invalid.');
@@ -1835,7 +1860,7 @@ export class CompilerInputJournal {
 	}
 
 	assertWithinDeadline(): void {
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 	}
 
 	registerProject(
@@ -1844,7 +1869,7 @@ export class CompilerInputJournal {
 		materialized: MaterializedProgramRecipe
 	): void {
 		if (this.finalized) fail('INVALID_CAPTURE', 'Compiler input capture is already finalized.');
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (this.registeredProjects >= this.budgets.maxProjects)
 			fail('BUDGET_EXCEEDED', 'Compiler input capture exceeded its project budget.');
 		if (typeof projectKey !== 'string' || projectKey.length === 0)
@@ -1860,13 +1885,13 @@ export class CompilerInputJournal {
 			this.budgets.maxPathCharacters,
 			this.reader.paths.repositoryRoot
 		);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (projectKey !== identity.projectKey)
 			fail(
 				'INVALID_QUERY',
 				'Compiler project attribution key must equal the authoritative ProgramRecipe config path.'
 			);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		this.attributions.registerProject(
 			projectKey,
 			identity.projectResolutionDigest,
@@ -1892,7 +1917,7 @@ export class CompilerInputJournal {
 		if (this.finalized) fail('INVALID_CAPTURE', 'Compiler input capture is already finalized.');
 		if (this.poisoned)
 			fail('INVALID_CAPTURE', 'Compiler input capture is poisoned by an earlier failed query.');
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		const attribution = this.attributions.entry(projectKey, this.entriesByQuery);
 		const ids = new Set(attribution.contextInputIds);
 		const observations = [...this.entriesByQuery.values()]
@@ -1905,7 +1930,7 @@ export class CompilerInputJournal {
 				'INVALID_CAPTURE',
 				`Captured compiler project evidence does not resolve every context input for ${projectKey}.`
 			);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		return Object.freeze({ attribution, observations: Object.freeze(observations) });
 	}
 
@@ -1913,10 +1938,11 @@ export class CompilerInputJournal {
 		if (this.finalized) fail('INVALID_CAPTURE', 'Compiler input capture is already finalized.');
 		if (this.poisoned)
 			fail('INVALID_CAPTURE', 'Compiler input capture is poisoned by an earlier failed query.');
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (projectKey.length === 0 || projectKey.length > this.budgets.maxPathCharacters)
 			fail('INVALID_QUERY', 'Compiler project attribution key is invalid.');
 		const query = normalizeCompilerInputQuery(queryValue, this.reader.paths, {
+			clock: this.clock,
 			deadlineMs: this.deadlineMs,
 			maxDirectoryEntries: this.budgets.maxDirectoryEntries,
 			maxPathCharacters: this.budgets.maxPathCharacters,
@@ -1949,7 +1975,7 @@ export class CompilerInputJournal {
 			this.queryInvocations += 1;
 			this.attributions.record(projectKey, query);
 			const result = cloneCaptured(updated);
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			return result;
 		}
 		if (this.entriesByQuery.size >= this.budgets.maxCompilerQueries)
@@ -1959,6 +1985,7 @@ export class CompilerInputJournal {
 			this.reader.paths.frozenArtifact(query.logicalPath) !== undefined;
 		const captured = this.reader.observe(query, {
 			allowPresentRead: frozenRead || this.contextFiles < this.budgets.maxContextFiles,
+			clock: this.clock,
 			deadlineMs: this.deadlineMs,
 			maxDirectoryEntries: this.budgets.maxDirectoryEntries - this.directoryEntries,
 			maxPathCharacters: this.budgets.maxPathCharacters,
@@ -1970,7 +1997,7 @@ export class CompilerInputJournal {
 				this.budgets.maxContextBytes - this.contextBytes
 			)
 		});
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (
 			('resultEntries' in captured.observation &&
 				captured.observation.resultEntries.some(
@@ -2028,7 +2055,7 @@ export class CompilerInputJournal {
 		this.queryInvocations += 1;
 		this.attributions.record(projectKey, query);
 		const result = cloneCaptured(stored);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		return result;
 	}
 
@@ -2057,18 +2084,19 @@ export class CompilerInputJournal {
 		if (this.poisoned)
 			fail('INVALID_CAPTURE', 'Compiler input capture is poisoned by an earlier failed query.');
 		this.finalized = true;
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		const entries = this.entries();
-		checkDeadline({ deadlineMs: this.deadlineMs });
-		validateJournalEntries(entries, this.reader.paths, this.budgets, this.deadlineMs);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
+		validateJournalEntries(entries, this.reader.paths, this.budgets, this.deadlineMs, this.clock);
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		const observations = this.observations();
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		const projectAttributions = this.attributions.entries(this.entriesByQuery);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		const capture = createFrozenCompilerCapture({
 			budgets: this.budgets,
 			closureDigest: compilerInputClosureDigest(observations),
+			clock: this.clock,
 			entries,
 			observations,
 			paths: this.reader.paths,
@@ -2077,7 +2105,7 @@ export class CompilerInputJournal {
 			startedAtMs: this.startedAtMs,
 			subject: this.reader.paths.subject
 		});
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		return capture;
 	}
 }
@@ -2137,7 +2165,8 @@ function validateCapturedEntry(
 	value: unknown,
 	paths: FrozenCompilerPathResolver,
 	budgets: SemanticBudgets,
-	deadlineMs: number
+	deadlineMs: number,
+	clock: SemanticOperationClock = Date.now
 ): CapturedCompilerInput {
 	try {
 		const entry = inertRecord(value, 'CapturedCompilerInput', 'INVALID_CAPTURE');
@@ -2151,6 +2180,7 @@ function validateCapturedEntry(
 			entry.query,
 			paths,
 			{
+				clock,
 				deadlineMs,
 				maxDirectoryEntries: budgets.maxDirectoryEntries,
 				maxPathCharacters: budgets.maxPathCharacters,
@@ -2222,7 +2252,9 @@ function validateCapturedEntry(
 				'INVALID_CAPTURE',
 				budgets.maxPathCharacters,
 				budgets.maxDirectoryEntries,
-				deadlineMs
+				deadlineMs,
+				undefined,
+				clock
 			);
 			if (
 				entries.some(
@@ -2359,13 +2391,16 @@ function validateJournalEntries(
 	entriesValue: unknown,
 	paths: FrozenCompilerPathResolver,
 	budgets: SemanticBudgets,
-	deadlineMs: number
+	deadlineMs: number,
+	clock: SemanticOperationClock = Date.now
 ): ValidatedJournal {
 	const values = inertDenseArray(
 		entriesValue,
 		'CapturedCompilerInput[]',
 		budgets.maxCompilerQueries,
-		'INVALID_CAPTURE'
+		'INVALID_CAPTURE',
+		deadlineMs,
+		clock
 	);
 	const entries: CapturedCompilerInput[] = [];
 	const queryKeys = new Set<string>();
@@ -2376,8 +2411,8 @@ function validateJournalEntries(
 	let invocationCount = 0;
 	let scannedEntries = 0;
 	for (const value of values) {
-		checkDeadline({ deadlineMs });
-		const entry = validateCapturedEntry(value, paths, budgets, deadlineMs);
+		checkDeadline({ clock, deadlineMs });
+		const entry = validateCapturedEntry(value, paths, budgets, deadlineMs, clock);
 		const key = compilerInputQueryKey(entry.query);
 		if (queryKeys.has(key))
 			fail(
@@ -2404,7 +2439,7 @@ function validateJournalEntries(
 			liveReads.set(entry.observation.logicalPath, entry.observation);
 		}
 		entries.push(entry);
-		checkDeadline({ deadlineMs });
+		checkDeadline({ clock, deadlineMs });
 	}
 	if (liveReads.size > budgets.maxContextFiles)
 		fail('BUDGET_EXCEEDED', 'Compiler input journal exceeds its live-context file budget.');
@@ -2425,13 +2460,14 @@ function validateJournalEntries(
 			'BUDGET_EXCEEDED',
 			'Compiler input journal exceeds its exact emitted metadata-byte budget.'
 		);
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock, deadlineMs });
 	return { entries: Object.freeze(entries) };
 }
 
 interface CompilerCaptureState {
 	readonly budgets: SemanticBudgets;
 	readonly closureDigest: string;
+	readonly clock: SemanticOperationClock;
 	readonly entries: readonly CapturedCompilerInput[];
 	readonly observations: readonly CompilerInputObservation[];
 	readonly paths: FrozenCompilerPathResolver;
@@ -2703,8 +2739,14 @@ function validateFinalizedState(
 	state: CompilerCaptureState,
 	deadlineMs: number
 ): readonly CapturedCompilerInput[] {
-	const { entries } = validateJournalEntries(state.entries, state.paths, state.budgets, deadlineMs);
-	checkDeadline({ deadlineMs });
+	const { entries } = validateJournalEntries(
+		state.entries,
+		state.paths,
+		state.budgets,
+		deadlineMs,
+		state.clock
+	);
+	checkDeadline({ clock: state.clock, deadlineMs });
 	const observations = entries
 		.map((entry) => entry.observation)
 		.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
@@ -2722,7 +2764,7 @@ function validateFinalizedState(
 	const projectKeys = new Set<string>();
 	const totals = new Map<string, number>();
 	for (const attribution of state.projectAttributions) {
-		checkDeadline({ deadlineMs });
+		checkDeadline({ clock: state.clock, deadlineMs });
 		if (
 			projectKeys.has(attribution.projectKey) ||
 			!SHA256.test(attribution.materializedRecipeDigest) ||
@@ -2733,7 +2775,7 @@ function validateFinalizedState(
 		const queryKeys = new Set<string>();
 		const expectedIds = new Set<SemanticContextInputId>();
 		for (const record of attribution.queryInvocations) {
-			checkDeadline({ deadlineMs });
+			checkDeadline({ clock: state.clock, deadlineMs });
 			const key = compilerInputQueryKey(record.query);
 			const entry = entriesByQuery.get(key);
 			if (
@@ -2763,7 +2805,7 @@ function validateFinalizedState(
 				'INVALID_CAPTURE',
 				'Finalized compiler project attribution does not reconcile global query multiplicity.'
 			);
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	return entries;
 }
 
@@ -2786,22 +2828,23 @@ export function recheckCompilerInputJournal(
 	const deadlineMs = state.startedAtMs + state.budgets.maxDurationMs;
 	if (!Number.isSafeInteger(state.startedAtMs) || !Number.isSafeInteger(deadlineMs))
 		fail('BUDGET_EXCEEDED', 'Compiler input recheck deadline is invalid.');
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	const entries = validateFinalizedState(state, deadlineMs);
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	assertAliasTopology(state);
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	let directoryEntries = 0;
 	let contextBytes = 0;
 	let contextFiles = 0;
 	for (const expected of entries) {
-		checkDeadline({ deadlineMs });
+		checkDeadline({ clock: state.clock, deadlineMs });
 		const frozenRead =
 			expected.observation.operation === 'READ_FILE' &&
 			expected.observation.result === 'PRESENT' &&
 			expected.observation.byteBudgetClass === 'FROZEN_SUBJECT';
 		const actualOne = state.reader.observe(expected.query, {
 			allowPresentRead: frozenRead || contextFiles < state.budgets.maxContextFiles,
+			clock: state.clock,
 			deadlineMs,
 			maxDirectoryEntries: state.budgets.maxDirectoryEntries - directoryEntries,
 			maxPathCharacters: state.budgets.maxPathCharacters,
@@ -2846,13 +2889,13 @@ export function recheckCompilerInputJournal(
 				`Compiler input changed between capture and replay: ${expected.observation.logicalPath}.`
 			);
 		}
-		checkDeadline({ deadlineMs });
+		checkDeadline({ clock: state.clock, deadlineMs });
 	}
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	assertAliasTopology(state);
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	const capture = createVerifiedCompilerCapture(state);
-	checkDeadline({ deadlineMs });
+	checkDeadline({ clock: state.clock, deadlineMs });
 	return capture;
 }
 
@@ -2862,6 +2905,7 @@ export class ReplayCompilerInputJournal {
 	private readonly consumedByQuery = new Map<string, number>();
 	private readonly entriesByQuery = new Map<string, CapturedCompilerInput>();
 	private readonly budgets: SemanticBudgets;
+	private readonly clock: SemanticOperationClock;
 	private readonly deadlineMs: number;
 	private finalized = false;
 	private poisoned = false;
@@ -2875,20 +2919,21 @@ export class ReplayCompilerInputJournal {
 		if (state.subject !== subject)
 			fail('INVALID_CAPTURE', 'Replay requires the exact FrozenSubject bound by verified capture.');
 		this.budgets = state.budgets;
+		this.clock = state.clock;
 		this.captureState = state;
 		this.paths = state.paths;
 		this.expectedAttributions = state.projectAttributions;
 		this.deadlineMs = state.startedAtMs + this.budgets.maxDurationMs;
 		if (!Number.isSafeInteger(state.startedAtMs) || !Number.isSafeInteger(this.deadlineMs))
 			fail('BUDGET_EXCEEDED', 'Replay deadline is invalid.');
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		const entries = validateFinalizedState(state, this.deadlineMs);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		for (const entry of entries) {
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			this.entriesByQuery.set(compilerInputQueryKey(entry.query), entry);
 		}
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 	}
 
 	get maxProjects(): number {
@@ -2904,7 +2949,7 @@ export class ReplayCompilerInputJournal {
 	}
 
 	assertWithinDeadline(): void {
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 	}
 
 	toRecordedAbsolute(logicalPath: string): string {
@@ -2925,7 +2970,7 @@ export class ReplayCompilerInputJournal {
 		materialized: MaterializedProgramRecipe
 	): void {
 		if (this.finalized) fail('INVALID_CAPTURE', 'Compiler input replay is already finalized.');
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (this.registeredProjects >= this.budgets.maxProjects)
 			fail('BUDGET_EXCEEDED', 'Compiler input replay exceeded its project budget.');
 		if (typeof projectKey !== 'string' || projectKey.length === 0)
@@ -2936,7 +2981,7 @@ export class ReplayCompilerInputJournal {
 				'Compiler project attribution key exceeds its path-character budget.'
 			);
 		const identity = compilerProjectIdentity(recipe, materialized, this.budgets.maxPathCharacters);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (projectKey !== identity.projectKey)
 			fail(
 				'INVALID_QUERY',
@@ -2954,7 +2999,7 @@ export class ReplayCompilerInputJournal {
 				'INVALID_CAPTURE',
 				`Replay compiler recipe identity does not reproduce capture for ${projectKey}.`
 			);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		this.attributions.registerProject(
 			projectKey,
 			identity.projectResolutionDigest,
@@ -2977,7 +3022,7 @@ export class ReplayCompilerInputJournal {
 			if (this.finalized) fail('INVALID_CAPTURE', 'Compiler input replay is already finalized.');
 			if (this.poisoned)
 				fail('INVALID_CAPTURE', 'Compiler input replay is poisoned by an earlier failed query.');
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			const expected = this.expectedAttributions.find(
 				(attribution) => attribution.projectKey === projectKey
 			);
@@ -2989,7 +3034,7 @@ export class ReplayCompilerInputJournal {
 					'UNCONSUMED_QUERY',
 					`Replay did not reproduce the exact compiler-query attribution for ${projectKey}.`
 				);
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		} catch (error) {
 			this.poisoned = true;
 			throw error;
@@ -3004,10 +3049,11 @@ export class ReplayCompilerInputJournal {
 		if (this.finalized) fail('INVALID_CAPTURE', 'Compiler input replay is already finalized.');
 		if (this.poisoned)
 			fail('INVALID_CAPTURE', 'Compiler input replay is poisoned by an earlier failed query.');
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		if (projectKey.length === 0 || projectKey.length > this.budgets.maxPathCharacters)
 			fail('INVALID_QUERY', 'Compiler project attribution key is invalid.');
 		const query = normalizeCompilerInputQuery(queryValue, this.paths, {
+			clock: this.clock,
 			deadlineMs: this.deadlineMs,
 			maxDirectoryEntries: this.budgets.maxDirectoryEntries,
 			maxPathCharacters: this.budgets.maxPathCharacters,
@@ -3032,7 +3078,7 @@ export class ReplayCompilerInputJournal {
 		this.consumedByQuery.set(key, consumed + 1);
 		this.attributions.record(projectKey, query);
 		const result = cloneCaptured(captured);
-		checkDeadline({ deadlineMs: this.deadlineMs });
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		return result;
 	}
 
@@ -3041,18 +3087,18 @@ export class ReplayCompilerInputJournal {
 			if (this.finalized) return;
 			if (this.poisoned)
 				fail('INVALID_CAPTURE', 'Compiler input replay is poisoned by an earlier failed query.');
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			const mismatches = [...this.entriesByQuery.entries()].filter(
 				([key, entry]) => (this.consumedByQuery.get(key) ?? 0) !== entry.observation.invocationCount
 			);
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			if (mismatches.length > 0)
 				fail(
 					'UNCONSUMED_QUERY',
 					`Replay did not reproduce the exact multiplicity of ${mismatches.length} captured compiler queries.`
 				);
 			const actualAttributions = this.attributions.entries(this.entriesByQuery);
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			if (
 				canonicalSemanticJson(actualAttributions) !==
 				canonicalSemanticJson(this.expectedAttributions)
@@ -3061,7 +3107,7 @@ export class ReplayCompilerInputJournal {
 					'INVALID_CAPTURE',
 					'Replay per-project compiler-query attribution does not reproduce capture.'
 				);
-			checkDeadline({ deadlineMs: this.deadlineMs });
+			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 			this.finalized = true;
 			COMPLETED_REPLAY_OPERATION_BUDGET_SOURCES.set(this, {
 				actualAttributions,

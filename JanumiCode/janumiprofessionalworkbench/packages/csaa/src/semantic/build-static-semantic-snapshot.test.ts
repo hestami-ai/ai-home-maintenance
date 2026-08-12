@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -2028,38 +2029,39 @@ describe('buildStaticSemanticSnapshot', () => {
 		const subject = resolved(root);
 		const request = semanticRequest(root, subject.descriptor.subjectId, { maxDurationMs: 1 });
 
-		const expiredClock = vi
-			.spyOn(Date, 'now')
-			.mockImplementation(() =>
-				new Error().stack?.includes('assertDeadline') === true ? 1_002 : 1_000
-			);
+		const expiredWallClock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+		const expiredClock = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(2);
 		let expired;
 		try {
 			expired = buildStaticSemanticSnapshot(request, { subject });
 		} finally {
 			expiredClock.mockRestore();
+			expiredWallClock.mockRestore();
 		}
 		expect(expired).toMatchObject({
 			diagnostics: [expect.objectContaining({ code: 'SEMANTIC_BUDGET_EXCEEDED' })],
 			outcome: 'unavailable'
 		});
 
-		const failingClock = vi.spyOn(Date, 'now').mockImplementation(() => {
-			if (new Error().stack?.includes('assertDeadline') === true)
+		const failingWallClock = vi.spyOn(Date, 'now').mockReturnValue(2_000);
+		const failingClock = vi
+			.spyOn(performance, 'now')
+			.mockReturnValueOnce(0)
+			.mockImplementation(() => {
 				throw new Error('clock unavailable');
-			return 2_000;
-		});
+			});
 		let failed;
 		try {
 			failed = buildStaticSemanticSnapshot(request, { subject });
 		} finally {
 			failingClock.mockRestore();
+			failingWallClock.mockRestore();
 		}
 		expect(failed).toMatchObject({
 			diagnostics: [
 				expect.objectContaining({
 					code: 'SEMANTIC_VALIDATION_FAILED',
-					message: expect.stringContaining('clock unavailable'),
+					message: expect.stringContaining('clock failed closed'),
 					phase: 'REQUEST'
 				})
 			],
