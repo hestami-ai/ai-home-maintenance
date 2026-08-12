@@ -27,6 +27,10 @@ const JOURNAL = `${ROOT}scripts/mutants/.in-flight`;
 const HARVEST_OUT = `${ROOT}scripts/mutants/.harvest.json`;
 /** Vitest's machine-readable run report, read back by HARVEST. Also gitignored, also never a record. */
 const HARVEST_REPORT = `${ROOT}scripts/mutants/.harvest-run.json`;
+/** The UNMUTATED whole-suite report a control's verdict is differenced against (REG-F-116). Gitignored. */
+const BASELINE_REPORT = `${ROOT}scripts/mutants/.baseline-run.json`;
+/** One control's whole-suite report, compared against `BASELINE_REPORT`. Gitignored. */
+const CONTROL_REPORT = `${ROOT}scripts/mutants/.control-run.json`;
 
 type Verdict =
 	| 'KILLED'
@@ -278,6 +282,49 @@ function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | 
 	return null;
 }
 
+/**
+ * Where this mutant's run should write vitest's machine-readable report, or `undefined` for the exit code alone.
+ *
+ * Two callers want it for different reasons: HARVEST records which suites reddened for a mutant with no named
+ * victim, and a CONTROL needs the set of failing files to difference against the baseline (REG-F-116). They write
+ * to separate paths deliberately — one is an input to a human judgment and the other is an input to a verdict, and
+ * a shared file would let a stale harvest decide a control.
+ */
+function jsonReportFor(m: DeclaredMutant): string | undefined {
+	if (HARVEST) return HARVEST_REPORT;
+	if (m.expectSurvive !== undefined) return CONTROL_REPORT;
+	return undefined;
+}
+
+/**
+ * A CONTROL's verdict, graded on the DIFFERENCE against the unmutated baseline rather than on the exit code.
+ *
+ * See `takeBaseline` for why: a control runs the whole workspace, so a non-zero exit is a claim about every test in
+ * the repository, and three controls were reported SURVIVED on this gate's first run because one unrelated pinned
+ * literal in another package was red.
+ */
+function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
+	const expectSurvive = m.expectSurvive ?? '';
+	if (passed) return { mutant: m, verdict: 'CONTROL_HELD', detail: expectSurvive.slice(0, 88) };
+	const already = new Set(baseline ?? []);
+	const fresh = failedFiles(CONTROL_REPORT).filter((f) => !already.has(f));
+	// NOTHING NEW REDDENED — the control HELD. The disclosure travels WITH the verdict, because "held against a red
+	// baseline" is a weaker statement than "held against a green one" and must not read as the same.
+	if (fresh.length === 0)
+		return {
+			mutant: m,
+			verdict: 'CONTROL_HELD',
+			detail: `${expectSurvive.slice(0, 60)} — held on the DIFFERENCE; ${already.size} suite(s) already red without it`
+		};
+	// A GENUINELY NEW RED. Now the original sentence is earned — and it NAMES what reddened instead of asserting a
+	// cause, which was the whole of V-4a's cost.
+	return {
+		mutant: m,
+		verdict: 'SURVIVED',
+		detail: `declared a CONTROL, but the prose-only edit NEWLY reddened ${fresh.length} suite(s) — something asserts on prose: ${fresh.slice(0, 3).join(', ')}`
+	};
+}
+
 function runMutant(m: DeclaredMutant): Result {
 	const pre = preApplyVerdict(m);
 	if ('result' in pre) return pre.result;
@@ -312,18 +359,24 @@ function runMutant(m: DeclaredMutant): Result {
 		// HARVEST asks vitest for the machine-readable report as WELL as the human one, so `summarise` keeps
 		// working unchanged and the two views cannot disagree about the same run.
 		// The applied mutant's id travels to the child so REG-F-100's anchor census can exempt EXACTLY it.
+		//
+		// A CONTROL ASKS FOR THE SAME REPORT, for a different reason: its verdict is the DIFFERENCE against the
+		// unmutated baseline (REG-F-116), and a difference needs the set of failing files, not an exit code.
+		// Scraping them from the human reporter is what `failedFiles` exists to avoid — a dropped filename there
+		// would silently convert a real finding into a held control.
 		const mutantEnv = { RPH_MUTANT_APPLIED: m.id };
+		const jsonTo = jsonReportFor(m);
 		const run = isE2eTarget(target)
 			? runPlaywright(target, mutantEnv)
 			: sh(
 					'bunx',
-					HARVEST
+					jsonTo !== undefined
 						? [
 								'vitest',
 								'run',
 								'--reporter=default',
 								'--reporter=json',
-								`--outputFile=${HARVEST_REPORT}`,
+								`--outputFile=${jsonTo}`,
 								...target
 							]
 						: ['vitest', 'run', ...target],
@@ -363,14 +416,15 @@ function runMutant(m: DeclaredMutant): Result {
 		// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
 		// survival is the PASS and a KILL is the finding, because a test that reddens when only prose changed is
 		// asserting on prose.
-		if (m.expectSurvive !== undefined)
-			return run.status === 0
-				? { mutant: m, verdict: 'CONTROL_HELD', detail: m.expectSurvive.slice(0, 88) }
-				: {
-						mutant: m,
-						verdict: 'SURVIVED',
-						detail: 'declared a CONTROL, but a test FAILED on it — something asserts on prose'
-					};
+		//
+		// ⚠ "A KILL" MEANS A **NEW** RED, NOT A NON-ZERO EXIT — REG-F-116's second limb. A control runs the WHOLE
+		// workspace, so its exit status is a claim about every test in the repository, and reading it as a claim
+		// about this prose edit is only sound if the suite was green to begin with. On this gate's first run it was
+		// not: one pinned literal in another package's unit test was red, and all THREE declared controls reported
+		// `SURVIVED — something asserts on prose`. Three false findings from one unrelated failure. The exit status
+		// cannot answer "did this mutation redden anything"; the DIFFERENCE against the unmutated baseline can, and
+		// it is the only question actually being asked.
+		if (m.expectSurvive !== undefined) return controlVerdict(m, run.status === 0);
 		if (run.status === 0)
 			return { mutant: m, verdict: 'SURVIVED', detail: summarise(out), victims };
 		return {
@@ -455,14 +509,14 @@ function runPlaywright(target: readonly string[], env: NodeJS.ProcessEnv): Retur
  * Returns `[]` on a missing or unreadable report, which is honest: the caller records "no candidates observed",
  * not "no candidates exist".
  */
-function readVictims(): readonly string[] {
+function failedFiles(reportPath: string): readonly string[] {
 	let raw: string;
 	try {
-		raw = readFileSync(HARVEST_REPORT, 'utf8');
+		raw = readFileSync(reportPath, 'utf8');
 	} catch {
 		return [];
 	}
-	rmSync(HARVEST_REPORT, { force: true });
+	rmSync(reportPath, { force: true });
 	const report = JSON.parse(raw) as {
 		testResults?: { name?: string; status?: string }[];
 	};
@@ -479,6 +533,53 @@ function readVictims(): readonly string[] {
 				.map((t) => rel(t.name as string))
 		)
 	].sort((a, b) => a.localeCompare(b));
+}
+
+const readVictims = (): readonly string[] => failedFiles(HARVEST_REPORT);
+
+/**
+ * WHICH SUITES ARE ALREADY RED **WITHOUT** ANY MUTATION — REG-F-116's second limb, and the one the first run of
+ * this gate proved was missing.
+ *
+ * ⚠ A CONTROL IS GRADED ON THE WHOLE WORKSPACE, SO ITS VERDICT IS A CLAIM ABOUT EVERY TEST IN THE REPOSITORY. It
+ * declares `expectRed: []`, `targetSuites` is empty, and vitest runs everything. `run.status !== 0` was then read
+ * as "a test reddened BECAUSE of this prose edit" — which is only sound if the suite was GREEN to begin with.
+ *
+ * IT WAS NOT, AND THE FAILURE WAS NOT EVEN OURS. A single pinned literal in another package's unit test
+ * (`packages/csaa`'s whole-repository root-population census, which any new file under `scripts/` or `verif/`
+ * moves) was red, and **all three declared controls duly reported SURVIVED: "declared a CONTROL, but a test FAILED
+ * on it — something asserts on prose"**. Three false findings from one unrelated red, in a repository two agents
+ * are working in at once.
+ *
+ * V-4b's first pass caught only the TIMEOUT case, because a timeout was the instance I had seen. **That was the
+ * defect one size too small**: the general fact is that a whole-suite run cannot attribute its failures to the
+ * mutation at all, and a timeout is merely one way for it to fail. So a control is now graded on the DIFFERENCE —
+ * did this mutation redden anything that was not ALREADY red — which is the only question its exit status can
+ * actually answer.
+ *
+ * THE BASELINE IS TAKEN ONCE, BEFORE ANY MUTATION IS APPLIED, and only when a control is actually selected: it is
+ * a full unmutated suite run and nothing else in this file costs that much. Taking it lazily inside `runMutant`
+ * would take it with a mutation on disk, which would bake the mutant into its own baseline — a control that
+ * cannot fail, arriving inside the fix for controls that could not pass.
+ */
+let baseline: readonly string[] | undefined;
+function takeBaseline(): void {
+	if (baseline !== undefined) return;
+	console.log('Taking the unmutated whole-suite BASELINE (a control is graded against it, not against zero)…');
+	sh('bunx', [
+		'vitest',
+		'run',
+		'--reporter=default',
+		'--reporter=json',
+		`--outputFile=${BASELINE_REPORT}`
+	]);
+	baseline = failedFiles(BASELINE_REPORT);
+	console.log(
+		baseline.length === 0
+			? 'BASELINE: the whole suite is GREEN — every control is measurable against zero.\n'
+			: `⚠ BASELINE: ${baseline.length} suite(s) ALREADY RED before any mutation — ${baseline.join(', ')}.\n` +
+					'  Controls are graded on the DIFFERENCE. A control whose run adds no NEW failure still HELD.\n'
+	);
 }
 const firstLine = (s: string): string =>
 	(s.split('\n').find((l) => l.includes('error')) ?? s).trim().slice(0, 160);
@@ -574,6 +675,12 @@ function banner(): string {
 	return `Running ${selected.length} declared mutant(s) under SOURCE resolution.\n`;
 }
 console.log(banner());
+
+// ⚠ THE BASELINE IS TAKEN BEFORE THE LOOP, NOT INSIDE IT (REG-F-116). Inside, a mutation would already be on disk
+// and the baseline would contain the mutant being graded against it — a control that cannot fail, arriving inside
+// the fix for controls that could not pass. It is skipped entirely when no control is selected, because it costs a
+// full unmutated suite run and nothing else here does.
+if (!PREFLIGHT && selected.some((m) => m.expectSurvive !== undefined)) takeBaseline();
 
 const results: Result[] = [];
 for (const m of selected) {

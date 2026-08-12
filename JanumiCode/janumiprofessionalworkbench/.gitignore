@@ -29,3 +29,7 @@ coverage/
 scripts/mutants/.in-flight
 scripts/mutants/.harvest.json
 scripts/mutants/.harvest-run.json
+# REG-F-116: the unmutated baseline a CONTROL's verdict is differenced against, and one control's own run report.
+# Inputs to a verdict, never a record — a committed baseline would let yesterday's red excuse today's finding.
+scripts/mutants/.baseline-run.json
+scripts/mutants/.control-run.json
