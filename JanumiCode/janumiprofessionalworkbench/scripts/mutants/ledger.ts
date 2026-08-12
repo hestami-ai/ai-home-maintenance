@@ -2457,12 +2457,12 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'REG-F-114 / A-5'
 	},
 	{
-		id: 'F114-a-machine-arrow-goes-unclaimed-quietly',
-		file: 'verif/lifecycle-arrow-declarations.test.ts',
-		find: "			arrows.filter((a) => COMMAND_TARGETS.has(a.split('->')[1]!) && !claimed.has(a)),",
-		replace: "			[] as string[],",
+		id: 'F114-a-spec-quietly-drops-an-arrow',
+		file: 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts',
+		find: "sourceStates: ['SHAPING', 'PLANNED', 'EXECUTING']",
+		replace: "sourceStates: ['SHAPING', 'EXECUTING']",
 		expectRed: ['verif/lifecycle-arrow-declarations.test.ts'],
-		why: "THE DRIFT GUARD IS THE HALF THAT MATTERS, and this removes it. The table narrows nothing today — every handler already intends exactly its target's in-edges — so its entire present value is that a NEW in-edge to a command-owned target stays UNIMPLEMENTED until someone declares it, instead of being silently accepted. Delete the unclaimed-arrow limb and the table tracks the machine only until the machine next moves, which is precisely when it stops being worth having. ⚠ THE SUBSET LIMB DOES NOT COVER THIS: a table may not claim arrows the machine lacks, and separately every command-owned arrow must be claimed. One direction alone is half a gate — subset-only passes on an EMPTY table. Predicted red: the 'every command-owned arrow is claimed by its spec' case, reported against a table that has silently stopped being compared.",
-		source: 'REG-F-114 / A-5'
+		why: "THE DRIFT GUARD, KILLED BY MUTATING WHAT IT GUARDS RATHER THAN THE GUARD ITSELF. `BlockPwu` claims SHAPING, PLANNED and EXECUTING because the machine declares all three in-edges to BLOCKED; dropping PLANNED leaves a ratified arrow no command claims, and the agreement gate's 'every command-owned arrow is claimed by its spec' limb reports `PLANNED->BLOCKED`. That limb is the entire present value of the table — the specs narrow nothing today, so all they buy is that a machine in-edge cannot go unimplemented in silence. ⚠ IT REPLACES A MUTANT THAT SURVIVED, AND THE SURVIVAL WAS THE FINDING: `F114-a-machine-arrow-goes-unclaimed-quietly` deleted the gate's OWN assertion, so the only test that could have objected was the one being disabled. A mutation of an assertion is unkillable by that assertion — measured, not reasoned: it reported SURVIVED with all 7 cases green. To hold a guard, mutate the thing it guards.",
+		source: 'REG-F-114 / A-5 — replaces F114-a-machine-arrow-goes-unclaimed-quietly, which SURVIVED'
 	}
 ];
