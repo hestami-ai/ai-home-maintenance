@@ -82,7 +82,14 @@ export const captureIntent: CommandHandler = (ctx, command, payload) => {
 		newRevision: 0,
 		newSemanticVersion: 1,
 		nextState: intent,
-		event
+		event,
+		// THE BIRTH OF `Intent.intentStatus` — REG-F-086, and the other half of REG-F-117. That entry made six
+		// arrows visible; a machine with arrows and no birth is `unanalysed`, which means the occupancy census
+		// cannot say which of its states are reachable and therefore cannot say which arrows are dead.
+		//
+		// ⚠ `RAW` IS READ OFF THE STATE COMMITTED ABOVE, NOT OFF `initialState` (REG-F-071: five machines declare
+		// one the engine never writes). `commitState` REFUSES if this declaration and that state disagree.
+		births: [{ machine: 'Intent.intentStatus', statusField: 'intentStatus', values: ['RAW'] }]
 	});
 };
 

@@ -166,12 +166,26 @@ describe('C-0c — every recorded command→transition claim is true of the hand
 			claim({ machine: 'DecompositionContract.status', from: '(initial)', to: 'DRAFT' })
 		]);
 		expect(a.excluded.length, 'the retired disposition axis is no longer refused').toBe(2);
-		expect(a.deadFrom.length, 'REQUESTED is no longer seen as unoccupiable').toBe(1);
-		expect(a.deadTo.length, 'the two DRAFT landings are no longer seen as unoccupiable').toBe(2);
 		expect(a.notABirth.length, 'the birth check no longer distinguishes initialState from a real birth').toBe(
 			2
 		);
-		// And the arrow key really is the one C-0 would use, or the subset comparison above is comparing nothing.
-		expect(a.deadFromArrows).toContain('AssuranceAssessment.state  REQUESTED -> EVIDENCE_PENDING');
+		// ⚠ REWRITTEN UNDER REG-F-118, AND THE REWRITE IS A WEAKENING THAT HAD TO BE STATED RATHER THAN HIDDEN.
+		//
+		// This control used to assert `deadFrom === 1` and `deadTo === 2` — that three of the five rows were caught
+		// as UNREACHABILITY findings. Those assertions are gone because the findings were **unsound**: all three
+		// machines have partly undeclared arrows (`AssuranceAssessment.state` 11/19, and the two DRAFT landings
+		// likewise), so `occupiable()` under-estimates and "never occupied" meant only "not shown reachable".
+		//
+		// ALL FIVE ROWS ARE STILL DETECTED — that is what this control exists to prove, and it still does. Two are
+		// `excluded` (a retired axis), two are `notABirth` (a check that reads `births` and never consults
+		// occupancy, so the soundness rule does not touch it), and the fifth is now reported as UNANALYSABLE rather
+		// than dead. **A row that cannot be judged must not vanish**, so it is asserted here by name: silence would
+		// be the census narrowing its own population, which is the defect this whole file exists to catch.
+		expect(
+			a.unanalysed,
+			'the REQUESTED row must still be SEEN — reported as unjudgeable, never dropped'
+		).toContain('AssuranceAssessment.state');
+		expect(a.deadFrom, 'no unreachability claim may survive on a machine with undeclared arrows').toEqual([]);
+		expect(a.deadTo, 'same, in the other direction').toEqual([]);
 	});
 });

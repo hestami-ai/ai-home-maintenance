@@ -378,22 +378,81 @@ export function birthStates(): Map<string, Set<string>> {
 	return birthsCache;
 }
 
+/**
+ * The primitives at whose call sites a BIRTH is declared — REG-F-086, and the same shape as `ADVANCE_PRIMITIVES`.
+ *
+ * `createObject` was the only one, which is exactly why `Intent.intentStatus` and `PWU.workLifecycleState` had no
+ * declarable birth: `captureIntent` and `proposePwu` commit through `commitState` directly. REG-F-086 recorded that
+ * as *"the birth cannot be declared"* — the blocker was real, the conclusion was not. **A declaration mechanism
+ * attached to one primitive does not reach the sites that use another.**
+ */
+const BIRTH_PRIMITIVES: ReadonlySet<string> = new Set(['createObject', 'commitState']);
+
+/** Does this commit spec CREATE the aggregate? `CommitArgs` defines it: `expectedRevision: undefined`. */
+function createsAggregate(spec: ts.ObjectLiteralExpression): boolean {
+	const p = prop(spec, 'expectedRevision');
+	return (
+		!!p &&
+		ts.isPropertyAssignment(p) &&
+		ts.isIdentifier(p.initializer) &&
+		p.initializer.text === 'undefined'
+	);
+}
+
+/**
+ * Is this call INSIDE the definition of a birth primitive — i.e. one primitive delegating to another?
+ *
+ * The only such site today is `createObject`'s own `commitState` call, whose birth is declared one frame up by the
+ * caller. Derived from the enclosing function's NAME rather than from a list of exempt files, so a second
+ * delegating primitive is covered the day it is written and an ordinary handler never is.
+ */
+function insideBirthPrimitive(node: ts.Node): boolean {
+	for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
+		if (ts.isFunctionDeclaration(n) && n.name && BIRTH_PRIMITIVES.has(n.name.text)) return true;
+	}
+	return false;
+}
+
 function computeBirthStates(): Map<string, Set<string>> {
 	const out = new Map<string, Set<string>>();
 	let declarations = 0;
 	for (const file of handlerFiles()) {
 		const source = readFileSync(HANDLERS + file, 'utf8');
-		if (!source.includes('births:')) continue;
+		// A file matters if it DECLARES a birth or CONTAINS a creation — the second half is what the ratchet below
+		// needs, and the old early-out (`births:` only) would have skipped every file it exists to catch.
+		if (!source.includes('births:') && !source.includes('expectedRevision: undefined')) continue;
 		const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
 		const visit = (node: ts.Node): void => {
 			ts.forEachChild(node, visit);
 			if (!ts.isCallExpression(node)) return;
-			if (!ts.isIdentifier(node.expression) || node.expression.text !== 'createObject') return;
+			if (!ts.isIdentifier(node.expression) || !BIRTH_PRIMITIVES.has(node.expression.text)) return;
 			const spec = node.arguments[2];
 			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
 			const p = prop(spec, 'births');
-			if (!p || !ts.isPropertyAssignment(p)) return;
 			const site = `${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
+			// ⚠ THE RATCHET (REG-F-086): A CREATION THAT DECLARES NO BIRTH IS A FAILURE, NOT A SKIP.
+			//
+			// Until now `births` was declare-if-you-like, so a new creation simply did not appear — and a machine
+			// that never appears is `unanalysed`, which reads as "not yet reached" rather than "nobody said". The
+			// two are opposite claims. `CommitArgs` defines a create in terms a reader can check —
+			// `expectedRevision: undefined` means *"the aggregate must NOT yet exist"* — so the census asks that
+			// question of the code rather than of a list someone maintains.
+			//
+			// ⚠ ONE STRUCTURAL EXEMPTION, AND IT IS NOT A FILE ALLOWLIST. `createObject` DELEGATES to `commitState`,
+			// so its inner call is a creation whose birth is declared by its CALLER, one frame up. The exemption is
+			// therefore "this call sits inside another birth primitive" — derived from the code's shape, so a new
+			// delegating primitive is covered automatically and an ordinary handler never is. A list of exempt
+			// FILES would have rotted into an allowlist the first time someone added a creation to one of them.
+			if (!p && createsAggregate(spec) && !insideBirthPrimitive(node)) {
+				return fail(
+					site,
+					'commits a CREATION (`expectedRevision: undefined`) and declares no `births`. The occupancy ' +
+						'census seeds from births, so an undeclared creation makes its machine unanalysable — which ' +
+						'reads as "no state is reachable yet" rather than "nobody said". Declare the machine and the ' +
+						'state this command actually commits it into'
+				);
+			}
+			if (!p || !ts.isPropertyAssignment(p)) return;
 			if (!ts.isArrayLiteralExpression(p.initializer)) {
 				return fail(site, '`births` must be an array literal so the census can read it');
 			}
@@ -464,22 +523,77 @@ export function occupiable(): Map<string, Set<string>> {
  * with no `births` declaration cannot be analysed — every state would look unoccupiable and every covered arrow
  * dead, which is a 100% false-positive rate dressed as a finding. Silently skipping them would be the census
  * narrowing its own population again, so `unanalysed` is an output the test pins.
+ *
+ * ⚠⚠ AND A BIRTH IS NOT ENOUGH — COMPLETE ARROW COVERAGE IS ALSO REQUIRED (REG-F-118), which is the same argument
+ * at a lower false-positive rate, and it went unstated for as long as this function has existed.
+ *
+ * `occupiable()` grows from the birth along DECLARED arrows. When a machine's declared set is a SUBSET of its
+ * ratified set, occupancy is an UNDER-estimate — so reachability can be proven (you got there) but UNreachability
+ * never can (you may simply not have been able to see the road). **"Never occupied" then means "not shown
+ * reachable", and those are different claims.** The polarity is the dangerous one: a DEAD arrow invites deleting
+ * code or a ratified arrow, so acting on a false one removes something real.
+ *
+ * MEASURED THE DAY THIS RULE WAS ADDED, and it is why the rule is not a precaution: **every single machine then
+ * reporting dead arrows had PARTIAL coverage** — `PWU.workLifecycleState` 49/57 (35 dead), `Assumption.status`
+ * 9/17 (5), `Claim.status` 7/15 (4), `AssuranceAssessment.state` 11/19 (1), `ExecutionPlan.status` 10/11 (1).
+ * **Not one dead-arrow claim in the repository rested on complete coverage.** The PWU case is the clearest: its
+ * eight undeclared arrows form one unbroken chain — READY -> PLANNED -> EXECUTING -> EVIDENCE_PENDING ->
+ * UNDER_ASSURANCE -> SATISFIED -> RECOMPOSING -> RECOMPOSED, the main lifecycle spine the workbench drives every
+ * day — so occupancy stopped at READY and called thirteen live states unreachable.
+ *
+ * `unanalysed` therefore carries TWO causes that share a remedy but not a diagnosis: **no declared birth**, and
+ * **incomplete arrow coverage**. Both make occupancy unanswerable; only the first is about a missing `births`.
  */
 export function deadCovered(): { dead: string[]; unanalysed: string[] } {
 	const occ = occupiable();
 	const arrows = declaredArrows();
+	const complete = occupancyAnalysable();
 	const dead: string[] = [];
 	for (const a of arrows) {
 		const set = occ.get(a.machine);
 		if (!set) continue; // no declared birth — reported as unanalysed, never as dead
+		// INCOMPLETE COVERAGE CANNOT SUPPORT A DEADNESS CLAIM. See the note above.
+		if (!complete.has(a.machine)) continue;
 		if (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));
 	}
-	const analysed = new Set(occ.keys());
+	const analysed = new Set([...occ.keys()].filter((m) => complete.has(m)));
 	const unanalysed = [...new Set(arrows.map((a) => a.machine))].filter((m) => !analysed.has(m));
 	return {
 		dead: [...new Set(dead)].sort((x, y) => x.localeCompare(y)),
 		unanalysed: unanalysed.sort((x, y) => x.localeCompare(y))
 	};
+}
+
+/**
+ * The machines whose DECLARED arrows are the whole of their RATIFIED arrows — the only ones a deadness claim can
+ * be made about (REG-F-118).
+ *
+ * Derived by comparing against `STATE_MACHINES`, never by a list: a machine joins the moment its last arrow is
+ * declared and leaves the moment the ratified set grows, with no one to remember either.
+ */
+/**
+ * The machines whose occupancy may be TRUSTED for a NEGATIVE claim — a declared birth AND complete arrow coverage.
+ *
+ * ⚠ EVERY CONSUMER OF UNREACHABILITY MUST ASK THIS, NOT `occupiable()` DIRECTLY (REG-F-118). `occupiable()`
+ * answers *"which states did I reach"*, which is sound as a POSITIVE claim and unsound as a NEGATIVE one: with
+ * arrows missing it UNDER-estimates, so "not in the set" means **not shown reachable**, never **unreachable**.
+ * Three layers were reading it as the latter — C-0's `deadCovered`, C-0c's `auditClaims` (`deadFrom`/`deadTo`),
+ * and C-0d through `auditClaims`. Shared here so the rule cannot hold in one layer and lapse in the next.
+ */
+export function occupancyAnalysable(): ReadonlySet<string> {
+	const complete = machinesWithCompleteArrowCoverage(declaredArrows());
+	const born = birthStates();
+	return new Set([...complete].filter((m) => born.has(m)));
+}
+
+function machinesWithCompleteArrowCoverage(arrows: readonly DeclaredArrow[]): ReadonlySet<string> {
+	const seen = new Set(arrows.map((a) => arrowKey(a.machine, a.from, a.to)));
+	const out = new Set<string>();
+	for (const [machine, def] of Object.entries(STATE_MACHINES)) {
+		const all = def?.transitions ?? [];
+		if (all.length > 0 && all.every((t) => seen.has(arrowKey(machine, t.from, t.to)))) out.add(machine);
+	}
+	return out;
 }
 
 export const arrowKey = (machine: string, from: string, to: string) => `${machine}  ${from} -> ${to}`;

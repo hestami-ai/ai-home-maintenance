@@ -321,7 +321,16 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		newRevision: 0,
 		newSemanticVersion: 1,
 		nextState: pwu,
-		event
+		event,
+		// THE BIRTH OF `PWU.workLifecycleState` — REG-F-086, and it is what makes the machine ANALYSABLE rather
+		// than merely visible. REG-F-114 gave it 49 declared arrows; occupancy seeds from a birth and grows along
+		// those, so until now the census could see the arrows and still not say which states are reachable — and
+		// therefore not say which "covered" arrows are DEAD.
+		//
+		// ⚠ `PROPOSED` IS READ OFF THE STATE THIS COMMAND COMMITS, NOT OFF `initialState`, which lies for five
+		// machines (REG-F-071). The declaration lives at the site that performs the birth because that is the only
+		// place that knows, and `commitState` REFUSES if the two disagree.
+		births: [{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] }]
 	});
 };
 

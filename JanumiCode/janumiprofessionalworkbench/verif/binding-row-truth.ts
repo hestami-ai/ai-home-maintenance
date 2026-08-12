@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { BINDINGS } from '@janumipwb/rph-contracts';
 import { STATE_MACHINES, isExcludedMachine } from '@janumipwb/rph-domain';
-import { arrowKey, birthStates, occupiable } from './arrow-command-census.js';
+import { arrowKey, birthStates, occupancyAnalysable, occupiable } from './arrow-command-census.js';
 
 const VOCAB = new URL('../packages/rph-contracts/vocab/m3-commands-events.json', import.meta.url);
 
@@ -199,6 +199,7 @@ function auditBirth(c: TransitionClaim, born: ReadonlySet<string>, bag: Bag): vo
 export function auditClaims(claims: readonly TransitionClaim[]): Audit {
 	const occ = occupiable();
 	const births = birthStates();
+	const analysable = occupancyAnalysable();
 	const bag: Bag = {
 		excluded: [],
 		unknown: [],
@@ -221,11 +222,15 @@ export function auditClaims(claims: readonly TransitionClaim[]): Audit {
 		}
 		auditTokens(c, bag);
 		const occupied = occ.get(c.machine);
-		if (!occupied) {
-			bag.unanalysed.add(c.machine);
-			continue;
-		}
-		auditOccupancy(c, occupied, bag);
+		// ⚠ THE COMPLETENESS RULE GATES **OCCUPANCY ONLY**, AND SCOPING IT WIDER WAS A REAL MISTAKE THIS CONTROL
+		// CAUGHT (REG-F-118). `auditOccupancy` files `deadFrom`/`deadTo` — UNREACHABILITY claims, unsound while a
+		// machine's arrows are partly undeclared, because `occupiable()` then UNDER-estimates. `auditBirth` is a
+		// different question entirely: it asks whether a creation claim lands where a handler DECLARES a birth,
+		// which reads `births` and never consults occupancy. Gating both behind one `continue` silently disabled a
+		// SOUND check — and the control that pins the five REG-F-068 rows in their right buckets went red, which is
+		// exactly what a control is for. **A soundness rule applied one scope too wide removes true findings.**
+		if (occupied && analysable.has(c.machine)) auditOccupancy(c, occupied, bag);
+		else bag.unanalysed.add(c.machine);
 		auditBirth(c, births.get(c.machine) ?? new Set<string>(), bag);
 	}
 

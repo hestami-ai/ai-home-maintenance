@@ -160,22 +160,19 @@
 		"Undertaking.status"
 	],
 	"total": 295,
-	"dead": [
-		"Assumption.status  ACCEPTED -> EXPIRED",
-		"Assumption.status  ACCEPTED -> FALSIFIED",
-		"Assumption.status  UNDER_VERIFICATION -> EXPIRED",
-		"Assumption.status  UNDER_VERIFICATION -> FALSIFIED",
-		"Assumption.status  VERIFIED -> FALSIFIED",
-		"AssuranceAssessment.state  REQUESTED -> CANCELLED",
-		"Claim.status  CONDITIONALLY_SUPPORTED -> CONTESTED",
-		"Claim.status  CONDITIONALLY_SUPPORTED -> REJECTED",
-		"Claim.status  CONDITIONALLY_SUPPORTED -> SUPPORTED",
-		"Claim.status  CONDITIONALLY_SUPPORTED -> UNDER_ASSESSMENT",
-		"ExecutionPlan.status  PROPOSED -> SUPERSEDED"
-	],
+	"dead": [],
 	"unanalysed": [
+		"Assumption.status",
+		"AssuranceAssessment.state",
+		"Baseline.status",
+		"Claim.status",
+		"Decision.status",
+		"DecompositionContract.status",
+		"Evidence.status",
+		"ExecutionPlan.status",
 		"ExecutionStep.stepState",
 		"Intent.intentStatus",
-		"PWU.workLifecycleState"
+		"PWU.workLifecycleState",
+		"RecompositionContract.status"
 	]
 }
