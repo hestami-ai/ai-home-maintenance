@@ -5,6 +5,10 @@ import {
 	CALL_GRAPH_OPERATION_VERSION,
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
 	CALL_GRAPH_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
 	READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_SCHEMA_VERSION,
@@ -21,6 +25,7 @@ import {
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
 	SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+	STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_SCHEMA_VERSION,
@@ -28,6 +33,7 @@ import {
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION,
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
+	buildCommandHandlerGraph,
 	buildReadWriteAccessGraph,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
@@ -39,9 +45,11 @@ import {
 	normalizeDependencyCruiserOutput,
 	observeStateMachineTopology,
 	observeArrowCommandCensus,
+	selectJpwbCommandHandlerRegistries,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateCallGraph,
+	validateCommandHandlerGraph,
 	validateReadWriteAccessGraph,
 	validateArrowCommandCensusArtifactSet,
 	validateArrowCommandCensusObservation,
@@ -63,6 +71,7 @@ function manifest(relativeUrl: string): PackageManifest {
 describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
+		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
@@ -72,9 +81,11 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(normalizeDependencyCruiserOutput).toBeTypeOf('function');
 		expect(observeStateMachineTopology).toBeTypeOf('function');
 		expect(observeArrowCommandCensus).toBeTypeOf('function');
+		expect(selectJpwbCommandHandlerRegistries).toBeTypeOf('function');
 		expect(validateDependencyCruiserObservation).toBeTypeOf('function');
 		expect(validateDependencyProviderComparison).toBeTypeOf('function');
 		expect(validateCallGraph).toBeTypeOf('function');
+		expect(validateCommandHandlerGraph).toBeTypeOf('function');
 		expect(validateReadWriteAccessGraph).toBeTypeOf('function');
 		expect(validateArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(validateArrowCommandCensusObservation).toBeTypeOf('function');
@@ -88,10 +99,23 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(SEMANTIC_OPERATION_VERSION).toBe('jan-csaa-build-static-semantic-snapshot/4.0.0');
 		expect(SEMANTIC_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-semantic-request/3.0.0');
 		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/7.0.0');
+		expect(STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-static-semantic-snapshot-progress/1.0.0'
+		);
 		expect(TYPESCRIPT_PROVIDER_VERSION).toBe('5.9.3');
 		expect(CALL_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-call-graph/0.1.0');
 		expect(CALL_GRAPH_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-call-graph-request/1.0.0');
 		expect(CALL_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-call-graph/1.0.0');
+		expect(COMMAND_HANDLER_GRAPH_OPERATION_VERSION).toBe(
+			'jan-csaa-build-command-handler-graph/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-progress/1.0.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-request/1.0.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-command-handler-graph/1.0.0');
 		expect(READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-read-write-access-graph/0.1.0'
 		);

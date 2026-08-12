@@ -10,8 +10,11 @@ import {
 	ARROW_COMMAND_CENSUS_ARTIFACT_SET_REQUEST_SCHEMA_VERSION,
 	ARROW_COMMAND_CENSUS_OPERATION_VERSION,
 	ARROW_COMMAND_CENSUS_REQUEST_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 	CALL_GRAPH_OPERATION_VERSION,
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	DEPENDENCY_CRUISER_INVOCATION_SCHEMA_VERSION,
 	DEPENDENCY_CRUISER_ARGV_GRAMMAR_VERSION,
 	DEPENDENCY_CRUISER_PROVIDER_ID,
@@ -32,8 +35,11 @@ import {
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_REQUEST_SCHEMA_VERSION,
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
+	type SemanticCapability,
+	type StaticSemanticSnapshotProgressEvent,
 	type ResolveSubjectRequest,
 	buildCallGraph,
+	buildCommandHandlerGraph,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
 	buildReadWriteAccessGraph,
@@ -46,10 +52,12 @@ import {
 	observeArrowCommandCensus,
 	observeStateMachineTopology,
 	resolveSubject,
+	selectJpwbCommandHandlerRegistries,
 	sha256,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateArrowCommandCensusObservation,
+	validateCommandHandlerGraph,
 	validateModuleDependencyGraph,
 	validateReadWriteAccessGraph,
 	validateStateMachineGraph,
@@ -58,6 +66,20 @@ import {
 } from '@janumipwb/csaa';
 
 const SMOKE_SELECTOR = process.env.CSAA_REPOSITORY_SMOKE;
+type RepositorySmokeProfile = 'FULL' | 'STRUCTURAL';
+
+function repositorySmokeProfile(value: string | undefined): RepositorySmokeProfile {
+	if (value === undefined || value.trim() === '') return 'FULL';
+	const normalized = value.trim().toUpperCase();
+	if (normalized === 'FULL' || normalized === 'STRUCTURAL') return normalized;
+	throw new Error(`Unsupported CSAA_REPOSITORY_SMOKE_PROFILE: ${value}`);
+}
+
+const SMOKE_PROFILE = repositorySmokeProfile(process.env.CSAA_REPOSITORY_SMOKE_PROFILE);
+const SEMANTIC_CAPABILITIES: readonly SemanticCapability[] =
+	SMOKE_PROFILE === 'FULL'
+		? ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE']
+		: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'];
 const RUN_REPOSITORY_SMOKE =
 	SMOKE_SELECTOR !== undefined && SMOKE_SELECTOR !== '' && SMOKE_SELECTOR !== '0';
 // Provisional runaway guards required by the budgeted APIs and test runner for this opt-in
@@ -71,22 +93,47 @@ const REPOSITORY_SMOKE_FAILSAFE_SUBJECT_PROJECTS = 200;
 const REPOSITORY_SMOKE_FAILSAFE_SUBJECT_CONFIG_DEPTH = 64;
 const REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS = 3_600_000;
 const REPOSITORY_SMOKE_FAILSAFE_SNAPSHOT_BYTES = 1_000_000_000;
-// Leaves runner-level margin after the semantic guard for failure reporting and cleanup.
-const REPOSITORY_SMOKE_FAILSAFE_TEST_TIMEOUT_MS = 3_900_000;
 const REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS = 300_000;
-// Dependency-closed real domain slice; the separate CSAA smoke covers the analyzer Program.
+// Two subject resolutions, the semantic build, two provider processes, and five minutes for
+// graph projection, validation, failure reporting, and cleanup. This is a test-runner guard,
+// not an empirical product ceiling or SLO.
+const REPOSITORY_SMOKE_FAILSAFE_TEST_TIMEOUT_MS =
+	REPOSITORY_SMOKE_FAILSAFE_SUBJECT_DURATION_MS * 2 +
+	REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS +
+	REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS * 2 +
+	300_000;
+// Historical three-project representative slice used by the FULL smoke profile.
 const REPRESENTATIVE_PROJECTS = [
+	'packages/rph-application/tsconfig.json',
 	'packages/rph-contracts/tsconfig.json',
 	'packages/rph-domain/tsconfig.json'
+] as const;
+const COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS = [
+	'packages/rph-application/tsconfig.json',
+	'packages/rph-assurance/tsconfig.json',
+	'packages/rph-contracts/tsconfig.json',
+	'packages/rph-domain/tsconfig.json',
+	'packages/rph-persistence/tsconfig.json',
+	'packages/rph-ports/tsconfig.json',
+	'packages/rph-projections/tsconfig.json'
 ] as const;
 const SELECTED_PROJECTS =
 	SMOKE_SELECTOR === 'all'
 		? null
 		: SMOKE_SELECTOR === undefined || SMOKE_SELECTOR === '1'
-			? REPRESENTATIVE_PROJECTS
+			? SMOKE_PROFILE === 'STRUCTURAL'
+				? COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
+				: REPRESENTATIVE_PROJECTS
 			: SMOKE_SELECTOR.split(',')
 					.map((path) => path.trim())
 					.filter((path) => path.length > 0);
+const USE_COMMON_STRUCTURAL_SUBJECT =
+	SMOKE_PROFILE === 'STRUCTURAL' &&
+	SELECTED_PROJECTS !== null &&
+	SELECTED_PROJECTS.length === COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS.length &&
+	COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS.every(
+		(path, index) => SELECTED_PROJECTS[index] === path
+	);
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
@@ -98,6 +145,7 @@ type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION'
 	| 'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE'
 	| 'CALL_GRAPH'
+	| 'COMMAND_HANDLER_STATIC_PROJECTION'
 	| 'DEPENDENCY_CRUISER_EXECUTION'
 	| 'DEPENDENCY_CRUISER_NORMALIZATION'
 	| 'DEPENDENCY_PROVIDER_COMPARISON'
@@ -314,6 +362,15 @@ function resolveSmokeSubject(scope: ResolveSubjectRequest['scope']) {
 }
 
 describe('repository smoke phase telemetry', () => {
+	it('selects an explicit structural profile without changing the full default', () => {
+		expect(repositorySmokeProfile(undefined)).toBe('FULL');
+		expect(repositorySmokeProfile('')).toBe('FULL');
+		expect(repositorySmokeProfile(' structural ')).toBe('STRUCTURAL');
+		expect(() => repositorySmokeProfile('unknown')).toThrow(
+			'Unsupported CSAA_REPOSITORY_SMOKE_PROFILE: unknown'
+		);
+	});
+
 	it('emits ordered structured run and phase progress with independent phase durations', () => {
 		const lines: string[] = [];
 		const times = [1_000, 1_010, 1_040, 1_050, 1_060];
@@ -390,13 +447,15 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					testDurationMs: REPOSITORY_SMOKE_FAILSAFE_TEST_TIMEOUT_MS
 				},
 				selectedProjects: SELECTED_PROJECTS ?? ['<repository>'],
+				semanticCapabilities: SEMANTIC_CAPABILITIES,
+				semanticProfile: SMOKE_PROFILE,
 				selector: SMOKE_SELECTOR ?? null
 			});
 			try {
 				let repositorySubjectOutcome: ReturnType<typeof resolveSmokeSubject> | null = null;
 				if (SELECTED_PROJECTS !== null) {
 					telemetry.start('REPOSITORY_DISCOVERY_PREFLIGHT', {
-						requiredProjects: REPRESENTATIVE_PROJECTS
+						requiredProjects: SELECTED_PROJECTS
 					});
 					repositorySubjectOutcome = resolveSmokeSubject({ kind: 'REPOSITORY' });
 					expect(repositorySubjectOutcome.outcome, JSON.stringify(repositorySubjectOutcome)).toBe(
@@ -407,10 +466,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					const discoveredProjectPaths = repositorySubjectOutcome.subject.projects.map(
 						(project) => project.configPath
 					);
-					expect(discoveredProjectPaths).toEqual(
-						expect.arrayContaining([...REPRESENTATIVE_PROJECTS])
-					);
-					expect(discoveredProjectPaths.length).toBeGreaterThan(REPRESENTATIVE_PROJECTS.length);
+					expect(discoveredProjectPaths).toEqual(expect.arrayContaining([...SELECTED_PROJECTS]));
 					telemetry.complete({ discoveredProjects: discoveredProjectPaths.length });
 				} else
 					telemetry.skip('REPOSITORY_DISCOVERY_PREFLIGHT', {
@@ -422,7 +478,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				const subjectOutcome = resolveSmokeSubject(
 					SELECTED_PROJECTS === null
 						? { kind: 'REPOSITORY' }
-						: { kind: 'EXPLICIT_PROJECTS', projects: SELECTED_PROJECTS }
+						: {
+								...(USE_COMMON_STRUCTURAL_SUBJECT
+									? { additionalArtifacts: ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS }
+									: {}),
+								kind: 'EXPLICIT_PROJECTS',
+								projects: SELECTED_PROJECTS
+							}
 				);
 				expect(subjectOutcome.outcome, JSON.stringify(subjectOutcome)).toBe('resolved');
 				if (subjectOutcome.outcome !== 'resolved') throw new Error(JSON.stringify(subjectOutcome));
@@ -443,8 +505,16 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				});
 
 				const semanticPipelineStartedAt = performance.now();
+				const semanticProgressEvents: StaticSemanticSnapshotProgressEvent[] = [];
+				const semanticPhaseDurationsMs: Record<string, number> = {};
+				const semanticMemoryHighWaterBytes = {
+					external: 0,
+					heapTotal: 0,
+					heapUsed: 0,
+					rss: 0
+				};
 				telemetry.start('STATIC_SEMANTIC_SNAPSHOT_BUILD', {
-					capabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE'],
+					capabilities: SEMANTIC_CAPABILITIES,
 					provisionalCallerOperationBudgets: {
 						maxDurationMs: REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS,
 						maxSnapshotBytes: REPOSITORY_SMOKE_FAILSAFE_SNAPSHOT_BYTES
@@ -474,14 +544,39 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							maxScopes: 1_000_000,
 							maxSources: 100_000
 						},
-						capabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE'],
+						capabilities: SEMANTIC_CAPABILITIES,
 						expectEmpty: false,
 						operationVersion: SEMANTIC_OPERATION_VERSION,
 						rootLocator: REPOSITORY_ROOT,
 						schemaVersion: SEMANTIC_REQUEST_SCHEMA_VERSION,
 						subjectId: subject.descriptor.subjectId
 					},
-					{ subject }
+					{ subject },
+					{
+						onProgress(event) {
+							semanticProgressEvents.push(event);
+							if (event.state !== 'STARTED')
+								semanticPhaseDurationsMs[event.phase] =
+									(semanticPhaseDurationsMs[event.phase] ?? 0) + event.durationMs;
+							semanticMemoryHighWaterBytes.external = Math.max(
+								semanticMemoryHighWaterBytes.external,
+								event.memoryUsage.external
+							);
+							semanticMemoryHighWaterBytes.heapTotal = Math.max(
+								semanticMemoryHighWaterBytes.heapTotal,
+								event.memoryUsage.heapTotal
+							);
+							semanticMemoryHighWaterBytes.heapUsed = Math.max(
+								semanticMemoryHighWaterBytes.heapUsed,
+								event.memoryUsage.heapUsed
+							);
+							semanticMemoryHighWaterBytes.rss = Math.max(
+								semanticMemoryHighWaterBytes.rss,
+								event.memoryUsage.rss
+							);
+							process.stdout.write(`${JSON.stringify(event)}\n`);
+						}
+					}
 				);
 				const outcomeSummary = JSON.stringify({
 					diagnostics: outcome.diagnostics,
@@ -492,10 +587,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(outcomeSummary);
 				const snapshot = outcome.snapshot;
 				telemetry.complete({
+					adapterPhaseDurationsMs: semanticPhaseDurationsMs,
 					astNodes: snapshot.astNodes.length,
 					diagnostics: outcome.diagnostics.length,
+					memoryHighWaterBytes: semanticMemoryHighWaterBytes,
 					outcome: outcome.outcome,
 					programs: snapshot.programs.length,
+					progressEvents: semanticProgressEvents.length,
 					sources: snapshot.sources.length
 				});
 				telemetry.start('STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE', {
@@ -575,39 +673,65 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					validationState: 'VALID'
 				});
 				const graphDurationMs = Math.max(0, Math.round(performance.now() - graphStartedAt));
-				const callGraphStartedAt = performance.now();
-				telemetry.start('CALL_GRAPH', { callSites: snapshot.invocations.length });
-				const callGraphOutcome = buildCallGraph(
-					{
-						operationVersion: CALL_GRAPH_OPERATION_VERSION,
-						schemaVersion: CALL_GRAPH_REQUEST_SCHEMA_VERSION,
-						semanticSnapshotId: snapshot.id,
-						subjectId: snapshot.subjectId
-					},
-					snapshot
-				);
-				expect(callGraphOutcome.outcome, JSON.stringify(callGraphOutcome.diagnostics)).toBe(
-					'partial'
-				);
-				if (callGraphOutcome.outcome === 'unavailable')
-					throw new Error(JSON.stringify(callGraphOutcome));
-				const callGraph = callGraphOutcome.graph;
-				expect(callGraph.coverage.reconciles).toBe(true);
-				expect(callGraph.coverage.representedCallSites).toBe(snapshot.invocations.length);
-				expect(callGraph.coverage.closure).toBe('OPEN');
-				expect(callGraph.coverage.wholeProgramReachability).toBe('NOT_CLAIMED');
-				const callGraphWitness = canonicalSemanticJsonWitness(callGraph);
-				telemetry.complete({
-					bytes: callGraphWitness.bytes,
-					candidateSetCallSites: callGraph.coverage.candidateSetCallSites,
-					edges: callGraph.coverage.targetEdges,
-					externalDispatchCallSites: callGraph.coverage.externalDispatchCallSites,
-					nodes: callGraph.nodes.length,
-					outcome: callGraphOutcome.outcome,
-					unsupportedCallSites: callGraph.coverage.unsupportedCallSites,
-					unresolvedCallSites: callGraph.coverage.unresolvedCallSites
-				});
-				const callGraphDurationMs = Math.max(0, Math.round(performance.now() - callGraphStartedAt));
+				let callGraphResult: null | {
+					readonly bytes: number;
+					readonly candidateSetCallSites: number;
+					readonly durationMs: number;
+					readonly externalDispatchCallSites: number;
+					readonly nodes: number;
+					readonly targetEdges: number;
+					readonly unresolvedCallSites: number;
+					readonly unsupportedCallSites: number;
+				} = null;
+				if (SEMANTIC_CAPABILITIES.includes('TS_TYPE')) {
+					const callGraphStartedAt = performance.now();
+					telemetry.start('CALL_GRAPH', { callSites: snapshot.invocations.length });
+					const callGraphOutcome = buildCallGraph(
+						{
+							operationVersion: CALL_GRAPH_OPERATION_VERSION,
+							schemaVersion: CALL_GRAPH_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: snapshot.subjectId
+						},
+						snapshot
+					);
+					expect(callGraphOutcome.outcome, JSON.stringify(callGraphOutcome.diagnostics)).toBe(
+						'partial'
+					);
+					if (callGraphOutcome.outcome === 'unavailable')
+						throw new Error(JSON.stringify(callGraphOutcome));
+					const callGraph = callGraphOutcome.graph;
+					expect(callGraph.coverage.reconciles).toBe(true);
+					expect(callGraph.coverage.representedCallSites).toBe(snapshot.invocations.length);
+					expect(callGraph.coverage.closure).toBe('OPEN');
+					expect(callGraph.coverage.wholeProgramReachability).toBe('NOT_CLAIMED');
+					const callGraphWitness = canonicalSemanticJsonWitness(callGraph);
+					telemetry.complete({
+						bytes: callGraphWitness.bytes,
+						candidateSetCallSites: callGraph.coverage.candidateSetCallSites,
+						edges: callGraph.coverage.targetEdges,
+						externalDispatchCallSites: callGraph.coverage.externalDispatchCallSites,
+						nodes: callGraph.nodes.length,
+						outcome: callGraphOutcome.outcome,
+						unsupportedCallSites: callGraph.coverage.unsupportedCallSites,
+						unresolvedCallSites: callGraph.coverage.unresolvedCallSites
+					});
+					callGraphResult = {
+						bytes: callGraphWitness.bytes,
+						candidateSetCallSites: callGraph.coverage.candidateSetCallSites,
+						durationMs: Math.max(0, Math.round(performance.now() - callGraphStartedAt)),
+						externalDispatchCallSites: callGraph.coverage.externalDispatchCallSites,
+						nodes: callGraph.nodes.length,
+						targetEdges: callGraph.coverage.targetEdges,
+						unresolvedCallSites: callGraph.coverage.unresolvedCallSites,
+						unsupportedCallSites: callGraph.coverage.unsupportedCallSites
+					};
+				} else
+					telemetry.skip('CALL_GRAPH', {
+						reason:
+							'The structural profile does not request TS_TYPE; the current call-graph contract requires it.',
+						reasonCode: 'TS_TYPE_NOT_REQUESTED'
+					});
 				const readWriteAccessGraphStartedAt = performance.now();
 				const readWriteAccessMaxAccesses = Math.max(
 					1,
@@ -745,7 +869,10 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						validationState: 'VALID'
 					});
 					const matchingSources = snapshot.sources.filter(
-						(source) => source.logicalPath === stateMachineArtifact.path
+						(source) =>
+							source.logicalPath === stateMachineArtifact.path &&
+							snapshot.projects.find((project) => project.id === source.projectId)?.configPath ===
+								'packages/rph-domain/tsconfig.json'
 					);
 					expect(matchingSources).toHaveLength(1);
 					const stateMachineSource = matchingSources[0]!;
@@ -824,12 +951,14 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				}
 
 				telemetry.start('ARROW_COMMAND_CENSUS_SUBJECT_SELECTION', {
-					reusedRepositoryPreflight: SELECTED_PROJECTS !== null,
-					reusedSelectedSubject: SELECTED_PROJECTS === null,
-					scope: 'REPOSITORY'
+					reusedRepositoryPreflight: SELECTED_PROJECTS !== null && !USE_COMMON_STRUCTURAL_SUBJECT,
+					reusedSelectedSubject: SELECTED_PROJECTS === null || USE_COMMON_STRUCTURAL_SUBJECT,
+					scope: USE_COMMON_STRUCTURAL_SUBJECT
+						? 'EXPLICIT_PROJECTS_WITH_AUXILIARY_EVIDENCE'
+						: 'REPOSITORY'
 				});
 				let arrowSubject = subject;
-				if (SELECTED_PROJECTS !== null) {
+				if (SELECTED_PROJECTS !== null && !USE_COMMON_STRUCTURAL_SUBJECT) {
 					if (repositorySubjectOutcome?.outcome !== 'resolved')
 						throw new Error(
 							'Repository preflight subject is unavailable for arrow-command census.'
@@ -844,8 +973,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					artifactBytes: arrowSubjectBytes,
 					artifacts: arrowSubject.artifacts.length,
 					projects: arrowSubject.projects.length,
-					reusedSelectedSubject: SELECTED_PROJECTS === null,
-					reusedRepositoryPreflight: SELECTED_PROJECTS !== null,
+					reusedSelectedSubject: SELECTED_PROJECTS === null || USE_COMMON_STRUCTURAL_SUBJECT,
+					reusedRepositoryPreflight: SELECTED_PROJECTS !== null && !USE_COMMON_STRUCTURAL_SUBJECT,
 					subjectId: arrowSubject.descriptor.subjectId
 				});
 
@@ -982,6 +1111,124 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					verifierAuthority: arrowObservation.verifierAuthority,
 					validationState: 'VALID'
 				});
+
+				let commandHandlerResult: null | {
+					readonly bytes: number;
+					readonly candidateEdges: number;
+					readonly commandRegistryEntries: number;
+					readonly durationMs: number;
+					readonly edges: number;
+					readonly frontiers: number;
+					readonly handlerRegistryEntries: number;
+					readonly nodes: number;
+				} = null;
+				if (snapshot.subjectId === arrowObservation.subjectId) {
+					const commandHandlerStartedAt = performance.now();
+					const registrySelectors = selectJpwbCommandHandlerRegistries(snapshot);
+					const commandHandlerBudgets = {
+						maxAstNodes: Math.max(1, snapshot.astNodes.length),
+						maxCommandRegistryEntries: Math.max(1, snapshot.declarations.length),
+						maxEdges: Math.max(
+							1,
+							snapshot.declarations.length * 4 + arrowObservation.declaredArrows.length
+						),
+						maxFrontiers: Math.max(
+							1,
+							snapshot.declarations.length + arrowObservation.declaredSites.length
+						),
+						maxHandlerRegistryEntries: Math.max(1, snapshot.declarations.length),
+						maxNodes: Math.max(
+							1,
+							snapshot.declarations.length * 4 +
+								arrowObservation.declaredSites.length +
+								arrowObservation.declaredArrows.length
+						),
+						maxSourceBytes: Math.max(1, subjectArtifactBytes)
+					};
+					const commandHandlerPhaseDurationsMs: Record<string, number> = {};
+					telemetry.start('COMMAND_HANDLER_STATIC_PROJECTION', {
+						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						budgets: commandHandlerBudgets,
+						declaredArrowOccurrences: arrowObservation.declaredArrows.length,
+						declaredSites: arrowObservation.declaredSites.length
+					});
+					const commandHandlerOutcome = buildCommandHandlerGraph(
+						{
+							arrowObservationId: arrowObservation.id,
+							budgets: commandHandlerBudgets,
+							commandRegistry: registrySelectors.commandRegistry,
+							handlerRegistry: registrySelectors.handlerRegistry,
+							operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+							schemaVersion: COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: snapshot.subjectId
+						},
+						snapshot,
+						arrowObservation,
+						arrowSubject,
+						{
+							onProgress(event) {
+								if (event.state !== 'STARTED')
+									commandHandlerPhaseDurationsMs[event.phase] = event.durationMs;
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						}
+					);
+					expect(
+						commandHandlerOutcome.outcome,
+						JSON.stringify(commandHandlerOutcome.diagnostics)
+					).toBe('partial');
+					if (commandHandlerOutcome.outcome !== 'partial')
+						throw new Error(JSON.stringify(commandHandlerOutcome));
+					const commandHandlerGraph = commandHandlerOutcome.graph;
+					const commandHandlerWitness = canonicalSemanticJsonWitness(commandHandlerGraph);
+					expect(
+						validateCommandHandlerGraph(
+							commandHandlerGraph,
+							snapshot,
+							arrowObservation,
+							arrowSubject,
+							{
+								maxIssues: 100_000,
+								maxRecords: Math.max(1, commandHandlerWitness.bytes),
+								maxStringCharacters: Math.max(1, commandHandlerWitness.bytes)
+							}
+						)
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(commandHandlerGraph.coverage.reconciles).toBe(true);
+					expect(commandHandlerGraph.coverage.discoveredCommandRegistryEntries).toBeGreaterThan(0);
+					expect(commandHandlerGraph.coverage.discoveredHandlerRegistryEntries).toBeGreaterThan(0);
+					expect(commandHandlerGraph.runtimeDispatchClosure).toBe('NOT_CLAIMED');
+					expect(commandHandlerGraph.runtimePerformability).toBe('NOT_CLAIMED');
+					telemetry.complete({
+						adapterPhaseDurationsMs: commandHandlerPhaseDurationsMs,
+						bytes: commandHandlerWitness.bytes,
+						candidateEdges: commandHandlerGraph.coverage.candidateEdges,
+						commandRegistryClosure: commandHandlerGraph.coverage.commandRegistryClosure,
+						commandRegistryEntries: commandHandlerGraph.coverage.discoveredCommandRegistryEntries,
+						edges: commandHandlerGraph.edges.length,
+						frontiers: commandHandlerGraph.coverage.frontierNodes,
+						handlerRegistryEntries: commandHandlerGraph.coverage.discoveredHandlerRegistryEntries,
+						nodes: commandHandlerGraph.nodes.length,
+						validationState: 'VALID'
+					});
+					commandHandlerResult = {
+						bytes: commandHandlerWitness.bytes,
+						candidateEdges: commandHandlerGraph.coverage.candidateEdges,
+						commandRegistryEntries: commandHandlerGraph.coverage.discoveredCommandRegistryEntries,
+						durationMs: Math.max(0, Math.round(performance.now() - commandHandlerStartedAt)),
+						edges: commandHandlerGraph.edges.length,
+						frontiers: commandHandlerGraph.coverage.frontierNodes,
+						handlerRegistryEntries: commandHandlerGraph.coverage.discoveredHandlerRegistryEntries,
+						nodes: commandHandlerGraph.nodes.length
+					};
+				} else
+					telemetry.skip('COMMAND_HANDLER_STATIC_PROJECTION', {
+						reason:
+							'The semantic snapshot and retained observation have distinct exact subjects; use the structural common-subject smoke profile for this projection.',
+						semanticSubjectId: snapshot.subjectId,
+						arrowObservationSubjectId: arrowObservation.subjectId
+					});
 
 				const dependencyCruiserInputPaths = providerInputPaths(projectPaths);
 				const dependencyCruiserArgs = [
@@ -1173,7 +1420,9 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				const phaseDurationsMs = telemetry.phaseDurationsMs();
 				telemetry.finish({
 					arrowCommandCensusOutcome: arrowOutcome.outcome,
+					commandHandlerStaticProjection: commandHandlerResult !== null,
 					semanticSnapshotOutcome: outcome.outcome,
+					semanticProfile: SMOKE_PROFILE,
 					projects: snapshot.projects.length,
 					sources: snapshot.sources.length,
 					stateMachineProjected: stateMachineResult !== null
@@ -1199,20 +1448,14 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							rawOutputId: arrowObservation.rawOutput.id,
 							rawOutputSha256: arrowObservation.rawOutput.sha256,
 							subjectId: arrowSubject.descriptor.subjectId,
-							subjectScope: 'REPOSITORY',
+							subjectScope: arrowSubject.request.scope.kind,
 							subjectArtifactBytes: arrowSubjectBytes,
 							subjectArtifacts: arrowSubject.artifacts.length,
 							totalInScopeTopologyArrows: arrowObservation.coverage.totalInScopeTopologyArrows,
 							uncoveredArrows: arrowObservation.coverage.uncoveredArrows
 						},
-						callGraphBytes: callGraphWitness.bytes,
-						callGraphCandidateCallSites: callGraph.coverage.candidateSetCallSites,
-						callGraphDurationMs,
-						callGraphExternalDispatchCallSites: callGraph.coverage.externalDispatchCallSites,
-						callGraphNodeCount: callGraph.nodes.length,
-						callGraphTargetEdgeCount: callGraph.coverage.targetEdges,
-						callGraphUnresolvedCallSites: callGraph.coverage.unresolvedCallSites,
-						callGraphUnsupportedCallSites: callGraph.coverage.unsupportedCallSites,
+						callGraph: callGraphResult,
+						commandHandlerStaticProjection: commandHandlerResult,
 						readWriteAccessGraph: {
 							accesses: readWriteAccessGraph.coverage.accessOccurrences,
 							bytes: readWriteAccessGraphWitness.bytes,
@@ -1251,6 +1494,10 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						phaseDurationsMs,
 						selector: SMOKE_SELECTOR ?? null,
 						semanticPipelineDurationMs,
+						semanticProfile: SMOKE_PROFILE,
+						semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
+						semanticSnapshotProgressEvents: semanticProgressEvents.length,
+						semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
 						snapshotBytes: canonicalWitness.bytes,
 						stateMachine: stateMachineResult,
 						sourceCount: snapshot.sources.length,

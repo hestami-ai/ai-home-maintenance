@@ -69,7 +69,7 @@ export interface InventorySubjectDescriptor {
 	readonly revision: null;
 	readonly resolutionCompleteness: 'COMPLETE' | 'PARTIAL';
 	readonly resolutionDiagnostics: readonly SubjectDiagnostic[];
-	readonly schemaVersion: 'jan-csaa-subject/1.0.0';
+	readonly schemaVersion: 'jan-csaa-subject/1.1.0';
 	readonly selectedFileCount: number;
 	readonly selectedFiles: readonly SelectedFileRecord[];
 	readonly subjectId: string;

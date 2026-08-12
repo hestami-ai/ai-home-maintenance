@@ -1,6 +1,7 @@
 export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
 export * from './contracts/arrow-command-census.js';
+export * from './contracts/command-handler-graph.js';
 export * from './contracts/read-write-access-graph.js';
 export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
@@ -13,9 +14,26 @@ export * from './inventory/collect-inventory.js';
 export * from './inventory/project-subject-for-inventory.js';
 export * from './inventory/render-inventory.js';
 export * from './inventory/run-inventory.js';
-export { buildStaticSemanticSnapshot } from './semantic/build-static-semantic-snapshot.js';
+export {
+	buildStaticSemanticSnapshot,
+	STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION,
+	type BuildStaticSemanticSnapshotRuntimeOptions,
+	type StaticSemanticSnapshotProgressCounts,
+	type StaticSemanticSnapshotProgressEvent,
+	type StaticSemanticSnapshotProgressMemoryUsage,
+	type StaticSemanticSnapshotProgressPhase,
+	type StaticSemanticSnapshotProgressProject
+} from './semantic/build-static-semantic-snapshot.js';
 export { buildCallGraph } from './graph/build-call-graph.js';
 export { buildReadWriteAccessGraph } from './graph/build-read-write-access-graph.js';
+export {
+	buildCommandHandlerGraph,
+	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
+	selectJpwbCommandHandlerRegistries,
+	type BuildCommandHandlerGraphOptions,
+	type CommandHandlerGraphProgressEvent,
+	type CommandHandlerGraphProgressPhase
+} from './graph/build-command-handler-graph.js';
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
@@ -40,6 +58,16 @@ export type {
 	ReadWriteAccessGraphValidationOptions,
 	ReadWriteAccessGraphValidationResult
 } from './graph/validate-read-write-access-graph.js';
+export {
+	validateCommandHandlerGraph,
+	validateConstructedCommandHandlerGraph
+} from './graph/validate-command-handler-graph.js';
+export type {
+	CommandHandlerGraphValidationIssue,
+	CommandHandlerGraphValidationIssueCode,
+	CommandHandlerGraphValidationOptions,
+	CommandHandlerGraphValidationResult
+} from './graph/validate-command-handler-graph.js';
 export { validateModuleDependencyGraph } from './graph/validate-graph.js';
 export type {
 	ModuleDependencyGraphValidationIssue,
@@ -64,6 +92,7 @@ export {
 } from './providers/dependency-cruiser/normalize-output.js';
 export { observeStateMachineTopology } from './providers/jpwb-state-machines/observe-state-machines.js';
 export {
+	ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 	buildArrowCommandCensusArtifactSet,
 	selectArrowCommandCensusArtifactSet,
 	validateArrowCommandCensusArtifactSet

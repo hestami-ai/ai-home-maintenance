@@ -17,6 +17,7 @@ import {
 	ARROW_COMMAND_CENSUS_METHOD,
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
+import { ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS } from '../providers/jpwb-arrow-command-census/artifact-set.js';
 import { collectInventory } from './collect-inventory.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
 import {
@@ -124,7 +125,7 @@ describe('inventory discovery and identity', () => {
 		});
 	});
 
-	it('reports the bounded Program-local TS_TYPE and module-dependency graph boundaries', () => {
+	it('reports bounded semantic and graph capability provenance without widening claims', () => {
 		const inventory = collectInventory({ repositoryRoot: fixture() });
 		const typescript = inventory.providers.find((provider) => provider.name === 'typescript');
 		expect(typescript?.adapterCapabilities).toEqual([
@@ -133,6 +134,7 @@ describe('inventory discovery and identity', () => {
 			'TS_SYNTAX',
 			'TS_TYPE',
 			'configuration-ast-parse',
+			'command-handler-static-projection',
 			'frozen-program-construction',
 			'read-write-access-projection'
 		]);
@@ -154,6 +156,35 @@ describe('inventory discovery and identity', () => {
 
 		const capabilities = new Map(
 			inventory.capabilities.map((capability) => [capability.id, capability])
+		);
+		const retainedArrowProvenance = [...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS];
+		expect(capabilities.get('arrow-command-census')).toMatchObject({
+			provenance: expect.arrayContaining(retainedArrowProvenance),
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('command-handler-static-projection')).toMatchObject({
+			provider: 'typescript+jpwb-arrow-command-census-overlay',
+			provenance: expect.arrayContaining([
+				...retainedArrowProvenance,
+				'capabilities#arrow-command-census',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast',
+				'packages/csaa/src/contracts/command-handler-graph.ts',
+				'packages/csaa/src/contracts/semantic.ts',
+				'packages/csaa/src/graph/build-command-handler-graph.ts',
+				'packages/csaa/src/graph/validate-command-handler-graph.ts',
+				'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+				'packages/csaa/src/providers/typescript/extract-symbols.ts',
+				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+				'packages/csaa/src/semantic/validate-snapshot.ts'
+			]),
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('command-handler-static-projection')?.provenance).not.toContain(
+			'packages/csaa/src/providers/typescript/extract-types.ts'
+		);
+		expect(capabilities.get('command-handler-static-projection')?.explanation).toContain(
+			'runtime performability'
 		);
 		expect(capabilities.get('typescript-ast')).toMatchObject({
 			explanation: expect.stringContaining(
@@ -295,13 +326,14 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first six bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first seven bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
 		);
 		expect(semanticBoundary).toContain('wrapper around the retained arrow-command census');
 		expect(semanticBoundary).toContain('Program-local read/write access projection');
+		expect(semanticBoundary).toContain('static JPWB command-registry-to-handler projection');
 		expect(semanticBoundary).toContain('JAN-CSAA-CAP-007 data-flow graphs');
 		expect(semanticBoundary).toContain(
 			'Inventory generation executes or benchmarks none of these analysis providers'
@@ -325,11 +357,12 @@ describe('inventory discovery and identity', () => {
 				'verif/policy-evidence-requirement-census.test.ts',
 				'verif/route-action-census.test.ts',
 				'packages/csaa/src/graph/build-call-graph.ts',
+				'packages/csaa/src/graph/build-command-handler-graph.ts',
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither the adapter, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither the adapter, static projection, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID}`
@@ -791,9 +824,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts',
 			'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
 			'packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts',
-			'verif/arrow-command-census.ts',
-			'verif/arrow-command-census.baseline.json',
-			'verif/arrow-command-census.test.ts'
+			...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS
 		];
 		const readWritePaths = [
 			'packages/csaa/src/contracts/read-write-access-graph.ts',
@@ -801,7 +832,13 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
 			'packages/csaa/src/graph/validate-read-write-access-graph.ts'
 		];
-		for (const path of [...semanticPaths, ...readWritePaths, ...arrowPaths])
+		const commandHandlerPaths = [
+			'packages/csaa/src/contracts/command-handler-graph.ts',
+			'packages/csaa/src/graph/build-command-handler-graph.ts',
+			'packages/csaa/src/graph/command-handler-graph-canonical.ts',
+			'packages/csaa/src/graph/validate-command-handler-graph.ts'
+		];
+		for (const path of [...semanticPaths, ...readWritePaths, ...commandHandlerPaths, ...arrowPaths])
 			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
 
 		const missing =

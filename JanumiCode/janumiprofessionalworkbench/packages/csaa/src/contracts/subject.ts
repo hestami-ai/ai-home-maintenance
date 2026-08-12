@@ -1,6 +1,6 @@
-export const SUBJECT_REQUEST_SCHEMA_VERSION = 'jan-csaa-subject-request/1.0.0' as const;
-export const SUBJECT_SCHEMA_VERSION = 'jan-csaa-subject/1.0.0' as const;
-export const SUBJECT_POLICY_VERSION = 'jan-csaa-subject-policy/1.0.0' as const;
+export const SUBJECT_REQUEST_SCHEMA_VERSION = 'jan-csaa-subject-request/1.1.0' as const;
+export const SUBJECT_SCHEMA_VERSION = 'jan-csaa-subject/1.1.0' as const;
+export const SUBJECT_POLICY_VERSION = 'jan-csaa-subject-policy/1.1.0' as const;
 export const SUBJECT_ID_ALGORITHM_VERSION = '1' as const;
 
 export type SubjectKind = 'WORKTREE';
@@ -40,6 +40,7 @@ export type ArtifactSemanticRole =
 	| 'VERIFICATION';
 
 export type SubjectDiagnosticCode =
+	| 'ADDITIONAL_ARTIFACT_REQUIRED_MISSING'
 	| 'ABSOLUTE_FILTER_FORBIDDEN'
 	| 'BUDGET_EXCEEDED'
 	| 'CANONICAL_PATH_COLLISION'
@@ -88,7 +89,11 @@ export interface SubjectFilters {
 
 export type SubjectScope =
 	| { readonly kind: 'REPOSITORY' }
-	| { readonly kind: 'EXPLICIT_PROJECTS'; readonly projects: readonly string[] };
+	| {
+			readonly additionalArtifacts?: readonly string[];
+			readonly kind: 'EXPLICIT_PROJECTS';
+			readonly projects: readonly string[];
+	  };
 
 export interface ResolveSubjectRequest {
 	readonly budgets: SubjectBudgets;

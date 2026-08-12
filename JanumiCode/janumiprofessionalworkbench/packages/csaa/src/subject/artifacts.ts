@@ -86,6 +86,20 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 				: ['ANALYSIS_INPUT', 'CONFIGURATION']
 		};
 	}
+	if (path.endsWith('.json') && hasSegment(path, 'src')) {
+		const generated =
+			hasSegment(path, 'gen') || hasSegment(path, 'generated') || path.endsWith('.generated.json');
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: generated ? 'GENERATED_SOURCE' : 'PRODUCTION_SOURCE',
+			reason: generated
+				? 'Generated source-bearing JSON remains a TypeScript compiler candidate.'
+				: 'Source-bearing JSON remains a TypeScript compiler candidate.',
+			roles: generated
+				? ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
+				: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION']
+		};
+	}
 	if (path.endsWith('.svelte')) {
 		return {
 			disposition: 'INVENTORY_ONLY',

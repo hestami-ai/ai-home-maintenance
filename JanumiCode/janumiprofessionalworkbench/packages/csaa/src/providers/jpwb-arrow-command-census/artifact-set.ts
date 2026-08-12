@@ -40,6 +40,11 @@ const AUTHORITY_TEST_PATHS = [
 	'verif/arrow-census-coverage.test.ts',
 	'verif/arrow-command-census.test.ts'
 ] as const;
+export const ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS = [
+	ANALYZER_PATH,
+	BASELINE_PATH,
+	...AUTHORITY_TEST_PATHS
+] as const;
 const DOMAIN_MANIFEST_PATH = 'packages/rph-domain/package.json';
 const CONTRACTS_MANIFEST_PATH = 'packages/rph-contracts/package.json';
 const DOMAIN_SOURCE_PREFIX = 'packages/rph-domain/src/';
@@ -54,9 +59,7 @@ const OPTIONAL_ENVIRONMENT_PATHS = new Set([
 ]);
 
 const REQUIRED_PATHS = [
-	ANALYZER_PATH,
-	BASELINE_PATH,
-	...AUTHORITY_TEST_PATHS,
+	...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 	DOMAIN_MANIFEST_PATH,
 	CONTRACTS_MANIFEST_PATH,
 	'packages/rph-domain/src/index.ts',

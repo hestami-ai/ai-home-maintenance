@@ -2984,6 +2984,15 @@ const constructable = class NamedClass {};
 			extractionInput(circularProgram, Object.keys(aliasFiles).sort(), { checker: circularProxy })
 		);
 		expect(circularRaw.aliases.some((alias) => alias.state === 'CIRCULAR')).toBe(true);
+		const circularReferences = circularRaw.references.filter(
+			(reference) => reference.resolutionState === 'UNSUPPORTED'
+		);
+		expect(circularReferences.length).toBeGreaterThan(0);
+		for (const reference of circularReferences)
+			expect(reference).toMatchObject({
+				resolvedSymbolOrdinal: null,
+				symbolOrdinal: null
+			});
 	});
 
 	it('fails closed when TypeScript exposes an atomic declaration name that is not Unicode scalar text', () => {

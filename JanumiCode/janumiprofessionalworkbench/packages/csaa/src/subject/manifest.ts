@@ -79,6 +79,7 @@ function applyExplicitScope(
 ): { readonly capture: SubjectCapture; readonly workspaces: readonly WorkspaceSubjectRecord[] } {
 	if (request.scope.kind !== 'EXPLICIT_PROJECTS') return { capture, workspaces };
 	const required = new Set<string>();
+	for (const path of request.scope.additionalArtifacts ?? []) required.add(path);
 	for (const project of projects) {
 		required.add(project.configPath);
 		for (const path of project.fileNames) required.add(path);
@@ -98,6 +99,10 @@ function applyExplicitScope(
 				scopedWorkspaces.some((workspace) => artifact.path.startsWith(`${workspace.path}/`)))
 		)
 			required.add(artifact.path);
+	}
+	for (const path of request.scope.additionalArtifacts ?? []) {
+		if (!capture.bytesByPath.has(path))
+			throw new Error(`Requested additional artifact was not captured: ${path}.`);
 	}
 	const artifacts = capture.artifacts.filter((artifact) => required.has(artifact.path));
 	const removed = capture.artifacts.filter((artifact) => !required.has(artifact.path));
@@ -176,7 +181,10 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 						)
 					)
 				].sort()
-			: inputs.projects.map((project) => project.configPath).sort();
+			: [
+					...inputs.projects.map((project) => project.configPath),
+					...(inputs.request.scope.additionalArtifacts ?? [])
+				].sort();
 	const identityPreimage = {
 		schemaVersion: SUBJECT_SCHEMA_VERSION,
 		subjectKind: inputs.request.subjectKind,

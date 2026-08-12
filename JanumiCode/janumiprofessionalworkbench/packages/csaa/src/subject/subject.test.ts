@@ -39,6 +39,7 @@ import {
 	globMatches,
 	isRequestedPath,
 	sensitiveOrLocalStateExclusion,
+	subjectFilterPolicyId,
 	validateBoundedPattern
 } from './policy.js';
 import {
@@ -223,7 +224,7 @@ describe('repository path and artifact policy', () => {
 		});
 	});
 
-	it('classifies tests, generated outputs, framework candidates, and authored tmp files truthfully', () => {
+	it('classifies tests, source-bearing JSON, generated outputs, framework candidates, and authored tmp files truthfully', () => {
 		expect(classifyArtifact('apps/demo/e2e/journey.ts')).toMatchObject({
 			primaryClass: 'TEST_SOURCE',
 			roles: expect.arrayContaining(['TEST'])
@@ -245,6 +246,31 @@ describe('repository path and artifact policy', () => {
 		expect(classifyArtifact('vitest.config.ts')).toMatchObject({
 			primaryClass: 'TOOL_CONFIGURATION',
 			roles: expect.arrayContaining(['COMPILER_CANDIDATE', 'CONFIGURATION'])
+		});
+		expect(
+			classifyArtifact(
+				'packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json'
+			)
+		).toMatchObject({
+			disposition: 'ANALYZED',
+			primaryClass: 'PRODUCTION_SOURCE',
+			roles: expect.arrayContaining(['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION'])
+		});
+		for (const path of [
+			'packages/demo/src/gen/schema.json',
+			'packages/demo/src/generated/schema.json',
+			'packages/demo/src/schema.generated.json'
+		]) {
+			expect(classifyArtifact(path)).toMatchObject({
+				disposition: 'ANALYZED',
+				primaryClass: 'GENERATED_SOURCE',
+				roles: expect.arrayContaining(['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED'])
+			});
+		}
+		expect(classifyArtifact('packages/demo/schemas/schema.json')).toMatchObject({
+			disposition: 'INVENTORY_ONLY',
+			primaryClass: 'OTHER',
+			roles: []
 		});
 		expect(classifyArtifact('packages/demo/src/foo.tmp')).toMatchObject({
 			disposition: 'INVENTORY_ONLY',
@@ -1297,6 +1323,110 @@ describe('generated context and subject identity', () => {
 		);
 	});
 
+	it('retains exact additional evidence beside an explicit project closure', () => {
+		const root = fixture();
+		write(root, 'verif/retained-evidence.ts', 'export const evidence = true;\n');
+		write(root, 'verif/not-requested.ts', 'export const omitted = true;\n');
+		const outcome = resolved(root, {
+			scope: {
+				additionalArtifacts: ['verif/retained-evidence.ts'],
+				kind: 'EXPLICIT_PROJECTS',
+				projects: ['packages/demo/tsconfig.json']
+			}
+		});
+		const paths = outcome.subject.artifacts.map((artifact) => artifact.path);
+		expect(paths).toContain('packages/demo/src/index.ts');
+		expect(paths).toContain('verif/retained-evidence.ts');
+		expect(paths).not.toContain('verif/not-requested.ts');
+		const beforeId = outcome.subject.descriptor.subjectId;
+		write(root, 'verif/retained-evidence.ts', 'export const evidence = false;\n');
+		const after = resolved(root, {
+			scope: {
+				additionalArtifacts: ['verif/retained-evidence.ts'],
+				kind: 'EXPLICIT_PROJECTS',
+				projects: ['packages/demo/tsconfig.json']
+			}
+		});
+		expect(after.subject.descriptor.subjectId).not.toBe(beforeId);
+		expect(after.subject.descriptor.perimeter).toContain('verif/retained-evidence.ts');
+	});
+
+	it('canonicalizes additional evidence order while preserving ordinary explicit-scope policy identity', () => {
+		const root = fixture();
+		write(root, 'verif/a-evidence.ts', 'export const a = true;\n');
+		write(root, 'verif/b-evidence.ts', 'export const b = true;\n');
+		const ordinaryScope = {
+			kind: 'EXPLICIT_PROJECTS' as const,
+			projects: ['packages/demo/tsconfig.json']
+		};
+		const ordinaryRequest = request(root, { scope: ordinaryScope });
+		const emptyRequest = request(root, {
+			scope: { ...ordinaryScope, additionalArtifacts: [] }
+		});
+		const expectedOrdinaryPolicyId = `jan-csaa-filter/1:${sha256(
+			canonicalJson({
+				exclude: [],
+				include: [],
+				scope: {
+					kind: 'EXPLICIT_PROJECTS',
+					projects: [canonicalPathKey('packages/demo/tsconfig.json')]
+				}
+			})
+		)}`;
+		expect(subjectFilterPolicyId(ordinaryRequest)).toBe(expectedOrdinaryPolicyId);
+		expect(subjectFilterPolicyId(emptyRequest)).toBe(expectedOrdinaryPolicyId);
+		const ordinary = resolved(root, { scope: ordinaryScope }).subject;
+		const empty = resolved(root, {
+			scope: { ...ordinaryScope, additionalArtifacts: [] }
+		}).subject;
+		expect(empty.descriptor.subjectId).toBe(ordinary.descriptor.subjectId);
+		expect(empty.request.scope).toEqual(ordinary.request.scope);
+
+		const first = resolved(root, {
+			scope: {
+				...ordinaryScope,
+				additionalArtifacts: ['verif/b-evidence.ts', 'verif/a-evidence.ts']
+			}
+		}).subject;
+		const second = resolved(root, {
+			scope: {
+				...ordinaryScope,
+				additionalArtifacts: ['verif/a-evidence.ts', 'verif/b-evidence.ts']
+			}
+		}).subject;
+		expect(first.descriptor.subjectId).toBe(second.descriptor.subjectId);
+		expect(first.descriptor.perimeter).toEqual(second.descriptor.perimeter);
+		expect(first.request.scope).toMatchObject({
+			additionalArtifacts: ['verif/a-evidence.ts', 'verif/b-evidence.ts']
+		});
+	});
+
+	it('fails closed when exact additional evidence is absent, filtered, or declared output', () => {
+		const root = fixture();
+		write(root, 'verif/evidence.ts', 'export const evidence = true;\n');
+		const scope = {
+			additionalArtifacts: ['verif/evidence.ts'],
+			kind: 'EXPLICIT_PROJECTS' as const,
+			projects: ['packages/demo/tsconfig.json']
+		};
+		for (const overrides of [
+			{ filters: { exclude: ['verif/evidence.ts'], include: [] }, scope },
+			{ outputs: ['verif/evidence.ts'], scope },
+			{
+				scope: {
+					...scope,
+					additionalArtifacts: ['verif/missing.ts']
+				}
+			}
+		]) {
+			const outcome = resolveSubject(request(root, overrides));
+			expect(outcome).toMatchObject({
+				diagnostics: [expect.objectContaining({ code: 'ADDITIONAL_ARTIFACT_REQUIRED_MISSING' })],
+				outcome: 'not-found'
+			});
+		}
+	});
+
 	it('isolates explicit-project identity from unrelated source and project-config mutations', () => {
 		const root = fixture();
 		json(root, 'packages/other/package.json', { name: '@fixture/other', private: true });
@@ -1351,18 +1481,46 @@ describe('generated context and subject identity', () => {
 	});
 
 	it.runIf(process.platform === 'win32')(
-		'treats case-equivalent output, filter, and project inputs identically on Windows',
+		'treats case-equivalent output, filter, project, and additional-artifact inputs identically on Windows',
 		() => {
 			const root = fixture();
 			write(root, 'verif/result.json', '{"generated":true}\n');
-			const outcome = resolved(root, {
-				filters: { include: ['PACKAGES/DEMO/SRC/**'], exclude: [] },
-				outputs: ['VERIF/RESULT.JSON'],
-				scope: { kind: 'EXPLICIT_PROJECTS', projects: ['PACKAGES/DEMO/TSCONFIG.JSON'] }
+			write(root, 'verif/evidence.ts', 'export const evidence = true;\n');
+			const canonical = resolved(root, {
+				filters: {
+					exclude: [],
+					include: ['packages/demo/src/**', 'verif/evidence.ts']
+				},
+				outputs: ['verif/result.json'],
+				scope: {
+					additionalArtifacts: ['verif/evidence.ts'],
+					kind: 'EXPLICIT_PROJECTS',
+					projects: ['packages/demo/tsconfig.json']
+				}
 			});
+			const outcome = resolved(root, {
+				filters: {
+					include: ['PACKAGES/DEMO/SRC/**', 'VERIF/EVIDENCE.TS'],
+					exclude: []
+				},
+				outputs: ['VERIF/RESULT.JSON'],
+				scope: {
+					additionalArtifacts: ['VERIF/EVIDENCE.TS'],
+					kind: 'EXPLICIT_PROJECTS',
+					projects: ['PACKAGES/DEMO/TSCONFIG.JSON']
+				}
+			});
+			expect(outcome.subject.descriptor.subjectId).toBe(canonical.subject.descriptor.subjectId);
 			expect(outcome.subject.projects.map((project) => project.configPath)).toEqual([
 				'packages/demo/tsconfig.json'
 			]);
+			expect(outcome.subject.request.scope).toMatchObject({
+				additionalArtifacts: ['verif/evidence.ts']
+			});
+			expect(outcome.subject.descriptor.perimeter).toContain('verif/evidence.ts');
+			expect(
+				outcome.subject.artifacts.some((artifact) => artifact.path === 'verif/evidence.ts')
+			).toBe(true);
 			expect(
 				outcome.subject.artifacts.some(
 					(artifact) => artifact.path.toLowerCase() === 'verif/result.json'

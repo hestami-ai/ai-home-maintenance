@@ -1473,7 +1473,7 @@ export function extractTypeScriptSymbols(
 				...base,
 				resolutionState: alias.state === 'UNRESOLVED' ? 'UNRESOLVED' : 'UNSUPPORTED',
 				resolvedSymbolOrdinal: null,
-				symbolOrdinal: group.symbolOrdinal
+				symbolOrdinal: alias.state === 'UNRESOLVED' ? group.symbolOrdinal : null
 			};
 		})
 		.sort(

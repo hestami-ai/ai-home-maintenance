@@ -9,6 +9,7 @@ import type { SubjectCapture } from './capture-model.js';
 import { reconcileConfigurationClosure } from './artifacts.js';
 import { reconcileGeneratedContext } from './generated-context.js';
 import { buildFrozenSubject } from './manifest.js';
+import { canonicalPathKey } from './paths.js';
 import { discoverProjects, ProjectDiscoveryFailure } from './projects.js';
 import { discoverWorkspaces, WorkspaceDiscoveryFailure } from './workspaces.js';
 
@@ -66,6 +67,49 @@ function unexpectedDiagnostic(error: unknown, rootLocator: string): SubjectDiagn
 	};
 }
 
+function canonicalizeAdditionalArtifacts(
+	request: ResolveSubjectRequest,
+	capture: SubjectCapture
+): ResolveSubjectRequest {
+	if (request.scope.kind !== 'EXPLICIT_PROJECTS') return request;
+	const requested = request.scope.additionalArtifacts ?? [];
+	if (requested.length === 0) {
+		if (request.scope.additionalArtifacts === undefined) return request;
+		return {
+			...request,
+			scope: { kind: 'EXPLICIT_PROJECTS', projects: [...request.scope.projects] }
+		};
+	}
+	const artifactByCanonicalPath = new Map(
+		capture.artifacts.map((artifact) => [artifact.canonicalPathKey, artifact] as const)
+	);
+	const additionalArtifacts = requested
+		.map((requestedPath) => {
+			const artifact = artifactByCanonicalPath.get(canonicalPathKey(requestedPath));
+			if (artifact === undefined || !capture.bytesByPath.has(artifact.path))
+				throw new CaptureFailure(
+					{
+						code: 'ADDITIONAL_ARTIFACT_REQUIRED_MISSING',
+						message: 'Requested additional evidence was absent or excluded by the subject request.',
+						path: requestedPath,
+						phase: 'CAPTURE',
+						severity: 'ERROR'
+					},
+					'not-found'
+				);
+			return artifact.path;
+		})
+		.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+	return {
+		...request,
+		scope: {
+			additionalArtifacts,
+			kind: 'EXPLICIT_PROJECTS',
+			projects: [...request.scope.projects]
+		}
+	};
+}
+
 export function resolveSubject(
 	request: ResolveSubjectRequest,
 	hooks?: SubjectResolutionHooks
@@ -96,16 +140,17 @@ export function resolveSubjectInternal(
 	for (let attempt = 1; attempt <= 2; attempt += 1) {
 		try {
 			const initialCapture = captureSubject(remainingRequest());
+			const resolvedRequest = canonicalizeAdditionalArtifacts(request, initialCapture);
 			options.hooks?.afterCapture?.(attempt);
 			remainingRequest();
 			const workspaceDiscovery = discoverWorkspaces(initialCapture);
 			const projectDiscovery = discoverProjects(
 				initialCapture,
-				request,
+				resolvedRequest,
 				workspaceDiscovery.workspaces
 			);
 			remainingRequest();
-			if (projectDiscovery.projects.length === 0 && request.expectEmpty !== true) {
+			if (projectDiscovery.projects.length === 0 && resolvedRequest.expectEmpty !== true) {
 				return {
 					diagnostics: [
 						{
@@ -126,7 +171,7 @@ export function resolveSubjectInternal(
 			const generated = reconcileGeneratedContext(
 				closureReconciled,
 				projectDiscovery.projects,
-				request
+				resolvedRequest
 			);
 			options.hooks?.beforeLiveRecheck?.(attempt);
 			if (options.skipLiveRecheck !== true) {
@@ -147,7 +192,7 @@ export function resolveSubjectInternal(
 				diagnostics,
 				generatedContexts: generated.contexts,
 				projects: projectDiscovery.projects,
-				request,
+				request: resolvedRequest,
 				workspaces: workspaceDiscovery.workspaces
 			});
 			const completeness =

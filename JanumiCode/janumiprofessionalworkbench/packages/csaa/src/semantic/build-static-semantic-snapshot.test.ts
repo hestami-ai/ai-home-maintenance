@@ -29,7 +29,9 @@ import * as staticRawExtraction from '../providers/typescript/extract-static-raw
 import { ProgramRecipeMaterializationError } from '../providers/typescript/materialize-program-recipe.js';
 import {
 	buildStaticSemanticSnapshot,
-	collectStaticDiagnosticFamily
+	collectStaticDiagnosticFamily,
+	type BuildStaticSemanticSnapshotRuntimeOptions,
+	type StaticSemanticSnapshotProgressEvent
 } from './build-static-semantic-snapshot.js';
 import { attachFrozenSubjectBytes, readFrozenSubjectArtifact } from '../subject/frozen-store.js';
 import { resolveSubject } from '../subject/resolve-subject.js';
@@ -85,6 +87,43 @@ function fixture(): string {
 			''
 		].join('\n')
 	);
+	write(root, 'bun.lock', 'fixture lock\n');
+	return root;
+}
+
+function jsonModuleFixture(): string {
+	const root = mkdtempSync(join(tmpdir(), 'csaa-semantic-json-module-'));
+	temporaryRoots.push(root);
+	json(root, 'package.json', {
+		name: 'semantic-json-module-fixture',
+		private: true,
+		workspaces: ['packages/*']
+	});
+	json(root, 'packages/demo/package.json', {
+		name: '@fixture/json-module',
+		private: true,
+		version: '0.0.0'
+	});
+	json(root, 'packages/demo/tsconfig.json', {
+		compilerOptions: {
+			allowSyntheticDefaultImports: true,
+			module: 'ESNext',
+			moduleResolution: 'Bundler',
+			noEmit: true,
+			noLib: true,
+			resolveJsonModule: true,
+			strict: true,
+			target: 'ES2022'
+		},
+		files: ['src/index.ts']
+	});
+	write(
+		root,
+		'packages/demo/src/index.ts',
+		"import data from './data.json';\nexport const answer: number = data.answer;\n"
+	);
+	json(root, 'packages/demo/src/data.json', { answer: 42, label: 'frozen JSON module' });
+	json(root, 'packages/demo/data/unimported.json', { ignored: true });
 	write(root, 'bun.lock', 'fixture lock\n');
 	return root;
 }
@@ -231,6 +270,12 @@ function subjectRequest(
 
 function resolved(root: string, projects?: readonly string[]) {
 	const outcome = resolveSubject(subjectRequest(root, projects));
+	if (outcome.outcome !== 'resolved') throw new Error(JSON.stringify(outcome));
+	return outcome.subject;
+}
+
+function resolvedRepository(root: string) {
+	const outcome = resolveSubject({ ...subjectRequest(root), scope: { kind: 'REPOSITORY' } });
 	if (outcome.outcome !== 'resolved') throw new Error(JSON.stringify(outcome));
 	return outcome.subject;
 }
@@ -419,6 +464,229 @@ describe('buildStaticSemanticSnapshot', () => {
 		expect(second.outcome, JSON.stringify(second)).toBe('complete');
 		if (second.outcome !== 'complete') throw new Error(JSON.stringify(second));
 		expect(canonicalSemanticJson(second.snapshot)).toBe(canonicalSemanticJson(first.snapshot));
+	});
+
+	it('emits ordered phase and per-project progress without leaking absolute locators', () => {
+		const root = referencedFixture();
+		const subject = resolved(root, ['packages/app/tsconfig.json']);
+		const request = semanticRequest(root, subject.descriptor.subjectId);
+		const events: StaticSemanticSnapshotProgressEvent[] = [];
+		const outcome = buildStaticSemanticSnapshot(
+			request,
+			{ subject },
+			{
+				onProgress: (event) => events.push(event)
+			}
+		);
+		expect(['complete', 'partial']).toContain(outcome.outcome);
+
+		const projectKeys = subject.projects
+			.map((project) => project.configPath)
+			.sort((left, right) => left.localeCompare(right));
+		const paired = (phase: StaticSemanticSnapshotProgressEvent['phase']) => [
+			[phase, 'STARTED'],
+			[phase, 'COMPLETED']
+		];
+		expect(events.map((event) => [event.phase, event.state])).toEqual([
+			...paired('REQUEST_BIND'),
+			...paired('INITIAL_FRESHNESS'),
+			...paired('RECIPE_MATERIALIZATION'),
+			...paired('CAPTURE_PREPARATION'),
+			...projectKeys.flatMap(() => paired('CAPTURE_PROJECT')),
+			...paired('CAPTURE_FINALIZATION'),
+			...paired('CAPTURE_RECHECK'),
+			...paired('REPLAY_PREPARATION'),
+			...projectKeys.flatMap(() => paired('REPLAY_PROJECT')),
+			...paired('REPLAY_FINALIZATION'),
+			...paired('PROJECTION_RECONCILIATION'),
+			...paired('NORMALIZE'),
+			...paired('FREEZE'),
+			...paired('SERIALIZE'),
+			...paired('VALIDATE'),
+			...paired('FINAL_FRESHNESS'),
+			...paired('FINALIZE')
+		]);
+		expect(
+			events
+				.filter((event) => event.phase === 'CAPTURE_PROJECT' && event.state === 'STARTED')
+				.map((event) => event.project)
+		).toEqual(
+			projectKeys.map((projectKey, index) => ({
+				index: index + 1,
+				projectKey,
+				total: projectKeys.length
+			}))
+		);
+		expect(
+			events
+				.filter((event) => event.phase === 'REPLAY_PROJECT' && event.state === 'STARTED')
+				.map((event) => event.project)
+		).toEqual(
+			projectKeys.map((projectKey, index) => ({
+				index: index + 1,
+				projectKey,
+				total: projectKeys.length
+			}))
+		);
+
+		for (const [index, event] of events.entries()) {
+			expect(event.sequence).toBe(index + 1);
+			expect(Number.isFinite(event.elapsedMs)).toBe(true);
+			expect(event.elapsedMs).toBeGreaterThanOrEqual(
+				index === 0 ? 0 : events[index - 1]!.elapsedMs
+			);
+			expect(Number.isFinite(event.durationMs)).toBe(true);
+			expect(event.durationMs).toBeGreaterThanOrEqual(0);
+			expect(Number.isNaN(Date.parse(event.timestamp))).toBe(false);
+			expect(Object.isFrozen(event)).toBe(true);
+			expect(Object.isFrozen(event.counts)).toBe(true);
+			for (const count of Object.values(event.counts)) {
+				expect(Number.isSafeInteger(count)).toBe(true);
+				expect(count).toBeGreaterThanOrEqual(0);
+			}
+			for (const bytes of Object.values(event.memoryUsage)) {
+				expect(Number.isSafeInteger(bytes)).toBe(true);
+				expect(bytes).toBeGreaterThanOrEqual(0);
+			}
+		}
+		const final = events.at(-1)!;
+		expect(final).toMatchObject({
+			counts: {
+				canonicalBytes: expect.any(Number),
+				captureProjectsCompleted: projectKeys.length,
+				materializedProjects: projectKeys.length,
+				replayProjectsCompleted: projectKeys.length,
+				semanticProjects: projectKeys.length,
+				subjectProjects: projectKeys.length
+			},
+			phase: 'FINALIZE',
+			state: 'COMPLETED'
+		});
+		expect(final.counts.canonicalBytes).toBeGreaterThan(0);
+		expect(JSON.stringify(events)).not.toContain(root);
+		expect(JSON.stringify(events)).not.toContain('export const result');
+	});
+
+	it('keeps output deterministic when the progress sink throws and inspects sink accessors inertly', () => {
+		const root = fixture();
+		const subject = resolved(root);
+		const request = semanticRequest(root, subject.descriptor.subjectId);
+		const baseline = buildStaticSemanticSnapshot(request, { subject });
+		let throwingCalls = 0;
+		const withThrowingSink = buildStaticSemanticSnapshot(
+			request,
+			{ subject },
+			{
+				onProgress() {
+					throwingCalls += 1;
+					throw new Error('telemetry sink failure');
+				}
+			}
+		);
+		expect(throwingCalls).toBeGreaterThan(0);
+		expect(canonicalSemanticJson(withThrowingSink)).toBe(canonicalSemanticJson(baseline));
+
+		let accessorCalls = 0;
+		const accessorOptions = Object.create(null) as BuildStaticSemanticSnapshotRuntimeOptions;
+		Object.defineProperty(accessorOptions, 'onProgress', {
+			enumerable: true,
+			get() {
+				accessorCalls += 1;
+				return () => undefined;
+			}
+		});
+		const withAccessor = buildStaticSemanticSnapshot(request, { subject }, accessorOptions);
+		expect(accessorCalls).toBe(0);
+		expect(canonicalSemanticJson(withAccessor)).toBe(canonicalSemanticJson(baseline));
+
+		const failureEvents: StaticSemanticSnapshotProgressEvent[] = [];
+		const refused = buildStaticSemanticSnapshot(
+			{ ...request, operationVersion: 'unsupported-operation' },
+			{ subject },
+			{ onProgress: (event) => failureEvents.push(event) }
+		);
+		expect(refused.outcome).toBe('incompatible');
+		expect(failureEvents.map((event) => [event.phase, event.state, event.detailCode])).toEqual([
+			['REQUEST_BIND', 'STARTED', null],
+			['REQUEST_BIND', 'FAILED', 'COMPILER_VERSION_MISMATCH'],
+			['FINALIZE', 'SKIPPED', 'BUILD_FAILED']
+		]);
+	});
+
+	it('deep-indexes an imported frozen JSON module without promoting unimported JSON', () => {
+		const root = jsonModuleFixture();
+		const subject = resolvedRepository(root);
+		const jsonPath = 'packages/demo/src/data.json';
+		const outsidePath = 'packages/demo/data/unimported.json';
+		const jsonArtifact = subject.artifacts.find((artifact) => artifact.path === jsonPath);
+		const outsideArtifact = subject.artifacts.find((artifact) => artifact.path === outsidePath);
+
+		expect(
+			subject.artifacts.map((artifact) => artifact.path),
+			JSON.stringify(subject.excludedArtifacts, null, 2)
+		).toEqual(expect.arrayContaining([jsonPath, outsidePath]));
+		expect(jsonArtifact).toMatchObject({
+			disposition: 'ANALYZED',
+			primaryClass: 'PRODUCTION_SOURCE',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION']
+		});
+		expect(outsideArtifact).toMatchObject({
+			disposition: 'INVENTORY_ONLY',
+			primaryClass: 'OTHER',
+			roles: []
+		});
+		if (jsonArtifact === undefined) throw new Error('Imported JSON artifact was not frozen.');
+
+		const outcome = buildStaticSemanticSnapshot(
+			semanticRequest(root, subject.descriptor.subjectId),
+			{ subject }
+		);
+		expect(outcome.outcome, JSON.stringify(outcome.diagnostics)).toBe('partial');
+		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome.diagnostics));
+		expect(
+			validateStaticSemanticSnapshot(outcome.snapshot, {}, { frozenSubject: subject })
+		).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const jsonSource = outcome.snapshot.sources.find((source) => source.logicalPath === jsonPath);
+		expect(jsonSource).toMatchObject({
+			analysisDisposition: 'DEEP_INDEXED',
+			artifactClass: jsonArtifact.primaryClass,
+			artifactRoles: jsonArtifact.roles,
+			bytes: jsonArtifact.bytes,
+			contentSha256: jsonArtifact.sha256,
+			declarationFile: false,
+			languageVariant: 'Standard',
+			logicalPath: jsonPath,
+			origin: 'AUTHORED',
+			rootFile: false,
+			rootNodeId: expect.any(String),
+			scriptKind: ts.ScriptKind.JSON,
+			scriptKindName: 'JSON',
+			syntaxProvenanceId: expect.any(String)
+		});
+		expect(outcome.snapshot.sources.some((source) => source.logicalPath === outsidePath)).toBe(
+			false
+		);
+
+		expect(
+			outcome.snapshot.compilerInputs.find(
+				(input) =>
+					input.operation === 'READ_FILE' &&
+					input.result === 'PRESENT' &&
+					input.logicalPath === jsonPath
+			)
+		).toMatchObject({
+			byteBudgetClass: 'FROZEN_SUBJECT',
+			contentBytes: jsonArtifact.bytes,
+			contentSha256: jsonArtifact.sha256,
+			logicalPath: jsonPath,
+			operation: 'READ_FILE',
+			origin: 'AUTHORED',
+			result: 'PRESENT'
+		});
 	});
 
 	it('builds deterministic checker-bound types, signatures, overloads, and requested assignability', () => {

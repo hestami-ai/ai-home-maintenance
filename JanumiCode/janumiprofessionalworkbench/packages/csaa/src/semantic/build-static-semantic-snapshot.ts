@@ -38,8 +38,7 @@ import {
 	extractStaticRaw,
 	finalizeStaticRawExtractionBudgetLedger,
 	StaticRawExtractionError,
-	type StaticRawDiagnosticFamilyInput,
-	type StaticRawExtractionBudgetEvidence
+	type StaticRawDiagnosticFamilyInput
 } from '../providers/typescript/extract-static-raw.js';
 import {
 	MATERIALIZED_ARRAY_PATH_OPTIONS,
@@ -103,6 +102,257 @@ const TYPE_QUERY_MODES = [
 	'VALUE_SYMBOL_TYPE_AT_LOCATION'
 ] as const satisfies readonly SemanticTypeQueryMode[];
 const SHA256 = /^[a-f0-9]{64}$/u;
+
+export const STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION =
+	'jan-csaa-static-semantic-snapshot-progress/1.0.0' as const;
+
+export type StaticSemanticSnapshotProgressPhase =
+	| 'REQUEST_BIND'
+	| 'INITIAL_FRESHNESS'
+	| 'RECIPE_MATERIALIZATION'
+	| 'CAPTURE_PREPARATION'
+	| 'CAPTURE_PROJECT'
+	| 'CAPTURE_FINALIZATION'
+	| 'CAPTURE_RECHECK'
+	| 'REPLAY_PREPARATION'
+	| 'REPLAY_PROJECT'
+	| 'REPLAY_FINALIZATION'
+	| 'PROJECTION_RECONCILIATION'
+	| 'NORMALIZE'
+	| 'FREEZE'
+	| 'SERIALIZE'
+	| 'VALIDATE'
+	| 'FINAL_FRESHNESS'
+	| 'FINALIZE';
+
+export interface StaticSemanticSnapshotProgressMemoryUsage {
+	readonly external: number;
+	readonly heapTotal: number;
+	readonly heapUsed: number;
+	readonly rss: number;
+}
+
+export interface StaticSemanticSnapshotProgressCounts {
+	readonly astNodes: number;
+	readonly canonicalBytes: number;
+	readonly captureObservations: number;
+	readonly captureProjectsCompleted: number;
+	readonly materializedProjects: number;
+	readonly replayProjectsCompleted: number;
+	readonly semanticProjects: number;
+	readonly sources: number;
+	readonly subjectProjects: number;
+	readonly symbols: number;
+}
+
+export interface StaticSemanticSnapshotProgressProject {
+	/** One-based ordinal in canonical project-key order. */
+	readonly index: number;
+	/** Canonical repository-relative project config path; never an absolute locator. */
+	readonly projectKey: string;
+	readonly total: number;
+}
+
+export interface StaticSemanticSnapshotProgressEvent {
+	readonly counts: StaticSemanticSnapshotProgressCounts;
+	readonly detailCode: string | null;
+	readonly durationMs: number;
+	readonly elapsedMs: number;
+	readonly memoryUsage: StaticSemanticSnapshotProgressMemoryUsage;
+	readonly phase: StaticSemanticSnapshotProgressPhase;
+	readonly project: StaticSemanticSnapshotProgressProject | null;
+	readonly schemaVersion: typeof STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION;
+	readonly sequence: number;
+	readonly state: 'STARTED' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+	readonly timestamp: string;
+}
+
+export interface BuildStaticSemanticSnapshotRuntimeOptions {
+	/** Out-of-band telemetry only; sink failures cannot affect semantic evidence or outcome. */
+	readonly onProgress?: (event: StaticSemanticSnapshotProgressEvent) => void;
+}
+
+interface MutableStaticSemanticSnapshotProgressCounts {
+	astNodes: number;
+	canonicalBytes: number;
+	captureObservations: number;
+	captureProjectsCompleted: number;
+	materializedProjects: number;
+	replayProjectsCompleted: number;
+	semanticProjects: number;
+	sources: number;
+	subjectProjects: number;
+	symbols: number;
+}
+
+interface StaticSemanticSnapshotProgressRecorder {
+	complete(detailCode?: string | null): void;
+	fail(detailCode: string): StaticSemanticSnapshotProgressPhase | null;
+	skip(
+		phase: StaticSemanticSnapshotProgressPhase,
+		detailCode: string,
+		project?: StaticSemanticSnapshotProgressProject | null
+	): void;
+	start(
+		phase: StaticSemanticSnapshotProgressPhase,
+		project?: StaticSemanticSnapshotProgressProject | null
+	): void;
+}
+
+function boundedTelemetryCount(value: number): number {
+	return Number.isSafeInteger(value) && value >= 0 ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function progressCounts(
+	counts: MutableStaticSemanticSnapshotProgressCounts
+): StaticSemanticSnapshotProgressCounts {
+	return Object.freeze({
+		astNodes: boundedTelemetryCount(counts.astNodes),
+		canonicalBytes: boundedTelemetryCount(counts.canonicalBytes),
+		captureObservations: boundedTelemetryCount(counts.captureObservations),
+		captureProjectsCompleted: boundedTelemetryCount(counts.captureProjectsCompleted),
+		materializedProjects: boundedTelemetryCount(counts.materializedProjects),
+		replayProjectsCompleted: boundedTelemetryCount(counts.replayProjectsCompleted),
+		semanticProjects: boundedTelemetryCount(counts.semanticProjects),
+		sources: boundedTelemetryCount(counts.sources),
+		subjectProjects: boundedTelemetryCount(counts.subjectProjects),
+		symbols: boundedTelemetryCount(counts.symbols)
+	});
+}
+
+function safeSemanticProgressSink(
+	options: BuildStaticSemanticSnapshotRuntimeOptions | undefined
+): ((event: StaticSemanticSnapshotProgressEvent) => void) | undefined {
+	try {
+		if (
+			options === undefined ||
+			options === null ||
+			typeof options !== 'object' ||
+			Array.isArray(options) ||
+			isProxy(options)
+		)
+			return undefined;
+		const prototype = Reflect.getPrototypeOf(options);
+		if (prototype !== Object.prototype && prototype !== null) return undefined;
+		const descriptor = Reflect.getOwnPropertyDescriptor(options, 'onProgress');
+		return descriptor !== undefined &&
+			descriptor.enumerable &&
+			'value' in descriptor &&
+			typeof descriptor.value === 'function'
+			? (descriptor.value as (event: StaticSemanticSnapshotProgressEvent) => void)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function createStaticSemanticSnapshotProgressRecorder(
+	options: BuildStaticSemanticSnapshotRuntimeOptions | undefined,
+	counts: MutableStaticSemanticSnapshotProgressCounts
+): StaticSemanticSnapshotProgressRecorder {
+	const sink = safeSemanticProgressSink(options);
+	let sequence = 0;
+	let lastElapsedMs = 0;
+	let active: {
+		readonly phase: StaticSemanticSnapshotProgressPhase;
+		readonly project: StaticSemanticSnapshotProgressProject | null;
+		readonly startedElapsedMs: number;
+	} | null = null;
+	let origin: bigint | null = null;
+	if (sink !== undefined)
+		try {
+			origin = process.hrtime.bigint();
+		} catch {
+			origin = null;
+		}
+
+	const elapsed = (): number => {
+		if (origin === null) return lastElapsedMs;
+		try {
+			const measured = Number(process.hrtime.bigint() - origin) / 1_000_000;
+			if (Number.isFinite(measured)) lastElapsedMs = Math.max(lastElapsedMs, measured);
+		} catch {
+			// Preserve the last monotonic observation if telemetry timing is unavailable.
+		}
+		return lastElapsedMs;
+	};
+	const emit = (
+		phase: StaticSemanticSnapshotProgressPhase,
+		state: StaticSemanticSnapshotProgressEvent['state'],
+		project: StaticSemanticSnapshotProgressProject | null,
+		startedElapsedMs: number,
+		detailCode: string | null
+	): void => {
+		if (sink === undefined) return;
+		try {
+			const currentElapsedMs = elapsed();
+			const memory = process.memoryUsage();
+			const memoryUsage = Object.freeze({
+				external: boundedTelemetryCount(memory.external),
+				heapTotal: boundedTelemetryCount(memory.heapTotal),
+				heapUsed: boundedTelemetryCount(memory.heapUsed),
+				rss: boundedTelemetryCount(memory.rss)
+			});
+			sequence += 1;
+			const event = Object.freeze({
+				counts: progressCounts(counts),
+				detailCode,
+				durationMs:
+					state === 'STARTED' || state === 'SKIPPED'
+						? 0
+						: Math.max(0, currentElapsedMs - startedElapsedMs),
+				elapsedMs: currentElapsedMs,
+				memoryUsage,
+				phase,
+				project,
+				schemaVersion: STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION,
+				sequence,
+				state,
+				timestamp: new Date().toISOString()
+			}) satisfies StaticSemanticSnapshotProgressEvent;
+			sink(event);
+		} catch {
+			// Telemetry is deliberately unable to affect semantic evidence or outcome.
+		}
+	};
+
+	return {
+		complete(detailCode = null): void {
+			if (active === null) return;
+			const completed = active;
+			active = null;
+			emit(completed.phase, 'COMPLETED', completed.project, completed.startedElapsedMs, detailCode);
+		},
+		fail(detailCode): StaticSemanticSnapshotProgressPhase | null {
+			if (active === null) return null;
+			const failed = active;
+			active = null;
+			emit(failed.phase, 'FAILED', failed.project, failed.startedElapsedMs, detailCode);
+			return failed.phase;
+		},
+		skip(phase, detailCode, project = null): void {
+			const retainedProject = project === null ? null : Object.freeze({ ...project });
+			emit(phase, 'SKIPPED', retainedProject, elapsed(), detailCode);
+		},
+		start(phase, project = null): void {
+			if (active !== null) {
+				const interrupted = active;
+				active = null;
+				emit(
+					interrupted.phase,
+					'FAILED',
+					interrupted.project,
+					interrupted.startedElapsedMs,
+					'PHASE_INTERRUPTED'
+				);
+			}
+			const startedElapsedMs = elapsed();
+			const retainedProject = project === null ? null : Object.freeze({ ...project });
+			active = { phase, project: retainedProject, startedElapsedMs };
+			emit(phase, 'STARTED', retainedProject, startedElapsedMs, null);
+		}
+	};
+}
 
 class StaticSemanticBuildFailure extends Error {
 	constructor(
@@ -1009,7 +1259,7 @@ function extractProjectResult<T>(
 }
 
 interface StaticRawExtractionPass<T> {
-	readonly budgetEvidence: StaticRawExtractionBudgetEvidence;
+	readonly budgetLedger: ReturnType<typeof createStaticRawExtractionBudgetLedger>;
 	readonly results: T[];
 }
 
@@ -1026,11 +1276,20 @@ function extractPass<T>(
 	clock: SemanticOperationClock,
 	assertWithinDeadline: () => void,
 	evidenceForProject: (projectKey: string) => ProjectSourceEvidence,
-	projectResult: (raw: RawStaticSemanticProjectExtraction) => T
+	projectResult: (raw: RawStaticSemanticProjectExtraction) => T,
+	progress: StaticSemanticSnapshotProgressRecorder,
+	progressCountsState: MutableStaticSemanticSnapshotProgressCounts,
+	progressPhase: 'CAPTURE_PROJECT' | 'REPLAY_PROJECT'
 ): StaticRawExtractionPass<T> {
 	const budgetLedger = createStaticRawExtractionBudgetLedger(budgets, budgetPhase, providerBinding);
 	const results: T[] = [];
-	for (const entry of projects) {
+	if (projects.length === 0) progress.skip(progressPhase, 'NO_PROJECTS');
+	for (const [index, entry] of projects.entries()) {
+		progress.start(progressPhase, {
+			index: index + 1,
+			projectKey: entry.project.configPath,
+			total: projects.length
+		});
 		assertWithinDeadline();
 		results.push(
 			extractProjectResult(
@@ -1049,9 +1308,12 @@ function extractPass<T>(
 			)
 		);
 		assertWithinDeadline();
+		if (progressPhase === 'CAPTURE_PROJECT') progressCountsState.captureProjectsCompleted += 1;
+		else progressCountsState.replayProjectsCompleted += 1;
+		progress.complete();
 	}
 	return {
-		budgetEvidence: finalizeStaticRawExtractionBudgetLedger(budgetLedger),
+		budgetLedger,
 		results
 	};
 }
@@ -1222,8 +1484,26 @@ function mapFailure(
 
 export function buildStaticSemanticSnapshot(
 	requestValue: unknown,
-	optionsValue: { readonly subject: FrozenSubject }
+	optionsValue: { readonly subject: FrozenSubject },
+	runtimeOptions?: BuildStaticSemanticSnapshotRuntimeOptions
 ): StaticSemanticSnapshotOutcome {
+	const progressCountsState: MutableStaticSemanticSnapshotProgressCounts = {
+		astNodes: 0,
+		canonicalBytes: 0,
+		captureObservations: 0,
+		captureProjectsCompleted: 0,
+		materializedProjects: 0,
+		replayProjectsCompleted: 0,
+		semanticProjects: 0,
+		sources: 0,
+		subjectProjects: 0,
+		symbols: 0
+	};
+	const progress = createStaticSemanticSnapshotProgressRecorder(
+		runtimeOptions,
+		progressCountsState
+	);
+	progress.start('REQUEST_BIND');
 	const operationClock = createMonotonicOperationClock();
 	const startedAtMs = operationClock.startedAtMs;
 	let request: BuildStaticSemanticSnapshotRequest | undefined;
@@ -1231,6 +1511,7 @@ export function buildStaticSemanticSnapshot(
 	try {
 		request = materializeRequest(requestValue);
 		const subject = materializeSubjectOption(optionsValue);
+		progressCountsState.subjectProjects = subject.projects.length;
 		const operationBudgetSession: StaticSemanticOperationBudgetSession =
 			createStaticSemanticOperationBudgetSession(request.budgets, startedAtMs, operationClock.now);
 		const operationBudgetProviderBinding = operationBudgetSession.providerBinding();
@@ -1264,10 +1545,14 @@ export function buildStaticSemanticSnapshot(
 					'REQUEST'
 				)
 			]);
+		progress.complete();
 
 		phase = 'FRESHNESS';
+		progress.start('INITIAL_FRESHNESS');
 		assertCurrent(subject, request, deadlineMs, operationClock.now);
+		progress.complete();
 		phase = 'MATERIALIZE';
+		progress.start('RECIPE_MATERIALIZATION');
 		if (subject.projects.length > request.budgets.maxProjects)
 			throw new StaticSemanticBuildFailure('unavailable', [
 				diagnostic(
@@ -1285,11 +1570,14 @@ export function buildStaticSemanticSnapshot(
 				materialized: materializeProgramRecipe(project.programRecipe, request.rootLocator),
 				project
 			});
+			progressCountsState.materializedProjects += 1;
 		}
 		assertWithinDeadline();
 		operationBudgetSession.acceptMaterializedSubject(subject);
+		progress.complete();
 
 		phase = 'CAPTURE';
+		progress.start('CAPTURE_PREPARATION');
 		const captureEnvironment: CapturingCompilerEnvironment = createCapturingCompilerEnvironment(
 			subject,
 			request.rootLocator,
@@ -1297,6 +1585,7 @@ export function buildStaticSemanticSnapshot(
 			startedAtMs,
 			operationClock.now
 		);
+		progress.complete();
 		phase = 'PROGRAM';
 		const capturePass = extractPass(
 			captureEnvironment,
@@ -1314,8 +1603,13 @@ export function buildStaticSemanticSnapshot(
 				...captureEnvironment.currentProjectEvidence(projectKey),
 				verificationState: 'CAPTURED_COMPILER_INPUT'
 			}),
-			(raw) => raw
+			(raw) => raw,
+			progress,
+			progressCountsState,
+			'CAPTURE_PROJECT'
 		);
+		phase = 'CAPTURE';
+		progress.start('CAPTURE_FINALIZATION');
 		const captureProjectionDigests = capturePass.results.map((raw) => {
 			const finalProjectEvidence = captureEnvironment.currentProjectEvidence(
 				raw.project.configPath
@@ -1324,8 +1618,11 @@ export function buildStaticSemanticSnapshot(
 				bindFinalCheckerContext(raw, compilerInputClosureDigest(finalProjectEvidence.observations))
 			);
 		});
-		phase = 'CAPTURE';
+		// Capture facts are now represented by the identity-free digests and the
+		// separately retained budget ledger; do not overlap both full raw passes.
+		capturePass.results.length = 0;
 		const frozenCapture = captureEnvironment.finalizeCapture();
+		progressCountsState.captureObservations = frozenCapture.observations.length;
 		operationBudgetSession.acceptCompilerInputWitness(
 			'CAPTURE',
 			issueFrozenCompilerCaptureOperationBudgetWitness(
@@ -1333,19 +1630,27 @@ export function buildStaticSemanticSnapshot(
 				frozenCapture
 			)
 		);
-		operationBudgetSession.acceptRawExtractionEvidence('CAPTURE', capturePass.budgetEvidence);
+		operationBudgetSession.acceptRawExtractionEvidence(
+			'CAPTURE',
+			finalizeStaticRawExtractionBudgetLedger(capturePass.budgetLedger)
+		);
 		assertWithinDeadline();
+		progress.complete();
 		phase = 'RECHECK';
+		progress.start('CAPTURE_RECHECK');
 		const verifiedCapture = recheckCompilerInputJournal(frozenCapture);
 		assertWithinDeadline();
 		phase = 'FRESHNESS';
 		assertCurrent(subject, request, deadlineMs, operationClock.now);
+		progress.complete();
 
 		phase = 'RECHECK';
+		progress.start('REPLAY_PREPARATION');
 		const replayEnvironment: ReplayCompilerEnvironment = createReplayCompilerEnvironment(
 			subject,
 			verifiedCapture
 		);
+		progress.complete();
 		phase = 'PROGRAM';
 		const replayPass = extractPass(
 			replayEnvironment,
@@ -1378,20 +1683,29 @@ export function buildStaticSemanticSnapshot(
 					verificationState: 'VERIFIED_COMPILER_INPUT'
 				};
 			},
-			(raw) => raw
+			(raw) => raw,
+			progress,
+			progressCountsState,
+			'REPLAY_PROJECT'
 		);
 		const replayRaw = replayPass.results;
 		phase = 'RECHECK';
+		progress.start('REPLAY_FINALIZATION');
 		replayEnvironment.assertFullyConsumed();
 		operationBudgetSession.acceptCompilerInputWitness(
 			'RECHECK',
 			replayEnvironment.issueRecheckOperationBudgetWitness(operationBudgetProviderBinding)
 		);
-		operationBudgetSession.acceptRawExtractionEvidence('EXTRACT', replayPass.budgetEvidence);
+		operationBudgetSession.acceptRawExtractionEvidence(
+			'EXTRACT',
+			finalizeStaticRawExtractionBudgetLedger(replayPass.budgetLedger)
+		);
 		assertWithinDeadline();
 		phase = 'FRESHNESS';
 		assertCurrent(subject, request, deadlineMs, operationClock.now);
+		progress.complete();
 		phase = 'VALIDATE';
+		progress.start('PROJECTION_RECONCILIATION');
 		const replayProjectionDigests = replayRaw.map(rawProjectionDigest);
 		if (
 			canonicalSemanticJson(captureProjectionDigests) !==
@@ -1405,7 +1719,9 @@ export function buildStaticSemanticSnapshot(
 				)
 			]);
 		assertWithinDeadline();
+		progress.complete();
 
+		progress.start('NORMALIZE');
 		const snapshot = normalizeStaticSemanticSnapshot({
 			capture: verifiedCapture,
 			projects: replayRaw,
@@ -1413,9 +1729,18 @@ export function buildStaticSemanticSnapshot(
 			subject
 		});
 		replayRaw.length = 0;
+		progressCountsState.astNodes = snapshot.astNodes.length;
+		progressCountsState.semanticProjects = snapshot.projects.length;
+		progressCountsState.sources = snapshot.sources.length;
+		progressCountsState.symbols = snapshot.symbols.length;
 		assertWithinDeadline();
+		progress.complete();
+		progress.start('FREEZE');
 		const finalSnapshot = deepFreeze(snapshot);
+		progress.complete();
+		progress.start('SERIALIZE');
 		const canonicalWitness = canonicalSemanticJsonWitness(finalSnapshot);
+		progressCountsState.canonicalBytes = canonicalWitness.bytes;
 		if (canonicalWitness.bytes > request.budgets.maxSnapshotBytes)
 			throw new StaticSemanticBuildFailure('unavailable', [
 				diagnostic(
@@ -1425,6 +1750,8 @@ export function buildStaticSemanticSnapshot(
 				)
 			]);
 		assertWithinDeadline();
+		progress.complete();
+		progress.start('VALIDATE');
 		const validatorOptions = validationOptions(request.budgets);
 		const validationEvidence = validateStaticSemanticSnapshotWithBudgetEvidence(
 			finalSnapshot,
@@ -1456,17 +1783,24 @@ export function buildStaticSemanticSnapshot(
 			]);
 		operationBudgetSession.acceptValidationEvidence(finalSnapshot, validationEvidence.evidence);
 		assertWithinDeadline();
+		progress.complete();
 		phase = 'FRESHNESS';
+		progress.start('FINAL_FRESHNESS');
 		assertCurrent(subject, request, deadlineMs, operationClock.now);
 		assertWithinDeadline();
+		progress.complete();
+		progress.start('FINALIZE');
 		const diagnostics = finalSnapshot.health === 'PARTIAL' ? partialDiagnostics(finalSnapshot) : [];
 		assertWithinDeadline();
 		operationBudgetSession.finalize();
+		progress.complete(finalSnapshot.health);
 		return finalSnapshot.health === 'PARTIAL'
 			? { diagnostics, outcome: 'partial', snapshot: finalSnapshot }
 			: { diagnostics, outcome: 'complete', snapshot: finalSnapshot };
 	} catch (error) {
 		const failure = mapFailure(error, phase, request?.rootLocator);
+		const failedPhase = progress.fail(failure.diagnostics[0]?.code ?? 'SEMANTIC_BUILD_FAILED');
+		if (failedPhase !== 'FINALIZE') progress.skip('FINALIZE', 'BUILD_FAILED');
 		return { diagnostics: canonicalDiagnostics(failure.diagnostics), outcome: failure.outcome };
 	}
 }

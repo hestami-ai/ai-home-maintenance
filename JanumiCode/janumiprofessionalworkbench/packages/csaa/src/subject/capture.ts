@@ -1,11 +1,13 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import ts from 'typescript';
-import type {
-	CapturedArtifactRecord,
-	ExcludedArtifactRecord,
-	ResolveSubjectRequest,
-	SubjectDiagnostic
+import {
+	SUBJECT_POLICY_VERSION,
+	SUBJECT_REQUEST_SCHEMA_VERSION,
+	type CapturedArtifactRecord,
+	type ExcludedArtifactRecord,
+	type ResolveSubjectRequest,
+	type SubjectDiagnostic
 } from '../contracts/subject.js';
 import { sha256 } from '../inventory/canonical.js';
 import { classifyArtifact } from './artifacts.js';
@@ -119,8 +121,8 @@ function nearestExistingAncestor(realRoot: string, repositoryPath: string): stri
 
 export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 	if (
-		request.schemaVersion !== 'jan-csaa-subject-request/1.0.0' ||
-		request.policyVersion !== 'jan-csaa-subject-policy/1.0.0' ||
+		request.schemaVersion !== SUBJECT_REQUEST_SCHEMA_VERSION ||
+		request.policyVersion !== SUBJECT_POLICY_VERSION ||
 		request.subjectKind !== 'WORKTREE'
 	) {
 		failure(

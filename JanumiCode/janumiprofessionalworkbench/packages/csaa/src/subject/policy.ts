@@ -166,6 +166,16 @@ export function validateRequestPaths(request: ResolveSubjectRequest): void {
 			throw new Error('Explicit project scope must name at least one project.');
 		for (const project of request.scope.projects) assertCanonicalRelativePath(project);
 		assertNoCanonicalPathCollisions(request.scope.projects);
+		for (const artifact of request.scope.additionalArtifacts ?? []) {
+			assertCanonicalRelativePath(artifact);
+			if (artifact.includes('*') || artifact.includes('?'))
+				throw new Error(`Additional artifact must be an exact path: ${artifact}`);
+		}
+		assertNoCanonicalPathCollisions(request.scope.additionalArtifacts ?? []);
+		assertNoCanonicalPathCollisions([
+			...request.scope.projects,
+			...(request.scope.additionalArtifacts ?? [])
+		]);
 	}
 	if (request.operationVersion.trim() === '')
 		throw new Error('Operation version must be nonempty.');
@@ -327,15 +337,27 @@ export function subjectFilterPolicyId(request: ResolveSubjectRequest): string {
 	const normalize = (value: string): string =>
 		ts.sys.useCaseSensitiveFileNames ? value : value.toLowerCase();
 	const scope =
-		request.scope.kind === 'REPOSITORY'
-			? request.scope
-			: {
-					kind: request.scope.kind,
-					projects: request.scope.projects.map((path) => canonicalPathKey(path)).sort()
-				};
+		request.scope.kind === 'REPOSITORY' ? request.scope : explicitScopePreimage(request);
 	const canonicalPatterns = (values: readonly string[]): string[] =>
 		[...new Set(values.map(normalize))].sort();
 	return `jan-csaa-filter/1:${sha256(canonicalJson({ exclude: canonicalPatterns(request.filters.exclude), include: canonicalPatterns(request.filters.include), scope }))}`;
+}
+
+function explicitScopePreimage(request: ResolveSubjectRequest): {
+	readonly additionalArtifacts?: readonly string[];
+	readonly kind: 'EXPLICIT_PROJECTS';
+	readonly projects: readonly string[];
+} {
+	if (request.scope.kind !== 'EXPLICIT_PROJECTS')
+		throw new Error('Explicit scope preimage requires an explicit-project request.');
+	const additionalArtifacts = (request.scope.additionalArtifacts ?? [])
+		.map((path) => canonicalPathKey(path))
+		.sort();
+	return {
+		...(additionalArtifacts.length > 0 ? { additionalArtifacts } : {}),
+		kind: request.scope.kind,
+		projects: request.scope.projects.map((path) => canonicalPathKey(path)).sort()
+	};
 }
 
 function isReplacementTemporary(path: string, output: string): boolean {
