@@ -2551,5 +2551,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/command-reissue-guard.test.ts'],
 		why: "THE FIFTH `advanceIntent` SITE, WHICH HAD NO MUTANT — found while checking whether DWP-03's claim to cover \"each\" site was true. It covers four; `ReviseIntent` is held elsewhere, by JAN-NOOP-01's `semanticVersion inflation cannot void an approval`. ⚠ AND THE OBVIOUS REASON TO SKIP THIS MUTANT IS FALSE, WHICH IS WHY IT EXISTS: the refusal code is `RPH_ILLEGAL_STATE_TRANSITION`, the same code `checkTransition` returns, so the precondition looks redundant — the machine has no `REVISED -> REVISED` arrow and would surely refuse anyway. **Measured: it does NOT.** With this widening the re-issue is ACCEPTED, because a self-transition is ABSORBED rather than refused — exactly the \"absorbed as a NOOP yet still bumped semanticVersion\" behaviour the handler's own comment records. Since `ApproveIntent` requires `approvedSemanticVersion === current`, that replayed no-op silently VOIDS an outstanding approval. The precondition is the only thing standing between those two facts. Predicted red: 1 test in the named victim, measured before declaring.",
 		source: 'REG-F-117 / JAN-CMDPRE DWP-03 residue'
+	},
+	// ── REG-F-118, THE TWO GROUNDS FOR A DEADNESS CLAIM ─────────────────────────────────────────────────────────
+	//
+	// A dead arrow invites deleting code, so the census may only assert one on evidence that carries it. Two
+	// independent grounds now do: the SOUND one (no ratified in-arrow and no birth) needs no coverage at all, and
+	// the WEAK one (occupancy) is gated on complete coverage. Each needs its own mutant, because either could be
+	// removed while the other kept the summary looking plausible.
+	{
+		id: 'F118-the-sound-deadness-ground-stops-proving-anything',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tconst unreachable = (def?.states ?? []).filter((s) => !hasInArrow.has(s) && !born.has(s));',
+		replace: '\t\tconst unreachable = (def?.states ?? []).filter((s) => hasInArrow.has(s) && born.has(s));',
+		expectRed: ['verif/trigger-claim-truth.test.ts'],
+		why: "THE GROUND THAT SURVIVES PARTIAL COVERAGE STOPS FINDING ANYTHING, and REG-F-088 and REG-F-089 go quiet. Inverting the predicate makes `provablyUnoccupiable` report states that DO have an in-arrow and ARE born — the opposite population, which is empty of anything interesting. ⚠ THE POINT IS WHAT IT DOES **NOT** BREAK: the occupancy ground is untouched, so the summary still reports a plausible census and only the three ratified-trigger rows vanish. Those three are the whole of C-0d's PINNED DEFECT set and the only deadness claims in the repository that partial coverage cannot dismiss. Predicted red: C-0d's `ratified arrows whose command cannot reach the source state`, whose expectations were never edited when the completeness rule landed — which is why they are the right victim.",
+		source: 'REG-F-118'
+	},
+	{
+		id: 'F118-completeness-stops-gating-the-occupancy-ground',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (!complete.has(a.machine)) continue;\n\t\tif (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));',
+		replace: '\t\tif (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE STATE THE REPOSITORY WAS IN UNTIL REG-F-118, RESTORED. Without the gate, `occupiable()` — which grows along DECLARED arrows and therefore UNDER-estimates — is read as unreachability on machines whose arrows are only partly declared, and the census goes from 2 provable dead arrows to 37. Thirty-five of those are false, including the whole PWU spine READY -> PLANNED -> EXECUTING -> ... , states the workbench occupies every day. ⚠ THIS IS THE FAIL-OPEN DIRECTION AND IT LOOKS LIKE A RICHER RESULT: more findings, all confidently worded, each inviting someone to delete a ratified arrow. Predicted red: C-0's `lists every COVERED arrow whose source state can never be occupied`.",
+		source: 'REG-F-118'
+	},
+	{
+		id: 'F118-the-birth-ratchets-exemption-stops-being-structural',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (ts.isFunctionDeclaration(n) && n.name && BIRTH_PRIMITIVES.has(n.name.text)) return true;',
+		replace: '\t\tif (ts.isFunctionDeclaration(n) && n.name && n.name.text === "nothingIsExempt") return true;',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE RATCHET EATS ITS OWN DELEGATION. `createObject` commits through `commitState`, so its inner call IS a creation — one whose birth is declared a frame up by the caller. With the structural exemption gone, that site is reported as a creation declaring no `births` and the census `fail()`s, taking every consumer of `birthStates()` with it. ⚠ THE ALTERNATIVE DESIGN IS WHAT THIS MUTANT ARGUES AGAINST: a list of exempt FILES would pass this mutation happily and would rot into an allowlist the first time someone added a real creation to `kit.ts`. Deriving the exemption from the enclosing function's name means a second delegating primitive is covered the day it is written. Predicted red: C-0's suite, loudly.",
+		source: 'REG-F-118'
 	}
 ];
