@@ -160,7 +160,10 @@
 		"Undertaking.status"
 	],
 	"total": 295,
-	"dead": [],
+	"dead": [
+		"AssuranceAssessment.state  REQUESTED -> CANCELLED",
+		"ExecutionPlan.status  PROPOSED -> SUPERSEDED"
+	],
 	"unanalysed": [
 		"Assumption.status",
 		"AssuranceAssessment.state",

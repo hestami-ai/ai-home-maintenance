@@ -548,11 +548,18 @@ export function deadCovered(): { dead: string[]; unanalysed: string[] } {
 	const occ = occupiable();
 	const arrows = declaredArrows();
 	const complete = occupancyAnalysable();
+	const provable = provablyUnoccupiable();
 	const dead: string[] = [];
 	for (const a of arrows) {
 		const set = occ.get(a.machine);
 		if (!set) continue; // no declared birth — reported as unanalysed, never as dead
-		// INCOMPLETE COVERAGE CANNOT SUPPORT A DEADNESS CLAIM. See the note above.
+		// TWO INDEPENDENT GROUNDS, and the first needs no arrow coverage: a source state the ratified machine gives
+		// no in-arrow and no birth declares can never be occupied, whatever is or is not declared elsewhere.
+		if (provable.get(a.machine)?.has(a.from)) {
+			dead.push(arrowKey(a.machine, a.from, a.to));
+			continue;
+		}
+		// INCOMPLETE COVERAGE CANNOT SUPPORT THE WEAKER, OCCUPANCY-BASED CLAIM. See the note above.
 		if (!complete.has(a.machine)) continue;
 		if (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));
 	}
@@ -571,6 +578,36 @@ export function deadCovered(): { dead: string[]; unanalysed: string[] } {
  * Derived by comparing against `STATE_MACHINES`, never by a list: a machine joins the moment its last arrow is
  * declared and leaves the moment the ratified set grows, with no one to remember either.
  */
+/**
+ * States that are PROVABLY unoccupiable — and this proof needs no arrow coverage at all (REG-F-118).
+ *
+ * ⚠ IT IS A DIFFERENT ARGUMENT FROM OCCUPANCY, WHICH IS WHY IT SURVIVES WHERE OCCUPANCY DOES NOT. `occupiable()`
+ * reasons forward from a birth along DECLARED arrows, so an undeclared arrow can always rescue a state and no
+ * negative claim is safe. This reasons from the RATIFIED machine: if the corpus declares **no arrow at all** into
+ * a state, then no command can ever move into it — `checkTransition` would refuse, declared or not — so the state
+ * is reachable ONLY by birth. If no birth declares it either, nothing can ever be in it. **Missing declarations
+ * cannot rescue it, because the arrows that would do so are not ratified.**
+ *
+ * THIS IS WHAT SAVED REG-F-088 when the completeness rule withdrew the occupancy-based version of it.
+ * `ExecutionPlan.status` has ZERO ratified arrows into `PROPOSED` and its handler births `UNDER_REVIEW`, so the
+ * recorded claim that `ProposeExecutionPlan` lands in PROPOSED is false of the code — provably, on 10/11 coverage,
+ * where the occupancy argument was worthless. **A sound rule and a weaker one disagree about the method, not
+ * about the answer; keeping both is how the finding survived its own instrument being corrected.**
+ */
+export function provablyUnoccupiable(): Map<string, Set<string>> {
+	const births = birthStates();
+	const out = new Map<string, Set<string>>();
+	for (const [machine, def] of Object.entries(STATE_MACHINES)) {
+		const born = births.get(machine);
+		// No birth declared at all is a DIFFERENT report (`unanalysed`) — it means nobody said, not that nothing can.
+		if (!born) continue;
+		const hasInArrow = new Set((def?.transitions ?? []).map((t) => t.to));
+		const unreachable = (def?.states ?? []).filter((s) => !hasInArrow.has(s) && !born.has(s));
+		if (unreachable.length > 0) out.set(machine, new Set(unreachable));
+	}
+	return out;
+}
+
 /**
  * The machines whose occupancy may be TRUSTED for a NEGATIVE claim — a declared birth AND complete arrow coverage.
  *

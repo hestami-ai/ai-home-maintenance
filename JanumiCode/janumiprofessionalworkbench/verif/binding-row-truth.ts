@@ -22,7 +22,13 @@
 import { readFileSync } from 'node:fs';
 import { BINDINGS } from '@janumipwb/rph-contracts';
 import { STATE_MACHINES, isExcludedMachine } from '@janumipwb/rph-domain';
-import { arrowKey, birthStates, occupancyAnalysable, occupiable } from './arrow-command-census.js';
+import {
+	arrowKey,
+	birthStates,
+	occupancyAnalysable,
+	occupiable,
+	provablyUnoccupiable
+} from './arrow-command-census.js';
 
 const VOCAB = new URL('../packages/rph-contracts/vocab/m3-commands-events.json', import.meta.url);
 
@@ -169,6 +175,25 @@ function auditTokens(c: TransitionClaim, bag: Bag): void {
 }
 
 /** Occupancy, for a machine whose births are declared and therefore analysable. */
+/**
+ * The deadness claim that needs NO arrow coverage — see `provablyUnoccupiable` (REG-F-118).
+ *
+ * A state the ratified machine gives no in-arrow, and no birth declares, can never hold an object: the arrows that
+ * would rescue it do not exist to be declared. So this fires on machines whose coverage is partial, where the
+ * occupancy argument below is worthless — which is exactly the case REG-F-088 rests on.
+ */
+function auditProvablyDead(c: TransitionClaim, unoccupiable: ReadonlySet<string>, bag: Bag): void {
+	if (unoccupiable.size === 0) return;
+	for (const s of statesOf(c.machine, c.from)) {
+		if (!unoccupiable.has(s)) continue;
+		bag.deadFrom.push(`${show(c)}  [from ${s} is never occupied]`);
+		for (const t of statesOf(c.machine, c.to)) bag.deadFromArrows.push(arrowKey(c.machine, s, t));
+	}
+	for (const s of statesOf(c.machine, c.to)) {
+		if (unoccupiable.has(s)) bag.deadTo.push(`${show(c)}  [to ${s} is never occupied]`);
+	}
+}
+
 function auditOccupancy(c: TransitionClaim, occupied: ReadonlySet<string>, bag: Bag): void {
 	for (const s of statesOf(c.machine, c.from)) {
 		if (occupied.has(s)) continue;
@@ -200,6 +225,7 @@ export function auditClaims(claims: readonly TransitionClaim[]): Audit {
 	const occ = occupiable();
 	const births = birthStates();
 	const analysable = occupancyAnalysable();
+	const provable = provablyUnoccupiable();
 	const bag: Bag = {
 		excluded: [],
 		unknown: [],
@@ -229,6 +255,9 @@ export function auditClaims(claims: readonly TransitionClaim[]): Audit {
 		// which reads `births` and never consults occupancy. Gating both behind one `continue` silently disabled a
 		// SOUND check — and the control that pins the five REG-F-068 rows in their right buckets went red, which is
 		// exactly what a control is for. **A soundness rule applied one scope too wide removes true findings.**
+		// THE SOUND GROUND FIRST: states the RATIFIED machine gives no in-arrow and no birth declares are dead
+		// whatever the coverage. Only the weaker occupancy argument needs completeness.
+		auditProvablyDead(c, provable.get(c.machine) ?? new Set<string>(), bag);
 		if (occupied && analysable.has(c.machine)) auditOccupancy(c, occupied, bag);
 		else bag.unanalysed.add(c.machine);
 		auditBirth(c, births.get(c.machine) ?? new Set<string>(), bag);
