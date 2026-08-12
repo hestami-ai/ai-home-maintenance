@@ -106,11 +106,40 @@ function canonArtifacts(): string[] {
 		.sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The canon artifacts, READ ONCE.
+ *
+ * ⚠ THIS WAS RE-READING EVERY ARTIFACT FOR EVERY RULE, and it turned the mutation gate into a coin flip.
+ * `canonFilesContaining` is called once per registered rule — ~112 of them — and each call did a `readdirSync`
+ * plus a full `readFileSync` of all six artifacts. The canon corpus is ~2.6 MB, so a single test was doing
+ * hundreds of large reads: 740ms in isolation, **6135ms under full-suite load, against a 5000ms default
+ * timeout.**
+ *
+ * THE FAILURE MODE IS WHAT MAKES IT WORTH FIXING PROPERLY RATHER THAN RAISING THE TIMEOUT. A declared CONTROL in
+ * the mutation ledger has no named victim, so `run.ts` invokes the WHOLE suite for it and treats any failure as
+ * "declared a CONTROL, but a test FAILED on it". A slow test tipping over its timeout therefore reports an
+ * unrelated control as SURVIVED and blocks the gate — which is exactly what happened, and it cost a long
+ * investigation down three wrong hypotheses before the message turned out to read `Test timed out`, not an
+ * assertion.
+ *
+ * AND IT WAS GETTING WORSE ON A SCHEDULE. `JPWB-REG-005` is one of the six artifacts re-read here, and it grows
+ * every time a finding is recorded — ten entries today alone. A test whose cost scales with the register is a
+ * test that will fail eventually no matter what the code does.
+ */
+let canonCorpus: readonly { readonly file: string; readonly text: string }[] | undefined;
+function canonCorpusOnce(): readonly { readonly file: string; readonly text: string }[] {
+	canonCorpus ??= canonArtifacts().map((f) => ({
+		file: f,
+		text: readFileSync(`${REPO_ROOT}docs/canon/${f}`, 'utf8')
+	}));
+	return canonCorpus;
+}
+
 /** Which canon artifacts contain `anchor` verbatim. Empty means the citation does not resolve. */
 function canonFilesContaining(anchor: string): string[] {
-	return canonArtifacts().filter((f) =>
-		readFileSync(`${REPO_ROOT}docs/canon/${f}`, 'utf8').includes(anchor)
-	);
+	return canonCorpusOnce()
+		.filter((a) => a.text.includes(anchor))
+		.map((a) => a.file);
 }
 
 /** The production files that mention `symbol` as a whole word. */
