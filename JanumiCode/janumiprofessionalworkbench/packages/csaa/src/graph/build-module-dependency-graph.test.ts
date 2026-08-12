@@ -213,7 +213,7 @@ describe('buildModuleDependencyGraph', () => {
 			expect(edge.resolutionState).toBe(resolution.resolutionState);
 			expect(nodeById.get(edge.source.nodeId)?.kind).toBe('SOURCE');
 			expect(nodeById.get(edge.target.nodeId)?.kind).toBe(
-				resolution.resolutionState === 'RESOLVED_SOURCE' ? 'SOURCE' : 'RESOLUTION_TARGET'
+				resolution.targetSourceId === null ? 'RESOLUTION_TARGET' : 'SOURCE'
 			);
 		}
 		expect(graph.forwardIndex).toHaveLength(graph.nodes.length);
@@ -266,5 +266,119 @@ describe('buildModuleDependencyGraph', () => {
 			diagnostics: [{ code: 'DANGLING_SEMANTIC_REFERENCE' }],
 			outcome: 'unavailable'
 		});
+	});
+
+	it('fails closed across request materialization, capability, and semantic population boundaries', () => {
+		const semanticSnapshot = snapshot(fixture('COMPLETE'));
+		const request = graphRequest(semanticSnapshot);
+		const outcomeFor = (requestValue: unknown, candidate = semanticSnapshot) =>
+			buildModuleDependencyGraph(requestValue, candidate);
+		const accessorRequest = { ...request } as Record<string, unknown>;
+		Object.defineProperty(accessorRequest, 'subjectId', {
+			configurable: true,
+			enumerable: true,
+			get: () => semanticSnapshot.subjectId
+		});
+		const hiddenRequest = { ...request } as Record<string, unknown>;
+		Object.defineProperty(hiddenRequest, 'subjectId', {
+			configurable: true,
+			enumerable: false,
+			value: semanticSnapshot.subjectId
+		});
+		const symbolRequest = { ...request, [Symbol('unexpected')]: true };
+		const nullPrototypeRequest = Object.assign(
+			Object.create(null) as Record<string, unknown>,
+			request
+		);
+		const invalidRequests: readonly unknown[] = [
+			null,
+			[],
+			new Proxy(request, {}),
+			Object.assign(Object.create({ inherited: true }) as Record<string, unknown>, request),
+			symbolRequest,
+			{ ...request, unexpected: true },
+			accessorRequest,
+			hiddenRequest,
+			{ ...request, subjectId: '' },
+			{ ...request, schemaVersion: 'other' },
+			{ ...request, operationVersion: 'other' }
+		];
+		for (const requestValue of invalidRequests)
+			expect(outcomeFor(requestValue)).toMatchObject({
+				diagnostics: [{ code: 'REQUEST_INVALID' }],
+				outcome: 'unavailable'
+			});
+		expect(outcomeFor(nullPrototypeRequest).outcome).toBe('complete');
+		expect(outcomeFor({ ...request, semanticSnapshotId: 'static:other' })).toMatchObject({
+			diagnostics: [{ code: 'SEMANTIC_SNAPSHOT_ID_MISMATCH' }],
+			outcome: 'unavailable'
+		});
+
+		for (const capabilityMutation of [
+			semanticSnapshot.capabilities.filter((record) => record.capability !== 'TS_SYNTAX'),
+			semanticSnapshot.capabilities.map((record) =>
+				record.capability === 'TS_SYMBOL' ? { ...record, state: 'UNSUPPORTED' as const } : record
+			)
+		])
+			expect(
+				outcomeFor(request, { ...semanticSnapshot, capabilities: capabilityMutation })
+			).toMatchObject({
+				diagnostics: [{ code: 'SEMANTIC_CAPABILITY_UNAVAILABLE' }],
+				outcome: 'unavailable'
+			});
+
+		const firstSource = semanticSnapshot.sources[0]!;
+		const firstNode = semanticSnapshot.astNodes[0]!;
+		const firstProvenance = semanticSnapshot.provenances[0]!;
+		const firstResolution = semanticSnapshot.moduleResolutions[0]!;
+		const semanticMutations: readonly StaticSemanticSnapshot[] = [
+			{ ...semanticSnapshot, sources: [...semanticSnapshot.sources, firstSource] },
+			{ ...semanticSnapshot, astNodes: [...semanticSnapshot.astNodes, firstNode] },
+			{ ...semanticSnapshot, provenances: [...semanticSnapshot.provenances, firstProvenance] },
+			{
+				...semanticSnapshot,
+				moduleResolutions: [...semanticSnapshot.moduleResolutions, firstResolution]
+			},
+			{
+				...semanticSnapshot,
+				moduleResolutions: [
+					{ ...firstResolution, sourceId: 'semantic:source-missing' },
+					...semanticSnapshot.moduleResolutions.slice(1)
+				]
+			},
+			{
+				...semanticSnapshot,
+				moduleResolutions: [
+					{ ...firstResolution, nodeId: 'semantic:node-missing' },
+					...semanticSnapshot.moduleResolutions.slice(1)
+				]
+			},
+			{
+				...semanticSnapshot,
+				moduleResolutions: [
+					{ ...firstResolution, provenanceId: 'semantic:provenance-missing' },
+					...semanticSnapshot.moduleResolutions.slice(1)
+				]
+			},
+			{
+				...semanticSnapshot,
+				moduleResolutions: [
+					{ ...firstResolution, targetSourceId: null },
+					...semanticSnapshot.moduleResolutions.slice(1)
+				]
+			},
+			{
+				...semanticSnapshot,
+				sources: [
+					{ ...firstSource, provenanceId: 'semantic:provenance-missing' },
+					...semanticSnapshot.sources.slice(1)
+				]
+			}
+		] as StaticSemanticSnapshot[];
+		for (const candidate of semanticMutations)
+			expect(outcomeFor(request, candidate)).toMatchObject({
+				diagnostics: [{ code: 'DANGLING_SEMANTIC_REFERENCE' }],
+				outcome: 'unavailable'
+			});
 	});
 });

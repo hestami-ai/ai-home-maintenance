@@ -325,8 +325,7 @@ describe('semantic wire shape materialization hardening', () => {
 					aliasSymbolId: null,
 					category: 'TYPE_PARAMETER',
 					display: 'T',
-					displayProfile:
-						'typescript-type-to-string-canonical-logical-paths/5.9.3-default/1.0.0',
+					displayProfile: 'typescript-type-to-string-canonical-logical-paths/5.9.3-default/1.0.0',
 					displaySha256: 'd'.repeat(64),
 					fingerprintProfile: 'jan-csaa-ts-type-fingerprint/1.0.0',
 					fingerprintSha256: 'e'.repeat(64),
@@ -516,6 +515,61 @@ describe('semantic wire shape materialization hardening', () => {
 				]
 			},
 			{ budget: false, message: 'Invalid scalar for symbol.flags.', path: '$.symbols[0].flags' }
+		);
+	});
+
+	it('rejects unknown type acquisition and relation discriminators', () => {
+		expectIssue(
+			{
+				types: [
+					{
+						acquisitionAnchors: [{ kind: 'UNKNOWN' }],
+						aliasSymbolId: null,
+						category: 'TYPE_PARAMETER',
+						display: 'T',
+						displayProfile: 'typescript-type-to-string-canonical-logical-paths/5.9.3-default/1.0.0',
+						displaySha256: 'd'.repeat(64),
+						fingerprintProfile: 'jan-csaa-ts-type-fingerprint/1.0.0',
+						fingerprintSha256: 'e'.repeat(64),
+						flagNames: ['TypeParameter'],
+						flags: 262_144,
+						id: 'type:1',
+						identityBasis: 'QUERY_ANCHORED',
+						objectFlagNames: [],
+						objectFlags: null,
+						programId: 'program:1',
+						projectId: 'project:1',
+						provenanceId: 'provenance:1',
+						structureState: 'COMPLETE',
+						symbolId: null,
+						unsupportedStructureKinds: []
+					}
+				]
+			},
+			{
+				budget: false,
+				message: 'Invalid closed type-acquisition-anchor discriminator.',
+				path: '$.types[0].acquisitionAnchors[0]'
+			}
+		);
+		expectIssue(
+			{
+				typeRelations: [
+					{
+						id: 'relation:1',
+						kind: 'UNKNOWN',
+						programId: 'program:1',
+						projectId: 'project:1',
+						provenanceId: 'provenance:1',
+						state: 'CONFIRMED'
+					}
+				]
+			},
+			{
+				budget: false,
+				message: 'Invalid closed type-relation discriminator.',
+				path: '$.typeRelations[0]'
+			}
 		);
 	});
 

@@ -866,6 +866,20 @@ describe('TypeScript directory parity and bounded traversal', () => {
 });
 
 describe('sealed capture, freshness, and replay', () => {
+	const replaceFinalAttribution = (
+		capture: ReturnType<typeof session>,
+		mutate: (
+			attribution: FrozenCompilerCapture['projectAttributions'][number]
+		) => FrozenCompilerCapture['projectAttributions'][number]
+	): void => {
+		const attribution = capture.journal.currentProjectEvidence(PROJECT_KEY).attribution;
+		(
+			capture.journal as unknown as {
+				attributions: { entries: () => FrozenCompilerCapture['projectAttributions'] };
+			}
+		).attributions = { entries: () => [mutate(attribution)] };
+	};
+
 	it('finalizes atomically with reconciled final context IDs and blocks every post-finalize drift', () => {
 		const root = temporaryRoot();
 		const frozen = subject({ 'src/index.ts': 'export {};\n' });
@@ -931,6 +945,124 @@ describe('sealed capture, freshness, and replay', () => {
 			'INVALID_CAPTURE'
 		);
 		expect(traps.value).toBe(0);
+	});
+
+	it.each([
+		[
+			'closure observations',
+			(capture: ReturnType<typeof session>) => {
+				(
+					capture.journal as unknown as {
+						observations: () => FrozenCompilerCapture['observations'];
+					}
+				).observations = () => [];
+			}
+		],
+		[
+			'project identity',
+			(capture: ReturnType<typeof session>) =>
+				replaceFinalAttribution(capture, (attribution) => ({
+					...attribution,
+					materializedRecipeDigest: 'not-a-sha256-digest'
+				}))
+		],
+		[
+			'project query invocation',
+			(capture: ReturnType<typeof session>) =>
+				replaceFinalAttribution(capture, (attribution) => ({
+					...attribution,
+					queryInvocations: [{ ...attribution.queryInvocations[0]!, invocationCount: 0 }]
+				}))
+		],
+		[
+			'project context-input identity',
+			(capture: ReturnType<typeof session>) =>
+				replaceFinalAttribution(capture, (attribution) => ({
+					...attribution,
+					contextInputIds: []
+				}))
+		],
+		[
+			'global query multiplicity',
+			(capture: ReturnType<typeof session>) =>
+				replaceFinalAttribution(capture, (attribution) => ({
+					...attribution,
+					queryInvocations: [{ ...attribution.queryInvocations[0]!, invocationCount: 2 }]
+				}))
+		]
+	] as const)('rejects provider-issued finalized state with corrupt %s', (_kind, corrupt) => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const capture = session(root, frozen);
+		capture.capture({ logicalPath: 'missing.ts', operation: 'FILE_EXISTS' });
+		corrupt(capture);
+
+		expectCode(
+			() => recheckCompilerInputJournal(capture.finalize()),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
+	});
+
+	it('fails closed when internal operation clocks make recheck or replay deadlines unsafe', () => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const unsafeRecheck = session(root, frozen);
+		unsafeRecheck.capture({ logicalPath: 'missing.ts', operation: 'FILE_EXISTS' });
+		(unsafeRecheck.journal as unknown as { startedAtMs: number }).startedAtMs =
+			Number.MAX_SAFE_INTEGER;
+		const unsafeFinalized = unsafeRecheck.finalize();
+		expectCode(
+			() => recheckCompilerInputJournal(unsafeFinalized),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+
+		const replayCapture = session(root, frozen);
+		replayCapture.capture({ logicalPath: 'missing.ts', operation: 'FILE_EXISTS' });
+		const finalized = replayCapture.finalize();
+		const intrinsicFreeze = Object.freeze;
+		let corruptedBudgetClone = false;
+		const freeze = vi.spyOn(Object, 'freeze').mockImplementation((value) => {
+			if (
+				!corruptedBudgetClone &&
+				value !== null &&
+				typeof value === 'object' &&
+				Object.hasOwn(value, 'maxDurationMs') &&
+				Object.hasOwn(value, 'maxCompilerInputMetadataBytes')
+			) {
+				(value as { maxDurationMs: number }).maxDurationMs = Number.MAX_SAFE_INTEGER;
+				corruptedBudgetClone = true;
+			}
+			return intrinsicFreeze(value);
+		});
+		const verified = recheckCompilerInputJournal(finalized);
+		freeze.mockRestore();
+		expect(corruptedBudgetClone).toBe(true);
+		expectCode(
+			() => new ReplayCompilerInputJournal(frozen, verified),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+	});
+
+	it('poisons replay when its internal invocation counter exceeds the captured budget', () => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const query = { logicalPath: 'missing.ts', operation: 'FILE_EXISTS' as const };
+		const capture = session(root, frozen);
+		capture.capture(query);
+		const verified = recheckCompilerInputJournal(capture.finalize());
+		const replay = replayJournal(frozen, verified, capture.recipe, capture.materialized);
+		(replay as unknown as { replayCalls: number }).replayCalls =
+			replay.semanticBudgets.maxCompilerQueryInvocations;
+
+		expectCode(
+			() => replay.replay(query, PROJECT_KEY),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+		expectCode(() => replay.assertFullyConsumed(), CompilerInputCaptureError, 'INVALID_CAPTURE');
 	});
 
 	it('rejects Proxy budgets and query arrays before reflection with zero trap execution', () => {

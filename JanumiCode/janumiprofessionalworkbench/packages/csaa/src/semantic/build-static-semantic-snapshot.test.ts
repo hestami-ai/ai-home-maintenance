@@ -24,6 +24,7 @@ import { programRecipeDigest } from './ids.js';
 import { canonicalSemanticJson } from './canonical.js';
 import { semanticPopulation } from './population.js';
 import { CompilerInputCaptureError } from '../providers/typescript/compiler-input-journal.js';
+import * as staticRawExtraction from '../providers/typescript/extract-static-raw.js';
 import { ProgramRecipeMaterializationError } from '../providers/typescript/materialize-program-recipe.js';
 import {
 	buildStaticSemanticSnapshot,
@@ -32,6 +33,8 @@ import {
 import { attachFrozenSubjectBytes, readFrozenSubjectArtifact } from '../subject/frozen-store.js';
 import { resolveSubject } from '../subject/resolve-subject.js';
 import { validateStaticSemanticSnapshot } from './validate-snapshot.js';
+import * as semanticNormalization from './normalize-semantic-snapshot.js';
+import * as semanticValidation from './validate-snapshot.js';
 
 const temporaryRoots: string[] = [];
 
@@ -1952,5 +1955,263 @@ describe('buildStaticSemanticSnapshot', () => {
 			outcome: 'unavailable'
 		});
 		expect('snapshot' in outcome).toBe(false);
+	});
+
+	it('closes assignability request selectors, identities, ordering, and capability prerequisites', () => {
+		const root = fixture();
+		const subject = resolved(root);
+		const base = semanticRequest(root, subject.descriptor.subjectId);
+		const selector = {
+			end: 1,
+			logicalPath: 'a.ts',
+			queryMode: 'TYPE_AT_LOCATION' as const,
+			start: 0,
+			syntaxKind: ts.SyntaxKind.Identifier
+		};
+		const request = {
+			requestId: 'a',
+			requesterRef: 'test',
+			source: selector,
+			target: selector
+		};
+		const expectRequestRefusal = (value: unknown): void => {
+			expect(buildStaticSemanticSnapshot(value, { subject })).toMatchObject({
+				diagnostics: [expect.objectContaining({ code: expect.any(String), phase: 'REQUEST' })],
+				outcome: 'incompatible'
+			});
+		};
+
+		for (const assignabilityRequest of [
+			{ ...request, requestId: '' },
+			{ ...request, requesterRef: '' },
+			{ ...request, source: { ...selector, logicalPath: 'longer-than-bound.ts' } },
+			{ ...request, source: { ...selector, logicalPath: '../outside.ts' } },
+			{ ...request, source: { ...selector, start: -1 } },
+			{ ...request, source: { ...selector, end: -1 } },
+			{ ...request, source: { ...selector, syntaxKind: -1 } },
+			{ ...request, source: { ...selector, queryMode: 'UNKNOWN_QUERY' } }
+		]) {
+			expectRequestRefusal({
+				...base,
+				assignabilityRequests: [assignabilityRequest],
+				budgets: { ...base.budgets, maxPathCharacters: 16 }
+			});
+		}
+
+		const later = { ...request, requestId: 'z' };
+		expectRequestRefusal({ ...base, assignabilityRequests: [later, request] });
+		expectRequestRefusal({ ...base, assignabilityRequests: [request, { ...request }] });
+
+		const actualSort = Array.prototype.sort;
+		const sort = vi.spyOn(Array.prototype, 'sort').mockImplementation(function (
+			this: unknown[],
+			compareFn?: (left: unknown, right: unknown) => number
+		) {
+			if (
+				this.length === 3 &&
+				this.includes('TS_PROJECT') &&
+				this.includes('TS_SYMBOL') &&
+				this.includes('TS_SYNTAX')
+			)
+				throw new Error('capability ordering unavailable');
+			return actualSort.call(this, compareFn);
+		});
+		try {
+			expectRequestRefusal(base);
+		} finally {
+			sort.mockRestore();
+		}
+	});
+
+	it('fails closed when the operation deadline expires or its clock throws between checkpoints', () => {
+		const root = fixture();
+		const subject = resolved(root);
+		const request = semanticRequest(root, subject.descriptor.subjectId, { maxDurationMs: 1 });
+
+		const expiredClock = vi
+			.spyOn(Date, 'now')
+			.mockImplementation(() =>
+				new Error().stack?.includes('assertDeadline') === true ? 1_002 : 1_000
+			);
+		let expired;
+		try {
+			expired = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			expiredClock.mockRestore();
+		}
+		expect(expired).toMatchObject({
+			diagnostics: [expect.objectContaining({ code: 'SEMANTIC_BUDGET_EXCEEDED' })],
+			outcome: 'unavailable'
+		});
+
+		const failingClock = vi.spyOn(Date, 'now').mockImplementation(() => {
+			if (new Error().stack?.includes('assertDeadline') === true)
+				throw new Error('clock unavailable');
+			return 2_000;
+		});
+		let failed;
+		try {
+			failed = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			failingClock.mockRestore();
+		}
+		expect(failed).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'SEMANTIC_VALIDATION_FAILED',
+					message: expect.stringContaining('clock unavailable'),
+					phase: 'REQUEST'
+				})
+			],
+			outcome: 'unavailable'
+		});
+	});
+
+	it('refuses replay drift and downstream normalization or validation disagreement', () => {
+		const root = fixture();
+		const subject = resolved(root);
+		const request = semanticRequest(root, subject.descriptor.subjectId);
+		const actualExtract = staticRawExtraction.extractStaticRaw;
+
+		let extractionCalls = 0;
+		const changedSymbol = vi
+			.spyOn(staticRawExtraction, 'extractStaticRaw')
+			.mockImplementation((input) => {
+				const raw = actualExtract(input);
+				extractionCalls += 1;
+				if (extractionCalls !== 2) return raw;
+				return {
+					...raw,
+					symbols: raw.symbols.map((symbol, index) =>
+						index === 0 ? { ...symbol, name: `${symbol.name}-replay-drift` } : symbol
+					)
+				};
+			});
+		let symbolDrift;
+		try {
+			symbolDrift = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			changedSymbol.mockRestore();
+		}
+		expect(symbolDrift).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'COMPILER_CONTEXT_CHANGED',
+					message: expect.stringContaining('symbols.name'),
+					phase: 'RECHECK'
+				})
+			],
+			outcome: 'unavailable'
+		});
+
+		extractionCalls = 0;
+		const changedProject = vi
+			.spyOn(staticRawExtraction, 'extractStaticRaw')
+			.mockImplementation((input) => {
+				const raw = actualExtract(input);
+				extractionCalls += 1;
+				return extractionCalls === 2
+					? {
+							...raw,
+							project: { ...raw.project, configPath: 'unexpected/tsconfig.json' }
+						}
+					: raw;
+			});
+		let projectDrift;
+		try {
+			projectDrift = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			changedProject.mockRestore();
+		}
+		expect(projectDrift).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'COMPILER_CONTEXT_CHANGED',
+					message: expect.stringMatching(/missing-project.*unexpected-project/u),
+					phase: 'RECHECK'
+				})
+			],
+			outcome: 'unavailable'
+		});
+
+		const normalizationFailure = vi
+			.spyOn(semanticNormalization, 'normalizeStaticSemanticSnapshot')
+			.mockImplementation(() => {
+				throw new semanticNormalization.SemanticNormalizationError(
+					'INVALID_RAW_MODEL',
+					'forced normalization disagreement'
+				);
+			});
+		let normalizationOutcome;
+		try {
+			normalizationOutcome = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			normalizationFailure.mockRestore();
+		}
+		expect(normalizationOutcome).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'SEMANTIC_VALIDATION_FAILED',
+					message: 'forced normalization disagreement',
+					phase: 'VALIDATE'
+				})
+			],
+			outcome: 'unavailable'
+		});
+
+		const validationFailure = vi
+			.spyOn(semanticValidation, 'validateStaticSemanticSnapshotWithBudgetEvidence')
+			.mockReturnValue({
+				evidence: null,
+				validation: {
+					issues: [
+						{
+							code: 'INVALID_VALUE',
+							message: 'forced validator disagreement',
+							path: '$.forced'
+						}
+					],
+					state: 'INVALID'
+				}
+			});
+		let invalidOutcome;
+		try {
+			invalidOutcome = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			validationFailure.mockRestore();
+		}
+		expect(invalidOutcome).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'SEMANTIC_VALIDATION_FAILED',
+					message: expect.stringContaining('forced validator disagreement'),
+					phase: 'VALIDATE'
+				})
+			],
+			outcome: 'unavailable'
+		});
+
+		const missingEvidence = vi
+			.spyOn(semanticValidation, 'validateStaticSemanticSnapshotWithBudgetEvidence')
+			.mockReturnValue({
+				evidence: null,
+				validation: { issues: [] as const, state: 'VALID' }
+			} as never);
+		let missingEvidenceOutcome;
+		try {
+			missingEvidenceOutcome = buildStaticSemanticSnapshot(request, { subject });
+		} finally {
+			missingEvidence.mockRestore();
+		}
+		expect(missingEvidenceOutcome).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'SEMANTIC_VALIDATION_FAILED',
+					message: expect.stringContaining('validator-owned budget evidence'),
+					phase: 'VALIDATE'
+				})
+			],
+			outcome: 'unavailable'
+		});
 	});
 });

@@ -2,15 +2,15 @@
   "artifactPopulations": [
     {
       "artifactClass": "CONFIGURATION",
-      "discovered": 57,
+      "discovered": 58,
       "excluded": 0,
       "failed": 0,
-      "included": 57,
+      "included": 58,
       "provenance": [
         "subject.selectedFiles#artifactClass=CONFIGURATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 57
+      "successfullyInventoried": 58
     },
     {
       "artifactClass": "GENERATED_SOURCE",
@@ -29,12 +29,12 @@
       "discovered": "UNKNOWN",
       "excluded": "UNKNOWN",
       "failed": 0,
-      "included": 129,
+      "included": 131,
       "provenance": [
         "subject.selectedFiles#artifactClass=OTHER",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 129
+      "successfullyInventoried": 131
     },
     {
       "artifactClass": "SCRIPT",
@@ -50,27 +50,27 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 211,
+      "discovered": 230,
       "excluded": 0,
       "failed": 0,
-      "included": 211,
+      "included": 230,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 211
+      "successfullyInventoried": 230
     },
     {
       "artifactClass": "TEST",
-      "discovered": 298,
+      "discovered": 306,
       "excluded": 0,
       "failed": 0,
-      "included": 298,
+      "included": 306,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 298
+      "successfullyInventoried": 306
     },
     {
       "artifactClass": "VERIFICATION",
@@ -197,12 +197,20 @@
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
         "apps/rph-demo/src/lib/theme.test.ts",
         "apps/rph-demo/src/lib/walkthrough.test.ts",
+        "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.test.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.test.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
         "packages/csaa/src/graph/validate-graph.test.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.test.ts",
         "packages/csaa/src/index.test.ts",
         "packages/csaa/src/inventory/boundary-policy.test.ts",
         "packages/csaa/src/inventory/canonical.test.ts",
         "packages/csaa/src/inventory/inventory.test.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.test.ts",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.test.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
         "packages/csaa/src/providers/typescript/compiler-paths.test.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.test.ts",
@@ -476,7 +484,7 @@
       "state": "IMPLEMENTED"
     },
     {
-      "explanation": "The first bounded DWP-004 increment projects every compiler-observed module occurrence into a validated TypeScript module-dependency graph with distinct occurrence relations, explicit non-source targets, provenance, limitations, and reconciled forward/reverse indexes. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, depcruise comparison, calls, flow, and cross-Program composition are not implemented by this increment.",
+      "explanation": "The first two bounded DWP-004 increments project every compiler-observed module occurrence into a validated TypeScript module-dependency graph and normalize exact-schema-validated dependency-cruiser 16.10.4 JSON evidence for conservative, context-bound comparison. Provider aggregates never replace compiler occurrence edges; qualified target agreement, unresolved agreement, collapsed corroboration, incomparable scope/context differences, and unqualified observed differences remain distinct. This contract cannot promote a difference to conflict without later validated context-equivalence and closed-perimeter evidence. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, provider execution, flow, graph algorithms, and cross-Program composition are not implemented by these increments.",
       "id": "dependency-graph",
       "provenance": [
         "packages/csaa/src/contracts/graph.ts",
@@ -488,22 +496,60 @@
         "packages/csaa/src/providers/typescript/extract-symbols.ts",
         "packages/csaa/src/semantic/raw-semantic-model.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
-        "packages/csaa/src/semantic/validate-snapshot.ts"
+        "packages/csaa/src/semantic/validate-snapshot.ts",
+        "packages/csaa/src/contracts/dependency-comparison.ts",
+        "packages/csaa/src/contracts/dependency-cruiser.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+        "packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts"
       ],
       "provider": "typescript",
       "state": "PARTIAL"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "The third bounded DWP-004 increment enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site into a validated graph with exact structural/lexical ownership within the declared method, open compiler-bound callable candidates, and explicit external-dispatch, unresolved, or unsupported frontiers. Runtime caller and evaluation ownership remain coarsened and are not inferred from the structural ownership edge. Invocation-specific resolved signatures, dispatch closure, runtime observations, and all twelve entry-mechanism classes are not yet analyzed, so exact targets, whole-program reachability, dead-code conclusions, and full JAN-CSAA-007 conformance are not claimed.",
       "id": "call-graph",
       "provenance": [
-        "packages/csaa/src/contracts/inventory.ts"
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts"
       ],
-      "provider": null,
-      "state": "UNIMPLEMENTED"
+      "provider": "typescript",
+      "state": "PARTIAL"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "The fourth bounded DWP-004 increment observes the exact frozen generated JPWB transition table without executing it and projects declared machines, states, legal transitions, guarded-legal restrictions, explicitly illegal transitions, and cross-axis frontiers. It uses implementation-local relation codes because the closed JAN-CSAA-007 registry has no state-machine relation family. This generated-runtime-topology projection does not establish upstream vocabulary authority, command performability, writer/effect coverage, guard enforcement, behavioral reachability, or any specialized verifier-census conclusion; full JAN-CSAA-007 and JAN-CSAA-008 conformance remain NOT_CLAIMED and existing verifier authority remains delegated.",
+      "id": "state-machine-graph",
+      "provenance": [
+        "packages/csaa/src/contracts/state-machine-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts"
+      ],
+      "provider": "jpwb-generated-transition-table",
+      "state": "PARTIAL"
+    },
+    {
+      "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "code-property-graph",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -512,7 +558,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "control-flow",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -521,7 +567,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "data-flow",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -530,7 +576,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "runtime-traces",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -539,7 +585,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "security-query",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -548,7 +594,7 @@
       "state": "UNIMPLEMENTED"
     },
     {
-      "explanation": "Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.",
+      "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "test-coverage-ingestion",
       "provenance": [
         "packages/csaa/src/contracts/inventory.ts"
@@ -1592,7 +1638,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "dc155c6e8f8c66514b587814a6013efcdcf1c43b004902705d7664f7f762c70e",
+    "configurationDigest": "05fbdfb541f0a42877413e1637ae93a7af3f1f10e89e0312ad33e57975c15793",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -1657,9 +1703,9 @@
         },
         {
           "artifactClass": "LOCKFILE",
-          "bytes": 131415,
+          "bytes": 131440,
           "path": "bun.lock",
-          "sha256": "b5d61e927fe054b00ff1bfde8ce335a4ead47fba9b29d7ad2628cb3fd49e39d6"
+          "sha256": "5715f85bdcb94a8ce0cee96615a06730992a13a119d4f60318d6d1a76708d813"
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
@@ -1681,9 +1727,15 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 678,
+          "bytes": 725,
           "path": "packages/csaa/package.json",
-          "sha256": "1be02cdc1ebf3065f3d76dbcde8203b3a522b2a422f5fe7c40553287c9641ede"
+          "sha256": "0ec113c9146d0c6193b9b6794eae51ee95f8df8006da816aa62194e517810567"
+        },
+        {
+          "artifactClass": "TOOL_CONFIGURATION",
+          "bytes": 10946,
+          "path": "packages/csaa/src/contracts/dependency-cruiser.ts",
+          "sha256": "2b0d13db0f56ab5dcd1f0e57e703ad622be3aeadf1408561f1c0922ead759599"
         },
         {
           "artifactClass": "PROJECT_CONFIGURATION",
@@ -2108,31 +2160,51 @@
               "node"
             ]
           },
-          "configClosureDigest": "a8c3cc3023b2ddc02eef51bccd39e1b1e2aff076befad9a2a94f476aa42415b3",
+          "configClosureDigest": "1297fdd2f4ab0a8f71c1377bd1abf5fcb529110524ac62e98095d161eb3e64c8",
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "464991c354f52510fa0123b1974f8a60d6a2bd84aceda9753270eff0a34f4859",
+          "projectResolutionDigest": "126a7904b5cc7cbfbab987b4b751d5cc0e7b0095d5dc06576b5c8d9bf4321a1b",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/contracts/call-graph.ts",
+            "packages/csaa/src/contracts/dependency-comparison.ts",
+            "packages/csaa/src/contracts/dependency-cruiser.ts",
             "packages/csaa/src/contracts/graph.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/semantic.ts",
+            "packages/csaa/src/contracts/state-machine-graph.ts",
             "packages/csaa/src/contracts/subject.ts",
+            "packages/csaa/src/graph/build-call-graph.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.ts",
+            "packages/csaa/src/graph/build-state-machine-graph.ts",
+            "packages/csaa/src/graph/call-graph-content.ts",
+            "packages/csaa/src/graph/call-graph-ids.ts",
+            "packages/csaa/src/graph/call-graph-input.ts",
+            "packages/csaa/src/graph/compare-dependency-providers.ts",
             "packages/csaa/src/graph/ids.ts",
             "packages/csaa/src/graph/module-dependency-content.ts",
             "packages/csaa/src/graph/module-dependency-input.ts",
+            "packages/csaa/src/graph/state-machine-graph-content.ts",
+            "packages/csaa/src/graph/state-machine-graph-ids.ts",
+            "packages/csaa/src/graph/state-machine-graph-input.ts",
+            "packages/csaa/src/graph/validate-call-graph.ts",
+            "packages/csaa/src/graph/validate-dependency-comparison.ts",
             "packages/csaa/src/graph/validate-graph.ts",
+            "packages/csaa/src/graph/validate-state-machine-graph.ts",
             "packages/csaa/src/index.ts",
             "packages/csaa/src/inventory/canonical.ts",
             "packages/csaa/src/inventory/collect-inventory.ts",
             "packages/csaa/src/inventory/project-subject-for-inventory.ts",
             "packages/csaa/src/inventory/render-inventory.ts",
             "packages/csaa/src/inventory/run-inventory.ts",
+            "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+            "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
+            "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+            "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
             "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
             "packages/csaa/src/providers/typescript/compiler-paths.ts",
             "packages/csaa/src/providers/typescript/extract-static-raw.ts",
@@ -2199,27 +2271,48 @@
               "node"
             ]
           },
-          "configClosureDigest": "30535c1429863e083b1d97837221c7c9f15660232886eec281b39daf640d699f",
+          "configClosureDigest": "4f09d16241811f4f7c2b0c82c37fd372ce8f05fb8592d1c0a3c913f17ef8fbda",
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "0f565f06eb3ace80a6b0d52482d165206961ad86511abf12990708c454b39561",
+          "projectResolutionDigest": "c99fc3b4f3f981627a9d632af1525060174c2bedd7de07525b5968333e72fc29",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/contracts/call-graph.ts",
+            "packages/csaa/src/contracts/dependency-comparison.ts",
+            "packages/csaa/src/contracts/dependency-cruiser.ts",
             "packages/csaa/src/contracts/graph.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/semantic.ts",
+            "packages/csaa/src/contracts/state-machine-graph.ts",
             "packages/csaa/src/contracts/subject.ts",
+            "packages/csaa/src/graph/build-call-graph.test.ts",
+            "packages/csaa/src/graph/build-call-graph.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.ts",
+            "packages/csaa/src/graph/build-state-machine-graph.test.ts",
+            "packages/csaa/src/graph/build-state-machine-graph.ts",
+            "packages/csaa/src/graph/call-graph-content.ts",
+            "packages/csaa/src/graph/call-graph-ids.ts",
+            "packages/csaa/src/graph/call-graph-input.ts",
+            "packages/csaa/src/graph/compare-dependency-providers.test.ts",
+            "packages/csaa/src/graph/compare-dependency-providers.ts",
             "packages/csaa/src/graph/ids.ts",
             "packages/csaa/src/graph/module-dependency-content.ts",
             "packages/csaa/src/graph/module-dependency-input.ts",
+            "packages/csaa/src/graph/state-machine-graph-content.ts",
+            "packages/csaa/src/graph/state-machine-graph-ids.ts",
+            "packages/csaa/src/graph/state-machine-graph-input.ts",
+            "packages/csaa/src/graph/validate-call-graph.ts",
+            "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
+            "packages/csaa/src/graph/validate-dependency-comparison.ts",
             "packages/csaa/src/graph/validate-graph.test.ts",
             "packages/csaa/src/graph/validate-graph.ts",
+            "packages/csaa/src/graph/validate-state-machine-graph.test.ts",
+            "packages/csaa/src/graph/validate-state-machine-graph.ts",
             "packages/csaa/src/index.test.ts",
             "packages/csaa/src/index.ts",
             "packages/csaa/src/inventory/boundary-policy.test.ts",
@@ -2230,6 +2323,13 @@
             "packages/csaa/src/inventory/project-subject-for-inventory.ts",
             "packages/csaa/src/inventory/render-inventory.ts",
             "packages/csaa/src/inventory/run-inventory.ts",
+            "packages/csaa/src/providers/dependency-cruiser/normalize-output.test.ts",
+            "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+            "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.test.ts",
+            "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
+            "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
+            "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+            "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
             "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
             "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
             "packages/csaa/src/providers/typescript/compiler-paths.test.ts",
@@ -4364,7 +4464,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "f7249190f92a2fa961d88e37fe9a413415c312be0cccf0e7ce43d5b2c54df5c1",
+    "fileManifestDigest": "7351857b2b235be614783f885d6c51b9c1a9302cdb86c542f9ead6092f95d7d2",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/tsconfig.json",
@@ -4411,7 +4511,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.0.0",
-    "selectedFileCount": 766,
+    "selectedFileCount": 796,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -5486,9 +5586,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 131415,
+        "bytes": 131440,
         "path": "bun.lock",
-        "sha256": "b5d61e927fe054b00ff1bfde8ce335a4ead47fba9b29d7ad2628cb3fd49e39d6",
+        "sha256": "5715f85bdcb94a8ce0cee96615a06730992a13a119d4f60318d6d1a76708d813",
         "subjectArtifactClass": "LOCKFILE"
       },
       {
@@ -5513,11 +5613,39 @@
         "subjectArtifactClass": "MANIFEST"
       },
       {
+        "artifactClass": "OTHER",
+        "bytes": 2613,
+        "path": "packages/csaa/THIRD_PARTY_NOTICES.md",
+        "sha256": "08e4a33bc02579d61fb0992e063b4731a498d19b058f5a4e57bae944711d0ad1",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
         "artifactClass": "CONFIGURATION",
-        "bytes": 678,
+        "bytes": 725,
         "path": "packages/csaa/package.json",
-        "sha256": "1be02cdc1ebf3065f3d76dbcde8203b3a522b2a422f5fe7c40553287c9641ede",
+        "sha256": "0ec113c9146d0c6193b9b6794eae51ee95f8df8006da816aa62194e517810567",
         "subjectArtifactClass": "MANIFEST"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 14077,
+        "path": "packages/csaa/src/contracts/call-graph.ts",
+        "sha256": "d8cbba0db1503c836b3d9b54a2f2dd1e47f1dd1f5ba7e907f8840c81ec364599",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 8600,
+        "path": "packages/csaa/src/contracts/dependency-comparison.ts",
+        "sha256": "c4188a76a4ed89f15200f65d967319f239bbc8ba6c3070d8cdbf054e8e5e00e2",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "CONFIGURATION",
+        "bytes": 10946,
+        "path": "packages/csaa/src/contracts/dependency-cruiser.ts",
+        "sha256": "2b0d13db0f56ab5dcd1f0e57e703ad622be3aeadf1408561f1c0922ead759599",
+        "subjectArtifactClass": "TOOL_CONFIGURATION"
       },
       {
         "artifactClass": "SOURCE",
@@ -5542,6 +5670,13 @@
       },
       {
         "artifactClass": "SOURCE",
+        "bytes": 18717,
+        "path": "packages/csaa/src/contracts/state-machine-graph.ts",
+        "sha256": "61c34ac3c4a445a6af9ce27c94365396cba5cd2aba59083eddcda54b280adcab",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
         "bytes": 8808,
         "path": "packages/csaa/src/contracts/subject.ts",
         "sha256": "ec55cf1567c33e2de39ea8a26c6a86aa6404de944e82efdd3445e68102e6b2f0",
@@ -5549,16 +5684,79 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 9635,
-        "path": "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
-        "sha256": "9c622cadab744269cf665cacbd4138dce0e2fbd51161df84d791412c8efec42f",
+        "bytes": 68005,
+        "path": "packages/csaa/src/graph/build-call-graph.test.ts",
+        "sha256": "32779ebbdb24e6b8bf449a463e0e73a3ea4e66ea74385b85ec73c7e5f6d6c891",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 20447,
+        "bytes": 51539,
+        "path": "packages/csaa/src/graph/build-call-graph.ts",
+        "sha256": "6c330982bab922b6c5ee253b7ee2bfc2b80d418270096819481474db01d81f07",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 13701,
+        "path": "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
+        "sha256": "709ab3153054249d782348f5cdf912db37d5e143efb7fe7a6498c1bfc095fa57",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 20748,
         "path": "packages/csaa/src/graph/build-module-dependency-graph.ts",
-        "sha256": "8bbffb7ea60d138c99fbf3cdeed78596899f37f4e5a283baba1ea5f3a03268b9",
+        "sha256": "b854d821b4a40e35563a073c4d5f89b3b4043a7eeb712077d3a1bf18de4b6b1f",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 14232,
+        "path": "packages/csaa/src/graph/build-state-machine-graph.test.ts",
+        "sha256": "294138256d12038ca1acd24425e3f358e7e1d762aeb5d811a3233eb9f88bcbd4",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 22061,
+        "path": "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "sha256": "c72571c86a0eba5e754f76b5c926cf7671dba77e2293e34e8eeb3ca7cdbc41de",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 450,
+        "path": "packages/csaa/src/graph/call-graph-content.ts",
+        "sha256": "0efde053e28a3f93723a833e035e3c9884aeb3aacd8dc45c9805f20fe3e63566",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 2966,
+        "path": "packages/csaa/src/graph/call-graph-ids.ts",
+        "sha256": "fb0317317cec5362b59b79113933ee5c190ef3e30832bd4709c18af56397c8dc",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 6870,
+        "path": "packages/csaa/src/graph/call-graph-input.ts",
+        "sha256": "b23fcf664bef55bd585c7fb6c94ae51c76feb3cbe4f4b1d72218a86e1e687f2b",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 29924,
+        "path": "packages/csaa/src/graph/compare-dependency-providers.test.ts",
+        "sha256": "0de44fa984255abda4d3b05a84c57715e071291349f1212831acc70766dc58db",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 30503,
+        "path": "packages/csaa/src/graph/compare-dependency-providers.ts",
+        "sha256": "d35f3c4dbe6e6d756086fae173b75775ed2791ab3f36802c9c4a1f4ab2fa74ce",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -5583,31 +5781,87 @@
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
-        "artifactClass": "TEST",
-        "bytes": 6647,
-        "path": "packages/csaa/src/graph/validate-graph.test.ts",
-        "sha256": "e207453707a614933683cf69c7dd7496fda5e8805435acaa8f5f13fc08d909dc",
-        "subjectArtifactClass": "TEST_SOURCE"
+        "artifactClass": "SOURCE",
+        "bytes": 989,
+        "path": "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "sha256": "4d7561b06f73112b5ad068439abb52911787dd15c9226ae8356d952120b3dce8",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 44437,
-        "path": "packages/csaa/src/graph/validate-graph.ts",
-        "sha256": "11e397ed83aa6f122caded1260de5cb7d4d2fd22617fff8871d3339bd7f264cc",
+        "bytes": 5491,
+        "path": "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "sha256": "6d61318eef7ce1ae20eeeb920c1d6f9baaad0e331a2817a7b681416ae34ac027",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 5172,
+        "path": "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "sha256": "b741447aef4116c23372caa0238a7044490c3fce289da1292d72a8548f0e1f10",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 106244,
+        "path": "packages/csaa/src/graph/validate-call-graph.ts",
+        "sha256": "2edf41b48376a4d8f1a181283db86cbdafa6bceeeed799abe109a6b2efd46a98",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 2801,
-        "path": "packages/csaa/src/index.test.ts",
-        "sha256": "2e457a6cfb1a73dead2440b077f4f87c8d294e66d7eda082e52e579072e36827",
+        "bytes": 19412,
+        "path": "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
+        "sha256": "bb4fe86926f448e173586fdbe1a52c2d0aba80baf838cdb72f0c7ca7c5131405",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 1661,
+        "bytes": 24348,
+        "path": "packages/csaa/src/graph/validate-dependency-comparison.ts",
+        "sha256": "f2ede469180fbde6f76c6dd78301fadf7e166d3ad42ab487c57e808d42e3a367",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 27140,
+        "path": "packages/csaa/src/graph/validate-graph.test.ts",
+        "sha256": "e16223110dface497ff31967f19d575c10d8943e21585a3971631abbd4abcd89",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 44466,
+        "path": "packages/csaa/src/graph/validate-graph.ts",
+        "sha256": "9d2454a2e63902b8340326033ca54b291e5a9b3ea0ccdcf686b93e2cfe46eb42",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 18749,
+        "path": "packages/csaa/src/graph/validate-state-machine-graph.test.ts",
+        "sha256": "655963dbb126b701df3b75cd51ef885bfee1b630e4b56432c3c166b2e06d5374",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 47864,
+        "path": "packages/csaa/src/graph/validate-state-machine-graph.ts",
+        "sha256": "0531c4f0970ee9045c6c5df144a8ce57153dd28ab482925bc7c01ada5d8068af",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 5291,
+        "path": "packages/csaa/src/index.test.ts",
+        "sha256": "1c84ab5dbbe26edd67ef28d46b32e0a68f5ebb52f983355aa3e40dfb35a9d4d3",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 3505,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "6e73afc59e7dfd432c45c356278a538a60894669e71f7b653205fd3051847dae",
+        "sha256": "7689aea8d07d12c78394381e4f0b09110ea0921bb5698e6209364393bebde230",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -5633,16 +5887,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 36620,
+        "bytes": 42385,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "0d8c4a20d89ffac48526d781ecb00586680abaac21bbc5c4db540ab04bea7497",
+        "sha256": "5bccdb5e28bf04215d69c5a747f8da42b9f1a29f6e4cf05388ae2ea3d80fe785",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 24476,
+        "bytes": 27456,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "4f3bdc77766945d4ca31ed270b77d00f3ed996eb5b71c02689ac8999b8e776da",
+        "sha256": "94dc2306eeab82ce2e0e42f74c004dc8c1768a38cfee44220fdcc924397c1d05",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5668,9 +5922,65 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 110510,
+        "bytes": 50777,
+        "path": "packages/csaa/src/providers/dependency-cruiser/normalize-output.test.ts",
+        "sha256": "8f0130ddbc62c18093366a715034d7784b49da107dddf41ed99a0a227fc66923",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 86297,
+        "path": "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+        "sha256": "3b115344a6c8eabf2d5573a0f213eb52733f6bbb75874cdd1863879c06eb71cc",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 21698,
+        "path": "packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json",
+        "sha256": "8a964fdaf14b8ceb60d6c9ec15b4b9edcf5e751fb869a3206a88a8035da0f26f",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 5528,
+        "path": "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.test.ts",
+        "sha256": "a0a2e8748c200fa66694f6ee665ef422006c5568fd55c7ab866599ad406b2a17",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 3909,
+        "path": "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
+        "sha256": "d049a754f97065fefff140ecbb051405a892e75509de6be3e71cb531be65a60d",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 22383,
+        "path": "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
+        "sha256": "3590454371af3758904a27e91f5f123824bd5ce510c26e1e1219b86e5b46f416",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 31309,
+        "path": "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "sha256": "1b54185356788aff593dcf726738cd0d40cd5100913e0d770ca1709535612da3",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 20104,
+        "path": "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
+        "sha256": "29a0d196cbc501e602a9b9cfcfb26b0eabcb891ef95f501273f593a4ba611837",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 114939,
         "path": "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
-        "sha256": "92f17ae222d198913131aefac53327dfb9189c617c05d75d5767f41a9e431ac1",
+        "sha256": "31e2a792be485dbbbd43c3c99cd15bcc9da0b9b1dcda19b78cc25d078db61a6a",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5696,9 +6006,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 91818,
+        "bytes": 100779,
         "path": "packages/csaa/src/providers/typescript/extract-static-raw.test.ts",
-        "sha256": "32dc65ac81d9cdacf14ac4598aa22978e65282e540ec74218bc7fdb502cf371b",
+        "sha256": "36f702502b2bb61a96263485be035c2d522716033b15dce1c4eeafe8fb56d377",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5738,9 +6048,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11880,
+        "bytes": 14262,
         "path": "packages/csaa/src/providers/typescript/materialize-program-recipe.test.ts",
-        "sha256": "68355b1583dd7c4eac9fbef2ec075afbada69953761b84854ea8beffd4a55a61",
+        "sha256": "c4fccbd5d69963136bce581718ef3f7f98c0bbe44079151fb77bc6c86782a965",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5752,9 +6062,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 69107,
+        "bytes": 76849,
         "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
-        "sha256": "a58574ca606d25cdfc420e55cde95da057f6d3e66d75581b866d9ff226b306bb",
+        "sha256": "80f129e16f2ebb9fd3bd88ac0e3b19aa15e8f6ade27652645429f53038441f91",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5801,9 +6111,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 67190,
+        "bytes": 91331,
         "path": "packages/csaa/src/semantic/normalize-semantic-snapshot.test.ts",
-        "sha256": "459ca4ca1382b6154eb0c564c5f489f0384c45e7e648348779db099c36670415",
+        "sha256": "44b9f0198934ba719cded66bd4c56d9d125f16117be22ac85bc13c3fc6f06141",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5857,9 +6167,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 7032,
+        "bytes": 22661,
         "path": "packages/csaa/src/semantic/repository-smoke.test.ts",
-        "sha256": "46aa1b7aa5ef79ff26c57b09bc27ff8794b9c3ae952a16ad00401352ad40f1a3",
+        "sha256": "c7e518706f51f43da32f1d5e354598a495f9776b08fd21e1895ee4c3bfc0b8d1",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5906,9 +6216,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 253643,
+        "bytes": 278359,
         "path": "packages/csaa/src/semantic/validate-snapshot.test.ts",
-        "sha256": "9766ecfc9c9531e840c5bafccfb5291a37d88fad83d32bac152e8d0f1ef8716e",
+        "sha256": "323bc67d557466e54e7f92c8d17442457ebd0b7ab91828970584b67c0512f3dc",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5920,9 +6230,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 18310,
+        "bytes": 19678,
         "path": "packages/csaa/src/semantic/validate-wire-shape.test.ts",
-        "sha256": "409d1b7bb4aa4cb1db01612e34529fcc3ed95eaede83a18722db8a5251425df9",
+        "sha256": "ee7c743eafaa89618e89a8f3dc8c99e4e99ae610ae1b8a0bc030fa50ed6f3f97",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -9776,7 +10086,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "37a40c8e7bf344c3786d815fc89fc2187a0981aae0bb55628d8fe0ed426387ef",
+    "subjectId": "d7af40a6a4869d978062e7e394668dfe23c33043e640349fb634165006a1ebd8",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -9940,7 +10250,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 51,
+      "candidateArtifactCount": 71,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -9966,21 +10276,41 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/dependency-comparison.ts",
+        "packages/csaa/src/contracts/dependency-cruiser.ts",
         "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/subject.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.ts",
         "packages/csaa/src/graph/ids.ts",
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.ts",
         "packages/csaa/src/graph/validate-graph.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/index.ts",
         "packages/csaa/src/inventory/canonical.ts",
         "packages/csaa/src/inventory/collect-inventory.ts",
         "packages/csaa/src/inventory/project-subject-for-inventory.ts",
         "packages/csaa/src/inventory/render-inventory.ts",
         "packages/csaa/src/inventory/run-inventory.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
         "packages/csaa/src/providers/typescript/compiler-paths.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.ts",
@@ -10024,7 +10354,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 73,
+      "candidateArtifactCount": 101,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -10051,17 +10381,38 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/dependency-comparison.ts",
+        "packages/csaa/src/contracts/dependency-cruiser.ts",
         "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/subject.ts",
+        "packages/csaa/src/graph/build-call-graph.test.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.test.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.test.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.ts",
         "packages/csaa/src/graph/ids.ts",
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.ts",
         "packages/csaa/src/graph/validate-graph.test.ts",
         "packages/csaa/src/graph/validate-graph.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.test.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/index.test.ts",
         "packages/csaa/src/index.ts",
         "packages/csaa/src/inventory/boundary-policy.test.ts",
@@ -10072,6 +10423,13 @@
         "packages/csaa/src/inventory/project-subject-for-inventory.ts",
         "packages/csaa/src/inventory/render-inventory.ts",
         "packages/csaa/src/inventory/run-inventory.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.test.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.test.ts",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
         "packages/csaa/src/providers/typescript/compiler-paths.test.ts",
@@ -11415,12 +11773,66 @@
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
         "packages/csaa/src/graph/validate-graph.ts",
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/contracts/state-machine-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
+        "packages/csaa/src/contracts/dependency-comparison.ts",
+        "packages/csaa/src/contracts/dependency-cruiser.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+        "packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
+        "capabilities#call-graph",
         "capabilities#dependency-graph",
+        "capabilities#state-machine-graph",
         "capabilities#symbol-table",
         "capabilities#typescript-ast",
         "capabilities#type-graph"
       ],
-      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first bounded DWP-004 increment implements only the validated compiler module-dependency projection; cross-Program semantic reconciliation, depcruise comparison, call/flow/state-machine graphs, and composed graph projections remain UNIMPLEMENTED."
+      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first four bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, and an implementation-local generated JPWB state-machine topology projection. Inventory generation executes none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control/data-flow graphs, generalized state-machine inference, and composed graph projections remain UNIMPLEMENTED."
+    },
+    {
+      "provenance": [
+        "verif/arrow-census-coverage.test.ts",
+        "verif/arrow-command-census.baseline.json",
+        "verif/arrow-command-census.test.ts",
+        "verif/arrow-command-census.ts",
+        "verif/authority-resolution-census.test.ts",
+        "verif/births-outside-the-census.test.ts",
+        "verif/command-dispatch-census.test.ts",
+        "verif/contract-number-census.test.ts",
+        "verif/dead-kernel-census.test.ts",
+        "verif/event-surface-census.test.ts",
+        "verif/policy-evidence-requirement-census.test.ts",
+        "verif/route-action-census.test.ts",
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/contracts/state-machine-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts"
+      ],
+      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer remains a WRAP candidate while its baseline and tests, and the authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families, remain delegated. Neither the partial call graph nor the generated state-machine topology projection ports, replaces, retires, weakens, or transfers this authority; the topology graph does not establish performability, births, occupancy, behavioral reachability, or any other specialized census conclusion."
     },
     {
       "provenance": [
@@ -11919,7 +12331,7 @@
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/guard-enforcement-ledger.ts at execution time.",
       "associatedBaselines": [],
       "contentSha256": "1aeab4efde15cdc99602c81ce4e09f5c7889870bc4cfdf8f4fc5d2247b9095e4",
-      "disposition": "RETAIN_DELEGATED",
+      "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
         "verif/guard-enforcement-ledger.test.ts",
@@ -11929,7 +12341,7 @@
       "provenance": [
         "verif/guard-enforcement-ledger.ts"
       ],
-      "role": "RUNTIME_GUARD"
+      "role": "ANALYZER"
     },
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/lifecycle-arrow-declarations.test.ts.",
@@ -12337,6 +12749,11 @@
     },
     {
       "dependencies": [
+        {
+          "name": "ajv",
+          "scope": "dependencies",
+          "specifier": "8.20.0"
+        },
         {
           "name": "typescript",
           "scope": "dependencies",

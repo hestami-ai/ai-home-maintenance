@@ -14,6 +14,7 @@ import ts from 'typescript';
 import type { ProgramRecipe } from '../../contracts/subject.js';
 import { TYPESCRIPT_PROVIDER_VERSION } from '../../contracts/semantic.js';
 import { programRecipeDigest } from '../../semantic/ids.js';
+import { validateProgramRecipePolicy } from '../../semantic/program-recipe-policy.js';
 import {
 	materializeProgramRecipe,
 	ProgramRecipeMaterializationError
@@ -295,6 +296,69 @@ describe('ProgramRecipe runtime materialization', () => {
 			}
 		});
 		expectTypedFailure(() => materializeProgramRecipe(hostile, repositoryRoot));
+	});
+
+	it('rejects non-inert recipe records and arrays before materialization', () => {
+		const repositoryRoot = repository();
+		const base = recipe({});
+		const inherited = Object.assign(Object.create({ inherited: true }) as ProgramRecipe, base);
+		const symbolRecord = { ...base, [Symbol('unexpected')]: true };
+		const invalidKeyRecord = { ...base } as unknown as Record<string, unknown>;
+		Object.defineProperty(invalidKeyRecord, '\ud800', { enumerable: true, value: true });
+		const accessorRecord = { ...base } as unknown as Record<string, unknown>;
+		Object.defineProperty(accessorRecord, 'configPath', {
+			enumerable: true,
+			get: () => base.configPath
+		});
+		const hiddenRecord = { ...base } as unknown as Record<string, unknown>;
+		Object.defineProperty(hiddenRecord, 'configPath', {
+			enumerable: false,
+			value: base.configPath
+		});
+		const sparse = [] as unknown[];
+		Object.defineProperty(sparse, 'length', { value: 1_000_001 });
+		const expando = [...base.rootNames] as unknown[] & { unexpected?: true };
+		expando.unexpected = true;
+		const accessorArray = [...base.rootNames];
+		Object.defineProperty(accessorArray, '0', {
+			enumerable: true,
+			get: () => base.rootNames[0]
+		});
+
+		for (const candidate of [
+			inherited,
+			symbolRecord,
+			invalidKeyRecord,
+			accessorRecord,
+			hiddenRecord,
+			{ ...base, unexpected: true },
+			{ ...base, rootNames: sparse },
+			{ ...base, rootNames: expando },
+			{ ...base, rootNames: accessorArray },
+			{ ...base, provider: { id: 1, version: TYPESCRIPT_PROVIDER_VERSION } }
+		])
+			expectTypedFailure(() =>
+				materializeProgramRecipe(candidate as unknown as ProgramRecipe, repositoryRoot)
+			);
+
+		expectTypedFailure(() =>
+			materializeProgramRecipe(recipe({ customConditions: ['\udc00'] }), repositoryRoot)
+		);
+		expect(() => validateProgramRecipePolicy(recipe({}), 0)).toThrowError(
+			'ProgramRecipe path-character budget must be a positive safe integer.'
+		);
+	});
+
+	it('retains supported scalar string and numeric compiler options', () => {
+		const repositoryRoot = repository();
+		const materialized = materializeProgramRecipe(
+			recipe({ jsxFactory: 'h', maxNodeModuleJsDepth: 2 }),
+			repositoryRoot
+		);
+		expect(materialized.compilerOptions).toMatchObject({
+			jsxFactory: 'h',
+			maxNodeModuleJsDepth: 2
+		});
 	});
 
 	it('requires an absolute existing directory repository root', () => {

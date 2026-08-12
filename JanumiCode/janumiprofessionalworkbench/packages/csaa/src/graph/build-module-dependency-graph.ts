@@ -245,10 +245,19 @@ function coverageFor(
 		representedSources === snapshot.sources.length &&
 		representedModuleResolutions === snapshot.moduleResolutions.length &&
 		stateTotal === snapshot.moduleResolutions.length &&
-		graphNativeTargets === snapshot.moduleResolutions.length - resolvedSourceTargets;
+		graphNativeTargets ===
+			snapshot.moduleResolutions.filter((record) => record.targetSourceId === null).length;
+	const hasNonProjectResolution = snapshot.moduleResolutions.some(
+		(record) => record.resolutionState !== 'RESOLVED_SOURCE'
+	);
 	return {
 		closure:
-			snapshot.health === 'PARTIAL' || graphNativeTargets > 0 || !reconciles ? 'OPEN' : 'CLOSED',
+			snapshot.health === 'PARTIAL' ||
+			graphNativeTargets > 0 ||
+			hasNonProjectResolution ||
+			!reconciles
+				? 'OPEN'
+				: 'CLOSED',
 		expectedModuleResolutions: snapshot.moduleResolutions.length,
 		expectedSources: snapshot.sources.length,
 		graphNativeTargets,
@@ -342,12 +351,10 @@ export function buildModuleDependencyGraph(
 				throw new Error(`Module resolution ${resolution.id} has an invalid occurrence node.`);
 			if (!provenanceIds.has(resolution.provenanceId))
 				throw new Error(`Module resolution ${resolution.id} has missing provenance.`);
-			if (resolution.resolutionState === 'RESOLVED_SOURCE') {
-				if (resolution.targetSourceId === null || !sourceById.has(resolution.targetSourceId))
-					throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
-			} else if (resolution.targetSourceId !== null) {
-				throw new Error(`Non-source module resolution ${resolution.id} carries a source target.`);
-			}
+			if (resolution.resolutionState === 'RESOLVED_SOURCE' && resolution.targetSourceId === null)
+				throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
+			if (resolution.targetSourceId !== null && !sourceById.has(resolution.targetSourceId))
+				throw new Error(`Module resolution ${resolution.id} references a missing target source.`);
 		}
 		for (const source of snapshot.sources)
 			if (!provenanceIds.has(source.provenanceId))
@@ -390,7 +397,9 @@ export function buildModuleDependencyGraph(
 				.map((node) => [node.semanticSourceId, node])
 		);
 		for (const resolution of snapshot.moduleResolutions) {
-			if (resolution.resolutionState === 'RESOLVED_SOURCE') continue;
+			if (resolution.targetSourceId !== null) continue;
+			if (resolution.resolutionState === 'RESOLVED_SOURCE')
+				throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
 			const occurrence = astNodeById.get(resolution.nodeId)!;
 			nodes.push({
 				epistemic: epistemicForResolution(resolution.resolutionState),
@@ -424,9 +433,9 @@ export function buildModuleDependencyGraph(
 			const occurrence = astNodeById.get(resolution.nodeId)!;
 			const sourceNode = sourceNodeBySemanticId.get(resolution.sourceId)!;
 			const targetNode =
-				resolution.resolutionState === 'RESOLVED_SOURCE'
-					? sourceNodeBySemanticId.get(resolution.targetSourceId!)!
-					: targetNodeByResolutionId.get(resolution.id)!;
+				resolution.targetSourceId === null
+					? targetNodeByResolutionId.get(resolution.id)!
+					: sourceNodeBySemanticId.get(resolution.targetSourceId)!;
 			const source = { kind: 'SOURCE' as const, nodeId: sourceNode.id };
 			const target = { kind: targetNode.kind, nodeId: targetNode.id };
 			const edgeRelationKind = relationKind(resolution.occurrenceKind);

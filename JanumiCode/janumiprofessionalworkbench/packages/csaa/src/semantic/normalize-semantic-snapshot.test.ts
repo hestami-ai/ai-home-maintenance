@@ -3,6 +3,9 @@ import ts from 'typescript';
 import {
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
+	SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE,
+	SEMANTIC_TYPE_DISPLAY_PROFILE,
+	SEMANTIC_TYPE_FINGERPRINT_PROFILE,
 	TYPESCRIPT_PROVIDER_VERSION,
 	type BuildStaticSemanticSnapshotRequest,
 	type CompilerInputObservation,
@@ -534,6 +537,347 @@ function normalize(rawProject = raw(), semanticRequest = request()) {
 	return normalizeStaticSemanticSnapshot(normalizationInput(rawProject, semanticRequest));
 }
 
+const TYPE_ASSIGNABILITY_REQUEST: BuildStaticSemanticSnapshotRequest['assignabilityRequests'][number] =
+	{
+		requestId: 'normalizer-type-assignability',
+		requesterRef: 'normalize-semantic-snapshot.test',
+		source: {
+			end: 3,
+			logicalPath: 'src/index.ts',
+			queryMode: 'TYPE_AT_LOCATION',
+			start: 2,
+			syntaxKind: ts.SyntaxKind.Identifier
+		},
+		target: {
+			end: 3,
+			logicalPath: 'src/index.ts',
+			queryMode: 'TYPE_AT_LOCATION',
+			start: 2,
+			syntaxKind: ts.SyntaxKind.Identifier
+		}
+	};
+
+function typeRequest(
+	assignabilityRequests: BuildStaticSemanticSnapshotRequest['assignabilityRequests'] = [
+		TYPE_ASSIGNABILITY_REQUEST
+	]
+): BuildStaticSemanticSnapshotRequest {
+	return {
+		...request(),
+		assignabilityRequests,
+		capabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE']
+	};
+}
+
+function typeRaw(): RawStaticSemanticProjectExtraction {
+	const base = bindingRaw();
+	const type = (
+		typeOrdinal: number,
+		display: string,
+		category: RawStaticSemanticProjectExtraction['types'][number]['category'],
+		acquisitionAnchors: RawStaticSemanticProjectExtraction['types'][number]['acquisitionAnchors']
+	): RawStaticSemanticProjectExtraction['types'][number] => ({
+		acquisitionAnchors,
+		aliasSymbolOrdinal: null,
+		category,
+		display,
+		displayProfile: SEMANTIC_TYPE_DISPLAY_PROFILE,
+		displaySha256: sha256(display),
+		fingerprintProfile: SEMANTIC_TYPE_FINGERPRINT_PROFILE,
+		fingerprintSha256: sha256(`normalizer-type-fingerprint:${typeOrdinal}`),
+		flagNames:
+			category === 'OBJECT'
+				? ['Object']
+				: category === 'INTRINSIC'
+					? ['Number']
+					: ['IncludesMissingType', 'TypeParameter'],
+		flags:
+			category === 'OBJECT'
+				? ts.TypeFlags.Object
+				: category === 'INTRINSIC'
+					? ts.TypeFlags.Number
+					: ts.TypeFlags.TypeParameter,
+		identityBasis: acquisitionAnchors.some((anchor) => anchor.kind === 'DECLARATION')
+			? 'DECLARATION_ANCHORED'
+			: acquisitionAnchors.some((anchor) => anchor.kind === 'NODE' || anchor.kind === 'SYMBOL')
+				? 'QUERY_ANCHORED'
+				: 'STRUCTURAL',
+		objectFlagNames: [],
+		objectFlags: category === 'OBJECT' ? 0 : null,
+		structureState: 'COMPLETE',
+		symbolOrdinal: null,
+		typeOrdinal,
+		unsupportedStructureKinds: []
+	});
+	const signature = (
+		signatureOrdinal: number,
+		display: string,
+		overrides: Partial<RawStaticSemanticProjectExtraction['signatures'][number]>
+	): RawStaticSemanticProjectExtraction['signatures'][number] => ({
+		declarationOrdinal: 0,
+		declarationRole: 'DECLARATION',
+		display,
+		displaySha256: sha256(display),
+		fingerprintProfile: SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE,
+		fingerprintSha256: sha256(`normalizer-signature-fingerprint:${signatureOrdinal}`),
+		identityBasis: 'DECLARATION_ANCHORED',
+		owner: { declarationOrdinal: 0, kind: 'DECLARATION' },
+		parameterOrdinals: [],
+		providerOrdinal: null,
+		returnTypeOrdinal: 1,
+		semanticKind: 'SIGNATURE',
+		signatureKind: 'CALL',
+		signatureOrdinal,
+		typeParameterOrdinals: [],
+		...overrides
+	});
+	const contextDigest = compilerInputClosureDigest([observation()]);
+
+	return {
+		...base,
+		astNodes: [
+			base.astNodes[0]!,
+			{
+				...base.astNodes[1]!,
+				end: 3,
+				siblingOrdinal: 0
+			},
+			{
+				...base.astNodes[2]!,
+				parentNodeOrdinal: 1,
+				siblingOrdinal: 0,
+				structuralRoles: ['declaration-name', 'generic-child']
+			}
+		],
+		declarationCandidates: [
+			{
+				ambientSyntax: false,
+				candidateRole: 'BINDING',
+				exportCarrierNodeOrdinal: null,
+				exportSyntax: 'NONE',
+				localModifiers: [],
+				nameNodeOrdinal: 2,
+				nameState: 'ATOMIC',
+				nodeOrdinal: 1,
+				sourceOrdinal: 0,
+				syntacticName: 'value',
+				syntaxKind: ts.SyntaxKind.VariableDeclaration,
+				syntaxKindName: 'VariableDeclaration'
+			}
+		],
+		declarations: [
+			{
+				...base.declarations[0]!,
+				candidateNodeOrdinal: 1,
+				declaringScopeOrdinal: 0,
+				end: 3
+			}
+		],
+		overloadSets: [],
+		references: [],
+		signatures: [
+			signature(0, '<T>(): number', { typeParameterOrdinals: [0] }),
+			signature(1, '(): number', {
+				identityBasis: 'OWNER_ORDINAL',
+				owner: { kind: 'TYPE', typeOrdinal: 0 },
+				providerOrdinal: 0
+			})
+		],
+		typeParameters: [
+			{
+				constraintState: 'UNSUPPORTED',
+				constraintTypeOrdinal: null,
+				declarationOrdinal: null,
+				defaultState: 'MISSING',
+				defaultTypeOrdinal: null,
+				name: 'T',
+				ordinal: 0,
+				owner: { kind: 'SIGNATURE', signatureOrdinal: 0 },
+				parameterTypeOrdinal: 2,
+				typeParameterOrdinal: 0
+			},
+			{
+				constraintState: 'MISSING',
+				constraintTypeOrdinal: null,
+				declarationOrdinal: null,
+				defaultState: 'UNRESOLVED',
+				defaultTypeOrdinal: null,
+				name: 'U',
+				ordinal: 0,
+				owner: { kind: 'TYPE', typeOrdinal: 0 },
+				parameterTypeOrdinal: 4,
+				typeParameterOrdinal: 1
+			}
+		],
+		typeRelations: [
+			{
+				kind: 'TYPE_OF',
+				queryMode: 'TYPE_AT_LOCATION',
+				relationOrdinal: 0,
+				state: 'CONFIRMED',
+				subject: { kind: 'AST_NODE', nodeOrdinal: 2, sourceOrdinal: 0 },
+				typeOrdinal: 0
+			},
+			{
+				kind: 'TYPE_OF',
+				queryMode: 'TYPE_AT_LOCATION',
+				relationOrdinal: 1,
+				state: 'CONFIRMED',
+				subject: { declarationOrdinal: 0, kind: 'DECLARATION' },
+				typeOrdinal: 3
+			},
+			{
+				kind: 'TYPE_OF',
+				queryMode: 'DECLARED_SYMBOL_TYPE',
+				relationOrdinal: 2,
+				state: 'CONFIRMED',
+				subject: { kind: 'SYMBOL', symbolOrdinal: 0 },
+				typeOrdinal: 4
+			},
+			{
+				argumentTypeOrdinals: [0],
+				genericTarget: { kind: 'SIGNATURE', signatureOrdinal: 0 },
+				instantiatedTarget: { kind: 'SIGNATURE', signatureOrdinal: 1 },
+				kind: 'GENERIC_INSTANTIATION',
+				relationOrdinal: 3,
+				state: 'CONFIRMED'
+			},
+			{
+				baseTypeOrdinal: 0,
+				derivedTypeOrdinal: 3,
+				heritageOccurrence: { kind: 'AST_NODE', nodeOrdinal: 2, sourceOrdinal: 0 },
+				kind: 'TYPE_EXTENSION',
+				relationOrdinal: 4,
+				state: 'CONFIRMED'
+			},
+			{
+				baseTypeOrdinal: 0,
+				derivedTypeOrdinal: 3,
+				heritageOccurrence: { declarationOrdinal: 0, kind: 'DECLARATION' },
+				kind: 'TYPE_IMPLEMENTATION',
+				relationOrdinal: 5,
+				state: 'CONFIRMED'
+			},
+			{
+				constraintState: 'UNSUPPORTED',
+				constraintTypeOrdinal: null,
+				kind: 'PARAMETER_CONSTRAINT',
+				relationOrdinal: 6,
+				state: 'UNSUPPORTED',
+				typeParameterOrdinal: 0
+			},
+			{
+				constraintState: 'MISSING',
+				constraintTypeOrdinal: null,
+				kind: 'PARAMETER_CONSTRAINT',
+				relationOrdinal: 7,
+				state: 'CONFIRMED',
+				typeParameterOrdinal: 1
+			},
+			{
+				checkerContextDigest: contextDigest,
+				kind: 'ASSIGNABILITY',
+				relationOrdinal: 8,
+				requestId: TYPE_ASSIGNABILITY_REQUEST.requestId,
+				result: true,
+				sourceTypeOrdinal: 0,
+				state: 'CONFIRMED',
+				targetTypeOrdinal: 0
+			}
+		],
+		types: [
+			type(0, 'Box', 'OBJECT', [
+				{ kind: 'NODE', nodeOrdinal: 2, queryMode: 'TYPE_AT_LOCATION', sourceOrdinal: 0 }
+			]),
+			type(
+				1,
+				'number',
+				'INTRINSIC',
+				[0, 1].map((signatureOrdinal) => ({
+					componentKind: 'RETURN' as const,
+					componentOrdinal: 0,
+					kind: 'SIGNATURE_COMPONENT' as const,
+					signatureOrdinal
+				}))
+			),
+			type(2, 'T', 'TYPE_PARAMETER', [
+				{
+					componentKind: 'TYPE_PARAMETER',
+					componentOrdinal: 0,
+					kind: 'SIGNATURE_COMPONENT',
+					signatureOrdinal: 0
+				}
+			]),
+			type(3, 'Derived', 'OBJECT', [
+				{ declarationOrdinal: 0, kind: 'DECLARATION', queryMode: 'TYPE_AT_LOCATION' }
+			]),
+			type(4, 'U', 'TYPE_PARAMETER', [
+				{ kind: 'SYMBOL', queryMode: 'DECLARED_SYMBOL_TYPE', symbolOrdinal: 0 }
+			])
+		]
+	};
+}
+
+function overloadTypeRaw(): RawStaticSemanticProjectExtraction {
+	const base = typeRaw();
+	const overloadSignatures: RawStaticSemanticProjectExtraction['signatures'] = [0, 1].map(
+		(providerOrdinal) => {
+			const signatureOrdinal = providerOrdinal + base.signatures.length;
+			const display = `(value: Box): number /* overload ${providerOrdinal} */`;
+			return {
+				...base.signatures[0]!,
+				declarationRole: 'OVERLOAD_DECLARATION',
+				display,
+				displaySha256: sha256(display),
+				fingerprintSha256: sha256(`normalizer-overload-signature:${providerOrdinal}`),
+				identityBasis: 'OWNER_ORDINAL',
+				owner: { kind: 'SYMBOL', symbolOrdinal: 0 },
+				providerOrdinal,
+				semanticKind: 'OVERLOAD_SIGNATURE',
+				signatureOrdinal,
+				typeParameterOrdinals: []
+			};
+		}
+	);
+	const membershipRelations: RawStaticSemanticProjectExtraction['typeRelations'] =
+		overloadSignatures.map((signature, ordinal) => ({
+			kind: 'OVERLOAD_MEMBERSHIP',
+			ordinal,
+			overloadSetOrdinal: 0,
+			relationOrdinal: base.typeRelations.length + ordinal,
+			role: 'OVERLOAD_DECLARATION',
+			signatureOrdinal: signature.signatureOrdinal,
+			state: 'CONFIRMED'
+		}));
+
+	return {
+		...base,
+		overloadSets: [{ callableSymbolOrdinal: 0, overloadSetOrdinal: 0 }],
+		signatures: [...base.signatures, ...overloadSignatures],
+		typeRelations: [...base.typeRelations, ...membershipRelations],
+		types: base.types.map((type) =>
+			type.typeOrdinal === 1
+				? {
+						...type,
+						acquisitionAnchors: [
+							...type.acquisitionAnchors,
+							...overloadSignatures.map((signature) => ({
+								componentKind: 'RETURN' as const,
+								componentOrdinal: 0,
+								kind: 'SIGNATURE_COMPONENT' as const,
+								signatureOrdinal: signature.signatureOrdinal
+							}))
+						]
+					}
+				: type
+		)
+	};
+}
+
+function normalizeTypes(rawProject = typeRaw(), semanticRequest = typeRequest()) {
+	return normalize(rawProject, semanticRequest);
+}
+
 describe('semantic snapshot normalization', () => {
 	it('assigns canonical identities, provenance, populations, and a validator-clean closed snapshot', () => {
 		const snapshot = normalize();
@@ -566,6 +910,536 @@ describe('semantic snapshot normalization', () => {
 				maxStringCharacters: 1_000_000
 			})
 		).toMatchObject({ canonicalBytes: Buffer.byteLength(canonical, 'utf8'), issues: [] });
+	});
+
+	it('normalizes validator-clean TS_TYPE ownership, heritage, overload, and acquisition structures', () => {
+		const snapshot = normalizeTypes();
+
+		expect(validateStaticSemanticSnapshot(snapshot, {}, { frozenSubject: subject() })).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(snapshot.signatures.map((signature) => signature.owner.kind)).toEqual(
+			expect.arrayContaining(['DECLARATION', 'TYPE'])
+		);
+		expect(snapshot.typeParameters.map((parameter) => parameter.owner.kind)).toEqual(
+			expect.arrayContaining(['SIGNATURE', 'TYPE'])
+		);
+		expect(snapshot.typeRelations.map((relation) => relation.kind)).toEqual(
+			expect.arrayContaining([
+				'ASSIGNABILITY',
+				'GENERIC_INSTANTIATION',
+				'PARAMETER_CONSTRAINT',
+				'TYPE_EXTENSION',
+				'TYPE_IMPLEMENTATION',
+				'TYPE_OF'
+			])
+		);
+		const overloadSnapshot = normalizeTypes(overloadTypeRaw());
+		expect(overloadSnapshot.signatures.map((signature) => signature.owner.kind)).toContain(
+			'SYMBOL'
+		);
+		expect(overloadSnapshot.typeRelations.map((relation) => relation.kind)).toContain(
+			'OVERLOAD_MEMBERSHIP'
+		);
+		const unsupportedTypeParameters = snapshot.populations.find(
+			(population) => population.kind === 'TYPE_PARAMETER'
+		)?.members.unsupported;
+		expect(unsupportedTypeParameters).toContain(
+			snapshot.typeParameters.find((parameter) => parameter.name === 'T')?.id
+		);
+	});
+
+	it('fails closed on malformed TS_TYPE request and collection boundaries', () => {
+		const nonArrayRequest = normalizationInput();
+		for (const [input, message] of [
+			[
+				{
+					...nonArrayRequest,
+					request: { ...nonArrayRequest.request, assignabilityRequests: null as never }
+				},
+				'Semantic assignability requests must be an array.'
+			],
+			[
+				normalizationInput(raw(), {
+					...request(),
+					assignabilityRequests: [TYPE_ASSIGNABILITY_REQUEST]
+				}),
+				'Assignability requests require TS_TYPE.'
+			],
+			[
+				normalizationInput({ ...raw(), types: null as never }),
+				'Raw project tsconfig.json lacks the types TS_TYPE collection.'
+			],
+			[
+				normalizationInput({ ...raw(), types: typeRaw().types }),
+				'Raw project tsconfig.json emitted TS_TYPE facts when not requested.'
+			],
+			[
+				normalizationInput({
+					...raw(),
+					project: {
+						...raw().project,
+						partialityReasons: [
+							{
+								capability: 'TS_TYPE',
+								code: 'CAPABILITY_UNSUPPORTED',
+								message: 'fixture type limitation',
+								path: null
+							}
+						]
+					}
+				}),
+				'Raw project tsconfig.json emitted TS_TYPE partiality when not requested.'
+			]
+		] as const) {
+			expect(() => normalizeStaticSemanticSnapshot(input)).toThrowError(
+				expect.objectContaining<Partial<SemanticNormalizationError>>({ message })
+			);
+		}
+	});
+
+	it('fails closed on incoherent TS_TYPE scalar, owner, and membership facts', () => {
+		const rejects = (project: RawStaticSemanticProjectExtraction, message: string): void => {
+			expect(() => normalizeTypes(project)).toThrowError(
+				expect.objectContaining<Partial<SemanticNormalizationError>>({ message })
+			);
+		};
+		const mutateType = (
+			mutate: (
+				type: RawStaticSemanticProjectExtraction['types'][number]
+			) => RawStaticSemanticProjectExtraction['types'][number]
+		): RawStaticSemanticProjectExtraction => {
+			const base = typeRaw();
+			return {
+				...base,
+				types: base.types.map((type, index) => (index === 0 ? mutate(type) : type))
+			};
+		};
+		for (const [project, message] of [
+			[
+				mutateType((type) => ({ ...type, displayProfile: 'unsupported' as never })),
+				'Type 0 has an unsupported display profile.'
+			],
+			[
+				mutateType((type) => ({ ...type, fingerprintProfile: 'unsupported' as never })),
+				'Type 0 has an unsupported fingerprint profile.'
+			],
+			[
+				mutateType((type) => ({ ...type, displaySha256: sha256('wrong-display') })),
+				'Type 0 display digest is incoherent.'
+			],
+			[mutateType((type) => ({ ...type, flags: -1 })), 'Type 0 flags are invalid.'],
+			[mutateType((type) => ({ ...type, objectFlags: -1 })), 'Type 0 object flags are invalid.'],
+			[
+				mutateType((type) => ({
+					...type,
+					structureState: 'BOUNDED',
+					unsupportedStructureKinds: []
+				})),
+				'Type 0 structure state is incoherent.'
+			],
+			[
+				mutateType((type) => ({ ...type, acquisitionAnchors: [] })),
+				'Type 0 lacks an acquisition anchor.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						signatures: base.signatures.map((signature, index) =>
+							index === 0 ? { ...signature, fingerprintProfile: 'unsupported' as never } : signature
+						)
+					};
+				})(),
+				'Signature 0 has an unsupported fingerprint profile.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						signatures: base.signatures.map((signature, index) =>
+							index === 0 ? { ...signature, displaySha256: sha256('wrong-display') } : signature
+						)
+					};
+				})(),
+				'Signature 0 display digest is incoherent.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						signatures: base.signatures.map((signature, index) =>
+							index === 0 ? { ...signature, declarationOrdinal: null } : signature
+						)
+					};
+				})(),
+				'Signature 0 identity basis is incoherent.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						signatures: base.signatures.map((signature, index) =>
+							index === 1 ? { ...signature, providerOrdinal: null } : signature
+						)
+					};
+				})(),
+				'Signature 1 lacks a valid provider ordinal.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						signatures: base.signatures.map((signature, index) =>
+							index === 0
+								? { ...signature, declarationRole: 'CALL_SIGNATURE', signatureKind: 'CONSTRUCT' }
+								: signature
+						)
+					};
+				})(),
+				'Signature 0 kind and declaration role differ.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						typeParameters: base.typeParameters.map((parameter, index) =>
+							index === 0 ? { ...parameter, ordinal: -1 } : parameter
+						)
+					};
+				})(),
+				'Type parameter 0 has an invalid owner ordinal.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						typeParameters: base.typeParameters.map((parameter, index) =>
+							index === 0 ? { ...parameter, constraintState: 'RESOLVED' } : parameter
+						)
+					};
+				})(),
+				'Type parameter 0 constraint state is incoherent.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						typeParameters: base.typeParameters.map((parameter, index) =>
+							index === 0 ? { ...parameter, defaultState: 'RESOLVED' } : parameter
+						)
+					};
+				})(),
+				'Type parameter 0 default state is incoherent.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						signatures: base.signatures.map((signature, index) =>
+							index === 0 ? { ...signature, typeParameterOrdinals: [1] } : signature
+						)
+					};
+				})(),
+				'Signature 0 type-parameter membership is incoherent.'
+			]
+		] as const) {
+			try {
+				rejects(project as RawStaticSemanticProjectExtraction, message);
+			} catch (error) {
+				throw new Error(`TS_TYPE rejection case did not fail as expected: ${message}`, {
+					cause: error
+				});
+			}
+		}
+	});
+
+	it('fails closed on incoherent TS_TYPE relations and acquisition witnesses', () => {
+		const rejects = (
+			project: RawStaticSemanticProjectExtraction,
+			message: string,
+			semanticRequest = typeRequest()
+		): void => {
+			try {
+				normalizeTypes(project, semanticRequest);
+			} catch (error) {
+				expect(error).toBeInstanceOf(SemanticNormalizationError);
+				expect((error as SemanticNormalizationError).message).toContain(message);
+				return;
+			}
+			throw new Error(`Expected TS_TYPE normalization failure containing: ${message}`);
+		};
+		const mutateRelation = (
+			relationOrdinal: number,
+			mutate: (
+				relation: RawStaticSemanticProjectExtraction['typeRelations'][number]
+			) => RawStaticSemanticProjectExtraction['typeRelations'][number],
+			project = typeRaw()
+		): RawStaticSemanticProjectExtraction => ({
+			...project,
+			typeRelations: project.typeRelations.map((relation) =>
+				relation.relationOrdinal === relationOrdinal ? mutate(relation) : relation
+			)
+		});
+		const appendRelation = (
+			relation: object,
+			project = typeRaw()
+		): RawStaticSemanticProjectExtraction => ({
+			...project,
+			typeRelations: [
+				...project.typeRelations,
+				{
+					...relation,
+					relationOrdinal: project.typeRelations.length
+				} as RawStaticSemanticProjectExtraction['typeRelations'][number]
+			]
+		});
+
+		for (const [project, message] of [
+			[
+				mutateRelation(0, (relation) => ({ ...relation, state: 'UNSUPPORTED' })),
+				'Type-of relation 0 state is incoherent.'
+			],
+			[
+				appendRelation({
+					aliasDeclarationOrdinal: 0,
+					aliasedTypeOrdinal: null,
+					kind: 'TYPE_ALIAS',
+					state: 'CONFIRMED'
+				}),
+				'Type-alias relation 9 state is incoherent.'
+			],
+			[
+				appendRelation({
+					compositeTypeOrdinal: 0,
+					constituentTypeOrdinal: 1,
+					kind: 'UNION_CONSTITUENT',
+					ordinal: 0,
+					state: 'UNSUPPORTED'
+				}),
+				'Constituent relation 9 must be confirmed.'
+			],
+			[
+				appendRelation({
+					compositeTypeOrdinal: 0,
+					constituentTypeOrdinal: 1,
+					kind: 'UNION_CONSTITUENT',
+					ordinal: -1,
+					state: 'CONFIRMED'
+				}),
+				'Constituent relation 9 has an invalid ordinal.'
+			],
+			[
+				appendRelation({
+					compositeTypeOrdinal: 0,
+					constituentTypeOrdinal: 1,
+					kind: 'UNION_CONSTITUENT',
+					ordinal: 0,
+					state: 'CONFIRMED'
+				}),
+				'Constituent relation 9 composite kind is incoherent.'
+			],
+			[
+				mutateRelation(3, (relation) => ({ ...relation, state: 'UNSUPPORTED' })),
+				'Generic relation 3 must be confirmed.'
+			],
+			[
+				mutateRelation(6, (relation) =>
+					relation.kind === 'PARAMETER_CONSTRAINT'
+						? { ...relation, constraintState: 'MISSING' }
+						: relation
+				),
+				'Constraint relation 6 does not mirror its type parameter.'
+			],
+			[
+				mutateRelation(4, (relation) => ({ ...relation, state: 'UNSUPPORTED' })),
+				'Heritage relation 4 must be confirmed.'
+			],
+			[
+				mutateRelation(8, (relation) =>
+					relation.kind === 'ASSIGNABILITY'
+						? { ...relation, checkerContextDigest: sha256('wrong-context') }
+						: relation
+				),
+				'Assignability relation 8 checker context is incoherent.'
+			],
+			[
+				mutateRelation(8, (relation) =>
+					relation.kind === 'ASSIGNABILITY'
+						? { ...relation, requestId: 'unrequested-assignability' }
+						: relation
+				),
+				'Assignability relation 8 has no matching request.'
+			],
+			[
+				mutateRelation(8, (relation) =>
+					relation.kind === 'ASSIGNABILITY' ? { ...relation, result: null } : relation
+				),
+				'Assignability relation 8 state is incoherent.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return { ...base, typeRelations: base.typeRelations.slice(0, -1) };
+				})(),
+				'Project tsconfig.json does not reconcile assignability requests.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						typeRelations: [
+							...base.typeRelations,
+							{ ...base.typeRelations[0]!, relationOrdinal: base.typeRelations.length }
+						]
+					};
+				})(),
+				'Project tsconfig.json contains duplicate type-relation identity'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						types: base.types.map((type, index) =>
+							index === 0
+								? {
+										...type,
+										acquisitionAnchors: [
+											{
+												componentKind: 'UNION',
+												componentOrdinal: -1,
+												kind: 'TYPE_COMPONENT',
+												parentTypeOrdinal: 0
+											}
+										]
+									}
+								: type
+						)
+					};
+				})(),
+				'Type component anchor has an invalid ordinal.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						types: base.types.map((type, index) =>
+							index === 2
+								? {
+										...type,
+										acquisitionAnchors: [
+											{
+												componentKind: 'TYPE_PARAMETER',
+												componentOrdinal: -1,
+												kind: 'SIGNATURE_COMPONENT',
+												signatureOrdinal: 0
+											}
+										]
+									}
+								: type
+						)
+					};
+				})(),
+				'Signature component anchor has an invalid ordinal.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						types: base.types.map((type, index) =>
+							index === 1
+								? {
+										...type,
+										acquisitionAnchors: type.acquisitionAnchors.map((anchor, anchorIndex) =>
+											anchorIndex === 0 && anchor.kind === 'SIGNATURE_COMPONENT'
+												? { ...anchor, componentOrdinal: 1 }
+												: anchor
+										)
+									}
+								: type
+						)
+					};
+				})(),
+				'A Signature return acquisition anchor must use ordinal zero.'
+			],
+			[
+				(() => {
+					const base = typeRaw();
+					return {
+						...base,
+						types: base.types.map((type, index) =>
+							index === 0
+								? {
+										...type,
+										acquisitionAnchors: type.acquisitionAnchors.map((anchor) =>
+											anchor.kind === 'NODE' ? { ...anchor, nodeOrdinal: 1 } : anchor
+										)
+									}
+								: type
+						)
+					};
+				})(),
+				'without a matching fact.'
+			]
+		] as const) {
+			try {
+				rejects(project as RawStaticSemanticProjectExtraction, message);
+			} catch (error) {
+				throw new Error(`TS_TYPE relation rejection case failed: ${message}`, { cause: error });
+			}
+		}
+
+		const overloadState = overloadTypeRaw();
+		const firstMembershipOrdinal = typeRaw().typeRelations.length;
+		rejects(
+			mutateRelation(
+				firstMembershipOrdinal,
+				(relation) => ({ ...relation, state: 'UNSUPPORTED' }),
+				overloadState
+			),
+			`Overload membership ${firstMembershipOrdinal} must be confirmed.`
+		);
+		rejects(
+			mutateRelation(
+				firstMembershipOrdinal,
+				(relation) =>
+					relation.kind === 'OVERLOAD_MEMBERSHIP' ? { ...relation, ordinal: -1 } : relation,
+				overloadState
+			),
+			`Overload membership ${firstMembershipOrdinal} has an invalid ordinal.`
+		);
+		rejects(
+			{
+				...overloadState,
+				typeRelations: overloadState.typeRelations.filter(
+					(relation) => relation.kind !== 'OVERLOAD_MEMBERSHIP'
+				)
+			},
+			'Overload set 0 has no membership relations.'
+		);
+		rejects(
+			mutateRelation(
+				firstMembershipOrdinal + 1,
+				(relation) =>
+					relation.kind === 'OVERLOAD_MEMBERSHIP' ? { ...relation, ordinal: 2 } : relation,
+				overloadState
+			),
+			'Overload set 0 membership ordinals are not contiguous.'
+		);
 	});
 
 	it('declares the exact Program-scoped TS_SYMBOL boundary for otherwise complete multi-Program snapshots', () => {

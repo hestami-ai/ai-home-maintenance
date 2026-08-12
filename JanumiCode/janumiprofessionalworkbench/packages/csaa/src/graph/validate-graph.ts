@@ -588,10 +588,15 @@ function expectedCoverage(snapshot: StaticSemanticSnapshot): ModuleDependencyGra
 	const count = (state: SemanticModuleResolutionRecord['resolutionState']): number =>
 		snapshot.moduleResolutions.filter((record) => record.resolutionState === state).length;
 	const graphNativeTargets = snapshot.moduleResolutions.filter(
-		(record) => record.resolutionState !== 'RESOLVED_SOURCE'
+		(record) => record.targetSourceId === null
 	).length;
 	return {
-		closure: snapshot.health === 'PARTIAL' || graphNativeTargets > 0 ? 'OPEN' : 'CLOSED',
+		closure:
+			snapshot.health === 'PARTIAL' ||
+			graphNativeTargets > 0 ||
+			snapshot.moduleResolutions.some((record) => record.resolutionState !== 'RESOLVED_SOURCE')
+				? 'OPEN'
+				: 'CLOSED',
 		expectedModuleResolutions: snapshot.moduleResolutions.length,
 		expectedSources: snapshot.sources.length,
 		graphNativeTargets,
@@ -1072,16 +1077,13 @@ function validateGraphSemantics(
 				'Edge source must be the exact importer SOURCE node.'
 			);
 		let expectedTarget: ModuleDependencyGraphNode | undefined;
-		if (resolution.resolutionState === 'RESOLVED_SOURCE') {
-			expectedTarget =
-				resolution.targetSourceId === null
-					? undefined
-					: sourceNodeBySemanticId.get(resolution.targetSourceId);
+		if (resolution.targetSourceId !== null) {
+			expectedTarget = sourceNodeBySemanticId.get(resolution.targetSourceId);
 			if (edge.target.kind !== 'SOURCE' || expectedTarget?.kind !== 'SOURCE')
 				issues.add(
 					'DANGLING_REFERENCE',
 					`${path}.target`,
-					'Resolved-source dependency must target its semantic SOURCE node.'
+					'A module resolution with a source target must use its semantic SOURCE node.'
 				);
 		} else {
 			expectedTarget = targetNodeByResolutionId.get(resolution.id);
@@ -1089,7 +1091,7 @@ function validateGraphSemantics(
 				issues.add(
 					'DANGLING_REFERENCE',
 					`${path}.target`,
-					'Non-source resolution must retain its explicit graph-native endpoint.'
+					'A module resolution without a source target must retain its explicit graph-native endpoint.'
 				);
 		}
 		if (expectedTarget === undefined || edge.target.nodeId !== expectedTarget.id)
@@ -1120,8 +1122,8 @@ function validateGraphSemantics(
 			(node) => node.moduleResolutionId === resolution.id
 		).length;
 		if (
-			(resolution.resolutionState === 'RESOLVED_SOURCE' && targetCount !== 0) ||
-			(resolution.resolutionState !== 'RESOLVED_SOURCE' && targetCount !== 1)
+			(resolution.targetSourceId !== null && targetCount !== 0) ||
+			(resolution.targetSourceId === null && targetCount !== 1)
 		)
 			issues.add(
 				'POPULATION_MISMATCH',
@@ -1143,7 +1145,7 @@ function validateGraphSemantics(
 		issues.add(
 			'POPULATION_MISMATCH',
 			'$.nodes',
-			'Graph-native target population does not match non-source module resolutions.'
+			'Graph-native target population does not match resolutions without source targets.'
 		);
 
 	const nodeIds = graph.nodes.map((node) => node.id).sort(compareText);

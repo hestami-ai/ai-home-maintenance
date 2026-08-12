@@ -52,6 +52,7 @@ import {
 	semanticReferenceId,
 	semanticScopeId,
 	semanticSignatureId,
+	semanticSignatureParameterId,
 	semanticSnapshotId,
 	semanticSourceId,
 	semanticSymbolId,
@@ -8129,6 +8130,818 @@ describe('bounded semantic snapshot validation', () => {
 					message: 'Population emission manifests do not match serialized records.'
 				})
 			])
+		);
+	});
+
+	it('fails closed across validation preflight, type-request, and type-provenance boundaries', () => {
+		const base = fixture();
+		const rich = withCallAndConstructOverloadFacts();
+		const expectMessage = (snapshot: StaticSemanticSnapshot, message: string): void => {
+			const result = validateSnapshot(snapshot, {}, contextForSnapshot(snapshot));
+			expect(result.state).toBe('INVALID');
+			expect(result.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ message: expect.stringContaining(message) })
+				])
+			);
+		};
+
+		expect(validateSnapshot(base, { maxReferenceChecks: 1 })).toMatchObject({
+			state: 'BUDGET_EXHAUSTED'
+		});
+		expectMessage(
+			{ ...base, fullJanCsaa007Conformance: 'CLAIMED' as never },
+			'Slice 3B must not claim full JAN-CSAA-007 conformance.'
+		);
+
+		const typeBoundaryLimitation = {
+			capability: 'TS_TYPE' as const,
+			closureEffect: 'DEGRADES_CLOSURE' as const,
+			reason:
+				'TypeScript type and Signature identities are Program-scoped; cross-Program type equivalence and checker-judgment reconciliation are intentionally not asserted for this multi-project snapshot.',
+			region: 'typescript-program-boundaries'
+		};
+		const program = rich.programs[0]!;
+		const multiProgram = {
+			...rich,
+			programs: [program, { ...program, id: `semantic:program-${'e'.repeat(64)}` as never }].sort(
+				(left, right) => (left.id < right.id ? -1 : 1)
+			)
+		};
+		expectMessage(
+			multiProgram,
+			'Multi-Program TS_TYPE snapshots require the exact canonical TS_TYPE Program-boundary limitation once.'
+		);
+		expectMessage(
+			multiProgram,
+			'Every TS_TYPE provenance in a multi-Program snapshot requires the exact canonical Program-boundary limitation once.'
+		);
+		expectMessage(
+			{ ...rich, limitations: [typeBoundaryLimitation] },
+			'The TS_TYPE Program-boundary limitation is forbidden unless TS_TYPE is requested for multiple Programs.'
+		);
+		const typeProvenance = rich.provenances.find(
+			(record) => record.capability === 'TS_TYPE' && record.sourceId === null
+		)!;
+		expectMessage(
+			{
+				...rich,
+				provenances: rich.provenances.map((record) =>
+					record.id === typeProvenance.id
+						? { ...record, limitations: [typeBoundaryLimitation] }
+						: record
+				)
+			},
+			'The TS_TYPE Program-boundary provenance limitation is forbidden outside TS_TYPE provenance in a multi-Program snapshot.'
+		);
+
+		const source = rich.sources[0]!;
+		const root = rich.astNodes.find((node) => node.id === source.rootNodeId)!;
+		const selector = {
+			end: root.end,
+			logicalPath: source.logicalPath,
+			queryMode: 'TYPE_AT_LOCATION' as const,
+			start: root.start,
+			syntaxKind: root.kind
+		};
+		const request = {
+			requestId: 'request-a',
+			requesterRef: 'validator-test',
+			source: selector,
+			target: selector
+		};
+		expectMessage(
+			{ ...base, assignabilityRequests: [request] },
+			'Assignability requests require the TS_TYPE capability.'
+		);
+		expectMessage(
+			{ ...rich, assignabilityRequests: [request, request] },
+			'Assignability requests must have unique identities and be canonically ordered by request identity.'
+		);
+		expectMessage(
+			{
+				...rich,
+				assignabilityRequests: [
+					{
+						...request,
+						requestId: '',
+						requesterRef: ''
+					}
+				]
+			},
+			'Assignability request identity and requester reference must be non-empty Unicode-scalar strings.'
+		);
+		expectMessage(
+			{
+				...rich,
+				assignabilityRequests: [
+					{
+						...request,
+						source: { ...selector, syntaxKind: 999_999 },
+						target: { ...selector, syntaxKind: 999_999 }
+					}
+				]
+			},
+			'Type selector must use a canonical logical path, valid UTF-16 span, public SyntaxKind, and closed query mode.'
+		);
+		expectMessage(
+			{
+				...rich,
+				requestedCapabilities: [
+					'TS_PROJECT',
+					'TS_SYMBOL',
+					'TS_SYNTAX'
+				] as StaticSemanticSnapshot['requestedCapabilities']
+			},
+			'TS_TYPE requests and records cannot be emitted when type analysis was not requested.'
+		);
+
+		const invalidTypeProvenance = {
+			...rich,
+			provenances: rich.provenances.map((record) =>
+				record.id === typeProvenance.id
+					? {
+							...record,
+							epistemic: {
+								...record.epistemic,
+								inference: 'derived' as const,
+								supportBasis: {
+									...record.epistemic.supportBasis,
+									kind: 'derived' as const,
+									method: 'typescript-public-ast-binding-rules'
+								}
+							}
+						}
+					: record
+			)
+		};
+		expectMessage(
+			invalidTypeProvenance,
+			'Type and signature facts require direct compiler-confirmed public TypeChecker provenance.'
+		);
+	});
+
+	it('rejects malformed type, type-parameter, Signature, and parameter closure', () => {
+		const rich = withCallAndConstructOverloadFacts();
+		const pair = withDeclarationOwnedPairTypeParameters();
+		const expectMessage = (snapshot: StaticSemanticSnapshot, message: string): void => {
+			const result = validateSnapshot(snapshot, {}, contextForSnapshot(snapshot));
+			expect(result.state).toBe('INVALID');
+			expect(result.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ message: expect.stringContaining(message) })
+				])
+			);
+		};
+		const replaceType = (
+			snapshot: StaticSemanticSnapshot,
+			changes: Partial<StaticSemanticSnapshot['types'][number]>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			types: snapshot.types.map((record, index) =>
+				index === 0 ? { ...record, ...changes } : record
+			)
+		});
+		const replaceSignature = (
+			snapshot: StaticSemanticSnapshot,
+			changes: Partial<StaticSemanticSnapshot['signatures'][number]>
+		): StaticSemanticSnapshot => ({
+			...snapshot,
+			signatures: snapshot.signatures.map((record, index) =>
+				index === 0 ? { ...record, ...changes } : record
+			)
+		});
+		const publicFlagNames = (flags: number, values: object): string[] => {
+			const names = new Set<string>();
+			for (const [name, value] of Object.entries(values))
+				if (
+					typeof value === 'number' &&
+					value > 0 &&
+					(value & (value - 1)) === 0 &&
+					(flags & value) !== 0
+				)
+					names.add(name);
+			return [...names].sort();
+		};
+
+		const otherType = replaceType(rich, {
+			category: 'OTHER',
+			flagNames: [],
+			flags: 0,
+			objectFlagNames: [],
+			objectFlags: null,
+			structureState: 'COMPLETE',
+			unsupportedStructureKinds: []
+		});
+		expect(validateSnapshot(otherType, {}, contextForSnapshot(otherType))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const mappedType = replaceType(rich, {
+			category: 'OBJECT',
+			flagNames: publicFlagNames(ts.TypeFlags.Object, ts.TypeFlags),
+			flags: ts.TypeFlags.Object,
+			objectFlagNames: publicFlagNames(ts.ObjectFlags.Mapped, ts.ObjectFlags),
+			objectFlags: ts.ObjectFlags.Mapped,
+			structureState: 'BOUNDED',
+			unsupportedStructureKinds: ['MAPPED']
+		});
+		expectMessage(mappedType, 'Population emission manifests do not match serialized records.');
+		expectMessage(
+			replaceType(rich, { display: '' }),
+			'Type display and fingerprint must use the frozen profiles, scalar representation, and exact SHA-256 digests.'
+		);
+		expectMessage(
+			replaceType(rich, { flagNames: [] }),
+			'Type flags, category, object flags, unsupported structures, and structure state are incoherent.'
+		);
+		expectMessage(
+			replaceType(rich, { acquisitionAnchors: [] }),
+			'Type acquisition anchors must be a non-empty canonical set.'
+		);
+		expectMessage(
+			replaceType(rich, { identityBasis: 'STRUCTURAL' }),
+			'Type identity basis does not match its declaration and acquisition evidence.'
+		);
+		expectMessage(
+			replaceType(rich, { id: `semantic:type-${'f'.repeat(64)}` as never }),
+			'Type identity mismatch.'
+		);
+		expectMessage(
+			replaceType(rich, { symbolId: `semantic:symbol-${'f'.repeat(64)}` as never }),
+			'Referenced symbol is absent.'
+		);
+		expectMessage(
+			replaceType(rich, { projectId: `semantic:project-${'f'.repeat(64)}` as never }),
+			'Record Program and project must exist and be the same mutually bound compiler context.'
+		);
+
+		const firstParameter = pair.typeParameters[0]!;
+		const secondParameter = pair.typeParameters[1]!;
+		const firstSignature = rich.signatures[0]!;
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === firstParameter.id ? { ...parameter, name: '' } : parameter
+				)
+			},
+			'Type parameter name and non-negative owner ordinal are invalid.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === secondParameter.id
+						? { ...parameter, ordinal: firstParameter.ordinal }
+						: parameter
+				)
+			},
+			'A type-parameter owner may contain at most one parameter at each ordinal.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === firstParameter.id ? { ...parameter, declarationId: null } : parameter
+				)
+			},
+			'Declaration-owned type parameter must identify its distinct TypeParameterDeclaration.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === firstParameter.id
+						? {
+								...parameter,
+								owner: { id: firstSignature.id, kind: 'SIGNATURE' as const }
+							}
+						: parameter
+				)
+			},
+			'Signature type parameter must retain its exact Signature-component acquisition anchor.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === firstParameter.id
+						? { ...parameter, owner: { id: pair.types[0]!.id, kind: 'TYPE' as const } }
+						: parameter
+				)
+			},
+			'Type-parameter identity mismatch.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) => ({
+					...parameter,
+					owner: { id: firstSignature.id, kind: 'SIGNATURE' as const }
+				}))
+			},
+			'Signature type-parameter membership must be complete, unique, and ordered by ordinal.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === firstParameter.id
+						? {
+								...parameter,
+								constraintState: 'RESOLVED' as const,
+								constraintTypeId: pair.types[0]!.id
+							}
+						: parameter
+				)
+			},
+			'Resolved constraint or default type must retain its exact type-component acquisition anchor.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) =>
+					parameter.id === firstParameter.id
+						? { ...parameter, constraintTypeId: pair.types[0]!.id }
+						: parameter
+				)
+			},
+			'Only RESOLVED type-parameter state may carry a resolved type identity.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) => ({
+					...parameter,
+					ordinal: parameter.ordinal + 1
+				}))
+			},
+			'Type-parameter owner '
+		);
+
+		expectMessage(
+			replaceSignature(rich, { display: '' }),
+			'Signature display and fingerprint must use the frozen profile, scalar representation, and exact SHA-256 digests.'
+		);
+		expectMessage(
+			replaceSignature(rich, { returnTypeId: `semantic:type-${'f'.repeat(64)}` as never }),
+			'Referenced type is absent.'
+		);
+		expectMessage(
+			replaceSignature(rich, {
+				parameterIds: [`semantic:signature-parameter-${'f'.repeat(64)}` as never]
+			}),
+			'Signature references an absent parameter.'
+		);
+		expectMessage(
+			replaceSignature(rich, {
+				typeParameterIds: [`semantic:type-parameter-${'f'.repeat(64)}` as never]
+			}),
+			'Referenced type parameter is absent.'
+		);
+		const declarationOwnedSignature = replaceSignature(rich, {
+			owner: { id: firstSignature.declarationId!, kind: 'DECLARATION' }
+		});
+		expectMessage(
+			declarationOwnedSignature,
+			'Overload membership role and callable owner are incoherent with its Signature.'
+		);
+
+		const signature = rich.signatures[0]!;
+		const type = rich.types[0]!;
+		const provenanceId = rich.provenances.find(
+			(record) => record.capability === 'TS_TYPE' && record.sourceId === null
+		)!.id;
+		const malformedParameter: StaticSemanticSnapshot['signatureParameters'][number] = {
+			declarationId: null,
+			id: semanticSignatureParameterId({ ordinal: 1, role: 'THIS', signatureId: signature.id }),
+			name: '',
+			optional: true,
+			ordinal: 1,
+			provenanceId,
+			rest: true,
+			role: 'THIS',
+			signatureId: signature.id,
+			symbolId: null,
+			typeId: type.id
+		};
+		const malformedParameterSnapshot = {
+			...rich,
+			signatureParameters: [malformedParameter]
+		};
+		expectMessage(
+			malformedParameterSnapshot,
+			'Signature parameter name, ordinal, or THIS-parameter modifiers are incoherent.'
+		);
+		expectMessage(malformedParameterSnapshot, 'THIS parameter ordinal must be zero.');
+		expectMessage(
+			malformedParameterSnapshot,
+			'Signature parameter type must retain its exact Signature-component acquisition anchor.'
+		);
+		expectMessage(
+			{ ...rich, signatureParameters: [malformedParameter, malformedParameter] },
+			'A Signature may contain at most one parameter per role and ordinal.'
+		);
+		expectMessage(
+			{
+				...rich,
+				signatureParameters: [
+					{ ...malformedParameter, id: `semantic:signature-parameter-${'f'.repeat(64)}` as never }
+				]
+			},
+			'Signature-parameter identity mismatch.'
+		);
+		const missingSignatureParameter = {
+			...malformedParameter,
+			id: semanticSignatureParameterId({
+				ordinal: 0,
+				role: 'PARAMETER',
+				signatureId: `semantic:signature-${'f'.repeat(64)}` as never
+			}),
+			name: 'missing',
+			optional: false,
+			ordinal: 0,
+			rest: false,
+			role: 'PARAMETER' as const,
+			signatureId: `semantic:signature-${'f'.repeat(64)}` as never
+		};
+		expectMessage(
+			{ ...rich, signatureParameters: [missingSignatureParameter] },
+			'Signature parameter references an absent Signature.'
+		);
+		expectMessage(
+			{
+				...rich,
+				overloadSets: rich.overloadSets.map((record) => ({
+					...record,
+					id: `semantic:overload-set-${'f'.repeat(64)}` as never
+				}))
+			},
+			'Overload-set identity mismatch.'
+		);
+	});
+
+	it('rejects every type-relation discriminator and its aggregate closure failures', () => {
+		const rich = withCallAndConstructOverloadFacts();
+		const pair = withDeclarationOwnedPairTypeParameters();
+		const source = rich.sources[0]!;
+		const root = rich.astNodes.find((node) => node.id === source.rootNodeId)!;
+		const declaration = rich.declarations[0]!;
+		const type = rich.types[0]!;
+		const signature = rich.signatures[0]!;
+		const typeProvenanceId = rich.provenances.find(
+			(record) => record.capability === 'TS_TYPE' && record.sourceId === null
+		)!.id;
+		const expectMessage = (snapshot: StaticSemanticSnapshot, message: string): void => {
+			const result = validateSnapshot(snapshot, {}, contextForSnapshot(snapshot));
+			expect(result.state).toBe('INVALID');
+			expect(result.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ message: expect.stringContaining(message) })
+				])
+			);
+		};
+		const withRelation = (
+			snapshot: StaticSemanticSnapshot,
+			preimage: Parameters<typeof semanticTypeRelationId>[0]
+		): StaticSemanticSnapshot => {
+			const relation = {
+				...preimage,
+				id: semanticTypeRelationId(preimage),
+				provenanceId: typeProvenanceId
+			} as StaticSemanticSnapshot['typeRelations'][number];
+			return {
+				...snapshot,
+				typeRelations: [...snapshot.typeRelations, relation].sort((left, right) =>
+					left.id < right.id ? -1 : 1
+				)
+			};
+		};
+		const common = {
+			programId: source.programId,
+			projectId: source.projectId
+		};
+
+		const typeOf = withRelation(rich, {
+			...common,
+			kind: 'TYPE_OF',
+			queryMode: 'TYPE_AT_LOCATION',
+			state: 'UNRESOLVED',
+			subject: { id: root.id, kind: 'AST_NODE' },
+			typeId: type.id
+		});
+		expectMessage(typeOf, 'TYPE_OF state and resolved type identity disagree.');
+		expectMessage(
+			typeOf,
+			'Confirmed TYPE_OF result must be retained as a matching type acquisition anchor.'
+		);
+		expectMessage(
+			withRelation(rich, {
+				...common,
+				kind: 'TYPE_OF',
+				queryMode: 'TYPE_AT_LOCATION',
+				state: 'UNRESOLVED',
+				subject: { id: `semantic:node-${'f'.repeat(64)}` as never, kind: 'AST_NODE' },
+				typeId: null
+			}),
+			'Referenced AST node is absent.'
+		);
+
+		const typeAlias = withRelation(rich, {
+			...common,
+			aliasDeclarationId: declaration.id,
+			aliasedTypeId: type.id,
+			kind: 'TYPE_ALIAS',
+			state: 'UNRESOLVED'
+		});
+		expectMessage(typeAlias, 'TYPE_ALIAS state and resolved type identity disagree.');
+		expectMessage(
+			withRelation(rich, {
+				...common,
+				aliasDeclarationId: `semantic:declaration-${'f'.repeat(64)}` as never,
+				aliasedTypeId: null,
+				kind: 'TYPE_ALIAS',
+				state: 'UNRESOLVED'
+			}),
+			'Referenced declaration is absent.'
+		);
+
+		const constituent = withRelation(rich, {
+			...common,
+			compositeTypeId: type.id,
+			constituentTypeId: type.id,
+			kind: 'UNION_CONSTITUENT',
+			ordinal: 0,
+			state: 'UNRESOLVED'
+		});
+		expectMessage(
+			constituent,
+			'Constituent relations must be confirmed with a non-negative ordinal.'
+		);
+		expectMessage(
+			constituent,
+			'Constituent relation kind does not match the composite type category.'
+		);
+		expectMessage(
+			constituent,
+			'Constituent relation must be mirrored by its exact type-component acquisition anchor.'
+		);
+		expectMessage(constituent, 'Composite UNION_CONSTITUENT');
+
+		const generic = withRelation(rich, {
+			...common,
+			argumentTypeIds: [type.id],
+			genericTarget: { id: type.id, kind: 'TYPE' },
+			instantiatedTarget: { id: type.id, kind: 'TYPE' },
+			kind: 'GENERIC_INSTANTIATION',
+			state: 'UNRESOLVED'
+		});
+		expectMessage(generic, 'Generic-instantiation relations must be confirmed.');
+		expectMessage(
+			generic,
+			'Generic target must retain its exact acquisition anchor from the instantiated type.'
+		);
+		expectMessage(
+			generic,
+			'Generic argument order must be mirrored by exact type-component acquisition anchors.'
+		);
+		expectMessage(
+			withRelation(rich, {
+				...common,
+				argumentTypeIds: [],
+				genericTarget: { id: `semantic:signature-${'f'.repeat(64)}` as never, kind: 'SIGNATURE' },
+				instantiatedTarget: { id: signature.id, kind: 'SIGNATURE' },
+				kind: 'GENERIC_INSTANTIATION',
+				state: 'CONFIRMED'
+			}),
+			'Referenced Signature is absent.'
+		);
+
+		const constraint = pair.typeRelations.find(
+			(relation) => relation.kind === 'PARAMETER_CONSTRAINT'
+		)!;
+		expectMessage(
+			{
+				...pair,
+				typeRelations: pair.typeRelations.map((relation) =>
+					relation.id === constraint.id ? { ...relation, state: 'UNRESOLVED' as const } : relation
+				)
+			},
+			'Constraint relation must exactly mirror its type-parameter constraint and epistemic state.'
+		);
+		const missingConstraint = {
+			...pair,
+			typeRelations: pair.typeRelations.filter((relation) => relation.id !== constraint.id)
+		};
+		expectMessage(missingConstraint, 'must have exactly one matching constraint relation.');
+
+		const heritageNode = withRelation(rich, {
+			...common,
+			baseTypeId: type.id,
+			derivedTypeId: type.id,
+			heritageOccurrence: { id: root.id, kind: 'AST_NODE' },
+			kind: 'TYPE_EXTENSION',
+			state: 'UNRESOLVED'
+		});
+		expectMessage(heritageNode, 'Heritage type relations must be confirmed.');
+		const heritageDeclaration = withRelation(rich, {
+			...common,
+			baseTypeId: type.id,
+			derivedTypeId: type.id,
+			heritageOccurrence: { id: declaration.id, kind: 'DECLARATION' },
+			kind: 'TYPE_IMPLEMENTATION',
+			state: 'CONFIRMED'
+		});
+		expectMessage(
+			heritageDeclaration,
+			'Population emission manifests do not match serialized records.'
+		);
+
+		const missingRequest = withRelation(rich, {
+			...common,
+			checkerContextDigest: rich.contextDigest,
+			kind: 'ASSIGNABILITY',
+			requestId: 'missing-request',
+			result: null,
+			sourceTypeId: null,
+			state: 'CONFIRMED',
+			targetTypeId: null
+		});
+		expectMessage(
+			missingRequest,
+			'Assignability relation must bind a requested judgment and its exact Program checker context.'
+		);
+		expectMessage(
+			missingRequest,
+			'Assignability state, endpoint resolution, and Boolean judgment are incoherent.'
+		);
+
+		const selector = {
+			end: root.end,
+			logicalPath: source.logicalPath,
+			queryMode: 'TYPE_AT_LOCATION' as const,
+			start: root.start,
+			syntaxKind: root.kind
+		};
+		const request = {
+			requestId: 'assignability-a',
+			requesterRef: 'validator-test',
+			source: selector,
+			target: selector
+		};
+		const requested = { ...rich, assignabilityRequests: [request] };
+		expectMessage(requested, 'must have exactly one judgment per requested Program.');
+		expectMessage(
+			requested,
+			'Assignability relations must equal the exact requested Program-by-request judgment matrix.'
+		);
+		const assigned = withRelation(requested, {
+			...common,
+			checkerContextDigest: rich.contextDigest,
+			kind: 'ASSIGNABILITY',
+			requestId: request.requestId,
+			result: true,
+			sourceTypeId: type.id,
+			state: 'CONFIRMED',
+			targetTypeId: type.id
+		});
+		expectMessage(
+			assigned,
+			'Resolved assignability endpoint must match its exact requested node and type acquisition anchor in the same Program.'
+		);
+
+		const membership = rich.typeRelations.find(
+			(relation) => relation.kind === 'OVERLOAD_MEMBERSHIP'
+		)!;
+		const unsupportedMembership = {
+			...rich,
+			typeRelations: rich.typeRelations.map((relation) =>
+				relation.id === membership.id ? { ...relation, state: 'UNSUPPORTED' as const } : relation
+			)
+		};
+		expectMessage(
+			unsupportedMembership,
+			'Overload membership must be confirmed with a non-negative ordinal.'
+		);
+		expectMessage(
+			{
+				...rich,
+				typeRelations: rich.typeRelations.map((relation) =>
+					relation.id === membership.id && relation.kind === 'OVERLOAD_MEMBERSHIP'
+						? { ...relation, overloadSetId: `semantic:overload-set-${'f'.repeat(64)}` as never }
+						: relation
+				)
+			},
+			'Overload membership set is absent or belongs to another Program.'
+		);
+
+		const withoutMembership = {
+			...rich,
+			typeRelations: rich.typeRelations.filter((relation) => relation.id !== membership.id)
+		};
+		expectMessage(withoutMembership, 'must belong to exactly one overload set.');
+		expectMessage(withoutMembership, 'Signature kind');
+		const duplicateMembershipPreimage = {
+			kind: 'OVERLOAD_MEMBERSHIP' as const,
+			ordinal: 99,
+			overloadSetId:
+				membership.kind === 'OVERLOAD_MEMBERSHIP'
+					? membership.overloadSetId
+					: rich.overloadSets[0]!.id,
+			programId: source.programId,
+			projectId: source.projectId,
+			role:
+				membership.kind === 'OVERLOAD_MEMBERSHIP' ? membership.role : ('CALL_SIGNATURE' as const),
+			signatureId:
+				membership.kind === 'OVERLOAD_MEMBERSHIP' ? membership.signatureId : signature.id,
+			state: 'CONFIRMED' as const
+		};
+		const duplicatedMembership = withRelation(rich, duplicateMembershipPreimage);
+		expectMessage(duplicatedMembership, 'may not be duplicated across overload memberships.');
+		expectMessage(
+			{
+				...rich,
+				signatures: rich.signatures.map((record) =>
+					record.id === membership.signatureId
+						? { ...record, semanticKind: 'SIGNATURE' as const }
+						: record
+				)
+			},
+			'Non-overload Signature'
+		);
+
+		const unionType = {
+			...rich,
+			types: rich.types.map((record, index) =>
+				index === 0
+					? {
+							...record,
+							category: 'UNION' as const,
+							flagNames: ['Union'],
+							flags: ts.TypeFlags.Union
+						}
+					: record
+			)
+		};
+		expectMessage(unionType, 'lacks its constituent relation closure.');
+
+		const noncontiguousParameter = {
+			declarationId: null,
+			id: semanticSignatureParameterId({
+				ordinal: 1,
+				role: 'PARAMETER',
+				signatureId: signature.id
+			}),
+			name: 'value',
+			optional: false,
+			ordinal: 1,
+			provenanceId: typeProvenanceId,
+			rest: false,
+			role: 'PARAMETER' as const,
+			signatureId: signature.id,
+			symbolId: null,
+			typeId: type.id
+		};
+		expectMessage(
+			{ ...rich, signatureParameters: [noncontiguousParameter] },
+			'ordinary parameter ordinals must be contiguous from zero.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter) => ({
+					...parameter,
+					ordinal: parameter.ordinal + 1
+				}))
+			},
+			'ordinals must be contiguous from zero.'
+		);
+		expectMessage(
+			{
+				...pair,
+				typeParameters: pair.typeParameters.map((parameter, index) =>
+					index === 0
+						? {
+								...parameter,
+								constraintState: 'UNSUPPORTED' as const
+							}
+						: parameter
+				)
+			},
+			'Population emission manifests do not match serialized records.'
+		);
+		expectMessage(
+			{
+				...rich,
+				typeRelations: rich.typeRelations.map((relation, index) =>
+					index === 0
+						? { ...relation, id: `semantic:type-relation-${'f'.repeat(64)}` as never }
+						: relation
+				)
+			},
+			'Type-relation identity mismatch.'
 		);
 	});
 });

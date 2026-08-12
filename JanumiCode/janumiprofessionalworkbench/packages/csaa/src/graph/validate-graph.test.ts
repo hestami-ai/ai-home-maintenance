@@ -107,6 +107,20 @@ function clone(graph: ModuleDependencyGraphSnapshot): ModuleDependencyGraphSnaps
 	return JSON.parse(canonicalSemanticJson(graph)) as ModuleDependencyGraphSnapshot;
 }
 
+function unresolvedSemanticSnapshot(): StaticSemanticSnapshot {
+	const snapshot = semanticSnapshot();
+	return {
+		...snapshot,
+		moduleResolutions: [
+			{
+				...snapshot.moduleResolutions[0]!,
+				resolutionState: 'UNRESOLVED',
+				targetSourceId: null
+			}
+		]
+	} as StaticSemanticSnapshot;
+}
+
 function issueCodes(
 	graph: ModuleDependencyGraphSnapshot,
 	snapshot: StaticSemanticSnapshot
@@ -116,12 +130,653 @@ function issueCodes(
 }
 
 describe('validateModuleDependencyGraph', () => {
+	it('keeps an external classification while using an available context source endpoint', () => {
+		const base = semanticSnapshot();
+		const snapshot = {
+			...base,
+			moduleResolutions: [
+				{ ...base.moduleResolutions[0]!, resolutionState: 'RESOLVED_EXTERNAL' as const }
+			]
+		} as StaticSemanticSnapshot;
+		const graph = validGraph(snapshot);
+		expect(graph).toMatchObject({
+			coverage: {
+				closure: 'OPEN',
+				graphNativeTargets: 0,
+				resolvedExternalTargets: 1
+			},
+			health: 'PARTIAL'
+		});
+		expect(graph.edges[0]?.target.kind).toBe('SOURCE');
+		expect(graph.limitations).toContainEqual(
+			expect.objectContaining({ kind: 'NON_SOURCE_MODULE_TARGET' })
+		);
+		expect(validateModuleDependencyGraph(graph, snapshot)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+	});
+
 	it('accepts the exact deterministic module-dependency graph', () => {
 		const snapshot = semanticSnapshot();
 		expect(validateModuleDependencyGraph(validGraph(snapshot), snapshot)).toEqual({
 			issues: [],
 			state: 'VALID'
 		});
+	});
+
+	it('rejects malformed graph wire shapes at every public composite boundary', () => {
+		const snapshot = semanticSnapshot();
+		const graph = validGraph(snapshot);
+		const unresolvedSnapshot = unresolvedSemanticSnapshot();
+		const unresolvedGraph = validGraph(unresolvedSnapshot);
+		const mutate = (
+			change: (candidate: ModuleDependencyGraphSnapshot) => void,
+			base = graph
+		): ModuleDependencyGraphSnapshot => {
+			const candidate = clone(base);
+			change(candidate);
+			return candidate;
+		};
+		const malformed: readonly unknown[] = [
+			null,
+			[],
+			mutate((candidate) => Object.assign(candidate, { unexpected: true })),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { coverage: unknown }, { coverage: null })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.coverage as unknown as { expectedSources: unknown }, {
+					expectedSources: -1
+				})
+			),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { limitations: unknown }, { limitations: [null] })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.limitations[0]! as unknown as { reason: unknown }, { reason: '' })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.nodes[0]! as unknown as { sourceLocations: unknown }, {
+					sourceLocations: [null]
+				})
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.nodes[0]! as unknown as { sourceLocations: unknown }, {
+					sourceLocations: [{ end: 0, sourceId: sourceA, start: 1 }]
+				})
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.edges[0]! as unknown as { source: unknown }, { source: null })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.edges[0]!.source as unknown as { kind: unknown }, { kind: 'BAD' })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { forwardIndex: unknown }, {
+					forwardIndex: [null]
+				})
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.forwardIndex[0]! as unknown as { edgeIds: unknown }, {
+					edgeIds: [1]
+				})
+			),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { producer: unknown }, { producer: null })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.producer as unknown as { version: unknown }, { version: '' })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { nodes: unknown }, { nodes: [null] })
+			),
+			mutate((candidate) => {
+				const sourceNode = candidate.nodes.find((node) => node.kind === 'SOURCE')!;
+				Object.assign(sourceNode as unknown as { logicalPath: unknown }, { logicalPath: 1 });
+			}),
+			mutate((candidate) => {
+				const target = candidate.nodes.find((node) => node.kind === 'RESOLUTION_TARGET')!;
+				Object.assign(target as unknown as { specifier: unknown }, { specifier: 1 });
+			}, unresolvedGraph),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { edges: unknown }, { edges: [null] })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.edges[0]! as unknown as { method: unknown }, { method: 'wrong' })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { layers: unknown }, { layers: [null] })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.layers[0]! as unknown as { ordinal: unknown }, { ordinal: 1 })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.layers[0]! as unknown as { limitations: unknown }, {
+					limitations: [null]
+				})
+			),
+			mutate((candidate) =>
+				Object.assign(candidate.layers[0]! as unknown as { nodeIds: unknown }, { nodeIds: [1] })
+			),
+			mutate((candidate) =>
+				Object.assign(candidate as unknown as { reverseIndex: unknown }, { reverseIndex: null })
+			)
+		];
+
+		for (const value of malformed)
+			expect(validateModuleDependencyGraph(value, snapshot)).toMatchObject({ state: 'INVALID' });
+		for (const maxIssues of [0, Number.NaN, 100_001])
+			expect(validateModuleDependencyGraph(graph, snapshot, { maxIssues })).toMatchObject({
+				issues: [expect.objectContaining({ path: '$validationOptions.maxIssues' })],
+				state: 'INVALID'
+			});
+		const hostile = new Proxy(
+			{},
+			{
+				getPrototypeOf() {
+					throw new Error('hostile graph');
+				}
+			}
+		);
+		expect(validateModuleDependencyGraph(hostile, snapshot)).toMatchObject({
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })],
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects shape-valid contract, reference, evidence, and reconciliation drift', () => {
+		type MutationCase = {
+			readonly expectedCode: string;
+			readonly name: string;
+			readonly unresolved?: boolean;
+			readonly mutate: (
+				graph: ModuleDependencyGraphSnapshot,
+				snapshot: StaticSemanticSnapshot
+			) => void;
+		};
+		const sourceNode = (graph: ModuleDependencyGraphSnapshot, semanticSourceId = sourceA) =>
+			graph.nodes.find(
+				(node) => node.kind === 'SOURCE' && node.semanticSourceId === semanticSourceId
+			)!;
+		const targetNode = (graph: ModuleDependencyGraphSnapshot) =>
+			graph.nodes.find((node) => node.kind === 'RESOLUTION_TARGET')!;
+		const cases: readonly MutationCase[] = [
+			{
+				expectedCode: 'UNSUPPORTED_SCHEMA_VERSION',
+				name: 'schema version',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { schemaVersion: string }, { schemaVersion: 'other' })
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'operation version',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { operationVersion: string }, {
+						operationVersion: 'other'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'canonical profile',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { canonicalProfile: string }, {
+						canonicalProfile: 'other'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'construction method',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { method: string }, { method: 'other' })
+			},
+			{
+				expectedCode: 'CONFORMANCE_OVERCLAIM',
+				name: 'full conformance overclaim',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { fullJanCsaa007Conformance: string }, {
+						fullJanCsaa007Conformance: 'CLAIMED'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'semantic snapshot binding',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { semanticSnapshotId: string }, {
+						semanticSnapshotId: 'static:other'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'subject binding',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { subjectId: string }, { subjectId: 'other' })
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'semantic extraction version',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { semanticExtractionVersion: string }, {
+						semanticExtractionVersion: 'other'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'semantic schema version',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { semanticSchemaVersion: string }, {
+						semanticSchemaVersion: 'other'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'producer version',
+				mutate: (graph) =>
+					Object.assign(graph.producer as unknown as { version: string }, { version: 'other' })
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'graph input digest form',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { graphInputDigest: string }, {
+						graphInputDigest: 'not-a-digest'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'content digest form',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { contentDigest: string }, {
+						contentDigest: 'not-a-digest'
+					})
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'layer population',
+				mutate: (graph) => Object.assign(graph as unknown as { layers: unknown[] }, { layers: [] })
+			},
+			{
+				expectedCode: 'IDENTITY_MISMATCH',
+				name: 'layer identity',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]! as unknown as { id: string }, { id: 'graph-layer:other' })
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'layer producer',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]!.producer as unknown as { version: string }, {
+						version: 'other'
+					})
+			},
+			...(['graphId', 'layerId', 'semanticSnapshotId', 'subjectId'] as const).map(
+				(field): MutationCase => ({
+					expectedCode: 'DANGLING_REFERENCE',
+					name: `node ${field} binding`,
+					mutate: (graph) =>
+						Object.assign(sourceNode(graph) as unknown as Record<string, string>, {
+							[field]: 'other'
+						})
+				})
+			),
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'absent provenance',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph) as unknown as { provenanceIds: string[] }, {
+						provenanceIds: ['semantic:provenance-missing']
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'provenance snapshot ownership',
+				mutate: (_graph, snapshot) =>
+					Object.assign(snapshot.provenances[0]! as unknown as { snapshotId: string }, {
+						snapshotId: 'static:other'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'location source',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph).sourceLocations[0]! as unknown as { sourceId: string }, {
+						sourceId: 'semantic:source-missing'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'location extent',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph).sourceLocations[0]! as unknown as { end: number }, {
+						end: 25
+					})
+			},
+			{
+				expectedCode: 'DUPLICATE_ID',
+				name: 'duplicate semantic source representation',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph, sourceB) as unknown as { semanticSourceId: string }, {
+						semanticSourceId: sourceA
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'absent semantic source',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph) as unknown as { semanticSourceId: string }, {
+						semanticSourceId: 'semantic:source-missing'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'semantic source field reproduction',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph) as unknown as { analysisDisposition: string }, {
+						analysisDisposition: 'CONTEXT_ONLY'
+					})
+			},
+			{
+				expectedCode: 'IDENTITY_MISMATCH',
+				name: 'source node identity',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph) as unknown as { id: string }, { id: 'graph-node:other' })
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'source provenance reproduction',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph) as unknown as { provenanceIds: string[] }, {
+						provenanceIds: [sourceBProvenance]
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'source location reproduction',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph).sourceLocations[0]! as unknown as { start: number }, {
+						start: 1
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'source epistemic state',
+				mutate: (graph) =>
+					Object.assign(sourceNode(graph) as unknown as { epistemic: string }, {
+						epistemic: 'UNKNOWN'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'absent native-target resolution',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(targetNode(graph) as unknown as { moduleResolutionId: string }, {
+						moduleResolutionId: 'semantic:module-resolution-missing'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'resolved-source native-target overrepresentation',
+				unresolved: true,
+				mutate: (_graph, snapshot) =>
+					Object.assign(snapshot.moduleResolutions[0]! as unknown as Record<string, unknown>, {
+						resolutionState: 'RESOLVED_SOURCE',
+						targetSourceId: sourceB
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'native-target field reproduction',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(targetNode(graph) as unknown as { specifier: string }, {
+						specifier: './other.js'
+					})
+			},
+			{
+				expectedCode: 'IDENTITY_MISMATCH',
+				name: 'native-target identity',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(targetNode(graph) as unknown as { id: string }, { id: 'graph-node:other' })
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'native-target provenance',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(targetNode(graph) as unknown as { provenanceIds: string[] }, {
+						provenanceIds: [sourceAProvenance]
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'native-target occurrence location',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(targetNode(graph).sourceLocations[0]! as unknown as { start: number }, {
+						start: 1
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'native-target epistemic state',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(targetNode(graph) as unknown as { epistemic: string }, {
+						epistemic: 'SUPPORTED'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'absent edge resolution',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]! as unknown as { moduleResolutionId: string }, {
+						moduleResolutionId: 'semantic:module-resolution-missing'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'absent occurrence node',
+				mutate: (_graph, snapshot) =>
+					Object.assign(snapshot as unknown as { astNodes: unknown[] }, { astNodes: [] })
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'occurrence importer mismatch',
+				mutate: (_graph, snapshot) =>
+					Object.assign(snapshot.astNodes[0]! as unknown as { sourceId: string }, {
+						sourceId: sourceB
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'edge occurrence reproduction',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]! as unknown as { typeOnly: boolean }, { typeOnly: true })
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'edge provenance reproduction',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]! as unknown as { provenanceIds: string[] }, {
+						provenanceIds: [sourceAProvenance]
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'edge occurrence location',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]!.sourceLocations[0]! as unknown as { start: number }, {
+						start: 1
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'edge importer endpoint',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]!.source as unknown as { nodeId: string }, {
+						nodeId: sourceNode(graph, sourceB).id
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'resolved-source target endpoint kind',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]!.target as unknown as Record<string, string>, {
+						kind: 'RESOLUTION_TARGET'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'native target endpoint kind',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]!.target as unknown as Record<string, string>, {
+						kind: 'SOURCE'
+					})
+			},
+			{
+				expectedCode: 'IDENTITY_MISMATCH',
+				name: 'edge identity',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]! as unknown as { id: string }, { id: 'graph-edge:other' })
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'edge epistemic state',
+				mutate: (graph) =>
+					Object.assign(graph.edges[0]! as unknown as { epistemic: string }, {
+						epistemic: 'UNKNOWN'
+					})
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'edge population',
+				mutate: (graph) => Object.assign(graph as unknown as { edges: unknown[] }, { edges: [] })
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'source-node population',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { nodes: unknown[] }, {
+						nodes: graph.nodes.filter(
+							(node) => node.kind !== 'SOURCE' || node.semanticSourceId !== sourceB
+						)
+					})
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'native-target population',
+				unresolved: true,
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { nodes: unknown[] }, {
+						nodes: graph.nodes.filter((node) => node.kind !== 'RESOLUTION_TARGET')
+					})
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'layer node manifest',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]! as unknown as { nodeIds: string[] }, { nodeIds: [] })
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'layer edge manifest',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]! as unknown as { edgeIds: string[] }, { edgeIds: [] })
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'index node',
+				mutate: (graph) =>
+					Object.assign(graph.forwardIndex[0]! as unknown as { nodeId: string }, {
+						nodeId: 'graph-node:missing'
+					})
+			},
+			{
+				expectedCode: 'DANGLING_REFERENCE',
+				name: 'index edge',
+				mutate: (graph) =>
+					Object.assign(
+						graph.forwardIndex.find((entry) => entry.edgeIds.length > 0)! as unknown as {
+							edgeIds: string[];
+						},
+						{ edgeIds: ['graph-edge:missing'] }
+					)
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'graph coverage',
+				mutate: (graph) =>
+					Object.assign(graph.coverage as unknown as { expectedSources: number }, {
+						expectedSources: graph.coverage.expectedSources + 1
+					})
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'layer coverage',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]!.coverage as unknown as { expectedSources: number }, {
+						expectedSources: graph.layers[0]!.coverage.expectedSources + 1
+					})
+			},
+			{
+				expectedCode: 'LIMITATION_MISMATCH',
+				name: 'layer limitation reconciliation',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]! as unknown as { limitations: unknown[] }, {
+						limitations: []
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'graph epistemic aggregate',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { epistemic: string }, { epistemic: 'UNKNOWN' })
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'layer epistemic aggregate',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]! as unknown as { epistemic: string }, {
+						epistemic: 'UNKNOWN'
+					})
+			},
+			{
+				expectedCode: 'INVALID_VALUE',
+				name: 'health closure contract',
+				mutate: (graph) =>
+					Object.assign(graph as unknown as { health: string }, {
+						health: graph.health === 'COMPLETE' ? 'PARTIAL' : 'COMPLETE'
+					})
+			},
+			{
+				expectedCode: 'POPULATION_MISMATCH',
+				name: 'layer provenance manifest',
+				mutate: (graph) =>
+					Object.assign(graph.layers[0]! as unknown as { provenanceIds: string[] }, {
+						provenanceIds: []
+					})
+			},
+			{
+				expectedCode: 'DUPLICATE_ID',
+				name: 'duplicate graph identities',
+				mutate: (graph) => {
+					Object.assign(graph as unknown as { nodes: unknown[]; edges: unknown[] }, {
+						edges: [...graph.edges, graph.edges[0]!],
+						nodes: [...graph.nodes, graph.nodes[0]!]
+					});
+				}
+			}
+		];
+
+		for (const scenario of cases) {
+			const snapshot = scenario.unresolved ? unresolvedSemanticSnapshot() : semanticSnapshot();
+			const graph = validGraph(snapshot);
+			scenario.mutate(graph, snapshot);
+			expect(issueCodes(graph, snapshot), scenario.name).toContain(scenario.expectedCode);
+		}
 	});
 
 	it('rejects a graph whose finalized content digest was changed', () => {

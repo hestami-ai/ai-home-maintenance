@@ -178,19 +178,45 @@ describe('inventory discovery and identity', () => {
 		});
 		expect(capabilities.get('dependency-graph')).toMatchObject({
 			explanation: expect.stringContaining(
-				'projects every compiler-observed module occurrence into a validated TypeScript module-dependency graph'
+				'project every compiler-observed module occurrence into a validated TypeScript module-dependency graph'
 			),
 			provider: 'typescript',
 			provenance: expect.arrayContaining([
+				'packages/csaa/src/contracts/dependency-cruiser.ts',
 				'packages/csaa/src/contracts/graph.ts',
 				'packages/csaa/src/graph/build-module-dependency-graph.ts',
+				'packages/csaa/src/graph/compare-dependency-providers.ts',
+				'packages/csaa/src/providers/dependency-cruiser/normalize-output.ts',
+				'packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json',
+				'packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts',
 				'packages/csaa/src/graph/validate-graph.ts'
 			]),
 			state: 'PARTIAL'
 		});
-		for (const id of ['call-graph', 'code-property-graph', 'control-flow', 'data-flow']) {
+		expect(capabilities.get('call-graph')).toMatchObject({
+			explanation: expect.stringContaining(
+				'enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site'
+			),
+			provider: 'typescript',
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/contracts/call-graph.ts',
+				'packages/csaa/src/graph/build-call-graph.ts',
+				'packages/csaa/src/graph/validate-call-graph.ts'
+			]),
+			state: 'PARTIAL'
+		});
+		expect(capabilities.get('call-graph')?.explanation).toContain(
+			'exact structural/lexical ownership within the declared method'
+		);
+		expect(capabilities.get('call-graph')?.explanation).toContain(
+			'Runtime caller and evaluation ownership remain coarsened'
+		);
+		expect(capabilities.get('call-graph')?.explanation).toContain(
+			'not inferred from the structural ownership edge'
+		);
+		for (const id of ['code-property-graph', 'control-flow', 'data-flow']) {
 			expect(capabilities.get(id)).toMatchObject({
-				explanation: expect.stringContaining('no call, control-flow, data-flow'),
+				explanation: expect.stringContaining('no control-flow, data-flow'),
 				provider: null,
 				state: 'UNIMPLEMENTED'
 			});
@@ -204,10 +230,53 @@ describe('inventory discovery and identity', () => {
 			entry.statement.includes('current DWP-003 frozen Program construction')
 		)?.statement;
 		expect(semanticBoundary).toContain('TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction');
+		expect(semanticBoundary).toContain('first four bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
-			'first bounded DWP-004 increment implements only the validated compiler module-dependency projection'
+			'implementation-local generated JPWB state-machine topology'
 		);
-		expect(semanticBoundary).toContain('call/flow/state-machine graphs');
+		expect(semanticBoundary).toContain(
+			'Inventory generation executes none of these analysis providers'
+		);
+		expect(semanticBoundary).toContain('generalized state-machine inference');
+		const verificationAuthority = inventory.unknowns.find((entry) =>
+			entry.statement.includes('Existing graph-relevant verif censuses remain authoritative')
+		);
+		expect(verificationAuthority).toMatchObject({
+			provenance: expect.arrayContaining([
+				'verif/arrow-census-coverage.test.ts',
+				'verif/arrow-command-census.baseline.json',
+				'verif/arrow-command-census.test.ts',
+				'verif/arrow-command-census.ts',
+				'verif/authority-resolution-census.test.ts',
+				'verif/births-outside-the-census.test.ts',
+				'verif/command-dispatch-census.test.ts',
+				'verif/contract-number-census.test.ts',
+				'verif/dead-kernel-census.test.ts',
+				'verif/event-surface-census.test.ts',
+				'verif/policy-evidence-requirement-census.test.ts',
+				'verif/route-action-census.test.ts',
+				'packages/csaa/src/graph/build-call-graph.ts',
+				'packages/csaa/src/graph/validate-call-graph.ts'
+			])
+		});
+		expect(verificationAuthority?.statement).toContain(
+			'Neither the partial call graph nor the generated state-machine topology projection ports, replaces, retires, weakens, or transfers this authority'
+		);
+		expect(verificationAuthority?.statement).toContain('WRAP candidate');
+		expect(verificationAuthority?.statement).toContain('baseline and tests');
+		for (const family of [
+			'arrow-command',
+			'authority-resolution',
+			'aggregate-birth',
+			'command-dispatch',
+			'contract-number',
+			'dead-kernel',
+			'event-surface',
+			'policy-evidence-requirement',
+			'route-action'
+		])
+			expect(verificationAuthority?.statement).toContain(family);
 	});
 
 	it('rejects malformed and duplicate workspace manifests', () => {

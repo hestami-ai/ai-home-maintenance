@@ -1,6 +1,10 @@
 export * from './contracts/inventory.js';
+export * from './contracts/call-graph.js';
+export * from './contracts/dependency-comparison.js';
+export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/semantic.js';
+export * from './contracts/state-machine-graph.js';
 export * from './contracts/subject.js';
 export * from './inventory/canonical.js';
 export * from './inventory/collect-inventory.js';
@@ -8,7 +12,24 @@ export * from './inventory/project-subject-for-inventory.js';
 export * from './inventory/render-inventory.js';
 export * from './inventory/run-inventory.js';
 export { buildStaticSemanticSnapshot } from './semantic/build-static-semantic-snapshot.js';
+export { buildCallGraph } from './graph/build-call-graph.js';
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
+export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
+export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
+export { validateDependencyProviderComparison } from './graph/validate-dependency-comparison.js';
+export type {
+	DependencyProviderComparisonValidationIssue,
+	DependencyProviderComparisonValidationIssueCode,
+	DependencyProviderComparisonValidationOptions,
+	DependencyProviderComparisonValidationResult
+} from './graph/validate-dependency-comparison.js';
+export { validateCallGraph } from './graph/validate-call-graph.js';
+export type {
+	CallGraphValidationIssue,
+	CallGraphValidationIssueCode,
+	CallGraphValidationOptions,
+	CallGraphValidationResult
+} from './graph/validate-call-graph.js';
 export { validateModuleDependencyGraph } from './graph/validate-graph.js';
 export type {
 	ModuleDependencyGraphValidationIssue,
@@ -16,9 +37,27 @@ export type {
 	ModuleDependencyGraphValidationOptions,
 	ModuleDependencyGraphValidationResult
 } from './graph/validate-graph.js';
+export { validateStateMachineGraph } from './graph/validate-state-machine-graph.js';
+export type {
+	StateMachineGraphValidationIssue,
+	StateMachineGraphValidationIssueCode,
+	StateMachineGraphValidationOptions,
+	StateMachineGraphValidationResult
+} from './graph/validate-state-machine-graph.js';
 export { canonicalSemanticJson, canonicalSemanticJsonWitness } from './semantic/canonical.js';
 export type { CanonicalSemanticJsonWitness } from './semantic/canonical.js';
 export * from './semantic/validate-snapshot.js';
+export {
+	dependencyCruiserObservationContentDigest,
+	normalizeDependencyCruiserOutput,
+	validateDependencyCruiserObservation
+} from './providers/dependency-cruiser/normalize-output.js';
+export { observeStateMachineTopology } from './providers/jpwb-state-machines/observe-state-machines.js';
+export {
+	validateStateMachineTopologyObservation,
+	type StateMachineTopologyObservationValidationIssue,
+	type StateMachineTopologyObservationValidationResult
+} from './providers/jpwb-state-machines/validate-state-machine-observation.js';
 export * from './subject/paths.js';
 export * from './subject/product-boundary.js';
 export * from './subject/artifacts.js';

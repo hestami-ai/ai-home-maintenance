@@ -55,6 +55,51 @@ const TYPESCRIPT_MODULE_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/validate-graph.ts'
 ] as const;
 
+const TYPESCRIPT_CALL_GRAPH_PROVENANCE = [
+	'packages/csaa/src/contracts/call-graph.ts',
+	'packages/csaa/src/graph/build-call-graph.ts',
+	'packages/csaa/src/graph/call-graph-content.ts',
+	'packages/csaa/src/graph/call-graph-ids.ts',
+	'packages/csaa/src/graph/call-graph-input.ts',
+	'packages/csaa/src/graph/validate-call-graph.ts'
+] as const;
+
+const JPWB_STATE_MACHINE_GRAPH_PROVENANCE = [
+	'packages/csaa/src/contracts/state-machine-graph.ts',
+	'packages/csaa/src/graph/build-state-machine-graph.ts',
+	'packages/csaa/src/graph/state-machine-graph-content.ts',
+	'packages/csaa/src/graph/state-machine-graph-ids.ts',
+	'packages/csaa/src/graph/state-machine-graph-input.ts',
+	'packages/csaa/src/graph/validate-state-machine-graph.ts',
+	'packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts',
+	'packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts'
+] as const;
+
+const EXISTING_GRAPH_RELEVANT_VERIFICATION_AUTHORITY = [
+	'verif/arrow-census-coverage.test.ts',
+	'verif/arrow-command-census.baseline.json',
+	'verif/arrow-command-census.test.ts',
+	'verif/arrow-command-census.ts',
+	'verif/authority-resolution-census.test.ts',
+	'verif/births-outside-the-census.test.ts',
+	'verif/command-dispatch-census.test.ts',
+	'verif/contract-number-census.test.ts',
+	'verif/dead-kernel-census.test.ts',
+	'verif/event-surface-census.test.ts',
+	'verif/policy-evidence-requirement-census.test.ts',
+	'verif/route-action-census.test.ts'
+] as const;
+
+const DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE = [
+	'packages/csaa/src/contracts/dependency-comparison.ts',
+	'packages/csaa/src/contracts/dependency-cruiser.ts',
+	'packages/csaa/src/graph/compare-dependency-providers.ts',
+	'packages/csaa/src/graph/validate-dependency-comparison.ts',
+	'packages/csaa/src/providers/dependency-cruiser/normalize-output.ts',
+	'packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json',
+	'packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts'
+] as const;
+
 const TYPESCRIPT_SEMANTIC_PROVENANCE = [
 	...TYPESCRIPT_AST_PROVENANCE,
 	...TYPESCRIPT_SYMBOL_PROVENANCE,
@@ -660,7 +705,8 @@ function verificationAssets(
 		const stem = basename(path).replace(/\.test\.ts$|\.data\.ts$|\.ts$/, '');
 		const isTest = path.endsWith('.test.ts');
 		const isData = path.endsWith('.data.ts');
-		const isGuard = !isTest && /(?:guard|refusal)/.test(basename(path));
+		const isGuard =
+			!isTest && /(?:guard|refusal)/.test(basename(path)) && projectsText.includes(basename(path));
 		const isScript = path.startsWith('scripts/');
 		const role = isTest
 			? 'TEST'
@@ -726,7 +772,6 @@ function verificationAssets(
 
 function capabilities(): CapabilityInventory[] {
 	const unimplemented = [
-		'call-graph',
 		'code-property-graph',
 		'control-flow',
 		'data-flow',
@@ -744,15 +789,35 @@ function capabilities(): CapabilityInventory[] {
 		},
 		{
 			explanation:
-				'The first bounded DWP-004 increment projects every compiler-observed module occurrence into a validated TypeScript module-dependency graph with distinct occurrence relations, explicit non-source targets, provenance, limitations, and reconciled forward/reverse indexes. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, depcruise comparison, calls, flow, and cross-Program composition are not implemented by this increment.',
+				'The first two bounded DWP-004 increments project every compiler-observed module occurrence into a validated TypeScript module-dependency graph and normalize exact-schema-validated dependency-cruiser 16.10.4 JSON evidence for conservative, context-bound comparison. Provider aggregates never replace compiler occurrence edges; qualified target agreement, unresolved agreement, collapsed corroboration, incomparable scope/context differences, and unqualified observed differences remain distinct. This contract cannot promote a difference to conflict without later validated context-equivalence and closed-perimeter evidence. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, provider execution, flow, graph algorithms, and cross-Program composition are not implemented by these increments.',
 			id: 'dependency-graph',
 			provider: 'typescript',
-			provenance: [...TYPESCRIPT_MODULE_GRAPH_PROVENANCE, ...TYPESCRIPT_SYMBOL_PROVENANCE],
+			provenance: [
+				...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+				...TYPESCRIPT_SYMBOL_PROVENANCE,
+				...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE
+			],
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The third bounded DWP-004 increment enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site into a validated graph with exact structural/lexical ownership within the declared method, open compiler-bound callable candidates, and explicit external-dispatch, unresolved, or unsupported frontiers. Runtime caller and evaluation ownership remain coarsened and are not inferred from the structural ownership edge. Invocation-specific resolved signatures, dispatch closure, runtime observations, and all twelve entry-mechanism classes are not yet analyzed, so exact targets, whole-program reachability, dead-code conclusions, and full JAN-CSAA-007 conformance are not claimed.',
+			id: 'call-graph',
+			provider: 'typescript',
+			provenance: [...TYPESCRIPT_CALL_GRAPH_PROVENANCE, ...TYPESCRIPT_SEMANTIC_PROVENANCE],
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The fourth bounded DWP-004 increment observes the exact frozen generated JPWB transition table without executing it and projects declared machines, states, legal transitions, guarded-legal restrictions, explicitly illegal transitions, and cross-axis frontiers. It uses implementation-local relation codes because the closed JAN-CSAA-007 registry has no state-machine relation family. This generated-runtime-topology projection does not establish upstream vocabulary authority, command performability, writer/effect coverage, guard enforcement, behavioral reachability, or any specialized verifier-census conclusion; full JAN-CSAA-007 and JAN-CSAA-008 conformance remain NOT_CLAIMED and existing verifier authority remains delegated.',
+			id: 'state-machine-graph',
+			provider: 'jpwb-generated-transition-table',
+			provenance: [...JPWB_STATE_MACHINE_GRAPH_PROVENANCE],
 			state: 'PARTIAL'
 		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
-				'Not implemented by the current bounded DWP-004 module-dependency graph increment; no call, control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, the module graph, or installed tools.',
+				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
 			id,
 			provider: null,
 			provenance: ['packages/csaa/src/contracts/inventory.ts'],
@@ -966,13 +1031,27 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 				provenance: [
 					...TYPESCRIPT_SEMANTIC_PROVENANCE,
 					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
+					...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE,
+					'capabilities#call-graph',
 					'capabilities#dependency-graph',
+					'capabilities#state-machine-graph',
 					'capabilities#symbol-table',
 					'capabilities#typescript-ast',
 					'capabilities#type-graph'
 				],
 				statement:
-					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first bounded DWP-004 increment implements only the validated compiler module-dependency projection; cross-Program semantic reconciliation, depcruise comparison, call/flow/state-machine graphs, and composed graph projections remain UNIMPLEMENTED.'
+					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. The first four bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, and an implementation-local generated JPWB state-machine topology projection. Inventory generation executes none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control/data-flow graphs, generalized state-machine inference, and composed graph projections remain UNIMPLEMENTED.'
+			},
+			{
+				provenance: [
+					...EXISTING_GRAPH_RELEVANT_VERIFICATION_AUTHORITY,
+					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
+				],
+				statement:
+					'Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer remains a WRAP candidate while its baseline and tests, and the authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families, remain delegated. Neither the partial call graph nor the generated state-machine topology projection ports, replaces, retires, weakens, or transfers this authority; the topology graph does not establish performability, births, occupancy, behavioral reachability, or any other specialized census conclusion.'
 			},
 			{
 				provenance: ['subject.excludedClasses'],

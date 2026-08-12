@@ -2201,6 +2201,266 @@ void (null as unknown as RuntimeModule);
 		});
 	});
 
+	it('retains heritage and signature evidence while bounding unsupported compiler type structures', () => {
+		const model = [
+			'export interface Base<T> { value: T }',
+			'export interface Derived extends Base<string> {',
+			'  invoke(this: Derived, value?: string, ...rest: boolean[]): void;',
+			'}',
+			'export class Impl implements Base<number> { value = 1; }',
+			'export interface Callable {',
+			'  (this: Derived, value: string): number;',
+			'  (value: number): string;',
+			'  new (value: string): Derived;',
+			'  new (value: number): Impl;',
+			'}',
+			'export declare function ambient(value: string): number;',
+			'export declare function ambient(value: number): string;',
+			'export type Literal = "literal";',
+			'export type Conditional<T> = T extends string ? "yes" : 0;',
+			'export type Indexed<T extends { value: unknown }> = T["value"];',
+			'export type IndexTarget<T> = keyof T;',
+			'export type Template<T extends string> = `prefix-${T}`;',
+			'export type Uppercase<S extends string> = intrinsic;',
+			'export type StringMapped<T extends string> = Uppercase<T>;',
+			'export type Mapped<T> = { [K in keyof T]: T[K] };',
+			''
+		].join('\n');
+		const roots = ['src/type-structures.ts'];
+		const raw = extractStaticRaw(
+			extractionInput(createTestProgram({ 'src/type-structures.ts': model }, roots), roots, {
+				includeTypes: true
+			})
+		);
+
+		const heritage = raw.typeRelations.filter(
+			(
+				relation
+			): relation is Extract<
+				(typeof raw.typeRelations)[number],
+				{ kind: 'TYPE_EXTENSION' | 'TYPE_IMPLEMENTATION' }
+			> => relation.kind === 'TYPE_EXTENSION' || relation.kind === 'TYPE_IMPLEMENTATION'
+		);
+		expect(new Set(heritage.map((relation) => relation.kind))).toEqual(
+			new Set(['TYPE_EXTENSION', 'TYPE_IMPLEMENTATION'])
+		);
+		expect(
+			heritage.every(
+				(relation) =>
+					relation.state === 'CONFIRMED' && relation.heritageOccurrence.kind === 'AST_NODE'
+			)
+		).toBe(true);
+
+		const boundedKinds = new Set(
+			raw.types
+				.filter((type) => type.structureState === 'BOUNDED')
+				.flatMap((type) => type.unsupportedStructureKinds)
+		);
+		for (const kind of [
+			'CONDITIONAL',
+			'INDEXED_ACCESS',
+			'INDEX_TARGET',
+			'MAPPED',
+			'STRING_MAPPING',
+			'TEMPLATE_LITERAL'
+		])
+			expect(boundedKinds.has(kind), kind).toBe(true);
+		expect(
+			raw.types
+				.filter((type) => type.structureState === 'COMPLETE')
+				.every((type) => type.unsupportedStructureKinds.length === 0)
+		).toBe(true);
+		expect(raw.types.some((type) => type.category === 'LITERAL')).toBe(true);
+		expect(raw.types.some((type) => type.category === 'INDEX')).toBe(true);
+
+		expect(raw.signatureParameters).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ name: 'this', optional: false, rest: false, role: 'THIS' }),
+				expect.objectContaining({ name: 'value', optional: true, role: 'PARAMETER' }),
+				expect.objectContaining({ name: 'rest', rest: true, role: 'PARAMETER' })
+			])
+		);
+		const declarationRoles = new Set(raw.signatures.map((signature) => signature.declarationRole));
+		for (const role of ['AMBIENT_OVERLOAD', 'CALL_SIGNATURE', 'CONSTRUCT_SIGNATURE'] as const)
+			expect(declarationRoles.has(role), role).toBe(true);
+		const membershipRoles = new Set(
+			raw.typeRelations.flatMap((relation) =>
+				relation.kind === 'OVERLOAD_MEMBERSHIP' ? [relation.role] : []
+			)
+		);
+		for (const role of ['AMBIENT_OVERLOAD', 'CALL_SIGNATURE', 'CONSTRUCT_SIGNATURE'] as const)
+			expect(membershipRoles.has(role), role).toBe(true);
+	});
+
+	it('honors every assignability selector mode and retains unresolved boundaries without invented judgments', () => {
+		const model = [
+			'export interface Named { name: string }',
+			'export type Alias = Named;',
+			'export const named: Named = { name: "value" };',
+			'export const other: Named = named;',
+			'export const answer = 42;',
+			''
+		].join('\n');
+		const logicalPath = 'src/selector-modes.ts';
+		const roots = [logicalPath];
+		const namedDeclarationStart = model.indexOf('Named');
+		const aliasTypeStart = model.indexOf('Named', namedDeclarationStart + 'Named'.length);
+		const namedValueStart = model.indexOf('named:');
+		const otherValueStart = model.indexOf('other:');
+		const literalStart = model.indexOf('42');
+		const selector = <
+			Mode extends
+				| 'DECLARED_SYMBOL_TYPE'
+				| 'TYPE_AT_LOCATION'
+				| 'TYPE_FROM_TYPE_NODE'
+				| 'VALUE_SYMBOL_TYPE_AT_LOCATION'
+		>(
+			start: number,
+			text: string,
+			syntaxKind: ts.SyntaxKind,
+			queryMode: Mode
+		) => ({
+			end: start + text.length,
+			logicalPath,
+			queryMode,
+			start,
+			syntaxKind
+		});
+		const declaredNamed = selector(
+			namedDeclarationStart,
+			'Named',
+			ts.SyntaxKind.Identifier,
+			'DECLARED_SYMBOL_TYPE'
+		);
+		const aliasType = selector(
+			aliasTypeStart,
+			'Named',
+			ts.SyntaxKind.TypeReference,
+			'TYPE_FROM_TYPE_NODE'
+		);
+		const namedValue = selector(
+			namedValueStart,
+			'named',
+			ts.SyntaxKind.Identifier,
+			'VALUE_SYMBOL_TYPE_AT_LOCATION'
+		);
+		const otherValue = selector(
+			otherValueStart,
+			'other',
+			ts.SyntaxKind.Identifier,
+			'VALUE_SYMBOL_TYPE_AT_LOCATION'
+		);
+		const declaredModeOnLiteral = selector(
+			literalStart,
+			'42',
+			ts.SyntaxKind.NumericLiteral,
+			'DECLARED_SYMBOL_TYPE'
+		);
+		const typeNodeModeOnIdentifier = {
+			...declaredNamed,
+			queryMode: 'TYPE_FROM_TYPE_NODE' as const
+		};
+		const assignabilityRequests = [
+			{
+				requestId: 'declared-to-type-node',
+				requesterRef: 'test:declared-to-type-node',
+				source: declaredNamed,
+				target: aliasType
+			},
+			{
+				requestId: 'value-to-value',
+				requesterRef: 'test:value-to-value',
+				source: namedValue,
+				target: otherValue
+			},
+			{
+				requestId: 'type-node-mode-on-identifier',
+				requesterRef: 'test:type-node-mode-on-identifier',
+				source: typeNodeModeOnIdentifier,
+				target: aliasType
+			},
+			{
+				requestId: 'declared-mode-on-literal',
+				requesterRef: 'test:declared-mode-on-literal',
+				source: declaredModeOnLiteral,
+				target: aliasType
+			}
+		];
+		const raw = extractStaticRaw(
+			extractionInput(createTestProgram({ [logicalPath]: model }, roots), roots, {
+				assignabilityRequests,
+				includeTypes: true
+			})
+		);
+		const assignability = new Map(
+			raw.typeRelations.flatMap((relation) =>
+				relation.kind === 'ASSIGNABILITY' ? [[relation.requestId, relation] as const] : []
+			)
+		);
+		expect(assignability.get('declared-to-type-node')).toMatchObject({
+			checkerContextDigest: 'c'.repeat(64),
+			result: true,
+			state: 'CONFIRMED',
+			sourceTypeOrdinal: expect.any(Number),
+			targetTypeOrdinal: expect.any(Number)
+		});
+		expect(assignability.get('value-to-value')).toMatchObject({
+			result: true,
+			state: 'CONFIRMED',
+			sourceTypeOrdinal: expect.any(Number),
+			targetTypeOrdinal: expect.any(Number)
+		});
+		for (const requestId of ['type-node-mode-on-identifier', 'declared-mode-on-literal'])
+			expect(assignability.get(requestId)).toMatchObject({
+				result: null,
+				sourceTypeOrdinal: null,
+				state: 'UNRESOLVED',
+				targetTypeOrdinal: expect.any(Number)
+			});
+		const queryModes = new Set(
+			raw.typeRelations.flatMap((relation) =>
+				relation.kind === 'TYPE_OF' ? [relation.queryMode] : []
+			)
+		);
+		for (const mode of [
+			'DECLARED_SYMBOL_TYPE',
+			'TYPE_AT_LOCATION',
+			'TYPE_FROM_TYPE_NODE',
+			'VALUE_SYMBOL_TYPE_AT_LOCATION'
+		] as const)
+			expect(queryModes.has(mode), mode).toBe(true);
+
+		expectTypedFailure(
+			() =>
+				extractStaticRaw(
+					extractionInput(createTestProgram({ [logicalPath]: model }, roots), roots, {
+						assignabilityRequests: [assignabilityRequests[0]!],
+						includeTypes: true,
+						resolveCheckerContextDigest: () => 'not-a-digest'
+					})
+				),
+			'INVALID_INPUT'
+		);
+
+		const failingProgram = createTestProgram({ [logicalPath]: model }, roots);
+		const typeQuery = vi
+			.spyOn(failingProgram.program.getTypeChecker(), 'getTypeFromTypeNode')
+			.mockImplementation(() => {
+				throw new Error('type query unavailable');
+			});
+		expectTypedFailure(
+			() =>
+				extractStaticRaw(
+					extractionInput(failingProgram, roots, {
+						assignabilityRequests: [assignabilityRequests[0]!],
+						includeTypes: true
+					})
+				),
+			'INVALID_INPUT'
+		);
+		typeQuery.mockRestore();
+	});
+
 	it('keeps the extraction-ledger capability protocol phase-, binding-, and issuer-exact', () => {
 		const operation = createStaticSemanticOperationBudgetSession(BUDGETS, Date.now());
 		const binding = operation.providerBinding();
@@ -2713,5 +2973,20 @@ const constructable = class NamedClass {};
 			extractionInput(circularProgram, Object.keys(aliasFiles).sort(), { checker: circularProxy })
 		);
 		expect(circularRaw.aliases.some((alias) => alias.state === 'CIRCULAR')).toBe(true);
+	});
+
+	it('fails closed when TypeScript exposes an atomic declaration name that is not Unicode scalar text', () => {
+		const unpairedSurrogate = String.fromCharCode(0xd800);
+		const text = 'export interface Unsafe { "member": number; }\n';
+		const testProgram = createTestProgram({ 'src/non-scalar-name.ts': text });
+		const sourceFile = testProgram.program.getSourceFile(absolute('src/non-scalar-name.ts'))!;
+		const declaration = sourceFile.statements[0] as ts.InterfaceDeclaration;
+		const name = declaration.members[0]!.name as ts.StringLiteral;
+		Object.defineProperty(name, 'text', { configurable: true, value: unpairedSurrogate });
+
+		expectTypedFailure(
+			() => extractStaticRaw(extractionInput(testProgram, ['src/non-scalar-name.ts'])),
+			'INVALID_INPUT'
+		);
 	});
 });

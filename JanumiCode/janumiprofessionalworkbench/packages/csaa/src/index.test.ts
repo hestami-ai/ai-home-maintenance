@@ -2,6 +2,12 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
+	CALL_GRAPH_OPERATION_VERSION,
+	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
+	CALL_GRAPH_SCHEMA_VERSION,
+	DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION,
+	DEPENDENCY_CRUISER_PROVIDER_VERSION,
+	DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION,
 	MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
 	MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION,
 	MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION,
@@ -9,12 +15,27 @@ import {
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
 	SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_OPERATION_VERSION,
+	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_SCHEMA_VERSION,
+	STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION,
+	STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION,
 	TYPESCRIPT_PROVIDER_VERSION,
+	buildCallGraph,
 	buildModuleDependencyGraph,
+	buildStateMachineGraph,
 	buildStaticSemanticSnapshot,
 	canonicalSemanticJson,
 	canonicalSemanticJsonWitness,
+	compareDependencyProviders,
+	normalizeDependencyCruiserOutput,
+	observeStateMachineTopology,
+	validateDependencyCruiserObservation,
+	validateDependencyProviderComparison,
+	validateCallGraph,
 	validateModuleDependencyGraph,
+	validateStateMachineGraph,
+	validateStateMachineTopologyObservation,
 	validateStaticSemanticSnapshot
 } from '@janumipwb/csaa';
 
@@ -28,10 +49,20 @@ function manifest(relativeUrl: string): PackageManifest {
 }
 
 describe('@janumipwb/csaa public semantic and graph surface', () => {
-	it('exports the DWP-003 semantic and bounded DWP-004 module-graph surfaces', () => {
+	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
+		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
+		expect(buildStateMachineGraph).toBeTypeOf('function');
 		expect(buildStaticSemanticSnapshot).toBeTypeOf('function');
+		expect(compareDependencyProviders).toBeTypeOf('function');
+		expect(normalizeDependencyCruiserOutput).toBeTypeOf('function');
+		expect(observeStateMachineTopology).toBeTypeOf('function');
+		expect(validateDependencyCruiserObservation).toBeTypeOf('function');
+		expect(validateDependencyProviderComparison).toBeTypeOf('function');
+		expect(validateCallGraph).toBeTypeOf('function');
 		expect(validateModuleDependencyGraph).toBeTypeOf('function');
+		expect(validateStateMachineGraph).toBeTypeOf('function');
+		expect(validateStateMachineTopologyObservation).toBeTypeOf('function');
 		expect(validateStaticSemanticSnapshot).toBeTypeOf('function');
 		expect(canonicalSemanticJson).toBeTypeOf('function');
 		expect(canonicalSemanticJsonWitness).toBeTypeOf('function');
@@ -40,6 +71,20 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(SEMANTIC_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-semantic-request/3.0.0');
 		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/7.0.0');
 		expect(TYPESCRIPT_PROVIDER_VERSION).toBe('5.9.3');
+		expect(CALL_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-call-graph/0.1.0');
+		expect(CALL_GRAPH_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-call-graph-request/1.0.0');
+		expect(CALL_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-call-graph/1.0.0');
+		expect(STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION).toBe(
+			'jan-csaa-observe-jpwb-state-machine-topology/0.1.0'
+		);
+		expect(STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-topology-observation/1.0.0'
+		);
+		expect(STATE_MACHINE_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-state-machine-graph/0.1.0');
+		expect(STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-graph-request/1.0.0'
+		);
+		expect(STATE_MACHINE_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-state-machine-graph/1.0.0');
 		expect(MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-module-dependency-graph/0.1.0'
 		);
@@ -47,6 +92,13 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-module-dependency-graph-request/1.0.0'
 		);
 		expect(MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-module-dependency-graph/1.0.0');
+		expect(DEPENDENCY_CRUISER_PROVIDER_VERSION).toBe('16.10.4');
+		expect(DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION).toBe(
+			'jan-csaa-normalize-dependency-cruiser-output/0.1.0'
+		);
+		expect(DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION).toBe(
+			'jan-csaa-compare-dependency-providers/0.1.0'
+		);
 	});
 
 	it('pins the provider version exactly at runtime and every repository declaration site', () => {
