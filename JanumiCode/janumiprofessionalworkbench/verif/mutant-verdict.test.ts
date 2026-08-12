@@ -76,13 +76,39 @@ const CLEAN_RUN = [
 	'   Duration  74.21s'
 ].join('\n');
 
+/**
+ * THE CHECK'S OWN OUTPUT WHEN A MUTANT KILLS A TEST IN THIS VERY FILE — copied verbatim from the run, not composed.
+ *
+ * ⚠ THIS IS THE CONTROL THAT WAS MISSING, AND ITS ABSENCE WAS MEASURED RATHER THAN IMAGINED. The first run of
+ * `F116-a-hung-arrangement-is-graded-as-a-kill` and `F116-the-e2e-runner-loses-its-timeout-marker` both reported
+ * INCONCLUSIVE instead of KILLED: `run.ts` scans the child's stdout, the child had just failed a test that ASSERTS
+ * on timeout text, and vitest duly printed that text into stdout. **The instrument read the fixture of the failing
+ * test as a diagnostic from the runner.** A mutant that its victim killed cleanly was reported as unmeasured.
+ *
+ * Note what the diff looks like: the marker sits at the START of its line, in quotes, with no `Error: ` prefix.
+ * Line-anchoring alone does not separate them; the runner's own prefix does.
+ */
+const KILLED_BY_ITS_OWN_FIXTURE = [
+	' FAIL  |verif| verif/mutant-verdict.test.ts > REG-F-116 — a timeout is not a measurement, in either direction > reports a HOOK timeout — a hung arrangement measures the mutation exactly as little',
+	"AssertionError: expected null to be 'Hook timed out in 10000ms' // Object.is equality",
+	'',
+	'- Expected:',
+	'"Hook timed out in 10000ms"',
+	'',
+	'+ Received:',
+	'null',
+	'',
+	' ❯ verif/mutant-verdict.test.ts:85:48',
+	'      Tests  1 failed | 5 passed (6)'
+].join('\n');
+
 describe('REG-F-116 — a timeout is not a measurement, in either direction', () => {
 	it('reports the vitest timeout that made V-4a report an unrelated CONTROL as SURVIVED', () => {
-		expect(timeoutEvidence(VITEST_TIMEOUT)).toBe('Test timed out in 5000ms');
+		expect(timeoutEvidence(VITEST_TIMEOUT)).toBe('Error: Test timed out in 5000ms');
 	});
 
 	it('reports a HOOK timeout — a hung arrangement measures the mutation exactly as little', () => {
-		expect(timeoutEvidence(VITEST_HOOK_TIMEOUT)).toBe('Hook timed out in 10000ms');
+		expect(timeoutEvidence(VITEST_HOOK_TIMEOUT)).toBe('Error: Hook timed out in 10000ms');
 	});
 
 	it('reports a PLAYWRIGHT timeout, which the other runner words entirely differently', () => {
@@ -99,6 +125,15 @@ describe('REG-F-116 — a timeout is not a measurement, in either direction', ()
 
 	it('CONTROL — a clean run is not a timeout either', () => {
 		expect(timeoutEvidence(CLEAN_RUN)).toBeNull();
+	});
+
+	// CONTROL — THE ONE THE MUTANTS THEMSELVES DEMANDED. Without it, this check reports its own test fixtures as
+	// runner diagnostics and grades a clean kill as unmeasured.
+	it('CONTROL — a fixture QUOTED in a failing diff is not a timeout, however exactly it reads like one', () => {
+		expect(
+			timeoutEvidence(KILLED_BY_ITS_OWN_FIXTURE),
+			'the instrument must not read its subject’s DATA as its own SIGNAL'
+		).toBeNull();
 	});
 
 	// ⚠ THE EVIDENCE IS THE MATCHED TEXT, NOT A BOOLEAN, and that is load-bearing rather than cosmetic: the whole

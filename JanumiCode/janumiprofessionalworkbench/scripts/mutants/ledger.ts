@@ -2475,28 +2475,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'F116-a-hung-arrangement-is-graded-as-a-kill',
 		file: 'scripts/mutants/measured.ts',
-		find: '\t/(?:Test|Hook) timed out in \\d+ms/,',
-		replace: '\t/Test timed out in \\d+ms/,',
+		find: '\t/^[ \\t]*Error: (?:Test|Hook) timed out in \\d+ms/m,',
+		replace: '\t/^[ \\t]*Error: Test timed out in \\d+ms/m,',
 		expectRed: ['verif/mutant-verdict.test.ts'],
-		why: "A SLOW ARRANGEMENT STOPS COUNTING AS A NON-MEASUREMENT. Vitest words a hung `beforeEach` differently from a hung assertion — `Hook timed out in 10000ms` — and a fixture that never completed measures the mutation exactly as little as a body that never completed. With `Hook` dropped, a mutant whose victim hangs in setup is graded KILLED and the guard is recorded as proven by a test that never reached its first assertion. Predicted red: the HOOK case alone; the vitest, Playwright and both CONTROL cases stay green.",
+		why: "A SLOW ARRANGEMENT STOPS COUNTING AS A NON-MEASUREMENT. Vitest words a hung `beforeEach` differently from a hung assertion — `Error: Hook timed out in 10000ms` — and a fixture that never completed measures the mutation exactly as little as a body that never completed. With `Hook` dropped, a mutant whose victim hangs in setup is graded KILLED and the guard is recorded as proven by a test that never reached its first assertion. Predicted red: the HOOK case alone; the vitest, Playwright and all three CONTROL cases stay green.",
 		source: 'REG-F-116 / JAN-VERIF V-4b'
 	},
 	{
 		id: 'F116-the-e2e-runner-loses-its-timeout-marker',
 		file: 'scripts/mutants/measured.ts',
-		find: '\t/Test timeout of \\d+ms exceeded/',
-		replace: '\t/Test timeout of \\d+ms elapsed/',
+		find: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m',
+		replace: '\t/^[ \\t]*Test timeout of \\d+ms elapsed/m',
 		expectRed: ['verif/mutant-verdict.test.ts'],
 		why: "THE OTHER RUNNER GOES BLIND. `run.ts` reaches `apps/` through Playwright, which reports timeouts in words vitest never uses; a marker list that covers only vitest leaves every e2e victim's timeout graded as a verdict. ⚠ THIS IS THE HALF MOST LIKELY TO ROT SILENTLY, because the e2e path is the rarer one and a stale marker fails OPEN — it produces confident KILLED rows, not errors. The same shape S-3 recorded when an unmatched vitest filter produced `KILLED` from the file-matcher rather than from any guard. Predicted red: the Playwright case alone.",
 		source: 'REG-F-116 / JAN-VERIF V-4b'
 	},
 	{
+		id: 'F116-the-instrument-reads-its-subjects-data-as-its-own-signal',
+		file: 'scripts/mutants/measured.ts',
+		find:
+			'\t/^[ \\t]*Error: (?:Test|Hook) timed out in \\d+ms/m,\n\t/^[ \\t]*Test timeout of \\d+ms exceeded/m',
+		replace: '\t/(?:Test|Hook) timed out in \\d+ms/,\n\t/Test timeout of \\d+ms exceeded/',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE DEFECT AS IT ACTUALLY SHIPPED, RESTORED — this is not a hypothetical mutation, it is the first version of this file. `run.ts` scans the CHILD'S stdout, so a test that ASSERTS on timeout text prints that text into stdout the moment it fails: vitest renders the expected value on a line of its own, in quotes, `\"Hook timed out in 10000ms\"`. Un-anchored, the check reads the FIXTURE OF THE FAILING TEST as a diagnostic from the runner and reports INCONCLUSIVE for a mutant its victim killed cleanly. ⚠ MEASURED, NOT FEARED: the first run of the two mutants above both reported INCONCLUSIVE for exactly this reason, and the only reason a third did not is that `run.ts` holds the unmutated function in memory while the child holds the mutated one. Third sighting of one shape — REG-F-110 (the census could not run under the runner that mutates anchors), REG-F-113 (prose ABOUT a status counted as a status), this. Predicted red: the fixture-quoting CONTROL, plus the two vitest cases that assert the `Error: ` prefix.",
+		source: 'REG-F-116 / feedback: a control needs its own mutant'
+	},
+	{
 		id: 'F116-the-timeout-check-widens-and-nothing-is-ever-measured',
 		file: 'scripts/mutants/measured.ts',
-		find: '\t/Test timeout of \\d+ms exceeded/\n];',
-		replace: '\t/Test timeout of \\d+ms exceeded/,\n\t/timed out/\n];',
+		find: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m\n];',
+		replace: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m,\n\t/timed out/\n];',
 		expectRed: ['verif/mutant-verdict.test.ts'],
-		why: "THE CONTROL'S OWN MUTANT, and it is the failure mode that would be introduced BY A REPAIR. Faced with a timeout the markers missed, the obvious fix is to add a loose fallback — and a loose fallback reads the WORDS in a test TITLE as evidence of a timeout, so every genuine failure in a suite named after timeouts is reported INCONCLUSIVE. A gate that answers 'not measured' to everything blocks forever while proving nothing, which is strictly worse than the false KILL it was widened to prevent. ⚠ THE FIXTURE IS THE V-4a REPAIR'S OWN TEST TITLE, deliberately: the tests most likely to carry those words are the ones written to stop timeouts. Predicted red: the CONTROL case alone — all three positive cases still return their exact matched text, because the added marker is last and the specific ones still win.",
+		why: "THE OTHER CONTROL'S OWN MUTANT, and it is the failure mode a REPAIR would introduce. Faced with a timeout the markers missed, the obvious fix is to add a loose fallback — and a loose fallback reads the WORDS IN A TEST TITLE as evidence of a timeout, so every genuine failure in a suite named after timeouts is reported INCONCLUSIVE. A gate that answers 'not measured' to everything blocks forever while proving nothing, which is strictly worse than the false KILL it was widened to prevent. ⚠ THE FIXTURE IS THE V-4a REPAIR'S OWN TEST TITLE, deliberately: the tests most likely to carry those words are the ones written to stop timeouts. Predicted red: both CONTROL cases; the three positive cases stay green because the added marker is last and the specific ones still win.",
 		source: 'REG-F-116 / feedback: a control needs its own mutant'
 	}
 ];

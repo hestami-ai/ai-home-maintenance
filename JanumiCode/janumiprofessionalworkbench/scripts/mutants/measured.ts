@@ -25,12 +25,40 @@
  * A third runner would arrive with its own marker and no row here, which is why the derivation is recorded next to
  * the list instead of the list being presented as complete on its own authority.
  *
- * Vitest reports `Error: Test timed out in 5000ms.` and, for a slow `beforeEach`, `Hook timed out in 10000ms.`
- * Playwright reports `Test timeout of 30000ms exceeded.`
+ * Vitest reports `Error: Test timed out in 5000ms.` and, for a slow `beforeEach`, `Error: Hook timed out in 10000ms.`
+ * Playwright reports `Test timeout of 30000ms exceeded.` on a line of its own.
+ *
+ * ⚠ EACH MARKER IS ANCHORED TO THE START OF ITS LINE, AND THE VITEST ONES REQUIRE THE `Error: ` PREFIX. THIS IS NOT
+ * TIDINESS — WITHOUT IT THIS CHECK POISONS ITSELF, MEASURED THE FIRST TIME ITS OWN MUTANTS RAN.
+ *
+ * `run.ts` scans the CHILD'S stdout. A test that ASSERTS on timeout text prints that text into stdout the moment it
+ * fails — vitest's diff renders the expected value on its own line, in quotes:
+ *
+ *     - Expected:
+ *     "Hook timed out in 10000ms"
+ *
+ * So a substring scan reads the FIXTURE of the failing test as a diagnostic from the runner, and reports
+ * INCONCLUSIVE for a mutant its victim killed cleanly. Observed, not feared: `F116-a-hung-arrangement-is-graded-as-
+ * a-kill` and `F116-the-e2e-runner-loses-its-timeout-marker` both reported INCONCLUSIVE on their first run, and the
+ * only reason the third did not is that `run.ts` holds the UNMUTATED function in memory while the child holds the
+ * mutated one.
+ *
+ * THE GENERAL FORM, AND IT IS THE THIRD SIGHTING IN THIS REGISTER: an instrument that reads a free-text channel
+ * cannot distinguish its subject's DATA from its own SIGNAL — and the test written to prove the instrument is
+ * precisely the one most likely to contain that data. REG-F-110: the anchor census could not run under the runner
+ * that mutates anchors. REG-F-113: prose ABOUT a status counted as a status. Here: a fixture QUOTING a timeout
+ * counted as a timeout. The repair is the same in all three — separate the signal structurally, at the narrowest
+ * rule that does it, rather than loosening the check.
+ *
+ * THE RESIDUAL IS DISCLOSED AND ITS POLARITY IS THE REASON IT IS TOLERABLE. A test that dumps a whole multi-line
+ * fixture into a diff — one whose second line genuinely begins `Error: Test timed out in …ms` — would still be
+ * misread. That is over-detection, and over-detection here FAILS CLOSED: it produces a loud BLOCKING
+ * `INCONCLUSIVE`, never a silent false KILL. Under-detection is the dangerous direction, and the anchoring cannot
+ * cause it: a real runner diagnostic is always emitted on a line of its own.
  */
 const TIMEOUT_MARKERS: readonly RegExp[] = [
-	/(?:Test|Hook) timed out in \d+ms/,
-	/Test timeout of \d+ms exceeded/
+	/^[ \t]*Error: (?:Test|Hook) timed out in \d+ms/m,
+	/^[ \t]*Test timeout of \d+ms exceeded/m
 ];
 
 /**
@@ -44,7 +72,7 @@ const TIMEOUT_MARKERS: readonly RegExp[] = [
 export function timeoutEvidence(out: string): string | null {
 	for (const marker of TIMEOUT_MARKERS) {
 		const hit = marker.exec(out);
-		if (hit !== null) return hit[0];
+		if (hit !== null) return hit[0].trim();
 	}
 	return null;
 }
