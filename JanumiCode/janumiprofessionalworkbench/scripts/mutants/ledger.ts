@@ -2577,12 +2577,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'REG-F-118'
 	},
 	{
-		id: 'F118-the-birth-ratchets-exemption-stops-being-structural',
-		file: 'verif/arrow-command-census.ts',
-		find: '\t\tif (ts.isFunctionDeclaration(n) && n.name && BIRTH_PRIMITIVES.has(n.name.text)) return true;',
-		replace: '\t\tif (ts.isFunctionDeclaration(n) && n.name && n.name.text === "nothingIsExempt") return true;',
+		id: 'F118-a-creation-stops-declaring-its-birth',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find:
+			"\t\tbirths: [{ machine: 'Intent.intentStatus', statusField: 'intentStatus', values: ['RAW'] }]\n\t});",
+		replace: '\t});',
 		expectRed: ['verif/arrow-command-census.test.ts'],
-		why: "THE RATCHET EATS ITS OWN DELEGATION. `createObject` commits through `commitState`, so its inner call IS a creation — one whose birth is declared a frame up by the caller. With the structural exemption gone, that site is reported as a creation declaring no `births` and the census `fail()`s, taking every consumer of `birthStates()` with it. ⚠ THE ALTERNATIVE DESIGN IS WHAT THIS MUTANT ARGUES AGAINST: a list of exempt FILES would pass this mutation happily and would rot into an allowlist the first time someone added a real creation to `kit.ts`. Deriving the exemption from the enclosing function's name means a second delegating primitive is covered the day it is written. Predicted red: C-0's suite, loudly.",
-		source: 'REG-F-118'
+		why: "THE RATCHET'S POSITIVE CASE, which had no mutant until the one I wrote first SURVIVED and taught me what to hold instead. A `commitState` site that CREATES (`expectedRevision: undefined`) and declares no `births` must FAIL the census, not be skipped — because a machine that never appears is `unanalysed`, which reads as *\"not yet reached\"* rather than *\"nobody said\"*, and those are opposite claims. Removing this declaration reproduces exactly the state `Intent.intentStatus` was in before REG-F-086. ⚠ IT REPLACES `F118-the-birth-ratchets-exemption-stops-being-structural`, WHICH SURVIVED AND WAS RIGHT TO: I had added a structural exemption so `createObject`'s own delegating call would not trip the ratchet, but `handlerFiles()` has excluded `kit.ts` since long before any of this, so the census never walks that site. **The exemption guarded a case that cannot arise — a hollow, authored inside the fix for a census — and only its mutant said so.** Predicted red: C-0's suite, which cannot build a birth map at all.",
+		source: 'REG-F-118 — replaces F118-the-birth-ratchets-exemption-stops-being-structural, which SURVIVED'
 	}
 ];

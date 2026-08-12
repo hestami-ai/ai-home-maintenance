@@ -399,20 +399,6 @@ function createsAggregate(spec: ts.ObjectLiteralExpression): boolean {
 	);
 }
 
-/**
- * Is this call INSIDE the definition of a birth primitive — i.e. one primitive delegating to another?
- *
- * The only such site today is `createObject`'s own `commitState` call, whose birth is declared one frame up by the
- * caller. Derived from the enclosing function's NAME rather than from a list of exempt files, so a second
- * delegating primitive is covered the day it is written and an ordinary handler never is.
- */
-function insideBirthPrimitive(node: ts.Node): boolean {
-	for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
-		if (ts.isFunctionDeclaration(n) && n.name && BIRTH_PRIMITIVES.has(n.name.text)) return true;
-	}
-	return false;
-}
-
 function computeBirthStates(): Map<string, Set<string>> {
 	const out = new Map<string, Set<string>>();
 	let declarations = 0;
@@ -438,12 +424,19 @@ function computeBirthStates(): Map<string, Set<string>> {
 			// `expectedRevision: undefined` means *"the aggregate must NOT yet exist"* — so the census asks that
 			// question of the code rather than of a list someone maintains.
 			//
-			// ⚠ ONE STRUCTURAL EXEMPTION, AND IT IS NOT A FILE ALLOWLIST. `createObject` DELEGATES to `commitState`,
-			// so its inner call is a creation whose birth is declared by its CALLER, one frame up. The exemption is
-			// therefore "this call sits inside another birth primitive" — derived from the code's shape, so a new
-			// delegating primitive is covered automatically and an ordinary handler never is. A list of exempt
-			// FILES would have rotted into an allowlist the first time someone added a creation to one of them.
-			if (!p && createsAggregate(spec) && !insideBirthPrimitive(node)) {
+			// ⚠ NO EXEMPTION IS NEEDED FOR `createObject`'s OWN DELEGATION, AND I SHIPPED ONE BEFORE CHECKING.
+			//
+			// `createObject` commits through `commitState`, so its inner call IS a creation declaring no `births` —
+			// its caller declares them a frame up. I wrote a structural exemption for exactly that ("this call sits
+			// inside another birth primitive"), and its mutant SURVIVED: `handlerFiles()` has excluded `kit.ts`
+			// since long before any of this, so the census never walks the delegating site and the exemption
+			// guarded a case that cannot arise. **A guard for an impossible case is a hollow** — the defect this
+			// programme keeps recording, authored here inside the fix for a census. Deleted rather than kept "just
+			// in case", because the mutant that proved it dead is the only thing that would have kept it honest.
+			//
+			// If `kit.ts` is ever brought into the population, this ratchet will fire on that delegating call —
+			// which is CORRECT, and the moment to decide deliberately rather than to have pre-decided blindly.
+			if (!p && createsAggregate(spec)) {
 				return fail(
 					site,
 					'commits a CREATION (`expectedRevision: undefined`) and declares no `births`. The occupancy ' +
