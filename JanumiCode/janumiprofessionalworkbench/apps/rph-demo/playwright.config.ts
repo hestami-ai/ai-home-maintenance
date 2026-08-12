@@ -13,7 +13,12 @@ import { defineConfig, devices } from '@playwright/test';
 // RPH_DEMO_MODE=test makes the server spin up a fresh, deterministic engine per boot (see
 // src/lib/server/workbench.ts): a throwaway temp SQLite DB + an injected monotonic clock and ULID sequence,
 // which keeps ids and screenshots stable and diffable.
-const PORT = 4319;
+// ⚠ OVERRIDABLE SO TWO WORKING TREES CAN RUN E2E AT ONCE, and 4319 stays the default so nothing changes for a
+// single tree. `--strictPort` below is deliberate and STAYS: a silent fallback to another port would let a spec
+// pass against a server that is not the one this config configured, which is worse than a loud collision. What
+// was wrong was not strictness but that the number was fixed in two places at once — the `url` read `PORT` while
+// the `command` hardcoded 4319, so they could disagree. Now there is one source.
+const PORT = Number(process.env.RPH_E2E_PORT ?? 4319);
 
 export default defineConfig({
 	testDir: './e2e',
@@ -41,8 +46,7 @@ export default defineConfig({
 		// Playwright owns the Vite process directly so teardown can terminate the complete server process on
 		// Windows. Reusing an arbitrary dev server would silently bypass RPH_DEMO_MODE=test and invalidate the
 		// deterministic reset/introspection contract.
-		command:
-			'node ../../node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4319 --strictPort',
+		command: `node ../../node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${PORT} --strictPort`,
 		// Readiness is itself a test-mode assertion: this route is 404 outside RPH_DEMO_MODE=test.
 		url: `http://127.0.0.1:${PORT}/test-api/introspect`,
 		reuseExistingServer: false,
