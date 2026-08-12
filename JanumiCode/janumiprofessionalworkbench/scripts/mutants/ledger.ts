@@ -2446,5 +2446,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/register-status.test.ts'],
 		why: "THE FALSE POSITIVE THAT WOULD GET THE GATE LOOSENED. Without the code-span strip, any entry that DESCRIBES the status convention — quoting the marker inside backticks — is counted as carrying extra live statuses and is reported as an offender. REG-F-113 is exactly such an entry, so the gate's first act was to reject the entry announcing it. ⚠ THE DANGER IS THE OBVIOUS REPAIR, NOT THE FAILURE: faced with a false positive on a correct entry, the tempting fix is to relax the rule (ignore lines containing backticks, or drop the exactly-one requirement), and either would let a genuinely statusless entry through forever. Prose about a status is not a status, and stripping code spans is the narrowest rule that separates them — narrower than ignoring backticked lines, because a real status line may cite a rule id in code. Predicted red: the offender limb names REG-F-113 itself.",
 		source: 'REG-F-113'
+	},
+	{
+		id: 'F114-the-declared-source-set-stops-being-checked',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "if (!declared.ok) return reject(command, 'RPH_ILLEGAL_STATE_TRANSITION', declared.reason!);",
+		replace: "",
+		expectRed: ['packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts'],
+		why: "THE DECLARATION BECOMES A COMMENT. With this line gone the spec still exists, the census still reads it, and the table still agrees with the machine — but nothing CHECKS it at dispatch, so a command performs any arrow the machine allows regardless of what it claims. ⚠ THIS MUTANT WAS UNKILLABLE WHEN I FIRST WENT TO DECLARE IT, and that is why its victim file exists. No real spec is narrower than its machine, so no command can be driven from a state it fails to claim while the machine permits it; and the refusal reuses RPH_ILLEGAL_STATE_TRANSITION — exactly what canAdvanceWorkLifecycle returns — while NO test in the repository asserted the MESSAGE. A guard whose removal is invisible: the shape this programme keeps finding, arriving inside the fix for it. What makes it observable is the ORDER, chosen for a different reason: the declared-set check runs FIRST, so a machine-forbidden state now reports 'UNDECLARED ARROW' where it used to report 'Cannot advance PWU'. Same code, different sentence — and the sentence is the assertion.",
+		source: 'REG-F-114 / A-5'
+	},
+	{
+		id: 'F114-a-machine-arrow-goes-unclaimed-quietly',
+		file: 'verif/lifecycle-arrow-declarations.test.ts',
+		find: "			arrows.filter((a) => COMMAND_TARGETS.has(a.split('->')[1]!) && !claimed.has(a)),",
+		replace: "			[] as string[],",
+		expectRed: ['verif/lifecycle-arrow-declarations.test.ts'],
+		why: "THE DRIFT GUARD IS THE HALF THAT MATTERS, and this removes it. The table narrows nothing today — every handler already intends exactly its target's in-edges — so its entire present value is that a NEW in-edge to a command-owned target stays UNIMPLEMENTED until someone declares it, instead of being silently accepted. Delete the unclaimed-arrow limb and the table tracks the machine only until the machine next moves, which is precisely when it stops being worth having. ⚠ THE SUBSET LIMB DOES NOT COVER THIS: a table may not claim arrows the machine lacks, and separately every command-owned arrow must be claimed. One direction alone is half a gate — subset-only passes on an EMPTY table. Predicted red: the 'every command-owned arrow is claimed by its spec' case, reported against a table that has silently stopped being compared.",
+		source: 'REG-F-114 / A-5'
 	}
 ];
