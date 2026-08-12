@@ -2464,5 +2464,39 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/lifecycle-arrow-declarations.test.ts'],
 		why: "THE DRIFT GUARD, KILLED BY MUTATING WHAT IT GUARDS RATHER THAN THE GUARD ITSELF. `BlockPwu` claims SHAPING, PLANNED and EXECUTING because the machine declares all three in-edges to BLOCKED; dropping PLANNED leaves a ratified arrow no command claims, and the agreement gate's 'every command-owned arrow is claimed by its spec' limb reports `PLANNED->BLOCKED`. That limb is the entire present value of the table — the specs narrow nothing today, so all they buy is that a machine in-edge cannot go unimplemented in silence. ⚠ IT REPLACES A MUTANT THAT SURVIVED, AND THE SURVIVAL WAS THE FINDING: `F114-a-machine-arrow-goes-unclaimed-quietly` deleted the gate's OWN assertion, so the only test that could have objected was the one being disabled. A mutation of an assertion is unkillable by that assertion — measured, not reasoned: it reported SURVIVED with all 7 cases green. To hold a guard, mutate the thing it guards.",
 		source: 'REG-F-114 / A-5 — replaces F114-a-machine-arrow-goes-unclaimed-quietly, which SURVIVED'
+	},
+	// ── REG-F-116, THE RUNNER'S OWN ATTRIBUTION ─────────────────────────────────────────────────────────────────
+	//
+	// Every verdict in `run.ts` is inferred from ONE bit — the exit status — and V-4a proved that bit can be
+	// non-zero for a reason that never touched the mutation. `timeoutEvidence` is what separates "measured and bad"
+	// from "not measured". It is the first logic in this harness to be under test at all: `run.ts` exports nothing
+	// and 700 lines of gate logic have never had a single assertion made about them, which is why the predicate was
+	// extracted rather than inlined.
+	{
+		id: 'F116-a-hung-arrangement-is-graded-as-a-kill',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/(?:Test|Hook) timed out in \\d+ms/,',
+		replace: '\t/Test timed out in \\d+ms/,',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "A SLOW ARRANGEMENT STOPS COUNTING AS A NON-MEASUREMENT. Vitest words a hung `beforeEach` differently from a hung assertion — `Hook timed out in 10000ms` — and a fixture that never completed measures the mutation exactly as little as a body that never completed. With `Hook` dropped, a mutant whose victim hangs in setup is graded KILLED and the guard is recorded as proven by a test that never reached its first assertion. Predicted red: the HOOK case alone; the vitest, Playwright and both CONTROL cases stay green.",
+		source: 'REG-F-116 / JAN-VERIF V-4b'
+	},
+	{
+		id: 'F116-the-e2e-runner-loses-its-timeout-marker',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/Test timeout of \\d+ms exceeded/',
+		replace: '\t/Test timeout of \\d+ms elapsed/',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE OTHER RUNNER GOES BLIND. `run.ts` reaches `apps/` through Playwright, which reports timeouts in words vitest never uses; a marker list that covers only vitest leaves every e2e victim's timeout graded as a verdict. ⚠ THIS IS THE HALF MOST LIKELY TO ROT SILENTLY, because the e2e path is the rarer one and a stale marker fails OPEN — it produces confident KILLED rows, not errors. The same shape S-3 recorded when an unmatched vitest filter produced `KILLED` from the file-matcher rather than from any guard. Predicted red: the Playwright case alone.",
+		source: 'REG-F-116 / JAN-VERIF V-4b'
+	},
+	{
+		id: 'F116-the-timeout-check-widens-and-nothing-is-ever-measured',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/Test timeout of \\d+ms exceeded/\n];',
+		replace: '\t/Test timeout of \\d+ms exceeded/,\n\t/timed out/\n];',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE CONTROL'S OWN MUTANT, and it is the failure mode that would be introduced BY A REPAIR. Faced with a timeout the markers missed, the obvious fix is to add a loose fallback — and a loose fallback reads the WORDS in a test TITLE as evidence of a timeout, so every genuine failure in a suite named after timeouts is reported INCONCLUSIVE. A gate that answers 'not measured' to everything blocks forever while proving nothing, which is strictly worse than the false KILL it was widened to prevent. ⚠ THE FIXTURE IS THE V-4a REPAIR'S OWN TEST TITLE, deliberately: the tests most likely to carry those words are the ones written to stop timeouts. Predicted red: the CONTROL case alone — all three positive cases still return their exact matched text, because the added marker is last and the specific ones still win.",
+		source: 'REG-F-116 / feedback: a control needs its own mutant'
 	}
 ];

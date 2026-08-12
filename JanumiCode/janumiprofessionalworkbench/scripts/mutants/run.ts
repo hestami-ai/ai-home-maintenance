@@ -17,6 +17,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
+import { timeoutEvidence } from './measured.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -37,6 +38,10 @@ type Verdict =
 	| 'KILLED_UNNAMED'
 	| 'ABORTED_DIRTY'
 	| 'CONTROL_HELD'
+	// NOT MEASURED — the run never exercised the mutation, so no verdict about it is available. See `measured.ts`
+	// and REG-F-116. It BLOCKS, like every other "the instrument did not work" verdict here, because a gate cannot
+	// pass on an unmeasured mutant; what it must never do is masquerade as a finding about the code.
+	| 'INCONCLUSIVE'
 	| 'DUPLICATE'
 	// PREFLIGHT ONLY, and deliberately not a measurement. See `PREFLIGHT` below.
 	| 'APPLICABLE';
@@ -326,6 +331,33 @@ function runMutant(m: DeclaredMutant): Result {
 					mutantEnv
 				);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+		// ⚠ DID THIS RUN MEASURE THE MUTATION? ASKED BEFORE ANY VERDICT IS ATTRIBUTED (REG-F-116, JAN-VERIF V-4b).
+		//
+		// Every arm below reads ONE bit — `run.status` — and states a CONCLUSION about the mutation. That inference
+		// is only sound if the run exercised it. V-4a proved it need not have: an unrelated suite tipped over its
+		// 5000ms default under load, vitest exited non-zero, and this runner printed `SURVIVED: … declared a
+		// CONTROL, but a test FAILED on it — something asserts on prose`. There was no such test. **The runner
+		// stated a cause it never measured**, and the operator spent four attempts and three confident wrong
+		// diagnoses looking for it.
+		//
+		// IT IS PLACED HERE, ABOVE BOTH ARMS, BECAUSE THE DAMAGE RUNS IN BOTH DIRECTIONS. A control's whole-suite
+		// run turns a timeout into a FALSE BLOCKING — loud, and expensive. A NAMED victim's run turns the same
+		// timeout into a FALSE KILL: status is non-zero, the ledger records the guard as proven, and nothing that
+		// ran ever touched it. REG-F-110 named that asymmetry — *"a false KILL is quieter than a false BLOCK and it
+		// had been sitting under a green tick."* One check above both arms is the only placement that catches both.
+		//
+		// THE COST IS DISCLOSED IN `measured.ts`: a mutation that genuinely HANGS its victim now reports
+		// INCONCLUSIVE rather than KILLED, and its author must say so deliberately. That is the correct polarity —
+		// the ledger's claim is "this named test reddens BECAUSE it asserts the guard", which a hang cannot establish.
+		const timedOut = timeoutEvidence(out);
+		if (timedOut !== null)
+			return {
+				mutant: m,
+				verdict: 'INCONCLUSIVE',
+				// The observed text is QUOTED rather than summarised, because the entire finding is that a verdict
+				// asserted something the reader could not check.
+				detail: `the run TIMED OUT (${timedOut}) — it did not measure this mutation, so neither KILLED nor SURVIVED is available. Fix the slow test; do not raise the timeout. ${summarise(out)}`
+			};
 		const victims = HARVEST ? readVictims() : undefined;
 		// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
 		// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
@@ -638,6 +670,7 @@ for (const v of [
 	'KILLED_UNNAMED',
 	'ABORTED_DIRTY',
 	'CONTROL_HELD',
+	'INCONCLUSIVE',
 	'DUPLICATE'
 ] as const)
 	console.log(`${v.padEnd(11)} ${by(v).length}`);
@@ -649,7 +682,9 @@ console.log(
 		`(${by('DUPLICATE').length} duplicate, ${by('RETIRED').length} retired).`
 );
 
-for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_COMPILE')])
+// INCONCLUSIVE prints WITH the failures, and the ordering is deliberate: it is listed LAST so that a run which is
+// partly unmeasured cannot be skimmed as if the measured part were the whole story.
+for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_COMPILE'), ...by('INCONCLUSIVE')])
 	console.log(
 		`\n${r.verdict}: ${r.mutant.id}\n  guard: ${r.mutant.why}\n  from:  ${r.mutant.source}\n  ${r.detail}`
 	);
@@ -693,11 +728,16 @@ ${unnamedVictims} mutant(s) had NO NAMED VICTIM and were run package-wide. That 
 			'never paste the whole list, which records the suites that FAILED rather than the ones that TEST the guard.'
 	);
 
+// ⚠ `INCONCLUSIVE` BLOCKS, and the reason is the one this whole file is built on: a gate that passes on a mutant it
+// did not measure is a gate reporting a guarantee nobody obtained. It joins `UNANCHORED`, `NO_COMPILE` and
+// `ABORTED_DIRTY` — the verdicts that say the INSTRUMENT did not work — rather than `SURVIVED`, which says the CODE
+// did not. Same exit code, different sentence, and the sentence is the point (REG-F-116).
 const failures =
 	by('ABORTED_DIRTY').length +
 	by('SURVIVED').length +
 	by('UNANCHORED').length +
 	by('NO_COMPILE').length +
+	by('INCONCLUSIVE').length +
 	unnamedVictims;
 if (failures > 0)
 	console.log(
