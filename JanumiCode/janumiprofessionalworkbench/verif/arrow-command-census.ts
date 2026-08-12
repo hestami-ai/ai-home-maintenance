@@ -184,7 +184,28 @@ function declaredRange(
 }
 
 /** Every arrow a command declares it can perform. Throws on any shape it cannot read — never skips a site. */
+/**
+ * ⚠ MEMOIZED — REG-F-116. Each of these two walks parses EVERY handler file with the TypeScript compiler
+ * (`ts.createSourceFile`), and they are pure functions of a source tree that cannot change inside one vitest module
+ * run. `declaredArrows()` alone is called three times in `arrow-census-coverage.test.ts` and again from other
+ * suites, so the compiler was re-parsing the whole handler directory once per call.
+ *
+ * MEASURED UNDER LOAD, WHICH IS THE CONDITION THAT DECIDES A GATE. That file's CONTROL costs 4345ms in isolation
+ * and **15727ms with a second vitest running — over its declared 15_000 budget, so it FAILS.** A declared control
+ * runs the whole suite, so a control that tips its own timeout is reported as a verdict about an unrelated mutation
+ * (REG-F-116's subject). The amplification is ~4×, far more than CPU contention explains: it is I/O between
+ * workers, and the fix is to stop asking for the same bytes.
+ *
+ * SAFE BECAUSE THE INPUT IS FROZEN FOR THE RUN, and unsafe to memoize anywhere it is not — the mutation runner
+ * mutates files BETWEEN vitest invocations, never during one, so a fresh process always re-reads.
+ */
+let arrowsCache: DeclaredArrow[] | undefined;
 export function declaredArrows(): DeclaredArrow[] {
+	arrowsCache ??= computeDeclaredArrows();
+	return arrowsCache;
+}
+
+function computeDeclaredArrows(): DeclaredArrow[] {
 	const arrows: DeclaredArrow[] = [];
 	let sites = 0;
 
@@ -331,7 +352,14 @@ export function declaredArrows(): DeclaredArrow[] {
  * because a diagram says so — the exact substitution of declaration for behaviour this whole file exists to
  * refuse.
  */
+/** Memoized for the same reason as `declaredArrows` — a second full TypeScript parse of the same directory. */
+let birthsCache: Map<string, Set<string>> | undefined;
 export function birthStates(): Map<string, Set<string>> {
+	birthsCache ??= computeBirthStates();
+	return birthsCache;
+}
+
+function computeBirthStates(): Map<string, Set<string>> {
 	const out = new Map<string, Set<string>>();
 	let declarations = 0;
 	for (const file of handlerFiles()) {

@@ -46,10 +46,29 @@ describe('authored source is reviewable text', () => {
 		expect(files.length).toBeGreaterThan(200);
 	});
 
-	it('contains no NUL byte, which would make git treat the file as binary and stop diffing it', () => {
-		const offenders = files
-			.filter((f) => readFileSync(f).includes(0))
-			.map((f) => f.slice(ROOT.length).replaceAll('\\', '/'));
-		expect(offenders).toEqual([]);
-	});
+	// ⚠ AN EXPLICIT BUDGET, AND THE DISTINCTION FROM V-4a IS THE WHOLE POINT OF THIS COMMENT (REG-F-116).
+	//
+	// V-4a REFUSED to raise a timeout, correctly: that test was doing 168 MB of REDUNDANT I/O — re-reading the same
+	// six files once per rule — and a bigger budget would have left the waste in place and the gate one slow machine
+	// from a false verdict. Four more instances of that same defect were found and fixed in this sweep.
+	//
+	// THIS ONE IS NOT THAT. It reads every authored file EXACTLY ONCE, which is the work; there is nothing to
+	// remove. Measured 1137ms in isolation and 15698ms with a second vitest running — the amplification is I/O
+	// contention between workers, not waste, and it grew when `packages/csaa` added ~680 files to the tree it walks.
+	// A test whose cost is inherent should DECLARE a budget that fits it rather than run against a 5000ms default
+	// that describes a different kind of test. Tipping it under load is what turns a mutation CONTROL's whole-suite
+	// run into a verdict about an unrelated mutation.
+	//
+	// The budget is not a licence: if this ever needs raising AGAIN, the question to ask first is whether the walk
+	// has started reading something it does not review.
+	it(
+		'contains no NUL byte, which would make git treat the file as binary and stop diffing it',
+		() => {
+			const offenders = files
+				.filter((f) => readFileSync(f).includes(0))
+				.map((f) => f.slice(ROOT.length).replaceAll('\\', '/'));
+			expect(offenders).toEqual([]);
+		},
+		30_000
+	);
 });

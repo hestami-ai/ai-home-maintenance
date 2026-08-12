@@ -51,8 +51,37 @@ export interface ClauseProvenance {
 /** The statement's own provenance is the FIRST thing the citation names. */
 const AUTHORED_AT_CANON = /^(NEW\b|session consensus)/i;
 
-/** Every clause-keyed entry across the canon provenance sidecars, in either line format. */
+/**
+ * The register's lines, READ AND SPLIT ONCE — REG-F-116, and the third file to carry the same defect.
+ *
+ * ⚠ `ratifyingActsFor` IS CALLED PER CLAUSE AND WAS RE-READING THE WHOLE REGISTER EACH TIME. That file is over
+ * 3100 lines and **grows with every finding recorded**, so this cost rose every time this programme did its job —
+ * which is exactly what V-4a found in `enforcement-register.test.ts` and exactly why that one eventually tipped a
+ * timeout and blocked the mutation gate on a false verdict.
+ *
+ * MEASURED UNDER LOAD, WHICH IS THE CONDITION THAT MATTERS. In isolation this file's PINNED test costs 1489ms; with
+ * a second vitest running it costs **15933ms and TIMES OUT**. The amplification is ~10×, which is far more than CPU
+ * contention explains — it is I/O contention between workers, and the fix is to stop asking for the same bytes.
+ */
+let registerLines: readonly string[] | undefined;
+function registerLinesOnce(): readonly string[] {
+	registerLines ??= readFileSync(REGISTER, 'utf8').split('\n');
+	return registerLines;
+}
+
+/**
+ * Every clause-keyed entry across the canon provenance sidecars, in either line format.
+ *
+ * ⚠ MEMOIZED, because `provenanceOf(clause)` calls this ONCE PER CLAUSE and it re-read every sidecar in `docs/canon`
+ * each time. Same defect as the register read above, same fix, found in the same sweep.
+ */
+let clauseIndex: Map<string, ClauseProvenance> | undefined;
 export function provenanceIndex(): Map<string, ClauseProvenance> {
+	clauseIndex ??= buildProvenanceIndex();
+	return clauseIndex;
+}
+
+function buildProvenanceIndex(): Map<string, ClauseProvenance> {
 	const out = new Map<string, ClauseProvenance>();
 	for (const file of readdirSync(CANON).sort()) {
 		if (!file.includes('provenance.md')) continue;
@@ -95,7 +124,7 @@ export function provenanceOf(clause: string): ClauseProvenance | undefined {
 export function ratifyingActsFor(clause: string): string[] {
 	const acts: string[] = [];
 	let current: string | undefined;
-	for (const line of readFileSync(REGISTER, 'utf8').split('\n')) {
+	for (const line of registerLinesOnce()) {
 		const heading = /^#{2,4}\s+(REG-[A-Z]-\d+)\b/.exec(line);
 		if (heading) {
 			current = heading[1]!.startsWith('REG-D-') ? heading[1] : undefined;

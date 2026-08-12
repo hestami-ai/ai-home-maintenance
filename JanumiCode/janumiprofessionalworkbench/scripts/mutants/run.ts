@@ -306,8 +306,19 @@ function jsonReportFor(m: DeclaredMutant): string | undefined {
 function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
 	const expectSurvive = m.expectSurvive ?? '';
 	if (passed) return { mutant: m, verdict: 'CONTROL_HELD', detail: expectSurvive.slice(0, 88) };
+	const reported = failedFiles(CONTROL_REPORT);
+	// NO REPORT AT ALL — the run exited non-zero and wrote nothing, so there is no difference to take. That is a
+	// non-measurement and must say so; grading it HELD would be the fail-open this whole entry is about.
+	if (reported === undefined)
+		return {
+			mutant: m,
+			verdict: 'INCONCLUSIVE',
+			detail:
+				'the run FAILED and wrote no report, so the difference against the baseline could not be taken — ' +
+				'no verdict about this control is available'
+		};
 	const already = new Set(baseline ?? []);
-	const fresh = failedFiles(CONTROL_REPORT).filter((f) => !already.has(f));
+	const fresh = reported.filter((f) => !already.has(f));
 	// NOTHING NEW REDDENED — the control HELD. The disclosure travels WITH the verdict, because "held against a red
 	// baseline" is a weaker statement than "held against a green one" and must not read as the same.
 	if (fresh.length === 0)
@@ -509,12 +520,16 @@ function runPlaywright(target: readonly string[], env: NodeJS.ProcessEnv): Retur
  * Returns `[]` on a missing or unreadable report, which is honest: the caller records "no candidates observed",
  * not "no candidates exist".
  */
-function failedFiles(reportPath: string): readonly string[] {
+function failedFiles(reportPath: string): readonly string[] | undefined {
 	let raw: string;
 	try {
 		raw = readFileSync(reportPath, 'utf8');
 	} catch {
-		return [];
+		// ⚠ `undefined`, NOT `[]` — the two mean opposite things and conflating them is a fail-OPEN hole in the fix
+		// for a fail-open hole. `[]` says "the run reported NO failures"; a missing report says "there is no
+		// measurement here at all", which for a control that exited non-zero is `INCONCLUSIVE`, not `held`. Caught
+		// by reading my own diff rather than by the gate, which would have graded a crashed control as HELD.
+		return undefined;
 	}
 	rmSync(reportPath, { force: true });
 	const report = JSON.parse(raw) as {
@@ -535,7 +550,8 @@ function failedFiles(reportPath: string): readonly string[] {
 	].sort((a, b) => a.localeCompare(b));
 }
 
-const readVictims = (): readonly string[] => failedFiles(HARVEST_REPORT);
+/** HARVEST's candidates. An unreadable report is honestly "no candidates OBSERVED", never "none exist". */
+const readVictims = (): readonly string[] => failedFiles(HARVEST_REPORT) ?? [];
 
 /**
  * WHICH SUITES ARE ALREADY RED **WITHOUT** ANY MUTATION — REG-F-116's second limb, and the one the first run of
@@ -573,7 +589,16 @@ function takeBaseline(): void {
 		'--reporter=json',
 		`--outputFile=${BASELINE_REPORT}`
 	]);
+	// A MISSING BASELINE REPORT IS NOT AN EMPTY ONE. `undefined` here would silently become "nothing was red", which
+	// makes every control's difference the whole of its own failure set — the pre-REG-F-116 behaviour, restored by
+	// an unreadable file. Left as `undefined` so the differencing arm cannot mistake it for a clean baseline.
 	baseline = failedFiles(BASELINE_REPORT);
+	if (baseline === undefined) {
+		console.error(
+			'FAIL: the unmutated baseline run wrote no report, so no control can be graded. Refusing to guess.'
+		);
+		process.exit(2);
+	}
 	console.log(
 		baseline.length === 0
 			? 'BASELINE: the whole suite is GREEN — every control is measurable against zero.\n'
