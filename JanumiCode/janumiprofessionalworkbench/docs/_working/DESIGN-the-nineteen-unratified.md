@@ -81,6 +81,34 @@ per-site fact.
 4. Only then: the roadmap section, with a predicted red per change and the pinned finding's count updated
    deliberately (19 → 8 → per-site dispositions).
 
+## 4a. Check results so far (2026-08-13, same session)
+
+**Check 1 — DONE, negative.** JAN-CMDPRE RESIDUALS R1–R6 do NOT cover these sites (R1 bumpPwaSemanticVersion,
+R2 conversation batches, R3 expectedRevision, R4 retraction, R5 projection contradiction, R6 the
+advancePwuLifecycle family). The self-edges are genuinely unruled. One precedent found: `ChangePwuState`'s
+DWP-02 vacuity predicate deliberately ADMITS partial NOOPs, refusing only the all-axes NOOP (RESIDUALS.md:86)
+— so deliberate NOOP-admission with a narrow refusal is an established shape.
+
+**Check 2, site 1 of 4 — DONE, and it REFRAMES the 13 Claim arrows.** `assurance.ts:770` is
+`recordClaimAssessment` (REG-D-024 / REG-F-044), and its rectangle is DELIBERATE, documented at the site:
+`fromStates(...)` = "every non-terminal claim state"; `targetStates: Object.keys(CLAIM_STATUS_EVENT)` keeps one
+source of truth; and pair-legality is DELEGATED to the machine — *"Which DESTINATIONS are legal from each is
+the machine's judgement; duplicating it here would create a second, drifting copy of the arrow table
+(REG-F-027's shape)."* So §3's "narrow the declarations" hypothesis is REFUTED FOR THIS SITE by the site's own
+recorded design: the 11 Claim non-self pairs are not a defect of the site, they are the rectangle idiom meeting
+the census's per-pair arrow semantics. The census question becomes: DECLARED (the rectangle, what the site
+claims) vs PERFORMABLE (rectangle ∩ machine, plus the NOOP self-edges within the rectangle that
+`checkTransition` admits). Both are honest answers to different questions; REG-F-121 pinned the difference so
+it stays visible, and any change must keep it visible rather than absorbing it.
+
+**Also material:** the `Claim.status` machine is AUTHORED, not ratified — all 15 arrows, disclosed in the vocab
+("Transitions RECONSTRUCTED … NO explicit matrix", REG-F-045). So for Claim, "ratify a HOLD self-arrow" (§3
+option b) is an AUTHORING act with disclosure (the REG-D-024 pattern), not a sponsor ratification — a lower bar
+than §3 assumed, but still a deliberate act with its own register entry, never a silent absorption.
+
+**Remaining:** sites 2–4 (execution.ts:668, runtime-binding.ts:119, validator-registry.ts:82 — 6 arrows), and
+the end-to-end drive of one self-edge (§4.3).
+
 ## 5. What this doc refuses to do
 
 - No `transitions.data.ts` edit — machines are reconstructed from ratified corpus; adding self-arrows is a
