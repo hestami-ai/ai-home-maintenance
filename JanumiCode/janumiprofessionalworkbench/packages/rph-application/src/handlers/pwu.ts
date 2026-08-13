@@ -385,9 +385,14 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
 } as const satisfies Readonly<Record<string, string>>;
 
 /**
- * THE ANTI-ROT MECHANISM. `advancePwuLifecycle`'s `target` is narrowed to this union, so a SEVENTH semantic
+ * THE ANTI-ROT MECHANISM. `advancePwuLifecycle`'s `target` is narrowed to this union, so a TWELFTH semantic
  * lifecycle command cannot be added without adding its row here — `check-types` fails before the new command's
  * arrow can quietly become reachable through the generic setter as well.
+ *
+ * ⚠ THIS SAID "SEVENTH" WHILE THE TABLE ABOVE HELD ELEVEN — corrected 2026-08-13 (P-5). The count was written
+ * when there were six and never re-derived as rows were added, which is the same disease REG-F-117 fixed in the
+ * census-blind comment: **a count in prose beside a live table is a count nothing checks.** The table is the
+ * authority and the type is derived from it; the number here is narrative only, which is exactly why it rotted.
  */
 export type OwnedLifecycleTarget = keyof typeof PWU_SEMANTIC_LIFECYCLE_COMMANDS;
 
