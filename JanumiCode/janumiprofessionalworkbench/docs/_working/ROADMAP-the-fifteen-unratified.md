@@ -51,6 +51,15 @@ Nothing is lost by leaving them: they cannot fire, they never enter the coverage
 they are pinned by name. **The register entry is the deliverable** — that these ten are a KNOWN, BOUNDED
 imprecision of the rectangle idiom, not an unresolved question.
 
+**⚠ ONE OF THE TEN IS NOW DRIVEN, and it confirms the criterion rather than merely illustrating it.** While
+arranging the §3 drive I issued `RecordClaimAssessment(SUPPORTED)` against a claim in OPEN — i.e.
+`Claim.status OPEN -> SUPPORTED`, one of these ten — and the engine refused it:
+`RPH_ILLEGAL_STATE_TRANSITION … ILLEGAL_UNDEFINED: transition OPEN -> SUPPORTED is not in the Claim.status
+matrix`. **The refusal comes from the MACHINE, exactly as §0 predicts for every `from ≠ to` member**, and it
+arrived as an accident of arranging a different test — which is worth recording, because it is the only member
+of the ten that has been driven at all. The other nine rest on the §0 criterion, which is sound but is an
+argument; do not write "all ten are refused" as though all ten were observed.
+
 ⚠ **Do NOT "fix" this by intersecting declarations with the machine.** That would make the census's output a
 function of the machine table — REG-F-114's forbidden inference — and would silently repair a real over-claim
 into a clean number, destroying the very signal this list exists to carry.
@@ -61,11 +70,26 @@ into a clean number, destroying the very signal this list exists to carry.
 - `RuntimeBinding PARTIALLY -> PARTIALLY` — **ruled** (N-22 narrowed; incremental multi-party authorization is
   expressible and needs no new arrow). Cite and close. ⚠ Its own docblock at `runtime-binding.ts:170-186` still
   says the OPPOSITE and must be struck in this increment or the citation points at prose that contradicts it.
-- `Claim.status` × 3 — **OPEN, and the only real question left.** A re-assessment that records new evidence
-  without changing status is either (i) the product working, in which case the hold is declared and disclosed on
-  the REG-D-024 precedent, or (ii) a duplicate `ClaimSupported`/`ClaimContested` event for a change that did not
-  happen, which is the governance-NOOP defect shape. **Decide by DRIVING it first** — issue a second
-  `RecordClaimAssessment` at the same status and read what is appended — not by reasoning from the guard.
+- `Claim.status` × 3 — **DRIVEN 2026-08-13, AND IT IS A LIVE DEFECT.** Through the real bus: AssertClaim →
+  RecordClaimAssessment(UNDER_ASSESSMENT) → admit evidence → RecordClaimAssessment(SUPPORTED) → **a second,
+  byte-identical RecordClaimAssessment(SUPPORTED) was ACCEPTED**, leaving
+  `["ClaimAsserted","ClaimUnderAssessment","ClaimSupported","ClaimSupported"]` — **a second `ClaimSupported`
+  recording a change that did not happen.** That is AX-7's permanent false entry in an append-only log, the same
+  shape as the governance `REVOKED -> REVOKED` re-issue and as RuntimeBinding's N-22 before it was guarded.
+
+  **⚠ AND THE FIX IS THE NARROW ONE, on the N-22 precedent: refuse "nothing changed", NOT "the status stayed the
+  same".** `RecordClaimAssessmentPayloadSchema` carries optional `assessmentId`, `rationale` and
+  `contradictingEvidenceIds`, so a SECOND assessment that reaches the same conclusion by a distinct assessment
+  IS expressible and IS a real act — refusing every self-edge would strand it, which is exactly the over-refusal
+  `runtime-binding.ts:221-228` records itself withdrawing. Only an assessment that adds nothing is the false
+  entry.
+
+  **⚠ AND THE DESIGN QUESTION THAT MUST BE ANSWERED BEFORE ANY CODE:** what counts as "changed" here is NOT
+  simply payload-vs-state, so `noOpEditPrecondition` (DWP-08) may not fit as-is. `mutate` persists only
+  `contradictingEvidenceIds` and a derived `supportingEvidenceIds`; `assessmentId` and `rationale` ride the
+  EVENT and are never written to the object. So a second assessment carrying a fresh `assessmentId` is
+  indistinguishable from the first BY STATE, and a state-only comparison would refuse a legitimate distinct
+  assessment. Deciding the comparison basis — state, last event, or the pair — is its own design step.
 
 ## 4. What this roadmap will NOT do
 
