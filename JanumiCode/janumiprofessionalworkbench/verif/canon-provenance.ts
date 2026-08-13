@@ -132,8 +132,25 @@ export function ratifyingActsFor(clause: string): string[] {
 		}
 		if (!current) continue;
 		// Literal, not tolerant: censused across the register as 180 × `- **Merge target:** ` and 1 ×
-		// `- **Merge targets (a…`. Optional quantifiers here only bought SonarLint S8786 backtracking, and the
-		// paired test pins the population so a narrowing that loses lines fails there rather than silently.
+		// `- **Merge targets (a…`. The optional quantifiers exist for that second form; they also draw SonarLint
+		// S8786, so the tempting edit is to narrow this to `/^- \*\*Merge target:\*\* (.*)$/`.
+		//
+		// ⚠ DO NOT, AND DO NOT TRUST THE PAIRED TEST TO STOP YOU (REG-F-125's sweep). This line used to read
+		// *"the paired test pins the population so a narrowing that loses lines fails there rather than
+		// silently"* — and that was FALSE ON THE DAY IT WAS WRITTEN. **Measured, by making the narrowing and
+		// running the suite: `canon-provenance.test.ts` passes 7/7 while the REG-D merge lines this reader sees
+		// drop 42 → 41.** What is lost is REG-D-014's `- **Merge targets (applied same date):**`.
+		//
+		// THE REASON THE TEST CANNOT SEE IT is worth stating, because it bounds what the test CAN hold: the final
+		// control pins the RESULT — which clauses in the 69-entry index carry a ratifying act — and NOT the
+		// population of merge lines. A lost line is therefore invisible unless its target names an INDEXED CLAUSE,
+		// and REG-D-014's targets are artifact versions (`CON-000 v1.2.0; DOC-002 v1.1.0; …`), not clause ids.
+		// So the guard is real but PARTIAL: it catches a narrowing that changes which clauses carry acts, and
+		// nothing else.
+		//
+		// The consequence of getting this wrong is not cosmetic: `ratifyingActsFor` under-reporting makes a clause
+		// look unratified, which is what B3 reads to decide whether a divergence was permitted — a governing
+		// clause reported DEFECTIVE because a regex stopped matching. Re-census the register before narrowing.
 		const merge = /^- \*\*Merge targets?[:*]{0,3} ?(.*)$/.exec(line.trim());
 		if (!merge) continue;
 		// ⚠ TRAP 2, THIRD FORM — and I caused this one myself, minutes after gating against the first two.
