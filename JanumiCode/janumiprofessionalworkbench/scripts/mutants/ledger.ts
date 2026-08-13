@@ -2595,7 +2595,11 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		id: 'F119-the-census-stops-reading-the-setter-table',
 		file: 'verif/arrow-command-census.ts',
 		find: '\tfor (const spec of Object.values(PWU_GENERIC_SETTER_SPECS)) {',
-		replace: '\tfor (const spec of Object.values({})) {',
+		// ⚠ REFORMULATED IN ITS OWN COMMIT (ledger rule #5). The first spelling was `Object.values({})`, which
+		// reported NO_COMPILE — `{}` widens `spec` to `unknown`, so the mutation was measuring tsc rather than the
+		// guard. `.slice(0, 0)` keeps the type and empties the population, which is also the more realistic drift:
+		// a reader that silently narrows its own input is the defect this census exists to catch.
+		replace: '\tfor (const spec of Object.values(PWU_GENERIC_SETTER_SPECS).slice(0, 0)) {',
 		expectRed: ['verif/arrow-census-coverage.test.ts'],
 		why: "THE SPINE GOES BACK TO BEING INVISIBLE. This is the exact state the repository was in before REG-F-119: forty-nine PERIPHERAL arrows visible (abandon, supersede, block, challenge) and the eight the workbench actually drives — READY -> PLANNED -> EXECUTING -> ... -> RECOMPOSED — read by nothing, because `ChangePwuState` takes its target from `payload.newState` at runtime and its call site declares nothing. ⚠ THE DANGEROUS PART IS WHAT STAYS GREEN: the machine simply drops back to 49/57, which is no longer COMPLETE, so under REG-F-118 it silently stops being occupancy-analysable and every unreachability question about it becomes unanswerable again — quietly, with no test naming that as the loss. Predicted red: `arrowsSeen` 178 -> 170 on the coverage pin.",
 		source: 'REG-F-119'
