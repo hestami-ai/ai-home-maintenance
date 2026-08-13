@@ -106,8 +106,37 @@ it stays visible, and any change must keep it visible rather than absorbing it.
 option b) is an AUTHORING act with disclosure (the REG-D-024 pattern), not a sponsor ratification — a lower bar
 than §3 assumed, but still a deliberate act with its own register entry, never a silent absorption.
 
-**Remaining:** sites 2–4 (execution.ts:668, runtime-binding.ts:119, validator-registry.ts:82 — 6 arrows), and
-the end-to-end drive of one self-edge (§4.3).
+**Check 2, sites 2–4 — DONE (2026-08-13), and site 4 is a NEW INSTRUMENT DEFECT.**
+
+- **Site 2, `execution.ts:668` (#14 `ExecutionPlan ACTIVE -> ACTIVE`): ALREADY RULED.** It is
+  `applyTacticalChange`, and the docstring says it in terms: *"The DECLARED HOLD (JAN-CMDPRE DWP-05; DS-001
+  §5): a tactical change is a legitimate REPEATED action on a live plan, so ACTIVE -> ACTIVE is admitted, not
+  refused."* Disposition: cite DWP-05, mark deliberately-admitted. A ledger mutant already exercises it.
+- **Site 3, `runtime-binding.ts:119` (#15): a REAL single-site rectangle**, like Claim's. `authorizeRuntimeBinding`
+  derives its target (AUTHORIZED | PARTIALLY_AUTHORIZED, range declared) from whether the grant covers the
+  request (JAN-PARTAUTH, closing N-6); fromStates includes PARTIALLY_AUTHORIZED. So
+  PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED CAN fire (a second partial grant that still does not cover) —
+  check JAN-PARTAUTH-DS-001 for whether the repeat-partial case was considered before disposing.
+- **⚠ Site 4, `validator-registry.ts:82` (#16–#19): ALL FOUR ARE CENSUS FABRICATIONS — no call declares them.**
+  The four `statusChange` calls declare exactly FIVE arrows (`ACTIVE->DEGRADED`, `DEGRADED->ACTIVE`,
+  `ACTIVE->DISABLED`, `DEGRADED->DISABLED`, `DISABLED->ACTIVE`), all ratified. But the census's
+  `factoryParameter` resolves a parameter by UNIONING literals across ALL call sites, so it reads
+  union(targets) × union(froms) = 9 arrows — manufacturing 4 no single call declares. Same defect family as
+  REG-F-122 (the instrument fabricating declarations), different mechanism: UNION instead of inference. These
+  4 also CANNOT FIRE — each handler's runtime `fromStates` is its own narrow list.
+
+**⚠ CORRECTION TO §2's mechanism split, forced by the per-site reads (REG-F-120's lesson, caught in the same
+doc that cited it):** "the 8 self-transitions CAN FIRE" was the mechanism DEFAULT, and per-site reading refutes
+it for 4 of 8. Fires: Claim's three (#4, #11, #13), ExecutionPlan's one (#14, ruled), RuntimeBinding's one
+(#15). Cannot fire: validator-registry's three self-edges + `DISABLED -> DEGRADED` (#16–#19, phantoms).
+
+**The census fix this implies (own increment, own re-pin, REG-F-124 candidate):** `factoryParameter` must pair
+per CALL SITE — (target, froms) per call — not union across them. Predicted movement when fixed:
+`distinctArrowsDeclared` 175 → 171, unratified 19 → 15. This is a DROP that removes fabrication, the same
+shape REG-F-122 recorded; the register entry must say so before a reader mistakes it for lost coverage.
+
+**Remaining:** the end-to-end drive of one live self-edge (§4.3 — Claim or RuntimeBinding), and the
+JAN-PARTAUTH-DS-001 check for #15.
 
 ## 5. What this doc refuses to do
 
