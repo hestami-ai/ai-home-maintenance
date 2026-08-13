@@ -135,8 +135,41 @@ per CALL SITE — (target, froms) per call — not union across them. Predicted 
 `distinctArrowsDeclared` 175 → 171, unratified 19 → 15. This is a DROP that removes fabrication, the same
 shape REG-F-122 recorded; the register entry must say so before a reader mistakes it for lost coverage.
 
-**Remaining:** the end-to-end drive of one live self-edge (§4.3 — Claim or RuntimeBinding), and the
-JAN-PARTAUTH-DS-001 check for #15.
+**Checks 3 + 4 for #15 — DONE (2026-08-13), and they settle the DISPOSITION QUESTION for every self-edge.**
+
+`JAN-PARTAUTH-DS-001` §3 considers the repeat-authorization case directly and adds a monotonicity guard
+(`G ⊉ G₀` REFUSED). Reading the LIVE handler (`runtime-binding.ts:187-257`) rather than the design: the N-22
+limb refuses only `from === to && added.length === 0` — *"the defect is NOTHING CHANGED, not THE STATUS STAYED
+THE SAME."* So #15 **is reachable and deliberate**, and it is DRIVEN END-TO-END by an existing green test:
+`partauth-derived-outcome.test.ts` *"THE PLATFORM CASE: three approvers each add a capability, reaching
+AUTHORIZED"* (22 passed, run 2026-08-13). §4.3's drive requirement is discharged by a test that already exists —
+no new fixture needed.
+
+**⚠ AND THE HANDLER'S OWN REASONING RETIRES §3's OPTION (b) FOR ALL SELF-EDGES.** Quoting `runtime-binding.ts:221-228`:
+
+> *"MY FIRST FORMULATION REFUSED EVERY `from === to`, AND IT WAS OVER-BROAD … The reasoning was: the machine's
+> arrows out of PARTIALLY_AUTHORIZED are to AUTHORIZED and to REVOKED, with no self-loop, therefore a
+> self-transition is illegal. But `checkTransition` admits `from === to` as a NOOP by design, and THIS CODEBASE
+> ALREADY HAS TWO GENUINE SAME-STATE HOLDS (`ApplyTacticalChange`…; the ChangePwuState path likewise) — they
+> simply declare their target rather than omitting it. **A same-state transition is not forbidden here; it is
+> UNDECLARED, which is a different thing.**"*
+
+So a HOLD needs **no new machine arrow and no ratification act** — §3(b) was my invention, and the repository had
+already reasoned past it. This also means **the pinned 19 conflates two different populations**, which is the
+real finding: (a) same-state HOLDS, admitted by design via the NOOP rule, needing only honest declaration; and
+(b) genuine cross-state pairs no machine ratifies — rectangle over-claims and union fabrications. Any disposition
+must keep those apart rather than resolve them to one number.
+
+**⚠ A LIVE DEFECT FOUND WHILE CHECKING — superseded prose contradicting live code in the same function.**
+`runtime-binding.ts:170-186` still carries the WITHDRAWN first formulation as if operative: *"There is NO
+self-loop. A further authorization must therefore COMPLETE the request"* and *"DISCLOSED CONSEQUENCE, recorded
+as N-22 … this makes INCREMENTAL multi-party authorization … inexpressible … that is a new arrow with its own
+trigger, which is a ratification act and not mine to author."* Sixty lines below, the live code says the exact
+opposite and says so explicitly: *"SO THE DISCLOSED COST IS WITHDRAWN … it needs no new arrow and therefore no
+ratification act."* **The stale half makes a RATIFICATION claim**, so a reader trusting it concludes sponsor
+action is required where none is — which is precisely the conclusion I drew an hour ago before reading further.
+Fourth instance of the orphaned/superseded-docstring class (REG-F-120 found three). Fix it in its own increment,
+and note the class keeps being found ONE AT A TIME by incidental reading, which argues for a derived sweep.
 
 ## 5. What this doc refuses to do
 
