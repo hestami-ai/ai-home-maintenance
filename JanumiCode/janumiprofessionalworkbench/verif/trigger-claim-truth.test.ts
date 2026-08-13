@@ -107,7 +107,6 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 			'ExecutionPlan.status',
 			'ExecutionStep.stepState',
 			'PWU.executionState',
-			'PWU.workLifecycleState',
 			'RecompositionContract.status'
 		]);
 	});

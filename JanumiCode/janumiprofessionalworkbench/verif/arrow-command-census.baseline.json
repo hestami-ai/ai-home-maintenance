@@ -126,14 +126,6 @@
 		"PWU.shapeIntegrityState  RESTORED -> PRESERVED",
 		"PWU.shapeIntegrityState  UNKNOWN -> PRESERVED",
 		"PWU.shapeIntegrityState  VIOLATED -> RESHAPING_REQUIRED",
-		"PWU.workLifecycleState  EVIDENCE_PENDING -> UNDER_ASSURANCE",
-		"PWU.workLifecycleState  EXECUTING -> EVIDENCE_PENDING",
-		"PWU.workLifecycleState  PLANNED -> EXECUTING",
-		"PWU.workLifecycleState  READY -> PLANNED",
-		"PWU.workLifecycleState  RECOMPOSING -> RECOMPOSED",
-		"PWU.workLifecycleState  SATISFIED -> RECOMPOSING",
-		"PWU.workLifecycleState  UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED",
-		"PWU.workLifecycleState  UNDER_ASSURANCE -> SATISFIED",
 		"PwuType.status  DRAFT -> PUBLISHED",
 		"PwuType.status  PUBLISHED -> DEPRECATED",
 		"RecompositionContract.status  COMPOSABLE -> SATISFIED",
@@ -175,7 +167,6 @@
 		"ExecutionPlan.status",
 		"ExecutionStep.stepState",
 		"Intent.intentStatus",
-		"PWU.workLifecycleState",
 		"RecompositionContract.status"
 	]
 }

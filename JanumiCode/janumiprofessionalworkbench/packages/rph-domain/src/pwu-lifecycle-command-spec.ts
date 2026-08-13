@@ -199,3 +199,86 @@ export function checkDeclaredSource(
 			`claim to be the one that performs it (REG-F-114).`
 	};
 }
+
+// ── THE GENERIC SETTER'S ARROWS — REG-F-119, and the other half of REG-F-114's ruling ────────────────────────
+//
+// `ChangePwuState` performs the PWU's MAIN LIFECYCLE SPINE, and until now the census could not see one arrow of
+// it. The eleven semantically named commands above declare 49 of the machine's 57 arrows — and every one of those
+// is a PERIPHERAL act: abandon, supersede, block, challenge, invalidate, reject. The eight below are the path the
+// workbench actually drives:
+//
+//     READY -> PLANNED -> EXECUTING -> EVIDENCE_PENDING -> UNDER_ASSURANCE -> SATISFIED -> RECOMPOSING
+//         -> RECOMPOSED            (and UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED)
+//
+// The setter is invisible to the census for a structural reason: its target is `payload.newState`, resolved at
+// RUNTIME, so its call site declares NOTHING — not a destination, let alone an arrow. That is the same shape
+// REG-F-114 found in `advancePwuLifecycle` and ruled on: **make the idiom self-declaring and let the census read
+// the declaration as DATA.** This table is that ruling applied to the fourth idiom.
+//
+// ── ⚠ TRANSCRIBED, NOT DERIVED, AND THE REASON IS A CONTROL THAT WOULD OTHERWISE BE UNFALSIFIABLE ─────────────
+// REG-F-072 says the generic setter may not target a state a named command owns, so these eight targets are
+// exactly the COMPLEMENT of the eleven above, minus `PROPOSED` — which is the BIRTH and the only state of the
+// twenty with no in-edge at all. It is therefore tempting to COMPUTE this table from that complement. **Do not.**
+// `verif/lifecycle-arrow-declarations.test.ts` asks whether any ratified arrow is unaccounted for by ANY command.
+// If these targets were the complement BY CONSTRUCTION, the union of the two tables would cover every state
+// NECESSARILY, and that gate could never fail — a control that cannot fail, authored inside the increment meant
+// to strengthen it. **The transcription IS the value**: it lets the gate compare two independently authored
+// artifacts, and these eight `sourceStates` are held equal to the machine's in-edges in BOTH directions.
+//
+// ── WHAT THIS BUYS, STATED AS NARROWLY AS REG-F-114 STATED ITS OWN ───────────────────────────────────────────
+// **DRIFT and VISIBILITY. It is NOT a new guard, and it must not become one.** `checkTransition` already enforces
+// the machine, and `rejectArrowOwnedBySemanticCommand` already enforces REG-F-072 at dispatch — with a DELIBERATE
+// exemption for holds (`newState === current`), one of which `generic-setter-scope.test.ts` pins as ACCEPTED.
+// ⚠ A `sourceStates` CHECK AT DISPATCH WOULD REFUSE THE REFERENCE UNDERTAKING: the seed HOLDS at
+// `EXECUTING -> EXECUTING` and `UNDER_ASSURANCE -> UNDER_ASSURANCE`, whose declared sources here are `PLANNED`
+// and `EVIDENCE_PENDING`. Measured before this table was written, not discovered after.
+export const PWU_GENERIC_SETTER_SPECS: Readonly<Record<string, PwuLifecycleCommandSpec>> = {
+	PLANNED: {
+		commandType: 'ChangePwuState',
+		target: 'PLANNED',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['READY']
+	},
+	EXECUTING: {
+		commandType: 'ChangePwuState',
+		target: 'EXECUTING',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['PLANNED']
+	},
+	EVIDENCE_PENDING: {
+		commandType: 'ChangePwuState',
+		target: 'EVIDENCE_PENDING',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['EXECUTING']
+	},
+	UNDER_ASSURANCE: {
+		commandType: 'ChangePwuState',
+		target: 'UNDER_ASSURANCE',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['EVIDENCE_PENDING']
+	},
+	SATISFIED: {
+		commandType: 'ChangePwuState',
+		target: 'SATISFIED',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['UNDER_ASSURANCE']
+	},
+	CONDITIONALLY_SATISFIED: {
+		commandType: 'ChangePwuState',
+		target: 'CONDITIONALLY_SATISFIED',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['UNDER_ASSURANCE']
+	},
+	RECOMPOSING: {
+		commandType: 'ChangePwuState',
+		target: 'RECOMPOSING',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['SATISFIED']
+	},
+	RECOMPOSED: {
+		commandType: 'ChangePwuState',
+		target: 'RECOMPOSED',
+		eventType: 'PwuStateChanged',
+		sourceStates: ['RECOMPOSING']
+	}
+};

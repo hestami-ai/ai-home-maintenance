@@ -16,6 +16,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { isExcludedMachine, STATE_MACHINES, STEP_COMMAND_SPECS,
 	PWU_LIFECYCLE_COMMAND_SPECS,
+	PWU_GENERIC_SETTER_SPECS,
 	PWU_LIFECYCLE_MACHINE
 } from '@janumipwb/rph-domain';
 import * as CONTRACT_SCHEMAS from '@janumipwb/rph-contracts';
@@ -356,6 +357,21 @@ function computeDeclaredArrows(): DeclaredArrow[] {
 				from,
 				to: spec.target,
 				site: `PWU_LIFECYCLE_COMMAND_SPECS.${spec.commandType}`
+			});
+		}
+	}
+	// THE FOURTH IDIOM, AND IT IS THE SAME DATA LOOP — REG-F-119. `ChangePwuState` takes its target from
+	// `payload.newState` at runtime, so its call site declares nothing at all; the eight arrows it performs are the
+	// PWU's main lifecycle spine and were invisible while forty-nine peripheral ones were visible. Keyed by TARGET
+	// rather than by commandType, because one command performs all eight — the site must name WHICH row, or eight
+	// arrows would share one locator and a drifted row could not be pointed at.
+	for (const spec of Object.values(PWU_GENERIC_SETTER_SPECS)) {
+		for (const from of spec.sourceStates) {
+			arrows.push({
+				machine: PWU_LIFECYCLE_MACHINE,
+				from,
+				to: spec.target,
+				site: `PWU_GENERIC_SETTER_SPECS.${spec.target}`
 			});
 		}
 	}

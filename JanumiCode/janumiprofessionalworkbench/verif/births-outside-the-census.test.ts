@@ -17,6 +17,7 @@
 // Every other occurrence is an aggregate created where no `births:` declaration can be attached.
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { birthStates } from './arrow-command-census.js';
 
 const HANDLERS = new URL('../packages/rph-application/src/handlers/', import.meta.url);
 
@@ -61,14 +62,29 @@ describe('REG-F-086 — every aggregate birth must be visible to the birth censu
 			.toHaveLength(1);
 	});
 
-	// The two bypasses are not hypothetical: they are the reason these two machines sit in C-0c's unanalysed set,
-	// and this ties the two records together so neither can move without the other being reconsidered.
-	it('the two bypassed machines are exactly the ones C-0c still cannot analyse', () => {
-		const pinned = readFileSync(new URL('./binding-row-truth.test.ts', import.meta.url), 'utf8');
+	// ⚠⚠ THIS TEST'S PREMISE EXPIRED, AND IT CAUGHT THAT ITSELF — which is the best thing a pin can do.
+	//
+	// It asserted that the two machines born outside `createObject` MUST remain in C-0c's unanalysed pin, on the
+	// reasoning that a bypassed birth is an INVISIBLE birth. That was true when written and is now false in both
+	// halves:
+	//
+	//   * **REG-F-086/118** taught `commitState` to declare `births` too, so both machines HAVE a declared,
+	//     runtime-checked birth. The bypass of `createObject` is still real — the pin above still reads exactly
+	//     two — but it no longer implies invisibility. **A bypass and a missing declaration were the same thing
+	//     for as long as one primitive could declare.**
+	//   * **REG-F-119** then took `PWU.workLifecycleState` to 57/57 arrows, so it left the unanalysed set
+	//     entirely. `Intent.intentStatus` remains, for the OTHER cause REG-F-118 added: 6 of 15 arrows declared.
+	//
+	// So the tie between the two records is inverted rather than deleted: a bypassed birth must be VISIBLE, and
+	// whether its machine is analysable is now a separate question about arrow coverage. Asserting the old
+	// direction would pin a machine into `unanalysed` and quietly punish the next increment that fixes it.
+	it('every bypassed birth is nonetheless VISIBLE to the census, which is what the bypass used to cost', () => {
+		const born = birthStates();
 		for (const machine of ['Intent.intentStatus', 'PWU.workLifecycleState']) {
 			expect(
-				pinned.includes(`'${machine}'`),
-				`${machine} is born outside \`createObject\`, so it MUST still be in C-0c's unanalysed pin`
+				born.has(machine),
+				`${machine} is born outside \`createObject\`; since REG-F-118 that no longer excuses an undeclared ` +
+					`birth, and \`commitState\` must carry one`
 			).toBe(true);
 		}
 	});

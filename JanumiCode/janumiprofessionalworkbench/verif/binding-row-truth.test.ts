@@ -47,11 +47,15 @@ const AUDIT = auditClaims(CLAIMS);
 //   * `ExecutionStep.stepState` is not an aggregate at all — steps are a nested collection inside the PLAN, with
 //     no entry in OBJECT_SCHEMAS, so `births[].statusField` (a key lookup on the created object) cannot reach it.
 // So this list no longer shrinks by declaring more births; each remaining member needs a different decision.
-// ⚠ 3 -> 18 UNDER REG-F-118. `unanalysed` now carries TWO causes, and the second turned out to be nearly
-// universal: **no declared birth** (the original), and **incomplete arrow coverage** (the new one). Only four
-// machines in the repository have every ratified arrow declared, so only four can support an unreachability
-// claim at all. Every other entry here was previously being judged on evidence that could not carry the
-// judgement — the list growing is the census reporting what it actually knows.
+// ⚠ 3 -> 18 UNDER REG-F-118, THEN 18 -> 17 UNDER REG-F-119, AND THE SHRINK IS THE POINT OF THE SECOND.
+// `unanalysed` carries TWO causes: **no declared birth** (the original) and **incomplete arrow coverage** (added
+// by REG-F-118, and nearly universal — a machine whose arrows are partly undeclared cannot support ANY
+// unreachability claim, because `occupiable()` under-estimates).
+//
+// `PWU.workLifecycleState` LEAVES here because REG-F-119 declared the generic setter's eight spine arrows, taking
+// it to 57/57. **It is the first PWU axis to become occupancy-analysable, and the first machine of any size to
+// do so** — the four that qualified before carry 5, 5, 6 and 5 arrows. Its analysis then reported ZERO dead
+// arrows, which is the retroactive proof that the 35 REG-F-118 withdrew were false rather than merely unproven.
 const UNANALYSED = [
 	'Assumption.status',
 	'AssuranceAssessment.state',
@@ -67,7 +71,6 @@ const UNANALYSED = [
 	'Harness.status',
 	'Intent.intentStatus',
 	'Obligation.status',
-	'PWU.workLifecycleState',
 	'PwuType.status',
 	'RecompositionContract.status',
 	'Undertaking.status'

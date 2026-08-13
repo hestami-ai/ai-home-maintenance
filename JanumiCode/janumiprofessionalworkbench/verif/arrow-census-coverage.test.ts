@@ -34,7 +34,7 @@ const MACHINES = STATE_MACHINES as unknown as Record<string, Machine>;
 const seenMachines = () => new Set(([...declaredArrows()] as Arrow[]).map((a) => a.machine));
 
 describe('REG-F-087 — how much of the ratified arrow surface the census actually sees', () => {
-	it('PINNED — 170 of 304 ratified arrows, across 16 of 27 machines', () => {
+	it('PINNED — 178 of 304 ratified arrows, across 16 of 27 machines', () => {
 		const declared = Object.keys(MACHINES);
 		const ratifiedArrows = declared.reduce((n, m) => n + MACHINES[m]!.transitions.length, 0);
 		expect(
@@ -46,7 +46,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			},
 			'if coverage MOVED, an idiom was fixed or a new unread one was introduced — either way REG-F-087 ' +
 				'and every conclusion drawn from this census need re-reading, so update them with this pin'
-		).toEqual({ machinesDeclared: 27, machinesSeen: 16, arrowsRatified: 304, arrowsSeen: 170 });
+		).toEqual({ machinesDeclared: 27, machinesSeen: 16, arrowsRatified: 304, arrowsSeen: 178 });
 	});
 
 	// Two causes live in this list and MUST NOT be conflated, which is why it is pinned by name and not by count:
