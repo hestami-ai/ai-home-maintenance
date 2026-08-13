@@ -909,13 +909,6 @@ export const detectAssumption: CommandHandler = (ctx, command, payload) => {
 };
 
 /**
- * ExpireAssumption — advance an Assumption to EXPIRED (RPH-ASM-006 / §12.2). W3-INC-2 (WP-3-008): before this,
- * the Assumption lifecycle was un-instantiated beyond PROPOSED (only DetectAssumption existed), so the kernel
- * `canAuthorizeNewWork` — which forbids an EXPIRED/FALSIFIED/SUPERSEDED assumption from authorizing new work —
- * could never fire. This instantiates the expiry transition; the RPH-ASM-006 guard is then wired at
- * ApproveExecutionPlan (execution.ts). The event is UNRATIFIED-AUTHORED (ungated), like DetectAssumption.
- */
-/**
  * DiscloseAssumption — PROPOSED -> DISCLOSED. THE ONLY ROUTE INTO THE MIDDLE OF THE LIFECYCLE.
  *
  * ⚠ AUTHORED BECAUSE `FalsifyAssumption` WOULD OTHERWISE HAVE SHIPPED DEAD, and that is worth stating plainly
@@ -1060,6 +1053,13 @@ export const falsifyAssumption: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
+/**
+ * ExpireAssumption — advance an Assumption to EXPIRED (RPH-ASM-006 / §12.2). W3-INC-2 (WP-3-008): before this,
+ * the Assumption lifecycle was un-instantiated beyond PROPOSED (only DetectAssumption existed), so the kernel
+ * `canAuthorizeNewWork` — which forbids an EXPIRED/FALSIFIED/SUPERSEDED assumption from authorizing new work —
+ * could never fire. This instantiates the expiry transition; the RPH-ASM-006 guard is then wired at
+ * ApproveExecutionPlan (execution.ts). The event is UNRATIFIED-AUTHORED (ungated), like DetectAssumption.
+ */
 export const expireAssumption: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ExpireAssumptionPayload;
 	return advanceStatus(ctx, command, {

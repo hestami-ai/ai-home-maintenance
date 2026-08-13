@@ -1476,7 +1476,15 @@ export const failExecutionStep: CommandHandler = (ctx, command) => {
 // between making them look like one. A comment asserting that two copies agree is exactly what R3 had to correct.
 
 /**
- * RetryExecutionStep — a FAILED step -> QUEUED (re-attempt). Two prechecks, in order:
+ * RetryExecutionStep — a FAILED step -> QUEUED (re-attempt).
+ *
+ * ~~Two prechecks, in order:~~ the same undercount its sibling carried at the Start docblock, corrected in the
+ * same sweep (REG-F-125) and recorded here rather than silently mirrored: this command's STEP_COMMAND_SPECS row
+ * declares SIX limbs — planLiveness, pwuOpenness, branchDecision, bindingAuthority, inputReadiness and
+ * retryBudget — all evaluated by `stepAuthorityRefusal` before anything below runs. Item (1) is the DECLARED
+ * planLiveness column, not a separate handler precheck, so counting it here double-counted one limb while
+ * omitting four. The limbs are deliberately not re-listed with their rules — a prose list beside the declared
+ * table is the drift the table exists to end. What follows is what this HANDLER adds on top of them:
  *  1. RPH-EXE-002 / §35.1 (DWP-02, §19 L3-5): a retry RE-OPENS the attempt cycle, so a SUPERSEDED/terminal plan must
  *     reject it — not only StartExecutionStep. Mirrors the start precheck so both reject a non-ACTIVE plan identically.
  *  2. RPH-EXE-008 (DWP-04): the ready-made kernel `retryDecision` caps retries at the plan's RetryPolicy maxAttempts
@@ -1662,25 +1670,6 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 };
 
 /**
- * PruneExecutionStep — a not-taken/unreachable step NOT_READY|READY|QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 /
- * D5, hardened DWP-07). ~~QUEUED -> SKIPPED~~ named one of the three states
- * `STEP_COMMAND_SPECS.PruneExecutionStep.sourceStates` declares; NOT_READY is in that set for D5's own anti-deadlock
- * reason — a not-taken arm that never became READY must still be clearable, or the plan deadlocks (the machine's
- * NOT_READY -> SKIPPED arrow in transitions.data.ts records the same reason). Found by REG-F-125's sweep.
- *
- * A SYSTEM prune of a BRANCH's not-taken arm (or its transitively-unreachable downstream). It does NOT route through
- * canSkipStep because the plan's own declared branch logic — not an operator — excludes the step, so no waiver applies.
- * That exemption is only defensible if the step really IS excluded, and it was NOT checked: the sole precheck was
- * plan-ACTIVE, so ANY QUEUED/READY step could be driven to terminal-success SKIPPED with no waiver, including a
- * MANDATORY step on the taken path of a plan with no transitions at all. That is precisely the outcome §21.1's
- * canSkipStep exists to refuse. The prunability check below closes that back door: prune is now authorised by the SAME
- * pure read-model the UI offers it from, exactly as startExecutionStep is authorised by startStepGate.
- *
- * Deadness itself is NOT recorded (DWP-08): it is STRUCTURAL — the gate computes reachability from the graph — so it
- * cannot be bypassed by reaching SKIPPED through some other command, and needs no persisted flag (which also means
- * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
- */
-/**
  * Render derived prune provenance into event-payload fields, switching on its CAUSE (JAN-REVREM RW-7 / N-8).
  *
  * A SWITCH RATHER THAN A SPREAD, because the two causes carry disjoint fields and the discriminated union is what
@@ -1713,6 +1702,25 @@ function prunePayloadProvenance(provenance: PruneProvenance | undefined): Record
 	};
 }
 
+/**
+ * PruneExecutionStep — a not-taken/unreachable step NOT_READY|READY|QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 /
+ * D5, hardened DWP-07). ~~QUEUED -> SKIPPED~~ named one of the three states
+ * `STEP_COMMAND_SPECS.PruneExecutionStep.sourceStates` declares; NOT_READY is in that set for D5's own anti-deadlock
+ * reason — a not-taken arm that never became READY must still be clearable, or the plan deadlocks (the machine's
+ * NOT_READY -> SKIPPED arrow in transitions.data.ts records the same reason). Found by REG-F-125's sweep.
+ *
+ * A SYSTEM prune of a BRANCH's not-taken arm (or its transitively-unreachable downstream). It does NOT route through
+ * canSkipStep because the plan's own declared branch logic — not an operator — excludes the step, so no waiver applies.
+ * That exemption is only defensible if the step really IS excluded, and it was NOT checked: the sole precheck was
+ * plan-ACTIVE, so ANY QUEUED/READY step could be driven to terminal-success SKIPPED with no waiver, including a
+ * MANDATORY step on the taken path of a plan with no transitions at all. That is precisely the outcome §21.1's
+ * canSkipStep exists to refuse. The prunability check below closes that back door: prune is now authorised by the SAME
+ * pure read-model the UI offers it from, exactly as startExecutionStep is authorised by startStepGate.
+ *
+ * Deadness itself is NOT recorded (DWP-08): it is STRUCTURAL — the gate computes reachability from the graph — so it
+ * cannot be bypassed by reaching SKIPPED through some other command, and needs no persisted flag (which also means
+ * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
+ */
 export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string };
 	// JAN-EXECREM WP-14 / F-37 — prune provenance is DERIVED from the graph that AUTHORIZED the prune.

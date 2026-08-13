@@ -57,9 +57,10 @@
 // ── SCOPE, stated so this is not read as more than it is (the mistake it exists to correct) ──────────────────
 //
 //  1. It observes what the SUITE emits. A declared event type no test ever produces is still unmeasured — 43 of
-//     the 132 remain in that state, and no gate can reach them without a dispatch that emits them. This file
-//     shrinks that blind spot from 98 to 43; it does not abolish it. `verif/event-surface-census.test.ts`
-//     (REG-F-021) is what keeps those 43 from drifting: it holds the DECLARED / BOUND / EMITTED sets against each
+//     the THEN-132 remained in that state as measured 2026-08-04, and no gate can reach them without a dispatch
+//     that emits them. This file shrank that blind spot from 98 to 43; it does not abolish it.
+//     `verif/event-surface-census.test.ts` (REG-F-021) is what keeps them from drifting: it holds the DECLARED /
+//     BOUND / EMITTED sets against each
 //     other, so a declared event that nothing binds and nothing produces is counted rather than merely absent.
 //  2. IT CANNOT DETECT A STALE LEDGER ROW. Vitest runs each project in its own worker, so `violations` is
 //     per-worker and no worker sees the whole catalog — an entry here for a type nothing emits any more would sit

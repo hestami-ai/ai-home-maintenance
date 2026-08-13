@@ -1027,23 +1027,6 @@ function rejectUnbackedDisposition(
 
 
 /**
- * EXECUTION SUCCESS MAY NOT BE ASSERTED — the third and last axis that was assigned rather than earned.
- *
- * `executionState: SUCCEEDED` is the premise of everything downstream: RPH-PWU-006's Given opens with "execution
- * succeeded", and §8.1 gates EXECUTING -> EVIDENCE_PENDING on "Execution state is SUCCEEDED". Until this guard,
- * that premise was a string the controller could type. The demo seed drove all thirteen PWUs to SUCCEEDED with
- * one hand-written Execution Plan between them, and never started or completed a single step.
- *
- * So: claiming SUCCEEDED requires citing an EXECUTION_PLAN that is FOR this PWU (`workUnitId`) and that has a
- * step which actually reached SUCCEEDED. That step's own completion is separately and independently guarded —
- * completeExecutionStep requires real output AND, for AI-produced results, a satisfied de minimis floor. Citing
- * the plan is what connects the PWU's claim to that already-defended fact.
- *
- * Only SUCCEEDED is guarded. The other executionState values (PLANNED/QUEUED/RUNNING/WAITING/FAILED) are
- * scheduling facts the controller legitimately owns, and FAILED in particular must never need permission to
- * record — a system that makes failure harder to report than success is worse than one that checks neither.
- */
-/**
  * WAIVED requires a granted WAIVER decision bound to this PWU at this version. JAN-PWUWP W-3, under REG-D-029.
  *
  * ⚠ THIS CLOSES A HOLE THE FILE ITSELF NAMED AND LEFT OPEN. `rejectUnbackedDisposition` short-circuits on
@@ -1111,6 +1094,23 @@ function rejectUnauthorizedWaiver(
 	);
 }
 
+/**
+ * EXECUTION SUCCESS MAY NOT BE ASSERTED — the third and last axis that was assigned rather than earned.
+ *
+ * `executionState: SUCCEEDED` is the premise of everything downstream: RPH-PWU-006's Given opens with "execution
+ * succeeded", and §8.1 gates EXECUTING -> EVIDENCE_PENDING on "Execution state is SUCCEEDED". Until this guard,
+ * that premise was a string the controller could type. The demo seed drove all thirteen PWUs to SUCCEEDED with
+ * one hand-written Execution Plan between them, and never started or completed a single step.
+ *
+ * So: claiming SUCCEEDED requires citing an EXECUTION_PLAN that is FOR this PWU (`workUnitId`) and that has a
+ * step which actually reached SUCCEEDED. That step's own completion is separately and independently guarded —
+ * completeExecutionStep requires real output AND, for AI-produced results, a satisfied de minimis floor. Citing
+ * the plan is what connects the PWU's claim to that already-defended fact.
+ *
+ * Only SUCCEEDED is guarded. The other executionState values (PLANNED/QUEUED/RUNNING/WAITING/FAILED) are
+ * scheduling facts the controller legitimately owns, and FAILED in particular must never need permission to
+ * record — a system that makes failure harder to report than success is worse than one that checks neither.
+ */
 function rejectUnbackedExecutionSuccess(
 	ctx: HandlerContext,
 	command: DomainCommand,

@@ -41,7 +41,7 @@ export const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
 		'and two binding rows in rph-contracts/vocab/m3-commands-events.json named this dead axis as the machine ' +
 		'they drive, both wrong twice over — RequestAssuranceAssessment recorded `(initial) -> PENDING` when the ' +
 		'handler BIRTHS at EVIDENCE_PENDING/READY, and CompleteAssuranceAssessment was recorded here when ' +
-		'assurance.ts:1898 names `AssuranceAssessment.state`. ' +
+		'completeAssuranceAssessment names `AssuranceAssessment.state` at three sites in assurance.ts. ' +
 		"⚠ CORRECTION TO THIS NOTE'S OWN EARLIER TEXT: it said correcting those rows moves C-0's arrow total. IT " +
 		'DOES NOT. The total is computed over STATE_MACHINES, generated from m2-transitions.json; the corrected ' +
 		'rows are in m3-commands-events.json, which feeds messages.ts and nothing else. Measured: the ' +
