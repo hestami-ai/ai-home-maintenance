@@ -131,7 +131,7 @@ export function ratifyingActsFor(clause: string): string[] {
 			continue;
 		}
 		if (!current) continue;
-		// Literal, not tolerant: censused across the register as 180 × `- **Merge target:** ` and 1 ×
+		// Literal, not tolerant: re-censused across the register 2026-08-13 (~~180~~) as 216 × `- **Merge target:** ` and 1 ×
 		// `- **Merge targets (a…`. The optional quantifiers exist for that second form; they also draw SonarLint
 		// S8786, so the tempting edit is to narrow this to `/^- \*\*Merge target:\*\* (.*)$/`.
 		//

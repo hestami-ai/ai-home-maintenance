@@ -245,7 +245,7 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 	return createObject(ctx, command, {
 		objectType: POLICY,
 		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
-		// TWO VALUES, AND THE SECOND IS NOT DEFENSIVE PADDING: `bornStatus` at assurance.ts:178 is
+		// TWO VALUES, AND THE SECOND IS NOT DEFENSIVE PADDING: `bornStatus` (computed just above the `state` literal) is
 		// `FLOOR_POLICY_ID_SET.has(p.policyId) ? 'ACTIVE' : 'DRAFT'`. Catalog policies are born DRAFT and must be
 		// activated; the three de minimis FLOOR policies are LOCKED and cannot be activated, so they MUST be born
 		// ACTIVE. Declaring only one would make the other genuinely-occupied state look unoccupiable.
@@ -1115,8 +1115,9 @@ const ASSESSMENT = 'ASSURANCE_ASSESSMENT';
  */
 const DISPOSITIONS = new Set<string>(AssuranceDispositionRecommendationSchema.options);
 
-/** RequestAssuranceAssessment — create an assessment already in ASSESSING (request-and-begin; the evidence-
- * pending/ready prep states are a deeper increment — see RESUME-STATE). */
+/** RequestAssuranceAssessment — create an assessment in EVIDENCE_PENDING (blocking evidence outstanding) or
+ * READY (vacuously satisfied), emitting AssuranceAssessmentRequested + AssuranceEvidenceRequired atomically. The
+ * fused request-and-begin was removed by REG-F-021 increment 3 — see THE FLIP in the body. */
 export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RequestAssuranceAssessmentPayload;
 	// FAIL CLOSED on policy governance state (independence follow-up B + the DOC-002 §18 lifecycle). The assessment's
@@ -1152,8 +1153,9 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 		);
 	}
 	// §38 "missing evidence" is sourced here. The policy's requiredEvidence (DOC-004 §6.1) names the required
-	// evidence-requirement ids; resolved from the (now loaded) policy and carried on the Started EVENT so the read
-	// model can report what this assessment requires — NOT on the command payload (the operator does not choose it,
+	// evidence-requirement ids; resolved from the (now loaded) policy and carried on the AssuranceEvidenceRequired
+	// EVENT committed alongside the request, so the read model can report what this assessment requires — NOT on
+	// the command payload (the operator does not choose it,
 	// the policy does), and NOT on the object state (the ASSURANCE_ASSESSMENT schema does not carry it; the event is
 	// the fold's source). Empty when the policy requires no evidence = a real sourced "none", not "unknown".
 	//
@@ -1370,15 +1372,26 @@ const evidenceNotAlreadyReceived = predicate(
 
 /** SubmitEvidenceForAssessment (DOC-004 §32) — the SATISFACTION side of "missing evidence". Records that an
  *  Evidence object satisfying one of the assessment's declared EvidenceRequirements (§6.1) was received, emitting
- *  AssuranceEvidenceReceived (§31). The §38 view folds `missingEvidence = requiredEvidenceIds` (from the Started
- *  event, Increment K) MINUS the requirement ids received here — so it flips from "the whole required set" to a
+ *  AssuranceEvidenceReceived (§31). The §38 view folds `missingEvidence = requiredEvidenceIds` (from the
+ *  AssuranceEvidenceRequired event — the fold moved off Started; see `foldEvidenceRequired` in assurance-view.ts)
+ *  MINUS the requirement ids received here — so it flips from "the whole required set" to a
  *  faithful required-minus-received. Ratified NAMES, AUTHORED schema (§31 L1783-1785: "ratified names here but
  *  schematized nowhere ... a schema-and-wiring task, NOT a ratification decision"). The received fact lives on the
  *  EVENT, not the assessment snapshot — symmetric with requiredEvidenceIds living on AssuranceAssessmentStarted,
  *  and the read model is the fold's consumer. */
-// CITATION CORRECTED 2026-08-04: this ruling was cited as "§31 L1783-1785" here and in five other artifacts. The
-// quoted sentence is at L1783-1785; L1783-1785 is a different line ("steps that drive the §30 state machine"). Checked
-// against the commit that introduced the ruling — the doc never moved, so the pointer was wrong from the start.
+// CITATION CORRECTED 2026-08-04: this ruling was cited as "§31 L1770" here and in five other artifacts. As of
+// that date the quoted sentence was at L1783-1785, and L1770 was a different line ("steps that drive the §30
+// state machine"). Checked against the commit that introduced the ruling — the doc had not moved, so the pointer
+// was wrong from the start.
+//
+// TWO THINGS THIS NOTE ITSELF GOT WRONG, both fixed 2026-08-13. (1) It was born MANGLED: de09e77d wrote the
+// CORRECTED range into all three slots, so it read "cited as L1783-1785 ... L1783-1785 is a different line" and
+// contradicted itself. The "L1770" above is restored from that commit's own diff, which shows the docblock line
+// above changing L1770 -> L1783-1785. (2) "the doc never moved" stopped being true the next day: DOC-004 gained
+// lines on 2026-08-05 (a46566b3) and BOTH anchors shifted by exactly +44, so every L-number in this note — and
+// the one still written on the docblock above — is now a stale POINTER. DO NOT RE-PIN THEM. Cite the ruling by
+// its quoted phrase ("schematized nowhere ... a schema-and-wiring task, NOT a ratification decision"), which is
+// how verif/assessment-lifecycle-contracts.test.ts matches it (RULING_CLAUSE = 'schematized nowhere').
 export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as SubmitEvidenceForAssessmentPayload;
 	const id = command.targetAggregateId; // the assessment aggregate
@@ -1508,9 +1521,11 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
  * a governance guarantee rather than ordering fidelity alone: after this command, *who assessed* is a committed
  * fact with its own event, not a field of the answer they produced.
  *
- * REACHABILITY, STATED PLAINLY: no assessment reaches `READY` until increment 3 flips `requestAssuranceAssessment`
- * to create in `REQUESTED`. So this handler is correct and, on the production paths, not yet reachable. Its tests
- * place the assessment in `READY` through the real write seam rather than pretending otherwise.
+ * REACHABILITY: increment 3 (faf996b2) landed, and NOT as this paragraph predicted — the request does not create
+ * in `REQUESTED`; it lands `EVIDENCE_PENDING` or `READY` (see `landingState` in `requestAssuranceAssessment`).
+ * Because no production policy declares requiredEvidence (REG-F-022) the blocking set is always empty, so every
+ * assessment this product creates is born `READY` and this handler IS reachable on the production path today. Its
+ * tests place the assessment in `READY` through the real write seam rather than pretending otherwise.
  *
  * AUTHORED SCHEMA, NO CORPUS RULING. §32 ratifies the NAME. Unlike `AssuranceEvidenceRequired`/`Received`, the §31
  * "schema-and-wiring, not a ratification decision" ruling does NOT name this event — that paragraph is about §38's
@@ -1568,10 +1583,12 @@ export const selectAssuranceEvaluator: CommandHandler = (ctx, command, payload) 
  * BeginAssuranceAssessment (DOC-004 §32) — the SECOND act of the `READY -> ASSESSING` arrow, and the only one that
  * moves the machine. It emits `AssuranceAssessmentStarted`.
  *
- * THIS EVENT IS THE WHOLE OF REG-F-021. `requestAssuranceAssessment` emits `AssuranceAssessmentStarted` today, at
- * the moment of the REQUEST — the LAST arrow's event fired at the FIRST arrow's moment, because the engine fused
- * request-and-begin. Until increment 3 moves that emission, both this handler and the request emit it, which is
- * why the census's bound-but-unemitted pin cannot yet see the difference (it compares SETS).
+ * THIS EVENT WAS THE WHOLE OF REG-F-021. Until increment 3 (faf996b2, 2026-08-04) `requestAssuranceAssessment`
+ * ALSO emitted `AssuranceAssessmentStarted` at the moment of the REQUEST — the LAST arrow's event fired at the
+ * FIRST arrow's moment, because the engine fused request-and-begin. That emission is GONE; THIS HANDLER IS NOW
+ * THE ONLY EMITTER. The census's bound-but-unemitted pin still cannot see that class of defect — it compares
+ * SETS, so an event fired by the WRONG command looks identical to a correct one — which is why the discriminating
+ * assertion is a per-aggregate COUNT in assessment-ready-arrow.test.ts, not in the census.
  *
  * `startedAt` IS STAMPED HERE, which is the moment it has always meant. Increment 0 made the field optional on the
  * object precisely so an assessment that has not begun can honestly lack it; this is where it stops lacking it,
@@ -1819,19 +1836,31 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// where §9.7's "resolved provider/model/version actually invoked" belongs.
 	//
 	// AND THIS IS STILL NOT THE RATIFIED HOME. DOC-004 §32 ratifies `selectAssuranceEvaluator` as its own
-	// command — choosing the evaluator is a governed act, not a rider on the verdict. That command does not exist
-	// in this codebase (nor do §32's `recordCriterionResult` or `beginAssuranceAssessment` — ~~4~~ THREE of §32's
-	// 13; corrected 2026-08-04, REG-F-021: this sentence also named `submitEvidenceForAssessment`, which HAS been
-	// built and is registered, so the count was one too many and the record went stale in the safe direction —
-	// claiming less capability than exists). Their absence is exactly why the evaluator is smuggled through the
-	// verdict and why criterion results are dropped at the boundary: the commands that own those facts were never
-	// built. Surfaced in HARMONIZATION-LOG PART 4, not fixed here.
+	// command — choosing the evaluator is a governed act, not a rider on the verdict. ~~That command does not exist
+	// in this codebase (nor do §32's `recordCriterionResult` or `beginAssuranceAssessment`~~ — that command EXISTS
+	// now, and so does `beginAssuranceAssessment`; only §32's `recordCriterionResult` is still unbuilt — ~~4~~
+	// ~~THREE~~ ONE of §32's FOURTEEN listed commands (thirteen ratified + `cancelAssuranceAssessment`, authored
+	// 2026-08-05). Corrected twice: 2026-08-04 (REG-F-021) dropped `submitEvidenceForAssessment`, and 2026-08-13
+	// dropped the remaining two, which had landed in 93294cf0 the same day this sentence declared them missing.
+	// ~~Their absence is exactly why~~ Their absence is NO LONGER why the evaluator is smuggled through the verdict:
+	// `selectAssuranceEvaluator` commits that fact with its own AssuranceEvaluatorSelected event, yet THIS handler
+	// still reads the evaluator off `validatorResult.executionProvenance` below — the smuggling outlived its stated
+	// cause. Criterion results ARE still dropped at the boundary: `recordCriterionResult` was never built.
+	// Surfaced in HARMONIZATION-LOG PART 4, not fixed here.
 	//
-	// THE MISSING TWO ARE THE ARROWS THAT LIFECYCLE COLLAPSE RUNS THROUGH (REG-F-021). The ratified
+	// ~~THE MISSING TWO ARE THE ARROWS THAT LIFECYCLE COLLAPSE RUNS THROUGH (REG-F-021). The ratified
 	// `AssuranceAssessment.state` machine is REQUESTED -> EVIDENCE_PENDING -> READY -> ASSESSING, and
 	// `requestAssuranceAssessment` creates the assessment ALREADY IN `ASSESSING`. Measured: `REQUESTED`,
 	// `EVIDENCE_PENDING` and `READY` are written by NO production line. Three ratified states no assessment ever
-	// occupies, and the two commands that would move through them are the two still missing.
+	// occupies, and the two commands that would move through them are the two still missing.~~
+	//
+	// WITHDRAWN 2026-08-13 — CLOSED by REG-F-021 increment 3 (faf996b2, 2026-08-04). `requestAssuranceAssessment`
+	// no longer creates in `ASSESSING`: it lands `EVIDENCE_PENDING` or `READY` (see `landingState` in that
+	// handler), so two of those three states ARE now written; and both commands are built and registered
+	// (`selectAssuranceEvaluator` / `beginAssuranceAssessment`, keyed SelectAssuranceEvaluator and
+	// BeginAssuranceAssessment in handlers/registry.ts). WHAT SURVIVES: `REQUESTED` alone is still written by no
+	// production line — it is the machine's declared `initialState`, REG-F-071's fourth case, recorded at the
+	// `births` declaration in `requestAssuranceAssessment`.
 	const evaluator = p.validatorResult?.executionProvenance?.evaluator;
 
 	// INDEPENDENCE (Increment I2). §39 invariant 8 ("Required independence must be verified"), §8.4, §20.2: a

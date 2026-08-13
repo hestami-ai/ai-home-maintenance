@@ -111,7 +111,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(driveLive()).toContain('IntentCaptured');
 	});
 
-	it('DEFICIENCY: the engine emits none of these 13 §26 event types (28 -> 23 -> 16 -> 14 -> 13 as the loops were wired)', () => {
+	it('DEFICIENCY: the engine emits none of these 12 §26 event types (28 -> 23 -> 16 -> 14 -> 13 -> 12 as the loops were wired)', () => {
 		const actual = new Set(driveLive());
 		const expected = [...new Set(loadExpectedEvents().map((e) => e.event))];
 		const missing = expected.filter((n) => !actual.has(n)).sort();
@@ -149,7 +149,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		]);
 	});
 
-	it('PROGRESS: 13 of the 17 chain-of-custody links now fire — claim to evidence to assessment to decision to baseline', () => {
+	it('PROGRESS: 14 of the 17 chain-of-custody links now fire — claim to evidence to assessment to decision to baseline', () => {
 		const actual = new Set(driveLive());
 		const emitted = ASSURANCE_CHAIN.filter((n) => actual.has(n));
 		// Was []. Every assurance fact in the terminal graph used to be asserted; a claim is now asserted,
@@ -157,9 +157,16 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// observations recorded, and a full §20 verdict returned (as AssuranceAssessmentCompleted, which is not
 		// in this list because the list uses the §26 trace's five-outcome-event spelling — see the pin above).
 		//
-		// This must only ever GROW. Still absent: the governance half — no decision proposes or takes effect, no
-		// baseline is created or promoted, and no assumption is ever detected. So the Architecture PWU still
-		// reaches BASELINED with no Baseline object, which ratified RPH-BAS-004 forbids.
+		// This must only ever GROW. THE GOVERNANCE HALF IS NO LONGER ABSENT. This read "no decision proposes or
+		// takes effect, no baseline is created or promoted, and no assumption is ever detected", and the pin below
+		// now carries AssumptionDetected, DecisionProposed, DecisionEffective, BaselineCreated,
+		// BaselineSubmittedForReview, BaselineApproved and BaselinePromoted. The RPH-BAS-004 conclusion drawn from
+		// it — the Architecture PWU reaching BASELINED with no Baseline object — is WITHDRAWN with it.
+		//
+		// STILL ABSENT, derived by subtracting the pin below from ASSURANCE_CHAIN rather than remembered: exactly
+		// three — AssuranceAssessmentSatisfied and AssuranceAssessmentConditionallySatisfied (the unpicked
+		// five-outcome-event vocab, see the pin above) and PwuSatisfied (the named-vs-generic question of the pin
+		// below).
 		// GREW 2026-08-04 (REG-F-021 increment 3): AssuranceAssessmentRequested now fires. The §26 trace expects it
 		// at seq 31 and the engine had never once produced it — partly because it was UNWIRED and partly because its
 		// authored payload REQUIRED `evaluator` and `disposition`, neither knowable at request time, so no conformant

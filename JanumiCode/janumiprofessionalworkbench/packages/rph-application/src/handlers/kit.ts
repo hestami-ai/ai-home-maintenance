@@ -343,10 +343,19 @@ const SCHEMA_BY_TYPE = OBJECT_SCHEMAS as Record<string, { schema: ZodType } | un
  * economy REG-D-013 forbids, so **the guarantee moved rather than lapsing**: optional at the schema, mandatory at
  * the state that implies it.
  *
- * EXPRESSED AS THE EXEMPT SET, DELIBERATELY, BECAUSE THAT FAILS CLOSED. The three pre-start states are named; every
- * other state — ASSESSING and all eleven terminal dispositions — requires the field. A state added later therefore
- * defaults to REQUIRING `startedAt`. The positive form (list the states that require it) would default a new state
- * to exempt, which is the direction that loses the guarantee silently.
+ * EXPRESSED AS THE EXEMPT SET, DELIBERATELY, BECAUSE THAT FAILS CLOSED. Four states are named — the three pre-start
+ * states and CANCELLED (see the note on the array below); every other state — ASSESSING and the other ten terminal
+ * dispositions — requires the field. A state added later therefore defaults to REQUIRING `startedAt`. The positive
+ * form (list the states that require it) would default a new state to exempt, which is the direction that loses the
+ * guarantee silently.
+ *
+ * ⚠ THIS SAID ~~"The three pre-start states are named; every other state — ASSESSING and all eleven terminal
+ * dispositions — requires the field"~~ WHILE `exemptStates` BELOW HELD FOUR — corrected 2026-08-13, struck rather
+ * than deleted because that sentence is what a reader counts from. CANCELLED was added to the exempt set by
+ * REG-F-021 R-1 (2026-08-05, e58f45e4) and this paragraph was not re-derived with it, so it went on asserting the
+ * 3-exempt/12-requires split that was true when written and false from R-1 on; of §30's 15 states it is now 4
+ * exempt and 11 requiring. Same class as P-5: **a count in prose beside a live table is a count nothing checks.**
+ * `exemptStates` is the authority; the numbers in this paragraph are narrative only.
  */
 const STATE_CONDITIONAL_FIELDS: Readonly<
 	Record<string, { statusField: string; exemptStates: readonly string[]; required: readonly string[] }>

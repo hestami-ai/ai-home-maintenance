@@ -57,7 +57,7 @@ import type { PwaGraphExport } from './pwa-graph.js';
 export type StepAdvanceCommand = 'start' | 'complete' | 'fail' | 'retry';
 
 /** The command-backed CONTROL actions (off-happy-path, JAN-EXECPLAN-DR-003 DWP-02/03 + DR-004 DWP-04): skip
- *  (READY/QUEUED→SKIPPED), cancel (READY/QUEUED/RUNNING/WAITING→CANCELLED), wait (RUNNING→WAITING) and resolve
+ *  (READY/QUEUED→SKIPPED), cancel (READY/QUEUED/RUNNING/WAITING/FAILED→CANCELLED), wait (RUNNING→WAITING) and resolve
  *  (WAITING→RUNNING). Distinct from advanceCommands (forward progress toward a terminal state) — a control action
  *  WAIVES, ABORTS or SUSPENDS a step rather than progressing it. Kept as its own allowlist so the UI never invents a
  *  button from the machine topology (the F-11 discipline); every member here has a registry handler (DWP-04 added the
@@ -288,7 +288,13 @@ const ADVANCE_BY_STEP_STATE: Record<StepState, readonly StepAdvanceCommand[]> = 
 // is legal READY|QUEUED|RUNNING|WAITING|FAILED→CANCELLED (NOT from NOT_READY — the machine has no such arrow); wait is legal
 // RUNNING→WAITING; resolve is legal WAITING→RUNNING. Record<StepState, …> forces every value to be classified.
 const CONTROL_BY_STEP_STATE: Record<StepState, readonly StepControlCommand[]> = {
-	NOT_READY: [], // machine: →CANCELLED only from READY/QUEUED/RUNNING/WAITING; →SKIPPED only from READY/QUEUED
+	// ⚠ EMPTY FOR ONE REASON, AND THE NOTE THAT USED TO SIT HERE WAS WRONG ABOUT BOTH HALVES. It read
+	// "machine: →CANCELLED only from READY/QUEUED/RUNNING/WAITING; →SKIPPED only from READY/QUEUED". The CANCELLED
+	// half dropped FAILED — the block comment above and the FAILED entry below both have it right — and the
+	// SKIPPED half is not a fact about the machine at all: NOT_READY→SKIPPED EXISTS, driven by PruneExecutionStep.
+	// What keeps the skip CONTROL out of this state is the COMMAND: `SkipExecutionStep` declares
+	// `sourceStates: ['READY', 'QUEUED']`. Prune, not skip, is NOT_READY's exit — see `prunableStepIds`.
+	NOT_READY: [],
 	READY: ['skip', 'cancel'],
 	QUEUED: ['skip', 'cancel'],
 	RUNNING: ['cancel', 'wait'], // a running step can be cancelled or suspended, but not skipped (machine)

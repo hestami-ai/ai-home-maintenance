@@ -318,7 +318,7 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
 		// ⚠ `initialState` FOR THIS MACHINE IS ONE OF REG-F-071'S LIARS (the set is pinned by name — REG-F-125). It declares PROPOSED; no handler ever
 		// writes PROPOSED, and the state has zero in-arrows. Declaring it here 'to match the spec' would assert an
-		// occupancy that does not exist — kit.ts:546 names this exact machine as the trap.
+		// occupancy that does not exist — the `births` docblock on `createObject` in kit.ts names this exact machine as the trap.
 		births: [{ machine: 'ExecutionPlan.status', statusField: 'status', values: ['UNDER_REVIEW'] }],
 		aggregateId: p.executionPlanId,
 		state,
@@ -539,7 +539,7 @@ export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command
  *
  * The ≥1-SUCCEEDED clause (JAN-EXECPLAN-DR-003 DWP-02 / §19 L3-M7): once 3C-iii's SkipExecutionStep makes SKIPPED
  *   reachable, an ALL-SKIPPED plan would satisfy the allow-list yet have PRODUCED NOTHING — it must not "complete".
- *   The ratified PWU-level `rejectUnbackedExecutionSuccess` (pwu.ts:649) requires a SUCCEEDED step for the PWU to
+ *   The ratified PWU-level `rejectUnbackedExecutionSuccess` (in pwu.ts) requires a SUCCEEDED step for the PWU to
  *   claim execution success; this clause aligns the plan-level rule with it, so the two planes cannot diverge (a plan
  *   "COMPLETED" whose PWU cannot claim success). Exec ≠ assurance (INV-5): this moves only `status`.
  */
@@ -958,7 +958,7 @@ function advanceStep(
 	// it can contradict the event it is recorded beside.
 	const newRevision = loaded.revision + 1;
 	// ONE payload object, ONE makeEvent call. If a later edit builds the payload twice — once for the overlay, once
-	// for the commit — they can drift and the identity silently breaks. `execution-branch-settlement.test.ts` asserts
+	// for the commit — they can drift and the identity silently breaks. `execrem-wp10-branch-settlement.test.ts` asserts
 	// state == event as the standing guard on that.
 	const basePayload =
 		typeof args.eventPayload === 'function' ? args.eventPayload(step) : args.eventPayload;
@@ -1207,7 +1207,15 @@ function bindingAuthorityRefusal(
 }
 
 /**
- * StartExecutionStep — a step QUEUED -> RUNNING (only under an ACTIVE plan). Two prechecks, in order:
+ * StartExecutionStep — a step QUEUED -> RUNNING (only under an ACTIVE plan). Gates, in order: FIRST every limb its
+ * STEP_COMMAND_SPECS row declares — evaluated by `stepAuthorityRefusal`, of which (1) below is the first, and Start
+ * declares a REQUIRES_* value in EVERY column that function reads — THEN this handler's own precheck (2).
+ *
+ * ~~Two prechecks, in order:~~ counted (1) and (2) alone and missed the pwuOpenness, bindingAuthority (JAN-REVREM
+ * RW-0) and inputReadiness (JAN-CAPBIND WP-3 / N-3) limbs; found by REG-F-125's sweep. The limbs are deliberately NOT
+ * re-listed here with their rules — a prose list beside the declared table is the drift the table exists to end,
+ * WP-8's "an omission is invisible in a list that does not exist".
+ *
  *  1. plan-ACTIVE (RPH-EXE-002): a superseded/terminal plan opens no new step (mirrors the retry precheck).
  *  2. Linear start-gate (JAN-EXECPLAN-DR-003 DWP-01 / RPH-EXE-005, Fork F): a step may start ONLY when every EARLIER
  *     step (array index in plan.steps) is terminal-success (SUCCEEDED/SKIPPED) — so nothing runs out of order. Array
@@ -1631,10 +1639,12 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 };
 
 /**
- * CancelExecutionStep — a step READY|QUEUED|RUNNING|WAITING -> CANCELLED (JAN-EXECPLAN-DR-003 DWP-02 / §26.4). Cancel
- * is CLEANUP, not new work: it is permitted even under a SUPERSEDED/terminal plan (RPH-EXE-002 forbids OPENING new
- * work/attempts, not terminating an existing step), so there is DELIBERATELY no plan-ACTIVE precheck — the
- * ExecutionStep.stepState machine (checkTransition, from READY/QUEUED/RUNNING/WAITING) alone gates the source state
+ * CancelExecutionStep — a step READY|QUEUED|RUNNING|WAITING|FAILED -> CANCELLED (JAN-EXECPLAN-DR-003 DWP-02 / §26.4).
+ * Cancel is CLEANUP, not new work: it is permitted even under a SUPERSEDED/terminal plan (RPH-EXE-002 forbids OPENING
+ * new work/attempts, not terminating an existing step), so there is DELIBERATELY no plan-ACTIVE precheck — the
+ * ExecutionStep.stepState machine (checkTransition, from READY/QUEUED/RUNNING/WAITING/FAILED — FAILED since JAN-EXECREM
+ * WP-5 AUTHORED the FAILED -> CANCELLED arrow; both clauses above named four states until REG-F-125's sweep) alone
+ * gates the source state
  * (§19 L3-M11). The `reason` is recorded on the event so the governed stream names the control action. Exec ≠
  * assurance (INV-5): the cancel moves only stepState.
  */
@@ -1652,7 +1662,11 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 };
 
 /**
- * PruneExecutionStep — a not-taken/unreachable step QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 / D5, hardened DWP-07).
+ * PruneExecutionStep — a not-taken/unreachable step NOT_READY|READY|QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 /
+ * D5, hardened DWP-07). ~~QUEUED -> SKIPPED~~ named one of the three states
+ * `STEP_COMMAND_SPECS.PruneExecutionStep.sourceStates` declares; NOT_READY is in that set for D5's own anti-deadlock
+ * reason — a not-taken arm that never became READY must still be clearable, or the plan deadlocks (the machine's
+ * NOT_READY -> SKIPPED arrow in transitions.data.ts records the same reason). Found by REG-F-125's sweep.
  *
  * A SYSTEM prune of a BRANCH's not-taken arm (or its transitively-unreachable downstream). It does NOT route through
  * canSkipStep because the plan's own declared branch logic — not an operator — excludes the step, so no waiver applies.

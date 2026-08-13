@@ -67,11 +67,13 @@
 // declared set still bites; it says nothing about operators nobody thought of. Generated mutation (Stryker) is
 // the honest successor and is deliberately out of scope — recorded so this is not mistaken for completeness.
 //
-// ── A SECOND DISCLOSED LIMIT: THE SURFACE LAYER IS UNREACHABLE FROM THIS LEDGER (recorded 2026-07-28) ────────
+// ── A SECOND DISCLOSED LIMIT, CLOSED 2026-07-28 BY S-3 (recorded and struck the same day) ────────────────────
 //
-// The runner executes `bunx vitest run <victim>`. Playwright specs are not vitest specs, so **no guard whose only
-// red-proof is an e2e can be carried here** — and this ledger has, by census, zero entries with `file: 'apps/…'`
-// and zero `expectRed` naming an `*.e2e.ts`.
+// UNTIL 2026-07-28 the runner executed only `bunx vitest run <victim>`. Playwright specs are not vitest specs, so
+// **no guard whose only red-proof was an e2e could be carried here** — and this ledger HAD, by census, zero entries
+// with `file: 'apps/…'` and zero `expectRed` naming an `*.e2e.ts`. b06dfa99 closed that the same day: `isE2eTarget`
+// in run.ts dispatches an e2e victim set to Playwright. RE-MEASURED at HEAD rather than arithmetic-shifted, the
+// census is now 23 entries with `file: 'apps/…'` and 16 whose `expectRed` names an `*.e2e.ts`.
 //
 // THAT IS A GAP, NOT A POLICY, AND THE TEMPTING WORKAROUND IS THE DANGEROUS ONE. Naming an e2e file as the victim
 // would not fail cleanly: vitest would find no matching spec, exit non-zero under `passWithNoTests: false`, and
@@ -80,8 +82,9 @@
 //
 // The live instance: `runSteps` in `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts` was made atomic on
 // 2026-07-28 (JPWB-SPEC-001 `SPEC-001-INV-14`, FORK-23 (b)); its red-proof is `e2e/undertaking-atomicity.e2e.ts`,
-// which was written first and observed FAILING on the assessment-count assertion before the fix landed. **No
-// entry was added for it**, deliberately, because an honest one cannot be run today. Closing this needs the
+// which was written first and observed FAILING on the assessment-count assertion before the fix landed. No entry
+// was added for it AT THE TIME, deliberately, because an honest one could not then be run; the entry is now
+// `S3-runSteps-loses-atomicity` below, added by b06dfa99 the same day. Closing it required the
 // runner to dispatch e2e victims to Playwright — which is the same boundary JPWB-SPEC-001 FORK-19 rules on when
 // it adds a `SURFACE` layer to the enforcement register, whose `LAYER_BY_PACKAGE` likewise maps `packages/`
 // prefixes only and fail-closes every `apps/` path to `UNKNOWN`.
@@ -175,7 +178,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: 'if (!/^\\d+$/.test(trimmed)) return null;',
 		replace: 'if (!/^\\d*$/.test(trimmed)) return null;',
 		expectRed: ['apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts'],
-		why: "ONE CHARACTER IS THE WHOLE DEFENCE. `+`->`*` admits the empty string, `Number('')` is 0, and a form that round-tripped NOTHING then declares 'expect revision 0' — which MATCHES every freshly created aggregate, because createObject commits `newRevision: alsoEvents.length` (kit.ts:563). MEASURED end to end on /baselines: under this mutant the `submit` step (acting on a row at revision 0) is ACCEPTED and its e2e assertion stays GREEN; only `approve` (revision 1) reddens. So the defect hides behind the first step of the only test that drives it. Observed at unit level: reddens exactly 2 of 8 assertions — the empty-string case and the discrimination case — leaving the other 6 green.",
+		why: "ONE CHARACTER IS THE WHOLE DEFENCE. `+`->`*` admits the empty string, `Number('')` is 0, and a form that round-tripped NOTHING then declares 'expect revision 0' — which MATCHES every freshly created aggregate, because createObject commits `newRevision: alsoEvents.length` (kit.ts). MEASURED end to end on /baselines: under this mutant the `submit` step (acting on a row at revision 0) is ACCEPTED and its e2e assertion stays GREEN; only `approve` (revision 1) reddens. So the defect hides behind the first step of the only test that drives it. Observed at unit level: reddens exactly 2 of 8 assertions — the empty-string case and the discrimination case — leaving the other 6 green.",
 		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
 	},
 	{
@@ -762,8 +765,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	// ── JAN-VERIF V-2: the OLDER ledger, harvested from JAN-EXECREM WP-2..WP-15 ──────────────────────────
 	//
 	// These are the entries most likely to have rotted: the code has moved through fifteen further work packages
-	// since each was written. NONE of them names the test it reddens — their work packages declared the mutation
-	// and never said which suite catches it — so each runs PACKAGE-WIDE and reports KILLED_UNNAMED. That is a
+	// since each was written. AS HARVESTED, none of them named the test it reddens — their work packages declared
+	// the mutation and never said which suite catches it — so each ran without a named victim and reported
+	// KILLED_UNNAMED. Such a run is WHOLE-WORKSPACE, never PACKAGE-WIDE: scoping a mutant to its own package was the
+	// wrong first attempt, and `targetSuites` in run.ts records why. JAN-VERIF V-3 then MEASURED and NAMED them —
+	// re-measured at HEAD, 9 of the 10 entries below carry a victim and the tenth is a `duplicateOf`, which reports
+	// DUPLICATE before anything is applied — and an empty `expectRed` on a mutant expected to be KILLED is now
+	// BLOCKING: it reports KILLED_UNNAMED, which `unnamedVictims` in run.ts folds into `failures`. That is a
 	// weaker claim, honestly labelled: it establishes the guard is tested somewhere, not that a named test does
 	// it. Guessing a victim would have been worse than admitting the gap, because a guessed victim is how a
 	// mutant comes to pass for the wrong reason.
@@ -1866,8 +1874,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// NOT A HYPOTHETICAL — this is the first implementation of the scope, restored. It closed over the
 		// Undertaking's PWU ids alone, which is the obvious reading of "belongs to this Undertaking" and is wrong:
 		// only the per-PWU FITNESS assessments name a PWU, while the three de-minimis FLOOR assessments per PWU name
-		// the EVIDENCE the step produced (`reference-undertaking.ts:602`). The result emptied the OWNING
-		// Undertaking's Assurance tab — a leak fix that over-corrected into hiding the subject's own records.
+		// the EVIDENCE the step produced (`reference-undertaking.ts`, the `satisfyFloor(evidenceId)` call). The
+		// result emptied the OWNING Undertaking's Assurance tab — a leak fix that over-corrected into hiding the
+		// subject's own records.
 		//
 		// It was caught by a CONTROL, never by the leak case, and that is the transferable lesson: scoping
 		// EVERYTHING to nothing satisfies a leak test perfectly. Any scope guard needs both halves.
@@ -1881,8 +1890,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		id: 'S1-baseline-items-stringify-to-object-Object',
 		file: 'packages/rph-engine/src/queries.ts',
 		// ALSO A RESTORED REAL DEFECT. `BASELINE.itemObjectVersions` is `BaselineItemVersion[]` — records of
-		// `{ objectId, semanticVersion, contentHash }` (`objects.ts:139-144`, `:674`) — not a string list and not a
-		// map, though the vocab field name reads like both. `String(entry)` yields "[object Object]", which matches
+		// `{ objectId, semanticVersion, contentHash }` (`objects.ts`, `BaselineItemVersionSchema`; the field itself
+		// is `BaselineObjectSchema.itemObjectVersions`) — not a string list and not a map, though the vocab field name
+		// reads like both. `String(entry)` yields "[object Object]", which matches
 		// no id, so every Baseline silently leaves the owning Undertaking's scope.
 		//
 		// The failure is SILENT in the direction that looks correct: an over-narrow scope shows less, and "less" is

@@ -581,7 +581,7 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 		return reject(
 			command,
 			'RPH_REVISION_CONFLICT',
-			`MarkPwuReady: expected semantic version ${p.expectedSemanticVersion}, but PWU ${command.targetAggregateId} is at semantic version ${loaded.semanticVersion} — the shape changed since readiness was attested (stale attestation).`
+			`MarkPwuReady: expected semantic version ${p.expectedSemanticVersion}, but PWU ${command.targetAggregateId} is at semantic version ${loaded.semanticVersion} — this caller states a version this PWU is not at, which is a caller reasoning about the wrong object or the wrong build. A PWU's semanticVersion cannot move (REG-F-109), so this is not a stale attestation.`
 		);
 	}
 	const readiness = checkPwuShapeReadiness(readinessFactsOf(ctx, loaded.state));

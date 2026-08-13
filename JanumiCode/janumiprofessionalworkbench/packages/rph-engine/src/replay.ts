@@ -17,8 +17,10 @@
 // The old note here said full replay "needs the command handlers deferred from M9/M10/M11 (a handler registry +
 // ~20 handlers + the 8 missing commands)". THAT BLOCKER IS STALE — the registry and handlers exist, and
 // driveReferenceUndertaking drives the real pipeline today. The actual gap is different and larger: the engine
-// emits none of 28 event types this trace expects (the whole claim -> evidence -> assessment -> decision ->
-// baseline chain), so it CANNOT yet produce this trace. replay-conformance.test.ts points the oracle at the live
+// emits none of 12 event types this trace expects — this said 28, and the claim -> evidence -> assessment ->
+// decision -> baseline chain it named now fires 14 of its 17 links; what remains is the unpicked
+// five-outcome-event vocab and the named-vs-generic PWU spellings — so it CANNOT yet produce this trace.
+// replay-conformance.test.ts points the oracle at the live
 // engine and pins that distance as a number, so it can only shrink.
 import { readFileSync } from 'node:fs';
 import { EVENTS } from '@janumipwb/rph-contracts';

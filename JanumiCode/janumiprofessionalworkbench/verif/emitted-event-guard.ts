@@ -5,8 +5,14 @@
 // `packages/rph-engine/src/emitted-event-conformance.test.ts` already does this — over the events the Reference
 // Undertaking happens to emit. Its register comment read "THE REGISTER IS NOW CLEARED — every event this system
 // emits conforms to its own declared shape", down from twelve, each fixed deliberately. That sentence is true as
-// written and reads as far more than it is: the drive emits 34 of the catalog's 132 declared types, so the
-// register was cleared over a quarter of the population and silent about the rest.
+// written and reads as far more than it is: the drive emitted 34 of the catalog's THEN-132 declared types, so
+// the register was cleared over a quarter of the population AS IT THEN STOOD, and silent about the rest.
+//
+// ⚠ BOTH FIGURES ARE DATED ON PURPOSE (MEASURED 2026-08-04), AND ONLY ONE OF THEM IS RE-MEASURED HERE. As of
+// 2026-08-13 `EVENTS` declares 142, not 132. The 34 is deliberately NOT re-derived and must not be guessed:
+// deriving it needs the whole-suite instrumentation that produced it, which scope note 2 below records no single
+// vitest worker can perform. (For DIRECTION only, and it is a RECORD rather than a re-run:
+// `verif/event-surface-census.test.ts`'s hand-maintained `EMITTED_2026_08_04` now lists 109 of the 142.)
 //
 // IT TOOK ONE NEW DISPATCH TO EXPOSE THAT. Closing RPH-FIX-005 made the drive record its first ever artifact, and
 // the register immediately grew an entry (`ArtifactRecorded` carried an `artifactId` its strict shape rejects).

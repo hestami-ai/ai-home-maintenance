@@ -458,7 +458,7 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 		// ── EMISSION — PAIRED WHEN BOTH HALVES CAME FROM THE SAME CALLS, CROSSED OTHERWISE (REG-F-124) ────────
 		//
 		// ⚠ THE SCOPE IS THE ARMS, NOT THE SHAPE, AND GETTING THAT WRONG DESTROYS REAL COVERAGE. Two other sites
-		// emit a full rectangle — `assurance.ts`'s `recordClaimAssessment` (5 targets × 4 sources) and
+		// emit a full rectangle — `assurance.ts`'s `recordClaimAssessment` (4 targets × 5 sources) and
 		// `runtime-binding.ts`'s `authorizeRuntimeBinding` (2 × 2) — and at BOTH the rectangle is what the site
 		// deliberately declares: the targets come from a table or a declared range, the sources from a literal
 		// `fromStates(…)`, and there are no per-call tuples in the source to recover. `recordClaimAssessment`
@@ -556,7 +556,9 @@ function computeDeclaredArrows(): DeclaredArrow[] {
 
 /**
  * The states a CREATION can bring an object into existence in, read from the `births` declarations at the
- * `createObject` sites (`kit.ts`), which `createObject` also checks at runtime.
+ * `createObject` AND `commitState` sites — `BIRTH_PRIMITIVES` below is that pair — which BOTH primitives also
+ * check at runtime: `refuseOnBirthDrift` is called from each of them in `kit.ts`. Named by FUNCTION and not by
+ * line, because a `kit.ts:NNN` pointer is exactly the rot the rest of this sweep is repairing.
  *
  * ⚠ READ FROM THE DECLARATIONS AND NOT FROM `initialState`, WHICH LIES (REG-F-071). Seeding occupancy from
  * `initialState` would mark a state occupied because a diagram says so — the exact substitution of declaration

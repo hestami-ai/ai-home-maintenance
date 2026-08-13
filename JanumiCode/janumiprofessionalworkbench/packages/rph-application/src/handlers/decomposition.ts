@@ -397,21 +397,28 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
  *
  * JPWB-SPEC-001-DR-002 F-I. `ReviseDecompositionPayloadSchema` declares all three, and they are precisely the
  * carriers for DOC-003's revision obligations — DEC-3 (obligation conservation) and DEC-4 (constraint
- * disposition), both of which SCOPE themselves to revision explicitly, plus DEC-2's impact analysis. This handler
- * implements none of that: it advances status and bumps the semantic version.
+ * disposition), both of which SCOPE themselves to revision explicitly, plus DEC-2's impact analysis. ~~This handler
+ * implements none of that: it advances status and bumps the semantic version.~~
  *
  * IMPLEMENTING THEM IS WIRING, NOT NEW DOMAIN LOGIC, AND IT IS SCHEDULED NOWHERE. The kernel exists and is
  * adversarially reviewed under M9 — `validateObligationConservation` and `validateConstraintPropagation` in
- * `@janumipwb/rph-domain`, which `validateDecomposition` already calls a hundred lines below (`:210-211`). The
- * revise path is a second call site nobody wired: the tracker defers it M9 → "M10/M11" → "M11/M13" → "M13" →
- * "live-command-drive handlers deferred", every station ✅, and no milestone holds it now. Nor is a ratification
+ * `@janumipwb/rph-domain`, which `validateDecomposition` already calls via `checkDecompositionConservation`.
+ * ~~The revise path is a second call site nobody wired: the tracker defers it M9 → "M10/M11" → "M11/M13" → "M13" →
+ * "live-command-drive handlers deferred", every station ✅, and no milestone holds it now.~~ Nor is a ratification
  * evidently required: DOC-003 is OPERATIVE and already binds revision, so the semantics are settled. (An earlier
  * version of this comment said it "awaits a decomposition-model increment awaiting ratification" — a phrase that
  * named no plan item and invented a governance blocker. REG-F-006 carries the correction.)
  *
- * ACCEPTING the fields meanwhile is not a
- * deferral, it is a false assertion — the caller is told the revision succeeded and has no way to learn the
- * children, allocations and dispositions were dropped. So they are REFUSED, by name, citing the obligation. A
+ * ⚠ THE STRUCK SENTENCES WERE WITHDRAWN BY REG-F-006 DOCS_STRONGER (48169630), WHICH LEFT THIS DOCBLOCK STANDING —
+ * corrected 2026-08-13, struck rather than deleted because a reader looking for the DEC-3/DEC-4 revision gate reads
+ * this first and would conclude it is MISSING. It is not: `obligationAllocations` and `constraintPropagations` are
+ * applied and are gated by the conservation kernel inside `reviseDecomposition` below; `childWorkUnitIds` alone is
+ * still refused. The `NARROWED 2026-08-02` note directly beneath this block is the authority on which is which.
+ *
+ * ACCEPTING an unhonoured field meanwhile is not a
+ * deferral, it is a false assertion — the caller is told the revision succeeded and has no way to learn ~~the
+ * children, allocations and dispositions were~~ that the revised child set was dropped. ~~So they are REFUSED, by
+ * name, citing the obligation.~~ So `childWorkUnitIds` is REFUSED, by name, citing the obligation. A
  * refusal to do what this handler does not do needs no ratification; it is CON-000 B7 discharged rather than
  * deferred, and it makes the missing capability visible on every attempt instead of never.
  */

@@ -108,11 +108,11 @@ function contestedClaimsAgainstBaselineItems(
  * `OpenObservationView`. `promoteBaseline` passed `openObservations: []` — a hard-coded empty list — so
  * `canPromoteBaseline`'s RPH-BAS-003 arm iterated nothing and no observation a professional recorded could
  * ever block a promotion. The rule was never missing; it is `findOpenBlockingObservations` in rph-domain,
- * unit-proven at `governance.test.ts:189` and reachable only through `canPromoteBaseline`. This function
- * supplies its input; it decides nothing itself.
+ * unit-proven by governance.test.ts's `RPH-BAS-003: an open unwaived blocking finding ...` case and reachable
+ * only through `canPromoteBaseline`. This function supplies its input; it decides nothing itself.
  *
  * Every field is READ from the accepted contract, none asserted:
- *   - `subjectObjectIds` (`AssuranceObservationSchema`, objects.ts:421) — inherited from the observation's
+ *   - `subjectObjectIds` (`AssuranceObservationSchema`, rph-contracts/objects.ts) — inherited from the observation's
  *     Assessment by `recordAssuranceObservation`; an observation is in scope when it names any item the
  *     Baseline freezes. Scoped to the Baseline's OWN `itemObjectVersions` (written at CreateBaseline), not to
  *     the promoting command's `expectedItemObjectVersions`, so a narrowed payload cannot shrink the set of

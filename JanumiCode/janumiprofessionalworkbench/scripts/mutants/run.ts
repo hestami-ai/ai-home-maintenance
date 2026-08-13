@@ -119,7 +119,12 @@ const sh = (
  * `scripts` would forbid running the harness while a NEW ledger entry is uncommitted — and that is the workflow
  * that found REG-F-097 (a run over an edited ledger reported the NO_COMPILE that exposed the missing type gate).
  * Deriving from `m.file` gets both: no mutant target can be outside the check, and a directory nothing mutates
- * imposes nothing. Today it adds none; the day someone declares a mutant on `scripts/mutants/run.ts` it adds one.
+ * imposes nothing — but it is no longer free. RE-MEASURED at HEAD: five entries target `scripts/mutants/measured.ts`
+ * (four from REG-F-116, one from REG-F-120), so since 2026-08-12 `scripts` IS in the derived set and a run over an
+ * UNCOMMITTED ledger or runner edit now aborts at `treeIsClean`. That is the price of closing the leak hole; do NOT
+ * re-hardcode the three trees to buy the workflow back. ⚠ The trigger test this paragraph used to state was itself
+ * mis-specified — nothing targets `run.ts`, the widening came from a SIBLING in the same tree, so a reader applying
+ * that test literally would have re-confirmed the stale sentence forever.
  */
 const CLEANLINESS_PATHS = [
 	...new Set([
@@ -214,9 +219,14 @@ function preApplyVerdict(m: DeclaredMutant): { result: Result } | { original: st
 /**
  * Which suites this mutant claims it reddens.
  *
- * A mutant with NO NAMED VICTIM is still worth running, against a weaker claim. Most of the mutants inherited
- * from JAN-EXECREM WP-2..WP-15 are in this state: their work packages declared the mutation but never said WHICH
- * test reddens. That is itself a records defect, and it is reported separately in the summary.
+ * A mutant with NO NAMED VICTIM is still worth running, against a weaker claim — but since JAN-VERIF V-3c that
+ * claim no longer passes the gate: `unnamedVictims` is added into `failures`, so KILLED_UNNAMED FAILS THE BUILD
+ * rather than being reported separately in the summary. The mutants inherited from JAN-EXECREM WP-2..WP-15
+ * ARRIVED in this state — their work packages declared the mutation but never said WHICH test reddens — and V-3
+ * measured and named them. RE-MEASURED at HEAD rather than carried over: of the 87 `.py`-sourced entries, 75 now
+ * carry a victim, and NO entry expected to be KILLED has an empty `expectRed`. The 17 still empty are 10
+ * `duplicateOf`, 4 `expectSurvive` controls, 2 `expectNoCompile` and 1 `supersededBy` — for every one of which an
+ * empty `expectRed` is CORRECT, so the empty-target path below is LIVE and must not be re-documented as dead.
  *
  * Running the whole workspace tells us whether the guard is tested AT ALL; it cannot say which test does it, so
  * the verdict is KILLED_UNNAMED rather than KILLED. Weaker evidence, honestly labelled, beats no evidence — and it
@@ -360,8 +370,11 @@ function runMutant(m: DeclaredMutant): Result {
 	// `F100-a-a-refactor-rewrites-an-anchored-line` exists to prove. Narrowing the exemption to the applied id
 	// makes that mutant sharper, not weaker — it can now only be killed by the two anchors it really breaks.
 	//
-	// `spawnSync` inherits `process.env`, so this reaches both the vitest and the Playwright child. Cleared in the
-	// same `finally` that restores the file, for the same reason: a leaked exemption is a disabled guard.
+	// The id travels to every child EXPLICITLY, never by inheritance — `sh` spreads it into `env` (REG-F-110 second
+	// attempt; the `sh` docblock records that Bun did NOT inherit it). This parent assignment is what reaches the
+	// `tsc` child, for which `sh` is called without an `env` argument; `mutantEnv` below carries it to the vitest and
+	// Playwright children. Cleared in the same `finally` that restores the file, for the same reason: a leaked
+	// exemption is a disabled guard.
 	process.env.RPH_MUTANT_APPLIED = m.id;
 	try {
 		const settled = compileVerdict(m, target);
@@ -709,7 +722,8 @@ if (!treeIsClean()) {
 //
 // Found while measuring MU-FRESH-18-C and -D together. Both do kill — verified by running them SEPARATELY,
 // which is the check that exposed this. Safe to widen: PREFLIGHT/HARVEST/ADVISORY are environment variables
-// (lines 54, 69, 589), so no argv entry is ever a flag, and a single argument behaves exactly as before.
+// (`MUTANTS_PREFLIGHT`, `MUTANTS_HARVEST`, `MUTANTS_ADVISORY` — grep the NAMES; the line numbers this cited had
+// already drifted), so no argv entry is ever a flag, and a single argument behaves exactly as before.
 const only = process.argv.slice(2);
 const chosen =
 	only.length > 0

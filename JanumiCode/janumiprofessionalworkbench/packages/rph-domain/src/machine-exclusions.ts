@@ -28,7 +28,10 @@ export const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
 		'MECHANICALLY UN-WRITABLE — not unbuilt, impossible — and this is a citation rather than a resemblance: ' +
 		'the schema decides it, no judgement is being exercised. ' +
 		'SUCCESSOR: `AssuranceAssessment.state`, which really does perform six of the nine transitions the dead ' +
-		'machine describes (assurance.ts:1826, :1898). ' +
+		'machine describes — the six `machine: AssuranceAssessment.state` transition sites in assurance.ts. ' +
+		'CITED BY SYMBOL: the citation that stood here, `assurance.ts:1826, :1898`, never resolved FROM THIS ' +
+		'FILE. It was copied in from the register without being re-resolved, and on the day this file was ' +
+		'created neither number was a machine site. ' +
 		'NOT AN EXEMPTION: an EXEMPT entry would record "deliberately unbuilt", which is false — this cannot be ' +
 		'built without adding a field the ratified schema forbids. ' +
 		'⚠ THE ARROWS STAY IN transitions.data.ts DELIBERATELY. That file is GENERATED from ' +
