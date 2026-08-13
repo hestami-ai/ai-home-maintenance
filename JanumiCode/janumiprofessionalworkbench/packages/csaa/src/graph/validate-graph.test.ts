@@ -165,6 +165,125 @@ describe('validateModuleDependencyGraph', () => {
 		});
 	});
 
+	it('rejects nested hostile graph and provenance properties before optimized indexes inspect them', () => {
+		const snapshot = unresolvedSemanticSnapshot();
+		const graph = clone(validGraph(snapshot));
+		const target = graph.nodes.find((node) => node.kind === 'RESOLUTION_TARGET')!;
+		const moduleResolutionId = target.moduleResolutionId;
+		let graphGetterHits = 0;
+		Object.defineProperty(target, 'moduleResolutionId', {
+			enumerable: true,
+			get() {
+				graphGetterHits += 1;
+				return moduleResolutionId;
+			}
+		});
+		expect(validateModuleDependencyGraph(graph, snapshot, { maxIssues: 1 })).toMatchObject({
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })],
+			state: 'BUDGET_EXHAUSTED'
+		});
+		expect(graphGetterHits).toBe(0);
+
+		const kindGraph = clone(validGraph(snapshot));
+		const kindTarget = kindGraph.nodes.find((node) => node.kind === 'RESOLUTION_TARGET')!;
+		let kindGetterHits = 0;
+		Object.defineProperty(kindTarget, 'kind', {
+			enumerable: true,
+			get() {
+				kindGetterHits += 1;
+				return 'RESOLUTION_TARGET';
+			}
+		});
+		expect(validateModuleDependencyGraph(kindGraph, snapshot)).toMatchObject({ state: 'INVALID' });
+		expect(kindGetterHits).toBe(0);
+
+		const symbolGraph = clone(validGraph(snapshot));
+		Object.defineProperty(symbolGraph, Symbol('hostile'), { enumerable: true, value: true });
+		expect(validateModuleDependencyGraph(symbolGraph, snapshot)).toMatchObject({
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })],
+			state: 'INVALID'
+		});
+
+		const proxyGraph = clone(validGraph(snapshot));
+		const targetIndex = proxyGraph.nodes.findIndex((node) => node.kind === 'RESOLUTION_TARGET');
+		let proxyTrapHits = 0;
+		(proxyGraph.nodes as ModuleDependencyGraphSnapshot['nodes'][number][])[targetIndex] = new Proxy(
+			proxyGraph.nodes[targetIndex]!,
+			{
+				getPrototypeOf() {
+					proxyTrapHits += 1;
+					throw new Error('nested graph proxy trap');
+				}
+			}
+		);
+		const proxyResult = validateModuleDependencyGraph(proxyGraph, snapshot);
+		expect(proxyResult.state).toBe('INVALID');
+		expect(proxyResult.issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_SHAPE' })])
+		);
+		expect(proxyTrapHits).toBe(0);
+
+		const provenanceRecords = snapshot.provenances.map((record) => ({ ...record }));
+		const hostileSnapshot = {
+			...snapshot,
+			provenances: provenanceRecords
+		} as StaticSemanticSnapshot;
+		const provenanceId = provenanceRecords[0]!.id;
+		let provenanceGetterHits = 0;
+		Object.defineProperty(provenanceRecords[0]!, 'id', {
+			enumerable: true,
+			get() {
+				provenanceGetterHits += 1;
+				return provenanceId;
+			}
+		});
+		const provenanceResult = validateModuleDependencyGraph(validGraph(snapshot), hostileSnapshot);
+		expect(provenanceResult.state).toBe('INVALID');
+		expect(provenanceResult.issues).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_SHAPE' })])
+		);
+		expect(provenanceGetterHits).toBe(0);
+
+		let semanticProxyTrapHits = 0;
+		const semanticProxy = new Proxy(snapshot, {
+			getPrototypeOf() {
+				semanticProxyTrapHits += 1;
+				throw new Error('semantic snapshot proxy trap');
+			}
+		});
+		expect(validateModuleDependencyGraph(validGraph(snapshot), semanticProxy)).toMatchObject({
+			issues: [expect.objectContaining({ code: 'INVALID_SHAPE' })],
+			state: 'INVALID'
+		});
+		expect(semanticProxyTrapHits).toBe(0);
+
+		let provenanceArrayProxyTrapHits = 0;
+		const provenanceArrayProxy = new Proxy([...snapshot.provenances], {
+			getPrototypeOf() {
+				provenanceArrayProxyTrapHits += 1;
+				throw new Error('semantic provenance array proxy trap');
+			}
+		});
+		const hostilePopulationSnapshot = {
+			...snapshot,
+			provenances: provenanceArrayProxy
+		} as StaticSemanticSnapshot;
+		expect(
+			validateModuleDependencyGraph(validGraph(snapshot), hostilePopulationSnapshot)
+		).toMatchObject({ state: 'INVALID' });
+		expect(provenanceArrayProxyTrapHits).toBe(0);
+
+		const nullProvenanceSnapshot = {
+			...snapshot,
+			provenances: [null]
+		} as unknown as StaticSemanticSnapshot;
+		expect(
+			validateModuleDependencyGraph(validGraph(snapshot), nullProvenanceSnapshot)
+		).toMatchObject({
+			state: 'INVALID'
+		});
+	});
+
 	it('rejects malformed graph wire shapes at every public composite boundary', () => {
 		const snapshot = semanticSnapshot();
 		const graph = validGraph(snapshot);

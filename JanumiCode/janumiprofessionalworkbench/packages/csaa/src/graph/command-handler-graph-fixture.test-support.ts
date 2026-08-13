@@ -103,11 +103,15 @@ const NESTED_DIRECT_HANDLER_SOURCE = [
 type HandlerFixtureVariant =
 	| 'DIRECT'
 	| 'EMPTY'
+	| 'EVENT_CONTRACT'
+	| 'EVENT_CONTRACT_TWO_COMMANDS'
 	| 'FACTORY'
 	| 'FACTORY_INITIALIZER'
 	| 'NESTED_DIRECT'
 	| 'SHARED_DIRECT'
 	| 'TABLE';
+
+export type EventContractRegistrySourceTransform = (source: string) => string;
 
 function handlerSource(variant: HandlerFixtureVariant): string {
 	if (variant === 'FACTORY') return FACTORY_HANDLER_SOURCE;
@@ -130,7 +134,10 @@ function json(root: string, path: string, value: unknown): void {
 	write(root, path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function createRepository(variant: HandlerFixtureVariant): {
+function createRepository(
+	variant: HandlerFixtureVariant,
+	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform
+): {
 	readonly handlerSiteLine: number;
 	readonly root: string;
 } {
@@ -202,6 +209,46 @@ function createRepository(variant: HandlerFixtureVariant): {
 		emitsEvent: '${eventName}',
 		firstSlice: false
 	}`;
+	const eventContractMessages = `export const StartWorkPayloadSchema = {};
+export const RuntimeOnlyPayloadSchema = {};
+export const UnbuiltPayloadSchema = {};
+export const WorkAuditedPayloadSchema = {};
+export const WorkStartedPayloadSchema = {};
+
+export const COMMANDS = {
+	StartWork: {
+		payload: StartWorkPayloadSchema,
+		targetAggregateType: 'WORK',
+		emitsEvent: 'WorkStarted',
+		alsoEmitsEvents: ['WorkAudited'],
+		firstSlice: false
+	}
+} as const;
+
+export const EVENTS = {
+	RuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },
+	Unbuilt: { payload: UnbuiltPayloadSchema, aggregateType: 'Work' },
+	WorkAudited: { payload: WorkAuditedPayloadSchema, aggregateType: 'Work' },
+	WorkStarted: { payload: WorkStartedPayloadSchema, aggregateType: 'Work' }
+} as const;
+`;
+	const twoCommandEventContractMessages = eventContractMessages
+		.replace(
+			'export const RuntimeOnlyPayloadSchema = {};',
+			'export const ResumeWorkPayloadSchema = {};\nexport const RuntimeOnlyPayloadSchema = {};'
+		)
+		.replace(
+			"\tStartWork: {\n\t\tpayload: StartWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkStarted',\n\t\talsoEmitsEvents: ['WorkAudited'],\n\t\tfirstSlice: false\n\t}",
+			"\tResumeWork: {\n\t\tpayload: ResumeWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkResumed',\n\t\tfirstSlice: false\n\t},\n\tStartWork: {\n\t\tpayload: StartWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkStarted',\n\t\talsoEmitsEvents: ['WorkAudited'],\n\t\tfirstSlice: false\n\t}"
+		)
+		.replace(
+			"\tRuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },",
+			"\tRuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },\n\tWorkResumed: { payload: WorkResumedPayloadSchema, aggregateType: 'Work' },"
+		)
+		.replace(
+			'export const WorkAuditedPayloadSchema = {};',
+			'export const WorkAuditedPayloadSchema = {};\nexport const WorkResumedPayloadSchema = {};'
+		);
 	const commandEntries =
 		variant === 'EMPTY'
 			? ''
@@ -211,7 +258,16 @@ function createRepository(variant: HandlerFixtureVariant): {
 	write(
 		root,
 		COMMAND_REGISTRY_PATH,
-		`export const StartWorkPayloadSchema = {};
+		variant === 'EVENT_CONTRACT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS'
+			? (eventContractRegistrySourceTransform?.(
+					variant === 'EVENT_CONTRACT_TWO_COMMANDS'
+						? twoCommandEventContractMessages
+						: eventContractMessages
+				) ??
+					(variant === 'EVENT_CONTRACT_TWO_COMMANDS'
+						? twoCommandEventContractMessages
+						: eventContractMessages))
+			: `export const StartWorkPayloadSchema = {};
 export const COMMANDS = {${commandEntries}
 } as const;
 `
@@ -220,7 +276,7 @@ export const COMMANDS = {${commandEntries}
 	const handlerEntries =
 		variant === 'EMPTY'
 			? ''
-			: variant === 'SHARED_DIRECT'
+			: variant === 'SHARED_DIRECT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS'
 				? 'StartWork: startWork, ResumeWork: startWork'
 				: 'StartWork: startWork';
 	write(
@@ -311,6 +367,98 @@ export const CROSS_AXIS_RULES = [];
 		'verif/command-dispatch-census.test.ts',
 		'// Retained delegated fixture; CSAA records but does not execute this census.\n'
 	);
+	if (variant === 'EVENT_CONTRACT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS') {
+		json(root, 'packages/rph-contracts/vocab/m3-commands-events.json', {
+			bindings: [
+				...(variant === 'EVENT_CONTRACT_TWO_COMMANDS'
+					? [
+							{
+								commandType: 'ResumeWork',
+								eventType: 'WorkResumed',
+								from: 'STARTED',
+								machine: 'Work.status',
+								to: 'STARTED'
+							}
+						]
+					: []),
+				{
+					commandType: 'StartWork',
+					eventType: 'WorkStarted',
+					from: 'PROPOSED',
+					machine: 'Work.status',
+					to: 'STARTED'
+				},
+				{
+					commandType: 'StartWork',
+					eventType: 'WorkAudited',
+					from: 'PROPOSED',
+					machine: 'Work.status',
+					to: '(none -- co-emitted)'
+				}
+			],
+			commands: [
+				...(variant === 'EVENT_CONTRACT_TWO_COMMANDS'
+					? [
+							{
+								commandType: 'ResumeWork',
+								emitsEvent: 'WorkResumed',
+								payloadFields: [],
+								targetAggregateType: 'WORK'
+							}
+						]
+					: []),
+				{
+					alsoEmitsEvents: ['WorkAudited'],
+					commandType: 'StartWork',
+					emitsEvent: 'WorkStarted',
+					payloadFields: [],
+					targetAggregateType: 'WORK'
+				}
+			],
+			events: [
+				'RuntimeOnly',
+				'Unbuilt',
+				'WorkAudited',
+				...(variant === 'EVENT_CONTRACT_TWO_COMMANDS' ? ['WorkResumed'] : []),
+				'WorkStarted'
+			].map((eventType) => ({ aggregateType: 'Work', eventType, payloadFields: [] })),
+			firstSliceCommands: []
+		});
+		write(
+			root,
+			'verif/event-surface-census.test.ts',
+			`import { EVENTS } from '@janumipwb/rph-contracts';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+interface Vocab {
+	commands?: { commandType: string; emitsEvent?: string }[];
+	bindings?: { commandType?: string; eventType?: string }[];
+	events?: { eventType: string }[];
+}
+const vocab = JSON.parse(
+	readFileSync(\`${'${REPO_ROOT}'}packages/rph-contracts/vocab/m3-commands-events.json\`, 'utf8')
+) as Vocab;
+const DECLARED = new Set(Object.keys(EVENTS));
+const BOUND = new Set<string>([
+	...(vocab.commands ?? []).flatMap((command) =>
+		command.emitsEvent ? [command.emitsEvent] : []
+	),
+	...(vocab.bindings ?? []).flatMap((binding) =>
+		binding.eventType ? [binding.eventType] : []
+	)
+]);
+const EMITTED_2026_08_04 = new Set(['RuntimeOnly', 'WorkAudited',${
+				variant === 'EVENT_CONTRACT_TWO_COMMANDS' ? " 'WorkResumed'," : ''
+			} 'WorkStarted']);
+
+void DECLARED;
+void BOUND;
+void EMITTED_2026_08_04;
+`
+		);
+	}
 	write(
 		root,
 		'verif/guard-enforcement-ledger.ts',
@@ -612,8 +760,12 @@ export interface CommandHandlerGraphFixture {
  * Builds a real compiler-backed, exact-subject fixture without executing the retained verifier.
  * The arrow observation is produced through the normalizer and validated against the same subject.
  */
-function createFixture(variant: HandlerFixtureVariant): CommandHandlerGraphFixture {
-	const repository = createRepository(variant);
+function createFixture(
+	variant: HandlerFixtureVariant,
+	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform,
+	semanticSnapshotTransform?: (snapshot: StaticSemanticSnapshot) => StaticSemanticSnapshot
+): CommandHandlerGraphFixture {
+	const repository = createRepository(variant, eventContractRegistrySourceTransform);
 	const { root } = repository;
 	let cleaned = false;
 	const cleanup = (): void => {
@@ -626,7 +778,8 @@ function createFixture(variant: HandlerFixtureVariant): CommandHandlerGraphFixtu
 		if (subjectOutcome.outcome !== 'resolved')
 			throw new Error(`Subject fixture construction failed: ${JSON.stringify(subjectOutcome)}`);
 		const subject = subjectOutcome.subject;
-		const snapshot = semanticSnapshot(root, subject);
+		let snapshot = semanticSnapshot(root, subject);
+		snapshot = semanticSnapshotTransform?.(snapshot) ?? snapshot;
 		const arrowArtifactSet = buildArrowArtifactSetFixture(subject);
 		const site =
 			variant === 'TABLE'
@@ -650,6 +803,40 @@ function createFixture(variant: HandlerFixtureVariant): CommandHandlerGraphFixtu
 
 export function createCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
 	return createFixture('DIRECT');
+}
+
+/** Event-rich direct-handler variant used by the command/event contract overlay fixture. */
+export function createEventContractCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
+	return createFixture('EVENT_CONTRACT');
+}
+
+/** Two-command event-rich fixture used to exercise deterministic multi-command ordering. */
+export function createTwoCommandEventContractCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
+	return createFixture('EVENT_CONTRACT_TWO_COMMANDS');
+}
+
+/** Event-rich fixture rebuilt from a caller-supplied generated-registry source transform. */
+export function createEventContractCommandHandlerGraphFixtureWithRegistrySourceTransform(
+	transform: EventContractRegistrySourceTransform
+): CommandHandlerGraphFixture {
+	return createFixture('EVENT_CONTRACT', transform);
+}
+
+/** Event-rich variant whose registered callable cannot be statically resolved to a target. */
+export function createUnresolvedEventContractCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
+	return createFixture('EVENT_CONTRACT', undefined, (snapshot) => {
+		const mutable = structuredClone(snapshot) as StaticSemanticSnapshot;
+		const source = mutable.sources.find(
+			(candidate) => candidate.logicalPath === HANDLER_SOURCE_PATH
+		);
+		const declaration = mutable.declarations.find(
+			(candidate) => candidate.sourceId === source?.id && candidate.name === 'startWork'
+		);
+		if (declaration === undefined)
+			throw new Error('Event-contract fixture startWork declaration is absent.');
+		Object.assign(declaration as unknown as { nodeId: null }, { nodeId: null });
+		return mutable;
+	});
 }
 
 /** Factory-result variant used to exercise explicitly candidate graph relations and frontiers. */

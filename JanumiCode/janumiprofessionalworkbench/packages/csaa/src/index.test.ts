@@ -9,6 +9,10 @@ import {
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_SCHEMA_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_SCHEMA_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION,
@@ -36,16 +40,21 @@ import {
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_SCHEMA_VERSION,
+	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
+	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION,
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
+	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	buildReadWriteAccessGraph,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
+	buildStructuralSccAnalysis,
 	buildStateMachineGraph,
 	buildStaticSemanticSnapshot,
 	canonicalSemanticJson,
@@ -55,10 +64,12 @@ import {
 	observeStateMachineTopology,
 	observeArrowCommandCensus,
 	observeGuardEnforcementLedger,
+	selectJpwbCommandEventContractOverlayInputs,
 	selectJpwbCommandHandlerRegistries,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateCallGraph,
+	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
 	validateGuardClassificationOverlay,
 	validateGuardEnforcementLedgerArtifactSet,
@@ -67,6 +78,7 @@ import {
 	validateArrowCommandCensusArtifactSet,
 	validateArrowCommandCensusObservation,
 	validateModuleDependencyGraph,
+	validateStructuralSccAnalysis,
 	validateStateMachineGraph,
 	validateStateMachineTopologyObservation,
 	validateStaticSemanticSnapshot
@@ -84,12 +96,14 @@ function manifest(relativeUrl: string): PackageManifest {
 describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
+		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
+		expect(buildStructuralSccAnalysis).toBeTypeOf('function');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
 		expect(buildStaticSemanticSnapshot).toBeTypeOf('function');
 		expect(compareDependencyProviders).toBeTypeOf('function');
@@ -97,10 +111,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(observeStateMachineTopology).toBeTypeOf('function');
 		expect(observeArrowCommandCensus).toBeTypeOf('function');
 		expect(observeGuardEnforcementLedger).toBeTypeOf('function');
+		expect(selectJpwbCommandEventContractOverlayInputs).toBeTypeOf('function');
 		expect(selectJpwbCommandHandlerRegistries).toBeTypeOf('function');
 		expect(validateDependencyCruiserObservation).toBeTypeOf('function');
 		expect(validateDependencyProviderComparison).toBeTypeOf('function');
 		expect(validateCallGraph).toBeTypeOf('function');
+		expect(validateCommandEventContractOverlay).toBeTypeOf('function');
 		expect(validateCommandHandlerGraph).toBeTypeOf('function');
 		expect(validateGuardClassificationOverlay).toBeTypeOf('function');
 		expect(validateGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
@@ -109,6 +125,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(validateArrowCommandCensusObservation).toBeTypeOf('function');
 		expect(validateModuleDependencyGraph).toBeTypeOf('function');
+		expect(validateStructuralSccAnalysis).toBeTypeOf('function');
 		expect(validateStateMachineGraph).toBeTypeOf('function');
 		expect(validateStateMachineTopologyObservation).toBeTypeOf('function');
 		expect(validateStaticSemanticSnapshot).toBeTypeOf('function');
@@ -135,6 +152,18 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-command-handler-graph-request/1.0.0'
 		);
 		expect(COMMAND_HANDLER_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-command-handler-graph/1.0.0');
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION).toBe(
+			'jan-csaa-build-command-event-contract-overlay/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-progress/1.0.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-request/1.0.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay/1.0.0'
+		);
 		expect(GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION).toBe(
 			'jan-csaa-build-guard-classification-overlay/0.1.0'
 		);
@@ -190,6 +219,11 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-module-dependency-graph-request/1.0.0'
 		);
 		expect(MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-module-dependency-graph/1.0.0');
+		expect(STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION).toBe('jan-csaa-analyze-structural-scc/0.1.0');
+		expect(STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-scc-analysis-request/1.0.0'
+		);
+		expect(STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION).toBe('jan-csaa-structural-scc-analysis/1.0.0');
 		expect(DEPENDENCY_CRUISER_PROVIDER_VERSION).toBe('16.10.4');
 		expect(DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION).toBe(
 			'jan-csaa-normalize-dependency-cruiser-output/0.1.0'

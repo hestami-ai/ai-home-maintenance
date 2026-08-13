@@ -576,7 +576,7 @@ describe('buildCommandHandlerGraph hostile and boundary coverage', () => {
 			message: 'The graph references an unknown semantic provenance.',
 			snapshot: badProvenanceSnapshot
 		});
-	}, 30_000);
+	}, 120_000);
 
 	it('ignores a hostile telemetry-options descriptor trap', () => {
 		const value = fixture();

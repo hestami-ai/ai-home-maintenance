@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 import { isProxy } from 'node:util/types';
 
+export function isProxyValue(value: unknown): boolean {
+	return (
+		value !== null && (typeof value === 'object' || typeof value === 'function') && isProxy(value)
+	);
+}
+
 export function isUnicodeScalarString(text: string): boolean {
 	for (let index = 0; index < text.length; index += 1) {
 		const code = text.charCodeAt(index);
@@ -140,7 +146,7 @@ function writeCanonicalSemanticJson(value: unknown, write: CanonicalChunkWriter)
 		}
 		if (typeof input !== 'object')
 			throw new TypeError(`Semantic canonical JSON cannot serialize ${typeof input}.`);
-		if (isProxy(input)) throw new TypeError('Semantic canonical JSON rejects Proxy values.');
+		if (isProxyValue(input)) throw new TypeError('Semantic canonical JSON rejects Proxy values.');
 		if (ancestors.has(input)) throw new TypeError('Semantic canonical JSON rejects cyclic values.');
 		ancestors.add(input);
 		try {

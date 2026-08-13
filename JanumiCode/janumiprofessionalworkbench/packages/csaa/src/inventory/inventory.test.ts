@@ -18,12 +18,30 @@ import {
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
 import {
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
+} from '../contracts/command-event-contract-overlay.js';
+import {
 	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
 	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
 	GUARD_ENFORCEMENT_LEDGER_METHOD,
 	GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
 	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
 } from '../contracts/guard-enforcement-ledger.js';
+import {
+	STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
+	STRUCTURAL_SCC_ANALYSIS_CAPABILITY,
+	STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS,
+	STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+	STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+	STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT,
+	STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY,
+	STRUCTURAL_SCC_ANALYSIS_METHOD,
+	STRUCTURAL_SCC_ANALYSIS_NONCLAIMS,
+	STRUCTURAL_SCC_ANALYSIS_SELECTION
+} from '../contracts/structural-scc-analysis.js';
 import { ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS } from '../providers/jpwb-arrow-command-census/artifact-set.js';
 import { collectInventory } from './collect-inventory.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
@@ -142,10 +160,12 @@ describe('inventory discovery and identity', () => {
 			'TS_TYPE',
 			'configuration-ast-parse',
 			'command-dispatch-static-topology',
+			'command-event-contract-static-overlay',
 			'command-handler-static-projection',
 			'frozen-program-construction',
 			'guard-classification-static-overlay',
-			'read-write-access-projection'
+			'read-write-access-projection',
+			'structural-scc-analysis'
 		]);
 		expect(typescript?.provenance).toEqual(
 			expect.arrayContaining([
@@ -160,15 +180,32 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
 				'packages/csaa/src/semantic/raw-semantic-model.ts',
 				'packages/csaa/src/semantic/validate-snapshot.ts',
+				'packages/csaa/src/contracts/command-event-contract-overlay.ts',
+				'packages/csaa/src/graph/build-command-event-contract-overlay.ts',
+				'packages/csaa/src/graph/command-event-contract-overlay-canonical.ts',
+				'packages/csaa/src/graph/validate-command-event-contract-overlay.ts',
+				'packages/csaa/src/semantic/repository-smoke.test.ts',
+				COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
 				'packages/csaa/src/contracts/guard-classification-overlay.ts',
 				'packages/csaa/src/graph/build-guard-classification-overlay.ts',
-				'packages/csaa/src/graph/validate-guard-classification-overlay.ts'
+				'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
+				'packages/csaa/src/contracts/structural-scc-analysis.ts',
+				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
+				'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
+				'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
 			])
 		);
+		expect(new Set(typescript!.provenance).size).toBe(typescript!.provenance.length);
 
 		const capabilities = new Map(
 			inventory.capabilities.map((capability) => [capability.id, capability])
 		);
+		for (const capability of capabilities.values()) {
+			expect(new Set(capability.provenance).size).toBe(capability.provenance.length);
+		}
 		const commandHandlerCapability = capabilities.get('command-handler-static-projection');
 		expect(commandHandlerCapability).toBeDefined();
 		const retainedArrowProvenance = [...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS];
@@ -293,6 +330,95 @@ describe('inventory discovery and identity', () => {
 			'full JAN-CSAA-007/008 conformance'
 		])
 			expect(guardOverlayCapability!.explanation).toContain(boundary);
+		const commandEventCapability = capabilities.get('command-event-contract-static-overlay');
+		expect(commandEventCapability).toMatchObject({
+			provider: 'typescript+command-handler-graph+jpwb-event-contract-overlay',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			'capabilities#arrow-command-census',
+			'capabilities#command-handler-static-projection',
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'packages/csaa/src/contracts/command-event-contract-overlay.ts',
+			'packages/csaa/src/graph/build-command-event-contract-overlay.ts',
+			'packages/csaa/src/graph/command-event-contract-overlay-canonical.ts',
+			'packages/csaa/src/graph/validate-command-event-contract-overlay.ts',
+			'packages/csaa/src/semantic/repository-smoke.test.ts',
+			COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+			'package.json#/scripts/csaa:semantic:smoke:command-event-contract'
+		])
+			expect(commandEventCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		for (const boundary of [
+			'primary and additional command-declared event links',
+			'dated pinned EMITTED set',
+			'JAN-CSAA-CAP-027 derivation lane',
+			'referenced predecessor handler attributions remain visibly exact, candidate, or unresolved without promotion',
+			"overlay's JAN-CSAA-CAP-028 inference lane is present but empty",
+			'adds no candidate relationship or runtime conclusion',
+			'RETAINED_DELEGATED',
+			'NOT_EXECUTED_BY_CSAA',
+			'NOT_INTEGRATED',
+			'handler ownership',
+			'neither invokes nor executes a handler',
+			'event construction or emission',
+			'payload compatibility',
+			'full JAN-CSAA-007/008 conformance'
+		])
+			expect(commandEventCapability!.explanation).toContain(boundary);
+		expect(
+			commandEventCapability!.provenance.includes(
+				'packages/csaa/src/providers/typescript/extract-types.ts'
+			)
+		).toBe(false);
+		const structuralSccCapability = capabilities.get('structural-scc-analysis');
+		expect(structuralSccCapability).toMatchObject({
+			provider: 'typescript+validated-module-dependency-graph-scc',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			'capabilities#dependency-graph',
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'packages/csaa/src/contracts/graph.ts',
+			'packages/csaa/src/contracts/semantic.ts',
+			'packages/csaa/src/contracts/structural-scc-analysis.ts',
+			'packages/csaa/src/graph/build-module-dependency-graph.ts',
+			'packages/csaa/src/graph/build-structural-scc-analysis.ts',
+			'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
+			'packages/csaa/src/graph/validate-graph.ts',
+			'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
+			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+			'packages/csaa/src/providers/typescript/extract-symbols.ts',
+			'packages/csaa/src/semantic/repository-smoke.test.ts',
+			'package.json#/scripts/csaa:semantic:smoke:structural-scc'
+		])
+			expect(structuralSccCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		for (const exactBoundary of [
+			STRUCTURAL_SCC_ANALYSIS_METHOD,
+			STRUCTURAL_SCC_ANALYSIS_CAPABILITY,
+			STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS,
+			STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY,
+			STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
+			STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT,
+			STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+			STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+			STRUCTURAL_SCC_ANALYSIS_SELECTION.nodePopulation,
+			STRUCTURAL_SCC_ANALYSIS_SELECTION.edgePopulation,
+			STRUCTURAL_SCC_ANALYSIS_SELECTION.direction,
+			...STRUCTURAL_SCC_ANALYSIS_NONCLAIMS
+		])
+			expect(structuralSccCapability!.explanation).toContain(exactBoundary);
+		for (const boundary of [
+			'independently validated TypeScript module-dependency graph',
+			'preserving parallel edges and self-loops',
+			'Structural closure is exact only for the selected validated graph',
+			'CONFIGURED_NOT_RUN by inventory generation'
+		])
+			expect(structuralSccCapability!.explanation).toContain(boundary);
 		const typescriptAstCapability = capabilities.get('typescript-ast');
 		expect(typescriptAstCapability).toBeDefined();
 		expect(typescriptAstCapability!.provider).toBe('typescript');
@@ -425,9 +551,22 @@ describe('inventory discovery and identity', () => {
 				entry.statement.includes('Program construction remains deferred')
 			)
 		).toBe(false);
-		const semanticBoundary = inventory.unknowns.find((entry) =>
+		const semanticBoundaryEntry = inventory.unknowns.find((entry) =>
 			entry.statement.includes('current DWP-003 frozen Program construction')
-		)?.statement;
+		);
+		expect(semanticBoundaryEntry?.provenance).toEqual(
+			expect.arrayContaining([
+				COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+				'capabilities#structural-scc-analysis',
+				'packages/csaa/src/contracts/structural-scc-analysis.ts',
+				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
+				'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
+			])
+		);
+		const semanticBoundary = semanticBoundaryEntry?.statement;
 		expect(semanticBoundary).toContain('TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction');
 		expect(semanticBoundary).toContain('wall-anchored monotonic operation clock');
 		expect(semanticBoundary).toContain(
@@ -436,7 +575,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first ten bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first twelve bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -447,6 +586,13 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain('compositional static command-bus topology overlay');
 		expect(semanticBoundary).toContain('wrapper around the retained guard-enforcement ledger');
 		expect(semanticBoundary).toContain('compositional static guard-classification overlay');
+		expect(semanticBoundary).toContain('static command-event-contract overlay');
+		expect(semanticBoundary).toContain('deterministic structural SCC analysis');
+		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
+		expect(semanticBoundary).toContain(
+			'does not execute the retained event-surface gate or the configured structural SCC smoke command'
+		);
+		expect(semanticBoundary).toContain('graph algorithms beyond this bounded SCC partition');
 		expect(semanticBoundary).toContain('JAN-CSAA-CAP-007 data-flow graphs');
 		expect(semanticBoundary).toContain(
 			'Inventory generation executes or benchmarks none of these analysis providers'
@@ -478,17 +624,36 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/contracts/guard-classification-overlay.ts',
 				'packages/csaa/src/graph/build-guard-classification-overlay.ts',
 				'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
+				'packages/csaa/src/contracts/command-event-contract-overlay.ts',
+				'packages/csaa/src/graph/build-command-event-contract-overlay.ts',
+				'packages/csaa/src/graph/validate-command-event-contract-overlay.ts',
+				COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+				COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+				'packages/csaa/src/contracts/structural-scc-analysis.ts',
+				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
+				'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, either static overlay, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			'does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'reproduces only the supported BOUND formula and dated pinned EMITTED declaration'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID}`
@@ -858,7 +1023,9 @@ describe('JPWB population non-vacuity', () => {
 				'lint',
 				'test',
 				'test:coverage',
-				'csaa:semantic:smoke:guard-classification'
+				'csaa:semantic:smoke:command-event-contract',
+				'csaa:semantic:smoke:guard-classification',
+				'csaa:semantic:smoke:structural-scc'
 			].map((name) => [name, 'true'])
 		);
 		const manifest = (workspaces: readonly string[] | undefined, scripts = completeScripts) =>
@@ -904,6 +1071,25 @@ describe('JPWB population non-vacuity', () => {
 			collectInventory({ repositoryRoot: missingCommand, requireJpwbPopulations: true })
 		).toThrow('Required JPWB assurance command is absent: boundary');
 
+		const missingCommandEventSmoke = fixture();
+		write(
+			missingCommandEventSmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:command-event-contract'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({ repositoryRoot: missingCommandEventSmoke, requireJpwbPopulations: true })
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:semantic:smoke:command-event-contract'
+		);
+
 		const missingGuardClassificationSmoke = fixture();
 		write(
 			missingGuardClassificationSmoke,
@@ -925,6 +1111,26 @@ describe('JPWB population non-vacuity', () => {
 		).toThrow(
 			'Required JPWB assurance command is absent: csaa:semantic:smoke:guard-classification'
 		);
+
+		const missingStructuralSccSmoke = fixture();
+		write(
+			missingStructuralSccSmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:structural-scc'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingStructuralSccSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:semantic:smoke:structural-scc');
 
 		const noSemanticImplementation = fixture();
 		write(noSemanticImplementation, 'package.json', manifest(['packages/*', 'apps/*']));
@@ -952,7 +1158,9 @@ describe('JPWB population non-vacuity', () => {
 						'lint',
 						'test',
 						'test:coverage',
-						'csaa:semantic:smoke:guard-classification'
+						'csaa:semantic:smoke:command-event-contract',
+						'csaa:semantic:smoke:guard-classification',
+						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, 'true'])
 				),
 				workspaces: ['packages/*', 'apps/*']
@@ -1041,7 +1249,9 @@ describe('JPWB population non-vacuity', () => {
 						'lint',
 						'test',
 						'test:coverage',
-						'csaa:semantic:smoke:guard-classification'
+						'csaa:semantic:smoke:command-event-contract',
+						'csaa:semantic:smoke:guard-classification',
+						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, 'true'])
 				),
 				workspaces: ['packages/*', 'apps/*']
@@ -1095,7 +1305,9 @@ describe('JPWB population non-vacuity', () => {
 						'lint',
 						'test',
 						'test:coverage',
-						'csaa:semantic:smoke:guard-classification'
+						'csaa:semantic:smoke:command-event-contract',
+						'csaa:semantic:smoke:guard-classification',
+						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, 'true'])
 				),
 				workspaces: ['packages/*', 'apps/*']
@@ -1105,6 +1317,11 @@ describe('JPWB population non-vacuity', () => {
 			root,
 			'packages/csaa/package.json',
 			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		write(
+			root,
+			'packages/rph-contracts/package.json',
+			JSON.stringify({ name: '@janumipwb/rph-contracts', private: true, version: '0.0.0' })
 		);
 		const requiredPaths = [
 			'packages/csaa/src/contracts/semantic.ts',
@@ -1155,6 +1372,14 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/guard-classification-overlay-canonical.ts',
 			'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
 			'packages/csaa/src/semantic/repository-smoke.test.ts',
+			'packages/csaa/src/contracts/command-event-contract-overlay.ts',
+			'packages/csaa/src/graph/build-command-event-contract-overlay.ts',
+			'packages/csaa/src/graph/command-event-contract-overlay-canonical.ts',
+			'packages/csaa/src/graph/validate-command-event-contract-overlay.ts',
+			COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
 			'packages/csaa/src/contracts/state-machine-graph.ts',
 			'packages/csaa/src/graph/build-state-machine-graph.ts',
 			'packages/csaa/src/graph/state-machine-graph-content.ts',
@@ -1162,9 +1387,14 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/state-machine-graph-input.ts',
 			'packages/csaa/src/graph/validate-state-machine-graph.ts',
 			'packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts',
-			'packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts'
+			'packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts',
+			'packages/csaa/src/contracts/structural-scc-analysis.ts',
+			'packages/csaa/src/graph/build-structural-scc-analysis.ts',
+			'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
+			'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
 		];
-		for (const path of requiredPaths) write(root, path, 'export {};\n');
+		for (const path of requiredPaths)
+			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
 
 		const missing =
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts';
@@ -1179,10 +1409,64 @@ describe('JPWB population non-vacuity', () => {
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
 			`Required JPWB state-machine graph implementation source is absent: ${missingStateGraph}`
 		);
-	});
+
+		write(root, missingStateGraph, 'export {};\n');
+		const missingCommandEventOverlay =
+			'packages/csaa/src/graph/validate-command-event-contract-overlay.ts';
+		rmSync(join(root, ...missingCommandEventOverlay.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${missingCommandEventOverlay}`
+		);
+
+		write(root, missingCommandEventOverlay, 'export {};\n');
+		const missingCommandEventRegistry = COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH;
+		rmSync(join(root, ...missingCommandEventRegistry.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${missingCommandEventRegistry}`
+		);
+
+		write(root, missingCommandEventRegistry, 'export {};\n');
+		const missingCommandEventProject = COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH;
+		rmSync(join(root, ...missingCommandEventProject.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${missingCommandEventProject}`
+		);
+
+		write(root, missingCommandEventProject, '{}\n');
+		const missingCommandEventInput = COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH;
+		rmSync(join(root, ...missingCommandEventInput.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${missingCommandEventInput}`
+		);
+
+		write(root, missingCommandEventInput, '{}\n');
+		const missingCommandEventCensus = COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH;
+		rmSync(join(root, ...missingCommandEventCensus.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${missingCommandEventCensus}`
+		);
+
+		write(root, missingCommandEventCensus, 'export {};\n');
+		const missingStructuralScc = 'packages/csaa/src/graph/validate-structural-scc-analysis.ts';
+		rmSync(join(root, ...missingStructuralScc.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB structural SCC analysis implementation source is absent: ${missingStructuralScc}`
+		);
+	}, 30_000);
 
 	it('discovers every current workspace manifest and every top-level verif TypeScript asset', () => {
 		const inventory = collectInventory({ repositoryRoot: ROOT, requireJpwbPopulations: true });
+		expect(
+			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:semantic:smoke:command-event-contract'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command:
+				'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=COMMAND_HANDLER vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts',
+			state: 'CONFIGURED_NOT_RUN'
+		});
 		expect(
 			inventory.commands.find(
 				(command) =>
@@ -1194,6 +1478,23 @@ describe('JPWB population non-vacuity', () => {
 				'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=COMMAND_HANDLER vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts',
 			state: 'CONFIGURED_NOT_RUN'
 		});
+		expect(
+			inventory.commands.find(
+				(command) => command.owner === '.' && command.name === 'csaa:semantic:smoke:structural-scc'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command:
+				'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts',
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(inventory.subject.selectedFiles.map((file) => file.path)).toEqual(
+			expect.arrayContaining([
+				'packages/csaa/src/graph/build-structural-scc-analysis.test.ts',
+				'packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts',
+				'packages/csaa/src/graph/structural-scc-analysis-fixture.test-support.ts'
+			])
+		);
 		const manifestCount = ['packages', 'apps'].reduce(
 			(total, base) =>
 				total +

@@ -2,6 +2,7 @@ export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
 export * from './contracts/arrow-command-census.js';
 export * from './contracts/command-handler-graph.js';
+export * from './contracts/command-event-contract-overlay.js';
 export * from './contracts/command-dispatch-topology.js';
 export * from './contracts/guard-enforcement-ledger.js';
 export * from './contracts/guard-classification-overlay.js';
@@ -11,6 +12,7 @@ export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
+export * from './contracts/structural-scc-analysis.js';
 export * from './contracts/subject.js';
 export * from './inventory/canonical.js';
 export * from './inventory/collect-inventory.js';
@@ -38,6 +40,10 @@ export {
 	type CommandHandlerGraphProgressPhase
 } from './graph/build-command-handler-graph.js';
 export {
+	buildCommandEventContractOverlay,
+	selectJpwbCommandEventContractOverlayInputs
+} from './graph/build-command-event-contract-overlay.js';
+export {
 	buildCommandDispatchTopology,
 	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_SCHEMA_VERSION,
 	selectJpwbCommandDispatchTopology,
@@ -61,6 +67,7 @@ export {
 } from './providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.js';
 export { validateGuardEnforcementLedgerObservation } from './providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.js';
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
+export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
 export { validateDependencyProviderComparison } from './graph/validate-dependency-comparison.js';
@@ -93,6 +100,10 @@ export {
 	validateConstructedCommandDispatchTopology
 } from './graph/validate-command-dispatch-topology.js';
 export {
+	validateCommandEventContractOverlay,
+	validateConstructedCommandEventContractOverlay
+} from './graph/validate-command-event-contract-overlay.js';
+export {
 	validateConstructedGuardClassificationOverlay,
 	validateGuardClassificationOverlay
 } from './graph/validate-guard-classification-overlay.js';
@@ -103,6 +114,10 @@ export type {
 	CommandHandlerGraphValidationResult
 } from './graph/validate-command-handler-graph.js';
 export { validateModuleDependencyGraph } from './graph/validate-graph.js';
+export {
+	validateConstructedStructuralSccAnalysis,
+	validateStructuralSccAnalysis
+} from './graph/validate-structural-scc-analysis.js';
 export type {
 	ModuleDependencyGraphValidationIssue,
 	ModuleDependencyGraphValidationIssueCode,

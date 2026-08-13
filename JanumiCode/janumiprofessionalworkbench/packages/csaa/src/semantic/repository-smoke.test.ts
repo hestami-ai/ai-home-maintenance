@@ -15,6 +15,10 @@ import {
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
 	COMMAND_DISPATCH_TOPOLOGY_OPERATION_VERSION,
 	COMMAND_DISPATCH_TOPOLOGY_REQUEST_SCHEMA_VERSION,
 	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH,
@@ -43,6 +47,15 @@ import {
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
+	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
+	STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+	STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+	STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT,
+	STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY,
+	STRUCTURAL_SCC_ANALYSIS_NONCLAIMS,
+	STRUCTURAL_SCC_ANALYSIS_SELECTION,
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
 	type ModuleDependencyGraphSnapshot,
@@ -54,12 +67,14 @@ import {
 	type StaticSemanticSnapshotProgressEvent,
 	type ResolveSubjectRequest,
 	buildCallGraph,
+	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
 	buildCommandDispatchTopology,
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
+	buildStructuralSccAnalysis,
 	buildReadWriteAccessGraph,
 	buildStaticSemanticSnapshot,
 	buildStateMachineGraph,
@@ -71,17 +86,20 @@ import {
 	observeGuardEnforcementLedger,
 	observeStateMachineTopology,
 	resolveSubject,
+	selectJpwbCommandEventContractOverlayInputs,
 	selectJpwbCommandHandlerRegistries,
 	selectJpwbCommandDispatchTopology,
 	sha256,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateArrowCommandCensusObservation,
+	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
 	validateCommandDispatchTopology,
 	validateGuardClassificationOverlay,
 	validateGuardEnforcementLedgerObservation,
 	validateModuleDependencyGraph,
+	validateStructuralSccAnalysis,
 	validateReadWriteAccessGraph,
 	validateStateMachineGraph,
 	validateStateMachineTopologyObservation,
@@ -95,12 +113,14 @@ type RepositorySmokeSuite = 'COMMAND_HANDLER_ONLY' | 'FULL_SUITE';
 interface RepositorySmokeProjectionPlan {
 	readonly runIndependentSemanticRevalidation: boolean;
 	readonly runCallGraph: boolean;
+	readonly runCommandEventContractOverlay: boolean;
 	readonly runDependencyProviderComparison: boolean;
 	readonly runGuardClassificationOverlay: boolean;
 	readonly runModuleDependencyGraph: boolean;
 	readonly runReadWriteAccessGraph: boolean;
 	readonly runRepositoryDiscoveryPreflight: boolean;
 	readonly runStateMachineProjection: boolean;
+	readonly runStructuralSccAnalysis: boolean;
 	readonly suite: RepositorySmokeSuite;
 }
 
@@ -110,23 +130,27 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 	COMMAND_HANDLER_ONLY: {
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: false,
+		runCommandEventContractOverlay: true,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: true,
 		runModuleDependencyGraph: false,
 		runReadWriteAccessGraph: false,
 		runRepositoryDiscoveryPreflight: false,
 		runStateMachineProjection: true,
+		runStructuralSccAnalysis: false,
 		suite: 'COMMAND_HANDLER_ONLY'
 	},
 	FULL_SUITE: {
 		runIndependentSemanticRevalidation: true,
 		runCallGraph: true,
+		runCommandEventContractOverlay: false,
 		runDependencyProviderComparison: true,
 		runGuardClassificationOverlay: false,
 		runModuleDependencyGraph: true,
 		runReadWriteAccessGraph: true,
 		runRepositoryDiscoveryPreflight: true,
 		runStateMachineProjection: true,
+		runStructuralSccAnalysis: true,
 		suite: 'FULL_SUITE'
 	}
 };
@@ -225,15 +249,17 @@ const USE_COMMON_COMMAND_HANDLER_SUBJECT =
 	COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS.every(
 		(path, index) => SELECTED_PROJECTS[index] === path
 	);
-const COMMAND_ANALYSIS_RETAINED_ARTIFACTS = [
+const COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS = [
 	...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 	...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
-	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH
+	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
 ] as const;
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.2.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.4.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -241,6 +267,7 @@ type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION'
 	| 'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE'
 	| 'CALL_GRAPH'
+	| 'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY'
 	| 'COMMAND_HANDLER_STATIC_PROJECTION'
 	| 'COMMAND_DISPATCH_STATIC_TOPOLOGY'
 	| 'GUARD_CLASSIFICATION_STATIC_OVERLAY'
@@ -251,6 +278,7 @@ type RepositorySmokePhase =
 	| 'DEPENDENCY_CRUISER_NORMALIZATION'
 	| 'DEPENDENCY_PROVIDER_COMPARISON'
 	| 'MODULE_DEPENDENCY_GRAPH'
+	| 'STRUCTURAL_SCC_ANALYSIS'
 	| 'READ_WRITE_ACCESS_GRAPH'
 	| 'REPOSITORY_DISCOVERY_PREFLIGHT'
 	| 'SELECTED_SUBJECT_RESOLUTION'
@@ -497,23 +525,27 @@ describe('repository smoke phase telemetry', () => {
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.COMMAND_HANDLER_ONLY).toEqual({
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
+			runCommandEventContractOverlay: true,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: true,
 			runModuleDependencyGraph: false,
 			runReadWriteAccessGraph: false,
 			runRepositoryDiscoveryPreflight: false,
 			runStateMachineProjection: true,
+			runStructuralSccAnalysis: false,
 			suite: 'COMMAND_HANDLER_ONLY'
 		});
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.FULL_SUITE).toEqual({
 			runIndependentSemanticRevalidation: true,
 			runCallGraph: true,
+			runCommandEventContractOverlay: false,
 			runDependencyProviderComparison: true,
 			runGuardClassificationOverlay: false,
 			runModuleDependencyGraph: true,
 			runReadWriteAccessGraph: true,
 			runRepositoryDiscoveryPreflight: true,
 			runStateMachineProjection: true,
+			runStructuralSccAnalysis: true,
 			suite: 'FULL_SUITE'
 		});
 		expect(semanticCapabilitiesForProfile('STRUCTURAL')).toEqual([
@@ -536,10 +568,12 @@ describe('repository smoke phase telemetry', () => {
 			'packages/rph-ports/tsconfig.json',
 			'packages/rph-projections/tsconfig.json'
 		]);
-		expect(COMMAND_ANALYSIS_RETAINED_ARTIFACTS).toEqual([
+		expect(COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS).toEqual([
 			...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
-			COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH
+			COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+			COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
 		]);
 	});
 
@@ -683,7 +717,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						? { kind: 'REPOSITORY' }
 						: {
 								...(USE_COMMON_COMMAND_HANDLER_SUBJECT
-									? { additionalArtifacts: COMMAND_ANALYSIS_RETAINED_ARTIFACTS }
+									? { additionalArtifacts: COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS }
 									: {}),
 								kind: 'EXPLICIT_PROJECTS',
 								projects: SELECTED_PROJECTS
@@ -887,6 +921,17 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly nodes: number;
 					readonly sha256: string;
 				} = null;
+				let structuralSccAnalysisResult: null | {
+					readonly bytes: number;
+					readonly components: number;
+					readonly cyclicComponents: number;
+					readonly durationMs: number;
+					readonly inputEdges: number;
+					readonly inputNodes: number;
+					readonly multiNodeComponents: number;
+					readonly selfLoopSingletons: number;
+					readonly sha256: string;
+				} = null;
 				if (SMOKE_PROJECTION_PLAN.runModuleDependencyGraph) {
 					const graphStartedAt = performance.now();
 					telemetry.start('MODULE_DEPENDENCY_GRAPH', {
@@ -938,6 +983,105 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				} else
 					telemetry.skip('MODULE_DEPENDENCY_GRAPH', {
 						reason: 'The selected smoke suite does not request the module-dependency projection.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
+				if (SMOKE_PROJECTION_PLAN.runStructuralSccAnalysis) {
+					if (moduleDependencyGraph === null)
+						throw new Error('Structural SCC analysis requires the validated module graph.');
+					const sccStartedAt = performance.now();
+					telemetry.start('STRUCTURAL_SCC_ANALYSIS', {
+						edges: moduleDependencyGraph.edges.length,
+						nodes: moduleDependencyGraph.nodes.length
+					});
+					const sccInputs = {
+						graph: moduleDependencyGraph,
+						request: {
+							budgets: {
+								maxComponents: moduleDependencyGraph.nodes.length,
+								maxDiagnostics: 100_000,
+								maxEdges: moduleDependencyGraph.edges.length,
+								maxInputRecords: 10_000_000,
+								maxInputStringCharacters: 1_000_000_000,
+								maxNodes: moduleDependencyGraph.nodes.length,
+								maxTraversalSteps:
+									moduleDependencyGraph.nodes.length + moduleDependencyGraph.edges.length
+							},
+							operationVersion: STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
+							schemaVersion: STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
+							selection: STRUCTURAL_SCC_ANALYSIS_SELECTION,
+							semanticSnapshotId: snapshot.id,
+							sourceGraph: {
+								contentDigest: moduleDependencyGraph.contentDigest,
+								graphId: moduleDependencyGraph.id,
+								graphInputDigest: moduleDependencyGraph.graphInputDigest,
+								graphKind: 'TYPESCRIPT_MODULE_DEPENDENCY' as const
+							},
+							subjectId: snapshot.subjectId
+						},
+						semanticSnapshot: snapshot
+					};
+					const sccOutcome = buildStructuralSccAnalysis(sccInputs);
+					expect(sccOutcome.outcome, JSON.stringify(sccOutcome.diagnostics)).toBe('partial');
+					if (sccOutcome.outcome !== 'partial') throw new Error(JSON.stringify(sccOutcome));
+					const analysis = sccOutcome.analysis;
+					expect(
+						validateStructuralSccAnalysis(analysis, sccInputs, {
+							maxDepth: 64,
+							maxInputRecords: 10_000_000,
+							maxInputStringCharacters: 1_000_000_000,
+							maxIssues: 100_000,
+							maxRecords: Math.max(1, analysis.coverage.chargedTraversalSteps * 64),
+							maxStringCharacters: Math.max(1, analysis.coverage.chargedTraversalSteps * 4_096)
+						})
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(analysis.coverage.partitionReconciles).toBe(true);
+					expect(analysis.coverage.edgeAccountingReconciles).toBe(true);
+					expect(analysis.coverage).toMatchObject({
+						components: 2_591,
+						cyclicComponents: 0,
+						inputEdges: 1_157,
+						inputNodes: 2_591,
+						multiNodeComponents: 0,
+						selfLoopSingletons: 0
+					});
+					expect(analysis.nonclaims).toEqual(STRUCTURAL_SCC_ANALYSIS_NONCLAIMS);
+					expect(analysis.graphAuthority).toBe(STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY);
+					expect(analysis.authorityTransfer).toBe(STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER);
+					expect(analysis.gateEffect).toBe(STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT);
+					expect(analysis.structuralClosure).toBe('EXACT_FOR_SELECTED_VALIDATED_GRAPH');
+					expect(analysis.upstreamClosure).toBe('OPEN');
+					expect(analysis.health).toBe('PARTIAL');
+					expect(analysis.fullJanCsaa007Conformance).toBe(
+						STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE
+					);
+					expect(analysis.fullJanCsaa008Conformance).toBe(
+						STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE
+					);
+					expect(moduleDependencyGraph.nodes).toHaveLength(2_591);
+					expect(moduleDependencyGraph.edges).toHaveLength(1_157);
+					const witness = canonicalSemanticJsonWitness(analysis);
+					telemetry.complete({
+						bytes: witness.bytes,
+						components: analysis.coverage.components,
+						cyclicComponents: analysis.coverage.cyclicComponents,
+						inputEdges: analysis.coverage.inputEdges,
+						inputNodes: analysis.coverage.inputNodes,
+						validationState: 'VALID'
+					});
+					structuralSccAnalysisResult = {
+						bytes: witness.bytes,
+						components: analysis.coverage.components,
+						cyclicComponents: analysis.coverage.cyclicComponents,
+						durationMs: Math.max(0, Math.round(performance.now() - sccStartedAt)),
+						inputEdges: analysis.coverage.inputEdges,
+						inputNodes: analysis.coverage.inputNodes,
+						multiNodeComponents: analysis.coverage.multiNodeComponents,
+						selfLoopSingletons: analysis.coverage.selfLoopSingletons,
+						sha256: witness.sha256
+					};
+				} else
+					telemetry.skip('STRUCTURAL_SCC_ANALYSIS', {
+						reason: 'The selected smoke suite does not request structural SCC analysis.',
 						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
 					});
 				let callGraphResult: null | {
@@ -1581,6 +1725,20 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly handlerRegistryEntries: number;
 					readonly nodes: number;
 				} = null;
+				let commandEventContractOverlayResult: null | {
+					readonly additionalDeclaredLinks: number;
+					readonly boundContributions: number;
+					readonly boundDistinctEvents: number;
+					readonly bytes: number;
+					readonly commands: number;
+					readonly declaredLinks: number;
+					readonly durationMs: number;
+					readonly eventContracts: number;
+					readonly frontiers: number;
+					readonly pinnedEmissions: number;
+					readonly primaryDeclaredLinks: number;
+					readonly retainedCensusBytes: number;
+				} = null;
 				let commandDispatchTopologyResult: null | {
 					readonly bytes: number;
 					readonly candidateEdges: number;
@@ -1717,6 +1875,157 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						handlerRegistryEntries: commandHandlerGraph.coverage.discoveredHandlerRegistryEntries,
 						nodes: commandHandlerGraph.nodes.length
 					};
+
+					if (SMOKE_PROJECTION_PLAN.runCommandEventContractOverlay) {
+						const commandEventStartedAt = performance.now();
+						const commandEventSelection = selectJpwbCommandEventContractOverlayInputs(
+							snapshot,
+							subject
+						);
+						const commandEventBudgets = {
+							maxAstNodes: Math.max(1, snapshot.astNodes.length),
+							maxBoundContributions: Math.max(1, snapshot.astNodes.length),
+							maxCommands: Math.max(1, snapshot.declarations.length),
+							maxDeclaredLinks: Math.max(1, snapshot.astNodes.length),
+							maxDiagnostics: 100_000,
+							maxEventContracts: Math.max(1, snapshot.declarations.length),
+							maxFrontiers: Math.max(1, snapshot.astNodes.length),
+							maxPinnedEmissions: Math.max(1, snapshot.declarations.length),
+							maxSourceBytes: Math.max(1, subjectArtifactBytes)
+						};
+						const { retainedCensusArtifact, vocabArtifact } = commandEventSelection;
+						const commandEventRequest = {
+							arrowObservationId: arrowObservation.id,
+							budgets: commandEventBudgets,
+							commandHandlerGraphId: commandHandlerGraph.id,
+							commandRegistry: commandEventSelection.commandRegistry,
+							eventRegistry: commandEventSelection.eventRegistry,
+							operationVersion: COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
+							retainedCensusArtifact,
+							schemaVersion: COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: snapshot.subjectId,
+							vocabArtifact
+						};
+						const commandEventInputs = {
+							arrowObservation,
+							commandHandlerGraph,
+							commandHandlerRequest,
+							request: commandEventRequest,
+							semanticSnapshot: snapshot,
+							subject
+						};
+						telemetry.start('COMMAND_EVENT_CONTRACT_STATIC_OVERLAY', {
+							budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+							budgets: commandEventBudgets,
+							predecessorGraphId: commandHandlerGraph.id,
+							retainedCensusArtifact: retainedCensusArtifact.artifactPath,
+							vocabArtifact: vocabArtifact.artifactPath
+						});
+						const commandEventOutcome = buildCommandEventContractOverlay(commandEventInputs, {
+							onProgress(event) {
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						});
+						expect(
+							commandEventOutcome.outcome,
+							JSON.stringify(commandEventOutcome.diagnostics)
+						).toBe('partial');
+						if (commandEventOutcome.outcome !== 'partial')
+							throw new Error(JSON.stringify(commandEventOutcome));
+						const commandEventOverlay = commandEventOutcome.overlay;
+						expect(
+							validateCommandEventContractOverlay(commandEventOverlay, commandEventInputs, {
+								maxInputRecords: 10_000_000,
+								maxInputStringCharacters: 1_000_000_000,
+								maxIssues: 100_000,
+								maxRecords: 10_000_000,
+								maxStringCharacters: 1_000_000_000
+							})
+						).toEqual({ issues: [], state: 'VALID' });
+						expect(commandEventOverlay.coverage).toEqual({
+							additionalDeclaredLinks: 4,
+							boundContributions: 179,
+							boundDistinctEvents: 104,
+							boundRepeatedContributions: 75,
+							commandDeclaredDistinctEvents: 104,
+							commandDeclaredLinks: 104,
+							commands: 100,
+							commandsWithoutTransitionBinding: 25,
+							declaredNeitherBoundNorPinned: 33,
+							eventContracts: 142,
+							frontiers: 63,
+							generatedBoundSetDifferences: 0,
+							missingEventContracts: 0,
+							pinnedEmissions: 109,
+							pinnedEmittedNotBound: 5,
+							primaryDeclaredLinks: 100,
+							reconciles: true,
+							retainedBoundNotPinnedEmitted: 0
+						});
+						expect(commandEventOverlay.layers[1]).toMatchObject({
+							boundContributionIds: [],
+							capability: 'JAN-CSAA-CAP-028',
+							commandIds: [],
+							declaredLinkIds: [],
+							eventIds: [],
+							frontierIds: [],
+							kind: 'JPWB_COMMAND_EVENT_CONTRACT_INFERENCE',
+							pinnedEmissionIds: []
+						});
+						expect(commandEventOverlay.retainedCensus).toMatchObject({
+							artifactPath: COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+							authorityTransfer: 'NONE',
+							execution: 'NOT_EXECUTED_BY_CSAA',
+							gateEffect: 'NONE',
+							integration: 'NOT_INTEGRATED',
+							oracleChange: 'NONE',
+							replacementEquivalence: 'NOT_CLAIMED',
+							verifierAuthority: 'RETAINED_DELEGATED'
+						});
+						expect(commandEventOverlay.vocabArtifact.artifactPath).toBe(
+							COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
+						);
+						expect(commandEventOverlay.health).toBe('PARTIAL');
+						expect(commandEventOverlay.runtimeEmission).toBe('NOT_CLAIMED');
+						expect(commandEventOverlay.runtimePerformability).toBe('NOT_CLAIMED');
+						expect(commandEventOverlay.fullJanCsaa007Conformance).toBe('NOT_CLAIMED');
+						expect(commandEventOverlay.fullJanCsaa008Conformance).toBe('NOT_CLAIMED');
+						const commandEventWitness = canonicalSemanticJsonWitness(commandEventOverlay);
+						telemetry.complete({
+							additionalDeclaredLinks: commandEventOverlay.coverage.additionalDeclaredLinks,
+							boundContributions: commandEventOverlay.coverage.boundContributions,
+							boundDistinctEvents: commandEventOverlay.coverage.boundDistinctEvents,
+							bytes: commandEventWitness.bytes,
+							commands: commandEventOverlay.coverage.commands,
+							declaredLinks: commandEventOverlay.coverage.commandDeclaredLinks,
+							eventContracts: commandEventOverlay.coverage.eventContracts,
+							frontiers: commandEventOverlay.coverage.frontiers,
+							pinnedEmissions: commandEventOverlay.coverage.pinnedEmissions,
+							primaryDeclaredLinks: commandEventOverlay.coverage.primaryDeclaredLinks,
+							retainedCensusBytes: commandEventOverlay.retainedCensus.artifactBytes,
+							validationState: 'VALID'
+						});
+						commandEventContractOverlayResult = {
+							additionalDeclaredLinks: commandEventOverlay.coverage.additionalDeclaredLinks,
+							boundContributions: commandEventOverlay.coverage.boundContributions,
+							boundDistinctEvents: commandEventOverlay.coverage.boundDistinctEvents,
+							bytes: commandEventWitness.bytes,
+							commands: commandEventOverlay.coverage.commands,
+							declaredLinks: commandEventOverlay.coverage.commandDeclaredLinks,
+							durationMs: Math.max(0, Math.round(performance.now() - commandEventStartedAt)),
+							eventContracts: commandEventOverlay.coverage.eventContracts,
+							frontiers: commandEventOverlay.coverage.frontiers,
+							pinnedEmissions: commandEventOverlay.coverage.pinnedEmissions,
+							primaryDeclaredLinks: commandEventOverlay.coverage.primaryDeclaredLinks,
+							retainedCensusBytes: commandEventOverlay.retainedCensus.artifactBytes
+						};
+					} else
+						telemetry.skip('COMMAND_EVENT_CONTRACT_STATIC_OVERLAY', {
+							reason:
+								'The selected smoke suite does not request the command-event-contract overlay.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
 
 					if (SMOKE_PROJECTION_PLAN.runGuardClassificationOverlay) {
 						if (guardObservation === null || stateMachineProjection === null)
@@ -1978,6 +2287,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						arrowObservationSubjectId: arrowObservation.subjectId
 					};
 					telemetry.skip('COMMAND_HANDLER_STATIC_PROJECTION', skipDetails);
+					telemetry.skip('COMMAND_EVENT_CONTRACT_STATIC_OVERLAY', skipDetails);
 					telemetry.skip('COMMAND_DISPATCH_STATIC_TOPOLOGY', skipDetails);
 					telemetry.skip('GUARD_CLASSIFICATION_STATIC_OVERLAY', skipDetails);
 				}
@@ -2215,6 +2525,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(
 						'COMMAND_HANDLER_ONLY cannot complete without a validated command-handler projection.'
 					);
+				if (
+					SMOKE_PROJECTION_PLAN.runCommandEventContractOverlay &&
+					commandEventContractOverlayResult === null
+				)
+					throw new Error(
+						'The selected smoke suite cannot complete without a validated command-event-contract overlay.'
+					);
 				if (SMOKE_SUITE === 'COMMAND_HANDLER_ONLY' && commandDispatchTopologyResult === null)
 					throw new Error(
 						'COMMAND_HANDLER_ONLY cannot complete without a validated command-dispatch static topology.'
@@ -2226,6 +2543,10 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(
 						'The selected smoke suite cannot complete without validated guard-ledger and guard-classification evidence.'
 					);
+				if (SMOKE_PROJECTION_PLAN.runStructuralSccAnalysis && structuralSccAnalysisResult === null)
+					throw new Error(
+						'The selected smoke suite cannot complete without validated structural SCC analysis.'
+					);
 				const exactSubjectReuse =
 					arrowSubject === subject &&
 					snapshot.subjectId === subject.descriptor.subjectId &&
@@ -2236,6 +2557,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				const skippedPhases = telemetry.skippedPhases();
 				telemetry.finish({
 					arrowCommandCensusOutcome: arrowOutcome.outcome,
+					commandEventContractStaticOverlay: commandEventContractOverlayResult !== null,
 					commandDispatchStaticTopology: commandDispatchTopologyResult !== null,
 					commandHandlerStaticProjection: commandHandlerResult !== null,
 					exactSubjectReuse,
@@ -2247,7 +2569,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					smokeSuite: SMOKE_SUITE,
 					projects: snapshot.projects.length,
 					sources: snapshot.sources.length,
-					stateMachineProjected: stateMachineResult !== null
+					stateMachineProjected: stateMachineResult !== null,
+					structuralSccAnalyzed: structuralSccAnalysisResult !== null
 				});
 				process.stdout.write(
 					`${JSON.stringify({
@@ -2276,6 +2599,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							uncoveredArrows: arrowObservation.coverage.uncoveredArrows
 						},
 						callGraph: callGraphResult,
+						commandEventContractStaticOverlay: commandEventContractOverlayResult,
 						commandDispatchStaticTopology: commandDispatchTopologyResult,
 						commandHandlerStaticProjection: commandHandlerResult,
 						dependencyProviderComparison: dependencyProviderResult,
@@ -2299,6 +2623,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						skippedPhases,
 						smokeSuite: SMOKE_SUITE,
 						stateMachine: stateMachineResult,
+						structuralSccAnalysis: structuralSccAnalysisResult,
 						sourceCount: snapshot.sources.length
 					})}\n`
 				);

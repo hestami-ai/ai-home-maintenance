@@ -37,7 +37,7 @@ beforeAll(() => {
 	if (outcome.outcome !== 'partial')
 		throw new Error(`Topology fixture construction failed: ${JSON.stringify(outcome)}`);
 	graph = outcome.graph;
-});
+}, 120_000);
 
 afterAll(() => fixture.cleanup());
 

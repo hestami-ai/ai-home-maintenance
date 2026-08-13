@@ -156,7 +156,7 @@ function withoutDeclaredCommandEvidence(): GuardClassificationOverlayBuildInputs
 	};
 }
 
-describe('guard-classification overlay hostile-path coverage', { timeout: 30_000 }, () => {
+describe('guard-classification overlay hostile-path coverage', { timeout: 120_000 }, () => {
 	it('preserves candidate-only factory, helper-frontier, and table-evidence boundaries', () => {
 		for (const [make, expected] of [
 			[

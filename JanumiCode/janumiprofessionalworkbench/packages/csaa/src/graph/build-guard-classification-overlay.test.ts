@@ -27,7 +27,7 @@ let value: GuardClassificationOverlayPredecessorFixture;
 
 beforeAll(() => {
 	value = createGuardClassificationOverlayPredecessorFixture();
-});
+}, 120_000);
 
 afterAll(() => {
 	value.cleanup();

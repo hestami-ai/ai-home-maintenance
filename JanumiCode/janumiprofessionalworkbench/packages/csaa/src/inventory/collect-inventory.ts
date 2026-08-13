@@ -7,11 +7,29 @@ import {
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
 import {
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
+} from '../contracts/command-event-contract-overlay.js';
+import {
 	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
 	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
 	GUARD_ENFORCEMENT_LEDGER_METHOD,
 	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
 } from '../contracts/guard-enforcement-ledger.js';
+import {
+	STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
+	STRUCTURAL_SCC_ANALYSIS_CAPABILITY,
+	STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS,
+	STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+	STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+	STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT,
+	STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY,
+	STRUCTURAL_SCC_ANALYSIS_METHOD,
+	STRUCTURAL_SCC_ANALYSIS_NONCLAIMS,
+	STRUCTURAL_SCC_ANALYSIS_SELECTION
+} from '../contracts/structural-scc-analysis.js';
 import {
 	INVENTORY_GENERATOR_ID,
 	INVENTORY_GENERATOR_VERSION,
@@ -68,6 +86,14 @@ const TYPESCRIPT_MODULE_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/validate-graph.ts'
 ] as const;
 
+const TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE = [
+	'packages/csaa/src/contracts/structural-scc-analysis.ts',
+	'packages/csaa/src/graph/build-structural-scc-analysis.ts',
+	'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
+	'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+
 const TYPESCRIPT_CALL_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/call-graph.ts',
 	'packages/csaa/src/graph/build-call-graph.ts',
@@ -89,6 +115,21 @@ const JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/build-command-handler-graph.ts',
 	'packages/csaa/src/graph/command-handler-graph-canonical.ts',
 	'packages/csaa/src/graph/validate-command-handler-graph.ts'
+] as const;
+
+const JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE = [
+	'packages/csaa/src/contracts/command-event-contract-overlay.ts',
+	'packages/csaa/src/graph/build-command-event-contract-overlay.ts',
+	'packages/csaa/src/graph/command-event-contract-overlay-canonical.ts',
+	'packages/csaa/src/graph/validate-command-event-contract-overlay.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+
+const JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE = [
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH
 ] as const;
 
 const JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE = [
@@ -204,10 +245,12 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'TS_TYPE',
 	'configuration-ast-parse',
 	'command-dispatch-static-topology',
+	'command-event-contract-static-overlay',
 	'command-handler-static-projection',
 	'frozen-program-construction',
 	'guard-classification-static-overlay',
-	'read-write-access-projection'
+	'read-write-access-projection',
+	'structural-scc-analysis'
 ] as const;
 
 function canonicalProvenance(...paths: readonly string[]): string[] {
@@ -768,20 +811,24 @@ function providerInventory(
 			installationState: version ? 'LOCKED' : 'NOT_LOCKED',
 			name,
 			potentialCapabilities,
-			provenance: [
+			provenance: canonicalProvenance(
 				...(lock ? [lock.path] : []),
 				...configurationPaths[name],
 				...gateEvidence[name],
 				...(inventoryIntegrated
 					? [
 							...TYPESCRIPT_SEMANTIC_PROVENANCE,
+							...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+							...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 							...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
 							...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 							...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE
 						]
 					: [])
-			].sort(compareText),
+			),
 			version
 		};
 	});
@@ -995,7 +1042,7 @@ function capabilities(): CapabilityInventory[] {
 				'The tenth bounded DWP-004 increment composes the validated retained guard-enforcement ledger, generated state-machine observation and graph, retained arrow observation, command-handler graph, one frozen subject, and one structural semantic snapshot. It preserves all guard classifications without promotion; maps every ledger arrow to its exact legal-transition record and complete projected state-edge set; correlates every matching retained declared-command occurrence; and rebinds ENFORCED citations by exact path and unique anchor text instead of stale retained line numbers. Exact direct-handler links remain JAN-CSAA-CAP-027 derivation evidence based only on static AST containment. Shared-factory links remain candidate-only JAN-CSAA-CAP-028 inference evidence, and helper citations remain explicit frontiers. Static correlation neither invokes nor executes handlers. A dedicated structural common-subject smoke command is configured but is not executed by inventory generation. The overlay does not prove handler ownership, handler execution, refusal semantics, CFG dominance, reachability, runtime enforcement or performability, effects, events, persistence, replacement equivalence, or full JAN-CSAA-007/008 conformance.',
 			id: 'guard-classification-static-overlay',
 			provider: 'typescript+retained-guard-state-handler-overlay',
-			provenance: [
+			provenance: canonicalProvenance(
 				...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 				...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
 				...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE,
@@ -1011,7 +1058,42 @@ function capabilities(): CapabilityInventory[] {
 				'capabilities#symbol-table',
 				'capabilities#typescript-ast',
 				'package.json#/scripts/csaa:semantic:smoke:guard-classification'
+			),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				"The eleventh bounded DWP-004 increment composes the validated command-handler graph, one frozen subject, and one structural semantic snapshot with the exact generated COMMANDS and EVENTS declarations, exact command/event vocabulary artifact, and exact retained event-surface census artifact. It records primary and additional command-declared event links, event payload-schema references, the retained BOUND formula's command-primary and transition-binding contributions, and the dated pinned EMITTED set, while preserving distinct sets and explicit discrepancy frontiers. Exact overlay-originated records occupy the JAN-CSAA-CAP-027 derivation lane; referenced predecessor handler attributions remain visibly exact, candidate, or unresolved without promotion. The overlay's JAN-CSAA-CAP-028 inference lane is present but empty: it adds no candidate relationship or runtime conclusion from a surface discrepancy. The retained event-surface gate remains RETAINED_DELEGATED, NOT_EXECUTED_BY_CSAA, and NOT_INTEGRATED, with no authority, oracle, baseline, or gate change. Static correlation neither invokes nor executes a handler and does not establish handler ownership, event construction or emission, runtime execution or performability, payload compatibility, control-flow feasibility, persistence effects, replacement equivalence, or full JAN-CSAA-007/008 conformance.",
+			id: 'command-event-contract-static-overlay',
+			provider: 'typescript+command-handler-graph+jpwb-event-contract-overlay',
+			provenance: [
+				...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+				...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
+				...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+				...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
+				...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SEMANTIC_PROVENANCE,
+				'capabilities#arrow-command-census',
+				'capabilities#command-handler-static-projection',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast',
+				'package.json#/scripts/csaa:semantic:smoke:command-event-contract'
 			],
+			state: 'PARTIAL'
+		},
+		{
+			explanation: `The twelfth bounded DWP-004 increment applies ${STRUCTURAL_SCC_ANALYSIS_METHOD} to one independently validated TypeScript module-dependency graph and deterministically partitions ${STRUCTURAL_SCC_ANALYSIS_SELECTION.nodePopulation} over ${STRUCTURAL_SCC_ANALYSIS_SELECTION.edgePopulation} in ${STRUCTURAL_SCC_ANALYSIS_SELECTION.direction} direction while preserving parallel edges and self-loops. It publishes canonical component membership, node-to-component indexing, internal-edge attribution, cycle-kind classification, exact population and edge-accounting reconciliation, source-graph identity, semantic-snapshot identity, and explicit upstream-closure status under ${STRUCTURAL_SCC_ANALYSIS_CAPABILITY} with ${STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS} status. Structural closure is exact only for the selected validated graph; graph authority is ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer is ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect is ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}. The dedicated structural full-suite smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are ${STRUCTURAL_SCC_ANALYSIS_NONCLAIMS.join(', ')}. Full JAN-CSAA-007 conformance is ${STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE}.`,
+			id: 'structural-scc-analysis',
+			provider: 'typescript+validated-module-dependency-graph-scc',
+			provenance: canonicalProvenance(
+				...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+				...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SEMANTIC_PROVENANCE,
+				'capabilities#dependency-graph',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast',
+				'package.json#/scripts/csaa:semantic:smoke:structural-scc'
+			),
 			state: 'PARTIAL'
 		},
 		...unimplemented.map((id): CapabilityInventory => ({
@@ -1147,7 +1229,9 @@ function assertJpwbNonVacuity(
 		'lint',
 		'test',
 		'test:coverage',
-		'csaa:semantic:smoke:guard-classification'
+		'csaa:semantic:smoke:command-event-contract',
+		'csaa:semantic:smoke:guard-classification',
+		'csaa:semantic:smoke:structural-scc'
 	]) {
 		if (!rootNames.has(required))
 			throw new Error(`Required JPWB assurance command is absent: ${required}`);
@@ -1211,10 +1295,27 @@ function assertJpwbNonVacuity(
 			);
 		}
 	}
+	for (const required of [
+		...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+		...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE
+	]) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${required}`
+			);
+		}
+	}
 	for (const required of JPWB_STATE_MACHINE_GRAPH_PROVENANCE) {
 		if (!selectedPaths.has(required)) {
 			throw new Error(
 				`Required JPWB state-machine graph implementation source is absent: ${required}`
+			);
+		}
+	}
+	for (const required of TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB structural SCC analysis implementation source is absent: ${required}`
 			);
 		}
 	}
@@ -1291,7 +1392,10 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
 					...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+					...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+					...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
 					...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
@@ -1301,18 +1405,20 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#arrow-command-census',
 					'capabilities#call-graph',
 					'capabilities#command-dispatch-static-topology',
+					'capabilities#command-event-contract-static-overlay',
 					'capabilities#command-handler-static-projection',
 					'capabilities#guard-enforcement-ledger',
 					'capabilities#guard-classification-static-overlay',
 					'capabilities#dependency-graph',
 					'capabilities#read-write-access-graph',
 					'capabilities#state-machine-graph',
+					'capabilities#structural-scc-analysis',
 					'capabilities#symbol-table',
 					'capabilities#typescript-ast',
 					'capabilities#type-graph'
 				),
 				statement:
-					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first ten bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, and a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, and runtime command performability remain UNIMPLEMENTED.'
+					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first twelve bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, and a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC smoke command. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms beyond this bounded SCC partition, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED.'
 			},
 			{
 				provenance: canonicalProvenance(
@@ -1321,12 +1427,15 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
 					...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE,
 					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+					...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+					...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 					...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
 				),
-				statement: `Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} using method ${GUARD_ENFORCEMENT_LEDGER_METHOD}; its retained analyzer, data, tests, ${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families remain delegated and unwrapped. Neither wrapper, either static overlay, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. Runtime guard enforcement, runtime dispatch, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.`
+				statement: `Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} using method ${GUARD_ENFORCEMENT_LEDGER_METHOD}; its retained analyzer, data, tests, ${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}; it does not change retained verifier authority. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, any static overlay, partial call graph, structural SCC analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.`
 			},
 			{
 				provenance: ['subject.excludedClasses'],

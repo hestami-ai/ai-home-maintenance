@@ -18,7 +18,11 @@ import {
 	type ModuleDependencyGraphNode,
 	type ModuleDependencyGraphSnapshot
 } from '../contracts/graph.js';
-import { canonicalSemanticJson, isUnicodeScalarString } from '../semantic/canonical.js';
+import {
+	canonicalSemanticJson,
+	isProxyValue,
+	isUnicodeScalarString
+} from '../semantic/canonical.js';
 import { assertCanonicalRelativePath } from '../subject/paths.js';
 import {
 	moduleDependencyGraphEdgeId,
@@ -228,9 +232,34 @@ class IssueCollector {
 type JsonRecord = Record<string, unknown>;
 
 function plainRecord(value: unknown): value is JsonRecord {
-	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+	if (value === null || typeof value !== 'object' || isProxyValue(value) || Array.isArray(value))
+		return false;
 	const prototype = Object.getPrototypeOf(value);
 	return prototype === Object.prototype || prototype === null;
+}
+
+function plainArray(value: unknown): value is readonly unknown[] {
+	if (
+		value === null ||
+		typeof value !== 'object' ||
+		isProxyValue(value) ||
+		!Array.isArray(value) ||
+		Object.getPrototypeOf(value) !== Array.prototype
+	)
+		return false;
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
+	if (lengthDescriptor === undefined || !('value' in lengthDescriptor)) return false;
+	const lengthValue = lengthDescriptor.value;
+	if (!Number.isSafeInteger(lengthValue) || (lengthValue as number) < 0) return false;
+	const length = lengthValue as number;
+	const ownKeys = Reflect.ownKeys(value);
+	if (ownKeys.length !== length + 1 || ownKeys.some((key) => typeof key === 'symbol')) return false;
+	for (let index = 0; index < length; index += 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			return false;
+	}
+	return true;
 }
 
 function exactKeys(
@@ -243,7 +272,21 @@ function exactKeys(
 		issues.add('INVALID_SHAPE', path, 'Expected a plain object.');
 		return false;
 	}
-	const actual = Object.keys(value).sort();
+	const ownKeys = Reflect.ownKeys(value);
+	const actual: string[] = [];
+	for (const key of ownKeys) {
+		if (typeof key !== 'string') {
+			issues.add('INVALID_SHAPE', path, 'Symbol properties are not permitted.');
+			return false;
+		}
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+			issues.add('INVALID_SHAPE', `${path}.${key}`, 'Expected an enumerable data property.');
+			return false;
+		}
+		actual.push(key);
+	}
+	actual.sort();
 	const wanted = [...expected].sort();
 	if (canonicalSemanticJson(actual) !== canonicalSemanticJson(wanted)) {
 		issues.add(
@@ -269,7 +312,46 @@ function nonnegativeInteger(value: unknown): value is number {
 }
 
 function stringArray(value: unknown): value is readonly string[] {
-	return Array.isArray(value) && value.every(scalarString);
+	return plainArray(value) && value.every(scalarString);
+}
+
+function shapeSemanticProvenanceLookup(
+	value: unknown,
+	issues: IssueCollector
+): value is StaticSemanticSnapshot {
+	if (!plainRecord(value)) {
+		issues.add('INVALID_SHAPE', '$semanticSnapshot', 'Expected a plain semantic snapshot object.');
+		return false;
+	}
+	const populationDescriptor = Reflect.getOwnPropertyDescriptor(value, 'provenances');
+	if (
+		populationDescriptor === undefined ||
+		!populationDescriptor.enumerable ||
+		!('value' in populationDescriptor) ||
+		!plainArray(populationDescriptor.value)
+	) {
+		issues.add(
+			'INVALID_SHAPE',
+			'$semanticSnapshot.provenances',
+			'Expected a dense provenance data-property array.'
+		);
+		return false;
+	}
+	for (const [index, record] of populationDescriptor.value.entries()) {
+		const path = `$semanticSnapshot.provenances[${index}]`;
+		if (!plainRecord(record)) {
+			issues.add('INVALID_SHAPE', path, 'Expected a plain semantic provenance object.');
+			return false;
+		}
+		for (const key of ['id', 'snapshotId', 'subjectId'] as const) {
+			const descriptor = Reflect.getOwnPropertyDescriptor(record, key);
+			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+				issues.add('INVALID_SHAPE', `${path}.${key}`, 'Expected an enumerable data property.');
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 function shapeCoverage(value: unknown, path: string, issues: IssueCollector): boolean {
@@ -346,7 +428,13 @@ function shapeNode(value: unknown, path: string, issues: IssueCollector): boolea
 		issues.add('INVALID_SHAPE', path, 'Expected a graph node object.');
 		return false;
 	}
-	const expected = value.kind === 'SOURCE' ? SOURCE_NODE_KEYS : RESOLUTION_TARGET_NODE_KEYS;
+	const kindDescriptor = Reflect.getOwnPropertyDescriptor(value, 'kind');
+	if (kindDescriptor === undefined || !kindDescriptor.enumerable || !('value' in kindDescriptor)) {
+		issues.add('INVALID_SHAPE', `${path}.kind`, 'Expected an enumerable data property.');
+		return false;
+	}
+	const expected =
+		kindDescriptor.value === 'SOURCE' ? SOURCE_NODE_KEYS : RESOLUTION_TARGET_NODE_KEYS;
 	if (!exactKeys(value, expected, path, issues)) return false;
 	let valid =
 		(value.epistemic === 'SUPPORTED' ||
@@ -358,9 +446,9 @@ function shapeNode(value: unknown, path: string, issues: IssueCollector): boolea
 		scalarString(value.layerId) &&
 		stringArray(value.provenanceIds) &&
 		scalarString(value.semanticSnapshotId) &&
-		Array.isArray(value.sourceLocations) &&
+		plainArray(value.sourceLocations) &&
 		scalarString(value.subjectId);
-	if (Array.isArray(value.sourceLocations))
+	if (plainArray(value.sourceLocations))
 		for (const [index, location] of value.sourceLocations.entries())
 			valid = shapeLocation(location, `${path}.sourceLocations[${index}]`, issues) && valid;
 	if (value.kind === 'SOURCE') {
@@ -414,14 +502,14 @@ function shapeEdge(value: unknown, path: string, issues: IssueCollector): boolea
 			'UNSUPPORTED'
 		].includes(value.resolutionState as never) &&
 		scalarString(value.semanticSnapshotId) &&
-		Array.isArray(value.sourceLocations) &&
+		plainArray(value.sourceLocations) &&
 		nullableString(value.specifier) &&
 		(value.specifierState === 'LITERAL' || value.specifierState === 'NON_LITERAL') &&
 		scalarString(value.subjectId) &&
 		typeof value.typeOnly === 'boolean';
 	valid = shapeEndpoint(value.source, `${path}.source`, issues) && valid;
 	valid = shapeEndpoint(value.target, `${path}.target`, issues) && valid;
-	if (Array.isArray(value.sourceLocations))
+	if (plainArray(value.sourceLocations))
 		for (const [index, location] of value.sourceLocations.entries())
 			valid = shapeLocation(location, `${path}.sourceLocations[${index}]`, issues) && valid;
 	if (!valid) issues.add('INVALID_SHAPE', path, 'Graph edge fields have invalid primitive values.');
@@ -436,24 +524,24 @@ function shapeGraph(
 	let valid =
 		scalarString(value.canonicalProfile) &&
 		scalarString(value.contentDigest) &&
-		Array.isArray(value.edges) &&
+		plainArray(value.edges) &&
 		(value.epistemic === 'SUPPORTED' ||
 			value.epistemic === 'UNKNOWN' ||
 			value.epistemic === 'UNSUPPORTED' ||
 			value.epistemic === 'CONFLICTING') &&
-		Array.isArray(value.forwardIndex) &&
+		plainArray(value.forwardIndex) &&
 		scalarString(value.fullJanCsaa007Conformance) &&
 		scalarString(value.graphInputDigest) &&
 		value.graphKind === 'TYPESCRIPT_MODULE_DEPENDENCY' &&
 		(value.health === 'COMPLETE' || value.health === 'PARTIAL') &&
 		scalarString(value.id) &&
-		Array.isArray(value.layers) &&
-		Array.isArray(value.limitations) &&
+		plainArray(value.layers) &&
+		plainArray(value.limitations) &&
 		scalarString(value.method) &&
-		Array.isArray(value.nodes) &&
+		plainArray(value.nodes) &&
 		scalarString(value.operationVersion) &&
 		plainRecord(value.producer) &&
-		Array.isArray(value.reverseIndex) &&
+		plainArray(value.reverseIndex) &&
 		scalarString(value.schemaVersion) &&
 		scalarString(value.semanticExtractionVersion) &&
 		scalarString(value.semanticSchemaVersion) &&
@@ -461,10 +549,10 @@ function shapeGraph(
 		scalarString(value.subjectId);
 	valid = shapeCoverage(value.coverage, '$.coverage', issues) && valid;
 	valid = shapeProvider(value.producer, '$.producer', issues) && valid;
-	if (Array.isArray(value.limitations))
+	if (plainArray(value.limitations))
 		for (const [index, limitation] of value.limitations.entries())
 			valid = shapeLimitation(limitation, `$.limitations[${index}]`, issues) && valid;
-	if (Array.isArray(value.layers)) {
+	if (plainArray(value.layers)) {
 		for (const [index, layer] of value.layers.entries()) {
 			const path = `$.layers[${index}]`;
 			if (!exactKeys(layer, LAYER_KEYS, path, issues)) {
@@ -480,7 +568,7 @@ function shapeGraph(
 				scalarString(layer.graphId) &&
 				scalarString(layer.id) &&
 				layer.kind === 'TYPESCRIPT_MODULE_RESOLUTION' &&
-				Array.isArray(layer.limitations) &&
+				plainArray(layer.limitations) &&
 				layer.method === MODULE_DEPENDENCY_GRAPH_METHOD &&
 				stringArray(layer.nodeIds) &&
 				layer.ordinal === 0 &&
@@ -490,7 +578,7 @@ function shapeGraph(
 				scalarString(layer.subjectId);
 			layerValid = shapeCoverage(layer.coverage, `${path}.coverage`, issues) && layerValid;
 			layerValid = shapeProvider(layer.producer, `${path}.producer`, issues) && layerValid;
-			if (Array.isArray(layer.limitations))
+			if (plainArray(layer.limitations))
 				for (const [limitationIndex, limitation] of layer.limitations.entries())
 					layerValid =
 						shapeLimitation(limitation, `${path}.limitations[${limitationIndex}]`, issues) &&
@@ -500,17 +588,17 @@ function shapeGraph(
 			valid = layerValid && valid;
 		}
 	}
-	if (Array.isArray(value.nodes))
+	if (plainArray(value.nodes))
 		for (const [index, node] of value.nodes.entries())
 			valid = shapeNode(node, `$.nodes[${index}]`, issues) && valid;
-	if (Array.isArray(value.edges))
+	if (plainArray(value.edges))
 		for (const [index, edge] of value.edges.entries())
 			valid = shapeEdge(edge, `$.edges[${index}]`, issues) && valid;
 	for (const [field, entries] of [
 		['forwardIndex', value.forwardIndex],
 		['reverseIndex', value.reverseIndex]
 	] as const)
-		if (Array.isArray(entries))
+		if (plainArray(entries))
 			for (const [index, entry] of entries.entries())
 				valid = shapeIndexEntry(entry, `$.${field}[${index}]`, issues) && valid;
 	if (!valid) issues.add('INVALID_SHAPE', '$', 'Graph fields have invalid primitive values.');
@@ -687,11 +775,11 @@ function validateLimitations(
 function validateProvenanceIds(
 	ids: readonly SemanticProvenanceId[],
 	snapshot: StaticSemanticSnapshot,
+	provenanceById: ReadonlyMap<string, StaticSemanticSnapshot['provenances'][number]>,
 	path: string,
 	issues: IssueCollector
 ): void {
 	sortedUniqueStrings(ids, path, issues);
-	const provenanceById = new Map(snapshot.provenances.map((record) => [record.id, record]));
 	for (const [index, id] of ids.entries()) {
 		const record = provenanceById.get(id);
 		if (record === undefined)
@@ -711,14 +799,16 @@ function expectedIndex(
 	edges: readonly ModuleDependencyGraphEdge[],
 	direction: 'FORWARD' | 'REVERSE'
 ): ModuleDependencyGraphIndexEntry[] {
+	const edgeIdsByNode = new Map(
+		nodes.map((node) => [node.id, [] as ModuleDependencyGraphEdge['id'][]])
+	);
+	for (const edge of edges) {
+		const nodeId = direction === 'FORWARD' ? edge.source.nodeId : edge.target.nodeId;
+		edgeIdsByNode.get(nodeId)?.push(edge.id);
+	}
 	return nodes
 		.map((node) => ({
-			edgeIds: edges
-				.filter((edge) =>
-					direction === 'FORWARD' ? edge.source.nodeId === node.id : edge.target.nodeId === node.id
-				)
-				.map((edge) => edge.id)
-				.sort(compareText),
+			edgeIds: edgeIdsByNode.get(node.id)!.sort(compareText),
 			nodeId: node.id
 		}))
 		.sort((left, right) => compareText(left.nodeId, right.nodeId));
@@ -861,6 +951,7 @@ function validateGraphSemantics(
 	const sourceById = new Map(snapshot.sources.map((record) => [record.id, record]));
 	const resolutionById = new Map(snapshot.moduleResolutions.map((record) => [record.id, record]));
 	const occurrenceById = new Map(snapshot.astNodes.map((record) => [record.id, record]));
+	const provenanceById = new Map(snapshot.provenances.map((record) => [record.id, record]));
 
 	const sourceNodes = graph.nodes.filter(
 		(node): node is Extract<ModuleDependencyGraphNode, { readonly kind: 'SOURCE' }> =>
@@ -872,11 +963,18 @@ function validateGraphSemantics(
 	);
 	const sourceNodeBySemanticId = new Map<string, (typeof sourceNodes)[number]>();
 	const targetNodeByResolutionId = new Map<string, (typeof targetNodes)[number]>();
+	const targetNodeCountByResolutionId = new Map<string, number>();
 
 	for (const [index, node] of graph.nodes.entries()) {
 		const path = `$.nodes[${index}]`;
 		graphWideReference(node, graph, layer.id, path, issues);
-		validateProvenanceIds(node.provenanceIds, snapshot, `${path}.provenanceIds`, issues);
+		validateProvenanceIds(
+			node.provenanceIds,
+			snapshot,
+			provenanceById,
+			`${path}.provenanceIds`,
+			issues
+		);
 		canonicalObjectArray(node.sourceLocations, `${path}.sourceLocations`, issues);
 		for (const [locationIndex, location] of node.sourceLocations.entries()) {
 			const source = sourceById.get(location.sourceId);
@@ -947,6 +1045,10 @@ function validateGraphSemantics(
 					'Semantic source nodes are supported facts.'
 				);
 		} else {
+			targetNodeCountByResolutionId.set(
+				node.moduleResolutionId,
+				(targetNodeCountByResolutionId.get(node.moduleResolutionId) ?? 0) + 1
+			);
 			if (targetNodeByResolutionId.has(node.moduleResolutionId))
 				issues.add(
 					'DUPLICATE_ID',
@@ -1011,7 +1113,13 @@ function validateGraphSemantics(
 	for (const [index, edge] of graph.edges.entries()) {
 		const path = `$.edges[${index}]`;
 		graphWideReference(edge, graph, layer.id, path, issues);
-		validateProvenanceIds(edge.provenanceIds, snapshot, `${path}.provenanceIds`, issues);
+		validateProvenanceIds(
+			edge.provenanceIds,
+			snapshot,
+			provenanceById,
+			`${path}.provenanceIds`,
+			issues
+		);
 		canonicalObjectArray(edge.sourceLocations, `${path}.sourceLocations`, issues);
 		const grouped = edgesByResolution.get(edge.moduleResolutionId) ?? [];
 		grouped.push(edge);
@@ -1118,9 +1226,7 @@ function validateGraphSemantics(
 				'$.edges',
 				`Module resolution ${resolution.id} must support exactly one distinct edge; received ${count}.`
 			);
-		const targetCount = targetNodes.filter(
-			(node) => node.moduleResolutionId === resolution.id
-		).length;
+		const targetCount = targetNodeCountByResolutionId.get(resolution.id) ?? 0;
 		if (
 			(resolution.targetSourceId !== null && targetCount !== 0) ||
 			(resolution.targetSourceId === null && targetCount !== 1)
@@ -1215,7 +1321,13 @@ function validateGraphSemantics(
 				.concat(graph.edges.flatMap((edge) => [...edge.provenanceIds]))
 		)
 	].sort(compareText);
-	validateProvenanceIds(layer.provenanceIds, snapshot, '$.layers[0].provenanceIds', issues);
+	validateProvenanceIds(
+		layer.provenanceIds,
+		snapshot,
+		provenanceById,
+		'$.layers[0].provenanceIds',
+		issues
+	);
 	if (!same(layer.provenanceIds, expectedLayerProvenance))
 		issues.add(
 			'POPULATION_MISMATCH',
@@ -1264,6 +1376,7 @@ export function validateModuleDependencyGraph(
 	const issues = new IssueCollector(maxIssues);
 	try {
 		if (!shapeGraph(value, issues)) return issues.result();
+		if (!shapeSemanticProvenanceLookup(semanticSnapshot, issues)) return issues.result();
 		validateGraphSemantics(value, semanticSnapshot, issues);
 		return issues.result();
 	} catch (error) {
