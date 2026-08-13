@@ -2585,5 +2585,40 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-command-census.test.ts'],
 		why: "THE RATCHET'S POSITIVE CASE, which had no mutant until the one I wrote first SURVIVED and taught me what to hold instead. A `commitState` site that CREATES (`expectedRevision: undefined`) and declares no `births` must FAIL the census, not be skipped — because a machine that never appears is `unanalysed`, which reads as *\"not yet reached\"* rather than *\"nobody said\"*, and those are opposite claims. Removing this declaration reproduces exactly the state `Intent.intentStatus` was in before REG-F-086. ⚠ IT REPLACES `F118-the-birth-ratchets-exemption-stops-being-structural`, WHICH SURVIVED AND WAS RIGHT TO: I had added a structural exemption so `createObject`'s own delegating call would not trip the ratchet, but `handlerFiles()` has excluded `kit.ts` since long before any of this, so the census never walks that site. **The exemption guarded a case that cannot arise — a hollow, authored inside the fix for a census — and only its mutant said so.** Predicted red: C-0's suite, which cannot build a birth map at all.",
 		source: 'REG-F-118 — replaces F118-the-birth-ratchets-exemption-stops-being-structural, which SURVIVED'
+	},
+	// ── REG-F-119, THE GENERIC SETTER'S SPINE ───────────────────────────────────────────────────────────────────
+	//
+	// Three properties, three mutants, because each fails differently: the census must READ the table, the table
+	// must AGREE with the machine, and the accountability gate must stay FALSIFIABLE now that two tables between
+	// them claim all 57 arrows.
+	{
+		id: 'F119-the-census-stops-reading-the-setter-table',
+		file: 'verif/arrow-command-census.ts',
+		find: '\tfor (const spec of Object.values(PWU_GENERIC_SETTER_SPECS)) {',
+		replace: '\tfor (const spec of Object.values({})) {',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE SPINE GOES BACK TO BEING INVISIBLE. This is the exact state the repository was in before REG-F-119: forty-nine PERIPHERAL arrows visible (abandon, supersede, block, challenge) and the eight the workbench actually drives — READY -> PLANNED -> EXECUTING -> ... -> RECOMPOSED — read by nothing, because `ChangePwuState` takes its target from `payload.newState` at runtime and its call site declares nothing. ⚠ THE DANGEROUS PART IS WHAT STAYS GREEN: the machine simply drops back to 49/57, which is no longer COMPLETE, so under REG-F-118 it silently stops being occupancy-analysable and every unreachability question about it becomes unanswerable again — quietly, with no test naming that as the loss. Predicted red: `arrowsSeen` 178 -> 170 on the coverage pin.",
+		source: 'REG-F-119'
+	},
+	{
+		id: 'F119-a-transcribed-source-drifts-from-the-machine',
+		file: 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts',
+		find: "\tEXECUTING: {\n\t\tcommandType: 'ChangePwuState',\n\t\ttarget: 'EXECUTING',\n\t\teventType: 'PwuStateChanged',\n\t\tsourceStates: ['PLANNED']",
+		replace: "\tEXECUTING: {\n\t\tcommandType: 'ChangePwuState',\n\t\ttarget: 'EXECUTING',\n\t\teventType: 'PwuStateChanged',\n\t\tsourceStates: ['READY']",
+		expectRed: ['verif/lifecycle-arrow-declarations.test.ts'],
+		why: "THE WHOLE RISK OF TRANSCRIBING RATHER THAN DERIVING, AND THE REASON THE AGREEMENT GATE HAD TO BE EXTENDED IN THE SAME COMMIT. A hand-written `sourceStates` can simply be WRONG — here `EXECUTING` is declared reachable from `READY`, which the machine does not ratify (its only in-edge is `PLANNED`). Before REG-F-119 extended `claimedArrows()` to span both tables, this drift would have been READ BY THE CENSUS and AUDITED BY NOTHING: the census would report `READY -> EXECUTING` as a covered arrow the machine never declared, which is fabricated coverage — the precise failure REG-F-114 forbade, arriving through a declaration instead of an inference. Predicted red: BOTH A-2 directions — the spec claims an arrow the machine does not declare, AND the real `PLANNED -> EXECUTING` becomes unclaimed.",
+		source: 'REG-F-119'
+	},
+	{
+		id: 'F119-the-accountability-gate-is-handed-a-derived-set',
+		file: 'verif/lifecycle-arrow-declarations.test.ts',
+		find: '\tObject.values(PWU_GENERIC_SETTER_SPECS).map((s) => s.target)\n);',
+		replace:
+			"\tObject.keys(STATE_MACHINES['PWU.workLifecycleState']?.states ?? {}).length >= 0\n\t\t? (STATE_MACHINES['PWU.workLifecycleState']?.states ?? []).filter(\n\t\t\t\t(s) => !COMMAND_TARGETS_FOR_CONTROL.has(s)\n\t\t\t)\n\t\t: []\n);",
+		expectNoCompile:
+			'DERIVING THE SETTER TARGETS CANNOT EVEN BE WRITTEN HERE without inventing a second owned-set constant, because `COMMAND_TARGETS` is declared BELOW this point. The mutation names `COMMAND_TARGETS_FOR_CONTROL`, which does not exist, so it fails to compile.',
+		why: "THE GUARANTEE IS THE ONE REG-F-119 EXISTS FOR: if the two target sets were computed as COMPLEMENTS of each other, `COMMAND_TARGETS ∪ GENERIC_TARGETS` would cover all twenty states BY CONSTRUCTION and the accountability test — *\"no arrow is unaccounted for\"* — could never fail. A control that cannot fail, authored inside the increment meant to strengthen it, which is this repository's most-repeated defect. ⚠ RECORDED HONESTLY AS THE WEAKER FENCE IT IS: a declaration-order accident is what makes the derived form awkward to write, not a rule anyone stated, and TYPE_PREVENTED here means 'this particular spelling does not compile' rather than 'the mistake is unreachable'. Someone who wanted the derived form could hoist a constant and get it. The real defence is the transcription itself plus the both-directions agreement gate; this row exists so that the day the derived form DOES compile, the ledger reports the change rather than absorbing it.",
+		expectRed: [],
+		source: 'REG-F-119'
 	}
 ];
