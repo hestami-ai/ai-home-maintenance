@@ -40,6 +40,9 @@ import {
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION,
@@ -54,6 +57,7 @@ import {
 	buildReadWriteAccessGraph,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
+	buildStructuralModuleReachabilityAnalysis,
 	buildStructuralSccAnalysis,
 	buildStateMachineGraph,
 	buildStaticSemanticSnapshot,
@@ -78,6 +82,7 @@ import {
 	validateArrowCommandCensusArtifactSet,
 	validateArrowCommandCensusObservation,
 	validateModuleDependencyGraph,
+	validateStructuralModuleReachabilityAnalysis,
 	validateStructuralSccAnalysis,
 	validateStateMachineGraph,
 	validateStateMachineTopologyObservation,
@@ -103,6 +108,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
+		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(buildStructuralSccAnalysis).toBeTypeOf('function');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
 		expect(buildStaticSemanticSnapshot).toBeTypeOf('function');
@@ -125,6 +131,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(validateArrowCommandCensusObservation).toBeTypeOf('function');
 		expect(validateModuleDependencyGraph).toBeTypeOf('function');
+		expect(validateStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(validateStructuralSccAnalysis).toBeTypeOf('function');
 		expect(validateStateMachineGraph).toBeTypeOf('function');
 		expect(validateStateMachineTopologyObservation).toBeTypeOf('function');
@@ -219,6 +226,15 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-module-dependency-graph-request/1.0.0'
 		);
 		expect(MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-module-dependency-graph/1.0.0');
+		expect(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION).toBe(
+			'jan-csaa-analyze-structural-module-reachability/0.1.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-module-reachability-analysis-request/1.0.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-module-reachability-analysis/1.0.0'
+		);
 		expect(STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION).toBe('jan-csaa-analyze-structural-scc/0.1.0');
 		expect(STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(
 			'jan-csaa-structural-scc-analysis-request/1.0.0'

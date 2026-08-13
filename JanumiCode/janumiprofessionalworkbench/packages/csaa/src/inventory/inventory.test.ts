@@ -31,6 +31,18 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
 } from '../contracts/guard-enforcement-ledger.js';
 import {
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY_STATUS,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_METHOD,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION
+} from '../contracts/structural-module-reachability-analysis.js';
+import {
 	STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
 	STRUCTURAL_SCC_ANALYSIS_CAPABILITY,
 	STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS,
@@ -54,6 +66,19 @@ import {
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const temporaryRoots: string[] = [];
+const STRUCTURAL_SCC_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_SCC vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_MODULE_REACHABILITY vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+
+function jpwbFixtureScriptCommand(name: string): string {
+	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
+		return STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND;
+	}
+	return name === 'csaa:semantic:smoke:structural-scc' ? STRUCTURAL_SCC_ONLY_SMOKE_COMMAND : 'true';
+}
 
 function write(root: string, path: string, content: string): void {
 	const absolute = join(root, ...path.split('/'));
@@ -165,6 +190,7 @@ describe('inventory discovery and identity', () => {
 			'frozen-program-construction',
 			'guard-classification-static-overlay',
 			'read-write-access-projection',
+			'structural-module-reachability-analysis',
 			'structural-scc-analysis'
 		]);
 		expect(typescript?.provenance).toEqual(
@@ -192,6 +218,12 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/contracts/guard-classification-overlay.ts',
 				'packages/csaa/src/graph/build-guard-classification-overlay.ts',
 				'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
+				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
+				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
+				'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
@@ -416,9 +448,67 @@ describe('inventory discovery and identity', () => {
 			'independently validated TypeScript module-dependency graph',
 			'preserving parallel edges and self-loops',
 			'Structural closure is exact only for the selected validated graph',
+			'dedicated structural SCC-only smoke command',
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
 			expect(structuralSccCapability!.explanation).toContain(boundary);
+		const structuralModuleReachabilityCapability = capabilities.get(
+			'structural-module-reachability-analysis'
+		);
+		expect(structuralModuleReachabilityCapability).toMatchObject({
+			provider: 'typescript+validated-module-dependency-graph-reachability',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			'capabilities#dependency-graph',
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'packages/csaa/src/contracts/graph.ts',
+			'packages/csaa/src/contracts/semantic.ts',
+			'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
+			'packages/csaa/src/graph/build-module-dependency-graph.ts',
+			'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
+			'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
+			'packages/csaa/src/graph/validate-graph.ts',
+			'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
+			'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
+			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
+			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+			'packages/csaa/src/providers/typescript/extract-symbols.ts',
+			'packages/csaa/src/semantic/repository-smoke.test.ts',
+			'package.json#/scripts/csaa:semantic:smoke:structural-module-reachability'
+		])
+			expect(structuralModuleReachabilityCapability!.provenance.includes(expectedProvenance)).toBe(
+				true
+			);
+		for (const exactBoundary of [
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_METHOD,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY_STATUS,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.nodePopulation,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.edgePopulation,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.parallelEdges,
+			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.witnessPolicy,
+			...STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_NONCLAIMS
+		])
+			expect(structuralModuleReachabilityCapability!.explanation).toContain(exactBoundary);
+		for (const boundary of [
+			'The thirteenth bounded DWP-004 increment',
+			'one independently validated TypeScript module-dependency graph and one explicit graph-node criterion',
+			'complete-or-unavailable',
+			'successful static traversal is NOT_TRUNCATED',
+			'structural closure is exact only within that one validated graph and criterion',
+			'upstream closure may remain OPEN',
+			'Unvisited nodes have no irrelevance or non-impact meaning',
+			'dedicated structural module-reachability-only smoke command',
+			'CONFIGURED_NOT_RUN by inventory generation'
+		])
+			expect(structuralModuleReachabilityCapability!.explanation).toContain(boundary);
 		const typescriptAstCapability = capabilities.get('typescript-ast');
 		expect(typescriptAstCapability).toBeDefined();
 		expect(typescriptAstCapability!.provider).toBe('typescript');
@@ -560,7 +650,11 @@ describe('inventory discovery and identity', () => {
 				COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
 				COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
 				COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+				'capabilities#structural-module-reachability-analysis',
 				'capabilities#structural-scc-analysis',
+				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
@@ -575,7 +669,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first twelve bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first thirteen bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -588,11 +682,17 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain('compositional static guard-classification overlay');
 		expect(semanticBoundary).toContain('static command-event-contract overlay');
 		expect(semanticBoundary).toContain('deterministic structural SCC analysis');
+		expect(semanticBoundary).toContain('deterministic static module-reachability traversal');
+		expect(semanticBoundary).toContain(
+			"complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations"
+		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'does not execute the retained event-surface gate or the configured structural SCC smoke command'
+			'does not execute the retained event-surface gate or the configured structural SCC and structural module-reachability smoke commands'
 		);
-		expect(semanticBoundary).toContain('graph algorithms beyond this bounded SCC partition');
+		expect(semanticBoundary).toContain(
+			'graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses'
+		);
 		expect(semanticBoundary).toContain('JAN-CSAA-CAP-007 data-flow graphs');
 		expect(semanticBoundary).toContain(
 			'Inventory generation executes or benchmarks none of these analysis providers'
@@ -631,6 +731,9 @@ describe('inventory discovery and identity', () => {
 				COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
 				COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
 				COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
+				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
+				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
@@ -638,11 +741,26 @@ describe('inventory discovery and identity', () => {
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}`
 		);
+		expect(verificationAuthority?.statement).toContain(
+			`structural module reachability analysis has graph authority ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT}`
+		);
+		for (const boundary of [
+			'complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure',
+			'not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing',
+			'whole-program or behavioral reachability',
+			'assigns irrelevance or non-impact to unvisited nodes',
+			'identifies orphan or dead code',
+			'proves safe removal',
+			'supplies runtime evidence',
+			'changes a gate',
+			'full JAN-CSAA-007/008 conformance'
+		])
+			expect(verificationAuthority?.statement).toContain(boundary);
 		expect(verificationAuthority?.statement).toContain(
 			`guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED`
 		);
@@ -1025,8 +1143,9 @@ describe('JPWB population non-vacuity', () => {
 				'test:coverage',
 				'csaa:semantic:smoke:command-event-contract',
 				'csaa:semantic:smoke:guard-classification',
+				'csaa:semantic:smoke:structural-module-reachability',
 				'csaa:semantic:smoke:structural-scc'
-			].map((name) => [name, 'true'])
+			].map((name) => [name, jpwbFixtureScriptCommand(name)])
 		);
 		const manifest = (workspaces: readonly string[] | undefined, scripts = completeScripts) =>
 			JSON.stringify({
@@ -1112,6 +1231,28 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is absent: csaa:semantic:smoke:guard-classification'
 		);
 
+		const missingStructuralModuleReachabilitySmoke = fixture();
+		write(
+			missingStructuralModuleReachabilitySmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:structural-module-reachability'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingStructuralModuleReachabilitySmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:semantic:smoke:structural-module-reachability'
+		);
+
 		const missingStructuralSccSmoke = fixture();
 		write(
 			missingStructuralSccSmoke,
@@ -1131,6 +1272,43 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:semantic:smoke:structural-scc');
+
+		const incompatibleStructuralSccSmoke = fixture();
+		write(
+			incompatibleStructuralSccSmoke,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:semantic:smoke:structural-scc': LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleStructuralSccSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:structural-scc'
+		);
+
+		const incompatibleStructuralModuleReachabilitySmoke = fixture();
+		write(
+			incompatibleStructuralModuleReachabilitySmoke,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:semantic:smoke:structural-module-reachability':
+					LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleStructuralModuleReachabilitySmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:structural-module-reachability'
+		);
 
 		const noSemanticImplementation = fixture();
 		write(noSemanticImplementation, 'package.json', manifest(['packages/*', 'apps/*']));
@@ -1160,8 +1338,9 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
+						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
-					].map((name) => [name, 'true'])
+					].map((name) => [name, jpwbFixtureScriptCommand(name)])
 				),
 				workspaces: ['packages/*', 'apps/*']
 			})
@@ -1251,8 +1430,9 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
+						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
-					].map((name) => [name, 'true'])
+					].map((name) => [name, jpwbFixtureScriptCommand(name)])
 				),
 				workspaces: ['packages/*', 'apps/*']
 			})
@@ -1307,8 +1487,9 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
+						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
-					].map((name) => [name, 'true'])
+					].map((name) => [name, jpwbFixtureScriptCommand(name)])
 				),
 				workspaces: ['packages/*', 'apps/*']
 			})
@@ -1391,7 +1572,13 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/contracts/structural-scc-analysis.ts',
 			'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 			'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
-			'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
+			'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
+			'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
+			'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
+			'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
+			'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
+			'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
+			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts'
 		];
 		for (const path of requiredPaths)
 			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
@@ -1452,6 +1639,14 @@ describe('JPWB population non-vacuity', () => {
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
 			`Required JPWB structural SCC analysis implementation source is absent: ${missingStructuralScc}`
 		);
+
+		write(root, missingStructuralScc, 'export {};\n');
+		const missingStructuralModuleReachability =
+			'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts';
+		rmSync(join(root, ...missingStructuralModuleReachability.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB structural module reachability analysis implementation source is absent: ${missingStructuralModuleReachability}`
+		);
 	}, 30_000);
 
 	it('discovers every current workspace manifest and every top-level verif TypeScript asset', () => {
@@ -1465,6 +1660,17 @@ describe('JPWB population non-vacuity', () => {
 			categories: ['OTHER'],
 			command:
 				'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=COMMAND_HANDLER vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts',
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
+				(command) =>
+					command.owner === '.' &&
+					command.name === 'csaa:semantic:smoke:structural-module-reachability'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND,
 			state: 'CONFIGURED_NOT_RUN'
 		});
 		expect(
@@ -1484,12 +1690,13 @@ describe('JPWB population non-vacuity', () => {
 			)
 		).toMatchObject({
 			categories: ['OTHER'],
-			command:
-				'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts',
+			command: STRUCTURAL_SCC_ONLY_SMOKE_COMMAND,
 			state: 'CONFIGURED_NOT_RUN'
 		});
 		expect(inventory.subject.selectedFiles.map((file) => file.path)).toEqual(
 			expect.arrayContaining([
+				'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
+				'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-fixture.test-support.ts'

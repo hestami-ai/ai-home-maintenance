@@ -47,6 +47,15 @@ import {
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION,
 	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
@@ -74,6 +83,7 @@ import {
 	buildGuardEnforcementLedgerArtifactSet,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
+	buildStructuralModuleReachabilityAnalysis,
 	buildStructuralSccAnalysis,
 	buildReadWriteAccessGraph,
 	buildStaticSemanticSnapshot,
@@ -99,6 +109,7 @@ import {
 	validateGuardClassificationOverlay,
 	validateGuardEnforcementLedgerObservation,
 	validateModuleDependencyGraph,
+	validateStructuralModuleReachabilityAnalysis,
 	validateStructuralSccAnalysis,
 	validateReadWriteAccessGraph,
 	validateStateMachineGraph,
@@ -108,7 +119,11 @@ import {
 
 const SMOKE_SELECTOR = process.env.CSAA_REPOSITORY_SMOKE;
 type RepositorySmokeProfile = 'FULL' | 'STRUCTURAL';
-type RepositorySmokeSuite = 'COMMAND_HANDLER_ONLY' | 'FULL_SUITE';
+type RepositorySmokeSuite =
+	| 'COMMAND_HANDLER_ONLY'
+	| 'FULL_SUITE'
+	| 'STRUCTURAL_MODULE_REACHABILITY_ONLY'
+	| 'STRUCTURAL_SCC_ONLY';
 
 interface RepositorySmokeProjectionPlan {
 	readonly runIndependentSemanticRevalidation: boolean;
@@ -120,8 +135,11 @@ interface RepositorySmokeProjectionPlan {
 	readonly runReadWriteAccessGraph: boolean;
 	readonly runRepositoryDiscoveryPreflight: boolean;
 	readonly runStateMachineProjection: boolean;
+	readonly runStructuralModuleReachabilityAnalysis: boolean;
 	readonly runStructuralSccAnalysis: boolean;
 	readonly suite: RepositorySmokeSuite;
+	readonly terminateAfterStructuralModuleReachabilityAnalysis: boolean;
+	readonly terminateAfterStructuralSccAnalysis: boolean;
 }
 
 const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
@@ -137,8 +155,11 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runReadWriteAccessGraph: false,
 		runRepositoryDiscoveryPreflight: false,
 		runStateMachineProjection: true,
+		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
-		suite: 'COMMAND_HANDLER_ONLY'
+		suite: 'COMMAND_HANDLER_ONLY',
+		terminateAfterStructuralModuleReachabilityAnalysis: false,
+		terminateAfterStructuralSccAnalysis: false
 	},
 	FULL_SUITE: {
 		runIndependentSemanticRevalidation: true,
@@ -150,8 +171,43 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runReadWriteAccessGraph: true,
 		runRepositoryDiscoveryPreflight: true,
 		runStateMachineProjection: true,
+		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: true,
-		suite: 'FULL_SUITE'
+		suite: 'FULL_SUITE',
+		terminateAfterStructuralModuleReachabilityAnalysis: false,
+		terminateAfterStructuralSccAnalysis: false
+	},
+	STRUCTURAL_MODULE_REACHABILITY_ONLY: {
+		runIndependentSemanticRevalidation: false,
+		runCallGraph: false,
+		runCommandEventContractOverlay: false,
+		runDependencyProviderComparison: false,
+		runGuardClassificationOverlay: false,
+		runModuleDependencyGraph: true,
+		runReadWriteAccessGraph: false,
+		runRepositoryDiscoveryPreflight: false,
+		runStateMachineProjection: false,
+		runStructuralModuleReachabilityAnalysis: true,
+		runStructuralSccAnalysis: false,
+		suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
+		terminateAfterStructuralModuleReachabilityAnalysis: true,
+		terminateAfterStructuralSccAnalysis: false
+	},
+	STRUCTURAL_SCC_ONLY: {
+		runIndependentSemanticRevalidation: false,
+		runCallGraph: false,
+		runCommandEventContractOverlay: false,
+		runDependencyProviderComparison: false,
+		runGuardClassificationOverlay: false,
+		runModuleDependencyGraph: true,
+		runReadWriteAccessGraph: false,
+		runRepositoryDiscoveryPreflight: false,
+		runStateMachineProjection: false,
+		runStructuralModuleReachabilityAnalysis: false,
+		runStructuralSccAnalysis: true,
+		suite: 'STRUCTURAL_SCC_ONLY',
+		terminateAfterStructuralModuleReachabilityAnalysis: false,
+		terminateAfterStructuralSccAnalysis: true
 	}
 };
 
@@ -167,6 +223,13 @@ function repositorySmokeSuite(value: string | undefined): RepositorySmokeSuite {
 	const normalized = value.trim().toUpperCase();
 	if (normalized === 'COMMAND_HANDLER' || normalized === 'COMMAND_HANDLER_ONLY')
 		return 'COMMAND_HANDLER_ONLY';
+	if (
+		normalized === 'STRUCTURAL_MODULE_REACHABILITY' ||
+		normalized === 'STRUCTURAL_MODULE_REACHABILITY_ONLY'
+	)
+		return 'STRUCTURAL_MODULE_REACHABILITY_ONLY';
+	if (normalized === 'STRUCTURAL_SCC' || normalized === 'STRUCTURAL_SCC_ONLY')
+		return 'STRUCTURAL_SCC_ONLY';
 	if (normalized === 'FULL' || normalized === 'FULL_SUITE') return 'FULL_SUITE';
 	throw new Error(`Unsupported CSAA_REPOSITORY_SMOKE_SUITE: ${value}`);
 }
@@ -176,10 +239,10 @@ function assertRepositorySmokeSelection(
 	suite: RepositorySmokeSuite,
 	selector: string | undefined
 ): void {
-	if (suite !== 'COMMAND_HANDLER_ONLY') return;
+	if (suite === 'FULL_SUITE') return;
 	if (profile !== 'STRUCTURAL')
-		throw new Error('COMMAND_HANDLER_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.');
-	if (selector !== '1') throw new Error('COMMAND_HANDLER_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		throw new Error(`${suite} requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.`);
+	if (selector !== '1') throw new Error(`${suite} requires CSAA_REPOSITORY_SMOKE=1.`);
 }
 
 function semanticCapabilitiesForProfile(
@@ -256,10 +319,12 @@ const COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS = [
 	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
 ] as const;
+const STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH =
+	'packages/rph-application/src/index.ts' as const;
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.4.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.6.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -278,6 +343,7 @@ type RepositorySmokePhase =
 	| 'DEPENDENCY_CRUISER_NORMALIZATION'
 	| 'DEPENDENCY_PROVIDER_COMPARISON'
 	| 'MODULE_DEPENDENCY_GRAPH'
+	| 'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS'
 	| 'STRUCTURAL_SCC_ANALYSIS'
 	| 'READ_WRITE_ACCESS_GRAPH'
 	| 'REPOSITORY_DISCOVERY_PREFLIGHT'
@@ -286,6 +352,77 @@ type RepositorySmokePhase =
 	| 'STATE_MACHINE_TOPOLOGY_OBSERVATION'
 	| 'STATIC_SEMANTIC_SNAPSHOT_BUILD'
 	| 'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE';
+
+const STRUCTURAL_SCC_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+	'CALL_GRAPH',
+	'READ_WRITE_ACCESS_GRAPH',
+	'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+	'STATE_MACHINE_GRAPH_PROJECTION',
+	'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+	'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+	'ARROW_COMMAND_CENSUS_OBSERVATION',
+	'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+	'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+	'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+	'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+	'COMMAND_HANDLER_STATIC_PROJECTION',
+	'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+	'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+	'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+	'DEPENDENCY_CRUISER_EXECUTION',
+	'DEPENDENCY_CRUISER_NORMALIZATION',
+	'DEPENDENCY_PROVIDER_COMPARISON'
+];
+
+const STRUCTURAL_MODULE_REACHABILITY_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'STRUCTURAL_SCC_ANALYSIS',
+	'CALL_GRAPH',
+	'READ_WRITE_ACCESS_GRAPH',
+	'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+	'STATE_MACHINE_GRAPH_PROJECTION',
+	'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+	'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+	'ARROW_COMMAND_CENSUS_OBSERVATION',
+	'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+	'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+	'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+	'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+	'COMMAND_HANDLER_STATIC_PROJECTION',
+	'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+	'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+	'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+	'DEPENDENCY_CRUISER_EXECUTION',
+	'DEPENDENCY_CRUISER_NORMALIZATION',
+	'DEPENDENCY_PROVIDER_COMPARISON'
+];
+
+const STRUCTURAL_MODULE_REACHABILITY_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase[] = [
+	'SELECTED_SUBJECT_RESOLUTION',
+	'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+	'MODULE_DEPENDENCY_GRAPH',
+	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS'
+];
+
+const STRUCTURAL_MODULE_REACHABILITY_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] =
+	[
+		'REPOSITORY_DISCOVERY_PREFLIGHT',
+		'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+		...STRUCTURAL_MODULE_REACHABILITY_ONLY_SKIPPED_PHASES
+	];
+
+const STRUCTURAL_SCC_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase[] = [
+	'SELECTED_SUBJECT_RESOLUTION',
+	'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+	'MODULE_DEPENDENCY_GRAPH',
+	'STRUCTURAL_SCC_ANALYSIS'
+];
+
+const STRUCTURAL_SCC_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'REPOSITORY_DISCOVERY_PREFLIGHT',
+	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	...STRUCTURAL_SCC_ONLY_SKIPPED_PHASES
+];
 
 interface RepositorySmokeTelemetryOptions {
 	/** Deterministic test clock; one sample supplies both wall and monotonic values. */
@@ -507,6 +644,14 @@ describe('repository smoke phase telemetry', () => {
 		expect(repositorySmokeSuite('')).toBe('FULL_SUITE');
 		expect(repositorySmokeSuite(' command_handler ')).toBe('COMMAND_HANDLER_ONLY');
 		expect(repositorySmokeSuite(' command_handler_only ')).toBe('COMMAND_HANDLER_ONLY');
+		expect(repositorySmokeSuite(' structural_module_reachability ')).toBe(
+			'STRUCTURAL_MODULE_REACHABILITY_ONLY'
+		);
+		expect(repositorySmokeSuite(' structural_module_reachability_only ')).toBe(
+			'STRUCTURAL_MODULE_REACHABILITY_ONLY'
+		);
+		expect(repositorySmokeSuite(' structural_scc ')).toBe('STRUCTURAL_SCC_ONLY');
+		expect(repositorySmokeSuite(' structural_scc_only ')).toBe('STRUCTURAL_SCC_ONLY');
 		expect(repositorySmokeSuite(' full ')).toBe('FULL_SUITE');
 		expect(repositorySmokeSuite(' full_suite ')).toBe('FULL_SUITE');
 		expect(() => repositorySmokeSuite('unknown')).toThrow(
@@ -522,6 +667,26 @@ describe('repository smoke phase telemetry', () => {
 		expect(() =>
 			assertRepositorySmokeSelection('STRUCTURAL', 'COMMAND_HANDLER_ONLY', '1')
 		).not.toThrow();
+		expect(() =>
+			assertRepositorySmokeSelection('FULL', 'STRUCTURAL_MODULE_REACHABILITY_ONLY', '1')
+		).toThrow(
+			'STRUCTURAL_MODULE_REACHABILITY_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.'
+		);
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'STRUCTURAL_MODULE_REACHABILITY_ONLY', 'all')
+		).toThrow('STRUCTURAL_MODULE_REACHABILITY_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'STRUCTURAL_MODULE_REACHABILITY_ONLY', '1')
+		).not.toThrow();
+		expect(() => assertRepositorySmokeSelection('FULL', 'STRUCTURAL_SCC_ONLY', '1')).toThrow(
+			'STRUCTURAL_SCC_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.'
+		);
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'STRUCTURAL_SCC_ONLY', 'all')
+		).toThrow('STRUCTURAL_SCC_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'STRUCTURAL_SCC_ONLY', '1')
+		).not.toThrow();
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.COMMAND_HANDLER_ONLY).toEqual({
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
@@ -532,8 +697,11 @@ describe('repository smoke phase telemetry', () => {
 			runReadWriteAccessGraph: false,
 			runRepositoryDiscoveryPreflight: false,
 			runStateMachineProjection: true,
+			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
-			suite: 'COMMAND_HANDLER_ONLY'
+			suite: 'COMMAND_HANDLER_ONLY',
+			terminateAfterStructuralModuleReachabilityAnalysis: false,
+			terminateAfterStructuralSccAnalysis: false
 		});
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.FULL_SUITE).toEqual({
 			runIndependentSemanticRevalidation: true,
@@ -545,9 +713,102 @@ describe('repository smoke phase telemetry', () => {
 			runReadWriteAccessGraph: true,
 			runRepositoryDiscoveryPreflight: true,
 			runStateMachineProjection: true,
+			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: true,
-			suite: 'FULL_SUITE'
+			suite: 'FULL_SUITE',
+			terminateAfterStructuralModuleReachabilityAnalysis: false,
+			terminateAfterStructuralSccAnalysis: false
 		});
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.STRUCTURAL_MODULE_REACHABILITY_ONLY).toEqual({
+			runIndependentSemanticRevalidation: false,
+			runCallGraph: false,
+			runCommandEventContractOverlay: false,
+			runDependencyProviderComparison: false,
+			runGuardClassificationOverlay: false,
+			runModuleDependencyGraph: true,
+			runReadWriteAccessGraph: false,
+			runRepositoryDiscoveryPreflight: false,
+			runStateMachineProjection: false,
+			runStructuralModuleReachabilityAnalysis: true,
+			runStructuralSccAnalysis: false,
+			suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
+			terminateAfterStructuralModuleReachabilityAnalysis: true,
+			terminateAfterStructuralSccAnalysis: false
+		});
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.STRUCTURAL_SCC_ONLY).toEqual({
+			runIndependentSemanticRevalidation: false,
+			runCallGraph: false,
+			runCommandEventContractOverlay: false,
+			runDependencyProviderComparison: false,
+			runGuardClassificationOverlay: false,
+			runModuleDependencyGraph: true,
+			runReadWriteAccessGraph: false,
+			runRepositoryDiscoveryPreflight: false,
+			runStateMachineProjection: false,
+			runStructuralModuleReachabilityAnalysis: false,
+			runStructuralSccAnalysis: true,
+			suite: 'STRUCTURAL_SCC_ONLY',
+			terminateAfterStructuralModuleReachabilityAnalysis: false,
+			terminateAfterStructuralSccAnalysis: true
+		});
+		expect(STRUCTURAL_SCC_ONLY_COMPLETED_PHASES).toEqual([
+			'SELECTED_SUBJECT_RESOLUTION',
+			'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+			'MODULE_DEPENDENCY_GRAPH',
+			'STRUCTURAL_SCC_ANALYSIS'
+		]);
+		expect(STRUCTURAL_SCC_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
+			'REPOSITORY_DISCOVERY_PREFLIGHT',
+			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+			'CALL_GRAPH',
+			'READ_WRITE_ACCESS_GRAPH',
+			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+			'STATE_MACHINE_GRAPH_PROJECTION',
+			'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+			'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+			'ARROW_COMMAND_CENSUS_OBSERVATION',
+			'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+			'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+			'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+			'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+			'COMMAND_HANDLER_STATIC_PROJECTION',
+			'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+			'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+			'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+			'DEPENDENCY_CRUISER_EXECUTION',
+			'DEPENDENCY_CRUISER_NORMALIZATION',
+			'DEPENDENCY_PROVIDER_COMPARISON'
+		]);
+		expect(STRUCTURAL_MODULE_REACHABILITY_ONLY_COMPLETED_PHASES).toEqual([
+			'SELECTED_SUBJECT_RESOLUTION',
+			'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+			'MODULE_DEPENDENCY_GRAPH',
+			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS'
+		]);
+		expect(STRUCTURAL_MODULE_REACHABILITY_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
+			'REPOSITORY_DISCOVERY_PREFLIGHT',
+			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'STRUCTURAL_SCC_ANALYSIS',
+			'CALL_GRAPH',
+			'READ_WRITE_ACCESS_GRAPH',
+			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+			'STATE_MACHINE_GRAPH_PROJECTION',
+			'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+			'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+			'ARROW_COMMAND_CENSUS_OBSERVATION',
+			'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+			'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+			'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+			'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+			'COMMAND_HANDLER_STATIC_PROJECTION',
+			'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+			'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+			'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+			'DEPENDENCY_CRUISER_EXECUTION',
+			'DEPENDENCY_CRUISER_NORMALIZATION',
+			'DEPENDENCY_PROVIDER_COMPARISON'
+		]);
 		expect(semanticCapabilitiesForProfile('STRUCTURAL')).toEqual([
 			'TS_PROJECT',
 			'TS_SYMBOL',
@@ -716,7 +977,9 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					SELECTED_PROJECTS === null
 						? { kind: 'REPOSITORY' }
 						: {
-								...(USE_COMMON_COMMAND_HANDLER_SUBJECT
+								...(USE_COMMON_COMMAND_HANDLER_SUBJECT &&
+								SMOKE_SUITE !== 'STRUCTURAL_SCC_ONLY' &&
+								SMOKE_SUITE !== 'STRUCTURAL_MODULE_REACHABILITY_ONLY'
 									? { additionalArtifacts: COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS }
 									: {}),
 								kind: 'EXPLICIT_PROJECTS',
@@ -915,22 +1178,78 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				let moduleDependencyGraph: ModuleDependencyGraphSnapshot | null = null;
 				let moduleDependencyGraphResult: null | {
 					readonly bytes: number;
+					readonly contentDigest: string;
 					readonly durationMs: number;
 					readonly edges: number;
+					readonly graphId: string;
+					readonly graphInputDigest: string;
 					readonly health: string;
 					readonly nodes: number;
+					readonly semanticSnapshotId: string;
 					readonly sha256: string;
+					readonly subjectId: string;
 				} = null;
 				let structuralSccAnalysisResult: null | {
+					readonly analysisId: string;
+					readonly authorityTransfer: string;
 					readonly bytes: number;
+					readonly capability: string;
+					readonly capabilityStatus: string;
 					readonly components: number;
+					readonly contentDigest: string;
 					readonly cyclicComponents: number;
 					readonly durationMs: number;
+					readonly fullJanCsaa007Conformance: string;
+					readonly fullJanCsaa008Conformance: string;
+					readonly gateEffect: string;
+					readonly graphAuthority: string;
+					readonly health: string;
 					readonly inputEdges: number;
+					readonly inputDigest: string;
 					readonly inputNodes: number;
 					readonly multiNodeComponents: number;
+					readonly nonclaims: readonly string[];
+					readonly outcome: string;
 					readonly selfLoopSingletons: number;
 					readonly sha256: string;
+					readonly structuralClosure: string;
+					readonly subjectId: string;
+					readonly upstreamClosure: string;
+				} = null;
+				let structuralModuleReachabilityAnalysisResult: null | {
+					readonly analysisId: string;
+					readonly authorityTransfer: string;
+					readonly bytes: number;
+					readonly capability: string;
+					readonly capabilityStatus: string;
+					readonly contentDigest: string;
+					readonly criterionLogicalPath: string;
+					readonly criterionNodeId: string;
+					readonly chargedTraversalSteps: number;
+					readonly direction: string;
+					readonly durationMs: number;
+					readonly encounteredFrontiers: number;
+					readonly examinedEdges: number;
+					readonly fullJanCsaa007Conformance: string;
+					readonly fullJanCsaa008Conformance: string;
+					readonly gateEffect: string;
+					readonly graphAuthority: string;
+					readonly health: string;
+					readonly inputDigest: string;
+					readonly inputEdges: number;
+					readonly inputNodes: number;
+					readonly maxDistance: number;
+					readonly nonclaims: readonly string[];
+					readonly outcome: string;
+					readonly reachedNodes: number;
+					readonly resolutionTargetMembers: number;
+					readonly sha256: string;
+					readonly sourceMembers: number;
+					readonly structuralClosure: string;
+					readonly subjectId: string;
+					readonly unvisitedNodes: number;
+					readonly upstreamClosure: string;
+					readonly witnessEdges: number;
 				} = null;
 				if (SMOKE_PROJECTION_PLAN.runModuleDependencyGraph) {
 					const graphStartedAt = performance.now();
@@ -974,17 +1293,264 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					moduleDependencyGraph = graph;
 					moduleDependencyGraphResult = {
 						bytes: graphWitness.bytes,
+						contentDigest: graph.contentDigest,
 						durationMs: Math.max(0, Math.round(performance.now() - graphStartedAt)),
 						edges: graph.edges.length,
+						graphId: graph.id,
+						graphInputDigest: graph.graphInputDigest,
 						health: graph.health,
 						nodes: graph.nodes.length,
-						sha256: graphWitness.sha256
+						semanticSnapshotId: graph.semanticSnapshotId,
+						sha256: graphWitness.sha256,
+						subjectId: graph.subjectId
 					};
 				} else
 					telemetry.skip('MODULE_DEPENDENCY_GRAPH', {
 						reason: 'The selected smoke suite does not request the module-dependency projection.',
 						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
 					});
+				if (SMOKE_PROJECTION_PLAN.runStructuralModuleReachabilityAnalysis) {
+					if (moduleDependencyGraph === null)
+						throw new Error('Structural module reachability requires the validated module graph.');
+					const reachabilityStartedAt = performance.now();
+					const criterionNodes = moduleDependencyGraph.nodes.filter(
+						(node) =>
+							node.kind === 'SOURCE' &&
+							node.logicalPath === STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH
+					);
+					expect(criterionNodes).toHaveLength(1);
+					const criterionNode = criterionNodes[0];
+					if (criterionNode === undefined)
+						throw new Error(
+							`Structural module reachability criterion is absent: ${STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH}`
+						);
+					telemetry.start('STRUCTURAL_MODULE_REACHABILITY_ANALYSIS', {
+						criterionLogicalPath: STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH,
+						criterionNodeId: criterionNode.id,
+						direction: 'FORWARD',
+						edges: moduleDependencyGraph.edges.length,
+						nodes: moduleDependencyGraph.nodes.length
+					});
+					const reachabilityInputs = {
+						graph: moduleDependencyGraph,
+						request: {
+							budgets: {
+								maxDiagnostics: 100_000,
+								maxEdges: moduleDependencyGraph.edges.length,
+								maxFrontierRecords: moduleDependencyGraph.nodes.length,
+								maxInputRecords: 10_000_000,
+								maxInputStringCharacters: 1_000_000_000,
+								maxNodes: moduleDependencyGraph.nodes.length,
+								maxReachableNodes: moduleDependencyGraph.nodes.length,
+								maxTraversalSteps:
+									moduleDependencyGraph.nodes.length + moduleDependencyGraph.edges.length,
+								maxWitnessEdges: moduleDependencyGraph.nodes.length
+							},
+							criterion: { nodeId: criterionNode.id },
+							direction: 'FORWARD' as const,
+							operationVersion: STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
+							schemaVersion: STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
+							selection: STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION,
+							semanticSnapshotId: snapshot.id,
+							sourceGraph: {
+								contentDigest: moduleDependencyGraph.contentDigest,
+								graphId: moduleDependencyGraph.id,
+								graphInputDigest: moduleDependencyGraph.graphInputDigest,
+								graphKind: 'TYPESCRIPT_MODULE_DEPENDENCY' as const
+							},
+							subjectId: snapshot.subjectId
+						},
+						semanticSnapshot: snapshot
+					};
+					const reachabilityOutcome = buildStructuralModuleReachabilityAnalysis(reachabilityInputs);
+					expect(reachabilityOutcome.outcome, JSON.stringify(reachabilityOutcome.diagnostics)).toBe(
+						'partial'
+					);
+					if (reachabilityOutcome.outcome !== 'partial')
+						throw new Error(JSON.stringify(reachabilityOutcome));
+					const analysis = reachabilityOutcome.analysis;
+					expect(
+						validateStructuralModuleReachabilityAnalysis(analysis, reachabilityInputs, {
+							maxDepth: 64,
+							maxInputRecords: 10_000_000,
+							maxInputStringCharacters: 1_000_000_000,
+							maxIssues: 100_000,
+							maxRecords: Math.max(1, analysis.coverage.chargedTraversalSteps * 64),
+							maxStringCharacters: Math.max(1, analysis.coverage.chargedTraversalSteps * 4_096)
+						})
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(analysis.criterion).toEqual({ nodeId: criterionNode.id });
+					expect(analysis.direction).toBe('FORWARD');
+					expect(analysis.coverage.criterionReconciles).toBe(true);
+					expect(analysis.coverage.memberAccountingReconciles).toBe(true);
+					expect(analysis.coverage.traversalReconciles).toBe(true);
+					expect(analysis.coverage.witnessAccountingReconciles).toBe(true);
+					expect(analysis.coverage).toMatchObject({
+						encounteredFrontiers: 1,
+						inputEdges: 1_157,
+						inputNodes: 2_591,
+						maxDistance: 3,
+						reachedNodes: 30,
+						resolutionTargetMembers: 1,
+						sourceMembers: 29,
+						unvisitedNodes: 2_561,
+						witnessEdges: 29
+					});
+					expect(analysis.coverage.reachedNodes + analysis.coverage.unvisitedNodes).toBe(
+						moduleDependencyGraph.nodes.length
+					);
+					expect(analysis.nonclaims).toEqual(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_NONCLAIMS);
+					expect(analysis.graphAuthority).toBe(
+						STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY
+					);
+					expect(analysis.authorityTransfer).toBe(
+						STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER
+					);
+					expect(analysis.gateEffect).toBe(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT);
+					expect(analysis.structuralClosure).toBe(
+						'EXACT_FOR_SELECTED_VALIDATED_GRAPH_AND_CRITERION'
+					);
+					expect(analysis.truncation).toEqual({ reason: null, state: 'NOT_TRUNCATED' });
+					expect(analysis.upstreamClosure).toBe(moduleDependencyGraph.coverage.closure);
+					expect(analysis.upstreamLimitations).toEqual(moduleDependencyGraph.limitations);
+					expect(analysis.health).toBe('PARTIAL');
+					expect(analysis.fullJanCsaa007Conformance).toBe(
+						STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE
+					);
+					expect(analysis.fullJanCsaa008Conformance).toBe(
+						STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE
+					);
+					const witness = canonicalSemanticJsonWitness(analysis);
+					telemetry.complete({
+						bytes: witness.bytes,
+						chargedTraversalSteps: analysis.coverage.chargedTraversalSteps,
+						criterionNodeId: criterionNode.id,
+						encounteredFrontiers: analysis.coverage.encounteredFrontiers,
+						examinedEdges: analysis.coverage.examinedEdges,
+						maxDistance: analysis.coverage.maxDistance,
+						reachedNodes: analysis.coverage.reachedNodes,
+						validationState: 'VALID',
+						witnessEdges: analysis.coverage.witnessEdges
+					});
+					structuralModuleReachabilityAnalysisResult = {
+						analysisId: analysis.id,
+						authorityTransfer: analysis.authorityTransfer,
+						bytes: witness.bytes,
+						capability: analysis.capability,
+						capabilityStatus: analysis.capabilityStatus,
+						contentDigest: analysis.contentDigest,
+						criterionLogicalPath: STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH,
+						criterionNodeId: criterionNode.id,
+						chargedTraversalSteps: analysis.coverage.chargedTraversalSteps,
+						direction: analysis.direction,
+						durationMs: Math.max(0, Math.round(performance.now() - reachabilityStartedAt)),
+						encounteredFrontiers: analysis.coverage.encounteredFrontiers,
+						examinedEdges: analysis.coverage.examinedEdges,
+						fullJanCsaa007Conformance: analysis.fullJanCsaa007Conformance,
+						fullJanCsaa008Conformance: analysis.fullJanCsaa008Conformance,
+						gateEffect: analysis.gateEffect,
+						graphAuthority: analysis.graphAuthority,
+						health: analysis.health,
+						inputDigest: analysis.inputDigest,
+						inputEdges: analysis.coverage.inputEdges,
+						inputNodes: analysis.coverage.inputNodes,
+						maxDistance: analysis.coverage.maxDistance,
+						nonclaims: analysis.nonclaims,
+						outcome: reachabilityOutcome.outcome,
+						reachedNodes: analysis.coverage.reachedNodes,
+						resolutionTargetMembers: analysis.coverage.resolutionTargetMembers,
+						sha256: witness.sha256,
+						sourceMembers: analysis.coverage.sourceMembers,
+						structuralClosure: analysis.structuralClosure,
+						subjectId: analysis.subjectId,
+						unvisitedNodes: analysis.coverage.unvisitedNodes,
+						upstreamClosure: analysis.upstreamClosure,
+						witnessEdges: analysis.coverage.witnessEdges
+					};
+				} else
+					telemetry.skip('STRUCTURAL_MODULE_REACHABILITY_ANALYSIS', {
+						reason:
+							'The selected smoke suite does not request structural module reachability analysis.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
+				if (SMOKE_PROJECTION_PLAN.terminateAfterStructuralModuleReachabilityAnalysis) {
+					if (
+						moduleDependencyGraphResult === null ||
+						structuralModuleReachabilityAnalysisResult === null
+					)
+						throw new Error(
+							'STRUCTURAL_MODULE_REACHABILITY_ONLY cannot complete without validated module-graph and reachability evidence.'
+						);
+					for (const phase of STRUCTURAL_MODULE_REACHABILITY_ONLY_SKIPPED_PHASES)
+						telemetry.skip(phase, {
+							reason:
+								'The structural module reachability-only suite terminates after validated reachability evidence.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
+					const phaseDurationsMs = telemetry.phaseDurationsMs();
+					const skippedPhases = telemetry.skippedPhases();
+					const completedPhases = Object.keys(phaseDurationsMs);
+					expect(completedPhases).toEqual(STRUCTURAL_MODULE_REACHABILITY_ONLY_COMPLETED_PHASES);
+					expect(skippedPhases).toEqual(
+						STRUCTURAL_MODULE_REACHABILITY_ONLY_EXPECTED_SKIPPED_PHASES
+					);
+					telemetry.finish({
+						completedPhases,
+						commandEventContractStaticOverlay: false,
+						commandDispatchStaticTopology: false,
+						commandHandlerStaticProjection: false,
+						guardClassificationStaticOverlay: false,
+						guardEnforcementLedgerObserved: false,
+						projects: snapshot.projects.length,
+						semanticSnapshotOutcome: outcome.outcome,
+						semanticProfile: SMOKE_PROFILE,
+						skippedPhases,
+						smokeSuite: SMOKE_SUITE,
+						sources: snapshot.sources.length,
+						stateMachineProjected: false,
+						structuralModuleReachabilityAnalyzed: true,
+						structuralSccAnalyzed: false,
+						terminalPhase: 'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS'
+					});
+					process.stdout.write(
+						`${JSON.stringify({
+							arrowCommandCensus: null,
+							callGraph: null,
+							completedPhases,
+							commandEventContractStaticOverlay: null,
+							commandDispatchStaticTopology: null,
+							commandHandlerStaticProjection: null,
+							dependencyProviderComparison: null,
+							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
+							exactSubjectReuse: null,
+							guardClassificationStaticOverlay: null,
+							guardEnforcementLedger: null,
+							moduleDependencyGraph: moduleDependencyGraphResult,
+							phaseDurationsMs,
+							projectCount: snapshot.projects.length,
+							readWriteAccessGraph: null,
+							selectedSubjectArtifactBytes: subjectArtifactBytes,
+							selectedSubjectArtifactCount: subject.artifacts.length,
+							selectedSubjectId: subject.descriptor.subjectId,
+							selector: SMOKE_SELECTOR ?? null,
+							semanticPipelineDurationMs,
+							semanticProfile: SMOKE_PROFILE,
+							semanticSnapshotOutcome: outcome.outcome,
+							semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
+							semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
+							semanticSnapshotProgressEvents: semanticProgressEvents.length,
+							semanticSnapshotWitness,
+							skippedPhases,
+							smokeSuite: SMOKE_SUITE,
+							sourceCount: snapshot.sources.length,
+							stateMachine: null,
+							structuralModuleReachabilityAnalysis: structuralModuleReachabilityAnalysisResult,
+							structuralSccAnalysis: null,
+							terminalPhase: 'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS'
+						})}\n`
+					);
+					return;
+				}
 				if (SMOKE_PROJECTION_PLAN.runStructuralSccAnalysis) {
 					if (moduleDependencyGraph === null)
 						throw new Error('Structural SCC analysis requires the validated module graph.');
@@ -1069,21 +1635,109 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						validationState: 'VALID'
 					});
 					structuralSccAnalysisResult = {
+						analysisId: analysis.id,
+						authorityTransfer: analysis.authorityTransfer,
 						bytes: witness.bytes,
+						capability: analysis.capability,
+						capabilityStatus: analysis.capabilityStatus,
 						components: analysis.coverage.components,
+						contentDigest: analysis.contentDigest,
 						cyclicComponents: analysis.coverage.cyclicComponents,
 						durationMs: Math.max(0, Math.round(performance.now() - sccStartedAt)),
+						fullJanCsaa007Conformance: analysis.fullJanCsaa007Conformance,
+						fullJanCsaa008Conformance: analysis.fullJanCsaa008Conformance,
+						gateEffect: analysis.gateEffect,
+						graphAuthority: analysis.graphAuthority,
+						health: analysis.health,
 						inputEdges: analysis.coverage.inputEdges,
+						inputDigest: analysis.inputDigest,
 						inputNodes: analysis.coverage.inputNodes,
 						multiNodeComponents: analysis.coverage.multiNodeComponents,
+						nonclaims: analysis.nonclaims,
+						outcome: sccOutcome.outcome,
 						selfLoopSingletons: analysis.coverage.selfLoopSingletons,
-						sha256: witness.sha256
+						sha256: witness.sha256,
+						structuralClosure: analysis.structuralClosure,
+						subjectId: analysis.subjectId,
+						upstreamClosure: analysis.upstreamClosure
 					};
 				} else
 					telemetry.skip('STRUCTURAL_SCC_ANALYSIS', {
 						reason: 'The selected smoke suite does not request structural SCC analysis.',
 						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
 					});
+				if (SMOKE_PROJECTION_PLAN.terminateAfterStructuralSccAnalysis) {
+					if (moduleDependencyGraphResult === null || structuralSccAnalysisResult === null)
+						throw new Error(
+							'STRUCTURAL_SCC_ONLY cannot complete without validated module-graph and SCC evidence.'
+						);
+					for (const phase of STRUCTURAL_SCC_ONLY_SKIPPED_PHASES)
+						telemetry.skip(phase, {
+							reason: 'The structural SCC-only suite terminates after validated SCC evidence.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
+					const phaseDurationsMs = telemetry.phaseDurationsMs();
+					const skippedPhases = telemetry.skippedPhases();
+					const completedPhases = Object.keys(phaseDurationsMs);
+					expect(completedPhases).toEqual(STRUCTURAL_SCC_ONLY_COMPLETED_PHASES);
+					expect(skippedPhases).toEqual(STRUCTURAL_SCC_ONLY_EXPECTED_SKIPPED_PHASES);
+					telemetry.finish({
+						completedPhases,
+						commandEventContractStaticOverlay: false,
+						commandDispatchStaticTopology: false,
+						commandHandlerStaticProjection: false,
+						guardClassificationStaticOverlay: false,
+						guardEnforcementLedgerObserved: false,
+						projects: snapshot.projects.length,
+						semanticSnapshotOutcome: outcome.outcome,
+						semanticProfile: SMOKE_PROFILE,
+						skippedPhases,
+						smokeSuite: SMOKE_SUITE,
+						sources: snapshot.sources.length,
+						stateMachineProjected: false,
+						structuralModuleReachabilityAnalyzed: false,
+						structuralSccAnalyzed: true,
+						terminalPhase: 'STRUCTURAL_SCC_ANALYSIS'
+					});
+					process.stdout.write(
+						`${JSON.stringify({
+							arrowCommandCensus: null,
+							callGraph: null,
+							completedPhases,
+							commandEventContractStaticOverlay: null,
+							commandDispatchStaticTopology: null,
+							commandHandlerStaticProjection: null,
+							dependencyProviderComparison: null,
+							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
+							exactSubjectReuse: null,
+							guardClassificationStaticOverlay: null,
+							guardEnforcementLedger: null,
+							moduleDependencyGraph: moduleDependencyGraphResult,
+							phaseDurationsMs,
+							projectCount: snapshot.projects.length,
+							readWriteAccessGraph: null,
+							selectedSubjectArtifactBytes: subjectArtifactBytes,
+							selectedSubjectArtifactCount: subject.artifacts.length,
+							selectedSubjectId: subject.descriptor.subjectId,
+							selector: SMOKE_SELECTOR ?? null,
+							semanticPipelineDurationMs,
+							semanticProfile: SMOKE_PROFILE,
+							semanticSnapshotOutcome: outcome.outcome,
+							semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
+							semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
+							semanticSnapshotProgressEvents: semanticProgressEvents.length,
+							semanticSnapshotWitness,
+							skippedPhases,
+							smokeSuite: SMOKE_SUITE,
+							sourceCount: snapshot.sources.length,
+							stateMachine: null,
+							structuralModuleReachabilityAnalysis: null,
+							structuralSccAnalysis: structuralSccAnalysisResult,
+							terminalPhase: 'STRUCTURAL_SCC_ANALYSIS'
+						})}\n`
+					);
+					return;
+				}
 				let callGraphResult: null | {
 					readonly bytes: number;
 					readonly candidateSetCallSites: number;
@@ -2547,6 +3201,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(
 						'The selected smoke suite cannot complete without validated structural SCC analysis.'
 					);
+				if (
+					SMOKE_PROJECTION_PLAN.runStructuralModuleReachabilityAnalysis &&
+					structuralModuleReachabilityAnalysisResult === null
+				)
+					throw new Error(
+						'The selected smoke suite cannot complete without validated structural module reachability analysis.'
+					);
 				const exactSubjectReuse =
 					arrowSubject === subject &&
 					snapshot.subjectId === subject.descriptor.subjectId &&
@@ -2570,6 +3231,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					projects: snapshot.projects.length,
 					sources: snapshot.sources.length,
 					stateMachineProjected: stateMachineResult !== null,
+					structuralModuleReachabilityAnalyzed: structuralModuleReachabilityAnalysisResult !== null,
 					structuralSccAnalyzed: structuralSccAnalysisResult !== null
 				});
 				process.stdout.write(
@@ -2623,6 +3285,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						skippedPhases,
 						smokeSuite: SMOKE_SUITE,
 						stateMachine: stateMachineResult,
+						structuralModuleReachabilityAnalysis: structuralModuleReachabilityAnalysisResult,
 						structuralSccAnalysis: structuralSccAnalysisResult,
 						sourceCount: snapshot.sources.length
 					})}\n`

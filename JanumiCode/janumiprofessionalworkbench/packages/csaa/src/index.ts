@@ -12,6 +12,7 @@ export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
+export * from './contracts/structural-module-reachability-analysis.js';
 export * from './contracts/structural-scc-analysis.js';
 export * from './contracts/subject.js';
 export * from './inventory/canonical.js';
@@ -67,6 +68,7 @@ export {
 } from './providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.js';
 export { validateGuardEnforcementLedgerObservation } from './providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.js';
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
+export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
@@ -114,6 +116,10 @@ export type {
 	CommandHandlerGraphValidationResult
 } from './graph/validate-command-handler-graph.js';
 export { validateModuleDependencyGraph } from './graph/validate-graph.js';
+export {
+	validateConstructedStructuralModuleReachabilityAnalysis,
+	validateStructuralModuleReachabilityAnalysis
+} from './graph/validate-structural-module-reachability-analysis.js';
 export {
 	validateConstructedStructuralSccAnalysis,
 	validateStructuralSccAnalysis
