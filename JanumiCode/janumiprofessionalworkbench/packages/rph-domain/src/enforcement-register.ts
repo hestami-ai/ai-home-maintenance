@@ -661,7 +661,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'DECLARATION: packages/rph-domain/src/step-command-spec.ts — the `inputReadiness` column, total over the nine step commands. ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — inputReadinessRefusal, invoked from stepAuthorityRefusal as the fourth declared limb for both arrows into RUNNING.',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// The kernel's own label travels in the MESSAGE: RPH_PRECONDITION_UNSATISFIED is not a member of the ratified
-		// 15-value RphErrorCodeSchema (the WP-11 discipline, as with RPH_BINDING_NOT_AUTHORIZED).
+		// RphErrorCodeSchema (the WP-11 discipline, as with RPH_BINDING_NOT_AUTHORIZED) — arity deliberately not
+		// restated; the premise is NON-MEMBERSHIP, which is unchanged.
 		refusalMarker: 'the step is not ready and no model/tool invocation is performed',
 		declaredMutations: [
 			'flip StartExecutionStep.inputReadiness to NOT_CONSUMING in step-command-spec.ts',
@@ -2427,7 +2428,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// THE REASON THE FAMILY IS UNIFORM IS STRUCTURAL, and it splits in two:
 	//
 	//   (a) NINE rules have NO DISPATCHABLE SUBJECT. There is no presentation command in this engine (no position,
-	//       layout, viewport, or ordering payload anywhere in the 84 commands), no phase/milestone setter and no
+	//       layout, viewport, or ordering payload anywhere in the 100 commands, re-searched 2026-08-13), no
+	//       phase/milestone setter and no
 	//       persisted phase field, no traceability-validation command, and the ratified `TraceLinkSchema` is minted
 	//       by nothing. A rule whose antecedent no dispatch can produce cannot be UNENFORCED_DISCLOSED, because
 	//       that arm demands an arrangement the engine ACCEPTS — the RPH-EVD-002 reasoning, applied nine times.
@@ -3130,7 +3132,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'consequence of falsification can be driven by a caller asserting it, while the assumption itself ' +
 			'cannot be falsified at all. That is the REG-F-014 shape a third time — a caller-supplied fact taken ' +
 			'as true where the engine could have resolved it — and it is why that finding\'s remediation is a ' +
-			'survey rather than a patch. `assessFalsification` has no caller outside its own module.'
+			'survey rather than a patch. ~~`assessFalsification` has no caller outside its own module.~~ CORRECTED 2026-08-08 (REG-F-069): it is called by `falsifyAssumption` in handlers/assurance.ts.'
 	},
 	// ── RPH-ASM-005 — THE PREDICATE WITH ZERO CALLERS ANYWHERE, INCLUDING ITS OWN MODULE ─────────────────────
 	//
@@ -3583,10 +3585,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'AND THE HONEST ARRANGEMENT IS UNREACHABLE FOR THIS SUBJECT. Censused every semantic-version write: only INTENT, DECOMPOSITION_CONTRACT and PROFESSIONAL_WORK_ARCHITECTURE can ever move their semanticVersion. A PWU\'s is 1 at creation and no command changes it — so over a PWU subject the rule\'s antecedent (the subject moving on after approval) CANNOT BE PRODUCED, which is why the forgery was needed to produce it. So the probe was RE-BASED: the decision now names the INTENT as a co-subject beside the baselined PWU, and the intent is genuinely REVISED after approval (semanticVersion 1 -> 2, `ReviseIntent`). The refusal is proved from a TRUE premise for the first time — the world moved, and nothing about the decision was edited. Re-basing did not cost the probe its sensitivity: neutralising this arm still reddens both it and its sibling test. The other three defects `promotionProbe` serves (RPH-BAS-003/004/006) keep the exact decision they had.'
 		]
 	},
-	// ── THE ONE LIVE WIRING IN A FAMILY OF FIVE DEAD PREDICATES ──────────────────────────────────────────────
+	// ── THE ONE LIVE WIRING IN A FAMILY OF FOUR DEAD PREDICATES ───────────────────────────────────────────────
 	//
 	// RPH-ASM-006 is the only ASM rule with a kernel predicate anything asks. `canAuthorizeNewWork` has real
-	// callers; its five siblings have none. It is also the only assumption consultation in the entire execution
+	// callers; four of its five siblings have none. It is also the only assumption consultation in the entire execution
 	// plane — one call, on the plan-approval arrow — and the handler's own comment concedes the scope: "the first
 	// live wiring of the assumption-impact half of WP-3-008 (the falsification transition + reshape/reassessment
 	// loop remain)".
