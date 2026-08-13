@@ -174,7 +174,6 @@ function auditTokens(c: TransitionClaim, bag: Bag): void {
 	}
 }
 
-/** Occupancy, for a machine whose births are declared and therefore analysable. */
 /**
  * The deadness claim that needs NO arrow coverage — see `provablyUnoccupiable` (REG-F-118).
  *
@@ -194,6 +193,15 @@ function auditProvablyDead(c: TransitionClaim, unoccupiable: ReadonlySet<string>
 	}
 }
 
+/**
+ * Occupancy, for a machine whose births are declared AND whose arrows are completely declared.
+ *
+ * ⚠ ITS ONE-LINE DOCSTRING SPENT THREE COMMITS ABOVE `auditProvablyDead` INSTEAD (REG-F-120), because that
+ * function was inserted beneath it. It read *"for a machine whose births are declared and therefore analysable"* —
+ * which was true when written and became WRONG in the same session: REG-F-118 established that a birth is NOT
+ * sufficient, because `occupiable()` under-estimates while any arrow is undeclared. So the stray line asserted the
+ * superseded rule, sitting above the function that embodies the replacement. Restored to its owner and corrected.
+ */
 function auditOccupancy(c: TransitionClaim, occupied: ReadonlySet<string>, bag: Bag): void {
 	for (const s of statesOf(c.machine, c.from)) {
 		if (occupied.has(s)) continue;

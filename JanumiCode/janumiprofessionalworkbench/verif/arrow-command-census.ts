@@ -581,13 +581,6 @@ export function deadCovered(): { dead: string[]; unanalysed: string[] } {
 }
 
 /**
- * The machines whose DECLARED arrows are the whole of their RATIFIED arrows — the only ones a deadness claim can
- * be made about (REG-F-118).
- *
- * Derived by comparing against `STATE_MACHINES`, never by a list: a machine joins the moment its last arrow is
- * declared and leaves the moment the ratified set grows, with no one to remember either.
- */
-/**
  * States that are PROVABLY unoccupiable — and this proof needs no arrow coverage at all (REG-F-118).
  *
  * ⚠ IT IS A DIFFERENT ARGUMENT FROM OCCUPANCY, WHICH IS WHY IT SURVIVES WHERE OCCUPANCY DOES NOT. `occupiable()`
@@ -632,6 +625,19 @@ export function occupancyAnalysable(): ReadonlySet<string> {
 	return new Set([...complete].filter((m) => born.has(m)));
 }
 
+/**
+ * The machines whose DECLARED arrows are the whole of their RATIFIED arrows — the only ones a deadness claim can
+ * be made about (REG-F-118).
+ *
+ * Derived by comparing against `STATE_MACHINES`, never by a list: a machine joins the moment its last arrow is
+ * declared and leaves the moment the ratified set grows, with no one to remember either.
+ *
+ * ⚠ THIS BLOCK SPENT THREE COMMITS ABOVE THE WRONG FUNCTION (REG-F-120). Inserting `provablyUnoccupiable` beneath
+ * it left two docstrings stacked, so this one documented nothing and a reader met it as the preamble to a
+ * different rule — the completeness argument attached to the proof that does NOT need completeness, which is the
+ * one distinction those two functions exist to keep apart. Moved, not deleted: it was always correct about its
+ * real owner.
+ */
 function machinesWithCompleteArrowCoverage(arrows: readonly DeclaredArrow[]): ReadonlySet<string> {
 	const seen = new Set(arrows.map((a) => arrowKey(a.machine, a.from, a.to)));
 	const out = new Set<string>();
