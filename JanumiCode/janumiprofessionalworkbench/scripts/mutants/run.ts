@@ -377,6 +377,23 @@ function runMutant(m: DeclaredMutant): Result {
 		// would silently convert a real finding into a held control.
 		const mutantEnv = { RPH_MUTANT_APPLIED: m.id };
 		const jsonTo = jsonReportFor(m);
+		// ⚠ DELETE THE REPORT BEFORE THE RUN, SO "NO REPORT" MEANS "THIS RUN WROTE NONE" (REG-F-120).
+		//
+		// `controlVerdict`'s passing arm returns CONTROL_HELD without calling `failedFiles`, and only `failedFiles`
+		// deletes. So a control that PASSES leaves its report on disk, and the next control that exits non-zero
+		// WITHOUT writing one reads the stale file, sees `[]`, computes `fresh.length === 0` and is graded HELD —
+		// the exact fail-open the `reported === undefined` arm below was added to close, walked around by a file
+		// that outlived its run.
+		//
+		// ⚠⚠ IT IS LATENT TODAY AND ARMS ITSELF WHEN THE REPOSITORY GETS HEALTHIER, which is why it is fixed now
+		// rather than when it bites. No control currently reaches the passing arm: one suite is red, so every
+		// control exits non-zero, takes the differencing path, and `failedFiles` deletes the report on the way
+		// through. **The day that suite goes green, controls start passing, the report starts surviving, and the
+		// hole opens.** A defect whose precondition is "the gate is finally clean" is the worst kind to leave.
+		//
+		// Deleting BEFORE the spawn is strictly stronger than deleting after the read: it also covers an invocation
+		// killed mid-flight, whose report would otherwise be inherited by the next run entirely.
+		if (jsonTo !== undefined) rmSync(jsonTo, { force: true });
 		const run = isE2eTarget(target)
 			? runPlaywright(target, mutantEnv)
 			: sh(

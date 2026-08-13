@@ -127,6 +127,36 @@ describe('REG-F-116 — a timeout is not a measurement, in either direction', ()
 		expect(timeoutEvidence(CLEAN_RUN)).toBeNull();
 	});
 
+	// ⚠ THE PLAYWRIGHT HALF, WHICH NOTHING HELD UNTIL AN AUDIT OF THIS FILE MEASURED IT (REG-F-120).
+	//
+	// The vitest markers carry TWO defences — the `Error: ` prefix and the line anchor — and the prefix does the
+	// separating on its own: dropping `^[ \t]*` from them leaves all seven cases GREEN, measured. **The Playwright
+	// marker has NO prefix.** Its anchor is its entire defence, and dropping that was ALSO green, because every
+	// fixture below that could poison it was a VITEST one. So the anchor on line 61 of `measured.ts` was
+	// unguarded: a reader could delete it as redundant — the vitest evidence says it is — and re-open the
+	// self-poisoning hole on the e2e path alone.
+	//
+	// The fixture is the shape a failing assertion about Playwright text actually takes: the value printed on its
+	// own line, in quotes. The QUOTE is what the anchor rejects and an unanchored marker accepts.
+	it('CONTROL — a quoted PLAYWRIGHT fixture is not a timeout either, and only the ANCHOR says so', () => {
+		const quotedPlaywright = [
+			' FAIL  verif/mutant-verdict.test.ts > reports a PLAYWRIGHT timeout',
+			"AssertionError: expected null to be 'Test timeout of 30000ms exceeded' // Object.is equality",
+			'',
+			'- Expected:',
+			'"Test timeout of 30000ms exceeded"',
+			'',
+			'+ Received:',
+			'null',
+			'      Tests  1 failed | 6 passed (7)'
+		].join('\n');
+		expect(
+			timeoutEvidence(quotedPlaywright),
+			'the Playwright marker has no `Error: ` prefix, so its line anchor is the ONLY thing separating a ' +
+				'runner diagnostic from a quoted fixture — this is the case that holds it'
+		).toBeNull();
+	});
+
 	// CONTROL — THE ONE THE MUTANTS THEMSELVES DEMANDED. Without it, this check reports its own test fixtures as
 	// runner diagnostics and grades a clean kill as unmeasured.
 	it('CONTROL — a fixture QUOTED in a failing diff is not a timeout, however exactly it reads like one', () => {

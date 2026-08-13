@@ -55,6 +55,14 @@
  * misread. That is over-detection, and over-detection here FAILS CLOSED: it produces a loud BLOCKING
  * `INCONCLUSIVE`, never a silent false KILL. Under-detection is the dangerous direction, and the anchoring cannot
  * cause it: a real runner diagnostic is always emitted on a line of its own.
+ *
+ * ⚠ THE TWO MARKERS ARE NOT DEFENDED EQUALLY, AND SAYING "THE PREFIX SEPARATES THEM" WAS AN OVER-GENERALISATION
+ * FROM THE VITEST CASE (REG-F-120). Measured: drop `^[ \t]*` from the vitest marker and all cases stay green —
+ * the `Error: ` prefix is doing the separating there, exactly as REG-F-116 claimed. **But the Playwright marker
+ * has no prefix to fall back on.** Its line anchor is its ENTIRE defence, and for a while nothing held it: the
+ * poisoning fixtures were all vitest-shaped, so dropping that anchor was green too. A reader could have deleted
+ * it as redundant — the vitest evidence says redundant — and re-opened the hole on the e2e path alone.
+ * `verif/mutant-verdict.test.ts` now carries a quoted-Playwright fixture whose only objector is that anchor.
  */
 const TIMEOUT_MARKERS: readonly RegExp[] = [
 	/^[ \t]*Error: (?:Test|Hook) timed out in \d+ms/m,
