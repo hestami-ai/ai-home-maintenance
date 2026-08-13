@@ -856,10 +856,19 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		},
 		why:
 			'"Changing a claim ... to SUPPORTED is rejected" presupposes a command that CHANGES A CLAIM\'S STATUS, and ' +
-			'no such command exists in the ratified vocabulary. `AssertClaim` is the only CLAIM-targeting command; its ' +
+			'~~no such command exists in the ratified vocabulary. `AssertClaim` is the only CLAIM-targeting command; its ' +
 			'`z.strictObject` payload has no `status` field at all, and the handler hard-codes `OPEN` in both the ' +
 			'persisted state and the emitted event. No handler anywhere drives the `Claim.status` machine — the ' +
-			'machine and its transition labels exist in the domain data, but nothing dispatches into them. So there is ' +
+			'machine and its transition labels exist in the domain data, but nothing dispatches into them.~~ ⚠ EXPIRED ' +
+			'2026-08-06 AND NOT NOTICED FOR SEVEN DAYS (REG-F-133). `RecordClaimAssessment` is registered ' +
+			'(registry.ts) and DRIVES `Claim.status`; seven of the machine\'s fifteen arrows are now covered. The ' +
+			'rule is not merely dispatchable, it is ENFORCED — the handler\'s guard is headed with this very rule ' +
+			'id and refuses SUPPORTED without ADMISSIBLE evidence, with a COMMAND-layer test asserting it. THE ' +
+			'DISPOSITION IS THEREFORE WRONG and this row is owed a move to ENFORCED with the backing REG-F-132 ' +
+			'enumerates (marker, declared mutations, manifest row, probe) — deliberately NOT done in the same ' +
+			'commit that found it, because a disposition move without its evidence is what REG-F-130 records. ' +
+			'HOW IT SURVIVED: seven register commits and one dedicated stale-prose sweep passed over it, because ' +
+			'arm 3 has no guard field, no probe and no selector — nothing could redden. So there is ' +
 			'no envelope for this refusal to attach to. This is NOT a disguised disclosure: the rule cannot be ' +
 			'violated by any dispatch, because the illegal transition is unreachable rather than unguarded, and ' +
 			'recording it as UNENFORCED_DISCLOSED would claim a gap that no arrangement can demonstrate.'
@@ -3165,14 +3174,21 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §4 OBJ-4; the downstream half is carried by STA-7 (Invalidation is first-class and satisfaction is revocable), which names reshaping and invalidation as the routes falsified assumptions take.'
 		},
 		why:
-			'A FIVE-LIMB OUTCOME CASCADE whose TRIGGERING ACT is not dispatchable: no `FalsifyAssumption` command ' +
+			'~~A FIVE-LIMB OUTCOME CASCADE whose TRIGGERING ACT is not dispatchable: no `FalsifyAssumption` command ' +
 			'exists, and no handler emits `AssumptionFalsified`. Nothing can be refused. THE PART WORTH RECORDING ' +
 			'IS THAT THE CONSEQUENT IS REACHABLE BY ASSERTION, WITHOUT THE ANTECEDENT. `ReshapePwu` — whose own doc ' +
 			'comment reads "EXECUTING|UNDER_ASSURANCE -> RESHAPING (material assumption falsified / blocking ' +
 			'finding)" — takes a free-text `reason` and an OPTIONAL `triggeringObjectId`, and never loads, ' +
 			'resolves, or status-checks the object that id names. So the exact transition this rule names as the ' +
 			'consequence of falsification can be driven by a caller asserting it, while the assumption itself ' +
-			'cannot be falsified at all. That is the REG-F-014 shape a third time — a caller-supplied fact taken ' +
+			'cannot be falsified at all.~~ ⚠ EXPIRED 2026-08-08, CAUGHT 2026-08-13 (REG-F-133), AND REFUTED BY THIS ' +
+			"ROW'S OWN TEXT TEN LINES BELOW: `FalsifyAssumption` IS registered and `AssumptionFalsified` IS emitted, " +
+			'which the struck sentence further down already records — *\'CORRECTED 2026-08-08 (REG-F-069): it is ' +
+			"called by `falsifyAssumption`'*. **A correcting pass fixed the ADJACENT sentence and left the " +
+			'LOAD-BEARING one standing**, so this row has contradicted itself, in one string, for five days. The ' +
+			'cascade limbs may still be unenforced — that is a separate question this correction does NOT settle — ' +
+			'but the stated GROUND (the act is not dispatchable) is gone. That is the REG-F-014 shape a third time — ' +
+			'a caller-supplied fact taken ' +
 			'as true where the engine could have resolved it — and it is why that finding\'s remediation is a ' +
 			'survey rather than a patch. ~~`assessFalsification` has no caller outside its own module.~~ CORRECTED 2026-08-08 (REG-F-069): it is called by `falsifyAssumption` in handlers/assurance.ts.'
 	},
