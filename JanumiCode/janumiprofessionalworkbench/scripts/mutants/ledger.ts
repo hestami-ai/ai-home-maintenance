@@ -2713,5 +2713,16 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-census-coverage.test.ts'],
 		why: "THE SPLIT STOPS DISCRIMINATING — every unratified declaration is reported as an over-claim and the self-edge list empties. This is the state the pin was in for its whole life before REG-F-128: ONE population, one number, and no way to say which kind of thing moved. ⚠ THE HAZARD IT GUARDS IS SPECIFIC, and it is why the CONTROL exists rather than the two name-pins alone: a collapsed classifier still produces two lists of the right TYPE, and if someone re-pinned the names to match it the suite would be green over a classifier that classifies nothing. The control asserts the discrimination itself — no `from !== to` pair may sit in the self-edge list, no self-edge may sit in the over-claim list, and the two must be disjoint — so it fails on the SHAPE rather than on the contents. ⚠ AND THIS MATTERS MORE SINCE REG-F-127: the five machine-admitted self-edges went two different ways (three were duplicate-append DEFECTS and are now refused; two are deliberate HOLDS), so a reader who cannot tell the categories apart cannot look up which disposition applies to the arrow in front of them. Predicted red: the by-name self-edge pin AND the CONTROL.",
 		source: 'REG-F-128'
+	},
+	{
+		id: 'F129-the-creation-gate-reuses-the-readiness-set',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "\tif ((intentObj.state as { intentStatus?: string }).intentStatus === 'SUPERSEDED') {",
+		replace:
+			"\tif (\n\t\t!['PROVISIONAL', 'FORMALIZED', 'APPROVED', 'REVISED'].includes(\n" +
+			"\t\t\tString((intentObj.state as { intentStatus?: string }).intentStatus)\n\t\t)\n\t) {",
+		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
+		why: "THE TEMPTING REUSE, AND THE ONE THE MOTIVATING TEST CANNOT SEE. STA-6 has FOUR clauses and two of them are about intent maturity, so the obvious move when writing the creation gate is to reach for the set the READINESS gate already uses — `INTENT_AT_LEAST_PROVISIONAL` (pwuGuards.ts), which is {PROVISIONAL, FORMALIZED, APPROVED, REVISED}. This mutation is that reuse, spelled inline. ⚠ THE SUPERSEDED TEST STAYS GREEN UNDER IT — a widened gate still refuses SUPERSEDED — so the test that MOTIVATED this guard cannot distinguish the ratified rule from a gate four times too wide. Only the controls can. And the over-refusal is not hypothetical: proposing under a RAW intent is the repository's normal pattern, measured at 56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` without maturing it in between. Predicted red, measured before declaring: the RAW control AND the WITHDRAWN non-rule pin, 2 failed / 2 passed — clause (a) governs readiness, clause (d) governs creation, and this is what keeps them apart.",
+		source: 'REG-F-129'
 	}
 ];

@@ -61,9 +61,33 @@ because the cost of the alternative is concrete: six new arrows, a green gate, a
 
 ## 5. What must land TOGETHER (the increment's shape, not yet its roadmap)
 
-1. `proposePwu` reads `intentStatus` and refuses a SUPERSEDED (and WITHDRAWN) intent — **red-first, and it can
-   be written and landed BEFORE any supersede command exists**, since the guard is testable by seeding. Landing
-   it first means RPH-INT-007 never has a window in which it is live-and-unenforced.
+1. `proposePwu` reads `intentStatus` and refuses a ~~SUPERSEDED (and WITHDRAWN)~~ **SUPERSEDED** intent —
+   **red-first, and it can be written and landed BEFORE any supersede command exists**, since the guard is
+   testable by seeding. Landing it first means RPH-INT-007 never has a window in which it is live-and-unenforced.
+
+   **⚠ THE `(and WITHDRAWN)` WAS MY ERROR, AND IT REPEATS ONE THE REGISTER ALREADY RATIFIED AS AN ERROR.** STA-6
+   names *"a superseded intent"* and nothing else; grepping the ratified Canonical Domain Model for `WITHDRAWN`
+   returns exactly two hits — the enum member and the §6.2 matrix row — and §6.3's seven invariants never mention
+   it. My ground for adding it was `terminalStates: ['SUPERSEDED','WITHDRAWN']`, i.e. *the two terminal states
+   should behave alike* — and **REG-F-083 records that `terminalStates` is WHOLLY A REPOSITORY SHAPE**: *"The
+   ratified Canonical Domain Model contains the word 'terminal' ZERO times."* So the inference reasons from a
+   repository artifact as though it were canon. **Refuse SUPERSEDED only.** The asymmetry is itself ratified —
+   Supersede has six in-arrows ("any active"), Withdraw only three ("permitted only from these three early
+   states"), so the two are not interchangeable in the corpus either.
+
+   **SCOPE: every PWU, root and non-root.** Clause (d) carries no root qualifier, unlike clause (a)'s "A root
+   PWU". Every proposal already loads its intent (PWU-002's existence check), so the status read costs nothing.
+
+   **⚠ AND IT MUST NOT REUSE `INTENT_AT_LEAST_PROVISIONAL`** (`pwuGuards.ts:92-97` = PROVISIONAL | FORMALIZED |
+   APPROVED | REVISED). That set serves clause (a) at READINESS. Using it at CREATION would refuse RAW and
+   UNDER_DISCOVERY — and **56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` never mature
+   the intent in between**, so proposing under a RAW intent is the normal, deliberate pattern
+   (`disclosure-observed.test.ts:395-397` states it in terms). Reusing the readiness set would strand it.
+
+   **PRE-EXISTING GAP, RECORDED AND NOT FIXED HERE:** `proposePwu` never asserts the referent's `objectType`, so
+   `intentId` may name a non-Intent object whose `intentStatus` is `undefined`. A `=== 'SUPERSEDED'` test admits
+   it — but so does today's existence-only check, so this guard does not worsen it. Closing it is a change to
+   PWU-002's own rule and belongs in its own increment, not smuggled in beside a canon-grounded one.
 2. Only then, `SupersedeIntent` + `IntentSuperseded` emission, with the shape's authored status disclosed as
    `recordClaimAssessment` disclosed its own (REG-D-024 pattern).
 3. `RPH-INT-007`'s register row is rewritten in the same commit as (2): its `NOT_A_COMMAND_REFUSAL` ground

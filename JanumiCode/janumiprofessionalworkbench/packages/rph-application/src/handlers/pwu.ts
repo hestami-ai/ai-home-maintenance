@@ -221,6 +221,42 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 			[p.pwuId]
 		);
 	}
+	// ── STA-6 (d): "a superseded intent cannot authorize new PWUs" — JPWB-DOC-003 §5, verbatim ────────────────
+	//
+	// ⚠ LANDED BEFORE THE COMMAND THAT MAKES ITS ANTECEDENT REACHABLE, which is the only ordering that works.
+	// `RPH-INT-007` closes this rule as NOT_A_COMMAND_REFUSAL purely because SUPERSEDED is command-unreachable,
+	// and says so with its own trigger attached: *"if SUPERSEDED ever becomes reachable, this rule becomes a live
+	// UNENFORCED_DISCLOSED row on the same day."* `SupersedeIntent` is the next increment; shipping it first would
+	// have delivered six new arrows, a green gate, and a governance rule that had quietly stopped being closed.
+	//
+	// ⚠ SUPERSEDED ONLY, AND WITHDRAWN IS DELIBERATELY ADMITTED. The design for this increment said "SUPERSEDED
+	// (and WITHDRAWN)" — an inference, and one this register has already ratified AS an error. STA-6 names *"a
+	// superseded intent"* and nothing else; the ratified domain model mentions WITHDRAWN only as an enum member
+	// and a matrix row, never in §6.3's invariants. The ground for pairing them was `terminalStates:
+	// ['SUPERSEDED','WITHDRAWN']` — and **REG-F-083 records that `terminalStates` is WHOLLY A REPOSITORY SHAPE**
+	// (*"the ratified Canonical Domain Model contains the word 'terminal' ZERO times"*). The corpus does not treat
+	// them alike either: Supersede has SIX in-arrows ("any active"), Withdraw only THREE.
+	//
+	// ⚠ AND IT IS NOT `INTENT_AT_LEAST_PROVISIONAL`, WHICH IS THE TEMPTING REUSE. That set (pwuGuards.ts) serves
+	// STA-6 clause (a) at READINESS and excludes RAW — so applying it at CREATION would refuse the repository's
+	// normal pattern: capture an intent and propose the work graph under it, maturing the intent later. Measured:
+	// 56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` never mature it in between. Clause
+	// (a) governs readiness, clause (d) governs creation, and they take different sets.
+	//
+	// SCOPE IS EVERY PWU, root and child alike: clause (d) carries no root qualifier (clause (a) does), and this
+	// handler mints child PWUs too — `parentWorkUnitId` is a payload field here, not a separate creator.
+	//
+	// DISCLOSED, NOT FIXED HERE: PWU-002 above is existence-only and never asserts the referent's `objectType`, so
+	// a non-INTENT id would carry `intentStatus: undefined` and pass this check. That gap predates this guard and
+	// is unchanged by it; closing it changes PWU-002's own rule and belongs in its own increment.
+	if ((intentObj.state as { intentStatus?: string }).intentStatus === 'SUPERSEDED') {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposePwu cannot be authorized by intent ${p.intentId}: it is SUPERSEDED, and a superseded intent authorizes no new work (JPWB-DOC-003 §5 STA-6). Propose against the intent that superseded it.`,
+			[p.pwuId]
+		);
+	}
 	const intentState = intentObj.state as { ontologyId?: string; ontologyVersion?: string };
 	if (p.parentWorkUnitId && !ctx.store.loadObject(p.parentWorkUnitId)) {
 		return reject(
