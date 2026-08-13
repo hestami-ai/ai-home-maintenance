@@ -3,10 +3,14 @@
 // ── WHY THIS LANDS BEFORE `SupersedeIntent` EXISTS, WHICH IS THE WHOLE POINT OF ITS ORDERING ──────────────────
 //
 // The enforcement register closes this rule as `NOT_A_COMMAND_REFUSAL` on the ground that SUPERSEDED is
-// COMMAND-UNREACHABLE — six INTENT commands are registered and none targets it — and states the consequence in
-// terms: *"if SUPERSEDED ever becomes reachable, this rule becomes a live UNENFORCED_DISCLOSED row on the same
-// day."* Building `SupersedeIntent` first would therefore ship six new arrows, a green gate, and a governance
-// rule that had silently stopped being closed. The guard lands FIRST so there is no such day.
+// COMMAND-UNREACHABLE — six INTENT commands are registered and none targets it. Building `SupersedeIntent`
+// first would therefore ship six new arrows, a green gate, and a governance rule that had silently stopped being
+// closed. The guard lands FIRST so there is no such day.
+//
+// ⚠ THE ROW ALSO PREDICTED WHERE IT WOULD GO — *"a live UNENFORCED_DISCLOSED row on the same day"* — AND THAT
+// WAS WRONG (REG-F-130). An UNENFORCED_DISCLOSED row must carry a probe that DISPATCHES the arrangement and
+// observes the engine ACCEPT it; this suite proves the engine REFUSES it, so that probe could never be honest.
+// The destination is ENFORCED, and this file is the observation it will be backed by.
 //
 // The antecedent being command-unreachable is also why this suite SEEDS the status rather than driving it: an
 // arrangement no command can produce is exactly the case a fixture is for, and `getMachine` is consulted so a

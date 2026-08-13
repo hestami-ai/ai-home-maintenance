@@ -224,10 +224,16 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 	// ── STA-6 (d): "a superseded intent cannot authorize new PWUs" — JPWB-DOC-003 §5, verbatim ────────────────
 	//
 	// ⚠ LANDED BEFORE THE COMMAND THAT MAKES ITS ANTECEDENT REACHABLE, which is the only ordering that works.
-	// `RPH-INT-007` closes this rule as NOT_A_COMMAND_REFUSAL purely because SUPERSEDED is command-unreachable,
-	// and says so with its own trigger attached: *"if SUPERSEDED ever becomes reachable, this rule becomes a live
-	// UNENFORCED_DISCLOSED row on the same day."* `SupersedeIntent` is the next increment; shipping it first would
-	// have delivered six new arrows, a green gate, and a governance rule that had quietly stopped being closed.
+	// `RPH-INT-007` closes this rule as NOT_A_COMMAND_REFUSAL purely because SUPERSEDED is command-unreachable.
+	// `SupersedeIntent` is the next increment; shipping it first would have delivered six new arrows, a green gate,
+	// and a governance rule that had quietly stopped being closed.
+	//
+	// ⚠ THAT ROW PREDICTED ITS OWN DESTINATION AND PREDICTED IT WRONG, corrected at REG-F-130 and repeated here
+	// because this docblock quoted it: it said the rule would become *"a live UNENFORCED_DISCLOSED row on the same
+	// day"*. It will not — an UNENFORCED_DISCLOSED row must carry a probe that DISPATCHES the arrangement and
+	// observes the engine ACCEPT it, and this guard REFUSES it, so no such probe could be written honestly. The
+	// destination is ENFORCED. **A prediction about a future disposition is a claim like any other**, and this one
+	// was made when only one arm looked available.
 	//
 	// ⚠ SUPERSEDED ONLY, AND WITHDRAWN IS DELIBERATELY ADMITTED. The design for this increment said "SUPERSEDED
 	// (and WITHDRAWN)" — an inference, and one this register has already ratified AS an error. STA-6 names *"a

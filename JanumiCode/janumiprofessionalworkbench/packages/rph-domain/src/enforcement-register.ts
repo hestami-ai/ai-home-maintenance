@@ -1473,25 +1473,39 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'a superseded intent cannot authorize new PWUs',
-			note: 'JPWB-DOC-003 §5 STA-6 states the rule verbatim. Carriage is total here even though enforcement is absent — the independence of the two axes, in the direction RPH-EXE-007 already demonstrates.'
+			note: 'JPWB-DOC-003 §5 STA-6 states the rule verbatim. ~~Carriage is total here even though enforcement is absent — the independence of the two axes, in the direction RPH-EXE-007 already demonstrates.~~ CORRECTED 2026-08-13 (REG-F-130): enforcement is NO LONGER ABSENT — REG-F-129 landed the guard at proposePwu — so this row must not be cited for that independence. Carriage remains total.'
 		},
 		why:
 			'THE ANTECEDENT IS COMMAND-UNREACHABLE, which is an unusual reason for this arm and must be read as ' +
-			'stated: this row does NOT mean ProposePwu is guarded. It is not. `proposePwu` loads the intent, checks ' +
+			'stated. ~~this row does NOT mean ProposePwu is guarded. It is not. `proposePwu` loads the intent, checks ' +
 			'that it EXISTS, then narrows it to `{ ontologyId, ontologyVersion }` and copies those two fields; it ' +
-			'never reads `intentStatus`, so a superseded intent would sail through. But no dispatch sequence can put ' +
+			'never reads `intentStatus`, so a superseded intent would sail through.~~ ⚠ CORRECTED 2026-08-13 ' +
+			'(REG-F-130): that WAS true and is now FALSE — REG-F-129 landed a guard at proposePwu that reads ' +
+			'`intentStatus` and refuses SUPERSEDED, deliberately BEFORE building the command that makes the state ' +
+			'reachable, so this rule would never be live-and-unenforced for a single commit. THE ARM IS STILL ' +
+			'CORRECT, and only for the surviving half of the original ground: no dispatch sequence can put ' +
 			'an Intent into SUPERSEDED: six INTENT commands are registered, none targets it, `SupersedeIntent` and ' +
 			'`WithdrawIntent` occur nowhere in the repository, intent.ts is the only production writer of the ' +
 			'aggregate, and the engine has no generic aggregate-mutation command. SUPERSEDED and WITHDRAWN are ' +
-			'declared terminal states of the ratified machine and both are unreachable. So the ENFORCED arm is closed ' +
-			'by the absent guard, and BOTH members of the UNENFORCED guard union are closed too: OBSERVED_ADMISSION ' +
+			'declared terminal states of the ratified machine and both are unreachable. ~~So the ENFORCED arm is closed ' +
+			'by the absent guard~~ — CORRECTED: the ENFORCED arm is closed by the UNREACHABLE ANTECEDENT, not by an ' +
+			'absent guard. ENFORCED means a DISPATCH is refused, and no dispatch can produce a SUPERSEDED intent, so ' +
+			'the guard that now exists has nothing to refuse yet. BOTH members of the UNENFORCED guard union are ' +
+			'closed too: OBSERVED_ADMISSION ' +
 			'has no dispatchable arrangement, and DEAD_PREDICATE has no honest subject — `INTENT_AT_LEAST_PROVISIONAL` ' +
 			'is a trap that would PASS the census gate (its census is pwuGuards.ts alone, excluding the command ' +
 			'layer) while being false on both clauses: it IS asked, from markPwuReady, and its subject is a ROOT PWU ' +
 			'at readiness rather than any PWU at proposal, so a non-root PWU escapes it entirely. That is the ' +
 			'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss taken together, and it is declined here ' +
-			'deliberately rather than stumbled into. THE RESIDUE, stated because it is real: if SUPERSEDED ever ' +
-			'becomes reachable, this rule becomes a live UNENFORCED_DISCLOSED row on the same day.'
+			'deliberately rather than stumbled into. ⚠ THE RESIDUE, AND ITS PREDICTED DESTINATION WAS WRONG — a ' +
+			'prediction about a future disposition is a claim like any other. It read: ~~if SUPERSEDED ever becomes ' +
+			'reachable, this rule becomes a live UNENFORCED_DISCLOSED row on the same day~~. It does not. An ' +
+			'UNENFORCED_DISCLOSED row with an OBSERVED_ADMISSION guard must carry a probe that DISPATCHES the ' +
+			'arrangement and observes the engine ACCEPT it — and the engine now REFUSES it, so that probe could never ' +
+			'be written honestly. The destination is ENFORCED, and the day `SupersedeIntent` lands this row moves ' +
+			'there WITH the backing an ENFORCED row owes: a refusalMarker, declaredMutations, a COMMAND-layer ' +
+			'coverage-manifest entry and a probe in the observation map. Measured, not assumed: moving the ' +
+			'disposition without them reddens five checks.'
 	},
 
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
