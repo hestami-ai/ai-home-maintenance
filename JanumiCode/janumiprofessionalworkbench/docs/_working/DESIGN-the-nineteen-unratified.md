@@ -171,6 +171,47 @@ action is required where none is — which is precisely the conclusion I drew an
 Fourth instance of the orphaned/superseded-docstring class (REG-F-120 found three). Fix it in its own increment,
 and note the class keeps being found ONE AT A TIME by incidental reading, which argues for a derived sweep.
 
+## 4b. THE CHALLENGE TO MY OWN REFRAME, AND ITS RESOLUTION (2026-08-13, measured)
+
+The REG-F-124 audit landed a hit on §4a's framing and it was right to: *"DECLARED vs PERFORMABLE … authored
+today, in a working doc, unratified. It is doing load-bearing work"* — against `arrow-command-census.ts:1`,
+which says the instrument reports arrows a registered command **"can actually perform"**. If a rectangle lets
+the census call an arrow covered that nothing can perform, the reframe is a redefinition that stops it measuring
+its own stated subject.
+
+**RESOLVED — and by arithmetic rather than by argument, because a re-reading that makes a finding vanish needs
+more verification than the finding did.** Two measurements, both on the live tree:
+
+1. **An unratified corner can NEVER enter the coverage numerator.** `ratifiedArrowsCovered` is
+   `|distinct declared ∩ ratified|`, so a pair no machine ratifies is excluded by construction. Measured: **0**
+   of the 15 unratified rows appear in it. The rectangle's over-claim lands ONLY in REG-F-121's secondary
+   "declared but ratified by nothing" list — never in the primary measure.
+2. **Every ratified corner that DOES enter coverage is genuinely performable — checked, not assumed**, because
+   this is the census's own declared-dangerous direction (*"reporting an arrow traversable when nothing can
+   perform it"*, which its header calls unreachable by construction). Ten corners enter: seven at
+   `assurance.ts:770`, three at `runtime-binding.ts:119`. **At BOTH sites the target is structurally independent
+   of the source state** — `recordClaimAssessment` takes `target` from `payload.targetStatus` and narrows
+   sources with an unrestricted `fromStates`; `authorizeRuntimeBinding` DERIVES its target from
+   (requested, granted), which does not read `authorizationStatus`. With no coupling between the halves, every
+   (source, target) the machine ratifies is a pair the command really can drive. The three RuntimeBinding
+   corners are driven green by `partauth-derived-outcome.test.ts`; none of the Claim seven is in the census's
+   `dead` set, and the site's only guard constrains SUPPORTED on a DATA condition, not a structural one.
+
+**So the census keeps measuring exactly what its first line claims, and the reframe describes the SECONDARY
+diagnostic only.** §4a stated it too broadly — as though DECLARED and PERFORMABLE were two readings of the whole
+instrument — and that is corrected here.
+
+**⚠ BUT THE AUDIT'S INSTINCT SURVIVES IN A SHARPER FORM, which is why the challenge was worth answering rather
+than dismissing.** The secondary list is not one population but THREE, and they take different remedies:
+- **(a) reader fabrications** — declared by nothing, ratified by nothing. Four, all `ValidatorRegistryEntry`,
+  FIXED at REG-F-124. This category is now empty and must stay so.
+- **(b) rectangle corners that CANNOT fire** — `Claim.status`'s 13. `checkTransition` refuses them, so the site
+  over-claims a capability it does not have. Honest-but-imprecise declaration; the remedy is about the SITE.
+- **(c) rectangle corners that CAN fire and are DELIBERATE** — `RuntimeBinding`'s
+  `PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED`, plus the same-state HOLDS. Here the declaration is right and
+  the MACHINE is the incomplete artifact, or the hold simply needs declaring (§4a's precedent).
+**Nothing may quote "15 unratified" as one number without saying which of the three it means.**
+
 ## 5. What this doc refuses to do
 
 - No `transitions.data.ts` edit — machines are reconstructed from ratified corpus; adding self-arrows is a
