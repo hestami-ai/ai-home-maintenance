@@ -108,8 +108,22 @@ function enclosingFunction(node: ts.Node): { fn: ts.SignatureDeclaration; name: 
  * Two handler families build handlers from a factory, so the arrows are declared at the factory's CALL SITES:
  * `makeDecisionEffective(target: 'EFFECTIVE', …)` states its range in the TYPE; `statusChange('DEGRADED', …,
  * ['ACTIVE'])` states it in the arguments. Both are read here — a parameter's literal type first, then callers.
+ *
+ * ⚠ `arm` IS LOAD-BEARING, NOT DIAGNOSTIC (REG-F-124). A `'type'` answer is a RANGE — one set, no per-call
+ * structure to recover. A `'calls'` answer is a FLATTENED UNION of values that were CORRELATED at each call, and
+ * that correlation is exactly what `factoryCallTuples` below re-reads. Only a `'calls'` answer may be paired;
+ * pairing a `'type'` answer would invent per-call tuples the source does not have.
  */
-function factoryParameter(sf: ts.SourceFile, at: ts.Node, paramName: string): string[] | undefined {
+interface FactoryValues {
+	readonly values: string[];
+	readonly arm: 'type' | 'calls';
+}
+
+function factoryParameter(
+	sf: ts.SourceFile,
+	at: ts.Node,
+	paramName: string
+): FactoryValues | undefined {
 	const enclosing = enclosingFunction(at);
 	if (!enclosing) return undefined;
 	const index = enclosing.fn.parameters.findIndex(
@@ -120,7 +134,7 @@ function factoryParameter(sf: ts.SourceFile, at: ts.Node, paramName: string): st
 	const declared = enclosing.fn.parameters[index]?.type;
 	if (declared) {
 		const fromType = literalsIn(declared);
-		if (fromType.length > 0) return fromType; // the type says it
+		if (fromType.length > 0) return { values: fromType, arm: 'type' }; // the type says it
 	}
 
 	const found = new Set<string>();
@@ -136,7 +150,80 @@ function factoryParameter(sf: ts.SourceFile, at: ts.Node, paramName: string): st
 		ts.forEachChild(n, walk);
 	};
 	walk(sf);
-	return found.size > 0 ? [...found] : undefined;
+	return found.size > 0 ? { values: [...found], arm: 'calls' } : undefined;
+}
+
+/**
+ * The (targets, sources) pairs a factory's CALL SITES supply, PAIRED PER CALL — REG-F-124.
+ *
+ * ── THE DEFECT THIS EXISTS TO END, STATED AS THE MECHANISM AND NOT AS THE SYMPTOM ────────────────────────────
+ *
+ * `factoryParameter` answers ONE parameter at a time and flattens its answers into a Set. When BOTH the target
+ * and the source list come from the factory's parameters, the caller then CROSS-PRODUCTS the two flattened sets
+ * — so a factory called N times with correlated (target, froms) tuples yields |∪targets| × |∪froms| arrows.
+ *
+ * **The correlation EXISTS in the source; the reader discarded it and then re-inflated the flattened remains
+ * into a rectangle.** That is a fabrication by the INSTRUMENT: it emits arrows no call site declares, which is
+ * the same wrong that REG-F-114 and REG-F-122 forbade, arriving by a third route (union, not inference).
+ *
+ * MEASURED at the one live site, `validator-registry.ts`'s `statusChange`: four calls declare FIVE arrows
+ * between them (`disableValidator` legitimately declares two, `['ACTIVE','DEGRADED'] -> DISABLED`), and the
+ * machine ratifies exactly those five. The census read NINE — manufacturing `ACTIVE -> ACTIVE`,
+ * `DEGRADED -> DEGRADED`, `DISABLED -> DISABLED` and `DISABLED -> DEGRADED`, all four of which appeared in
+ * REG-F-121's pinned "declared but ratified by no machine" list as though a COMMAND had claimed them.
+ *
+ * ⚠ NOTE THE ARITHMETIC, because the obvious formulation is wrong: this is NOT "N calls become N²". The truth
+ * is Σᵢ|targetsᵢ|×|sourcesᵢ| = 5 against |∪t|×|∪s| = 9. A rule phrased in CALL COUNTS is false, and stating it
+ * that way once already produced a wrong prediction.
+ *
+ * ⚠ AND IT MUST NEVER BE "FIXED" BY CONSULTING THE MACHINE. Three of the four fabrications are self-edges, and
+ * `classifyTransition` calls `from === to` a NOOP which `checkTransition` ADMITS (`ValidatorRegistryEntry.status`
+ * declares `illegal: []`). A reader that filtered its own output against `STATE_MACHINES` would re-mint them and
+ * would be REG-F-114's forbidden inference wearing a filter's clothes.
+ */
+function factoryCallTuples(
+	sf: ts.SourceFile,
+	at: ts.Node,
+	targetParam: string,
+	sourcesParam: string,
+	site: string
+): { targets: string[]; sources: string[] }[] | undefined {
+	const enclosing = enclosingFunction(at);
+	if (!enclosing) return undefined;
+	const idx = (name: string) =>
+		enclosing.fn.parameters.findIndex((p) => ts.isIdentifier(p.name) && p.name.text === name);
+	const ti = idx(targetParam);
+	const si = idx(sourcesParam);
+	if (ti < 0 || si < 0) return undefined;
+
+	const tuples: { targets: string[]; sources: string[] }[] = [];
+	const walk = (n: ts.Node) => {
+		if (
+			ts.isCallExpression(n) &&
+			ts.isIdentifier(n.expression) &&
+			n.expression.text === enclosing.name
+		) {
+			const targets = n.arguments[ti] ? literalsIn(n.arguments[ti] as ts.Node) : [];
+			const sources = n.arguments[si] ? literalsIn(n.arguments[si] as ts.Node) : [];
+			// ⚠ FAILS RATHER THAN SKIPS, and the difference is this census's oldest lesson (see the file header:
+			// a silent drop reads as full coverage). Under the UNION a call passing a computed value was rescued
+			// by its literal-passing siblings; under pairing it would contribute NOTHING and the arrows it really
+			// declares would vanish with no test naming the loss. There is no live instance of this today — all
+			// four `statusChange` calls pass literals — so the arm is held by a SYNTHETIC fixture through
+			// `declaredArrowsInFile`, exactly as REG-F-122's arms are.
+			if (targets.length === 0 || sources.length === 0)
+				fail(
+					site,
+					`is built by factory \`${enclosing.name}\`, and one of its calls passes a non-literal ` +
+						`target or source list. The census pairs a factory's arguments PER CALL and cannot read ` +
+						`a computed one; declare it literally at the call rather than leaving its arrows unaudited`
+				);
+			tuples.push({ targets, sources });
+		}
+		ts.forEachChild(n, walk);
+	};
+	walk(sf);
+	return tuples.length > 0 ? tuples : undefined;
 }
 
 /** The declared range of a computed `target`: a literal list, a table's keys, or a ratified enum's options. */
@@ -271,6 +358,8 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
 					? consts.get(tp.initializer.text)
 					: undefined;
+		/** The factory parameter the TARGET came from, when it came from one BY CALL SITE — REG-F-124. */
+		let targetParam: string | undefined;
 		if (staticTarget !== undefined) {
 			targets = [staticTarget];
 		} else {
@@ -282,15 +371,22 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
 					? tp.initializer.text
 					: undefined;
-			targets =
-				declared ??
-				(name ? factoryParameter(sf, node, name) : undefined) ??
-				fail(
-					site,
-					'computes its target and declares no `targetStates`. A computed range is not statically ' +
-						'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
-						'arrows it drives unaudited'
-				);
+			if (declared) {
+				targets = declared;
+			} else {
+				const viaFactory =
+					(name ? factoryParameter(sf, node, name) : undefined) ??
+					fail(
+						site,
+						'computes its target and declares no `targetStates`. A computed range is not statically ' +
+							'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
+							'arrows it drives unaudited'
+					);
+				targets = viaFactory.values;
+				// Only the CALL-SITE arm carries per-call structure; a literal TYPE is a range and pairs with
+				// nothing. See `factoryCallTuples`.
+				if (viaFactory.arm === 'calls') targetParam = name;
+			}
 		}
 
 		// SOURCES — `fromStates(...)` read from the precondition AT THIS LITERAL, and from nowhere else.
@@ -340,23 +436,56 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 					'that is a new idiom to be taught deliberately, with its own ruling, not defaulted into'
 			);
 		let sources: string[];
+		/** The factory parameter the SOURCES came from, when they came from one BY CALL SITE — REG-F-124. */
+		let sourcesParam: string | undefined;
 		const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
 		if (direct.length > 0) sources = direct;
 		else {
 			// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
 			const spread = call.arguments.find(ts.isSpreadElement);
 			const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
-			sources =
+			const viaFactory =
 				(id ? factoryParameter(sf, node, id) : undefined) ??
 				fail(
 					site,
 					'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
 						'an unreadable source list would contribute zero arrows and read as full coverage'
 				);
+			sources = viaFactory.values;
+			if (viaFactory.arm === 'calls') sourcesParam = id;
 		}
 
-		for (const to of targets) {
-			for (const f of sources) arrows.push({ machine, from: f, to, site });
+		// ── EMISSION — PAIRED WHEN BOTH HALVES CAME FROM THE SAME CALLS, CROSSED OTHERWISE (REG-F-124) ────────
+		//
+		// ⚠ THE SCOPE IS THE ARMS, NOT THE SHAPE, AND GETTING THAT WRONG DESTROYS REAL COVERAGE. Two other sites
+		// emit a full rectangle — `assurance.ts`'s `recordClaimAssessment` (5 targets × 4 sources) and
+		// `runtime-binding.ts`'s `authorizeRuntimeBinding` (2 × 2) — and at BOTH the rectangle is what the site
+		// deliberately declares: the targets come from a table or a declared range, the sources from a literal
+		// `fromStates(…)`, and there are no per-call tuples in the source to recover. `recordClaimAssessment`
+		// says so where it declares them: *"Which DESTINATIONS are legal from each is the machine's judgement;
+		// duplicating it here would create a second, drifting copy of the arrow table"*. A fix scoped to "stop
+		// emitting rectangles" would silently drop the ratified Claim arrows that rectangle really does declare —
+		// removing fabrication AND truth together. Scoped to the ARMS, exactly one site pairs today.
+		//
+		// Whether those two rectangles OVER-CLAIM (they declare pairs the machines do not ratify) is a live and
+		// UNSETTLED question, deliberately untouched here: it is a question about what the SITES declare, and this
+		// is a fix to what the READER fabricates. Conflating them would put one movement inside another.
+		if (targetParam !== undefined && sourcesParam !== undefined) {
+			const tuples =
+				factoryCallTuples(sf, node, targetParam, sourcesParam, site) ??
+				fail(
+					site,
+					`resolves BOTH its target and its sources from factory \`${targetParam}\`/\`${sourcesParam}\` ` +
+						'but no call to that factory could be read. Never crossed as a fallback: the cross product ' +
+						'of two flattened parameter sets manufactures arrows no call declares (REG-F-124)'
+				);
+			for (const { targets: perCallTargets, sources: perCallSources } of tuples)
+				for (const to of perCallTargets)
+					for (const f of perCallSources) arrows.push({ machine, from: f, to, site });
+		} else {
+			for (const to of targets) {
+				for (const f of sources) arrows.push({ machine, from: f, to, site });
+			}
 		}
 	};
 	visit(sf);

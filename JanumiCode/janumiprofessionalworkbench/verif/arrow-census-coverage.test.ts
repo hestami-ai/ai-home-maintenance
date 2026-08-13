@@ -105,19 +105,41 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			machinesDeclared: 27,
 			machinesSeen: 16,
 			arrowsRatified: 304,
-			declarationRows: 178,
-			distinctArrowsDeclared: 175,
+			// ⚠ 178 -> 174 and 175 -> 171 AT REG-F-124, AND THE DROP IS THE INSTRUMENT CEASING TO FABRICATE.
+			// `validator-registry.ts`'s `statusChange` factory is called four times declaring FIVE arrows between
+			// them; the census resolved its `target` and `from` parameters INDEPENDENTLY, flattened each into a
+			// set, and crossed them — reading NINE. The four extra were manufactured by the reader, not claimed
+			// by any command. A reader seeing this number fall must not read it as lost coverage: the line below
+			// is the control on exactly that, and it did not move.
+			declarationRows: 174,
+			distinctArrowsDeclared: 171,
+			// ⚠ UNMOVED AT 156 ACROSS BOTH REG-F-122 AND REG-F-124, which is the point of pinning it SEPARATELY
+			// (REG-F-121). Two fabrication defects have now been removed from this instrument and neither cost a
+			// single ratified arrow — because a fabricated arrow was, by construction, one no machine ratified.
+			// If a future fabrication-removal moves THIS number, it removed truth as well and is not the same act.
 			ratifiedArrowsCovered: 156
 		});
 	});
 
 	// ⚠ A SEPARATE FINDING THIS SPLIT EXPOSED, PINNED SO IT CANNOT DRIFT WHILE IT IS INVESTIGATED (REG-F-121).
-	// NINETEEN declared arrows are not ratified by any machine — commands declaring transitions the corpus does
-	// not have. Several are self-transitions (`Claim.status SUPPORTED -> SUPPORTED`), which is the HOLD shape the
-	// generic setter also produces and which the machines do not model. Whether the declarations are wrong or the
-	// machines are incomplete is UNDECIDED and must not be guessed: pinned by count, and by the machines they sit
-	// on, so the question stays open and visible rather than being absorbed into a coverage number.
-	it('PINNED FINDING — 19 declared arrows are not ratified by any machine', () => {
+	// Declared arrows that are ratified by no machine — commands appearing to claim transitions the corpus does
+	// not have. Pinned by count, and by the machines they sit on, so the question stays open and visible rather
+	// than being absorbed into a coverage number.
+	//
+	// ⚠ 19 -> 15 AT REG-F-124, AND THE FOUR THAT LEFT REFUTE THE DICHOTOMY THIS PIN WAS WRITTEN UNDER. Its
+	// original wording asked whether "the declarations are wrong or the machines are incomplete" — a question
+	// with exactly two answers, and for four of its own members BOTH were false. The four
+	// `ValidatorRegistryEntry.status` rows were never declared by any command and never ratified by any machine:
+	// the CENSUS minted them by crossing two flattened factory parameters. The declarations were right, the
+	// machine was right, the READER was wrong. **A third category — arrows nothing declares at all — and a pinned
+	// question that could not express it.** Corrected here rather than only in the register, because the wording
+	// beside the number is what the next reader actually reads.
+	//
+	// The remaining 15 are still genuinely undecided and must not be guessed. They are now known to hold TWO
+	// populations that must not be conflated: same-state HOLDS, which `checkTransition` admits as NOOPs by design
+	// and which need declaring rather than ratifying (`ApplyTacticalChange` is the worked precedent), and genuine
+	// cross-state pairs a site declares but no machine ratifies.
+	it('PINNED FINDING — 15 declared arrows are not ratified by any machine', () => {
 		const ratifiedKeys = new Set(
 			Object.keys(MACHINES).flatMap((m) =>
 				(MACHINES[m]!.transitions as readonly { from: string; to: string }[]).map(
@@ -132,7 +154,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 					.filter((a) => !ratifiedKeys.has(a))
 			)
 		];
-		expect(unratified.length, unratified.sort().join('\n')).toBe(19);
+		expect(unratified.length, unratified.sort().join('\n')).toBe(15);
 	});
 
 	// Two causes live in this list and MUST NOT be conflated, which is why it is pinned by name and not by count:

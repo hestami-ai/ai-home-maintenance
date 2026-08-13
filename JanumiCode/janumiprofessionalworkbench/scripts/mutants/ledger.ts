@@ -2659,5 +2659,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-command-census.test.ts'],
 		why: "THE RESURRECTION, VERBATIM. This is the expression REG-F-122 deleted — the census's own REG-F-114 violation: with no readable `fromStates`, the from-half is taken from the MACHINE'S in-edges, and a fabricated arrow enters the census indistinguishable from a declared one. Measured while it was live: exactly ONE of 46 sites ever reached it (`governance.ts:293`), and its fabrication coincided with the callers' real declaration only because `Decision.status` has a single in-arrow to EFFECTIVE — luck, not soundness. ⚠ THE VICTIM IS A SYNTHETIC FIXTURE BY NECESSITY, AND THE REPO-WIDE PINS CANNOT KILL THIS MUTANT: after REG-F-122 every real site declares a readable `fromStates`, so against the live tree this fallback is DEAD CODE and the coverage pins stay bit-identical under the mutation. The predicate-only fixture in the victim is the entire population of the failing arm — which is why `declaredArrowsInFile` is exported as a seam. Predicted red: 'refuses a precondition with no readable fromStates' alone; the two uninspectable-name refusals and the reading CONTROL all stay green.",
 		source: 'REG-F-122'
+	},
+	{
+		id: 'F124-the-factory-parameters-are-crossed-again',
+		file: 'verif/arrow-command-census.ts',
+		find:
+			'\t\t\tfor (const { targets: perCallTargets, sources: perCallSources } of tuples)\n' +
+			'\t\t\t\tfor (const to of perCallTargets)\n' +
+			'\t\t\t\t\tfor (const f of perCallSources) arrows.push({ machine, from: f, to, site });',
+		replace:
+			'\t\t\tvoid tuples;\n' +
+			'\t\t\tfor (const to of targets) for (const f of sources) arrows.push({ machine, from: f, to, site });',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE RECTANGLE, RESTORED — the reader goes back to crossing two flattened factory parameters and manufacturing arrows no call declares. This is the state the census shipped in for its whole life until REG-F-124: `validator-registry.ts`'s four `statusChange` calls declare FIVE arrows between them and were read as NINE, and the four extra sat in REG-F-121's pinned unratified list looking exactly like commands over-claiming. ⚠ NOTE THE ARITHMETIC IN THE MUTATION, because it is the finding: `tuples` is still computed (so the `fail()` arm is untouched and this measures the EMISSION alone) and is then discarded in favour of the crossed sets. ⚠ AND THE VICTIM IS THE SYNTHETIC FIXTURE, NOT THE COUNT PINS, DELIBERATELY: `arrow-census-coverage.test.ts` WOULD also redden (174 -> 178), but a count pin cannot say WHICH reading is right — it fails identically whether the number moved by fabrication or by a real declaration landing. The two-call fixture with disjoint targets and disjoint sources is the only assertion that distinguishes paired from crossed, and it is why one call would not do (a single tuple's cross product IS that tuple). Predicted red: 'pairs a factory's (target, sources) PER CALL instead of crossing the flattened sets' — measured ALONE before declaring.",
+		source: 'REG-F-124 — from the 7-agent adversarial audit that corrected the finding three times'
 	}
 ];

@@ -172,6 +172,52 @@ describe('REG-F-122 — a from-half the walk cannot read is REFUSED, never infer
 		expect(() => declaredArrowsInFile(sf)).toThrowError(/fixture-predicate-only\.ts:1/);
 	});
 
+	// ── REG-F-124: THE PAIRING, AND THE RECTANGLE IT REPLACED ────────────────────────────────────────────────
+	//
+	// A factory whose target AND source list both come from its parameters declares a (target, sources) TUPLE at
+	// each call. The census used to resolve the two parameters independently, flatten each into a set, and cross
+	// them — so two calls declaring 2 arrows were read as 4, and the extra two were claimed by nothing.
+	//
+	// ⚠ THE FIXTURE IS TWO CALLS, NOT ONE, AND NOT FOUR. One call cannot tell pairing from crossing (the
+	// cross product of a single tuple IS that tuple). Four would mirror the live site so closely that the test
+	// would pass by coincidence if the walk special-cased it. Two calls with DISJOINT targets and DISJOINT
+	// sources is the smallest arrangement where the two readings differ, and they differ loudly: paired = 2,
+	// crossed = 4.
+	it('pairs a factory’s (target, sources) PER CALL instead of crossing the flattened sets', () => {
+		const sf = parse(
+			'fixture-factory.ts',
+			[
+				'const statusChange = (target: string, from: [string, ...string[]]) => (ctx, command) =>',
+				"\tadvanceStatus(ctx, command, { machine: 'Decision.status', target, precondition: fromStates(...from) });",
+				"export const a = statusChange('EFFECTIVE', ['PROPOSED']);",
+				"export const b = statusChange('REVOKED', ['EFFECTIVE']);"
+			].join('\n')
+		);
+		const { arrows } = declaredArrowsInFile(sf);
+		expect(
+			arrows.map((a) => `${a.from} -> ${a.to}`).sort(),
+			'crossing would add PROPOSED -> REVOKED and EFFECTIVE -> EFFECTIVE, which no call declares'
+		).toEqual(['EFFECTIVE -> REVOKED', 'PROPOSED -> EFFECTIVE']);
+	});
+
+	// ⚠ THE ARM WITH NO LIVE POSITIVE CASE (hazard H2 of the REG-F-124 audit). Under the old UNION a call passing
+	// a computed target was RESCUED by its literal-passing siblings — their values were in the same flattened
+	// set. Under pairing that call contributes NOTHING, so a real declaration would vanish silently and the
+	// census would read the loss as coverage. All four live `statusChange` calls pass literals, so nothing in the
+	// repository can enter this arm; this fixture is its entire population.
+	it('REFUSES a factory call whose target or sources are not literal, rather than dropping its arrows', () => {
+		const sf = parse(
+			'fixture-computed-call.ts',
+			[
+				'const statusChange = (target: string, from: [string, ...string[]]) => (ctx, command) =>',
+				"\tadvanceStatus(ctx, command, { machine: 'Decision.status', target, precondition: fromStates(...from) });",
+				"export const a = statusChange('EFFECTIVE', ['PROPOSED']);",
+				'export const b = statusChange(computeTarget(), [someState]);'
+			].join('\n')
+		);
+		expect(() => declaredArrowsInFile(sf)).toThrowError(/fixture-computed-call\.ts/);
+	});
+
 	// CONTROL — the three refusals above are all satisfied by a walk that throws on EVERYTHING, and such a walk
 	// would take the whole census down with it. This is the case that holds the READING half.
 	it('CONTROL — a fromStates declared at the literal is read exactly, not refused', () => {
