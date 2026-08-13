@@ -2624,5 +2624,30 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "THE GUARANTEE IS THE ONE REG-F-119 EXISTS FOR: if the two target sets were computed as COMPLEMENTS of each other, `COMMAND_TARGETS ∪ GENERIC_TARGETS` would cover all twenty states BY CONSTRUCTION and the accountability test — *\"no arrow is unaccounted for\"* — could never fail. A control that cannot fail, authored inside the increment meant to strengthen it, which is this repository's most-repeated defect. ⚠ RECORDED HONESTLY AS THE WEAKER FENCE IT IS: a declaration-order accident is what makes the derived form awkward to write, not a rule anyone stated, and TYPE_PREVENTED here means 'this particular spelling does not compile' rather than 'the mistake is unreachable'. Someone who wanted the derived form could hoist a constant and get it. The real defence is the transcription itself plus the both-directions agreement gate; this row exists so that the day the derived form DOES compile, the ledger reports the change rather than absorbing it.",
 		expectRed: [],
 		source: 'REG-F-119'
+	},
+	// ── REG-F-120, FROM AN AUDIT OF THIS SESSION'S OWN COMMITS ──────────────────────────────────────────────────
+	//
+	// ⚠ ONLY ONE OF THE TWO FIXES GETS A MUTANT, AND THE OTHER'S ABSENCE IS THE RECORD.
+	//
+	// The leaked-report fix (`rmSync` before the spawn in `run.ts`) guards a condition NO CURRENT TEST CAN REACH:
+	// it needs a control that PASSES — leaving `.control-run.json` behind — followed by one that exits non-zero
+	// without writing a report. Today no control passes, because one suite is red, so every control takes the
+	// differencing path and `failedFiles` deletes the report on the way through. **A mutant for it would report
+	// SURVIVED and be RIGHT to.** Declaring one anyway would either block the gate on a false finding or teach
+	// someone to weaken the mutant until it passed.
+	//
+	// This repository has the precedent and states it in `run.ts`: the atomicity guard "shipped with no ledger
+	// entry and a comment saying so", because a fake measurement is worse than a declared absence. Same here —
+	// the guard is commented at its site with its trigger condition, and the register entry says it is unguarded.
+	// ⚠ IT BECOMES KILLABLE THE DAY THE SUITE GOES GREEN, which is also the day it becomes NECESSARY. Whoever
+	// fixes that suite should add the mutant in the same commit.
+	{
+		id: 'F120-the-playwright-anchor-is-deleted-as-redundant',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m',
+		replace: '\t/Test timeout of \\d+ms exceeded/',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE DELETION A READER IS ACTIVELY INVITED TO MAKE, AND WHICH WAS UNGUARDED FOR AS LONG AS THE ANCHOR EXISTED. The two vitest markers carry a `Error: ` prefix AND a line anchor, and the prefix does the separating on its own — measured: drop `^[ \\t]*` from them and all cases stay green. So the anchor LOOKS redundant, and REG-F-116's own summary said as much (\"the runner's own prefix does\"). ⚠ THE PLAYWRIGHT MARKER HAS NO PREFIX. Its anchor is its entire defence against a quoted fixture, and every poisoning fixture written for REG-F-116 was vitest-shaped, so dropping THIS anchor was green too — the e2e half of the self-poisoning hole could have been re-opened by someone acting correctly on the vitest evidence. Measured before declaring: with the quoted-Playwright fixture added, this mutation reddens that control ALONE (1 failed / 7 passed).",
+		source: 'REG-F-120 — from the 43-agent audit of this session'
 	}
 ];
