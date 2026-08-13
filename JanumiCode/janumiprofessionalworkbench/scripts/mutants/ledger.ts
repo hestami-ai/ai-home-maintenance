@@ -2704,5 +2704,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/claim-assessment.test.ts'],
 		why: "THE OVER-BROAD FORMULATION — the one this repository has already adopted and withdrawn ONCE, at `runtime-binding.ts` N-22, whose own comment records it: *\"MY FIRST FORMULATION REFUSED EVERY `from === to`, AND IT WAS OVER-BROAD … the defect is 'NOTHING CHANGED', not 'THE STATUS STAYED THE SAME'.\"* With `adds` forced false, every same-state re-assessment is refused, including a genuinely DISTINCT one by a second assessor — which is what DIFFERENT_AGENT independence looks like, so the guard would strand the act the assurance plane most wants. ⚠ AND THE DUPLICATE-REFUSAL TESTS STAY GREEN UNDER IT, which is the entire reason this mutant exists: a widened guard still refuses the identical re-issue, so the two tests that MOTIVATED the fix cannot tell the narrow rule from the broad one. Only the CONTROL can. Measured before declaring: reddens `CONTROL — a DISTINCT re-assessment at the same status is still ACCEPTED` ALONE (1 failed / 8 passed).",
 		source: 'REG-F-127'
+	},
+	{
+		id: 'F128-the-split-collapses-back-into-one-list',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (a.from === a.to && !explicitlyIllegal) machineAdmittedSelfEdges.push(key);\n\t\telse overClaimed.push(key);',
+		replace: '\t\tvoid explicitlyIllegal;\n\t\toverClaimed.push(key);',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE SPLIT STOPS DISCRIMINATING — every unratified declaration is reported as an over-claim and the self-edge list empties. This is the state the pin was in for its whole life before REG-F-128: ONE population, one number, and no way to say which kind of thing moved. ⚠ THE HAZARD IT GUARDS IS SPECIFIC, and it is why the CONTROL exists rather than the two name-pins alone: a collapsed classifier still produces two lists of the right TYPE, and if someone re-pinned the names to match it the suite would be green over a classifier that classifies nothing. The control asserts the discrimination itself — no `from !== to` pair may sit in the self-edge list, no self-edge may sit in the over-claim list, and the two must be disjoint — so it fails on the SHAPE rather than on the contents. ⚠ AND THIS MATTERS MORE SINCE REG-F-127: the five machine-admitted self-edges went two different ways (three were duplicate-append DEFECTS and are now refused; two are deliberate HOLDS), so a reader who cannot tell the categories apart cannot look up which disposition applies to the arrow in front of them. Predicted red: the by-name self-edge pin AND the CONTROL.",
+		source: 'REG-F-128'
 	}
 ];

@@ -592,6 +592,63 @@ export function birthStates(): Map<string, Set<string>> {
  * actually written) rather than just the machine — a pin whose message is only a name makes the reader go
  * looking for what changed.
  */
+/**
+ * The declared arrows NO machine ratifies, SPLIT by the only criterion that separates them mechanically —
+ * REG-F-128, from `ROADMAP-the-fifteen-unratified.md` §0.
+ *
+ * ── WHY A SPLIT AND NOT A COUNT ──────────────────────────────────────────────────────────────────────────────
+ * REG-F-121 pinned this population as ONE NUMBER so the question would stay visible. REG-F-124 then proved a
+ * count can be wrong in a way its own framing cannot express: four of the nineteen were declared by nothing and
+ * ratified by nothing — the CENSUS had minted them — and the pinned question ("are the declarations wrong or the
+ * machines incomplete?") had no third answer. A number that cannot express its own categories is the same defect
+ * one level up.
+ *
+ * ── THE CRITERION IS EXACT AND READS ONLY THE DECLARATION ────────────────────────────────────────────────────
+ * `advanceStatus` commits only what `checkTransition` admits, and `checkTransition` admits LEGAL **or NOOP**.
+ * Unratified ⇒ not LEGAL. **So an unratified pair can reach the store only as a NOOP — only when `from === to`.**
+ * `classifyTransition` consults `illegal` BEFORE the NOOP shortcut, so a self-edge the machine lists illegal does
+ * NOT qualify, and that list is the only thing consulted here.
+ *
+ * ⚠ NO MACHINE INFERENCE. This reads `from`/`to` off the DECLARATION and the machine's `illegal` list only —
+ * never `transitions`. Deriving the split from the arrow table would be REG-F-114's forbidden inference wearing a
+ * classifier's clothes, and would silently repair a real over-claim into a clean category.
+ *
+ * ⚠ AND `machineAdmitted` IS NOT `performable` — the distinction REG-F-127 then proved in practice. The criterion
+ * establishes what the MACHINE would admit; the SITE's guard decides the rest. Of the five machine-admitted
+ * self-edges, three (`Claim.status`) are now REFUSED by a precondition because a second identical assessment
+ * appended a duplicate event, while two are deliberate HOLDS (`ExecutionPlan ACTIVE -> ACTIVE`, JAN-CMDPRE
+ * DWP-05; `RuntimeBinding PARTIALLY -> PARTIALLY`, N-22). **The same shape was a defect on one machine and
+ * correct behaviour on another**, which is why this function classifies and does not judge.
+ */
+export function unratifiedDeclarations(): {
+	overClaimed: string[];
+	machineAdmittedSelfEdges: string[];
+} {
+	const ratified = new Set<string>();
+	for (const [name, def] of Object.entries(STATE_MACHINES))
+		for (const t of def.transitions) ratified.add(arrowKey(name, t.from, t.to));
+
+	const overClaimed: string[] = [];
+	const machineAdmittedSelfEdges: string[] = [];
+	const seen = new Set<string>();
+	for (const a of declaredArrows()) {
+		const key = arrowKey(a.machine, a.from, a.to);
+		if (ratified.has(key) || seen.has(key)) continue;
+		seen.add(key);
+		const illegal = (STATE_MACHINES[a.machine]?.illegal ?? []) as readonly {
+			from: string;
+			to: string;
+		}[];
+		const explicitlyIllegal = illegal.some((i) => i.from === a.from && i.to === a.to);
+		if (a.from === a.to && !explicitlyIllegal) machineAdmittedSelfEdges.push(key);
+		else overClaimed.push(key);
+	}
+	return {
+		overClaimed: overClaimed.sort((x, y) => x.localeCompare(y)),
+		machineAdmittedSelfEdges: machineAdmittedSelfEdges.sort((x, y) => x.localeCompare(y))
+	};
+}
+
 export function initialStateFictions(): { machine: string; declared: string; actuallyBornIn: string[] }[] {
 	const births = birthStates();
 	const out: { machine: string; declared: string; actuallyBornIn: string[] }[] = [];

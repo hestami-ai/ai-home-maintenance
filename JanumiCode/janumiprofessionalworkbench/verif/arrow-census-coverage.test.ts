@@ -49,7 +49,7 @@
 // handler that uses an unread idiom makes coverage drop and reddens them too. Neither can happen quietly.
 import { STATE_MACHINES } from '@janumipwb/rph-domain';
 import { describe, expect, it } from 'vitest';
-import { declaredArrows } from './arrow-command-census.js';
+import { declaredArrows, unratifiedDeclarations } from './arrow-command-census.js';
 import { auditClaims, bindingClaims, vocabDriveClaims } from './binding-row-truth.js';
 
 type Arrow = { machine: string };
@@ -121,40 +121,76 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 		});
 	});
 
-	// ⚠ A SEPARATE FINDING THIS SPLIT EXPOSED, PINNED SO IT CANNOT DRIFT WHILE IT IS INVESTIGATED (REG-F-121).
-	// Declared arrows that are ratified by no machine — commands appearing to claim transitions the corpus does
-	// not have. Pinned by count, and by the machines they sit on, so the question stays open and visible rather
-	// than being absorbed into a coverage number.
+	// ── THE POPULATION NO MACHINE RATIFIES — PINNED BY NAME, AND SPLIT (REG-F-121 → REG-F-124 → REG-F-128) ───
 	//
-	// ⚠ 19 -> 15 AT REG-F-124, AND THE FOUR THAT LEFT REFUTE THE DICHOTOMY THIS PIN WAS WRITTEN UNDER. Its
-	// original wording asked whether "the declarations are wrong or the machines are incomplete" — a question
-	// with exactly two answers, and for four of its own members BOTH were false. The four
-	// `ValidatorRegistryEntry.status` rows were never declared by any command and never ratified by any machine:
-	// the CENSUS minted them by crossing two flattened factory parameters. The declarations were right, the
-	// machine was right, the READER was wrong. **A third category — arrows nothing declares at all — and a pinned
-	// question that could not express it.** Corrected here rather than only in the register, because the wording
-	// beside the number is what the next reader actually reads.
+	// This began as ONE COUNT, pinned so the question would stay visible. Two findings later it is two lists, and
+	// each step was forced by the previous one being unable to say something true:
 	//
-	// The remaining 15 are still genuinely undecided and must not be guessed. They are now known to hold TWO
-	// populations that must not be conflated: same-state HOLDS, which `checkTransition` admits as NOOPs by design
-	// and which need declaring rather than ratifying (`ApplyTacticalChange` is the worked precedent), and genuine
-	// cross-state pairs a site declares but no machine ratifies.
-	it('PINNED FINDING — 15 declared arrows are not ratified by any machine', () => {
-		const ratifiedKeys = new Set(
-			Object.keys(MACHINES).flatMap((m) =>
-				(MACHINES[m]!.transitions as readonly { from: string; to: string }[]).map(
-					(t) => `${m}  ${t.from} -> ${t.to}`
-				)
-			)
-		);
-		const unratified = [
-			...new Set(
-				([...declaredArrows()] as { machine: string; from: string; to: string }[])
-					.map((a) => `${a.machine}  ${a.from} -> ${a.to}`)
-					.filter((a) => !ratifiedKeys.has(a))
-			)
-		];
-		expect(unratified.length, unratified.sort().join('\n')).toBe(15);
+	//   REG-F-121 pinned 19 and asked "are the declarations wrong, or the machines incomplete?"
+	//   REG-F-124 proved that question has NO answer for 4 of its own 19 — the census had MINTED them, so the
+	//              declarations were right, the machines were right, and the READER was wrong. 19 → 15.
+	//   REG-F-128 (here) splits the remaining 15, because they are two populations with two different remedies
+	//              and a single number cannot say which one moved.
+	//
+	// ⚠ BY NAME, NOT BY COUNT — REG-F-121's own rule, restated because it is what makes these lists honest:
+	// `toBe(15)` goes GREEN when someone DELETES an arrow. The number improves by destroying the evidence.
+	it('PINNED — the 10 declared pairs the machine structurally REFUSES (over-claims)', () => {
+		// `checkTransition` admits LEGAL or NOOP; unratified ⇒ not LEGAL; from ≠ to ⇒ not NOOP. So NOTHING can
+		// perform these, and the rectangle idiom that declares them over-claims a capability it does not have.
+		// Left as-is DELIBERATELY: `recordClaimAssessment` declines to correlate its targets with its sources so
+		// that the machine stays the single authority on which pairs are legal, and duplicating that table at the
+		// site is the drift REG-F-119 measured the cost of. Honest imprecision, bounded and named.
+		expect(unratifiedDeclarations().overClaimed).toEqual([
+			'Claim.status  CONDITIONALLY_SUPPORTED -> REJECTED',
+			'Claim.status  CONDITIONALLY_SUPPORTED -> SUPPORTED',
+			'Claim.status  CONDITIONALLY_SUPPORTED -> UNDER_ASSESSMENT',
+			'Claim.status  CONTESTED -> SUPPORTED',
+			'Claim.status  CONTESTED -> UNDER_ASSESSMENT',
+			'Claim.status  OPEN -> CONTESTED',
+			'Claim.status  OPEN -> REJECTED',
+			'Claim.status  OPEN -> SUPPORTED',
+			'Claim.status  SUPPORTED -> REJECTED',
+			'Claim.status  SUPPORTED -> UNDER_ASSESSMENT'
+		]);
+	});
+
+	// ⚠ "MACHINE-ADMITTED" IS NOT "PERFORMABLE", and REG-F-127 proved the difference matters rather than being a
+	// pedantic caveat. These five are the ones `checkTransition` WOULD admit as NOOPs — what happens next is the
+	// SITE's business, and it has gone both ways:
+	//   · the three `Claim.status` edges were DEFECTS — a second identical assessment appended a duplicate event
+	//     (AX-7) — and are now refused by a precondition, while remaining DECLARED here;
+	//   · `ExecutionPlan ACTIVE -> ACTIVE` is a deliberate HOLD (JAN-CMDPRE DWP-05);
+	//   · `RuntimeBinding PARTIALLY -> PARTIALLY` is N-22's incremental multi-party grant, driven green.
+	// The same shape, a defect on one machine and correct on another — which is exactly why this list classifies
+	// and does not judge, and why a blanket rule over it was refused.
+	it('PINNED — the 5 self-edges the machine would admit as NOOPs', () => {
+		expect(unratifiedDeclarations().machineAdmittedSelfEdges).toEqual([
+			'Claim.status  CONTESTED -> CONTESTED',
+			'Claim.status  SUPPORTED -> SUPPORTED',
+			'Claim.status  UNDER_ASSESSMENT -> UNDER_ASSESSMENT',
+			'ExecutionPlan.status  ACTIVE -> ACTIVE',
+			'RuntimeBinding.authorizationStatus  PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED'
+		]);
+	});
+
+	// CONTROL — the two pins above are equally satisfied by a classifier that puts EVERYTHING in one bucket and
+	// happens to match today's lists. This holds the discrimination itself: no `from !== to` pair may be called a
+	// self-edge, and no self-edge may be called an over-claim. Without it, collapsing the split back into one
+	// list passes.
+	it('CONTROL — the split discriminates, and the two lists are disjoint and complete', () => {
+		const { overClaimed, machineAdmittedSelfEdges } = unratifiedDeclarations();
+		for (const k of machineAdmittedSelfEdges) {
+			const [from, to] = (k.split('  ')[1] ?? '').split(' -> ');
+			expect(from, `${k} is in the SELF-EDGE list but is not a self-edge`).toBe(to);
+		}
+		for (const k of overClaimed) {
+			const [from, to] = (k.split('  ')[1] ?? '').split(' -> ');
+			expect(from === to, `${k} is a self-edge but is in the OVER-CLAIM list`).toBe(false);
+		}
+		expect(
+			new Set([...overClaimed, ...machineAdmittedSelfEdges]).size,
+			'the two lists must be disjoint — an arrow in both would be counted twice'
+		).toBe(overClaimed.length + machineAdmittedSelfEdges.length);
 	});
 
 	// Two causes live in this list and MUST NOT be conflated, which is why it is pinned by name and not by count:
