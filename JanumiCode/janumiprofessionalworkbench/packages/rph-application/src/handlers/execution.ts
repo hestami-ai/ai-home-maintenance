@@ -315,8 +315,8 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: PLAN,
-		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
-		// ⚠ `initialState` FOR THIS MACHINE IS ONE OF REG-F-071'S FOUR LIARS. It declares PROPOSED; no handler ever
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
+		// ⚠ `initialState` FOR THIS MACHINE IS ONE OF REG-F-071'S LIARS (the set is pinned by name — REG-F-125). It declares PROPOSED; no handler ever
 		// writes PROPOSED, and the state has zero in-arrows. Declaring it here 'to match the spec' would assert an
 		// occupancy that does not exist — kit.ts:546 names this exact machine as the trap.
 		births: [{ machine: 'ExecutionPlan.status', statusField: 'status', values: ['UNDER_REVIEW'] }],

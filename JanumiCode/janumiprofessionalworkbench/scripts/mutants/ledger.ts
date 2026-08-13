@@ -2673,5 +2673,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-command-census.test.ts'],
 		why: "THE RECTANGLE, RESTORED — the reader goes back to crossing two flattened factory parameters and manufacturing arrows no call declares. This is the state the census shipped in for its whole life until REG-F-124: `validator-registry.ts`'s four `statusChange` calls declare FIVE arrows between them and were read as NINE, and the four extra sat in REG-F-121's pinned unratified list looking exactly like commands over-claiming. ⚠ NOTE THE ARITHMETIC IN THE MUTATION, because it is the finding: `tuples` is still computed (so the `fail()` arm is untouched and this measures the EMISSION alone) and is then discarded in favour of the crossed sets. ⚠ AND THE VICTIM IS THE SYNTHETIC FIXTURE, NOT THE COUNT PINS, DELIBERATELY: `arrow-census-coverage.test.ts` WOULD also redden (174 -> 178), but a count pin cannot say WHICH reading is right — it fails identically whether the number moved by fabrication or by a real declaration landing. The two-call fixture with disjoint targets and disjoint sources is the only assertion that distinguishes paired from crossed, and it is why one call would not do (a single tuple's cross product IS that tuple). Predicted red: 'pairs a factory's (target, sources) PER CALL instead of crossing the flattened sets' — measured ALONE before declaring.",
 		source: 'REG-F-124 — from the 7-agent adversarial audit that corrected the finding three times'
+	},
+	{
+		id: 'F125-the-fiction-census-reads-the-diagram-again',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (!born.has(declared))',
+		replace: '\t\tif (born.has(declared))',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE PREDICATE INVERTED, WHICH IS THE ONLY WAY THIS DERIVATION CAN LIE WITHOUT LOOKING BROKEN. `initialStateFictions()` answers \"does any creation write the state the machine calls initial?\" — flip the sense and it reports the machines that AGREE as fictions and stays silent about the five that do not. ⚠ AND THE POINT IS THAT THE COUNT WOULD STILL LOOK PLAUSIBLE: the inverted set is non-empty (every machine born exactly where it declares), so a reader checking only \"is the number about right\" sees a list of similar length and no failure. That is precisely how the ORIGINAL defect survived — REG-F-071 measured four, the answer became five, and fourteen comments across nine files went on asserting four because nothing compared the claim to the machines. Predicted red: the by-NAME pin AND both controls (`Intent`/`PWU` would now appear, and the birth-declaration scope check would fail on machines that have none) — measured before declaring.",
+		source: 'REG-F-125'
 	}
 ];

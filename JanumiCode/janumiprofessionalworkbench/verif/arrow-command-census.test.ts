@@ -34,7 +34,14 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { census, deadCovered, declaredArrows, declaredArrowsInFile } from './arrow-command-census.js';
+import {
+	census,
+	deadCovered,
+	declaredArrows,
+	declaredArrowsInFile,
+	initialStateFictions,
+	birthStates
+} from './arrow-command-census.js';
 
 /**
  * The baseline is DATA, in a committed JSON file, not a literal in this test.
@@ -95,8 +102,9 @@ describe('C-0 — every declared arrow can be performed by some command', () => 
 	// assertions above would all score it COVERED. REG-F-067 found the first instance; REG-F-069 then walked
 	// straight into it, registering a FalsifyAssumption whose four source states nothing could produce.
 	//
-	// Occupancy is seeded from BIRTHS DECLARED AT THE CREATION SITES, not from `initialState`, which lies for at
-	// least six machines (REG-F-071) — and not from the arrow graph, which cannot see a birth at all.
+	// Occupancy is seeded from BIRTHS DECLARED AT THE CREATION SITES, not from `initialState`, which lies for a
+	// set this file now DERIVES and pins by name (REG-F-125 below; this line said "at least six" while fourteen
+	// others said "four") — and not from the arrow graph, which cannot see a birth at all.
 	it('lists every COVERED arrow whose source state can never be occupied', () => {
 		const { dead } = deadCovered();
 		expect(dead, `covered arrows that can never fire:\n${dead.join('\n')}`).toEqual(BASELINE.dead);
@@ -130,6 +138,47 @@ describe('C-0 — every declared arrow can be performed by some command', () => 
 		expect(machines.has('Decision.status')).toBe(true);
 		// The second idiom, read from exported data rather than source.
 		expect(machines.has('ExecutionStep.stepState')).toBe(true);
+	});
+});
+
+// ── REG-F-125: THE NUMBER FOURTEEN COMMENTS ASSERTED AND NOTHING CHECKED ─────────────────────────────────────
+//
+// REG-F-071 measured that some machines declare an `initialState` no creation ever writes. The measurement was
+// right when taken and was then COPIED, as the clause `a fiction on four machines`, to fourteen sites across
+// nine files — handlers, `verif/binding-row-truth.ts`, and this census's own docstring. **Nothing gated it.** By
+// the time anyone re-derived it the answer was FIVE: `AssuranceAssessment.state` joined when its request path
+// moved to land in EVIDENCE_PENDING|READY instead of REQUESTED, and fourteen comments went on saying four.
+//
+// ⚠ PINNED BY NAME, NOT BY COUNT, and the distinction is REG-F-121's: `toBe(5)` goes green if a machine is
+// DELETED, so the number improves by destroying the evidence. The pin below names each machine WITH the
+// contradiction it carries, so the failure output tells a reader which machine changed and how.
+describe('REG-F-125 — which machines declare an initialState the engine never writes, DERIVED not remembered', () => {
+	it('pins the fictions BY NAME, with the state actually written', () => {
+		expect(initialStateFictions()).toEqual([
+			{ machine: 'AssuranceAssessment.state', declared: 'REQUESTED', actuallyBornIn: ['EVIDENCE_PENDING', 'READY'] },
+			{ machine: 'Baseline.status', declared: 'DRAFT', actuallyBornIn: ['CANDIDATE'] },
+			{ machine: 'DecompositionContract.status', declared: 'DRAFT', actuallyBornIn: ['UNDER_REVIEW'] },
+			{ machine: 'ExecutionPlan.status', declared: 'PROPOSED', actuallyBornIn: ['UNDER_REVIEW'] },
+			{ machine: 'RecompositionContract.status', declared: 'DRAFT', actuallyBornIn: ['READY'] }
+		]);
+	});
+
+	// CONTROL — the pin above is satisfied by a function that returns those five hard-coded, and equally by one
+	// that calls EVERY machine a liar and happens to be filtered elsewhere. This holds the discriminating half:
+	// a machine born exactly where it says it is must be ABSENT. `Intent.intentStatus` declares RAW and
+	// `intent.ts` declares `births: [… values: ['RAW']]`, so it agrees — and it must never appear here.
+	it('CONTROL — a machine born where it declares is NOT a fiction', () => {
+		const named = new Set(initialStateFictions().map((f) => f.machine));
+		expect(named.has('Intent.intentStatus'), 'Intent is born in RAW, exactly as declared').toBe(false);
+		expect(named.has('PWU.workLifecycleState'), 'PWU is born in PROPOSED, exactly as declared').toBe(false);
+	});
+
+	// CONTROL — scope. A machine with NO `births` declaration is UNANALYSABLE, not a liar; counting it here would
+	// read absence of evidence as evidence of absence and would silently inflate a governance-facing number.
+	it('CONTROL — machines with no declared birth are excluded, not counted as fictions', () => {
+		const analysable = birthStates();
+		for (const f of initialStateFictions())
+			expect(analysable.has(f.machine), `${f.machine} was reported without a birth declaration`).toBe(true);
 	});
 });
 

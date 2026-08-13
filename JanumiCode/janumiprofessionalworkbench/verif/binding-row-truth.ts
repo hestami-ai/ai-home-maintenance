@@ -218,7 +218,7 @@ function auditOccupancy(c: TransitionClaim, occupied: ReadonlySet<string>, bag: 
  *
  * `(initial) -> X` says this command brings the object into existence in X, so X must be a state some handler
  * DECLARES it births into — not merely a state reachable later by some other command. Both bad rows landed on
- * their machine's declared `initialState`, which REG-F-071 measured as a fiction on four machines: the author
+ * their machine's declared `initialState`, which REG-F-071 measured as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125): the author
  * read the diagram's entry point instead of the arrow the command actually takes. Occupancy alone would have
  * missed a landing state that some LATER command can reach; only the birth set answers "created where".
  */

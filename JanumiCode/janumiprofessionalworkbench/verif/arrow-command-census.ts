@@ -558,16 +558,54 @@ function computeDeclaredArrows(): DeclaredArrow[] {
  * The states a CREATION can bring an object into existence in, read from the `births` declarations at the
  * `createObject` sites (`kit.ts`), which `createObject` also checks at runtime.
  *
- * ⚠ READ FROM THE DECLARATIONS AND NOT FROM `initialState`, WHICH LIES (REG-F-071). Four machines declare an
- * initial state the engine never writes. Seeding occupancy from `initialState` would mark a state occupied
- * because a diagram says so — the exact substitution of declaration for behaviour this whole file exists to
- * refuse.
+ * ⚠ READ FROM THE DECLARATIONS AND NOT FROM `initialState`, WHICH LIES (REG-F-071). Seeding occupancy from
+ * `initialState` would mark a state occupied because a diagram says so — the exact substitution of declaration
+ * for behaviour this whole file exists to refuse.
+ *
+ * ⚠ HOW MANY MACHINES LIE IS NOT WRITTEN HERE, AND THAT IS THE FIX (REG-F-125). This sentence read "Four
+ * machines declare an initial state the engine never writes" — and by the time anyone checked, it was FIVE.
+ * The same clause had been copied to fourteen sites across nine files, so one measurement taken once in
+ * 2026-08-02 was still being asserted by fourteen comments, none of which anything gated. `initialStateFictions()`
+ * below DERIVES the set, and `arrow-command-census.test.ts` pins it BY NAME; every one of those fourteen sites
+ * now points here instead of carrying its own copy of a number.
  */
 /** Memoized for the same reason as `declaredArrows` — a second full TypeScript parse of the same directory. */
 let birthsCache: Map<string, Set<string>> | undefined;
 export function birthStates(): Map<string, Set<string>> {
 	birthsCache ??= computeBirthStates();
 	return birthsCache;
+}
+
+/**
+ * REG-F-071's finding, DERIVED instead of remembered — the machines whose declared `initialState` is a state no
+ * creation ever writes (REG-F-125).
+ *
+ * ⚠ SCOPED TO MACHINES THAT DECLARE A BIRTH, and the scope is the whole care of it. A machine with NO `births`
+ * declaration is not evidence that its `initialState` is a fiction — it is evidence that nothing here can tell,
+ * which is C-0c's `unanalysed` set and a different claim entirely. Counting those as liars would inflate this
+ * set with machines whose creation path this census simply cannot see, which is the "absence of evidence read as
+ * evidence of absence" shape recorded against this programme more than once.
+ *
+ * Returned sorted so the pin is stable, and as pairs so the failure output names the CONTRADICTION (declared vs
+ * actually written) rather than just the machine — a pin whose message is only a name makes the reader go
+ * looking for what changed.
+ */
+export function initialStateFictions(): { machine: string; declared: string; actuallyBornIn: string[] }[] {
+	const births = birthStates();
+	const out: { machine: string; declared: string; actuallyBornIn: string[] }[] = [];
+	for (const machine of Object.keys(STATE_MACHINES).sort((a, b) => a.localeCompare(b))) {
+		const declared = STATE_MACHINES[machine]?.initialState;
+		if (declared === undefined) continue;
+		const born = births.get(machine);
+		if (born === undefined) continue; // no declared birth — unanalysable, NOT a liar. See above.
+		if (!born.has(declared))
+			out.push({
+				machine,
+				declared,
+				actuallyBornIn: [...born].sort((a, b) => a.localeCompare(b))
+			});
+	}
+	return out;
 }
 
 /**
