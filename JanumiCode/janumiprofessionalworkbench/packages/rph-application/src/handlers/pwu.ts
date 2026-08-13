@@ -385,14 +385,28 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
 } as const satisfies Readonly<Record<string, string>>;
 
 /**
- * THE ANTI-ROT MECHANISM. `advancePwuLifecycle`'s `target` is narrowed to this union, so a TWELFTH semantic
- * lifecycle command cannot be added without adding its row here — `check-types` fails before the new command's
- * arrow can quietly become reachable through the generic setter as well.
+ * ⚠⚠ THE ANTI-ROT MECHANISM THIS TYPE PROVIDED IS GONE, AND I REMOVED IT MYSELF WITHOUT NOTICING (REG-F-120).
  *
- * ⚠ THIS SAID "SEVENTH" WHILE THE TABLE ABOVE HELD ELEVEN — corrected 2026-08-13 (P-5). The count was written
- * when there were six and never re-derived as rows were added, which is the same disease REG-F-117 fixed in the
- * census-blind comment: **a count in prose beside a live table is a count nothing checks.** The table is the
- * authority and the type is derived from it; the number here is narrative only, which is exactly why it rotted.
+ * The docstring here read: *"`advancePwuLifecycle`'s `target` is narrowed to this union, so a SEVENTH semantic
+ * lifecycle command cannot be added without adding its row here — `check-types` fails before the new command's
+ * arrow can quietly become reachable through the generic setter as well."* **That was true when written.**
+ *
+ * **REG-F-114 replaced that `target` parameter with `spec: PwuLifecycleCommandSpec`** (see its signature below),
+ * whose `target` is the WIDE `WorkLifecycleState`. From that commit on, nothing was narrowed and a twelfth
+ * command could be added with no row here and no type error. **The type has had ZERO consumers ever since** —
+ * only its own declaration and a re-export in `index.ts`.
+ *
+ * ⚠ AND I MAINTAINED ITS DOCUMENTATION AFTERWARDS. On 2026-08-13 I corrected the count in this very docstring
+ * from "SEVENTH" to "TWELFTH" as a P-5 records fix, having verified the number against the table and never asked
+ * whether the MECHANISM the sentence describes still existed. **A count is easy to check and a claim is not, so
+ * the easy half got audited and the load-bearing half did not.** That is the same shape as REG-F-118's finding
+ * one layer up: the positive half of a claim was correct, so the negative half was never questioned.
+ *
+ * KEPT, NOT DELETED, AND NARROWLY SCOPED TO WHAT IT NOW IS: a NAME for the owned set, useful to a reader and to
+ * `rejectArrowOwnedBySemanticCommand`'s intent, with NO enforcement behind it. **Nothing may cite it as a
+ * guarantee.** The protection that does exist is elsewhere and is real: the runtime lookup in
+ * `rejectArrowOwnedBySemanticCommand`, and `verif/lifecycle-arrow-declarations.test.ts`, which holds the two
+ * ownership sets DISJOINT and every ratified arrow ACCOUNTED FOR by one table or the other.
  */
 export type OwnedLifecycleTarget = keyof typeof PWU_SEMANTIC_LIFECYCLE_COMMANDS;
 

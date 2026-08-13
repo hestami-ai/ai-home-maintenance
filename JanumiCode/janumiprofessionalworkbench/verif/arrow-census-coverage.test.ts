@@ -1,5 +1,21 @@
-// REG-F-087 — how much of the ratified arrow surface the census sees. **164 of 304 (54%) as of 2026-08-10;
-// it was 115 (38%) until PWU lifecycle commands began declaring their arrows.**
+// REG-F-087 — how much of the ratified arrow surface the census sees. **178 of 304 (59%) as of 2026-08-13.**
+//
+// ⚠ THE NUMBER IS NOT A PROGRESS BAR, AND WRITING IT AS ONE IS WHAT KEPT THIS HEADER STALE. It read "164 of 304
+// (54%)" through two increments that moved it, because a reader updating the PIN below has no reason to think a
+// sentence at the top of the file is also a measurement. It is, and it now says what the count MEANS rather than
+// only what it is:
+//
+//   115 (38%)  the census read two idioms — `advanceStatus` and the STEP_COMMAND_SPECS table
+//   164 (54%)  REG-F-114: PWU lifecycle commands declared their arrows (+49, all PERIPHERAL — abandon,
+//              supersede, block, challenge)
+//   170 (56%)  REG-F-117: `advanceIntent` sites were ALREADY declaring their sources; only the machine was
+//              unrecoverable, so this was a reader gap, not a declaration gap (+6)
+//   178 (59%)  REG-F-119: the generic setter's SPINE — READY -> PLANNED -> ... -> RECOMPOSED (+8), which took
+//              `PWU.workLifecycleState` to 57/57 and made it the first PWU axis that can be occupancy-analysed
+//
+// ⚠ AND 59% IS NOT "59% CORRECT". The remaining 126 are missing for two reasons that must never be conflated:
+// commands whose idiom the census cannot read, and arrows NO command performs at all. Only the second is a
+// coverage gap in the product; the first is a gap in this instrument.
 //
 // ⚠ THIS PIN DID ITS JOB, WHICH IS WORTH RECORDING BECAUSE PINS USUALLY ONLY ANNOY. It was written to redden
 // the moment coverage moved in either direction, and it reddened on exactly the +49 the design predicted —

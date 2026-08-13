@@ -547,8 +547,18 @@ function runPlaywright(target: readonly string[], env: NodeJS.ProcessEnv): Retur
  * workers — parsing it would silently drop victims, and a harvest that drops a victim is worse than none because
  * the survivor it hides looks like a clean result.
  *
- * Returns `[]` on a missing or unreadable report, which is honest: the caller records "no candidates observed",
- * not "no candidates exist".
+ * ⚠ RETURNS `undefined` — NOT `[]` — ON A MISSING OR UNREADABLE REPORT, and this docstring asserted the opposite
+ * for as long as the fix existed. It read: *"Returns `[]` on a missing or unreadable report, which is honest: the
+ * caller records 'no candidates observed', not 'no candidates exist'."* That WAS the behaviour, and REG-F-116
+ * removed it precisely because `[]` conflated **"the run reported no failures"** with **"there is no report"** —
+ * a control whose run crashed would have been graded HELD. The code changed in that commit; this sentence did
+ * not, so the function's own documentation described the fail-open its body had just closed.
+ *
+ * A reader trusting the docstring would write `failedFiles(p).length === 0` and reintroduce the hole in one line.
+ * The two states are now distinct at the type level: `undefined` means NOTHING WAS RECORDED, `[]` means NOTHING
+ * FAILED, and every caller must decide which it is looking at — `readVictims` coalesces deliberately (a harvest
+ * with no report honestly observed no candidates), `controlVerdict` reports INCONCLUSIVE, `takeBaseline` refuses
+ * to run at all.
  */
 function failedFiles(reportPath: string): readonly string[] | undefined {
 	let raw: string;

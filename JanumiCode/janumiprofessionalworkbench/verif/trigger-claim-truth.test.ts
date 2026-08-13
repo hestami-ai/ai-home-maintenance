@@ -91,7 +91,9 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 
 	// Inherited blindness, not new: PWU is invisible to both census readers (REG-F-086/087) and ExecutionStep is
 	// not an aggregate. Pinned so this control's scope cannot widen or narrow unnoticed either.
-	// ⚠ THIS LIST GREW FROM 3 TO 11 UNDER REG-F-118, AND THE GROWTH IS THE CENSUS BECOMING HONEST RATHER THAN
+	// ⚠ 3 -> 11 UNDER REG-F-118, THEN 11 -> 10 UNDER REG-F-119 — and the second number was left stale for exactly
+	// one commit, which is the third time this session that prose beside a live list rotted while the list moved.
+	// `PWU.workLifecycleState` left when its spine was declared and it reached 57/57. The GROWTH is the census
 	// WEAKER. `unanalysed` used to mean one thing — "no declared birth". It now carries a second, far more common
 	// cause: **incomplete arrow coverage**. A machine whose arrows are only partly declared cannot support ANY
 	// unreachability claim, because `occupiable()` grows along declared arrows and therefore under-estimates.
