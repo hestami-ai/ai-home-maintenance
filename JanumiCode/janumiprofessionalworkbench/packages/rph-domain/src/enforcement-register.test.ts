@@ -111,7 +111,7 @@ function canonArtifacts(): string[] {
  *
  * ⚠ THIS WAS RE-READING EVERY ARTIFACT FOR EVERY RULE, and it turned the mutation gate into a coin flip.
  * `canonFilesContaining` is called once per registered rule — ~112 of them — and each call did a `readdirSync`
- * plus a full `readFileSync` of all six artifacts. The canon corpus is ~2.6 MB, so a single test was doing
+ * plus a full `readFileSync` of all six artifacts. Those six total ~1.19 MB and the REGISTER ALONE IS 80% OF IT (an earlier note said ~2.6 MB, which is the whole `docs/canon` directory including `JPWB-SPEC-001` at 1.25 MB — a file this filter EXCLUDES), so a single test was doing
  * hundreds of large reads: 740ms in isolation, **6135ms under full-suite load, against a 5000ms default
  * timeout.**
  *

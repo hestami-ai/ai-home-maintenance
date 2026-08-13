@@ -4,13 +4,18 @@
 
 ## What is missing, and who performs it
 
-REG-F-118 named eight undeclared `PWU.workLifecycleState` arrows, and they form one unbroken chain — the main
-lifecycle spine the workbench drives every day:
+REG-F-118 named eight undeclared `PWU.workLifecycleState` arrows. They form **a spine with one fork** — the path
+the workbench drives every day:
 
 ```
 READY → PLANNED → EXECUTING → EVIDENCE_PENDING → UNDER_ASSURANCE → SATISFIED → RECOMPOSING → RECOMPOSED
-                                                (also UNDER_ASSURANCE → CONDITIONALLY_SATISFIED)
+                                                       └────────→ CONDITIONALLY_SATISFIED
 ```
+
+⚠ This said *"one unbroken chain"*, named eight arrows, and drew **seven** — the eighth parenthesised below the
+line as an aside. `UNDER_ASSURANCE` has TWO out-arrows in the undeclared set. **The tidier word cost the shape:**
+a fork at the assurance verdict is not an aside, it is the whole reason that state exists, and a reader checking
+"eight" against the diagram would have counted seven and had to decide which to believe.
 
 **They are not unimplemented.** They are performed by `changePwuState` — the GENERIC setter — whose target comes
 from `payload.newState` at runtime. None of the eleven `PWU_SEMANTIC_LIFECYCLE_COMMANDS` targets any spine state:

@@ -22,7 +22,7 @@ import { timeoutEvidence } from '../scripts/mutants/measured.js';
  * The ACTUAL failure text from V-4a, not a plausible reconstruction of one.
  *
  * A fixture written from memory tests the memory. This is the shape vitest emitted when
- * `enforcement-register.test.ts` re-read the 2.6 MB canon corpus once per registered rule and tipped over the
+ * `enforcement-register.test.ts` re-read the ~1.19 MB canon corpus once per registered rule and tipped over the
  * 5000ms default under full-suite load.
  */
 const VITEST_TIMEOUT = [
@@ -86,7 +86,11 @@ const CLEAN_RUN = [
  * test as a diagnostic from the runner.** A mutant that its victim killed cleanly was reported as unmeasured.
  *
  * Note what the diff looks like: the marker sits at the START of its line, in quotes, with no `Error: ` prefix.
- * Line-anchoring alone does not separate them; the runner's own prefix does.
+ * ⚠ SO FOR **THIS** FIXTURE THE PREFIX IS WHAT SEPARATES THEM, AND SAYING THAT WITHOUT A QUANTIFIER WAS THE ERROR
+ * (REG-F-120). This line read "Line-anchoring alone does not separate them; the runner's own prefix does" — true
+ * of the two VITEST markers and false of the Playwright one, which has no prefix at all and is held by its anchor
+ * alone. A conclusion measured on one member of a class, written as a rule about the class. The control below
+ * exists because of it.
  */
 const KILLED_BY_ITS_OWN_FIXTURE = [
 	' FAIL  |verif| verif/mutant-verdict.test.ts > REG-F-116 — a timeout is not a measurement, in either direction > reports a HOOK timeout — a hung arrangement measures the mutation exactly as little',
