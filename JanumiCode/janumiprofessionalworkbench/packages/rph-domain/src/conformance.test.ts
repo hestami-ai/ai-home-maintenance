@@ -167,10 +167,22 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         `obligationIds: []`, so the check would have quantified over nothing and passed.
 		//                         The drive now authors the obligations, and the check fails an empty population.
 		//                         `verif/deferral-honesty.test.ts` is the gate for the direction that was blind.
+		//   2026-08-13  40 -> 41  RPH-INT-007 alone, and its cite is a COMMAND-layer probe that DRIVES the
+		//                         arrangement rather than seeding it. The rule — "a superseded intent cannot
+		//                         authorize new PWUs" — could not be covered before, and NOT because nobody had
+		//                         written the check: its ANTECEDENT was command-unreachable, so no dispatch could
+		//                         be refused for it. Three increments made it coverable in order, deliberately:
+		//                         the guard landed first while the state was still unreachable (REG-F-129), the
+		//                         disposition was held back when moving it early reddened five checks (REG-F-130),
+		//                         and `SupersedeIntent` finally made the arrangement dispatchable (REG-F-131).
+		//                         ⚠ THIS +1 IS NOT A NEW CHECK OVER AN OLD CAPABILITY — it is a rule that became
+		//                         REFUSABLE. The distinction matters here more than usual, because a coverage
+		//                         number that rises when a capability is ADDED reads identically to one that rises
+		//                         when a test is added, and only this ledger separates them.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(40);
+		).toBe(41);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

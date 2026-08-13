@@ -91,12 +91,20 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// guarantee on the strength of a publish-path refusal. The row is now UNENFORCED_DISCLOSED.
 	'RPH-ASR-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-ASR-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
-	// The RPH-INT tranche (2026-08-02). Three of seven are ENFORCED and cite their probes; the other four are
-	// NOT_A_COMMAND_REFUSAL and carry no per-id row, because their statements describe what an ACCEPTED command
-	// produces rather than anything a dispatch could be refused for.
+	// The RPH-INT tranche (2026-08-02). ~~Three~~ FOUR of seven are ENFORCED and cite their probes; the other
+	// ~~four~~ THREE are NOT_A_COMMAND_REFUSAL and carry no per-id row, because their statements describe what an
+	// ACCEPTED command produces rather than anything a dispatch could be refused for.
+	//
+	// ⚠ RPH-INT-007 JOINED ON 2026-08-13 (REG-F-132) AND ITS ABSENCE UNTIL THEN WAS CORRECT. Its rule — "a
+	// superseded intent cannot authorize new PWUs" — was NOT_A_COMMAND_REFUSAL because its ANTECEDENT was
+	// command-unreachable: nothing could put an Intent into SUPERSEDED, so no dispatch could be refused for it.
+	// `SupersedeIntent` (REG-F-131) made the arrangement dispatchable and the guard that had been waiting since
+	// REG-F-129 finally has something to refuse. The cited probe DRIVES the supersession through the bus rather
+	// than seeding the status, which is what lets this row cite a COMMAND-layer observation at all.
 	'RPH-INT-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-005': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-INT-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// The RPH-PWU tranche, five of ten (2026-08-02). Only the two ENFORCED rows appear; the family is NOT yet
 	// total in the register (RPH-PWU-003/007/008 are investigated and owed), which is why RPH-PWU is absent from
 	// TOTAL_OVER_FAMILIES.

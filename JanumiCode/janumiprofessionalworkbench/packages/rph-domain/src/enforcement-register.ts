@@ -1469,43 +1469,71 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'refusal gap where the truth is an absent capability recorded elsewhere.'
 	},
 	'RPH-INT-007': {
-		kind: 'NOT_A_COMMAND_REFUSAL',
+		// ⚠ NOT_A_COMMAND_REFUSAL -> ENFORCED, 2026-08-13 (REG-F-132), and ONLY now. The disposition was held
+		// deliberately across two prior increments: REG-F-129 landed the guard while the antecedent was still
+		// unreachable (a guard waiting correctly is not a discharged obligation), and REG-F-130 moved it too early
+		// and was told so by five reddening checks — ENFORCED means a DISPATCH is refused, and no dispatch could
+		// then produce a SUPERSEDED intent. REG-F-131's `SupersedeIntent` made the arrangement dispatchable, so the
+		// claim is now backed by an observation rather than by a fixture.
+		kind: 'ENFORCED',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'a superseded intent cannot authorize new PWUs',
 			note: 'JPWB-DOC-003 §5 STA-6 states the rule verbatim. ~~Carriage is total here even though enforcement is absent — the independence of the two axes, in the direction RPH-EXE-007 already demonstrates.~~ CORRECTED 2026-08-13 (REG-F-130): enforcement is NO LONGER ABSENT — REG-F-129 landed the guard at proposePwu — so this row must not be cited for that independence. Carriage remains total.'
 		},
-		why:
-			'THE ANTECEDENT IS COMMAND-UNREACHABLE, which is an unusual reason for this arm and must be read as ' +
-			'stated. ~~this row does NOT mean ProposePwu is guarded. It is not. `proposePwu` loads the intent, checks ' +
-			'that it EXISTS, then narrows it to `{ ontologyId, ontologyVersion }` and copies those two fields; it ' +
-			'never reads `intentStatus`, so a superseded intent would sail through.~~ ⚠ CORRECTED 2026-08-13 ' +
-			'(REG-F-130): that WAS true and is now FALSE — REG-F-129 landed a guard at proposePwu that reads ' +
-			'`intentStatus` and refuses SUPERSEDED, deliberately BEFORE building the command that makes the state ' +
-			'reachable, so this rule would never be live-and-unenforced for a single commit. THE ARM IS STILL ' +
-			'CORRECT, and only for the surviving half of the original ground: no dispatch sequence can put ' +
-			'an Intent into SUPERSEDED: six INTENT commands are registered, none targets it, `SupersedeIntent` and ' +
-			'`WithdrawIntent` occur nowhere in the repository, intent.ts is the only production writer of the ' +
-			'aggregate, and the engine has no generic aggregate-mutation command. SUPERSEDED and WITHDRAWN are ' +
-			'declared terminal states of the ratified machine and both are unreachable. ~~So the ENFORCED arm is closed ' +
-			'by the absent guard~~ — CORRECTED: the ENFORCED arm is closed by the UNREACHABLE ANTECEDENT, not by an ' +
-			'absent guard. ENFORCED means a DISPATCH is refused, and no dispatch can produce a SUPERSEDED intent, so ' +
-			'the guard that now exists has nothing to refuse yet. BOTH members of the UNENFORCED guard union are ' +
-			'closed too: OBSERVED_ADMISSION ' +
-			'has no dispatchable arrangement, and DEAD_PREDICATE has no honest subject — `INTENT_AT_LEAST_PROVISIONAL` ' +
-			'is a trap that would PASS the census gate (its census is pwuGuards.ts alone, excluding the command ' +
-			'layer) while being false on both clauses: it IS asked, from markPwuReady, and its subject is a ROOT PWU ' +
-			'at readiness rather than any PWU at proposal, so a non-root PWU escapes it entirely. That is the ' +
-			'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss taken together, and it is declined here ' +
-			'deliberately rather than stumbled into. ⚠ THE RESIDUE, AND ITS PREDICTED DESTINATION WAS WRONG — a ' +
-			'prediction about a future disposition is a claim like any other. It read: ~~if SUPERSEDED ever becomes ' +
-			'reachable, this rule becomes a live UNENFORCED_DISCLOSED row on the same day~~. It does not. An ' +
-			'UNENFORCED_DISCLOSED row with an OBSERVED_ADMISSION guard must carry a probe that DISPATCHES the ' +
-			'arrangement and observes the engine ACCEPT it — and the engine now REFUSES it, so that probe could never ' +
-			'be written honestly. The destination is ENFORCED, and the day `SupersedeIntent` lands this row moves ' +
-			'there WITH the backing an ENFORCED row owes: a refusalMarker, declaredMutations, a COMMAND-layer ' +
-			'coverage-manifest entry and a probe in the observation map. Measured, not assumed: moving the ' +
-			'disposition without them reddens five checks.'
+		enforcedAt:
+			'DECLARATION: packages/rph-application/src/handlers/pwu.ts — proposePwu reads `intentStatus` off the '  +
+			'loaded intent and refuses SUPERSEDED. MECHANISM: an inline refusal in the handler, sited AFTER '  +
+			"PWU-002's existence check (so an absent intent still refuses as absent) and BEFORE the intent state is " +
+			'narrowed to `{ ontologyId, ontologyVersion }` — the narrowing that made `intentStatus` unreadable is '  +
+			'exactly why this rule went unenforced for so long. INVOCATION: proposePwu is the SOLE production '  +
+			'creator of a PWU aggregate — derived, not assumed, by an AST walk over 636 files finding 27 '  +
+			'aggregate-creation sites repo-wide (creation = `expectedRevision: undefined`, the only branch reaching '  +
+			'the adapter INSERT), of which exactly two carry a PWU objectType and one is a test. So the guard covers '  +
+			'every creation, root and child alike — `parentWorkUnitId` is a payload field on this same command, not '  +
+			'a separate creator.',
+		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
+		// THE TAIL IS THE MARKER, and it has to be. `RPH_VALIDATION_SEMANTIC_FAILED` is minted by PWU-002's own
+		// existence refusal twelve lines above, by the ownership binding, and by dozens of other sites — a
+		// code-only probe would prove only that SOMETHING refused. Deleting this guard makes the same arrangement
+		// SUCCEED rather than refuse differently, but a future reader who moved the check ABOVE the existence
+		// check would get the same code with a different message, and only this marker separates them.
+		refusalMarker: 'it is SUPERSEDED, and a superseded intent authorizes no new work',
+		declaredMutations: [
+			'delete the intentStatus check — the arrangement is ACCEPTED and a PWU is created under a superseded '  +
+				'intent, so the probe reports the refusal missing entirely',
+			"widen it to the readiness set `INTENT_AT_LEAST_PROVISIONAL` — SUPERSEDED is still refused, so a " +
+				'code-and-marker probe reports a FALSE KILLED; only the RAW control in sta6-superseded-intent.test.ts '  +
+				'catches it, which is why that control exists and why this mutation is declared here',
+			'move the check ABOVE PWU-002\'s existence refusal — a proposal naming a NONEXISTENT intent then '  +
+				'refuses with this rule\'s message instead of the missing-intent one, so the marker is right and the '  +
+				'subject is wrong',
+			'refuse WITHDRAWN as well — nothing reddens in the ratified direction, which is the point: the '  +
+				'over-refusal is caught by the deliberate non-rule pin, not by this rule'
+		],
+		// ── THE HISTORY, KEPT AS A COMMENT BECAUSE AN ENFORCED ROW HAS NO `why` FIELD BY TYPE ─────────────────
+		//
+		// This row was NOT_A_COMMAND_REFUSAL on ONE ground, and it was RIGHT when written: THE ANTECEDENT WAS
+		// COMMAND-UNREACHABLE. `proposePwu` loaded the intent, checked it EXISTED, narrowed it to
+		// `{ ontologyId, ontologyVersion }` and never read `intentStatus` — and no dispatch sequence could put an
+		// Intent into SUPERSEDED, because six INTENT commands were registered and none targeted it.
+		//
+		// ⚠ IT ALSO PREDICTED ITS OWN EXPIRY AND PREDICTED THE WRONG DESTINATION. It said that when SUPERSEDED
+		// became reachable the rule would become *"a live UNENFORCED_DISCLOSED row on the same day"*. It did not:
+		// an UNENFORCED_DISCLOSED row with an OBSERVED_ADMISSION guard must carry a probe that DISPATCHES the
+		// arrangement and observes the engine ACCEPT it, and the engine refuses it. A prediction about a future
+		// disposition is a claim like any other (REG-F-130).
+		//
+		// ⚠ AND THE TRAP THE ORIGINAL ROW NAMED IS STILL DECLINED — the guard was written to avoid it.
+		// `INTENT_AT_LEAST_PROVISIONAL` is NOT the predicate here: that set is {PROVISIONAL, FORMALIZED, APPROVED,
+		// REVISED} and serves STA-6 clause (a) at READINESS from markPwuReady. Using it at CREATION would refuse
+		// RAW — and proposing under a RAW intent is the repository's normal pattern, measured at 56 of the 71
+		// files that dispatch both CaptureIntent and ProposePwu without maturing it in between. Clause (a) governs
+		// readiness, clause (d) governs creation, and they take different sets.
+		//
+		// SCOPE, stated so it is not read wider: SUPERSEDED only. WITHDRAWN is deliberately ADMITTED — STA-6 names
+		// *a superseded intent* and nothing else, and the only ground for pairing them is `terminalStates`, which
+		// REG-F-083 records is wholly a repository shape (REG-F-129).
 	},
 
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════

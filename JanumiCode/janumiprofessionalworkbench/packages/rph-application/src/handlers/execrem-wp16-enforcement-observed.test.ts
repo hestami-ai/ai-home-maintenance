@@ -697,6 +697,34 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 	// `bumpSemanticVersion`, and only `reviseIntent` does. The controls below therefore approve v1 — and they had
 	// to be corrected to it, because the first draft assumed the rule was performed. See REG-F-009.
 
+	/** ProposePwu against a NAMED intent — the RPH-INT-007 arrangement needs to choose which intent authorizes. */
+	const proposePwuAgainstIntent = (pwuId: string, intentId: string) =>
+		dispatch(
+			'ProposePwu',
+			{
+				pwuId,
+				pwuKind: 'ARCHITECTURE',
+				title: 'Architecture Definition',
+				description: 'd',
+				intentId,
+				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				obligationIds: [],
+				constraintIds: [],
+				assumptionIds: [],
+				expectedOutputs: [],
+				assurancePolicyIds: [],
+				riskProfile: {
+					consequence: 'HIGH',
+					uncertainty: 'MEDIUM',
+					irreversibility: 'MEDIUM',
+					securitySensitivity: 'HIGH',
+					regulatoryExposure: 'LOW'
+				}
+			},
+			pwuId,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+
 	const captureIntent = (id: string) =>
 		ok(
 			dispatch(
@@ -1324,7 +1352,30 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-INT-001': null,
 		'RPH-INT-002': null,
 		'RPH-INT-006': null,
-		'RPH-INT-007': null,
+
+		// ⚠ THIS ROW WAS `NOT_A_COMMAND_REFUSAL` UNTIL 2026-08-13 AND COULD NOT BE PROBED AT ALL — its antecedent was
+		// COMMAND-UNREACHABLE, so there was no arrangement to dispatch. `SupersedeIntent` (REG-F-131) made one, and
+		// this probe is the observation the ENFORCED disposition now rests on (REG-F-132). No fixture anywhere in the
+		// chain: the intent is superseded through the bus, exactly as a professional would.
+		'RPH-INT-007': {
+			arrangement:
+				'ProposePwu against an intent that has been SUPERSEDED through the bus — work authorized by an intent that is no longer the authority',
+			run: () => {
+				const DEAD = 'int_01ARZ3NDEKTSV4RRFFQ69H6220';
+				const HEIR = 'int_01ARZ3NDEKTSV4RRFFQ69H6221';
+				captureIntent(DEAD);
+				captureIntent(HEIR);
+				ok(dispatch('SupersedeIntent', { supersedingIntentId: HEIR }, DEAD, 'INTENT'), `supersede ${DEAD}`);
+				// CONTROL: the SAME command against a LIVE intent. A handler that refused every proposal — or one that
+				// reused the READINESS set and so refused RAW — cannot green this row.
+				const LIVE = 'int_01ARZ3NDEKTSV4RRFFQ69H6222';
+				captureIntent(LIVE);
+				return {
+					control: proposePwuAgainstIntent('pwu_01ARZ3NDEKTSV4RRFFQ69H6223', LIVE),
+					observed: proposePwuAgainstIntent('pwu_01ARZ3NDEKTSV4RRFFQ69H6224', DEAD)
+				};
+			}
+		},
 		// ── THE FIRST SCHEMA-LAYER ROW (2026-08-02) ────────────────────────────────────────────────────────────
 		'RPH-CON-001': null,
 		'RPH-CON-003': null,
