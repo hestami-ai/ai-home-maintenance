@@ -90,6 +90,26 @@ because the cost of the alternative is concrete: six new arrows, a green gate, a
    PWU-002's own rule and belongs in its own increment, not smuggled in beside a canon-grounded one.
 2. Only then, `SupersedeIntent` + `IntentSuperseded` emission, with the shape's authored status disclosed as
    `recordClaimAssessment` disclosed its own (REG-D-024 pattern).
+
+   **⚠ THE COMMAND NAME IS AUTHORED, AND THE BASIS IS VERIFIED RATHER THAN ASSUMED FROM PRECEDENT.** Checked
+   2026-08-13: `SupersedeIntent` appears NOWHERE in canon — the only hits in `docs/canon` are my own register
+   entries — and there is no `SupersedeIntentPayloadSchema`. So minting it is an authoring act, and it needs the
+   same three-part ground `recordClaimAssessment` stood on, each limb re-verified here:
+   - **The EVENT is ratified.** `IntentSuperseded` is in the ratified Canonical Domain Model's event list
+     (`…Canonical Domain Model…md:1534`), and `IntentSupersededPayloadSchema` exists in `messages.ts:1365`,
+     shape marked `UNRATIFIED-AUTHORED` and cited to DOC-002 §26.2.
+   - **The STATE and its arrows are ratified.** Six in-arrows, one from every non-terminal state, each carrying
+     *"VERBATIM §6.2. 'Any active' = any non-terminal state"*.
+   - **A command is PRESUPPOSED by canon, not invented.** PER-3 (DOC-003:345): *"Canonical state is mutated only
+     through authenticated, authorized, semantically named commands … No generic CRUD/PATCH path … bypasses this
+     pipeline."* So a ratified state with ratified in-arrows and a ratified event MUST be reached by a command;
+     the corpus leaves only its NAME unstated.
+   - **And the asymmetry is the tell.** The ratified event list names six Intent events, and FIVE of them
+     (`IntentCaptured`, `IntentDiscoveryStarted`, `IntentFormalized`, `IntentApproved`, `IntentRevised`) already
+     have commands. Only the supersede one does not — an implementation gap, not a corpus exclusion.
+
+   Disclosed exactly as REG-D-024 required: the NAME is authored, the SHAPE is authored, and both are recorded
+   in the register rather than presented as ratified.
 3. `RPH-INT-007`'s register row is rewritten in the same commit as (2): its `NOT_A_COMMAND_REFUSAL` ground
    (unreachability) expires the moment the command exists, and the row must move to ENFORCED — with the guard
    from (1) as its probe — rather than be left describing a world that ended.
