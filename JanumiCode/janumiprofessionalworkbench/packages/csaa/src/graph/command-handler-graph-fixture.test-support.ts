@@ -74,10 +74,46 @@ const FACTORY_HANDLER_SOURCE = [
 	''
 ].join('\n');
 
-type HandlerFixtureVariant = 'DIRECT' | 'EMPTY' | 'FACTORY' | 'SHARED_DIRECT' | 'TABLE';
+const INITIALIZER_FACTORY_HANDLER_SOURCE = [
+	'function advanceStatus<T>(value: T): T { return value; }',
+	'',
+	'export const makeWorkHandler = () => {',
+	'\treturn () => {',
+	"\t\treturn advanceStatus({ machine: 'Work.status', target: 'STARTED' });",
+	'\t};',
+	'};',
+	'',
+	'export const startWork = makeWorkHandler();',
+	''
+].join('\n');
+
+const NESTED_DIRECT_HANDLER_SOURCE = [
+	'function advanceStatus<T>(value: T): T { return value; }',
+	'',
+	'export const startWork = () => {',
+	'\tconst guard = () => {',
+	"\t\treturn 'authorized';",
+	'\t};',
+	'\tguard();',
+	"\treturn advanceStatus({ machine: 'Work.status', target: 'STARTED' });",
+	'};',
+	''
+].join('\n');
+
+type HandlerFixtureVariant =
+	| 'DIRECT'
+	| 'EMPTY'
+	| 'FACTORY'
+	| 'FACTORY_INITIALIZER'
+	| 'NESTED_DIRECT'
+	| 'SHARED_DIRECT'
+	| 'TABLE';
 
 function handlerSource(variant: HandlerFixtureVariant): string {
-	return variant === 'FACTORY' ? FACTORY_HANDLER_SOURCE : DIRECT_HANDLER_SOURCE;
+	if (variant === 'FACTORY') return FACTORY_HANDLER_SOURCE;
+	if (variant === 'FACTORY_INITIALIZER') return INITIALIZER_FACTORY_HANDLER_SOURCE;
+	if (variant === 'NESTED_DIRECT') return NESTED_DIRECT_HANDLER_SOURCE;
+	return DIRECT_HANDLER_SOURCE;
 }
 
 function handlerSiteLine(source: string): number {
@@ -241,7 +277,25 @@ export class CommandBus {
 	write(
 		root,
 		'packages/rph-domain/src/transitions.data.ts',
-		'// GENERATED FILE - fixture only.\nexport const STATE_MACHINES = {};\n'
+		`// GENERATED FILE - fixture only.
+export const STATE_MACHINES = {
+	'Work.status': {
+		name: 'Work.status',
+		states: ['PROPOSED', 'STARTED'],
+		initialState: 'PROPOSED',
+		terminalStates: ['STARTED'],
+		transitions: [
+			{ from: 'PROPOSED', to: 'STARTED', trigger: 'start', guard: 'operator is authorized' }
+		],
+		illegal: [],
+		guarded: [
+			{ from: 'PROPOSED', to: 'STARTED', reason: 'requires an authenticated operator' },
+			{ from: 'PROPOSED', to: 'STARTED', reason: 'requires command authorization' }
+		]
+	}
+};
+export const CROSS_AXIS_RULES = [];
+`
 	);
 
 	write(root, RETAINED_VERIFIER_PATH, 'export const retainedArrowCensus = true;\n');
@@ -256,6 +310,37 @@ export class CommandBus {
 		root,
 		'verif/command-dispatch-census.test.ts',
 		'// Retained delegated fixture; CSAA records but does not execute this census.\n'
+	);
+	write(
+		root,
+		'verif/guard-enforcement-ledger.ts',
+		`export interface GuardRow {
+	readonly disposition: 'ENFORCED' | 'UNENFORCED';
+	readonly evidence: string;
+	readonly enforcingSite?: string;
+	readonly enforcingAnchor?: string;
+}
+export const retainedGuardLedgerAnalyzer = true;
+`
+	);
+	write(
+		root,
+		'verif/guard-enforcement-ledger.data.ts',
+		`import type { GuardRow } from './guard-enforcement-ledger.js';
+export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
+	['operator is authorized']: {
+		disposition: 'ENFORCED',
+		evidence: 'The direct fixture handler contains the retained refusing anchor.',
+		enforcingSite: 'packages/rph-application/src/handlers/work.ts:999',
+		enforcingAnchor: "return advanceStatus({ machine: 'Work.status', target: 'STARTED' });"
+	}
+};
+`
+	);
+	write(
+		root,
+		'verif/guard-enforcement-ledger.test.ts',
+		'// Retained guard-ledger authority fixture; CSAA does not execute this test.\n'
 	);
 	return { handlerSiteLine: handlerSiteLine(source), root };
 }
@@ -570,6 +655,16 @@ export function createCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
 /** Factory-result variant used to exercise explicitly candidate graph relations and frontiers. */
 export function createFactoryCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
 	return createFixture('FACTORY');
+}
+
+/** Factory-result variant whose factory callable is reached through a variable initializer. */
+export function createInitializerFactoryCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
+	return createFixture('FACTORY_INITIALIZER');
+}
+
+/** Places the retained site inside a nested callback contained by the direct registered handler. */
+export function createNestedDirectCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
+	return createFixture('NESTED_DIRECT');
 }
 
 /** Table-locator variant used to verify independent semantic command-table attribution. */

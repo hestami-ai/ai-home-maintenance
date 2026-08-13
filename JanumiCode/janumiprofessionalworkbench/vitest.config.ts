@@ -106,6 +106,7 @@ export default defineConfig({
 			include: ['packages/*/src/**/*.ts'],
 			exclude: [
 				'**/*.test.ts',
+				'**/*.test-support.ts',
 				'**/__tests__/**',
 				'**/src/gen/**',
 				// Generated contract artifacts — emitted from vocab by `bun run gen`, reviewed as a diff, not

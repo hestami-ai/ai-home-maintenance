@@ -9,6 +9,10 @@ import {
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_PROGRESS_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_SCHEMA_VERSION,
@@ -37,6 +41,7 @@ import {
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
 	buildCommandHandlerGraph,
+	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	buildReadWriteAccessGraph,
 	buildArrowCommandCensusArtifactSet,
@@ -55,6 +60,7 @@ import {
 	validateDependencyProviderComparison,
 	validateCallGraph,
 	validateCommandHandlerGraph,
+	validateGuardClassificationOverlay,
 	validateGuardEnforcementLedgerArtifactSet,
 	validateGuardEnforcementLedgerObservation,
 	validateReadWriteAccessGraph,
@@ -79,6 +85,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
+		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
@@ -95,6 +102,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateDependencyProviderComparison).toBeTypeOf('function');
 		expect(validateCallGraph).toBeTypeOf('function');
 		expect(validateCommandHandlerGraph).toBeTypeOf('function');
+		expect(validateGuardClassificationOverlay).toBeTypeOf('function');
 		expect(validateGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(validateGuardEnforcementLedgerObservation).toBeTypeOf('function');
 		expect(validateReadWriteAccessGraph).toBeTypeOf('function');
@@ -127,6 +135,18 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-command-handler-graph-request/1.0.0'
 		);
 		expect(COMMAND_HANDLER_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-command-handler-graph/1.0.0');
+		expect(GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION).toBe(
+			'jan-csaa-build-guard-classification-overlay/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-progress/1.0.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-request/1.0.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay/1.0.0'
+		);
 		expect(READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-read-write-access-graph/0.1.0'
 		);

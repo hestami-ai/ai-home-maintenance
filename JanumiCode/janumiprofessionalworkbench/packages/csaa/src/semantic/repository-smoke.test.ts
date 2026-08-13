@@ -18,6 +18,13 @@ import {
 	COMMAND_DISPATCH_TOPOLOGY_OPERATION_VERSION,
 	COMMAND_DISPATCH_TOPOLOGY_REQUEST_SCHEMA_VERSION,
 	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH,
+	GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_OPERATION_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_REQUEST_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REQUEST_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
 	DEPENDENCY_CRUISER_INVOCATION_SCHEMA_VERSION,
 	DEPENDENCY_CRUISER_ARGV_GRAMMAR_VERSION,
 	DEPENDENCY_CRUISER_PROVIDER_ID,
@@ -39,12 +46,18 @@ import {
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
 	type ModuleDependencyGraphSnapshot,
+	type BuildStateMachineGraphRequest,
+	type GuardEnforcementLedgerObservation,
+	type StateMachineGraphSnapshot,
+	type StateMachineTopologyObservation,
 	type SemanticCapability,
 	type StaticSemanticSnapshotProgressEvent,
 	type ResolveSubjectRequest,
 	buildCallGraph,
 	buildCommandHandlerGraph,
 	buildCommandDispatchTopology,
+	buildGuardClassificationOverlay,
+	buildGuardEnforcementLedgerArtifactSet,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
 	buildReadWriteAccessGraph,
@@ -55,6 +68,7 @@ import {
 	compareDependencyProviders,
 	normalizeDependencyCruiserOutput,
 	observeArrowCommandCensus,
+	observeGuardEnforcementLedger,
 	observeStateMachineTopology,
 	resolveSubject,
 	selectJpwbCommandHandlerRegistries,
@@ -65,6 +79,8 @@ import {
 	validateArrowCommandCensusObservation,
 	validateCommandHandlerGraph,
 	validateCommandDispatchTopology,
+	validateGuardClassificationOverlay,
+	validateGuardEnforcementLedgerObservation,
 	validateModuleDependencyGraph,
 	validateReadWriteAccessGraph,
 	validateStateMachineGraph,
@@ -80,6 +96,7 @@ interface RepositorySmokeProjectionPlan {
 	readonly runIndependentSemanticRevalidation: boolean;
 	readonly runCallGraph: boolean;
 	readonly runDependencyProviderComparison: boolean;
+	readonly runGuardClassificationOverlay: boolean;
 	readonly runModuleDependencyGraph: boolean;
 	readonly runReadWriteAccessGraph: boolean;
 	readonly runRepositoryDiscoveryPreflight: boolean;
@@ -94,16 +111,18 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: false,
 		runDependencyProviderComparison: false,
+		runGuardClassificationOverlay: true,
 		runModuleDependencyGraph: false,
 		runReadWriteAccessGraph: false,
 		runRepositoryDiscoveryPreflight: false,
-		runStateMachineProjection: false,
+		runStateMachineProjection: true,
 		suite: 'COMMAND_HANDLER_ONLY'
 	},
 	FULL_SUITE: {
 		runIndependentSemanticRevalidation: true,
 		runCallGraph: true,
 		runDependencyProviderComparison: true,
+		runGuardClassificationOverlay: false,
 		runModuleDependencyGraph: true,
 		runReadWriteAccessGraph: true,
 		runRepositoryDiscoveryPreflight: true,
@@ -208,12 +227,13 @@ const USE_COMMON_COMMAND_HANDLER_SUBJECT =
 	);
 const COMMAND_ANALYSIS_RETAINED_ARTIFACTS = [
 	...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+	...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
 	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH
 ] as const;
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.1.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.2.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -223,6 +243,10 @@ type RepositorySmokePhase =
 	| 'CALL_GRAPH'
 	| 'COMMAND_HANDLER_STATIC_PROJECTION'
 	| 'COMMAND_DISPATCH_STATIC_TOPOLOGY'
+	| 'GUARD_CLASSIFICATION_STATIC_OVERLAY'
+	| 'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING'
+	| 'GUARD_ENFORCEMENT_LEDGER_OBSERVATION'
+	| 'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE'
 	| 'DEPENDENCY_CRUISER_EXECUTION'
 	| 'DEPENDENCY_CRUISER_NORMALIZATION'
 	| 'DEPENDENCY_PROVIDER_COMPARISON'
@@ -474,16 +498,18 @@ describe('repository smoke phase telemetry', () => {
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
 			runDependencyProviderComparison: false,
+			runGuardClassificationOverlay: true,
 			runModuleDependencyGraph: false,
 			runReadWriteAccessGraph: false,
 			runRepositoryDiscoveryPreflight: false,
-			runStateMachineProjection: false,
+			runStateMachineProjection: true,
 			suite: 'COMMAND_HANDLER_ONLY'
 		});
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.FULL_SUITE).toEqual({
 			runIndependentSemanticRevalidation: true,
 			runCallGraph: true,
 			runDependencyProviderComparison: true,
+			runGuardClassificationOverlay: false,
 			runModuleDependencyGraph: true,
 			runReadWriteAccessGraph: true,
 			runRepositoryDiscoveryPreflight: true,
@@ -509,6 +535,11 @@ describe('repository smoke phase telemetry', () => {
 			'packages/rph-persistence/tsconfig.json',
 			'packages/rph-ports/tsconfig.json',
 			'packages/rph-projections/tsconfig.json'
+		]);
+		expect(COMMAND_ANALYSIS_RETAINED_ARTIFACTS).toEqual([
+			...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
+			COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH
 		]);
 	});
 
@@ -1086,11 +1117,15 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly states: number;
 					readonly transitions: number;
 				} = null;
+				let stateMachineProjection: null | {
+					readonly graph: StateMachineGraphSnapshot;
+					readonly observation: StateMachineTopologyObservation;
+					readonly request: BuildStateMachineGraphRequest;
+				} = null;
 				if (!SMOKE_PROJECTION_PLAN.runStateMachineProjection) {
 					const skipDetails = {
-						reason:
-							'The independent state-machine projection is not required by the command-handler graph contract.',
-						reasonCode: 'NOT_REQUIRED_BY_COMMAND_HANDLER_CONTRACT'
+						reason: 'The selected smoke suite does not request state-machine projection.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
 					};
 					telemetry.skip('STATE_MACHINE_TOPOLOGY_OBSERVATION', skipDetails);
 					telemetry.skip('STATE_MACHINE_GRAPH_PROJECTION', skipDetails);
@@ -1218,6 +1253,11 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						states: observation.states.length,
 						transitions:
 							observation.legalTransitions.length + observation.explicitlyIllegalTransitions.length
+					};
+					stateMachineProjection = {
+						graph: stateMachineGraph,
+						observation,
+						request: graphRequest
 					};
 				} else {
 					const skipDetails = {
@@ -1400,6 +1440,137 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					validationState: 'VALID'
 				});
 
+				let guardObservation: GuardEnforcementLedgerObservation | null = null;
+				let guardEnforcementLedgerResult: null | {
+					readonly artifactBytes: number;
+					readonly artifacts: number;
+					readonly arrowOccurrences: number;
+					readonly classifiedGuardTexts: number;
+					readonly durationMs: number;
+					readonly ledgerRows: number;
+					readonly observationBytes: number;
+				} = null;
+				if (SMOKE_PROJECTION_PLAN.runGuardClassificationOverlay) {
+					const guardLedgerStartedAt = performance.now();
+					const guardArtifactSetBudgets = {
+						maxArtifacts: subject.artifacts.length,
+						maxDiagnostics: 100_000,
+						maxTotalBytes: subjectArtifactBytes
+					};
+					telemetry.start('GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING', {
+						budgetClassification: 'CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						budgets: guardArtifactSetBudgets
+					});
+					const guardArtifactSetOutcome = buildGuardEnforcementLedgerArtifactSet(
+						{
+							budgets: guardArtifactSetBudgets,
+							operationVersion: GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_OPERATION_VERSION,
+							schemaVersion: GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_REQUEST_SCHEMA_VERSION,
+							subjectId: subject.descriptor.subjectId
+						},
+						{ subject }
+					);
+					expect(guardArtifactSetOutcome.outcome, JSON.stringify(guardArtifactSetOutcome)).toBe(
+						'complete'
+					);
+					if (guardArtifactSetOutcome.outcome !== 'complete')
+						throw new Error(JSON.stringify(guardArtifactSetOutcome));
+					const guardArtifactSet = guardArtifactSetOutcome.artifactSet;
+					const guardArtifactBytes = guardArtifactSet.artifacts.reduce(
+						(total, artifact) => total + artifact.bytes,
+						0
+					);
+					telemetry.complete({
+						artifactBytes: guardArtifactBytes,
+						artifacts: guardArtifactSet.artifacts.length,
+						reconciles: guardArtifactSet.coverage.reconciles
+					});
+					const guardObservationBudgets = {
+						maxArtifacts: guardArtifactSet.artifacts.length,
+						maxAuditEntries: 1_000_000,
+						maxDiagnostics: 100_000,
+						maxExecutorDurationMs: REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS,
+						maxExternalModuleBytes: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
+						maxExternalModuleFiles: 100_000,
+						maxGuardedArrows: 1_000_000,
+						maxGuardTexts: 1_000_000,
+						maxLedgerRows: 1_000_000,
+						maxMaterializedBytes: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
+						maxOutputStringCharacters: 100_000_000,
+						maxRawArrayEntries: 10_000_000,
+						maxRawJsonDepth: 64,
+						maxStderrBytes: 100_000_000,
+						maxStdoutBytes: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES
+					};
+					const guardAdapterPhaseDurationsMs: Record<string, number> = {};
+					telemetry.start('GUARD_ENFORCEMENT_LEDGER_OBSERVATION', {
+						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						budgets: guardObservationBudgets
+					});
+					const guardOutcome = await observeGuardEnforcementLedger(
+						{
+							artifactSetId: guardArtifactSet.id,
+							budgets: guardObservationBudgets,
+							operationVersion: GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
+							schemaVersion: GUARD_ENFORCEMENT_LEDGER_REQUEST_SCHEMA_VERSION,
+							subjectId: subject.descriptor.subjectId
+						},
+						{ artifactSet: guardArtifactSet, subject },
+						{
+							onProgress(event) {
+								if (event.durationMs !== undefined && event.state !== 'STARTED')
+									guardAdapterPhaseDurationsMs[event.phase] = event.durationMs;
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						}
+					);
+					expect(['complete', 'partial'], JSON.stringify(guardOutcome)).toContain(
+						guardOutcome.outcome
+					);
+					if (guardOutcome.outcome === 'unavailable') throw new Error(JSON.stringify(guardOutcome));
+					guardObservation = guardOutcome.observation;
+					telemetry.complete({
+						adapterPhaseDurationsMs: guardAdapterPhaseDurationsMs,
+						arrowOccurrences: guardObservation.coverage.arrowOccurrences,
+						classifiedGuardTexts: guardObservation.coverage.classifiedGuardTexts,
+						ledgerRows: guardObservation.coverage.ledgerRows,
+						outcome: guardOutcome.outcome
+					});
+					telemetry.start('GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE', {
+						observationId: guardObservation.id,
+						subjectBound: true
+					});
+					expect(validateGuardEnforcementLedgerObservation(guardObservation, subject)).toEqual({
+						issues: [],
+						state: 'VALID'
+					});
+					const guardObservationWitness = canonicalSemanticJsonWitness(guardObservation);
+					telemetry.complete({
+						bytes: guardObservationWitness.bytes,
+						contentDigest: guardObservation.contentDigest,
+						runtimeEnforcement: guardObservation.runtimeEnforcement,
+						validationState: 'VALID',
+						verifierAuthority: guardObservation.verifierAuthority
+					});
+					guardEnforcementLedgerResult = {
+						artifactBytes: guardArtifactBytes,
+						artifacts: guardArtifactSet.artifacts.length,
+						arrowOccurrences: guardObservation.coverage.arrowOccurrences,
+						classifiedGuardTexts: guardObservation.coverage.classifiedGuardTexts,
+						durationMs: Math.max(0, Math.round(performance.now() - guardLedgerStartedAt)),
+						ledgerRows: guardObservation.coverage.ledgerRows,
+						observationBytes: guardObservationWitness.bytes
+					};
+				} else {
+					const skipDetails = {
+						reason: 'The selected smoke suite does not request the guard-classification overlay.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					};
+					telemetry.skip('GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING', skipDetails);
+					telemetry.skip('GUARD_ENFORCEMENT_LEDGER_OBSERVATION', skipDetails);
+					telemetry.skip('GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE', skipDetails);
+				}
+
 				let commandHandlerResult: null | {
 					readonly bytes: number;
 					readonly candidateEdges: number;
@@ -1417,6 +1588,18 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly nodes: number;
 					readonly pipelineFacts: number;
 					readonly retainedCensusBytes: number;
+				} = null;
+				let guardClassificationOverlayResult: null | {
+					readonly anchorSites: number;
+					readonly bytes: number;
+					readonly candidateHandlerLinks: number;
+					readonly classifications: number;
+					readonly commandEvidenceLinks: number;
+					readonly directHandlerLinks: number;
+					readonly durationMs: number;
+					readonly frontiers: number;
+					readonly occurrences: number;
+					readonly stateEvidenceRefs: number;
 				} = null;
 				if (snapshot.subjectId === arrowObservation.subjectId) {
 					const commandHandlerStartedAt = performance.now();
@@ -1441,6 +1624,16 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						),
 						maxSourceBytes: Math.max(1, subjectArtifactBytes)
 					};
+					const commandHandlerRequest = {
+						arrowObservationId: arrowObservation.id,
+						budgets: commandHandlerBudgets,
+						commandRegistry: registrySelectors.commandRegistry,
+						handlerRegistry: registrySelectors.handlerRegistry,
+						operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+						schemaVersion: COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
+						semanticSnapshotId: snapshot.id,
+						subjectId: snapshot.subjectId
+					};
 					const commandHandlerPhaseDurationsMs: Record<string, number> = {};
 					telemetry.start('COMMAND_HANDLER_STATIC_PROJECTION', {
 						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
@@ -1449,16 +1642,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						declaredSites: arrowObservation.declaredSites.length
 					});
 					const commandHandlerOutcome = buildCommandHandlerGraph(
-						{
-							arrowObservationId: arrowObservation.id,
-							budgets: commandHandlerBudgets,
-							commandRegistry: registrySelectors.commandRegistry,
-							handlerRegistry: registrySelectors.handlerRegistry,
-							operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
-							schemaVersion: COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
-							semanticSnapshotId: snapshot.id,
-							subjectId: snapshot.subjectId
-						},
+						commandHandlerRequest,
 						snapshot,
 						arrowObservation,
 						arrowSubject,
@@ -1533,6 +1717,141 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						handlerRegistryEntries: commandHandlerGraph.coverage.discoveredHandlerRegistryEntries,
 						nodes: commandHandlerGraph.nodes.length
 					};
+
+					if (SMOKE_PROJECTION_PLAN.runGuardClassificationOverlay) {
+						if (guardObservation === null || stateMachineProjection === null)
+							throw new Error(
+								'The guard-classification overlay requires validated guard and state-machine predecessors.'
+							);
+						const guardOverlayStartedAt = performance.now();
+						const guardOverlayBudgets = {
+							maxAnchorSites: Math.max(1, guardObservation.guards.length),
+							maxAstNodes: Math.max(1, snapshot.astNodes.length),
+							maxCommandEvidenceLinks: Math.max(
+								1,
+								guardObservation.guardedArrows.length *
+									Math.max(1, arrowObservation.declaredArrows.length)
+							),
+							maxDiagnostics: 100_000,
+							maxFrontiers: Math.max(
+								1,
+								guardObservation.guardedArrows.length + guardObservation.guards.length * 2
+							),
+							maxGuardOccurrences: Math.max(1, guardObservation.guardedArrows.length),
+							maxGuardRecords: Math.max(1, guardObservation.guards.length),
+							maxHandlerLinks: Math.max(
+								1,
+								guardObservation.guards.length * Math.max(1, commandHandlerGraph.nodes.length)
+							),
+							maxSourceBytes: Math.max(1, subjectArtifactBytes),
+							maxStateEvidenceRefs: Math.max(
+								1,
+								guardObservation.guardedArrows.length *
+									Math.max(1, stateMachineProjection.graph.edges.length)
+							)
+						};
+						const guardOverlayRequest = {
+							arrowObservationId: arrowObservation.id,
+							budgets: guardOverlayBudgets,
+							commandHandlerGraphId: commandHandlerGraph.id,
+							guardObservationId: guardObservation.id,
+							operationVersion: GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION,
+							schemaVersion: GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							stateGraphId: stateMachineProjection.graph.id,
+							stateObservationId: stateMachineProjection.observation.id,
+							subjectId: subject.descriptor.subjectId
+						};
+						const guardOverlayInputs = {
+							arrowObservation,
+							commandHandlerGraph,
+							commandHandlerRequest,
+							guardObservation,
+							request: guardOverlayRequest,
+							semanticSnapshot: snapshot,
+							stateGraph: stateMachineProjection.graph,
+							stateGraphRequest: stateMachineProjection.request,
+							stateObservation: stateMachineProjection.observation,
+							subject
+						};
+						telemetry.start('GUARD_CLASSIFICATION_STATIC_OVERLAY', {
+							budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+							budgets: guardOverlayBudgets,
+							guardObservationId: guardObservation.id,
+							stateGraphId: stateMachineProjection.graph.id
+						});
+						const guardOverlayOutcome = buildGuardClassificationOverlay(guardOverlayInputs, {
+							onProgress(event) {
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						});
+						expect(
+							guardOverlayOutcome.outcome,
+							JSON.stringify(guardOverlayOutcome.diagnostics)
+						).toBe('partial');
+						if (guardOverlayOutcome.outcome !== 'partial')
+							throw new Error(JSON.stringify(guardOverlayOutcome));
+						const guardOverlay = guardOverlayOutcome.overlay;
+						expect(
+							validateGuardClassificationOverlay(guardOverlay, guardOverlayInputs, {
+								maxInputRecords: 10_000_000,
+								maxInputStringCharacters: 1_000_000_000,
+								maxIssues: 100_000,
+								maxRecords: 10_000_000,
+								maxStringCharacters: 1_000_000_000
+							})
+						).toEqual({ issues: [], state: 'VALID' });
+						expect(guardOverlay.coverage).toMatchObject({
+							anchorSites: 12,
+							candidateFactoryHandlerLinks: 1,
+							classifications: 82,
+							commandEvidenceLinks: 94,
+							directHandlerLinks: 10,
+							expectedClassifications: 82,
+							expectedCommandEvidenceLinks: 94,
+							expectedOccurrences: 146,
+							expectedStateEvidenceRefs: 148,
+							helperFrontiers: 3,
+							noCommandEvidenceFrontiers: 55,
+							occurrences: 146,
+							reconciles: true,
+							stateEvidenceRefs: 148
+						});
+						expect(guardOverlay.health).toBe('PARTIAL');
+						expect(guardOverlay.runtimeEnforcement).toBe('NOT_CLAIMED');
+						expect(guardOverlay.runtimePerformability).toBe('NOT_CLAIMED');
+						expect(guardOverlay.fullJanCsaa007Conformance).toBe('NOT_CLAIMED');
+						expect(guardOverlay.fullJanCsaa008Conformance).toBe('NOT_CLAIMED');
+						const guardOverlayWitness = canonicalSemanticJsonWitness(guardOverlay);
+						telemetry.complete({
+							anchorSites: guardOverlay.coverage.anchorSites,
+							bytes: guardOverlayWitness.bytes,
+							candidateHandlerLinks: guardOverlay.coverage.candidateFactoryHandlerLinks,
+							classifications: guardOverlay.coverage.classifications,
+							commandEvidenceLinks: guardOverlay.coverage.commandEvidenceLinks,
+							directHandlerLinks: guardOverlay.coverage.directHandlerLinks,
+							frontiers: guardOverlay.coverage.frontiers,
+							occurrences: guardOverlay.coverage.occurrences,
+							stateEvidenceRefs: guardOverlay.coverage.stateEvidenceRefs,
+							validationState: 'VALID'
+						});
+						guardClassificationOverlayResult = {
+							anchorSites: guardOverlay.coverage.anchorSites,
+							bytes: guardOverlayWitness.bytes,
+							candidateHandlerLinks: guardOverlay.coverage.candidateFactoryHandlerLinks,
+							classifications: guardOverlay.coverage.classifications,
+							commandEvidenceLinks: guardOverlay.coverage.commandEvidenceLinks,
+							directHandlerLinks: guardOverlay.coverage.directHandlerLinks,
+							durationMs: Math.max(0, Math.round(performance.now() - guardOverlayStartedAt)),
+							frontiers: guardOverlay.coverage.frontiers,
+							occurrences: guardOverlay.coverage.occurrences,
+							stateEvidenceRefs: guardOverlay.coverage.stateEvidenceRefs
+						};
+					} else
+						telemetry.skip('GUARD_CLASSIFICATION_STATIC_OVERLAY', {
+							reason: 'The selected smoke suite does not request the guard-classification overlay.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
 
 					const commandDispatchStartedAt = performance.now();
 					const commandBusSelector = selectJpwbCommandDispatchTopology(snapshot);
@@ -1660,6 +1979,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					};
 					telemetry.skip('COMMAND_HANDLER_STATIC_PROJECTION', skipDetails);
 					telemetry.skip('COMMAND_DISPATCH_STATIC_TOPOLOGY', skipDetails);
+					telemetry.skip('GUARD_CLASSIFICATION_STATIC_OVERLAY', skipDetails);
 				}
 
 				let dependencyProviderResult: null | {
@@ -1899,6 +2219,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(
 						'COMMAND_HANDLER_ONLY cannot complete without a validated command-dispatch static topology.'
 					);
+				if (
+					SMOKE_PROJECTION_PLAN.runGuardClassificationOverlay &&
+					(guardEnforcementLedgerResult === null || guardClassificationOverlayResult === null)
+				)
+					throw new Error(
+						'The selected smoke suite cannot complete without validated guard-ledger and guard-classification evidence.'
+					);
 				const exactSubjectReuse =
 					arrowSubject === subject &&
 					snapshot.subjectId === subject.descriptor.subjectId &&
@@ -1912,6 +2239,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					commandDispatchStaticTopology: commandDispatchTopologyResult !== null,
 					commandHandlerStaticProjection: commandHandlerResult !== null,
 					exactSubjectReuse,
+					guardClassificationStaticOverlay: guardClassificationOverlayResult !== null,
+					guardEnforcementLedgerObserved: guardEnforcementLedgerResult !== null,
 					semanticSnapshotOutcome: outcome.outcome,
 					semanticProfile: SMOKE_PROFILE,
 					skippedPhases,
@@ -1952,6 +2281,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						dependencyProviderComparison: dependencyProviderResult,
 						event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 						exactSubjectReuse,
+						guardClassificationStaticOverlay: guardClassificationOverlayResult,
+						guardEnforcementLedger: guardEnforcementLedgerResult,
 						moduleDependencyGraph: moduleDependencyGraphResult,
 						readWriteAccessGraph: readWriteAccessGraphResult,
 						projectCount: snapshot.projects.length,

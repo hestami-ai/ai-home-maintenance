@@ -4,6 +4,7 @@ export * from './contracts/arrow-command-census.js';
 export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-dispatch-topology.js';
 export * from './contracts/guard-enforcement-ledger.js';
+export * from './contracts/guard-classification-overlay.js';
 export * from './contracts/read-write-access-graph.js';
 export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
@@ -44,6 +45,7 @@ export {
 	type CommandDispatchTopologyProgressEvent,
 	type CommandDispatchTopologyProgressPhase
 } from './graph/build-command-dispatch-topology.js';
+export { buildGuardClassificationOverlay } from './graph/build-guard-classification-overlay.js';
 export {
 	buildGuardEnforcementLedgerArtifactSet,
 	selectGuardEnforcementLedgerArtifactSet,
@@ -90,6 +92,10 @@ export {
 	validateCommandDispatchTopology,
 	validateConstructedCommandDispatchTopology
 } from './graph/validate-command-dispatch-topology.js';
+export {
+	validateConstructedGuardClassificationOverlay,
+	validateGuardClassificationOverlay
+} from './graph/validate-guard-classification-overlay.js';
 export type {
 	CommandHandlerGraphValidationIssue,
 	CommandHandlerGraphValidationIssueCode,

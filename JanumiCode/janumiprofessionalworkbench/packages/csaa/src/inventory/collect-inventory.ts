@@ -120,6 +120,14 @@ const JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE = [
 	'verif/guard-enforcement-ledger.ts'
 ] as const;
 
+const JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE = [
+	'packages/csaa/src/contracts/guard-classification-overlay.ts',
+	'packages/csaa/src/graph/build-guard-classification-overlay.ts',
+	'packages/csaa/src/graph/guard-classification-overlay-canonical.ts',
+	'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+
 const JPWB_STATE_MACHINE_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/state-machine-graph.ts',
 	'packages/csaa/src/graph/build-state-machine-graph.ts',
@@ -198,6 +206,7 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'command-dispatch-static-topology',
 	'command-handler-static-projection',
 	'frozen-program-construction',
+	'guard-classification-static-overlay',
 	'read-write-access-projection'
 ] as const;
 
@@ -768,7 +777,8 @@ function providerInventory(
 							...TYPESCRIPT_SEMANTIC_PROVENANCE,
 							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 							...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
-							...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE
+							...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+							...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE
 						]
 					: [])
 			].sort(compareText),
@@ -980,6 +990,30 @@ function capabilities(): CapabilityInventory[] {
 			],
 			state: 'PARTIAL'
 		},
+		{
+			explanation:
+				'The tenth bounded DWP-004 increment composes the validated retained guard-enforcement ledger, generated state-machine observation and graph, retained arrow observation, command-handler graph, one frozen subject, and one structural semantic snapshot. It preserves all guard classifications without promotion; maps every ledger arrow to its exact legal-transition record and complete projected state-edge set; correlates every matching retained declared-command occurrence; and rebinds ENFORCED citations by exact path and unique anchor text instead of stale retained line numbers. Exact direct-handler links remain JAN-CSAA-CAP-027 derivation evidence based only on static AST containment. Shared-factory links remain candidate-only JAN-CSAA-CAP-028 inference evidence, and helper citations remain explicit frontiers. Static correlation neither invokes nor executes handlers. A dedicated structural common-subject smoke command is configured but is not executed by inventory generation. The overlay does not prove handler ownership, handler execution, refusal semantics, CFG dominance, reachability, runtime enforcement or performability, effects, events, persistence, replacement equivalence, or full JAN-CSAA-007/008 conformance.',
+			id: 'guard-classification-static-overlay',
+			provider: 'typescript+retained-guard-state-handler-overlay',
+			provenance: [
+				...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
+				...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
+				...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE,
+				...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
+				...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+				...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
+				...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SEMANTIC_PROVENANCE,
+				'capabilities#arrow-command-census',
+				'capabilities#command-handler-static-projection',
+				'capabilities#guard-enforcement-ledger',
+				'capabilities#state-machine-graph',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast',
+				'package.json#/scripts/csaa:semantic:smoke:guard-classification'
+			],
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
 				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
@@ -1112,7 +1146,8 @@ function assertJpwbNonVacuity(
 		'gate:fast',
 		'lint',
 		'test',
-		'test:coverage'
+		'test:coverage',
+		'csaa:semantic:smoke:guard-classification'
 	]) {
 		if (!rootNames.has(required))
 			throw new Error(`Required JPWB assurance command is absent: ${required}`);
@@ -1166,6 +1201,20 @@ function assertJpwbNonVacuity(
 		if (!selectedPaths.has(required)) {
 			throw new Error(
 				`Required JPWB guard-enforcement-ledger implementation or retained-authority artifact is absent: ${required}`
+			);
+		}
+	}
+	for (const required of JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB guard-classification static overlay implementation source is absent: ${required}`
+			);
+		}
+	}
+	for (const required of JPWB_STATE_MACHINE_GRAPH_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB state-machine graph implementation source is absent: ${required}`
 			);
 		}
 	}
@@ -1247,12 +1296,14 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
 					...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
 					...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
+					...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 					...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE,
 					'capabilities#arrow-command-census',
 					'capabilities#call-graph',
 					'capabilities#command-dispatch-static-topology',
 					'capabilities#command-handler-static-projection',
 					'capabilities#guard-enforcement-ledger',
+					'capabilities#guard-classification-static-overlay',
 					'capabilities#dependency-graph',
 					'capabilities#read-write-access-graph',
 					'capabilities#state-machine-graph',
@@ -1261,7 +1312,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#type-graph'
 				),
 				statement:
-					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first nine bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, and an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, and runtime command performability remain UNIMPLEMENTED.'
+					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first ten bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, and a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, and runtime command performability remain UNIMPLEMENTED.'
 			},
 			{
 				provenance: canonicalProvenance(
@@ -1271,6 +1322,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE,
 					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+					...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
 				),

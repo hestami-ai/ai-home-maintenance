@@ -144,6 +144,7 @@ describe('inventory discovery and identity', () => {
 			'command-dispatch-static-topology',
 			'command-handler-static-projection',
 			'frozen-program-construction',
+			'guard-classification-static-overlay',
 			'read-write-access-projection'
 		]);
 		expect(typescript?.provenance).toEqual(
@@ -158,7 +159,10 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/semantic/monotonic-operation-clock.ts',
 				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
 				'packages/csaa/src/semantic/raw-semantic-model.ts',
-				'packages/csaa/src/semantic/validate-snapshot.ts'
+				'packages/csaa/src/semantic/validate-snapshot.ts',
+				'packages/csaa/src/contracts/guard-classification-overlay.ts',
+				'packages/csaa/src/graph/build-guard-classification-overlay.ts',
+				'packages/csaa/src/graph/validate-guard-classification-overlay.ts'
 			])
 		);
 
@@ -254,6 +258,41 @@ describe('inventory discovery and identity', () => {
 			'full JAN-CSAA-007/008 conformance remain NOT_CLAIMED'
 		])
 			expect(commandDispatchCapability!.explanation).toContain(boundary);
+		const guardOverlayCapability = capabilities.get('guard-classification-static-overlay');
+		expect(guardOverlayCapability).toBeDefined();
+		expect(guardOverlayCapability).toMatchObject({
+			provider: 'typescript+retained-guard-state-handler-overlay',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			'capabilities#arrow-command-census',
+			'capabilities#command-handler-static-projection',
+			'capabilities#guard-enforcement-ledger',
+			'capabilities#state-machine-graph',
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'packages/csaa/src/contracts/guard-classification-overlay.ts',
+			'packages/csaa/src/graph/build-guard-classification-overlay.ts',
+			'packages/csaa/src/graph/guard-classification-overlay-canonical.ts',
+			'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
+			'packages/csaa/src/semantic/repository-smoke.test.ts',
+			'package.json#/scripts/csaa:semantic:smoke:guard-classification',
+			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS
+		])
+			expect(guardOverlayCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		for (const boundary of [
+			'without promotion',
+			'configured but is not executed by inventory generation',
+			'stale retained line numbers',
+			'JAN-CSAA-CAP-027 derivation evidence',
+			'candidate-only JAN-CSAA-CAP-028 inference evidence',
+			'neither invokes nor executes handlers',
+			'handler execution',
+			'helper citations remain explicit frontiers',
+			'runtime enforcement or performability',
+			'full JAN-CSAA-007/008 conformance'
+		])
+			expect(guardOverlayCapability!.explanation).toContain(boundary);
 		const typescriptAstCapability = capabilities.get('typescript-ast');
 		expect(typescriptAstCapability).toBeDefined();
 		expect(typescriptAstCapability!.provider).toBe('typescript');
@@ -397,7 +436,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first nine bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first ten bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -407,6 +446,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain('static JPWB command-registry-to-handler projection');
 		expect(semanticBoundary).toContain('compositional static command-bus topology overlay');
 		expect(semanticBoundary).toContain('wrapper around the retained guard-enforcement ledger');
+		expect(semanticBoundary).toContain('compositional static guard-classification overlay');
 		expect(semanticBoundary).toContain('JAN-CSAA-CAP-007 data-flow graphs');
 		expect(semanticBoundary).toContain(
 			'Inventory generation executes or benchmarks none of these analysis providers'
@@ -435,6 +475,9 @@ describe('inventory discovery and identity', () => {
 				'verif/route-action-census.test.ts',
 				'packages/csaa/src/graph/build-call-graph.ts',
 				'packages/csaa/src/graph/build-command-handler-graph.ts',
+				'packages/csaa/src/contracts/guard-classification-overlay.ts',
+				'packages/csaa/src/graph/build-guard-classification-overlay.ts',
+				'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
 		});
@@ -807,9 +850,16 @@ describe('generated product safety', () => {
 describe('JPWB population non-vacuity', () => {
 	it('rejects each vacuous required JPWB population independently', () => {
 		const completeScripts = Object.fromEntries(
-			['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
-				(name) => [name, 'true']
-			)
+			[
+				'boundary',
+				'check-types',
+				'gate',
+				'gate:fast',
+				'lint',
+				'test',
+				'test:coverage',
+				'csaa:semantic:smoke:guard-classification'
+			].map((name) => [name, 'true'])
 		);
 		const manifest = (workspaces: readonly string[] | undefined, scripts = completeScripts) =>
 			JSON.stringify({
@@ -854,6 +904,28 @@ describe('JPWB population non-vacuity', () => {
 			collectInventory({ repositoryRoot: missingCommand, requireJpwbPopulations: true })
 		).toThrow('Required JPWB assurance command is absent: boundary');
 
+		const missingGuardClassificationSmoke = fixture();
+		write(
+			missingGuardClassificationSmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:guard-classification'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingGuardClassificationSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:semantic:smoke:guard-classification'
+		);
+
 		const noSemanticImplementation = fixture();
 		write(noSemanticImplementation, 'package.json', manifest(['packages/*', 'apps/*']));
 		expect(() =>
@@ -872,9 +944,16 @@ describe('JPWB population non-vacuity', () => {
 				name: 'janumi-professional-workbench',
 				private: true,
 				scripts: Object.fromEntries(
-					['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
-						(name) => [name, 'true']
-					)
+					[
+						'boundary',
+						'check-types',
+						'gate',
+						'gate:fast',
+						'lint',
+						'test',
+						'test:coverage',
+						'csaa:semantic:smoke:guard-classification'
+					].map((name) => [name, 'true'])
 				),
 				workspaces: ['packages/*', 'apps/*']
 			})
@@ -954,9 +1033,16 @@ describe('JPWB population non-vacuity', () => {
 				name: 'janumi-professional-workbench',
 				private: true,
 				scripts: Object.fromEntries(
-					['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
-						(name) => [name, 'true']
-					)
+					[
+						'boundary',
+						'check-types',
+						'gate',
+						'gate:fast',
+						'lint',
+						'test',
+						'test:coverage',
+						'csaa:semantic:smoke:guard-classification'
+					].map((name) => [name, 'true'])
 				),
 				workspaces: ['packages/*', 'apps/*']
 			})
@@ -1001,9 +1087,16 @@ describe('JPWB population non-vacuity', () => {
 				name: 'janumi-professional-workbench',
 				private: true,
 				scripts: Object.fromEntries(
-					['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
-						(name) => [name, 'true']
-					)
+					[
+						'boundary',
+						'check-types',
+						'gate',
+						'gate:fast',
+						'lint',
+						'test',
+						'test:coverage',
+						'csaa:semantic:smoke:guard-classification'
+					].map((name) => [name, 'true'])
 				),
 				workspaces: ['packages/*', 'apps/*']
 			})
@@ -1056,7 +1149,20 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts',
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts',
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts',
-			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS
+			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
+			'packages/csaa/src/contracts/guard-classification-overlay.ts',
+			'packages/csaa/src/graph/build-guard-classification-overlay.ts',
+			'packages/csaa/src/graph/guard-classification-overlay-canonical.ts',
+			'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
+			'packages/csaa/src/semantic/repository-smoke.test.ts',
+			'packages/csaa/src/contracts/state-machine-graph.ts',
+			'packages/csaa/src/graph/build-state-machine-graph.ts',
+			'packages/csaa/src/graph/state-machine-graph-content.ts',
+			'packages/csaa/src/graph/state-machine-graph-ids.ts',
+			'packages/csaa/src/graph/state-machine-graph-input.ts',
+			'packages/csaa/src/graph/validate-state-machine-graph.ts',
+			'packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts',
+			'packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts'
 		];
 		for (const path of requiredPaths) write(root, path, 'export {};\n');
 
@@ -1066,10 +1172,28 @@ describe('JPWB population non-vacuity', () => {
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
 			`Required JPWB guard-enforcement-ledger implementation or retained-authority artifact is absent: ${missing}`
 		);
+
+		write(root, missing, 'export {};\n');
+		const missingStateGraph = 'packages/csaa/src/graph/validate-state-machine-graph.ts';
+		rmSync(join(root, ...missingStateGraph.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB state-machine graph implementation source is absent: ${missingStateGraph}`
+		);
 	});
 
 	it('discovers every current workspace manifest and every top-level verif TypeScript asset', () => {
 		const inventory = collectInventory({ repositoryRoot: ROOT, requireJpwbPopulations: true });
+		expect(
+			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:semantic:smoke:guard-classification'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command:
+				'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=COMMAND_HANDLER vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts',
+			state: 'CONFIGURED_NOT_RUN'
+		});
 		const manifestCount = ['packages', 'apps'].reduce(
 			(total, base) =>
 				total +
