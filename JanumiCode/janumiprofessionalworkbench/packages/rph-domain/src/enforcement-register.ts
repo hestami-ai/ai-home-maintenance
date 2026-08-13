@@ -436,25 +436,27 @@ export type RegisteredRuleId =
 	| 'RPH-CMP-002'
 	| 'RPH-CMP-003'
 	| 'RPH-CMP-004'
-	// RPH-GOV, SIX OF SEVEN (2026-08-03). GOV-006 (DISCLOSED) still owes its observation, so the family stays OUT
-	// of `TOTAL_OVER_FAMILIES`.
+	// RPH-GOV (2026-08-03) — six of seven at this point in the append log. GOV-006 is appended below and now
+	// carries its observation, so the family is CLOSED 7/7 and IS in `TOTAL_OVER_FAMILIES`.
 	| 'RPH-GOV-001'
 	| 'RPH-GOV-002'
 	| 'RPH-GOV-004'
 	| 'RPH-GOV-007'
-	// RPH-BAS, FOUR OF SEVEN (2026-08-02). BAS-003/004/006 are ENFORCED and owe dispatch probes.
+	// RPH-BAS (2026-08-02) — four of seven at this point in the append log. BAS-003/004/006 are appended below,
+	// and each now has its dispatch probe.
 	| 'RPH-BAS-001'
 	| 'RPH-BAS-002'
 	| 'RPH-BAS-005'
 	| 'RPH-BAS-007'
-	// RPH-ASM, FIVE OF SIX (2026-08-02). ASM-006 is ENFORCED and owes its dispatch probe.
+	// RPH-ASM (2026-08-02) — five of six at this point in the append log. ASM-006 is appended below and probed.
 	| 'RPH-ASM-001'
 	| 'RPH-ASM-002'
 	| 'RPH-ASM-003'
 	| 'RPH-ASM-004'
 	| 'RPH-ASM-005'
-	// RPH-DEC five of seven and RPH-CNS three of four (2026-08-02). DEC-002/003 and CNS-003 are ENFORCED and owe
-	// dispatch probes; DEC-005 is a disclosure owing its observation.
+	// RPH-DEC (2026-08-02) — five of seven, and RPH-CNS three of four, at this point in the append log.
+	// DEC-002/003, CNS-003 and DEC-005 are appended below; all now carry their probes or observations, and both
+	// families are CLOSED and in `TOTAL_OVER_FAMILIES`.
 	| 'RPH-DEC-001'
 	| 'RPH-DEC-004'
 	| 'RPH-DEC-006'
@@ -533,7 +535,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'DECISION: packages/rph-domain/src/execution.ts — bindingAuthorityVerdict (the four checks and their order). ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — bindingAuthorityRefusal, invoked from stepAuthorityRefusal on the `bindingAuthority` column (JAN-EXEBIND WP-B1, re-sited by JAN-REVREM RW-0, split by RW-6)',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// The kernel's own label travels in the MESSAGE: `RPH_BINDING_NOT_AUTHORIZED` is not a member of the ratified
-		// 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
+		// RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline). THE ARITY IS DELIBERATELY NOT
+		// RESTATED HERE: `errors.ts` rules that the count does not belong in prose, and the enum has since grown
+		// (REG-D-027 authored RPH_AUTHENTICATION_REQUIRED). The load-bearing premise is NON-MEMBERSHIP, unchanged.
 		refusalMarker: 'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding',
 		// MUTATIONS CORRECTED BY RW-5. Two of the three named acts no longer exist: the precheck call was moved, and
 		// the §15.3 allowlist limb was WITHDRAWN. A `declaredMutations` entry that cannot be applied is worse than an
@@ -1210,7 +1214,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'envelope, and no dispatch can violate the rule by being accepted — a condition is either carried into ' +
 			'the read models or it is not, and if it is not, the defect surfaces as a missing field in a projection ' +
 			'rather than as an admitted command. No kernel predicate decides whether a condition is visible either: ' +
-			'`dispositionFor` returns CONDITIONALLY_SATISFIED and `aggregateDisposition` propagates it, but neither ' +
+			'`dispositionFromFindings` returns CONDITIONALLY_SATISFIED and `aggregateDisposition` propagates it, but ' +
+			'neither ' +
 			'has a visibility limb and no predicate anywhere takes a "surfaces" argument. Recorded as a read-model ' +
 			'obligation, which is the register\'s third arm by definition — and note that if the projections DID drop ' +
 			'the condition, the instrument that would catch it is a projection test, not this register.'
@@ -1489,15 +1494,16 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-	// THE RPH-PWU FAMILY — FIVE OF TEN, AND THE FAMILY IS DELIBERATELY NOT YET TOTAL (2026-08-02).
+	// THE RPH-PWU FAMILY — CLOSED AT TEN OF TEN (2026-08-02).
 	//
-	// `TOTAL_OVER_FAMILIES` does NOT list RPH-PWU, and that is a statement rather than an oversight. RPH-PWU-002
-	// and RPH-PWU-004 are enforced and probed; RPH-PWU-001, -005 and -006 need no probe because nothing is refused;
-	// RPH-PWU-009 and -010 have been rows since JAN-EXECREM. THE THREE THAT ARE MISSING — RPH-PWU-003, -007 and
-	// -008 — are all investigated and all three are UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards whose
-	// arrangements are long (a full PWA authoring-and-publish chain; a full execution-and-assurance chain; a full
-	// drive to INVALIDATED followed by a baseline promotion). Landing a disclosure without its observation would be
-	// the one thing this arm may never do, so they are recorded as owed instead.
+	// It landed at five, then eight, then nine, and was deliberately ABSENT from `TOTAL_OVER_FAMILIES` for three
+	// commits, because the missing rows were UNENFORCED_DISCLOSED and a disclosure may not land without its
+	// observation. That absence was a STATEMENT rather than an oversight — the one thing this arm may never do is
+	// claim a family total while a disclosure in it is unobserved. RPH-PWU-002 and RPH-PWU-004 are enforced and
+	// probed; RPH-PWU-001, -005 and -006 need no probe because nothing is refused; RPH-PWU-009 and -010 have been
+	// rows since JAN-EXECREM. The three held back — RPH-PWU-003, -007 and -008 — all now carry OBSERVED_ADMISSION
+	// guards with their arrangements built (a full PWA authoring-and-publish chain; a full execution-and-assurance
+	// chain; a full drive to INVALIDATED followed by a baseline promotion), so the family is in the gate.
 	//
 	// A TRAP THIS FAMILY CARRIES, worth naming because it nearly cost a false row. `proposePwu` refuses a named-but-
 	// absent parent with a message ending "(PWU-003)" — the production code CLAIMS this rule id. It is not this
@@ -1681,8 +1687,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// `REJECTED`, so it classified real, working enforcement as ADMITTED — which is why this register's scope
 	// paragraph said RPH-CON was structurally inexpressible. It was not inexpressible; it was a second layer.
 	//
-	// THE FAMILY IS NOT TOTAL AND RPH-CON IS NOT IN `TOTAL_OVER_FAMILIES`. This is one row of eight, landed to prove
-	// the arm against a real refusal rather than only against synthetic input. The other seven are uninvestigated.
+	// THE FAMILY CLOSED AT EIGHT OF EIGHT AND RPH-CON IS IN `TOTAL_OVER_FAMILIES` (2026-08-02). This row landed
+	// FIRST, to prove the arm against a real refusal rather than only against synthetic input; the other seven
+	// followed, each with its own disposition.
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 	'RPH-CON-002': {
 		kind: 'ENFORCED',
@@ -1967,8 +1974,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// worth stating because the register's other families have needed CARRIED_BY_GENERAL_RULE and NO_CANON_CARRIER
 	// repeatedly; here the pre-canon rule and the canon rule are usually the same sentence twice.
 	//
-	// TWO ROWS ARE OWED (RPH-PER-003, RPH-PER-004) and the family is therefore OUT of `TOTAL_OVER_FAMILIES`. Both
-	// are cross-aggregate uniqueness disclosures needing OBSERVED_ADMISSION probes that drive the governance chain.
+	// THE TWO HELD-BACK ROWS (RPH-PER-003, RPH-PER-004) NOW CARRY THEIR OBSERVED_ADMISSION PROBES, so the family
+	// closed at fourteen of fourteen and IS in `TOTAL_OVER_FAMILIES` (2026-08-02, one commit after it landed at
+	// twelve). Both are cross-aggregate uniqueness disclosures whose arrangements drive the governance chain — and
+	// the doctrine that held them out is the durable part: a disclosure may not land without its observation.
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 	'RPH-PER-001': {
 		kind: 'ENFORCED',
@@ -2391,9 +2400,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'a restart in that window. What does not is the raw §20 ValidatorResult itself, which is the rule\'s ' +
 			'actual subject, and the state that would mark the window: every one of the fifteen ' +
 			'`AssuranceAssessmentState` members was enumerated and none means "validator result in hand, ' +
-			'disposition not yet authoritative". The assessment is born directly ' +
-			'in ASSESSING, and `AssuranceAssessmentState` has no member meaning "validator result in hand, ' +
-			'disposition not yet authoritative" — VALIDATOR_FAILED is a terminal disposition, not a pending one. ' +
+			'disposition not yet authoritative". ~~The assessment is born directly in ASSESSING~~ CORRECTED: the ' +
+			'assessment is born in EVIDENCE_PENDING or READY (`RequestAssuranceAssessment`) and reaches ASSESSING only ' +
+			'by a separate `BeginAssuranceAssessment` dispatch (REG-F-021) — and no state on that path means "validator ' +
+			'result in hand, disposition not yet authoritative" either. VALIDATOR_FAILED is a terminal disposition, not ' +
+			'a pending one. ' +
 			'The validator\'s content rides the EVENT, never a pre-disposition object. Nor is there a separately ' +
 			'restartable Assurance Service: the path runs in-process. So validation and disposition are ONE atomic ' +
 			'act, and the window the rule describes does not exist to be interrupted. WHAT WOULD SERVE IF IT DID: ' +
@@ -2511,7 +2522,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'CONTRACT from referencing a mutating command, this one constrains what a presentation OPERATION may ' +
 			'do, and neither has anything to quantify over. Searched as a concept, not a spelling — position, ' +
 			'layout, canvas, viewport, collapse, ordering — across the command vocabulary, the generated schemas ' +
-			'and the command/event vocab JSON: no presentation command exists among the 84, and no ' +
+			'and the command/event vocab JSON: no presentation command exists among the 100 (the vocabulary\'s own ' +
+			'`commands` array, re-counted and RE-SEARCHED 2026-08-13 over every entry, not only the census original), ' +
+			'and no ' +
 			'`presentationRevision` field exists anywhere, so canon\'s "Layout has its own revision plane" describes ' +
 			'a plane this repository has not built. THE PWA DESIGNER DOES RENDER A NODE GRAPH, which is exactly why ' +
 			'this was checked rather than assumed; its layout is computed client-side and never persisted. THE ' +
@@ -2716,8 +2729,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	//   ProposeDecision issued by an AGENT, payload `authority` naming a HUMAN  -> ~~ACCEPTED~~ **REFUSED**
 	//   ApproveDecision on that decision, issued by the SAME AGENT              -> ~~ACCEPTED~~ (unreachable)
 	//   final state: ~~status EFFECTIVE, authority { actorType: 'HUMAN' }~~ (no Decision is created)
-	// The governed record asserted a human decided when none had. Filed as REG-F-014; the first of its five
-	// instances is fixed, the other four stand — see `RPH-GOV-003`'s integrity caveat for the second.
+	// The governed record asserted a human decided when none had. Filed as REG-F-014, ~~the first of its five
+	// instances is fixed, the other four stand~~ — that heading and its instance arithmetic are SUPERSEDED by
+	// REG-F-040, which is the entry to read for the count and the residue (it records that BOTH earlier counts were
+	// wrong, and its own figure is transcribed there rather than restated here). The second instance closed
+	// 2026-08-03 as REG-F-017 — struck in place in `RPH-GOV-003`'s integrity caveat, which is where that pointer
+	// now leads. Do not re-derive the count from `decomposition.ts`: its instance numbering and the register's
+	// disagree, and that disagreement is itself recorded in REG-F-040.
 	//
 	// WHY ENFORCED AND NOT UNENFORCED_DISCLOSED. The disclosure arm's contract is "the statement IS a command
 	// refusal and NOTHING in production enforces it". Something does: `makeDecisionEffective`'s guard refuses with
@@ -2737,10 +2755,14 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	//
 	// THE HONEST SUMMARY, AND ITS REMAINING LIMIT. The rule is enforced against the arrangement it names, and the
 	// enforcement now rests on the ISSUER rather than on a fact the actor supplies about itself — but only up to
-	// the boundary this engine has: there is no authentication layer, so `command.issuedBy` is caller-supplied
-	// too. Binding the two makes authority CONSISTENT, not VERIFIABLE. It removes the ability to name one actor
-	// while acting as another; it cannot establish who is acting. That needs the platform tier the Charter
-	// allocates elsewhere — the same boundary RPH-EXE-004's row argues.
+	// the boundary this engine has: it does not MINT identity, it CONSUMES a credential the host established
+	// (`AuthenticationPort`, REG-D-027). ~~there is no authentication layer, so `command.issuedBy` is
+	// caller-supplied too. Binding the two makes authority CONSISTENT, not VERIFIABLE.~~ CORRECTED: `issuedBy` is
+	// no longer caller-supplied — `command-bus.ts` STAMPS it from the authenticated principal, and refuses a
+	// command that declares an issuer it is not, or one with no resolvable principal, with
+	// `RPH_AUTHENTICATION_REQUIRED` at status UNAUTHORIZED. A forgery attempt is a recorded refusal rather than a
+	// silent overwrite. What remains outside is credential issuance and revocation. That needs the platform tier
+	// the Charter allocates elsewhere — the same boundary RPH-EXE-004's row argues.
 	'RPH-GOV-001': {
 		kind: 'ENFORCED',
 		canonCarriage: {
@@ -3002,11 +3024,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-	// THE RPH-ASM FAMILY — FIVE DEAD PREDICATES OUT OF SIX RULES.
+	// THE RPH-ASM FAMILY — FOUR DEAD PREDICATES OUT OF SIX RULES.
 	//
-	// Measured, not asserted: `requiresReification`, `validateAssumptionReification`, `assessAcceptance`,
-	// `assessFalsification` and `blocksIrreversibleWork` are ALL referenced by exactly one non-test file — their
-	// own definition module, `rph-domain/src/decomposition.ts`. Only `canAuthorizeNewWork` (RPH-ASM-006) has live
+	// Measured, not asserted, and RE-MEASURED 2026-08-13: `requiresReification`, `validateAssumptionReification`,
+	// `assessAcceptance` and `blocksIrreversibleWork` are ALL referenced by exactly one non-test file — their
+	// own definition module, `rph-domain/src/decomposition.ts`. TWO now have live callers: `canAuthorizeNewWork`
+	// (RPH-ASM-006, via `handlers/execution.ts`) and `assessFalsification` (RPH-ASM-004, wired 2026-08-08 by
+	// REG-F-069's `falsifyAssumption` in `handlers/assurance.ts`; `verif/dead-kernel-census.test.ts` struck its
+	// row the same day, because a symbol that acquired a caller is not dead). The count moved because the family
+	// moved — this comment is the kind that goes stale silently, so it names the measurement date.
 	// callers. A whole family of correct, unit-tested kernel predicates, each written FOR the rule it does not
 	// enforce, is the archetype this register was built around, and it has never appeared this densely.
 	//
@@ -3579,7 +3605,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'widen canAuthorizeNewWork to accept EXPIRED — the probe reports ADMITTED',
 			'delete the guard from approveExecutionPlan — ADMITTED',
 			'drop the `a?.objectType !== ASSUMPTION` skip in assumptionsAuthorizeNewWork so an unresolvable id gates — the probe still kills; what reddens is any fixture naming a non-existent assumption, and the skip is a DELIBERATE fail-open the handler comments as "unknown status → not gatable (sound)"',
-			'TWO STATUSES THE PREDICATE REFUSES AND NO COMMAND CAN REACH: FALSIFIED and SUPERSEDED. Only DetectAssumption and ExpireAssumption exist, so EXPIRED is the sole reachable arm of the three. This row is enforced on one third of its own predicate.',
+			'~~TWO STATUSES THE PREDICATE REFUSES AND NO COMMAND CAN REACH: FALSIFIED and SUPERSEDED. Only DetectAssumption and ExpireAssumption exist, so EXPIRED is the sole reachable arm of the three. This row is enforced on one third of its own predicate.~~ CORRECTED 2026-08-08 (REG-F-069), struck rather than deleted. FALSIFIED became reachable when `FalsifyAssumption` landed. FOUR ASSUMPTION-targeting commands now exist — DetectAssumption, DiscloseAssumption, ExpireAssumption, FalsifyAssumption — and NONE targets SUPERSEDED; every production `target: \'SUPERSEDED\'` site is on another aggregate (PWU, AssurancePolicy, DecompositionContract, ExecutionPlan, Decision, Baseline). So ONE status the predicate refuses is still unreachable, and this row is enforced on two thirds of its own predicate.',
 			'AND THE SET IT WALKS IS WRITE-ONCE: only ProposePwu writes `assumptionIds`, so an Assumption created later by DetectAssumption can never become gatable on an already-proposed PWU. The rule holds for assumptions declared at proposal time and for no others.'
 		]
 	},
