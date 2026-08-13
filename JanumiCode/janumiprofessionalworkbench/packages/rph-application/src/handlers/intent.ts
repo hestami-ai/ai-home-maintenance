@@ -8,7 +8,8 @@ import type {
 	DomainCommand,
 	FormalizeIntentPayload,
 	ProvisionIntentPayload,
-	ReviseIntentPayload
+	ReviseIntentPayload,
+	SupersedeIntentPayload
 } from '@janumipwb/rph-contracts';
 import {
 	checkTransition,
@@ -340,6 +341,68 @@ export const reviseIntent: CommandHandler = (ctx, command, payload) => {
 			...(p.impactAnalysisId !== undefined ? { impactAnalysisId: p.impactAnalysisId } : {}),
 			semanticVersion: v.next,
 			intentStatus: 'REVISED'
+		})
+	});
+};
+
+/**
+ * SupersedeIntent — (any active) -> SUPERSEDED. The first command to reach an Intent terminal state.
+ *
+ * ── THE NAME IS AUTHORED; NOTHING ELSE HERE IS (REG-F-131, on REG-D-024's precedent) ──────────────────────────
+ *
+ * `SupersedeIntent` appears NOWHERE in canon — checked, and the only hits in `docs/canon` are the register
+ * entries about this work. The EVENT is ratified (`IntentSuperseded` is in the Canonical Domain Model's event
+ * list) and so are the six in-arrows, each machine row noting *"VERBATIM §6.2. 'Any active' = any non-terminal
+ * state"*.
+ *
+ * The command is PRESUPPOSED rather than invented: PER-3 states canonical state is mutated *"only through
+ * authenticated, authorized, semantically named commands"*, with no bypass — so a ratified state with ratified
+ * in-arrows and a ratified event MUST be reached by a command, and the corpus leaves only its NAME unstated.
+ * **The asymmetry is the tell: the ratified list names six Intent events and FIVE already had commands.**
+ *
+ * ── WHY THE GUARD LANDED FIRST, AND WHAT THIS COMMAND CHANGES ─────────────────────────────────────────────────
+ *
+ * This makes SUPERSEDED reachable for the first time. STA-6's *"a superseded intent cannot authorize new PWUs"*
+ * was closed in the enforcement register purely because nothing could produce that state, so shipping this first
+ * would have delivered six arrows, a green gate, and a governance rule that had quietly stopped being closed.
+ * `proposePwu` already refuses a SUPERSEDED intent (REG-F-129) — landed one increment ahead, deliberately,
+ * against an antecedent nothing could yet reach.
+ *
+ * ── THE SUCCESSOR IS REQUIRED, AND NOT BY MY CHOICE ───────────────────────────────────────────────────────────
+ *
+ * `IntentSupersededPayloadSchema` declares `supersedingIntentId` REQUIRED, so a supersession names its successor
+ * or the event cannot be built. It is NOT checked to EXIST here: REG-F-017's survey found that whether a governed
+ * reference may name an object that was never created is a SEPARATE rule (11 of its 13 divergences were exactly
+ * that), and bundling it in would make one command carry two. Recorded rather than silently decided.
+ *
+ * ⚠ NO `WithdrawIntent` SIBLING, DELIBERATELY. WITHDRAWN's three arrows stay uncovered because the corpus
+ * ratifies NO event for them — `IntentWithdrawn` occurs nowhere — and minting one would be inventing the very
+ * thing this docblock argues was merely UNSTATED for supersede. A state reached by an invented event looks
+ * governed; a state nothing can reach stays visible. That is REG-D-024's own reasoning, applied in the refusing
+ * direction.
+ */
+export const supersedeIntent: CommandHandler = (ctx, command, payload) => {
+	const p = payload as SupersedeIntentPayload;
+	return advanceIntent(ctx, command, {
+		machine: MACHINE,
+		target: 'SUPERSEDED',
+		// The machine's six in-arrows — "any active" — declared LITERALLY, so the arrow census reads them at this
+		// site instead of inferring them from the machine (REG-F-114, and REG-F-122 which deleted the inference).
+		precondition: fromStates(
+			'RAW',
+			'UNDER_DISCOVERY',
+			'PROVISIONAL',
+			'FORMALIZED',
+			'APPROVED',
+			'REVISED'
+		),
+		eventType: 'IntentSuperseded',
+		// The event records the RESULTING status alongside the successor, so a log-driven fold can see where the
+		// intent went. Omitting it is how FAILED and post-retry QUEUED became unobservable in the execution machine
+		// (JAN-EXECREM F-25), and REG-F-020 found the same omission across four handlers.
+		eventPayload: () => ({
+			supersedingIntentId: p.supersedingIntentId,
+			intentStatus: 'SUPERSEDED'
 		})
 	});
 };

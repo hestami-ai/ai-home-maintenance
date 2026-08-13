@@ -111,13 +111,21 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			// set, and crossed them — reading NINE. The four extra were manufactured by the reader, not claimed
 			// by any command. A reader seeing this number fall must not read it as lost coverage: the line below
 			// is the control on exactly that, and it did not move.
-			declarationRows: 174,
-			distinctArrowsDeclared: 171,
+			// ⚠ 174 -> 180 and 171 -> 177 AT REG-F-131, AND THIS RISE IS COVERAGE ADDED, not fabrication returning.
+			// `SupersedeIntent` declares the machine's six ratified in-arrows to SUPERSEDED, so Intent.intentStatus
+			// goes 6/15 -> 12/15 — the honest ceiling, because the three WITHDRAWN arrows have no ratified event and
+			// are deliberately left uncovered.
+			declarationRows: 180,
+			distinctArrowsDeclared: 177,
 			// ⚠ UNMOVED AT 156 ACROSS BOTH REG-F-122 AND REG-F-124, which is the point of pinning it SEPARATELY
 			// (REG-F-121). Two fabrication defects have now been removed from this instrument and neither cost a
 			// single ratified arrow — because a fabricated arrow was, by construction, one no machine ratified.
 			// If a future fabrication-removal moves THIS number, it removed truth as well and is not the same act.
-			ratifiedArrowsCovered: 156
+			// ⚠ 156 -> 162, AND THIS IS THE FIRST TIME THIS NUMBER HAS MOVED SINCE IT WAS SPLIT OUT. REG-F-124's
+			// note beside it said that if a fabrication-removal ever moved it, that removal took truth with it.
+			// This movement is the OTHER direction and the other cause: six arrows a command can now really
+			// perform. The invariant it guards is intact — removals must not move it; additions must.
+			ratifiedArrowsCovered: 162
 		});
 	});
 

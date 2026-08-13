@@ -58,6 +58,13 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-08-13, REG-F-131: `IntentSuperseded` acquires its FIRST emitter, `SupersedeIntent`. It had been a
+	// RATIFIED event (it is in the Canonical Domain Model's own event list) that was neither bound nor emitted —
+	// the corpus named the event and the six arrows into SUPERSEDED, and no command reached them, so an Intent
+	// could never terminate. Recorded by hand because this set is a PINNED SNAPSHOT: the emitter exists and is
+	// driven end-to-end in `sta6-superseded-intent.test.ts`, but no single vitest worker can see the whole
+	// suite's emissions, so an unrecorded emitter reads here as unemitted.
+	'IntentSuperseded',
 	// + 2026-08-09, JAN-PWUWP W-1 (REG-D-029): both acquired their FIRST emitter. `PwuAbandoned` and
 	// `PwuRejected` had been declared, registered and bound while NOTHING produced them — the two acts
 	// JPWB-DOC-001 §5.2 reserves to Governance were performed by a generic setter that emitted the generic

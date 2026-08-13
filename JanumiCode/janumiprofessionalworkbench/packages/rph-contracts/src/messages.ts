@@ -383,6 +383,11 @@ export const ReviseIntentPayloadSchema = z.strictObject({
 	impactAnalysisId: z.string().optional()
 });
 export type ReviseIntentPayload = z.infer<typeof ReviseIntentPayloadSchema>;
+export const SupersedeIntentPayloadSchema = z.strictObject({
+	supersedingIntentId: z.string(),
+	rationale: z.string().optional()
+});
+export type SupersedeIntentPayload = z.infer<typeof SupersedeIntentPayloadSchema>;
 export const ChallengePwuPayloadSchema = z.strictObject({
 	challengeReason: z.string(),
 	observationIds: z.array(z.string()).optional()
@@ -2055,6 +2060,12 @@ export const COMMANDS = {
 		payload: ReviseIntentPayloadSchema,
 		targetAggregateType: 'Intent',
 		emitsEvent: 'IntentRevised',
+		firstSlice: false
+	},
+	SupersedeIntent: {
+		payload: SupersedeIntentPayloadSchema,
+		targetAggregateType: 'INTENT',
+		emitsEvent: 'IntentSuperseded',
 		firstSlice: false
 	},
 	ChallengePwu: {

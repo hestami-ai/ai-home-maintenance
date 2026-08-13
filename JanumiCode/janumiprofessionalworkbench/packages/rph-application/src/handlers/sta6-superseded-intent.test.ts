@@ -191,4 +191,81 @@ describe('STA-6 (d) — a superseded intent cannot authorize new PWUs', () => {
 				'repository shape and not canon — a ratification question, not a repository one'
 		).toBe('ACCEPTED');
 	});
+	// ── THE ARRANGEMENT IS NOW DISPATCHABLE (REG-F-131) ──────────────────────────────────────────────────────
+	//
+	// Everything above SEEDS the SUPERSEDED status, because when this suite was written no command could produce
+	// it. `SupersedeIntent` now can, so the rule is observed END-TO-END through the bus — no fixture in the chain.
+	// **The seeded cases are kept rather than replaced**: they pin the guard against the STATE, this pins it
+	// against the ACT, and a later change could break either one alone.
+	it('DRIVEN END-TO-END — SupersedeIntent then ProposePwu, no fixture anywhere in the chain', () => {
+		const successor = 'int_01ARZ3NDEKTSV4RRFFQ69G5FBB';
+		expect(
+			send(
+				'CaptureIntent',
+				{ intentId: successor, originatingExpression: 'the replacement', ontologyId: 'o', ontologyVersion: '1' },
+				successor,
+				'INTENT'
+			).status
+		).toBe('ACCEPTED');
+
+		const superseded = send(
+			'SupersedeIntent',
+			{ supersedingIntentId: successor },
+			INTENT_ID,
+			'INTENT'
+		);
+		expect(superseded.status, 'RAW is one of the six ratified in-arrows to SUPERSEDED').toBe('ACCEPTED');
+		expect((store.loadObject(INTENT_ID)?.state as { intentStatus?: string }).intentStatus).toBe('SUPERSEDED');
+
+		const r = proposePwu('pwu_01ARZ3NDEKTSV4RRFFQ69G5FBC');
+		expect(r.status, 'STA-6 (d), observed through the bus rather than seeded').not.toBe('ACCEPTED');
+		expect(store.loadObject('pwu_01ARZ3NDEKTSV4RRFFQ69G5FBC')).toBeUndefined();
+	});
+
+	// The event is what a later reader folds, so it must carry where the intent WENT, not only which successor
+	// replaced it — the omission REG-F-020 found across four handlers.
+	it('the emitted IntentSuperseded records the successor AND the resulting status', () => {
+		const successor = 'int_01ARZ3NDEKTSV4RRFFQ69G5FBD';
+		send(
+			'CaptureIntent',
+			{ intentId: successor, originatingExpression: 'the replacement', ontologyId: 'o', ontologyVersion: '1' },
+			successor,
+			'INTENT'
+		);
+		expect(send('SupersedeIntent', { supersedingIntentId: successor }, INTENT_ID, 'INTENT').status).toBe(
+			'ACCEPTED'
+		);
+		const ev = store
+			.readAllEvents()
+			.filter((e) => String(e.aggregateId) === INTENT_ID && String(e.eventType) === 'IntentSuperseded');
+		expect(ev).toHaveLength(1);
+		expect(ev[0]?.payload).toEqual({ supersedingIntentId: successor, intentStatus: 'SUPERSEDED' });
+	});
+
+	// ⚠ THE TERMINAL HALF. SUPERSEDED has no out-arrows, so a second supersession must refuse — otherwise the
+	// command that ends an intent's life could be replayed to rewrite which successor replaced it.
+	it('a SUPERSEDED intent cannot be superseded again — the state is terminal', () => {
+		const a = 'int_01ARZ3NDEKTSV4RRFFQ69G5FBE';
+		const b = 'int_01ARZ3NDEKTSV4RRFFQ69G5FBF';
+		for (const id of [a, b])
+			send(
+				'CaptureIntent',
+				{ intentId: id, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+				id,
+				'INTENT'
+			);
+		expect(send('SupersedeIntent', { supersedingIntentId: a }, INTENT_ID, 'INTENT').status).toBe('ACCEPTED');
+		expect(
+			send('SupersedeIntent', { supersedingIntentId: b }, INTENT_ID, 'INTENT').status,
+			'a replayed supersession would rewrite the successor of a terminated intent'
+		).not.toBe('ACCEPTED');
+	});
+
+	// ⚠ WITHDRAWN STAYS UNREACHABLE, and this asserts the ABSENCE deliberately. The corpus ratifies no
+	// `IntentWithdrawn` event, so minting a command for it would be inventing what supersede merely had unstated.
+	it('WithdrawIntent does not exist — the three WITHDRAWN arrows stay uncovered and visible', () => {
+		const r = send('WithdrawIntent', { rationale: 'x' }, INTENT_ID, 'INTENT');
+		expect(r.status, 'an unregistered command must refuse, not silently no-op').not.toBe('ACCEPTED');
+		expect((store.loadObject(INTENT_ID)?.state as { intentStatus?: string }).intentStatus).toBe('RAW');
+	});
 });

@@ -131,6 +131,10 @@ describe('validate', () => {
 		// 348 -> 351 (2026-08-09, JAN-PWUWP W-5): `BlockPwuPayload`, `EscalatePwuPayload` and
 		// `PwuEscalatedPayload`. THREE, not two — `PwuEscalated` is the first PWU lifecycle event in this
 		// programme authored from scratch; every other one already existed with no emitter.
-		expect(buildContractRegistry().ids()).toHaveLength(351);
+		// 351 -> 352 (2026-08-13, REG-F-131): `SupersedeIntentPayload`. ONE, not two — the EVENT payload
+		// `IntentSupersededPayload` has existed since the vocab was written, ratified and unemitted, because the
+		// corpus named the event and the six arrows into SUPERSEDED but no command to reach them. Only the
+		// COMMAND shape is new, and only its NAME is authored.
+		expect(buildContractRegistry().ids()).toHaveLength(352);
 	});
 });

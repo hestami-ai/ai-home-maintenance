@@ -8,7 +8,8 @@ import {
 	captureIntent,
 	formalizeIntent,
 	provisionIntent,
-	reviseIntent
+	reviseIntent,
+	supersedeIntent
 } from './intent.js';
 import {
 	abandonPwu,
@@ -128,6 +129,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	FormalizeIntent: formalizeIntent,
 	ApproveIntent: approveIntent,
 	ReviseIntent: reviseIntent,
+	SupersedeIntent: supersedeIntent,
 	// PWU lifecycle (DOC-002 §7, §8)
 	ProposePwu: proposePwu,
 	BeginPwuShaping: beginPwuShaping,

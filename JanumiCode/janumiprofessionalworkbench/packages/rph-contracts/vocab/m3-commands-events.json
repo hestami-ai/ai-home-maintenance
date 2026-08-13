@@ -1438,6 +1438,30 @@
 			]
 		},
 		{
+			"commandType": "SupersedeIntent",
+			"targetAggregateType": "INTENT",
+			"emitsEvent": "IntentSuperseded",
+			"drivesMachine": "Intent.intentStatus",
+			"drivesFrom": "RAW|UNDER_DISCOVERY|PROVISIONAL|FORMALIZED|APPROVED|REVISED",
+			"drivesTo": "SUPERSEDED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-13, REG-F-131): THE COMMAND NAME IS AUTHORED \u2014 `SupersedeIntent` appears NOWHERE in canon \u2014 and so is this payload shape. THE EVENT IS RATIFIED: `IntentSuperseded` is in the Canonical Domain Model's event list, and its own vocab row notes \"(any active)->SUPERSEDED\". THE COMMAND IS PRESUPPOSED RATHER THAN INVENTED: JPWB-DOC-003 \u00a79 PER-3 states canonical state is mutated ONLY through \"authenticated, authorized, semantically named commands\" with no bypass, so a ratified state with ratified in-arrows and a ratified event MUST be reached by a command \u2014 the corpus leaves only its NAME unstated. THE ASYMMETRY IS THE TELL: the ratified list names SIX Intent events and FIVE already have commands; only supersede did not, which is an implementation gap rather than a corpus exclusion. `drivesFrom` is the machine's six ratified in-arrows, each row noting \"VERBATIM \u00a76.2. 'Any active' = any non-terminal state\". Do NOT treat this sourceSection as proof the shape is ratified; ratification pending, on the REG-D-024 precedent that authored `recordClaimAssessment`. Cited: DOC-002 \u00a726.2 (IntentSuperseded); JPWB-DOC-003 \u00a75 STA-6; JPWB-DOC-003 \u00a79 PER-3.",
+			"payloadFields": [
+				{
+					"field": "supersedingIntentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref. REQUIRED, and not by my choice: the ratified `IntentSupersededPayloadSchema` already declares it required, so a supersession names its successor or the event cannot be built."
+				},
+				{
+					"field": "rationale",
+					"required": false,
+					"type": "string",
+					"note": "AUTHORED, and OPTIONAL deliberately: the corpus states no rationale requirement for this act, and demanding one would enforce an inference \u2014 the error REG-F-129 records being made on this same increment's guard scope."
+				}
+			]
+		},
+		{
 			"commandType": "ChallengePwu",
 			"targetAggregateType": "ProfessionalWorkUnit",
 			"emitsEvent": "PwuChallenged",
