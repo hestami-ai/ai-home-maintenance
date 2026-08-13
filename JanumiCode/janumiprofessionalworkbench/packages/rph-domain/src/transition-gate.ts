@@ -94,9 +94,24 @@ export interface GatePlan {
 export type InEdgeDisposition = 'SATISFIED' | 'NEUTRALIZED' | 'PENDING' | 'UNRESOLVED';
 
 /**
- * DWP-02 hook: evaluate a CONDITIONAL edge's guard. DWP-01 has no evaluator, so a CONDITIONAL edge is treated
- * conservatively (its guard is NOT satisfied until DWP-02 supplies one) — but no CONDITIONAL edge exists yet
- * (BRANCH lands in DWP-03), so this does not affect any shipped or DWP-01 plan.
+ * Evaluate a CONDITIONAL edge's guard. Optional, and a CONDITIONAL edge whose evaluator is absent is treated
+ * conservatively — its guard is NOT satisfied. That default is FAIL-CLOSED and is the point: a branch whose arms
+ * are all conditional selects NOTHING without an evaluator, rather than guessing an arm.
+ *
+ * ⚠ THE CLAUSE STRUCK HERE SAID `but no CONDITIONAL edge exists yet (BRANCH lands in DWP-03), so this does not
+ * affect any shipped or DWP-01 plan` — WITHDRAWN, and it had been false for as long as DWP-03 has been landed
+ * (REG-F-125's sweep). CONDITIONAL edges exist, and TWO evaluators are built on this hook:
+ * `guardEvaluatorFor` (rph-application/handlers/execution.ts, the authority — and the SOLE production caller of
+ * `resolveBranchSelection` supplies it) and `conditionEvaluatorFor` (rph-projections, the read side). A reader
+ * who believed the struck clause would treat the conservative default as unreachable scaffolding and "simplify"
+ * it away — which is the one edit that would turn the fail-closed default into a guess.
+ *
+ * ⚠ AND WHAT IS **NOT** WRONG HERE, RECORDED BECAUSE AN AUDIT PROPOSED IT AND IT WAS REFUTED ON THE CODE.
+ * `resolveBranchSelection` returns the FIRST out-edge that is unconditional, before evaluating any later
+ * conditional arm — which reads like an ordering bug and is not one: this grammar is **first-match** (stated at
+ * the head of this file), and under first-match an unconditional arm IS a match. The reported hazard — "with no
+ * evaluator every guarded arm is skipped and the first SEQUENTIAL arm is silently selected" — additionally
+ * requires a production path with no evaluator, and there is none.
  */
 export type EdgeGuardEvaluator = (edge: GateTransition, plan: GatePlan) => boolean;
 
