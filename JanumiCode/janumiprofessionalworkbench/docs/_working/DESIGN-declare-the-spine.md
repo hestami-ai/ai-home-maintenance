@@ -166,5 +166,13 @@ machine's in-edges to the site's *declared* sources, which may be narrower — s
 C-0 baseline with it. That is its own increment with its own re-pin and its own predicted red, and folding it into
 the spine work would make two movements indistinguishable in one diff.
 
-**Safe default until then:** the census's arrow count is *"declared, except one site inferred"*, and no argument
-that rests on the from-half being universally declared may cite it.
+~~**Safe default until then:** the census's arrow count is *"declared, except one site inferred"*, and no argument
+that rests on the from-half being universally declared may cite it.~~
+
+**RESOLVED — REG-F-122 (2026-08-13).** The site declares `fromStates('PROPOSED')` at the factory literal, the
+census's inference expression is DELETED (the walk now refuses any from-half it cannot read, held by synthetic
+fixtures through the new `declaredArrowsInFile` seam plus one mutant), and the re-pin moved NOTHING —
+`Decision.status` has a single in-arrow to EFFECTIVE, so the movement this section predicted could never occur on
+this machine. The caution was the right reason to keep the increment separate, and wrong about the direction: the
+coincidence of the fabricated set with the declared one is what let the violation sit harmless for so long. The
+safe default above is retired; arguments may now rest on the from-half being universally declared.

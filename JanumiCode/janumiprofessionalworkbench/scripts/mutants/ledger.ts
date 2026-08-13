@@ -2649,5 +2649,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/mutant-verdict.test.ts'],
 		why: "THE DELETION A READER IS ACTIVELY INVITED TO MAKE, AND WHICH WAS UNGUARDED FOR AS LONG AS THE ANCHOR EXISTED. The two vitest markers carry a `Error: ` prefix AND a line anchor, and the prefix does the separating on its own — measured: drop `^[ \\t]*` from them and all cases stay green. So the anchor LOOKS redundant, and REG-F-116's own summary said as much (\"the runner's own prefix does\"). ⚠ THE PLAYWRIGHT MARKER HAS NO PREFIX. Its anchor is its entire defence against a quoted fixture, and every poisoning fixture written for REG-F-116 was vitest-shaped, so dropping THIS anchor was green too — the e2e half of the self-poisoning hole could have been re-opened by someone acting correctly on the vitest evidence. Measured before declaring: with the quoted-Playwright fixture added, this mutation reddens that control ALONE (1 failed / 7 passed).",
 		source: 'REG-F-120 — from the 43-agent audit of this session'
+	},
+	{
+		id: 'F122-the-census-resumes-inferring-the-from-half',
+		file: 'verif/arrow-command-census.ts',
+		find: "\t\tfind(pp.initializer);\n\t\tif (call === undefined)\n\t\t\treturn fail(\n\t\t\t\tsite,\n\t\t\t\t'declares a precondition with no readable `fromStates(…)`. The census does NOT infer a from-half ' +\n\t\t\t\t\t'from STATE_MACHINES (REG-F-114) — if this command is genuinely un-narrowed by source state, ' +\n\t\t\t\t\t'that is a new idiom to be taught deliberately, with its own ruling, not defaulted into'\n\t\t\t);",
+		replace:
+			'\t\tfind(pp.initializer);\n\t\tif (call === undefined) {\n\t\t\tfor (const to of targets)\n\t\t\t\tfor (const f of STATE_MACHINES[machine]!.transitions.filter((t) => t.to === to).map((t) => t.from))\n\t\t\t\t\tarrows.push({ machine, from: f, to, site });\n\t\t\treturn;\n\t\t}',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE RESURRECTION, VERBATIM. This is the expression REG-F-122 deleted — the census's own REG-F-114 violation: with no readable `fromStates`, the from-half is taken from the MACHINE'S in-edges, and a fabricated arrow enters the census indistinguishable from a declared one. Measured while it was live: exactly ONE of 46 sites ever reached it (`governance.ts:293`), and its fabrication coincided with the callers' real declaration only because `Decision.status` has a single in-arrow to EFFECTIVE — luck, not soundness. ⚠ THE VICTIM IS A SYNTHETIC FIXTURE BY NECESSITY, AND THE REPO-WIDE PINS CANNOT KILL THIS MUTANT: after REG-F-122 every real site declares a readable `fromStates`, so against the live tree this fallback is DEAD CODE and the coverage pins stay bit-identical under the mutation. The predicate-only fixture in the victim is the entire population of the failing arm — which is why `declaredArrowsInFile` is exported as a seam. Predicted red: 'refuses a precondition with no readable fromStates' alone; the two uninspectable-name refusals and the reading CONTROL all stay green.",
+		source: 'REG-F-122'
 	}
 ];

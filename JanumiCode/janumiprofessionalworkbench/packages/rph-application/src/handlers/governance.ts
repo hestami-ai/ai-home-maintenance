@@ -268,15 +268,26 @@ export const proposeDecision: CommandHandler = (ctx, command, payload) => {
  * audit (authorizeDecisionEffective checks only legality + authority, and floor-gate reads the resulting OBJECT
  * without regard to which command produced it).
  *
- * Each caller composes its kind predicate with `fromStates('PROPOSED')` — explicit and LIVE since DWP-01b sited
- * precondition enforcement AHEAD of the guard. DELIBERATE refusal-code change: a wrong-state re-issue (e.g.
+ * THE FROM-HALF IS DECLARED AT THIS LITERAL — `fromStates('PROPOSED')` below, composed kind → state → post-state
+ * (REG-F-122). It used to be composed by each CALLER, which left `precondition` here a bare parameter name — the
+ * one advance site (of 46) the arrow census could not see into, and the only site whose from-half the census then
+ * took from the machine's in-edges instead of from a declaration (REG-F-114's exact substitution; nil arithmetic
+ * effect only because `Decision.status` has a single in-arrow to EFFECTIVE). Callers now declare their KIND
+ * predicate — and ApproveDecision its version-pin check, which composes AFTER the state fact so refusal codes are
+ * unchanged — while the state fact common to both lives at the shared site the census reads. The composition is
+ * LIVE since DWP-01b sited precondition enforcement AHEAD of the guard. DELIBERATE refusal-code change: a
+ * wrong-state re-issue (e.g.
  * re-approving an EFFECTIVE decision) now refuses RPH_ILLEGAL_STATE_TRANSITION where the guard's legality arm
  * previously surfaced RPH_AUTHORITY_INSUFFICIENT — the state fact is the true refusal; authority was never the
  * defect there. The guard below is authority-only again. */
 function makeDecisionEffective(
 	target: 'EFFECTIVE',
 	eventType: string,
-	precondition: Precondition,
+	kindPrecondition: Precondition,
+	/** Composed AFTER `fromStates('PROPOSED')` — ApproveDecision's version-pin check sits here so a wrong-state
+	 *  re-issue still refuses RPH_ILLEGAL_STATE_TRANSITION rather than complaining about versions on a decision
+	 *  that is not even PROPOSED. Order is kind → state → these; REG-F-122 moved the state fact, not the order. */
+	postStatePreconditions?: readonly Precondition[],
 	extraMutate?: (base: Record<string, unknown>, command: DomainCommand) => Record<string, unknown>,
 	/**
 	 * The EVENT payload, when this caller's event is not `DecisionEffective`. ONE advanceStatus literal serves two
@@ -296,7 +307,13 @@ function makeDecisionEffective(
 			machine: 'Decision.status',
 			target,
 			eventType,
-			precondition,
+			// Kind BEFORE state (DWP-01a): a mis-aimed act refuses as the category error it is, whatever the
+			// decision's status. The from-half is declared HERE, at the literal the arrow census reads.
+			precondition: allOf(
+				kindPrecondition,
+				fromStates('PROPOSED'),
+				...(postStatePreconditions ?? [])
+			),
 			guard: (state) => {
 				const authority = state.authority as { actorType?: string } | undefined;
 				// ── HUMAN ONLY, AND THE `|| 'SYSTEM'` THAT USED TO SIT HERE COULD NEVER BE TRUE ──────────────────────
@@ -365,16 +382,19 @@ function makeDecisionEffective(
 export const approveDecision: CommandHandler = makeDecisionEffective(
 	'EFFECTIVE',
 	'DecisionEffective',
-	// Kind BEFORE state: a mis-aimed approval refuses as the category error it is, whatever the waiver's status.
-	allOf(
-		predicate(
-			"the target decision's decisionType is not WAIVER (granting is GrantWaiver's act)",
-			({ state, command }) =>
-				String(state.decisionType) === 'WAIVER'
-					? `ApproveDecision cannot make WAIVER decision ${command.targetAggregateId} effective: a waiver becomes effective only via GrantWaiver, whose WaiverGranted event is the waiver fact the assurance floor audits. Approving it here would discharge the floor with no WaiverGranted fact recorded.`
-					: null
-		),
-		fromStates('PROPOSED'),
+	// The KIND predicate; the factory composes it BEFORE its own `fromStates('PROPOSED')`, so a mis-aimed
+	// approval refuses as the category error it is, whatever the waiver's status (REG-F-122 kept DWP-01a's order).
+	predicate(
+		"the target decision's decisionType is not WAIVER (granting is GrantWaiver's act)",
+		({ state, command }) =>
+			String(state.decisionType) === 'WAIVER'
+				? `ApproveDecision cannot make WAIVER decision ${command.targetAggregateId} effective: a waiver becomes effective only via GrantWaiver, whose WaiverGranted event is the waiver fact the assurance floor audits. Approving it here would discharge the floor with no WaiverGranted fact recorded.`
+				: null
+	),
+	[
+		// POST-STATE, deliberately: composed after the factory's state check, exactly where it sat before
+		// REG-F-122 moved the state fact into the factory — refusal codes unchanged.
+		//
 		// The ratified payload field is no longer WRITTEN (above), so this is what stops it becoming decorative:
 		// an approver may still state the versions it believes it is approving, and what it states must match the
 		// pin. Scoped to subjects the PIN covers — `proposeDecision` pins only objects the store could load, so a
@@ -398,7 +418,7 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
 						`the versions that were REVIEWED; to approve different ones, propose again (DOC-003 ASR-15).`;
 			}
 		)
-	),
+	],
 	(base, command) => {
 		const p = command.payload as ApproveDecisionPayload;
 		return {
@@ -634,16 +654,15 @@ export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 export const grantWaiver: CommandHandler = makeDecisionEffective(
 	'EFFECTIVE',
 	'WaiverGranted',
-	allOf(
-		predicate(
-			"the target decision's decisionType is WAIVER (a non-waiver becomes effective via ApproveDecision)",
-			({ state, command }) =>
-				String(state.decisionType) !== 'WAIVER'
-					? `GrantWaiver cannot make ${String(state.decisionType)} decision ${command.targetAggregateId} effective: only a Decision of decisionType WAIVER carries the waiver detail the floor gate scopes by. A non-waiver decision becomes effective via ApproveDecision.`
-					: null
-		),
-		fromStates('PROPOSED')
+	// The KIND predicate alone — the factory supplies `fromStates('PROPOSED')` at the shared literal (REG-F-122).
+	predicate(
+		"the target decision's decisionType is WAIVER (a non-waiver becomes effective via ApproveDecision)",
+		({ state, command }) =>
+			String(state.decisionType) !== 'WAIVER'
+				? `GrantWaiver cannot make ${String(state.decisionType)} decision ${command.targetAggregateId} effective: only a Decision of decisionType WAIVER carries the waiver detail the floor gate scopes by. A non-waiver decision becomes effective via ApproveDecision.`
+				: null
 	),
+	undefined,
 	(base, command) => ({
 		...base,
 		effectiveAt: command.issuedAt

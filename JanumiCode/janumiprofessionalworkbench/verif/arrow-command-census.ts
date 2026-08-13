@@ -225,106 +225,153 @@ export function declaredArrows(): DeclaredArrow[] {
 	return arrowsCache;
 }
 
+/**
+ * Every arrow ONE source file declares, plus how many advance-primitive sites it holds.
+ *
+ * EXPORTED AS A SEAM, AND THE RATCHET'S OWN POSITIVE CASE IS WHY (REG-F-122). The refusals in the SOURCES block
+ * below had exactly one live instance (`governance.ts:293`, a shorthand `precondition`), and it left the
+ * repository in the same commit that made them refusals — so no test over the real handler tree can ever enter
+ * their failing arms again. Only a SYNTHETIC source file can hold them red, which requires the per-file walk to
+ * take a `ts.SourceFile` instead of closing over the handler directory.
+ */
+export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow[]; sites: number } {
+	const arrows: DeclaredArrow[] = [];
+	let sites = 0;
+	const consts = stringConsts(sf);
+
+	const visit = (node: ts.Node): void => {
+		ts.forEachChild(node, visit);
+		if (!ts.isCallExpression(node)) return;
+		if (!ts.isIdentifier(node.expression) || !ADVANCE_PRIMITIVES.has(node.expression.text)) return;
+		const spec = node.arguments[2];
+		if (!spec || !ts.isObjectLiteralExpression(spec)) return;
+		sites += 1;
+		const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+		const site = `${sf.fileName}:${line}`;
+
+		// MACHINE
+		const mp = prop(spec, 'machine');
+		if (!mp || !ts.isPropertyAssignment(mp)) return fail(site, 'declares no `machine`');
+		const machine = ts.isStringLiteral(mp.initializer)
+			? mp.initializer.text
+			: ts.isIdentifier(mp.initializer)
+				? (consts.get(mp.initializer.text) ??
+					fail(site, `machine \`${mp.initializer.text}\` is not a top-level string const`))
+				: fail(site, 'machine is neither a string literal nor a named constant');
+		if (!STATE_MACHINES[machine])
+			fail(site, `names machine \`${machine}\`, which transitions.data.ts does not declare`);
+
+		// TARGET — a literal/const head, or a computed one whose RANGE must be declared.
+		const tp = prop(spec, 'target');
+		if (!tp) return fail(site, 'declares no `target`');
+		let targets: string[];
+		const staticTarget =
+			ts.isPropertyAssignment(tp) && ts.isStringLiteral(tp.initializer)
+				? tp.initializer.text
+				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
+					? consts.get(tp.initializer.text)
+					: undefined;
+		if (staticTarget !== undefined) {
+			targets = [staticTarget];
+		} else {
+			// An explicit declaration WINS over inference. Trying inference first once let it answer for a site
+			// that had already declared its range, and the census reported four built arrows as uncovered.
+			const declared = declaredRange(sf, spec, site);
+			const name = ts.isShorthandPropertyAssignment(tp)
+				? tp.name.text
+				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
+					? tp.initializer.text
+					: undefined;
+			targets =
+				declared ??
+				(name ? factoryParameter(sf, node, name) : undefined) ??
+				fail(
+					site,
+					'computes its target and declares no `targetStates`. A computed range is not statically ' +
+						'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
+						'arrows it drives unaudited'
+				);
+		}
+
+		// SOURCES — `fromStates(...)` read from the precondition AT THIS LITERAL, and from nowhere else.
+		//
+		// ⚠ THE EXPRESSION THAT USED TO CLOSE THIS BLOCK WAS THE CENSUS'S OWN REG-F-114 VIOLATION (REG-F-122):
+		// `sources ?? def.transitions.filter((t) => t.to === to).map((t) => t.from)` — when no `fromStates` was
+		// readable, the walk silently substituted the MACHINE'S in-edges for the site's declaration. Measured
+		// before removal: exactly ONE of 46 sites ever reached it (`governance.ts:293`, a shorthand
+		// `precondition` bound to a factory parameter), and there the substitution happened to coincide with the
+		// callers' declared `fromStates('PROPOSED')` only because `Decision.status` has a single in-arrow to
+		// EFFECTIVE — nil arithmetic effect by luck, not by soundness. That site now declares at the literal, and
+		// this walk REFUSES rather than infers: reading a declaration cannot fabricate one; inferring a missing
+		// half can.
+		const pp = prop(spec, 'precondition');
+		if (!pp)
+			return fail(
+				site,
+				'declares no `precondition`. Every advance site names its source set with `fromStates(…)` in the ' +
+					'literal; the census reads a from-half from nowhere else (REG-F-114)'
+			);
+		if (
+			ts.isShorthandPropertyAssignment(pp) ||
+			(ts.isPropertyAssignment(pp) && ts.isIdentifier(pp.initializer))
+		)
+			return fail(
+				site,
+				'passes its `precondition` through a bare name the walk cannot see into. A `fromStates(…)` hidden ' +
+					'behind that name would leave this site read as un-narrowed and its from-half taken from the ' +
+					"machine's in-edges — a fabricated declaration (REG-F-114). Compose the precondition in this " +
+					'literal; `governance.ts:293` was this exact shape'
+			);
+		if (!ts.isPropertyAssignment(pp))
+			return fail(site, '`precondition` is not a property assignment the walk can read');
+		let call: ts.CallExpression | undefined;
+		const find = (n: ts.Node) => {
+			if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'fromStates') {
+				call ??= n;
+			}
+			ts.forEachChild(n, find);
+		};
+		find(pp.initializer);
+		if (call === undefined)
+			return fail(
+				site,
+				'declares a precondition with no readable `fromStates(…)`. The census does NOT infer a from-half ' +
+					'from STATE_MACHINES (REG-F-114) — if this command is genuinely un-narrowed by source state, ' +
+					'that is a new idiom to be taught deliberately, with its own ruling, not defaulted into'
+			);
+		let sources: string[];
+		const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
+		if (direct.length > 0) sources = direct;
+		else {
+			// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
+			const spread = call.arguments.find(ts.isSpreadElement);
+			const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
+			sources =
+				(id ? factoryParameter(sf, node, id) : undefined) ??
+				fail(
+					site,
+					'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
+						'an unreadable source list would contribute zero arrows and read as full coverage'
+				);
+		}
+
+		for (const to of targets) {
+			for (const f of sources) arrows.push({ machine, from: f, to, site });
+		}
+	};
+	visit(sf);
+	return { arrows, sites };
+}
+
 function computeDeclaredArrows(): DeclaredArrow[] {
 	const arrows: DeclaredArrow[] = [];
 	let sites = 0;
 
 	for (const file of handlerFiles()) {
 		const source = readFileSync(HANDLERS + file, 'utf8');
-		const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
-		const consts = stringConsts(sf);
-
-		const visit = (node: ts.Node): void => {
-			ts.forEachChild(node, visit);
-			if (!ts.isCallExpression(node)) return;
-			if (!ts.isIdentifier(node.expression) || !ADVANCE_PRIMITIVES.has(node.expression.text)) return;
-			const spec = node.arguments[2];
-			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
-			sites += 1;
-			const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-			const site = `${file}:${line}`;
-
-			// MACHINE
-			const mp = prop(spec, 'machine');
-			if (!mp || !ts.isPropertyAssignment(mp)) return fail(site, 'declares no `machine`');
-			const machine = ts.isStringLiteral(mp.initializer)
-				? mp.initializer.text
-				: ts.isIdentifier(mp.initializer)
-					? (consts.get(mp.initializer.text) ??
-						fail(site, `machine \`${mp.initializer.text}\` is not a top-level string const`))
-					: fail(site, 'machine is neither a string literal nor a named constant');
-			const def = STATE_MACHINES[machine];
-			if (!def) fail(site, `names machine \`${machine}\`, which transitions.data.ts does not declare`);
-
-			// TARGET — a literal/const head, or a computed one whose RANGE must be declared.
-			const tp = prop(spec, 'target');
-			if (!tp) return fail(site, 'declares no `target`');
-			let targets: string[];
-			const staticTarget =
-				ts.isPropertyAssignment(tp) && ts.isStringLiteral(tp.initializer)
-					? tp.initializer.text
-					: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
-						? consts.get(tp.initializer.text)
-						: undefined;
-			if (staticTarget !== undefined) {
-				targets = [staticTarget];
-			} else {
-				// An explicit declaration WINS over inference. Trying inference first once let it answer for a site
-				// that had already declared its range, and the census reported four built arrows as uncovered.
-				const declared = declaredRange(sf, spec, site);
-				const name = ts.isShorthandPropertyAssignment(tp)
-					? tp.name.text
-					: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
-						? tp.initializer.text
-						: undefined;
-				targets =
-					declared ??
-					(name ? factoryParameter(sf, node, name) : undefined) ??
-					fail(
-						site,
-						'computes its target and declares no `targetStates`. A computed range is not statically ' +
-							'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
-							'arrows it drives unaudited'
-					);
-			}
-
-			// SOURCES — `fromStates(...)` anywhere in the precondition. Absent is legal (a predicate-only
-			// precondition) and means the command is not narrowed by source state.
-			const pp = prop(spec, 'precondition');
-			let sources: string[] | undefined;
-			if (pp && ts.isPropertyAssignment(pp)) {
-				let call: ts.CallExpression | undefined;
-				const find = (n: ts.Node) => {
-					if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'fromStates') {
-						call ??= n;
-					}
-					ts.forEachChild(n, find);
-				};
-				find(pp.initializer);
-				if (call) {
-					const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
-					if (direct.length > 0) sources = direct;
-					else {
-						// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
-						const spread = call.arguments.find(ts.isSpreadElement);
-						const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
-						sources =
-							(id ? factoryParameter(sf, node, id) : undefined) ??
-							fail(
-								site,
-								'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
-									'an unreadable source list would contribute zero arrows and read as full coverage'
-							);
-					}
-				}
-			}
-
-			for (const to of targets) {
-				const from = sources ?? def!.transitions.filter((t) => t.to === to).map((t) => t.from);
-				for (const f of from) arrows.push({ machine, from: f, to, site });
-			}
-		};
-		visit(sf);
+		const perFile = declaredArrowsInFile(ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true));
+		arrows.push(...perFile.arrows);
+		sites += perFile.sites;
 	}
 
 	if (sites === 0) fail('extractor', 'found no advanceStatus call sites at all — it is broken');

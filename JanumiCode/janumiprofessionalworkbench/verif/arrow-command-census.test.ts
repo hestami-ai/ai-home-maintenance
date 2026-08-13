@@ -32,8 +32,9 @@
 // `transitions.data.ts`: the number improves by destroying the evidence. So the arrow TOTAL is pinned too, and
 // the failure output is the LIST — a reader must see WHICH capability is missing, not how many.
 import { readFileSync, writeFileSync } from 'node:fs';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { census, deadCovered, declaredArrows } from './arrow-command-census.js';
+import { census, deadCovered, declaredArrows, declaredArrowsInFile } from './arrow-command-census.js';
 
 /**
  * The baseline is DATA, in a committed JSON file, not a literal in this test.
@@ -129,5 +130,61 @@ describe('C-0 — every declared arrow can be performed by some command', () => 
 		expect(machines.has('Decision.status')).toBe(true);
 		// The second idiom, read from exported data rather than source.
 		expect(machines.has('ExecutionStep.stepState')).toBe(true);
+	});
+});
+
+// ── REG-F-122: THE RATCHET'S POSITIVE CASES, WHICH ONLY A SYNTHETIC SOURCE CAN HOLD ──────────────────────────
+//
+// The refusals under test had exactly ONE live instance — `governance.ts:293`, a shorthand `precondition` bound
+// to a factory parameter — and it left the repository in the same commit that made these shapes refusals. So no
+// test over the real handler tree can ever enter the failing arms again, and a guard whose positive case is
+// extinct in its population is exactly the mutant-survives-and-is-right-to hole REG-F-120 recorded. The fixtures
+// below ARE the population; `declaredArrowsInFile` is exported as a seam for precisely this reason.
+describe('REG-F-122 — a from-half the walk cannot read is REFUSED, never inferred', () => {
+	const parse = (name: string, src: string) =>
+		ts.createSourceFile(name, src, ts.ScriptTarget.ES2022, true);
+
+	it('refuses a shorthand `precondition` — the exact shape governance.ts:293 had', () => {
+		const sf = parse(
+			'fixture-shorthand.ts',
+			"advanceStatus(ctx, command, { machine: 'Decision.status', target: 'EFFECTIVE', precondition });\n"
+		);
+		expect(() => declaredArrowsInFile(sf)).toThrowError(/fixture-shorthand\.ts:1/);
+	});
+
+	it('refuses a `precondition` bound to a bare name — the same hole spelled as an assignment', () => {
+		const sf = parse(
+			'fixture-named.ts',
+			"advanceStatus(ctx, command, { machine: 'Decision.status', target: 'EFFECTIVE', precondition: pre });\n"
+		);
+		expect(() => declaredArrowsInFile(sf)).toThrowError(/fixture-named\.ts:1/);
+	});
+
+	it("refuses a precondition with no readable fromStates, instead of substituting the machine's in-edges", () => {
+		// THE ARM THE F122 MUTANT MEASURES. Under the deleted fallback this site was read as un-narrowed and
+		// handed PROPOSED -> EFFECTIVE from the machine table — one arrow, fabricated, indistinguishable in the
+		// census output from a declared one. The repo-wide pins cannot catch that resurrection (every real site
+		// declares a readable fromStates, so the fallback is dead code against the live tree); this fixture can.
+		const sf = parse(
+			'fixture-predicate-only.ts',
+			"advanceStatus(ctx, command, { machine: 'Decision.status', target: 'EFFECTIVE', precondition: predicate('x', () => null) });\n"
+		);
+		expect(() => declaredArrowsInFile(sf)).toThrowError(/fixture-predicate-only\.ts:1/);
+	});
+
+	// CONTROL — the three refusals above are all satisfied by a walk that throws on EVERYTHING, and such a walk
+	// would take the whole census down with it. This is the case that holds the READING half.
+	it('CONTROL — a fromStates declared at the literal is read exactly, not refused', () => {
+		// Two sources, deliberately: a single one would also pass under a walk that keeps only the first literal.
+		const sf = parse(
+			'fixture-declared.ts',
+			"advanceStatus(ctx, command, { machine: 'Decision.status', target: 'REVOKED', precondition: allOf(kind, fromStates('EFFECTIVE', 'PROPOSED')) });\n"
+		);
+		const { arrows, sites } = declaredArrowsInFile(sf);
+		expect(sites).toBe(1);
+		expect(arrows).toEqual([
+			{ machine: 'Decision.status', from: 'EFFECTIVE', to: 'REVOKED', site: 'fixture-declared.ts:1' },
+			{ machine: 'Decision.status', from: 'PROPOSED', to: 'REVOKED', site: 'fixture-declared.ts:1' }
+		]);
 	});
 });
