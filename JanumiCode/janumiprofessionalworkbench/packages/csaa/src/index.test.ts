@@ -9,6 +9,9 @@ import {
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
 	READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_SCHEMA_VERSION,
@@ -34,6 +37,7 @@ import {
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
 	buildCommandHandlerGraph,
+	buildGuardEnforcementLedgerArtifactSet,
 	buildReadWriteAccessGraph,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
@@ -45,11 +49,14 @@ import {
 	normalizeDependencyCruiserOutput,
 	observeStateMachineTopology,
 	observeArrowCommandCensus,
+	observeGuardEnforcementLedger,
 	selectJpwbCommandHandlerRegistries,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateCallGraph,
 	validateCommandHandlerGraph,
+	validateGuardEnforcementLedgerArtifactSet,
+	validateGuardEnforcementLedgerObservation,
 	validateReadWriteAccessGraph,
 	validateArrowCommandCensusArtifactSet,
 	validateArrowCommandCensusObservation,
@@ -72,6 +79,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
+		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
@@ -81,11 +89,14 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(normalizeDependencyCruiserOutput).toBeTypeOf('function');
 		expect(observeStateMachineTopology).toBeTypeOf('function');
 		expect(observeArrowCommandCensus).toBeTypeOf('function');
+		expect(observeGuardEnforcementLedger).toBeTypeOf('function');
 		expect(selectJpwbCommandHandlerRegistries).toBeTypeOf('function');
 		expect(validateDependencyCruiserObservation).toBeTypeOf('function');
 		expect(validateDependencyProviderComparison).toBeTypeOf('function');
 		expect(validateCallGraph).toBeTypeOf('function');
 		expect(validateCommandHandlerGraph).toBeTypeOf('function');
+		expect(validateGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
+		expect(validateGuardEnforcementLedgerObservation).toBeTypeOf('function');
 		expect(validateReadWriteAccessGraph).toBeTypeOf('function');
 		expect(validateArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(validateArrowCommandCensusObservation).toBeTypeOf('function');
@@ -131,6 +142,15 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(ARROW_COMMAND_CENSUS_PROGRESS_SCHEMA_VERSION).toBe(
 			'jan-csaa-arrow-command-census-progress/1.0.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION).toBe(
+			'jan-csaa-observe-jpwb-guard-enforcement-ledger/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-observation/1.0.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-progress/1.0.0'
 		);
 		expect(STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION).toBe(
 			'jan-csaa-observe-jpwb-state-machine-topology/0.1.0'

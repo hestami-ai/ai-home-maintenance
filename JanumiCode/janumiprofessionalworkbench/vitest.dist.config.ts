@@ -39,6 +39,12 @@ export default defineConfig({
 		// The mirror of `test:src`'s `RPH_TEST_RESOLVE: 'source'`. Declared in the config rather than plumbed through
 		// a shell variable so the flag cannot drift from the resolution it names.
 		env: { RPH_TEST_RESOLVE: 'dist' },
+		// Artifact mode runs the complete cross-project suite concurrently against emitted package exports. The
+		// Vitest 5-second defaults predate the compiler-backed CSAA fixtures and now expire during otherwise-valid
+		// scheduling contention. These are test-harness watchdogs, measured against the complete suite; they are not
+		// CSAA operation budgets, product ceilings, or SLOs.
+		hookTimeout: 60_000,
+		testTimeout: 60_000,
 		projects: projectsFor(true)
 	}
 });

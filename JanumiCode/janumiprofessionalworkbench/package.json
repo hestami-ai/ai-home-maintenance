@@ -27,7 +27,9 @@
 		"spec:obligations": "bun run scripts/spec-obligations.ts",
 		"csaa:inventory": "bun run scripts/csaa-inventory.ts --write",
 		"csaa:inventory:check": "bun run scripts/csaa-inventory.ts --check",
+		"csaa:guard-ledger:smoke": "CSAA_GUARD_LEDGER_INTEGRATION=1 vitest run --disableConsoleIntercept packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
 		"csaa:semantic:smoke": "CSAA_REPOSITORY_SMOKE=1 vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts",
+		"csaa:semantic:smoke:command-handler": "CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=COMMAND_HANDLER vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts",
 		"csaa:semantic:smoke:structural": "CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts",
 		"csaa:semantic:smoke:csaa": "CSAA_REPOSITORY_SMOKE=packages/csaa/tsconfig.json vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts"
 	},

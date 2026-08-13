@@ -15,6 +15,9 @@ import {
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_OPERATION_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REQUEST_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH,
 	DEPENDENCY_CRUISER_INVOCATION_SCHEMA_VERSION,
 	DEPENDENCY_CRUISER_ARGV_GRAMMAR_VERSION,
 	DEPENDENCY_CRUISER_PROVIDER_ID,
@@ -35,11 +38,13 @@ import {
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_REQUEST_SCHEMA_VERSION,
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
+	type ModuleDependencyGraphSnapshot,
 	type SemanticCapability,
 	type StaticSemanticSnapshotProgressEvent,
 	type ResolveSubjectRequest,
 	buildCallGraph,
 	buildCommandHandlerGraph,
+	buildCommandDispatchTopology,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
 	buildReadWriteAccessGraph,
@@ -53,11 +58,13 @@ import {
 	observeStateMachineTopology,
 	resolveSubject,
 	selectJpwbCommandHandlerRegistries,
+	selectJpwbCommandDispatchTopology,
 	sha256,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateArrowCommandCensusObservation,
 	validateCommandHandlerGraph,
+	validateCommandDispatchTopology,
 	validateModuleDependencyGraph,
 	validateReadWriteAccessGraph,
 	validateStateMachineGraph,
@@ -67,6 +74,43 @@ import {
 
 const SMOKE_SELECTOR = process.env.CSAA_REPOSITORY_SMOKE;
 type RepositorySmokeProfile = 'FULL' | 'STRUCTURAL';
+type RepositorySmokeSuite = 'COMMAND_HANDLER_ONLY' | 'FULL_SUITE';
+
+interface RepositorySmokeProjectionPlan {
+	readonly runIndependentSemanticRevalidation: boolean;
+	readonly runCallGraph: boolean;
+	readonly runDependencyProviderComparison: boolean;
+	readonly runModuleDependencyGraph: boolean;
+	readonly runReadWriteAccessGraph: boolean;
+	readonly runRepositoryDiscoveryPreflight: boolean;
+	readonly runStateMachineProjection: boolean;
+	readonly suite: RepositorySmokeSuite;
+}
+
+const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
+	Record<RepositorySmokeSuite, RepositorySmokeProjectionPlan>
+> = {
+	COMMAND_HANDLER_ONLY: {
+		runIndependentSemanticRevalidation: false,
+		runCallGraph: false,
+		runDependencyProviderComparison: false,
+		runModuleDependencyGraph: false,
+		runReadWriteAccessGraph: false,
+		runRepositoryDiscoveryPreflight: false,
+		runStateMachineProjection: false,
+		suite: 'COMMAND_HANDLER_ONLY'
+	},
+	FULL_SUITE: {
+		runIndependentSemanticRevalidation: true,
+		runCallGraph: true,
+		runDependencyProviderComparison: true,
+		runModuleDependencyGraph: true,
+		runReadWriteAccessGraph: true,
+		runRepositoryDiscoveryPreflight: true,
+		runStateMachineProjection: true,
+		suite: 'FULL_SUITE'
+	}
+};
 
 function repositorySmokeProfile(value: string | undefined): RepositorySmokeProfile {
 	if (value === undefined || value.trim() === '') return 'FULL';
@@ -75,11 +119,39 @@ function repositorySmokeProfile(value: string | undefined): RepositorySmokeProfi
 	throw new Error(`Unsupported CSAA_REPOSITORY_SMOKE_PROFILE: ${value}`);
 }
 
-const SMOKE_PROFILE = repositorySmokeProfile(process.env.CSAA_REPOSITORY_SMOKE_PROFILE);
-const SEMANTIC_CAPABILITIES: readonly SemanticCapability[] =
-	SMOKE_PROFILE === 'FULL'
+function repositorySmokeSuite(value: string | undefined): RepositorySmokeSuite {
+	if (value === undefined || value.trim() === '') return 'FULL_SUITE';
+	const normalized = value.trim().toUpperCase();
+	if (normalized === 'COMMAND_HANDLER' || normalized === 'COMMAND_HANDLER_ONLY')
+		return 'COMMAND_HANDLER_ONLY';
+	if (normalized === 'FULL' || normalized === 'FULL_SUITE') return 'FULL_SUITE';
+	throw new Error(`Unsupported CSAA_REPOSITORY_SMOKE_SUITE: ${value}`);
+}
+
+function assertRepositorySmokeSelection(
+	profile: RepositorySmokeProfile,
+	suite: RepositorySmokeSuite,
+	selector: string | undefined
+): void {
+	if (suite !== 'COMMAND_HANDLER_ONLY') return;
+	if (profile !== 'STRUCTURAL')
+		throw new Error('COMMAND_HANDLER_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.');
+	if (selector !== '1') throw new Error('COMMAND_HANDLER_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+}
+
+function semanticCapabilitiesForProfile(
+	profile: RepositorySmokeProfile
+): readonly SemanticCapability[] {
+	return profile === 'FULL'
 		? ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE']
 		: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'];
+}
+
+const SMOKE_PROFILE = repositorySmokeProfile(process.env.CSAA_REPOSITORY_SMOKE_PROFILE);
+const SMOKE_SUITE = repositorySmokeSuite(process.env.CSAA_REPOSITORY_SMOKE_SUITE);
+const SMOKE_PROJECTION_PLAN = REPOSITORY_SMOKE_PROJECTION_PLANS[SMOKE_SUITE];
+assertRepositorySmokeSelection(SMOKE_PROFILE, SMOKE_SUITE, SMOKE_SELECTOR);
+const SEMANTIC_CAPABILITIES = semanticCapabilitiesForProfile(SMOKE_PROFILE);
 const RUN_REPOSITORY_SMOKE =
 	SMOKE_SELECTOR !== undefined && SMOKE_SELECTOR !== '' && SMOKE_SELECTOR !== '0';
 // Provisional runaway guards required by the budgeted APIs and test runner for this opt-in
@@ -127,17 +199,21 @@ const SELECTED_PROJECTS =
 			: SMOKE_SELECTOR.split(',')
 					.map((path) => path.trim())
 					.filter((path) => path.length > 0);
-const USE_COMMON_STRUCTURAL_SUBJECT =
+const USE_COMMON_COMMAND_HANDLER_SUBJECT =
 	SMOKE_PROFILE === 'STRUCTURAL' &&
 	SELECTED_PROJECTS !== null &&
 	SELECTED_PROJECTS.length === COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS.length &&
 	COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS.every(
 		(path, index) => SELECTED_PROJECTS[index] === path
 	);
+const COMMAND_ANALYSIS_RETAINED_ARTIFACTS = [
+	...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+	COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH
+] as const;
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.0.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.1.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -146,6 +222,7 @@ type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE'
 	| 'CALL_GRAPH'
 	| 'COMMAND_HANDLER_STATIC_PROJECTION'
+	| 'COMMAND_DISPATCH_STATIC_TOPOLOGY'
 	| 'DEPENDENCY_CRUISER_EXECUTION'
 	| 'DEPENDENCY_CRUISER_NORMALIZATION'
 	| 'DEPENDENCY_PROVIDER_COMPARISON'
@@ -216,6 +293,7 @@ function createRepositorySmokeTelemetry(
 	let ended = false;
 	const completed: Array<{ readonly durationMs: number; readonly phase: RepositorySmokePhase }> =
 		[];
+	const skipped: RepositorySmokePhase[] = [];
 	const emit = (event: Readonly<Record<string, unknown>>): void => {
 		write(
 			`${JSON.stringify({ schemaVersion: REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION, sequence, ...event })}\n`
@@ -299,6 +377,7 @@ function createRepositorySmokeTelemetry(
 				throw new Error(`Repository smoke phase ${active.name} is still active.`);
 			if (ended) throw new Error('Repository smoke telemetry has already ended.');
 			const skippedAt = readTimes();
+			skipped.push(name);
 			emit({
 				details: skipDetails,
 				durationMs: 0,
@@ -308,6 +387,9 @@ function createRepositorySmokeTelemetry(
 				state: 'SKIPPED',
 				timestamp: new Date(skippedAt.wallMs).toISOString()
 			});
+		},
+		skippedPhases(): readonly RepositorySmokePhase[] {
+			return [...skipped];
 		},
 		start(name: RepositorySmokePhase, phaseDetails: Readonly<Record<string, unknown>> = {}): void {
 			if (active !== null)
@@ -369,6 +451,65 @@ describe('repository smoke phase telemetry', () => {
 		expect(() => repositorySmokeProfile('unknown')).toThrow(
 			'Unsupported CSAA_REPOSITORY_SMOKE_PROFILE: unknown'
 		);
+		expect(repositorySmokeSuite(undefined)).toBe('FULL_SUITE');
+		expect(repositorySmokeSuite('')).toBe('FULL_SUITE');
+		expect(repositorySmokeSuite(' command_handler ')).toBe('COMMAND_HANDLER_ONLY');
+		expect(repositorySmokeSuite(' command_handler_only ')).toBe('COMMAND_HANDLER_ONLY');
+		expect(repositorySmokeSuite(' full ')).toBe('FULL_SUITE');
+		expect(repositorySmokeSuite(' full_suite ')).toBe('FULL_SUITE');
+		expect(() => repositorySmokeSuite('unknown')).toThrow(
+			'Unsupported CSAA_REPOSITORY_SMOKE_SUITE: unknown'
+		);
+		expect(() => assertRepositorySmokeSelection('FULL', 'COMMAND_HANDLER_ONLY', '1')).toThrow(
+			'COMMAND_HANDLER_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.'
+		);
+		for (const selector of [undefined, '', '0', 'all', ' 1 '])
+			expect(() =>
+				assertRepositorySmokeSelection('STRUCTURAL', 'COMMAND_HANDLER_ONLY', selector)
+			).toThrow('COMMAND_HANDLER_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'COMMAND_HANDLER_ONLY', '1')
+		).not.toThrow();
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.COMMAND_HANDLER_ONLY).toEqual({
+			runIndependentSemanticRevalidation: false,
+			runCallGraph: false,
+			runDependencyProviderComparison: false,
+			runModuleDependencyGraph: false,
+			runReadWriteAccessGraph: false,
+			runRepositoryDiscoveryPreflight: false,
+			runStateMachineProjection: false,
+			suite: 'COMMAND_HANDLER_ONLY'
+		});
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.FULL_SUITE).toEqual({
+			runIndependentSemanticRevalidation: true,
+			runCallGraph: true,
+			runDependencyProviderComparison: true,
+			runModuleDependencyGraph: true,
+			runReadWriteAccessGraph: true,
+			runRepositoryDiscoveryPreflight: true,
+			runStateMachineProjection: true,
+			suite: 'FULL_SUITE'
+		});
+		expect(semanticCapabilitiesForProfile('STRUCTURAL')).toEqual([
+			'TS_PROJECT',
+			'TS_SYMBOL',
+			'TS_SYNTAX'
+		]);
+		expect(semanticCapabilitiesForProfile('FULL')).toEqual([
+			'TS_PROJECT',
+			'TS_SYMBOL',
+			'TS_SYNTAX',
+			'TS_TYPE'
+		]);
+		expect(COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS).toEqual([
+			'packages/rph-application/tsconfig.json',
+			'packages/rph-assurance/tsconfig.json',
+			'packages/rph-contracts/tsconfig.json',
+			'packages/rph-domain/tsconfig.json',
+			'packages/rph-persistence/tsconfig.json',
+			'packages/rph-ports/tsconfig.json',
+			'packages/rph-projections/tsconfig.json'
+		]);
 	});
 
 	it('emits ordered structured run and phase progress with independent phase durations', () => {
@@ -383,7 +524,10 @@ describe('repository smoke phase telemetry', () => {
 		);
 		telemetry.start('CALL_GRAPH', { callSites: 7 });
 		telemetry.complete({ edges: 9 });
-		telemetry.skip('STATE_MACHINE_GRAPH_PROJECTION', { reason: 'artifact absent' });
+		telemetry.skip('STATE_MACHINE_GRAPH_PROJECTION', {
+			reason: 'artifact absent',
+			reasonCode: 'STATE_MACHINE_ARTIFACT_ABSENT'
+		});
 		telemetry.finish({ outcome: 'partial' });
 		const events = lines.map((line) => JSON.parse(line) as Record<string, any>);
 		expect(events.map((event) => [event.event, event.state, event.phase ?? null])).toEqual([
@@ -394,10 +538,29 @@ describe('repository smoke phase telemetry', () => {
 			['CSAA_REPOSITORY_SMOKE_RUN', 'COMPLETED', null]
 		]);
 		expect(events[2]).toMatchObject({ durationMs: 30, runElapsedMs: 40 });
+		expect(events[3]).toMatchObject({
+			details: { reasonCode: 'STATE_MACHINE_ARTIFACT_ABSENT' },
+			durationMs: 0
+		});
 		expect(events[4]!.phaseDurationsMs).toEqual({ CALL_GRAPH: 30 });
+		expect(telemetry.phaseDurationsMs()).toEqual({ CALL_GRAPH: 30 });
+		expect(telemetry.skippedPhases()).toEqual(['STATE_MACHINE_GRAPH_PROJECTION']);
 		expect(
 			events.every((event) => event.schemaVersion === REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION)
 		).toBe(true);
+	});
+
+	it('rejects skip operations that would obscure an active or ended run state', () => {
+		const telemetry = createRepositorySmokeTelemetry({}, { write: () => undefined });
+		telemetry.start('CALL_GRAPH');
+		expect(() => telemetry.skip('MODULE_DEPENDENCY_GRAPH', {})).toThrow(
+			'Repository smoke phase CALL_GRAPH is still active.'
+		);
+		telemetry.complete();
+		telemetry.finish();
+		expect(() => telemetry.skip('MODULE_DEPENDENCY_GRAPH', {})).toThrow(
+			'Repository smoke telemetry has already ended.'
+		);
 	});
 
 	it('records the active failure phase and reuses the same error in the run terminal event', () => {
@@ -446,14 +609,16 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					},
 					testDurationMs: REPOSITORY_SMOKE_FAILSAFE_TEST_TIMEOUT_MS
 				},
+				projectionPlan: SMOKE_PROJECTION_PLAN,
 				selectedProjects: SELECTED_PROJECTS ?? ['<repository>'],
 				semanticCapabilities: SEMANTIC_CAPABILITIES,
 				semanticProfile: SMOKE_PROFILE,
+				smokeSuite: SMOKE_SUITE,
 				selector: SMOKE_SELECTOR ?? null
 			});
 			try {
 				let repositorySubjectOutcome: ReturnType<typeof resolveSmokeSubject> | null = null;
-				if (SELECTED_PROJECTS !== null) {
+				if (SELECTED_PROJECTS !== null && SMOKE_PROJECTION_PLAN.runRepositoryDiscoveryPreflight) {
 					telemetry.start('REPOSITORY_DISCOVERY_PREFLIGHT', {
 						requiredProjects: SELECTED_PROJECTS
 					});
@@ -470,7 +635,14 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					telemetry.complete({ discoveredProjects: discoveredProjectPaths.length });
 				} else
 					telemetry.skip('REPOSITORY_DISCOVERY_PREFLIGHT', {
-						reason: 'Repository scope is already the selected subject.'
+						reason:
+							SELECTED_PROJECTS === null
+								? 'Repository scope is already the selected subject.'
+								: 'The selected smoke suite resolves its exact explicit-project subject directly.',
+						reasonCode:
+							SELECTED_PROJECTS === null
+								? 'REPOSITORY_SCOPE_ALREADY_SELECTED'
+								: 'SUITE_PHASE_NOT_REQUESTED'
 					});
 				telemetry.start('SELECTED_SUBJECT_RESOLUTION', {
 					scope: SELECTED_PROJECTS === null ? 'REPOSITORY' : 'EXPLICIT_PROJECTS'
@@ -479,8 +651,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					SELECTED_PROJECTS === null
 						? { kind: 'REPOSITORY' }
 						: {
-								...(USE_COMMON_STRUCTURAL_SUBJECT
-									? { additionalArtifacts: ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS }
+								...(USE_COMMON_COMMAND_HANDLER_SUBJECT
+									? { additionalArtifacts: COMMAND_ANALYSIS_RETAINED_ARTIFACTS }
 									: {}),
 								kind: 'EXPLICIT_PROJECTS',
 								projects: SELECTED_PROJECTS
@@ -596,23 +768,6 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					progressEvents: semanticProgressEvents.length,
 					sources: snapshot.sources.length
 				});
-				telemetry.start('STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE', {
-					semanticSnapshotId: snapshot.id
-				});
-				expect(
-					validateStaticSemanticSnapshot(
-						snapshot,
-						{
-							maxDepth: 4_096,
-							maxDiagnostics: snapshot.budgets.maxDiagnostics,
-							maxIssues: 100_000,
-							maxRecords: snapshot.budgets.maxSnapshotBytes,
-							maxReferenceChecks: snapshot.budgets.maxSnapshotBytes,
-							maxStringCharacters: snapshot.budgets.maxSnapshotBytes
-						},
-						{ frozenSubject: subject }
-					)
-				).toEqual({ issues: [], state: 'VALID' });
 				expect(snapshot.projects).toHaveLength(subject.projects.length);
 				expect(snapshot.programs).toHaveLength(subject.projects.length);
 				expect(snapshot.sources.length).toBeGreaterThan(0);
@@ -624,55 +779,136 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				expect(snapshot.references.length).toBeGreaterThan(0);
 				expect(snapshot.moduleResolutions.length).toBeGreaterThan(0);
 				expect(snapshot.moduleExports.length).toBeGreaterThan(0);
-				const canonicalWitness = canonicalSemanticJsonWitness(snapshot);
-				expect(canonicalWitness.bytes).toBeLessThanOrEqual(snapshot.budgets.maxSnapshotBytes);
-				expect(canonicalWitness.sha256).toMatch(/^[a-f0-9]{64}$/u);
-				telemetry.complete({
-					bytes: canonicalWitness.bytes,
-					sha256: canonicalWitness.sha256,
-					validationState: 'VALID'
-				});
+				const completedInternalSemanticPhases = new Set(
+					semanticProgressEvents
+						.filter((event) => event.state === 'COMPLETED')
+						.map((event) => event.phase)
+				);
+				for (const requiredPhase of ['SERIALIZE', 'VALIDATE', 'FINALIZE'] as const)
+					expect(completedInternalSemanticPhases.has(requiredPhase)).toBe(true);
+				const internalSerializeEvent = semanticProgressEvents.find(
+					(event) => event.phase === 'SERIALIZE' && event.state === 'COMPLETED'
+				);
+				if (internalSerializeEvent === undefined)
+					throw new Error('The semantic builder did not report a completed SERIALIZE phase.');
+				let semanticSnapshotWitness: {
+					readonly bytes: number;
+					readonly sha256: string | null;
+					readonly validationMode: 'BUILDER_INTERNAL' | 'INDEPENDENT_REVALIDATION';
+				} = {
+					bytes: internalSerializeEvent.counts.canonicalBytes,
+					sha256: null,
+					validationMode: 'BUILDER_INTERNAL'
+				};
+				expect(semanticSnapshotWitness.bytes).toBeGreaterThan(0);
+				expect(semanticSnapshotWitness.bytes).toBeLessThanOrEqual(
+					snapshot.budgets.maxSnapshotBytes
+				);
+				if (SMOKE_PROJECTION_PLAN.runIndependentSemanticRevalidation) {
+					telemetry.start('STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE', {
+						semanticSnapshotId: snapshot.id
+					});
+					expect(
+						validateStaticSemanticSnapshot(
+							snapshot,
+							{
+								maxDepth: 4_096,
+								maxDiagnostics: snapshot.budgets.maxDiagnostics,
+								maxIssues: 100_000,
+								maxRecords: snapshot.budgets.maxSnapshotBytes,
+								maxReferenceChecks: snapshot.budgets.maxSnapshotBytes,
+								maxStringCharacters: snapshot.budgets.maxSnapshotBytes
+							},
+							{ frozenSubject: subject }
+						)
+					).toEqual({ issues: [], state: 'VALID' });
+					const canonicalWitness = canonicalSemanticJsonWitness(snapshot);
+					expect(canonicalWitness.bytes).toBeLessThanOrEqual(snapshot.budgets.maxSnapshotBytes);
+					expect(canonicalWitness.sha256).toMatch(/^[a-f0-9]{64}$/u);
+					expect(canonicalWitness.bytes).toBe(semanticSnapshotWitness.bytes);
+					semanticSnapshotWitness = {
+						...canonicalWitness,
+						validationMode: 'INDEPENDENT_REVALIDATION'
+					};
+					telemetry.complete({
+						bytes: canonicalWitness.bytes,
+						sha256: canonicalWitness.sha256,
+						validationState: 'VALID'
+					});
+				} else
+					telemetry.skip('STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE', {
+						builderCompletedPhases: ['SERIALIZE', 'VALIDATE', 'FINALIZE'],
+						canonicalBytes: semanticSnapshotWitness.bytes,
+						reason:
+							'The semantic builder already serialized, validated, and finalized the accepted snapshot against the frozen subject.',
+						reasonCode: 'VALIDATED_IN_BUILD_PIPELINE'
+					});
 				const semanticPipelineDurationMs = Math.max(
 					0,
 					Math.round(performance.now() - semanticPipelineStartedAt)
 				);
-				const graphStartedAt = performance.now();
-				telemetry.start('MODULE_DEPENDENCY_GRAPH', {
-					moduleResolutions: snapshot.moduleResolutions.length,
-					sources: snapshot.sources.length
-				});
-				const graphOutcome = buildModuleDependencyGraph(
-					{
-						operationVersion: MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
-						schemaVersion: MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION,
-						semanticSnapshotId: snapshot.id,
-						subjectId: snapshot.subjectId
-					},
-					snapshot
-				);
-				expect(['complete', 'partial'], JSON.stringify(graphOutcome)).toContain(
-					graphOutcome.outcome
-				);
-				if (graphOutcome.outcome === 'unavailable') throw new Error(JSON.stringify(graphOutcome));
-				const graph = graphOutcome.graph;
-				expect(validateModuleDependencyGraph(graph, snapshot)).toEqual({
-					issues: [],
-					state: 'VALID'
-				});
-				expect(graph.coverage.reconciles).toBe(true);
-				expect(graph.coverage.representedSources).toBe(snapshot.sources.length);
-				expect(graph.coverage.representedModuleResolutions).toBe(snapshot.moduleResolutions.length);
-				expect(graph.edges).toHaveLength(snapshot.moduleResolutions.length);
-				const graphWitness = canonicalSemanticJsonWitness(graph);
-				telemetry.complete({
-					bytes: graphWitness.bytes,
-					edges: graph.edges.length,
-					health: graph.health,
-					nodes: graph.nodes.length,
-					outcome: graphOutcome.outcome,
-					validationState: 'VALID'
-				});
-				const graphDurationMs = Math.max(0, Math.round(performance.now() - graphStartedAt));
+				let moduleDependencyGraph: ModuleDependencyGraphSnapshot | null = null;
+				let moduleDependencyGraphResult: null | {
+					readonly bytes: number;
+					readonly durationMs: number;
+					readonly edges: number;
+					readonly health: string;
+					readonly nodes: number;
+					readonly sha256: string;
+				} = null;
+				if (SMOKE_PROJECTION_PLAN.runModuleDependencyGraph) {
+					const graphStartedAt = performance.now();
+					telemetry.start('MODULE_DEPENDENCY_GRAPH', {
+						moduleResolutions: snapshot.moduleResolutions.length,
+						sources: snapshot.sources.length
+					});
+					const graphOutcome = buildModuleDependencyGraph(
+						{
+							operationVersion: MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
+							schemaVersion: MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: snapshot.subjectId
+						},
+						snapshot
+					);
+					expect(['complete', 'partial'], JSON.stringify(graphOutcome)).toContain(
+						graphOutcome.outcome
+					);
+					if (graphOutcome.outcome === 'unavailable') throw new Error(JSON.stringify(graphOutcome));
+					const graph = graphOutcome.graph;
+					expect(validateModuleDependencyGraph(graph, snapshot)).toEqual({
+						issues: [],
+						state: 'VALID'
+					});
+					expect(graph.coverage.reconciles).toBe(true);
+					expect(graph.coverage.representedSources).toBe(snapshot.sources.length);
+					expect(graph.coverage.representedModuleResolutions).toBe(
+						snapshot.moduleResolutions.length
+					);
+					expect(graph.edges).toHaveLength(snapshot.moduleResolutions.length);
+					const graphWitness = canonicalSemanticJsonWitness(graph);
+					telemetry.complete({
+						bytes: graphWitness.bytes,
+						edges: graph.edges.length,
+						health: graph.health,
+						nodes: graph.nodes.length,
+						outcome: graphOutcome.outcome,
+						validationState: 'VALID'
+					});
+					moduleDependencyGraph = graph;
+					moduleDependencyGraphResult = {
+						bytes: graphWitness.bytes,
+						durationMs: Math.max(0, Math.round(performance.now() - graphStartedAt)),
+						edges: graph.edges.length,
+						health: graph.health,
+						nodes: graph.nodes.length,
+						sha256: graphWitness.sha256
+					};
+				} else
+					telemetry.skip('MODULE_DEPENDENCY_GRAPH', {
+						reason: 'The selected smoke suite does not request the module-dependency projection.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
 				let callGraphResult: null | {
 					readonly bytes: number;
 					readonly candidateSetCallSites: number;
@@ -683,7 +919,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly unresolvedCallSites: number;
 					readonly unsupportedCallSites: number;
 				} = null;
-				if (SEMANTIC_CAPABILITIES.includes('TS_TYPE')) {
+				if (SMOKE_PROJECTION_PLAN.runCallGraph && SEMANTIC_CAPABILITIES.includes('TS_TYPE')) {
 					const callGraphStartedAt = performance.now();
 					telemetry.start('CALL_GRAPH', { callSites: snapshot.invocations.length });
 					const callGraphOutcome = buildCallGraph(
@@ -728,82 +964,115 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					};
 				} else
 					telemetry.skip('CALL_GRAPH', {
-						reason:
-							'The structural profile does not request TS_TYPE; the current call-graph contract requires it.',
-						reasonCode: 'TS_TYPE_NOT_REQUESTED'
+						reason: SMOKE_PROJECTION_PLAN.runCallGraph
+							? 'The structural profile does not request TS_TYPE; the current call-graph contract requires it.'
+							: 'The selected smoke suite does not request the call-graph projection.',
+						reasonCode: SMOKE_PROJECTION_PLAN.runCallGraph
+							? 'TS_TYPE_NOT_REQUESTED'
+							: 'SUITE_PHASE_NOT_REQUESTED'
 					});
-				const readWriteAccessGraphStartedAt = performance.now();
-				const readWriteAccessMaxAccesses = Math.max(
-					1,
-					snapshot.references.length + snapshot.declarations.length
-				);
-				const readWriteAccessMaxFrontiers = Math.max(
-					1,
-					snapshot.references.length + snapshot.assignments.length
-				);
-				const readWriteAccessBudgets = {
-					maxAccesses: readWriteAccessMaxAccesses,
-					maxEdges: Math.max(1, readWriteAccessMaxAccesses * 2),
-					maxFrontiers: readWriteAccessMaxFrontiers,
-					maxNodes: Math.max(1, readWriteAccessMaxAccesses * 2 + readWriteAccessMaxFrontiers)
-				};
-				telemetry.start('READ_WRITE_ACCESS_GRAPH', {
-					assignments: snapshot.assignments.length,
-					budgets: readWriteAccessBudgets,
-					declarations: snapshot.declarations.length,
-					references: snapshot.references.length,
-					symbols: snapshot.symbols.length
-				});
-				const readWriteAccessOutcome = buildReadWriteAccessGraph(
-					{
+				let readWriteAccessGraphResult: null | {
+					readonly accesses: number;
+					readonly bytes: number;
+					readonly durationMs: number;
+					readonly edges: number;
+					readonly frontiers: number;
+					readonly id: string;
+					readonly nodes: number;
+					readonly reads: number;
+					readonly readWrites: number;
+					readonly sha256: string;
+					readonly symbolSlots: number;
+					readonly writes: number;
+				} = null;
+				if (SMOKE_PROJECTION_PLAN.runReadWriteAccessGraph) {
+					const readWriteAccessGraphStartedAt = performance.now();
+					const readWriteAccessMaxAccesses = Math.max(
+						1,
+						snapshot.references.length + snapshot.declarations.length
+					);
+					const readWriteAccessMaxFrontiers = Math.max(
+						1,
+						snapshot.references.length + snapshot.assignments.length
+					);
+					const readWriteAccessBudgets = {
+						maxAccesses: readWriteAccessMaxAccesses,
+						maxEdges: Math.max(1, readWriteAccessMaxAccesses * 2),
+						maxFrontiers: readWriteAccessMaxFrontiers,
+						maxNodes: Math.max(1, readWriteAccessMaxAccesses * 2 + readWriteAccessMaxFrontiers)
+					};
+					telemetry.start('READ_WRITE_ACCESS_GRAPH', {
+						assignments: snapshot.assignments.length,
 						budgets: readWriteAccessBudgets,
-						operationVersion: READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
-						schemaVersion: READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
-						semanticSnapshotId: snapshot.id,
-						subjectId: snapshot.subjectId
-					},
-					snapshot
-				);
-				expect(
-					readWriteAccessOutcome.outcome,
-					JSON.stringify(readWriteAccessOutcome.diagnostics)
-				).toBe('partial');
-				if (readWriteAccessOutcome.outcome === 'unavailable')
-					throw new Error(JSON.stringify(readWriteAccessOutcome));
-				const readWriteAccessGraph = readWriteAccessOutcome.graph;
-				expect(
-					validateReadWriteAccessGraph(readWriteAccessGraph, snapshot, {
-						maxIssues: 100_000,
-						maxRecords: snapshot.budgets.maxSnapshotBytes,
-						maxStringCharacters: snapshot.budgets.maxSnapshotBytes
-					})
-				).toEqual({
-					issues: [],
-					state: 'VALID'
-				});
-				expect(readWriteAccessGraph.coverage.reconciles).toBe(true);
-				expect(readWriteAccessGraph.coverage.closure).toBe('OPEN');
-				expect(readWriteAccessGraph.fullJanCsaaCapability007DataFlow).toBe(
-					FULL_JAN_CSAA_CAPABILITY_007_DATA_FLOW
-				);
-				const readWriteAccessGraphWitness = canonicalSemanticJsonWitness(readWriteAccessGraph);
-				telemetry.complete({
-					accesses: readWriteAccessGraph.coverage.accessOccurrences,
-					bytes: readWriteAccessGraphWitness.bytes,
-					edges: readWriteAccessGraph.edges.length,
-					frontiers: readWriteAccessGraph.coverage.frontierNodes,
-					nodes: readWriteAccessGraph.nodes.length,
-					outcome: readWriteAccessOutcome.outcome,
-					reads: readWriteAccessGraph.coverage.readAccesses,
-					readWrites: readWriteAccessGraph.coverage.readWriteAccesses,
-					symbolSlots: readWriteAccessGraph.coverage.symbolSlots,
-					validationState: 'VALID',
-					writes: readWriteAccessGraph.coverage.writeAccesses
-				});
-				const readWriteAccessGraphDurationMs = Math.max(
-					0,
-					Math.round(performance.now() - readWriteAccessGraphStartedAt)
-				);
+						declarations: snapshot.declarations.length,
+						references: snapshot.references.length,
+						symbols: snapshot.symbols.length
+					});
+					const readWriteAccessOutcome = buildReadWriteAccessGraph(
+						{
+							budgets: readWriteAccessBudgets,
+							operationVersion: READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
+							schemaVersion: READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: snapshot.subjectId
+						},
+						snapshot
+					);
+					expect(
+						readWriteAccessOutcome.outcome,
+						JSON.stringify(readWriteAccessOutcome.diagnostics)
+					).toBe('partial');
+					if (readWriteAccessOutcome.outcome === 'unavailable')
+						throw new Error(JSON.stringify(readWriteAccessOutcome));
+					const readWriteAccessGraph = readWriteAccessOutcome.graph;
+					expect(
+						validateReadWriteAccessGraph(readWriteAccessGraph, snapshot, {
+							maxIssues: 100_000,
+							maxRecords: snapshot.budgets.maxSnapshotBytes,
+							maxStringCharacters: snapshot.budgets.maxSnapshotBytes
+						})
+					).toEqual({
+						issues: [],
+						state: 'VALID'
+					});
+					expect(readWriteAccessGraph.coverage.reconciles).toBe(true);
+					expect(readWriteAccessGraph.coverage.closure).toBe('OPEN');
+					expect(readWriteAccessGraph.fullJanCsaaCapability007DataFlow).toBe(
+						FULL_JAN_CSAA_CAPABILITY_007_DATA_FLOW
+					);
+					const readWriteAccessGraphWitness = canonicalSemanticJsonWitness(readWriteAccessGraph);
+					telemetry.complete({
+						accesses: readWriteAccessGraph.coverage.accessOccurrences,
+						bytes: readWriteAccessGraphWitness.bytes,
+						edges: readWriteAccessGraph.edges.length,
+						frontiers: readWriteAccessGraph.coverage.frontierNodes,
+						nodes: readWriteAccessGraph.nodes.length,
+						outcome: readWriteAccessOutcome.outcome,
+						reads: readWriteAccessGraph.coverage.readAccesses,
+						readWrites: readWriteAccessGraph.coverage.readWriteAccesses,
+						symbolSlots: readWriteAccessGraph.coverage.symbolSlots,
+						validationState: 'VALID',
+						writes: readWriteAccessGraph.coverage.writeAccesses
+					});
+					readWriteAccessGraphResult = {
+						accesses: readWriteAccessGraph.coverage.accessOccurrences,
+						bytes: readWriteAccessGraphWitness.bytes,
+						durationMs: Math.max(0, Math.round(performance.now() - readWriteAccessGraphStartedAt)),
+						edges: readWriteAccessGraph.edges.length,
+						frontiers: readWriteAccessGraph.coverage.frontierNodes,
+						id: readWriteAccessGraph.id,
+						nodes: readWriteAccessGraph.nodes.length,
+						reads: readWriteAccessGraph.coverage.readAccesses,
+						readWrites: readWriteAccessGraph.coverage.readWriteAccesses,
+						sha256: readWriteAccessGraphWitness.sha256,
+						symbolSlots: readWriteAccessGraph.coverage.symbolSlots,
+						writes: readWriteAccessGraph.coverage.writeAccesses
+					};
+				} else
+					telemetry.skip('READ_WRITE_ACCESS_GRAPH', {
+						reason: 'The selected smoke suite does not request the read/write-access projection.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
 				const stateMachineArtifact = subject.artifacts.find(
 					(artifact) => artifact.path === 'packages/rph-domain/src/transitions.data.ts'
 				);
@@ -817,7 +1086,15 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly states: number;
 					readonly transitions: number;
 				} = null;
-				if (stateMachineArtifact !== undefined) {
+				if (!SMOKE_PROJECTION_PLAN.runStateMachineProjection) {
+					const skipDetails = {
+						reason:
+							'The independent state-machine projection is not required by the command-handler graph contract.',
+						reasonCode: 'NOT_REQUIRED_BY_COMMAND_HANDLER_CONTRACT'
+					};
+					telemetry.skip('STATE_MACHINE_TOPOLOGY_OBSERVATION', skipDetails);
+					telemetry.skip('STATE_MACHINE_GRAPH_PROJECTION', skipDetails);
+				} else if (stateMachineArtifact !== undefined) {
 					const stateMachineStartedAt = performance.now();
 					const populationBudget = Math.max(1, stateMachineArtifact.bytes);
 					telemetry.start('STATE_MACHINE_TOPOLOGY_OBSERVATION', {
@@ -944,26 +1221,33 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					};
 				} else {
 					const skipDetails = {
-						reason: 'Selected subject does not contain packages/rph-domain/src/transitions.data.ts.'
+						reason:
+							'Selected subject does not contain packages/rph-domain/src/transitions.data.ts.',
+						reasonCode: 'STATE_MACHINE_ARTIFACT_ABSENT'
 					};
 					telemetry.skip('STATE_MACHINE_TOPOLOGY_OBSERVATION', skipDetails);
 					telemetry.skip('STATE_MACHINE_GRAPH_PROJECTION', skipDetails);
 				}
 
 				telemetry.start('ARROW_COMMAND_CENSUS_SUBJECT_SELECTION', {
-					reusedRepositoryPreflight: SELECTED_PROJECTS !== null && !USE_COMMON_STRUCTURAL_SUBJECT,
-					reusedSelectedSubject: SELECTED_PROJECTS === null || USE_COMMON_STRUCTURAL_SUBJECT,
-					scope: USE_COMMON_STRUCTURAL_SUBJECT
+					reusedRepositoryPreflight:
+						SELECTED_PROJECTS !== null && !USE_COMMON_COMMAND_HANDLER_SUBJECT,
+					reusedSelectedSubject: SELECTED_PROJECTS === null || USE_COMMON_COMMAND_HANDLER_SUBJECT,
+					scope: USE_COMMON_COMMAND_HANDLER_SUBJECT
 						? 'EXPLICIT_PROJECTS_WITH_AUXILIARY_EVIDENCE'
 						: 'REPOSITORY'
 				});
 				let arrowSubject = subject;
-				if (SELECTED_PROJECTS !== null && !USE_COMMON_STRUCTURAL_SUBJECT) {
+				if (SELECTED_PROJECTS !== null && !USE_COMMON_COMMAND_HANDLER_SUBJECT) {
 					if (repositorySubjectOutcome?.outcome !== 'resolved')
 						throw new Error(
 							'Repository preflight subject is unavailable for arrow-command census.'
 						);
 					arrowSubject = repositorySubjectOutcome.subject;
+				}
+				if (SMOKE_SUITE === 'COMMAND_HANDLER_ONLY') {
+					expect(arrowSubject).toBe(subject);
+					expect(arrowSubject.descriptor.subjectId).toBe(snapshot.subjectId);
 				}
 				const arrowSubjectBytes = arrowSubject.artifacts.reduce(
 					(total, artifact) => total + artifact.bytes,
@@ -973,8 +1257,9 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					artifactBytes: arrowSubjectBytes,
 					artifacts: arrowSubject.artifacts.length,
 					projects: arrowSubject.projects.length,
-					reusedSelectedSubject: SELECTED_PROJECTS === null || USE_COMMON_STRUCTURAL_SUBJECT,
-					reusedRepositoryPreflight: SELECTED_PROJECTS !== null && !USE_COMMON_STRUCTURAL_SUBJECT,
+					reusedSelectedSubject: SELECTED_PROJECTS === null || USE_COMMON_COMMAND_HANDLER_SUBJECT,
+					reusedRepositoryPreflight:
+						SELECTED_PROJECTS !== null && !USE_COMMON_COMMAND_HANDLER_SUBJECT,
 					subjectId: arrowSubject.descriptor.subjectId
 				});
 
@@ -1002,6 +1287,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				if (artifactSetOutcome.outcome !== 'complete')
 					throw new Error(JSON.stringify(artifactSetOutcome));
 				const arrowArtifactSet = artifactSetOutcome.artifactSet;
+				expect(arrowArtifactSet.subjectId).toBe(arrowSubject.descriptor.subjectId);
 				const arrowArtifactBytes = arrowArtifactSet.artifacts.reduce(
 					(total, artifact) => total + artifact.bytes,
 					0
@@ -1063,6 +1349,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 				if (arrowOutcome.outcome !== 'complete' && arrowOutcome.outcome !== 'partial')
 					throw new Error(JSON.stringify(arrowOutcome));
 				const arrowObservation = arrowOutcome.observation;
+				expect(arrowObservation.subjectId).toBe(arrowSubject.descriptor.subjectId);
+				expect(arrowObservation.artifactSet.id).toBe(arrowArtifactSet.id);
 				const externalModuleBytes = arrowObservation.executor.externalModules.reduce(
 					(total, module) => total + module.bytes,
 					0
@@ -1121,6 +1409,14 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly frontiers: number;
 					readonly handlerRegistryEntries: number;
 					readonly nodes: number;
+				} = null;
+				let commandDispatchTopologyResult: null | {
+					readonly bytes: number;
+					readonly candidateEdges: number;
+					readonly durationMs: number;
+					readonly nodes: number;
+					readonly pipelineFacts: number;
+					readonly retainedCensusBytes: number;
 				} = null;
 				if (snapshot.subjectId === arrowObservation.subjectId) {
 					const commandHandlerStartedAt = performance.now();
@@ -1196,8 +1492,23 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						)
 					).toEqual({ issues: [], state: 'VALID' });
 					expect(commandHandlerGraph.coverage.reconciles).toBe(true);
+					expect(commandHandlerGraph.coverage.commandRegistryClosure).toBe('CLOSED');
 					expect(commandHandlerGraph.coverage.discoveredCommandRegistryEntries).toBeGreaterThan(0);
 					expect(commandHandlerGraph.coverage.discoveredHandlerRegistryEntries).toBeGreaterThan(0);
+					expect(commandHandlerGraph.coverage.missingHandlerRegistrations).toBe(0);
+					expect(commandHandlerGraph.coverage.undeclaredHandlerRegistrations).toBe(0);
+					expect(commandHandlerGraph.coverage.representedCommandRegistryEntries).toBe(
+						commandHandlerGraph.coverage.discoveredCommandRegistryEntries
+					);
+					expect(commandHandlerGraph.coverage.representedHandlerRegistryEntries).toBe(
+						commandHandlerGraph.coverage.discoveredHandlerRegistryEntries
+					);
+					expect(commandHandlerGraph.coverage.representedArrowSites).toBe(
+						commandHandlerGraph.coverage.discoveredArrowSites
+					);
+					expect(commandHandlerGraph.coverage.representedArrowOccurrences).toBe(
+						commandHandlerGraph.coverage.discoveredArrowOccurrences
+					);
 					expect(commandHandlerGraph.runtimeDispatchClosure).toBe('NOT_CLAIMED');
 					expect(commandHandlerGraph.runtimePerformability).toBe('NOT_CLAIMED');
 					telemetry.complete({
@@ -1222,214 +1533,395 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						handlerRegistryEntries: commandHandlerGraph.coverage.discoveredHandlerRegistryEntries,
 						nodes: commandHandlerGraph.nodes.length
 					};
-				} else
-					telemetry.skip('COMMAND_HANDLER_STATIC_PROJECTION', {
+
+					const commandDispatchStartedAt = performance.now();
+					const commandBusSelector = selectJpwbCommandDispatchTopology(snapshot);
+					const commandBusSource = snapshot.sources.find(
+						(source) => source.id === commandBusSelector.sourceId
+					);
+					if (commandBusSource === undefined)
+						throw new Error(
+							'The selected command-bus source is absent from the semantic snapshot.'
+						);
+					const handlerTargets = commandHandlerGraph.nodes.filter(
+						(node) => node.kind === 'HANDLER_TARGET'
+					).length;
+					const commandDispatchBudgets = {
+						maxAstNodes: Math.max(1, snapshot.astNodes.length),
+						maxDiagnostics: 100_000,
+						maxEdges: Math.max(1, handlerTargets),
+						maxHandlerTargets: Math.max(1, handlerTargets),
+						maxNodes: 1,
+						maxSourceBytes: Math.max(1, commandBusSource.bytes)
+					};
+					const commandDispatchPhaseDurationsMs: Record<string, number> = {};
+					telemetry.start('COMMAND_DISPATCH_STATIC_TOPOLOGY', {
+						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						budgets: commandDispatchBudgets,
+						predecessorGraphId: commandHandlerGraph.id,
+						predecessorHandlerTargets: handlerTargets
+					});
+					const commandDispatchOutcome = buildCommandDispatchTopology(
+						{
+							budgets: commandDispatchBudgets,
+							commandBus: commandBusSelector,
+							commandHandlerGraphId: commandHandlerGraph.id,
+							operationVersion: COMMAND_DISPATCH_TOPOLOGY_OPERATION_VERSION,
+							schemaVersion: COMMAND_DISPATCH_TOPOLOGY_REQUEST_SCHEMA_VERSION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: snapshot.subjectId
+						},
+						snapshot,
+						commandHandlerGraph,
+						arrowObservation,
+						arrowSubject,
+						{
+							onProgress(event) {
+								if (event.state !== 'STARTED')
+									commandDispatchPhaseDurationsMs[event.phase] = event.monotonicDurationMs;
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						}
+					);
+					expect(
+						commandDispatchOutcome.outcome,
+						JSON.stringify(commandDispatchOutcome.diagnostics)
+					).toBe('partial');
+					if (commandDispatchOutcome.outcome !== 'partial')
+						throw new Error(JSON.stringify(commandDispatchOutcome));
+					const commandDispatchGraph = commandDispatchOutcome.graph;
+					const commandDispatchWitness = canonicalSemanticJsonWitness(commandDispatchGraph);
+					expect(
+						validateCommandDispatchTopology(
+							commandDispatchGraph,
+							{
+								budgets: commandDispatchBudgets,
+								commandBus: commandBusSelector,
+								commandHandlerGraphId: commandHandlerGraph.id,
+								operationVersion: COMMAND_DISPATCH_TOPOLOGY_OPERATION_VERSION,
+								schemaVersion: COMMAND_DISPATCH_TOPOLOGY_REQUEST_SCHEMA_VERSION,
+								semanticSnapshotId: snapshot.id,
+								subjectId: snapshot.subjectId
+							},
+							snapshot,
+							commandHandlerGraph,
+							arrowObservation,
+							arrowSubject,
+							{
+								maxIssues: 100_000,
+								maxRecords: 10_000_000,
+								maxStringCharacters: 1_000_000_000
+							}
+						)
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(commandDispatchGraph.coverage.reconciles).toBe(true);
+					expect(commandDispatchGraph.coverage.pipelineNodes).toBe(1);
+					expect(commandDispatchGraph.coverage.representedPipelineFacts).toBe(5);
+					expect(commandDispatchGraph.coverage.candidateHandlerTargetEdges).toBeGreaterThan(0);
+					expect(commandDispatchGraph.edges.every((edge) => edge.attribution === 'CANDIDATE')).toBe(
+						true
+					);
+					expect(commandDispatchGraph.retainedCommandDispatchCensus).toMatchObject({
+						artifactPath: COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH,
+						execution: 'NOT_EXECUTED_BY_CSAA',
+						integration: 'NOT_INTEGRATED',
+						verifierAuthority: 'RETAIN_DELEGATED'
+					});
+					expect(commandDispatchGraph.runtimeDispatchClosure).toBe('NOT_CLAIMED');
+					expect(commandDispatchGraph.runtimePerformability).toBe('NOT_CLAIMED');
+					telemetry.complete({
+						adapterPhaseDurationsMs: commandDispatchPhaseDurationsMs,
+						bytes: commandDispatchWitness.bytes,
+						candidateEdges: commandDispatchGraph.coverage.candidateHandlerTargetEdges,
+						nodes: commandDispatchGraph.nodes.length,
+						pipelineFacts: commandDispatchGraph.coverage.representedPipelineFacts,
+						retainedCensusBytes: commandDispatchGraph.retainedCommandDispatchCensus.artifactBytes,
+						validationState: 'VALID'
+					});
+					commandDispatchTopologyResult = {
+						bytes: commandDispatchWitness.bytes,
+						candidateEdges: commandDispatchGraph.coverage.candidateHandlerTargetEdges,
+						durationMs: Math.max(0, Math.round(performance.now() - commandDispatchStartedAt)),
+						nodes: commandDispatchGraph.nodes.length,
+						pipelineFacts: commandDispatchGraph.coverage.representedPipelineFacts,
+						retainedCensusBytes: commandDispatchGraph.retainedCommandDispatchCensus.artifactBytes
+					};
+				} else if (SMOKE_SUITE === 'COMMAND_HANDLER_ONLY')
+					throw new Error(
+						`COMMAND_HANDLER_ONLY requires one exact subject, but semantic ${snapshot.subjectId} and retained observation ${arrowObservation.subjectId} differ.`
+					);
+				else {
+					const skipDetails = {
 						reason:
 							'The semantic snapshot and retained observation have distinct exact subjects; use the structural common-subject smoke profile for this projection.',
+						reasonCode: 'SUBJECT_IDENTITY_MISMATCH',
 						semanticSubjectId: snapshot.subjectId,
 						arrowObservationSubjectId: arrowObservation.subjectId
-					});
+					};
+					telemetry.skip('COMMAND_HANDLER_STATIC_PROJECTION', skipDetails);
+					telemetry.skip('COMMAND_DISPATCH_STATIC_TOPOLOGY', skipDetails);
+				}
 
-				const dependencyCruiserInputPaths = providerInputPaths(projectPaths);
-				const dependencyCruiserArgs = [
-					'depcruise',
-					...dependencyCruiserInputPaths,
-					'--config',
-					'.dependency-cruiser.cjs',
-					'--output-type',
-					'json'
-				];
-				const providerStartedAt = new Date();
-				const dependencyProviderPipelineStartedMs = performance.now();
-				telemetry.start('DEPENDENCY_CRUISER_EXECUTION', {
-					inputPaths: dependencyCruiserInputPaths,
-					provisionalRuntimeCancellationGuardMs: REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS
-				});
-				const providerProcess = spawnSync('bunx', dependencyCruiserArgs, {
-					cwd: REPOSITORY_ROOT,
-					encoding: 'utf8',
-					maxBuffer: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
-					timeout: REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS,
-					windowsHide: true
-				});
-				const providerFinishedAt = new Date();
-				if (providerProcess.error) throw providerProcess.error;
-				expect(providerProcess.status).not.toBeNull();
-				if (providerProcess.status === null)
-					throw new Error(
-						`dependency-cruiser terminated without an exit status: ${providerProcess.stderr}`
-					);
-				const providerRaw = providerProcess.stdout;
-				const providerRawForBinding = JSON.parse(providerRaw) as {
-					readonly summary?: { readonly optionsUsed?: { readonly baseDir?: unknown } };
-				};
-				const providerReportedBaseDir = providerRawForBinding.summary?.optionsUsed?.baseDir;
-				if (typeof providerReportedBaseDir !== 'string' || !isAbsolute(providerReportedBaseDir))
-					throw new Error('dependency-cruiser did not report the expected absolute subject root.');
-				expect(resolve(providerReportedBaseDir)).toBe(resolve(REPOSITORY_ROOT));
-				telemetry.complete({
-					exitStatus: providerProcess.status,
-					reportedBaseDirState: 'MATCHED_REPOSITORY_ROOT',
-					stderrBytes: Buffer.byteLength(providerProcess.stderr, 'utf8'),
-					stdoutBytes: Buffer.byteLength(providerRaw, 'utf8')
-				});
-				telemetry.start('DEPENDENCY_CRUISER_NORMALIZATION', {
-					rawBytes: Buffer.byteLength(providerRaw, 'utf8')
-				});
-				const configBytes = readFileSync(`${REPOSITORY_ROOT}/.dependency-cruiser.cjs`);
-				const providerNormalization = normalizeDependencyCruiserOutput(providerRaw, {
-					argvGrammarVersion: DEPENDENCY_CRUISER_ARGV_GRAMMAR_VERSION,
-					baseDir: '.',
-					budgets: {
-						maxCommandArgs: 1_000,
-						maxDependencies: 5_000_000,
-						maxDependents: 5_000_000,
-						maxInputPaths: 100_000,
-						maxIssues: 100_000,
-						maxJsonDepth: 256,
-						maxModules: 1_000_000,
-						maxPathLength: 4_096,
-						maxRawBytes: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
-						maxRules: 1_000_000,
-						maxStringLength: 1_000_000,
-						maxSummaryViolations: 1_000_000,
-						maxTotalStringCharacters: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES
-					},
-					command: {
-						args: dependencyCruiserArgs.slice(1),
+				let dependencyProviderResult: null | {
+					readonly agreementRecords: number;
+					readonly corroborationRecords: number;
+					readonly dependencies: number;
+					readonly durationMs: number;
+					readonly health: string;
+					readonly incomparableRecords: number;
+					readonly modules: number;
+					readonly observedDifferenceRecords: number;
+					readonly records: number;
+				} = null;
+				if (SMOKE_PROJECTION_PLAN.runDependencyProviderComparison) {
+					if (moduleDependencyGraph === null)
+						throw new Error(
+							'Dependency-provider comparison requires the module-dependency graph phase.'
+						);
+					const graph = moduleDependencyGraph;
+					const dependencyCruiserInputPaths = providerInputPaths(projectPaths);
+					const dependencyCruiserArgs = [
+						'depcruise',
+						...dependencyCruiserInputPaths,
+						'--config',
+						'.dependency-cruiser.cjs',
+						'--output-type',
+						'json'
+					];
+					const providerStartedAt = new Date();
+					const dependencyProviderPipelineStartedMs = performance.now();
+					telemetry.start('DEPENDENCY_CRUISER_EXECUTION', {
+						inputPaths: dependencyCruiserInputPaths,
+						provisionalRuntimeCancellationGuardMs: REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS
+					});
+					const providerProcess = spawnSync('bunx', dependencyCruiserArgs, {
+						cwd: REPOSITORY_ROOT,
+						encoding: 'utf8',
+						maxBuffer: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
+						timeout: REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS,
+						windowsHide: true
+					});
+					const providerFinishedAt = new Date();
+					if (providerProcess.error) throw providerProcess.error;
+					expect(providerProcess.status).not.toBeNull();
+					if (providerProcess.status === null)
+						throw new Error(
+							`dependency-cruiser terminated without an exit status: ${providerProcess.stderr}`
+						);
+					const providerRaw = providerProcess.stdout;
+					const providerRawForBinding = JSON.parse(providerRaw) as {
+						readonly summary?: { readonly optionsUsed?: { readonly baseDir?: unknown } };
+					};
+					const providerReportedBaseDir = providerRawForBinding.summary?.optionsUsed?.baseDir;
+					if (typeof providerReportedBaseDir !== 'string' || !isAbsolute(providerReportedBaseDir))
+						throw new Error(
+							'dependency-cruiser did not report the expected absolute subject root.'
+						);
+					expect(resolve(providerReportedBaseDir)).toBe(resolve(REPOSITORY_ROOT));
+					telemetry.complete({
 						exitStatus: providerProcess.status,
-						finishedAt: providerFinishedAt.toISOString(),
-						startedAt: providerStartedAt.toISOString()
-					},
-					config: { path: '.dependency-cruiser.cjs', sha256: sha256(configBytes) },
-					inputPaths: dependencyCruiserInputPaths,
-					provider: {
-						id: DEPENDENCY_CRUISER_PROVIDER_ID,
-						version: DEPENDENCY_CRUISER_PROVIDER_VERSION
-					},
-					providerReportedBaseDir: {
-						bytes: Buffer.byteLength(providerReportedBaseDir, 'utf8'),
-						representation: 'ABSOLUTE',
-						sha256: sha256(providerReportedBaseDir),
-						state: 'PRESENT'
-					},
-					raw: {
-						bytes: Buffer.byteLength(providerRaw, 'utf8'),
-						sha256: sha256(providerRaw)
-					},
-					rawSchemaId: DEPENDENCY_CRUISER_RAW_SCHEMA_ID,
-					schemaVersion: DEPENDENCY_CRUISER_INVOCATION_SCHEMA_VERSION,
-					subjectRoot: {
-						bytes: Buffer.byteLength(providerReportedBaseDir, 'utf8'),
-						sha256: sha256(providerReportedBaseDir)
-					},
-					subjectId: snapshot.subjectId
-				});
-				expect(providerNormalization.outcome, JSON.stringify(providerNormalization)).toBe(
-					'complete'
-				);
-				if (providerNormalization.outcome === 'unavailable')
-					throw new Error(JSON.stringify(providerNormalization));
-				const providerObservation = providerNormalization.observation;
-				expect(validateDependencyCruiserObservation(providerObservation)).toEqual({
-					issues: [],
-					state: 'VALID'
-				});
-				telemetry.complete({
-					dependencies: providerObservation.dependencies.length,
-					health: providerObservation.health,
-					modules: providerObservation.modules.length,
-					outcome: providerNormalization.outcome,
-					validationState: 'VALID'
-				});
-				telemetry.start('DEPENDENCY_PROVIDER_COMPARISON', {
-					compilerEdges: graph.edges.length,
-					providerDependencies: providerObservation.dependencies.length
-				});
-				const comparisonRequest = {
-					budgets: {
-						maxComparisonRecords: 5_000_000,
-						maxDiagnostics: 100_000,
-						maxRationaleCharacters: 100_000
-					},
-					dependencyCruiserObservationId: providerObservation.id,
-					graphId: graph.id,
-					negativeCoverage: {
-						rationale:
-							'The smoke invocation is intentionally bounded to selected input roots and the configured dependency-cruiser exclusions.',
-						state: 'OPEN' as const
-					},
-					operationVersion: DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION,
-					resolutionContext: {
-						compilerContextDigest: sha256(
-							canonicalSemanticJson({
-								graphInputDigest: graph.graphInputDigest,
-								projectIds: snapshot.projects.map((project) => project.id)
-							})
-						),
-						providerContextDigest: sha256(
-							canonicalSemanticJson({
-								configDigest: providerObservation.invocation.config.sha256,
-								inputPaths: providerObservation.invocation.inputPaths,
-								optionsDigest: providerObservation.summary.optionsDigest
-							})
-						),
-						rationale:
-							'The compiler uses the selected project tsconfig context while dependency-cruiser uses the repository root tsconfig and its own resolver options.',
-						state: 'NOT_EQUIVALENT' as const
-					},
-					schemaVersion: DEPENDENCY_PROVIDER_COMPARISON_REQUEST_SCHEMA_VERSION,
-					semanticSnapshotId: snapshot.id,
-					subjectId: snapshot.subjectId
-				};
-				const comparisonOutcome = compareDependencyProviders(
-					comparisonRequest,
-					snapshot,
-					graph,
-					providerObservation
-				);
-				expect(comparisonOutcome.outcome, JSON.stringify(comparisonOutcome)).toBe('partial');
-				if (comparisonOutcome.outcome === 'unavailable')
-					throw new Error(JSON.stringify(comparisonOutcome));
-				const comparison = comparisonOutcome.comparison;
-				expect(
-					validateDependencyProviderComparison(
-						comparison,
+						reportedBaseDirState: 'MATCHED_REPOSITORY_ROOT',
+						stderrBytes: Buffer.byteLength(providerProcess.stderr, 'utf8'),
+						stdoutBytes: Buffer.byteLength(providerRaw, 'utf8')
+					});
+					telemetry.start('DEPENDENCY_CRUISER_NORMALIZATION', {
+						rawBytes: Buffer.byteLength(providerRaw, 'utf8')
+					});
+					const configBytes = readFileSync(`${REPOSITORY_ROOT}/.dependency-cruiser.cjs`);
+					const providerNormalization = normalizeDependencyCruiserOutput(providerRaw, {
+						argvGrammarVersion: DEPENDENCY_CRUISER_ARGV_GRAMMAR_VERSION,
+						baseDir: '.',
+						budgets: {
+							maxCommandArgs: 1_000,
+							maxDependencies: 5_000_000,
+							maxDependents: 5_000_000,
+							maxInputPaths: 100_000,
+							maxIssues: 100_000,
+							maxJsonDepth: 256,
+							maxModules: 1_000_000,
+							maxPathLength: 4_096,
+							maxRawBytes: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
+							maxRules: 1_000_000,
+							maxStringLength: 1_000_000,
+							maxSummaryViolations: 1_000_000,
+							maxTotalStringCharacters: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES
+						},
+						command: {
+							args: dependencyCruiserArgs.slice(1),
+							exitStatus: providerProcess.status,
+							finishedAt: providerFinishedAt.toISOString(),
+							startedAt: providerStartedAt.toISOString()
+						},
+						config: { path: '.dependency-cruiser.cjs', sha256: sha256(configBytes) },
+						inputPaths: dependencyCruiserInputPaths,
+						provider: {
+							id: DEPENDENCY_CRUISER_PROVIDER_ID,
+							version: DEPENDENCY_CRUISER_PROVIDER_VERSION
+						},
+						providerReportedBaseDir: {
+							bytes: Buffer.byteLength(providerReportedBaseDir, 'utf8'),
+							representation: 'ABSOLUTE',
+							sha256: sha256(providerReportedBaseDir),
+							state: 'PRESENT'
+						},
+						raw: {
+							bytes: Buffer.byteLength(providerRaw, 'utf8'),
+							sha256: sha256(providerRaw)
+						},
+						rawSchemaId: DEPENDENCY_CRUISER_RAW_SCHEMA_ID,
+						schemaVersion: DEPENDENCY_CRUISER_INVOCATION_SCHEMA_VERSION,
+						subjectRoot: {
+							bytes: Buffer.byteLength(providerReportedBaseDir, 'utf8'),
+							sha256: sha256(providerReportedBaseDir)
+						},
+						subjectId: snapshot.subjectId
+					});
+					expect(providerNormalization.outcome, JSON.stringify(providerNormalization)).toBe(
+						'complete'
+					);
+					if (providerNormalization.outcome === 'unavailable')
+						throw new Error(JSON.stringify(providerNormalization));
+					const providerObservation = providerNormalization.observation;
+					expect(validateDependencyCruiserObservation(providerObservation)).toEqual({
+						issues: [],
+						state: 'VALID'
+					});
+					telemetry.complete({
+						dependencies: providerObservation.dependencies.length,
+						health: providerObservation.health,
+						modules: providerObservation.modules.length,
+						outcome: providerNormalization.outcome,
+						validationState: 'VALID'
+					});
+					telemetry.start('DEPENDENCY_PROVIDER_COMPARISON', {
+						compilerEdges: graph.edges.length,
+						providerDependencies: providerObservation.dependencies.length
+					});
+					const comparisonRequest = {
+						budgets: {
+							maxComparisonRecords: 5_000_000,
+							maxDiagnostics: 100_000,
+							maxRationaleCharacters: 100_000
+						},
+						dependencyCruiserObservationId: providerObservation.id,
+						graphId: graph.id,
+						negativeCoverage: {
+							rationale:
+								'The smoke invocation is intentionally bounded to selected input roots and the configured dependency-cruiser exclusions.',
+							state: 'OPEN' as const
+						},
+						operationVersion: DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION,
+						resolutionContext: {
+							compilerContextDigest: sha256(
+								canonicalSemanticJson({
+									graphInputDigest: graph.graphInputDigest,
+									projectIds: snapshot.projects.map((project) => project.id)
+								})
+							),
+							providerContextDigest: sha256(
+								canonicalSemanticJson({
+									configDigest: providerObservation.invocation.config.sha256,
+									inputPaths: providerObservation.invocation.inputPaths,
+									optionsDigest: providerObservation.summary.optionsDigest
+								})
+							),
+							rationale:
+								'The compiler uses the selected project tsconfig context while dependency-cruiser uses the repository root tsconfig and its own resolver options.',
+							state: 'NOT_EQUIVALENT' as const
+						},
+						schemaVersion: DEPENDENCY_PROVIDER_COMPARISON_REQUEST_SCHEMA_VERSION,
+						semanticSnapshotId: snapshot.id,
+						subjectId: snapshot.subjectId
+					};
+					const comparisonOutcome = compareDependencyProviders(
 						comparisonRequest,
 						snapshot,
 						graph,
 						providerObservation
-					)
-				).toEqual({ issues: [], state: 'VALID' });
-				expect(comparison.coverage.reconciles).toBe(true);
-				expect(comparison.coverage.recordCount).toBeGreaterThan(0);
-				expect(
-					comparison.limitations.some(
-						(limitation) => limitation.kind === 'CONFLICT_QUALIFICATION_UNAVAILABLE'
-					)
-				).toBe(true);
-				telemetry.complete({
-					agreementRecords: comparison.coverage.agreementRecords,
-					corroborationRecords: comparison.coverage.corroborationRecords,
-					incomparableRecords: comparison.coverage.incomparableRecords,
-					observedDifferenceRecords: comparison.coverage.observedDifferenceRecords,
-					outcome: comparisonOutcome.outcome,
-					records: comparison.coverage.recordCount,
-					validationState: 'VALID'
-				});
+					);
+					expect(comparisonOutcome.outcome, JSON.stringify(comparisonOutcome)).toBe('partial');
+					if (comparisonOutcome.outcome === 'unavailable')
+						throw new Error(JSON.stringify(comparisonOutcome));
+					const comparison = comparisonOutcome.comparison;
+					expect(
+						validateDependencyProviderComparison(
+							comparison,
+							comparisonRequest,
+							snapshot,
+							graph,
+							providerObservation
+						)
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(comparison.coverage.reconciles).toBe(true);
+					expect(comparison.coverage.recordCount).toBeGreaterThan(0);
+					expect(
+						comparison.limitations.some(
+							(limitation) => limitation.kind === 'CONFLICT_QUALIFICATION_UNAVAILABLE'
+						)
+					).toBe(true);
+					telemetry.complete({
+						agreementRecords: comparison.coverage.agreementRecords,
+						corroborationRecords: comparison.coverage.corroborationRecords,
+						incomparableRecords: comparison.coverage.incomparableRecords,
+						observedDifferenceRecords: comparison.coverage.observedDifferenceRecords,
+						outcome: comparisonOutcome.outcome,
+						records: comparison.coverage.recordCount,
+						validationState: 'VALID'
+					});
+					dependencyProviderResult = {
+						agreementRecords: comparison.coverage.agreementRecords,
+						corroborationRecords: comparison.coverage.corroborationRecords,
+						dependencies: providerObservation.dependencies.length,
+						durationMs: Math.max(
+							0,
+							Math.round(performance.now() - dependencyProviderPipelineStartedMs)
+						),
+						health: providerObservation.health,
+						incomparableRecords: comparison.coverage.incomparableRecords,
+						modules: providerObservation.modules.length,
+						observedDifferenceRecords: comparison.coverage.observedDifferenceRecords,
+						records: comparison.coverage.recordCount
+					};
+				} else {
+					const skipDetails = {
+						reason: 'The selected smoke suite does not request dependency-provider execution.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					};
+					telemetry.skip('DEPENDENCY_CRUISER_EXECUTION', skipDetails);
+					telemetry.skip('DEPENDENCY_CRUISER_NORMALIZATION', skipDetails);
+					telemetry.skip('DEPENDENCY_PROVIDER_COMPARISON', skipDetails);
+				}
+				if (SMOKE_SUITE === 'COMMAND_HANDLER_ONLY' && commandHandlerResult === null)
+					throw new Error(
+						'COMMAND_HANDLER_ONLY cannot complete without a validated command-handler projection.'
+					);
+				if (SMOKE_SUITE === 'COMMAND_HANDLER_ONLY' && commandDispatchTopologyResult === null)
+					throw new Error(
+						'COMMAND_HANDLER_ONLY cannot complete without a validated command-dispatch static topology.'
+					);
+				const exactSubjectReuse =
+					arrowSubject === subject &&
+					snapshot.subjectId === subject.descriptor.subjectId &&
+					arrowArtifactSet.subjectId === snapshot.subjectId &&
+					arrowObservation.subjectId === snapshot.subjectId;
+				if (SMOKE_SUITE === 'COMMAND_HANDLER_ONLY') expect(exactSubjectReuse).toBe(true);
 				const phaseDurationsMs = telemetry.phaseDurationsMs();
+				const skippedPhases = telemetry.skippedPhases();
 				telemetry.finish({
 					arrowCommandCensusOutcome: arrowOutcome.outcome,
+					commandDispatchStaticTopology: commandDispatchTopologyResult !== null,
 					commandHandlerStaticProjection: commandHandlerResult !== null,
+					exactSubjectReuse,
 					semanticSnapshotOutcome: outcome.outcome,
 					semanticProfile: SMOKE_PROFILE,
+					skippedPhases,
+					smokeSuite: SMOKE_SUITE,
 					projects: snapshot.projects.length,
 					sources: snapshot.sources.length,
 					stateMachineProjected: stateMachineResult !== null
 				});
 				process.stdout.write(
 					`${JSON.stringify({
-						selectedSubjectArtifactCount: subject.artifacts.length,
 						arrowCommandCensus: {
 							adapterPhaseDurationsMs: arrowAdapterPhaseDurationsMs,
 							artifactBytes: arrowArtifactBytes,
@@ -1455,53 +1947,28 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							uncoveredArrows: arrowObservation.coverage.uncoveredArrows
 						},
 						callGraph: callGraphResult,
+						commandDispatchStaticTopology: commandDispatchTopologyResult,
 						commandHandlerStaticProjection: commandHandlerResult,
-						readWriteAccessGraph: {
-							accesses: readWriteAccessGraph.coverage.accessOccurrences,
-							bytes: readWriteAccessGraphWitness.bytes,
-							durationMs: readWriteAccessGraphDurationMs,
-							edges: readWriteAccessGraph.edges.length,
-							frontiers: readWriteAccessGraph.coverage.frontierNodes,
-							id: readWriteAccessGraph.id,
-							nodes: readWriteAccessGraph.nodes.length,
-							reads: readWriteAccessGraph.coverage.readAccesses,
-							readWrites: readWriteAccessGraph.coverage.readWriteAccesses,
-							sha256: readWriteAccessGraphWitness.sha256,
-							symbolSlots: readWriteAccessGraph.coverage.symbolSlots,
-							writes: readWriteAccessGraph.coverage.writeAccesses
-						},
+						dependencyProviderComparison: dependencyProviderResult,
 						event: 'CSAA_REPOSITORY_SMOKE_RESULT',
-						graphBytes: graphWitness.bytes,
-						graphDurationMs,
-						graphEdgeCount: graph.edges.length,
-						graphHealth: graph.health,
-						graphNodeCount: graph.nodes.length,
-						semanticSnapshotOutcome: outcome.outcome,
-						providerComparisonAgreementRecords: comparison.coverage.agreementRecords,
-						providerComparisonCorroborationRecords: comparison.coverage.corroborationRecords,
-						providerComparisonIncomparableRecords: comparison.coverage.incomparableRecords,
-						providerComparisonObservedDifferenceRecords:
-							comparison.coverage.observedDifferenceRecords,
-						providerComparisonRecordCount: comparison.coverage.recordCount,
-						providerDependencyCount: providerObservation.dependencies.length,
-						dependencyProviderPipelineDurationMs: Math.max(
-							0,
-							Math.round(performance.now() - dependencyProviderPipelineStartedMs)
-						),
-						providerHealth: providerObservation.health,
-						providerModuleCount: providerObservation.modules.length,
+						exactSubjectReuse,
+						moduleDependencyGraph: moduleDependencyGraphResult,
+						readWriteAccessGraph: readWriteAccessGraphResult,
 						projectCount: snapshot.projects.length,
 						phaseDurationsMs,
+						selectedSubjectArtifactBytes: subjectArtifactBytes,
+						selectedSubjectArtifactCount: subject.artifacts.length,
 						selector: SMOKE_SELECTOR ?? null,
 						semanticPipelineDurationMs,
 						semanticProfile: SMOKE_PROFILE,
 						semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
 						semanticSnapshotProgressEvents: semanticProgressEvents.length,
 						semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
-						snapshotBytes: canonicalWitness.bytes,
+						semanticSnapshotWitness,
+						skippedPhases,
+						smokeSuite: SMOKE_SUITE,
 						stateMachine: stateMachineResult,
-						sourceCount: snapshot.sources.length,
-						selectedSubjectArtifactBytes: subjectArtifactBytes
+						sourceCount: snapshot.sources.length
 					})}\n`
 				);
 			} catch (error) {

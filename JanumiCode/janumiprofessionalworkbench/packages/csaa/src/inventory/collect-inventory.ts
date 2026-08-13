@@ -7,6 +7,12 @@ import {
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
 import {
+	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
+	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
+	GUARD_ENFORCEMENT_LEDGER_METHOD,
+	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
+} from '../contracts/guard-enforcement-ledger.js';
+import {
 	INVENTORY_GENERATOR_ID,
 	INVENTORY_GENERATOR_VERSION,
 	INVENTORY_SCHEMA_VERSION,
@@ -85,6 +91,35 @@ const JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/validate-command-handler-graph.ts'
 ] as const;
 
+const JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE = [
+	'packages/csaa/src/contracts/command-dispatch-topology.ts',
+	'packages/csaa/src/graph/build-command-dispatch-topology.ts',
+	'packages/csaa/src/graph/command-dispatch-topology-canonical.ts',
+	'packages/csaa/src/graph/validate-command-dispatch-topology.ts'
+] as const;
+
+const JPWB_COMMAND_DISPATCH_RETAINED_CENSUS_REFERENCE = [
+	'verif/command-dispatch-census.test.ts'
+] as const;
+
+const JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE = [
+	'packages/csaa/src/contracts/guard-enforcement-ledger.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts',
+	'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts',
+	'packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts'
+] as const;
+
+const JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE = [
+	'verif/guard-enforcement-ledger.data.ts',
+	'verif/guard-enforcement-ledger.test.ts',
+	'verif/guard-enforcement-ledger.ts'
+] as const;
+
 const JPWB_STATE_MACHINE_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/state-machine-graph.ts',
 	'packages/csaa/src/graph/build-state-machine-graph.ts',
@@ -160,10 +195,15 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'TS_SYNTAX',
 	'TS_TYPE',
 	'configuration-ast-parse',
+	'command-dispatch-static-topology',
 	'command-handler-static-projection',
 	'frozen-program-construction',
 	'read-write-access-projection'
 ] as const;
+
+function canonicalProvenance(...paths: readonly string[]): string[] {
+	return [...new Set(paths)].sort(compareText);
+}
 
 export interface CollectInventoryOptions {
 	readonly repositoryRoot: string;
@@ -727,6 +767,7 @@ function providerInventory(
 					? [
 							...TYPESCRIPT_SEMANTIC_PROVENANCE,
 							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+							...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
 							...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE
 						]
 					: [])
@@ -913,6 +954,32 @@ function capabilities(): CapabilityInventory[] {
 			],
 			state: 'PARTIAL'
 		},
+		{
+			explanation:
+				'The eighth bounded DWP-004 increment composes a static JPWB command-bus topology overlay over the validated command-handler graph. From normalized TypeScript syntax and symbol facts it binds the selected dispatchStamped COMMANDS lookup, payload-validation call, HANDLERS lookup, missing-handler guard, and handler invocation, then emits candidate-only cross-graph references to the predecessor HANDLER_TARGET population without duplicating registry or handler nodes. The retained command-dispatch census is bound by exact FrozenSubject artifact identity as separately attributed RETAIN_DELEGATED corroboration but is NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Cross-Program COMMANDS source/declaration equivalence, control flow, path feasibility, runtime dispatch, runtime performability, replacement equivalence, and full JAN-CSAA-007/008 conformance remain NOT_CLAIMED.',
+			id: 'command-dispatch-static-topology',
+			provider: 'typescript+command-handler-graph-overlay',
+			provenance: [
+				...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+				...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+				...JPWB_COMMAND_DISPATCH_RETAINED_CENSUS_REFERENCE,
+				...TYPESCRIPT_STRUCTURAL_SEMANTIC_PROVENANCE,
+				'capabilities#command-handler-static-projection',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast'
+			],
+			state: 'PARTIAL'
+		},
+		{
+			explanation: `The ninth bounded DWP-004 increment implements the ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} strategy through exact adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} and method ${GUARD_ENFORCEMENT_LEDGER_METHOD}, preserving every retained guarded-arrow occurrence, distinct guard text, ledger classification, enforcement citation, anchor, and audit finding from the JPWB guard-enforcement ledger. It binds exact FrozenSubject artifacts, executes the retained analyzer and data exports in an isolated temporary byte capsule, verifies subject and executor integrity, and publishes deterministic raw and normalized evidence without changing the ${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority, test gate, oracle, baseline, or source implementation. Process isolation is not a hostile-code security sandbox, retained subject initializers may execute inside the capsule, and worker duration/output guards cannot confine an intentionally detached descendant process. Public in-memory exact-shape validation must enumerate already-materialized plain-object keys; maxRecords bounds containers and array entries but is not a transport byte ceiling or an object-key enumeration bound. The retained Vitest authority is identity-bound but NOT_EXECUTED_BY_CSAA. Ledger classifications remain retained repository judgments: this wrapper does not prove guard dominance, reachability, runtime enforcement, command performability, effects, events, persistence behavior, replacement equivalence, or full JAN-CSAA-007/008 conformance.`,
+			id: 'guard-enforcement-ledger',
+			provider: GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
+			provenance: [
+				...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
+				...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE
+			],
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
 				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
@@ -1073,12 +1140,32 @@ function assertJpwbNonVacuity(
 		}
 	}
 	for (const required of [
+		...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+		...JPWB_COMMAND_DISPATCH_RETAINED_CENSUS_REFERENCE
+	]) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB command-dispatch static topology implementation or retained reference is absent: ${required}`
+			);
+		}
+	}
+	for (const required of [
 		...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
 		...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE
 	]) {
 		if (!selectedPaths.has(required)) {
 			throw new Error(
 				`Required JPWB arrow-command census implementation or retained-authority artifact is absent: ${required}`
+			);
+		}
+	}
+	for (const required of [
+		...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
+		...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE
+	]) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB guard-enforcement-ledger implementation or retained-authority artifact is absent: ${required}`
 			);
 		}
 	}
@@ -1150,37 +1237,44 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 				statement: 'Configured commands are inventoried but NOT_RUN by inventory generation.'
 			},
 			{
-				provenance: [
+				provenance: canonicalProvenance(
 					...TYPESCRIPT_SEMANTIC_PROVENANCE,
 					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
 					...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
 					...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
+					...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
 					...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE,
 					'capabilities#arrow-command-census',
 					'capabilities#call-graph',
+					'capabilities#command-dispatch-static-topology',
 					'capabilities#command-handler-static-projection',
+					'capabilities#guard-enforcement-ledger',
 					'capabilities#dependency-graph',
 					'capabilities#read-write-access-graph',
 					'capabilities#state-machine-graph',
 					'capabilities#symbol-table',
 					'capabilities#typescript-ast',
 					'capabilities#type-graph'
-				],
+				),
 				statement:
-					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seven bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, and a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, and runtime command dispatch remain UNIMPLEMENTED.'
+					'TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first nine bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, and an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, and runtime command performability remain UNIMPLEMENTED.'
 			},
 			{
-				provenance: [
+				provenance: canonicalProvenance(
 					...EXISTING_GRAPH_RELEVANT_VERIFICATION_AUTHORITY,
 					...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
+					...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
+					...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE,
+					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
-				],
-				statement: `Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged. The static command-handler projection is an overlay that independently reconciles COMMANDS and HANDLERS and correlates retained sites; it does not rewrite the retained observation or integrate the separate command-dispatch census. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families remain delegated and unwrapped. Neither the adapter, static projection, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. Runtime dispatch, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.`
+				),
+				statement: `Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} using method ${GUARD_ENFORCEMENT_LEDGER_METHOD}; its retained analyzer, data, tests, ${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families remain delegated and unwrapped. Neither wrapper, either static overlay, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. Runtime guard enforcement, runtime dispatch, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.`
 			},
 			{
 				provenance: ['subject.excludedClasses'],

@@ -862,7 +862,10 @@ describe('two-pass frozen CompilerHost', () => {
 		const toolchainBudgets = {
 			...BUDGETS,
 			maxContextBytes: 16 * 1024 * 1024,
-			maxContextFileBytes: 4 * 1024 * 1024
+			maxContextFileBytes: 4 * 1024 * 1024,
+			// Coverage instrumentation can exceed the shared 30-second fixture guard while walking
+			// the pinned TypeScript library surface. This is test-operation headroom, not a product SLO.
+			maxDurationMs: 60_000
 		};
 		const { projectResolutionDigest: _digest, ...recipeWithoutDigest } = fixtureValue.recipe;
 		const noLibBase = {

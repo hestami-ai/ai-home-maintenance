@@ -436,7 +436,7 @@ describe('JPWB retained arrow-command census bounded observer', () => {
 			});
 			expect(events.at(-1)).toMatchObject({ phase: 'CAPSULE_CLEANUP', state: 'COMPLETED' });
 		},
-		30_000
+		60_000 // Test-harness headroom for instrumented full-suite worker contention; not an executor budget.
 	);
 
 	it('fails closed when materialization exceeds its caller operation budget and cleans the capsule', async () => {

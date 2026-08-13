@@ -17,6 +17,13 @@ import {
 	ARROW_COMMAND_CENSUS_METHOD,
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
+import {
+	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
+	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
+	GUARD_ENFORCEMENT_LEDGER_METHOD,
+	GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
+	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
+} from '../contracts/guard-enforcement-ledger.js';
 import { ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS } from '../providers/jpwb-arrow-command-census/artifact-set.js';
 import { collectInventory } from './collect-inventory.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
@@ -134,6 +141,7 @@ describe('inventory discovery and identity', () => {
 			'TS_SYNTAX',
 			'TS_TYPE',
 			'configuration-ast-parse',
+			'command-dispatch-static-topology',
 			'command-handler-static-projection',
 			'frozen-program-construction',
 			'read-write-access-projection'
@@ -157,46 +165,108 @@ describe('inventory discovery and identity', () => {
 		const capabilities = new Map(
 			inventory.capabilities.map((capability) => [capability.id, capability])
 		);
+		const commandHandlerCapability = capabilities.get('command-handler-static-projection');
+		expect(commandHandlerCapability).toBeDefined();
 		const retainedArrowProvenance = [...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS];
-		expect(capabilities.get('arrow-command-census')).toMatchObject({
-			provenance: expect.arrayContaining(retainedArrowProvenance),
-			state: 'PARTIAL'
-		});
-		expect(capabilities.get('command-handler-static-projection')).toMatchObject({
-			provider: 'typescript+jpwb-arrow-command-census-overlay',
-			provenance: expect.arrayContaining([
-				...retainedArrowProvenance,
-				'capabilities#arrow-command-census',
-				'capabilities#symbol-table',
-				'capabilities#typescript-ast',
-				'packages/csaa/src/contracts/command-handler-graph.ts',
-				'packages/csaa/src/contracts/semantic.ts',
-				'packages/csaa/src/graph/build-command-handler-graph.ts',
-				'packages/csaa/src/graph/validate-command-handler-graph.ts',
-				'packages/csaa/src/providers/typescript/extract-static-raw.ts',
-				'packages/csaa/src/providers/typescript/extract-symbols.ts',
-				'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
-				'packages/csaa/src/semantic/validate-snapshot.ts'
-			]),
-			state: 'PARTIAL'
-		});
-		expect(capabilities.get('command-handler-static-projection')?.provenance).not.toContain(
-			'packages/csaa/src/providers/typescript/extract-types.ts'
+		const arrowCapability = capabilities.get('arrow-command-census');
+		expect(arrowCapability).toBeDefined();
+		expect(arrowCapability!.state).toBe('PARTIAL');
+		for (const expectedProvenance of retainedArrowProvenance) {
+			expect(arrowCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		}
+		const guardCapability = capabilities.get('guard-enforcement-ledger');
+		expect(guardCapability).toBeDefined();
+		expect(guardCapability!.provider).toBe(GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID);
+		expect(guardCapability!.state).toBe('PARTIAL');
+		for (const expectedProvenance of [
+			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
+			'packages/csaa/src/contracts/guard-enforcement-ledger.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts'
+		]) {
+			expect(guardCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		}
+		expect(guardCapability!.explanation).toContain(
+			`exact adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} and method ${GUARD_ENFORCEMENT_LEDGER_METHOD}`
 		);
-		expect(capabilities.get('command-handler-static-projection')?.explanation).toContain(
-			'runtime performability'
+		expect(guardCapability!.explanation).toContain(
+			`${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority`
 		);
-		expect(capabilities.get('typescript-ast')).toMatchObject({
-			explanation: expect.stringContaining(
-				'operation-wide duration budget is enforced from a wall-anchored monotonic elapsed-time clock'
-			),
-			provider: 'typescript',
-			provenance: expect.arrayContaining([
+		expect(guardCapability!.explanation).toContain('NOT_EXECUTED_BY_CSAA');
+		expect(guardCapability!.explanation).toContain('runtime enforcement');
+		expect(guardCapability!.explanation).toContain(
+			'Process isolation is not a hostile-code security sandbox'
+		);
+		expect(guardCapability!.explanation).toContain(
+			'retained subject initializers may execute inside the capsule'
+		);
+		expect(commandHandlerCapability!.provider).toBe('typescript+jpwb-arrow-command-census-overlay');
+		expect(commandHandlerCapability!.state).toBe('PARTIAL');
+		for (const expectedProvenance of [
+			...retainedArrowProvenance,
+			'capabilities#arrow-command-census',
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'packages/csaa/src/contracts/command-handler-graph.ts',
+			'packages/csaa/src/contracts/semantic.ts',
+			'packages/csaa/src/graph/build-command-handler-graph.ts',
+			'packages/csaa/src/graph/validate-command-handler-graph.ts',
+			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+			'packages/csaa/src/providers/typescript/extract-symbols.ts',
+			'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/validate-snapshot.ts'
+		]) {
+			expect(commandHandlerCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		}
+		expect(
+			commandHandlerCapability!.provenance.includes(
+				'packages/csaa/src/providers/typescript/extract-types.ts'
+			)
+		).toBe(false);
+		expect(commandHandlerCapability!.explanation).toContain('runtime performability');
+		const commandDispatchCapability = capabilities.get('command-dispatch-static-topology');
+		expect(commandDispatchCapability).toBeDefined();
+		expect(commandDispatchCapability!.provider).toBe('typescript+command-handler-graph-overlay');
+		expect(commandDispatchCapability!.state).toBe('PARTIAL');
+		for (const expectedProvenance of [
+			'capabilities#command-handler-static-projection',
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'packages/csaa/src/contracts/command-dispatch-topology.ts',
+			'packages/csaa/src/graph/build-command-dispatch-topology.ts',
+			'packages/csaa/src/graph/command-dispatch-topology-canonical.ts',
+			'packages/csaa/src/graph/validate-command-dispatch-topology.ts',
+			'verif/command-dispatch-census.test.ts'
+		]) {
+			expect(commandDispatchCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		}
+		expect(
+			commandDispatchCapability!.provenance.includes(
+				'packages/csaa/src/providers/typescript/extract-types.ts'
+			)
+		).toBe(false);
+		for (const boundary of [
+			'NOT_EXECUTED_BY_CSAA',
+			'NOT_INTEGRATED',
+			'runtime dispatch',
+			'full JAN-CSAA-007/008 conformance remain NOT_CLAIMED'
+		])
+			expect(commandDispatchCapability!.explanation).toContain(boundary);
+		const typescriptAstCapability = capabilities.get('typescript-ast');
+		expect(typescriptAstCapability).toBeDefined();
+		expect(typescriptAstCapability!.provider).toBe('typescript');
+		expect(typescriptAstCapability!.state).toBe('IMPLEMENTED');
+		expect(
+			typescriptAstCapability!.provenance.includes(
 				'packages/csaa/src/semantic/monotonic-operation-clock.ts'
-			]),
-			state: 'IMPLEMENTED'
-		});
-		expect(capabilities.get('typescript-ast')?.explanation).toContain(
+			)
+		).toBe(true);
+		expect(typescriptAstCapability!.explanation).toContain(
+			'operation-wide duration budget is enforced from a wall-anchored monotonic elapsed-time clock'
+		);
+		expect(typescriptAstCapability!.explanation).toContain(
 			'not a benchmark, product ceiling, expected duration, or SLO'
 		);
 		expect(capabilities.get('symbol-table')).toMatchObject({
@@ -240,7 +310,10 @@ describe('inventory discovery and identity', () => {
 			]),
 			state: 'PARTIAL'
 		});
-		expect(capabilities.get('call-graph')).toMatchObject({
+		const callGraphCapability = capabilities.get('call-graph');
+		expect(callGraphCapability).toBeDefined();
+		const callGraphExplanation = callGraphCapability!.explanation;
+		expect(callGraphCapability).toMatchObject({
 			explanation: expect.stringContaining(
 				'enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site'
 			),
@@ -252,36 +325,36 @@ describe('inventory discovery and identity', () => {
 			]),
 			state: 'PARTIAL'
 		});
-		expect(capabilities.get('call-graph')?.explanation).toContain(
+		expect(callGraphExplanation).toContain(
 			'exact structural/lexical ownership within the declared method'
 		);
-		expect(capabilities.get('call-graph')?.explanation).toContain(
+		expect(callGraphExplanation).toContain(
 			'Runtime caller and evaluation ownership remain coarsened'
 		);
-		expect(capabilities.get('call-graph')?.explanation).toContain(
-			'not inferred from the structural ownership edge'
-		);
-		expect(capabilities.get('arrow-command-census')).toMatchObject({
-			provider: ARROW_COMMAND_CENSUS_ADAPTER_ID,
-			provenance: expect.arrayContaining([
-				'packages/csaa/src/contracts/arrow-command-census.ts',
-				'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
-				'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
-				'verif/arrow-command-census.ts',
-				'verif/arrow-command-census.baseline.json'
-			]),
-			state: 'PARTIAL'
-		});
-		expect(capabilities.get('arrow-command-census')?.explanation).toContain(
+		expect(callGraphExplanation).toContain('not inferred from the structural ownership edge');
+		expect(arrowCapability!.provider).toBe(ARROW_COMMAND_CENSUS_ADAPTER_ID);
+		for (const expectedProvenance of [
+			'packages/csaa/src/contracts/arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
+			'verif/arrow-command-census.ts',
+			'verif/arrow-command-census.baseline.json'
+		]) {
+			expect(arrowCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		}
+		expect(arrowCapability!.explanation).toContain(
 			`exact adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} and method ${ARROW_COMMAND_CENSUS_METHOD}`
 		);
-		expect(capabilities.get('arrow-command-census')?.explanation).toContain(
+		expect(arrowCapability!.explanation).toContain(
 			`${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority`
 		);
-		expect(capabilities.get('arrow-command-census')?.explanation).toContain(
+		expect(arrowCapability!.explanation).toContain(
 			'process isolation rather than a hostile-code security sandbox'
 		);
-		expect(capabilities.get('read-write-access-graph')).toMatchObject({
+		const readWriteCapability = capabilities.get('read-write-access-graph');
+		expect(readWriteCapability).toBeDefined();
+		const readWriteExplanation = readWriteCapability!.explanation;
+		expect(readWriteCapability).toMatchObject({
 			explanation: expect.stringContaining(
 				'derives a validated Program-local read/write access graph'
 			),
@@ -294,13 +367,11 @@ describe('inventory discovery and identity', () => {
 			]),
 			state: 'PARTIAL'
 		});
-		expect(capabilities.get('read-write-access-graph')?.explanation).toContain(
-			'JAN-CSAA-CAP-007 data flow'
-		);
-		expect(capabilities.get('read-write-access-graph')?.explanation).toContain(
+		expect(readWriteExplanation).toContain('JAN-CSAA-CAP-007 data flow');
+		expect(readWriteExplanation).toContain(
 			'broader data-flow capability therefore remains UNIMPLEMENTED'
 		);
-		expect(capabilities.get('read-write-access-graph')?.explanation).toContain(
+		expect(readWriteExplanation).toContain(
 			'write forms absent from the normalized assignment taxonomy are not classified as supported writes'
 		);
 		for (const id of ['code-property-graph', 'control-flow', 'data-flow']) {
@@ -326,7 +397,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first seven bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first nine bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -334,6 +405,8 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain('wrapper around the retained arrow-command census');
 		expect(semanticBoundary).toContain('Program-local read/write access projection');
 		expect(semanticBoundary).toContain('static JPWB command-registry-to-handler projection');
+		expect(semanticBoundary).toContain('compositional static command-bus topology overlay');
+		expect(semanticBoundary).toContain('wrapper around the retained guard-enforcement ledger');
 		expect(semanticBoundary).toContain('JAN-CSAA-CAP-007 data-flow graphs');
 		expect(semanticBoundary).toContain(
 			'Inventory generation executes or benchmarks none of these analysis providers'
@@ -342,6 +415,10 @@ describe('inventory discovery and identity', () => {
 		const verificationAuthority = inventory.unknowns.find((entry) =>
 			entry.statement.includes('Existing graph-relevant verif censuses remain authoritative')
 		);
+		for (const unknown of inventory.unknowns) {
+			expect(new Set(unknown.provenance).size).toBe(unknown.provenance.length);
+			expect(unknown.provenance).toEqual([...unknown.provenance].sort());
+		}
 		expect(verificationAuthority).toMatchObject({
 			provenance: expect.arrayContaining([
 				'verif/arrow-census-coverage.test.ts',
@@ -362,7 +439,13 @@ describe('inventory discovery and identity', () => {
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither the adapter, static projection, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, either static overlay, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID}`
@@ -838,7 +921,20 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/command-handler-graph-canonical.ts',
 			'packages/csaa/src/graph/validate-command-handler-graph.ts'
 		];
-		for (const path of [...semanticPaths, ...readWritePaths, ...commandHandlerPaths, ...arrowPaths])
+		const commandDispatchPaths = [
+			'packages/csaa/src/contracts/command-dispatch-topology.ts',
+			'packages/csaa/src/graph/build-command-dispatch-topology.ts',
+			'packages/csaa/src/graph/command-dispatch-topology-canonical.ts',
+			'packages/csaa/src/graph/validate-command-dispatch-topology.ts',
+			'verif/command-dispatch-census.test.ts'
+		];
+		for (const path of [
+			...semanticPaths,
+			...readWritePaths,
+			...commandHandlerPaths,
+			...commandDispatchPaths,
+			...arrowPaths
+		])
 			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
 
 		const missing =
@@ -893,6 +989,82 @@ describe('JPWB population non-vacuity', () => {
 		rmSync(join(root, ...missing.split('/')));
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
 			`Required JPWB TypeScript read/write access graph implementation source is absent: ${missing}`
+		);
+	});
+
+	it('rejects a missing guard-ledger provenance path after earlier populations pass', () => {
+		const root = fixture();
+		write(
+			root,
+			'package.json',
+			JSON.stringify({
+				name: 'janumi-professional-workbench',
+				private: true,
+				scripts: Object.fromEntries(
+					['boundary', 'check-types', 'gate', 'gate:fast', 'lint', 'test', 'test:coverage'].map(
+						(name) => [name, 'true']
+					)
+				),
+				workspaces: ['packages/*', 'apps/*']
+			})
+		);
+		write(
+			root,
+			'packages/csaa/package.json',
+			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		const requiredPaths = [
+			'packages/csaa/src/contracts/semantic.ts',
+			'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
+			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
+			'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
+			'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/monotonic-operation-clock.ts',
+			'packages/csaa/src/providers/typescript/extract-symbols.ts',
+			'packages/csaa/src/semantic/raw-semantic-model.ts',
+			'packages/csaa/src/semantic/normalize-semantic-snapshot.ts',
+			'packages/csaa/src/semantic/validate-snapshot.ts',
+			'packages/csaa/src/providers/typescript/extract-types.ts',
+			'packages/csaa/src/contracts/read-write-access-graph.ts',
+			'packages/csaa/src/graph/build-read-write-access-graph.ts',
+			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
+			'packages/csaa/src/graph/validate-read-write-access-graph.ts',
+			'packages/csaa/src/contracts/command-handler-graph.ts',
+			'packages/csaa/src/graph/build-command-handler-graph.ts',
+			'packages/csaa/src/graph/command-handler-graph-canonical.ts',
+			'packages/csaa/src/graph/validate-command-handler-graph.ts',
+			'packages/csaa/src/contracts/command-dispatch-topology.ts',
+			'packages/csaa/src/graph/build-command-dispatch-topology.ts',
+			'packages/csaa/src/graph/command-dispatch-topology-canonical.ts',
+			'packages/csaa/src/graph/validate-command-dispatch-topology.ts',
+			'verif/command-dispatch-census.test.ts',
+			'packages/csaa/src/contracts/arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/normalize-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
+			'packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts',
+			...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+			'packages/csaa/src/contracts/guard-enforcement-ledger.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts',
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts',
+			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS
+		];
+		for (const path of requiredPaths) write(root, path, 'export {};\n');
+
+		const missing =
+			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts';
+		rmSync(join(root, ...missing.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB guard-enforcement-ledger implementation or retained-authority artifact is absent: ${missing}`
 		);
 	});
 

@@ -88,10 +88,16 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 	// moving, which is precisely the event the pins above are for.
 	it('CONTROL — census-blindness and C-0c-unanalysability are different failures, whatever their counts', () => {
 		const censusBlind = new Set(Object.keys(MACHINES).filter((m) => !seenMachines().has(m)));
-		const unanalysable = new Set(auditClaims([...bindingClaims(), ...vocabDriveClaims()]).unanalysed);
+		const unanalysable = new Set(
+			auditClaims([...bindingClaims(), ...vocabDriveClaims()]).unanalysed
+		);
 
-		expect(censusBlind.size, 'a control comparing two empty sets proves nothing').toBeGreaterThan(0);
-		expect(unanalysable.size, 'a control comparing two empty sets proves nothing').toBeGreaterThan(0);
+		expect(censusBlind.size, 'a control comparing two empty sets proves nothing').toBeGreaterThan(
+			0
+		);
+		expect(unanalysable.size, 'a control comparing two empty sets proves nothing').toBeGreaterThan(
+			0
+		);
 		// Both directions, so neither can quietly become a subset of the other.
 		expect(
 			[...censusBlind].filter((m) => !unanalysable.has(m)),
@@ -102,5 +108,5 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			[...unanalysable].filter((m) => !censusBlind.has(m)),
 			'unanalysed became a subset of census-blind — same warning in the other direction'
 		).not.toEqual([]);
-	}, 15_000);
+	}, 45_000); // Test-harness headroom for full-repository coverage instrumentation; not a product ceiling.
 });

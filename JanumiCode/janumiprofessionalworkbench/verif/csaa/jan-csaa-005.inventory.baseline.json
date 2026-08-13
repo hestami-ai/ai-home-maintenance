@@ -50,27 +50,27 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 250,
+      "discovered": 263,
       "excluded": 0,
       "failed": 0,
-      "included": 250,
+      "included": 263,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 250
+      "successfullyInventoried": 263
     },
     {
       "artifactClass": "TEST",
-      "discovered": 317,
+      "discovered": 328,
       "excluded": 0,
       "failed": 0,
-      "included": 317,
+      "included": 328,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 317
+      "successfullyInventoried": 328
     },
     {
       "artifactClass": "VERIFICATION",
@@ -198,12 +198,15 @@
         "apps/rph-demo/src/lib/theme.test.ts",
         "apps/rph-demo/src/lib/walkthrough.test.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
         "packages/csaa/src/graph/build-command-handler-graph-coverage.test.ts",
         "packages/csaa/src/graph/build-command-handler-graph.test.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.test.ts",
         "packages/csaa/src/graph/build-state-machine-graph.test.ts",
         "packages/csaa/src/graph/compare-dependency-providers.test.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology-coverage.test.ts",
         "packages/csaa/src/graph/validate-command-handler-graph-coverage.test.ts",
         "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
         "packages/csaa/src/graph/validate-graph.test.ts",
@@ -220,6 +223,14 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.test.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.test.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output-hardening.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger-hardening.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.test.ts",
         "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
         "packages/csaa/src/providers/typescript/compiler-paths.test.ts",
@@ -636,6 +647,56 @@
       "state": "PARTIAL"
     },
     {
+      "explanation": "The eighth bounded DWP-004 increment composes a static JPWB command-bus topology overlay over the validated command-handler graph. From normalized TypeScript syntax and symbol facts it binds the selected dispatchStamped COMMANDS lookup, payload-validation call, HANDLERS lookup, missing-handler guard, and handler invocation, then emits candidate-only cross-graph references to the predecessor HANDLER_TARGET population without duplicating registry or handler nodes. The retained command-dispatch census is bound by exact FrozenSubject artifact identity as separately attributed RETAIN_DELEGATED corroboration but is NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Cross-Program COMMANDS source/declaration equivalence, control flow, path feasibility, runtime dispatch, runtime performability, replacement equivalence, and full JAN-CSAA-007/008 conformance remain NOT_CLAIMED.",
+      "id": "command-dispatch-static-topology",
+      "provenance": [
+        "packages/csaa/src/contracts/command-dispatch-topology.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
+        "packages/csaa/src/contracts/command-handler-graph.ts",
+        "packages/csaa/src/graph/build-command-handler-graph.ts",
+        "packages/csaa/src/graph/command-handler-graph-canonical.ts",
+        "packages/csaa/src/graph/validate-command-handler-graph.ts",
+        "verif/command-dispatch-census.test.ts",
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/monotonic-operation-clock.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts",
+        "capabilities#command-handler-static-projection",
+        "capabilities#symbol-table",
+        "capabilities#typescript-ast"
+      ],
+      "provider": "typescript+command-handler-graph-overlay",
+      "state": "PARTIAL"
+    },
+    {
+      "explanation": "The ninth bounded DWP-004 increment implements the WRAP strategy through exact adapter jan-csaa-jpwb-guard-enforcement-ledger and method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0, preserving every retained guarded-arrow occurrence, distinct guard text, ledger classification, enforcement citation, anchor, and audit finding from the JPWB guard-enforcement ledger. It binds exact FrozenSubject artifacts, executes the retained analyzer and data exports in an isolated temporary byte capsule, verifies subject and executor integrity, and publishes deterministic raw and normalized evidence without changing the RETAINED_DELEGATED verifier authority, test gate, oracle, baseline, or source implementation. Process isolation is not a hostile-code security sandbox, retained subject initializers may execute inside the capsule, and worker duration/output guards cannot confine an intentionally detached descendant process. Public in-memory exact-shape validation must enumerate already-materialized plain-object keys; maxRecords bounds containers and array entries but is not a transport byte ceiling or an object-key enumeration bound. The retained Vitest authority is identity-bound but NOT_EXECUTED_BY_CSAA. Ledger classifications remain retained repository judgments: this wrapper does not prove guard dominance, reachability, runtime enforcement, command performability, effects, events, persistence behavior, replacement equivalence, or full JAN-CSAA-007/008 conformance.",
+      "id": "guard-enforcement-ledger",
+      "provenance": [
+        "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts",
+        "verif/guard-enforcement-ledger.data.ts",
+        "verif/guard-enforcement-ledger.test.ts",
+        "verif/guard-enforcement-ledger.ts"
+      ],
+      "provider": "jan-csaa-jpwb-guard-enforcement-ledger",
+      "state": "PARTIAL"
+    },
+    {
       "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "code-property-graph",
       "provenance": [
@@ -770,6 +831,18 @@
       "categories": [
         "OTHER"
       ],
+      "command": "CSAA_GUARD_LEDGER_INTEGRATION=1 vitest run --disableConsoleIntercept packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
+      "name": "csaa:guard-ledger:smoke",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:guard-ledger:smoke"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
       "command": "bun run scripts/csaa-inventory.ts --write",
       "name": "csaa:inventory",
       "owner": ".",
@@ -799,6 +872,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/csaa:semantic:smoke"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=COMMAND_HANDLER vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts",
+      "name": "csaa:semantic:smoke:command-handler",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:semantic:smoke:command-handler"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -1660,6 +1745,7 @@
         "TS_SYNTAX",
         "TS_TYPE",
         "configuration-ast-parse",
+        "command-dispatch-static-topology",
         "command-handler-static-projection",
         "frozen-program-construction",
         "read-write-access-projection"
@@ -1679,13 +1765,17 @@
         "apps/rph-demo/tsconfig.json",
         "bun.lock",
         "package.json#/scripts/check-types",
+        "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-handler-graph.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
         "packages/csaa/src/graph/command-handler-graph-canonical.ts",
         "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
         "packages/csaa/src/graph/validate-command-handler-graph.ts",
         "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
@@ -1749,7 +1839,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "3c24ff26374e69ab043b4f67bb1b9a5430429f985eb13b8bb612a5a6fe3a8b40",
+    "configurationDigest": "f7c1c6ffcb6ef62281e021ee40d16bd559b9361eb6a981aded8087e5d0222873",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -1832,9 +1922,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 2585,
+          "bytes": 3039,
           "path": "package.json",
-          "sha256": "790d5b78b07db7965710ba88dae76ea4ba56a772398b7188b4d795a3b818bc7a"
+          "sha256": "6d57bfbd1197ecac6797043fe7f956988479c1ed62a1fb454dc75396e9aac0b3"
         },
         {
           "artifactClass": "MANIFEST",
@@ -2090,9 +2180,9 @@
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
-          "bytes": 3308,
+          "bytes": 3739,
           "path": "vitest.dist.config.ts",
-          "sha256": "1c2d14cdd1f4efc9d17292f96f7eb8dc580b541865758e465105abffbffec0f7"
+          "sha256": "5e8733dc3f870512059d1ff79923be78c4a2b40be14050a1af65b397d8f019a3"
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
@@ -2275,7 +2365,7 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "6a7da74688939e4b78883f4e106aeef3713517b6adfa3b26143ef93f636612ff",
+          "projectResolutionDigest": "3e39e0bbc622046d936916659aa9eff3b49ddf9e27875f959134c4c71bdb1b7c",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2283,16 +2373,19 @@
           "rootNames": [
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
+            "packages/csaa/src/contracts/command-dispatch-topology.ts",
             "packages/csaa/src/contracts/command-handler-graph.ts",
             "packages/csaa/src/contracts/dependency-comparison.ts",
             "packages/csaa/src/contracts/dependency-cruiser.ts",
             "packages/csaa/src/contracts/graph.ts",
+            "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/read-write-access-graph.ts",
             "packages/csaa/src/contracts/semantic.ts",
             "packages/csaa/src/contracts/state-machine-graph.ts",
             "packages/csaa/src/contracts/subject.ts",
             "packages/csaa/src/graph/build-call-graph.ts",
+            "packages/csaa/src/graph/build-command-dispatch-topology.ts",
             "packages/csaa/src/graph/build-command-handler-graph.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.ts",
             "packages/csaa/src/graph/build-read-write-access-graph.ts",
@@ -2300,6 +2393,8 @@
             "packages/csaa/src/graph/call-graph-content.ts",
             "packages/csaa/src/graph/call-graph-ids.ts",
             "packages/csaa/src/graph/call-graph-input.ts",
+            "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+            "packages/csaa/src/graph/command-dispatch-topology-fixture.test-support.ts",
             "packages/csaa/src/graph/command-handler-graph-canonical.ts",
             "packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts",
             "packages/csaa/src/graph/compare-dependency-providers.ts",
@@ -2311,6 +2406,7 @@
             "packages/csaa/src/graph/state-machine-graph-ids.ts",
             "packages/csaa/src/graph/state-machine-graph-input.ts",
             "packages/csaa/src/graph/validate-call-graph.ts",
+            "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
             "packages/csaa/src/graph/validate-command-handler-graph.ts",
             "packages/csaa/src/graph/validate-dependency-comparison.ts",
             "packages/csaa/src/graph/validate-graph.ts",
@@ -2332,6 +2428,13 @@
             "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
             "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
             "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
             "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
             "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
             "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
@@ -2405,7 +2508,7 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "205faf74cb189eabc436a5449ea003b245f96092db969b596ed4a071d8106f3e",
+          "projectResolutionDigest": "23f577c2a91df0fa625069deca60bc2e7a1407769c38e12d91af47bd82b19e66",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2413,10 +2516,12 @@
           "rootNames": [
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
+            "packages/csaa/src/contracts/command-dispatch-topology.ts",
             "packages/csaa/src/contracts/command-handler-graph.ts",
             "packages/csaa/src/contracts/dependency-comparison.ts",
             "packages/csaa/src/contracts/dependency-cruiser.ts",
             "packages/csaa/src/contracts/graph.ts",
+            "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/read-write-access-graph.ts",
             "packages/csaa/src/contracts/semantic.ts",
@@ -2424,6 +2529,9 @@
             "packages/csaa/src/contracts/subject.ts",
             "packages/csaa/src/graph/build-call-graph.test.ts",
             "packages/csaa/src/graph/build-call-graph.ts",
+            "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
+            "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
+            "packages/csaa/src/graph/build-command-dispatch-topology.ts",
             "packages/csaa/src/graph/build-command-handler-graph-coverage.test.ts",
             "packages/csaa/src/graph/build-command-handler-graph.test.ts",
             "packages/csaa/src/graph/build-command-handler-graph.ts",
@@ -2436,6 +2544,8 @@
             "packages/csaa/src/graph/call-graph-content.ts",
             "packages/csaa/src/graph/call-graph-ids.ts",
             "packages/csaa/src/graph/call-graph-input.ts",
+            "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+            "packages/csaa/src/graph/command-dispatch-topology-fixture.test-support.ts",
             "packages/csaa/src/graph/command-handler-graph-canonical.ts",
             "packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts",
             "packages/csaa/src/graph/compare-dependency-providers.test.ts",
@@ -2448,6 +2558,8 @@
             "packages/csaa/src/graph/state-machine-graph-ids.ts",
             "packages/csaa/src/graph/state-machine-graph-input.ts",
             "packages/csaa/src/graph/validate-call-graph.ts",
+            "packages/csaa/src/graph/validate-command-dispatch-topology-coverage.test.ts",
+            "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
             "packages/csaa/src/graph/validate-command-handler-graph-coverage.test.ts",
             "packages/csaa/src/graph/validate-command-handler-graph.ts",
             "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
@@ -2485,6 +2597,21 @@
             "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
             "packages/csaa/src/providers/jpwb-arrow-command-census/worker.test.ts",
             "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output-hardening.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger-hardening.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.test.ts",
+            "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
             "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
             "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
             "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
@@ -3802,11 +3929,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "bc6394dbef85bec3640e77ebaef43e5ed7ca9b6c6d4f87f975506d25737032c7",
+          "configClosureDigest": "1d5b15f79164f4e422a6e34c4bba34a7f7c65934daa4285677b46b2118a866c0",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "fee8e05606ea709f8bd0da6638b83045f92a48caecba4cd97daa932777ed1cf5",
+          "projectResolutionDigest": "40f84328ca3cde573b21af9cc226b5d796f623dfa703186121459ffb592de5ca",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3847,11 +3974,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "406509dfb86d452abf81c5e99ca13d1bfc6775f6ab586544db02a7e5f4366732",
+          "configClosureDigest": "0cf3be1b5d4f6cdbab15fbbff156d7f75c4680d3872a10c9ecf62b3c464ccf9b",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "ee61b316f792db76e618d91456707080276376c3814a48aef3c238da9dd79bee",
+          "projectResolutionDigest": "cbc1055dacb27e39c850e4a74a1b0b7a9e9cf2dd214f9c158209d2f501f64628",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3885,11 +4012,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "bb41f6892723704ef890285375c8c47966be96dcd78e560869f1df39903bc5c7",
+          "configClosureDigest": "1042ea3637cdc657d166b6e9e8f677b6129ceb6bdaa695fb5cf818d830226a56",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "1219138c84bb74b415f36e235a97921c5587390d68086f6d0366ceab3daf13c3",
+          "projectResolutionDigest": "210ccd55ddf2b779477197818e3da4c8e74e2163d59f4d23c5df3e3c398e6ef0",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4624,7 +4751,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "25de3d26eb13bc39a52ecc6a93728d25dd07d80152cdf60142a8377c54a0892d",
+    "fileManifestDigest": "0fbcb0798826f7c8a838dd84d68b2f49233319736dbe0925d7570f4b33db7ed0",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/tsconfig.json",
@@ -4671,7 +4798,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 826,
+    "selectedFileCount": 850,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -5767,9 +5894,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 2585,
+        "bytes": 3039,
         "path": "package.json",
-        "sha256": "790d5b78b07db7965710ba88dae76ea4ba56a772398b7188b4d795a3b818bc7a",
+        "sha256": "6d57bfbd1197ecac6797043fe7f956988479c1ed62a1fb454dc75396e9aac0b3",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -5802,6 +5929,13 @@
       },
       {
         "artifactClass": "SOURCE",
+        "bytes": 23662,
+        "path": "packages/csaa/src/contracts/command-dispatch-topology.ts",
+        "sha256": "99f3f87522d6241d2cd408fcc85a7e904e110aba31f84c520badd7b4e146dddd",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
         "bytes": 20705,
         "path": "packages/csaa/src/contracts/command-handler-graph.ts",
         "sha256": "6f949b5532241b5683bde7cd92d37432c8b48c6ba8111debb3057f6dec8caab9",
@@ -5826,6 +5960,13 @@
         "bytes": 9083,
         "path": "packages/csaa/src/contracts/graph.ts",
         "sha256": "1651d649e37a535c43ecfb92a8649ddbf964212b6ae3a62e9a88c9be35e2c8b4",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 17989,
+        "path": "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
+        "sha256": "218c4c42999347e6631a5d650551f8e17eb2ba1b94e3c58e65051fb8ea1a6cd7",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -5875,6 +6016,27 @@
         "bytes": 51539,
         "path": "packages/csaa/src/graph/build-call-graph.ts",
         "sha256": "6c330982bab922b6c5ee253b7ee2bfc2b80d418270096819481474db01d81f07",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 29844,
+        "path": "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
+        "sha256": "f32e43b4573434abf5688684023003c3f1f43dc4307cc73eaa9317b239231cd7",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 14035,
+        "path": "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
+        "sha256": "f1adaa23e7262dc7989bdf473f90d44795cac56ac032ea4c557530c9e05a7fab",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 56840,
+        "path": "packages/csaa/src/graph/build-command-dispatch-topology.ts",
+        "sha256": "4e258a0e671e8041a19d8d4313ad13148d7fb7771d60014243becff2db38cc54",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -5963,6 +6125,20 @@
       },
       {
         "artifactClass": "SOURCE",
+        "bytes": 10100,
+        "path": "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+        "sha256": "d47953b1bf11bfc81aadfe6e7fe9e95c1459acc1a0e41f700a6768d64a03a077",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4887,
+        "path": "packages/csaa/src/graph/command-dispatch-topology-fixture.test-support.ts",
+        "sha256": "e19ef8a45ec4b2ef37cd536c08aec7d52ec793c3a464f0e137b90a72cf3e66b5",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
         "bytes": 8565,
         "path": "packages/csaa/src/graph/command-handler-graph-canonical.ts",
         "sha256": "71d9f1463e7db679ff6a691943212de195d822608bcee04ae29cf988f1f19bba",
@@ -5970,9 +6146,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 17955,
+        "bytes": 18874,
         "path": "packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts",
-        "sha256": "d368d2d15c3dbb331cfab5346dc850ceb0bc02b884230a522104fcc74cf99de2",
+        "sha256": "8546cb42bfc9b0cbd902a6e959bc80e40bcfb929e82681bd51e00176c28a3df5",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6047,6 +6223,20 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 30209,
+        "path": "packages/csaa/src/graph/validate-command-dispatch-topology-coverage.test.ts",
+        "sha256": "0df38a4e5ecf2ed3db18e3680ee97057d5c37a5b408608ba860793d310bd7954",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 66266,
+        "path": "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
+        "sha256": "4c93377e4d3518eee8f6ce34e83845d6ed0e6174b2e39f0f20581b094fa8c65e",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 24992,
         "path": "packages/csaa/src/graph/validate-command-handler-graph-coverage.test.ts",
         "sha256": "5859afa636cde69ba07b99289f3cabfdc76a8ca9eb34ad92993b36f2b8878047",
@@ -6110,16 +6300,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 7916,
+        "bytes": 8868,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "56a695d9223b4a83aeeb347cabbe5cf166fd0daa5f18bbfeae728ca339239d75",
+        "sha256": "60dc762baf6675d1ed2de478f254256ffcc7e3088c6658c7833d83c5292c9b4a",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 5724,
+        "bytes": 6994,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "cbf9ea4aaad787aef6716ed3323b92da01b687ecccbe12a8be02655bba842e15",
+        "sha256": "707d0c312a7aed09c94ccd1efaa93aeb0483ed4f3a2f32863e0b5ad0334baf1c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6145,16 +6335,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 51003,
+        "bytes": 57979,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "a543c2f88c42f41ed88d8c35ded429066d2c7fcc3b5ea7a8a545cc8420110ce5",
+        "sha256": "780a80667e40a93c4461ceddf7aaee8831d505be55b944cf0b0fe0eea6abf11f",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 38004,
+        "bytes": 46875,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "30def6cacd275528b896bcb7a6fc7c2cd7463a433b390632b49d16c4247232f1",
+        "sha256": "509302e4da2d5f2bede3cb7a5b18da6777ca5775ccace6cc814da35a67d2b075",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -6264,9 +6454,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 22167,
+        "bytes": 22263,
         "path": "packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.test.ts",
-        "sha256": "f743763ad286a26516fa8afd4f9627518b22c112a2b4dd4462d8b654a1b0d65b",
+        "sha256": "7dda8f249ed9c5b0834fe225c82eda0107bdebe4a0eda98e21bac489941847a5",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -6309,6 +6499,111 @@
         "bytes": 17355,
         "path": "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
         "sha256": "39ef15b5e03d924f9c76de8e55ccb4bade8e6f18caabae7251033287d0a94b68",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 27581,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.test.ts",
+        "sha256": "974ce53d9f482c882bbb673c2a980dbb96f39319199c47a1dd72a3737547b8e2",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 37951,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+        "sha256": "5c1f60724dcb2a140e4e8e13445d4bbaebb47cf47660ca30fb074b16724074b8",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4348,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+        "sha256": "bf529536f71f835365e80be4018087d63ef94f5ca50327f89698cc7816504164",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 33827,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.test.ts",
+        "sha256": "6db28c9def8b0cee81428de6fbc0f932c18dafe6df6f4482b3aff1747e539ccd",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 29768,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+        "sha256": "cac5ecc7427ddc90fb7f103774caa82be145ed2a0ed761f162f14fd9048f7af8",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 10214,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
+        "sha256": "db4e333bab82574ba7831f560cae37bb2386d09402d6e713b62ce252a6d9d44f",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 13800,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.test.ts",
+        "sha256": "576a576706a348ca0f9fa64df061a5fbc0a53fc44dde25771dd3dc0ca833ea20",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 33505,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+        "sha256": "96272cfbcaede9db08fadee5a5056f6f111ec3bb00a391afbdfb370b5475d1cf",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 4295,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output-hardening.test.ts",
+        "sha256": "5f078befc19143986eae3f1520c232409aa9ea48a83799abc501efdaec30297e",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 7611,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.test.ts",
+        "sha256": "024f269ec4931d56e5abe2b456eb794bbfcf4c2fa51ac1ac2d0da5f49379ba48",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 14363,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+        "sha256": "28d8c095a0b5a583418cbe9e4e364e2ed3388438830fe0c089e78aea82d6698f",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 2885,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger-hardening.test.ts",
+        "sha256": "6817ac4550fbe57080486b0dbfe7870dd514e0cfcd7c1819af1a12c1b39862ea",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 26017,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+        "sha256": "2ee97f1d9319a4349ef63c5a27598374c302fc43642e7ddd2286de998a02cb31",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 17799,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.test.ts",
+        "sha256": "33a43e2766ffb62e750c7dddae29f1b2e7f2282c518c83baa63df6a619bb2c5a",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 18689,
+        "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
+        "sha256": "cab8dcaed3036a034aa4cf7f864ea549ce4856c0988951b3f33e8fa9a1f8e283",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6390,9 +6685,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 46200,
+        "bytes": 46414,
         "path": "packages/csaa/src/providers/typescript/frozen-compiler-host.test.ts",
-        "sha256": "47b804919f17d7f632854d3fbd73be2b2969954da5ece7638f46834fdfeb75ed",
+        "sha256": "c8cf12e5c9c8ca53384a8d55430da5d1694a68e6cca168919d322c224995924d",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -6537,9 +6832,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 62830,
+        "bytes": 82599,
         "path": "packages/csaa/src/semantic/repository-smoke.test.ts",
-        "sha256": "b09b1c430b88472342124128e4c525730b9f218e30fac390d423c17a369947bf",
+        "sha256": "6567700cb47b7051f5c3a2aff9a0adde0a73950cd94581bd8c490b0e10ba4a25",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10142,9 +10437,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 6632,
+        "bytes": 6747,
         "path": "verif/arrow-census-coverage.test.ts",
-        "sha256": "268c4c7db9e5c8216f319243714af093f0ab5a6638c239fbd9f77a9d0e7a6d92",
+        "sha256": "9930beb43d32cbfefb7fd1d3ea430ff085685f93a289d1f7287a1721b119864c",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -10443,9 +10738,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 3308,
+        "bytes": 3739,
         "path": "vitest.dist.config.ts",
-        "sha256": "1c2d14cdd1f4efc9d17292f96f7eb8dc580b541865758e465105abffbffec0f7",
+        "sha256": "5e8733dc3f870512059d1ff79923be78c4a2b40be14050a1af65b397d8f019a3",
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       },
       {
@@ -10456,7 +10751,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "01dbe0ee812e49a6bc44157afdd4756259d2d32994a8e432aa104c856cb9df65",
+    "subjectId": "20d7e35f2a99858d2c3bd28d757b79a208a3236ede03568e0ca1ae3ea239be4c",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -10620,7 +10915,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 90,
+      "candidateArtifactCount": 103,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -10648,16 +10943,19 @@
       "resolvedRootFiles": [
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-handler-graph.ts",
         "packages/csaa/src/contracts/dependency-comparison.ts",
         "packages/csaa/src/contracts/dependency-cruiser.ts",
         "packages/csaa/src/contracts/graph.ts",
+        "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/subject.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.ts",
@@ -10665,6 +10963,8 @@
         "packages/csaa/src/graph/call-graph-content.ts",
         "packages/csaa/src/graph/call-graph-ids.ts",
         "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-fixture.test-support.ts",
         "packages/csaa/src/graph/command-handler-graph-canonical.ts",
         "packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts",
         "packages/csaa/src/graph/compare-dependency-providers.ts",
@@ -10676,6 +10976,7 @@
         "packages/csaa/src/graph/state-machine-graph-ids.ts",
         "packages/csaa/src/graph/state-machine-graph-input.ts",
         "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
         "packages/csaa/src/graph/validate-command-handler-graph.ts",
         "packages/csaa/src/graph/validate-dependency-comparison.ts",
         "packages/csaa/src/graph/validate-graph.ts",
@@ -10697,6 +10998,13 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
         "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
         "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
@@ -10743,7 +11051,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 131,
+      "candidateArtifactCount": 155,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -10772,10 +11080,12 @@
       "resolvedRootFiles": [
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-handler-graph.ts",
         "packages/csaa/src/contracts/dependency-comparison.ts",
         "packages/csaa/src/contracts/dependency-cruiser.ts",
         "packages/csaa/src/contracts/graph.ts",
+        "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
@@ -10783,6 +11093,9 @@
         "packages/csaa/src/contracts/subject.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-handler-graph-coverage.test.ts",
         "packages/csaa/src/graph/build-command-handler-graph.test.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
@@ -10795,6 +11108,8 @@
         "packages/csaa/src/graph/call-graph-content.ts",
         "packages/csaa/src/graph/call-graph-ids.ts",
         "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-fixture.test-support.ts",
         "packages/csaa/src/graph/command-handler-graph-canonical.ts",
         "packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts",
         "packages/csaa/src/graph/compare-dependency-providers.test.ts",
@@ -10807,6 +11122,8 @@
         "packages/csaa/src/graph/state-machine-graph-ids.ts",
         "packages/csaa/src/graph/state-machine-graph-input.ts",
         "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology-coverage.test.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
         "packages/csaa/src/graph/validate-command-handler-graph-coverage.test.ts",
         "packages/csaa/src/graph/validate-command-handler-graph.ts",
         "packages/csaa/src/graph/validate-dependency-comparison.test.ts",
@@ -10844,6 +11161,21 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.test.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output-hardening.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger-hardening.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.test.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
         "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
         "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
         "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
@@ -12176,46 +12508,57 @@
     },
     {
       "provenance": [
-        "packages/csaa/src/contracts/semantic.ts",
-        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
-        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
-        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
-        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
-        "packages/csaa/src/semantic/monotonic-operation-clock.ts",
-        "packages/csaa/src/providers/typescript/extract-symbols.ts",
-        "packages/csaa/src/semantic/raw-semantic-model.ts",
-        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
-        "packages/csaa/src/semantic/validate-snapshot.ts",
-        "packages/csaa/src/providers/typescript/extract-types.ts",
-        "packages/csaa/src/contracts/graph.ts",
-        "packages/csaa/src/graph/build-module-dependency-graph.ts",
-        "packages/csaa/src/graph/ids.ts",
-        "packages/csaa/src/graph/module-dependency-content.ts",
-        "packages/csaa/src/graph/module-dependency-input.ts",
-        "packages/csaa/src/graph/validate-graph.ts",
+        "capabilities#arrow-command-census",
+        "capabilities#call-graph",
+        "capabilities#command-dispatch-static-topology",
+        "capabilities#command-handler-static-projection",
+        "capabilities#dependency-graph",
+        "capabilities#guard-enforcement-ledger",
+        "capabilities#read-write-access-graph",
+        "capabilities#state-machine-graph",
+        "capabilities#symbol-table",
+        "capabilities#type-graph",
+        "capabilities#typescript-ast",
+        "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/command-dispatch-topology.ts",
+        "packages/csaa/src/contracts/command-handler-graph.ts",
+        "packages/csaa/src/contracts/dependency-comparison.ts",
+        "packages/csaa/src/contracts/dependency-cruiser.ts",
+        "packages/csaa/src/contracts/graph.ts",
+        "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
+        "packages/csaa/src/contracts/read-write-access-graph.ts",
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.ts",
+        "packages/csaa/src/graph/build-command-handler-graph.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/build-read-write-access-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
         "packages/csaa/src/graph/call-graph-content.ts",
         "packages/csaa/src/graph/call-graph-ids.ts",
         "packages/csaa/src/graph/call-graph-input.ts",
-        "packages/csaa/src/graph/validate-call-graph.ts",
-        "packages/csaa/src/contracts/read-write-access-graph.ts",
-        "packages/csaa/src/graph/build-read-write-access-graph.ts",
-        "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
-        "packages/csaa/src/graph/validate-read-write-access-graph.ts",
-        "packages/csaa/src/contracts/command-handler-graph.ts",
-        "packages/csaa/src/graph/build-command-handler-graph.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
         "packages/csaa/src/graph/command-handler-graph-canonical.ts",
-        "packages/csaa/src/graph/validate-command-handler-graph.ts",
-        "packages/csaa/src/contracts/state-machine-graph.ts",
-        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/compare-dependency-providers.ts",
+        "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/module-dependency-content.ts",
+        "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
         "packages/csaa/src/graph/state-machine-graph-content.ts",
         "packages/csaa/src/graph/state-machine-graph-ids.ts",
         "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
+        "packages/csaa/src/graph/validate-command-handler-graph.ts",
+        "packages/csaa/src/graph/validate-dependency-comparison.ts",
+        "packages/csaa/src/graph/validate-graph.ts",
+        "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
-        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
-        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
-        "packages/csaa/src/contracts/arrow-command-census.ts",
+        "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
+        "packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json",
+        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts",
@@ -12224,27 +12567,69 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
-        "packages/csaa/src/contracts/dependency-comparison.ts",
-        "packages/csaa/src/contracts/dependency-cruiser.ts",
-        "packages/csaa/src/graph/compare-dependency-providers.ts",
-        "packages/csaa/src/graph/validate-dependency-comparison.ts",
-        "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
-        "packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json",
-        "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
-        "capabilities#arrow-command-census",
-        "capabilities#call-graph",
-        "capabilities#command-handler-static-projection",
-        "capabilities#dependency-graph",
-        "capabilities#read-write-access-graph",
-        "capabilities#state-machine-graph",
-        "capabilities#symbol-table",
-        "capabilities#typescript-ast",
-        "capabilities#type-graph"
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/monotonic-operation-clock.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts"
       ],
-      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seven bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, and a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, and runtime command dispatch remain UNIMPLEMENTED."
+      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first nine bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, and an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger. Inventory generation executes or benchmarks none of these analysis providers. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, and runtime command performability remain UNIMPLEMENTED."
     },
     {
       "provenance": [
+        "packages/csaa/src/contracts/arrow-command-census.ts",
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/command-dispatch-topology.ts",
+        "packages/csaa/src/contracts/command-handler-graph.ts",
+        "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
+        "packages/csaa/src/contracts/state-machine-graph.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/build-command-dispatch-topology.ts",
+        "packages/csaa/src/graph/build-command-handler-graph.ts",
+        "packages/csaa/src/graph/build-state-machine-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
+        "packages/csaa/src/graph/command-handler-graph-canonical.ts",
+        "packages/csaa/src/graph/state-machine-graph-content.ts",
+        "packages/csaa/src/graph/state-machine-graph-ids.ts",
+        "packages/csaa/src/graph/state-machine-graph-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
+        "packages/csaa/src/graph/validate-command-handler-graph.ts",
+        "packages/csaa/src/graph/validate-state-machine-graph.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/normalize-arrow-command-census.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
+        "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/guard-enforcement-ledger-content.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
+        "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
+        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.baseline.json",
         "verif/arrow-command-census.test.ts",
@@ -12255,37 +12640,13 @@
         "verif/contract-number-census.test.ts",
         "verif/dead-kernel-census.test.ts",
         "verif/event-surface-census.test.ts",
+        "verif/guard-enforcement-ledger.data.ts",
+        "verif/guard-enforcement-ledger.test.ts",
+        "verif/guard-enforcement-ledger.ts",
         "verif/policy-evidence-requirement-census.test.ts",
-        "verif/route-action-census.test.ts",
-        "packages/csaa/src/contracts/arrow-command-census.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/normalize-arrow-command-census.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
-        "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
-        "packages/csaa/src/contracts/command-handler-graph.ts",
-        "packages/csaa/src/graph/build-command-handler-graph.ts",
-        "packages/csaa/src/graph/command-handler-graph-canonical.ts",
-        "packages/csaa/src/graph/validate-command-handler-graph.ts",
-        "packages/csaa/src/contracts/call-graph.ts",
-        "packages/csaa/src/graph/build-call-graph.ts",
-        "packages/csaa/src/graph/call-graph-content.ts",
-        "packages/csaa/src/graph/call-graph-ids.ts",
-        "packages/csaa/src/graph/call-graph-input.ts",
-        "packages/csaa/src/graph/validate-call-graph.ts",
-        "packages/csaa/src/contracts/state-machine-graph.ts",
-        "packages/csaa/src/graph/build-state-machine-graph.ts",
-        "packages/csaa/src/graph/state-machine-graph-content.ts",
-        "packages/csaa/src/graph/state-machine-graph-ids.ts",
-        "packages/csaa/src/graph/state-machine-graph-input.ts",
-        "packages/csaa/src/graph/validate-state-machine-graph.ts",
-        "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
-        "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts"
+        "verif/route-action-census.test.ts"
       ],
-      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The static command-handler projection is an overlay that independently reconciles COMMANDS and HANDLERS and correlates retained sites; it does not rewrite the retained observation or integrate the separate command-dispatch census. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families remain delegated and unwrapped. Neither the adapter, static projection, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. Runtime dispatch, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
+      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, event-surface, policy-evidence-requirement, and route-action census families remain delegated and unwrapped. Neither wrapper, either static overlay, partial call graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. Runtime guard enforcement, runtime dispatch, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
     },
     {
       "provenance": [
@@ -12422,7 +12783,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/arrow-census-coverage.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "268c4c7db9e5c8216f319243714af093f0ab5a6638c239fbd9f77a9d0e7a6d92",
+      "contentSha256": "9930beb43d32cbfefb7fd1d3ea430ff085685f93a289d1f7287a1721b119864c",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

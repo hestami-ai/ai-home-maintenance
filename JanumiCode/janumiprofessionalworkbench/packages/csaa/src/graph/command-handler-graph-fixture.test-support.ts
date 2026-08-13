@@ -139,7 +139,7 @@ function createRepository(variant: HandlerFixtureVariant): {
 			strict: true,
 			target: 'ES2022'
 		},
-		files: ['src/handlers/registry.ts', 'src/handlers/work.ts']
+		files: ['src/command-bus.ts', 'src/handlers/registry.ts', 'src/handlers/work.ts']
 	});
 	json(root, 'packages/rph-domain/tsconfig.json', {
 		compilerOptions: {
@@ -195,6 +195,30 @@ export const HANDLERS = { ${handlerEntries} } as const;
 `
 	);
 	write(root, HANDLER_SOURCE_PATH, source);
+	write(
+		root,
+		'packages/rph-application/src/command-bus.ts',
+		`import { COMMANDS } from '../../rph-contracts/src/messages.js';
+import { HANDLERS } from './handlers/registry.js';
+
+function validateAgainst(_schema: unknown, value: unknown, _context: unknown) {
+	return { ok: true as const, value };
+}
+
+export class CommandBus {
+	private dispatchStamped(command: { commandType: keyof typeof COMMANDS; payload: unknown }) {
+		const spec = COMMANDS[command.commandType];
+		if (!spec) return null;
+		const parsed = validateAgainst(spec.payload, command.payload, {});
+		if (!parsed.ok) return null;
+		const handler = HANDLERS[command.commandType];
+		if (!handler) return null;
+		const ctx = {};
+		return handler(ctx, command, parsed.value);
+	}
+}
+`
+	);
 
 	write(root, 'packages/rph-domain/src/index.ts', "export * from './transitions.data.js';\n");
 	write(
@@ -228,6 +252,11 @@ export const HANDLERS = { ${handlerEntries} } as const;
 	);
 	write(root, 'verif/arrow-census-coverage.test.ts', 'export const retainedCoverage = true;\n');
 	write(root, 'verif/arrow-command-census.test.ts', 'export const retainedOracle = true;\n');
+	write(
+		root,
+		'verif/command-dispatch-census.test.ts',
+		'// Retained delegated fixture; CSAA records but does not execute this census.\n'
+	);
 	return { handlerSiteLine: handlerSiteLine(source), root };
 }
 
