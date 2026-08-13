@@ -414,14 +414,27 @@ function runMutant(m: DeclaredMutant): Result {
 		// INCONCLUSIVE rather than KILLED, and its author must say so deliberately. That is the correct polarity —
 		// the ledger's claim is "this named test reddens BECAUSE it asserts the guard", which a hang cannot establish.
 		const timedOut = timeoutEvidence(out);
-		if (timedOut !== null)
+		if (timedOut !== null) {
+			// ⚠ NAME THE SUITE, DO NOT JUST REPORT THE MARKER. The first version of this verdict quoted the timeout
+			// text and stopped there, and diagnosing the next blocking run meant inferring the culprit from the
+			// milliseconds in the marker. That is the same shortfall REG-F-116 is about, one notch smaller: a
+			// verdict is worth what the reader can CHECK, and the failing suites are already in the report a
+			// control writes. Absent (a named victim writes no report) it says so rather than guessing.
+			const failing = jsonTo === undefined ? undefined : failedFiles(jsonTo);
+			const where =
+				failing === undefined
+					? 'no report was written, so the timed-out suite cannot be named here — re-run with MUTANTS_HARVEST=1'
+					: failing.length === 0
+						? 'the report names no failing suite'
+						: `in: ${failing.slice(0, 3).join(', ')}`;
 			return {
 				mutant: m,
 				verdict: 'INCONCLUSIVE',
 				// The observed text is QUOTED rather than summarised, because the entire finding is that a verdict
 				// asserted something the reader could not check.
-				detail: `the run TIMED OUT (${timedOut}) — it did not measure this mutation, so neither KILLED nor SURVIVED is available. Fix the slow test; do not raise the timeout. ${summarise(out)}`
+				detail: `the run TIMED OUT (${timedOut}) ${where} — it did not measure this mutation, so neither KILLED nor SURVIVED is available. Fix the slow test; do not raise the timeout. ${summarise(out)}`
 			};
+		}
 		const victims = HARVEST ? readVictims() : undefined;
 		// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
 		// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
