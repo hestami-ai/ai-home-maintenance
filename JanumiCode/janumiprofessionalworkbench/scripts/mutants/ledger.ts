@@ -2692,5 +2692,17 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-command-census.test.ts'],
 		why: "THE PREDICATE INVERTED, WHICH IS THE ONLY WAY THIS DERIVATION CAN LIE WITHOUT LOOKING BROKEN. `initialStateFictions()` answers \"does any creation write the state the machine calls initial?\" — flip the sense and it reports the machines that AGREE as fictions and stays silent about the five that do not. ⚠ AND THE POINT IS THAT THE COUNT WOULD STILL LOOK PLAUSIBLE: the inverted set is non-empty (every machine born exactly where it declares), so a reader checking only \"is the number about right\" sees a list of similar length and no failure. That is precisely how the ORIGINAL defect survived — REG-F-071 measured four, the answer became five, and fourteen comments across nine files went on asserting four because nothing compared the claim to the machines. Predicted red: the by-NAME pin AND both controls (`Intent`/`PWU` would now appear, and the birth-declaration scope check would fail on machines that have none) — measured before declaring.",
 		source: 'REG-F-125'
+	},
+	{
+		id: 'F127-the-reassessment-rule-widens-to-every-self-edge',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		find:
+			'\t\tconst adds = (CLAIM_REASSESSMENT_DISCRIMINATORS[target] ?? []).some(\n' +
+			'\t\t\t(f) => supplied[f] !== undefined && !isDeepStrictEqual(supplied[f], before[f])\n' +
+			'\t\t);',
+		replace: '\t\tconst adds = false;\n\t\tvoid supplied;',
+		expectRed: ['packages/rph-application/src/handlers/claim-assessment.test.ts'],
+		why: "THE OVER-BROAD FORMULATION — the one this repository has already adopted and withdrawn ONCE, at `runtime-binding.ts` N-22, whose own comment records it: *\"MY FIRST FORMULATION REFUSED EVERY `from === to`, AND IT WAS OVER-BROAD … the defect is 'NOTHING CHANGED', not 'THE STATUS STAYED THE SAME'.\"* With `adds` forced false, every same-state re-assessment is refused, including a genuinely DISTINCT one by a second assessor — which is what DIFFERENT_AGENT independence looks like, so the guard would strand the act the assurance plane most wants. ⚠ AND THE DUPLICATE-REFUSAL TESTS STAY GREEN UNDER IT, which is the entire reason this mutant exists: a widened guard still refuses the identical re-issue, so the two tests that MOTIVATED the fix cannot tell the narrow rule from the broad one. Only the CONTROL can. Measured before declaring: reddens `CONTROL — a DISTINCT re-assessment at the same status is still ACCEPTED` ALONE (1 failed / 8 passed).",
+		source: 'REG-F-127'
 	}
 ];

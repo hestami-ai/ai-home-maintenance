@@ -56,6 +56,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import { isDeepStrictEqual } from 'node:util';
 import { allOf, fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 
 /** Non-object primitive union: the cast that keeps String() off Object's default stringification (S6551). */
@@ -723,6 +724,85 @@ const CLAIM_STATUS_EVENT: Readonly<Record<string, string>> = {
 };
 
 /**
+ * WHICH PAYLOAD FIELDS EACH ARM'S EVENT ACTUALLY CARRIES — the discriminators for "did this re-assessment
+ * record anything?" (REG-F-127).
+ *
+ * ⚠ TRANSCRIBED FROM `eventPayload` BELOW, NOT DERIVED, and for the REG-F-119 reason: a derived set would be
+ * whatever the builder does, so the agreement between this table and that builder could never fail. Hand-written,
+ * it can be WRONG — and the tests below drive each arm separately so a wrong row shows up as an admitted
+ * duplicate rather than as nothing at all.
+ *
+ * ⚠ AND THE ARMS GENUINELY DIFFER, which is why one field list would be a defect rather than a simplification.
+ * `ClaimContested` carries `contradictingEvidenceIds` and NOT `assessmentId`/`rationale`; `ClaimSupported` and
+ * `ClaimUnderAssessment` carry `assessmentId` only. **A field the emitted event does not carry cannot make a
+ * re-issue distinguishable to any later reader** — supplying it changes nothing observable, so it must not count
+ * as change. That is the whole difference between this and comparing the raw command payload.
+ */
+const CLAIM_REASSESSMENT_DISCRIMINATORS: Readonly<Record<string, readonly string[]>> = {
+	SUPPORTED: ['assessmentId'],
+	UNDER_ASSESSMENT: ['assessmentId'],
+	CONTESTED: ['contradictingEvidenceIds'],
+	REJECTED: ['assessmentId', 'rationale']
+};
+
+/**
+ * A re-assessment at the SAME status must record something the last one did not — REG-F-127.
+ *
+ * ── DRIVEN, NOT REASONED ─────────────────────────────────────────────────────────────────────────────────────
+ * Measured through the real bus before this existed: `AssertClaim` -> `RecordClaimAssessment(UNDER_ASSESSMENT)`
+ * -> admit evidence -> `RecordClaimAssessment(SUPPORTED)` -> **a second, byte-identical
+ * `RecordClaimAssessment(SUPPORTED)` was ACCEPTED**, leaving two `ClaimSupported` events. The second records an
+ * assessment that did not happen — AX-7's permanent false entry in an append-only log, and the same shape as
+ * governance's `REVOKED -> REVOKED` re-issue.
+ *
+ * ── ⚠ WHY THIS IS NOT `fromStates` NARROWING, AND NOT `noOpEditPrecondition` ─────────────────────────────────
+ * **The defect is "NOTHING CHANGED", not "THE STATUS STAYED THE SAME".** `runtime-binding.ts` records itself
+ * adopting the broad form first and withdrawing it (N-22): a second assessment reaching the same conclusion by a
+ * DISTINCT assessment is a real professional act — it is what DIFFERENT_AGENT independence looks like — and
+ * refusing every self-edge would strand it. A CONTROL asserts exactly that case still succeeds.
+ *
+ * `noOpEditPrecondition` (DWP-08) cannot serve here, and the reason is a trap worth recording: it compares the
+ * payload against the OBJECT'S STATE, and `mutate` persists neither `assessmentId` nor `rationale` — they ride
+ * the EVENT. Comparing `assessmentId` against `state.assessmentId` compares against `undefined` ALWAYS, so the
+ * helper's "changed" test would be TRUE for every assessment that supplies one and FALSE only for those that do
+ * not — **exactly inverted from the rule wanted, while looking like it worked.**
+ *
+ * ── DISCLOSED RESIDUAL, CITED RATHER THAN RE-DECIDED ─────────────────────────────────────────────────────────
+ * A caller that mints a FRESH `assessmentId` on every re-issue passes this check, and the log then accumulates
+ * `ClaimSupported` events distinguished only by an id the caller chose. That may be right (each IS a distinct
+ * assessment) or it may be an unbounded-append hole; it is the SAME question `AppendConversationEntries` reached
+ * and deferred as **JAN-CMDPRE residual R2** — *"a content-only key over-refuses a legitimately recurring
+ * identical turn"* — awaiting a stable per-act id. Deferred on that precedent, not silently settled here.
+ */
+const claimReassessmentRecordsSomething = predicate(
+	'a re-assessment at the same status must record something the last one did not',
+	({ state, command, payload, read }) => {
+		const p = payload as RecordClaimAssessmentPayload;
+		const target = String(p.targetStatus);
+		// Only the SAME-STATE case is this rule's business; a real transition is the machine's to judge.
+		if (String(state.status) !== target) return null;
+		const eventType = CLAIM_STATUS_EVENT[target];
+		if (!eventType) return null; // no minted event — refused earlier, on its own ground
+		const prior = read
+			.aggregateEvents(CLAIM, command.targetAggregateId)
+			.filter((e) => String(e.eventType) === eventType);
+		const last = prior.at(-1);
+		// Nothing to duplicate: the first assessment at a status is never a no-op, including N-18's
+		// deliberately-empty one.
+		if (!last) return null;
+		const before = (last.payload ?? {}) as Record<string, unknown>;
+		const supplied = p as unknown as Record<string, unknown>;
+		const adds = (CLAIM_REASSESSMENT_DISCRIMINATORS[target] ?? []).some(
+			(f) => supplied[f] !== undefined && !isDeepStrictEqual(supplied[f], before[f])
+		);
+		return adds
+			? null
+			: `RecordClaimAssessment ${command.targetAggregateId} records nothing: the claim is already ${target} and this assessment supplies nothing the last ${eventType} did not already carry. A second ${eventType} would assert an assessment that did not happen (DOC-002 §27: events record ACCEPTED STATE CHANGES; CON-000 AX-7). To record a genuinely distinct assessment, supply an assessmentId (or the field this arm records) that differs from the last.`;
+	},
+	'RPH_VALIDATION_SEMANTIC_FAILED'
+);
+
+/**
  * RecordClaimAssessment — the act that moves a Claim off OPEN. REG-D-024 (sponsor conferral) / REG-F-044.
  *
  * ── WHY A COMMAND AT ALL, since the corpus ratifies EVENTS and no claim command ────────────────────────────
@@ -781,12 +861,11 @@ export const recordClaimAssessment: CommandHandler = (ctx, command, payload) => 
 		// JAN-CMDPRE: the states this command may be issued FROM — every non-terminal claim state. Which
 		// DESTINATIONS are legal from each is the machine's judgement; duplicating it here would create a
 		// second, drifting copy of the arrow table (REG-F-027's shape).
-		precondition: fromStates(
-			'OPEN',
-			'UNDER_ASSESSMENT',
-			'SUPPORTED',
-			'CONDITIONALLY_SUPPORTED',
-			'CONTESTED'
+		// STATE first, then the no-op rule (REG-F-127) — so a wrong-source issue still refuses as the illegal
+		// transition it is, and only a source the machine admits reaches the "records nothing" question.
+		precondition: allOf(
+			fromStates('OPEN', 'UNDER_ASSESSMENT', 'SUPPORTED', 'CONDITIONALLY_SUPPORTED', 'CONTESTED'),
+			claimReassessmentRecordsSomething
 		),
 		// ── RPH-EVD-002, THE ONE NON-FORGEABLE REFUSAL IN THIS COMMAND ────────────────────────────────────────
 		// Scoped to SUPPORTED, because that is the destination the ratified test names. A guard that demanded
