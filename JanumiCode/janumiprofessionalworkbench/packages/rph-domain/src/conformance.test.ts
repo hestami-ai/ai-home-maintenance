@@ -13,6 +13,7 @@ import {
 	PROPERTY_COVERAGE,
 	type CoverageStatus
 } from './conformance-manifest.js';
+import { ENFORCEMENT_REGISTER, REGISTERED_RULE_IDS } from './enforcement-register.js';
 
 interface Rule {
 	readonly id: string;
@@ -205,5 +206,74 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 			const abs = new URL(rel, repoRoot);
 			expect(existsSync(abs), `cited test file missing: ${rel}`).toBe(true);
 		}
+	});
+});
+
+/**
+ * Every disposition a manifest NOTE states about a rule, as (ruleId, disposition) pairs.
+ *
+ * The notes are prose, but the part worth checking is not: they name RULE IDS against a CLOSED THREE-WORD
+ * vocabulary, in the same package as the register that owns those ids. Clauses are split on `;` because that is
+ * how these notes are written — one disposition claim per clause — and a clause naming two dispositions is
+ * skipped rather than guessed at, which is why the reach is asserted separately below.
+ */
+function notedDispositions(): { ruleId: string; noted: string; actual: string }[] {
+	const DISPOSITIONS = ['UNENFORCED_DISCLOSED', 'NOT_A_COMMAND_REFUSAL', 'ENFORCED'] as const;
+	const notesToIds = new Map<string, Set<string>>();
+	for (const id of REGISTERED_RULE_IDS) {
+		const note = coverageFor(id)?.note;
+		if (note) notesToIds.set(note, (notesToIds.get(note) ?? new Set()).add(id));
+	}
+	const out: { ruleId: string; noted: string; actual: string }[] = [];
+	for (const [note, ids] of notesToIds) {
+		// The family is taken from a rule the note actually covers, never parsed out of the prose.
+		const family = [...ids][0]!.split('-').slice(0, 2).join('-');
+		for (const clause of note.split(';')) {
+			// ⚠ WORD-BOUNDARY, not `includes`. The first version of this reader used `includes` and reported
+			// RPH-EXE-004 as a contradiction because the note says "EXE-004 remains UNENFORCED" — in which
+			// `ENFORCED` is a SUBSTRING. It would have had me "correct" a note that was right, which is the
+			// instrument manufacturing the defect it exists to find. `\bENFORCED\b` matches neither `UNENFORCED`
+			// nor `UNENFORCED_DISCLOSED`, since neither position is a word boundary.
+			const named = DISPOSITIONS.filter((d) => new RegExp(`\\b${d}\\b`).test(clause));
+			if (named.length !== 1) continue;
+			for (const m of clause.matchAll(/\b(\d{3})\b/g)) {
+				const ruleId = `${family}-${m[1]}`;
+				const row = ENFORCEMENT_REGISTER[ruleId as keyof typeof ENFORCEMENT_REGISTER];
+				if (row) out.push({ ruleId, noted: named[0]!, actual: row.kind });
+			}
+		}
+	}
+	return out;
+}
+
+// ── THE MANIFEST AND THE REGISTER ARE COMPARED (REG-F-142) ──────────────────────────────────────────────────
+//
+// REG-F-140 found the register and the C-0b guard ledger contradicting each other for seven days, and could
+// only build a narrow gate because those two share NO join key. **This pair does.** Same package, rule ids on
+// both sides, a closed disposition vocabulary — the join is trivial, and nothing had ever made it.
+describe('the coverage manifest and the enforcement register agree about dispositions', () => {
+	it('no manifest note states a disposition the register contradicts', () => {
+		const wrong = notedDispositions().filter((c) => c.noted !== c.actual);
+		expect(
+			wrong,
+			`manifest notes contradicted by the register:\n${wrong
+				.map((c) => `  ${c.ruleId}: note says ${c.noted}, register says ${c.actual}`)
+				.join('\n')}`
+		).toEqual([]);
+	});
+
+	// CONTROL — `[]` is also what a parser that matched nothing returns, which is this check's characteristic
+	// failure: the ids are three bare digits inside English, and any rewording can silently empty the join.
+	it('CONTROL — the note reader resolves real claims across several families', () => {
+		const claims = notedDispositions();
+		expect(claims.length, 'the reader must find real disposition claims, or it is asserting over nothing').
+			toBeGreaterThan(15);
+		expect(
+			new Set(claims.map((c) => c.ruleId.split('-').slice(0, 2).join('-'))).size,
+			'and across more than one family, so a single reworded note cannot blind it'
+		).toBeGreaterThan(2);
+		// Every disposition it reports must be a real one, which fails if the vocabulary drifts.
+		for (const c of claims)
+			expect(['UNENFORCED_DISCLOSED', 'NOT_A_COMMAND_REFUSAL', 'ENFORCED']).toContain(c.actual);
 	});
 });

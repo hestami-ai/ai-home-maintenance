@@ -332,7 +332,7 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// while INT-006 and INT-007 are not pending a test at all — the register disposes them as
 		// NOT_A_COMMAND_REFUSAL, INT-006 because its six consequents are outcomes (two of which need an
 		// impact-analysis plane that does not exist) and INT-007 because its antecedent is command-unreachable.
-		note: 'INT-003/004/005 ENFORCED and cited by id above; INT-001/002/006/007 are NOT_A_COMMAND_REFUSAL in enforcement-register.ts (INT-001/002 describe what an accepted command produces; INT-006 enumerates outcomes; INT-007 has a command-unreachable antecedent). The enforcement question is answered in the register, not by this row.'
+		note: 'INT-003/004/005/007 ENFORCED and cited by id above; INT-001/002/006 are NOT_A_COMMAND_REFUSAL in enforcement-register.ts (INT-001/002 describe what an accepted command produces; INT-006 enumerates outcomes). The struck ground for INT-007 — ~~a command-unreachable antecedent~~ — held until 2026-08-13, when `SupersedeIntent` made SUPERSEDED reachable (REG-F-132); this note was left stale by that same commit and caught by the gate added at REG-F-142. The enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-PWU': {
 		status: 'PARTIAL',
@@ -352,8 +352,10 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// PURE_KERNEL predicate test; both are now dispositioned UNENFORCED_DISCLOSED and OBSERVED being admitted
 		// through a live dispatch. It also claimed "the EVD-005 cascade pending", which JAN-EXECREM WIRE #4 had
 		// already closed to the extent the rule permits (the impact is recorded on the event; the state changes the
-		// rule names are command-unreachable). Per-family status stays PARTIAL: only EVD-007 is enforced.
-		note: 'EVD-007 (admission evaluates the evidence) ENFORCED and cited by id above; EVD-001/003/004 are dispositioned UNENFORCED_DISCLOSED in enforcement-register.ts with observed admissions; EVD-002/005/006 are NOT_A_COMMAND_REFUSAL there. The kernel predicate is asserted here; the enforcement question is answered in the register, not by this row.'
+		// rule names are command-unreachable). Per-family status stays PARTIAL: ~~only EVD-007 is enforced~~ — THREE are
+		// (EVD-002/003/007), corrected 2026-08-14 with the note below. A prose summary beside the field it summarises is
+		// a second copy with no checker (REG-F-141); this one is covered now only because the FIELD is gated.
+		note: 'EVD-002/003/007 ENFORCED and cited by id above; EVD-001/004 are dispositioned UNENFORCED_DISCLOSED in enforcement-register.ts with observed admissions; EVD-005/006 are NOT_A_COMMAND_REFUSAL there. ~~EVD-001/003/004 ... UNENFORCED_DISCLOSED; EVD-002/005/006 ... NOT_A_COMMAND_REFUSAL~~ — STALE IN TWO LIMBS AND FOR DIFFERENT LENGTHS OF TIME, which is why the gate at REG-F-142 checks every id rather than the sentence: EVD-003 moved to ENFORCED on 2026-08-02 (REG-F-008\'s remediation, twelve days) and EVD-002 on 2026-08-13 (REG-F-138, one day) — and REG-F-138 EDITED THIS FILE, adding the COMMAND-layer cite 270 lines above while leaving this contradiction untouched. The kernel predicate is asserted here; the enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-TRC': {
 		status: 'PARTIAL',
