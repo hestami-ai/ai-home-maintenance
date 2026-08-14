@@ -852,7 +852,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Claims are supported by admissible evidence through explicit relationships',
-			note: 'JPWB-CON-000 §4. Canon carries the RULE (support requires admissible evidence) even though this engine has no command that could violate it — which is the carriage/enforcement independence RPH-EXE-007 already demonstrates in the other direction.'
+			note: 'JPWB-CON-000 §4. Canon carries the RULE (support requires admissible evidence) ~~even though this engine has no command that could violate it~~ ⚠ THAT CLAUSE WAS FALSE FROM 2026-08-06 AND SURVIVED THE REG-F-133 STRIKE ON THIS ROW’S `why` FIVE LINES BELOW (corrected 2026-08-13, REG-F-137): `RecordClaimAssessment` drives `Claim.status` and its guard refuses SUPPORTED without ADMISSIBLE evidence. The carriage/enforcement independence RPH-EXE-007 demonstrates in the other direction still holds — it is the example that was wrong, not the principle.'
 		},
 		why:
 			'"Changing a claim ... to SUPPORTED is rejected" presupposes a command that CHANGES A CLAIM\'S STATUS, and ' +
@@ -868,10 +868,20 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'enumerates (marker, declared mutations, manifest row, probe) — deliberately NOT done in the same ' +
 			'commit that found it, because a disposition move without its evidence is what REG-F-130 records. ' +
 			'HOW IT SURVIVED: seven register commits and one dedicated stale-prose sweep passed over it, because ' +
-			'arm 3 has no guard field, no probe and no selector — nothing could redden. So there is ' +
-			'no envelope for this refusal to attach to. This is NOT a disguised disclosure: the rule cannot be ' +
-			'violated by any dispatch, because the illegal transition is unreachable rather than unguarded, and ' +
-			'recording it as UNENFORCED_DISCLOSED would claim a gap that no arrangement can demonstrate.'
+			'arm 3 has no guard field, no probe and no selector — nothing could redden. ' +
+			'~~So there is no envelope for this refusal to attach to. This is NOT a disguised disclosure: the ' +
+			'rule cannot be violated by any dispatch, because the illegal transition is unreachable rather than ' +
+			'unguarded, and recording it as UNENFORCED_DISCLOSED would claim a gap that no arrangement can ' +
+			'demonstrate.~~ ⚠ CORRECTED 2026-08-13 (REG-F-137). THE SENTENCES ABOVE ARE THE ORIGINAL ' +
+			'ARGUMENT AND THEY CONTRADICT THE CORRECTION FOUR LINES ABOVE THEM, which says this rule IS ' +
+			'dispatchable and IS enforced. REG-F-133 struck the OPENING limb of this `why`, spliced its ' +
+			'correction into the middle, and left the CLOSING argument standing — so for one day this row ' +
+			'asserted both that the rule is enforced and that it cannot be violated by any dispatch. ⚠ THAT ' +
+			'IS THE EXACT DEFECT REG-F-133 HEADLINED IN RPH-ASM-004 (*\'a correcting pass fixed the ADJACENT ' +
+			"sentence and left the LOAD-BEARING one standing\'*), committed by its own author in the same " +
+			'commit, on a second row, while writing the entry about it. A strike is not a correction until ' +
+			'EVERY limb resting on the struck ground is re-read — including the ones in OTHER FIELDS of the ' +
+			'same object, which is how the `canonCarriage.note` limb above survived too.'
 	},
 	// RE-DISPOSITIONED 2026-08-02, UNENFORCED_DISCLOSED -> ENFORCED, BY THE DISCLOSURE'S OWN GUARD.
 	//
