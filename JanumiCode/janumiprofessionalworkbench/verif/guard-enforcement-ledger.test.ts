@@ -19,6 +19,7 @@ import {
 } from './guard-enforcement-ledger.js';
 import { GUARD_LEDGER } from './guard-enforcement-ledger.data.js';
 import { arrowKey, declaredArrows } from './arrow-command-census.js';
+import { STATE_MACHINES } from '@janumipwb/rph-domain';
 
 const AUDIT = auditLedger(GUARD_LEDGER);
 
@@ -253,6 +254,65 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 			'the unreachability check can only speak about rows whose machines the census SEES; the rest pass by ' +
 				'construction. If this moves, the gate’s honest reach moved with it — re-derive before re-pinning.'
 		).toEqual({ arrowUnreachableRows: 21, vacuousBecauseCensusBlind: 9 });
+	});
+
+	// ── THE OTHER DISMISSIVE DISPOSITION IS CHECKED TOO, AND UNLIKE THE LAST ONE IT IS WORTH IT ─────────────
+	//
+	// REG-F-134 left `REDUNDANT_WITH_MACHINE` ungated on the ground that its claim — *the guard's negative case
+	// is already illegal* — "needs a reading of the guard text and cannot be joined mechanically". That is true
+	// of a GENERIC join and false of these two rows: each states a fact about machine SHAPE, and shape is data.
+	//
+	// ⚠ WHY THIS ONE IS BUILT WHEN REG-F-151 DECLINED THE OTHER. That entry refused a `declaredMutations` gate
+	// because it would have watched 1 row of 107 — a reach indistinguishable from vacuity. Here the reach is
+	// 2 OF 2. The checks are bespoke per row, which is the honest shape when there are two of them, and the count
+	// is pinned below so a THIRD row cannot join the disposition without someone writing its check.
+	//
+	// The risk is real rather than theoretical: these rows say NOTHING IS OWED because the machine already
+	// forbids the case. Give `BASELINED` one out-arrow and that stops being true — the guard becomes genuinely
+	// unenforced, and without this nothing would notice.
+	it('the REDUNDANT_WITH_MACHINE rows still restate the machine they defer to', () => {
+		const machine = (name: string) =>
+			(STATE_MACHINES as unknown as Record<string, { transitions: readonly { from: string; to: string }[] }>)[
+				name
+			]!.transitions;
+
+		// ROW 1 — "Not already BASELINED", on the 17 `-> SUPERSEDED` arrows of PWU.workLifecycleState. The guard
+		// restates the table only while BASELINED is genuinely terminal.
+		expect(
+			machine('PWU.workLifecycleState').filter((t) => t.from === 'BASELINED'),
+			'BASELINED gained an out-arrow, so "Not already BASELINED" is no longer a restatement of the machine — ' +
+				're-disposition the row, it is now a real and unenforced guard'
+		).toEqual([]);
+
+		// ROW 2 — "the assessment is ACTIVE", on the 4 `-> CANCELLED` arrows. The precondition is redundant only
+		// while the machine admits CANCELLED from exactly those four sources and no others.
+		expect(
+			machine('AssuranceAssessment.state')
+				.filter((t) => t.to === 'CANCELLED')
+				.map((t) => t.from)
+				.sort((a, b) => a.localeCompare(b)),
+			'the CANCELLED in-arrows moved; the handler precondition is no longer the machine’s own shape'
+		).toEqual(['ASSESSING', 'EVIDENCE_PENDING', 'READY', 'REQUESTED']);
+
+		// ⚠ THE REACH, pinned — these two checks are hand-written per row, so a third row would be unchecked and
+		// would LOOK checked (REG-F-150's lesson, one increment earlier).
+		expect(
+			Object.values(GUARD_LEDGER).filter((r) => r.disposition === 'REDUNDANT_WITH_MACHINE').length,
+			'a REDUNDANT_WITH_MACHINE row was added or removed; each needs its own shape check written by hand'
+		).toBe(2);
+	});
+
+	// CONTROL — both assertions above are `toEqual` against an EMPTY-ish expectation, which a broken reader also
+	// satisfies. This shows the same query returns real data for states known to have the thing being denied.
+	it('CONTROL — the shape reader finds out-arrows and in-arrows where they exist', () => {
+		const pwu = (STATE_MACHINES as unknown as Record<string, { transitions: readonly { from: string; to: string }[] }>)[
+			'PWU.workLifecycleState'
+		]!.transitions;
+		expect(pwu.filter((t) => t.to === 'SUPERSEDED').length, 'the 17 guarded arrows must be findable').toBe(17);
+		expect(
+			pwu.filter((t) => t.from === 'SATISFIED').length,
+			'a NON-terminal state must show out-arrows, or the BASELINED assertion is vacuous'
+		).toBeGreaterThan(0);
 	});
 
 	// ── CONTROL 6: AN EMPTY COVERED SET IS REFUSED, NOT PASSED ──────────────────────────────────────────────
