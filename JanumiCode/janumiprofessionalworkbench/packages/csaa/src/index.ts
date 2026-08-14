@@ -1,5 +1,6 @@
 export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
+export * from './contracts/conditional-export-resolution.js';
 export * from './contracts/arrow-command-census.js';
 export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-event-contract-overlay.js';
@@ -72,6 +73,7 @@ export { validateGuardEnforcementLedgerObservation } from './providers/jpwb-guar
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
 export { buildLogicalGraphComposition } from './graph/build-logical-graph-composition.js';
 export { buildProjectContextGraph } from './graph/build-project-context-graph.js';
+export { buildConditionalExportResolution } from './resolution/build-conditional-export-resolution.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
@@ -125,6 +127,7 @@ export {
 	validateLogicalGraphComposition
 } from './graph/validate-logical-graph-composition.js';
 export { validateProjectContextGraph } from './graph/validate-project-context-graph.js';
+export { validateConditionalExportResolution } from './resolution/validate-conditional-export-resolution.js';
 export {
 	validateConstructedStructuralModuleReachabilityAnalysis,
 	validateStructuralModuleReachabilityAnalysis

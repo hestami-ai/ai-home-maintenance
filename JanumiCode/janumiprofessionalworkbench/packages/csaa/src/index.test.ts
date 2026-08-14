@@ -1,10 +1,15 @@
 import { readFileSync } from 'node:fs';
+import * as publicSurface from '@janumipwb/csaa';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
 	CALL_GRAPH_OPERATION_VERSION,
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
 	CALL_GRAPH_SCHEMA_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_PROGRESS_SCHEMA_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_REQUEST_SCHEMA_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
@@ -58,6 +63,7 @@ import {
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION,
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
+	buildConditionalExportResolution,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
 	buildGuardClassificationOverlay,
@@ -83,6 +89,7 @@ import {
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
 	validateCallGraph,
+	validateConditionalExportResolution,
 	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
 	validateGuardClassificationOverlay,
@@ -113,6 +120,7 @@ function manifest(relativeUrl: string): PackageManifest {
 describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
+		expect(buildConditionalExportResolution).toBeTypeOf('function');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
@@ -136,6 +144,8 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateDependencyCruiserObservation).toBeTypeOf('function');
 		expect(validateDependencyProviderComparison).toBeTypeOf('function');
 		expect(validateCallGraph).toBeTypeOf('function');
+		expect(validateConditionalExportResolution).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('validateConstructedConditionalExportResolution');
 		expect(validateCommandEventContractOverlay).toBeTypeOf('function');
 		expect(validateCommandHandlerGraph).toBeTypeOf('function');
 		expect(validateGuardClassificationOverlay).toBeTypeOf('function');
@@ -165,6 +175,18 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(CALL_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-call-graph/0.1.0');
 		expect(CALL_GRAPH_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-call-graph-request/1.0.0');
 		expect(CALL_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-call-graph/1.0.0');
+		expect(CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION).toBe(
+			'jan-csaa-resolve-conditional-export/0.1.0'
+		);
+		expect(CONDITIONAL_EXPORT_RESOLUTION_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-conditional-export-resolution-progress/1.0.0'
+		);
+		expect(CONDITIONAL_EXPORT_RESOLUTION_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-conditional-export-resolution-request/1.0.0'
+		);
+		expect(CONDITIONAL_EXPORT_RESOLUTION_SCHEMA_VERSION).toBe(
+			'jan-csaa-conditional-export-resolution/1.0.0'
+		);
 		expect(COMMAND_HANDLER_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-command-handler-graph/0.1.0'
 		);

@@ -24,6 +24,19 @@ import {
 	COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
 } from '../contracts/command-event-contract-overlay.js';
 import {
+	CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY,
+	CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER,
+	CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY,
+	CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY_STATUS,
+	CONDITIONAL_EXPORT_RESOLUTION_CURRENTNESS,
+	CONDITIONAL_EXPORT_RESOLUTION_FRESHNESS,
+	CONDITIONAL_EXPORT_RESOLUTION_FULL_JAN_CSAA_012_CONFORMANCE,
+	CONDITIONAL_EXPORT_RESOLUTION_GATE_EFFECT,
+	CONDITIONAL_EXPORT_RESOLUTION_METHOD,
+	CONDITIONAL_EXPORT_RESOLUTION_NONCLAIMS,
+	CONDITIONAL_EXPORT_RESOLUTION_SELECTION
+} from '../contracts/conditional-export-resolution.js';
+import {
 	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
 	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
 	GUARD_ENFORCEMENT_LEDGER_METHOD,
@@ -102,6 +115,8 @@ const LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=FULL CSAA_REPOSITORY_SMOKE_SUITE=LOGICAL_GRAPH_COMPOSITION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=PROJECT_CONTEXT_GRAPH vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=CONDITIONAL_EXPORT_RESOLUTION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_LOGICAL_GRAPH_COMPOSITION_SELECTORLESS_SMOKE_COMMAND =
@@ -125,8 +140,21 @@ const PROJECT_CONTEXT_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/project-context-graph-coverage.test.ts',
 	'packages/csaa/src/semantic/repository-smoke.test.ts'
 ] as const;
+const CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE = [
+	'packages/csaa/src/contracts/conditional-export-resolution.ts',
+	'packages/csaa/src/resolution/build-conditional-export-resolution.ts',
+	'packages/csaa/src/resolution/conditional-export-resolution-canonical.ts',
+	'packages/csaa/src/resolution/validate-conditional-export-resolution.ts',
+	'packages/csaa/src/resolution/conditional-export-resolution-fixture.test-support.ts',
+	'packages/csaa/src/resolution/build-conditional-export-resolution.test.ts',
+	'packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
 
 function jpwbFixtureScriptCommand(name: string): string {
+	if (name === 'csaa:semantic:smoke:conditional-export-resolution') {
+		return CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND;
+	}
 	if (name === 'csaa:semantic:smoke:logical-graph-composition') {
 		return LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND;
 	}
@@ -246,6 +274,7 @@ describe('inventory discovery and identity', () => {
 			'command-dispatch-static-topology',
 			'command-event-contract-static-overlay',
 			'command-handler-static-projection',
+			'conditional-export-resolution',
 			'frozen-program-construction',
 			'guard-classification-static-overlay',
 			'logical-graph-composition',
@@ -286,6 +315,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/graph/build-logical-graph-composition.test.ts',
 				'packages/csaa/src/graph/logical-graph-composition-coverage.test.ts',
 				...PROJECT_CONTEXT_GRAPH_PROVENANCE,
+				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
@@ -702,6 +732,51 @@ describe('inventory discovery and identity', () => {
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
 			expect(projectContextGraphCapability!.explanation).toContain(boundary);
+		const conditionalExportResolutionCapability = capabilities.get('conditional-export-resolution');
+		expect(conditionalExportResolutionCapability).toMatchObject({
+			provider: 'typescript+frozen-workspace-conditional-export-resolution',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
+			'capabilities#project-context-graph',
+			'package.json#/scripts/csaa:semantic:smoke:conditional-export-resolution'
+		])
+			expect(conditionalExportResolutionCapability!.provenance).toContain(expectedProvenance);
+		expect(new Set(conditionalExportResolutionCapability!.provenance).size).toBe(
+			conditionalExportResolutionCapability!.provenance.length
+		);
+		expect(conditionalExportResolutionCapability!.provenance).toEqual(
+			[...conditionalExportResolutionCapability!.provenance].sort()
+		);
+		for (const exactBoundary of [
+			CONDITIONAL_EXPORT_RESOLUTION_METHOD,
+			CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY,
+			CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY_STATUS,
+			CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY,
+			CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER,
+			CONDITIONAL_EXPORT_RESOLUTION_GATE_EFFECT,
+			CONDITIONAL_EXPORT_RESOLUTION_FRESHNESS,
+			CONDITIONAL_EXPORT_RESOLUTION_CURRENTNESS,
+			CONDITIONAL_EXPORT_RESOLUTION_FULL_JAN_CSAA_012_CONFORMANCE,
+			JSON.stringify(CONDITIONAL_EXPORT_RESOLUTION_SELECTION),
+			...CONDITIONAL_EXPORT_RESOLUTION_NONCLAIMS
+		])
+			expect(conditionalExportResolutionCapability!.explanation).toContain(exactBoundary);
+		for (const boundary of [
+			'The sixteenth bounded DWP-004 increment',
+			'PARTIAL JAN-CSAA-CAP-012 slice',
+			'one explicit consumer source and Program',
+			'one exact selected FrozenSubject workspace package manifest',
+			'preserves raw manifest declaration order and UTF-16 source spans',
+			'binds a raw exports-value digest',
+			'one context-specific decision',
+			'explicit frontiers and never become a false resolution miss',
+			'complete-or-unavailable under caller budgets and is never truncated',
+			'dedicated STRUCTURAL-profile conditional-export-resolution-only smoke command',
+			'CONFIGURED_NOT_RUN by inventory generation'
+		])
+			expect(conditionalExportResolutionCapability!.explanation).toContain(boundary);
 		const typescriptAstCapability = capabilities.get('typescript-ast');
 		expect(typescriptAstCapability).toBeDefined();
 		expect(typescriptAstCapability!.provider).toBe('typescript');
@@ -847,12 +922,16 @@ describe('inventory discovery and identity', () => {
 				'capabilities#structural-scc-analysis',
 				'capabilities#logical-graph-composition',
 				'capabilities#project-context-graph',
+				'capabilities#conditional-export-resolution',
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
 				'packages/csaa/src/graph/build-logical-graph-composition.ts',
 				'packages/csaa/src/graph/validate-logical-graph-composition.ts',
 				'packages/csaa/src/contracts/project-context-graph.ts',
 				'packages/csaa/src/graph/build-project-context-graph.ts',
 				'packages/csaa/src/graph/validate-project-context-graph.ts',
+				'packages/csaa/src/contracts/conditional-export-resolution.ts',
+				'packages/csaa/src/resolution/build-conditional-export-resolution.ts',
+				'packages/csaa/src/resolution/validate-conditional-export-resolution.ts',
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
@@ -870,7 +949,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first fifteen bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first sixteen bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -894,12 +973,20 @@ describe('inventory discovery and identity', () => {
 			'exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants'
 		);
 		expect(semanticBoundary).toContain(
+			'bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers'
+		);
+		expect(semanticBoundary).toContain(
 			"complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations"
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, and project context graph smoke commands'
+			'does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, and conditional export resolution smoke commands'
 		);
+		expect(semanticBoundary).toContain('JAN-CSAA-CAP-011 path-alias or module resolution');
+		expect(semanticBoundary).toContain(
+			'conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions'
+		);
+		expect(semanticBoundary).toContain('JAN-CSAA-CAP-030 code slicing');
 		expect(semanticBoundary).toContain(
 			'graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses'
 		);
@@ -956,11 +1043,14 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/contracts/project-context-graph.ts',
 				'packages/csaa/src/graph/build-project-context-graph.ts',
 				'packages/csaa/src/graph/validate-project-context-graph.ts',
+				'packages/csaa/src/contracts/conditional-export-resolution.ts',
+				'packages/csaa/src/resolution/build-conditional-export-resolution.ts',
+				'packages/csaa/src/resolution/validate-conditional-export-resolution.ts',
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}`
@@ -985,6 +1075,15 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`Full JAN-CSAA-010 conformance is ${PROJECT_CONTEXT_GRAPH_FULL_JAN_CSAA_010_CONFORMANCE}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`conditional export resolution has resolution authority ${CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY}, authority transfer ${CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER}, and gate effect ${CONDITIONAL_EXPORT_RESOLUTION_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`freshness is ${CONDITIONAL_EXPORT_RESOLUTION_FRESHNESS}, currentness is ${CONDITIONAL_EXPORT_RESOLUTION_CURRENTNESS}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`Full JAN-CSAA-012 conformance is ${CONDITIONAL_EXPORT_RESOLUTION_FULL_JAN_CSAA_012_CONFORMANCE}`
 		);
 		for (const boundary of [
 			'complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure',
@@ -1378,6 +1477,7 @@ describe('JPWB population non-vacuity', () => {
 				'lint',
 				'test',
 				'test:coverage',
+				'csaa:semantic:smoke:conditional-export-resolution',
 				'csaa:semantic:smoke:command-event-contract',
 				'csaa:semantic:smoke:guard-classification',
 				'csaa:semantic:smoke:logical-graph-composition',
@@ -1428,6 +1528,28 @@ describe('JPWB population non-vacuity', () => {
 		expect(() =>
 			collectInventory({ repositoryRoot: missingCommand, requireJpwbPopulations: true })
 		).toThrow('Required JPWB assurance command is absent: boundary');
+
+		const missingConditionalExportResolutionSmoke = fixture();
+		write(
+			missingConditionalExportResolutionSmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:conditional-export-resolution'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingConditionalExportResolutionSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:semantic:smoke:conditional-export-resolution'
+		);
 
 		const missingCommandEventSmoke = fixture();
 		write(
@@ -1556,6 +1678,25 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:semantic:smoke:structural-scc');
 
+		const selectorlessConditionalExportResolutionSmoke = fixture();
+		write(
+			selectorlessConditionalExportResolutionSmoke,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:semantic:smoke:conditional-export-resolution':
+					LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: selectorlessConditionalExportResolutionSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:conditional-export-resolution'
+		);
+
 		const selectorlessLogicalGraphCompositionSmoke = fixture();
 		write(
 			selectorlessLogicalGraphCompositionSmoke,
@@ -1656,6 +1797,7 @@ describe('JPWB population non-vacuity', () => {
 						'lint',
 						'test',
 						'test:coverage',
+						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
 						'csaa:semantic:smoke:logical-graph-composition',
@@ -1750,6 +1892,7 @@ describe('JPWB population non-vacuity', () => {
 						'lint',
 						'test',
 						'test:coverage',
+						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
 						'csaa:semantic:smoke:logical-graph-composition',
@@ -1809,6 +1952,7 @@ describe('JPWB population non-vacuity', () => {
 						'lint',
 						'test',
 						'test:coverage',
+						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
 						'csaa:semantic:smoke:logical-graph-composition',
@@ -1906,7 +2050,8 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
 			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
 			...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
-			...PROJECT_CONTEXT_GRAPH_PROVENANCE
+			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
+			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE
 		];
 		for (const path of requiredPaths)
 			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
@@ -1999,15 +2144,37 @@ describe('JPWB population non-vacuity', () => {
 			);
 			write(root, missingProjectContextGraphPath, 'export {};\n');
 		}
+		for (const missingConditionalExportResolutionPath of CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE.filter(
+			(path) => path !== 'packages/csaa/src/semantic/repository-smoke.test.ts'
+		)) {
+			rmSync(join(root, ...missingConditionalExportResolutionPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB conditional export resolution implementation or verification source is absent: ${missingConditionalExportResolutionPath}`
+			);
+			write(root, missingConditionalExportResolutionPath, 'export {};\n');
+		}
 		const sharedRepositorySmokePath = 'packages/csaa/src/semantic/repository-smoke.test.ts';
 		rmSync(join(root, ...sharedRepositorySmokePath.split('/')));
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
 			`Required JPWB guard-classification static overlay implementation source is absent: ${sharedRepositorySmokePath}`
 		);
-	}, 30_000);
+	}, 120_000);
 
 	it('discovers every current workspace manifest and every top-level verif TypeScript asset', () => {
 		const inventory = collectInventory({ repositoryRoot: ROOT, requireJpwbPopulations: true });
+		expect(
+			inventory.commands.find(
+				(command) =>
+					command.owner === '.' &&
+					command.name === 'csaa:semantic:smoke:conditional-export-resolution'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
 		expect(
 			inventory.commands.find(
 				(command) =>
@@ -2077,7 +2244,8 @@ describe('JPWB population non-vacuity', () => {
 				'packages/csaa/src/graph/build-structural-scc-analysis.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-fixture.test-support.ts',
-				...LOGICAL_GRAPH_COMPOSITION_PROVENANCE
+				...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE
 			])
 		);
 		const manifestCount = ['packages', 'apps'].reduce(

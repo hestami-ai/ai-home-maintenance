@@ -13,6 +13,21 @@ import {
 	ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 	CALL_GRAPH_OPERATION_VERSION,
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY,
+	CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER,
+	CONDITIONAL_EXPORT_RESOLUTION_CANONICAL_PROFILE,
+	CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY,
+	CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY_STATUS,
+	CONDITIONAL_EXPORT_RESOLUTION_CURRENTNESS,
+	CONDITIONAL_EXPORT_RESOLUTION_FRESHNESS,
+	CONDITIONAL_EXPORT_RESOLUTION_FULL_JAN_CSAA_012_CONFORMANCE,
+	CONDITIONAL_EXPORT_RESOLUTION_GATE_EFFECT,
+	CONDITIONAL_EXPORT_RESOLUTION_METHOD,
+	CONDITIONAL_EXPORT_RESOLUTION_NONCLAIMS,
+	CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_REQUEST_SCHEMA_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_SCHEMA_VERSION,
+	CONDITIONAL_EXPORT_RESOLUTION_SELECTION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
@@ -90,7 +105,10 @@ import {
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
 	type CallGraphSnapshot,
+	type ConditionalExportResolutionProgressEvent,
+	type ConditionalExportResolutionSnapshot,
 	type ModuleDependencyGraphSnapshot,
+	type ProjectContextGraphSnapshot,
 	type BuildStateMachineGraphRequest,
 	type GuardEnforcementLedgerObservation,
 	type StateMachineGraphSnapshot,
@@ -99,6 +117,7 @@ import {
 	type StaticSemanticSnapshotProgressEvent,
 	type ResolveSubjectRequest,
 	buildCallGraph,
+	buildConditionalExportResolution,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
 	buildCommandDispatchTopology,
@@ -127,6 +146,7 @@ import {
 	sha256,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
+	validateConditionalExportResolution,
 	validateArrowCommandCensusObservation,
 	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
@@ -148,6 +168,7 @@ const SMOKE_SELECTOR = process.env.CSAA_REPOSITORY_SMOKE;
 type RepositorySmokeProfile = 'FULL' | 'STRUCTURAL';
 type RepositorySmokeSuite =
 	| 'COMMAND_HANDLER_ONLY'
+	| 'CONDITIONAL_EXPORT_RESOLUTION_ONLY'
 	| 'FULL_SUITE'
 	| 'LOGICAL_GRAPH_COMPOSITION_ONLY'
 	| 'PROJECT_CONTEXT_GRAPH_ONLY'
@@ -158,6 +179,7 @@ interface RepositorySmokeProjectionPlan {
 	readonly runIndependentSemanticRevalidation: boolean;
 	readonly runCallGraph: boolean;
 	readonly runCommandEventContractOverlay: boolean;
+	readonly runConditionalExportResolution: boolean;
 	readonly runDependencyProviderComparison: boolean;
 	readonly runGuardClassificationOverlay: boolean;
 	readonly runLogicalGraphComposition: boolean;
@@ -169,6 +191,7 @@ interface RepositorySmokeProjectionPlan {
 	readonly runStructuralModuleReachabilityAnalysis: boolean;
 	readonly runStructuralSccAnalysis: boolean;
 	readonly suite: RepositorySmokeSuite;
+	readonly terminateAfterConditionalExportResolution: boolean;
 	readonly terminateAfterLogicalGraphComposition: boolean;
 	readonly terminateAfterProjectContextGraph: boolean;
 	readonly terminateAfterStructuralModuleReachabilityAnalysis: boolean;
@@ -182,6 +205,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: false,
 		runCommandEventContractOverlay: true,
+		runConditionalExportResolution: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: true,
 		runLogicalGraphComposition: false,
@@ -193,6 +217,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
 		suite: 'COMMAND_HANDLER_ONLY',
+		terminateAfterConditionalExportResolution: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterProjectContextGraph: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -202,6 +227,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: true,
 		runCallGraph: true,
 		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: false,
 		runDependencyProviderComparison: true,
 		runGuardClassificationOverlay: false,
 		runLogicalGraphComposition: true,
@@ -213,6 +239,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: true,
 		suite: 'FULL_SUITE',
+		terminateAfterConditionalExportResolution: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterProjectContextGraph: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -222,6 +249,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: true,
 		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: false,
 		runLogicalGraphComposition: true,
@@ -233,6 +261,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
 		suite: 'LOGICAL_GRAPH_COMPOSITION_ONLY',
+		terminateAfterConditionalExportResolution: false,
 		terminateAfterLogicalGraphComposition: true,
 		terminateAfterProjectContextGraph: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -242,6 +271,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: false,
 		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: false,
 		runLogicalGraphComposition: false,
@@ -253,8 +283,31 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
 		suite: 'PROJECT_CONTEXT_GRAPH_ONLY',
+		terminateAfterConditionalExportResolution: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterProjectContextGraph: true,
+		terminateAfterStructuralModuleReachabilityAnalysis: false,
+		terminateAfterStructuralSccAnalysis: false
+	},
+	CONDITIONAL_EXPORT_RESOLUTION_ONLY: {
+		runIndependentSemanticRevalidation: false,
+		runCallGraph: false,
+		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: true,
+		runDependencyProviderComparison: false,
+		runGuardClassificationOverlay: false,
+		runLogicalGraphComposition: false,
+		runModuleDependencyGraph: false,
+		runProjectContextGraph: true,
+		runReadWriteAccessGraph: false,
+		runRepositoryDiscoveryPreflight: false,
+		runStateMachineProjection: false,
+		runStructuralModuleReachabilityAnalysis: false,
+		runStructuralSccAnalysis: false,
+		suite: 'CONDITIONAL_EXPORT_RESOLUTION_ONLY',
+		terminateAfterConditionalExportResolution: true,
+		terminateAfterLogicalGraphComposition: false,
+		terminateAfterProjectContextGraph: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -262,6 +315,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: false,
 		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: false,
 		runLogicalGraphComposition: false,
@@ -273,6 +327,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: false,
 		suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
+		terminateAfterConditionalExportResolution: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterProjectContextGraph: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: true,
@@ -282,6 +337,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runIndependentSemanticRevalidation: false,
 		runCallGraph: false,
 		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: false,
 		runLogicalGraphComposition: false,
@@ -293,6 +349,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: true,
 		suite: 'STRUCTURAL_SCC_ONLY',
+		terminateAfterConditionalExportResolution: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterProjectContextGraph: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -312,6 +369,11 @@ function repositorySmokeSuite(value: string | undefined): RepositorySmokeSuite {
 	const normalized = value.trim().toUpperCase();
 	if (normalized === 'COMMAND_HANDLER' || normalized === 'COMMAND_HANDLER_ONLY')
 		return 'COMMAND_HANDLER_ONLY';
+	if (
+		normalized === 'CONDITIONAL_EXPORT_RESOLUTION' ||
+		normalized === 'CONDITIONAL_EXPORT_RESOLUTION_ONLY'
+	)
+		return 'CONDITIONAL_EXPORT_RESOLUTION_ONLY';
 	if (
 		normalized === 'STRUCTURAL_MODULE_REACHABILITY' ||
 		normalized === 'STRUCTURAL_MODULE_REACHABILITY_ONLY'
@@ -374,14 +436,14 @@ const REPOSITORY_SMOKE_FAILSAFE_SUBJECT_CONFIG_DEPTH = 64;
 const REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS = 3_600_000;
 const REPOSITORY_SMOKE_FAILSAFE_SNAPSHOT_BYTES = 1_000_000_000;
 const REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS = 300_000;
-// Two subject resolutions, the semantic build, two provider processes, and five minutes for
-// graph projection, validation, failure reporting, and cleanup. This is a test-runner guard,
-// not an empirical product ceiling or SLO.
+// Two subject resolutions, the semantic build, two provider processes, and thirty minutes for
+// bounded projections, repeated independent predecessor validation, failure reporting, and
+// cleanup. This is a test-runner guard, not an empirical product ceiling or SLO.
 const REPOSITORY_SMOKE_FAILSAFE_TEST_TIMEOUT_MS =
 	REPOSITORY_SMOKE_FAILSAFE_SUBJECT_DURATION_MS * 2 +
 	REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS +
 	REPOSITORY_SMOKE_FAILSAFE_PROVIDER_DURATION_MS * 2 +
-	300_000;
+	1_800_000;
 // Historical three-project representative slice used by the FULL smoke profile.
 const REPRESENTATIVE_PROJECTS = [
 	'packages/rph-application/tsconfig.json',
@@ -432,10 +494,15 @@ const COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS = [
 ] as const;
 const STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH =
 	'packages/rph-application/src/index.ts' as const;
+const CONDITIONAL_EXPORT_RESOLUTION_CONSUMER_LOGICAL_PATH =
+	'packages/rph-application/src/command-bus.ts' as const;
+const CONDITIONAL_EXPORT_RESOLUTION_PACKAGE_NAME = '@janumipwb/rph-contracts' as const;
+const CONDITIONAL_EXPORT_RESOLUTION_EXPORT_SUBPATH = '.' as const;
+const CONDITIONAL_EXPORT_RESOLUTION_EXPLICIT_CONDITIONS = ['source', 'types'] as const;
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.8.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.9.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -446,6 +513,7 @@ type RepositorySmokePhase =
 	| 'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY'
 	| 'COMMAND_HANDLER_STATIC_PROJECTION'
 	| 'COMMAND_DISPATCH_STATIC_TOPOLOGY'
+	| 'CONDITIONAL_EXPORT_RESOLUTION'
 	| 'GUARD_CLASSIFICATION_STATIC_OVERLAY'
 	| 'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING'
 	| 'GUARD_ENFORCEMENT_LEDGER_OBSERVATION'
@@ -467,6 +535,7 @@ type RepositorySmokePhase =
 	| 'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE';
 
 const STRUCTURAL_SCC_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'CONDITIONAL_EXPORT_RESOLUTION',
 	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 	'CALL_GRAPH',
 	'LOGICAL_GRAPH_COMPOSITION',
@@ -490,6 +559,7 @@ const STRUCTURAL_SCC_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 ];
 
 const STRUCTURAL_MODULE_REACHABILITY_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'CONDITIONAL_EXPORT_RESOLUTION',
 	'STRUCTURAL_SCC_ANALYSIS',
 	'CALL_GRAPH',
 	'LOGICAL_GRAPH_COMPOSITION',
@@ -573,12 +643,14 @@ const LOGICAL_GRAPH_COMPOSITION_ONLY_EXPECTED_SKIPPED_PHASES: readonly Repositor
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 	'PROJECT_CONTEXT_GRAPH',
+	'CONDITIONAL_EXPORT_RESOLUTION',
 	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 	'STRUCTURAL_SCC_ANALYSIS',
 	...LOGICAL_GRAPH_COMPOSITION_ONLY_DOWNSTREAM_SKIPPED_PHASES
 ];
 
 const PROJECT_CONTEXT_GRAPH_ONLY_DOWNSTREAM_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'CONDITIONAL_EXPORT_RESOLUTION',
 	'MODULE_DEPENDENCY_GRAPH',
 	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 	'STRUCTURAL_SCC_ANALYSIS',
@@ -614,6 +686,25 @@ const PROJECT_CONTEXT_GRAPH_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmo
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 	...PROJECT_CONTEXT_GRAPH_ONLY_DOWNSTREAM_SKIPPED_PHASES
 ];
+
+const CONDITIONAL_EXPORT_RESOLUTION_ONLY_DOWNSTREAM_SKIPPED_PHASES: readonly RepositorySmokePhase[] =
+	PROJECT_CONTEXT_GRAPH_ONLY_DOWNSTREAM_SKIPPED_PHASES.filter(
+		(phase) => phase !== 'CONDITIONAL_EXPORT_RESOLUTION'
+	);
+
+const CONDITIONAL_EXPORT_RESOLUTION_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase[] = [
+	'SELECTED_SUBJECT_RESOLUTION',
+	'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+	'PROJECT_CONTEXT_GRAPH',
+	'CONDITIONAL_EXPORT_RESOLUTION'
+];
+
+const CONDITIONAL_EXPORT_RESOLUTION_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] =
+	[
+		'REPOSITORY_DISCOVERY_PREFLIGHT',
+		'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+		...CONDITIONAL_EXPORT_RESOLUTION_ONLY_DOWNSTREAM_SKIPPED_PHASES
+	];
 
 interface RepositorySmokeTelemetryOptions {
 	/** Deterministic test clock; one sample supplies both wall and monotonic values. */
@@ -835,6 +926,12 @@ describe('repository smoke phase telemetry', () => {
 		expect(repositorySmokeSuite('')).toBe('FULL_SUITE');
 		expect(repositorySmokeSuite(' command_handler ')).toBe('COMMAND_HANDLER_ONLY');
 		expect(repositorySmokeSuite(' command_handler_only ')).toBe('COMMAND_HANDLER_ONLY');
+		expect(repositorySmokeSuite(' conditional_export_resolution ')).toBe(
+			'CONDITIONAL_EXPORT_RESOLUTION_ONLY'
+		);
+		expect(repositorySmokeSuite(' conditional_export_resolution_only ')).toBe(
+			'CONDITIONAL_EXPORT_RESOLUTION_ONLY'
+		);
 		expect(repositorySmokeSuite(' structural_module_reachability ')).toBe(
 			'STRUCTURAL_MODULE_REACHABILITY_ONLY'
 		);
@@ -904,6 +1001,17 @@ describe('repository smoke phase telemetry', () => {
 		expect(() =>
 			assertRepositorySmokeSelection('STRUCTURAL', 'PROJECT_CONTEXT_GRAPH_ONLY', '1')
 		).not.toThrow();
+		expect(() =>
+			assertRepositorySmokeSelection('FULL', 'CONDITIONAL_EXPORT_RESOLUTION_ONLY', '1')
+		).toThrow(
+			'CONDITIONAL_EXPORT_RESOLUTION_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.'
+		);
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'CONDITIONAL_EXPORT_RESOLUTION_ONLY', 'all')
+		).toThrow('CONDITIONAL_EXPORT_RESOLUTION_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'CONDITIONAL_EXPORT_RESOLUTION_ONLY', '1')
+		).not.toThrow();
 		expect(selectedProjectsForSmoke('FULL', 'FULL_SUITE', '1')).toEqual(REPRESENTATIVE_PROJECTS);
 		expect(selectedProjectsForSmoke('FULL', 'LOGICAL_GRAPH_COMPOSITION_ONLY', '1')).toEqual(
 			COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
@@ -914,11 +1022,15 @@ describe('repository smoke phase telemetry', () => {
 		expect(selectedProjectsForSmoke('STRUCTURAL', 'PROJECT_CONTEXT_GRAPH_ONLY', '1')).toEqual(
 			COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
 		);
+		expect(
+			selectedProjectsForSmoke('STRUCTURAL', 'CONDITIONAL_EXPORT_RESOLUTION_ONLY', '1')
+		).toEqual(COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS);
 		expect(selectedProjectsForSmoke('FULL', 'FULL_SUITE', 'all')).toBeNull();
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.COMMAND_HANDLER_ONLY).toEqual({
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
 			runCommandEventContractOverlay: true,
+			runConditionalExportResolution: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: true,
 			runLogicalGraphComposition: false,
@@ -930,6 +1042,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
 			suite: 'COMMAND_HANDLER_ONLY',
+			terminateAfterConditionalExportResolution: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterProjectContextGraph: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -939,6 +1052,7 @@ describe('repository smoke phase telemetry', () => {
 			runIndependentSemanticRevalidation: true,
 			runCallGraph: true,
 			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: false,
 			runDependencyProviderComparison: true,
 			runGuardClassificationOverlay: false,
 			runLogicalGraphComposition: true,
@@ -950,6 +1064,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: true,
 			suite: 'FULL_SUITE',
+			terminateAfterConditionalExportResolution: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterProjectContextGraph: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -959,6 +1074,7 @@ describe('repository smoke phase telemetry', () => {
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: true,
 			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: false,
 			runLogicalGraphComposition: true,
@@ -970,6 +1086,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
 			suite: 'LOGICAL_GRAPH_COMPOSITION_ONLY',
+			terminateAfterConditionalExportResolution: false,
 			terminateAfterLogicalGraphComposition: true,
 			terminateAfterProjectContextGraph: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -979,6 +1096,7 @@ describe('repository smoke phase telemetry', () => {
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
 			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: false,
 			runLogicalGraphComposition: false,
@@ -990,8 +1108,31 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
 			suite: 'PROJECT_CONTEXT_GRAPH_ONLY',
+			terminateAfterConditionalExportResolution: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterProjectContextGraph: true,
+			terminateAfterStructuralModuleReachabilityAnalysis: false,
+			terminateAfterStructuralSccAnalysis: false
+		});
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.CONDITIONAL_EXPORT_RESOLUTION_ONLY).toEqual({
+			runIndependentSemanticRevalidation: false,
+			runCallGraph: false,
+			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: true,
+			runDependencyProviderComparison: false,
+			runGuardClassificationOverlay: false,
+			runLogicalGraphComposition: false,
+			runModuleDependencyGraph: false,
+			runProjectContextGraph: true,
+			runReadWriteAccessGraph: false,
+			runRepositoryDiscoveryPreflight: false,
+			runStateMachineProjection: false,
+			runStructuralModuleReachabilityAnalysis: false,
+			runStructuralSccAnalysis: false,
+			suite: 'CONDITIONAL_EXPORT_RESOLUTION_ONLY',
+			terminateAfterConditionalExportResolution: true,
+			terminateAfterLogicalGraphComposition: false,
+			terminateAfterProjectContextGraph: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -999,6 +1140,7 @@ describe('repository smoke phase telemetry', () => {
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
 			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: false,
 			runLogicalGraphComposition: false,
@@ -1010,6 +1152,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: false,
 			suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
+			terminateAfterConditionalExportResolution: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterProjectContextGraph: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: true,
@@ -1019,6 +1162,7 @@ describe('repository smoke phase telemetry', () => {
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
 			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: false,
 			runLogicalGraphComposition: false,
@@ -1030,6 +1174,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: true,
 			suite: 'STRUCTURAL_SCC_ONLY',
+			terminateAfterConditionalExportResolution: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterProjectContextGraph: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
@@ -1045,6 +1190,7 @@ describe('repository smoke phase telemetry', () => {
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 			'PROJECT_CONTEXT_GRAPH',
+			'CONDITIONAL_EXPORT_RESOLUTION',
 			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 			'CALL_GRAPH',
 			'LOGICAL_GRAPH_COMPOSITION',
@@ -1076,6 +1222,7 @@ describe('repository smoke phase telemetry', () => {
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 			'PROJECT_CONTEXT_GRAPH',
+			'CONDITIONAL_EXPORT_RESOLUTION',
 			'STRUCTURAL_SCC_ANALYSIS',
 			'CALL_GRAPH',
 			'LOGICAL_GRAPH_COMPOSITION',
@@ -1108,6 +1255,7 @@ describe('repository smoke phase telemetry', () => {
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 			'PROJECT_CONTEXT_GRAPH',
+			'CONDITIONAL_EXPORT_RESOLUTION',
 			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 			'STRUCTURAL_SCC_ANALYSIS',
 			'READ_WRITE_ACCESS_GRAPH',
@@ -1134,6 +1282,39 @@ describe('repository smoke phase telemetry', () => {
 			'PROJECT_CONTEXT_GRAPH'
 		]);
 		expect(PROJECT_CONTEXT_GRAPH_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
+			'REPOSITORY_DISCOVERY_PREFLIGHT',
+			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'CONDITIONAL_EXPORT_RESOLUTION',
+			'MODULE_DEPENDENCY_GRAPH',
+			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+			'STRUCTURAL_SCC_ANALYSIS',
+			'CALL_GRAPH',
+			'LOGICAL_GRAPH_COMPOSITION',
+			'READ_WRITE_ACCESS_GRAPH',
+			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+			'STATE_MACHINE_GRAPH_PROJECTION',
+			'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+			'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+			'ARROW_COMMAND_CENSUS_OBSERVATION',
+			'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+			'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+			'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+			'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+			'COMMAND_HANDLER_STATIC_PROJECTION',
+			'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+			'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+			'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+			'DEPENDENCY_CRUISER_EXECUTION',
+			'DEPENDENCY_CRUISER_NORMALIZATION',
+			'DEPENDENCY_PROVIDER_COMPARISON'
+		]);
+		expect(CONDITIONAL_EXPORT_RESOLUTION_ONLY_COMPLETED_PHASES).toEqual([
+			'SELECTED_SUBJECT_RESOLUTION',
+			'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+			'PROJECT_CONTEXT_GRAPH',
+			'CONDITIONAL_EXPORT_RESOLUTION'
+		]);
+		expect(CONDITIONAL_EXPORT_RESOLUTION_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 			'MODULE_DEPENDENCY_GRAPH',
@@ -1330,7 +1511,8 @@ describe('current JPWB repository semantic and graph smoke', () => {
 								...(USE_COMMON_COMMAND_HANDLER_SUBJECT &&
 								SMOKE_SUITE !== 'STRUCTURAL_SCC_ONLY' &&
 								SMOKE_SUITE !== 'STRUCTURAL_MODULE_REACHABILITY_ONLY' &&
-								SMOKE_SUITE !== 'PROJECT_CONTEXT_GRAPH_ONLY'
+								SMOKE_SUITE !== 'PROJECT_CONTEXT_GRAPH_ONLY' &&
+								SMOKE_SUITE !== 'CONDITIONAL_EXPORT_RESOLUTION_ONLY'
 									? { additionalArtifacts: COMMAND_ANALYSIS_AUXILIARY_ARTIFACTS }
 									: {}),
 								kind: 'EXPLICIT_PROJECTS',
@@ -1526,6 +1708,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					0,
 					Math.round(performance.now() - semanticPipelineStartedAt)
 				);
+				let projectContextGraph: ProjectContextGraphSnapshot | null = null;
 				let projectContextGraphResult: null | {
 					readonly bytes: number;
 					readonly chargedInputTraversalSteps: number;
@@ -1541,6 +1724,34 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					readonly projects: number;
 					readonly sha256: string;
 					readonly sources: number;
+				} = null;
+				let conditionalExportResolutionResult: null | {
+					readonly authorityTransfer: string;
+					readonly branches: number;
+					readonly bytes: number;
+					readonly capability: string;
+					readonly capabilityStatus: string;
+					readonly chargedTraversalSteps: number;
+					readonly closure: string;
+					readonly conditionChecks: number;
+					readonly contentDigest: string;
+					readonly currentness: string;
+					readonly decisionState: string;
+					readonly durationMs: number;
+					readonly exactExportKeyComparisons: number;
+					readonly freshness: string;
+					readonly frontiers: number;
+					readonly fullJanCsaa012Conformance: string;
+					readonly gateEffect: string;
+					readonly inputDigest: string;
+					readonly manifestBytes: number;
+					readonly nonclaims: readonly string[];
+					readonly resolutionAuthority: string;
+					readonly resolutionId: string;
+					readonly resolution: ConditionalExportResolutionSnapshot;
+					readonly resultCompleteness: string;
+					readonly selectedTarget: string | null;
+					readonly sha256: string;
 				} = null;
 				if (SMOKE_PROJECTION_PLAN.runProjectContextGraph) {
 					const projectContextStartedAt = performance.now();
@@ -1607,17 +1818,18 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					).toBe('partial');
 					if (projectContextOutcome.outcome !== 'partial')
 						throw new Error(JSON.stringify(projectContextOutcome));
-					const projectContextGraph = projectContextOutcome.graph;
-					expect(
-						validateProjectContextGraph(projectContextGraph, projectContextInputs, {
-							maxDepth: 4_096,
-							maxInputRecords: projectContextBudgets.maxInputRecords,
-							maxInputStringCharacters: projectContextBudgets.maxInputStringCharacters,
-							maxIssues: projectContextBudgets.maxDiagnostics,
-							maxRecords: projectContextBudgets.maxInputRecords,
-							maxStringCharacters: projectContextBudgets.maxInputStringCharacters
-						})
-					).toEqual({ issues: [], state: 'VALID' });
+					projectContextGraph = projectContextOutcome.graph;
+					if (SMOKE_SUITE !== 'CONDITIONAL_EXPORT_RESOLUTION_ONLY')
+						expect(
+							validateProjectContextGraph(projectContextGraph, projectContextInputs, {
+								maxDepth: 4_096,
+								maxInputRecords: projectContextBudgets.maxInputRecords,
+								maxInputStringCharacters: projectContextBudgets.maxInputStringCharacters,
+								maxIssues: projectContextBudgets.maxDiagnostics,
+								maxRecords: projectContextBudgets.maxInputRecords,
+								maxStringCharacters: projectContextBudgets.maxInputStringCharacters
+							})
+						).toEqual({ issues: [], state: 'VALID' });
 					expect(projectContextGraph.projects).toHaveLength(snapshot.projects.length);
 					expect(projectContextGraph.programs).toHaveLength(snapshot.programs.length);
 					expect(projectContextGraph.sources).toHaveLength(snapshot.sources.length);
@@ -1720,6 +1932,434 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						reason: 'The selected smoke suite does not request the project-context projection.',
 						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
 					});
+				if (SMOKE_PROJECTION_PLAN.runConditionalExportResolution) {
+					if (projectContextGraph === null)
+						throw new Error(
+							'CONDITIONAL_EXPORT_RESOLUTION_ONLY requires validated project-context evidence.'
+						);
+					const conditionalExportStartedAt = performance.now();
+					const consumerSources = projectContextGraph.sources.filter(
+						(source) => source.logicalPath === CONDITIONAL_EXPORT_RESOLUTION_CONSUMER_LOGICAL_PATH
+					);
+					expect(consumerSources).toHaveLength(1);
+					const consumerSource = consumerSources[0];
+					if (consumerSource === undefined)
+						throw new Error('The selected CAP-012 consumer source is absent.');
+					const consumerPrograms = projectContextGraph.programs.filter(
+						(program) => program.id === consumerSource.programId
+					);
+					expect(consumerPrograms).toHaveLength(1);
+					const consumerProgram = consumerPrograms[0];
+					if (consumerProgram === undefined)
+						throw new Error('The selected CAP-012 consumer program is absent.');
+					const selectedWorkspaces = subject.workspaces.filter(
+						(workspace) => workspace.name === CONDITIONAL_EXPORT_RESOLUTION_PACKAGE_NAME
+					);
+					expect(selectedWorkspaces).toHaveLength(1);
+					const selectedWorkspace = selectedWorkspaces[0];
+					if (selectedWorkspace === undefined)
+						throw new Error('The selected CAP-012 workspace package is absent.');
+					expect(selectedWorkspace.manifestPath).toBe('packages/rph-contracts/package.json');
+					const conditionalExportBudgets = {
+						maxAstNodes: 111,
+						maxBranches: 4,
+						maxConditionChecks: 4,
+						maxDiagnostics: 100_000,
+						maxFrontiers: 0,
+						maxInputRecords: 50_000_000,
+						maxInputStringCharacters: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
+						maxManifestBytes: 1_467,
+						maxOutputRecords: 5,
+						maxTraversalSteps: 117
+					};
+					const conditionalExportInputs = {
+						frozenSubject: subject,
+						projectContextGraph,
+						request: {
+							budgets: conditionalExportBudgets,
+							conditions: CONDITIONAL_EXPORT_RESOLUTION_EXPLICIT_CONDITIONS,
+							consumer: {
+								projectContextProgramId: consumerProgram.id,
+								projectContextSourceId: consumerSource.id,
+								semanticProgramId: consumerProgram.semanticProgramId,
+								semanticSourceId: consumerSource.semanticSourceId
+							},
+							exportSubpath: CONDITIONAL_EXPORT_RESOLUTION_EXPORT_SUBPATH,
+							manifestPath: selectedWorkspace.manifestPath,
+							moduleMode: 'IMPORT' as const,
+							operationVersion: CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION,
+							packageName: CONDITIONAL_EXPORT_RESOLUTION_PACKAGE_NAME,
+							platform: 'NODE' as const,
+							projectContextGraph: {
+								contentDigest: projectContextGraph.contentDigest,
+								graphId: projectContextGraph.id,
+								inputDigest: projectContextGraph.inputDigest
+							},
+							schemaVersion: CONDITIONAL_EXPORT_RESOLUTION_REQUEST_SCHEMA_VERSION,
+							selection: CONDITIONAL_EXPORT_RESOLUTION_SELECTION,
+							semanticSnapshotId: snapshot.id,
+							subjectId: subject.descriptor.subjectId
+						},
+						semanticSnapshot: snapshot
+					};
+					const conditionalExportProgressEvents: ConditionalExportResolutionProgressEvent[] = [];
+					telemetry.start('CONDITIONAL_EXPORT_RESOLUTION', {
+						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						consumerLogicalPath: consumerSource.logicalPath,
+						exportSubpath: CONDITIONAL_EXPORT_RESOLUTION_EXPORT_SUBPATH,
+						packageName: CONDITIONAL_EXPORT_RESOLUTION_PACKAGE_NAME
+					});
+					const conditionalExportOutcome = buildConditionalExportResolution(
+						conditionalExportInputs,
+						{
+							onProgress(event) {
+								conditionalExportProgressEvents.push(event);
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						}
+					);
+					await Promise.resolve();
+					expect(
+						conditionalExportProgressEvents
+							.filter((event) => event.state === 'COMPLETED')
+							.map((event) => event.phase)
+					).toEqual([
+						'REQUEST_BIND',
+						'INPUT_BUDGET',
+						'PROJECT_CONTEXT_GRAPH_VALIDATE',
+						'CONSUMER_BIND',
+						'MANIFEST_PARSE',
+						'EXPORT_KEY_MATCH',
+						'CONDITION_EVALUATE',
+						'MATERIALIZE',
+						'SERIALIZE',
+						'RESOLUTION_VALIDATE'
+					]);
+					expect(
+						conditionalExportOutcome.outcome,
+						JSON.stringify(conditionalExportOutcome.diagnostics)
+					).toBe('partial');
+					if (conditionalExportOutcome.outcome !== 'partial')
+						throw new Error(JSON.stringify(conditionalExportOutcome));
+					const resolution = conditionalExportOutcome.resolution;
+					expect(
+						validateConditionalExportResolution(resolution, conditionalExportInputs, {
+							maxDepth: 4_096,
+							maxInputRecords: conditionalExportBudgets.maxInputRecords,
+							maxInputStringCharacters: conditionalExportBudgets.maxInputStringCharacters,
+							maxIssues: conditionalExportBudgets.maxDiagnostics,
+							maxRecords: conditionalExportBudgets.maxInputRecords,
+							maxStringCharacters: conditionalExportBudgets.maxInputStringCharacters
+						})
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(resolution.budgets).toEqual(conditionalExportBudgets);
+					expect(resolution.consumerEnvironment).toEqual({
+						conditionSemantics: 'MEMBERSHIP_ONLY_PRIORITY_FROM_MANIFEST_DECLARATION_ORDER',
+						conditions: ['source', 'types'],
+						defaultConditionEnabled: true,
+						effectiveConditions: ['source', 'types', 'node', 'import'],
+						logicalPath: CONDITIONAL_EXPORT_RESOLUTION_CONSUMER_LOGICAL_PATH,
+						moduleMode: 'IMPORT',
+						platform: 'NODE',
+						projectContextProgramId: consumerProgram.id,
+						projectContextProjectId: consumerProgram.projectId,
+						projectContextSourceId: consumerSource.id,
+						semanticProgramId: consumerProgram.semanticProgramId,
+						semanticProjectId: consumerProgram.semanticProjectId,
+						semanticSourceId: consumerSource.semanticSourceId
+					});
+					expect(resolution.manifestWitness).toEqual({
+						exportsPropertySpan: {
+							coordinateSystem: 'UTF16_CODE_UNIT_ZERO_BASED_HALF_OPEN',
+							length: 332,
+							start: 300
+						},
+						exportsValueSha256: 'aadd683ab52d321a88747a71bcb388d8935cca99120f13ae92820c950168ba69',
+						exportsValueSpan: {
+							coordinateSystem: 'UTF16_CODE_UNIT_ZERO_BASED_HALF_OPEN',
+							length: 321,
+							start: 311
+						},
+						importsPropertySpan: null,
+						manifestBytes: 1_467,
+						manifestPath: 'packages/rph-contracts/package.json',
+						manifestSha256: '2e751402faeb3e5cd6d72c1335241f283d552f4733e51287a4aa3ff7fdc11ea1',
+						parseMethod: 'TYPESCRIPT_PARSE_JSON_TEXT',
+						parserVersion: '5.9.3',
+						rootSpan: {
+							coordinateSystem: 'UTF16_CODE_UNIT_ZERO_BASED_HALF_OPEN',
+							length: 1_466,
+							start: 0
+						},
+						sourceEncoding: 'UTF-8',
+						workspaceKind: 'PACKAGE',
+						workspaceName: CONDITIONAL_EXPORT_RESOLUTION_PACKAGE_NAME,
+						workspacePath: 'packages/rph-contracts'
+					});
+					expect(resolution.exactKeyOutcome).toEqual({
+						declarationOrdinal: 7,
+						exportSubpath: '.',
+						keySpan: {
+							coordinateSystem: 'UTF16_CODE_UNIT_ZERO_BASED_HALF_OPEN',
+							length: 3,
+							start: 317
+						},
+						matchKind: 'EXPLICIT_SUBPATH_KEY',
+						state: 'MATCHED',
+						valueSpan: {
+							coordinateSystem: 'UTF16_CODE_UNIT_ZERO_BASED_HALF_OPEN',
+							length: 147,
+							start: 322
+						}
+					});
+					expect(
+						resolution.branches.map(
+							({
+								condition,
+								conditionMatch,
+								conditionPath,
+								declarationOrdinal,
+								depth,
+								evaluation,
+								exclusionReason,
+								ordinal,
+								target,
+								valueKind
+							}) => ({
+								condition,
+								conditionMatch,
+								conditionPath,
+								declarationOrdinal,
+								depth,
+								evaluation,
+								exclusionReason,
+								ordinal,
+								target,
+								valueKind
+							})
+						)
+					).toEqual([
+						{
+							condition: 'source',
+							conditionMatch: 'EXPLICIT',
+							conditionPath: ['source'],
+							declarationOrdinal: 8,
+							depth: 0,
+							evaluation: 'SELECTED',
+							exclusionReason: null,
+							ordinal: 0,
+							target: './src/index.ts',
+							valueKind: 'STRING'
+						},
+						...(['types', 'import', 'default'] as const).map((condition, index) => ({
+							condition,
+							conditionMatch:
+								condition === 'default'
+									? 'DEFAULT'
+									: condition === 'import'
+										? 'MODULE_MODE'
+										: 'EXPLICIT',
+							conditionPath: [condition],
+							declarationOrdinal: 9 + index,
+							depth: 0,
+							evaluation: 'EXCLUDED',
+							exclusionReason: 'PRIOR_BRANCH_TERMINATED_EVALUATION',
+							ordinal: 1 + index,
+							target: condition === 'types' ? './dist/index.d.ts' : './dist/index.js',
+							valueKind: 'STRING'
+						}))
+					]);
+					expect(
+						resolution.branches.map(({ keySpan, valueSpan }) => ({
+							key: { length: keySpan.length, start: keySpan.start },
+							value: { length: valueSpan.length, start: valueSpan.start }
+						}))
+					).toEqual([
+						{ key: { length: 8, start: 330 }, value: { length: 16, start: 340 } },
+						{ key: { length: 7, start: 364 }, value: { length: 19, start: 373 } },
+						{ key: { length: 8, start: 400 }, value: { length: 17, start: 410 } },
+						{ key: { length: 9, start: 435 }, value: { length: 17, start: 446 } }
+					]);
+					expect(resolution.decision).toMatchObject({
+						basis: 'RAW_MANIFEST_DECLARATION_ORDER_FOR_EXACT_CONSUMER_ENVIRONMENT',
+						ordinal: 0,
+						selectedBranchId: resolution.branches[0]?.id,
+						state: 'SELECTED_TARGET',
+						target: './src/index.ts'
+					});
+					expect(resolution.frontiers).toEqual([]);
+					expect(resolution.coverage).toEqual({
+						astNodes: 111,
+						blockedByNullDecisions: 0,
+						branchPopulationReconciles: true,
+						branchRecords: 4,
+						candidateBranches: 0,
+						chargedTraversalSteps: 117,
+						conditionChecks: 4,
+						decisionPopulationReconciles: true,
+						decisionRecords: 1,
+						exactExportKeyComparisons: 2,
+						exactExportKeyMatches: 1,
+						exactExportKeyMisses: 0,
+						excludedBranches: 3,
+						frontierPopulationReconciles: true,
+						frontierRecords: 0,
+						manifestBytes: 1_467,
+						noExactExportKeyDecisions: 0,
+						noMatchingConditionDecisions: 0,
+						outputRecords: 5,
+						selectedBranches: 1,
+						selectedConsumerPrograms: 1,
+						selectedConsumerSources: 1,
+						selectedManifests: 1,
+						selectedTargetDecisions: 1,
+						selectedWorkspacePackages: 1,
+						unsupportedDecisions: 0
+					});
+					expect(resolution.canonicalProfile).toBe(CONDITIONAL_EXPORT_RESOLUTION_CANONICAL_PROFILE);
+					expect(resolution.capability).toBe(CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY);
+					expect(resolution.capabilityStatus).toBe(CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY_STATUS);
+					expect(resolution.method).toBe(CONDITIONAL_EXPORT_RESOLUTION_METHOD);
+					expect(resolution.operationVersion).toBe(CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION);
+					expect(resolution.schemaVersion).toBe(CONDITIONAL_EXPORT_RESOLUTION_SCHEMA_VERSION);
+					expect(resolution.selection).toEqual(CONDITIONAL_EXPORT_RESOLUTION_SELECTION);
+					expect(resolution.subjectId).toBe(subject.descriptor.subjectId);
+					expect(resolution.semanticSnapshotId).toBe(snapshot.id);
+					expect(resolution.projectContextGraph).toEqual({
+						contentDigest: projectContextGraph.contentDigest,
+						graphId: projectContextGraph.id,
+						inputDigest: projectContextGraph.inputDigest
+					});
+					expect(resolution.health).toBe('PARTIAL');
+					expect(resolution.closure).toBe('CLOSED_FOR_SELECTED_EXACT_EXPORT_DECISION');
+					expect(resolution.resultCompleteness).toBe(
+						'COMPLETE_FOR_SELECTED_SUPPORTED_EXACT_EXPORT_CRITERION'
+					);
+					expect(resolution.resolutionAuthority).toBe(CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY);
+					expect(resolution.authorityTransfer).toBe(
+						CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER
+					);
+					expect(resolution.gateEffect).toBe(CONDITIONAL_EXPORT_RESOLUTION_GATE_EFFECT);
+					expect(resolution.freshness).toBe(CONDITIONAL_EXPORT_RESOLUTION_FRESHNESS);
+					expect(resolution.currentness).toBe(CONDITIONAL_EXPORT_RESOLUTION_CURRENTNESS);
+					expect(resolution.fullJanCsaa012Conformance).toBe(
+						CONDITIONAL_EXPORT_RESOLUTION_FULL_JAN_CSAA_012_CONFORMANCE
+					);
+					expect(resolution.nonclaims).toEqual(CONDITIONAL_EXPORT_RESOLUTION_NONCLAIMS);
+					expect(resolution.truncation).toEqual({ reason: null, state: 'NOT_TRUNCATED' });
+					const conditionalExportWitness = canonicalSemanticJsonWitness(resolution);
+					telemetry.complete({
+						branches: resolution.branches.length,
+						bytes: conditionalExportWitness.bytes,
+						decisionState: resolution.decision.state,
+						frontiers: resolution.frontiers.length,
+						manifestBytes: resolution.manifestWitness.manifestBytes,
+						validationState: 'VALID'
+					});
+					conditionalExportResolutionResult = {
+						authorityTransfer: resolution.authorityTransfer,
+						branches: resolution.branches.length,
+						bytes: conditionalExportWitness.bytes,
+						capability: resolution.capability,
+						capabilityStatus: resolution.capabilityStatus,
+						chargedTraversalSteps: resolution.coverage.chargedTraversalSteps,
+						closure: resolution.closure,
+						conditionChecks: resolution.coverage.conditionChecks,
+						contentDigest: resolution.contentDigest,
+						currentness: resolution.currentness,
+						decisionState: resolution.decision.state,
+						durationMs: Math.max(0, Math.round(performance.now() - conditionalExportStartedAt)),
+						exactExportKeyComparisons: resolution.coverage.exactExportKeyComparisons,
+						freshness: resolution.freshness,
+						frontiers: resolution.frontiers.length,
+						fullJanCsaa012Conformance: resolution.fullJanCsaa012Conformance,
+						gateEffect: resolution.gateEffect,
+						inputDigest: resolution.inputDigest,
+						manifestBytes: resolution.manifestWitness.manifestBytes,
+						nonclaims: resolution.nonclaims,
+						resolution,
+						resolutionAuthority: resolution.resolutionAuthority,
+						resolutionId: resolution.id,
+						resultCompleteness: resolution.resultCompleteness,
+						selectedTarget: resolution.decision.target,
+						sha256: conditionalExportWitness.sha256
+					};
+				} else
+					telemetry.skip('CONDITIONAL_EXPORT_RESOLUTION', {
+						reason: 'The selected smoke suite does not request conditional-export resolution.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
+				if (SMOKE_PROJECTION_PLAN.terminateAfterConditionalExportResolution) {
+					if (projectContextGraphResult === null || conditionalExportResolutionResult === null)
+						throw new Error(
+							'CONDITIONAL_EXPORT_RESOLUTION_ONLY cannot complete without validated CAP-010 and CAP-012 evidence.'
+						);
+					for (const phase of CONDITIONAL_EXPORT_RESOLUTION_ONLY_DOWNSTREAM_SKIPPED_PHASES)
+						telemetry.skip(phase, {
+							reason:
+								'The conditional-export-only suite terminates after one exact validated frozen-package decision.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
+					const phaseDurationsMs = telemetry.phaseDurationsMs();
+					const skippedPhases = telemetry.skippedPhases();
+					const completedPhases = Object.keys(phaseDurationsMs);
+					expect(completedPhases).toEqual(CONDITIONAL_EXPORT_RESOLUTION_ONLY_COMPLETED_PHASES);
+					expect(skippedPhases).toEqual(CONDITIONAL_EXPORT_RESOLUTION_ONLY_EXPECTED_SKIPPED_PHASES);
+					telemetry.finish({
+						completedPhases,
+						conditionalExportResolved: true,
+						logicalGraphComposed: false,
+						projectContextProjected: true,
+						projects: snapshot.projects.length,
+						semanticSnapshotOutcome: outcome.outcome,
+						semanticProfile: SMOKE_PROFILE,
+						skippedPhases,
+						smokeSuite: SMOKE_SUITE,
+						sources: snapshot.sources.length,
+						terminalPhase: 'CONDITIONAL_EXPORT_RESOLUTION'
+					});
+					process.stdout.write(
+						`${JSON.stringify({
+							arrowCommandCensus: null,
+							callGraph: null,
+							completedPhases,
+							commandEventContractStaticOverlay: null,
+							commandDispatchStaticTopology: null,
+							commandHandlerStaticProjection: null,
+							conditionalExportResolution: conditionalExportResolutionResult,
+							dependencyProviderComparison: null,
+							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
+							exactSubjectReuse: null,
+							guardClassificationStaticOverlay: null,
+							guardEnforcementLedger: null,
+							logicalGraphComposition: null,
+							moduleDependencyGraph: null,
+							phaseDurationsMs,
+							projectContextGraph: projectContextGraphResult,
+							projectCount: snapshot.projects.length,
+							readWriteAccessGraph: null,
+							selectedSubjectArtifactBytes: subjectArtifactBytes,
+							selectedSubjectArtifactCount: subject.artifacts.length,
+							selectedSubjectId: subject.descriptor.subjectId,
+							selector: SMOKE_SELECTOR ?? null,
+							semanticPipelineDurationMs,
+							semanticProfile: SMOKE_PROFILE,
+							semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
+							semanticSnapshotOutcome: outcome.outcome,
+							semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
+							semanticSnapshotProgressEvents: semanticProgressEvents.length,
+							semanticSnapshotWitness,
+							skippedPhases,
+							smokeSuite: SMOKE_SUITE,
+							sourceCount: snapshot.sources.length,
+							stateMachine: null,
+							structuralModuleReachabilityAnalysis: null,
+							structuralSccAnalysis: null,
+							terminalPhase: 'CONDITIONAL_EXPORT_RESOLUTION'
+						})}\n`
+					);
+					return;
+				}
 				if (SMOKE_PROJECTION_PLAN.terminateAfterProjectContextGraph) {
 					if (projectContextGraphResult === null)
 						throw new Error(
@@ -1738,6 +2378,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					expect(skippedPhases).toEqual(PROJECT_CONTEXT_GRAPH_ONLY_EXPECTED_SKIPPED_PHASES);
 					telemetry.finish({
 						completedPhases,
+						conditionalExportResolved: false,
 						logicalGraphComposed: false,
 						projectContextProjected: true,
 						projects: snapshot.projects.length,
@@ -1756,6 +2397,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandEventContractStaticOverlay: null,
 							commandDispatchStaticTopology: null,
 							commandHandlerStaticProjection: null,
+							conditionalExportResolution: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -2113,6 +2755,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandEventContractStaticOverlay: false,
 						commandDispatchStaticTopology: false,
 						commandHandlerStaticProjection: false,
+						conditionalExportResolved: false,
 						guardClassificationStaticOverlay: false,
 						guardEnforcementLedgerObserved: false,
 						logicalGraphComposed: false,
@@ -2136,6 +2779,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandEventContractStaticOverlay: null,
 							commandDispatchStaticTopology: null,
 							commandHandlerStaticProjection: null,
+							conditionalExportResolution: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -2304,6 +2948,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandEventContractStaticOverlay: false,
 						commandDispatchStaticTopology: false,
 						commandHandlerStaticProjection: false,
+						conditionalExportResolved: false,
 						guardClassificationStaticOverlay: false,
 						guardEnforcementLedgerObserved: false,
 						logicalGraphComposed: false,
@@ -2326,6 +2971,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandEventContractStaticOverlay: null,
 							commandDispatchStaticTopology: null,
 							commandHandlerStaticProjection: null,
+							conditionalExportResolution: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -2672,6 +3318,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandEventContractStaticOverlay: false,
 						commandDispatchStaticTopology: false,
 						commandHandlerStaticProjection: false,
+						conditionalExportResolved: false,
 						guardClassificationStaticOverlay: false,
 						guardEnforcementLedgerObserved: false,
 						logicalGraphComposed: true,
@@ -2695,6 +3342,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandEventContractStaticOverlay: null,
 							commandDispatchStaticTopology: null,
 							commandHandlerStaticProjection: null,
+							conditionalExportResolution: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -4143,6 +4791,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(
 						'The selected smoke suite cannot complete without validated logical graph composition.'
 					);
+				if (
+					SMOKE_PROJECTION_PLAN.runConditionalExportResolution &&
+					conditionalExportResolutionResult === null
+				)
+					throw new Error(
+						'The selected smoke suite cannot complete without validated conditional-export resolution.'
+					);
 				if (SMOKE_PROJECTION_PLAN.runProjectContextGraph && projectContextGraphResult === null)
 					throw new Error(
 						'The selected smoke suite cannot complete without validated project-context evidence.'
@@ -4160,6 +4815,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					commandEventContractStaticOverlay: commandEventContractOverlayResult !== null,
 					commandDispatchStaticTopology: commandDispatchTopologyResult !== null,
 					commandHandlerStaticProjection: commandHandlerResult !== null,
+					conditionalExportResolved: conditionalExportResolutionResult !== null,
 					exactSubjectReuse,
 					guardClassificationStaticOverlay: guardClassificationOverlayResult !== null,
 					guardEnforcementLedgerObserved: guardEnforcementLedgerResult !== null,
@@ -4205,6 +4861,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandEventContractStaticOverlay: commandEventContractOverlayResult,
 						commandDispatchStaticTopology: commandDispatchTopologyResult,
 						commandHandlerStaticProjection: commandHandlerResult,
+						conditionalExportResolution: conditionalExportResolutionResult,
 						dependencyProviderComparison: dependencyProviderResult,
 						event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 						exactSubjectReuse,

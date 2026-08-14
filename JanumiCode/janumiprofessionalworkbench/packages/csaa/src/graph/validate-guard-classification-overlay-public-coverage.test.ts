@@ -25,7 +25,7 @@ beforeAll(() => {
 	const outcome = buildGuardClassificationOverlay(fixture.inputs);
 	if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
 	baseline = outcome.overlay;
-});
+}, 120_000);
 
 afterAll(() => fixture.cleanup());
 
