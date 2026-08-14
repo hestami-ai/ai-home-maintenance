@@ -18,6 +18,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
+import { gradeControl } from './verdict.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -383,37 +384,20 @@ function jsonReportFor(m: DeclaredMutant): string | undefined {
  * the repository, and three controls were reported SURVIVED on this gate's first run because one unrelated pinned
  * literal in another package was red.
  */
+/**
+ * ⚠ THE DECISION MOVED TO `verdict.ts` AND THIS IS NOW ONLY THE I/O (REG-F-165). The grading logic lived here,
+ * inside a module with ZERO exports that executes on import — so no suite could reach it, and a fail-open sat in
+ * it undetected: a run that exited non-zero and wrote a report naming NO failing test file was graded
+ * CONTROL_HELD, one line below the arm written to refuse exactly that. **The layer deciding what every other
+ * verdict means was the only layer with no test on it**, and it stayed that way because a script's logic is
+ * untestable by default rather than by decision.
+ *
+ * What remains here is the part that must touch the world — reading the report — and it is deliberately the only
+ * part: `gradeControl` is pure so fixtures can enter the arms no healthy run can reach.
+ */
 function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
-	const expectSurvive = m.expectSurvive ?? '';
-	if (passed) return { mutant: m, verdict: 'CONTROL_HELD', detail: expectSurvive.slice(0, 88) };
-	const reported = failedFiles(CONTROL_REPORT);
-	// NO REPORT AT ALL — the run exited non-zero and wrote nothing, so there is no difference to take. That is a
-	// non-measurement and must say so; grading it HELD would be the fail-open this whole entry is about.
-	if (reported === undefined)
-		return {
-			mutant: m,
-			verdict: 'INCONCLUSIVE',
-			detail:
-				'the run FAILED and wrote no report, so the difference against the baseline could not be taken — ' +
-				'no verdict about this control is available'
-		};
-	const already = new Set(baseline ?? []);
-	const fresh = reported.filter((f) => !already.has(f));
-	// NOTHING NEW REDDENED — the control HELD. The disclosure travels WITH the verdict, because "held against a red
-	// baseline" is a weaker statement than "held against a green one" and must not read as the same.
-	if (fresh.length === 0)
-		return {
-			mutant: m,
-			verdict: 'CONTROL_HELD',
-			detail: `${expectSurvive.slice(0, 60)} — held on the DIFFERENCE; ${already.size} suite(s) already red without it`
-		};
-	// A GENUINELY NEW RED. Now the original sentence is earned — and it NAMES what reddened instead of asserting a
-	// cause, which was the whole of V-4a's cost.
-	return {
-		mutant: m,
-		verdict: 'SURVIVED',
-		detail: `declared a CONTROL, but the prose-only edit NEWLY reddened ${fresh.length} suite(s) — something asserts on prose: ${fresh.slice(0, 3).join(', ')}`
-	};
+	const { verdict, detail } = gradeControl(passed, failedFiles(CONTROL_REPORT), baseline, m.expectSurvive ?? '');
+	return { mutant: m, verdict, detail };
 }
 
 function runMutant(m: DeclaredMutant): Result {
