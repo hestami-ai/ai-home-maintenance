@@ -30,14 +30,21 @@
 // for context rather than rest on its emptiness. The gate's job is to make the AUTHOR RE-READ the row when the
 // world under it moves — which is precisely what did not happen for seven days.
 //
-// ⚠ AND IT IS PARTIAL BY CONSTRUCTION: only 4 of the 57 arm-3 rows name a machine at all. The other 53 rest on
-// absences this gate cannot see (a missing command, an absent plane, a predicate with no caller). Recorded as a
-// bound, not a claim of coverage — an instrument that overstates its own reach is the defect one level up.
+// ⚠ AND IT IS PARTIAL BY CONSTRUCTION: only ~~4 of the 57~~ **3 of the 56** arm-3 rows name a machine at all
+// (RPH-EVD-002 left the arm for ENFORCED on 2026-08-13). The other 53 rest on absences this gate cannot see (a
+// missing command, an absent plane, a predicate with no caller). Recorded as a bound, not a claim of coverage —
+// an instrument that overstates its own reach is the defect one level up. ⚠ THE 4/57 ABOVE WAS STALE FOR A DAY:
+// the ASSERTION was re-pinned when the row moved and this SENTENCE was not, by the same hand, in the same file —
+// the third time in one session that a prose count beside a live list rotted by its own author's edit. The
+// numbers here are now derived in the assertions below; treat this paragraph as commentary, not as the record.
 import { ENFORCEMENT_REGISTER, STATE_MACHINES } from '@janumipwb/rph-domain';
 import { describe, expect, it } from 'vitest';
 import { declaredArrows } from './arrow-command-census.js';
+import { guardedArrows } from './guard-enforcement-ledger.js';
+import { GUARD_LEDGER } from './guard-enforcement-ledger.data.js';
 
 type Row = { kind: string; why?: string };
+type LedgerRow = { disposition: string };
 const REGISTER = ENFORCEMENT_REGISTER as unknown as Record<string, Row>;
 const MACHINES = STATE_MACHINES as unknown as Record<
 	string,
@@ -57,6 +64,51 @@ function coverageByMachine(): Map<string, string> {
 		out.set(name, `${covered}/${def.transitions.length}`);
 	}
 	return out;
+}
+
+/**
+ * Arm-3 rows contradicted by C-0b: the row says NO COMMAND could violate the rule, while the guard ledger
+ * records an ENFORCED guard on an arrow of a machine that row NAMES.
+ *
+ * ── WHY THIS EXISTS: THE EVIDENCE WAS ALREADY IN THE REPOSITORY, IN A MACHINE-READABLE FILE ──────────────────
+ * RPH-EVD-002 sat in arm 3 for seven days saying *"No handler anywhere drives the `Claim.status` machine"* while
+ * `verif/guard-enforcement-ledger.data.ts` — same repository, same day — recorded the `Claim.status`
+ * UNDER_ASSESSMENT -> SUPPORTED guard as **ENFORCED**, with a DRIVEN refusal and a resolving anchor, citing
+ * RPH-EVD-002 by id. **Two instruments, flatly contradictory, and nothing compared them.** The fact needed to
+ * catch it was not missing; it was unjoined.
+ *
+ * ⚠ THIS IS A STATE CHECK, NOT A CHANGE CHECK, which is what makes it worth adding beside the coverage pins
+ * above. Those catch a world that MOVES under a row. This catches a row that is BORN contradicting what another
+ * instrument already records — the case that produced the seven days, since nothing moved: the row was simply
+ * wrong from the moment it was written.
+ *
+ * ⚠ AND IT IS NARROW, FOR A REASON WORTH STATING RATHER THAN HIDING. The register keys by RULE ID and the guard
+ * ledger keys by GUARD TEXT; **they share no join key at all.** Machine name is the only bridge, and it exists
+ * only because arm-3 rows happen to name machines in backticks — an incidental property of prose. A join on
+ * rule ids was measured and rejected: only 2 of the 15 ENFORCED ledger rows name one, and one of those two names
+ * a DOCUMENT id (`RPH-DOC-008`) rather than a register rule. The reach is pinned below so this narrowness cannot
+ * be mistaken for coverage.
+ */
+function registerLedgerConflicts(
+	register: Readonly<Record<string, Row>>,
+	ledger: Readonly<Record<string, LedgerRow>>
+): string[] {
+	const enforcedMachines = new Set<string>();
+	for (const a of guardedArrows())
+		if (ledger[a.guard]?.disposition === 'ENFORCED') enforcedMachines.add(a.machine);
+	if (enforcedMachines.size === 0)
+		throw new Error('registerLedgerConflicts: C-0b records no ENFORCED guard at all — the reader is broken');
+
+	const names = Object.keys(MACHINES);
+	const out: string[] = [];
+	for (const [id, row] of Object.entries(register)) {
+		if (row.kind !== 'NOT_A_COMMAND_REFUSAL') continue;
+		const why = String(row.why ?? '');
+		for (const m of names)
+			if (why.includes(`\`${m}\``) && enforcedMachines.has(m))
+				out.push(`${id} rests on \`${m}\`, but C-0b records an ENFORCED guard on that machine`);
+	}
+	return out.sort((a, b) => a.localeCompare(b));
 }
 
 /** Arm-3 rows, keyed to every state machine their reason NAMES in backticks. */
@@ -128,5 +180,38 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 			// would appear if the row had simply been DELETED, which is why the by-name pin above is the primary
 			// record and this is the bound on it.
 		).toEqual({ armThreeRows: 56, rowsThisGateCanSee: 3 });
+	});
+
+	// ── THE TWO INSTRUMENTS ARE FINALLY COMPARED (REG-F-140) ────────────────────────────────────────────────
+	// The register said nothing drives `Claim.status`; C-0b said a `Claim.status` guard was ENFORCED and had
+	// DRIVEN the refusal. Both were in this repository, both machine-readable, for seven days.
+	it('no arm-3 row rests on a machine C-0b records an ENFORCED guard on', () => {
+		const conflicts = registerLedgerConflicts(REGISTER, GUARD_LEDGER);
+		expect(
+			conflicts,
+			`arm-3 rows contradicted by the guard ledger:\n${conflicts.join('\n')}`
+		).toEqual([]);
+	});
+
+	// CONTROL — `[]` is also what this returns when the join key silently stops matching, which is the failure it
+	// is most exposed to: the bridge is a BACKTICKED MACHINE NAME inside prose, and prose gets reworded. A
+	// synthetic arm-3 row resting on a machine known to carry an ENFORCED guard must surface; the same row
+	// naming a machine with no ENFORCED guard must not.
+	it('CONTROL — a synthetic arm-3 row contradicting C-0b is caught, and an innocent one is not', () => {
+		const base = registerLedgerConflicts(REGISTER, GUARD_LEDGER).length;
+		const guilty = registerLedgerConflicts(
+			{ ...REGISTER, 'RPH-CONTROL-001': { kind: 'NOT_A_COMMAND_REFUSAL', why: 'nothing drives `Claim.status`' } },
+			GUARD_LEDGER
+		);
+		expect(guilty.length, 'the synthetic contradiction must surface').toBe(base + 1);
+		expect(guilty.join('\n')).toContain('RPH-CONTROL-001');
+
+		// `Harness.status` is a real machine that no ENFORCED guard touches — so an arm-3 row resting on it is
+		// exactly the case this check must NOT flag, and the difference proves the check discriminates.
+		const innocent = registerLedgerConflicts(
+			{ ...REGISTER, 'RPH-CONTROL-002': { kind: 'NOT_A_COMMAND_REFUSAL', why: 'nothing drives `Harness.status`' } },
+			GUARD_LEDGER
+		);
+		expect(innocent.length, 'a row on a machine with no ENFORCED guard is not a conflict').toBe(base);
 	});
 });
