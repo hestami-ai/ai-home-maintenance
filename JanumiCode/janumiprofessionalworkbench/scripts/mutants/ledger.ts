@@ -2866,5 +2866,29 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-census-coverage.test.ts'],
 		why: "C-0c REVERTS TO ITS OWN IDEA OF THE TABLE — the exact state REG-F-160 found it in, and the state `machine-exclusions.ts` exists to prevent: *\"Two censuses over one table must not each keep their own idea of the table.\"* Three instruments applied `isExcludedMachine` (C-0 :944/:955, C-0b :83, binding-row-truth :249) and this one did not, so `arrowsRatified` carried 9 arrows belonging to `AssuranceAssessment.disposition` — a machine over a field the ratified object schema DOES NOT HAVE (`z.strictObject`; `commitState` validates the produced state), permanently uncoverable. ISOLATING BY CONSTRUCTION: this anchors the FIGURES site alone, so only the `machinesDeclared/arrowsRatified` pin reddens (25 -> 27, 295 -> 304) while the blind-list pin and the excluded-set pin stay green — which is what distinguishes 'the figures consult the population' from 'something somewhere consults it'.",
 		source: 'REG-F-160'
+	},
+	// ── REG-F-161: TWO READ BRANCHES STARVED BY A BIRTH-ONLY MACHINE ────────────────────────────────────────
+	//
+	// Both are CONTROLS whose SURVIVAL is the finding, and both retire together the day an observation-disposition
+	// command is authored — at which point a KILL is the signal, not a regression.
+	{
+		id: 'F161-the-baseline-waiver-escape-is-starved',
+		file: 'packages/rph-application/src/handlers/governance.ts',
+		find: "\t\t\twaived: disposition === 'WAIVED'",
+		replace: '\t\t\twaived: false',
+		expectRed: [],
+		why: "RPH-BAS-003's WAIVER ESCAPE CANNOT FIRE, AND THE SUBSTITUTION IS EXACT. `AssuranceObservation.disposition` has ONE write in the repository — the birth at `assurance.ts:2324`, value `OPEN` — verified by the write funnel (`objectType: OBSERVATION` occurs at exactly one commit site) rather than by grep. So `disposition === 'WAIVED'` is permanently false, and `findOpenBlockingObservations`' `if (o.blocking && !o.waived)` reduces to `if (o.blocking)`. ⚠ NOT A LOCAL FILTER PROBLEM, WHICH WAS THE FIRST HYPOTHESIS AND IT WAS WRONG: `UNSETTLED_DISPOSITIONS` three lines above DOES contain `WAIVED`, so the value is admitted and then can never occur.",
+		expectSurvive: "SURVIVAL IS THE FINDING. MEASURED 2026-08-14 with this exact substitution: `rph-application` + `rph-domain` ran 132 files / 1464 tests, ALL PASSING. ⚠ AND `governance.test.ts:242` ASSERTS THE WAIVED CASE — it passes `waived: true` STRAIGHT INTO the kernel predicate, bypassing the producer, so the kernel branch is tested while the production path that would elicit it cannot exist. FAIL-CLOSED: the gate is STRICTER than canon intends, never laxer — a waived blocking finding is refused rather than excused — so this is a dead branch, not a hole. ⚠ A KILL MEANS AN OBSERVATION-DISPOSITION COMMAND WAS BUILT — retire this entry deliberately and re-drive RPH-BAS-003's C-0b row.",
+		source: 'REG-F-161'
+	},
+	{
+		id: 'F161-the-floor-gate-resolved-finding-filter-is-starved',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: "\t\tif (s.disposition && s.disposition !== 'OPEN') continue; // already resolved/waived elsewhere",
+		replace: '\t\t// already resolved/waived elsewhere',
+		expectRed: [],
+		why: "THE SAME STARVATION AT THE OTHER END OF THE SYSTEM, AND ITS POLARITY IS WORTH RECORDING SEPARATELY. `openFindingCodes` skips observations whose disposition is anything but `OPEN`; since `OPEN` is the only value ever written, the `continue` never fires and the filter excludes nothing. So a waiver must name EVERY finding code the assessment ever raised, including any that were resolved — which is again STRICTER, not laxer.",
+		expectSurvive: "SURVIVAL IS THE FINDING. MEASURED 2026-08-14 with this exact deletion: `rph-application` + `rph-domain` + `rph-assurance` ran 137 files / 1511 tests, ALL PASSING. ⚠ PAIRED WITH `F161-the-baseline-waiver-escape-is-starved` — one root cause, two consumers, and BOTH fail closed, which is why this is filed as a dead-branch census rather than as a defect needing a hotfix. A KILL means the disposition machine acquired a writer; retire both entries together.",
+		source: 'REG-F-161'
 	}
 ];
