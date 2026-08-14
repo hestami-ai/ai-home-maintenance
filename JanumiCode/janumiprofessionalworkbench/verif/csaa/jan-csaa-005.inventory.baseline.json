@@ -50,27 +50,27 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 282,
+      "discovered": 287,
       "excluded": 0,
       "failed": 0,
-      "included": 282,
+      "included": 287,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 282
+      "successfullyInventoried": 287
     },
     {
       "artifactClass": "TEST",
-      "discovered": 342,
+      "discovered": 344,
       "excluded": 0,
       "failed": 0,
-      "included": 342,
+      "included": 344,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 342
+      "successfullyInventoried": 344
     },
     {
       "artifactClass": "VERIFICATION",
@@ -208,6 +208,7 @@
         "packages/csaa/src/graph/build-guard-classification-overlay-closure-coverage.test.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay-coverage.test.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.test.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.test.ts",
         "packages/csaa/src/graph/build-state-machine-graph.test.ts",
@@ -215,6 +216,7 @@
         "packages/csaa/src/graph/build-structural-scc-analysis.test.ts",
         "packages/csaa/src/graph/compare-dependency-providers.test.ts",
         "packages/csaa/src/graph/guard-classification-overlay-encoding-coverage.test.ts",
+        "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
         "packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts",
         "packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts",
         "packages/csaa/src/graph/validate-command-dispatch-topology-coverage.test.ts",
@@ -895,6 +897,50 @@
       "state": "PARTIAL"
     },
     {
+      "explanation": "The fourteenth bounded DWP-004 increment applies exact-two-layer-semantic-source-reference-composition/1.0.0 under JAN-CSAA-CAP-009 with PARTIAL status to one independently validated TypeScript module-dependency graph and one independently validated TypeScript call graph derived from the same frozen semantic snapshot. It performs an exact reference-only semanticSourceId join from ALL_VALIDATED_MODULE_SOURCE_NODES to ALL_VALIDATED_CALL_SOURCE_REGION_NODES using EXACT_SEMANTIC_SOURCE_ID, emitting SAME_SEMANTIC_SOURCE_OCCURRENCE cross-links without copying predecessor nodes or edges. Composition mode is REFERENCE_ONLY; conflicts receive INCOMPATIBLE_INPUT_REFUSED after exact consistency checks over PROGRAM_ID, PROJECT_ID, LOGICAL_PATH, ANALYSIS_DISPOSITION. The current source population is a total mapping with explicit empty unmatched and conflict populations. Source-layer graph identities, semantic-snapshot identities, coverage, health, epistemic state, closure, and limitations are preserved without promotion; composition is complete only for the declared mapping between MODULE_DEPENDENCY and CALL layers, not for a universal or materialized code property graph. Graph authority is NONE, authority transfer is NONE, and gate effect is NONE. Freshness is NOT_ASSESSED, and currentness is NOT_CLAIMED. The dedicated FULL-profile logical-graph-composition-only smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are FULL_JAN_CSAA_CAP_009_GRAPH_COMPOSITION, UNIVERSAL_OR_MATERIALIZED_CODE_PROPERTY_GRAPH, LAYERS_BEYOND_MODULE_DEPENDENCY_AND_CALL, CROSS_LAYER_TRAVERSAL_OR_UNIFIED_AUTHORITATIVE_EDGE_SET, SEMANTIC_EQUIVALENCE_BEYOND_EXACT_SOURCE_OCCURRENCE, IMPORT_CAUSES_CALL_OR_CALL_BELONGS_TO_DEPENDENCY, JAN_CSAA_CAP_026_ARCHITECTURE_DISCOVERY, JAN_CSAA_CAP_029_SEMANTIC_QUERY, JAN_CSAA_CAP_030_CODE_SLICE, JAN_CSAA_CAP_031_CHANGE_IMPACT, JAN_CSAA_CAP_032_SEMANTIC_COMPARISON, EXACT_CALL_DISPATCH, ENTRY_MECHANISM_OR_POPULATION_CLOSURE, WHOLE_PROGRAM_OR_BEHAVIORAL_REACHABILITY, CURRENTNESS_OR_FRESHNESS, ORPHAN_OR_DEAD_CODE_CANDIDACY, UNMATCHED_NODE_IRRELEVANCE_OR_NON_IMPACT, SAFE_REMOVAL, RUNTIME_EXECUTION_OR_BEHAVIOR, FINDING_GATE_DECISION_OR_REMEDIATION_AUTHORITY, FULL_JAN_CSAA_007_OR_008_CONFORMANCE. Full JAN-CSAA-009 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED.",
+      "id": "logical-graph-composition",
+      "provenance": [
+        "capabilities#call-graph",
+        "capabilities#dependency-graph",
+        "capabilities#symbol-table",
+        "capabilities#type-graph",
+        "capabilities#typescript-ast",
+        "package.json#/scripts/csaa:semantic:smoke:logical-graph-composition",
+        "packages/csaa/src/contracts/call-graph.ts",
+        "packages/csaa/src/contracts/graph.ts",
+        "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "packages/csaa/src/contracts/semantic.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.ts",
+        "packages/csaa/src/graph/build-module-dependency-graph.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
+        "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+        "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
+        "packages/csaa/src/graph/module-dependency-content.ts",
+        "packages/csaa/src/graph/module-dependency-input.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/graph/validate-graph.ts",
+        "packages/csaa/src/graph/validate-logical-graph-composition.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/providers/typescript/extract-static-raw.ts",
+        "packages/csaa/src/providers/typescript/extract-symbols.ts",
+        "packages/csaa/src/providers/typescript/extract-types.ts",
+        "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/monotonic-operation-clock.ts",
+        "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/raw-semantic-model.ts",
+        "packages/csaa/src/semantic/repository-smoke.test.ts",
+        "packages/csaa/src/semantic/validate-snapshot.ts"
+      ],
+      "provider": "typescript+validated-module-and-call-graph-composition",
+      "state": "PARTIAL"
+    },
+    {
       "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "code-property-graph",
       "provenance": [
@@ -1118,6 +1164,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/csaa:semantic:smoke:guard-classification"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=FULL CSAA_REPOSITORY_SMOKE_SUITE=LOGICAL_GRAPH_COMPOSITION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts",
+      "name": "csaa:semantic:smoke:logical-graph-composition",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:semantic:smoke:logical-graph-composition"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -1996,6 +2054,7 @@
         "command-handler-static-projection",
         "frozen-program-construction",
         "guard-classification-static-overlay",
+        "logical-graph-composition",
         "read-write-access-projection",
         "structural-module-reachability-analysis",
         "structural-scc-analysis"
@@ -2015,40 +2074,52 @@
         "apps/rph-demo/tsconfig.json",
         "bun.lock",
         "package.json#/scripts/check-types",
+        "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
         "packages/csaa/src/contracts/command-handler-graph.ts",
         "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
+        "packages/csaa/src/contracts/logical-graph-composition.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.ts",
         "packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts",
         "packages/csaa/src/graph/build-structural-module-reachability-analysis.ts",
         "packages/csaa/src/graph/build-structural-scc-analysis.ts",
+        "packages/csaa/src/graph/call-graph-content.ts",
+        "packages/csaa/src/graph/call-graph-ids.ts",
+        "packages/csaa/src/graph/call-graph-input.ts",
         "packages/csaa/src/graph/command-dispatch-topology-canonical.ts",
         "packages/csaa/src/graph/command-event-contract-overlay-canonical.ts",
         "packages/csaa/src/graph/command-handler-graph-canonical.ts",
         "packages/csaa/src/graph/guard-classification-overlay-canonical.ts",
         "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+        "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
         "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
         "packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts",
         "packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts",
         "packages/csaa/src/graph/structural-scc-analysis-canonical.ts",
+        "packages/csaa/src/graph/validate-call-graph.ts",
         "packages/csaa/src/graph/validate-command-dispatch-topology.ts",
         "packages/csaa/src/graph/validate-command-event-contract-overlay.ts",
         "packages/csaa/src/graph/validate-command-handler-graph.ts",
         "packages/csaa/src/graph/validate-graph.ts",
         "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/validate-logical-graph-composition.ts",
         "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
         "packages/csaa/src/graph/validate-structural-scc-analysis.ts",
@@ -2117,7 +2188,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "87fb02578798762932be84eba6d7107bb635bccfba32685fd0d636b61cf2e95a",
+    "configurationDigest": "f97e2d0dfbd5bc94db3f3b5c44469c8a0d2f28034e815a43a38db301d22b51b5",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2200,9 +2271,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 4047,
+          "bytes": 4303,
           "path": "package.json",
-          "sha256": "b83b5ba041ff7da3a424adaca72300afa9e35966c99dd3d7c1628897535a61cb"
+          "sha256": "9756831009388fd481f00b0e3be5b2aa5d2867d8efd4c02eadd6a5eb2a8283fa"
         },
         {
           "artifactClass": "MANIFEST",
@@ -2643,7 +2714,7 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "9884111483209b468a502ede4237443564c33d7f8454953aa0566d3ee5c1c2c2",
+          "projectResolutionDigest": "5329fcf2239be0bd90c12f07ad5a7355bc363bd4f8169916ffe41cb10f9c57f3",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2660,6 +2731,7 @@
             "packages/csaa/src/contracts/guard-classification-overlay.ts",
             "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
             "packages/csaa/src/contracts/inventory.ts",
+            "packages/csaa/src/contracts/logical-graph-composition.ts",
             "packages/csaa/src/contracts/read-write-access-graph.ts",
             "packages/csaa/src/contracts/semantic.ts",
             "packages/csaa/src/contracts/state-machine-graph.ts",
@@ -2671,6 +2743,7 @@
             "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
             "packages/csaa/src/graph/build-command-handler-graph.ts",
             "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+            "packages/csaa/src/graph/build-logical-graph-composition.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.ts",
             "packages/csaa/src/graph/build-read-write-access-graph.ts",
             "packages/csaa/src/graph/build-state-machine-graph.ts",
@@ -2685,6 +2758,7 @@
             "packages/csaa/src/graph/compare-dependency-providers.ts",
             "packages/csaa/src/graph/guard-classification-overlay-canonical.ts",
             "packages/csaa/src/graph/ids.ts",
+            "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
             "packages/csaa/src/graph/module-dependency-content.ts",
             "packages/csaa/src/graph/module-dependency-input.ts",
             "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
@@ -2700,6 +2774,7 @@
             "packages/csaa/src/graph/validate-dependency-comparison.ts",
             "packages/csaa/src/graph/validate-graph.ts",
             "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+            "packages/csaa/src/graph/validate-logical-graph-composition.ts",
             "packages/csaa/src/graph/validate-read-write-access-graph.ts",
             "packages/csaa/src/graph/validate-state-machine-graph.ts",
             "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
@@ -2800,7 +2875,7 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "f2f6f9c6f10f99e8a89825c80bfc462578843b262ef3a8271c5987dfae87c7c8",
+          "projectResolutionDigest": "bfd0b419eb46ad260f32c4f340508dff174b7c1e24832a8815aab3cf24fe8d93",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2817,6 +2892,7 @@
             "packages/csaa/src/contracts/guard-classification-overlay.ts",
             "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
             "packages/csaa/src/contracts/inventory.ts",
+            "packages/csaa/src/contracts/logical-graph-composition.ts",
             "packages/csaa/src/contracts/read-write-access-graph.ts",
             "packages/csaa/src/contracts/semantic.ts",
             "packages/csaa/src/contracts/state-machine-graph.ts",
@@ -2838,6 +2914,8 @@
             "packages/csaa/src/graph/build-guard-classification-overlay-coverage.test.ts",
             "packages/csaa/src/graph/build-guard-classification-overlay.test.ts",
             "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+            "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+            "packages/csaa/src/graph/build-logical-graph-composition.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
             "packages/csaa/src/graph/build-module-dependency-graph.ts",
             "packages/csaa/src/graph/build-read-write-access-graph.test.ts",
@@ -2863,6 +2941,9 @@
             "packages/csaa/src/graph/guard-classification-overlay-encoding-coverage.test.ts",
             "packages/csaa/src/graph/guard-classification-overlay-fixture.test-support.ts",
             "packages/csaa/src/graph/ids.ts",
+            "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+            "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
+            "packages/csaa/src/graph/logical-graph-composition-fixture.test-support.ts",
             "packages/csaa/src/graph/module-dependency-content.ts",
             "packages/csaa/src/graph/module-dependency-input.ts",
             "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
@@ -2888,6 +2969,7 @@
             "packages/csaa/src/graph/validate-guard-classification-overlay-coverage.test.ts",
             "packages/csaa/src/graph/validate-guard-classification-overlay-public-coverage.test.ts",
             "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+            "packages/csaa/src/graph/validate-logical-graph-composition.ts",
             "packages/csaa/src/graph/validate-read-write-access-graph.ts",
             "packages/csaa/src/graph/validate-state-machine-graph.test.ts",
             "packages/csaa/src/graph/validate-state-machine-graph.ts",
@@ -4254,11 +4336,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "4c230b3d9d8ccffb4404dd14b25c6b6713ce6d3a1eaac395e53c82b358068d60",
+          "configClosureDigest": "948f0d405b6e7629cdd93b389d287b1fa888b9bc46e082f57995f471ed3ff413",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "4d94c3747da8f62a1b741c66c829a7abc9b4f7bda24fcacf2fac1decda8ab5dc",
+          "projectResolutionDigest": "6b58268f0b56938b2e7a5974966f8ca64a2639aefd0fe4eada66b05d5383c80a",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4299,11 +4381,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "5ed30eaeff1d49e997b344e579cce0536da7044ef6bd0280c941d7b5e1002853",
+          "configClosureDigest": "a62f90b78d5b962916c7d25aa3d97a15040066e5b8927c203edb711da0013e89",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "0206ac320e58aa921dd37c6942ff8890a6860dc525f31607521e554ed8ef9d4c",
+          "projectResolutionDigest": "e0eaee951fdd739be4fd121bc80c92a2ae391839d0b5724bb8f373dc22e07481",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4337,11 +4419,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "19f8b1f406fe9d853a7886b2e8c3caa684a61dad4623ddb06cfb5868b4c8849a",
+          "configClosureDigest": "6057c7c38adbb5b660e2a11ebe9a24ea07cf877337ba5e257f44d32f6330932e",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "24f4cc0e73cb740487de7d331be8acca43f2ea20e2850f0401bcde061d674182",
+          "projectResolutionDigest": "d266ae830a4c87b7e81ef224451600a9abdac0253b31ec203eb514ec2e3250bd",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5076,7 +5158,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "83ac919fb9a58f669774e1c5ee8a557a7f042cf691e373ed713ff11477de81cb",
+    "fileManifestDigest": "d14082103604906b7c370a2525d0c5203132374a8613c715d73d8f65c0907b64",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/tsconfig.json",
@@ -5123,7 +5205,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 883,
+    "selectedFileCount": 890,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6219,9 +6301,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 4047,
+        "bytes": 4303,
         "path": "package.json",
-        "sha256": "b83b5ba041ff7da3a424adaca72300afa9e35966c99dd3d7c1628897535a61cb",
+        "sha256": "9756831009388fd481f00b0e3be5b2aa5d2867d8efd4c02eadd6a5eb2a8283fa",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -6313,6 +6395,13 @@
         "bytes": 8603,
         "path": "packages/csaa/src/contracts/inventory.ts",
         "sha256": "a11a7dcfcfc5a7f5032648c3cacb7dde3a4c0bfb1f992d5e9e8bc75282d63776",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 17244,
+        "path": "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "sha256": "ee50c3edd152a3376248ee24d1120469dbe26edd7803a93f27de5163b5991b0e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6460,6 +6549,20 @@
         "bytes": 60321,
         "path": "packages/csaa/src/graph/build-guard-classification-overlay.ts",
         "sha256": "a32f79d5d5fc811477bdfc938b683e6072284e2b2e4c4c9dad7e3e3838eeff8d",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 20631,
+        "path": "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+        "sha256": "24ba0511b38bdbe1656fa3abf7c5eecc22b7a11e6f4c9b3e0c60eb34ff55ecaf",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 37062,
+        "path": "packages/csaa/src/graph/build-logical-graph-composition.ts",
+        "sha256": "6aa44ba29a4a1d805b51707e76da6bd026e7c69f6b37482c28ca9592f20b272f",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6639,6 +6742,27 @@
       },
       {
         "artifactClass": "SOURCE",
+        "bytes": 4651,
+        "path": "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+        "sha256": "c830d1d48686808c6bbd49a740441e73b3a24f6f710c16361ab7c5da61ad5345",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 24989,
+        "path": "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
+        "sha256": "acd6e783d75b8367e908bbc7b241b1bb94c6087219a48670b123d8e0a4c348cd",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 10835,
+        "path": "packages/csaa/src/graph/logical-graph-composition-fixture.test-support.ts",
+        "sha256": "6e0333791a7740bb7d1bb8678476b918ce0d4e43eca777c494e42f2b3fc25743",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
         "bytes": 571,
         "path": "packages/csaa/src/graph/module-dependency-content.ts",
         "sha256": "730a59273004dddf8841d5fd3b73a4ea7eb3478c84202066bcf4d347ed18f6d0",
@@ -6814,6 +6938,13 @@
       },
       {
         "artifactClass": "SOURCE",
+        "bytes": 40608,
+        "path": "packages/csaa/src/graph/validate-logical-graph-composition.ts",
+        "sha256": "c6649ae1e25d68125c4835d4064b5d2365d106f3b6bbbe7c50f6644cd891f6f3",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
         "bytes": 45179,
         "path": "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "sha256": "99574d3e56059c1f4890f543d047115de796fd8b0128e5ab6e1f8b63eba95860",
@@ -6849,16 +6980,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 12328,
+        "bytes": 13179,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "0ec5c72ba3ebfd6428c7489838dd73e42b49869ef3d4d4daa9b64849d38181cc",
+        "sha256": "48c2c628899e6a9b005f09cd8121f4bd1376751b31056c7b032cbd3598591107",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8323,
+        "bytes": 8615,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "5aafc06e82556e2082a9b342a3f07846410e378a6a884f5bc89879db8ae4211b",
+        "sha256": "da193b4fd2e4cbd23342b7e72b2bad6ddb76d08dbdf0635552504d768c8c0989",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6884,16 +7015,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 76862,
+        "bytes": 83077,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "ffb87f446da144f5214ca16236453717218568e6eb51ec830a91c99da83cd06d",
+        "sha256": "f2db881f08acae346f37937de5166710b379a9efae5961a169ed55a041c8432c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 76784,
+        "bytes": 87323,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "45c6db4d245857b095f0b03b5aed27535950261fdda7daf82562b8daf698b153",
+        "sha256": "1b73eb344adf3ba1666d6a4b9965fbc91ed72177c6dc50d1b00f0d0d03102ec0",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -7388,9 +7519,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 140004,
+        "bytes": 161358,
         "path": "packages/csaa/src/semantic/repository-smoke.test.ts",
-        "sha256": "6c787bdb7ca0eca01397c0ab38ca806ef88c9c4cdc28c50563e645037ad0564a",
+        "sha256": "9461e38bca46c8e9701566261358b582ded62490d9d38dee4adf8c546d99eb2b",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11307,7 +11438,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "b4faad69ae2f96d8e688de216d096e3ebeb9094daa3762be92704ead5483fbe3",
+    "subjectId": "cbdaa6539eb8d2056ebc78d0cc9a6d9e59624fc593687f1d06a5559d87f72c7c",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -11471,7 +11602,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 117,
+      "candidateArtifactCount": 121,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -11509,6 +11640,7 @@
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/inventory.ts",
+        "packages/csaa/src/contracts/logical-graph-composition.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
@@ -11520,6 +11652,7 @@
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.ts",
         "packages/csaa/src/graph/build-state-machine-graph.ts",
@@ -11534,6 +11667,7 @@
         "packages/csaa/src/graph/compare-dependency-providers.ts",
         "packages/csaa/src/graph/guard-classification-overlay-canonical.ts",
         "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
         "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
@@ -11549,6 +11683,7 @@
         "packages/csaa/src/graph/validate-dependency-comparison.ts",
         "packages/csaa/src/graph/validate-graph.ts",
         "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/validate-logical-graph-composition.ts",
         "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
@@ -11622,7 +11757,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 188,
+      "candidateArtifactCount": 195,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -11660,6 +11795,7 @@
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/inventory.ts",
+        "packages/csaa/src/contracts/logical-graph-composition.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
@@ -11681,6 +11817,8 @@
         "packages/csaa/src/graph/build-guard-classification-overlay-coverage.test.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.test.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.test.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.test.ts",
@@ -11706,6 +11844,9 @@
         "packages/csaa/src/graph/guard-classification-overlay-encoding-coverage.test.ts",
         "packages/csaa/src/graph/guard-classification-overlay-fixture.test-support.ts",
         "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+        "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
+        "packages/csaa/src/graph/logical-graph-composition-fixture.test-support.ts",
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
         "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
@@ -11731,6 +11872,7 @@
         "packages/csaa/src/graph/validate-guard-classification-overlay-coverage.test.ts",
         "packages/csaa/src/graph/validate-guard-classification-overlay-public-coverage.test.ts",
         "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/validate-logical-graph-composition.ts",
         "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/graph/validate-state-machine-graph.test.ts",
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
@@ -13120,6 +13262,7 @@
         "capabilities#dependency-graph",
         "capabilities#guard-classification-static-overlay",
         "capabilities#guard-enforcement-ledger",
+        "capabilities#logical-graph-composition",
         "capabilities#read-write-access-graph",
         "capabilities#state-machine-graph",
         "capabilities#structural-module-reachability-analysis",
@@ -13137,6 +13280,7 @@
         "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
+        "packages/csaa/src/contracts/logical-graph-composition.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
@@ -13147,6 +13291,8 @@
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
         "packages/csaa/src/graph/build-read-write-access-graph.ts",
         "packages/csaa/src/graph/build-state-machine-graph.ts",
@@ -13162,6 +13308,8 @@
         "packages/csaa/src/graph/compare-dependency-providers.ts",
         "packages/csaa/src/graph/guard-classification-overlay-canonical.ts",
         "packages/csaa/src/graph/ids.ts",
+        "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+        "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
         "packages/csaa/src/graph/module-dependency-content.ts",
         "packages/csaa/src/graph/module-dependency-input.ts",
         "packages/csaa/src/graph/read-write-access-graph-canonical.ts",
@@ -13178,6 +13326,7 @@
         "packages/csaa/src/graph/validate-dependency-comparison.ts",
         "packages/csaa/src/graph/validate-graph.ts",
         "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/validate-logical-graph-composition.ts",
         "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
@@ -13218,7 +13367,7 @@
         "packages/rph-contracts/vocab/m3-commands-events.json",
         "verif/event-surface-census.test.ts"
       ],
-      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first thirteen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, and a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC and structural module-reachability smoke commands. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
+      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first fourteen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, and an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, and logical graph composition smoke commands. Cross-Program symbol or binding reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
     },
     {
       "provenance": [
@@ -13229,6 +13378,7 @@
         "packages/csaa/src/contracts/command-handler-graph.ts",
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
+        "packages/csaa/src/contracts/logical-graph-composition.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
@@ -13237,6 +13387,8 @@
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
         "packages/csaa/src/graph/build-command-handler-graph.ts",
         "packages/csaa/src/graph/build-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.test.ts",
+        "packages/csaa/src/graph/build-logical-graph-composition.ts",
         "packages/csaa/src/graph/build-state-machine-graph.ts",
         "packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts",
         "packages/csaa/src/graph/build-structural-module-reachability-analysis.ts",
@@ -13248,6 +13400,8 @@
         "packages/csaa/src/graph/command-event-contract-overlay-canonical.ts",
         "packages/csaa/src/graph/command-handler-graph-canonical.ts",
         "packages/csaa/src/graph/guard-classification-overlay-canonical.ts",
+        "packages/csaa/src/graph/logical-graph-composition-canonical.ts",
+        "packages/csaa/src/graph/logical-graph-composition-coverage.test.ts",
         "packages/csaa/src/graph/state-machine-graph-content.ts",
         "packages/csaa/src/graph/state-machine-graph-ids.ts",
         "packages/csaa/src/graph/state-machine-graph-input.ts",
@@ -13259,6 +13413,7 @@
         "packages/csaa/src/graph/validate-command-event-contract-overlay.ts",
         "packages/csaa/src/graph/validate-command-handler-graph.ts",
         "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
+        "packages/csaa/src/graph/validate-logical-graph-composition.ts",
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
         "packages/csaa/src/graph/validate-structural-scc-analysis.ts",
@@ -13299,7 +13454,7 @@
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/route-action-census.test.ts"
       ],
-      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it does not change retained verifier authority. The structural module reachability analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
+      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it does not change retained verifier authority. The structural module reachability analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The logical graph composition has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is NOT_CLAIMED. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
     },
     {
       "provenance": [

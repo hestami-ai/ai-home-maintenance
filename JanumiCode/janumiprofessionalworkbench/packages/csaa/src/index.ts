@@ -10,6 +10,7 @@ export * from './contracts/read-write-access-graph.js';
 export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
+export * from './contracts/logical-graph-composition.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
 export * from './contracts/structural-module-reachability-analysis.js';
@@ -68,6 +69,7 @@ export {
 } from './providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.js';
 export { validateGuardEnforcementLedgerObservation } from './providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.js';
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
+export { buildLogicalGraphComposition } from './graph/build-logical-graph-composition.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
@@ -116,6 +118,10 @@ export type {
 	CommandHandlerGraphValidationResult
 } from './graph/validate-command-handler-graph.js';
 export { validateModuleDependencyGraph } from './graph/validate-graph.js';
+export {
+	validateConstructedLogicalGraphComposition,
+	validateLogicalGraphComposition
+} from './graph/validate-logical-graph-composition.js';
 export {
 	validateConstructedStructuralModuleReachabilityAnalysis,
 	validateStructuralModuleReachabilityAnalysis

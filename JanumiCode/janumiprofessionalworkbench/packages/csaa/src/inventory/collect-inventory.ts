@@ -19,6 +19,21 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
 } from '../contracts/guard-enforcement-ledger.js';
 import {
+	LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER,
+	LOGICAL_GRAPH_COMPOSITION_CAPABILITY,
+	LOGICAL_GRAPH_COMPOSITION_CAPABILITY_STATUS,
+	LOGICAL_GRAPH_COMPOSITION_CURRENTNESS,
+	LOGICAL_GRAPH_COMPOSITION_FRESHNESS,
+	LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_007_CONFORMANCE,
+	LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_008_CONFORMANCE,
+	LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE,
+	LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT,
+	LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY,
+	LOGICAL_GRAPH_COMPOSITION_METHOD,
+	LOGICAL_GRAPH_COMPOSITION_NONCLAIMS,
+	LOGICAL_GRAPH_COMPOSITION_SELECTION
+} from '../contracts/logical-graph-composition.js';
+import {
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY_STATUS,
@@ -130,6 +145,19 @@ const TYPESCRIPT_CALL_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/call-graph-input.ts',
 	'packages/csaa/src/graph/validate-call-graph.ts'
 ] as const;
+
+const TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE = [
+	'packages/csaa/src/contracts/logical-graph-composition.ts',
+	'packages/csaa/src/graph/build-logical-graph-composition.ts',
+	'packages/csaa/src/graph/logical-graph-composition-canonical.ts',
+	'packages/csaa/src/graph/validate-logical-graph-composition.ts',
+	'packages/csaa/src/graph/build-logical-graph-composition.test.ts',
+	'packages/csaa/src/graph/logical-graph-composition-coverage.test.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+
+const JPWB_LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=FULL CSAA_REPOSITORY_SMOKE_SUITE=LOGICAL_GRAPH_COMPOSITION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 
 const TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-graph.ts',
@@ -277,6 +305,7 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'command-handler-static-projection',
 	'frozen-program-construction',
 	'guard-classification-static-overlay',
+	'logical-graph-composition',
 	'read-write-access-projection',
 	'structural-module-reachability-analysis',
 	'structural-scc-analysis'
@@ -848,6 +877,8 @@ function providerInventory(
 					? [
 							...TYPESCRIPT_SEMANTIC_PROVENANCE,
 							...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+							...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+							...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
@@ -1141,6 +1172,24 @@ function capabilities(): CapabilityInventory[] {
 			),
 			state: 'PARTIAL'
 		},
+		{
+			explanation: `The fourteenth bounded DWP-004 increment applies ${LOGICAL_GRAPH_COMPOSITION_METHOD} under ${LOGICAL_GRAPH_COMPOSITION_CAPABILITY} with ${LOGICAL_GRAPH_COMPOSITION_CAPABILITY_STATUS} status to one independently validated TypeScript module-dependency graph and one independently validated TypeScript call graph derived from the same frozen semantic snapshot. It performs an exact reference-only semanticSourceId join from ${LOGICAL_GRAPH_COMPOSITION_SELECTION.moduleNodePopulation} to ${LOGICAL_GRAPH_COMPOSITION_SELECTION.callNodePopulation} using ${LOGICAL_GRAPH_COMPOSITION_SELECTION.joinKey}, emitting ${LOGICAL_GRAPH_COMPOSITION_SELECTION.crossLinkRelation} cross-links without copying predecessor nodes or edges. Composition mode is ${LOGICAL_GRAPH_COMPOSITION_SELECTION.compositionMode}; conflicts receive ${LOGICAL_GRAPH_COMPOSITION_SELECTION.conflictTreatment} after exact consistency checks over ${LOGICAL_GRAPH_COMPOSITION_SELECTION.consistencyFields.join(', ')}. The current source population is a total mapping with explicit empty unmatched and conflict populations. Source-layer graph identities, semantic-snapshot identities, coverage, health, epistemic state, closure, and limitations are preserved without promotion; composition is complete only for the declared mapping between ${LOGICAL_GRAPH_COMPOSITION_SELECTION.layerOrder.join(' and ')} layers, not for a universal or materialized code property graph. Graph authority is ${LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY}, authority transfer is ${LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER}, and gate effect is ${LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT}. Freshness is ${LOGICAL_GRAPH_COMPOSITION_FRESHNESS}, and currentness is ${LOGICAL_GRAPH_COMPOSITION_CURRENTNESS}. The dedicated FULL-profile logical-graph-composition-only smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are ${LOGICAL_GRAPH_COMPOSITION_NONCLAIMS.join(', ')}. Full JAN-CSAA-009 conformance is ${LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE}, full JAN-CSAA-007 conformance is ${LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_008_CONFORMANCE}.`,
+			id: 'logical-graph-composition',
+			provider: 'typescript+validated-module-and-call-graph-composition',
+			provenance: canonicalProvenance(
+				...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+				...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+				...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+				...TYPESCRIPT_SEMANTIC_PROVENANCE,
+				'capabilities#call-graph',
+				'capabilities#dependency-graph',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast',
+				'capabilities#type-graph',
+				'package.json#/scripts/csaa:semantic:smoke:logical-graph-composition'
+			),
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
 				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
@@ -1276,11 +1325,23 @@ function assertJpwbNonVacuity(
 		'test:coverage',
 		'csaa:semantic:smoke:command-event-contract',
 		'csaa:semantic:smoke:guard-classification',
+		'csaa:semantic:smoke:logical-graph-composition',
 		'csaa:semantic:smoke:structural-module-reachability',
 		'csaa:semantic:smoke:structural-scc'
 	]) {
 		if (!rootNames.has(required))
 			throw new Error(`Required JPWB assurance command is absent: ${required}`);
+	}
+	const logicalGraphCompositionSmokeCommand = configuredCommands.find(
+		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:logical-graph-composition'
+	);
+	if (
+		logicalGraphCompositionSmokeCommand?.command !==
+		JPWB_LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND
+	) {
+		throw new Error(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:logical-graph-composition'
+		);
 	}
 	const structuralSccSmokeCommand = configuredCommands.find(
 		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:structural-scc'
@@ -1392,6 +1453,13 @@ function assertJpwbNonVacuity(
 			);
 		}
 	}
+	for (const required of TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB logical graph composition implementation or verification source is absent: ${required}`
+			);
+		}
+	}
 }
 
 export function collectInventory(options: CollectInventoryOptions): InventoryDocument {
@@ -1464,6 +1532,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_SEMANTIC_PROVENANCE,
 					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 					...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
@@ -1484,6 +1553,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#guard-enforcement-ledger',
 					'capabilities#guard-classification-static-overlay',
 					'capabilities#dependency-graph',
+					'capabilities#logical-graph-composition',
 					'capabilities#read-write-access-graph',
 					'capabilities#state-machine-graph',
 					'capabilities#structural-module-reachability-analysis',
@@ -1493,7 +1563,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#type-graph'
 				),
 				statement:
-					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first thirteen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, and a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC and structural module-reachability smoke commands. Cross-Program semantic reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
+					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first fourteen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, and an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, and logical graph composition smoke commands. Cross-Program symbol or binding reconciliation, invocation-specific resolved signatures, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
 			},
 			{
 				provenance: canonicalProvenance(
@@ -1507,11 +1577,26 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 					...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
 				),
-				statement: `Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} using method ${GUARD_ENFORCEMENT_LEDGER_METHOD}; its retained analyzer, data, tests, ${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}; it does not change retained verifier authority. The structural module reachability analysis has graph authority ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT}; it changes no retained verifier authority. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.`
+				statement: [
+					'Existing graph-relevant verif censuses remain authoritative for their specialized repository gates.',
+					`The arrow-command analyzer's ${ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${ARROW_COMMAND_CENSUS_ADAPTER_ID} using method ${ARROW_COMMAND_CENSUS_METHOD}, while its source, exact baseline, tests, ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged.`,
+					`The guard-enforcement ledger's ${GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY} integration strategy is IMPLEMENTED by bounded CSAA adapter ${GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID} using method ${GUARD_ENFORCEMENT_LEDGER_METHOD}; its retained analyzer, data, tests, ${GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY} verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA.`,
+					'The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites.',
+					'The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy.',
+					'The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged.',
+					`The structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}; it does not change retained verifier authority.`,
+					`The structural module reachability analysis has graph authority ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT}; it changes no retained verifier authority. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing.`,
+					`The logical graph composition has graph authority ${LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY}, authority transfer ${LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER}, and gate effect ${LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT}; freshness is ${LOGICAL_GRAPH_COMPOSITION_FRESHNESS}, currentness is ${LOGICAL_GRAPH_COMPOSITION_CURRENTNESS}, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is ${LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE}.`,
+					'The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED.',
+					'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority.',
+					'No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance.',
+					'Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.'
+				].join(' ')
 			},
 			{
 				provenance: ['subject.excludedClasses'],

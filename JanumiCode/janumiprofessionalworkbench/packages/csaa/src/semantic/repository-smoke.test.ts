@@ -29,6 +29,18 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_REQUEST_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
+	LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER,
+	LOGICAL_GRAPH_COMPOSITION_CURRENTNESS,
+	LOGICAL_GRAPH_COMPOSITION_FRESHNESS,
+	LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_007_CONFORMANCE,
+	LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_008_CONFORMANCE,
+	LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE,
+	LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT,
+	LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY,
+	LOGICAL_GRAPH_COMPOSITION_NONCLAIMS,
+	LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REQUEST_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_SELECTION,
 	DEPENDENCY_CRUISER_INVOCATION_SCHEMA_VERSION,
 	DEPENDENCY_CRUISER_ARGV_GRAMMAR_VERSION,
 	DEPENDENCY_CRUISER_PROVIDER_ID,
@@ -67,6 +79,7 @@ import {
 	STRUCTURAL_SCC_ANALYSIS_SELECTION,
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
+	type CallGraphSnapshot,
 	type ModuleDependencyGraphSnapshot,
 	type BuildStateMachineGraphRequest,
 	type GuardEnforcementLedgerObservation,
@@ -82,6 +95,7 @@ import {
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	buildArrowCommandCensusArtifactSet,
+	buildLogicalGraphComposition,
 	buildModuleDependencyGraph,
 	buildStructuralModuleReachabilityAnalysis,
 	buildStructuralSccAnalysis,
@@ -108,6 +122,7 @@ import {
 	validateCommandDispatchTopology,
 	validateGuardClassificationOverlay,
 	validateGuardEnforcementLedgerObservation,
+	validateLogicalGraphComposition,
 	validateModuleDependencyGraph,
 	validateStructuralModuleReachabilityAnalysis,
 	validateStructuralSccAnalysis,
@@ -122,6 +137,7 @@ type RepositorySmokeProfile = 'FULL' | 'STRUCTURAL';
 type RepositorySmokeSuite =
 	| 'COMMAND_HANDLER_ONLY'
 	| 'FULL_SUITE'
+	| 'LOGICAL_GRAPH_COMPOSITION_ONLY'
 	| 'STRUCTURAL_MODULE_REACHABILITY_ONLY'
 	| 'STRUCTURAL_SCC_ONLY';
 
@@ -131,6 +147,7 @@ interface RepositorySmokeProjectionPlan {
 	readonly runCommandEventContractOverlay: boolean;
 	readonly runDependencyProviderComparison: boolean;
 	readonly runGuardClassificationOverlay: boolean;
+	readonly runLogicalGraphComposition: boolean;
 	readonly runModuleDependencyGraph: boolean;
 	readonly runReadWriteAccessGraph: boolean;
 	readonly runRepositoryDiscoveryPreflight: boolean;
@@ -138,6 +155,7 @@ interface RepositorySmokeProjectionPlan {
 	readonly runStructuralModuleReachabilityAnalysis: boolean;
 	readonly runStructuralSccAnalysis: boolean;
 	readonly suite: RepositorySmokeSuite;
+	readonly terminateAfterLogicalGraphComposition: boolean;
 	readonly terminateAfterStructuralModuleReachabilityAnalysis: boolean;
 	readonly terminateAfterStructuralSccAnalysis: boolean;
 }
@@ -151,6 +169,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runCommandEventContractOverlay: true,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: true,
+		runLogicalGraphComposition: false,
 		runModuleDependencyGraph: false,
 		runReadWriteAccessGraph: false,
 		runRepositoryDiscoveryPreflight: false,
@@ -158,6 +177,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
 		suite: 'COMMAND_HANDLER_ONLY',
+		terminateAfterLogicalGraphComposition: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -167,6 +187,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runCommandEventContractOverlay: false,
 		runDependencyProviderComparison: true,
 		runGuardClassificationOverlay: false,
+		runLogicalGraphComposition: true,
 		runModuleDependencyGraph: true,
 		runReadWriteAccessGraph: true,
 		runRepositoryDiscoveryPreflight: true,
@@ -174,6 +195,25 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: true,
 		suite: 'FULL_SUITE',
+		terminateAfterLogicalGraphComposition: false,
+		terminateAfterStructuralModuleReachabilityAnalysis: false,
+		terminateAfterStructuralSccAnalysis: false
+	},
+	LOGICAL_GRAPH_COMPOSITION_ONLY: {
+		runIndependentSemanticRevalidation: false,
+		runCallGraph: true,
+		runCommandEventContractOverlay: false,
+		runDependencyProviderComparison: false,
+		runGuardClassificationOverlay: false,
+		runLogicalGraphComposition: true,
+		runModuleDependencyGraph: true,
+		runReadWriteAccessGraph: false,
+		runRepositoryDiscoveryPreflight: false,
+		runStateMachineProjection: false,
+		runStructuralModuleReachabilityAnalysis: false,
+		runStructuralSccAnalysis: false,
+		suite: 'LOGICAL_GRAPH_COMPOSITION_ONLY',
+		terminateAfterLogicalGraphComposition: true,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -183,6 +223,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runCommandEventContractOverlay: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: false,
+		runLogicalGraphComposition: false,
 		runModuleDependencyGraph: true,
 		runReadWriteAccessGraph: false,
 		runRepositoryDiscoveryPreflight: false,
@@ -190,6 +231,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: false,
 		suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
+		terminateAfterLogicalGraphComposition: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: true,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -199,6 +241,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runCommandEventContractOverlay: false,
 		runDependencyProviderComparison: false,
 		runGuardClassificationOverlay: false,
+		runLogicalGraphComposition: false,
 		runModuleDependencyGraph: true,
 		runReadWriteAccessGraph: false,
 		runRepositoryDiscoveryPreflight: false,
@@ -206,6 +249,7 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: true,
 		suite: 'STRUCTURAL_SCC_ONLY',
+		terminateAfterLogicalGraphComposition: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: true
 	}
@@ -230,6 +274,8 @@ function repositorySmokeSuite(value: string | undefined): RepositorySmokeSuite {
 		return 'STRUCTURAL_MODULE_REACHABILITY_ONLY';
 	if (normalized === 'STRUCTURAL_SCC' || normalized === 'STRUCTURAL_SCC_ONLY')
 		return 'STRUCTURAL_SCC_ONLY';
+	if (normalized === 'LOGICAL_GRAPH_COMPOSITION' || normalized === 'LOGICAL_GRAPH_COMPOSITION_ONLY')
+		return 'LOGICAL_GRAPH_COMPOSITION_ONLY';
 	if (normalized === 'FULL' || normalized === 'FULL_SUITE') return 'FULL_SUITE';
 	throw new Error(`Unsupported CSAA_REPOSITORY_SMOKE_SUITE: ${value}`);
 }
@@ -240,6 +286,15 @@ function assertRepositorySmokeSelection(
 	selector: string | undefined
 ): void {
 	if (suite === 'FULL_SUITE') return;
+	if (suite === 'LOGICAL_GRAPH_COMPOSITION_ONLY') {
+		if (profile !== 'FULL')
+			throw new Error(
+				'LOGICAL_GRAPH_COMPOSITION_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=FULL.'
+			);
+		if (selector !== '1')
+			throw new Error('LOGICAL_GRAPH_COMPOSITION_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		return;
+	}
 	if (profile !== 'STRUCTURAL')
 		throw new Error(`${suite} requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.`);
 	if (selector !== '1') throw new Error(`${suite} requires CSAA_REPOSITORY_SMOKE=1.`);
@@ -295,16 +350,25 @@ const COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS = [
 	'packages/rph-ports/tsconfig.json',
 	'packages/rph-projections/tsconfig.json'
 ] as const;
-const SELECTED_PROJECTS =
-	SMOKE_SELECTOR === 'all'
+
+function selectedProjectsForSmoke(
+	profile: RepositorySmokeProfile,
+	suite: RepositorySmokeSuite,
+	selector: string | undefined
+): readonly string[] | null {
+	return selector === 'all'
 		? null
-		: SMOKE_SELECTOR === undefined || SMOKE_SELECTOR === '1'
-			? SMOKE_PROFILE === 'STRUCTURAL'
+		: selector === undefined || selector === '1'
+			? profile === 'STRUCTURAL' || suite === 'LOGICAL_GRAPH_COMPOSITION_ONLY'
 				? COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
 				: REPRESENTATIVE_PROJECTS
-			: SMOKE_SELECTOR.split(',')
+			: selector
+					.split(',')
 					.map((path) => path.trim())
 					.filter((path) => path.length > 0);
+}
+
+const SELECTED_PROJECTS = selectedProjectsForSmoke(SMOKE_PROFILE, SMOKE_SUITE, SMOKE_SELECTOR);
 const USE_COMMON_COMMAND_HANDLER_SUBJECT =
 	SMOKE_PROFILE === 'STRUCTURAL' &&
 	SELECTED_PROJECTS !== null &&
@@ -324,7 +388,7 @@ const STRUCTURAL_MODULE_REACHABILITY_CRITERION_LOGICAL_PATH =
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.6.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.7.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -339,6 +403,7 @@ type RepositorySmokePhase =
 	| 'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING'
 	| 'GUARD_ENFORCEMENT_LEDGER_OBSERVATION'
 	| 'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE'
+	| 'LOGICAL_GRAPH_COMPOSITION'
 	| 'DEPENDENCY_CRUISER_EXECUTION'
 	| 'DEPENDENCY_CRUISER_NORMALIZATION'
 	| 'DEPENDENCY_PROVIDER_COMPARISON'
@@ -356,6 +421,7 @@ type RepositorySmokePhase =
 const STRUCTURAL_SCC_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 	'CALL_GRAPH',
+	'LOGICAL_GRAPH_COMPOSITION',
 	'READ_WRITE_ACCESS_GRAPH',
 	'STATE_MACHINE_TOPOLOGY_OBSERVATION',
 	'STATE_MACHINE_GRAPH_PROJECTION',
@@ -378,6 +444,7 @@ const STRUCTURAL_SCC_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 const STRUCTURAL_MODULE_REACHABILITY_ONLY_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'STRUCTURAL_SCC_ANALYSIS',
 	'CALL_GRAPH',
+	'LOGICAL_GRAPH_COMPOSITION',
 	'READ_WRITE_ACCESS_GRAPH',
 	'STATE_MACHINE_TOPOLOGY_OBSERVATION',
 	'STATE_MACHINE_GRAPH_PROJECTION',
@@ -422,6 +489,42 @@ const STRUCTURAL_SCC_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 	...STRUCTURAL_SCC_ONLY_SKIPPED_PHASES
+];
+
+const LOGICAL_GRAPH_COMPOSITION_ONLY_DOWNSTREAM_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'READ_WRITE_ACCESS_GRAPH',
+	'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+	'STATE_MACHINE_GRAPH_PROJECTION',
+	'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+	'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+	'ARROW_COMMAND_CENSUS_OBSERVATION',
+	'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+	'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+	'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+	'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+	'COMMAND_HANDLER_STATIC_PROJECTION',
+	'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+	'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+	'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+	'DEPENDENCY_CRUISER_EXECUTION',
+	'DEPENDENCY_CRUISER_NORMALIZATION',
+	'DEPENDENCY_PROVIDER_COMPARISON'
+];
+
+const LOGICAL_GRAPH_COMPOSITION_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase[] = [
+	'SELECTED_SUBJECT_RESOLUTION',
+	'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+	'MODULE_DEPENDENCY_GRAPH',
+	'CALL_GRAPH',
+	'LOGICAL_GRAPH_COMPOSITION'
+];
+
+const LOGICAL_GRAPH_COMPOSITION_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'REPOSITORY_DISCOVERY_PREFLIGHT',
+	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+	'STRUCTURAL_SCC_ANALYSIS',
+	...LOGICAL_GRAPH_COMPOSITION_ONLY_DOWNSTREAM_SKIPPED_PHASES
 ];
 
 interface RepositorySmokeTelemetryOptions {
@@ -652,6 +755,12 @@ describe('repository smoke phase telemetry', () => {
 		);
 		expect(repositorySmokeSuite(' structural_scc ')).toBe('STRUCTURAL_SCC_ONLY');
 		expect(repositorySmokeSuite(' structural_scc_only ')).toBe('STRUCTURAL_SCC_ONLY');
+		expect(repositorySmokeSuite(' logical_graph_composition ')).toBe(
+			'LOGICAL_GRAPH_COMPOSITION_ONLY'
+		);
+		expect(repositorySmokeSuite(' logical_graph_composition_only ')).toBe(
+			'LOGICAL_GRAPH_COMPOSITION_ONLY'
+		);
 		expect(repositorySmokeSuite(' full ')).toBe('FULL_SUITE');
 		expect(repositorySmokeSuite(' full_suite ')).toBe('FULL_SUITE');
 		expect(() => repositorySmokeSuite('unknown')).toThrow(
@@ -687,12 +796,30 @@ describe('repository smoke phase telemetry', () => {
 		expect(() =>
 			assertRepositorySmokeSelection('STRUCTURAL', 'STRUCTURAL_SCC_ONLY', '1')
 		).not.toThrow();
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'LOGICAL_GRAPH_COMPOSITION_ONLY', '1')
+		).toThrow('LOGICAL_GRAPH_COMPOSITION_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=FULL.');
+		expect(() =>
+			assertRepositorySmokeSelection('FULL', 'LOGICAL_GRAPH_COMPOSITION_ONLY', 'all')
+		).toThrow('LOGICAL_GRAPH_COMPOSITION_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		expect(() =>
+			assertRepositorySmokeSelection('FULL', 'LOGICAL_GRAPH_COMPOSITION_ONLY', '1')
+		).not.toThrow();
+		expect(selectedProjectsForSmoke('FULL', 'FULL_SUITE', '1')).toEqual(REPRESENTATIVE_PROJECTS);
+		expect(selectedProjectsForSmoke('FULL', 'LOGICAL_GRAPH_COMPOSITION_ONLY', '1')).toEqual(
+			COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
+		);
+		expect(selectedProjectsForSmoke('STRUCTURAL', 'STRUCTURAL_SCC_ONLY', '1')).toEqual(
+			COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
+		);
+		expect(selectedProjectsForSmoke('FULL', 'FULL_SUITE', 'all')).toBeNull();
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.COMMAND_HANDLER_ONLY).toEqual({
 			runIndependentSemanticRevalidation: false,
 			runCallGraph: false,
 			runCommandEventContractOverlay: true,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: true,
+			runLogicalGraphComposition: false,
 			runModuleDependencyGraph: false,
 			runReadWriteAccessGraph: false,
 			runRepositoryDiscoveryPreflight: false,
@@ -700,6 +827,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
 			suite: 'COMMAND_HANDLER_ONLY',
+			terminateAfterLogicalGraphComposition: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -709,6 +837,7 @@ describe('repository smoke phase telemetry', () => {
 			runCommandEventContractOverlay: false,
 			runDependencyProviderComparison: true,
 			runGuardClassificationOverlay: false,
+			runLogicalGraphComposition: true,
 			runModuleDependencyGraph: true,
 			runReadWriteAccessGraph: true,
 			runRepositoryDiscoveryPreflight: true,
@@ -716,6 +845,25 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: true,
 			suite: 'FULL_SUITE',
+			terminateAfterLogicalGraphComposition: false,
+			terminateAfterStructuralModuleReachabilityAnalysis: false,
+			terminateAfterStructuralSccAnalysis: false
+		});
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.LOGICAL_GRAPH_COMPOSITION_ONLY).toEqual({
+			runIndependentSemanticRevalidation: false,
+			runCallGraph: true,
+			runCommandEventContractOverlay: false,
+			runDependencyProviderComparison: false,
+			runGuardClassificationOverlay: false,
+			runLogicalGraphComposition: true,
+			runModuleDependencyGraph: true,
+			runReadWriteAccessGraph: false,
+			runRepositoryDiscoveryPreflight: false,
+			runStateMachineProjection: false,
+			runStructuralModuleReachabilityAnalysis: false,
+			runStructuralSccAnalysis: false,
+			suite: 'LOGICAL_GRAPH_COMPOSITION_ONLY',
+			terminateAfterLogicalGraphComposition: true,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -725,6 +873,7 @@ describe('repository smoke phase telemetry', () => {
 			runCommandEventContractOverlay: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: false,
+			runLogicalGraphComposition: false,
 			runModuleDependencyGraph: true,
 			runReadWriteAccessGraph: false,
 			runRepositoryDiscoveryPreflight: false,
@@ -732,6 +881,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: false,
 			suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
+			terminateAfterLogicalGraphComposition: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: true,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -741,6 +891,7 @@ describe('repository smoke phase telemetry', () => {
 			runCommandEventContractOverlay: false,
 			runDependencyProviderComparison: false,
 			runGuardClassificationOverlay: false,
+			runLogicalGraphComposition: false,
 			runModuleDependencyGraph: true,
 			runReadWriteAccessGraph: false,
 			runRepositoryDiscoveryPreflight: false,
@@ -748,6 +899,7 @@ describe('repository smoke phase telemetry', () => {
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: true,
 			suite: 'STRUCTURAL_SCC_ONLY',
+			terminateAfterLogicalGraphComposition: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: true
 		});
@@ -762,6 +914,7 @@ describe('repository smoke phase telemetry', () => {
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 			'CALL_GRAPH',
+			'LOGICAL_GRAPH_COMPOSITION',
 			'READ_WRITE_ACCESS_GRAPH',
 			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
 			'STATE_MACHINE_GRAPH_PROJECTION',
@@ -791,6 +944,37 @@ describe('repository smoke phase telemetry', () => {
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
 			'STRUCTURAL_SCC_ANALYSIS',
 			'CALL_GRAPH',
+			'LOGICAL_GRAPH_COMPOSITION',
+			'READ_WRITE_ACCESS_GRAPH',
+			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+			'STATE_MACHINE_GRAPH_PROJECTION',
+			'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+			'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+			'ARROW_COMMAND_CENSUS_OBSERVATION',
+			'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+			'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+			'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+			'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+			'COMMAND_HANDLER_STATIC_PROJECTION',
+			'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+			'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+			'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+			'DEPENDENCY_CRUISER_EXECUTION',
+			'DEPENDENCY_CRUISER_NORMALIZATION',
+			'DEPENDENCY_PROVIDER_COMPARISON'
+		]);
+		expect(LOGICAL_GRAPH_COMPOSITION_ONLY_COMPLETED_PHASES).toEqual([
+			'SELECTED_SUBJECT_RESOLUTION',
+			'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+			'MODULE_DEPENDENCY_GRAPH',
+			'CALL_GRAPH',
+			'LOGICAL_GRAPH_COMPOSITION'
+		]);
+		expect(LOGICAL_GRAPH_COMPOSITION_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
+			'REPOSITORY_DISCOVERY_PREFLIGHT',
+			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+			'STRUCTURAL_SCC_ANALYSIS',
 			'READ_WRITE_ACCESS_GRAPH',
 			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
 			'STATE_MACHINE_GRAPH_PROJECTION',
@@ -1501,6 +1685,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandHandlerStaticProjection: false,
 						guardClassificationStaticOverlay: false,
 						guardEnforcementLedgerObserved: false,
+						logicalGraphComposed: false,
 						projects: snapshot.projects.length,
 						semanticSnapshotOutcome: outcome.outcome,
 						semanticProfile: SMOKE_PROFILE,
@@ -1525,6 +1710,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							exactSubjectReuse: null,
 							guardClassificationStaticOverlay: null,
 							guardEnforcementLedger: null,
+							logicalGraphComposition: null,
 							moduleDependencyGraph: moduleDependencyGraphResult,
 							phaseDurationsMs,
 							projectCount: snapshot.projects.length,
@@ -1688,6 +1874,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandHandlerStaticProjection: false,
 						guardClassificationStaticOverlay: false,
 						guardEnforcementLedgerObserved: false,
+						logicalGraphComposed: false,
 						projects: snapshot.projects.length,
 						semanticSnapshotOutcome: outcome.outcome,
 						semanticProfile: SMOKE_PROFILE,
@@ -1712,6 +1899,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							exactSubjectReuse: null,
 							guardClassificationStaticOverlay: null,
 							guardEnforcementLedger: null,
+							logicalGraphComposition: null,
 							moduleDependencyGraph: moduleDependencyGraphResult,
 							phaseDurationsMs,
 							projectCount: snapshot.projects.length,
@@ -1738,6 +1926,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					);
 					return;
 				}
+				let callGraph: CallGraphSnapshot | null = null;
 				let callGraphResult: null | {
 					readonly bytes: number;
 					readonly candidateSetCallSites: number;
@@ -1765,7 +1954,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					);
 					if (callGraphOutcome.outcome === 'unavailable')
 						throw new Error(JSON.stringify(callGraphOutcome));
-					const callGraph = callGraphOutcome.graph;
+					callGraph = callGraphOutcome.graph;
 					expect(callGraph.coverage.reconciles).toBe(true);
 					expect(callGraph.coverage.representedCallSites).toBe(snapshot.invocations.length);
 					expect(callGraph.coverage.closure).toBe('OPEN');
@@ -1800,6 +1989,311 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							? 'TS_TYPE_NOT_REQUESTED'
 							: 'SUITE_PHASE_NOT_REQUESTED'
 					});
+				let logicalGraphCompositionResult: null | {
+					readonly bytes: number;
+					readonly callInputEdges: number;
+					readonly callInputNodes: number;
+					readonly closure: string;
+					readonly conflicts: number;
+					readonly contentDigest: string;
+					readonly crossLinks: number;
+					readonly durationMs: number;
+					readonly id: string;
+					readonly inheritedLimitations: number;
+					readonly inputDigest: string;
+					readonly moduleInputEdges: number;
+					readonly moduleInputNodes: number;
+					readonly sha256: string;
+					readonly unmatchedSources: number;
+				} = null;
+				if (SMOKE_PROJECTION_PLAN.runLogicalGraphComposition) {
+					if (moduleDependencyGraph === null || callGraph === null)
+						throw new Error(
+							'Logical graph composition requires validated module-dependency and call graphs.'
+						);
+					const logicalCompositionStartedAt = performance.now();
+					const logicalCompositionBudgets = {
+						maxCallEdges: callGraph.edges.length,
+						maxCallNodes: callGraph.nodes.length,
+						maxConflictRecords: 0 as const,
+						maxDiagnostics: 100_000,
+						maxEligibleSourceNodes: snapshot.sources.length * 2,
+						maxInputRecords: 50_000_000,
+						maxInputStringCharacters: REPOSITORY_SMOKE_FAILSAFE_SUBJECT_BYTES,
+						maxLinks: snapshot.sources.length,
+						maxModuleDependencyEdges: moduleDependencyGraph.edges.length,
+						maxModuleDependencyNodes: moduleDependencyGraph.nodes.length,
+						maxOutputRecords:
+							3 +
+							moduleDependencyGraph.limitations.length +
+							callGraph.limitations.length +
+							snapshot.sources.length,
+						maxTraversalSteps:
+							moduleDependencyGraph.nodes.length +
+							moduleDependencyGraph.edges.length +
+							callGraph.nodes.length +
+							callGraph.edges.length +
+							snapshot.sources.length * 2,
+						maxUnmatchedRecords: 0 as const
+					};
+					const logicalCompositionInputs = {
+						callGraph,
+						moduleDependencyGraph,
+						request: {
+							budgets: logicalCompositionBudgets,
+							operationVersion: LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION,
+							schemaVersion: LOGICAL_GRAPH_COMPOSITION_REQUEST_SCHEMA_VERSION,
+							selection: LOGICAL_GRAPH_COMPOSITION_SELECTION,
+							semanticSnapshotId: snapshot.id,
+							sourceLayers: [
+								{
+									canonicalProfile: moduleDependencyGraph.canonicalProfile,
+									contentDigest: moduleDependencyGraph.contentDigest,
+									graphId: moduleDependencyGraph.id,
+									graphInputDigest: moduleDependencyGraph.graphInputDigest,
+									graphKind: moduleDependencyGraph.graphKind,
+									layerId: moduleDependencyGraph.layers[0].id,
+									method: moduleDependencyGraph.method,
+									operationVersion: moduleDependencyGraph.operationVersion,
+									ordinal: 0 as const,
+									producer: moduleDependencyGraph.producer,
+									role: 'MODULE_DEPENDENCY' as const,
+									schemaVersion: moduleDependencyGraph.schemaVersion,
+									semanticExtractionVersion: moduleDependencyGraph.semanticExtractionVersion,
+									semanticSchemaVersion: moduleDependencyGraph.semanticSchemaVersion,
+									semanticSnapshotId: moduleDependencyGraph.semanticSnapshotId,
+									subjectId: moduleDependencyGraph.subjectId
+								},
+								{
+									canonicalProfile: callGraph.canonicalProfile,
+									contentDigest: callGraph.contentDigest,
+									graphId: callGraph.id,
+									graphInputDigest: callGraph.graphInputDigest,
+									graphKind: callGraph.graphKind,
+									layerId: callGraph.layers[0].id,
+									method: callGraph.method,
+									operationVersion: callGraph.operationVersion,
+									ordinal: 1 as const,
+									producer: callGraph.producer,
+									role: 'CALL' as const,
+									schemaVersion: callGraph.schemaVersion,
+									semanticExtractionVersion: callGraph.semanticExtractionVersion,
+									semanticSchemaVersion: callGraph.semanticSchemaVersion,
+									semanticSnapshotId: callGraph.semanticSnapshotId,
+									subjectId: callGraph.subjectId
+								}
+							] as const,
+							subjectId: snapshot.subjectId
+						},
+						semanticSnapshot: snapshot
+					};
+					telemetry.start('LOGICAL_GRAPH_COMPOSITION', {
+						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						budgets: logicalCompositionBudgets,
+						callGraphId: callGraph.id,
+						moduleDependencyGraphId: moduleDependencyGraph.id
+					});
+					const compositionOutcome = buildLogicalGraphComposition(logicalCompositionInputs, {
+						onProgress(event) {
+							process.stdout.write(`${JSON.stringify(event)}\n`);
+						}
+					});
+					expect(compositionOutcome.outcome, JSON.stringify(compositionOutcome.diagnostics)).toBe(
+						'partial'
+					);
+					if (compositionOutcome.outcome !== 'partial')
+						throw new Error(JSON.stringify(compositionOutcome));
+					const composition = compositionOutcome.composition;
+					if (SMOKE_SUITE === 'LOGICAL_GRAPH_COMPOSITION_ONLY') {
+						expect(snapshot.sources).toHaveLength(2_532);
+						expect(snapshot.invocations).toHaveLength(26_214);
+						expect(moduleDependencyGraph.nodes).toHaveLength(2_591);
+						expect(moduleDependencyGraph.edges).toHaveLength(1_157);
+						expect(callGraph.nodes).toHaveLength(51_319);
+						expect(callGraph.edges).toHaveLength(52_428);
+						expect(callGraph.coverage).toMatchObject({
+							candidateSetCallSites: 8_625,
+							externalDispatchCallSites: 11_538,
+							representedCallSites: 26_214,
+							targetEdges: 26_214,
+							unresolvedCallSites: 0,
+							unsupportedCallSites: 6_051
+						});
+						expect(composition.coverage).toEqual({
+							callEligibleSourceRegions: 2_532,
+							callInputEdges: 52_428,
+							callInputNodes: 51_319,
+							callPopulationReconciles: true,
+							chargedInputTraversalSteps: 112_559,
+							conflictingSemanticSources: 0,
+							crossLinks: 2_532,
+							exactSemanticSourceIdCandidates: 2_532,
+							linkedSemanticSources: 2_532,
+							linkPopulationReconciles: true,
+							moduleEligibleSourceNodes: 2_532,
+							moduleInputEdges: 1_157,
+							moduleInputNodes: 2_591,
+							modulePopulationReconciles: true,
+							sourceIdentityPopulationReconciles: true,
+							unmatchedCallSources: 0,
+							unmatchedModuleSources: 0
+						});
+						expect(composition.inheritedLimitations).toHaveLength(26_907);
+					}
+					expect(
+						validateLogicalGraphComposition(composition, logicalCompositionInputs, {
+							maxDepth: 4_096,
+							maxInputRecords: logicalCompositionBudgets.maxInputRecords,
+							maxInputStringCharacters: logicalCompositionBudgets.maxInputStringCharacters,
+							maxIssues: logicalCompositionBudgets.maxDiagnostics,
+							maxRecords: logicalCompositionBudgets.maxInputRecords,
+							maxStringCharacters: logicalCompositionBudgets.maxInputStringCharacters
+						})
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(composition.coverage).toMatchObject({
+						callEligibleSourceRegions: snapshot.sources.length,
+						callPopulationReconciles: true,
+						conflictingSemanticSources: 0,
+						crossLinks: snapshot.sources.length,
+						exactSemanticSourceIdCandidates: snapshot.sources.length,
+						linkedSemanticSources: snapshot.sources.length,
+						linkPopulationReconciles: true,
+						moduleEligibleSourceNodes: snapshot.sources.length,
+						modulePopulationReconciles: true,
+						sourceIdentityPopulationReconciles: true,
+						unmatchedCallSources: 0,
+						unmatchedModuleSources: 0
+					});
+					expect(composition.conflicts).toEqual([]);
+					expect(composition.unmatchedSources).toEqual([]);
+					expect(composition.layers).toHaveLength(2);
+					expect(composition.health).toBe('PARTIAL');
+					expect(composition.closure).toBe('OPEN');
+					expect(composition.graphAuthority).toBe(LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY);
+					expect(composition.authorityTransfer).toBe(LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER);
+					expect(composition.gateEffect).toBe(LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT);
+					expect(composition.freshness).toBe(LOGICAL_GRAPH_COMPOSITION_FRESHNESS);
+					expect(composition.currentness).toBe(LOGICAL_GRAPH_COMPOSITION_CURRENTNESS);
+					expect(composition.fullJanCsaa009Conformance).toBe(
+						LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE
+					);
+					expect(composition.fullJanCsaa007Conformance).toBe(
+						LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_007_CONFORMANCE
+					);
+					expect(composition.fullJanCsaa008Conformance).toBe(
+						LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_008_CONFORMANCE
+					);
+					expect(composition.nonclaims).toEqual(LOGICAL_GRAPH_COMPOSITION_NONCLAIMS);
+					const compositionWitness = canonicalSemanticJsonWitness(composition);
+					telemetry.complete({
+						bytes: compositionWitness.bytes,
+						conflicts: composition.conflicts.length,
+						crossLinks: composition.crossLinks.length,
+						inheritedLimitations: composition.inheritedLimitations.length,
+						unmatchedSources: composition.unmatchedSources.length,
+						validationState: 'VALID'
+					});
+					logicalGraphCompositionResult = {
+						bytes: compositionWitness.bytes,
+						callInputEdges: composition.coverage.callInputEdges,
+						callInputNodes: composition.coverage.callInputNodes,
+						closure: composition.closure,
+						conflicts: composition.conflicts.length,
+						contentDigest: composition.contentDigest,
+						crossLinks: composition.crossLinks.length,
+						durationMs: Math.max(0, Math.round(performance.now() - logicalCompositionStartedAt)),
+						id: composition.id,
+						inheritedLimitations: composition.inheritedLimitations.length,
+						inputDigest: composition.inputDigest,
+						moduleInputEdges: composition.coverage.moduleInputEdges,
+						moduleInputNodes: composition.coverage.moduleInputNodes,
+						sha256: compositionWitness.sha256,
+						unmatchedSources: composition.unmatchedSources.length
+					};
+				} else
+					telemetry.skip('LOGICAL_GRAPH_COMPOSITION', {
+						reason: 'The selected smoke suite does not request logical graph composition.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
+				if (SMOKE_PROJECTION_PLAN.terminateAfterLogicalGraphComposition) {
+					if (
+						moduleDependencyGraphResult === null ||
+						callGraphResult === null ||
+						logicalGraphCompositionResult === null
+					)
+						throw new Error(
+							'LOGICAL_GRAPH_COMPOSITION_ONLY cannot complete without validated module, call, and composition evidence.'
+						);
+					for (const phase of LOGICAL_GRAPH_COMPOSITION_ONLY_DOWNSTREAM_SKIPPED_PHASES)
+						telemetry.skip(phase, {
+							reason:
+								'The logical-graph-composition-only suite terminates after validated two-layer composition evidence.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
+					const phaseDurationsMs = telemetry.phaseDurationsMs();
+					const skippedPhases = telemetry.skippedPhases();
+					const completedPhases = Object.keys(phaseDurationsMs);
+					expect(completedPhases).toEqual(LOGICAL_GRAPH_COMPOSITION_ONLY_COMPLETED_PHASES);
+					expect(skippedPhases).toEqual(LOGICAL_GRAPH_COMPOSITION_ONLY_EXPECTED_SKIPPED_PHASES);
+					telemetry.finish({
+						completedPhases,
+						commandEventContractStaticOverlay: false,
+						commandDispatchStaticTopology: false,
+						commandHandlerStaticProjection: false,
+						guardClassificationStaticOverlay: false,
+						guardEnforcementLedgerObserved: false,
+						logicalGraphComposed: true,
+						projects: snapshot.projects.length,
+						semanticSnapshotOutcome: outcome.outcome,
+						semanticProfile: SMOKE_PROFILE,
+						skippedPhases,
+						smokeSuite: SMOKE_SUITE,
+						sources: snapshot.sources.length,
+						stateMachineProjected: false,
+						structuralModuleReachabilityAnalyzed: false,
+						structuralSccAnalyzed: false,
+						terminalPhase: 'LOGICAL_GRAPH_COMPOSITION'
+					});
+					process.stdout.write(
+						`${JSON.stringify({
+							arrowCommandCensus: null,
+							callGraph: callGraphResult,
+							completedPhases,
+							commandEventContractStaticOverlay: null,
+							commandDispatchStaticTopology: null,
+							commandHandlerStaticProjection: null,
+							dependencyProviderComparison: null,
+							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
+							exactSubjectReuse: null,
+							guardClassificationStaticOverlay: null,
+							guardEnforcementLedger: null,
+							logicalGraphComposition: logicalGraphCompositionResult,
+							moduleDependencyGraph: moduleDependencyGraphResult,
+							phaseDurationsMs,
+							projectCount: snapshot.projects.length,
+							readWriteAccessGraph: null,
+							selectedSubjectArtifactBytes: subjectArtifactBytes,
+							selectedSubjectArtifactCount: subject.artifacts.length,
+							selectedSubjectId: subject.descriptor.subjectId,
+							selector: SMOKE_SELECTOR ?? null,
+							semanticPipelineDurationMs,
+							semanticProfile: SMOKE_PROFILE,
+							semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
+							semanticSnapshotOutcome: outcome.outcome,
+							semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
+							semanticSnapshotProgressEvents: semanticProgressEvents.length,
+							semanticSnapshotWitness,
+							skippedPhases,
+							smokeSuite: SMOKE_SUITE,
+							sourceCount: snapshot.sources.length,
+							stateMachine: null,
+							structuralModuleReachabilityAnalysis: null,
+							structuralSccAnalysis: null,
+							terminalPhase: 'LOGICAL_GRAPH_COMPOSITION'
+						})}\n`
+					);
+					return;
+				}
 				let readWriteAccessGraphResult: null | {
 					readonly accesses: number;
 					readonly bytes: number;
@@ -3208,6 +3702,13 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					throw new Error(
 						'The selected smoke suite cannot complete without validated structural module reachability analysis.'
 					);
+				if (
+					SMOKE_PROJECTION_PLAN.runLogicalGraphComposition &&
+					logicalGraphCompositionResult === null
+				)
+					throw new Error(
+						'The selected smoke suite cannot complete without validated logical graph composition.'
+					);
 				const exactSubjectReuse =
 					arrowSubject === subject &&
 					snapshot.subjectId === subject.descriptor.subjectId &&
@@ -3224,6 +3725,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					exactSubjectReuse,
 					guardClassificationStaticOverlay: guardClassificationOverlayResult !== null,
 					guardEnforcementLedgerObserved: guardEnforcementLedgerResult !== null,
+					logicalGraphComposed: logicalGraphCompositionResult !== null,
 					semanticSnapshotOutcome: outcome.outcome,
 					semanticProfile: SMOKE_PROFILE,
 					skippedPhases,
@@ -3269,6 +3771,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						exactSubjectReuse,
 						guardClassificationStaticOverlay: guardClassificationOverlayResult,
 						guardEnforcementLedger: guardEnforcementLedgerResult,
+						logicalGraphComposition: logicalGraphCompositionResult,
 						moduleDependencyGraph: moduleDependencyGraphResult,
 						readWriteAccessGraph: readWriteAccessGraphResult,
 						projectCount: snapshot.projects.length,
