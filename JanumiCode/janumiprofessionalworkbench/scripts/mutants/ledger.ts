@@ -2762,5 +2762,25 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
 		why: "THE SELF-SUPERSESSION ARM IS DELETED. Without it an intent can name ITSELF its own replacement, which moves it to a TERMINAL state whose recorded successor is the dead intent — the stranding this increment exists to close, reached by a second route that the existence-and-type check cannot see (the intent trivially exists and is trivially an INTENT). ⚠ EVERY OTHER TEST IN THE SUITE STAYS GREEN, including the ghost and decoy refusals and the CONTROL, so this arm has exactly one witness and the mutation proves it is a real one rather than a defensive line nothing reaches. Predicted red: \"REFUSES an intent superseding itself\" alone.",
 		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-enforcedAt-citation-is-the-literal-it-is-checked-against',
+		file: 'packages/rph-domain/src/enforcement-register.ts',
+		find: "\t\t\t'packages/rph-application/src/handlers/execution.ts \u2014 activateExecutionPlan / canActivatePlan',",
+		replace: "\t\t\t'packages/',",
+		expectRed: [],
+		why: "THE CITATION IS REPLACED BY THE LITERAL IT IS CHECKED AGAINST. `enforcedAt` is supposed to name the site that refuses; the ONLY assertion on it in the whole repository is `toContain(‘packages/’)` at enforcement-register.test.ts:255, so the bare string \"packages/\" satisfies it while naming no file, no function and no line. This mutation is that string.",
+		expectSurvive: "SURVIVAL IS THE FINDING, AND IT IS THE EVIDENCE REG-F-134 PROMISED — a claim that a check CANNOT FAIL must be demonstrated, not asserted. The field's own doc comment already concedes it (\"Prose, checked by a reader, not by the gate\"), and one directory over verif/guard-enforcement-ledger.ts demands an anchor that resolves EXACTLY ONCE in the file it names — the unofficial instrument is stricter than the canonical one. ⚠ A KILL HERE IS THE GOOD NEWS AND MUST BE ACTED ON, NOT SILENCED: it means someone content-gated `enforcedAt`, at which point this entry is RETIRED deliberately and REG-F-134’s open limb closes.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-a-declared-mutation-need-not-exist',
+		file: 'packages/rph-domain/src/enforcement-register.ts',
+		find: "\t\t\t'delete the `if (!check.ok)` arm in activateExecutionPlan',",
+		replace: "\t\t\t'delete the `if (!thisFunctionDoesNotExist)` arm in aHandlerThatWasNeverWritten',",
+		expectRed: [],
+		why: "A DECLARED MUTATION IS REPLACED BY ONE THAT DOES NOT EXIST. `declaredMutations` is supposed to say what to break to prove the guard; the ONLY assertion on it in the whole repository is `.length > 0` at enforcement-register.test.ts:256, so the strings need not name mutations that exist, apply, or redden anything. This mutation replaces a real entry with an invented one.",
+		expectSurvive: "SURVIVAL IS THE FINDING. ⚠ AND THE DEEPER GAP IS THAT THE TWO SYSTEMS ARE UNLINKED: this ledger — the file you are reading — is where mutations actually live, and `enforcement-register.ts` mentions it nowhere. Searched scripts/mutants/ledger.ts for the RPH-EVD-002 guard text and rule id: 0 hits; positive control CLAIM_REASSESSMENT_DISCRIMINATORS in the same file: 1 hit, so the search discriminates. Making `declaredMutations` resolve to ledger ids is a separate work package, filed rather than smuggled into a disposition move. ⚠ A KILL HERE MEANS THE JOIN WAS BUILT — retire this entry deliberately.",
+		source: 'REG-F-134'
 	}
 ];
