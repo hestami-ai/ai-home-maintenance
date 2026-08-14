@@ -937,6 +937,19 @@ function printTimings(): void {
 	console.log(`${'TOTAL (subprocess time only)'.padEnd(30)} ${secs(total).padStart(9)}`);
 }
 
+// ⚠ REGISTERED ON `exit`, NOT CALLED AT THE END OF THE FILE — AND THE FIRST VERSION WAS THE HOLLOW (REG-F-163).
+//
+// I appended `printTimings()` as the last statement of this module. Every path out of this runner ends in
+// `process.exit(...)` — there are SIX — so the call was UNREACHABLE and the very first instrumented run printed
+// no table at all. Types passed, lint passed, the gate passed: nothing anywhere can tell that a `console.log`
+// never happened. **An instrument added to measure this gate, which did not run, in the commit whose register
+// entry is about instruments that measure nothing.**
+//
+// `process.on('exit')` fires on every path including `process.exit`, so the ABORTED_DIRTY and preflight exits
+// report their legs too — which is what a reader wants from a run that stopped early. The handler must stay
+// SYNCHRONOUS (console.log only); an async one would silently not run, which is this same defect again.
+process.on('exit', printTimings);
+
 console.log('\n=== MUTATION LEDGER SUMMARY ===');
 // ⚠ STATED WITH THE NUMBERS, EVERY RUN. A whole-suite verdict — CONTROL_HELD above all — means "held over
 // everything EXCEPT these projects", and a reader who does not know that will over-read it. REG-F-136.
@@ -1025,5 +1038,3 @@ if (failures > 0)
 		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'ADVISORY — MUTANTS_ADVISORY=1 was set, so this run cannot fail the gate.'}`
 	);
 process.exit(blocking && failures > 0 ? 1 : 0);
-
-printTimings();
