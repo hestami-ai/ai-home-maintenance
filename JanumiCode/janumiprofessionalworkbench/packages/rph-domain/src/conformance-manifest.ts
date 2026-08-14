@@ -345,7 +345,12 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// INT-005 are ENFORCED and now cited by id above (both refused by approveIntent's precheck, in that order),
 		// while INT-006 and INT-007 are not pending a test at all — the register disposes them as
 		// NOT_A_COMMAND_REFUSAL, INT-006 because its six consequents are outcomes (two of which need an
-		// impact-analysis plane that does not exist) and INT-007 because its antecedent is command-unreachable.
+		// impact-analysis plane that does not exist)~~ and INT-007 because its antecedent is command-unreachable~~
+		// — INT-007 LEFT arm 3 on 2026-08-13: `SupersedeIntent` (REG-F-131) made SUPERSEDED reachable and the
+		// register disposes it ENFORCED (REG-F-132), as the `note` below now records. ⚠ THIS COMMENT SAT AS
+		// UNCHANGED CONTEXT IN THE VERY HUNK THAT CORRECTED THAT NOTE (REG-F-142), in the commit that wrote the
+		// rule "a prose summary beside the field it summarises is a second copy with no checker" — and the gate
+		// that commit added reads `coverageFor(id)?.note`, the FIELD only, so it provably cannot see this line.
 		note: 'INT-003/004/005/007 ENFORCED and cited by id above; INT-001/002/006 are NOT_A_COMMAND_REFUSAL in enforcement-register.ts (INT-001/002 describe what an accepted command produces; INT-006 enumerates outcomes). The struck ground for INT-007 — ~~a command-unreachable antecedent~~ — held until 2026-08-13, when `SupersedeIntent` made SUPERSEDED reachable (REG-F-132); this note was left stale by that same commit and caught by the gate added at REG-F-142. The enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-PWU': {

@@ -287,6 +287,19 @@ describe('WP-16 (c) — the register is TOTAL over the families it claims', () =
 			src.replace(/\r\n/g, '\n'),
 			'the closing "honest headline is N" must carry the same ENFORCED count as the census above it'
 		).toContain(`the honest headline is ${live.ENFORCED}, not ${live.total}`);
+
+		// ⚠ AND THE ADJECTIVE, because the first version of this check STOPPED FOUR WORDS SHORT OF IT and greened
+		// on a sentence whose digits it had just verified and whose meaning the same edit had just falsified
+		// (REG-F-148). The paragraph reads "…and a MAJORITY states outcomes, permissions, or planes that do not
+		// exist" — a claim about arm 3's SHARE, which was true at 58 of 112 and false at 56. A gate that checks
+		// the numbers in a sentence and not the word they qualify is checking the citation, not the claim.
+		const armThreeIsMajority = live.NOT_A_COMMAND_REFUSAL * 2 > live.total;
+		expect(
+			src.replace(/\r\n/g, '\n').includes('and a MAJORITY states outcomes'),
+			armThreeIsMajority
+				? 'arm 3 IS a majority — the paragraph should say so'
+				: `arm 3 is ${live.NOT_A_COMMAND_REFUSAL} of ${live.total}, which is NOT a majority — the paragraph must not claim one`
+		).toBe(armThreeIsMajority);
 	});
 
 	it('every disposition carries its reason, and no reason is a stub', () => {

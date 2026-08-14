@@ -77,8 +77,14 @@
 // WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
 // every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 31 are
 // ENFORCED, 25 are UNENFORCED_DISCLOSED and 56 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
-// catalog is a refusal the engine actually performs, and a MAJORITY states outcomes, permissions, or planes that do
-// not exist. Including all fourteen read-model rules. The register's value is that those are now written down and
+// catalog is a refusal the engine actually performs, and ~~a MAJORITY~~ EXACTLY HALF (56 of 112) states
+// outcomes, permissions, or planes that do not exist.
+// ⚠ THE ADJECTIVE WAS FALSIFIED BY THE CENSUS CORRECTION IN ITS OWN SENTENCE (REG-F-148). At 58 rows
+// "MAJORITY" was true; REG-F-141 corrected 58 -> 56 four words earlier and left it standing. The same word
+// was diagnosed three commits later in `verif/unreachability-grounds.test.ts` — "56 of 112 is EXACTLY HALF,
+// not a majority" — and this copy was never revisited. ⚠ AND THE GATE ADDED WITH THAT CORRECTION CANNOT
+// SEE IT: its regex stops at NOT_A_COMMAND_REFUSAL, four words short of the adjective, so it greened on a
+// sentence whose digits it had just verified and whose meaning it had just falsified. Including all fourteen read-model rules. The register's value is that those are now written down and
 // gated, not that they are closed; the honest headline is 31, not 112.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
@@ -3147,10 +3153,18 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// last two were authored at REG-F-069 and this sentence was not brought to them). The
 	// arrows into ACCEPTED, VERIFIED, UNDER_VERIFICATION and ~~FALSIFIED~~ are authored and command-unreachable
 	// — **FALSIFIED IS NOW REACHABLE**, and is struck from that list; the other three are re-derived and
-	// still unreachable, so this paragraph's CONCLUSION survives its own correction. Which
-	// is the RPH-EVD-002 shape (the `Claim.status` machine nothing dispatches into) repeated on a second aggregate.
-	// That is why three of these rows are arm 3 rather than disclosures: their triggering ACT cannot be dispatched,
-	// so no arrangement can demonstrate a gap.
+	// still unreachable. ⚠ ~~so this paragraph's CONCLUSION survives its own correction~~ — IT DOES NOT, AND
+	// I CERTIFIED IT WITHOUT READING IT (REG-F-148). Both remaining sentences rest on things I had spent the
+	// same day correcting elsewhere:
+	// ~~Which is the RPH-EVD-002 shape (the `Claim.status` machine nothing dispatches into) repeated on a
+	// second aggregate.~~ — RPH-EVD-002 is ENFORCED (REG-F-138) and `RecordClaimAssessment` covers 7 of the 15
+	// `Claim.status` arrows. The analogy now points at a machine that IS dispatched into.
+	// ~~That is why three of these rows are arm 3 rather than disclosures: their triggering ACT cannot be
+	// dispatched~~ — that ground holds for **RPH-ASM-003 ALONE**. RPH-ASM-001's own `why` says it is "AN
+	// OUTCOME ASSERTION" and that "a creating command exists (`DetectAssumption`)"; RPH-ASM-004's own `why`
+	// says "the stated GROUND (the act is not dispatchable) is gone" — a sentence I wrote at REG-F-133. I held
+	// the fact that kills this claim and certified the claim anyway.
+	// so no arrangement can demonstrate a gap — true of ASM-003, and of the others for DIFFERENT reasons.
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 	'RPH-ASM-001': {
 		kind: 'NOT_A_COMMAND_REFUSAL',
