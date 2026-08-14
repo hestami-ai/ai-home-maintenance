@@ -11,10 +11,25 @@
 // guards from the machine table.** A census that leaves no ledger is an anecdote; a ledger with no control is a
 // document that drifts.
 import { describe, expect, it } from 'vitest';
-import { auditLedger, guardTexts, guardedArrows } from './guard-enforcement-ledger.js';
+import {
+	auditLedger,
+	guardTexts,
+	guardedArrows,
+	unreachabilityFaults
+} from './guard-enforcement-ledger.js';
 import { GUARD_LEDGER } from './guard-enforcement-ledger.data.js';
+import { arrowKey, declaredArrows } from './arrow-command-census.js';
 
 const AUDIT = auditLedger(GUARD_LEDGER);
+
+/**
+ * What C-0 scores COVERED, keyed by C-0's own function.
+ *
+ * Built here rather than inside the ledger module so CONTROL 5 can inject a different set.
+ */
+const COVERED: ReadonlySet<string> = new Set(
+	declaredArrows().map((a) => arrowKey(a.machine, a.from, a.to))
+);
 
 /**
  * The population, pinned.
@@ -34,10 +49,14 @@ const TEXTS = 82;
  * adversarial pass attacked — and it attacked sixteen claims and overturned two.
  */
 const COUNTS = {
-	ARROW_UNREACHABLE: 22,
+	// ⚠ MOVED 2026-08-13, ARROW_UNREACHABLE 22 -> 21 and UNENFORCED 44 -> 45, and the DIRECTION is the point.
+	// "Replacement intent identified" was a DISMISSAL that REG-F-131 falsified four commits earlier; correcting
+	// it makes the ledger read WORSE, which is what distinguishes this from the reclassification the docblock
+	// below forbids. The guard is enforced in a later increment, and only then does this move back.
+	ARROW_UNREACHABLE: 21,
 	ENFORCED: 14,
 	REDUNDANT_WITH_MACHINE: 2,
-	UNENFORCED: 44
+	UNENFORCED: 45
 };
 
 describe('C-0b — every declared arrow guard is classified, and the ledger is pinned', () => {
@@ -93,6 +112,21 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 
 	it('pins the disposition census', () => {
 		expect(AUDIT.counts, JSON.stringify(AUDIT.counts)).toEqual(COUNTS);
+	});
+
+	// ── THE DISMISSAL IS CHECKED TOO ────────────────────────────────────────────────────────────────────────
+	// An `ARROW_UNREACHABLE` row says NO COMMAND PERFORMS THIS ARROW — a claim about the code, exactly as an
+	// ENFORCED row is. The docblock above COUNTS said the opposite ("ENFORCED is the only disposition that
+	// asserts something about the code"), and that belief is why this went unchecked while a row sat false for
+	// four commits. `UNENFORCED` needs no such check: it understates, and over-admission is not a defect.
+	it('carries no ARROW_UNREACHABLE row that a command actually performs', () => {
+		const faults = unreachabilityFaults(GUARD_LEDGER, COVERED);
+		expect(
+			faults,
+			`ARROW_UNREACHABLE rows the census contradicts:\n${faults
+				.map((f) => `  "${f.guard}"\n${f.coveredArrows.map((a) => `        ${a}`).join('\n')}`)
+				.join('\n')}`
+		).toEqual([]);
 	});
 
 	// ── CONTROL 1: THE READER IS REAL ────────────────────────────────────────────────────────────────────────
@@ -154,5 +188,40 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 		expect(audit({ enforcingAnchor: 'import' })[0], 'an anchor matching more than once').toContain(
 			'ambiguous'
 		);
+	});
+
+	// ── CONTROL 5: THE UNREACHABILITY CHECK CAN ACTUALLY FAIL ───────────────────────────────────────────────
+	// `[]` is also what this join returns when the two censuses key arrows differently — the failure this check
+	// is most exposed to, and one that reads as "no faults" while comparing nothing. So a row marked
+	// ARROW_UNREACHABLE on a demonstrably COVERED arrow must surface...
+	it('CONTROL — ARROW_UNREACHABLE on a covered arrow is caught, and UNENFORCED on it is not', () => {
+		const baseline = unreachabilityFaults(GUARD_LEDGER, COVERED).map((f) => f.guard);
+		const victim = guardedArrows().find((a) => COVERED.has(arrowKey(a.machine, a.from, a.to)));
+		expect(
+			victim,
+			'at least one GUARDED arrow must be covered for this control to mean anything'
+		).toBeDefined();
+
+		const dismissed = unreachabilityFaults(
+			{ ...GUARD_LEDGER, [victim!.guard]: { disposition: 'ARROW_UNREACHABLE', evidence: '<control>' } },
+			COVERED
+		).map((f) => f.guard);
+		expect(dismissed, 'the synthetic dismissal must surface').toContain(victim!.guard);
+		expect(dismissed.length, 'and surface exactly one NEW fault').toBe(baseline.length + 1);
+
+		// ...and the SAME arrow ADMITTED rather than dismissed must not, which pins the one-directionality.
+		// A gate that also pushed UNENFORCED rows toward ARROW_UNREACHABLE would manufacture the dismissals
+		// this whole check exists to catch.
+		const admitted = unreachabilityFaults(
+			{ ...GUARD_LEDGER, [victim!.guard]: { disposition: 'UNENFORCED', evidence: '<control>' } },
+			COVERED
+		).map((f) => f.guard);
+		expect(admitted, 'UNENFORCED is an admission, never a fault').toEqual(baseline);
+	});
+
+	// ── CONTROL 6: AN EMPTY COVERED SET IS REFUSED, NOT PASSED ──────────────────────────────────────────────
+	// The whole check degrades to green if the census hands it nothing. It must throw instead of reporting [].
+	it('CONTROL — an empty covered set throws rather than passing every row', () => {
+		expect(() => unreachabilityFaults(GUARD_LEDGER, new Set())).toThrow(/census reader is broken/);
 	});
 });

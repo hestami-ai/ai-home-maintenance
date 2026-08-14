@@ -2724,5 +2724,25 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
 		why: "THE TEMPTING REUSE, AND THE ONE THE MOTIVATING TEST CANNOT SEE. STA-6 has FOUR clauses and two of them are about intent maturity, so the obvious move when writing the creation gate is to reach for the set the READINESS gate already uses — `INTENT_AT_LEAST_PROVISIONAL` (pwuGuards.ts), which is {PROVISIONAL, FORMALIZED, APPROVED, REVISED}. This mutation is that reuse, spelled inline. ⚠ THE SUPERSEDED TEST STAYS GREEN UNDER IT — a widened gate still refuses SUPERSEDED — so the test that MOTIVATED this guard cannot distinguish the ratified rule from a gate four times too wide. Only the controls can. And the over-refusal is not hypothetical: proposing under a RAW intent is the repository's normal pattern, measured at 56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` without maturing it in between. Predicted red, measured before declaring: the RAW control AND the WITHDRAWN non-rule pin, 2 failed / 2 passed — clause (a) governs readiness, clause (d) governs creation, and this is what keeps them apart.",
 		source: 'REG-F-129'
+	},
+	{
+		id: 'F134-the-dismissal-check-returns-nothing',
+		file: 'verif/guard-enforcement-ledger.ts',
+		find: "\t\tif (ledger[guard]?.disposition !== 'ARROW_UNREACHABLE') continue;",
+		replace:
+			"\t\tif (ledger[guard]?.disposition !== 'ARROW_UNREACHABLE') continue;\n" +
+			'\t\tif (arrows.length >= 0) continue;',
+		expectRed: ['verif/guard-enforcement-ledger.test.ts'],
+		why: "THE CHECK STOPS CHECKING WHILE READING AS GREEN. `unreachabilityFaults` returns [] unconditionally, which is EXACTLY what a correct ledger also produces — so the main assertion cannot tell the two apart, and that is the whole reason CONTROL 5 exists rather than the assertion alone. ⚠ THIS IS NOT A HYPOTHETICAL SHAPE: the identical failure is what let \"Replacement intent identified\" sit false for four commits. There was no check at all, and no-check and check-that-returns-nothing are indistinguishable from the outside. MEASURED BEFORE DECLARING by neutering the function by hand: 1 failed / 13 passed, and the one failure was CONTROL 5 — the main test stayed GREEN under it, which is the point. Predicted red: CONTROL 5 alone.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-two-censuses-key-arrows-differently',
+		file: 'verif/guard-enforcement-ledger.ts',
+		find: '\t\t\t.map((a) => arrowKey(a.machine, a.from, a.to))',
+		replace: '\t\t\t.map((a) => `${a.machine} ${a.from} -> ${a.to}`)',
+		expectRed: ['verif/guard-enforcement-ledger.test.ts'],
+		why: "THE JOIN SILENTLY AGREES ON NOTHING. This function joins TWO censuses — C-0b's guarded arrows and C-0's covered set — and its characteristic failure is therefore not a wrong answer but a KEY-FORMAT MISMATCH, which yields an empty intersection and reads as \"no faults\". Swapping the shared `arrowKey` for a private format is the mutation the file's own header warns against in its second paragraph: two censuses over one table must not each keep their own idea of the table. ⚠ AND IT IS THE MUTATION MOST LIKELY TO BE WRITTEN BY ACCIDENT, because a hand-rolled `${machine} ${from} -> ${to}` differs from the real key by ONE SPACE and nothing about it looks wrong. Predicted red: CONTROL 5 — not the main assertion, which a mismatched join leaves green.",
+		source: 'REG-F-134'
 	}
 ];
