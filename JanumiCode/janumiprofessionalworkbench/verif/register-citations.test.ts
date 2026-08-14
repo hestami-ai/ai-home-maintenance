@@ -49,13 +49,18 @@ function citedIds(): Map<string, string[]> {
 			// This file NAMES the dangling ids in its own docblock and fabricates one in its CONTROL. A gate that
 			// scanned itself would report its own examples as findings.
 			if (e === 'register-citations.test.ts') continue;
+			if (e === 'ASTs and Code Analysis') continue; // CSAA's documents, same standing scope rule
 			const p = `${dir}/${e}`;
 			if (statSync(p).isDirectory()) walk(p, out);
-			else if (/\.(ts|svelte)$/.test(e)) out.push(p);
+			else if (/\.(ts|svelte|md)$/.test(e)) out.push(p);
 		}
 		return out;
 	};
-	const files = ['packages', 'verif', 'scripts', 'apps'].flatMap((d) => walk(`${ROOT}${d}`));
+	// ⚠ MARKDOWN IS SCANNED TOO, and that was a residual this gate's own first version DISCLOSED rather than
+	// closed: `REG-F-139` was invisible to it because the id appeared only in prose and a commit title. Measured
+	// before extending — 248 ids cited across `docs/`, 246 resolving — so the addition is high-signal rather
+	// than a wall of noise. `docs/ASTs and Code Analysis` is excluded as CSAA's, by the same standing scope rule.
+	const files = ['packages', 'verif', 'scripts', 'apps', 'docs'].flatMap((d) => walk(`${ROOT}${d}`));
 	const out = new Map<string, string[]>();
 	for (const f of files) {
 		// ⚠ SCOPED TO THE SERIES THE CANON DEFINES WITH HEADINGS — `REG-D`, `REG-F`, `REG-Q`. `REG-E` is
@@ -81,11 +86,21 @@ function citedIds(): Map<string, string[]> {
  */
 const SYNTHETIC = new Set(['REG-F-998', 'REG-F-999']);
 
+/**
+ * Ids that are cited, are genuinely undefined, and are NOT this programme's to write.
+ *
+ * `REG-F-115` was allocated in the subject line of `689ac61b` — a CSAA finding. `packages/csaa` is outside this
+ * programme's remit by standing instruction and is never staged from this worktree, so the entry belongs to that
+ * programme's author. **Exempted BY NAME with the reason, never by a pattern**: a wildcard here would silently
+ * absorb the next real gap, which is the whole failure mode this file exists to catch.
+ */
+const FOREIGN = new Map([['REG-F-115', 'CSAA finding, allocated in 689ac61b; out of this programme’s remit']]);
+
 describe('register citations resolve', () => {
 	it('every REG id cited by the code names an entry that exists', () => {
 		const defined = definedIds();
 		const dangling = [...citedIds()]
-			.filter(([id]) => !SYNTHETIC.has(id) && !defined.has(id))
+			.filter(([id]) => !SYNTHETIC.has(id) && !FOREIGN.has(id) && !defined.has(id))
 			.map(([id, files]) => `${id} — cited by ${files.slice(0, 3).join(', ')}`)
 			.sort((a, b) => a.localeCompare(b));
 		expect(
@@ -109,5 +124,18 @@ describe('register citations resolve', () => {
 		// And the synthetic exemption must be exactly the fixtures, never a real gap.
 		for (const id of SYNTHETIC)
 			expect(defined.has(id), `${id} is exempted as a fixture but a canon document defines it`).toBe(false);
+
+		// ⚠ EVERY EXEMPTION MUST STILL BE EARNING ITS PLACE. An exemption for an id someone has since WRITTEN is
+		// how a list of "known gaps" becomes a list nobody re-reads — the shape this register has recorded under
+		// half a dozen names. If the entry now exists, delete the exemption rather than keep a stale apology.
+		for (const [id, why] of FOREIGN)
+			expect(defined.has(id), `${id} is exempted (${why}) but is now DEFINED — remove the exemption`).toBe(
+				false
+			);
+		// The markdown reach is real, not incidental: the docs cite far more ids than the code does.
+		expect(
+			[...citedIds().values()].filter((fs) => fs.some((f) => f.endsWith('.md'))).length,
+			'markdown citations must be seen, or REG-F-139’s escape route is still open'
+		).toBeGreaterThan(100);
 	});
 });
