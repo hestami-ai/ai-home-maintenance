@@ -224,9 +224,19 @@ function preApplyVerdict(m: DeclaredMutant): { result: Result } | { original: st
  * rather than being reported separately in the summary. The mutants inherited from JAN-EXECREM WP-2..WP-15
  * ARRIVED in this state — their work packages declared the mutation but never said WHICH test reddens — and V-3
  * measured and named them. RE-MEASURED at HEAD rather than carried over: of the 87 `.py`-sourced entries, 75 now
- * carry a victim, and NO entry expected to be KILLED has an empty `expectRed`. The 17 still empty are 10
- * `duplicateOf`, 4 `expectSurvive` controls, 2 `expectNoCompile` and 1 `supersededBy` — for every one of which an
- * empty `expectRed` is CORRECT, so the empty-target path below is LIVE and must not be re-documented as dead.
+ * carry a victim, and NO entry expected to be KILLED has an empty `expectRed`. The ~~17~~ **19** still empty are
+ * 10 `duplicateOf`, ~~4~~ **6** `expectSurvive` controls, 2 `expectNoCompile` and 1 `supersededBy` — for every one
+ * of which an empty `expectRed` is CORRECT, so the empty-target path below is LIVE and must not be re-documented
+ * as dead. (17 -> 19 on 2026-08-13, REG-F-134's two demonstration controls. **DERIVED by importing the ledger,
+ * not by adding 2 to the sentence** — the previous number was right, which is the only reason this correction is
+ * arithmetic rather than an audit.)
+ *
+ * ⚠ AND THESE 19 ARE EXACTLY THE ENTRIES A SLOW FOREIGN SUITE CAN DISABLE, which stopped being hypothetical on
+ * 2026-08-13. An empty `expectRed` means the WHOLE workspace runs, so `packages/csaa`'s 5000ms timeouts make
+ * every one of them INCONCLUSIVE — 8 genuinely so, since the 11 `duplicateOf`/`supersededBy` are decided before
+ * anything is applied. **The controls are the part of this instrument that proves it can fail, and they are the
+ * part a foreign package's test performance takes offline first.** That is not a reason to scope them down: a
+ * control that only runs the suites you already suspect has stopped being a control.
  *
  * Running the whole workspace tells us whether the guard is tested AT ALL; it cannot say which test does it, so
  * the verdict is KILLED_UNNAMED rather than KILLED. Weaker evidence, honestly labelled, beats no evidence — and it
