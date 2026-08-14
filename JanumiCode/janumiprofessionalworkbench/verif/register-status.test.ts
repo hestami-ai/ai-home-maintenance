@@ -18,8 +18,13 @@
 // is wrapped in `~~…~~` and the replacement is a new line.
 //
 // ⚠ AND IT RATCHETS RATHER THAN MIGRATES, which is the same shape REG-D-042 ruled for tiers and the same shape
-// `absence-claims.test.ts` already uses next door. 63 of 209 entries do not conform today — 56 with every status
-// struck and no replacement, 7 with two live statuses. Rewriting 63 canon entries in one sweep would be a large
+// `absence-claims.test.ts` already uses next door. 63 of ~~209~~ **240** entries do not conform today — 56 with
+// every status struck and no replacement, 7 with two live statuses.
+// ⚠ POPULATION RE-DERIVED 2026-08-14 (REG-F-149) by running THIS FILE'S OWN `entries()` over the register:
+// **240**. The 63 is NOT stale — it is the length of the by-name GRANDFATHERED list below, which the gate
+// keeps honest. ⚠ THE 56/7 SPLIT WAS NOT RE-DERIVED and is left as written rather than silently reprinted
+// as though it had been: correcting a figure beside an underived one is how REG-F-148's four defects were
+// made, and marking the boundary is cheaper than implying a check that did not happen. Rewriting 63 canon entries in one sweep would be a large
 // unreviewed edit to the audit record itself. So they are GRANDFATHERED by id, new entries must conform, and the
 // list may only SHRINK.
 import { readFileSync } from 'node:fs';

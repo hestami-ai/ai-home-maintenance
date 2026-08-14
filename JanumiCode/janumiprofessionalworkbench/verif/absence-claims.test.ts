@@ -54,7 +54,8 @@ function unevidencedAbsenceClaims(): string[] {
 }
 
 // ⚠ GRANDFATHERED, NOT FORGIVEN. These predate the rule, and are pinned BY NAME rather than by count so the list
-// can only shrink deliberately. A rule applied retroactively to 184 entries would be a red wall nobody clears,
+// can only shrink deliberately. A rule applied retroactively to ~~184~~ **237** entries would be a red wall
+// nobody clears (population re-derived 2026-08-14, REG-F-149, by running this file's own `entries()`),
 // which is how a control becomes wallpaper; enforced from today forward, it binds.
 //
 // **13 at P-3; 12 since REG-F-049 was amended under P-5.** The list shrank because an entry was REPAIRED — its
