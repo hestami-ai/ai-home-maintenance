@@ -221,6 +221,40 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 		expect(admitted, 'UNENFORCED is an admission, never a fault').toEqual(baseline);
 	});
 
+	// ── THE CHECK ABOVE IS VACUOUS FOR NINE OF ITS OWN ROWS, AND SAYS SO ────────────────────────────────────
+	//
+	// `unreachabilityFaults` asks the CENSUS whether an arrow is performed. For a machine the census cannot see
+	// at all, the answer is `covered = 0` **whatever the truth is** — so the row passes by construction, not by
+	// evidence. Three of the eight machines named by ARROW_UNREACHABLE rows are census-blind
+	// (`AssuranceObservation.disposition`, `Constraint.status`, `Obligation.status`), and the nine rows resting
+	// wholly on them are checked by nothing.
+	//
+	// ⚠ THIS IS REG-F-133's OWN RULE TURNED ON REG-F-134's GATE. That gate was described on landing as "total and
+	// derived" against REG-F-133's hand-listed 4-of-57 — it is total over the ROWS and vacuous for nine of them,
+	// which is a different claim. An instrument that overstates its reach is the defect one level up, so the
+	// fraction is pinned here rather than left to be inferred from a green run.
+	it('pins how many ARROW_UNREACHABLE rows the census can actually speak about', () => {
+		const seen = new Set(declaredArrows().map((a) => a.machine));
+		const machinesOf = new Map<string, Set<string>>();
+		for (const a of guardedArrows()) {
+			if (!machinesOf.has(a.guard)) machinesOf.set(a.guard, new Set());
+			machinesOf.get(a.guard)!.add(a.machine);
+		}
+		let rows = 0;
+		let vacuous = 0;
+		for (const [text, row] of Object.entries(GUARD_LEDGER)) {
+			if (row.disposition !== 'ARROW_UNREACHABLE') continue;
+			rows += 1;
+			const ms = [...(machinesOf.get(text) ?? [])];
+			if (ms.length > 0 && ms.every((m) => !seen.has(m))) vacuous += 1;
+		}
+		expect(
+			{ arrowUnreachableRows: rows, vacuousBecauseCensusBlind: vacuous },
+			'the unreachability check can only speak about rows whose machines the census SEES; the rest pass by ' +
+				'construction. If this moves, the gate’s honest reach moved with it — re-derive before re-pinning.'
+		).toEqual({ arrowUnreachableRows: 21, vacuousBecauseCensusBlind: 9 });
+	});
+
 	// ── CONTROL 6: AN EMPTY COVERED SET IS REFUSED, NOT PASSED ──────────────────────────────────────────────
 	// The whole check degrades to green if the census hands it nothing. It must throw instead of reporting [].
 	it('CONTROL — an empty covered set throws rather than passing every row', () => {
