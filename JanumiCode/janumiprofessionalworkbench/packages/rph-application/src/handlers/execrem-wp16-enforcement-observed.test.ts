@@ -1179,7 +1179,15 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						),
 						`assert ${id}`
 					);
-				const support = (claimId: string, evId: string) => {
+				// ⚠ PROPOSE AND ADMIT ARE SEPARATE, and that separation is the whole rule. The first version of
+				// this probe gave the observed claim NO EVIDENCE AT ALL — which is refused, but for the WEAKER
+				// reason. `F134-admissible-collapses-into-present` (weakening the ADMISSIBLE test to a presence
+				// check) SURVIVED against it, because a claim with nothing is still a claim with nothing however
+				// the status test reads. The observed claim must therefore carry evidence that is PROPOSED and
+				// NEVER ADMITTED: present, and inadmissible. That is the only arrangement in which "ADMISSIBLE"
+				// and "PRESENT" give different answers, and it is exactly what the rule's own message says —
+				// "Evidence that is merely PROPOSED has not been admitted."
+				const propose = (claimId: string, evId: string) => {
 					ok(
 						dispatch(
 							'ProposeEvidence',
@@ -1199,9 +1207,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						),
 						`propose ${evId}`
 					);
-					// ⚠ ADMIT, not merely propose. PROPOSED evidence is PRESENT but not ADMISSIBLE, and the whole
-					// rule is that distinction — the guard folds committed EVIDENCE state rather than reading the
-					// payload, which is what makes this the one non-forgeable refusal in the command.
+				};
+				// PROPOSED evidence is PRESENT but not ADMISSIBLE. Only `AdmitEvidence` produces ADMISSIBLE, and
+				// the guard folds committed EVIDENCE state rather than reading the payload — which is what makes
+				// this the one non-forgeable refusal in the command.
+				const admit = (claimId: string, evId: string) =>
 					ok(
 						dispatch(
 							'AdmitEvidence',
@@ -1215,7 +1225,6 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						),
 						`admit ${evId}`
 					);
-				};
 				const assess = (claimId: string, targetStatus: string, extra: Record<string, unknown> = {}) =>
 					dispatch('RecordClaimAssessment', { targetStatus, ...extra }, claimId, 'CLAIM');
 
@@ -1223,7 +1232,12 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const CLAIM_BAD = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE2';
 				claim(CLAIM_OK);
 				claim(CLAIM_BAD);
-				support(CLAIM_OK, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE3');
+				// The control's evidence is proposed AND admitted; the observed claim's is proposed and LEFT
+				// PROPOSED. Both claims therefore HAVE supporting evidence, and the ONLY difference between them
+				// is its admissibility — which is the difference the rule is about.
+				propose(CLAIM_OK, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE3');
+				admit(CLAIM_OK, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE3');
+				propose(CLAIM_BAD, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE6');
 
 				// ⚠ BOTH CLAIMS MUST REACH UNDER_ASSESSMENT FIRST. The guard runs BEFORE `checkTransition`, so a
 				// claim left in OPEN produces this same marker for an arrangement the rule is not about — the
