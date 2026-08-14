@@ -292,8 +292,35 @@ function targetSuites(m: DeclaredMutant): string[] {
  * Typechecking comes first because a mutant that does not compile never reached the code, so a RED test run would
  * be measuring the compiler rather than the guard — an easy and flattering mistake.
  */
+/**
+ * WHERE THE TIME GOES — instrumentation only, and it decides NOTHING.
+ *
+ * ⚠ ADDED BECAUSE THE COST OF THIS GATE WAS BEING OPTIMISED FROM PROSE (REG-F-162). Two numbers were in
+ * circulation — `~40-minute run` in this file's own header and `~30-minute run` in `mutant-ledger.test.ts` —
+ * BOTH UNDATED, disagreeing with each other, and both written when the ledger held roughly half its current
+ * entries. Every speedup proposed against them was arithmetic over a guessed constant.
+ *
+ * ⚠ IT MUST NOT BE ABLE TO CHANGE A VERDICT, which is the whole design constraint. `timed` returns its callback's
+ * value untouched and the accumulators are never read by any arm that decides anything — they are printed after
+ * the summary and nowhere else. A timing hook that can alter what is measured is the observer defect this
+ * repository has recorded in three other instruments.
+ */
+const legs: Record<string, { ms: number; n: number }> = {};
+function timed<T>(leg: string, fn: () => T): T {
+	const t0 = Date.now();
+	try {
+		return fn();
+	} finally {
+		const acc = (legs[leg] ??= { ms: 0, n: 0 });
+		acc.ms += Date.now() - t0;
+		acc.n += 1;
+	}
+}
+
 function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | null {
-	const types = sh('bunx', ['tsc', '--noEmit', '-p', `${pkgOf(m.file)}/tsconfig.json`]);
+	const types = timed(`tsc ${pkgOf(m.file)}`, () =>
+		sh('bunx', ['tsc', '--noEmit', '-p', `${pkgOf(m.file)}/tsconfig.json`])
+	);
 	const compiles = types.status === 0;
 	// A mutant may be declared as EXPECTED not to compile (`expectNoCompile`). For those, refusing to typecheck IS
 	// the guarantee: the defect is UNEXPRESSIBLE rather than merely caught, which is stronger — a test can be
@@ -443,7 +470,12 @@ function runMutant(m: DeclaredMutant): Result {
 		// Deleting BEFORE the spawn is strictly stronger than deleting after the read: it also covers an invocation
 		// killed mid-flight, whose report would otherwise be inherited by the next run entirely.
 		if (jsonTo !== undefined) rmSync(jsonTo, { force: true });
-		const run = isE2eTarget(target)
+		const leg = isE2eTarget(target)
+			? 'playwright'
+			: target.length === 0
+				? 'vitest WHOLE-SUITE'
+				: 'vitest targeted';
+		const run = timed(leg, () => isE2eTarget(target)
 			? runPlaywright(target, mutantEnv)
 			: sh(
 					'bunx',
@@ -460,7 +492,7 @@ function runMutant(m: DeclaredMutant): Result {
 						: ['vitest', 'run', ...(target.length === 0 ? projectFilters() : []), ...target],
 					ROOT,
 					mutantEnv
-				);
+				));
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
 		// ⚠ DID THIS RUN MEASURE THE MUTATION? ASKED BEFORE ANY VERDICT IS ATTRIBUTED (REG-F-116, JAN-VERIF V-4b).
 		//
@@ -889,6 +921,22 @@ if (PREFLIGHT) {
 	process.exit(rot.length > 0 && process.env.MUTANTS_ADVISORY !== '1' ? 1 : 0);
 }
 
+function printTimings(): void {
+	const rows = Object.entries(legs).sort((a, b) => b[1].ms - a[1].ms);
+	if (rows.length === 0) return;
+	const total = rows.reduce((n, [, v]) => n + v.ms, 0);
+	const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+	// NOT A VERDICT, and said so in the heading for the same reason PREFLIGHT and HARVEST refuse the summary
+	// banner: a table printed beside a measurement gets read as one.
+	console.log('\n=== WHERE THE TIME WENT (instrumentation, NOT a verdict) ===');
+	for (const [leg, v] of rows)
+		console.log(
+			`${leg.padEnd(30)} ${secs(v.ms).padStart(9)}  ${String(v.n).padStart(4)} call(s)  ` +
+				`avg ${secs(v.ms / v.n).padStart(7)}  ${((v.ms / total) * 100).toFixed(1)}%`
+		);
+	console.log(`${'TOTAL (subprocess time only)'.padEnd(30)} ${secs(total).padStart(9)}`);
+}
+
 console.log('\n=== MUTATION LEDGER SUMMARY ===');
 // ⚠ STATED WITH THE NUMBERS, EVERY RUN. A whole-suite verdict — CONTROL_HELD above all — means "held over
 // everything EXCEPT these projects", and a reader who does not know that will over-read it. REG-F-136.
@@ -977,3 +1025,5 @@ if (failures > 0)
 		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'ADVISORY — MUTANTS_ADVISORY=1 was set, so this run cannot fail the gate.'}`
 	);
 process.exit(blocking && failures > 0 ? 1 : 0);
+
+printTimings();
