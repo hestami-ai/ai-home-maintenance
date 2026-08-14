@@ -5,11 +5,16 @@
 //
 // The enforcement register has THREE arms and, until this file, gates for TWO. Derived by loading it:
 //
-//     ENFORCED               30   every row probed — `enforcedRuleIds().filter(id => PROBES[id] === null)` is []
-//     UNENFORCED_DISCLOSED   25   21 OBSERVED_ADMISSION probed, 4 DEAD_PREDICATE census-gated
-//     NOT_A_COMMAND_REFUSAL  57   **no guard field in the type, no probe, and no selector that iterates them**
+//     ENFORCED               ~~30~~ 31   every row probed — `enforcedRuleIds().filter(id => PROBES[id] === null)` is []
+//     UNENFORCED_DISCLOSED       25   21 OBSERVED_ADMISSION probed, 4 DEAD_PREDICATE census-gated
+//     NOT_A_COMMAND_REFUSAL  ~~57~~ 56   **no guard field in the type, no probe, and no selector that iterates them**
 //
-// So 57 rows — a MAJORITY of the register — make claims nothing checks. And the claims are not innocuous: arm 3
+// So ~~57 rows — a MAJORITY of the register —~~ **56 rows — EXACTLY HALF of the 112 —** make claims nothing
+// checks. ⚠ CORRECTED 2026-08-14 (REG-F-144), AND THE CORRECTION IS THE FOURTH INSTANCE OF ITS OWN CLASS BY
+// THIS HAND. REG-F-140 corrected the OTHER stale count in THIS SAME COMMENT BLOCK ("4 of the 57" -> 3 of the
+// 56, thirty lines below) and left these three standing — REG-F-137's defect, in the same file, two commits
+// after I wrote the rule against it. And "a MAJORITY" was not decoration: REG-F-133's headline rested on it,
+// it was true by ONE ROW when written, and RPH-EVD-002's move to ENFORCED made it false by one row. And the claims are not innocuous: arm 3
 // means *"no dispatch could violate this rule"*, which is frequently justified by **an absence** — no such
 // command, nothing drives that machine, the antecedent is unreachable. **An absence is exactly the kind of fact
 // this repository keeps deleting**, by building the missing command.

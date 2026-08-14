@@ -1054,7 +1054,7 @@ function advanceStep(
  * (The §15.3 allowlist limb that once sat here is WITHDRAWN — see the note at the end of this function.)
  *
  * THE KERNEL'S CODE IS CARRIED INTO THE MESSAGE, NOT RETURNED AS ONE. `RPH_BINDING_NOT_AUTHORIZED` is
- * `bindingPermitsExecution`'s label; the ratified `RphErrorCodeSchema` is a closed 15-value enum that does not
+ * `bindingPermitsExecution`'s label; the ratified `RphErrorCodeSchema` is a closed ~~15~~ 16-value enum (REG-F-144) that does not
  * contain it. Same discipline as `validateStepCompletion` (WP-11): refuse with a ratified code, name the kernel's
  * verdict in the message so a caller can tell the limbs apart.
  *

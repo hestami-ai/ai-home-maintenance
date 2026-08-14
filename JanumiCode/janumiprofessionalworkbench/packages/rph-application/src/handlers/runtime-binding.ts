@@ -204,7 +204,7 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 			});
 			if (!check.ok)
 				// The kernel's label travels in the MESSAGE: `RPH_CAPABILITY_NOT_REQUESTED` is not a member of the
-				// ratified 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
+				// ratified ~~15~~ 16-value RphErrorCodeSchema (REG-F-144), so it goes there or nowhere (the WP-11 discipline).
 				return reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',

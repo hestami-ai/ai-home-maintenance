@@ -17,8 +17,9 @@
 // is exactly what idempotency exists to avoid. Recorded as owed rather than approximated.
 //
 // THE ERROR CODE IS A RATIFIED ONE CARRYING A LABEL, per the WP-11 discipline REG-F-012 names.
-// `RPH_IDEMPOTENCY_CONFLICT` would be the natural code and is NOT among the ratified fifteen; minting one is a
-// sponsor act, not a repository one. `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which
+// `RPH_IDEMPOTENCY_CONFLICT` would be the natural code and is ~~NOT among the ratified fifteen; minting one
+// is a sponsor act, not a repository one~~.
+// ⚠ THE AUTHORITY CLAIM ABOVE IS REFUTED, AND THIS COMMENT IS WHY IT MATTERED (REG-F-144). REG-D-027/REG-F-057 settled on 2026-08-07 that minting an error code is **a repository shape change, through the contract procedure — NOT a sponsor act**: REG-D-004 makes the repository authoritative for "error codes" by name, and DOC-004 §5 routes enum extension through the contract procedure. `packages/rph-contracts/src/errors.ts` records the correction AND records that THIS SITE is what the refuted claim was blocking — *"a code comment in command-bus.ts that refused to mint a needed code on the strength of it"*. The count is also gone: the ratified set is no longer fifteen (`RphErrorCodeSchema.options.length === 16` since `RPH_AUTHENTICATION_REQUIRED` was minted under exactly that procedure). **The workaround below therefore stands on a ground that was removed seven days ago.** Minting `RPH_IDEMPOTENCY_CONFLICT` is now AVAILABLE — it is a contract change with schema, storage, fixture and test coordination, so it is filed as its own work package rather than smuggled into a comment fix. `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which
 // REG-F-010 records as correctly carrying no error at all. So the refusal uses
 // `RPH_VALIDATION_SEMANTIC_FAILED` — the command is semantically inapplicable given the receipt on record — and
 // puts `IDEMPOTENCY_KEY_REUSED` in the message where a reader and a future code can both find it.

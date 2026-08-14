@@ -409,7 +409,8 @@ export class Engine {
 		// so the guard is written to make it obvious rather than to be terse.
 		//
 		// THE CODE IS A RATIFIED ONE CARRYING A LABEL (the WP-11 discipline). `RPH_IDEMPOTENCY_CONFLICT` would be
-		// the natural code and is NOT among the ratified fifteen — minting one is a sponsor act.
+		// the natural code and is ~~NOT among the ratified fifteen — minting one is a sponsor act~~.
+		// ⚠ THE AUTHORITY CLAIM ABOVE IS REFUTED, AND THIS COMMENT IS WHY IT MATTERED (REG-F-144). REG-D-027/REG-F-057 settled on 2026-08-07 that minting an error code is **a repository shape change, through the contract procedure — NOT a sponsor act**: REG-D-004 makes the repository authoritative for "error codes" by name, and DOC-004 §5 routes enum extension through the contract procedure. `packages/rph-contracts/src/errors.ts` records the correction AND records that THIS SITE is what the refuted claim was blocking — *"a code comment in command-bus.ts that refused to mint a needed code on the strength of it"*. The count is also gone: the ratified set is no longer fifteen (`RphErrorCodeSchema.options.length === 16` since `RPH_AUTHENTICATION_REQUIRED` was minted under exactly that procedure). **The workaround below therefore stands on a ground that was removed seven days ago.** Minting `RPH_IDEMPOTENCY_CONFLICT` is now AVAILABLE — it is a contract change with schema, storage, fixture and test coordination, so it is filed as its own work package rather than smuggled into a comment fix.
 		// `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which REG-F-010 records as correctly
 		// carrying no error at all. So the label travels in the message where a reader and a future code can both
 		// find it.
