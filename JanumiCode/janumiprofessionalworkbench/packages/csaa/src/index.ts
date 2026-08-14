@@ -12,6 +12,7 @@ export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/logical-graph-composition.js';
+export * from './contracts/module-resolution-trace.js';
 export * from './contracts/project-context-graph.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
@@ -74,6 +75,7 @@ export { buildModuleDependencyGraph } from './graph/build-module-dependency-grap
 export { buildLogicalGraphComposition } from './graph/build-logical-graph-composition.js';
 export { buildProjectContextGraph } from './graph/build-project-context-graph.js';
 export { buildConditionalExportResolution } from './resolution/build-conditional-export-resolution.js';
+export { buildModuleResolutionTrace } from './resolution/build-module-resolution-trace.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
@@ -128,6 +130,7 @@ export {
 } from './graph/validate-logical-graph-composition.js';
 export { validateProjectContextGraph } from './graph/validate-project-context-graph.js';
 export { validateConditionalExportResolution } from './resolution/validate-conditional-export-resolution.js';
+export { validateModuleResolutionTrace } from './resolution/validate-module-resolution-trace.js';
 export {
 	validateConstructedStructuralModuleReachabilityAnalysis,
 	validateStructuralModuleReachabilityAnalysis

@@ -1934,11 +1934,13 @@ export function validateConditionalExportResolution(
 /**
  * Producer-internal path with a trusted precondition: the exact FrozenSubject,
  * StaticSemanticSnapshot, and ProjectContextGraph object graph must have passed
- * public CAP-010 validation immediately before uninterrupted synchronous
- * construction without intervening mutation. The known digest must reproduce
- * the compact input binding but does not replace that trust precondition;
- * callers without the predecessor-validation evidence must use the public
- * validator.
+ * either public CAP-010 validation or the equivalent documented producer chain:
+ * public semantic validation under limits no looser than the CAP-010 graph
+ * request, followed by constructed CAP-010 validation. That evidence must be
+ * established immediately before uninterrupted synchronous construction without
+ * intervening mutation. The known digest must reproduce the compact input binding
+ * but does not replace that trust precondition; callers without the exact
+ * predecessor-validation evidence must use the public validator.
  */
 export function validateConstructedConditionalExportResolution(
 	value: unknown,

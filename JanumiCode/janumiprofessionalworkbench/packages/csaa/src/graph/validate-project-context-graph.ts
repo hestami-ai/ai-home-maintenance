@@ -1133,9 +1133,11 @@ export function validateProjectContextGraph(
 
 /**
  * Producer-internal path with a trusted precondition: the exact frozen subject and semantic
- * snapshot object graph must have validated successfully immediately before uninterrupted
- * synchronous construction. The known digest proves mutation/binding parity, not semantic
- * validity; callers without that predecessor-validation evidence must use the public validator.
+ * snapshot object graph must have validated successfully, using limits no looser than this
+ * graph request's diagnostic, input-record, reference-check, and string-character budgets,
+ * immediately before uninterrupted synchronous construction. The known digest proves
+ * mutation/binding parity, not semantic validity; callers without that predecessor-validation
+ * evidence must use the public validator.
  */
 export function validateConstructedProjectContextGraph(
 	value: unknown,

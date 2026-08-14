@@ -108,6 +108,54 @@ export interface VerifiedCompilerCapture {
 	readonly projectAttributions: readonly CompilerProjectAttribution[];
 }
 
+/** @internal Exact semantic-snapshot projection bound to a verified compiler capture. */
+export interface VerifiedCompilerCaptureSnapshotBinding {
+	readonly compilerInputs: readonly CompilerInputObservation[];
+	readonly contextDigest: string;
+	readonly subjectId: string;
+}
+
+/** @internal Exact project projection bound to a verified compiler capture. */
+export interface VerifiedCompilerProjectInputProjectionBinding {
+	readonly configPath: string;
+	readonly contextInputIds: readonly SemanticContextInputId[];
+	readonly materializedRecipeDigest: string;
+	readonly programContextDigest: string;
+	readonly projectResolutionDigest: string;
+}
+
+/** @internal One-project convenience binding including the shared snapshot projection. */
+export interface VerifiedCompilerProjectInputBinding
+	extends VerifiedCompilerCaptureSnapshotBinding, VerifiedCompilerProjectInputProjectionBinding {}
+
+/** @internal Bulk binding that proves the global capture once before opening project views. */
+export interface VerifiedCompilerProjectInputLookupSetBinding extends VerifiedCompilerCaptureSnapshotBinding {
+	readonly projects: readonly VerifiedCompilerProjectInputProjectionBinding[];
+}
+
+/** @internal One immutable lookup paired with its exact configuration path. */
+export interface VerifiedCompilerProjectInputLookupSetEntry {
+	readonly configPath: string;
+	readonly lookup: VerifiedCompilerProjectInputLookup;
+}
+
+/** @internal A cloned captured input plus its project-scoped query multiplicity. */
+export interface VerifiedCompilerProjectInputEntry extends CapturedCompilerInput {
+	readonly attributedInvocationCount: number;
+}
+
+/**
+ * @internal Immutable, non-consuming access to the recorded inputs attributed to one project.
+ * This is deliberately not replay: repeated lookups do not consume captured multiplicity.
+ */
+export interface VerifiedCompilerProjectInputLookup {
+	readonly attribution: CompilerProjectAttribution;
+	readonly subjectId: string;
+	lookupAttributedQuery(query: CompilerInputQuery): VerifiedCompilerProjectInputEntry | undefined;
+	toRecordedAbsolute(logicalPath: string): string;
+	toRecordedLogical(path: string): string;
+}
+
 declare const COMPILER_INPUT_OPERATION_BUDGET_WITNESS_BRAND: unique symbol;
 export interface CompilerInputOperationBudgetWitness {
 	readonly [COMPILER_INPUT_OPERATION_BUDGET_WITNESS_BRAND]: true;
@@ -2548,6 +2596,177 @@ function verifiedState(value: unknown): CompilerCaptureState {
 			'Compiler input replay requires the exact verified capture capability.'
 		);
 	return state;
+}
+
+function assertVerifiedSnapshotBinding(
+	state: CompilerCaptureState,
+	subject: FrozenSubject,
+	binding: VerifiedCompilerCaptureSnapshotBinding
+): void {
+	if (state.subject !== subject)
+		fail(
+			'INVALID_CAPTURE',
+			'Verified compiler input lookup requires the exact captured FrozenSubject capability.'
+		);
+	if (
+		binding.subjectId !== subject.descriptor.subjectId ||
+		binding.contextDigest !== state.closureDigest ||
+		binding.contextDigest !== compilerInputClosureDigest(binding.compilerInputs) ||
+		canonicalSemanticJson(binding.compilerInputs) !== canonicalSemanticJson(state.observations)
+	)
+		fail(
+			'INVALID_CAPTURE',
+			'Verified compiler capture does not reproduce the exact semantic snapshot context closure.'
+		);
+}
+
+/** @internal Proves the exact subject and global semantic-context binding without live reads. */
+export function assertVerifiedCompilerCaptureSnapshotBinding(
+	subject: FrozenSubject,
+	capture: VerifiedCompilerCapture,
+	binding: VerifiedCompilerCaptureSnapshotBinding
+): void {
+	assertVerifiedSnapshotBinding(verifiedState(capture), subject, binding);
+}
+
+function cloneVerifiedProjectInputEntry(
+	entry: CapturedCompilerInput,
+	attributedInvocationCount: number
+): VerifiedCompilerProjectInputEntry {
+	return Object.freeze({
+		...cloneCaptured(entry),
+		attributedInvocationCount
+	});
+}
+
+/**
+ * @internal Opens project-scoped, non-consuming views after proving the shared capture/snapshot
+ * closure once. Global observations and queries are indexed once; each project then traverses only
+ * its attributed IDs and query invocations.
+ */
+export function createVerifiedCompilerProjectInputLookupSet(
+	subject: FrozenSubject,
+	capture: VerifiedCompilerCapture,
+	binding: VerifiedCompilerProjectInputLookupSetBinding
+): readonly VerifiedCompilerProjectInputLookupSetEntry[] {
+	const state = verifiedState(capture);
+	assertVerifiedSnapshotBinding(state, subject, binding);
+	const attributionsByProject = new Map(
+		state.projectAttributions.map((attribution) => [attribution.projectKey, attribution] as const)
+	);
+	const observationsById = new Map(
+		state.observations.map((observation) => [observation.id, observation] as const)
+	);
+	const entriesByQuery = new Map(
+		state.entries.map((entry) => [compilerInputQueryKey(entry.query), entry] as const)
+	);
+	const lookupLimits = Object.freeze({
+		clock: () => 0,
+		deadlineMs: Number.MAX_SAFE_INTEGER,
+		maxDirectoryEntries: state.budgets.maxDirectoryEntries,
+		maxPathCharacters: state.budgets.maxPathCharacters,
+		maxQueryMetadataBytes: state.budgets.maxCompilerInputMetadataBytes
+	});
+	const opened = new Set<string>();
+	const lookups: VerifiedCompilerProjectInputLookupSetEntry[] = [];
+	for (const projectBinding of binding.projects) {
+		if (opened.has(projectBinding.configPath))
+			fail(
+				'INVALID_CAPTURE',
+				`Verified compiler lookup binding repeats project ${projectBinding.configPath}.`
+			);
+		opened.add(projectBinding.configPath);
+		const attribution = attributionsByProject.get(projectBinding.configPath);
+		if (
+			attribution === undefined ||
+			attribution.materializedRecipeDigest !== projectBinding.materializedRecipeDigest ||
+			attribution.projectResolutionDigest !== projectBinding.projectResolutionDigest ||
+			canonicalSemanticJson(attribution.contextInputIds) !==
+				canonicalSemanticJson(projectBinding.contextInputIds)
+		)
+			fail(
+				'INVALID_CAPTURE',
+				`Verified compiler capture does not reproduce project attribution ${projectBinding.configPath}.`
+			);
+		const contextIds = new Set(attribution.contextInputIds);
+		const projectObservations: CompilerInputObservation[] = [];
+		for (const id of contextIds) {
+			const observation = observationsById.get(id);
+			if (observation !== undefined) projectObservations.push(observation);
+		}
+		if (
+			projectObservations.length !== contextIds.size ||
+			compilerInputClosureDigest(projectObservations) !== projectBinding.programContextDigest
+		)
+			fail(
+				'INVALID_CAPTURE',
+				`Verified compiler capture does not reproduce program context ${projectBinding.configPath}.`
+			);
+
+		const attributedEntries = new Map<
+			string,
+			{
+				readonly entry: CapturedCompilerInput;
+				readonly invocationCount: number;
+			}
+		>();
+		for (const queryAttribution of attribution.queryInvocations) {
+			const key = compilerInputQueryKey(queryAttribution.query);
+			const entry = entriesByQuery.get(key);
+			if (entry === undefined)
+				fail(
+					'INVALID_CAPTURE',
+					`Verified project attribution references an absent compiler query ${projectBinding.configPath}.`
+				);
+			attributedEntries.set(
+				key,
+				Object.freeze({ entry, invocationCount: queryAttribution.invocationCount })
+			);
+		}
+		const retainedAttribution = cloneAttributions([attribution])[0];
+		if (retainedAttribution === undefined)
+			fail('INVALID_CAPTURE', 'Verified compiler project attribution could not be retained.');
+		const lookup: VerifiedCompilerProjectInputLookup = Object.freeze({
+			attribution: retainedAttribution,
+			lookupAttributedQuery(queryValue: CompilerInputQuery) {
+				const query = normalizeCompilerInputQuery(queryValue, state.paths, lookupLimits);
+				const attributed = attributedEntries.get(compilerInputQueryKey(query));
+				return attributed === undefined
+					? undefined
+					: cloneVerifiedProjectInputEntry(attributed.entry, attributed.invocationCount);
+			},
+			subjectId: subject.descriptor.subjectId,
+			toRecordedAbsolute(logicalPath: string) {
+				return state.paths.toRecordedAbsolute(logicalPath);
+			},
+			toRecordedLogical(path: string) {
+				return state.paths.toRecordedLogical(path);
+			}
+		});
+		lookups.push(Object.freeze({ configPath: projectBinding.configPath, lookup }));
+	}
+	return Object.freeze(lookups);
+}
+
+/**
+ * @internal Opens one project-scoped view. Bulk callers should use the lookup-set API so shared
+ * capture proof and global indexes are constructed once.
+ */
+export function createVerifiedCompilerProjectInputLookup(
+	subject: FrozenSubject,
+	capture: VerifiedCompilerCapture,
+	binding: VerifiedCompilerProjectInputBinding
+): VerifiedCompilerProjectInputLookup {
+	const lookups = createVerifiedCompilerProjectInputLookupSet(subject, capture, {
+		compilerInputs: binding.compilerInputs,
+		contextDigest: binding.contextDigest,
+		projects: [binding],
+		subjectId: binding.subjectId
+	});
+	const lookup = lookups[0]?.lookup;
+	if (lookup === undefined)
+		fail('INVALID_CAPTURE', 'Verified compiler project lookup could not be opened.');
+	return lookup;
 }
 
 interface CompilerInputOperationBudgetWitnessState {

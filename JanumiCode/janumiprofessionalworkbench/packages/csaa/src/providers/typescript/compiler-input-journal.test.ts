@@ -8,6 +8,7 @@ import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
 import { sha256 } from '../../inventory/canonical.js';
 import { canonicalSemanticJson } from '../../semantic/canonical.js';
 import {
+	compilerInputClosureDigest,
 	compilerInputResultDigest,
 	programRecipeDigest,
 	semanticContextInputId
@@ -27,6 +28,8 @@ import {
 	CompilerInputJournal,
 	LiveCompilerInputReader,
 	ReplayCompilerInputJournal,
+	createVerifiedCompilerProjectInputLookup,
+	createVerifiedCompilerProjectInputLookupSet,
 	issueFrozenCompilerCaptureOperationBudgetWitness,
 	issueReplayCompilerInputOperationBudgetWitness,
 	normalizeSemanticBudgets,
@@ -903,6 +906,116 @@ describe('sealed capture, freshness, and replay', () => {
 			'INVALID_CAPTURE'
 		);
 		expectCode(() => capture.finalize(), CompilerInputCaptureError, 'INVALID_CAPTURE');
+	});
+
+	it('opens an immutable non-consuming lookup over only one verified project attribution', () => {
+		const root = temporaryRoot();
+		const frozen = subject({ 'src/index.ts': 'export const value = 1;\n' });
+		const capture = session(root, frozen);
+		const readQuery = { logicalPath: 'src/index.ts', operation: 'READ_FILE' as const };
+		capture.capture(readQuery);
+		capture.capture(readQuery);
+		const other = projectBinding(root, 'other/tsconfig.json');
+		capture.journal.registerProject('other/tsconfig.json', other.recipe, other.materialized);
+		const otherQuery = { logicalPath: 'other/missing.ts', operation: 'FILE_EXISTS' as const };
+		capture.journal.capture(otherQuery, 'other/tsconfig.json');
+		const verified = recheckCompilerInputJournal(capture.finalize());
+		const attribution = verified.projectAttributions.find(
+			(candidate) => candidate.projectKey === PROJECT_KEY
+		)!;
+		const contextInputIds = new Set(attribution.contextInputIds);
+		const binding = {
+			compilerInputs: verified.observations,
+			configPath: PROJECT_KEY,
+			contextDigest: verified.closureDigest,
+			contextInputIds: attribution.contextInputIds,
+			materializedRecipeDigest: attribution.materializedRecipeDigest,
+			programContextDigest: compilerInputClosureDigest(
+				verified.observations.filter((observation) => contextInputIds.has(observation.id))
+			),
+			projectResolutionDigest: capture.recipe.projectResolutionDigest,
+			subjectId: frozen.descriptor.subjectId
+		};
+		const lookup = createVerifiedCompilerProjectInputLookup(frozen, verified, binding);
+		const observe = vi.spyOn(capture.reader, 'observe');
+		const first = lookup.lookupAttributedQuery(readQuery);
+		expect(first).toMatchObject({ attributedInvocationCount: 2, query: readQuery });
+		expect(first?.bytes).toBeInstanceOf(Uint8Array);
+		expect(first?.observation).toEqual(
+			verified.observations.find(
+				(observation) =>
+					observation.operation === 'READ_FILE' && observation.logicalPath === readQuery.logicalPath
+			)
+		);
+		expect(Object.isFrozen(first)).toBe(true);
+		expect(Object.isFrozen(first?.query)).toBe(true);
+		expect(Object.isFrozen(first?.observation)).toBe(true);
+		if (first?.bytes === undefined) throw new Error('Expected captured source bytes.');
+		first.bytes[0] = first.bytes[0]! ^ 0xff;
+		const second = lookup.lookupAttributedQuery(readQuery);
+		expect(second?.bytes).not.toBe(first.bytes);
+		expect(second?.bytes?.[0]).not.toBe(first.bytes[0]);
+		expect(lookup.lookupAttributedQuery(otherQuery)).toBeUndefined();
+		expect(lookup.toRecordedLogical(root)).toBe('.');
+		expect(lookup.toRecordedAbsolute('.')).toBe(capture.paths.repositoryRoot);
+		expect(observe).not.toHaveBeenCalled();
+		const otherAttribution = verified.projectAttributions.find(
+			(candidate) => candidate.projectKey === 'other/tsconfig.json'
+		)!;
+		const projection = (
+			projectAttribution: (typeof verified.projectAttributions)[number],
+			projectResolutionDigest: string
+		) => {
+			const ids = new Set(projectAttribution.contextInputIds);
+			return {
+				configPath: projectAttribution.projectKey,
+				contextInputIds: projectAttribution.contextInputIds,
+				materializedRecipeDigest: projectAttribution.materializedRecipeDigest,
+				programContextDigest: compilerInputClosureDigest(
+					verified.observations.filter((observation) => ids.has(observation.id))
+				),
+				projectResolutionDigest
+			};
+		};
+		const projects = [
+			projection(attribution, capture.recipe.projectResolutionDigest),
+			projection(otherAttribution, other.recipe.projectResolutionDigest)
+		];
+		const bulk = createVerifiedCompilerProjectInputLookupSet(frozen, verified, {
+			compilerInputs: verified.observations,
+			contextDigest: verified.closureDigest,
+			projects,
+			subjectId: frozen.descriptor.subjectId
+		});
+		expect(Object.isFrozen(bulk)).toBe(true);
+		expect(bulk.map((entry) => entry.configPath)).toEqual([PROJECT_KEY, 'other/tsconfig.json']);
+		expect(bulk[0]!.lookup.lookupAttributedQuery(readQuery)).toMatchObject({
+			attributedInvocationCount: 2
+		});
+		expect(bulk[1]!.lookup.lookupAttributedQuery(readQuery)).toBeUndefined();
+		expect(bulk[1]!.lookup.lookupAttributedQuery(otherQuery)).toMatchObject({
+			attributedInvocationCount: 1
+		});
+		expectCode(
+			() =>
+				createVerifiedCompilerProjectInputLookupSet(frozen, verified, {
+					compilerInputs: verified.observations,
+					contextDigest: verified.closureDigest,
+					projects: [projects[0]!, projects[0]!],
+					subjectId: frozen.descriptor.subjectId
+				}),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
+		expectCode(
+			() =>
+				createVerifiedCompilerProjectInputLookup(frozen, verified, {
+					...binding,
+					materializedRecipeDigest: 'c'.repeat(64)
+				}),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
 	});
 
 	it('requires unforgeable finalized and verified capabilities and never executes hostile traps', () => {

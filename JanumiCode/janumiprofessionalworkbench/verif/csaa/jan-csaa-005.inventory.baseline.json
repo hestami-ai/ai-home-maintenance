@@ -50,27 +50,27 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 297,
+      "discovered": 303,
       "excluded": 0,
       "failed": 0,
-      "included": 297,
+      "included": 303,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 297
+      "successfullyInventoried": 303
     },
     {
       "artifactClass": "TEST",
-      "discovered": 348,
+      "discovered": 350,
       "excluded": 0,
       "failed": 0,
-      "included": 348,
+      "included": 350,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 348
+      "successfullyInventoried": 350
     },
     {
       "artifactClass": "VERIFICATION",
@@ -257,7 +257,9 @@
         "packages/csaa/src/providers/typescript/frozen-compiler-host.test.ts",
         "packages/csaa/src/providers/typescript/materialize-program-recipe.test.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.test.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
         "packages/csaa/src/semantic/durable-declaration-id.test.ts",
         "packages/csaa/src/semantic/ids.test.ts",
@@ -992,6 +994,32 @@
       "state": "PARTIAL"
     },
     {
+      "explanation": "The seventeenth bounded DWP-004 increment applies validated-typescript-public-resolve-module-name-over-project-scoped-capture/1.0.0 to a PARTIAL JAN-CSAA-CAP-011 slice for one exact literal bare workspace-package root IMPORT occurrence after independently validating its FrozenSubject-bound static semantic snapshot, project context graph, and a newly constructed conditional-export predecessor with explicit types condition, NODE platform, and IMPORT mode. The configured smoke criterion is packages/rph-application/src/command-bus.ts importing @janumipwb/rph-contracts, with exact resolved declaration build-output target packages/rph-contracts/dist/index.d.ts and captured target-byte digest and length. It invokes public TypeScript getImpliedNodeFormatForFile, createSourceFile, getModeForUsageLocation, and resolveModuleName against only the exact verified project-scoped in-memory capture; records fresh two-stage ordered callbacks as exact query/observation attempts; derives candidates bijectively only from MODULE_RESOLUTION-stage FILE_EXISTS attempts; and publishes exact importer, resolver configuration, case-sensitivity, condition-membership, capture, selected-target, relation, coverage, and reconciliation witnesses. Successful output is complete-or-unavailable under caller budgets, PARTIAL, and NOT_TRUNCATED. The attached capture capability is in-memory and exact-object-bound: serialization, structured cloning, persistence, and deserialized replay do not carry it. The package root publicly exports buildModuleResolutionTrace and validateModuleResolutionTrace; attachVerifiedCompilerCaptureToStaticSemanticSnapshot, getStaticSemanticSnapshotCompilerProjectInputLookup, validateConstructedModuleResolutionTrace, and the mutable @internal moduleResolutionTraceTypeScriptPublicApi test seam remain trust-bound implementation details and are not package-root exports. The exact selection policy is {\"acceptedOutcome\":\"RESOLVED_DECLARATION_BUILD_OUTPUT\",\"candidateDerivation\":\"MODULE_RESOLUTION_STAGE_FILE_EXISTS_CALLBACKS_ONLY\",\"compilerApi\":\"TYPESCRIPT_PUBLIC_RESOLVE_MODULE_NAME\",\"conditionalExportExplicitConditions\":[\"types\"],\"conditionalExportModuleMode\":\"IMPORT\",\"conditionalExportPlatform\":\"NODE\",\"conditionOrderAuthority\":\"MEMBERSHIP_ONLY_ORDER_NOT_CLAIMED\",\"importerPopulation\":\"ONE_EXACT_SEMANTIC_LITERAL_BARE_IMPORT_OCCURRENCE\",\"impliedNodeFormatApi\":\"TYPESCRIPT_PUBLIC_GET_IMPLIED_NODE_FORMAT_FOR_FILE\",\"moduleModeApi\":\"TYPESCRIPT_PUBLIC_GET_MODE_FOR_USAGE_LOCATION\",\"packagePopulation\":\"ONE_EXACT_FROZEN_WORKSPACE_PACKAGE\",\"resolutionHost\":\"VERIFIED_PROJECT_SCOPED_CAPTURE_ONLY\",\"specifierSyntax\":\"BARE_WORKSPACE_PACKAGE_ROOT_LITERAL_ONLY\",\"targetEvidence\":\"EXACT_CAPTURED_READ_FILE_BYTES_AND_SEMANTIC_SOURCE\",\"unsupportedTreatment\":\"OPERATION_UNAVAILABLE_NEVER_PARTIAL_OUTPUT\"}. Resolution authority is NONE, authority transfer is NONE, gate effect is NONE, freshness is NOT_ASSESSED, and currentness is NOT_CLAIMED. The dedicated STRUCTURAL-profile module-resolution-trace-only smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are FULL_JAN_CSAA_CAP_011_PATH_ALIAS_OR_MODULE_RESOLUTION, FULL_JAN_CSAA_007_CONFORMANCE, FULL_JAN_CSAA_008_CONFORMANCE, IMPORTER_OR_SPECIFIER_POPULATION_BEYOND_SELECTED_EXACT_OCCURRENCE, PATH_ALIAS_RESOLUTION, RELATIVE_SPECIFIER_RESOLUTION, PACKAGE_SUBPATH_RESOLUTION_BEYOND_SELECTED_ROOT, EXTERNAL_OR_NON_WORKSPACE_NODE_MODULES_RESOLUTION, PACKAGE_IMPORTS_MAP_RESOLUTION, FILE_EXTENSION_INDEX_OR_DIRECTORY_RESOLUTION_BEYOND_EXACT_TARGET, CUSTOM_PLUGIN_PNP_OR_RUNTIME_LOADER_RESOLUTION, SOURCE_CUSTOM_CONDITION_ACTIVATION, CONDITION_MODE_OR_PLATFORM_UNIVERSALITY, NODE_OR_TYPESCRIPT_RESOLVER_EQUIVALENCE_BEYOND_SELECTED_EXACT_REQUEST, TARGET_RUNTIME_LOADABILITY_OR_BUILD_SUCCESS, TARGET_DECLARATION_SEMANTIC_OR_TYPE_COMPATIBILITY, DEPENDENCY_DECLARATION_IMPORT_OR_RUNTIME_LOAD_EQUIVALENCE, UNRESOLVED_SPECIFIER_MEANS_ABSENT_DEPENDENCY, ORIGINAL_TYPESCRIPT_PROGRAM_RESOLUTION_CACHE_OR_CALLBACK_ORDER, PERSISTED_OR_DESERIALIZED_CAPTURE_REPLAY, UNDOCUMENTED_TYPESCRIPT_INTERNAL_CONDITION_ARRAY_ORDER, CURRENTNESS_OR_FRESHNESS, PROVIDER_QUALIFICATION_OR_ORACLE_CONFERRAL, FINDING_GATE_DECISION_OR_REMEDIATION_AUTHORITY. Full JAN-CSAA-011 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED.",
+      "id": "module-resolution-trace",
+      "provenance": [
+        "capabilities#conditional-export-resolution",
+        "capabilities#project-context-graph",
+        "capabilities#symbol-table",
+        "capabilities#typescript-ast",
+        "package.json#/scripts/csaa:semantic:smoke:module-resolution-trace",
+        "packages/csaa/src/contracts/module-resolution-trace.ts",
+        "packages/csaa/src/index.test.ts",
+        "packages/csaa/src/index.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
+        "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/compiler-capture-capability.ts",
+        "packages/csaa/src/semantic/repository-smoke.test.ts"
+      ],
+      "provider": "typescript+verified-project-capture-module-resolution-trace",
+      "state": "PARTIAL"
+    },
+    {
       "explanation": "Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.",
       "id": "code-property-graph",
       "provenance": [
@@ -1239,6 +1267,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/csaa:semantic:smoke:logical-graph-composition"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=MODULE_RESOLUTION_TRACE vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts",
+      "name": "csaa:semantic:smoke:module-resolution-trace",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:semantic:smoke:module-resolution-trace"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -2131,6 +2171,7 @@
         "frozen-program-construction",
         "guard-classification-static-overlay",
         "logical-graph-composition",
+        "module-resolution-trace",
         "project-context-graph",
         "read-write-access-projection",
         "structural-module-reachability-analysis",
@@ -2159,6 +2200,7 @@
         "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "packages/csaa/src/contracts/module-resolution-trace.ts",
         "packages/csaa/src/contracts/project-context-graph.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
@@ -2208,6 +2250,8 @@
         "packages/csaa/src/graph/validate-read-write-access-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
         "packages/csaa/src/graph/validate-structural-scc-analysis.ts",
+        "packages/csaa/src/index.test.ts",
+        "packages/csaa/src/index.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.ts",
         "packages/csaa/src/providers/typescript/extract-symbols.ts",
@@ -2215,11 +2259,18 @@
         "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.test.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-fixture.test-support.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
         "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/compiler-capture-capability.ts",
         "packages/csaa/src/semantic/monotonic-operation-clock.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
         "packages/csaa/src/semantic/raw-semantic-model.ts",
@@ -2279,7 +2330,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "b35e9b5645493f9abdcc20f31e6442c1971100d489ff56bd41ea6393f6a26160",
+    "configurationDigest": "8556fadd2fc4e6dc0ae291c2e653d6a29446f8991575fb11e0cb40a3375fe5a5",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2362,9 +2413,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 4827,
+          "bytes": 5085,
           "path": "package.json",
-          "sha256": "8b8470ff1189e3bd32cc2978f80a1edf28cce3a5e6b473ccce8572c2f0c87272"
+          "sha256": "c753ac70237f30be5934c776cc6f7e4e582f22f05cfa6f9eedad53529e406070"
         },
         {
           "artifactClass": "MANIFEST",
@@ -2805,7 +2856,7 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "007724387c32beada31b3904d12c521801e667da04c7ab21cb36ab03632058d6",
+          "projectResolutionDigest": "36beeb6715334e8059493f1a72db30d6f67009b9bc9ddfcdadb349b1682dedc4",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2824,6 +2875,7 @@
             "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/logical-graph-composition.ts",
+            "packages/csaa/src/contracts/module-resolution-trace.ts",
             "packages/csaa/src/contracts/project-context-graph.ts",
             "packages/csaa/src/contracts/read-write-access-graph.ts",
             "packages/csaa/src/contracts/semantic.ts",
@@ -2908,10 +2960,14 @@
             "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
             "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
             "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+            "packages/csaa/src/resolution/build-module-resolution-trace.ts",
             "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
+            "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
             "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+            "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
             "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
             "packages/csaa/src/semantic/canonical.ts",
+            "packages/csaa/src/semantic/compiler-capture-capability.ts",
             "packages/csaa/src/semantic/durable-declaration-id.ts",
             "packages/csaa/src/semantic/ids.ts",
             "packages/csaa/src/semantic/monotonic-operation-clock.ts",
@@ -2974,7 +3030,7 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "4642b1fd1c5ab526ecbe1ba8aa23fd699165c994c0f23aaeb5b4bc3a26667ac8",
+          "projectResolutionDigest": "c24125c06e8fcd1374af9f882c380de3c2efdb0287c4543e8d18bf14f90a54ce",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2993,6 +3049,7 @@
             "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
             "packages/csaa/src/contracts/inventory.ts",
             "packages/csaa/src/contracts/logical-graph-composition.ts",
+            "packages/csaa/src/contracts/module-resolution-trace.ts",
             "packages/csaa/src/contracts/project-context-graph.ts",
             "packages/csaa/src/contracts/read-write-access-graph.ts",
             "packages/csaa/src/contracts/semantic.ts",
@@ -3143,13 +3200,20 @@
             "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
             "packages/csaa/src/resolution/build-conditional-export-resolution.test.ts",
             "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+            "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+            "packages/csaa/src/resolution/build-module-resolution-trace.ts",
             "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
             "packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts",
             "packages/csaa/src/resolution/conditional-export-resolution-fixture.test-support.ts",
+            "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+            "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+            "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
             "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+            "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
             "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
             "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
             "packages/csaa/src/semantic/canonical.ts",
+            "packages/csaa/src/semantic/compiler-capture-capability.ts",
             "packages/csaa/src/semantic/durable-declaration-id.test.ts",
             "packages/csaa/src/semantic/durable-declaration-id.ts",
             "packages/csaa/src/semantic/ids.test.ts",
@@ -4449,11 +4513,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "6f80dac682a5cdbb5900aca518cd64b0e361f6daaff3c5a2c29f8ce97515c23d",
+          "configClosureDigest": "81354b396b5c726ae6851050fca08abe0ceb9a353485355a49e9fbd5c9efaa54",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "758305420bb7163cf4184e07683e262cca45aa14e06c43eed35d07f62a154dab",
+          "projectResolutionDigest": "4e659c9ef7f20279497469c9f120a96c18149593c2b8ed1c0f6ea56582801557",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4494,11 +4558,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "3ed5c603c911beaeec1424804db61037a1e73799e71cf9d75cc4c8301435a965",
+          "configClosureDigest": "6114f0dac19554768f36f32064023bc6f5fd50a0a1686e4b0c07ef68a88621fc",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "daf5e5b62d4f5df48bb58dd80227dc2e848198e3e8b3fc7b31cbedc48d63e8a7",
+          "projectResolutionDigest": "01d954e0ff928c80ce790d9b604610f23a42c07176df5c138312bbcf7fbef3c7",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4532,11 +4596,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "4fa1ef75cabddc1bbb63d0494889f997ee733f5a2a7ca7dd4a569fe523642437",
+          "configClosureDigest": "bf683697228659bd9cbc4cafd4ec4f75ae3a003964e37ef3152dedf4ae617fae",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "de4dbb74473135f01fb8796e26920fb40ee83b12a10764337efbac68db412695",
+          "projectResolutionDigest": "0704bfa544b02f8a889331acec6632061fddbb8ab2cb024971681971decb118c",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5271,7 +5335,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "b7ae56f31ac5aae86fa35127b2eb62102d73b7c4d3bf143a60da8fde4e27d12a",
+    "fileManifestDigest": "fe424251faeb6b25b637fd0f384c188e726b88c1782e953acb1431d578472b01",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/tsconfig.json",
@@ -5318,7 +5382,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 904,
+    "selectedFileCount": 912,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6414,9 +6478,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 4827,
+        "bytes": 5085,
         "path": "package.json",
-        "sha256": "8b8470ff1189e3bd32cc2978f80a1edf28cce3a5e6b473ccce8572c2f0c87272",
+        "sha256": "c753ac70237f30be5934c776cc6f7e4e582f22f05cfa6f9eedad53529e406070",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -6522,6 +6586,13 @@
         "bytes": 17244,
         "path": "packages/csaa/src/contracts/logical-graph-composition.ts",
         "sha256": "ee50c3edd152a3376248ee24d1120469dbe26edd7803a93f27de5163b5991b0e",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 20879,
+        "path": "packages/csaa/src/contracts/module-resolution-trace.ts",
+        "sha256": "54b42543177924d3b2698db597fd4ade32cd975e35b7f2de291a5c134b10d023",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7107,9 +7178,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 40206,
+        "bytes": 40335,
         "path": "packages/csaa/src/graph/validate-project-context-graph.ts",
-        "sha256": "1524e1351577a8a933357f1bf7ae50b3b6cd4302cbf22f8cd880b81e8de9529a",
+        "sha256": "46edeb8f3d06ee6ca80193eb082bfc766c13422d1c5575b428e3e0f3962c1005",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7149,16 +7220,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 15029,
+        "bytes": 16234,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "7bee51320a20b16431f59de1d311f5055a80936f89f8c64d3738bc1eac832edf",
+        "sha256": "8ce79c8675a2e5b69c7c8b67a486793715fa857938af3d1a3905f991ad3dd520",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 9117,
+        "bytes": 9363,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "25c47366b31c18d37034c9a47935f7d579d5c8fff5d366cede3e2215540581fb",
+        "sha256": "023505c594cb8951de7b9ae2607f7de84043ce75d72f81dbd21f9c44115166e2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7184,16 +7255,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 94033,
+        "bytes": 100937,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "41ff95a24e0a473569c52646052c4617f20bb8f96d45108a3c441abcb0c2cdb8",
+        "sha256": "8db12ff0201b20e0d5d24c877160131ad3ae76382dfbbb80707e8d66567cc35f",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 102723,
+        "bytes": 111694,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "acc18ad7251e2809e98572ebbbc8c0278d2749b6b0690cd629d5e7dbfb397712",
+        "sha256": "46d1f322f9c7167d10f3d7f87bde42e46f9a45b1395db3b88d3c9ae83a718fe7",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -7485,16 +7556,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 117368,
+        "bytes": 122236,
         "path": "packages/csaa/src/providers/typescript/compiler-input-journal.test.ts",
-        "sha256": "3a9ac9ffb63ae8d4decc4852304be7e2eafb658008286b5da3387c100721c093",
+        "sha256": "6e5215ffc27a2ac4a158482bcd9e5d377aac69db13d36d66ad9a2bb0cbdb9180",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 108197,
+        "bytes": 116790,
         "path": "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
-        "sha256": "e2791de67713a9bd0e128d18bad00554d82a96682d179c9c879d12f6ea87edeb",
+        "sha256": "5365eabcd3408a5c2a249f1a97d84223f6c05f7850882d5ec4f552722150c067",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7582,6 +7653,20 @@
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
+        "artifactClass": "TEST",
+        "bytes": 12573,
+        "path": "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+        "sha256": "054f87237eb7dde34d9ddabce7380fbe7e0451beda237a4a9951b3f1bba0d116",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 71781,
+        "path": "packages/csaa/src/resolution/build-module-resolution-trace.ts",
+        "sha256": "12a5e49c672090b85ca20ca07715e6273da51f0f462d78353190fb404de17f74",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
         "artifactClass": "SOURCE",
         "bytes": 5663,
         "path": "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
@@ -7604,23 +7689,51 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 65355,
-        "path": "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
-        "sha256": "cee8128aea69bc116220ade94cb342a35eeef35c8e2a7a97b382949f8692bca1",
+        "bytes": 6257,
+        "path": "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+        "sha256": "32eb47e36db896809d777facadac011f372f05605843baec9a16aa26195a654c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 86160,
-        "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
-        "sha256": "c3d84abf6cb3fbe248e5c9e276332d329129dc0c21bded5e7d353885f2333519",
+        "bytes": 53388,
+        "path": "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+        "sha256": "d1a63b719c75931d18127ab7a8ab85324e00adb7018fe8878e9edb7f2ecb5326",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 61113,
+        "bytes": 17557,
+        "path": "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
+        "sha256": "b4ac30d5276d5f53567720a3f42f31436597f4eafd3949d9c181e991fb0a9eab",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 65579,
+        "path": "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+        "sha256": "321f0e4e280f4138225b46f86c6847b2b493d05bbeba61d11bbf78d5c6eef6a0",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 72069,
+        "path": "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
+        "sha256": "e8f70be6a860b6a625235849a89553a13868d98aca54d30b23d06cc55b9b411f",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 87298,
+        "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
+        "sha256": "1b7592fcdcad8a31de204044d172dfd0be48c355a66a934381b7af6bb2bd6152",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 61367,
         "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
-        "sha256": "0136f029bc78e0b513be67b057fb47d2c000308aecf0c74707875f66c61d64e9",
+        "sha256": "13b53e3fb1fcbbdf6ce69b412e193e8dce9997ec89040dbc4c743ecf80ed852e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7628,6 +7741,13 @@
         "bytes": 8981,
         "path": "packages/csaa/src/semantic/canonical.ts",
         "sha256": "3d71c932172dac28d253786ff1e0bd5c87116e5e63877ede5b9cc5abc4d59f2c",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4330,
+        "path": "packages/csaa/src/semantic/compiler-capture-capability.ts",
+        "sha256": "c91802faba243414365a889ee7b6f924ea35ecde5e2120d4b87c277a87daf252",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7730,9 +7850,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 207047,
+        "bytes": 232671,
         "path": "packages/csaa/src/semantic/repository-smoke.test.ts",
-        "sha256": "345c94415dabe0087f3de1b37ad61ba74a795cd03c33f802e6c5519be41eb12b",
+        "sha256": "c22d21ea6a294a6726590ed69f1a8168e7ab5e5d8c156116172179f54fe59c75",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11649,7 +11769,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "39c207e71e94d5f443559f665b872279ad7977b0ee7e5466126632f9746d5224",
+    "subjectId": "45d5f0cd4b42981e8472d3a579ebdfc4dffccbdddcb05b71cda7d5039a19165f",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -11813,7 +11933,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 129,
+      "candidateArtifactCount": 134,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -11853,6 +11973,7 @@
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "packages/csaa/src/contracts/module-resolution-trace.ts",
         "packages/csaa/src/contracts/project-context-graph.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
@@ -11937,10 +12058,14 @@
         "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
         "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
         "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
         "packages/csaa/src/semantic/canonical.ts",
+        "packages/csaa/src/semantic/compiler-capture-capability.ts",
         "packages/csaa/src/semantic/durable-declaration-id.ts",
         "packages/csaa/src/semantic/ids.ts",
         "packages/csaa/src/semantic/monotonic-operation-clock.ts",
@@ -11976,7 +12101,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 209,
+      "candidateArtifactCount": 217,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -12016,6 +12141,7 @@
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/inventory.ts",
         "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "packages/csaa/src/contracts/module-resolution-trace.ts",
         "packages/csaa/src/contracts/project-context-graph.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
@@ -12166,13 +12292,20 @@
         "packages/csaa/src/providers/typescript/materialize-program-recipe.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.test.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-fixture.test-support.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
         "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.test.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
         "packages/csaa/src/semantic/canonical.ts",
+        "packages/csaa/src/semantic/compiler-capture-capability.ts",
         "packages/csaa/src/semantic/durable-declaration-id.test.ts",
         "packages/csaa/src/semantic/durable-declaration-id.ts",
         "packages/csaa/src/semantic/ids.test.ts",
@@ -13497,6 +13630,7 @@
         "capabilities#guard-classification-static-overlay",
         "capabilities#guard-enforcement-ledger",
         "capabilities#logical-graph-composition",
+        "capabilities#module-resolution-trace",
         "capabilities#project-context-graph",
         "capabilities#read-write-access-graph",
         "capabilities#state-machine-graph",
@@ -13517,6 +13651,7 @@
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "packages/csaa/src/contracts/module-resolution-trace.ts",
         "packages/csaa/src/contracts/project-context-graph.ts",
         "packages/csaa/src/contracts/read-write-access-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
@@ -13574,6 +13709,8 @@
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
         "packages/csaa/src/graph/validate-structural-scc-analysis.ts",
+        "packages/csaa/src/index.test.ts",
+        "packages/csaa/src/index.ts",
         "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
         "packages/csaa/src/providers/dependency-cruiser/schema/cruise-result-16.10.4.schema.json",
         "packages/csaa/src/providers/dependency-cruiser/validate-raw-wire-schema.ts",
@@ -13601,11 +13738,18 @@
         "packages/csaa/src/providers/typescript/frozen-compiler-host.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.test.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-fixture.test-support.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
         "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
         "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/compiler-capture-capability.ts",
         "packages/csaa/src/semantic/monotonic-operation-clock.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
         "packages/csaa/src/semantic/raw-semantic-model.ts",
@@ -13616,7 +13760,7 @@
         "packages/rph-contracts/vocab/m3-commands-events.json",
         "verif/event-surface-census.test.ts"
       ],
-      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first sixteen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, and a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, and conditional export resolution smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module resolution, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
+      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, and module resolution trace smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
     },
     {
       "provenance": [
@@ -13629,6 +13773,7 @@
         "packages/csaa/src/contracts/guard-classification-overlay.ts",
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
         "packages/csaa/src/contracts/logical-graph-composition.ts",
+        "packages/csaa/src/contracts/module-resolution-trace.ts",
         "packages/csaa/src/contracts/project-context-graph.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
@@ -13674,6 +13819,8 @@
         "packages/csaa/src/graph/validate-state-machine-graph.ts",
         "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
         "packages/csaa/src/graph/validate-structural-scc-analysis.ts",
+        "packages/csaa/src/index.test.ts",
+        "packages/csaa/src/index.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/arrow-command-census-content.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts",
@@ -13691,12 +13838,21 @@
         "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
         "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts",
         "packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts",
+        "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.test.ts",
         "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.test.ts",
+        "packages/csaa/src/resolution/build-module-resolution-trace.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-canonical.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-coverage.test.ts",
         "packages/csaa/src/resolution/conditional-export-resolution-fixture.test-support.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-canonical.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-coverage.test.ts",
+        "packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts",
         "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
+        "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
+        "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
+        "packages/csaa/src/semantic/compiler-capture-capability.ts",
         "packages/csaa/src/semantic/repository-smoke.test.ts",
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
@@ -13717,7 +13873,7 @@
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/route-action-census.test.ts"
       ],
-      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it does not change retained verifier authority. The structural module reachability analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The logical graph composition has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is NOT_CLAIMED. The project context graph has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-010 conformance is NOT_CLAIMED. The conditional export resolution has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-012 conformance is NOT_CLAIMED. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
+      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it does not change retained verifier authority. The structural module reachability analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The logical graph composition has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is NOT_CLAIMED. The project context graph has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-010 conformance is NOT_CLAIMED. The conditional export resolution has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-012 conformance is NOT_CLAIMED. The module resolution trace has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-011 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
     },
     {
       "provenance": [

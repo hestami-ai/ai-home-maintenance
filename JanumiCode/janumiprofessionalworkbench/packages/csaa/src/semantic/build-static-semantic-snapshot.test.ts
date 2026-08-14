@@ -23,6 +23,7 @@ import {
 } from '../contracts/subject.js';
 import { programRecipeDigest } from './ids.js';
 import { canonicalSemanticJson } from './canonical.js';
+import { getStaticSemanticSnapshotCompilerProjectInputLookup } from './compiler-capture-capability.js';
 import { semanticPopulation } from './population.js';
 import { CompilerInputCaptureError } from '../providers/typescript/compiler-input-journal.js';
 import * as staticRawExtraction from '../providers/typescript/extract-static-raw.js';
@@ -459,6 +460,30 @@ describe('buildStaticSemanticSnapshot', () => {
 		expect(first.snapshot.assignments.length).toBeGreaterThan(0);
 		expect(Object.isFrozen(first.snapshot)).toBe(true);
 		expect(Object.isFrozen(first.snapshot.astNodes)).toBe(true);
+		const firstProject = first.snapshot.projects[0]!;
+		const compilerLookup = getStaticSemanticSnapshotCompilerProjectInputLookup(
+			first.snapshot,
+			firstProject.configPath
+		);
+		expect(compilerLookup?.attribution.contextInputIds).toEqual(firstProject.contextInputIds);
+		const capturedRead = compilerLookup?.attribution.queryInvocations.find(
+			(entry) => entry.query.operation === 'READ_FILE'
+		);
+		expect(capturedRead).toBeDefined();
+		if (capturedRead === undefined) throw new Error('Expected a captured project READ_FILE query.');
+		const capturedInput = compilerLookup?.lookupAttributedQuery(capturedRead.query);
+		expect(capturedInput?.attributedInvocationCount).toBe(capturedRead.invocationCount);
+		expect(
+			first.snapshot.compilerInputs.find(
+				(observation) => observation.id === capturedInput?.observation.id
+			)
+		).toEqual(capturedInput?.observation);
+		expect(
+			getStaticSemanticSnapshotCompilerProjectInputLookup(
+				structuredClone(first.snapshot),
+				firstProject.configPath
+			)
+		).toBeUndefined();
 
 		const second = buildStaticSemanticSnapshot(request, { subject });
 		expect(second.outcome, JSON.stringify(second)).toBe('complete');

@@ -45,6 +45,10 @@ import {
 	MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
 	MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION,
 	MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_OPERATION_VERSION,
+	MODULE_RESOLUTION_TRACE_PROGRESS_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_REQUEST_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_SCHEMA_VERSION,
 	SEMANTIC_EXTRACTION_VERSION,
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
@@ -64,6 +68,7 @@ import {
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
 	buildConditionalExportResolution,
+	buildModuleResolutionTrace,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
 	buildGuardClassificationOverlay,
@@ -90,6 +95,7 @@ import {
 	validateDependencyProviderComparison,
 	validateCallGraph,
 	validateConditionalExportResolution,
+	validateModuleResolutionTrace,
 	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
 	validateGuardClassificationOverlay,
@@ -121,6 +127,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildConditionalExportResolution).toBeTypeOf('function');
+		expect(buildModuleResolutionTrace).toBeTypeOf('function');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
@@ -146,6 +153,13 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateCallGraph).toBeTypeOf('function');
 		expect(validateConditionalExportResolution).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty('validateConstructedConditionalExportResolution');
+		expect(validateModuleResolutionTrace).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('validateConstructedModuleResolutionTrace');
+		expect(publicSurface).not.toHaveProperty('getStaticSemanticSnapshotCompilerProjectInputLookup');
+		expect(publicSurface).not.toHaveProperty(
+			'attachVerifiedCompilerCaptureToStaticSemanticSnapshot'
+		);
+		expect(publicSurface).not.toHaveProperty('moduleResolutionTraceTypeScriptPublicApi');
 		expect(validateCommandEventContractOverlay).toBeTypeOf('function');
 		expect(validateCommandHandlerGraph).toBeTypeOf('function');
 		expect(validateGuardClassificationOverlay).toBeTypeOf('function');
@@ -264,6 +278,16 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-module-dependency-graph-request/1.0.0'
 		);
 		expect(MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-module-dependency-graph/1.0.0');
+		expect(MODULE_RESOLUTION_TRACE_OPERATION_VERSION).toBe(
+			'jan-csaa-build-module-resolution-trace/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-progress/1.0.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-request/1.0.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_SCHEMA_VERSION).toBe('jan-csaa-module-resolution-trace/1.0.0');
 		expect(LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION).toBe(
 			'jan-csaa-compose-logical-graph/0.1.0'
 		);

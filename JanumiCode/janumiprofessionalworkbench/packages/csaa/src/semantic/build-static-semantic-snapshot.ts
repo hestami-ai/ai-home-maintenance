@@ -55,6 +55,7 @@ import {
 	canonicalSemanticJsonWitness,
 	isUnicodeScalarString
 } from './canonical.js';
+import { attachVerifiedCompilerCaptureToStaticSemanticSnapshot } from './compiler-capture-capability.js';
 import { compilerInputClosureDigest } from './ids.js';
 import {
 	normalizeStaticSemanticSnapshot,
@@ -1793,6 +1794,8 @@ export function buildStaticSemanticSnapshot(
 		const diagnostics = finalSnapshot.health === 'PARTIAL' ? partialDiagnostics(finalSnapshot) : [];
 		assertWithinDeadline();
 		operationBudgetSession.finalize();
+		attachVerifiedCompilerCaptureToStaticSemanticSnapshot(finalSnapshot, subject, verifiedCapture);
+		assertDeadline(deadlineMs, operationClock.now);
 		progress.complete(finalSnapshot.health);
 		return finalSnapshot.health === 'PARTIAL'
 			? { diagnostics, outcome: 'partial', snapshot: finalSnapshot }
