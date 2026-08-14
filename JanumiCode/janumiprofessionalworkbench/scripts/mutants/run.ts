@@ -244,6 +244,32 @@ function preApplyVerdict(m: DeclaredMutant): { result: Result } | { original: st
  *
  * An empty result means "every project", which is slower and correct.
  */
+/**
+ * Vitest projects held out of every WHOLE-SUITE run, by name.
+ *
+ * ── WHY THIS EXISTS, AND WHY IT IS A LIST OF NAMES RATHER THAN A SWITCH ──────────────────────────────────────
+ * REG-F-136: a mutant with a named victim runs one file, but a CONTROL declares `expectRed: []` and therefore
+ * runs the WHOLE workspace by construction. `packages/csaa` times out at the 5000ms default under that load, so
+ * every control and every `expectNoCompile` entry — 8 of them — returned INCONCLUSIVE, and the whole gate exited
+ * BLOCKING on a package none of them measures. The controls are the part of this instrument that proves it can
+ * fail, and they were the first part a foreign suite took offline.
+ *
+ * ⚠ THIS IS A REAL WEAKENING AND IS NAMED SO IT CANNOT GROW QUIETLY. REG-F-136 itself argued that "a control
+ * that runs only the suites you already suspect has stopped being a control", and that argument still stands.
+ * What makes this admissible is that it is not a scope-down to the suspected suites: it is the whole workspace
+ * MINUS ONE NAMED PACKAGE, which is outside this programme's remit by standing instruction, is never staged from
+ * this worktree, and measures none of the code these mutants touch. A SECOND name in this array is a different
+ * decision and must be argued on its own, which is why it is a pinned list and not a boolean.
+ *
+ * ⚠ AND IT IS ANNOUNCED ON EVERY RUN. A control graded against a partial workspace must never be READ as one
+ * graded against the whole; `CONTROL_HELD` means "held over everything except these names".
+ *
+ * The BASELINE must use the identical filter — a control's verdict is a DIFFERENCE against it, and differencing
+ * a filtered run against an unfiltered baseline would attribute the excluded project's failures to the mutation.
+ */
+const EXCLUDED_PROJECTS: readonly string[] = ['csaa'];
+const projectFilters = (): string[] => EXCLUDED_PROJECTS.map((p) => `--project=!${p}`);
+
 function targetSuites(m: DeclaredMutant): string[] {
 	// `MUTANTS_TARGET` overrides the suite selection for an investigation — e.g. asking whether a rph-domain mutant
 	// that survived its OWN package is caught by rph-application's command-layer tests. Kept as an env override
@@ -428,9 +454,10 @@ function runMutant(m: DeclaredMutant): Result {
 								'--reporter=default',
 								'--reporter=json',
 								`--outputFile=${jsonTo}`,
+								...(target.length === 0 ? projectFilters() : []),
 								...target
 							]
-						: ['vitest', 'run', ...target],
+						: ['vitest', 'run', ...(target.length === 0 ? projectFilters() : []), ...target],
 					ROOT,
 					mutantEnv
 				);
@@ -644,13 +671,20 @@ const readVictims = (): readonly string[] => failedFiles(HARVEST_REPORT) ?? [];
 let baseline: readonly string[] | undefined;
 function takeBaseline(): void {
 	if (baseline !== undefined) return;
-	console.log('Taking the unmutated whole-suite BASELINE (a control is graded against it, not against zero)…');
+	console.log(
+		`Taking the unmutated whole-suite BASELINE (a control is graded against it, not against zero), ` +
+			`EXCLUDING ${EXCLUDED_PROJECTS.join(', ')} — see EXCLUDED_PROJECTS…`
+	);
 	sh('bunx', [
 		'vitest',
 		'run',
 		'--reporter=default',
 		'--reporter=json',
-		`--outputFile=${BASELINE_REPORT}`
+		`--outputFile=${BASELINE_REPORT}`,
+		// The identical filter as the control runs above. A control's verdict is a DIFFERENCE against this
+		// baseline, so a filtered run differenced against an unfiltered baseline would read the excluded
+		// project's failures as caused by the mutation.
+		...projectFilters()
 	]);
 	// A MISSING BASELINE REPORT IS NOT AN EMPTY ONE. `undefined` here would silently become "nothing was red", which
 	// makes every control's difference the whole of its own failure set — the pre-REG-F-116 behaviour, restored by
@@ -856,6 +890,9 @@ if (PREFLIGHT) {
 }
 
 console.log('\n=== MUTATION LEDGER SUMMARY ===');
+// ⚠ STATED WITH THE NUMBERS, EVERY RUN. A whole-suite verdict — CONTROL_HELD above all — means "held over
+// everything EXCEPT these projects", and a reader who does not know that will over-read it. REG-F-136.
+console.log(`(whole-suite runs EXCLUDE the project(s): ${EXCLUDED_PROJECTS.join(', ')})`);
 for (const v of [
 	'KILLED',
 	'TYPE_PREVENTED',

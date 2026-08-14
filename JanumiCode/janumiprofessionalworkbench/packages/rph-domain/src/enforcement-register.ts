@@ -878,7 +878,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'correction into the middle, and left the CLOSING argument standing — so for one day this row ' +
 			'asserted both that the rule is enforced and that it cannot be violated by any dispatch. ⚠ THAT ' +
 			'IS THE EXACT DEFECT REG-F-133 HEADLINED IN RPH-ASM-004 (*\'a correcting pass fixed the ADJACENT ' +
-			"sentence and left the LOAD-BEARING one standing\'*), committed by its own author in the same " +
+			"sentence and left the LOAD-BEARING one standing'*), committed by its own author in the same " +
 			'commit, on a second row, while writing the entry about it. A strike is not a correction until ' +
 			'EVERY limb resting on the struck ground is re-read — including the ones in OTHER FIELDS of the ' +
 			'same object, which is how the `canonCarriage.note` limb above survived too.'
