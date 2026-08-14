@@ -54,8 +54,15 @@ type Verdict =
 //
 // Checks ONLY that each mutant still ANCHORS and still COMPILES, and runs no tests at all. It exists because the
 // two verdicts that mean "the ledger has rotted" — UNANCHORED and NO_COMPILE — are both decided before a single
-// test runs, yet finding them cost a full ~40-minute run. Triaging rot against a fast loop is the difference
-// between a ledger that gets repaired and one that accumulates.
+// test runs, yet finding them costs a full run: **37.2 minutes of subprocess time over 205 mutations,
+// MEASURED 2026-08-14 at e070c462** by `printTimings` below (tsc 31.8%, targeted vitest 24.2%,
+// whole-suite vitest 22.6%, Playwright 21.5% — no single leg dominates).
+// ⚠ DATED ON PURPOSE, AND IT REPLACES AN UNDATED GUESS (REG-F-164). This said "~40-minute run" and a
+// sibling comment said "~30-minute" — two numbers, disagreeing, neither dated, both written when the
+// ledger held roughly half its entries, and both used to justify speedups. A duration in a comment is a
+// measurement with no instrument behind it; re-measure and re-date rather than adjusting the adjective.
+//
+// Triaging rot against a fast loop is the difference between a ledger that gets repaired and one that accumulates.
 //
 // IT IS NOT A WEAKER FULL RUN. A mutant that anchors and compiles reports `APPLICABLE`, which says only that it
 // COULD be measured — never that it was. Preflight refuses to print a verdict summary for exactly that reason: a
@@ -707,17 +714,22 @@ function takeBaseline(): void {
 		`Taking the unmutated whole-suite BASELINE (a control is graded against it, not against zero), ` +
 			`EXCLUDING ${EXCLUDED_PROJECTS.join(', ')} — see EXCLUDED_PROJECTS…`
 	);
-	sh('bunx', [
-		'vitest',
-		'run',
-		'--reporter=default',
-		'--reporter=json',
-		`--outputFile=${BASELINE_REPORT}`,
-		// The identical filter as the control runs above. A control's verdict is a DIFFERENCE against this
-		// baseline, so a filtered run differenced against an unfiltered baseline would read the excluded
-		// project's failures as caused by the mutation.
-		...projectFilters()
-	]);
+	// ⚠ TIMED SEPARATELY FROM THE CONTROL RUNS, AND IT WAS MISSING FROM THE FIRST MEASUREMENT (REG-F-164).
+	// This is a whole-suite run costing about as much as a control, and leaving it out made the instrument
+	// UNDER-REPORT its own subject — the smaller sibling of the defect that made the instrument silent.
+	timed('vitest BASELINE', () =>
+		sh('bunx', [
+			'vitest',
+			'run',
+			'--reporter=default',
+			'--reporter=json',
+			`--outputFile=${BASELINE_REPORT}`,
+			// The identical filter as the control runs above. A control's verdict is a DIFFERENCE against this
+			// baseline, so a filtered run differenced against an unfiltered baseline would read the excluded
+			// project's failures as caused by the mutation.
+			...projectFilters()
+		])
+	);
 	// A MISSING BASELINE REPORT IS NOT AN EMPTY ONE. `undefined` here would silently become "nothing was red", which
 	// makes every control's difference the whole of its own failure set — the pre-REG-F-116 behaviour, restored by
 	// an unreadable file. Left as `undefined` so the differencing arm cannot mistake it for a clean baseline.
