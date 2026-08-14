@@ -283,3 +283,57 @@ describe('REG-F-122 — a from-half the walk cannot read is REFUSED, never infer
 		]);
 	});
 });
+// ── REG-F-159: THE FOUR AXES A PWU IS BORN INTO, AND WHY THREE OF THEM WERE MISSING ──────────────────────────
+//
+// `proposePwu` commits all FOUR axes from one `seededAxes` literal and, until this pin, declared ONE. That is the
+// same one-of-four shape REG-F-157 found in the DRIVE path, sitting in the BIRTH path of the same command — and
+// its consequence was that every occupancy layer skipped the three sub-axes by an explicit guard:
+// `deadCovered` (`if (!set) continue`), `provablyUnoccupiable` (`if (!born) continue`), `initialStateFictions`
+// (`if (born === undefined) continue`), `occupancyAnalysable` (`born.has(m)`).
+//
+// ⚠ SO THE CHECK THAT WOULD HAVE CONTRADICTED THE LARGEST COVERAGE CLAIM IN THE PROGRAMME COULD NOT FIRE ON IT.
+// REG-F-157 measured a 42-arrow declaration worth 162/304 -> 204/304 on exactly these three machines. Had it
+// been taken, `deadCovered` would have reported nothing about any of the 42 — not because they are live, but
+// because it skips machines with no declared birth. **A control that cannot fail, arriving precisely where the
+// number is largest.** The 42 is refused for other reasons (REG-F-159); this pin removes the blind spot either way.
+//
+// ⚠ PINNED BY NAME AND VALUE, NOT BY COUNT. `expect(births.size).toBe(22)` goes green when a declaration is
+// deleted and another added, which is REG-F-121's lesson. The mutant this pin exists to kill is the DELETION of
+// one entry from the array: nothing else in the suite reddens for it — `refuseOnBirthDrift` simply stops checking
+// that axis, silently — so this is the only assertion standing between that deletion and a green run.
+describe('REG-F-159 — the four axes a PWU is born into are DECLARED, not merely written', () => {
+	it('pins each birth BY MACHINE AND VALUE, read off the state `proposePwu` commits', () => {
+		const births = birthStates();
+		expect(births.get('PWU.workLifecycleState'), 'seededAxes.workLifecycleState').toEqual(new Set(['PROPOSED']));
+		expect(births.get('PWU.executionState'), 'seededAxes.executionState').toEqual(new Set(['NOT_PLANNED']));
+		expect(births.get('PWU.assuranceState'), 'seededAxes.assuranceState').toEqual(new Set(['UNASSESSED']));
+		expect(births.get('PWU.shapeIntegrityState'), 'seededAxes.shapeIntegrityState').toEqual(new Set(['UNKNOWN']));
+	});
+
+	// CONTROL — the pin above passes for a census that reads the declaration and equally for one that has
+	// hard-coded these four. This holds the discriminating half: the census must read a PLURAL array, which no
+	// site in the repository used before this increment. If `computeBirthStates` ever regressed to reading only
+	// `births[0]`, the pin above would fail on three machines and this would name the cause.
+	it('CONTROL — a births array with FOUR entries is read in full, not just its first', () => {
+		const births = birthStates();
+		const pwuAxes = [...births.keys()].filter((m) => m.startsWith('PWU.')).sort((a, b) => a.localeCompare(b));
+		expect(pwuAxes, 'all four PWU axes come from ONE births array at one commit site').toEqual([
+			'PWU.assuranceState',
+			'PWU.executionState',
+			'PWU.shapeIntegrityState',
+			'PWU.workLifecycleState'
+		]);
+	});
+
+	// CONTROL — scope. Declaring a birth must not smuggle in an arrow claim: these three machines have ZERO
+	// declared arrows and the C-0 baseline must not move. `dead` and `unanalysed` are both derived from
+	// `declaredArrows()`, so a machine with no arrows appears in neither — and a future change that made a birth
+	// declaration also count as coverage would break exactly here.
+	it('CONTROL — a birth is not a coverage claim: the three sub-axes stay out of dead AND unanalysed', () => {
+		const { dead, unanalysed } = deadCovered();
+		for (const m of ['PWU.executionState', 'PWU.assuranceState', 'PWU.shapeIntegrityState']) {
+			expect(unanalysed, `${m} has no declared arrows, so it cannot be unanalysed`).not.toContain(m);
+			expect(dead.some((d) => d.startsWith(`${m}  `)), `${m} declares no arrow to be dead`).toBe(false);
+		}
+	});
+});

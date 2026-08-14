@@ -2813,5 +2813,33 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
 		why: "ADMISSIBLE COLLAPSES INTO MERELY PRESENT — the one distinction this rule exists to draw. RPH-EVD-002 is the single NON-FORGEABLE refusal in this command precisely because admissibility is a fact the ENGINE holds: evidence reaches ADMISSIBLE only through `AdmitEvidence`, and the guard folds COMMITTED events rather than reading the payload. Weakening the status test to a presence check hands that fact back to the caller, who can then reach SUPPORTED on evidence it merely PROPOSED. ⚠ THE ENFORCEMENT PROBE’S CONTROL CANNOT SEE THIS — the control ADMITS its evidence, so it stays ACCEPTED either way; only the OBSERVED arm, whose evidence was never admitted, flips from REJECTED to ACCEPTED. That asymmetry is why the probe carries two claim aggregates instead of asserting a refusal alone.",
 		source: 'REG-F-138'
+	},
+	// ── REG-F-159: THE GUARD THE OCCUPANCY CENSUS RESTS ON, AND THE DECLARATION THAT FEEDS IT ────────────────
+	//
+	// These two are a PAIR and they fail in opposite directions, which is what distinguishes a real gate from
+	// one that merely refuses a lot: the first kills the ENFORCEMENT, the second kills the DECLARATION.
+	{
+		id: 'F159-birth-drift-refusal-neutered',
+		file: 'packages/rph-application/src/handlers/kit.ts',
+		// TWO LINES: `for (const b of births ?? []) {` alone would be unique, but anchoring on the CONDITION is
+		// what makes the mutation the one described — the loop is not the guard, the predicate is.
+		find:
+			'\t\tconst actual = state[b.statusField];\n' +
+			"\t\tif (typeof actual !== 'string' || !b.values.includes(actual)) {",
+		replace: '\t\tconst actual = state[b.statusField];\n\t\tif (false as boolean) {',
+		expectRed: ['packages/rph-application/src/handlers/birth-drift.test.ts'],
+		why: "THE OCCUPANCY CENSUS'S ONLY RUNTIME DEFENCE, AND IT WAS MEASURED UNFALSIFIABLE BEFORE ITS TEST EXISTED. `refuseOnBirthDrift` runs at BOTH commit seams and its header states the stake: a declaration that has drifted from the code makes the census confidently wrong, which is worse than no census. MEASURED 2026-08-14 with this exact mutation applied: the `rph-application` project ran 99 files / 884 tests, ALL PASSING — every declaration in the repository agrees with the state its site commits, which is what the census passing MEANS, so no production path ever entered the refusing arm and no test ever constructed one. A guard nothing distinguishes from `return null` is this programme's hollow, sitting underneath the instrument that finds hollows. `birth-drift.test.ts` enters the arm directly with synthetic declarations, and reddens on 3 of its 5 cases here while both `toBeNull` controls correctly HOLD — the discrimination that stops it reddening with the herd.",
+		source: 'REG-F-159'
+	},
+	{
+		id: 'F159-fourth-birth-declaration-deleted',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find:
+			"\t\t\t{ machine: 'PWU.shapeIntegrityState', statusField: 'shapeIntegrityState', values: ['UNKNOWN'] }",
+		replace:
+			"\t\t\t{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] }",
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "A DECLARATION SILENTLY STOPS BEING MADE, AND NOTHING ELSE IN THE REPOSITORY NOTICES. Deleting an entry does not break any commit — `refuseOnBirthDrift` simply stops checking that axis — so the failure mode is a machine quietly returning to `unanalysable`, which every occupancy layer reads as \"nobody said\" and skips. ⚠ THE REPLACEMENT IS A DUPLICATE OF AN EXISTING ENTRY RATHER THAN A DELETION, deliberately: it keeps the array's LENGTH at four, so a pin counting entries would stay green and only a pin naming MACHINES can catch it. That is the REG-F-121 shape — a count improves by destroying the evidence — and it is why the REG-F-159 pin asserts machine and value rather than size.",
+		source: 'REG-F-159'
 	}
 ];

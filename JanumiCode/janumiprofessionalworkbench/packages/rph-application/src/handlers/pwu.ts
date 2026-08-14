@@ -364,15 +364,33 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		newSemanticVersion: 1,
 		nextState: pwu,
 		event,
-		// THE BIRTH OF `PWU.workLifecycleState` — REG-F-086, and it is what makes the machine ANALYSABLE rather
-		// than merely visible. REG-F-114 gave it 49 declared arrows; occupancy seeds from a birth and grows along
-		// those, so until now the census could see the arrows and still not say which states are reachable — and
-		// therefore not say which "covered" arrows are DEAD.
+		// THE BIRTH OF ALL FOUR PWU AXES — REG-F-086 for the first, REG-F-159 for the other three, and it is what
+		// makes each machine ANALYSABLE rather than merely visible. REG-F-114 gave `workLifecycleState` 49 declared
+		// arrows; occupancy seeds from a birth and grows along those, so without a birth the census could see the
+		// arrows and still not say which states are reachable — and therefore not say which "covered" arrows are DEAD.
 		//
-		// ⚠ `PROPOSED` IS READ OFF THE STATE THIS COMMAND COMMITS, NOT OFF `initialState`, which lies for five
-		// machines (REG-F-071). The declaration lives at the site that performs the birth because that is the only
-		// place that knows, and `commitState` REFUSES if the two disagree.
-		births: [{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] }]
+		// ⚠ EVERY VALUE IS READ OFF `seededAxes` ABOVE — THE STATE THIS COMMAND COMMITS — NOT OFF `initialState`,
+		// which lies for five machines (REG-F-071). The declaration lives at the site that performs the birth
+		// because that is the only place that knows, and `commitState` REFUSES if the two disagree.
+		//
+		// ⚠ THREE OF THESE FOUR WERE MISSING FOR AS LONG AS THIS SITE HAS EXISTED, AND THE CONSEQUENCE WAS A CHECK
+		// THAT COULD NOT FIRE (REG-F-159). `seededAxes` commits four axes; this array declared one. Every occupancy
+		// layer then skipped the other three by an explicit guard — `deadCovered` (`if (!set) continue`),
+		// `provablyUnoccupiable` (`if (!born) continue`), `initialStateFictions`, `occupancyAnalysable` — so the
+		// 42-arrow declaration REG-F-157 measured on exactly these three machines (162/304 -> 204/304, the largest
+		// coverage movement available anywhere in this programme) would have been made with the ONLY instrument
+		// capable of contradicting it structurally silent. **A control that cannot fail, at the point the number is
+		// largest.** The 42 is refused on other grounds; this declaration removes the blind spot regardless.
+		//
+		// ⚠ AND THE GAP IT CLOSES AT RUNTIME IS NARROW AND REAL: the object schema types each axis as an ENUM, so
+		// drift to a NON-member was already refused. Drift to a DIFFERENT VALID MEMBER — `PLANNED` for
+		// `NOT_PLANNED` — was refused by nothing at all until this array named the value.
+		births: [
+			{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] },
+			{ machine: 'PWU.executionState', statusField: 'executionState', values: ['NOT_PLANNED'] },
+			{ machine: 'PWU.assuranceState', statusField: 'assuranceState', values: ['UNASSESSED'] },
+			{ machine: 'PWU.shapeIntegrityState', statusField: 'shapeIntegrityState', values: ['UNKNOWN'] }
+		]
 	});
 };
 
