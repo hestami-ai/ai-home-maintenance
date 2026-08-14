@@ -413,8 +413,14 @@ export const supersedeIntent: CommandHandler = (ctx, command, payload) => {
 		);
 	}
 	const successor = ctx.store.loadObject(p.supersedingIntentId);
+	// ⚠ COMPUTED OUTSIDE THE GUARD ON PURPOSE. Inside `if (successor?.objectType !== 'INTENT')` this read is
+	// fine, but the WEAKENED form of that condition — `if (!successor)`, the existence-only shape this guard
+	// deliberately rejects — narrows `successor` to `undefined` and makes the same expression `never`. The
+	// mutant that expresses the weakening then fails to COMPILE rather than being measured, and an unmeasurable
+	// mutant is not a passing one: `NO_COMPILE` blocks precisely because no verdict about the code is available.
+	// Hoisting it keeps the guard's own weakening expressible, which is what makes the mutant evidence.
+	const found = successor ? `a ${String(successor.objectType)}` : 'not stored';
 	if (successor?.objectType !== 'INTENT') {
-		const found = successor ? `a ${String(successor.objectType)}` : 'not stored';
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
