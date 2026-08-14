@@ -3142,8 +3142,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// enforce, is the archetype this register was built around, and it has never appeared this densely.
 	//
 	// AND THE VOCABULARY IS HALF-BUILT IN A PARTICULAR WAY. `Assumption.status` declares eight states with
-	// transitions and guard prose, but only TWO commands exist — `DetectAssumption` and `ExpireAssumption`. The
-	// arrows into ACCEPTED, VERIFIED, UNDER_VERIFICATION and FALSIFIED are authored and command-unreachable, which
+	// transitions and guard prose, but only ~~TWO~~ FOUR commands exist — `DetectAssumption`,
+	// `DiscloseAssumption`, `ExpireAssumption` and `FalsifyAssumption` (corrected 2026-08-14, REG-F-146; the
+	// last two were authored at REG-F-069 and this sentence was not brought to them). The
+	// arrows into ACCEPTED, VERIFIED, UNDER_VERIFICATION and ~~FALSIFIED~~ are authored and command-unreachable
+	// — **FALSIFIED IS NOW REACHABLE**, and is struck from that list; the other three are re-derived and
+	// still unreachable, so this paragraph's CONCLUSION survives its own correction. Which
 	// is the RPH-EVD-002 shape (the `Claim.status` machine nothing dispatches into) repeated on a second aggregate.
 	// That is why three of these rows are arm 3 rather than disclosures: their triggering ACT cannot be dispatched,
 	// so no arrangement can demonstrate a gap.

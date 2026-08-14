@@ -112,9 +112,16 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-INT-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-005': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
-	// The RPH-PWU tranche, five of ten (2026-08-02). Only the two ENFORCED rows appear; the family is NOT yet
+	// The RPH-PWU tranche, five of ten (2026-08-02). Only the two ENFORCED rows appear; ~~the family is NOT yet
 	// total in the register (RPH-PWU-003/007/008 are investigated and owed), which is why RPH-PWU is absent from
-	// TOTAL_OVER_FAMILIES.
+	// TOTAL_OVER_FAMILIES.~~
+	// ⚠ ALL THREE LIMBS WENT FALSE THE SAME DAY THEY WERE WRITTEN (corrected 2026-08-14, REG-F-146). Derived by
+	// importing ENFORCEMENT_REGISTER: RPH-PWU has TEN of ten rows, every one dispositioned — 003/007/008 are
+	// UNENFORCED_DISCLOSED (which IS a disposition, so it cannot ground non-totality) and each carries an
+	// OBSERVED_ADMISSION guard — and `RPH-PWU-` IS in TOTAL_OVER_FAMILIES. The note landed at 87f07183 and the
+	// family joined the list at ec12b5d9, hours later on 2026-08-02. `enforcement-register.ts` already rebuts it
+	// by id ("THE RPH-PWU FAMILY — CLOSED AT TEN OF TEN") and even records the absence in the PAST TENSE.
+	// The tranche-scoped first clause is left standing: it is correct about that tranche.
 	'RPH-PWU-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ── THE RPH-PER CITES, ALL FOUR CORRECTED 2026-08-02 WHILE DISPOSITIONING THE FAMILY ─────────────────────
@@ -148,8 +155,11 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
 	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
 	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
-	// RPH-ASM-006 — the only ASM rule with a live kernel caller, cited per-id with its dispatch probe. Its five
-	// siblings have no caller at all, which is why this is the family's only COMMAND-layer cite.
+	// RPH-ASM-006 — ~~the only ASM rule with a live kernel caller~~ ONE OF TWO (corrected 2026-08-14,
+	// REG-F-146: `assessFalsification` gained a production caller in `handlers/assurance.ts` when
+	// `FalsifyAssumption` was authored, REG-F-069). ~~Its five siblings have no caller at all~~ — FOUR of the
+	// five do not. This remains the family's only COMMAND-layer cite, which is a fact about the MANIFEST and is
+	// unaffected by the correction.
 	'RPH-ASM-006': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// The four PROMOTION-GATE rows, cited per-id 2026-08-02 with their dispatch probes. BAS-003/004/006 share one
 	// joined finding-code message; GOV-003 refuses at a later arm of the same handler with its own sentence.
@@ -209,9 +219,13 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	// This row read COVERED, "RPH-ASM-001..006 by id", on a PURE_KERNEL file. The register disposed RPH-ASM-002
 	// and RPH-ASM-005 UNENFORCED_DISCLOSED — each with a dead-predicate census — and the gate rejected the pair.
 	//
-	// THE FAMILY-LEVEL FACT IS THE ONE WORTH CARRYING: FIVE of the six ASM rules have a dedicated kernel predicate
-	// referenced by exactly one non-test file — its own definition module, rph-domain/src/decomposition.ts. Only
-	// the authorize-new-work predicate behind ASM-006 has a live caller. The cited test file is honest and its
+	// THE FAMILY-LEVEL FACT IS THE ONE WORTH CARRYING: ~~FIVE~~ FOUR of the six ASM rules have a dedicated kernel
+	// predicate referenced by exactly one non-test file — its own definition module,
+	// rph-domain/src/decomposition.ts. ~~Only the authorize-new-work predicate behind ASM-006 has a live
+	// caller.~~ TWO have live callers: `canAuthorizeNewWork` (ASM-006, from handlers/execution.ts) and
+	// `assessFalsification` (from handlers/assurance.ts). Corrected 2026-08-14 (REG-F-146); the re-measured
+	// figure in `enforcement-register.ts` ("FOUR DEAD PREDICATES OUT OF SIX RULES", 2026-08-13) was already
+	// right and these two sites had not been brought to it — one measurement, three restatements, two stale. The cited test file is honest and its
 	// assertions hold; what it cannot see is that nothing in the running engine asks any of the other five. That
 	// is DS-001 §4 item 2 at family scale rather than rule scale.
 	//
