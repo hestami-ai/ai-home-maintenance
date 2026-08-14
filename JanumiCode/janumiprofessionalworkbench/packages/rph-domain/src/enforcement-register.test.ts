@@ -248,6 +248,47 @@ describe('WP-16 (c) — the register is TOTAL over the families it claims', () =
 		]);
 	});
 
+	// ── THE HEADER'S OWN CENSUS IS DERIVED FROM THE ROWS, NOT TRUSTED (REG-F-141) ────────────────────────────
+	//
+	// That paragraph carried `29 / 25 / 58` while the module held `31 / 25 / 56` — stale in two arms, and
+	// UNGATED, so it could say anything indefinitely. It is the third instance in one session of the same shape:
+	// **a number written in prose that duplicates a number the code can derive is not documentation, it is a
+	// second copy with no checker** (REG-F-140 states the rule; `run.ts`'s 17→19 and the arm-3 gate's 4/57 were
+	// the other two, both rotted by the hand of the person editing the list beside them).
+	//
+	// ⚠ THE CHECK PARSES THE COMMENT DELIBERATELY, rather than the prose being softened to avoid numbers. The
+	// numbers are what give the paragraph its force — "barely a QUARTER" is an argument, not decoration — so the
+	// honest fix is to make the claim CHECKABLE, not to make it vaguer. A vaguer paragraph would have been the
+	// easier edit and would have removed the evidence rather than the defect.
+	it("the header's census matches the rows it describes", () => {
+		const src = readFileSync(new URL('./enforcement-register.ts', import.meta.url), 'utf8');
+		const m = /Of the (\d+) rows, (\d+) are\s*\/\/\s*ENFORCED, (\d+) are UNENFORCED_DISCLOSED and (\d+) are NOT_A_COMMAND_REFUSAL/.exec(
+			src.replace(/\r\n/g, '\n')
+		);
+		expect(m, 'the header census sentence moved or was reworded — re-derive it, do not delete this check').
+			not.toBeNull();
+
+		const live = { total: REGISTERED_RULE_IDS.length, ENFORCED: 0, UNENFORCED_DISCLOSED: 0, NOT_A_COMMAND_REFUSAL: 0 };
+		for (const id of REGISTERED_RULE_IDS) live[ENFORCEMENT_REGISTER[id].kind] += 1;
+
+		expect(
+			{
+				total: Number(m![1]),
+				ENFORCED: Number(m![2]),
+				UNENFORCED_DISCLOSED: Number(m![3]),
+				NOT_A_COMMAND_REFUSAL: Number(m![4])
+			},
+			'the header paragraph states a census that the rows contradict — update the PROSE, and the "honest headline" figure in the same sentence with it'
+		).toEqual(live);
+
+		// The same paragraph repeats the ENFORCED figure as its closing "honest headline". One number, two
+		// places, and only this assertion relates them.
+		expect(
+			src.replace(/\r\n/g, '\n'),
+			'the closing "honest headline is N" must carry the same ENFORCED count as the census above it'
+		).toContain(`the honest headline is ${live.ENFORCED}, not ${live.total}`);
+	});
+
 	it('every disposition carries its reason, and no reason is a stub', () => {
 		for (const id of REGISTERED_RULE_IDS) {
 			const row = ENFORCEMENT_REGISTER[id];

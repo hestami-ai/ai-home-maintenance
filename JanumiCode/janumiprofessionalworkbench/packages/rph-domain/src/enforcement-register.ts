@@ -68,11 +68,11 @@
 //   instrument" is a claim about the register, which does not license a claim about the repository.
 //
 // WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
-// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 29 are
-// ENFORCED, 25 are UNENFORCED_DISCLOSED and 58 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
+// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 31 are
+// ENFORCED, 25 are UNENFORCED_DISCLOSED and 56 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
 // catalog is a refusal the engine actually performs, and a MAJORITY states outcomes, permissions, or planes that do
 // not exist. Including all fourteen read-model rules. The register's value is that those are now written down and
-// gated, not that they are closed; the honest headline is 29, not 112.
+// gated, not that they are closed; the honest headline is 31, not 112.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
@@ -878,12 +878,24 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// (assurance.ts) folds COMMITTED evidence state and requires `status === 'ADMISSIBLE'`, never the payload.
 	// Evidence reaches ADMISSIBLE only through `AdmitEvidence`. And it REFUSES rather than validates — `kit.ts`
 	// short-circuits on the guard's rejection, so no event is emitted and no revision is bumped.
-	// SCOPE, MEASURED: the guard is scoped to `target === 'SUPPORTED'`, and SUPPORTED has EXACTLY ONE in-arrow
-	// on the machine (UNDER_ASSESSMENT -> SUPPORTED). So the guard is total over the ratified rule — which reads
-	// "Changing a claim with no admissible evidence to SUPPORTED is rejected" (m12-conformance.json, one limb,
-	// one destination). The rule needed no narrowing and no split. ⚠ The '7 of 15 arrows' figure recorded
-	// elsewhere answers a DIFFERENT question — the arrows `RecordClaimAssessment` DECLARES, which is what the
-	// census counts — and conflating the two would have suggested a 15-arrow rule guarded on one arrow.
+	// SCOPE: the guard is keyed on the DESTINATION — `if (target !== 'SUPPORTED') return null` — where
+	// `target` is read from the command payload. The ratified statement names exactly one destination
+	// ("Changing a claim with no admissible evidence to SUPPORTED is rejected", m12-conformance.json: one limb,
+	// one destination), so the guard is TOTAL over the rule. The rule needed no narrowing and no split.
+	//
+	// ⚠ TWO SUPPORTING CLAIMS WRITTEN HERE ON 2026-08-13 WERE WRONG, AND ARE CORRECTED RATHER THAN QUIETLY
+	// DROPPED, because the CONCLUSION above survived both and that is exactly when a bad argument goes unnoticed
+	// (REG-F-141).
+	//   ~~"SUPPORTED has EXACTLY ONE in-arrow, so the guard is total"~~ — the PREMISE is true (15 transitions,
+	//   one in-arrow, derived from `STATE_MACHINES`) but the INFERENCE is a non-sequitur. `kit.ts` invokes the
+	//   guard as `args.guard?.(loaded.state, ctx)`: the ARROW IS NEVER PASSED, and the state it does pass this
+	//   guard names `_state` and never reads. Totality would survive fifty in-arrows. Worse, the bad reason is
+	//   fragile in the DANGEROUS direction — ratify a second in-arrow and the stated justification falsifies
+	//   while the guard stays total, inviting a future reader to order a split that is not owed.
+	//   ~~"the 7-of-15 figure counts the arrows `RecordClaimAssessment` DECLARES"~~ — FALSE. Measured: this
+	//   site declares TWENTY arrows on `Claim.status`, of which thirteen are NOT ratified. The 7 is
+	//   |declared ∩ ratified| and the 15 is the machine's own transition count, so BOTH halves range over the
+	//   ratified machine — the very population the sentence claimed it was not about.
 	'RPH-EVD-002': {
 		kind: 'ENFORCED',
 		canonCarriage: {
