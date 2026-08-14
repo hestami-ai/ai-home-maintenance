@@ -2744,5 +2744,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/guard-enforcement-ledger.test.ts'],
 		why: "THE JOIN SILENTLY AGREES ON NOTHING. This function joins TWO censuses — C-0b's guarded arrows and C-0's covered set — and its characteristic failure is therefore not a wrong answer but a KEY-FORMAT MISMATCH, which yields an empty intersection and reads as \"no faults\". Swapping the shared `arrowKey` for a private format is the mutation the file's own header warns against in its second paragraph: two censuses over one table must not each keep their own idea of the table. ⚠ AND IT IS THE MUTATION MOST LIKELY TO BE WRITTEN BY ACCIDENT, because a hand-rolled `${machine} ${from} -> ${to}` differs from the real key by ONE SPACE and nothing about it looks wrong. Predicted red: CONTROL 5 — not the main assertion, which a mismatched join leaves green.",
 		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-successor-is-merely-required-to-exist',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\tif (successor?.objectType !== 'INTENT') {",
+		replace: '\tif (!successor) {',
+		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
+		why: "THE SUCCESSOR GOES BACK TO BEING THE CALLER’S WORD. Weakening the resolution to an EXISTENCE test (`!successor`) is the tempting version, and it is precisely the shape `proposePwu`’s PWU-002 already has — which DISCLOSES its own hole at pwu.ts:255: \"a non-INTENT id would carry intentStatus: undefined and pass this check\". ⚠ THE GHOST-SUCCESSOR TEST STAYS GREEN UNDER THIS MUTATION, because a nonexistent id fails an existence test too; only the NOT-AN-INTENT case can tell the two apart. That is why this arrow departs from PWU-002 rather than copying it, and why the decoy PWU exists in the suite. Predicted red: \"REFUSES a supersession whose successor is not an INTENT\" alone.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-an-intent-may-supersede-itself',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: '\tif (p.supersedingIntentId === command.targetAggregateId) {',
+		replace: '\tif (false as boolean) {',
+		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
+		why: "THE SELF-SUPERSESSION ARM IS DELETED. Without it an intent can name ITSELF its own replacement, which moves it to a TERMINAL state whose recorded successor is the dead intent — the stranding this increment exists to close, reached by a second route that the existence-and-type check cannot see (the intent trivially exists and is trivially an INTENT). ⚠ EVERY OTHER TEST IN THE SUITE STAYS GREEN, including the ghost and decoy refusals and the CONTROL, so this arm has exactly one witness and the mutation proves it is a real one rather than a defensive line nothing reaches. Predicted red: \"REFUSES an intent superseding itself\" alone.",
+		source: 'REG-F-134'
 	}
 ];

@@ -49,14 +49,16 @@ const TEXTS = 82;
  * adversarial pass attacked — and it attacked sixteen claims and overturned two.
  */
 const COUNTS = {
-	// ⚠ MOVED 2026-08-13, ARROW_UNREACHABLE 22 -> 21 and UNENFORCED 44 -> 45, and the DIRECTION is the point.
-	// "Replacement intent identified" was a DISMISSAL that REG-F-131 falsified four commits earlier; correcting
-	// it makes the ledger read WORSE, which is what distinguishes this from the reclassification the docblock
-	// below forbids. The guard is enforced in a later increment, and only then does this move back.
+	// ⚠ "Replacement intent identified" MOVED TWICE IN TWO COMMITS, and both directions are recorded because the
+	// ORDER is the evidence. REG-F-134 first moved it ARROW_UNREACHABLE -> UNENFORCED (22->21, 44->45): a
+	// DISMISSAL that REG-F-131 had falsified four commits earlier, corrected in the direction that makes the
+	// ledger read WORSE, which is what separates it from the reclassification the docblock below forbids. The
+	// next increment then ENFORCED the guard and re-drove the row (45->44, 14->15) — *"the way to move it is to
+	// enforce a guard and re-drive its row, never to reclassify one"*, done in that order rather than claimed.
 	ARROW_UNREACHABLE: 21,
-	ENFORCED: 14,
+	ENFORCED: 15,
 	REDUNDANT_WITH_MACHINE: 2,
-	UNENFORCED: 45
+	UNENFORCED: 44
 };
 
 describe('C-0b — every declared arrow guard is classified, and the ledger is pinned', () => {

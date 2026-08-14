@@ -261,6 +261,78 @@ describe('STA-6 (d) — a superseded intent cannot authorize new PWUs', () => {
 		).not.toBe('ACCEPTED');
 	});
 
+	// ── THE SUCCESSOR IS RESOLVED, NOT TAKEN ON THE CALLER'S WORD (REG-F-134) ───────────────────────────────
+	//
+	// REG-F-131 shipped `supersedeIntent` copying `supersedingIntentId` into the emitted event without ever
+	// loading the object that id names — the REG-F-014 shape, a caller-supplied fact taken as true where the
+	// engine could have resolved it. The guard ledger's `"Replacement intent identified"` row is the guard this
+	// arrow DECLARES, and it was scored ARROW_UNREACHABLE until REG-F-131 made the arrow reachable and nothing
+	// reddened.
+	//
+	// ⚠ AND IT IS A LIVE DEFECT, NOT A LABELLING ONE, because of how it composes with the increment ONE COMMIT
+	// EARLIER. SUPERSEDED is terminal, and REG-F-129 makes `proposePwu` refuse a SUPERSEDED intent. So a
+	// supersession naming a successor that does not exist STRANDS THE INTENT PERMANENTLY: it authorizes no new
+	// work, there is no successor to propose against, and no arrow leaves SUPERSEDED. Neither increment had the
+	// defect alone.
+	it('REFUSES a supersession whose successor does not exist', () => {
+		const ghost = 'int_01ARZ3NDEKTSV4RRFFQ69G5FBG';
+		expect(store.loadObject(ghost), 'the successor must genuinely not exist').toBeUndefined();
+		const r = send('SupersedeIntent', { supersedingIntentId: ghost }, INTENT_ID, 'INTENT');
+		expect(r.status, 'a supersession to nowhere strands the intent in a terminal state').not.toBe(
+			'ACCEPTED'
+		);
+		expect(
+			(store.loadObject(INTENT_ID)?.state as { intentStatus?: string }).intentStatus,
+			'and the intent is left alive'
+		).toBe('RAW');
+	});
+
+	// The referent must be an INTENT, not merely SOMETHING. `proposePwu`'s PWU-002 check is existence-only and
+	// says so at pwu.ts:255 — *"a non-INTENT id would carry `intentStatus: undefined` and pass this check"* — so
+	// reusing that shape verbatim would inherit the hole and let a PWU supersede an intent. That the referent
+	// carries `objectType` at all was DRIVEN through the bus before this guard was written, not assumed: the
+	// literal `objectType: 'INTENT'` appears elsewhere in this repository only in test seeds.
+	it('REFUSES a supersession whose successor is not an INTENT', () => {
+		const pwuId = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5FBH';
+		expect(proposePwu(pwuId).status).toBe('ACCEPTED');
+		expect(store.loadObject(pwuId)?.objectType, 'the decoy exists and is not an INTENT').toBe(
+			'PROFESSIONAL_WORK_UNIT'
+		);
+		const r = send('SupersedeIntent', { supersedingIntentId: pwuId }, INTENT_ID, 'INTENT');
+		expect(r.status, 'existence is not identity — the successor must be an intent').not.toBe('ACCEPTED');
+		expect((store.loadObject(INTENT_ID)?.state as { intentStatus?: string }).intentStatus).toBe('RAW');
+	});
+
+	it('REFUSES an intent superseding itself', () => {
+		const r = send('SupersedeIntent', { supersedingIntentId: INTENT_ID }, INTENT_ID, 'INTENT');
+		expect(r.status, 'a self-supersession terminates an intent and names itself the replacement').not.toBe(
+			'ACCEPTED'
+		);
+		expect((store.loadObject(INTENT_ID)?.state as { intentStatus?: string }).intentStatus).toBe('RAW');
+	});
+
+	// ⚠ THE CONTROL WITHOUT WHICH THE THREE ABOVE ARE SATISFIED BY REFUSING EVERYTHING. A guard that rejected
+	// every supersession would turn all three green and silently re-close the six arrows REG-F-131 opened —
+	// undoing that increment while reading as a hardening of it.
+	it('CONTROL — a real, existing INTENT successor is still ACCEPTED', () => {
+		const successor = 'int_01ARZ3NDEKTSV4RRFFQ69G5FBJ';
+		expect(
+			send(
+				'CaptureIntent',
+				{ intentId: successor, originatingExpression: 'the replacement', ontologyId: 'o', ontologyVersion: '1' },
+				successor,
+				'INTENT'
+			).status
+		).toBe('ACCEPTED');
+		expect(
+			send('SupersedeIntent', { supersedingIntentId: successor }, INTENT_ID, 'INTENT').status,
+			'the arrow REG-F-131 opened must stay open'
+		).toBe('ACCEPTED');
+		expect((store.loadObject(INTENT_ID)?.state as { intentStatus?: string }).intentStatus).toBe(
+			'SUPERSEDED'
+		);
+	});
+
 	// ⚠ WITHDRAWN STAYS UNREACHABLE, and this asserts the ABSENCE deliberately. The corpus ratifies no
 	// `IntentWithdrawn` event, so minting a command for it would be inventing what supersede merely had unstated.
 	it('WithdrawIntent does not exist — the three WITHDRAWN arrows stay uncovered and visible', () => {

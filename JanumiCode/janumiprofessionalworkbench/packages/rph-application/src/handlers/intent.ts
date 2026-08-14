@@ -383,6 +383,49 @@ export const reviseIntent: CommandHandler = (ctx, command, payload) => {
  */
 export const supersedeIntent: CommandHandler = (ctx, command, payload) => {
 	const p = payload as SupersedeIntentPayload;
+
+	// ── THE SUCCESSOR IS RESOLVED, NOT TAKEN ON THE CALLER'S WORD (REG-F-134) ────────────────────────────────
+	//
+	// This arrow DECLARES the guard "Replacement intent identified", and the first version of this handler
+	// copied `supersedingIntentId` into the event without ever loading the object it names — the REG-F-014
+	// shape, a caller-supplied fact taken as true where the engine could have resolved it. That the guard was
+	// unenforced went unnoticed because C-0b scored its row ARROW_UNREACHABLE and nothing checked dismissals.
+	//
+	// ⚠ AND THE OMISSION WAS A LIVE DEFECT, because of how it composed with the increment ONE COMMIT EARLIER.
+	// SUPERSEDED is terminal and REG-F-129 makes `proposePwu` refuse a SUPERSEDED intent, so a supersession
+	// naming a successor that does not exist STRANDS THE INTENT PERMANENTLY: no new work is authorized, there
+	// is no successor to propose against, and no arrow leaves SUPERSEDED. Neither increment had it alone.
+	//
+	// ⚠ THE TYPE IS ASSERTED, NOT ONLY EXISTENCE, and that is a DEPARTURE from `proposePwu`'s PWU-002 rather
+	// than a copy of it. PWU-002 discloses at `pwu.ts:255` that it is existence-only and that "a non-INTENT id
+	// would carry `intentStatus: undefined` and pass this check"; inheriting that shape here would let a PWU
+	// supersede an intent. That a command-created intent carries `objectType` at all was DRIVEN through the bus
+	// before this guard was written — the literal `objectType: 'INTENT'` occurs elsewhere only in test seeds,
+	// so reading it would have been reading a fixture.
+	if (p.supersedingIntentId === command.targetAggregateId) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`SupersedeIntent cannot name intent ${command.targetAggregateId} as its own successor: a ` +
+				`supersession moves an intent to a TERMINAL state and names what replaces it, so naming itself ` +
+				`would end the intent and leave nothing to carry the work forward.`,
+			[command.targetAggregateId]
+		);
+	}
+	const successor = ctx.store.loadObject(p.supersedingIntentId);
+	if (successor?.objectType !== 'INTENT') {
+		const found = successor ? `a ${String(successor.objectType)}` : 'not stored';
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`SupersedeIntent requires an existing INTENT as the superseding intent, and ` +
+				`${p.supersedingIntentId} is ${found}. ` +
+				`SUPERSEDED is terminal and a superseded intent authorizes no new work (JPWB-DOC-003 §5 STA-6), ` +
+				`so a supersession to an unresolvable successor would strand this intent permanently.`,
+			[command.targetAggregateId]
+		);
+	}
+
 	return advanceIntent(ctx, command, {
 		machine: MACHINE,
 		target: 'SUPERSEDED',
