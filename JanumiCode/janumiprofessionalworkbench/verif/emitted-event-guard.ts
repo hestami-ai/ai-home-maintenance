@@ -12,7 +12,11 @@
 // 2026-08-13 `EVENTS` declares 142, not 132. The 34 is deliberately NOT re-derived and must not be guessed:
 // deriving it needs the whole-suite instrumentation that produced it, which scope note 2 below records no single
 // vitest worker can perform. (For DIRECTION only, and it is a RECORD rather than a re-run:
-// `verif/event-surface-census.test.ts`'s hand-maintained `EMITTED_2026_08_04` now lists 109 of the 142.)
+// `verif/event-surface-census.test.ts`'s hand-maintained `EMITTED_2026_08_04` now lists ~~109~~ 110 of the
+// 142 — re-counted 2026-08-14 (REG-F-147). ⚠ THE ORIGINAL FIGURE IS LEFT VISIBLE BECAUSE THIS SENTENCE IS
+// A DATED RECORD, and the one event between them is the point: `IntentSuperseded` was appended to that
+// list the same day this note was written (REG-F-131), so the two were never wrong together — they were
+// written hours apart and only one moved.)
 //
 // IT TOOK ONE NEW DISPATCH TO EXPOSE THAT. Closing RPH-FIX-005 made the drive record its first ever artifact, and
 // the register immediately grew an entry (`ArtifactRecorded` carried an `artifactId` its strict shape rejects).

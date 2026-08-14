@@ -11,9 +11,12 @@
 //   EMITTED   — what handlers actually commit, measured across the whole suite by `emitted-event-guard.ts`.
 //
 // THE THREE DISAGREE, and the disagreements are the finding rather than an accounting quirk:
-//   * events EMITTED but not BOUND — the engine produces events the binding table does not describe. Six of
-//     them, including every kernel-chosen recomposition outcome (`eventType: evaluation.event`), which no static
-//     command->event row can express.
+//   * events EMITTED but not BOUND — the engine produces events the binding table does not describe. ~~Six~~
+//     FIVE of them, including every kernel-chosen recomposition outcome (`eventType: evaluation.event`), which
+//     no static command->event row can express.
+//     ⚠ THIS FILE ALREADY CONTRADICTED ITSELF: the passage 130 lines below records the drop verbatim —
+//     "6 -> 5 (REG-F-021 increment 1)" — while this headline kept saying six. Corrected 2026-08-14
+//     (REG-F-147); re-derived by mirroring this file's own set algebra, EMITTED(110) \ BOUND(105) = 5.
 //   * events BOUND but never EMITTED — a command declares it produces an event and produces a different one.
 //     `RequestAssuranceAssessment` is bound to `AssuranceAssessmentRequested` and emits
 //     `AssuranceAssessmentStarted`. The corpus's own §26 trace expects `AssuranceAssessmentRequested` at seq 31,
@@ -144,7 +147,8 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 
 	// The engine produces events the binding table does not describe. NOT a defect to fix by deleting them: a
 	// kernel that CHOOSES its outcome event (`eventType: evaluation.event`) cannot be expressed as a static
-	// command->event row. The count is pinned so a SEVENTH cannot appear unnoticed.
+	// command->event row. The count is pinned so a ~~SEVENTH~~ SIXTH cannot appear unnoticed (REG-F-147 — the
+	// ordinal tracked the stale headline above rather than the pin below it).
 	//
 	// 6 -> 5 (REG-F-021 increment 1), AND THE DROP IS NOT PROGRESS — READ IT CAREFULLY. `AssuranceAssessmentStarted`
 	// left this list because increment 1 BOUND it, to `BeginAssuranceAssessment`, which is where the ratified §30
