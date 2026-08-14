@@ -2841,5 +2841,30 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-command-census.test.ts'],
 		why: "A DECLARATION SILENTLY STOPS BEING MADE, AND NOTHING ELSE IN THE REPOSITORY NOTICES. Deleting an entry does not break any commit — `refuseOnBirthDrift` simply stops checking that axis — so the failure mode is a machine quietly returning to `unanalysable`, which every occupancy layer reads as \"nobody said\" and skips. ⚠ THE REPLACEMENT IS A DUPLICATE OF AN EXISTING ENTRY RATHER THAN A DELETION, deliberately: it keeps the array's LENGTH at four, so a pin counting entries would stay green and only a pin naming MACHINES can catch it. That is the REG-F-121 shape — a count improves by destroying the evidence — and it is why the REG-F-159 pin asserts machine and value rather than size.",
 		source: 'REG-F-159'
+	},
+	// ── REG-F-160: THE POPULATION ITSELF ────────────────────────────────────────────────────────────────────
+	//
+	// One mutant on the LIST (can it grow silently?) and one on the READER (does C-0c actually consult it?).
+	{
+		id: 'F160-a-real-coverage-gap-is-moved-into-the-exclusion-list',
+		file: 'packages/rph-domain/src/machine-exclusions.ts',
+		find: '/** True when `machine` is a declared key that no control should treat as a lifecycle. */',
+		replace:
+			"Object.assign(NOT_STATE_MACHINES as Record<string, string>, {\n" +
+			"\t'Harness.status': 'a plausible-sounding reason that cites nothing'\n" +
+			'});\n' +
+			'/** True when `machine` is a declared key that no control should treat as a lifecycle. */',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE ALLOWLIST ROT `machine-exclusions.ts` NAMES IN ITS OWN HEADER, PERFORMED. It warns that *\"moving a real gap in here would be the allowlist rot this repository keeps recording\"* — and until REG-F-160 NOTHING CHECKED THAT LIST'S MEMBERSHIP. The move is cheap and flattering in both directions at once: `Harness.status` is a genuine coverage gap (harness.ts has exactly one commit site, the `createObject` birth at :34), so excluding it SHORTENS the blind list AND RAISES the coverage percentage by shrinking the denominator. PRIMARY VICTIM: the new `PINNED — exactly which machines are EXCLUDED from the population` pin, which asserts the membership BY NAME WITH ARROW COUNTS. The blind-list pin and the coverage-figures pin also redden, and that is the design rather than a weakness — the point is that this cannot happen quietly, not that exactly one assertion notices.",
+		source: 'REG-F-160'
+	},
+	{
+		id: 'F160-the-coverage-figures-stop-asking-the-population',
+		file: 'verif/arrow-census-coverage.test.ts',
+		find: '\t\tconst declared = inScopeMachines();',
+		replace: '\t\tconst declared = Object.keys(MACHINES);',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "C-0c REVERTS TO ITS OWN IDEA OF THE TABLE — the exact state REG-F-160 found it in, and the state `machine-exclusions.ts` exists to prevent: *\"Two censuses over one table must not each keep their own idea of the table.\"* Three instruments applied `isExcludedMachine` (C-0 :944/:955, C-0b :83, binding-row-truth :249) and this one did not, so `arrowsRatified` carried 9 arrows belonging to `AssuranceAssessment.disposition` — a machine over a field the ratified object schema DOES NOT HAVE (`z.strictObject`; `commitState` validates the produced state), permanently uncoverable. ISOLATING BY CONSTRUCTION: this anchors the FIGURES site alone, so only the `machinesDeclared/arrowsRatified` pin reddens (25 -> 27, 295 -> 304) while the blind-list pin and the excluded-set pin stay green — which is what distinguishes 'the figures consult the population' from 'something somewhere consults it'.",
+		source: 'REG-F-160'
 	}
 ];

@@ -377,7 +377,7 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		// THAT COULD NOT FIRE (REG-F-159). `seededAxes` commits four axes; this array declared one. Every occupancy
 		// layer then skipped the other three by an explicit guard — `deadCovered` (`if (!set) continue`),
 		// `provablyUnoccupiable` (`if (!born) continue`), `initialStateFictions`, `occupancyAnalysable` — so the
-		// 42-arrow declaration REG-F-157 measured on exactly these three machines (162/304 -> 204/304, the largest
+		// 42-arrow declaration REG-F-157 measured on exactly these three machines (162/295 -> 204/295, the largest
 		// coverage movement available anywhere in this programme) would have been made with the ONLY instrument
 		// capable of contradicting it structurally silent. **A control that cannot fail, at the point the number is
 		// largest.** The 42 is refused on other grounds; this declaration removes the blind spot regardless.

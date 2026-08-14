@@ -1,5 +1,6 @@
 // REG-F-087 — how much of the ratified arrow surface the census sees.
-// **~~156 of 304 ratified arrows COVERED (51%), from 178 declaration rows, as of 2026-08-13~~ → 162 of 304 (53.3%), from 180 declaration rows, re-derived 2026-08-14 (REG-F-145).**
+// **~~156 of 304 ratified arrows COVERED (51%), from 178 declaration rows, as of 2026-08-13~~ ~~→ 162 of 304 (53.3%), from 180 declaration rows, re-derived 2026-08-14 (REG-F-145)~~ → **162 of 295 (54.9%)**, from 180 declaration rows — REG-F-160 removed 9 arrows belonging to an EXCLUDED machine from the denominator. The numerator did NOT move: zero declared arrows name an excluded machine.**
+// ⚠ AND THE DENOMINATOR IS THE HALF NOBODY AUDITED. REG-F-121 (the correction struck above) fixed the NUMERATOR of this exact fraction — rows vs distinct-ratified — and left `304` unexamined for as long again. **Correcting a number is not auditing what it measures.**
 // ⚠ THREE COPIES OF THIS FIGURE ROTTED TOGETHER while the `toEqual` forty lines below stayed correct —
 // header, the "51% IS NOT 51% CORRECT" paragraph, and the TEST TITLE. The title has been emptied rather
 // than synced: it restated the assertion and carried no argument, so the second copy is gone instead of
@@ -52,7 +53,7 @@
 // WHAT THIS FILE DOES. It pins the coverage RATIO and the blind set, both derived at runtime. Fixing an idiom
 // makes coverage jump and reddens these pins, forcing REG-F-087 to be revisited in the same commit. Adding a
 // handler that uses an unread idiom makes coverage drop and reddens them too. Neither can happen quietly.
-import { STATE_MACHINES } from '@janumipwb/rph-domain';
+import { STATE_MACHINES, isExcludedMachine } from '@janumipwb/rph-domain';
 import { describe, expect, it } from 'vitest';
 import { declaredArrows, unratifiedDeclarations } from './arrow-command-census.js';
 import { auditClaims, bindingClaims, vocabDriveClaims } from './binding-row-truth.js';
@@ -62,6 +63,32 @@ type Machine = { transitions: readonly unknown[] };
 
 const MACHINES = STATE_MACHINES as unknown as Record<string, Machine>;
 const seenMachines = () => new Set(([...declaredArrows()] as Arrow[]).map((a) => a.machine));
+
+/**
+ * THE POPULATION, AND UNTIL REG-F-160 THIS FILE WAS THE ONLY INSTRUMENT THAT DID NOT ASK FOR IT.
+ *
+ * `isExcludedMachine` is applied by C-0 (`arrow-command-census.ts:944, :955`), C-0b
+ * (`guard-enforcement-ledger.ts:83`) and `binding-row-truth.ts:249`. This file took `Object.keys(MACHINES)` raw
+ * at three sites — so four instruments over one table, and the fourth kept its own idea of the table.
+ *
+ * ⚠ `machine-exclusions.ts` EXISTS TO PREVENT EXACTLY THIS AND SAYS SO IN ITS OWN HEADER: *"a private exclusion
+ * list means the two controls disagree about what the population even is: one reports nine arrows as uncovered
+ * while the other has already ruled the whole machine out of scope. Two censuses over one table must not each
+ * keep their own idea of the table."* The fix reached three instruments and not the fourth — and **the "nine
+ * arrows" in that sentence are literally the nine this file was still counting**.
+ *
+ * ⚠ AND THE CONSEQUENCE LANDED ON THE DENOMINATOR OF THE FRACTION THIS FILE EXISTS TO REPORT. `arrowsRatified`
+ * was 304, of which 9 belong to `AssuranceAssessment.disposition` — a machine over a field the ratified object
+ * schema DOES NOT HAVE (`z.strictObject`; `commitState` validates the produced state against it), so those 9
+ * can never be covered by anything, ever. They sat permanently in the denominator: 162/304 = 53.3% where the
+ * honest figure is 162/295 = 54.9%.
+ *
+ * ⚠⚠ AND REG-F-121 AUDITED THE OTHER HALF OF THIS EXACT FRACTION AND STOPPED. Its correction — rows vs distinct
+ * ratified, quoted at the top of this file — fixed the NUMERATOR and left the denominator unexamined for as
+ * long again. **Correcting a number is not auditing what it measures**, and both halves of one fraction have
+ * now been wrong, separately, for different reasons.
+ */
+const inScopeMachines = () => Object.keys(MACHINES).filter((m) => !isExcludedMachine(m));
 
 describe('REG-F-087 — how much of the ratified arrow surface the census actually sees', () => {
 	// ⚠⚠ `arrowsSeen` COUNTED DECLARATION ROWS AND WAS DIVIDED BY RATIFIED ARROWS — two different populations,
@@ -81,7 +108,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 	// PRODUCT (how much of the ratified surface can any command perform?). A change to one and not the other is
 	// itself information.
 	it('PINNED — the coverage figures are the toEqual below; a title restating them is a second copy', () => {
-		const declared = Object.keys(MACHINES);
+		const declared = inScopeMachines();
 		const ratifiedArrows = declared.reduce((n, m) => n + MACHINES[m]!.transitions.length, 0);
 		const ratifiedKeys = new Set(
 			declared.flatMap((m) =>
@@ -107,9 +134,15 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			'if coverage MOVED, an idiom was fixed or a new unread one was introduced — either way REG-F-087 ' +
 				'and every conclusion drawn from this census need re-reading, so update them with this pin'
 		).toEqual({
-			machinesDeclared: 27,
+			// ⚠ 27 -> 25 and 304 -> 295 AT REG-F-160, AND THIS IS THE POPULATION BEING CORRECTED, NOT COVERAGE
+			// IMPROVING. Two keys `machine-exclusions.ts` had already ruled not-machines were still being
+			// counted here — `AggregateAssuranceDisposition` (0 arrows) and `AssuranceAssessment.disposition`
+			// (9 arrows on a field the ratified schema does not have). MEASURED: the numerator did NOT move,
+			// because ZERO declared arrows name an excluded machine, and the two lines below are the control
+			// on exactly that. A reader seeing the percentage rise must read it as a denominator repaired.
+			machinesDeclared: 25,
 			machinesSeen: 16,
-			arrowsRatified: 304,
+			arrowsRatified: 295,
 			// ⚠ 178 -> 174 and 175 -> 171 AT REG-F-124, AND THE DROP IS THE INSTRUMENT CEASING TO FABRICATE.
 			// `validator-registry.ts`'s `statusChange` factory is called four times declaring FIVE arrows between
 			// them; the census resolved its `target` and `from` parameters INDEPENDENTLY, flattened each into a
@@ -206,10 +239,31 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 		).toBe(overClaimed.length + machineAdmittedSelfEdges.length);
 	});
 
-	// Two causes live in this list and MUST NOT be conflated, which is why it is pinned by name and not by count:
-	//   (a) nothing performs them at all — harness.ts and obligation-constraint.ts contain zero transition calls
-	//       of ANY idiom, so Harness/Obligation/Constraint are a genuine coverage gap, not a census defect;
-	//   (b) commands exist and the census cannot read them — the three remaining PWU axes.
+	// ⚠⚠ THIS SAID ~~"TWO causes live in this list"~~ AND THERE ARE THREE — corrected at REG-F-160, where all
+	// eleven were classified for the first time and the third category turned out to be the two members the
+	// dichotomy could not express AT ALL. Every limb below is DERIVED, and the derivation is named, because a
+	// hand-list is the defect one level up (REG-F-124):
+	//
+	//   (a) NOTHING PERFORMS THEM — a genuine coverage gap, not a census defect. SIX machines, each established
+	//       by the WRITE FUNNEL rather than by grep: `Harness.status` (harness.ts has exactly ONE commit site,
+	//       the `createObject` birth at :34), `Obligation.status` / `Constraint.status` /
+	//       `AssuranceObservation.disposition` (REG-F-156's birth-only derivation), and — NEW at REG-F-160 —
+	//       `PwuType.status` (2 arrows) and `Undertaking.status` (3 arrows).
+	//   (b) COMMANDS EXIST AND THE CENSUS CANNOT READ THEM — the three PWU sub-axes, 42 arrows, driven through
+	//       `changePwuState`'s `subAxisChecks` tuple (REG-F-155/157). Their declaration is REFUSED, and not for
+	//       an occupancy reason: REG-F-159 measured 0 of 42 dead and refused them because the 42 is three
+	//       populations on a command W-7 retires.
+	//   (c) EXCLUDED BY NAME — NEITHER A COVERAGE GAP NOR A CENSUS DEFECT, and the category this comment did not
+	//       have. `AggregateAssuranceDisposition` and `AssuranceAssessment.disposition` are in
+	//       `NOT_STATE_MACHINES` with a citation each. They are no longer in this list because `inScopeMachines`
+	//       now asks — but they do NOT vanish: the pin below names them, for the reason C-0 pins `unanalysed`.
+	//
+	// ⚠ THE POSITIVE CONTROL FOR (a) IS INTERNAL AND EXACT, which is what makes it a finding rather than a
+	// failed search. `PwuType.status` and `Undertaking.status` are BORN in `pwa-authoring.ts`, and every
+	// `machine:` in that whole file is either one of three `births:` declarations or `PWA_MACHINE` at five
+	// `advanceStatus` sites. `PWA.publicationStatus` is meanwhile one of only FIVE machines in the repository
+	// with COMPLETE arrow coverage. **The census reads that file perfectly; nothing in it advances those two.**
+	// Same file, same idiom, different answer — so (a) here is measured, not merely unfound.
 	//
 	// ⚠ THE (b) HALF SHRANK TWICE AND THE COMMENT LAGGED BOTH TIMES, which is the records defect this programme
 	// keeps finding in its own notes. It read "the four PWU axes and Intent.intentStatus" while the list below
@@ -219,13 +273,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 	// list that is pinned by name is a count nothing checks.**
 	it('PINNED — exactly which machines the census is blind to', () => {
 		const seen = seenMachines();
-		expect(
-			Object.keys(MACHINES)
-				.filter((m) => !seen.has(m))
-				.sort()
-		).toEqual([
-			'AggregateAssuranceDisposition',
-			'AssuranceAssessment.disposition',
+		expect(inScopeMachines().filter((m) => !seen.has(m)).sort()).toEqual([
 			'AssuranceObservation.disposition',
 			'Constraint.status',
 			'Harness.status',
@@ -241,12 +289,12 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 	// ── CONTROL: CENSUS-BLINDNESS AND C-0c-UNANALYSABILITY ARE DIFFERENT SETS ────────────────────────────────
 	// ⚠ ~~A COINCIDENCE THAT IS A TRAP. The census-blind set and C-0c's `unanalysed` set BOTH number 13, and
 	// they are NOT the same 13 — only 8 members overlap.~~ THE COINCIDENCE HAS SINCE EVAPORATED (re-derived
-	// 2026-08-14, REG-F-145): blind = 11, unanalysed = 17, overlap = 6. **The equivocation it warned about is
+	// 2026-08-14, REG-F-145): ~~blind = 11~~ **blind = 9 (REG-F-160 — two were EXCLUDED machines this file was still counting)**, unanalysed = 17, overlap = 6. **The equivocation it warned about is
 	// therefore no longer AVAILABLE — nobody can now say "the 13 blind machines" and mean either set.**
 	// ⚠ AND THE CONTROL BELOW NEEDED NO CHANGE, which is the part worth keeping. An earlier pass had already
 	// rewritten it from `size === 13 && size === 13 && overlap === 8` to a RELATIONAL form, after a mutant
 	// caught it reddening with the herd. So when the numbers moved, the assertions did not care: both subset
-	// checks still hold (blind∖unanalysed = 5, unanalysed∖blind = 11). **A control stated relationally survives
+	// checks still hold (~~blind∖unanalysed = 5~~ **3 at REG-F-160**, unanalysed∖blind = 11). **A control stated relationally survives
 	// the world moving under it; the prose above it did not.** Kept so a future change collapsing one set into
 	// the other still has to say so out loud.
 	// ⚠ THIS ASSERTS A RELATIONSHIP, NOT THE SIZES — and it was rewritten to do so after a mutant caught it.
@@ -255,8 +303,50 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 	// the herd, and it is the second control demoted for it today. Stated relationally, it now has its own failure
 	// mode — it fires only if the two sets become equal or one swallows the other, and survives coverage merely
 	// moving, which is precisely the event the pins above are for.
+	// ── REG-F-160: THE EXCLUDED SET IS AN OUTPUT, NOT A SILENT FILTER ───────────────────────────────────────
+	//
+	// Applying `isExcludedMachine` above removes two machines from a list that was pinned BY NAME. A filter with
+	// no pin behind it is the census narrowing its own population — this repository's oldest recorded defect —
+	// so the removed members are asserted here instead of disappearing. C-0 sets the precedent verbatim for
+	// `unanalysed`: *"Silently skipping them would be the census narrowing its own population, so `unanalysed`
+	// is an output the test pins."*
+	//
+	// ⚠ AND THIS PIN'S REAL JOB IS THE OPPOSITE DIRECTION — EXCLUSION-LIST GROWTH. `machine-exclusions.ts` warns
+	// that *"moving a real gap in here would be the allowlist rot this repository keeps recording"*, and the
+	// move is CHEAP and FLATTERING: adding a machine with unbuilt arrows raises the coverage percentage and
+	// shortens the blind list at the same time. Nothing anywhere checked that list's membership until now.
+	//
+	// PINNED WITH ARROW COUNTS, not just names, because the count is what the denominator loses: the honest
+	// figure moved 162/304 (53.3%) to 162/295 (54.9%) and every one of those 9 belongs to ONE machine.
+	it('PINNED — exactly which machines are EXCLUDED from the population, and what the denominator loses', () => {
+		const excluded = Object.keys(MACHINES)
+			.filter((m) => isExcludedMachine(m))
+			.sort((a, b) => a.localeCompare(b))
+			.map((m) => `${m} (${MACHINES[m]!.transitions.length} arrows)`);
+		expect(
+			excluded,
+			'the exclusion list MOVED — if a machine was added, say why it is not-a-machine rather than an ' +
+				'unbuilt one, because this is the change that buys coverage by shrinking the denominator'
+		).toEqual([
+			'AggregateAssuranceDisposition (0 arrows)',
+			'AssuranceAssessment.disposition (9 arrows)'
+		]);
+	});
+
+	// CONTROL — the pin above is equally satisfied by a filter that excludes NOTHING and a list that happens to
+	// name two machines. This holds the discriminating half: the excluded machines must be ABSENT from the
+	// blind list, which is the behaviour the whole increment exists to produce and which the pin above cannot see.
+	it('CONTROL — an excluded machine is absent from the blind list, not merely named in the pin above', () => {
+		const seen = seenMachines();
+		const blind = new Set(inScopeMachines().filter((m) => !seen.has(m)));
+		for (const m of Object.keys(MACHINES).filter((x) => isExcludedMachine(x))) {
+			expect(seen.has(m), `${m} is excluded, so no command may declare an arrow on it`).toBe(false);
+			expect(blind.has(m), `${m} is excluded and must not be reported as census-blind`).toBe(false);
+		}
+	});
+
 	it('CONTROL — census-blindness and C-0c-unanalysability are different failures, whatever their counts', () => {
-		const censusBlind = new Set(Object.keys(MACHINES).filter((m) => !seenMachines().has(m)));
+		const censusBlind = new Set(inScopeMachines().filter((m) => !seenMachines().has(m)));
 		const unanalysable = new Set(auditClaims([...bindingClaims(), ...vocabDriveClaims()]).unanalysed);
 
 		expect(censusBlind.size, 'a control comparing two empty sets proves nothing').toBeGreaterThan(0);
