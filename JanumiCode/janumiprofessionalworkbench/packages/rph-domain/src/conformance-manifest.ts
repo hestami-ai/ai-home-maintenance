@@ -76,6 +76,13 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED, and a per-id COVERED
 	// row for any of the other six would collide with the register's "no disclosed rule is certified COVERED" gate.
 	'RPH-EVD-007': 'packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts',
+	// ADDED 2026-08-13 when RPH-EVD-002 moved NOT_A_COMMAND_REFUSAL -> ENFORCED (REG-F-138). The comment above
+	// said "Only EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED" — true when
+	// written, and now two. It cites the enforcement probe rather than `claim-assessment.test.ts`, and the reason
+	// is measured rather than stylistic: that file is 300 lines about this rule and asserts on NO refusal code or
+	// message anywhere, so with the guard's code swapped the whole workspace stayed green. The probe is the only
+	// COMMAND-layer artifact that pins the refusal's identity rather than merely its non-acceptance.
+	'RPH-EVD-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ADDED 2026-08-02 when REG-F-008's remediation moved EVD-003 from disclosed to ENFORCED. It cites the
 	// enforcement probe rather than the admissibility-gate test because that test's fixture is the SCOPE limb,
 	// which is EVD-007; this rule's refusal is the CONTENT limb, and the two must not share their evidence.

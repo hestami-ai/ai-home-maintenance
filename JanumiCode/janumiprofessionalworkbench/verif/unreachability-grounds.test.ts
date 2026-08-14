@@ -81,11 +81,11 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 	// bare count would go green if a row were deleted, and would not tell a reader which claim to re-read.
 	it('pins the machine-coverage every arm-3 row rests on', () => {
 		expect(armThreeMachineClaims()).toEqual({
-			// ⚠ ALREADY FALSE WHEN THIS GATE WAS WRITTEN, and pinned at its TRUE value rather than a flattering one.
-			// The row says nothing drives `Claim.status`; seven of its fifteen arrows are covered, by
-			// `RecordClaimAssessment` (registry.ts:181) whose own guard comment cites RPH-EVD-002 by id. Corrected
-			// in the same increment; the pin stays so the next movement is loud.
-			'RPH-EVD-002': ['Claim.status=7/15'],
+			// ⚠ `RPH-EVD-002` WAS PINNED HERE AND HAS LEFT THE ARM ENTIRELY (2026-08-13). This gate was written
+			// with it already FALSE — pinned at its true `Claim.status=7/15` rather than a flattering zero — and
+			// its departure to ENFORCED is what the pin was for: the row it flagged is gone because the flag was
+			// acted on, which is the only disappearance from this list that is good news. The reduction from 4
+			// watched rows to 3 is asserted below, so the shrinking reach cannot pass unnoticed.
 			// ⚠ SUSPECT AND UNRESOLVED — surfaced BY this gate, not by the audit that prompted it. Nine of
 			// seventeen `Assumption.status` arrows are covered. Whether this row RESTS on that machine's emptiness
 			// or merely mentions it is an open question, recorded rather than guessed.
@@ -123,6 +123,10 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 		expect(
 			{ armThreeRows: armThree, rowsThisGateCanSee: seen },
 			'this instrument watches a small minority of arm 3; the rest rest on absences it cannot read'
-		).toEqual({ armThreeRows: 57, rowsThisGateCanSee: 4 });
+			// ⚠ 57/4 -> 56/3 on 2026-08-13, and the DIRECTION is why this assertion exists. Arm 3 shrank because
+			// RPH-EVD-002 moved to ENFORCED — a row leaving because its ground was acted on. The same numbers
+			// would appear if the row had simply been DELETED, which is why the by-name pin above is the primary
+			// record and this is the bound on it.
+		).toEqual({ armThreeRows: 56, rowsThisGateCanSee: 3 });
 	});
 });

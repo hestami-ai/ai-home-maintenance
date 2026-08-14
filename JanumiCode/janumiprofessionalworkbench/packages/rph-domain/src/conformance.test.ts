@@ -179,10 +179,23 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         REFUSABLE. The distinction matters here more than usual, because a coverage
 		//                         number that rises when a capability is ADDED reads identically to one that rises
 		//                         when a test is added, and only this ledger separates them.
+		//   2026-08-13  41 -> 42  RPH-EVD-002 alone, and it is the OPPOSITE case to the line above: nothing became
+		//                        refusable here. The refusal had existed and been running since 2026-08-06, while
+		//                        the register recorded the rule as NOT_A_COMMAND_REFUSAL on the ground that "no
+		//                        handler anywhere drives the Claim.status machine". The +1 is a correction of the
+		//                        REGISTER, not an addition to the ENGINE — the capability was already there and
+		//                        the paperwork denied it for seven days (REG-F-133, REG-F-138).
+		//                        ⚠ AND THE CHECK IT NOW CITES DID NOT EXIST EITHER, which is why this is not a
+		//                        clerical +1. Measured before the move: with the guard's refusal code swapped to
+		//                        RPH_VALIDATION_SEMANTIC_FAILED the ENTIRE workspace stayed green — 269 files,
+		//                        2732 passed. `claim-assessment.test.ts` is 300 lines about this rule and asserts
+		//                        on no refusal code or message anywhere, so what was "covered" was the rule's
+		//                        NON-ACCEPTANCE, never its identity. The cite is the enforcement probe, which
+		//                        checks code and marker.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(41);
+		).toBe(42);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

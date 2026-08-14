@@ -1155,7 +1155,90 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// gate below rejects both a missing probe for an ENFORCED row and a probe for a row that is not.
 		// The three disclosed rows are observed being ADMITTED instead, in `disclosure-observed.test.ts`.
 		'RPH-EVD-001': null,
-		'RPH-EVD-002': null,
+		// ⚠ WAS `null` UNTIL 2026-08-13, ON A GROUND THAT EXPIRED SEVEN DAYS EARLIER. The row read
+		// NOT_A_COMMAND_REFUSAL because "no handler anywhere drives the Claim.status machine" — true when written,
+		// false from the moment `RecordClaimAssessment` was registered, and unnoticed because arm 3 has no probe
+		// and no selector (REG-F-133). The refusal it denies existing is headed with this rule's own id.
+		'RPH-EVD-002': {
+			arrangement:
+				'a claim in UNDER_ASSESSMENT with NO admissible evidence moved to SUPPORTED; the control is a second claim whose supporting evidence was proposed AND admitted',
+			run: () => {
+				// TWO CLAIM AGGREGATES, not one claim assessed twice: SUPPORTED is reached from UNDER_ASSESSMENT,
+				// so re-running the same claim would meet a different source state and measure a different guard.
+				const claim = (id: string) =>
+					ok(
+						dispatch(
+							'AssertClaim',
+							{
+								statement: 'the tenant isolation boundary holds',
+								claimType: 'COMPLETENESS',
+								subjectObjectIds: []
+							},
+							id,
+							'CLAIM'
+						),
+						`assert ${id}`
+					);
+				const support = (claimId: string, evId: string) => {
+					ok(
+						dispatch(
+							'ProposeEvidence',
+							{
+								evidenceId: evId,
+								evidenceType: 'TEST_RESULT',
+								contentReference: { uri: 'ref://suite/tenant-isolation' },
+								producedBy: { actorId: 'ci-1', actorType: 'SERVICE', displayName: 'CI' },
+								supportsClaimIds: [claimId],
+								contradictsClaimIds: [],
+								scope: 'tenant isolation',
+								limitations: [],
+								capturedAt: TS
+							},
+							evId,
+							'EVIDENCE'
+						),
+						`propose ${evId}`
+					);
+					// ⚠ ADMIT, not merely propose. PROPOSED evidence is PRESENT but not ADMISSIBLE, and the whole
+					// rule is that distinction — the guard folds committed EVIDENCE state rather than reading the
+					// payload, which is what makes this the one non-forgeable refusal in the command.
+					ok(
+						dispatch(
+							'AdmitEvidence',
+							{
+								admissibilityAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5F02',
+								admittedScope: 'tenant isolation',
+								admittedClaimIds: [claimId]
+							},
+							evId,
+							'EVIDENCE'
+						),
+						`admit ${evId}`
+					);
+				};
+				const assess = (claimId: string, targetStatus: string, extra: Record<string, unknown> = {}) =>
+					dispatch('RecordClaimAssessment', { targetStatus, ...extra }, claimId, 'CLAIM');
+
+				const CLAIM_OK = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE1';
+				const CLAIM_BAD = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE2';
+				claim(CLAIM_OK);
+				claim(CLAIM_BAD);
+				support(CLAIM_OK, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE3');
+
+				// ⚠ BOTH CLAIMS MUST REACH UNDER_ASSESSMENT FIRST. The guard runs BEFORE `checkTransition`, so a
+				// claim left in OPEN produces this same marker for an arrangement the rule is not about — the
+				// refusal would be real and the probe would still be measuring the wrong thing.
+				ok(assess(CLAIM_OK, 'UNDER_ASSESSMENT'), 'arrange control to UNDER_ASSESSMENT');
+				ok(assess(CLAIM_BAD, 'UNDER_ASSESSMENT'), 'arrange observed to UNDER_ASSESSMENT');
+
+				return {
+					// The control has ADMISSIBLE evidence and must be ACCEPTED — without it, a guard that refused
+					// every move to SUPPORTED would pass this row while enforcing nothing about admissibility.
+					control: assess(CLAIM_OK, 'SUPPORTED', { assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE4' }),
+					observed: assess(CLAIM_BAD, 'SUPPORTED', { assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE5' })
+				};
+			}
+		},
 		'RPH-EVD-003': {
 			arrangement:
 				'Evidence whose contentReference is {} — a source reference naming nothing — offered for admission (REG-F-008 remediation)',

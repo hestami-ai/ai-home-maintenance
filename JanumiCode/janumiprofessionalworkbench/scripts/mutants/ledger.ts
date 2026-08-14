@@ -2782,5 +2782,36 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "A DECLARED MUTATION IS REPLACED BY ONE THAT DOES NOT EXIST. `declaredMutations` is supposed to say what to break to prove the guard; the ONLY assertion on it in the whole repository is `.length > 0` at enforcement-register.test.ts:256, so the strings need not name mutations that exist, apply, or redden anything. This mutation replaces a real entry with an invented one.",
 		expectSurvive: "SURVIVAL IS THE FINDING. ⚠ AND THE DEEPER GAP IS THAT THE TWO SYSTEMS ARE UNLINKED: this ledger — the file you are reading — is where mutations actually live, and `enforcement-register.ts` mentions it nowhere. Searched scripts/mutants/ledger.ts for the RPH-EVD-002 guard text and rule id: 0 hits; positive control CLAIM_REASSESSMENT_DISCRIMINATORS in the same file: 1 hit, so the search discriminates. Making `declaredMutations` resolve to ledger ids is a separate work package, filed rather than smuggled into a disposition move. ⚠ A KILL HERE MEANS THE JOIN WAS BUILT — retire this entry deliberately.",
 		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-evd002-refusal-code-is-unpinned',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// `RPH_INVARIANT_VIOLATION` occurs three times in this file, so the anchor MUST carry the message line
+		// beneath it to satisfy the exactly-once rule.
+		find:
+			"\t\t\t\t'RPH_INVARIANT_VIOLATION',\n" +
+			'\t\t\t\t`Claim ${command.targetAggregateId} cannot be SUPPORTED: no ADMISSIBLE evidence supports it `',
+		replace:
+			"\t\t\t\t'RPH_VALIDATION_SEMANTIC_FAILED',\n" +
+			'\t\t\t\t`Claim ${command.targetAggregateId} cannot be SUPPORTED: no ADMISSIBLE evidence supports it `',
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
+		why: "THE REFUSAL CHANGES IDENTITY WHILE STAYING A REFUSAL. ⚠ THIS MUTATION WAS MEASURED SURVIVING BEFORE THE PROBE EXISTED, and that measurement is the entire justification for REG-F-138: with the code swapped, the whole workspace stayed GREEN — 269 files, 2732 passed, nothing anywhere reddened. It survived because (a) `claim-assessment.test.ts` is 300 lines about this rule and asserts on NO `error.code` or message anywhere (positive control: `assumption-falsification.test.ts:223` DOES assert `r.error?.code`, same grep shape, different answer); (b) the message is untouched, so the guard-ledger anchor still resolves; and (c) `RPH_VALIDATION_SEMANTIC_FAILED` is not a key of `STATUS_FOR_CODE`, so the status stays REJECTED and every `.not.toBe(‘ACCEPTED’)` stays green. What was \"covered\" was the rule’s NON-ACCEPTANCE, never its IDENTITY. Predicted red now: the WP-16 (c) enforcement probe, whose `classifyRefusal` compares `code === refusalCode`.",
+		source: 'REG-F-138'
+	},
+	{
+		id: 'F134-admissible-collapses-into-present',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// ⚠ TWO LINES, because the identical ADMISSIBLE test appears TWICE in this file — assurance.ts:705 in
+		// `claimsWithAdmissibleEvidence` (the GUARD's set) and :935 in `admissibleEvidenceFor` (the MUTATE
+		// path). Only the following line distinguishes them, and only the first is the one this rule refuses on.
+		find:
+			"\t\tif (!st || String(st.status) !== 'ADMISSIBLE') continue;\n" +
+			'\t\tif (!Array.isArray(st.supportsClaimIds)) continue;',
+		replace:
+			"\t\tif (!st) continue;\n" +
+			'\t\tif (!Array.isArray(st.supportsClaimIds)) continue;',
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
+		why: "ADMISSIBLE COLLAPSES INTO MERELY PRESENT — the one distinction this rule exists to draw. RPH-EVD-002 is the single NON-FORGEABLE refusal in this command precisely because admissibility is a fact the ENGINE holds: evidence reaches ADMISSIBLE only through `AdmitEvidence`, and the guard folds COMMITTED events rather than reading the payload. Weakening the status test to a presence check hands that fact back to the caller, who can then reach SUPPORTED on evidence it merely PROPOSED. ⚠ THE ENFORCEMENT PROBE’S CONTROL CANNOT SEE THIS — the control ADMITS its evidence, so it stays ACCEPTED either way; only the OBSERVED arm, whose evidence was never admitted, flips from REJECTED to ACCEPTED. That asymmetry is why the probe carries two claim aggregates instead of asserting a refusal alone.",
+		source: 'REG-F-138'
 	}
 ];

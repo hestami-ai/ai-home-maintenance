@@ -847,41 +847,64 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'census guard could not detect the very wiring it would exist to detect.'
 		}
 	},
+	// ── RPH-EVD-002 — RE-DISPOSITIONED 2026-08-13, NOT_A_COMMAND_REFUSAL -> ENFORCED ────────────────────────
+	//
+	// THE HISTORY IS HOISTED HERE RATHER THAN DELETED, and that is the point of doing it in this order.
+	// `EnforcedRule` declares NO `why` PROPERTY — a `why` on this arm is TS2353 — so flipping the kind DELETES
+	// the field, and with it every strike, correction and dated admission the row had accumulated. REG-F-137
+	// exists because this row spent a day contradicting itself; had the move been made first, the routine edit
+	// would have erased the evidence of that as a side effect and the register would carry no trace that its own
+	// author committed the defect he was documenting. Correction first, move second.
+	//
+	// ── WHAT THE ROW SAID, AND WHEN EACH LIMB DIED ─────────────────────────────────────────────────────────
+	// ORIGINAL GROUND: *"'Changing a claim ... to SUPPORTED is rejected' presupposes a command that CHANGES A
+	// CLAIM'S STATUS, and no such command exists in the ratified vocabulary. `AssertClaim` is the only
+	// CLAIM-targeting command ... No handler anywhere drives the `Claim.status` machine."*
+	//   ⚠ EXPIRED 2026-08-06, UNNOTICED FOR SEVEN DAYS (REG-F-133). `RecordClaimAssessment` was registered and
+	//   drives `Claim.status`. Seven register commits and one dedicated stale-prose sweep passed over it,
+	//   because arm 3 carries no guard field, no probe and no selector — nothing could redden.
+	// SECOND LIMB: *"there is no envelope for this refusal to attach to ... the rule cannot be violated by any
+	// dispatch."*
+	//   ⚠ CORRECTED 2026-08-13 (REG-F-137). REG-F-133 struck the OPENING limb and spliced its correction into
+	//   the middle, leaving this CLOSING argument standing — so the row asserted both that the rule is enforced
+	//   and that it cannot be violated. That is the exact defect REG-F-133 headlined in RPH-ASM-004, committed
+	//   by its own author in the same commit, on a second row, while writing the entry about it.
+	// THIRD LIMB, IN ANOTHER FIELD: `canonCarriage.note` read *"even though this engine has no command that
+	// could violate it"* — false since 2026-08-06 and untouched by the strike, because a strike that visits
+	// sentences does not visit FIELDS. Rewritten below.
+	//
+	// ── WHY ENFORCED IS THE ARM, DERIVED RATHER THAN ASSUMED ───────────────────────────────────────────────
+	// The refusal is NON-FORGEABLE, which is what separates this from a validation: `claimsWithAdmissibleEvidence`
+	// (assurance.ts) folds COMMITTED evidence state and requires `status === 'ADMISSIBLE'`, never the payload.
+	// Evidence reaches ADMISSIBLE only through `AdmitEvidence`. And it REFUSES rather than validates — `kit.ts`
+	// short-circuits on the guard's rejection, so no event is emitted and no revision is bumped.
+	// SCOPE, MEASURED: the guard is scoped to `target === 'SUPPORTED'`, and SUPPORTED has EXACTLY ONE in-arrow
+	// on the machine (UNDER_ASSESSMENT -> SUPPORTED). So the guard is total over the ratified rule — which reads
+	// "Changing a claim with no admissible evidence to SUPPORTED is rejected" (m12-conformance.json, one limb,
+	// one destination). The rule needed no narrowing and no split. ⚠ The '7 of 15 arrows' figure recorded
+	// elsewhere answers a DIFFERENT question — the arrows `RecordClaimAssessment` DECLARES, which is what the
+	// census counts — and conflating the two would have suggested a 15-arrow rule guarded on one arrow.
 	'RPH-EVD-002': {
-		kind: 'NOT_A_COMMAND_REFUSAL',
+		kind: 'ENFORCED',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Claims are supported by admissible evidence through explicit relationships',
-			note: 'JPWB-CON-000 §4. Canon carries the RULE (support requires admissible evidence) ~~even though this engine has no command that could violate it~~ ⚠ THAT CLAUSE WAS FALSE FROM 2026-08-06 AND SURVIVED THE REG-F-133 STRIKE ON THIS ROW’S `why` FIVE LINES BELOW (corrected 2026-08-13, REG-F-137): `RecordClaimAssessment` drives `Claim.status` and its guard refuses SUPPORTED without ADMISSIBLE evidence. The carriage/enforcement independence RPH-EXE-007 demonstrates in the other direction still holds — it is the example that was wrong, not the principle.'
+			note: 'JPWB-CON-000 §4. Canon carries the RULE (support requires admissible evidence) and this engine now enforces it. ⚠ THIS FIELD PREVIOUSLY READ "even though this engine has no command that could violate it" — false from 2026-08-06 and left standing by the REG-F-133 strike on the adjacent `why`, because that strike visited SENTENCES and not FIELDS (REG-F-137). The carriage/enforcement independence RPH-EXE-007 demonstrates in the other direction still holds; it was the example that was wrong, not the principle.'
 		},
-		why:
-			'"Changing a claim ... to SUPPORTED is rejected" presupposes a command that CHANGES A CLAIM\'S STATUS, and ' +
-			'~~no such command exists in the ratified vocabulary. `AssertClaim` is the only CLAIM-targeting command; its ' +
-			'`z.strictObject` payload has no `status` field at all, and the handler hard-codes `OPEN` in both the ' +
-			'persisted state and the emitted event. No handler anywhere drives the `Claim.status` machine — the ' +
-			'machine and its transition labels exist in the domain data, but nothing dispatches into them.~~ ⚠ EXPIRED ' +
-			'2026-08-06 AND NOT NOTICED FOR SEVEN DAYS (REG-F-133). `RecordClaimAssessment` is registered ' +
-			'(registry.ts) and DRIVES `Claim.status`; seven of the machine\'s fifteen arrows are now covered. The ' +
-			'rule is not merely dispatchable, it is ENFORCED — the handler\'s guard is headed with this very rule ' +
-			'id and refuses SUPPORTED without ADMISSIBLE evidence, with a COMMAND-layer test asserting it. THE ' +
-			'DISPOSITION IS THEREFORE WRONG and this row is owed a move to ENFORCED with the backing REG-F-132 ' +
-			'enumerates (marker, declared mutations, manifest row, probe) — deliberately NOT done in the same ' +
-			'commit that found it, because a disposition move without its evidence is what REG-F-130 records. ' +
-			'HOW IT SURVIVED: seven register commits and one dedicated stale-prose sweep passed over it, because ' +
-			'arm 3 has no guard field, no probe and no selector — nothing could redden. ' +
-			'~~So there is no envelope for this refusal to attach to. This is NOT a disguised disclosure: the ' +
-			'rule cannot be violated by any dispatch, because the illegal transition is unreachable rather than ' +
-			'unguarded, and recording it as UNENFORCED_DISCLOSED would claim a gap that no arrangement can ' +
-			'demonstrate.~~ ⚠ CORRECTED 2026-08-13 (REG-F-137). THE SENTENCES ABOVE ARE THE ORIGINAL ' +
-			'ARGUMENT AND THEY CONTRADICT THE CORRECTION FOUR LINES ABOVE THEM, which says this rule IS ' +
-			'dispatchable and IS enforced. REG-F-133 struck the OPENING limb of this `why`, spliced its ' +
-			'correction into the middle, and left the CLOSING argument standing — so for one day this row ' +
-			'asserted both that the rule is enforced and that it cannot be violated by any dispatch. ⚠ THAT ' +
-			'IS THE EXACT DEFECT REG-F-133 HEADLINED IN RPH-ASM-004 (*\'a correcting pass fixed the ADJACENT ' +
-			"sentence and left the LOAD-BEARING one standing'*), committed by its own author in the same " +
-			'commit, on a second row, while writing the entry about it. A strike is not a correction until ' +
-			'EVERY limb resting on the struck ground is re-read — including the ones in OTHER FIELDS of the ' +
-			'same object, which is how the `canonCarriage.note` limb above survived too.'
+		enforcedAt:
+			'packages/rph-application/src/handlers/assurance.ts — recordClaimAssessment, whose advanceStatus guard returns a rejection when the claim is absent from claimsWithAdmissibleEvidence(hctx). That set folds COMMITTED evidence events and tests status === ADMISSIBLE, so it cannot be satisfied from the command payload. Scoped to target === SUPPORTED, which is the machine\'s only in-arrow to that state.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'cannot be SUPPORTED: no ADMISSIBLE evidence supports it',
+		declaredMutations: [
+			// ⚠ THE FIRST ENTRY WAS MEASURED BEFORE THIS ROW MOVED, and it is why the move is worth anything: with
+			// the refusal code swapped to RPH_VALIDATION_SEMANTIC_FAILED the ENTIRE workspace stayed green (269
+			// files, 2732 passed). claim-assessment.test.ts — 300 lines, the file that supposedly proves this rule
+			// — asserts on no refusal code or message anywhere, and the status stays REJECTED because that code is
+			// absent from STATUS_FOR_CODE. The probe added with this row is what now kills it.
+			"swap the guard's refusal code to 'RPH_VALIDATION_SEMANTIC_FAILED' — SURVIVED the whole suite before this row was probed (F134-the-evd002-refusal-code-is-unpinned)",
+			'delete the `if (claimsWithAdmissibleEvidence(hctx).has(...)) return null` arm so every move to SUPPORTED is refused — caught by the probe CONTROL, not by the observation',
+			"weaken the ADMISSIBLE test in claimsWithAdmissibleEvidence to a presence check, so PROPOSED evidence counts — the one mutation that separates ADMISSIBLE from merely PRESENT"
+		]
 	},
 	// RE-DISPOSITIONED 2026-08-02, UNENFORCED_DISCLOSED -> ENFORCED, BY THE DISCLOSURE'S OWN GUARD.
 	//
