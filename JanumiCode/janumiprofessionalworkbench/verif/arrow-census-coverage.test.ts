@@ -1,5 +1,10 @@
 // REG-F-087 — how much of the ratified arrow surface the census sees.
-// **156 of 304 ratified arrows COVERED (51%), from 178 declaration rows, as of 2026-08-13.**
+// **~~156 of 304 ratified arrows COVERED (51%), from 178 declaration rows, as of 2026-08-13~~ → 162 of 304 (53.3%), from 180 declaration rows, re-derived 2026-08-14 (REG-F-145).**
+// ⚠ THREE COPIES OF THIS FIGURE ROTTED TOGETHER while the `toEqual` forty lines below stayed correct —
+// header, the "51% IS NOT 51% CORRECT" paragraph, and the TEST TITLE. The title has been emptied rather
+// than synced: it restated the assertion and carried no argument, so the second copy is gone instead of
+// corrected. The two paragraphs keep their numbers because the numbers ARE their argument — which is the
+// distinction REG-F-141 drew between GATING a prose count and SOFTENING one.
 //
 // ⚠⚠ THE PERCENTAGE WAS WRONG FOR THIS CENSUS'S ENTIRE LIFE, AND I REWROTE THIS HEADER ONE COMMIT BEFORE
 // NOTICING (REG-F-121). Every published figure — 38%, 54%, 56%, 59% — divided DECLARATION ROWS by RATIFIED
@@ -22,7 +27,7 @@
 //   REG-F-119  the generic setter's SPINE — READY -> PLANNED -> ... -> RECOMPOSED (+8), taking
 //              `PWU.workLifecycleState` to 57/57, the first PWU axis that can be occupancy-analysed
 //
-// ⚠ AND 51% IS NOT "51% CORRECT". The remaining 148 are missing for two reasons that must never be conflated:
+// ⚠ AND 53.3% IS NOT "53.3% CORRECT". The remaining 142 are missing for two reasons never to be conflated:
 // commands whose idiom the census cannot read, and arrows NO command performs at all. Only the second is a
 // coverage gap in the product; the first is a gap in this instrument.
 //
@@ -75,7 +80,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 	// `declarationRows` is about the READER (did an idiom stop being read?), `ratifiedArrowsCovered` is about the
 	// PRODUCT (how much of the ratified surface can any command perform?). A change to one and not the other is
 	// itself information.
-	it('PINNED — 156 of 304 ratified arrows COVERED, from 178 declaration rows, across 16 of 27 machines', () => {
+	it('PINNED — the coverage figures are the toEqual below; a title restating them is a second copy', () => {
 		const declared = Object.keys(MACHINES);
 		const ratifiedArrows = declared.reduce((n, m) => n + MACHINES[m]!.transitions.length, 0);
 		const ratifiedKeys = new Set(
@@ -233,11 +238,17 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 		]);
 	});
 
-	// ── CONTROL: THE TWO THIRTEENS ARE DIFFERENT SETS ────────────────────────────────────────────────────────
-	// ⚠ A COINCIDENCE THAT IS A TRAP. The census-blind set and C-0c's `unanalysed` set BOTH number 13, and they
-	// are NOT the same 13 — only 8 members overlap. "The 13 blind machines" is therefore an ambiguous phrase that
-	// reads as one fact and is two. Asserted so the equivocation cannot be made silently, and so that a future
-	// change collapsing one set into the other has to say so out loud.
+	// ── CONTROL: CENSUS-BLINDNESS AND C-0c-UNANALYSABILITY ARE DIFFERENT SETS ────────────────────────────────
+	// ⚠ ~~A COINCIDENCE THAT IS A TRAP. The census-blind set and C-0c's `unanalysed` set BOTH number 13, and
+	// they are NOT the same 13 — only 8 members overlap.~~ THE COINCIDENCE HAS SINCE EVAPORATED (re-derived
+	// 2026-08-14, REG-F-145): blind = 11, unanalysed = 17, overlap = 6. **The equivocation it warned about is
+	// therefore no longer AVAILABLE — nobody can now say "the 13 blind machines" and mean either set.**
+	// ⚠ AND THE CONTROL BELOW NEEDED NO CHANGE, which is the part worth keeping. An earlier pass had already
+	// rewritten it from `size === 13 && size === 13 && overlap === 8` to a RELATIONAL form, after a mutant
+	// caught it reddening with the herd. So when the numbers moved, the assertions did not care: both subset
+	// checks still hold (blind∖unanalysed = 5, unanalysed∖blind = 11). **A control stated relationally survives
+	// the world moving under it; the prose above it did not.** Kept so a future change collapsing one set into
+	// the other still has to say so out loud.
 	// ⚠ THIS ASSERTS A RELATIONSHIP, NOT THE SIZES — and it was rewritten to do so after a mutant caught it.
 	// Written first as `size === 13 && size === 13 && overlap === 8`, it reddened alongside BOTH pins above when a
 	// mutant made one blind machine visible: it restated their fact instead of adding one. That is reddening with
