@@ -50,8 +50,15 @@
 //   scenario families. ~~Both are legitimately DEFERRED in the conformance manifest with named work packages. They
 //   are the only two prefixes left in `DEFERRABLE_PREFIXES`~~ — CORRECTED 2026-08-04 (REG-F-019), struck rather
 //   than deleted. Only ONE of them was. `RPH-FIX` was DEFERRED while FOUR of its six rules had named, running,
-//   GREEN checks in `packages/rph-engine/src/replay.ts`; it is now `PARTIAL` and `DEFERRABLE_PREFIXES` holds
-//   `RPH-E2E` alone. Two families sat under one sentence and this paragraph repeated it — the association was
+//   GREEN checks in `packages/rph-engine/src/replay.ts`; ~~it is now `PARTIAL`~~ and `DEFERRABLE_PREFIXES`
+//   holds `RPH-E2E` alone.
+//   ⚠ `PARTIAL` WAS TRUE FOR PART OF ONE DAY. `61cc3690` (2026-08-04, REG-F-019) moved RPH-FIX
+//   DEFERRED -> PARTIAL and this sentence was written correct; `766e46bc`, LATER THE SAME DAY, moved it
+//   PARTIAL -> COVERED, and the sentence has been false for the ten days since. Its current status is
+//   `COVERED` (`conformance-manifest.ts`, the file that owns the fact). Caught 2026-08-14 (REG-F-143).
+//   ⚠ AND THIS DIRECTION IS NOT GATED. REG-F-142 gates manifest NOTES against the register; nothing gates
+//   register PROSE against the manifest, because this file is 310KB of English and the claim has no
+//   regular form. So this correction is a repair, not a closure — recorded as such rather than as fixed. Two families sat under one sentence and this paragraph repeated it — the association was
 //   mine, and it is the same failure the paragraph immediately below warns about, committed in the act of
 //   warning. After REG-F-013 that set is treated as the most dangerous data in the manifest: an entry there does
 //   not weaken a claim, it deletes it.
