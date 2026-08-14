@@ -24,6 +24,10 @@ import {
 	LOGICAL_GRAPH_COMPOSITION_PROGRESS_SCHEMA_VERSION,
 	LOGICAL_GRAPH_COMPOSITION_REQUEST_SCHEMA_VERSION,
 	LOGICAL_GRAPH_COMPOSITION_SCHEMA_VERSION,
+	PROJECT_CONTEXT_GRAPH_OPERATION_VERSION,
+	PROJECT_CONTEXT_GRAPH_PROGRESS_SCHEMA_VERSION,
+	PROJECT_CONTEXT_GRAPH_REQUEST_SCHEMA_VERSION,
+	PROJECT_CONTEXT_GRAPH_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
 	READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_SCHEMA_VERSION,
@@ -62,6 +66,7 @@ import {
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
 	buildLogicalGraphComposition,
+	buildProjectContextGraph,
 	buildStructuralModuleReachabilityAnalysis,
 	buildStructuralSccAnalysis,
 	buildStateMachineGraph,
@@ -88,6 +93,7 @@ import {
 	validateArrowCommandCensusObservation,
 	validateModuleDependencyGraph,
 	validateLogicalGraphComposition,
+	validateProjectContextGraph,
 	validateStructuralModuleReachabilityAnalysis,
 	validateStructuralSccAnalysis,
 	validateStateMachineGraph,
@@ -115,6 +121,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
 		expect(buildLogicalGraphComposition).toBeTypeOf('function');
+		expect(buildProjectContextGraph).toBeTypeOf('function');
 		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(buildStructuralSccAnalysis).toBeTypeOf('function');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
@@ -139,6 +146,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateArrowCommandCensusObservation).toBeTypeOf('function');
 		expect(validateModuleDependencyGraph).toBeTypeOf('function');
 		expect(validateLogicalGraphComposition).toBeTypeOf('function');
+		expect(validateProjectContextGraph).toBeTypeOf('function');
 		expect(validateStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(validateStructuralSccAnalysis).toBeTypeOf('function');
 		expect(validateStateMachineGraph).toBeTypeOf('function');
@@ -246,6 +254,16 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(LOGICAL_GRAPH_COMPOSITION_SCHEMA_VERSION).toBe(
 			'jan-csaa-logical-graph-composition/1.0.0'
 		);
+		expect(PROJECT_CONTEXT_GRAPH_OPERATION_VERSION).toBe(
+			'jan-csaa-build-project-context-graph/0.1.0'
+		);
+		expect(PROJECT_CONTEXT_GRAPH_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-project-context-graph-progress/1.0.0'
+		);
+		expect(PROJECT_CONTEXT_GRAPH_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-project-context-graph-request/1.0.0'
+		);
+		expect(PROJECT_CONTEXT_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-project-context-graph/1.0.0');
 		expect(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION).toBe(
 			'jan-csaa-analyze-structural-module-reachability/0.1.0'
 		);

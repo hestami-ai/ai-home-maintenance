@@ -46,6 +46,19 @@ import {
 	LOGICAL_GRAPH_COMPOSITION_SELECTION
 } from '../contracts/logical-graph-composition.js';
 import {
+	PROJECT_CONTEXT_GRAPH_AUTHORITY_TRANSFER,
+	PROJECT_CONTEXT_GRAPH_CAPABILITY,
+	PROJECT_CONTEXT_GRAPH_CAPABILITY_STATUS,
+	PROJECT_CONTEXT_GRAPH_CURRENTNESS,
+	PROJECT_CONTEXT_GRAPH_FRESHNESS,
+	PROJECT_CONTEXT_GRAPH_FULL_JAN_CSAA_010_CONFORMANCE,
+	PROJECT_CONTEXT_GRAPH_GATE_EFFECT,
+	PROJECT_CONTEXT_GRAPH_GRAPH_AUTHORITY,
+	PROJECT_CONTEXT_GRAPH_METHOD,
+	PROJECT_CONTEXT_GRAPH_NONCLAIMS,
+	PROJECT_CONTEXT_GRAPH_SELECTION
+} from '../contracts/project-context-graph.js';
+import {
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY_STATUS,
@@ -87,6 +100,8 @@ const STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_MODULE_REACHABILITY vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=FULL CSAA_REPOSITORY_SMOKE_SUITE=LOGICAL_GRAPH_COMPOSITION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=PROJECT_CONTEXT_GRAPH vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_LOGICAL_GRAPH_COMPOSITION_SELECTORLESS_SMOKE_COMMAND =
@@ -100,10 +115,23 @@ const LOGICAL_GRAPH_COMPOSITION_PROVENANCE = [
 	'packages/csaa/src/graph/logical-graph-composition-coverage.test.ts',
 	'packages/csaa/src/semantic/repository-smoke.test.ts'
 ] as const;
+const PROJECT_CONTEXT_GRAPH_PROVENANCE = [
+	'packages/csaa/src/contracts/project-context-graph.ts',
+	'packages/csaa/src/graph/build-project-context-graph.ts',
+	'packages/csaa/src/graph/project-context-graph-canonical.ts',
+	'packages/csaa/src/graph/validate-project-context-graph.ts',
+	'packages/csaa/src/graph/project-context-graph-fixture.test-support.ts',
+	'packages/csaa/src/graph/build-project-context-graph.test.ts',
+	'packages/csaa/src/graph/project-context-graph-coverage.test.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
 
 function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:semantic:smoke:logical-graph-composition') {
 		return LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND;
+	}
+	if (name === 'csaa:semantic:smoke:project-context-graph') {
+		return PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND;
 	}
 	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
 		return STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND;
@@ -221,6 +249,7 @@ describe('inventory discovery and identity', () => {
 			'frozen-program-construction',
 			'guard-classification-static-overlay',
 			'logical-graph-composition',
+			'project-context-graph',
 			'read-write-access-projection',
 			'structural-module-reachability-analysis',
 			'structural-scc-analysis'
@@ -256,6 +285,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/graph/validate-logical-graph-composition.ts',
 				'packages/csaa/src/graph/build-logical-graph-composition.test.ts',
 				'packages/csaa/src/graph/logical-graph-composition-coverage.test.ts',
+				...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
@@ -623,6 +653,55 @@ describe('inventory discovery and identity', () => {
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
 			expect(logicalGraphCompositionCapability!.explanation).toContain(boundary);
+		const projectContextGraphCapability = capabilities.get('project-context-graph');
+		expect(projectContextGraphCapability).toMatchObject({
+			provider: 'typescript+frozen-project-context-projection',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
+			'capabilities#symbol-table',
+			'capabilities#typescript-ast',
+			'package.json#/scripts/csaa:semantic:smoke:project-context-graph'
+		])
+			expect(projectContextGraphCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		expect(new Set(projectContextGraphCapability!.provenance).size).toBe(
+			projectContextGraphCapability!.provenance.length
+		);
+		expect(projectContextGraphCapability!.provenance).toEqual(
+			[...projectContextGraphCapability!.provenance].sort()
+		);
+		for (const exactBoundary of [
+			PROJECT_CONTEXT_GRAPH_METHOD,
+			PROJECT_CONTEXT_GRAPH_CAPABILITY,
+			PROJECT_CONTEXT_GRAPH_CAPABILITY_STATUS,
+			PROJECT_CONTEXT_GRAPH_GRAPH_AUTHORITY,
+			PROJECT_CONTEXT_GRAPH_AUTHORITY_TRANSFER,
+			PROJECT_CONTEXT_GRAPH_GATE_EFFECT,
+			PROJECT_CONTEXT_GRAPH_FRESHNESS,
+			PROJECT_CONTEXT_GRAPH_CURRENTNESS,
+			PROJECT_CONTEXT_GRAPH_FULL_JAN_CSAA_010_CONFORMANCE,
+			PROJECT_CONTEXT_GRAPH_SELECTION.projectPopulation,
+			PROJECT_CONTEXT_GRAPH_SELECTION.programPopulation,
+			PROJECT_CONTEXT_GRAPH_SELECTION.sourcePopulation,
+			PROJECT_CONTEXT_GRAPH_SELECTION.projectReferencePopulation,
+			PROJECT_CONTEXT_GRAPH_SELECTION.referenceResolutionBasis,
+			PROJECT_CONTEXT_GRAPH_SELECTION.variantPolicy,
+			PROJECT_CONTEXT_GRAPH_SELECTION.effectiveConfigurationPolicy,
+			...PROJECT_CONTEXT_GRAPH_SELECTION.membershipRelations,
+			...PROJECT_CONTEXT_GRAPH_NONCLAIMS
+		])
+			expect(projectContextGraphCapability!.explanation).toContain(exactBoundary);
+		for (const boundary of [
+			'The fifteenth bounded DWP-004 increment',
+			'one exact FrozenSubject and one independently validated static semantic snapshot',
+			'every declared project reference resolves within the selected project population',
+			'outside-selected and unresolved populations are explicitly empty',
+			'no additional build, test, browser, SSR, generated, or consumer variant is inferred',
+			'dedicated STRUCTURAL-profile project-context-only smoke command',
+			'CONFIGURED_NOT_RUN by inventory generation'
+		])
+			expect(projectContextGraphCapability!.explanation).toContain(boundary);
 		const typescriptAstCapability = capabilities.get('typescript-ast');
 		expect(typescriptAstCapability).toBeDefined();
 		expect(typescriptAstCapability!.provider).toBe('typescript');
@@ -767,9 +846,13 @@ describe('inventory discovery and identity', () => {
 				'capabilities#structural-module-reachability-analysis',
 				'capabilities#structural-scc-analysis',
 				'capabilities#logical-graph-composition',
+				'capabilities#project-context-graph',
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
 				'packages/csaa/src/graph/build-logical-graph-composition.ts',
 				'packages/csaa/src/graph/validate-logical-graph-composition.ts',
+				'packages/csaa/src/contracts/project-context-graph.ts',
+				'packages/csaa/src/graph/build-project-context-graph.ts',
+				'packages/csaa/src/graph/validate-project-context-graph.ts',
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
@@ -787,7 +870,7 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'not an empirical runtime, expected duration, product ceiling, or SLO'
 		);
-		expect(semanticBoundary).toContain('first fourteen bounded DWP-004 increments implement');
+		expect(semanticBoundary).toContain('first fifteen bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -808,11 +891,14 @@ describe('inventory discovery and identity', () => {
 			'preserves their identities, coverage, and limitations without constructing a universal code property graph'
 		);
 		expect(semanticBoundary).toContain(
+			'exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants'
+		);
+		expect(semanticBoundary).toContain(
 			"complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations"
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, and logical graph composition smoke commands'
+			'does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, and project context graph smoke commands'
 		);
 		expect(semanticBoundary).toContain(
 			'graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses'
@@ -867,11 +953,14 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
 				'packages/csaa/src/graph/build-logical-graph-composition.ts',
 				'packages/csaa/src/graph/validate-logical-graph-composition.ts',
+				'packages/csaa/src/contracts/project-context-graph.ts',
+				'packages/csaa/src/graph/build-project-context-graph.ts',
+				'packages/csaa/src/graph/validate-project-context-graph.ts',
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}`
@@ -887,6 +976,15 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`Full JAN-CSAA-009 conformance is ${LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`project context graph has graph authority ${PROJECT_CONTEXT_GRAPH_GRAPH_AUTHORITY}, authority transfer ${PROJECT_CONTEXT_GRAPH_AUTHORITY_TRANSFER}, and gate effect ${PROJECT_CONTEXT_GRAPH_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`freshness is ${PROJECT_CONTEXT_GRAPH_FRESHNESS}, currentness is ${PROJECT_CONTEXT_GRAPH_CURRENTNESS}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`Full JAN-CSAA-010 conformance is ${PROJECT_CONTEXT_GRAPH_FULL_JAN_CSAA_010_CONFORMANCE}`
 		);
 		for (const boundary of [
 			'complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure',
@@ -1283,6 +1381,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:semantic:smoke:command-event-contract',
 				'csaa:semantic:smoke:guard-classification',
 				'csaa:semantic:smoke:logical-graph-composition',
+				'csaa:semantic:smoke:project-context-graph',
 				'csaa:semantic:smoke:structural-module-reachability',
 				'csaa:semantic:smoke:structural-scc'
 			].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -1393,6 +1492,28 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is absent: csaa:semantic:smoke:logical-graph-composition'
 		);
 
+		const missingProjectContextGraphSmoke = fixture();
+		write(
+			missingProjectContextGraphSmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:project-context-graph'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingProjectContextGraphSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:semantic:smoke:project-context-graph'
+		);
+
 		const missingStructuralModuleReachabilitySmoke = fixture();
 		write(
 			missingStructuralModuleReachabilitySmoke,
@@ -1452,6 +1573,24 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow(
 			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:logical-graph-composition'
+		);
+
+		const incompatibleProjectContextGraphSmoke = fixture();
+		write(
+			incompatibleProjectContextGraphSmoke,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:semantic:smoke:project-context-graph': LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleProjectContextGraphSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:project-context-graph'
 		);
 
 		const incompatibleStructuralSccSmoke = fixture();
@@ -1520,6 +1659,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
 						'csaa:semantic:smoke:logical-graph-composition',
+						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -1613,6 +1753,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
 						'csaa:semantic:smoke:logical-graph-composition',
+						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -1671,6 +1812,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
 						'csaa:semantic:smoke:logical-graph-composition',
+						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -1763,7 +1905,8 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
 			'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
 			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
-			...LOGICAL_GRAPH_COMPOSITION_PROVENANCE
+			...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+			...PROJECT_CONTEXT_GRAPH_PROVENANCE
 		];
 		for (const path of requiredPaths)
 			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
@@ -1845,6 +1988,17 @@ describe('JPWB population non-vacuity', () => {
 			);
 			write(root, missingLogicalGraphCompositionPath, 'export {};\n');
 		}
+		for (const missingProjectContextGraphPath of PROJECT_CONTEXT_GRAPH_PROVENANCE.filter(
+			(path) => path !== 'packages/csaa/src/semantic/repository-smoke.test.ts'
+		)) {
+			rmSync(join(root, ...missingProjectContextGraphPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB project context graph implementation or verification source is absent: ${missingProjectContextGraphPath}`
+			);
+			write(root, missingProjectContextGraphPath, 'export {};\n');
+		}
 		const sharedRepositorySmokePath = 'packages/csaa/src/semantic/repository-smoke.test.ts';
 		rmSync(join(root, ...sharedRepositorySmokePath.split('/')));
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
@@ -1873,6 +2027,16 @@ describe('JPWB population non-vacuity', () => {
 		).toMatchObject({
 			categories: ['OTHER'],
 			command: LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:semantic:smoke:project-context-graph'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND,
 			state: 'CONFIGURED_NOT_RUN'
 		});
 		expect(
