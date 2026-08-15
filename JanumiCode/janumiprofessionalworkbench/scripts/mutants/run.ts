@@ -431,6 +431,37 @@ function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
  * would bake the mutation into its own baseline — the defect REG-F-116 recorded for the whole-suite baseline,
  * and there is no reason to re-learn it here.
  */
+/**
+ * CONFIRM A RED BEFORE BELIEVING IT — REG-F-173, and it closes the half REG-F-172 left open.
+ *
+ * A per-victim baseline (REG-F-171) catches ENVIRONMENTAL failures, because those fail the baseline too. It is
+ * blind to FLAKES: a timing-dependent test can pass the baseline and fail the mutated run for reasons that have
+ * nothing to do with the mutation, and that was still scored KILLED.
+ *
+ * ⚠ THE ASYMMETRY THAT MADE THIS CHEAP TO FIX, AND IT WAS ALREADY HALF-DONE. `playwright.config.ts:30` sets
+ * `retries: 1`, so the e2e channel has ALWAYS confirmed its reds; a fail-then-pass exits zero and reports
+ * SURVIVED. **Vitest had neither a retry nor a `testTimeout` override**, so its victims had no confirmation at
+ * all — while REG-F-169 measured that this repository's real flake mechanism is precisely a load-dependent
+ * crossing of vitest's 5000 ms DEFAULT. The unprotected channel was the one whose flakes had been observed.
+ *
+ * `--retry=1` re-runs only the FAILED TEST, not the suite, so confirmation costs milliseconds rather than the
+ * ~20% a whole re-run of every red victim would have cost.
+ *
+ * ⚠ AND IT IS A CLOSED PREDICATE, NOT AN ENUMERATION (REG-F-172's rule). It does not ask "did this fail in one of
+ * the ways I listed"; it asks whether the failure REPRODUCES. Any nondeterministic failure gets a second chance,
+ * including ones nobody has thought of.
+ *
+ * ⚠⚠ APPLIED TO EVERY VITEST INVOCATION, BASELINE INCLUDED, AND THE SYMMETRY IS LOAD-BEARING. Retrying only the
+ * mutated run would let a flaky BASELINE red stand, flipping `victimWasGreen` to false and manufacturing a
+ * spurious INCONCLUSIVE. That is REG-F-116's rule — *"the baseline must carry the IDENTICAL filter as the
+ * control run"* — restated for a different option, and the reason it is a shared constant rather than a literal
+ * typed at four call sites.
+ *
+ * WHAT A FLAKE BECOMES: a fail-then-pass exits zero, so the mutant reports SURVIVED and BLOCKS. That is a false
+ * BLOCKING finding, never a false KILL — the same polarity Playwright has always had, and the safe direction.
+ */
+const CONFIRM_RED = ['--retry=1'];
+
 const victimGreen = new Map<string, boolean>();
 
 function victimWasGreen(target: readonly string[]): boolean {
@@ -441,7 +472,7 @@ function victimWasGreen(target: readonly string[]): boolean {
 	const run = timed(leg, () =>
 		isE2eTarget(target)
 			? runPlaywright(target, {})
-			: sh('bunx', ['vitest', 'run', ...target], ROOT)
+			: sh('bunx', ['vitest', 'run', ...CONFIRM_RED, ...target], ROOT)
 	);
 	// A non-completion is not a green baseline and not a red one; treat it as NOT green so the mutant reports
 	// INCONCLUSIVE rather than being graded against a measurement that never happened.
@@ -529,13 +560,14 @@ function runMutant(m: DeclaredMutant): Result {
 						? [
 								'vitest',
 								'run',
+								...CONFIRM_RED,
 								'--reporter=default',
 								'--reporter=json',
 								`--outputFile=${jsonTo}`,
 								...(target.length === 0 ? projectFilters() : []),
 								...target
 							]
-						: ['vitest', 'run', ...(target.length === 0 ? projectFilters() : []), ...target],
+						: ['vitest', 'run', ...CONFIRM_RED, ...(target.length === 0 ? projectFilters() : []), ...target],
 					ROOT,
 					mutantEnv
 				));
@@ -768,6 +800,7 @@ function takeBaseline(): void {
 		sh('bunx', [
 			'vitest',
 			'run',
+			...CONFIRM_RED,
 			'--reporter=default',
 			'--reporter=json',
 			`--outputFile=${BASELINE_REPORT}`,
