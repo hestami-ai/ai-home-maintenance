@@ -81,11 +81,27 @@ describe('REG-F-012: an idempotency key is bound to the command that claimed it'
 			key
 		);
 
+	// ⚠ THE CODE ITSELF IS ASSERTED HERE, AND NOTHING ASSERTED IT BEFORE (REG-F-181). Every assertion in this file
+	// reads the MESSAGE — `toContain('IDEMPOTENCY_KEY_REUSED')` — because for eight days the label WAS the contract:
+	// the refusal borrowed `RPH_VALIDATION_SEMANTIC_FAILED` and carried its real meaning in prose. That left the
+	// mint with no test that could notice it: swapping the code while keeping the label would have passed this
+	// whole suite unchanged, which is a contract change no gate could see. So the code assertion is written FIRST
+	// and driven RED before the enum is touched.
+	//
+	// THE CATEGORY IS ASSERTED BESIDE IT, because minting moves it. `makeRphError` derives `category` from
+	// `ERROR_CODE_CATEGORY`, so this refusal leaves VALIDATION for CONCURRENCY — and CONCURRENCY is not a
+	// preference: `RPH_IDEMPOTENCY_DUPLICATE` (the sibling idempotency code) and `RPH_REVISION_CONFLICT` (the only
+	// other `*_CONFLICT`) are both CONCURRENCY already. Anything routing on category sees this move, so it is
+	// pinned rather than left to be discovered.
 	it('a DIFFERENT target under the same key is refused, not swallowed', () => {
 		expect(capture(INTENT_A, KEY).status, 'the first command claims the key').toBe('ACCEPTED');
 
 		const second = capture(INTENT_B, KEY);
 		expect(second.status, JSON.stringify(second.error)).toBe('REJECTED');
+		expect(second.error?.code, 'the refusal names the condition in its CODE, not only in prose').toBe(
+			'RPH_IDEMPOTENCY_CONFLICT'
+		);
+		expect(second.error?.category, 'and it routes as a conflict, like its two siblings').toBe('CONCURRENCY');
 		expect(second.error?.message).toContain('IDEMPOTENCY_KEY_REUSED');
 		expect(
 			store.loadObject(INTENT_B),

@@ -408,8 +408,17 @@ export class Engine {
 		// Absence of evidence is not evidence of difference — a mistake this register has recorded more than once,
 		// so the guard is written to make it obvious rather than to be terse.
 		//
-		// THE CODE IS A RATIFIED ONE CARRYING A LABEL (the WP-11 discipline). `RPH_IDEMPOTENCY_CONFLICT` would be
-		// the natural code and is NOT among the ratified fifteen — ~~minting one is a sponsor act~~.
+		// ~~THE CODE IS A RATIFIED ONE CARRYING A LABEL (the WP-11 discipline). `RPH_IDEMPOTENCY_CONFLICT` would be
+		// the natural code and is NOT among the ratified fifteen — ~~minting one is a sponsor act~~.~~
+		// ✅ MINTED 2026-08-15 (REG-F-181). The code below IS `RPH_IDEMPOTENCY_CONFLICT`, category CONCURRENCY —
+		// still not one of the ratified fifteen, and still disclosed as authored in `errors.ts` rather than blended
+		// into them. The paragraph beneath is left standing because it is the record of WHY this took eight days:
+		// the ground was removed on 2026-08-07 and this consumer was never told.
+		//
+		// ⚠ THE LABEL STAYS IN THE MESSAGE, AND THAT IS A DECISION RATHER THAN LEFTOVER. It now duplicates the
+		// code. It stays because it is prose emitted from the same refusal — no drift surface between them — four
+		// assertions and any operator grep depend on it, and removing it is a separable call that must not ride in
+		// on a mint. Whoever removes it should do so deliberately, not while tidying.
 		// ⚠ THE AUTHORITY CLAIM ABOVE IS REFUTED, AND THIS COMMENT IS WHY IT MATTERED (REG-F-144). REG-D-027/REG-F-057 settled on 2026-08-07 that minting an error code is **a repository shape change, through the contract procedure — NOT a sponsor act**: REG-D-004 makes the repository authoritative for "error codes" by name, and DOC-004 §5 routes enum extension through the contract procedure. `packages/rph-contracts/src/errors.ts` records the correction AND records that THIS SITE is what the refuted claim was blocking — *"a code comment in command-bus.ts that refused to mint a needed code on the strength of it"*. ⚠ AND THE COUNT SENTENCE THAT STOOD HERE WAS ITSELF THE CONFLATION THIS COMMIT REVERTED ELSEWHERE (corrected REG-F-148). It read "the ratified set is no longer fifteen". **It still is fifteen.** `errors.ts` states the split explicitly — "Fifteen transcribed from DOC-007 §25.1 ... plus one AUTHORED addition disclosed inline below" — and the sixteenth member carries "AUTHORED 2026-08-07 (REG-D-027). Not from DOC-007 §25.1; **disclosed rather than blended in**". So the RATIFIED set is fifteen and the WIRE ENUM is sixteen, and writing "the ratified set is no longer fifteen" blends in the very member that was deliberately kept separate. `RPH_IDEMPOTENCY_CONFLICT` is in NEITHER set, which is why the struck limb above was TRUE and is restored, and why minting it remains a real contract change. **The workaround below therefore stands on a ground that was removed seven days ago.** Minting `RPH_IDEMPOTENCY_CONFLICT` is now AVAILABLE — it is a contract change with schema, storage, fixture and test coordination, so it is filed as its own work package rather than smuggled into a comment fix.
 		// `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which REG-F-010 records as correctly
 		// carrying no error at all. So the label travels in the message where a reader and a future code can both
@@ -433,7 +442,7 @@ export class Engine {
 			return {
 				...base,
 				status: 'REJECTED',
-				error: makeRphError('RPH_VALIDATION_SEMANTIC_FAILED', {
+				error: makeRphError('RPH_IDEMPOTENCY_CONFLICT', {
 					message:
 						`IDEMPOTENCY_KEY_REUSED: key '${command.idempotencyKey}' was claimed by ` +
 						`${prior.commandType} on ${prior.targetAggregateId}, and this is ` +
