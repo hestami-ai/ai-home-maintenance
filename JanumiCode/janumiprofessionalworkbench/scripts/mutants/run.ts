@@ -378,6 +378,16 @@ function timed<T>(leg: string, fn: () => T): T {
  * option. `node_modules/.cache/` is gitignored by construction and is destroyed by `bun install`, which is exactly
  * the invalidation this wants.
  *
+ * MEASURED WITH THIS RUNNER'S OWN INSTRUMENT, WHICH IS THE ONLY ADMISSIBLE ONE (REG-F-177). Four mutants in
+ * `packages/rph-application`, driven twice: **9.3 s over 4 calls, avg 2.3 s** fully warm, against the **4.0 s** the
+ * `6642430c` run actually paid over 78 calls — about 43 % less. The same command timed from a shell instead read
+ * 16–20 s, four times the truth and in the flattering direction, which is why no cost in this file may come from
+ * anywhere but a `printTimings` leg.
+ *
+ * ⚠ AND THE COLD CALL GOT DEARER: the two runs differ only in cache state, so the 14.5 s − 9.3 s between them puts a
+ * cold call at ~7.5 s against the old 4.0 s. That is the whole reason the cache is KEPT — cleared per run, this
+ * would make the harness SLOWER on every package holding few mutants.
+ *
  * ⚠ KEPT ACROSS RUNS DELIBERATELY, AND SAFE BECAUSE TYPESCRIPT VALIDATES BY CONTENT. A `.tsbuildinfo` records a
  * per-file version derived from the text, plus the options and the compiler version, and discards itself when any of
  * the three disagree — so a cache left behind by a DIFFERENT commit does not make a changed file go unchecked, it
