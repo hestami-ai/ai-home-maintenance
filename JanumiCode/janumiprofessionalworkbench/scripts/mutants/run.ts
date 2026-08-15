@@ -55,9 +55,12 @@ type Verdict =
 //
 // Checks ONLY that each mutant still ANCHORS and still COMPILES, and runs no tests at all. It exists because the
 // two verdicts that mean "the ledger has rotted" — UNANCHORED and NO_COMPILE — are both decided before a single
-// test runs, yet finding them costs a full run: **43.6 minutes of subprocess time over 205 mutations,
-// MEASURED 2026-08-15 at 52dc5e1a** by `printTimings` below (targeted vitest 19.8%, whole-suite vitest 19.1%,
-// Playwright 18.0%, tsc 27.1%, per-victim baselines 12.3% — no single leg dominates).
+// test runs, yet finding them costs a full run: **roughly 44-47 minutes of subprocess time over 205 mutations**
+// (2615.5s at 52dc5e1a, 2848.7s at 7df537cd) by `printTimings` below — targeted vitest ~20%, whole-suite vitest
+// ~20%, Playwright ~17%, tsc ~27%, per-victim baselines ~12%; no single leg dominates.
+// ⚠ A RANGE, NOT A POINT, AND THE REASON IS REG-F-174. `tsc packages/rph-application` runs 78 identical calls
+// every run and spread 302-352s across four of them — a +16.3% swing on a leg NOTHING changed. Any before/after
+// delta smaller than that is machine variance, so single-run totals here are quoted as a band.
 // ⚠ UP FROM 37.2 min AT e070c462, AND THE RISE IS A GUARANTEE BOUGHT, NOT A REGRESSION: REG-F-171 added the
 // per-victim baseline so a KILLED means the victim went GREEN -> RED rather than merely being red.
 // ⚠ DATED ON PURPOSE, AND IT REPLACES AN UNDATED GUESS (REG-F-164). This said "~40-minute run" and a
