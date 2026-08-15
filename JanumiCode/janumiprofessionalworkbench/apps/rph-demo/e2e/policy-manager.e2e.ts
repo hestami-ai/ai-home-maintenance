@@ -5,6 +5,20 @@ import { shot } from './support/gallery';
 // The engine-backed Assurance Policy manager (§8.9/§17): the library lists the LOCKED mandatory floor policies +
 // the additive ones; a human can create / suspend / activate / version a policy, and reference an ACTIVE policy on
 // a PWU Type. Verifies the full round-trip form -> command -> engine (introspect) -> reload -> UI.
+/**
+ * FIND-OR-FAIL. Narrows `T | undefined` to `T`, and turns a missing row into a NAMED assertion failure instead
+ * of a TypeError three lines later.
+ *
+ * ⚠ ADDED WHEN `apps/rph-demo/e2e/` WAS FIRST PUT UNDER A TYPE GATE (REG-F-166). Every `.find()` here was used
+ * unnarrowed, which typechecked as `possibly undefined` the moment anything looked — and nothing ever had: 38
+ * specs were compiled by nothing at all. A bare `!` would have silenced the compiler while leaving the runtime
+ * failure exactly as opaque; this asserts the thing the spec already believes, so the failure names itself.
+ */
+function must<T>(row: T | undefined, what: string): T {
+	expect(row, what).toBeTruthy();
+	return row as T;
+}
+
 test.describe('PWA Designer — Assurance Policy manager', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'empty');
@@ -43,7 +57,10 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		// TRUTH: a regular policy is born DRAFT, with its criteria, and must be deliberately activated.
 		let snap = await introspect(request);
 		const findByName = (name: string) =>
-			snap.assurancePolicies.find((p: { state: { name?: string } }) => p.state.name === name);
+			must(
+				snap.assurancePolicies.find((p: { state: { name?: string } }) => p.state.name === name),
+				`assurance policy ${name} exists`
+			);
 		const created = findByName('Tenant Isolation Review');
 		expect(created, 'new policy exists').toBeTruthy();
 		expect(created.state.status).toBe('DRAFT');
@@ -73,8 +90,9 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 
 		// TRUTH: the root declares the policy.
 		snap = await introspect(request);
-		const root = snap.pwuTypes.find(
-			(t: { state: { name?: string } }) => t.state.name === 'Realization Root'
+		const root = must(
+			snap.pwuTypes.find((t: { state: { name?: string } }) => t.state.name === 'Realization Root'),
+			'the Realization Root PWU Type exists'
 		);
 		expect(root.state.requiredAssurancePolicyIds).toContain(createdId);
 
@@ -98,7 +116,10 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 		snap = await introspect(request);
 		expect(
-			snap.pwuTypes.find((t: { id: string }) => t.id === root.id).state.requiredAssurancePolicyIds
+			must(
+				snap.pwuTypes.find((t: { id: string }) => t.id === root.id),
+				'the root survives the reload'
+			).state.requiredAssurancePolicyIds
 		).toContain(createdId);
 
 		await page.getByRole('button', { name: '⚖ Policies' }).click();
@@ -111,7 +132,10 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		await card.getByRole('button', { name: 'Create & activate version' }).click();
 		await expect(card.getByText('SUPERSEDED', { exact: true })).toBeVisible();
 		snap = await introspect(request);
-		const predecessor = snap.assurancePolicies.find((p: { id: string }) => p.id === createdId);
+		const predecessor = must(
+			snap.assurancePolicies.find((p: { id: string }) => p.id === createdId),
+			'the superseded predecessor is still stored'
+		);
 		expect(predecessor.state.status).toBe('SUPERSEDED');
 		const successors = snap.assurancePolicies.filter(
 			(p: { id: string; state: { name?: string } }) =>
@@ -120,7 +144,10 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		expect(successors).toHaveLength(1);
 		expect(successors[0].state.status).toBe('ACTIVE');
 		const successorId = successors[0].id as string;
-		const migratedRoot = snap.pwuTypes.find((t: { id: string }) => t.id === root.id);
+		const migratedRoot = must(
+			snap.pwuTypes.find((t: { id: string }) => t.id === root.id),
+			'the root survives the version migration'
+		);
 		expect(migratedRoot.state.requiredAssurancePolicyIds).toContain(successorId);
 		expect(migratedRoot.state.requiredAssurancePolicyIds).not.toContain(createdId);
 		for (const field of [
@@ -154,7 +181,10 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		);
 		expect(newest).toHaveLength(1);
 		expect(newest[0].state.status).toBe('ACTIVE');
-		const publishedRoot = snap.pwuTypes.find((t: { id: string }) => t.id === root.id);
+		const publishedRoot = must(
+			snap.pwuTypes.find((t: { id: string }) => t.id === root.id),
+			'the root survives publication'
+		);
 		expect(publishedRoot.state.requiredAssurancePolicyIds).toContain(successorId);
 		expect(publishedRoot.state.requiredAssurancePolicyIds).not.toContain(newest[0].id);
 	});

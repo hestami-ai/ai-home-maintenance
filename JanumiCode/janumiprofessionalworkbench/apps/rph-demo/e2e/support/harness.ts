@@ -16,6 +16,12 @@ export interface EngineSnapshot {
 	readonly pwus: ObjectRow[];
 	readonly executionPlans: ObjectRow[];
 	readonly assessments: ObjectRow[];
+	// ⚠ MISSING UNTIL REG-F-166, AND NOTHING COULD HAVE TOLD ANYONE. `test-api/introspect/+server.ts` has
+	// returned `assurancePolicies` all along; this interface simply did not say so, and `apps/rph-demo/e2e/` was
+	// under NO type gate at all — 38 specs typechecked by nothing — so the omission could not surface. The specs
+	// that read it compensated with inline casts, which is what an under-described payload looks like from the
+	// consumer side: hand-annotation where the type should have spoken.
+	readonly assurancePolicies: ObjectRow[];
 	readonly observations: ObjectRow[];
 	readonly decisions: ObjectRow[];
 	readonly baselines: ObjectRow[];

@@ -9,7 +9,7 @@
     "build": "svelte-kit sync && vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check-types": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check-types": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p ./e2e/tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "prepare": "svelte-kit sync",
     "e2e": "node ../../node_modules/@sveltejs/kit/svelte-kit.js sync && node ../../node_modules/@playwright/test/cli.js test",
