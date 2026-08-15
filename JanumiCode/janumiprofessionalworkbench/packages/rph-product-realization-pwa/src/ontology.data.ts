@@ -123,7 +123,7 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			candidateChildren: [],
 			defaultPolicyIds: ['pol_intent_fidelity', 'pol_assumption_disclosure'],
 			sourceSection:
-				'Spec §10 (Required behavior + Assurance considerations: solution substitution, premature architecture, omitted constraints, preference-as-requirement, unsupported assumptions, scope expansion); DOC-005 §5.1 (INTAKE decomposition). pwuKind INFERRED UPPER_SNAKE (not a ratified literal).'
+				'Spec §10 (Required behavior + Assurance considerations: solution substitution, premature architecture, omission of inconvenient constraints, conversion of preferences into requirements, unsupported assumptions, scope expansion disguised as helpfulness); DOC-005 §5.1 (INTAKE decomposition). pwuKind INFERRED UPPER_SNAKE (not a ratified literal).'
 		},
 		{
 			pwuKind: 'PRODUCT_BOUNDARY',
@@ -206,7 +206,7 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			outputArtifactTypes: ['USER_JOURNEY', 'SCENARIO'],
 			completionClaims: [
 				'The journey traces to intent and preserves the originating outcome end-to-end.',
-				'Applicable scenario classes (normal, alternate valid, user-error, system-failure, permission-denied, interrupted/resumed, data-unavailable, cancellation) are covered or their inapplicability is explicit.'
+				'Applicable scenario classes (normal path, alternate valid path, user-error path, system-failure path, permission-denied path, interrupted or resumed path, data-unavailable path, cancellation path) are covered or their inapplicability is explicit.'
 			],
 			requiredEvidenceTypes: ['ARTIFACT', 'TRACE'],
 			candidateChildren: ['SCENARIO_DEFINITION'],
@@ -3604,14 +3604,14 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 		{
 			profile: 'LIGHTWEIGHT',
 			appliesToRisk:
-				'Small, reversible, well-understood changes; low-risk prototypes; local refactoring; exploratory spikes. Risk gate: RISK_AT_LEAST(CONSEQUENCE,MEDIUM)=FALSE AND RISK_AT_LEAST(IRREVERSIBILITY,MEDIUM)=FALSE AND RISK_AT_LEAST(SECURITY_SENSITIVITY,MEDIUM)=FALSE AND RISK_AT_LEAST(REGULATORY_EXPOSURE,MEDIUM)=FALSE (no dimension reaches MEDIUM). Minimum expectations (Spec §4.1, Catalog §36.1): explicit intent + bounded PWU + known constraints + expected output + local evidence + basic validation + no unresolved critical assumptions; mostly advisory findings; no human approval unless a material change emerges.',
+				'Small, reversible changes; well-understood internal features; low-risk prototypes; local refactoring; exploratory spikes. Risk gate: RISK_AT_LEAST(CONSEQUENCE,MEDIUM)=FALSE AND RISK_AT_LEAST(IRREVERSIBILITY,MEDIUM)=FALSE AND RISK_AT_LEAST(SECURITY_SENSITIVITY,MEDIUM)=FALSE AND RISK_AT_LEAST(REGULATORY_EXPOSURE,MEDIUM)=FALSE (no dimension reaches MEDIUM). Minimum expectations (Spec §4.1, Catalog §36.1): explicit intent + bounded PWU + known constraints + expected output + local evidence + basic validation + no unresolved critical assumptions; mostly advisory findings; no human approval unless a material change emerges.',
 			minIndependence: 'DIFFERENT_INVOCATION',
 			mandatoryPolicyIds: ['pol_intent_fidelity', 'pol_assumption_disclosure']
 		},
 		{
 			profile: 'STANDARD',
 			appliesToRisk:
-				'Ordinary product features; user-facing behavior; database/API changes; multi-component work; material architecture decisions. Risk gate: max{CONSEQUENCE,UNCERTAINTY,IRREVERSIBILITY,SECURITY_SENSITIVITY,REGULATORY_EXPOSURE} reaches MEDIUM but no dimension reaches HIGH (some RISK_AT_LEAST(*,MEDIUM)=TRUE and all RISK_AT_LEAST(*,HIGH)=FALSE). Adds journeys, acceptance criteria, architecture impact, decomposition contract, assumption disclosure, independent verification, integration evidence, human/delegated approval (Spec §4.2, Catalog §36.2). Different model preferred for material claims.',
+				'Ordinary product features; user-facing behavior; database or API changes; multi-component work; material architecture decisions. Risk gate: max{CONSEQUENCE,UNCERTAINTY,IRREVERSIBILITY,SECURITY_SENSITIVITY,REGULATORY_EXPOSURE} reaches MEDIUM but no dimension reaches HIGH (some RISK_AT_LEAST(*,MEDIUM)=TRUE and all RISK_AT_LEAST(*,HIGH)=FALSE). Adds journeys, acceptance criteria, architecture impact, decomposition contract, assumption disclosure, independent verification, integration evidence, human/delegated approval (Spec §4.2, Catalog §36.2). Different model preferred for material claims.',
 			minIndependence: 'DIFFERENT_AGENT',
 			mandatoryPolicyIds: [
 				'pol_intent_fidelity',
