@@ -14,7 +14,7 @@
 // the end — a mutation harness that leaves a mutant behind is worse than none, and one of the review agents in
 // this repo did exactly that mid-run.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
@@ -364,6 +364,35 @@ function timed<T>(leg: string, fn: () => T): T {
 	}
 }
 
+/**
+ * Where the compile leg's incremental state lives, one file per package.
+ *
+ * ⚠ THIS RE-CHECKS THE WHOLE PACKAGE FOR A ONE-LINE EDIT, ONCE PER MUTANT, AND THAT IS THE COST BEING ATTACKED.
+ * `tsc packages/rph-application` was the single largest compile leg of the 6642430c run — **314.6 s over 78 calls**,
+ * one call per live entry in that package — and every one of those 78 calls re-typechecked the entire package from
+ * scratch to judge a mutation of a single line.
+ *
+ * ⚠ IT MUST LIVE OUTSIDE THE TREE `treeIsClean` JUDGES. A run writes this file on every mutant; inside `packages/`
+ * or `scripts/` that is a new file appearing mid-run, and while `--untracked-files=no` means it would not currently
+ * trip the guard, resting on that flag would make the harness's own cleanliness check depend on a `git status`
+ * option. `node_modules/.cache/` is gitignored by construction and is destroyed by `bun install`, which is exactly
+ * the invalidation this wants.
+ *
+ * ⚠ KEPT ACROSS RUNS DELIBERATELY, AND SAFE BECAUSE TYPESCRIPT VALIDATES BY CONTENT. A `.tsbuildinfo` records a
+ * per-file version derived from the text, plus the options and the compiler version, and discards itself when any of
+ * the three disagree — so a cache left behind by a DIFFERENT commit does not make a changed file go unchecked, it
+ * makes it re-checked. Deleting it per run would throw away the cold-start saving on the first mutant of every
+ * package for no gain in soundness.
+ */
+function buildInfoFor(pkg: string): string {
+	const dir = `${ROOT}node_modules/.cache/jpwb-mutants`;
+	// Created here rather than once at start-up so the path and its directory cannot drift apart: `mkdirSync` with
+	// `recursive` is idempotent, and a compile leg that fails because a cache directory was missing would report
+	// NO_COMPILE — the instrument's failure wearing a verdict's name.
+	mkdirSync(dir, { recursive: true });
+	return `${dir}/${pkg.replace(/[/\\]/g, '__')}.tsbuildinfo`;
+}
+
 function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | null {
 	// ⚠ A `.svelte` MUTANT MUST BE CHECKED BY THE COMPILER THAT CAN READ IT (REG-F-175). `tsc` does not load
 	// `.svelte` AT ALL — measured: `tsc --noEmit -p apps/rph-demo/tsconfig.json --listFiles` reports 1640 files
@@ -383,7 +412,17 @@ function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | 
 	const pkg = pkgOf(m.file);
 	const types = isSvelte
 		? timed(`svelte-check ${pkg}`, () => sh('bun', ['run', '--cwd', pkg, 'check']))
-		: timed(`tsc ${pkg}`, () => sh('bunx', ['tsc', '--noEmit', '-p', `${pkg}/tsconfig.json`]));
+		: timed(`tsc ${pkg}`, () =>
+				sh('bunx', [
+					'tsc',
+					'--noEmit',
+					'--incremental',
+					'--tsBuildInfoFile',
+					buildInfoFor(pkg),
+					'-p',
+					`${pkg}/tsconfig.json`
+				])
+			);
 	const compiles = types.status === 0;
 	// A mutant may be declared as EXPECTED not to compile (`expectNoCompile`). For those, refusing to typecheck IS
 	// the guarantee: the defect is UNEXPRESSIBLE rather than merely caught, which is stronger — a test can be
