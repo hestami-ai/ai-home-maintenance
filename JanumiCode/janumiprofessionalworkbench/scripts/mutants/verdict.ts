@@ -35,8 +35,10 @@
  * evidence buffer emptied — indistinguishable at every field the runner inspects from a genuine kill, and
  * `timeoutEvidence` blinded because it scans output that is now the empty string.
  *
- * So `status: 1` alone cannot be trusted either; `maxBuffer` is raised at the call site to make the truncation
- * far less reachable, and this predicate catches the residue that still arrives as a non-completion.
+ * So `status: 1` alone cannot be trusted either — and NOTHING here can catch that case, because it is a
+ * well-formed completion by every field available. `maxBuffer` at the call site does NOT help: it was tried and
+ * measured INERT under `shell: true`, which is the actual cause (see the seam in `run.ts`). This predicate
+ * catches the residue that arrives as a genuine non-completion, and the truncation is recorded as UNGUARDED.
  */
 export interface SpawnOutcome {
 	readonly status: number | null;
@@ -53,6 +55,40 @@ export function nonCompletion(run: SpawnOutcome): string | null {
 	if (typeof run.status !== 'number')
 		return 'the child process reported no exit status at all — no verdict about this mutation is available';
 	return null;
+}
+
+/**
+ * GRADE A NAMED-VICTIM MUTANT ON THE DIFFERENCE, NOT ON THE EXIT CODE — REG-F-168/171.
+ *
+ * ⚠ THE ARGUMENT FOR THIS WAS ALREADY WRITTEN IN `run.ts`, TWO LINES ABOVE THE CODE THAT IGNORED IT: *"The exit
+ * status cannot answer 'did this mutation redden anything'; the DIFFERENCE against the unmutated baseline can,
+ * and it is the only question actually being asked."* REG-F-116 built that remedy and applied it to the NINE
+ * controls. The 193 entries carrying the gate's actual claim kept reading `run.status === 0` alone.
+ *
+ * The consequence was measured, not feared: those 193 ride on only **70 distinct victim files**, thirteen of them
+ * on `execrem-wp12-skip-authorization.test.ts` and 46 on the top five. **One unrelated red in one file converted
+ * thirteen mutants to KILLED**, each recorded as a guard proven by evidence that had nothing to do with it.
+ *
+ * `victimWasGreen` is the whole point: a red that follows a green is ATTRIBUTABLE, and a red that follows a red
+ * is not. When the victim was already failing there is no verdict to give — the mutation was never measured —
+ * and INCONCLUSIVE says so and BLOCKS, rather than a KILLED that would read as proof.
+ */
+export function gradeNamedVictim(
+	victimWasGreen: boolean,
+	passedAfterMutation: boolean,
+	victim: string,
+	detailFromOutput: string
+): { verdict: 'KILLED' | 'SURVIVED' | 'INCONCLUSIVE'; detail: string } {
+	if (!victimWasGreen)
+		return {
+			verdict: 'INCONCLUSIVE',
+			detail:
+				`the named victim ${victim} was ALREADY RED before this mutation was applied, so its failure ` +
+				'afterwards attributes nothing — fix the suite, then re-run; a kill measured against a red ' +
+				'baseline is not evidence about this guard'
+		};
+	if (passedAfterMutation) return { verdict: 'SURVIVED', detail: detailFromOutput };
+	return { verdict: 'KILLED', detail: detailFromOutput };
 }
 
 export type ControlVerdict = 'CONTROL_HELD' | 'INCONCLUSIVE' | 'SURVIVED';

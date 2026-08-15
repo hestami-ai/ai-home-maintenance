@@ -16,7 +16,7 @@
 // healthy, so a test over real runs could never enter the branches it exists to prove. The inputs here are exactly
 // what the runner observed at the call site — which is why `gradeControl` had to be made pure to be testable.
 import { describe, expect, it } from 'vitest';
-import { gradeControl, nonCompletion } from '../scripts/mutants/verdict.js';
+import { gradeControl, gradeNamedVictim, nonCompletion } from '../scripts/mutants/verdict.js';
 
 const WHY = 'SURVIVAL IS THE FINDING — this branch is dead and its deadness is the record.';
 
@@ -137,5 +137,61 @@ describe('REG-F-168 — a non-completion is a non-measurement, never a kill', ()
 	it('CONTROL — it does not refuse everything: ordinary completions remain measurable', () => {
 		const completions = [0, 1, 2, 137].map((status) => nonCompletion({ status, signal: null }));
 		expect(completions).toEqual([null, null, null, null]);
+	});
+});
+// ── REG-F-171: THE KILL ARM IS GRADED ON A DIFFERENCE, LIKE THE CONTROLS ALWAYS WERE ────────────────────────
+//
+// `run.ts` said, of CONTROLS: "The exit status cannot answer 'did this mutation redden anything'; the DIFFERENCE
+// against the unmutated baseline can, and it is the only question actually being asked." The line immediately
+// below it graded 193 named-victim mutants on `run.status === 0` alone.
+//
+// The cost was measured rather than feared: those 193 ride on 70 DISTINCT victim files, thirteen of them on
+// `execrem-wp12-skip-authorization.test.ts`. One unrelated red there converted THIRTEEN mutants to KILLED, each
+// recorded as a guard proven by evidence that had nothing to do with it.
+describe('REG-F-171 — a red that follows a red attributes nothing', () => {
+	const OUT = 'FAIL packages/x/y.test.ts > the guard refuses';
+
+	it('green before, red after — the kill is ATTRIBUTED', () => {
+		const g = gradeNamedVictim(true, false, 'v.test.ts', OUT);
+		expect(g.verdict).toBe('KILLED');
+		expect(g.detail, 'the observed output, not a restatement').toBe(OUT);
+	});
+
+	it('green before, green after — the guard is UNTESTED, which still blocks', () => {
+		expect(gradeNamedVictim(true, true, 'v.test.ts', 'no failures').verdict).toBe('SURVIVED');
+	});
+
+	// ⚠ THE ARM THIS ENTRY EXISTS FOR, AND THE ONE THAT USED TO READ AS PROOF.
+	it('RED before — INCONCLUSIVE, never KILLED, and the reason names the victim', () => {
+		const g = gradeNamedVictim(false, false, 'execrem-wp12-skip-authorization.test.ts', OUT);
+		expect(g.verdict, 'a kill measured against a red baseline is not evidence').toBe('INCONCLUSIVE');
+		expect(g.detail).toContain('ALREADY RED');
+		expect(g.detail).toContain('execrem-wp12-skip-authorization.test.ts');
+	});
+
+	// A red baseline blocks EITHER WAY: if the suite was already failing, a pass afterwards says nothing either.
+	it('RED before and green after is ALSO inconclusive, not a survival', () => {
+		expect(gradeNamedVictim(false, true, 'v.test.ts', 'x').verdict).toBe('INCONCLUSIVE');
+	});
+
+	// CONTROL — every assertion above is satisfied by a function returning INCONCLUSIVE for everything, which
+	// would block the gate permanently while looking rigorous. This holds the discriminating half: on a GREEN
+	// baseline both real verdicts must still be reachable, so the tightening did not swallow them.
+	it('CONTROL — on a green baseline, KILLED and SURVIVED are both still reachable', () => {
+		const verdicts = [
+			gradeNamedVictim(true, false, 'v', 'x').verdict,
+			gradeNamedVictim(true, true, 'v', 'x').verdict
+		];
+		expect(verdicts).toEqual(['KILLED', 'SURVIVED']);
+	});
+
+	// CONTROL — the detail on a real verdict must be the OBSERVED OUTPUT and must not assert a cause, which is
+	// `measured.ts`'s standing rule and the one the control path broke (REG-F-165).
+	it('CONTROL — a real verdict reports what was observed and asserts no cause', () => {
+		for (const passed of [true, false]) {
+			const d = gradeNamedVictim(true, passed, 'v', OUT).detail;
+			expect(d).toBe(OUT);
+			expect(d).not.toContain('because');
+		}
 	});
 });

@@ -18,7 +18,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
-import { gradeControl, nonCompletion } from './verdict.js';
+import { gradeControl, gradeNamedVictim, nonCompletion } from './verdict.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -417,12 +417,48 @@ function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
 	return { mutant: m, verdict, detail };
 }
 
+/**
+ * WAS THIS VICTIM GREEN BEFORE THE MUTATION? — the question the KILLED arm never asked (REG-F-168/171).
+ *
+ * ⚠ MEASURED, NOT ASSUMED, AND CACHED BY VICTIM RATHER THAN BY MUTANT. 193 killable entries name only 70
+ * DISTINCT victims, so the honest question costs 70 runs, not 193 — and 13 of those entries share one file, which
+ * is exactly why one unrelated red used to convert thirteen mutants to KILLED at once.
+ *
+ * ⚠ IT MUST RUN ON A CLEAN TREE, which is why it is called from `runMutant` AFTER `preApplyVerdict` (whose
+ * `treeIsClean` gate has already passed) and BEFORE the mutation is written. Running it with a mutant on disk
+ * would bake the mutation into its own baseline — the defect REG-F-116 recorded for the whole-suite baseline,
+ * and there is no reason to re-learn it here.
+ */
+const victimGreen = new Map<string, boolean>();
+
+function victimWasGreen(target: readonly string[]): boolean {
+	const key = [...target].sort((a, b) => a.localeCompare(b)).join('\u0000');
+	const cached = victimGreen.get(key);
+	if (cached !== undefined) return cached;
+	const leg = isE2eTarget(target) ? 'playwright BASELINE' : 'vitest victim BASELINE';
+	const run = timed(leg, () =>
+		isE2eTarget(target)
+			? runPlaywright(target, {})
+			: sh('bunx', ['vitest', 'run', ...target], ROOT)
+	);
+	// A non-completion is not a green baseline and not a red one; treat it as NOT green so the mutant reports
+	// INCONCLUSIVE rather than being graded against a measurement that never happened.
+	const green = nonCompletion(run) === null && run.status === 0;
+	victimGreen.set(key, green);
+	if (!green) console.log(`  victim NOT green before mutation: ${target.join(', ')}`);
+	return green;
+}
+
 function runMutant(m: DeclaredMutant): Result {
 	const pre = preApplyVerdict(m);
 	if ('result' in pre) return pre.result;
 	const { original } = pre;
 	const target = targetSuites(m);
 	const unnamed = m.expectRed.length === 0;
+
+	// ⚠ ESTABLISH THE VICTIM'S UNMUTATED STATE FIRST — the tree is still clean here (REG-F-171). A control is
+	// graded on a DIFFERENCE and always has been; a named victim was graded on an exit code alone until now.
+	const baselineGreen = unnamed ? true : victimWasGreen(target);
 
 	writeFileSync(JOURNAL, m.file, 'utf8');
 	writeFileSync(`${ROOT}${m.file}`, original.replace(m.find, m.replace), 'utf8');
@@ -563,14 +599,15 @@ function runMutant(m: DeclaredMutant): Result {
 		const incomplete = nonCompletion(run);
 		if (incomplete !== null) return { mutant: m, verdict: 'INCONCLUSIVE', detail: incomplete, victims };
 		if (m.expectSurvive !== undefined) return controlVerdict(m, run.status === 0);
-		if (run.status === 0)
-			return { mutant: m, verdict: 'SURVIVED', detail: summarise(out), victims };
-		return {
-			mutant: m,
-			verdict: unnamed ? 'KILLED_UNNAMED' : 'KILLED',
-			detail: summarise(out),
-			victims
-		};
+		if (unnamed)
+			return {
+				mutant: m,
+				verdict: run.status === 0 ? 'SURVIVED' : 'KILLED_UNNAMED',
+				detail: summarise(out),
+				victims
+			};
+		const graded = gradeNamedVictim(baselineGreen, run.status === 0, target.join(', '), summarise(out));
+		return { mutant: m, verdict: graded.verdict, detail: graded.detail, victims };
 	} finally {
 		writeFileSync(`${ROOT}${m.file}`, original, 'utf8');
 		rmSync(JOURNAL, { force: true });
