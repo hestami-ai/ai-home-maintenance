@@ -55,9 +55,11 @@ type Verdict =
 //
 // Checks ONLY that each mutant still ANCHORS and still COMPILES, and runs no tests at all. It exists because the
 // two verdicts that mean "the ledger has rotted" — UNANCHORED and NO_COMPILE — are both decided before a single
-// test runs, yet finding them costs a full run: **37.2 minutes of subprocess time over 205 mutations,
-// MEASURED 2026-08-14 at e070c462** by `printTimings` below (tsc 31.8%, targeted vitest 24.2%,
-// whole-suite vitest 22.6%, Playwright 21.5% — no single leg dominates).
+// test runs, yet finding them costs a full run: **43.6 minutes of subprocess time over 205 mutations,
+// MEASURED 2026-08-15 at 52dc5e1a** by `printTimings` below (targeted vitest 19.8%, whole-suite vitest 19.1%,
+// Playwright 18.0%, tsc 27.1%, per-victim baselines 12.3% — no single leg dominates).
+// ⚠ UP FROM 37.2 min AT e070c462, AND THE RISE IS A GUARANTEE BOUGHT, NOT A REGRESSION: REG-F-171 added the
+// per-victim baseline so a KILLED means the victim went GREEN -> RED rather than merely being red.
 // ⚠ DATED ON PURPOSE, AND IT REPLACES AN UNDATED GUESS (REG-F-164). This said "~40-minute run" and a
 // sibling comment said "~30-minute" — two numbers, disagreeing, neither dated, both written when the
 // ledger held roughly half its entries, and both used to justify speedups. A duration in a comment is a

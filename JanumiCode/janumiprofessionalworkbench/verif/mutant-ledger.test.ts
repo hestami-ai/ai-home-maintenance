@@ -113,8 +113,9 @@ describe('the mutant ledger is internally coherent', () => {
 	// ── V-3c: THE UNNAMED-VICTIM RATCHET, CHECKED IN SECONDS RATHER THAN IN THIRTY-SEVEN MINUTES ─────────────
 	//
 	// `run.ts` also fails on KILLED_UNNAMED, and that is the authoritative gate — it observes the mutant actually
-	// being killed by the suite it names. But it is a **37.2-minute run (measured 2026-08-14 at e070c462,
-	// REG-F-164 — this said "~30-minute", undated and wrong)**, so it is the WRONG place to learn that a
+	// being killed by the suite it names. But it is a **43.6-minute run (measured 2026-08-15 at 52dc5e1a; was
+	// 37.2 min at e070c462 before REG-F-171 bought attribution with per-victim baselines; and before REG-F-164
+	// this said "~30-minute", undated and wrong)**, so it is the WRONG place to learn that a
 	// field was left blank: the feedback arrives long after the commit that caused it, which is how a records
 	// defect accumulates for eighteen work packages while being truthfully reported every single run.
 	//
