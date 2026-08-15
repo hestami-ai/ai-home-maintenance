@@ -2058,7 +2058,7 @@ export const COMMANDS = {
 	},
 	ReviseIntent: {
 		payload: ReviseIntentPayloadSchema,
-		targetAggregateType: 'Intent',
+		targetAggregateType: 'INTENT',
 		emitsEvent: 'IntentRevised',
 		firstSlice: false
 	},
@@ -2070,73 +2070,73 @@ export const COMMANDS = {
 	},
 	ChallengePwu: {
 		payload: ChallengePwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuChallenged',
 		firstSlice: false
 	},
 	AbandonPwu: {
 		payload: AbandonPwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuAbandoned',
 		firstSlice: false
 	},
 	BlockPwu: {
 		payload: BlockPwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuBlocked',
 		firstSlice: false
 	},
 	EscalatePwu: {
 		payload: EscalatePwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuEscalated',
 		firstSlice: false
 	},
 	BaselinePwu: {
 		payload: BaselinePwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuBaselined',
 		firstSlice: false
 	},
 	RejectPwu: {
 		payload: RejectPwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuRejected',
 		firstSlice: false
 	},
 	ReshapePwu: {
 		payload: ReshapePwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuReshapingStarted',
 		firstSlice: false
 	},
 	InvalidatePwu: {
 		payload: InvalidatePwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuInvalidated',
 		firstSlice: false
 	},
 	SupersedePwu: {
 		payload: SupersedePwuPayloadSchema,
-		targetAggregateType: 'ProfessionalWorkUnit',
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
 		emitsEvent: 'PwuSuperseded',
 		firstSlice: false
 	},
 	ProposeDecomposition: {
 		payload: ProposeDecompositionPayloadSchema,
-		targetAggregateType: 'DecompositionContract',
+		targetAggregateType: 'DECOMPOSITION_CONTRACT',
 		emitsEvent: 'DecompositionProposed',
 		firstSlice: false
 	},
 	ValidateDecomposition: {
 		payload: ValidateDecompositionPayloadSchema,
-		targetAggregateType: 'DecompositionContract',
+		targetAggregateType: 'DECOMPOSITION_CONTRACT',
 		emitsEvent: 'DecompositionValidated',
 		firstSlice: false
 	},
 	ReviseDecomposition: {
 		payload: ReviseDecompositionPayloadSchema,
-		targetAggregateType: 'DecompositionContract',
+		targetAggregateType: 'DECOMPOSITION_CONTRACT',
 		emitsEvent: 'DecompositionRevised',
 		firstSlice: false
 	},
@@ -2148,55 +2148,55 @@ export const COMMANDS = {
 	},
 	BeginRecomposition: {
 		payload: BeginRecompositionPayloadSchema,
-		targetAggregateType: 'RecompositionContract',
+		targetAggregateType: 'RECOMPOSITION_CONTRACT',
 		emitsEvent: 'RecompositionStarted',
 		firstSlice: false
 	},
 	CompleteRecomposition: {
 		payload: CompleteRecompositionPayloadSchema,
-		targetAggregateType: 'RecompositionContract',
+		targetAggregateType: 'RECOMPOSITION_CONTRACT',
 		emitsEvent: 'RecompositionCompleted',
 		firstSlice: false
 	},
 	InvalidateEvidence: {
 		payload: InvalidateEvidencePayloadSchema,
-		targetAggregateType: 'Evidence',
+		targetAggregateType: 'EVIDENCE',
 		emitsEvent: 'EvidenceInvalidated',
 		firstSlice: false
 	},
 	RequestWaiver: {
 		payload: RequestWaiverPayloadSchema,
-		targetAggregateType: 'Decision',
+		targetAggregateType: 'DECISION',
 		emitsEvent: 'WaiverRequested',
 		firstSlice: false
 	},
 	GrantWaiver: {
 		payload: GrantWaiverPayloadSchema,
-		targetAggregateType: 'Decision',
+		targetAggregateType: 'DECISION',
 		emitsEvent: 'WaiverGranted',
 		firstSlice: false
 	},
 	DenyWaiver: {
 		payload: DenyWaiverPayloadSchema,
-		targetAggregateType: 'Decision',
+		targetAggregateType: 'DECISION',
 		emitsEvent: 'WaiverDenied',
 		firstSlice: false
 	},
 	RetryExecutionStep: {
 		payload: RetryExecutionStepPayloadSchema,
-		targetAggregateType: 'ExecutionPlan',
+		targetAggregateType: 'EXECUTION_PLAN',
 		emitsEvent: 'ExecutionStepRetried',
 		firstSlice: false
 	},
 	ApplyTacticalChange: {
 		payload: ApplyTacticalChangePayloadSchema,
-		targetAggregateType: 'ExecutionPlan',
+		targetAggregateType: 'EXECUTION_PLAN',
 		emitsEvent: 'TacticalChangeApplied',
 		firstSlice: false
 	},
 	CancelExecutionPlan: {
 		payload: CancelExecutionPlanPayloadSchema,
-		targetAggregateType: 'ExecutionPlan',
+		targetAggregateType: 'EXECUTION_PLAN',
 		emitsEvent: 'ExecutionTerminated',
 		firstSlice: false
 	},
@@ -2220,13 +2220,13 @@ export const COMMANDS = {
 	},
 	RevokeDecision: {
 		payload: RevokeDecisionPayloadSchema,
-		targetAggregateType: 'Decision',
+		targetAggregateType: 'DECISION',
 		emitsEvent: 'DecisionRevoked',
 		firstSlice: false
 	},
 	SupersedeBaseline: {
 		payload: SupersedeBaselinePayloadSchema,
-		targetAggregateType: 'Baseline',
+		targetAggregateType: 'BASELINE',
 		emitsEvent: 'BaselineSuperseded',
 		firstSlice: false
 	},

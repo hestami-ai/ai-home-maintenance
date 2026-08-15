@@ -17,7 +17,7 @@
 // strictly stronger for a negative: **a command that does not exist cannot be dispatched, whatever any handler
 // contains.** The two limbs are independent — one could hold while the other broke — which is why this file adds
 // the second rather than restating the first.
-import { COMMANDS } from '@janumipwb/rph-contracts';
+import { COMMANDS, ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 
 type CommandSpec = { readonly targetAggregateType?: string; readonly emitsEvent?: string };
@@ -86,55 +86,57 @@ describe('REG-F-167 — the observation aggregate has exactly ONE command, and i
 // ways**, splitting 54 commands across keys that no consumer reconciles. Any future census keyed on this field
 // silently sees a SUBSET — which is this programme's oldest defect, waiting in a field nobody reads.
 //
-// PINNED RATHER THAN REPAIRED, DELIBERATELY. `messages.ts` is GENERATED from `packages/rph-contracts/vocab/`,
-// so normalising the spellings is a vocab change plus a regeneration with a large diff, and it belongs in its
-// own increment where the regeneration can be inspected. What must not happen meanwhile is the set growing
-// quietly, so it is pinned BY NAME WITH COUNTS: a new split reddens here.
-describe('REG-F-167 — the registry spells seven aggregates two ways, and nothing reads the field', () => {
-	it('pins every aggregate spelled MORE THAN ONE WAY, so the split cannot widen unnoticed', () => {
-		const byNormalized = new Map<string, Map<string, number>>();
-		for (const spec of Object.values(REGISTRY)) {
-			const raw = spec.targetAggregateType;
-			if (raw === undefined) continue;
-			const key = normalizeAggregate(raw);
-			const seen = byNormalized.get(key) ?? new Map<string, number>();
-			seen.set(raw, (seen.get(raw) ?? 0) + 1);
-			byNormalized.set(key, seen);
-		}
-		const split = [...byNormalized.values()]
-			.filter((spellings) => spellings.size > 1)
-			.map((spellings) =>
-				[...spellings.entries()]
-					.sort((a, b) => a[0].localeCompare(b[0]))
-					.map(([name, n]) => `${name} x${n}`)
-					.join(' | ')
+// ~~PINNED RATHER THAN REPAIRED, DELIBERATELY.~~ **REPAIRED IN REG-F-179, AND THE PIN WAS REPLACED BY A CLOSED
+// PREDICATE RATHER THAN UPDATED.** The old pin listed the seven split groups by name and count, which is an
+// ENUMERATION of the exceptions: it reddens when the seven move, and says nothing about an eighth spelling that
+// never acquires a twin. That blind spot was real — `DecompositionContract` ×3 had no SCREAMING_SNAKE counterpart,
+// so it was invisible to a dual-spelling test while being the same defect, one twin away from joining the list.
+//
+// ⚠ THE AUTHORITY WAS ALREADY IN THE VOCAB AND NOBODY HAD ASKED IT. `canonicalEnums[0]` is
+// `ProfessionalWorkObjectType`, whose own `appliesTo` reads *"ObjectEnvelope.objectType (all Professional Work
+// Objects)"* — 23 SCREAMING_SNAKE values. So the canonical spelling was never a preference to be chosen: a
+// `targetAggregateType` names a Professional Work Object type, and the question is MEMBERSHIP. Measured before the
+// repair: 22 of 30 spellings (77 declarations) were members and **8 spellings (24 declarations) were not**, each
+// mapping letter-for-letter onto exactly one member.
+//
+// The predicate STRICTLY SUBSUMES the pin it replaces: enum members are distinct SCREAMING_SNAKE names, so no two
+// can normalise to the same key, and membership therefore forbids dual spelling as a corollary. One assertion, no
+// literal to keep current, and an eighth stray is caught the same way the seven were.
+describe('REG-F-179 — every targetAggregateType names a Professional Work Object type', () => {
+	it('pins the PREDICATE, not the exceptions: no command declares a target outside the enum', () => {
+		const members = new Set<string>(ProfessionalWorkObjectTypeSchema.options);
+		const strays = Object.entries(REGISTRY)
+			.filter(
+				([, spec]) => spec.targetAggregateType !== undefined && !members.has(spec.targetAggregateType)
 			)
+			.map(([name, spec]) => `${name} -> ${spec.targetAggregateType}`)
 			.sort((a, b) => a.localeCompare(b));
 		expect(
-			split,
-			'the dual-spelling set MOVED. If it SHRANK, the vocab was normalised — good, update this pin in that ' +
-				'commit. If it GREW, a new command adopted a spelling its siblings do not use, and every census ' +
-				'keyed on targetAggregateType now sees a smaller population than it reports.'
-		).toEqual([
-			'Baseline x1 | BASELINE x4',
-			'Decision x4 | DECISION x2',
-			'Evidence x1 | EVIDENCE x2',
-			'EXECUTION_PLAN x14 | ExecutionPlan x3',
-			'Intent x1 | INTENT x6',
-			'PROFESSIONAL_WORK_UNIT x4 | ProfessionalWorkUnit x9',
-			'RECOMPOSITION_CONTRACT x1 | RecompositionContract x2'
-		]);
+			strays,
+			'a command declares a `targetAggregateType` that is NOT a value of `ProfessionalWorkObjectType`. ' +
+				'Nothing reads this field at runtime, so it breaks nothing today — which is exactly why it must be ' +
+				'caught here: every census keyed on it silently reports a subset. Fix the spelling in ' +
+				'`packages/rph-contracts/vocab/m3-commands-events.json` and re-run `bun run gen`; do NOT widen the enum ' +
+				'unless a genuinely new object type is being introduced.'
+		).toEqual([]);
 	});
 
-	// CONTROL — the pin above passes for a reader that finds these seven and equally for one that finds nothing
-	// and is compared against a stale literal. This holds the discriminating half: the registry must be
-	// NON-EMPTY and most aggregates must be spelled ONE way, so a reader returning everything or nothing fails.
-	it('CONTROL — the census reads a real, mostly-consistent registry', () => {
+	// CONTROL — an empty `strays` list is produced equally by a registry with no strays and by a reader that
+	// resolves nothing, or by a membership set so large it accepts anything. This holds all three discriminating
+	// halves: the registry is real, the enum ACCEPTS the canonical spelling, and it REJECTS the exact spelling the
+	// repair removed. The third is the one that matters — without it, `members` could be `new Set(everything)`.
+	it('CONTROL — the registry is real and the membership test both accepts and rejects', () => {
 		const targets = Object.values(REGISTRY)
 			.map((s) => s.targetAggregateType)
 			.filter((v): v is string => v !== undefined);
 		expect(targets.length, 'the registry must be non-empty').toBeGreaterThan(100);
-		const distinct = new Set(targets.map(normalizeAggregate));
-		expect(distinct.size, 'most aggregates are spelled ONE way — 7 are not').toBeGreaterThan(7);
+		const members = new Set<string>(ProfessionalWorkObjectTypeSchema.options);
+		expect(members.has('PROFESSIONAL_WORK_UNIT'), 'the canonical spelling must be accepted').toBe(true);
+		expect(
+			members.has('ProfessionalWorkUnit'),
+			'the spelling REG-F-179 removed must still be REJECTED — otherwise this gate accepts what it was ' +
+				'written to forbid'
+		).toBe(false);
+		expect(normalizeAggregate('PROFESSIONAL_WORK_UNIT')).toBe(normalizeAggregate('ProfessionalWorkUnit'));
 	});
 });
