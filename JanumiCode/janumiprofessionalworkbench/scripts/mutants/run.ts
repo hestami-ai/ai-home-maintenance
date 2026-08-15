@@ -116,7 +116,24 @@ const sh = (
 	spawnSync(cmd, args, {
 		cwd,
 		encoding: 'utf8',
-		shell: true,
+		// ⚠ NO `shell: true`, AND ITS REMOVAL IS THE FIX FOR A MEASURED EVIDENCE LOSS (REG-F-176).
+		//
+		// Under Bun, a child that EXITED 0 having written more than 1,048,576 bytes was reported to this runner as
+		// `{ status: 1, signal: null, error: undefined, stdout: '' }` — a PASSING suite delivered as a failure with
+		// its evidence emptied, which the kill arm scored KILLED and `timeoutEvidence` could not see because it
+		// scans that buffer. All four combinations were measured:
+		//     shell:true  + no maxBuffer -> status 1,    0 bytes,  no error
+		//     shell:true  + maxBuffer64M -> status 1,    0 bytes,  no error   <- the knob is INERT under a shell
+		//     shell:false + no maxBuffer -> status null, 1.08 MB,  ENOBUFS    <- `nonCompletion` CATCHES this
+		//     shell:false + maxBuffer64M -> status 0,    1.26 MB,  no error   <- correct
+		// **The shell wrapper is what erases the evidence**, so `maxBuffer` alone could never work — REG-F-168
+		// removed it as an inert knob rather than keep a guard that provably cannot fire.
+		//
+		// ⚠ SAFE ON WINDOWS, AND MEASURED RATHER THAN ASSUMED. `shell: true` existed to resolve `bunx`; both
+		// `bunx vitest --version` and `bun --version` return status 0 with `shell: false` here, and a resolution
+		// failure would be LOUD (`ENOENT` through `nonCompletion`) rather than silent. Dropping the shell also
+		// removes an interpolation layer from every path this runner passes.
+		maxBuffer: 64 * 1024 * 1024,
 		env: { ...process.env, ...env },
 		// ⚠ NO `maxBuffer` HERE, AND ITS ABSENCE IS DELIBERATE (REG-F-168). I added `maxBuffer: 64MB` as the fix
 		// for the truncation described below, then DROVE it: **it changed nothing.** Measured under Bun, same
