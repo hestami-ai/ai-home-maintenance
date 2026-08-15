@@ -19,6 +19,42 @@
 // A verdict function that reads the world cannot be put under fixtures, and this whole file exists because the
 // previous one could not be.
 
+/**
+ * DID THE CHILD PROCESS ACTUALLY FINISH? — REG-F-168, and it is asked BEFORE any verdict is attributed.
+ *
+ * `run.ts` read exactly one field of the spawn result, `status`, and treated every non-zero value as proof that
+ * the mutation was caught. `spawnSync` reports three other outcomes through fields it never looked at:
+ *   - `signal` non-null — the child was KILLED (SIGTERM, an external `taskkill`, an OOM kill);
+ *   - `error` defined   — the spawn itself failed, or the output exceeded `maxBuffer` (ENOBUFS);
+ *   - `status` null     — either of the above; there is no exit code to read.
+ * All three arrived at `run.status === 0 ? SURVIVED : KILLED` and came out **KILLED**.
+ *
+ * ⚠ AND ONE OF THEM IS NOT HYPOTHETICAL ON THIS RUNTIME. MEASURED 2026-08-14: under Bun, `spawnSync` with this
+ * runner's exact options reports a child that **exited 0** and wrote more than 1,048,576 bytes as
+ * `{ status: 1, signal: null, error: undefined, stdout: '' }`. A PASSING suite, reported as a failure, with the
+ * evidence buffer emptied — indistinguishable at every field the runner inspects from a genuine kill, and
+ * `timeoutEvidence` blinded because it scans output that is now the empty string.
+ *
+ * So `status: 1` alone cannot be trusted either; `maxBuffer` is raised at the call site to make the truncation
+ * far less reachable, and this predicate catches the residue that still arrives as a non-completion.
+ */
+export interface SpawnOutcome {
+	readonly status: number | null;
+	readonly signal: NodeJS.Signals | null;
+	readonly error?: Error;
+}
+
+/** `null` when the process completed normally; otherwise WHY no verdict about the mutation is available. */
+export function nonCompletion(run: SpawnOutcome): string | null {
+	if (run.error !== undefined)
+		return `the child process did not run to completion (${run.error.name}: ${run.error.message}) — no verdict about this mutation is available`;
+	if (run.signal !== null)
+		return `the child process was KILLED by ${run.signal} rather than exiting — a signal is not a test result, so no verdict about this mutation is available`;
+	if (typeof run.status !== 'number')
+		return 'the child process reported no exit status at all — no verdict about this mutation is available';
+	return null;
+}
+
 export type ControlVerdict = 'CONTROL_HELD' | 'INCONCLUSIVE' | 'SURVIVED';
 
 export interface ControlGrade {

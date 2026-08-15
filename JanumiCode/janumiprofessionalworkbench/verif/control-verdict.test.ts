@@ -16,7 +16,7 @@
 // healthy, so a test over real runs could never enter the branches it exists to prove. The inputs here are exactly
 // what the runner observed at the call site — which is why `gradeControl` had to be made pure to be testable.
 import { describe, expect, it } from 'vitest';
-import { gradeControl } from '../scripts/mutants/verdict.js';
+import { gradeControl, nonCompletion } from '../scripts/mutants/verdict.js';
 
 const WHY = 'SURVIVAL IS THE FINDING — this branch is dead and its deadness is the record.';
 
@@ -78,5 +78,64 @@ describe('REG-F-165 — a control is graded on a DIFFERENCE, and a non-measureme
 			gradeControl(false, ['b.test.ts'], [], WHY).verdict
 		]);
 		expect([...verdicts].sort((x, y) => x.localeCompare(y))).toEqual(['CONTROL_HELD', 'SURVIVED']);
+	});
+});
+// ── REG-F-168: A PROCESS THAT NEVER REPORTED A TEST RESULT IS NOT A KILL ────────────────────────────────────
+//
+// The runner read exactly ONE field of the spawn result — `status` — and treated every non-zero value as proof
+// the mutation was caught. `spawnSync` reports three other outcomes through fields it never looked at: a child
+// killed by a SIGNAL, a spawn that ERRORED, and `status: null` where there is no exit code at all. All three
+// arrived at `run.status === 0 ? SURVIVED : KILLED` and came out KILLED — the gate stating a finding about a
+// guard on the strength of a process that never ran a test to completion.
+describe('REG-F-168 — a non-completion is a non-measurement, never a kill', () => {
+	it('a normal exit — zero or non-zero — is a COMPLETION, so the verdict arms may read it', () => {
+		expect(nonCompletion({ status: 0, signal: null })).toBeNull();
+		expect(nonCompletion({ status: 1, signal: null })).toBeNull();
+	});
+
+	it('a child KILLED BY A SIGNAL is not a test result', () => {
+		const why = nonCompletion({ status: null, signal: 'SIGTERM' });
+		expect(why).toContain('SIGTERM');
+		expect(why, 'the reason must say no verdict is available').toContain('no verdict');
+	});
+
+	it('a spawn that ERRORED is not a test result, and the reason names the error', () => {
+		const why = nonCompletion({
+			status: null,
+			signal: null,
+			error: Object.assign(new Error('stdout maxBuffer length exceeded'), { name: 'ENOBUFS' })
+		});
+		expect(why).toContain('ENOBUFS');
+		expect(why).toContain('maxBuffer');
+	});
+
+	it('a null status with no signal and no error is still a non-completion', () => {
+		expect(nonCompletion({ status: null, signal: null })).toContain('no exit status');
+	});
+
+	// ⚠ THE CASE THAT IS NOT HYPOTHETICAL ON THIS RUNTIME, AND THE ONE THIS PREDICATE CANNOT CATCH. MEASURED
+	// 2026-08-14 under Bun with the runner's exact `sh()` options: a child that EXITED 0 having written
+	// 1,048,577 bytes is reported as `{ status: 1, signal: null, error: undefined, stdout: '' }` — a PASSING
+	// suite, reported as a failure, with the evidence buffer emptied. It is a well-formed completion by every
+	// field available, so NOTHING here can distinguish it.
+	//
+	// ⚠ AND THE OBVIOUS FIX DOES NOT WORK — I DROVE IT. `maxBuffer: 64MB` at the spawn seam changed nothing:
+	// `shell: true` is the cause, and the knob cannot reach it (all four combinations measured at the seam in
+	// run.ts). Under `shell: false` the same overrun surfaces as ENOBUFS, which the predicate above DOES catch —
+	// so the shell wrapper is precisely what erases the evidence. The residual case is UNGUARDED today and is
+	// pinned here as a case rather than described as fixed.
+	it('CONTROL — the measured Bun truncation shape looks like a COMPLETION, which is why maxBuffer is the fix', () => {
+		expect(
+			nonCompletion({ status: 1, signal: null }),
+			'if this ever became non-null, the predicate would be guessing rather than reading'
+		).toBeNull();
+	});
+
+	// CONTROL — every assertion above is satisfied by a predicate that returns a string for everything, which
+	// would turn every mutant INCONCLUSIVE and block the gate forever while looking rigorous. This holds the
+	// discriminating half: the ordinary completions must stay null.
+	it('CONTROL — it does not refuse everything: ordinary completions remain measurable', () => {
+		const completions = [0, 1, 2, 137].map((status) => nonCompletion({ status, signal: null }));
+		expect(completions).toEqual([null, null, null, null]);
 	});
 });

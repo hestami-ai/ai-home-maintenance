@@ -18,7 +18,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
-import { gradeControl } from './verdict.js';
+import { gradeControl, nonCompletion } from './verdict.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -107,7 +107,24 @@ const sh = (
 	args: readonly string[],
 	cwd: string = ROOT,
 	env: NodeJS.ProcessEnv = {}
-) => spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: true, env: { ...process.env, ...env } });
+) =>
+	spawnSync(cmd, args, {
+		cwd,
+		encoding: 'utf8',
+		shell: true,
+		env: { ...process.env, ...env },
+		// ⚠ NO `maxBuffer` HERE, AND ITS ABSENCE IS DELIBERATE (REG-F-168). I added `maxBuffer: 64MB` as the fix
+		// for the truncation described below, then DROVE it: **it changed nothing.** Measured under Bun, same
+		// child, all four combinations:
+		//     shell:true  + no maxBuffer -> status 1,    0 bytes,  no error
+		//     shell:true  + maxBuffer64M -> status 1,    0 bytes,  no error   <- the knob is INERT
+		//     shell:false + no maxBuffer -> status null, 1.08 MB,  ENOBUFS
+		//     shell:false + maxBuffer64M -> status 0,    1.26 MB,  no error   <- correct
+		// So `shell: true` is the cause and `maxBuffer` cannot reach it. A knob that provably does nothing is the
+		// hollow this repository keeps deleting rather than keeping "just in case" — see the `createObject`
+		// exemption removed under REG-F-086 for the same reason. The real fix is dropping `shell: true`, which
+		// changes how every one of the 205 spawns resolves `bunx` on Windows and is its own increment.
+	});
 
 /**
  * Is the working tree free of MODIFICATIONS? The harness must never leave a mutant behind.
@@ -538,6 +555,13 @@ function runMutant(m: DeclaredMutant): Result {
 		// `SURVIVED — something asserts on prose`. Three false findings from one unrelated failure. The exit status
 		// cannot answer "did this mutation redden anything"; the DIFFERENCE against the unmutated baseline can, and
 		// it is the only question actually being asked.
+		// ⚠ DID THE PROCESS FINISH AT ALL? ASKED FIRST, BECAUSE EVERY ARM BELOW READS `status` AND CONCLUDES
+		// SOMETHING ABOUT THE MUTATION (REG-F-168). A child killed by a signal, a spawn that failed, or a
+		// `maxBuffer` overrun arrives here with `status` non-zero or null and used to be scored KILLED — the
+		// runner stating a finding about the guard on the strength of a process that never reported a test result.
+		// This is REG-F-116's rule applied to the fields it did not reach: a non-measurement must say so.
+		const incomplete = nonCompletion(run);
+		if (incomplete !== null) return { mutant: m, verdict: 'INCONCLUSIVE', detail: incomplete, victims };
 		if (m.expectSurvive !== undefined) return controlVerdict(m, run.status === 0);
 		if (run.status === 0)
 			return { mutant: m, verdict: 'SURVIVED', detail: summarise(out), victims };

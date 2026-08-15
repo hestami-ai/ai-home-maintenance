@@ -97,6 +97,15 @@ const SYNTHETIC = new Set(['REG-F-998', 'REG-F-999']);
 const FOREIGN = new Map([['REG-F-115', 'CSAA finding, allocated in 689ac61b; out of this programme’s remit']]);
 
 describe('register citations resolve', () => {
+	// ⚠ AN EXPLICIT TIMEOUT, BECAUSE THIS SCAN GROWS WITH THE REGISTER (REG-F-169). Both assertions here walk
+	// the whole canon corpus plus `packages/ verif/ scripts/ apps/ docs/`, and the register gained eleven entries
+	// in one session. Under `--project verif` load the CONTROL below crossed vitest's 5000 ms DEFAULT and failed
+	// with `Test timed out in 5000ms` — reproduced three times, and passing in 2.2 s when the file runs alone.
+	//
+	// ⚠⚠ AND IT WAS THE **CONTROL** THAT DIED FIRST, WHICH IS THE PART WORTH RECORDING. The control is what proves
+	// the reader sees real data rather than returning `[]` for everything; the assertion it guards was still
+	// green. So under load this file kept its CHECK and lost the EVIDENCE THAT THE CHECK WORKS — REG-F-136's
+	// finding that a slow suite takes the controls offline first, arriving here by a different route.
 	it('every REG id cited by the code names an entry that exists', () => {
 		const defined = definedIds();
 		const dangling = [...citedIds()]
@@ -109,7 +118,7 @@ describe('register citations resolve', () => {
 				'Either the entry was never written (write it), or the id is wrong (fix the citation). A commit ' +
 				'message naming an entry does not create one.'
 		).toEqual([]);
-	});
+	}, 30_000);
 
 	// CONTROL — `[]` is also what a reader that finds no citations returns, and what one that treats every id as
 	// defined returns. This pins that both halves see real data, and that a fabricated id IS caught.
@@ -137,5 +146,7 @@ describe('register citations resolve', () => {
 			[...citedIds().values()].filter((fs) => fs.some((f) => f.endsWith('.md'))).length,
 			'markdown citations must be seen, or REG-F-139’s escape route is still open'
 		).toBeGreaterThan(100);
-	});
+		// SAME BUDGET AS THE ASSERTION IT GUARDS — a control that dies first under load leaves the check standing
+		// with nothing proving it discriminates, which is exactly how this file failed before REG-F-169.
+	}, 30_000);
 });
