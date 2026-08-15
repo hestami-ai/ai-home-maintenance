@@ -114,6 +114,23 @@ import {
 	READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
+	SOURCE_ORIGIN_CORRELATION_AUTHORITY,
+	SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER,
+	SOURCE_ORIGIN_CORRELATION_CANONICAL_PROFILE,
+	SOURCE_ORIGIN_CORRELATION_CAPABILITY,
+	SOURCE_ORIGIN_CORRELATION_CAPABILITY_STATUS,
+	SOURCE_ORIGIN_CORRELATION_CURRENTNESS,
+	SOURCE_ORIGIN_CORRELATION_FRESHNESS,
+	SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_007_CONFORMANCE,
+	SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_008_CONFORMANCE,
+	SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_014_CONFORMANCE,
+	SOURCE_ORIGIN_CORRELATION_GATE_EFFECT,
+	SOURCE_ORIGIN_CORRELATION_METHOD,
+	SOURCE_ORIGIN_CORRELATION_NONCLAIMS,
+	SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION,
+	SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION,
+	SOURCE_ORIGIN_CORRELATION_SCHEMA_VERSION,
+	SOURCE_ORIGIN_CORRELATION_SELECTION,
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION,
@@ -157,6 +174,9 @@ import {
 	type SemanticCapability,
 	type StaticSemanticSnapshotProgressEvent,
 	type ResolveSubjectRequest,
+	type SourceOriginCorrelationBuildInputs,
+	type SourceOriginCorrelationProgressEvent,
+	type SourceOriginCorrelationSnapshot,
 	buildCallGraph,
 	buildConditionalExportResolution,
 	buildDeclarationContextAnalysis,
@@ -173,6 +193,7 @@ import {
 	buildStructuralModuleReachabilityAnalysis,
 	buildStructuralSccAnalysis,
 	buildReadWriteAccessGraph,
+	buildSourceOriginCorrelation,
 	buildStaticSemanticSnapshot,
 	buildStateMachineGraph,
 	canonicalSemanticJson,
@@ -204,6 +225,7 @@ import {
 	validateStructuralModuleReachabilityAnalysis,
 	validateStructuralSccAnalysis,
 	validateReadWriteAccessGraph,
+	validateSourceOriginCorrelation,
 	validateStateMachineGraph,
 	validateStateMachineTopologyObservation,
 	validateStaticSemanticSnapshot
@@ -219,6 +241,7 @@ type RepositorySmokeSuite =
 	| 'LOGICAL_GRAPH_COMPOSITION_ONLY'
 	| 'MODULE_RESOLUTION_TRACE_ONLY'
 	| 'PROJECT_CONTEXT_GRAPH_ONLY'
+	| 'SOURCE_ORIGIN_CORRELATION_ONLY'
 	| 'STRUCTURAL_MODULE_REACHABILITY_ONLY'
 	| 'STRUCTURAL_SCC_ONLY';
 
@@ -239,12 +262,14 @@ interface RepositorySmokeProjectionPlan {
 	readonly runStateMachineProjection: boolean;
 	readonly runStructuralModuleReachabilityAnalysis: boolean;
 	readonly runStructuralSccAnalysis: boolean;
+	readonly runSourceOriginCorrelation: boolean;
 	readonly suite: RepositorySmokeSuite;
 	readonly terminateAfterConditionalExportResolution: boolean;
 	readonly terminateAfterDeclarationContextAnalysis: boolean;
 	readonly terminateAfterLogicalGraphComposition: boolean;
 	readonly terminateAfterModuleResolutionTrace: boolean;
 	readonly terminateAfterProjectContextGraph: boolean;
+	readonly terminateAfterSourceOriginCorrelation: boolean;
 	readonly terminateAfterStructuralModuleReachabilityAnalysis: boolean;
 	readonly terminateAfterStructuralSccAnalysis: boolean;
 }
@@ -269,12 +294,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: true,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'COMMAND_HANDLER_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -295,12 +322,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: true,
 		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: true,
+		runSourceOriginCorrelation: false,
 		suite: 'FULL_SUITE',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -321,12 +350,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'LOGICAL_GRAPH_COMPOSITION_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: true,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -347,12 +378,42 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'PROJECT_CONTEXT_GRAPH_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: true,
+		terminateAfterSourceOriginCorrelation: false,
+		terminateAfterStructuralModuleReachabilityAnalysis: false,
+		terminateAfterStructuralSccAnalysis: false
+	},
+	SOURCE_ORIGIN_CORRELATION_ONLY: {
+		runIndependentSemanticRevalidation: false,
+		runCallGraph: false,
+		runCommandEventContractOverlay: false,
+		runConditionalExportResolution: false,
+		runDeclarationContextAnalysis: false,
+		runDependencyProviderComparison: false,
+		runGuardClassificationOverlay: false,
+		runLogicalGraphComposition: false,
+		runModuleDependencyGraph: false,
+		runModuleResolutionTrace: false,
+		runProjectContextGraph: false,
+		runReadWriteAccessGraph: false,
+		runRepositoryDiscoveryPreflight: false,
+		runStateMachineProjection: false,
+		runStructuralModuleReachabilityAnalysis: false,
+		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: true,
+		suite: 'SOURCE_ORIGIN_CORRELATION_ONLY',
+		terminateAfterConditionalExportResolution: false,
+		terminateAfterDeclarationContextAnalysis: false,
+		terminateAfterLogicalGraphComposition: false,
+		terminateAfterModuleResolutionTrace: false,
+		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: true,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -373,12 +434,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'CONDITIONAL_EXPORT_RESOLUTION_ONLY',
 		terminateAfterConditionalExportResolution: true,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -399,12 +462,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'MODULE_RESOLUTION_TRACE_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: true,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -425,12 +490,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'DECLARATION_CONTEXT_ANALYSIS_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: true,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -451,12 +518,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: true,
 		runStructuralSccAnalysis: false,
+		runSourceOriginCorrelation: false,
 		suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: true,
 		terminateAfterStructuralSccAnalysis: false
 	},
@@ -477,12 +546,14 @@ const REPOSITORY_SMOKE_PROJECTION_PLANS: Readonly<
 		runStateMachineProjection: false,
 		runStructuralModuleReachabilityAnalysis: false,
 		runStructuralSccAnalysis: true,
+		runSourceOriginCorrelation: false,
 		suite: 'STRUCTURAL_SCC_ONLY',
 		terminateAfterConditionalExportResolution: false,
 		terminateAfterDeclarationContextAnalysis: false,
 		terminateAfterLogicalGraphComposition: false,
 		terminateAfterModuleResolutionTrace: false,
 		terminateAfterProjectContextGraph: false,
+		terminateAfterSourceOriginCorrelation: false,
 		terminateAfterStructuralModuleReachabilityAnalysis: false,
 		terminateAfterStructuralSccAnalysis: true
 	}
@@ -523,6 +594,8 @@ function repositorySmokeSuite(value: string | undefined): RepositorySmokeSuite {
 		return 'LOGICAL_GRAPH_COMPOSITION_ONLY';
 	if (normalized === 'PROJECT_CONTEXT_GRAPH' || normalized === 'PROJECT_CONTEXT_GRAPH_ONLY')
 		return 'PROJECT_CONTEXT_GRAPH_ONLY';
+	if (normalized === 'SOURCE_ORIGIN_CORRELATION' || normalized === 'SOURCE_ORIGIN_CORRELATION_ONLY')
+		return 'SOURCE_ORIGIN_CORRELATION_ONLY';
 	if (normalized === 'FULL' || normalized === 'FULL_SUITE') return 'FULL_SUITE';
 	throw new Error(`Unsupported CSAA_REPOSITORY_SMOKE_SUITE: ${value}`);
 }
@@ -597,12 +670,14 @@ const COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS = [
 	'packages/rph-ports/tsconfig.json',
 	'packages/rph-projections/tsconfig.json'
 ] as const;
+const SOURCE_ORIGIN_CORRELATION_PROJECTS = ['packages/rph-contracts/tsconfig.json'] as const;
 
 function selectedProjectsForSmoke(
 	profile: RepositorySmokeProfile,
 	suite: RepositorySmokeSuite,
 	selector: string | undefined
 ): readonly string[] | null {
+	if (suite === 'SOURCE_ORIGIN_CORRELATION_ONLY') return SOURCE_ORIGIN_CORRELATION_PROJECTS;
 	return selector === 'all'
 		? null
 		: selector === undefined || selector === '1'
@@ -639,10 +714,42 @@ const CONDITIONAL_EXPORT_RESOLUTION_EXPORT_SUBPATH = '.' as const;
 const CONDITIONAL_EXPORT_RESOLUTION_EXPLICIT_CONDITIONS = ['source', 'types'] as const;
 const MODULE_RESOLUTION_TRACE_EXPLICIT_CONDITIONS = ['types'] as const;
 const DECLARATION_CONTEXT_ANALYSIS_EXPORT_NAME = 'RPH_CONTRACTS_VERSION' as const;
+const SOURCE_ORIGIN_CORRELATION_CONFIG_LOGICAL_PATH =
+	'packages/rph-contracts/tsconfig.json' as const;
+const SOURCE_ORIGIN_CORRELATION_SOURCE_LOGICAL_PATH =
+	'packages/rph-contracts/src/index.ts' as const;
+const SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH =
+	'packages/rph-contracts/dist/index.d.ts' as const;
+const SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH =
+	'packages/rph-contracts/dist/index.d.ts.map' as const;
+// These independently pinned local build-artifact capture facts are caller-supplied and ignored by
+// the worktree subject. They are absent from FrozenSubject and do not establish persisted/build
+// authority or filesystem currentness/freshness; CAP-014 binds their caller-visible bytes and
+// digests as exact request and artifact identities.
+const SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS = Object.freeze({
+	declarationMap: Object.freeze({
+		bytes: 305,
+		sha256: '6a38abed64a08f422493ddf4c98be7f556809a5273f5624a955698e170f5d6e2'
+	}),
+	targetDeclaration: Object.freeze({
+		bytes: 325,
+		sha256: 'ec320112b3cf6e5ebae8e439d7d63201b86577f11143e729f9cb2b19c60e4209'
+	})
+});
+const SOURCE_ORIGIN_CORRELATION_SELECTED_SOURCE_FACT = Object.freeze({
+	bytes: 850,
+	sha256: '35996650406dbc977d8156f4dd7bb0293cc821be6c1f37746a10776ffc8d4616',
+	textLength: 844
+});
+const SOURCE_ORIGIN_CORRELATION_REAL_SCALE_CENSUS_FACTS = Object.freeze({
+	inputRecords: 2_452_065,
+	inputStringCharacters: 111_900_013,
+	semanticSnapshotCanonicalBytes: 123_650_345
+});
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION =
-	'jan-csaa-repository-smoke-telemetry/1.11.0' as const;
+	'jan-csaa-repository-smoke-telemetry/1.12.0' as const;
 
 type RepositorySmokePhase =
 	| 'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING'
@@ -671,6 +778,7 @@ type RepositorySmokePhase =
 	| 'READ_WRITE_ACCESS_GRAPH'
 	| 'REPOSITORY_DISCOVERY_PREFLIGHT'
 	| 'SELECTED_SUBJECT_RESOLUTION'
+	| 'SOURCE_ORIGIN_CORRELATION'
 	| 'STATE_MACHINE_GRAPH_PROJECTION'
 	| 'STATE_MACHINE_TOPOLOGY_OBSERVATION'
 	| 'STATIC_SEMANTIC_SNAPSHOT_BUILD'
@@ -739,6 +847,7 @@ const STRUCTURAL_MODULE_REACHABILITY_ONLY_EXPECTED_SKIPPED_PHASES: readonly Repo
 	[
 		'REPOSITORY_DISCOVERY_PREFLIGHT',
 		'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+		'SOURCE_ORIGIN_CORRELATION',
 		'PROJECT_CONTEXT_GRAPH',
 		...STRUCTURAL_MODULE_REACHABILITY_ONLY_SKIPPED_PHASES
 	];
@@ -753,6 +862,7 @@ const STRUCTURAL_SCC_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase[] = [
 const STRUCTURAL_SCC_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	'SOURCE_ORIGIN_CORRELATION',
 	'PROJECT_CONTEXT_GRAPH',
 	...STRUCTURAL_SCC_ONLY_SKIPPED_PHASES
 ];
@@ -788,6 +898,7 @@ const LOGICAL_GRAPH_COMPOSITION_ONLY_COMPLETED_PHASES: readonly RepositorySmokeP
 const LOGICAL_GRAPH_COMPOSITION_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	'SOURCE_ORIGIN_CORRELATION',
 	'PROJECT_CONTEXT_GRAPH',
 	'CONDITIONAL_EXPORT_RESOLUTION',
 	'MODULE_RESOLUTION_TRACE',
@@ -834,6 +945,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase
 const PROJECT_CONTEXT_GRAPH_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	'SOURCE_ORIGIN_CORRELATION',
 	...PROJECT_CONTEXT_GRAPH_ONLY_DOWNSTREAM_SKIPPED_PHASES
 ];
 
@@ -853,6 +965,7 @@ const CONDITIONAL_EXPORT_RESOLUTION_ONLY_EXPECTED_SKIPPED_PHASES: readonly Repos
 	[
 		'REPOSITORY_DISCOVERY_PREFLIGHT',
 		'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+		'SOURCE_ORIGIN_CORRELATION',
 		...CONDITIONAL_EXPORT_RESOLUTION_ONLY_DOWNSTREAM_SKIPPED_PHASES
 	];
 
@@ -872,6 +985,7 @@ const MODULE_RESOLUTION_TRACE_ONLY_COMPLETED_PHASES: readonly RepositorySmokePha
 const MODULE_RESOLUTION_TRACE_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	'SOURCE_ORIGIN_CORRELATION',
 	...MODULE_RESOLUTION_TRACE_ONLY_DOWNSTREAM_SKIPPED_PHASES
 ];
 
@@ -892,7 +1006,49 @@ const DECLARATION_CONTEXT_ANALYSIS_ONLY_COMPLETED_PHASES: readonly RepositorySmo
 const DECLARATION_CONTEXT_ANALYSIS_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
 	'REPOSITORY_DISCOVERY_PREFLIGHT',
 	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	'SOURCE_ORIGIN_CORRELATION',
 	...DECLARATION_CONTEXT_ANALYSIS_ONLY_DOWNSTREAM_SKIPPED_PHASES
+];
+
+const SOURCE_ORIGIN_CORRELATION_ONLY_COMPLETED_PHASES: readonly RepositorySmokePhase[] = [
+	'SELECTED_SUBJECT_RESOLUTION',
+	'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+	'SOURCE_ORIGIN_CORRELATION'
+];
+
+const SOURCE_ORIGIN_CORRELATION_ONLY_DOWNSTREAM_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'PROJECT_CONTEXT_GRAPH',
+	'CONDITIONAL_EXPORT_RESOLUTION',
+	'MODULE_RESOLUTION_TRACE',
+	'DECLARATION_CONTEXT_ANALYSIS',
+	'MODULE_DEPENDENCY_GRAPH',
+	'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+	'STRUCTURAL_SCC_ANALYSIS',
+	'CALL_GRAPH',
+	'LOGICAL_GRAPH_COMPOSITION',
+	'READ_WRITE_ACCESS_GRAPH',
+	'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+	'STATE_MACHINE_GRAPH_PROJECTION',
+	'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+	'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+	'ARROW_COMMAND_CENSUS_OBSERVATION',
+	'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+	'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+	'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+	'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+	'COMMAND_HANDLER_STATIC_PROJECTION',
+	'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+	'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+	'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+	'DEPENDENCY_CRUISER_EXECUTION',
+	'DEPENDENCY_CRUISER_NORMALIZATION',
+	'DEPENDENCY_PROVIDER_COMPARISON'
+];
+
+const SOURCE_ORIGIN_CORRELATION_ONLY_EXPECTED_SKIPPED_PHASES: readonly RepositorySmokePhase[] = [
+	'REPOSITORY_DISCOVERY_PREFLIGHT',
+	'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+	...SOURCE_ORIGIN_CORRELATION_ONLY_DOWNSTREAM_SKIPPED_PHASES
 ];
 
 interface RepositorySmokeTelemetryOptions {
@@ -1147,6 +1303,12 @@ describe('repository smoke phase telemetry', () => {
 		);
 		expect(repositorySmokeSuite(' project_context_graph ')).toBe('PROJECT_CONTEXT_GRAPH_ONLY');
 		expect(repositorySmokeSuite(' project_context_graph_only ')).toBe('PROJECT_CONTEXT_GRAPH_ONLY');
+		expect(repositorySmokeSuite(' source_origin_correlation ')).toBe(
+			'SOURCE_ORIGIN_CORRELATION_ONLY'
+		);
+		expect(repositorySmokeSuite(' source_origin_correlation_only ')).toBe(
+			'SOURCE_ORIGIN_CORRELATION_ONLY'
+		);
 		expect(repositorySmokeSuite(' full ')).toBe('FULL_SUITE');
 		expect(repositorySmokeSuite(' full_suite ')).toBe('FULL_SUITE');
 		expect(() => repositorySmokeSuite('unknown')).toThrow(
@@ -1231,6 +1393,15 @@ describe('repository smoke phase telemetry', () => {
 		expect(() =>
 			assertRepositorySmokeSelection('STRUCTURAL', 'DECLARATION_CONTEXT_ANALYSIS_ONLY', '1')
 		).not.toThrow();
+		expect(() =>
+			assertRepositorySmokeSelection('FULL', 'SOURCE_ORIGIN_CORRELATION_ONLY', '1')
+		).toThrow('SOURCE_ORIGIN_CORRELATION_ONLY requires CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL.');
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'SOURCE_ORIGIN_CORRELATION_ONLY', 'all')
+		).toThrow('SOURCE_ORIGIN_CORRELATION_ONLY requires CSAA_REPOSITORY_SMOKE=1.');
+		expect(() =>
+			assertRepositorySmokeSelection('STRUCTURAL', 'SOURCE_ORIGIN_CORRELATION_ONLY', '1')
+		).not.toThrow();
 		expect(selectedProjectsForSmoke('FULL', 'FULL_SUITE', '1')).toEqual(REPRESENTATIVE_PROJECTS);
 		expect(selectedProjectsForSmoke('FULL', 'LOGICAL_GRAPH_COMPOSITION_ONLY', '1')).toEqual(
 			COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS
@@ -1250,6 +1421,12 @@ describe('repository smoke phase telemetry', () => {
 		expect(
 			selectedProjectsForSmoke('STRUCTURAL', 'DECLARATION_CONTEXT_ANALYSIS_ONLY', '1')
 		).toEqual(COMMAND_HANDLER_COMPILER_CLOSURE_PROJECTS);
+		expect(selectedProjectsForSmoke('STRUCTURAL', 'SOURCE_ORIGIN_CORRELATION_ONLY', '1')).toEqual([
+			'packages/rph-contracts/tsconfig.json'
+		]);
+		expect(selectedProjectsForSmoke('STRUCTURAL', 'SOURCE_ORIGIN_CORRELATION_ONLY', 'all')).toEqual(
+			['packages/rph-contracts/tsconfig.json']
+		);
 		expect(selectedProjectsForSmoke('FULL', 'FULL_SUITE', 'all')).toBeNull();
 		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.COMMAND_HANDLER_ONLY).toEqual({
 			runIndependentSemanticRevalidation: false,
@@ -1268,12 +1445,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: true,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'COMMAND_HANDLER_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1294,12 +1473,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: true,
 			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: true,
+			runSourceOriginCorrelation: false,
 			suite: 'FULL_SUITE',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1320,12 +1501,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'LOGICAL_GRAPH_COMPOSITION_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: true,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1346,12 +1529,42 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'PROJECT_CONTEXT_GRAPH_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: true,
+			terminateAfterSourceOriginCorrelation: false,
+			terminateAfterStructuralModuleReachabilityAnalysis: false,
+			terminateAfterStructuralSccAnalysis: false
+		});
+		expect(REPOSITORY_SMOKE_PROJECTION_PLANS.SOURCE_ORIGIN_CORRELATION_ONLY).toEqual({
+			runIndependentSemanticRevalidation: false,
+			runCallGraph: false,
+			runCommandEventContractOverlay: false,
+			runConditionalExportResolution: false,
+			runDeclarationContextAnalysis: false,
+			runDependencyProviderComparison: false,
+			runGuardClassificationOverlay: false,
+			runLogicalGraphComposition: false,
+			runModuleDependencyGraph: false,
+			runModuleResolutionTrace: false,
+			runProjectContextGraph: false,
+			runReadWriteAccessGraph: false,
+			runRepositoryDiscoveryPreflight: false,
+			runStateMachineProjection: false,
+			runStructuralModuleReachabilityAnalysis: false,
+			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: true,
+			suite: 'SOURCE_ORIGIN_CORRELATION_ONLY',
+			terminateAfterConditionalExportResolution: false,
+			terminateAfterDeclarationContextAnalysis: false,
+			terminateAfterLogicalGraphComposition: false,
+			terminateAfterModuleResolutionTrace: false,
+			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: true,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1372,12 +1585,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'CONDITIONAL_EXPORT_RESOLUTION_ONLY',
 			terminateAfterConditionalExportResolution: true,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1398,12 +1613,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'MODULE_RESOLUTION_TRACE_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: true,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1424,12 +1641,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'DECLARATION_CONTEXT_ANALYSIS_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: true,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1450,12 +1669,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: true,
 			runStructuralSccAnalysis: false,
+			runSourceOriginCorrelation: false,
 			suite: 'STRUCTURAL_MODULE_REACHABILITY_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: true,
 			terminateAfterStructuralSccAnalysis: false
 		});
@@ -1476,12 +1697,14 @@ describe('repository smoke phase telemetry', () => {
 			runStateMachineProjection: false,
 			runStructuralModuleReachabilityAnalysis: false,
 			runStructuralSccAnalysis: true,
+			runSourceOriginCorrelation: false,
 			suite: 'STRUCTURAL_SCC_ONLY',
 			terminateAfterConditionalExportResolution: false,
 			terminateAfterDeclarationContextAnalysis: false,
 			terminateAfterLogicalGraphComposition: false,
 			terminateAfterModuleResolutionTrace: false,
 			terminateAfterProjectContextGraph: false,
+			terminateAfterSourceOriginCorrelation: false,
 			terminateAfterStructuralModuleReachabilityAnalysis: false,
 			terminateAfterStructuralSccAnalysis: true
 		});
@@ -1494,6 +1717,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(STRUCTURAL_SCC_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'PROJECT_CONTEXT_GRAPH',
 			'CONDITIONAL_EXPORT_RESOLUTION',
 			'MODULE_RESOLUTION_TRACE',
@@ -1528,6 +1752,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(STRUCTURAL_MODULE_REACHABILITY_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'PROJECT_CONTEXT_GRAPH',
 			'CONDITIONAL_EXPORT_RESOLUTION',
 			'MODULE_RESOLUTION_TRACE',
@@ -1563,6 +1788,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(LOGICAL_GRAPH_COMPOSITION_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'PROJECT_CONTEXT_GRAPH',
 			'CONDITIONAL_EXPORT_RESOLUTION',
 			'MODULE_RESOLUTION_TRACE',
@@ -1595,6 +1821,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(PROJECT_CONTEXT_GRAPH_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'CONDITIONAL_EXPORT_RESOLUTION',
 			'MODULE_RESOLUTION_TRACE',
 			'DECLARATION_CONTEXT_ANALYSIS',
@@ -1630,6 +1857,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(CONDITIONAL_EXPORT_RESOLUTION_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'MODULE_RESOLUTION_TRACE',
 			'DECLARATION_CONTEXT_ANALYSIS',
 			'MODULE_DEPENDENCY_GRAPH',
@@ -1665,6 +1893,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(MODULE_RESOLUTION_TRACE_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'DECLARATION_CONTEXT_ANALYSIS',
 			'MODULE_DEPENDENCY_GRAPH',
 			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
@@ -1700,6 +1929,7 @@ describe('repository smoke phase telemetry', () => {
 		expect(DECLARATION_CONTEXT_ANALYSIS_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
 			'REPOSITORY_DISCOVERY_PREFLIGHT',
 			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'SOURCE_ORIGIN_CORRELATION',
 			'MODULE_DEPENDENCY_GRAPH',
 			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
 			'STRUCTURAL_SCC_ANALYSIS',
@@ -1723,6 +1953,51 @@ describe('repository smoke phase telemetry', () => {
 			'DEPENDENCY_CRUISER_NORMALIZATION',
 			'DEPENDENCY_PROVIDER_COMPARISON'
 		]);
+		expect(SOURCE_ORIGIN_CORRELATION_ONLY_COMPLETED_PHASES).toEqual([
+			'SELECTED_SUBJECT_RESOLUTION',
+			'STATIC_SEMANTIC_SNAPSHOT_BUILD',
+			'SOURCE_ORIGIN_CORRELATION'
+		]);
+		expect(SOURCE_ORIGIN_CORRELATION_ONLY_EXPECTED_SKIPPED_PHASES).toEqual([
+			'REPOSITORY_DISCOVERY_PREFLIGHT',
+			'STATIC_SEMANTIC_SNAPSHOT_VALIDATE_AND_SERIALIZE',
+			'PROJECT_CONTEXT_GRAPH',
+			'CONDITIONAL_EXPORT_RESOLUTION',
+			'MODULE_RESOLUTION_TRACE',
+			'DECLARATION_CONTEXT_ANALYSIS',
+			'MODULE_DEPENDENCY_GRAPH',
+			'STRUCTURAL_MODULE_REACHABILITY_ANALYSIS',
+			'STRUCTURAL_SCC_ANALYSIS',
+			'CALL_GRAPH',
+			'LOGICAL_GRAPH_COMPOSITION',
+			'READ_WRITE_ACCESS_GRAPH',
+			'STATE_MACHINE_TOPOLOGY_OBSERVATION',
+			'STATE_MACHINE_GRAPH_PROJECTION',
+			'ARROW_COMMAND_CENSUS_SUBJECT_SELECTION',
+			'ARROW_COMMAND_CENSUS_ARTIFACT_SET_BINDING',
+			'ARROW_COMMAND_CENSUS_OBSERVATION',
+			'ARROW_COMMAND_CENSUS_VALIDATE_AND_SERIALIZE',
+			'GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_BINDING',
+			'GUARD_ENFORCEMENT_LEDGER_OBSERVATION',
+			'GUARD_ENFORCEMENT_LEDGER_VALIDATE_AND_SERIALIZE',
+			'COMMAND_HANDLER_STATIC_PROJECTION',
+			'COMMAND_EVENT_CONTRACT_STATIC_OVERLAY',
+			'GUARD_CLASSIFICATION_STATIC_OVERLAY',
+			'COMMAND_DISPATCH_STATIC_TOPOLOGY',
+			'DEPENDENCY_CRUISER_EXECUTION',
+			'DEPENDENCY_CRUISER_NORMALIZATION',
+			'DEPENDENCY_PROVIDER_COMPARISON'
+		]);
+		const sourceOriginCorrelationPhasePartition = [
+			...SOURCE_ORIGIN_CORRELATION_ONLY_COMPLETED_PHASES,
+			...SOURCE_ORIGIN_CORRELATION_ONLY_EXPECTED_SKIPPED_PHASES
+		];
+		expect(sourceOriginCorrelationPhasePartition).toHaveLength(31);
+		expect(new Set(sourceOriginCorrelationPhasePartition)).toHaveLength(31);
+		expect(REPOSITORY_SMOKE_TELEMETRY_SCHEMA_VERSION).toBe(
+			'jan-csaa-repository-smoke-telemetry/1.12.0'
+		);
+		expect(SOURCE_ORIGIN_CORRELATION_PROJECTS).toEqual(['packages/rph-contracts/tsconfig.json']);
 		expect(semanticCapabilitiesForProfile('STRUCTURAL')).toEqual([
 			'TS_PROJECT',
 			'TS_SYMBOL',
@@ -2094,6 +2369,484 @@ describe('current JPWB repository semantic and graph smoke', () => {
 					0,
 					Math.round(performance.now() - semanticPipelineStartedAt)
 				);
+				if (SMOKE_PROJECTION_PLAN.runSourceOriginCorrelation) {
+					expect(semanticSnapshotWitness.bytes).toBe(
+						SOURCE_ORIGIN_CORRELATION_REAL_SCALE_CENSUS_FACTS.semanticSnapshotCanonicalBytes
+					);
+					if (!SMOKE_PROJECTION_PLAN.terminateAfterSourceOriginCorrelation)
+						throw new Error(
+							'SOURCE_ORIGIN_CORRELATION_ONLY must terminate after validated CAP-014 evidence.'
+						);
+					expect(projectPaths).toEqual([SOURCE_ORIGIN_CORRELATION_CONFIG_LOGICAL_PATH]);
+					expect(subject.projects).toHaveLength(1);
+					expect(snapshot.projects).toHaveLength(1);
+					expect(snapshot.programs).toHaveLength(1);
+					expect(snapshot.sources).toHaveLength(372);
+					expect(
+						subject.artifacts.some(
+							(artifact) =>
+								artifact.path === SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH ||
+								artifact.path === SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH
+						)
+					).toBe(false);
+					const matchingProjects = snapshot.projects.filter(
+						(project) => project.configPath === SOURCE_ORIGIN_CORRELATION_CONFIG_LOGICAL_PATH
+					);
+					const matchingSources = snapshot.sources.filter(
+						(source) => source.logicalPath === SOURCE_ORIGIN_CORRELATION_SOURCE_LOGICAL_PATH
+					);
+					expect(matchingProjects).toHaveLength(1);
+					expect(matchingSources).toHaveLength(1);
+					const selectedProject = matchingProjects[0];
+					const selectedSource = matchingSources[0];
+					if (selectedProject === undefined || selectedSource === undefined)
+						throw new Error('The exact CAP-014 semantic project/root source is unavailable.');
+					const selectedProgram = snapshot.programs.find(
+						(program) => program.id === selectedProject.programId
+					);
+					if (selectedProgram === undefined)
+						throw new Error('The exact CAP-014 semantic Program is unavailable.');
+					expect({
+						programRootSources: selectedProgram.rootSourceIds.length,
+						programSources: selectedProgram.sourceIds.length,
+						projectRootNames: selectedProject.rootNames.length,
+						projectSources: selectedProject.sourceIds.length
+					}).toEqual({
+						programRootSources: 28,
+						programSources: 372,
+						projectRootNames: 28,
+						projectSources: 372
+					});
+					expect(selectedProject.sourceIds).toEqual(selectedProgram.sourceIds);
+					expect(selectedSource).toMatchObject({
+						bytes: SOURCE_ORIGIN_CORRELATION_SELECTED_SOURCE_FACT.bytes,
+						contentSha256: SOURCE_ORIGIN_CORRELATION_SELECTED_SOURCE_FACT.sha256,
+						declarationFile: false,
+						logicalPath: SOURCE_ORIGIN_CORRELATION_SOURCE_LOGICAL_PATH,
+						origin: 'AUTHORED',
+						programId: selectedProgram.id,
+						projectId: selectedProject.id,
+						rootFile: true,
+						textLength: SOURCE_ORIGIN_CORRELATION_SELECTED_SOURCE_FACT.textLength
+					});
+					expect(selectedProgram.rootSourceIds).toContain(selectedSource.id);
+
+					const sourceOriginCorrelationStartedAt = performance.now();
+					telemetry.start('SOURCE_ORIGIN_CORRELATION', {
+						budgetClassification: 'PROVISIONAL_CALLER_OPERATION_BUDGETS_NOT_PRODUCT_CEILINGS',
+						declarationMapLogicalPath: SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH,
+						selectedSourceLogicalPath: SOURCE_ORIGIN_CORRELATION_SOURCE_LOGICAL_PATH,
+						targetDeclarationLogicalPath: SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH
+					});
+					const targetDeclarationBytes = new Uint8Array(
+						readFileSync(resolve(REPOSITORY_ROOT, SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH))
+					);
+					const declarationMapBytes = new Uint8Array(
+						readFileSync(resolve(REPOSITORY_ROOT, SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH))
+					);
+					const callerCaptureFacts = {
+						declarationMap: {
+							bytes: declarationMapBytes.byteLength,
+							sha256: sha256(declarationMapBytes)
+						},
+						targetDeclaration: {
+							bytes: targetDeclarationBytes.byteLength,
+							sha256: sha256(targetDeclarationBytes)
+						}
+					};
+					expect(callerCaptureFacts).toEqual({
+						declarationMap: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.declarationMap,
+						targetDeclaration: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.targetDeclaration
+					});
+					const sourceOriginCorrelationBudgets = {
+						maxCallerCaptureBytes: 16 * 1024 * 1024,
+						maxCompilerInputAttempts: 2_000_000,
+						maxCorrelations: 500_000,
+						maxDecodedMapLines: 1_000_000,
+						maxDecodedMapSegments: 500_000,
+						maxDiagnostics: 100_000,
+						maxDurationMs: REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS,
+						maxEmitBytes: 16 * 1024 * 1024,
+						maxEmitOutputs: 2,
+						maxEmitStringCharacters: 16 * 1024 * 1024,
+						maxInputRecords: 3_000_000,
+						maxInputStringCharacters: 128 * 1024 * 1024,
+						maxLocations: 1_000_000,
+						maxMappingsCharacters: 4 * 1024 * 1024,
+						maxOutputRecords: 2_100_000,
+						maxPathCharacters: 16_384,
+						maxProgramReadBytes: 512 * 1024 * 1024,
+						maxProgramSourceFiles: 100_000,
+						maxReadBytes: 528 * 1024 * 1024,
+						maxSourceMapJsonDepth: 256,
+						maxSourceMapJsonRecords: 1_000_000,
+						maxSourceTextCodeUnits: 16 * 1024 * 1024,
+						maxTraversalSteps: 250_000_000,
+						maxUnmappedGeneratedLines: 1_000_000
+					};
+					const sourceOriginCorrelationInputs: SourceOriginCorrelationBuildInputs = {
+						declarationMapBytes,
+						frozenSubject: subject,
+						request: {
+							budgets: sourceOriginCorrelationBudgets,
+							declarationMap: {
+								contentBytes: declarationMapBytes.byteLength,
+								contentSha256: callerCaptureFacts.declarationMap.sha256,
+								logicalPath: SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH
+							},
+							operationVersion: SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION,
+							schemaVersion: SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION,
+							selection: SOURCE_ORIGIN_CORRELATION_SELECTION,
+							semanticProgramId: selectedProgram.id,
+							semanticProjectId: selectedProject.id,
+							semanticSnapshotId: snapshot.id,
+							semanticSourceId: selectedSource.id,
+							subjectId: subject.descriptor.subjectId,
+							targetDeclaration: {
+								contentBytes: targetDeclarationBytes.byteLength,
+								contentSha256: callerCaptureFacts.targetDeclaration.sha256,
+								logicalPath: SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH
+							}
+						},
+						semanticSnapshot: snapshot,
+						targetDeclarationBytes
+					};
+					const sourceOriginCorrelationProgressEvents: SourceOriginCorrelationProgressEvent[] = [];
+					const sourceOriginCorrelationOutcome = buildSourceOriginCorrelation(
+						sourceOriginCorrelationInputs,
+						{
+							onProgress(event) {
+								sourceOriginCorrelationProgressEvents.push(event);
+								process.stdout.write(`${JSON.stringify(event)}\n`);
+							}
+						}
+					);
+					await Promise.resolve();
+					expect(
+						sourceOriginCorrelationOutcome.outcome,
+						JSON.stringify(sourceOriginCorrelationOutcome.diagnostics)
+					).toBe('partial');
+					if (sourceOriginCorrelationOutcome.outcome !== 'partial')
+						throw new Error(JSON.stringify(sourceOriginCorrelationOutcome));
+					expect(sourceOriginCorrelationOutcome.diagnostics).toEqual([]);
+					const sourceOriginInputBudgetEvent = sourceOriginCorrelationProgressEvents.find(
+						(event) => event.phase === 'INPUT_BUDGET' && event.state === 'COMPLETED'
+					);
+					expect(sourceOriginInputBudgetEvent?.counts).toEqual({
+						inputRecords: SOURCE_ORIGIN_CORRELATION_REAL_SCALE_CENSUS_FACTS.inputRecords,
+						inputStringCharacters:
+							SOURCE_ORIGIN_CORRELATION_REAL_SCALE_CENSUS_FACTS.inputStringCharacters
+					});
+					const sourceOriginCorrelation: SourceOriginCorrelationSnapshot =
+						sourceOriginCorrelationOutcome.analysis;
+					expect(
+						validateSourceOriginCorrelation(
+							sourceOriginCorrelation,
+							sourceOriginCorrelationInputs,
+							{
+								maxDepth: 4_096,
+								maxDurationMs: REPOSITORY_SMOKE_FAILSAFE_SEMANTIC_DURATION_MS,
+								maxInputRecords: sourceOriginCorrelationBudgets.maxInputRecords,
+								maxInputStringCharacters: sourceOriginCorrelationBudgets.maxInputStringCharacters,
+								maxIssues: sourceOriginCorrelationBudgets.maxDiagnostics,
+								maxRecords: sourceOriginCorrelationBudgets.maxInputRecords,
+								maxStringCharacters: sourceOriginCorrelationBudgets.maxInputStringCharacters
+							}
+						)
+					).toEqual({ issues: [], state: 'VALID' });
+					expect(
+						sourceOriginCorrelation.artifacts.map((artifact) => ({
+							bytes: artifact.bytes,
+							contentSha256: artifact.contentSha256,
+							logicalPath: artifact.logicalPath,
+							origin: artifact.origin,
+							role: artifact.role
+						}))
+					).toEqual([
+						{
+							bytes: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.targetDeclaration.bytes,
+							contentSha256:
+								SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.targetDeclaration.sha256,
+							logicalPath: SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH,
+							origin: 'GENERATED_DECLARATION',
+							role: 'TARGET_DECLARATION'
+						},
+						{
+							bytes: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.declarationMap.bytes,
+							contentSha256: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.declarationMap.sha256,
+							logicalPath: SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH,
+							origin: 'GENERATED',
+							role: 'EXTERNAL_DECLARATION_MAP'
+						},
+						{
+							bytes: SOURCE_ORIGIN_CORRELATION_SELECTED_SOURCE_FACT.bytes,
+							contentSha256: SOURCE_ORIGIN_CORRELATION_SELECTED_SOURCE_FACT.sha256,
+							logicalPath: SOURCE_ORIGIN_CORRELATION_SOURCE_LOGICAL_PATH,
+							origin: 'AUTHORED',
+							role: 'AUTHORED_SOURCE'
+						}
+					]);
+					expect(
+						sourceOriginCorrelation.emission.outputs.map((output) => ({
+							bytes: output.bytes,
+							contentSha256: output.contentSha256,
+							logicalPath: output.logicalPath,
+							role: output.role,
+							sourceFileSemanticSourceIds: output.sourceFileSemanticSourceIds,
+							writeByteOrderMark: output.writeByteOrderMark
+						}))
+					).toEqual([
+						{
+							bytes: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.targetDeclaration.bytes,
+							contentSha256:
+								SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.targetDeclaration.sha256,
+							logicalPath: SOURCE_ORIGIN_CORRELATION_TARGET_LOGICAL_PATH,
+							role: 'TARGET_DECLARATION',
+							sourceFileSemanticSourceIds: [selectedSource.id],
+							writeByteOrderMark: false
+						},
+						{
+							bytes: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.declarationMap.bytes,
+							contentSha256: SOURCE_ORIGIN_CORRELATION_CALLER_CAPTURE_FACTS.declarationMap.sha256,
+							logicalPath: SOURCE_ORIGIN_CORRELATION_MAP_LOGICAL_PATH,
+							role: 'EXTERNAL_DECLARATION_MAP',
+							sourceFileSemanticSourceIds: [selectedSource.id],
+							writeByteOrderMark: false
+						}
+					]);
+					expect(sourceOriginCorrelation.coverage).toMatchObject({
+						artifacts: 3,
+						authoredLocations: 38,
+						callerCaptureBytes: 630,
+						callerCaptureRecords: 2,
+						correlations: 38,
+						decodedLines: 9,
+						decodedSegments: 38,
+						emitBytes: 630,
+						emitDiagnostics: 0,
+						emitOutputs: 2,
+						exactMappings: 38,
+						generatedLocations: 38,
+						locations: 76,
+						mappingHealthRecords: 1,
+						mappingsCharacters: 201,
+						outputRecords: 160,
+						programSourceFiles: 372,
+						sourceMaps: 1,
+						unmappedGeneratedLines: 1
+					});
+					expect(sourceOriginCorrelation.coverage.chargedInputRecords).toBe(
+						sourceOriginCorrelation.coverage.programCompilerInputAttempts + 2
+					);
+					expect(sourceOriginCorrelation.coverage.readBytes).toBe(
+						sourceOriginCorrelation.coverage.programReadBytes + 630
+					);
+					expect(sourceOriginCorrelation.sourceMap).toMatchObject({
+						decodedLines: 9,
+						decodedSegments: 38,
+						file: 'index.d.ts',
+						format: 'SOURCE_MAP_V3',
+						mappingEncoding: 'BASE64_VLQ',
+						mappingsCharacters: 201,
+						names: [],
+						rawSources: ['../src/index.ts'],
+						sourceRoot: '',
+						sourcesContent: 'ABSENT',
+						version: 3
+					});
+					expect(sourceOriginCorrelation.segments).toHaveLength(38);
+					expect(sourceOriginCorrelation.locations).toHaveLength(76);
+					expect(sourceOriginCorrelation.correlations).toHaveLength(38);
+					expect(sourceOriginCorrelation.unmappedGeneratedLines).toHaveLength(1);
+					expect(sourceOriginCorrelation.unmappedGeneratedLines[0]).toMatchObject({
+						classification: 'SOURCE_MAPPING_URL_TRAILER',
+						line: 9,
+						state: 'UNMAPPED'
+					});
+					expect(sourceOriginCorrelation.mappingHealth).toMatchObject({
+						mappedSegments: 38,
+						mapParseHealth: 'VALID',
+						reverseLookup: 'TOTAL_UNIQUE_OVER_COMPLETE_MAPPED_SEGMENT_POPULATION',
+						sourcePathResolution: 'EXACT_REPOSITORY_INTERNAL',
+						state: 'EXACT'
+					});
+					expect(sourceOriginCorrelation.canonicalProfile).toBe(
+						SOURCE_ORIGIN_CORRELATION_CANONICAL_PROFILE
+					);
+					expect(sourceOriginCorrelation.capability).toBe(SOURCE_ORIGIN_CORRELATION_CAPABILITY);
+					expect(sourceOriginCorrelation.capabilityStatus).toBe(
+						SOURCE_ORIGIN_CORRELATION_CAPABILITY_STATUS
+					);
+					expect(sourceOriginCorrelation.method).toBe(SOURCE_ORIGIN_CORRELATION_METHOD);
+					expect(sourceOriginCorrelation.operationVersion).toBe(
+						SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION
+					);
+					expect(sourceOriginCorrelation.schemaVersion).toBe(
+						SOURCE_ORIGIN_CORRELATION_SCHEMA_VERSION
+					);
+					expect(sourceOriginCorrelation.selection).toEqual(SOURCE_ORIGIN_CORRELATION_SELECTION);
+					expect(sourceOriginCorrelation.analysisAuthority).toBe(
+						SOURCE_ORIGIN_CORRELATION_AUTHORITY
+					);
+					expect(sourceOriginCorrelation.authorityTransfer).toBe(
+						SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER
+					);
+					expect(sourceOriginCorrelation.gateEffect).toBe(SOURCE_ORIGIN_CORRELATION_GATE_EFFECT);
+					expect(sourceOriginCorrelation.freshness).toBe(SOURCE_ORIGIN_CORRELATION_FRESHNESS);
+					expect(sourceOriginCorrelation.currentness).toBe(SOURCE_ORIGIN_CORRELATION_CURRENTNESS);
+					expect(sourceOriginCorrelation.fullJanCsaa014Conformance).toBe(
+						SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_014_CONFORMANCE
+					);
+					expect(sourceOriginCorrelation.fullJanCsaa007Conformance).toBe(
+						SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_007_CONFORMANCE
+					);
+					expect(sourceOriginCorrelation.fullJanCsaa008Conformance).toBe(
+						SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_008_CONFORMANCE
+					);
+					expect(sourceOriginCorrelation.nonclaims).toEqual(SOURCE_ORIGIN_CORRELATION_NONCLAIMS);
+					expect(sourceOriginCorrelation.health).toBe('PARTIAL');
+					expect(sourceOriginCorrelation.truncation).toEqual({
+						reason: null,
+						state: 'NOT_TRUNCATED'
+					});
+					expect(sourceOriginCorrelation.semanticProgramId).toBe(selectedProgram.id);
+					expect(sourceOriginCorrelation.semanticProjectId).toBe(selectedProject.id);
+					expect(sourceOriginCorrelation.semanticSourceId).toBe(selectedSource.id);
+					expect(sourceOriginCorrelation.emission.programSourceFiles).toBe(
+						selectedProgram.sourceIds.length
+					);
+					expect(sourceOriginCorrelation.emission.programCompilerInputAttempts).toBeGreaterThan(0);
+					expect(sourceOriginCorrelation.emission.programInputAttemptPopulationReconciles).toBe(
+						true
+					);
+					expect(sourceOriginCorrelation.emission.programSourceFilePopulationReconciles).toBe(true);
+					expect(
+						sourceOriginCorrelation.emission.declarationEmitCallbacksUseOnlyAttributedQueries
+					).toBe(true);
+					expect(
+						sourceOriginCorrelation.emission.programCallbacksWithinAttributedInvocationBounds
+					).toBe(true);
+					const sourceOriginCorrelationWitness =
+						canonicalSemanticJsonWitness(sourceOriginCorrelation);
+					const sourceOriginCorrelationResult = {
+						analysisAuthority: sourceOriginCorrelation.analysisAuthority,
+						analysisId: sourceOriginCorrelation.id,
+						artifacts: sourceOriginCorrelation.artifacts.length,
+						authorityTransfer: sourceOriginCorrelation.authorityTransfer,
+						bytes: sourceOriginCorrelationWitness.bytes,
+						callerCaptureBytes: sourceOriginCorrelation.coverage.callerCaptureBytes,
+						capability: sourceOriginCorrelation.capability,
+						capabilityStatus: sourceOriginCorrelation.capabilityStatus,
+						contentDigest: sourceOriginCorrelation.contentDigest,
+						correlations: sourceOriginCorrelation.correlations.length,
+						currentness: sourceOriginCorrelation.currentness,
+						decodedLines: sourceOriginCorrelation.coverage.decodedLines,
+						decodedSegments: sourceOriginCorrelation.coverage.decodedSegments,
+						durationMs: Math.max(
+							0,
+							Math.round(performance.now() - sourceOriginCorrelationStartedAt)
+						),
+						freshness: sourceOriginCorrelation.freshness,
+						fullJanCsaa007Conformance: sourceOriginCorrelation.fullJanCsaa007Conformance,
+						fullJanCsaa008Conformance: sourceOriginCorrelation.fullJanCsaa008Conformance,
+						fullJanCsaa014Conformance: sourceOriginCorrelation.fullJanCsaa014Conformance,
+						gateEffect: sourceOriginCorrelation.gateEffect,
+						health: sourceOriginCorrelation.health,
+						inputDigest: sourceOriginCorrelation.inputDigest,
+						locations: sourceOriginCorrelation.locations.length,
+						nonclaims: sourceOriginCorrelation.nonclaims,
+						programCompilerInputAttempts:
+							sourceOriginCorrelation.coverage.programCompilerInputAttempts,
+						programReadBytes: sourceOriginCorrelation.coverage.programReadBytes,
+						programSourceFiles: sourceOriginCorrelation.coverage.programSourceFiles,
+						selectedSourceLogicalPath: SOURCE_ORIGIN_CORRELATION_SOURCE_LOGICAL_PATH,
+						sha256: sourceOriginCorrelationWitness.sha256,
+						unmappedGeneratedLines: sourceOriginCorrelation.unmappedGeneratedLines.length
+					};
+					telemetry.complete({
+						artifacts: sourceOriginCorrelationResult.artifacts,
+						callerCaptureBytes: sourceOriginCorrelationResult.callerCaptureBytes,
+						correlations: sourceOriginCorrelationResult.correlations,
+						decodedSegments: sourceOriginCorrelationResult.decodedSegments,
+						locations: sourceOriginCorrelationResult.locations,
+						progressEvents: sourceOriginCorrelationProgressEvents.length,
+						validationState: 'VALID'
+					});
+					for (const phase of SOURCE_ORIGIN_CORRELATION_ONLY_DOWNSTREAM_SKIPPED_PHASES)
+						telemetry.skip(phase, {
+							reason:
+								'The source-origin-correlation-only suite terminates after one exact fresh declaration-map correlation.',
+							reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+						});
+					const phaseDurationsMs = telemetry.phaseDurationsMs();
+					const skippedPhases = telemetry.skippedPhases();
+					const completedPhases = Object.keys(phaseDurationsMs);
+					expect(completedPhases).toEqual(SOURCE_ORIGIN_CORRELATION_ONLY_COMPLETED_PHASES);
+					expect(skippedPhases).toEqual(SOURCE_ORIGIN_CORRELATION_ONLY_EXPECTED_SKIPPED_PHASES);
+					telemetry.finish({
+						completedPhases,
+						projects: snapshot.projects.length,
+						semanticSnapshotOutcome: outcome.outcome,
+						semanticProfile: SMOKE_PROFILE,
+						skippedPhases,
+						smokeSuite: SMOKE_SUITE,
+						sourceOriginCorrelated: true,
+						sources: snapshot.sources.length,
+						terminalPhase: 'SOURCE_ORIGIN_CORRELATION'
+					});
+					process.stdout.write(
+						`${JSON.stringify({
+							arrowCommandCensus: null,
+							callGraph: null,
+							commandEventContractStaticOverlay: null,
+							commandDispatchStaticTopology: null,
+							commandHandlerStaticProjection: null,
+							completedPhases,
+							conditionalExportResolution: null,
+							declarationContextAnalysis: null,
+							dependencyProviderComparison: null,
+							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
+							exactSubjectReuse: null,
+							guardClassificationStaticOverlay: null,
+							guardEnforcementLedger: null,
+							logicalGraphComposition: null,
+							moduleDependencyGraph: null,
+							moduleResolutionTrace: null,
+							phaseDurationsMs,
+							projectContextGraph: null,
+							projectCount: snapshot.projects.length,
+							readWriteAccessGraph: null,
+							selectedSubjectArtifactBytes: subjectArtifactBytes,
+							selectedSubjectArtifactCount: subject.artifacts.length,
+							selectedSubjectId: subject.descriptor.subjectId,
+							selector: SMOKE_SELECTOR ?? null,
+							semanticPipelineDurationMs,
+							semanticProfile: SMOKE_PROFILE,
+							semanticSnapshotMemoryHighWaterBytes: semanticMemoryHighWaterBytes,
+							semanticSnapshotOutcome: outcome.outcome,
+							semanticSnapshotPhaseDurationsMs: semanticPhaseDurationsMs,
+							semanticSnapshotProgressEvents: semanticProgressEvents.length,
+							semanticSnapshotWitness,
+							skippedPhases,
+							smokeSuite: SMOKE_SUITE,
+							sourceCount: snapshot.sources.length,
+							sourceOriginCorrelation: sourceOriginCorrelationResult,
+							stateMachine: null,
+							structuralModuleReachabilityAnalysis: null,
+							structuralSccAnalysis: null,
+							terminalPhase: 'SOURCE_ORIGIN_CORRELATION'
+						})}\n`
+					);
+					return;
+				} else
+					telemetry.skip('SOURCE_ORIGIN_CORRELATION', {
+						reason: 'The selected smoke suite does not request source-origin correlation.',
+						reasonCode: 'SUITE_PHASE_NOT_REQUESTED'
+					});
+				if (SMOKE_PROJECTION_PLAN.terminateAfterSourceOriginCorrelation)
+					throw new Error(
+						'Terminal source-origin-correlation selection requires its projection phase.'
+					);
 				let projectContextGraph: ProjectContextGraphSnapshot | null = null;
 				let projectContextGraphResult: null | {
 					readonly bytes: number;
@@ -2789,6 +3542,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: conditionalExportResolutionResult,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -3142,6 +3896,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: conditionalExportResolutionResult,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -3660,6 +4415,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: conditionalExportResolutionResult,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -3734,6 +4490,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: null,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -4119,6 +4876,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: null,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -4314,6 +5072,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: null,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -4688,6 +5447,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 							commandHandlerStaticProjection: null,
 							conditionalExportResolution: null,
 							declarationContextAnalysis: declarationContextAnalysisResult,
+							sourceOriginCorrelation: null,
 							dependencyProviderComparison: null,
 							event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 							exactSubjectReuse: null,
@@ -6210,6 +6970,7 @@ describe('current JPWB repository semantic and graph smoke', () => {
 						commandHandlerStaticProjection: commandHandlerResult,
 						conditionalExportResolution: conditionalExportResolutionResult,
 						declarationContextAnalysis: declarationContextAnalysisResult,
+						sourceOriginCorrelation: null,
 						dependencyProviderComparison: dependencyProviderResult,
 						event: 'CSAA_REPOSITORY_SMOKE_RESULT',
 						exactSubjectReuse,

@@ -2590,7 +2590,11 @@ function materializeAnalysis(
 	const programInputAttempts: DeclarationContextProgramInputAttemptRecord[] = [];
 	for (const inputRecord of derived.evidence.inputRecords) {
 		deadline.step();
-		if (inputRecord.stage === 'DECLARATION_ARTIFACT_PARSE') continue;
+		if (
+			inputRecord.stage === 'DECLARATION_ARTIFACT_PARSE' ||
+			inputRecord.stage === 'DECLARATION_EMIT'
+		)
+			continue;
 		const ordinal = programInputAttempts.length;
 		if (inputRecord.ordinal !== ordinal)
 			throw new DeclarationContextAnalysisFailure(

@@ -102,6 +102,21 @@ import {
 	PROJECT_CONTEXT_GRAPH_SELECTION
 } from '../contracts/project-context-graph.js';
 import {
+	SOURCE_ORIGIN_CORRELATION_AUTHORITY,
+	SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER,
+	SOURCE_ORIGIN_CORRELATION_CAPABILITY,
+	SOURCE_ORIGIN_CORRELATION_CAPABILITY_STATUS,
+	SOURCE_ORIGIN_CORRELATION_CURRENTNESS,
+	SOURCE_ORIGIN_CORRELATION_FRESHNESS,
+	SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_007_CONFORMANCE,
+	SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_008_CONFORMANCE,
+	SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_014_CONFORMANCE,
+	SOURCE_ORIGIN_CORRELATION_GATE_EFFECT,
+	SOURCE_ORIGIN_CORRELATION_METHOD,
+	SOURCE_ORIGIN_CORRELATION_NONCLAIMS,
+	SOURCE_ORIGIN_CORRELATION_SELECTION
+} from '../contracts/source-origin-correlation.js';
+import {
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_CAPABILITY_STATUS,
@@ -151,6 +166,8 @@ const MODULE_RESOLUTION_TRACE_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=MODULE_RESOLUTION_TRACE vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=DECLARATION_CONTEXT_ANALYSIS vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const SOURCE_ORIGIN_CORRELATION_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=SOURCE_ORIGIN_CORRELATION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_LOGICAL_GRAPH_COMPOSITION_SELECTORLESS_SMOKE_COMMAND =
@@ -219,6 +236,26 @@ const DECLARATION_CONTEXT_ANALYSIS_PROVENANCE = [
 	'packages/csaa/src/semantic/validate-declaration-context-analysis.test.ts',
 	'packages/csaa/src/semantic/validate-declaration-context-analysis.ts'
 ] as const;
+const SOURCE_ORIGIN_CORRELATION_PROVENANCE = [
+	'package.json',
+	'packages/csaa/src/contracts/source-origin-correlation.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/providers/source-map/decode-source-map-v3.test.ts',
+	'packages/csaa/src/providers/source-map/decode-source-map-v3.ts',
+	'packages/csaa/src/providers/typescript/compiler-project-declaration-emission.test.ts',
+	'packages/csaa/src/providers/typescript/compiler-project-declaration-emission.ts',
+	'packages/csaa/src/semantic/build-source-origin-correlation.test.ts',
+	'packages/csaa/src/semantic/build-source-origin-correlation.ts',
+	'packages/csaa/src/semantic/compiler-project-program-capability.test.ts',
+	'packages/csaa/src/semantic/compiler-project-program-capability.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts',
+	'packages/csaa/src/semantic/source-origin-correlation-canonical.test.ts',
+	'packages/csaa/src/semantic/source-origin-correlation-canonical.ts',
+	'packages/csaa/src/semantic/source-origin-correlation-fixture.test-support.ts',
+	'packages/csaa/src/semantic/validate-source-origin-correlation.test.ts',
+	'packages/csaa/src/semantic/validate-source-origin-correlation.ts'
+] as const;
 
 function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:semantic:smoke:conditional-export-resolution') {
@@ -226,6 +263,9 @@ function jpwbFixtureScriptCommand(name: string): string {
 	}
 	if (name === 'csaa:semantic:smoke:declaration-context-analysis') {
 		return DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND;
+	}
+	if (name === 'csaa:semantic:smoke:source-origin-correlation') {
+		return SOURCE_ORIGIN_CORRELATION_ONLY_SMOKE_COMMAND;
 	}
 	if (name === 'csaa:semantic:smoke:module-resolution-trace') {
 		return MODULE_RESOLUTION_TRACE_ONLY_SMOKE_COMMAND;
@@ -357,6 +397,7 @@ describe('inventory discovery and identity', () => {
 			'module-resolution-trace',
 			'project-context-graph',
 			'read-write-access-projection',
+			'source-origin-correlation',
 			'structural-module-reachability-analysis',
 			'structural-scc-analysis'
 		]);
@@ -395,6 +436,7 @@ describe('inventory discovery and identity', () => {
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
@@ -973,6 +1015,59 @@ describe('inventory discovery and identity', () => {
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
 			expect(declarationContextAnalysisCapability!.explanation).toContain(boundary);
+		const sourceOriginCorrelationCapability = capabilities.get('source-origin-correlation');
+		expect(sourceOriginCorrelationCapability).toMatchObject({
+			provider: 'typescript+verified-project-capture-source-origin-correlation',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
+			'capabilities#typescript-ast',
+			'package.json#/scripts/csaa:semantic:smoke:source-origin-correlation'
+		])
+			expect(sourceOriginCorrelationCapability!.provenance).toContain(expectedProvenance);
+		expect(sourceOriginCorrelationCapability!.provenance).not.toContain(
+			'capabilities#declaration-context-analysis'
+		);
+		expect(new Set(sourceOriginCorrelationCapability!.provenance).size).toBe(
+			sourceOriginCorrelationCapability!.provenance.length
+		);
+		expect(sourceOriginCorrelationCapability!.provenance).toEqual(
+			[...sourceOriginCorrelationCapability!.provenance].sort()
+		);
+		for (const exactBoundary of [
+			SOURCE_ORIGIN_CORRELATION_METHOD,
+			SOURCE_ORIGIN_CORRELATION_CAPABILITY,
+			SOURCE_ORIGIN_CORRELATION_CAPABILITY_STATUS,
+			SOURCE_ORIGIN_CORRELATION_AUTHORITY,
+			SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER,
+			SOURCE_ORIGIN_CORRELATION_GATE_EFFECT,
+			SOURCE_ORIGIN_CORRELATION_FRESHNESS,
+			SOURCE_ORIGIN_CORRELATION_CURRENTNESS,
+			SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_014_CONFORMANCE,
+			SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_007_CONFORMANCE,
+			SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_008_CONFORMANCE,
+			JSON.stringify(SOURCE_ORIGIN_CORRELATION_SELECTION),
+			...SOURCE_ORIGIN_CORRELATION_NONCLAIMS
+		])
+			expect(sourceOriginCorrelationCapability!.explanation).toContain(exactBoundary);
+		for (const boundary of [
+			'A second bounded DWP-003 semantic-completion increment',
+			'self-contained request over one exact FrozenSubject and its exact StaticSemanticSnapshot',
+			'has no capability predecessor and does not consume or depend on JAN-CSAA-CAP-013',
+			'exactly one selected authored root source',
+			'strictly decodes the complete flat external source-map v3 mappings population',
+			'exact unique zero-width generated/authored location pairs and bidirectional correlations',
+			'operation unavailable rather than producing a truncated or partially mapped result',
+			'caller-supplied ignored local build-artifact captures that are absent from FrozenSubject',
+			'not checked-in build outputs, FrozenSubject evidence, freshness evidence, or currentness evidence',
+			'no declaration, source, build, finding, gate, or remediation authority is conferred',
+			'complete for only the exact request selection, NOT_TRUNCATED',
+			'package root publicly exports buildSourceOriginCorrelation and validateSourceOriginCorrelation',
+			'dedicated STRUCTURAL-profile source-origin-correlation-only smoke command',
+			'CONFIGURED_NOT_RUN by inventory generation'
+		])
+			expect(sourceOriginCorrelationCapability!.explanation).toContain(boundary);
 		const typescriptAstCapability = capabilities.get('typescript-ast');
 		expect(typescriptAstCapability).toBeDefined();
 		expect(typescriptAstCapability!.provider).toBe('typescript');
@@ -1121,7 +1216,9 @@ describe('inventory discovery and identity', () => {
 				'capabilities#conditional-export-resolution',
 				'capabilities#declaration-context-analysis',
 				'capabilities#module-resolution-trace',
+				'capabilities#source-origin-correlation',
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
 				'packages/csaa/src/graph/build-logical-graph-composition.ts',
 				'packages/csaa/src/graph/validate-logical-graph-composition.ts',
@@ -1182,14 +1279,17 @@ describe('inventory discovery and identity', () => {
 			'bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor'
 		);
 		expect(semanticBoundary).toContain(
-			'A separate bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target'
+			'One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target'
+		);
+		expect(semanticBoundary).toContain(
+			'A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission'
 		);
 		expect(semanticBoundary).toContain(
 			"complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations"
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, and declaration context analysis smoke commands'
+			'does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
 		);
 		expect(semanticBoundary).toContain(
 			'JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice'
@@ -1198,7 +1298,10 @@ describe('inventory discovery and identity', () => {
 			'conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions'
 		);
 		expect(semanticBoundary).toContain(
-			'broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by this slice, CAP-023 generated-to-authored lineage'
+			'broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice'
+		);
+		expect(semanticBoundary).toContain(
+			'source-map range inference or formats beyond the strict selected external declaration map, filesystem freshness/currentness after capture, checked-in build-output provenance or build authority from ignored local caller captures'
 		);
 		expect(semanticBoundary).toContain('JAN-CSAA-CAP-030 code slicing');
 		expect(semanticBoundary).toContain(
@@ -1264,11 +1367,12 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/resolution/build-module-resolution-trace.ts',
 				'packages/csaa/src/resolution/validate-module-resolution-trace.ts',
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}`
@@ -1323,6 +1427,21 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			'selected same-root zero-hop direct or one-hop local-only explicit-ExportSpecifier declaration-binding slice is implemented without conferring authority over broader declaration, merge, augmentation, ambient-effect, CAP-002, or CAP-023 surfaces'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`source origin correlation has analysis authority ${SOURCE_ORIGIN_CORRELATION_AUTHORITY}, authority transfer ${SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER}, and gate effect ${SOURCE_ORIGIN_CORRELATION_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`freshness is ${SOURCE_ORIGIN_CORRELATION_FRESHNESS}, currentness is ${SOURCE_ORIGIN_CORRELATION_CURRENTNESS}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'without a CAP-013 predecessor and implements only the strict external flat version-3 declaration-map slice'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'ignored local target and map captures are absent from FrozenSubject and are neither checked-in build-output provenance nor freshness, currentness, or build-authority evidence'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`Full JAN-CSAA-014 conformance is ${SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_014_CONFORMANCE}, full JAN-CSAA-007 conformance is ${SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_008_CONFORMANCE}`
 		);
 		for (const boundary of [
 			'complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure',
@@ -1718,6 +1837,7 @@ describe('JPWB population non-vacuity', () => {
 				'test:coverage',
 				'csaa:semantic:smoke:conditional-export-resolution',
 				'csaa:semantic:smoke:declaration-context-analysis',
+				'csaa:semantic:smoke:source-origin-correlation',
 				'csaa:semantic:smoke:module-resolution-trace',
 				'csaa:semantic:smoke:command-event-contract',
 				'csaa:semantic:smoke:guard-classification',
@@ -1812,6 +1932,28 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow(
 			'Required JPWB assurance command is absent: csaa:semantic:smoke:declaration-context-analysis'
+		);
+
+		const missingSourceOriginCorrelationSmoke = fixture();
+		write(
+			missingSourceOriginCorrelationSmoke,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:semantic:smoke:source-origin-correlation'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingSourceOriginCorrelationSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:semantic:smoke:source-origin-correlation'
 		);
 
 		const missingModuleResolutionTraceSmoke = fixture();
@@ -2001,6 +2143,24 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:declaration-context-analysis'
 		);
 
+		const incompatibleSourceOriginCorrelationSmoke = fixture();
+		write(
+			incompatibleSourceOriginCorrelationSmoke,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:semantic:smoke:source-origin-correlation': LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleSourceOriginCorrelationSmoke,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:source-origin-correlation'
+		);
+
 		const selectorlessModuleResolutionTraceSmoke = fixture();
 		write(
 			selectorlessModuleResolutionTraceSmoke,
@@ -2100,7 +2260,7 @@ describe('JPWB population non-vacuity', () => {
 		).toThrow(
 			'Required JPWB TypeScript semantic implementation source is absent: packages/csaa/src/contracts/semantic.ts'
 		);
-	});
+	}, 120_000);
 
 	it('rejects a missing arrow-command adapter provenance path after all prior populations pass', () => {
 		const root = fixture();
@@ -2121,6 +2281,7 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:declaration-context-analysis',
+						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
@@ -2218,6 +2379,7 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:declaration-context-analysis',
+						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
@@ -2280,6 +2442,7 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:declaration-context-analysis',
+						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
@@ -2381,7 +2544,8 @@ describe('JPWB population non-vacuity', () => {
 			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 			...MODULE_RESOLUTION_TRACE_PROVENANCE,
-			...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE
+			...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+			...SOURCE_ORIGIN_CORRELATION_PROVENANCE.filter((path) => path !== 'package.json')
 		];
 		for (const path of requiredPaths)
 			write(root, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
@@ -2512,6 +2676,19 @@ describe('JPWB population non-vacuity', () => {
 			);
 			write(root, missingDeclarationContextAnalysisPath, 'export {};\n');
 		}
+		for (const missingSourceOriginCorrelationPath of SOURCE_ORIGIN_CORRELATION_PROVENANCE.filter(
+			(path) =>
+				path !== 'package.json' &&
+				!DECLARATION_CONTEXT_ANALYSIS_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingSourceOriginCorrelationPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB source origin correlation implementation or verification source is absent: ${missingSourceOriginCorrelationPath}`
+			);
+			write(root, missingSourceOriginCorrelationPath, 'export {};\n');
+		}
 		const sharedRepositorySmokePath = 'packages/csaa/src/semantic/repository-smoke.test.ts';
 		rmSync(join(root, ...sharedRepositorySmokePath.split('/')));
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
@@ -2551,6 +2728,16 @@ describe('JPWB population non-vacuity', () => {
 		).toMatchObject({
 			categories: ['OTHER'],
 			command: DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:semantic:smoke:source-origin-correlation'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: SOURCE_ORIGIN_CORRELATION_ONLY_SMOKE_COMMAND,
 			state: 'CONFIGURED_NOT_RUN'
 		});
 		expect(
@@ -2625,7 +2812,8 @@ describe('JPWB population non-vacuity', () => {
 				...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
-				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE
+				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
 			])
 		);
 		const manifestCount = ['packages', 'apps'].reduce(

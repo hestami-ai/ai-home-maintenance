@@ -14,6 +14,10 @@ import {
 	DECLARATION_CONTEXT_ANALYSIS_PROGRESS_SCHEMA_VERSION,
 	DECLARATION_CONTEXT_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	DECLARATION_CONTEXT_ANALYSIS_SCHEMA_VERSION,
+	SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION,
+	SOURCE_ORIGIN_CORRELATION_PROGRESS_SCHEMA_VERSION,
+	SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION,
+	SOURCE_ORIGIN_CORRELATION_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
@@ -73,6 +77,7 @@ import {
 	buildCallGraph,
 	buildConditionalExportResolution,
 	buildDeclarationContextAnalysis,
+	buildSourceOriginCorrelation,
 	buildModuleResolutionTrace,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
@@ -101,6 +106,7 @@ import {
 	validateCallGraph,
 	validateConditionalExportResolution,
 	validateDeclarationContextAnalysis,
+	validateSourceOriginCorrelation,
 	validateModuleResolutionTrace,
 	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
@@ -134,6 +140,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildConditionalExportResolution).toBeTypeOf('function');
 		expect(buildDeclarationContextAnalysis).toBeTypeOf('function');
+		expect(buildSourceOriginCorrelation).toBeTypeOf('function');
 		expect(buildModuleResolutionTrace).toBeTypeOf('function');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
@@ -173,6 +180,16 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('withAttributedQueryForVerifiedHost');
 		expect(publicSurface).not.toHaveProperty('declarationContextAnalysisCompilerProgramCapability');
 		expect(publicSurface).not.toHaveProperty('declarationContextAnalysisTypeScriptPublicApi');
+		expect(validateSourceOriginCorrelation).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('validateConstructedSourceOriginCorrelation');
+		expect(publicSurface).not.toHaveProperty(
+			'validateSourceOriginCorrelationWithProviderForTesting'
+		);
+		expect(publicSurface).not.toHaveProperty('emitCompilerProjectDeclaration');
+		expect(publicSurface).not.toHaveProperty('decodeSourceMapV3');
+		expect(publicSurface).not.toHaveProperty('sourceOriginCorrelationDeclarationEmissionProvider');
+		expect(publicSurface).not.toHaveProperty('sourceOriginCorrelationInputDigest');
+		expect(publicSurface).not.toHaveProperty('sourceOriginCorrelationContentDigest');
 		expect(validateModuleResolutionTrace).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty('validateConstructedModuleResolutionTrace');
 		expect(publicSurface).not.toHaveProperty('getStaticSemanticSnapshotCompilerProjectInputLookup');
@@ -238,6 +255,18 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(DECLARATION_CONTEXT_ANALYSIS_SCHEMA_VERSION).toBe(
 			'jan-csaa-declaration-context-analysis/1.0.0'
+		);
+		expect(SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION).toBe(
+			'jan-csaa-build-source-origin-correlation/0.1.0'
+		);
+		expect(SOURCE_ORIGIN_CORRELATION_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-source-origin-correlation-progress/1.0.0'
+		);
+		expect(SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-source-origin-correlation-request/1.0.0'
+		);
+		expect(SOURCE_ORIGIN_CORRELATION_SCHEMA_VERSION).toBe(
+			'jan-csaa-source-origin-correlation/1.0.0'
 		);
 		expect(COMMAND_HANDLER_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-command-handler-graph/0.1.0'

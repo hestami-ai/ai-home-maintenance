@@ -33,10 +33,14 @@ import { getStaticSemanticSnapshotCompilerProjectInputLookup } from './compiler-
 import { createMonotonicOperationClock } from './monotonic-operation-clock.js';
 
 export const COMPILER_PROJECT_PROGRAM_CAPABILITY_VERSION =
-	'jan-csaa-verified-compiler-project-program/1.0.0' as const;
+	'jan-csaa-verified-compiler-project-program/1.1.0' as const;
 
 export type CompilerProjectProgramInputStage =
-	'PROGRAM_CONSTRUCTION' | 'TYPE_CHECKER_CREATE' | 'CALLER_ANALYSIS' | 'DECLARATION_ARTIFACT_PARSE';
+	| 'PROGRAM_CONSTRUCTION'
+	| 'TYPE_CHECKER_CREATE'
+	| 'CALLER_ANALYSIS'
+	| 'DECLARATION_EMIT'
+	| 'DECLARATION_ARTIFACT_PARSE';
 
 export interface CompilerProjectProgramLimits {
 	readonly maxDurationMs: number;
@@ -66,9 +70,12 @@ export interface CompilerProjectProgramEvidence {
 	readonly compilerHostReadBytes: number;
 	readonly configPath: string;
 	readonly contextInputIds: readonly SemanticContextInputId[];
+	readonly declarationEmitCallbacksUseOnlyAttributedQueries: true;
+	readonly declarationEmitInputRecords: number;
+	readonly declarationEmitReadBytes: number;
 	readonly inputRecords: readonly CompilerProjectProgramInputRecord[];
 	readonly materializedRecipeDigest: string;
-	/** Every non-artifact-parse callback stayed within its captured per-query invocation upper bound. */
+	/** Every callback outside artifact-parse and declaration-emit replay stayed within its captured per-query invocation upper bound. */
 	readonly programCallbacksWithinAttributedInvocationBounds: true;
 	readonly programCompilerHostCallbacks: number;
 	readonly programCompilerHostReadBytes: number;
@@ -95,6 +102,7 @@ export interface CompilerProjectProgramSession {
 	finalize(): CompilerProjectProgramEvidence;
 	parseCapturedSourceFile(logicalPath: string): CompilerProjectParsedSource;
 	toLogicalPath(path: string): string;
+	withDeclarationEmit<Value>(operation: () => Value): Value;
 }
 
 /** @internal One explicit fresh CAP-001 parse sourced through a separately charged captured read. */
@@ -583,10 +591,13 @@ export function createCompilerProjectProgramSession(
 	setupProgress.finish();
 
 	let finalized = false;
+	let declarationEmitActive = false;
 	let stage: CompilerProjectProgramInputStage = 'PROGRAM_CONSTRUCTION';
 	let compilerHostReadBytes = 0;
 	let programCompilerHostCallbacks = 0;
 	let programCompilerHostReadBytes = 0;
+	let declarationEmitInputRecords = 0;
+	let declarationEmitReadBytes = 0;
 	let artifactParseInputRecords = 0;
 	let artifactParseReadBytes = 0;
 	let pendingArtifactEncoding: VerifiedCompilerSourceEncoding | null = null;
@@ -646,7 +657,8 @@ export function createCompilerProjectProgramSession(
 							'CAPTURE_UNAVAILABLE',
 							'Fresh compiler Program requested an input outside its exact attributed population.'
 						);
-					const programStage = stage !== 'DECLARATION_ARTIFACT_PARSE';
+					const declarationEmitStage = stage === 'DECLARATION_EMIT';
+					const programStage = stage !== 'DECLARATION_ARTIFACT_PARSE' && !declarationEmitStage;
 					if (programStage && invocationOrdinal >= attributedLimit)
 						fail(
 							'CAPTURE_UNAVAILABLE',
@@ -674,6 +686,14 @@ export function createCompilerProjectProgramSession(
 						);
 						if (programCompilerHostReadBytes > limits.maxProgramReadBytes)
 							fail('BUDGET_EXCEEDED', 'Fresh compiler Program exceeded maxProgramReadBytes.');
+					}
+					if (declarationEmitStage) {
+						declarationEmitInputRecords += 1;
+						declarationEmitReadBytes = safeAdd(
+							declarationEmitReadBytes,
+							readBytes,
+							'Declaration-emission replay read bytes'
+						);
 					}
 					if (stage === 'DECLARATION_ARTIFACT_PARSE') {
 						artifactParseInputRecords += 1;
@@ -771,6 +791,8 @@ export function createCompilerProjectProgramSession(
 		checker,
 		configPath: bound.project.configPath,
 		finalize(): CompilerProjectProgramEvidence {
+			if (declarationEmitActive)
+				fail('CAPTURE_UNAVAILABLE', 'Fresh compiler Program declaration emit is active.');
 			if (finalized)
 				fail('CAPTURE_UNAVAILABLE', 'Fresh compiler Program session is already finalized.');
 			assertWithinDeadline();
@@ -793,6 +815,9 @@ export function createCompilerProjectProgramSession(
 				compilerHostReadBytes,
 				configPath: bound.project.configPath,
 				contextInputIds,
+				declarationEmitCallbacksUseOnlyAttributedQueries: true,
+				declarationEmitInputRecords,
+				declarationEmitReadBytes,
 				inputRecords,
 				materializedRecipeDigest: bound.lookup.attribution.materializedRecipeDigest,
 				programCallbacksWithinAttributedInvocationBounds: true,
@@ -811,6 +836,8 @@ export function createCompilerProjectProgramSession(
 			return evidence;
 		},
 		parseCapturedSourceFile(logicalPath: string): CompilerProjectParsedSource {
+			if (declarationEmitActive)
+				fail('CAPTURE_UNAVAILABLE', 'Fresh compiler Program declaration emit is active.');
 			if (finalized)
 				fail('CAPTURE_UNAVAILABLE', 'Fresh compiler Program session is already finalized.');
 			if (
@@ -883,6 +910,25 @@ export function createCompilerProjectProgramSession(
 			const logicalPath = captureBoundary(() => bound.lookup.toRecordedLogical(path));
 			assertWithinDeadline();
 			return logicalPath;
+		},
+		withDeclarationEmit<Value>(operation: () => Value): Value {
+			if (finalized)
+				fail('CAPTURE_UNAVAILABLE', 'Fresh compiler Program session is already finalized.');
+			if (declarationEmitActive)
+				fail('CAPTURE_UNAVAILABLE', 'Fresh compiler Program declaration emit cannot reenter.');
+			if (typeof operation !== 'function')
+				fail('INPUT_INVALID', 'Fresh compiler Program declaration emit requires an operation.');
+			assertWithinDeadline();
+			const priorStage = stage;
+			declarationEmitActive = true;
+			stage = 'DECLARATION_EMIT';
+			try {
+				return operation();
+			} finally {
+				stage = priorStage;
+				declarationEmitActive = false;
+				assertWithinDeadline();
+			}
 		}
 	});
 }

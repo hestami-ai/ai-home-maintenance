@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+	COMPILER_PROJECT_PROGRAM_CAPABILITY_VERSION,
 	CompilerProjectProgramCapabilityError,
 	createCompilerProjectProgramSession,
 	type CompilerProjectProgramLimits
@@ -18,6 +19,7 @@ import {
 import * as frozenCompilerHost from '../providers/typescript/frozen-compiler-host.js';
 import { materializeProgramRecipe } from '../providers/typescript/materialize-program-recipe.js';
 import { createModuleResolutionTraceFixture } from '../resolution/module-resolution-trace-fixture.test-support.js';
+import { createSourceOriginCorrelationFixture } from './source-origin-correlation-fixture.test-support.js';
 
 function limits(
 	overrides: Partial<CompilerProjectProgramLimits> = {}
@@ -187,6 +189,171 @@ describe('verified compiler project Program capability', () => {
 			expect(capabilityError(() => first.parseCapturedSourceFile(fixture.targetPath)).code).toBe(
 				'CAPTURE_UNAVAILABLE'
 			);
+		} finally {
+			fixture.cleanup();
+		}
+	}, 180_000);
+
+	it('replays only captured declaration-emit queries while preserving construction bounds and charging every callback', () => {
+		const fixture = createSourceOriginCorrelationFixture();
+		try {
+			const project = fixture.semanticSnapshot.projects.find(
+				(candidate) => candidate.id === fixture.semanticProjectId
+			);
+			if (project === undefined) throw new Error('Fixture lacks its selected semantic project.');
+			const stages: string[] = [];
+			const session = createCompilerProjectProgramSession(
+				fixture.semanticSnapshot,
+				project.configPath,
+				limits(),
+				{ onInput: (stage) => stages.push(stage) }
+			);
+			const selectedSource = session.program
+				.getSourceFiles()
+				.find((source) => session.toLogicalPath(source.fileName) === fixture.sourcePath);
+			if (selectedSource === undefined)
+				throw new Error('Fixture fresh Program lacks its selected source.');
+
+			expect(
+				capabilityError(() =>
+					session.withDeclarationEmit(() => session.withDeclarationEmit(() => undefined))
+				).code
+			).toBe('CAPTURE_UNAVAILABLE');
+			expect(
+				capabilityError(() => session.withDeclarationEmit(null as unknown as () => undefined)).code
+			).toBe('INPUT_INVALID');
+			let outputCount = 0;
+			const emitResult = session.withDeclarationEmit(() => {
+				expect(session.toLogicalPath(selectedSource.fileName)).toBe(fixture.sourcePath);
+				expect(capabilityError(() => session.finalize()).code).toBe('CAPTURE_UNAVAILABLE');
+				expect(
+					capabilityError(() => session.parseCapturedSourceFile(fixture.sourcePath)).code
+				).toBe('CAPTURE_UNAVAILABLE');
+				return session.program.emit(
+					selectedSource,
+					() => {
+						outputCount += 1;
+					},
+					undefined,
+					true
+				);
+			});
+			expect(emitResult.emitSkipped).toBe(false);
+			expect(emitResult.diagnostics).toEqual([]);
+			expect(outputCount).toBe(2);
+
+			const evidence = session.finalize();
+			const emitRecords = evidence.inputRecords.filter(
+				(record) => record.stage === 'DECLARATION_EMIT'
+			);
+			const presentReadBytes = evidence.inputRecords.reduce(
+				(total, record) =>
+					total +
+					(record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT'
+						? record.observation.contentBytes
+						: 0),
+				0
+			);
+			const emitReadBytes = emitRecords.reduce(
+				(total, record) =>
+					total +
+					(record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT'
+						? record.observation.contentBytes
+						: 0),
+				0
+			);
+			expect(stages).toEqual(evidence.inputRecords.map((record) => record.stage));
+			expect(evidence.version).toBe(COMPILER_PROJECT_PROGRAM_CAPABILITY_VERSION);
+			expect(evidence.version).toBe('jan-csaa-verified-compiler-project-program/1.1.0');
+			expect(evidence.declarationEmitCallbacksUseOnlyAttributedQueries).toBe(true);
+			expect(evidence.declarationEmitInputRecords).toBe(emitRecords.length);
+			expect(evidence.declarationEmitInputRecords).toBeGreaterThan(0);
+			expect(evidence.declarationEmitReadBytes).toBe(emitReadBytes);
+			expect(evidence.compilerHostCallbacks).toBe(evidence.inputRecords.length);
+			expect(evidence.compilerHostCallbacks).toBe(
+				evidence.programCompilerHostCallbacks + evidence.declarationEmitInputRecords
+			);
+			expect(evidence.compilerHostReadBytes).toBe(presentReadBytes);
+			expect(evidence.compilerHostReadBytes).toBe(
+				evidence.programCompilerHostReadBytes + evidence.declarationEmitReadBytes
+			);
+			expect(evidence.programCallbacksWithinAttributedInvocationBounds).toBe(true);
+			expect(
+				evidence.inputRecords
+					.filter((record) => record.stage !== 'DECLARATION_EMIT')
+					.every((record) => record.invocationOrdinal < record.attributedInvocationCount)
+			).toBe(true);
+			expect(evidence.inputRecords.map((record) => record.ordinal)).toEqual(
+				evidence.inputRecords.map((_, index) => index)
+			);
+			const stageRank = {
+				CALLER_ANALYSIS: 2,
+				DECLARATION_ARTIFACT_PARSE: 4,
+				DECLARATION_EMIT: 3,
+				PROGRAM_CONSTRUCTION: 0,
+				TYPE_CHECKER_CREATE: 1
+			} as const;
+			expect(
+				evidence.inputRecords.every(
+					(record, index, records) =>
+						index === 0 || stageRank[records[index - 1]!.stage] <= stageRank[record.stage]
+				)
+			).toBe(true);
+			expect(emitRecords).toContainEqual(
+				expect.objectContaining({
+					attributedInvocationCount: 22,
+					invocationOrdinal: 22,
+					query: {
+						logicalPath: '.',
+						operation: 'USE_CASE_SENSITIVE_FILE_NAMES'
+					},
+					stage: 'DECLARATION_EMIT'
+				})
+			);
+
+			const baselineSession = createCompilerProjectProgramSession(
+				fixture.semanticSnapshot,
+				project.configPath,
+				limits()
+			);
+			const baseline = baselineSession.finalize();
+			expect(baseline).toMatchObject({
+				declarationEmitCallbacksUseOnlyAttributedQueries: true,
+				declarationEmitInputRecords: 0,
+				declarationEmitReadBytes: 0,
+				programCompilerHostCallbacks: evidence.programCompilerHostCallbacks,
+				programCompilerHostReadBytes: evidence.programCompilerHostReadBytes,
+				version: COMPILER_PROJECT_PROGRAM_CAPABILITY_VERSION
+			});
+			expect(capabilityError(() => baselineSession.withDeclarationEmit(() => undefined)).code).toBe(
+				'CAPTURE_UNAVAILABLE'
+			);
+		} finally {
+			fixture.cleanup();
+		}
+	}, 180_000);
+
+	it('restores the caller-analysis stage after a declaration-emit operation throws', () => {
+		const fixture = createSourceOriginCorrelationFixture();
+		try {
+			const project = fixture.semanticSnapshot.projects.find(
+				(candidate) => candidate.id === fixture.semanticProjectId
+			);
+			if (project === undefined) throw new Error('Fixture lacks its selected semantic project.');
+			const session = createCompilerProjectProgramSession(
+				fixture.semanticSnapshot,
+				project.configPath,
+				limits()
+			);
+			const fault = new Error('emit operation fault');
+			expect(() =>
+				session.withDeclarationEmit(() => {
+					throw fault;
+				})
+			).toThrow(fault);
+			const evidence = session.finalize();
+			expect(evidence.declarationEmitInputRecords).toBe(0);
+			expect(evidence.declarationEmitReadBytes).toBe(0);
 		} finally {
 			fixture.cleanup();
 		}
