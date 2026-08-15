@@ -136,6 +136,73 @@ describe('REG-F-183 — every RPH-DOC-003 ontology population the seed claims to
 		expect(missing, 'a profile selection criterion is not carried in the ratified wording').toEqual([]);
 	});
 
+	// ── THE INPUTS TRANSCRIPTION, WHICH IS A CONVENTION THE SEED ALREADY FOLLOWS ────────────────────────────
+	//
+	// Five of the thirteen PWU Type sections give an inputs list (`## Required inputs`, or `## Inputs` in §8).
+	// Where one exists the seed transcribes it VERBATIM AND IN ORDER — §10 5/5, §14 8/8, §20 10/10 — so this
+	// asserts a rule the authors were already keeping, rather than imposing a new one. The other eight sections
+	// provide no such list and their templates' `inputs` are AUTHORED; they are out of scope here, and saying so
+	// is the point: REG-F-186 called §12's `inputs` a merge of §12's "Required fields", and §12 has no inputs
+	// list at all, so that reading was wrong (corrected there).
+	//
+	// The section↔template mapping is DERIVED — UPPER_SNAKE of the section's own name — so a renamed section
+	// fails to resolve instead of silently matching nothing. `sourceSection` cannot be used for this: the root
+	// template carries no `Spec §` citation at all, which is how a first pass scored §8 as "seed 0 inputs".
+	describe('where RPH-DOC-003 gives an inputs list, the seeded template transcribes it verbatim', () => {
+		const sections = (() => {
+			const out: { n: string; kind: string; items: string[] }[] = [];
+			lines.forEach((l, i) => {
+				const m = /^# (\d+)\. PWU Type: (.+)$/.exec(l);
+				if (!m) return;
+				const end = lines.findIndex((x, j) => j > i && /^# \d+\. /.test(x));
+				const body = lines.slice(i + 1, end < 0 ? undefined : end);
+				for (const title of ['Required inputs', 'Inputs']) {
+					const at = body.findIndex((b) => b.trim() === `## ${title}`);
+					if (at < 0) continue;
+					const items: string[] = [];
+					for (let z = at + 1; z < body.length; z += 1) {
+						const t = body[z]!.trim();
+						if (t === '') {
+							if (items.length > 0) break;
+							continue;
+						}
+						if (!t.startsWith('* ')) break;
+						items.push(t.slice(2).replace(/[;.]$/, ''));
+					}
+					if (items.length > 0)
+						out.push({ n: m[1]!, kind: m[2]!.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_'), items });
+					break;
+				}
+			});
+			return out;
+		})();
+
+		it('CONTROL — the five sections that give an inputs list are found, and each resolves to a template', () => {
+			expect(sections.map((s) => s.n)).toEqual(['8', '10', '14', '18', '20']);
+			for (const s of sections)
+				expect(
+					ontology.pwuTemplates.find((t) => t.pwuKind === s.kind),
+					`§${s.n} maps to pwuKind ${s.kind}, which no seeded template declares`
+				).toBeDefined();
+		});
+
+		it.each(sections.map((s) => [`§${s.n} -> ${s.kind}`, s] as const))('%s', (_label, s) => {
+			const tpl = ontology.pwuTemplates.find((t) => t.pwuKind === s.kind);
+			// NARROWED, NOT CAST. `pwuTemplates` is `as const`, so it is a union of literal shapes and two members
+			// (`PRODUCT_REALIZATION`, `ARCHITECTURE_CONCERN`) genuinely have no `inputs`. An `as` here would have
+			// silenced the compiler's correct objection and left a template with no inputs comparing as `[]`.
+			const inputs: readonly string[] = tpl !== undefined && 'inputs' in tpl ? tpl.inputs : [];
+			expect(
+				[...inputs],
+				'The seeded template no longer transcribes its section\'s inputs list exactly. Both divergences ' +
+					'this gate was built on were invisible to every other check: §8 REORDERED "user\'s originating ' +
+					'expression" into "originating user expression", and §18 DROPPED a word from "approved PWU ' +
+					'Instance shape". A word-bag or content search passes both. Restore the ratified wording; do ' +
+					'not relax this to a set comparison.'
+			).toEqual(s.items);
+		});
+	});
+
 	// ── CONTROLS ────────────────────────────────────────────────────────────────────────────────────────────
 	//
 	// Every assertion above is `expect(missing).toEqual([])`, which is exactly what a reader that finds NOTHING

@@ -15,7 +15,7 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			purpose:
 				"Govern the full transformation from the user's originating expression through an approved Product Intent to an implemented and assured software baseline; produce justified confidence (not merely working code) that the user's authorized intent survives progressive formalization, decomposition, design, planning, implementation, integrated validation, and acceptance.",
 			inputs: [
-				'originating user expression',
+				'user’s originating expression',
 				'workspace and repository context',
 				'organizational policy',
 				'applicable professional ontology version',
@@ -403,7 +403,7 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			purpose:
 				'Produce source code, configuration, tests, documentation, migrations, and related product artifacts from the approved implementation decomposition; disclose newly discovered assumptions and deviations without silently changing authoritative intent, requirements, or architecture.',
 			inputs: [
-				'approved PWU shape',
+				'approved PWU Instance shape',
 				'requirements',
 				'architecture',
 				'constraints',
