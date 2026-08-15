@@ -64,7 +64,11 @@ export interface ModuleResolutionTraceFixtureOptions {
 	readonly consumerPackageType?: 'commonjs' | 'module';
 	readonly consumerProjectReferences?: readonly string[];
 	readonly consumerSourceEncoding?: 'UTF16BE' | 'UTF16LE' | 'UTF8';
+	readonly importerExtension?: 'js' | 'jsx' | 'ts' | 'tsx';
+	readonly importerText?: string;
+	readonly targetDeclarationText?: string;
 	readonly targetDeclarationExtension?: 'd.cts' | 'd.mts' | 'd.ts';
+	readonly targetSiblingDeclarationText?: string;
 }
 
 function compilerTextBytes(text: string, encoding: 'UTF16BE' | 'UTF16LE' | 'UTF8'): Uint8Array {
@@ -84,7 +88,10 @@ function repository(options: ModuleResolutionTraceFixtureOptions): string {
 	const root = mkdtempSync(join(tmpdir(), 'csaa-module-resolution-trace-'));
 	const targetExtension = options.targetDeclarationExtension ?? 'd.ts';
 	const targetPath = `packages/module-target/dist/index.${targetExtension}`;
-	const importerPath = MODULE_RESOLUTION_FIXTURE_IMPORTER_PATH;
+	const importerPath =
+		options.importerExtension === undefined
+			? MODULE_RESOLUTION_FIXTURE_IMPORTER_PATH
+			: `packages/consumer/src/index.${options.importerExtension}`;
 	json(root, 'package.json', {
 		name: 'module-resolution-trace-fixture',
 		private: true,
@@ -118,7 +125,9 @@ function repository(options: ModuleResolutionTraceFixtureOptions): string {
 		files: ['src/index.ts']
 	});
 	write(root, 'packages/module-target/src/index.ts', 'export const target = 7 as const;\n');
-	write(root, targetPath, 'export declare const target: 7;\n');
+	write(root, targetPath, options.targetDeclarationText ?? 'export declare const target: 7;\n');
+	if (options.targetSiblingDeclarationText !== undefined)
+		write(root, 'packages/module-target/dist/terminal.d.ts', options.targetSiblingDeclarationText);
 	write(root, 'packages/module-target/dist/index.js', 'export const target = 7;\n');
 	json(root, 'packages/consumer/package.json', {
 		name: '@fixture/module-consumer',
@@ -143,7 +152,9 @@ function repository(options: ModuleResolutionTraceFixtureOptions): string {
 					references: options.consumerProjectReferences.map((path) => ({ path }))
 				})
 	});
-	const importerText = `import { target } from '${MODULE_RESOLUTION_FIXTURE_PACKAGE_NAME}';\nexport const value = target;\n`;
+	const importerText =
+		options.importerText ??
+		`import { target } from '${MODULE_RESOLUTION_FIXTURE_PACKAGE_NAME}';\nexport const value = target;\n`;
 	const importerAbsolute = join(root, ...importerPath.split('/'));
 	mkdirSync(dirname(importerAbsolute), { recursive: true });
 	writeFileSync(
@@ -393,7 +404,10 @@ export function createModuleResolutionTraceFixture(
 	options: ModuleResolutionTraceFixtureOptions = {}
 ): ModuleResolutionTraceFixture {
 	const root = repository(options);
-	const importerPath = MODULE_RESOLUTION_FIXTURE_IMPORTER_PATH;
+	const importerPath =
+		options.importerExtension === undefined
+			? MODULE_RESOLUTION_FIXTURE_IMPORTER_PATH
+			: `packages/consumer/src/index.${options.importerExtension}`;
 	const targetPath = `packages/module-target/dist/index.${
 		options.targetDeclarationExtension ?? 'd.ts'
 	}`;

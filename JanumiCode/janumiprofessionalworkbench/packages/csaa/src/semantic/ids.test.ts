@@ -11,7 +11,10 @@ import {
 } from '../contracts/semantic.js';
 import {
 	canonicalSemanticJson,
+	canonicalSemanticJsonPrefixedSha256,
 	canonicalSemanticJsonWitness,
+	canonicalSemanticJsonWitnessWithProgress,
+	compareCanonicalSemanticJsonStrings,
 	encodeSemanticDiagnosticText,
 	hasLoneUtf16CodeUnit,
 	parseUtf16CodeUnitsHex,
@@ -188,6 +191,77 @@ describe('semantic canonical identity profile', () => {
 		});
 	});
 
+	it('incrementally escapes exact JSON string bytes across control and chunk boundaries', () => {
+		const values = [
+			'',
+			'"/\\\b\f\n\r\t',
+			String.fromCharCode(...Array.from({ length: 0x20 }, (_, index) => index)),
+			'astral 🧪 separators \u2028\u2029',
+			`${'a'.repeat(255)}\n${'🧪'.repeat(257)}\\"tail`
+		];
+		for (const value of values) {
+			expect(canonicalSemanticJson(value)).toBe(JSON.stringify(value));
+			expect(canonicalSemanticJson({ [value]: value })).toBe(JSON.stringify({ [value]: value }));
+		}
+		const commonPrefix = 'k'.repeat(1_024);
+		const laterKey = `${commonPrefix}b`;
+		const earlierKey = `${commonPrefix}a`;
+		expect(canonicalSemanticJson({ [laterKey]: 2, [earlierKey]: 1 })).toBe(
+			`{${JSON.stringify(earlierKey)}:1,${JSON.stringify(laterKey)}:2}`
+		);
+	});
+
+	it('checkpoints streaming work at bounded cadence and preserves prefixed identity bytes', () => {
+		const value = { key: `${'x'.repeat(1_024)}\n🧪` };
+		let checkpoints = 0;
+		const witness = canonicalSemanticJsonWitnessWithProgress(value, () => {
+			checkpoints += 1;
+		});
+		const canonical = canonicalSemanticJson(value);
+		expect(checkpoints).toBeGreaterThan(2);
+		expect(witness).toEqual({
+			bytes: Buffer.byteLength(canonical, 'utf8'),
+			sha256: createHash('sha256').update(canonical, 'utf8').digest('hex')
+		});
+		const prefix = 'TEST-DOMAIN\0' as const;
+		expect(canonicalSemanticJsonPrefixedSha256(prefix, value)).toBe(
+			createHash('sha256').update(prefix, 'utf8').update(canonical, 'utf8').digest('hex')
+		);
+		expect(() => canonicalSemanticJsonPrefixedSha256('\udc00', null)).toThrow('scalar');
+		let expiringCheckpoints = 0;
+		expect(() =>
+			canonicalSemanticJsonWitnessWithProgress(value, () => {
+				expiringCheckpoints += 1;
+				if (expiringCheckpoints === 3) throw new Error('expired checkpoint');
+			})
+		).toThrow('expired checkpoint');
+	});
+
+	it('compares canonical string tokens exactly without materializing them', () => {
+		const values = [
+			'',
+			'"',
+			'\\',
+			'\n',
+			'/',
+			'0',
+			'a',
+			'é',
+			'\u2028',
+			'\u2029',
+			'🧪',
+			`${'z'.repeat(255)}\n`
+		];
+		for (const left of values)
+			for (const right of values) {
+				const leftToken = canonicalSemanticJson(left);
+				const rightToken = canonicalSemanticJson(right);
+				const expected = leftToken < rightToken ? -1 : leftToken > rightToken ? 1 : 0;
+				expect(Math.sign(compareCanonicalSemanticJsonStrings(left, right))).toBe(expected);
+			}
+		expect(() => compareCanonicalSemanticJsonStrings('\udc00', '')).toThrow('surrogate');
+	});
+
 	it('fails closed for non-I-JSON, sparse, cyclic, and non-plain inputs', () => {
 		const sparse = Array<string>(1);
 		const cyclic: { self?: unknown } = {};
@@ -198,6 +272,8 @@ describe('semantic canonical identity profile', () => {
 		expect(() => canonicalSemanticJson(1n)).toThrow('bigint');
 		expect(() => canonicalSemanticJson(sparse)).toThrow('sparse');
 		expect(() => canonicalSemanticJson('\ud800')).toThrow('surrogate');
+		expect(() => canonicalSemanticJson('\udc00')).toThrow('surrogate');
+		expect(() => canonicalSemanticJson({ ['\udc00']: 1 })).toThrow('surrogate');
 		expect(() => canonicalSemanticJson(cyclic)).toThrow('cyclic');
 		expect(() => canonicalSemanticJson(new Date(0))).toThrow('plain objects');
 	});

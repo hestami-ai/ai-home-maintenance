@@ -18,7 +18,10 @@ import {
 } from '../../contracts/semantic.js';
 import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
 import { sha256 } from '../../inventory/canonical.js';
-import { canonicalSemanticJson } from '../../semantic/canonical.js';
+import {
+	canonicalSemanticJson,
+	canonicalSemanticJsonWitnessWithProgress
+} from '../../semantic/canonical.js';
 import {
 	compilerInputClosureDigest,
 	compilerInputResultDigest,
@@ -139,8 +142,16 @@ export interface VerifiedCompilerProjectInputLookupSetEntry {
 	readonly lookup: VerifiedCompilerProjectInputLookup;
 }
 
-/** @internal A cloned captured input plus its project-scoped query multiplicity. */
+/**
+ * @internal Immutable retained query/observation evidence, a fresh caller-owned byte copy when
+ * present, and the project-scoped query multiplicity.
+ */
 export interface VerifiedCompilerProjectInputEntry extends CapturedCompilerInput {
+	readonly attributedInvocationCount: number;
+}
+
+/** @internal Mutable bytes are borrowed only for the dynamic extent of a trusted host callback. */
+export interface BorrowedVerifiedCompilerProjectInputEntry extends CapturedCompilerInput {
 	readonly attributedInvocationCount: number;
 }
 
@@ -151,7 +162,15 @@ export interface VerifiedCompilerProjectInputEntry extends CapturedCompilerInput
 export interface VerifiedCompilerProjectInputLookup {
 	readonly attribution: CompilerProjectAttribution;
 	readonly subjectId: string;
-	lookupAttributedQuery(query: CompilerInputQuery): VerifiedCompilerProjectInputEntry | undefined;
+	lookupAttributedQuery(
+		query: CompilerInputQuery,
+		onProgress?: () => void
+	): VerifiedCompilerProjectInputEntry | undefined;
+	withAttributedQueryForVerifiedHost(
+		query: CompilerInputQuery,
+		onProgress: () => void,
+		consumer: (entry: BorrowedVerifiedCompilerProjectInputEntry) => void
+	): boolean;
 	toRecordedAbsolute(logicalPath: string): string;
 	toRecordedLogical(path: string): string;
 }
@@ -200,6 +219,7 @@ interface CompilerInputReadLimits {
 	readonly maxPathCharacters: number;
 	readonly maxQueryMetadataBytes: number;
 	readonly maxReadBytes: number;
+	readonly onProgress?: () => void;
 }
 
 interface DirectoryScan {
@@ -247,19 +267,42 @@ function fail(code: CompilerInputCaptureError['code'], message: string): never {
 	throw new CompilerInputCaptureError(code, message);
 }
 
+class CompilerInputProgressError extends Error {
+	constructor(readonly original: unknown) {
+		super('Compiler input resource progress callback failed.');
+		this.name = 'CompilerInputProgressError';
+	}
+}
+
+function guardedProgress(onProgress: (() => void) | undefined): () => void {
+	return () => {
+		try {
+			onProgress?.();
+		} catch (error) {
+			throw new CompilerInputProgressError(error);
+		}
+	};
+}
+
 function inertRecord(
 	value: unknown,
 	field: string,
-	errorCode: CompilerInputCaptureError['code']
+	errorCode: CompilerInputCaptureError['code'],
+	onProgress?: () => void,
+	maxKeys = Number.MAX_SAFE_INTEGER
 ): Readonly<Record<string, unknown>> {
 	try {
+		onProgress?.();
 		if (value === null || typeof value !== 'object' || isProxy(value) || Array.isArray(value))
 			fail(errorCode, `${field} must be an inert wire object.`);
 		const prototype = Object.getPrototypeOf(value);
 		if (prototype !== Object.prototype && prototype !== null)
 			fail(errorCode, `${field} must be an inert wire object.`);
+		const keys = Reflect.ownKeys(value);
+		if (keys.length > maxKeys) fail(errorCode, `${field} has unknown or missing fields.`);
 		const result = Object.create(null) as Record<string, unknown>;
-		for (const key of Reflect.ownKeys(value)) {
+		for (const key of keys) {
+			onProgress?.();
 			if (typeof key !== 'string') fail(errorCode, `${field} must not contain symbol properties.`);
 			const descriptor = Object.getOwnPropertyDescriptor(value, key);
 			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
@@ -268,7 +311,8 @@ function inertRecord(
 		}
 		return Object.freeze(result);
 	} catch (error) {
-		if (error instanceof CompilerInputCaptureError) throw error;
+		if (error instanceof CompilerInputCaptureError || error instanceof CompilerInputProgressError)
+			throw error;
 		fail(errorCode, `${field} could not be inspected as inert wire data.`);
 	}
 }
@@ -277,15 +321,18 @@ function exactKeys(
 	record: Readonly<Record<string, unknown>>,
 	field: string,
 	expected: readonly string[],
-	errorCode: CompilerInputCaptureError['code']
+	errorCode: CompilerInputCaptureError['code'],
+	onProgress?: () => void
 ): void {
 	const actual = Object.keys(record).sort();
 	const sortedExpected = [...expected].sort();
-	if (
-		actual.length !== sortedExpected.length ||
-		actual.some((key, index) => key !== sortedExpected[index])
-	)
+	if (actual.length !== sortedExpected.length)
 		fail(errorCode, `${field} has unknown or missing fields.`);
+	for (let index = 0; index < actual.length; index += 1) {
+		onProgress?.();
+		if (actual[index] !== sortedExpected[index])
+			fail(errorCode, `${field} has unknown or missing fields.`);
+	}
 }
 
 function inertDenseArray(
@@ -346,6 +393,22 @@ interface QueryParameterWork {
 	readonly maxMetadataBytes: number;
 }
 
+function compareUtf16Strings(left: string, right: string, onProgress?: () => void): number {
+	const commonLength = Math.min(left.length, right.length);
+	for (let index = 0; index < commonLength; index += 1) {
+		onProgress?.();
+		const leftUnit = left.charCodeAt(index);
+		const rightUnit = right.charCodeAt(index);
+		if (leftUnit !== rightUnit) return leftUnit < rightUnit ? -1 : 1;
+	}
+	onProgress?.();
+	return left.length === right.length ? 0 : left.length < right.length ? -1 : 1;
+}
+
+function visitUtf16String(value: string, onProgress: () => void): void {
+	for (let index = 0; index < value.length; index += 1) onProgress();
+}
+
 function inertStringArray(
 	value: unknown,
 	field: string,
@@ -354,9 +417,11 @@ function inertStringArray(
 	maxLength = Number.MAX_SAFE_INTEGER,
 	deadlineMs = Number.MAX_SAFE_INTEGER,
 	work?: QueryParameterWork,
-	clock: SemanticOperationClock = Date.now
+	clock: SemanticOperationClock = Date.now,
+	onProgress?: () => void
 ): readonly string[] {
 	try {
+		onProgress?.();
 		if (value === null || typeof value !== 'object' || isProxy(value) || !Array.isArray(value))
 			fail(errorCode, `${field} must be a dense inert string array.`);
 		if (Object.getPrototypeOf(value) !== Array.prototype)
@@ -374,19 +439,23 @@ function inertStringArray(
 			fail('BUDGET_EXCEEDED', `${field} exceeds its cumulative array bound.`);
 		const length = lengthDescriptor.value;
 		const keys = Reflect.ownKeys(value);
-		const indexKeys = keys.filter(
-			(key): key is string => typeof key === 'string' && key !== 'length'
-		);
-		if (
-			keys.some(
-				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-			) ||
-			indexKeys.length !== length ||
-			indexKeys.some((key) => Number(key) >= length)
-		)
+		let indexKeyCount = 0;
+		let invalidKey = false;
+		for (const key of keys) {
+			onProgress?.();
+			if (typeof key !== 'string') {
+				invalidKey = true;
+				continue;
+			}
+			if (key === 'length') continue;
+			indexKeyCount += 1;
+			if (!/^(?:0|[1-9][0-9]*)$/u.test(key) || Number(key) >= length) invalidKey = true;
+		}
+		if (invalidKey || indexKeyCount !== length)
 			fail(errorCode, `${field} must not contain holes, symbols, or expando properties.`);
 		const result: string[] = [];
 		for (let index = 0; index < length; index += 1) {
+			onProgress?.();
 			checkDeadline({ clock, deadlineMs });
 			const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
 			if (
@@ -400,7 +469,7 @@ function inertStringArray(
 				fail('BUDGET_EXCEEDED', `${field}[${index}] exceeds the string bound.`);
 			if (work !== undefined) {
 				const addition =
-					Buffer.byteLength(canonicalSemanticJson(descriptor.value), 'utf8') +
+					canonicalSemanticJsonWitnessWithProgress(descriptor.value, onProgress).bytes +
 					(index === 0 ? 0 : 1);
 				if (
 					!Number.isSafeInteger(work.metadataBytes + addition) ||
@@ -417,7 +486,8 @@ function inertStringArray(
 		}
 		return result;
 	} catch (error) {
-		if (error instanceof CompilerInputCaptureError) throw error;
+		if (error instanceof CompilerInputCaptureError || error instanceof CompilerInputProgressError)
+			throw error;
 		fail(errorCode, `${field} could not be inspected as an inert string array.`);
 	}
 }
@@ -430,7 +500,8 @@ function canonicalStringSet(
 	deadlineMs: number,
 	errorCode: CompilerInputCaptureError['code'],
 	work?: QueryParameterWork,
-	clock: SemanticOperationClock = Date.now
+	clock: SemanticOperationClock = Date.now,
+	onProgress?: () => void
 ): readonly string[] {
 	const result = inertStringArray(
 		value,
@@ -440,14 +511,16 @@ function canonicalStringSet(
 		maxLength,
 		deadlineMs,
 		work,
-		clock
+		clock,
+		onProgress
 	);
 	for (let index = 1; index < result.length; index += 1) {
+		onProgress?.();
 		checkDeadline({ clock, deadlineMs });
-		if (result[index - 1]! >= result[index]!)
+		if (compareUtf16Strings(result[index - 1]!, result[index]!, onProgress) >= 0)
 			fail(errorCode, `${field} must be sorted and duplicate-free.`);
 	}
-	return Object.freeze([...result]);
+	return Object.freeze(result);
 }
 
 export function normalizeSemanticBudgets(value: unknown): SemanticBudgets {
@@ -501,13 +574,23 @@ function normalizeCompilerInputQuery(
 	paths: FrozenCompilerPathResolver,
 	limits: Pick<
 		CompilerInputReadLimits,
-		'clock' | 'deadlineMs' | 'maxDirectoryEntries' | 'maxPathCharacters' | 'maxQueryMetadataBytes'
+		| 'clock'
+		| 'deadlineMs'
+		| 'maxDirectoryEntries'
+		| 'maxPathCharacters'
+		| 'maxQueryMetadataBytes'
+		| 'onProgress'
 	> = DEFAULT_READ_LIMITS,
 	errorCode: CompilerInputCaptureError['code'] = 'INVALID_QUERY'
 ): CompilerInputQuery {
-	try {
+	const resourceProgress = guardedProgress(limits.onProgress);
+	const checkpoint = (): void => {
+		resourceProgress();
 		checkDeadline(limits);
-		const record = inertRecord(value, 'CompilerInputQuery', errorCode);
+	};
+	try {
+		checkpoint();
+		const record = inertRecord(value, 'CompilerInputQuery', errorCode, checkpoint, 6);
 		const operation = record.operation;
 		if (typeof operation !== 'string' || !OPERATIONS.has(operation))
 			fail(errorCode, 'CompilerInputQuery.operation is not registered.');
@@ -515,17 +598,23 @@ function normalizeCompilerInputQuery(
 			operation === 'READ_DIRECTORY'
 				? ['depth', 'excludes', 'extensions', 'includes', 'logicalPath', 'operation']
 				: ['logicalPath', 'operation'];
-		exactKeys(record, 'CompilerInputQuery', expected, errorCode);
+		exactKeys(record, 'CompilerInputQuery', expected, errorCode, checkpoint);
 		if (typeof record.logicalPath !== 'string')
 			fail(errorCode, 'CompilerInputQuery.logicalPath must be a string.');
 		if (record.logicalPath.length > limits.maxPathCharacters)
 			fail('BUDGET_EXCEEDED', 'CompilerInputQuery.logicalPath exceeds its path-character budget.');
+		visitUtf16String(record.logicalPath, checkpoint);
+		checkpoint();
 		const logicalPath = paths.canonicalRecordedLogical(record.logicalPath);
+		checkpoint();
 		if (operation === 'CURRENT_DIRECTORY' || operation === 'USE_CASE_SENSITIVE_FILE_NAMES') {
 			if (record.logicalPath !== '.' || logicalPath !== '.')
 				fail(errorCode, `${operation} is fixed to the logical repository root.`);
 			const query = Object.freeze({ logicalPath: '.' as const, operation });
-			if (Buffer.byteLength(canonicalSemanticJson(query), 'utf8') > limits.maxQueryMetadataBytes)
+			if (
+				canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes >
+				limits.maxQueryMetadataBytes
+			)
 				fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
 			return query;
 		}
@@ -549,7 +638,7 @@ function normalizeCompilerInputQuery(
 				entries: 0,
 				maxEntries: limits.maxDirectoryEntries,
 				maxMetadataBytes: limits.maxQueryMetadataBytes,
-				metadataBytes: Buffer.byteLength(canonicalSemanticJson(emptyQuery), 'utf8')
+				metadataBytes: canonicalSemanticJsonWitnessWithProgress(emptyQuery, checkpoint).bytes
 			};
 			if (work.metadataBytes > work.maxMetadataBytes)
 				fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
@@ -561,7 +650,8 @@ function normalizeCompilerInputQuery(
 				limits.deadlineMs,
 				errorCode,
 				work,
-				limits.clock
+				limits.clock,
+				checkpoint
 			);
 			const extensions = canonicalStringSet(
 				record.extensions,
@@ -571,7 +661,8 @@ function normalizeCompilerInputQuery(
 				limits.deadlineMs,
 				errorCode,
 				work,
-				limits.clock
+				limits.clock,
+				checkpoint
 			);
 			const includes = canonicalStringSet(
 				record.includes,
@@ -581,7 +672,8 @@ function normalizeCompilerInputQuery(
 				limits.deadlineMs,
 				errorCode,
 				work,
-				limits.clock
+				limits.clock,
+				checkpoint
 			);
 			const query = Object.freeze({
 				depth: record.depth as number | null,
@@ -591,16 +683,20 @@ function normalizeCompilerInputQuery(
 				logicalPath,
 				operation: 'READ_DIRECTORY' as const
 			});
-			checkDeadline(limits);
-			if (Buffer.byteLength(canonicalSemanticJson(query), 'utf8') !== work.metadataBytes)
+			checkpoint();
+			if (canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes !== work.metadataBytes)
 				fail('INVALID_QUERY', 'Compiler input query metadata accounting failed to reconcile.');
 			return query;
 		}
 		const query = Object.freeze({ logicalPath, operation }) as CompilerInputQuery;
-		if (Buffer.byteLength(canonicalSemanticJson(query), 'utf8') > limits.maxQueryMetadataBytes)
+		if (
+			canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes >
+			limits.maxQueryMetadataBytes
+		)
 			fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
 		return query;
 	} catch (error) {
+		if (error instanceof CompilerInputProgressError) throw error.original;
 		if (error instanceof CompilerInputCaptureError || error instanceof CompilerPathError)
 			throw error;
 		fail(errorCode, 'CompilerInputQuery could not be read as inert wire data.');
@@ -609,6 +705,70 @@ function normalizeCompilerInputQuery(
 
 function compilerInputQueryKey(query: CompilerInputQuery): string {
 	return canonicalSemanticJson(query);
+}
+
+function verifiedCompilerInputQueryBucketKey(
+	query: CompilerInputQuery,
+	onProgress?: () => void
+): string {
+	return canonicalSemanticJsonWitnessWithProgress(query, onProgress).sha256;
+}
+
+function sameStringArray(
+	left: readonly string[],
+	right: readonly string[],
+	onProgress?: () => void
+): boolean {
+	onProgress?.();
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index += 1) {
+		onProgress?.();
+		if (compareUtf16Strings(left[index]!, right[index]!, onProgress) !== 0) return false;
+	}
+	return true;
+}
+
+function sameCompilerInputQuery(
+	left: CompilerInputQuery,
+	right: CompilerInputQuery,
+	onProgress?: () => void
+): boolean {
+	onProgress?.();
+	if (
+		left.operation !== right.operation ||
+		compareUtf16Strings(left.logicalPath, right.logicalPath, onProgress) !== 0
+	)
+		return false;
+	if (left.operation !== 'READ_DIRECTORY' || right.operation !== 'READ_DIRECTORY') return true;
+	return (
+		left.depth === right.depth &&
+		sameStringArray(left.excludes, right.excludes, onProgress) &&
+		sameStringArray(left.extensions, right.extensions, onProgress) &&
+		sameStringArray(left.includes, right.includes, onProgress)
+	);
+}
+
+/** @internal Collision-safe exact discriminator for one fixed-size verified-query digest bucket. */
+export function exactVerifiedCompilerInputQueryBucketEntry<
+	T extends { readonly query: CompilerInputQuery }
+>(
+	bucket: readonly T[] | undefined,
+	query: CompilerInputQuery,
+	onProgress?: () => void
+): T | undefined {
+	let matched: T | undefined;
+	for (const candidate of bucket ?? []) {
+		onProgress?.();
+		if (!sameCompilerInputQuery(candidate.query, query, onProgress)) continue;
+		if (matched !== undefined)
+			fail(
+				'INVALID_CAPTURE',
+				'Verified compiler input query bucket contains duplicate exact queries.'
+			);
+		matched = candidate;
+	}
+	onProgress?.();
+	return matched;
 }
 
 function finalizeObservation(
@@ -2629,13 +2789,45 @@ export function assertVerifiedCompilerCaptureSnapshotBinding(
 	assertVerifiedSnapshotBinding(verifiedState(capture), subject, binding);
 }
 
-function cloneVerifiedProjectInputEntry(
+function copyVerifiedProjectInputBytes(
+	bytes: Uint8Array | undefined,
+	onProgress?: () => void
+): Uint8Array | undefined {
+	onProgress?.();
+	if (bytes === undefined) return undefined;
+	const copy = new Uint8Array(bytes.byteLength);
+	for (let offset = 0; offset < bytes.byteLength; offset += 256) {
+		onProgress?.();
+		const end = Math.min(offset + 256, bytes.byteLength);
+		copy.set(bytes.subarray(offset, end), offset);
+	}
+	onProgress?.();
+	return copy;
+}
+
+function materializeVerifiedProjectInputEntry(
+	entry: CapturedCompilerInput,
+	attributedInvocationCount: number,
+	onProgress?: () => void
+): VerifiedCompilerProjectInputEntry {
+	const bytes = copyVerifiedProjectInputBytes(entry.bytes, onProgress);
+	return Object.freeze({
+		attributedInvocationCount,
+		...(bytes === undefined ? {} : { bytes }),
+		observation: entry.observation,
+		query: entry.query
+	});
+}
+
+function borrowedVerifiedProjectInputEntry(
 	entry: CapturedCompilerInput,
 	attributedInvocationCount: number
-): VerifiedCompilerProjectInputEntry {
+): BorrowedVerifiedCompilerProjectInputEntry {
 	return Object.freeze({
-		...cloneCaptured(entry),
-		attributedInvocationCount
+		attributedInvocationCount,
+		...(entry.bytes === undefined ? {} : { bytes: entry.bytes }),
+		observation: entry.observation,
+		query: entry.query
 	});
 }
 
@@ -2657,11 +2849,16 @@ export function createVerifiedCompilerProjectInputLookupSet(
 	const observationsById = new Map(
 		state.observations.map((observation) => [observation.id, observation] as const)
 	);
-	const entriesByQuery = new Map(
-		state.entries.map((entry) => [compilerInputQueryKey(entry.query), entry] as const)
-	);
+	const entriesByQueryBucket = new Map<string, CapturedCompilerInput[]>();
+	for (const entry of state.entries) {
+		const bucketKey = verifiedCompilerInputQueryBucketKey(entry.query);
+		const bucket = entriesByQueryBucket.get(bucketKey) ?? [];
+		if (exactVerifiedCompilerInputQueryBucketEntry(bucket, entry.query) !== undefined)
+			fail('INVALID_CAPTURE', 'Verified compiler capture repeats an exact compiler query.');
+		bucket.push(entry);
+		entriesByQueryBucket.set(bucketKey, bucket);
+	}
 	const lookupLimits = Object.freeze({
-		clock: () => 0,
 		deadlineMs: Number.MAX_SAFE_INTEGER,
 		maxDirectoryEntries: state.budgets.maxDirectoryEntries,
 		maxPathCharacters: state.budgets.maxPathCharacters,
@@ -2703,37 +2900,85 @@ export function createVerifiedCompilerProjectInputLookupSet(
 				`Verified compiler capture does not reproduce program context ${projectBinding.configPath}.`
 			);
 
-		const attributedEntries = new Map<
+		const attributedEntryBuckets = new Map<
 			string,
-			{
+			Array<{
 				readonly entry: CapturedCompilerInput;
 				readonly invocationCount: number;
-			}
+				readonly query: CompilerInputQuery;
+			}>
 		>();
 		for (const queryAttribution of attribution.queryInvocations) {
-			const key = compilerInputQueryKey(queryAttribution.query);
-			const entry = entriesByQuery.get(key);
+			const bucketKey = verifiedCompilerInputQueryBucketKey(queryAttribution.query);
+			const entry = exactVerifiedCompilerInputQueryBucketEntry(
+				entriesByQueryBucket.get(bucketKey),
+				queryAttribution.query
+			);
 			if (entry === undefined)
 				fail(
 					'INVALID_CAPTURE',
 					`Verified project attribution references an absent compiler query ${projectBinding.configPath}.`
 				);
-			attributedEntries.set(
-				key,
-				Object.freeze({ entry, invocationCount: queryAttribution.invocationCount })
+			const bucket = attributedEntryBuckets.get(bucketKey) ?? [];
+			if (exactVerifiedCompilerInputQueryBucketEntry(bucket, queryAttribution.query) !== undefined)
+				fail(
+					'INVALID_CAPTURE',
+					`Verified project attribution repeats a compiler query ${projectBinding.configPath}.`
+				);
+			bucket.push(
+				Object.freeze({
+					entry,
+					invocationCount: queryAttribution.invocationCount,
+					query: entry.query
+				})
 			);
+			attributedEntryBuckets.set(bucketKey, bucket);
 		}
-		const retainedAttribution = cloneAttributions([attribution])[0];
-		if (retainedAttribution === undefined)
-			fail('INVALID_CAPTURE', 'Verified compiler project attribution could not be retained.');
+		const locateAttributed = (
+			queryValue: CompilerInputQuery,
+			onProgress?: () => void
+		):
+			| {
+					readonly entry: CapturedCompilerInput;
+					readonly invocationCount: number;
+					readonly query: CompilerInputQuery;
+			  }
+			| undefined => {
+			onProgress?.();
+			const query = normalizeCompilerInputQuery(queryValue, state.paths, {
+				...lookupLimits,
+				onProgress
+			});
+			const bucketKey = verifiedCompilerInputQueryBucketKey(query, onProgress);
+			return exactVerifiedCompilerInputQueryBucketEntry(
+				attributedEntryBuckets.get(bucketKey),
+				query,
+				onProgress
+			);
+		};
 		const lookup: VerifiedCompilerProjectInputLookup = Object.freeze({
-			attribution: retainedAttribution,
-			lookupAttributedQuery(queryValue: CompilerInputQuery) {
-				const query = normalizeCompilerInputQuery(queryValue, state.paths, lookupLimits);
-				const attributed = attributedEntries.get(compilerInputQueryKey(query));
+			attribution,
+			lookupAttributedQuery(queryValue: CompilerInputQuery, onProgress?: () => void) {
+				const attributed = locateAttributed(queryValue, onProgress);
 				return attributed === undefined
 					? undefined
-					: cloneVerifiedProjectInputEntry(attributed.entry, attributed.invocationCount);
+					: materializeVerifiedProjectInputEntry(
+							attributed.entry,
+							attributed.invocationCount,
+							onProgress
+						);
+			},
+			withAttributedQueryForVerifiedHost(
+				queryValue: CompilerInputQuery,
+				onProgress: () => void,
+				consumer: (entry: BorrowedVerifiedCompilerProjectInputEntry) => void
+			) {
+				const attributed = locateAttributed(queryValue, onProgress);
+				if (attributed === undefined) return false;
+				onProgress();
+				consumer(borrowedVerifiedProjectInputEntry(attributed.entry, attributed.invocationCount));
+				onProgress();
+				return true;
 			},
 			subjectId: subject.descriptor.subjectId,
 			toRecordedAbsolute(logicalPath: string) {

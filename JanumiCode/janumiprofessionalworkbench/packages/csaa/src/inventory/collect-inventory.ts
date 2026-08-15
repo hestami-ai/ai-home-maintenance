@@ -26,6 +26,21 @@ import {
 	CONDITIONAL_EXPORT_RESOLUTION_SELECTION
 } from '../contracts/conditional-export-resolution.js';
 import {
+	DECLARATION_CONTEXT_ANALYSIS_AUTHORITY,
+	DECLARATION_CONTEXT_ANALYSIS_AUTHORITY_TRANSFER,
+	DECLARATION_CONTEXT_ANALYSIS_CAPABILITY,
+	DECLARATION_CONTEXT_ANALYSIS_CAPABILITY_STATUS,
+	DECLARATION_CONTEXT_ANALYSIS_CURRENTNESS,
+	DECLARATION_CONTEXT_ANALYSIS_FRESHNESS,
+	DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
+	DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
+	DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_013_CONFORMANCE,
+	DECLARATION_CONTEXT_ANALYSIS_GATE_EFFECT,
+	DECLARATION_CONTEXT_ANALYSIS_METHOD,
+	DECLARATION_CONTEXT_ANALYSIS_NONCLAIMS,
+	DECLARATION_CONTEXT_ANALYSIS_SELECTION
+} from '../contracts/declaration-context-analysis.js';
+import {
 	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
 	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
 	GUARD_ENFORCEMENT_LEDGER_METHOD,
@@ -247,6 +262,30 @@ const TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE = [
 const JPWB_MODULE_RESOLUTION_TRACE_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=MODULE_RESOLUTION_TRACE vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 
+const TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE = [
+	'packages/csaa/src/contracts/declaration-context-analysis.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
+	'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
+	'packages/csaa/src/resolution/module-resolution-trace-fixture.test-support.ts',
+	'packages/csaa/src/semantic/build-declaration-context-analysis.test.ts',
+	'packages/csaa/src/semantic/build-declaration-context-analysis.ts',
+	'packages/csaa/src/semantic/compiler-capture-capability.ts',
+	'packages/csaa/src/semantic/compiler-project-program-capability.test.ts',
+	'packages/csaa/src/semantic/compiler-project-program-capability.ts',
+	'packages/csaa/src/semantic/canonical.ts',
+	'packages/csaa/src/semantic/declaration-context-analysis-canonical.ts',
+	'packages/csaa/src/semantic/declaration-context-analysis-coverage.test.ts',
+	'packages/csaa/src/semantic/declaration-context-analysis-fixture.test-support.ts',
+	'packages/csaa/src/semantic/repository-smoke.test.ts',
+	'packages/csaa/src/semantic/validate-declaration-context-analysis.test.ts',
+	'packages/csaa/src/semantic/validate-declaration-context-analysis.ts'
+] as const;
+
+const JPWB_DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND =
+	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=DECLARATION_CONTEXT_ANALYSIS vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+
 const TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-graph.ts',
 	'packages/csaa/src/graph/build-read-write-access-graph.ts',
@@ -392,6 +431,7 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'command-event-contract-static-overlay',
 	'command-handler-static-projection',
 	'conditional-export-resolution',
+	'declaration-context-analysis',
 	'frozen-program-construction',
 	'guard-classification-static-overlay',
 	'logical-graph-composition',
@@ -973,6 +1013,7 @@ function providerInventory(
 							...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
 							...TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 							...TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE,
+							...TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
@@ -1322,6 +1363,20 @@ function capabilities(): CapabilityInventory[] {
 			),
 			state: 'PARTIAL'
 		},
+		{
+			explanation: `The bounded DWP-003 semantic-completion increment applies ${DECLARATION_CONTEXT_ANALYSIS_METHOD} to a ${DECLARATION_CONTEXT_ANALYSIS_CAPABILITY_STATUS} ${DECLARATION_CONTEXT_ANALYSIS_CAPABILITY} slice for one exact package-root export name in the ${MODULE_RESOLUTION_TRACE_CAPABILITY} selected WORKSPACE_BUILD_DECLARATION target. It independently validates and binds JAN-CSAA-CAP-001 through the exact FrozenSubject-bound StaticSemanticSnapshot carrier, ${PROJECT_CONTEXT_GRAPH_CAPABILITY}, ${MODULE_RESOLUTION_TRACE_CAPABILITY}, and ${CONDITIONAL_EXPORT_RESOLUTION_CAPABILITY}; CAP-002 declaration and symbol identities are explicitly forbidden inputs. The selected supported slice reconstructs one fresh public-TypeScript Program over the verified project-scoped compiler capture, meters every Program, checker-creation, caller-analysis, and separate declaration-artifact parse input attempt and duplicate PRESENT read byte, inventories every Program source and AST node, completely enumerates the package-root export symbols, accepts only a zero-hop direct root export or one same-root local-only ExportSpecifier without a module specifier whose property name directly identifies the terminal declaration through one public getAliasedSymbol call, and creates an exact byte-bound public createSourceFile parse witness for the selected root declaration artifact. It emits exactly one selected export binding, one terminal checker symbol, the complete same-root terminal declaration set, one declaration artifact, declarations, a zero-or-one merge classification, and exact DECLARES, CONTRIBUTES_TO, and linear MERGES_WITH participation relations. Cross-file declarations or merges, reexports, multi-hop or indirect alias bindings, unsupported declaration kinds, non-declaration or non-WORKSPACE_BUILD_DECLARATION targets, module/global augmentation syntax, ambient-effect syntax, and incompatible predecessors fail closed as unavailable; augmentation and ambient-effect output populations are explicitly empty. Successful output is complete-or-unavailable under caller budgets, ${DECLARATION_CONTEXT_ANALYSIS_CAPABILITY_STATUS}, and NOT_TRUNCATED. The elapsed wall-clock budget brackets synchronous predecessor-validator and public-TypeScript capability calls and fails closed on return, but does not claim preemptive cancellation inside those separately bounded calls. The exact selection policy is ${JSON.stringify(DECLARATION_CONTEXT_ANALYSIS_SELECTION)}. Analysis authority is ${DECLARATION_CONTEXT_ANALYSIS_AUTHORITY}, authority transfer is ${DECLARATION_CONTEXT_ANALYSIS_AUTHORITY_TRANSFER}, gate effect is ${DECLARATION_CONTEXT_ANALYSIS_GATE_EFFECT}, freshness is ${DECLARATION_CONTEXT_ANALYSIS_FRESHNESS}, and currentness is ${DECLARATION_CONTEXT_ANALYSIS_CURRENTNESS}. The package root publicly exports buildDeclarationContextAnalysis and validateDeclarationContextAnalysis; createCompilerProjectProgramSession, createPrevalidatedVerifiedCompilerProjectInputHost, the callback-scoped withAttributedQueryForVerifiedHost borrowed-input path, getStaticSemanticSnapshotCompilerProjectInputLookup, validateConstructedDeclarationContextAnalysis, the immutable per-call @internal validateDeclarationContextAnalysisWithProviderForTesting provider-fault injection entry, the immutable @internal compareDeclarationContextAnalysisCanonicalValuesForTesting comparator probe, the mutable @internal declarationContextAnalysisCompilerProgramCapability and declarationContextAnalysisTypeScriptPublicApi producer test seams, the progress-aware canonicalSemanticJsonWithProgress, canonicalSemanticJsonWitnessWithProgress, canonicalSemanticJsonPrefixedSha256, and compareCanonicalSemanticJsonStrings helpers, and fixture support remain trust-bound implementation details and are not package-root exports. The callback-free one-argument canonicalSemanticJson and canonicalSemanticJsonWitness APIs remain package-root public and byte-compatible. The dedicated STRUCTURAL-profile declaration-context-analysis-only smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are ${DECLARATION_CONTEXT_ANALYSIS_NONCLAIMS.join(', ')}. Full JAN-CSAA-013 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_013_CONFORMANCE}, full JAN-CSAA-007 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE}.`,
+			id: 'declaration-context-analysis',
+			provider: 'typescript+verified-project-capture-declaration-context-analysis',
+			provenance: canonicalProvenance(
+				...TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				'capabilities#conditional-export-resolution',
+				'capabilities#module-resolution-trace',
+				'capabilities#project-context-graph',
+				'capabilities#typescript-ast',
+				'package.json#/scripts/csaa:semantic:smoke:declaration-context-analysis'
+			),
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
 				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
@@ -1456,6 +1511,7 @@ function assertJpwbNonVacuity(
 		'test',
 		'test:coverage',
 		'csaa:semantic:smoke:conditional-export-resolution',
+		'csaa:semantic:smoke:declaration-context-analysis',
 		'csaa:semantic:smoke:module-resolution-trace',
 		'csaa:semantic:smoke:command-event-contract',
 		'csaa:semantic:smoke:guard-classification',
@@ -1477,6 +1533,18 @@ function assertJpwbNonVacuity(
 	) {
 		throw new Error(
 			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:conditional-export-resolution'
+		);
+	}
+	const declarationContextAnalysisSmokeCommand = configuredCommands.find(
+		(entry) =>
+			entry.owner === '.' && entry.name === 'csaa:semantic:smoke:declaration-context-analysis'
+	);
+	if (
+		declarationContextAnalysisSmokeCommand?.command !==
+		JPWB_DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND
+	) {
+		throw new Error(
+			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:declaration-context-analysis'
 		);
 	}
 	const moduleResolutionTraceSmokeCommand = configuredCommands.find(
@@ -1646,6 +1714,13 @@ function assertJpwbNonVacuity(
 			);
 		}
 	}
+	for (const required of TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE) {
+		if (!selectedPaths.has(required)) {
+			throw new Error(
+				`Required JPWB declaration context analysis implementation or verification source is absent: ${required}`
+			);
+		}
+	}
 }
 
 export function collectInventory(options: CollectInventoryOptions): InventoryDocument {
@@ -1722,6 +1797,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 					...TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE,
+					...TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
@@ -1745,6 +1821,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#logical-graph-composition',
 					'capabilities#project-context-graph',
 					'capabilities#conditional-export-resolution',
+					'capabilities#declaration-context-analysis',
 					'capabilities#module-resolution-trace',
 					'capabilities#read-write-access-graph',
 					'capabilities#state-machine-graph',
@@ -1755,7 +1832,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#type-graph'
 				),
 				statement:
-					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, and module resolution trace smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNIMPLEMENTED."
+					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. A separate bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, and declaration context analysis smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by this slice, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN or UNIMPLEMENTED."
 			},
 			{
 				provenance: canonicalProvenance(
@@ -1773,6 +1850,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
 					...TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 					...TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE,
+					...TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
@@ -1790,8 +1868,9 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					`The project context graph has graph authority ${PROJECT_CONTEXT_GRAPH_GRAPH_AUTHORITY}, authority transfer ${PROJECT_CONTEXT_GRAPH_AUTHORITY_TRANSFER}, and gate effect ${PROJECT_CONTEXT_GRAPH_GATE_EFFECT}; freshness is ${PROJECT_CONTEXT_GRAPH_FRESHNESS}, currentness is ${PROJECT_CONTEXT_GRAPH_CURRENTNESS}, and it changes no retained verifier authority. Full JAN-CSAA-010 conformance is ${PROJECT_CONTEXT_GRAPH_FULL_JAN_CSAA_010_CONFORMANCE}.`,
 					`The conditional export resolution has resolution authority ${CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY}, authority transfer ${CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER}, and gate effect ${CONDITIONAL_EXPORT_RESOLUTION_GATE_EFFECT}; freshness is ${CONDITIONAL_EXPORT_RESOLUTION_FRESHNESS}, currentness is ${CONDITIONAL_EXPORT_RESOLUTION_CURRENTNESS}, and it changes no retained verifier authority. Full JAN-CSAA-012 conformance is ${CONDITIONAL_EXPORT_RESOLUTION_FULL_JAN_CSAA_012_CONFORMANCE}.`,
 					`The module resolution trace has resolution authority ${MODULE_RESOLUTION_TRACE_AUTHORITY}, authority transfer ${MODULE_RESOLUTION_TRACE_AUTHORITY_TRANSFER}, and gate effect ${MODULE_RESOLUTION_TRACE_GATE_EFFECT}; freshness is ${MODULE_RESOLUTION_TRACE_FRESHNESS}, currentness is ${MODULE_RESOLUTION_TRACE_CURRENTNESS}, and it changes no retained verifier authority. Full JAN-CSAA-011 conformance is ${MODULE_RESOLUTION_TRACE_FULL_JAN_CSAA_011_CONFORMANCE}, full JAN-CSAA-007 conformance is ${MODULE_RESOLUTION_TRACE_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${MODULE_RESOLUTION_TRACE_FULL_JAN_CSAA_008_CONFORMANCE}.`,
+					`The declaration context analysis has analysis authority ${DECLARATION_CONTEXT_ANALYSIS_AUTHORITY}, authority transfer ${DECLARATION_CONTEXT_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${DECLARATION_CONTEXT_ANALYSIS_GATE_EFFECT}; freshness is ${DECLARATION_CONTEXT_ANALYSIS_FRESHNESS}, currentness is ${DECLARATION_CONTEXT_ANALYSIS_CURRENTNESS}, and it changes no retained verifier authority. Its selected same-root zero-hop direct or one-hop local-only explicit-ExportSpecifier declaration-binding slice is implemented without conferring authority over broader declaration, merge, augmentation, ambient-effect, CAP-002, or CAP-023 surfaces. Full JAN-CSAA-013 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_013_CONFORMANCE}, full JAN-CSAA-007 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE}.`,
 					'The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED.',
-					'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority.',
+					'Neither wrapper, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority.',
 					'No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance.',
 					'Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.'
 				].join(' ')

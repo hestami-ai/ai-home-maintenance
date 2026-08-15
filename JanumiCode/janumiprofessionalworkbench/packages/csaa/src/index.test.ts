@@ -10,6 +10,10 @@ import {
 	CONDITIONAL_EXPORT_RESOLUTION_PROGRESS_SCHEMA_VERSION,
 	CONDITIONAL_EXPORT_RESOLUTION_REQUEST_SCHEMA_VERSION,
 	CONDITIONAL_EXPORT_RESOLUTION_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_ANALYSIS_OPERATION_VERSION,
+	DECLARATION_CONTEXT_ANALYSIS_PROGRESS_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_ANALYSIS_REQUEST_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_ANALYSIS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
@@ -68,6 +72,7 @@ import {
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
 	buildConditionalExportResolution,
+	buildDeclarationContextAnalysis,
 	buildModuleResolutionTrace,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
@@ -95,6 +100,7 @@ import {
 	validateDependencyProviderComparison,
 	validateCallGraph,
 	validateConditionalExportResolution,
+	validateDeclarationContextAnalysis,
 	validateModuleResolutionTrace,
 	validateCommandEventContractOverlay,
 	validateCommandHandlerGraph,
@@ -127,6 +133,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildConditionalExportResolution).toBeTypeOf('function');
+		expect(buildDeclarationContextAnalysis).toBeTypeOf('function');
 		expect(buildModuleResolutionTrace).toBeTypeOf('function');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
@@ -153,6 +160,19 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateCallGraph).toBeTypeOf('function');
 		expect(validateConditionalExportResolution).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty('validateConstructedConditionalExportResolution');
+		expect(validateDeclarationContextAnalysis).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('validateConstructedDeclarationContextAnalysis');
+		expect(publicSurface).not.toHaveProperty(
+			'validateDeclarationContextAnalysisWithProviderForTesting'
+		);
+		expect(publicSurface).not.toHaveProperty(
+			'compareDeclarationContextAnalysisCanonicalValuesForTesting'
+		);
+		expect(publicSurface).not.toHaveProperty('createCompilerProjectProgramSession');
+		expect(publicSurface).not.toHaveProperty('createPrevalidatedVerifiedCompilerProjectInputHost');
+		expect(publicSurface).not.toHaveProperty('withAttributedQueryForVerifiedHost');
+		expect(publicSurface).not.toHaveProperty('declarationContextAnalysisCompilerProgramCapability');
+		expect(publicSurface).not.toHaveProperty('declarationContextAnalysisTypeScriptPublicApi');
 		expect(validateModuleResolutionTrace).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty('validateConstructedModuleResolutionTrace');
 		expect(publicSurface).not.toHaveProperty('getStaticSemanticSnapshotCompilerProjectInputLookup');
@@ -178,6 +198,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(validateStaticSemanticSnapshot).toBeTypeOf('function');
 		expect(canonicalSemanticJson).toBeTypeOf('function');
 		expect(canonicalSemanticJsonWitness).toBeTypeOf('function');
+		expect(canonicalSemanticJson).toHaveLength(1);
+		expect(canonicalSemanticJsonWitness).toHaveLength(1);
+		expect(publicSurface).not.toHaveProperty('canonicalSemanticJsonWithProgress');
+		expect(publicSurface).not.toHaveProperty('canonicalSemanticJsonWitnessWithProgress');
+		expect(publicSurface).not.toHaveProperty('canonicalSemanticJsonPrefixedSha256');
+		expect(publicSurface).not.toHaveProperty('compareCanonicalSemanticJsonStrings');
 		expect(SEMANTIC_EXTRACTION_VERSION).toBe('jan-csaa-typescript-static/0.7.0');
 		expect(SEMANTIC_OPERATION_VERSION).toBe('jan-csaa-build-static-semantic-snapshot/4.0.0');
 		expect(SEMANTIC_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-semantic-request/3.0.0');
@@ -200,6 +226,18 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(CONDITIONAL_EXPORT_RESOLUTION_SCHEMA_VERSION).toBe(
 			'jan-csaa-conditional-export-resolution/1.0.0'
+		);
+		expect(DECLARATION_CONTEXT_ANALYSIS_OPERATION_VERSION).toBe(
+			'jan-csaa-build-declaration-context-analysis/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_ANALYSIS_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-analysis-progress/1.0.0'
+		);
+		expect(DECLARATION_CONTEXT_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-analysis-request/1.0.0'
+		);
+		expect(DECLARATION_CONTEXT_ANALYSIS_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-analysis/1.0.0'
 		);
 		expect(COMMAND_HANDLER_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-command-handler-graph/0.1.0'

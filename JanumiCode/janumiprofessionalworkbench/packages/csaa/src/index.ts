@@ -1,6 +1,7 @@
 export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
 export * from './contracts/conditional-export-resolution.js';
+export * from './contracts/declaration-context-analysis.js';
 export * from './contracts/arrow-command-census.js';
 export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-event-contract-overlay.js';
@@ -76,6 +77,7 @@ export { buildLogicalGraphComposition } from './graph/build-logical-graph-compos
 export { buildProjectContextGraph } from './graph/build-project-context-graph.js';
 export { buildConditionalExportResolution } from './resolution/build-conditional-export-resolution.js';
 export { buildModuleResolutionTrace } from './resolution/build-module-resolution-trace.js';
+export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
@@ -131,6 +133,7 @@ export {
 export { validateProjectContextGraph } from './graph/validate-project-context-graph.js';
 export { validateConditionalExportResolution } from './resolution/validate-conditional-export-resolution.js';
 export { validateModuleResolutionTrace } from './resolution/validate-module-resolution-trace.js';
+export { validateDeclarationContextAnalysis } from './semantic/validate-declaration-context-analysis.js';
 export {
 	validateConstructedStructuralModuleReachabilityAnalysis,
 	validateStructuralModuleReachabilityAnalysis

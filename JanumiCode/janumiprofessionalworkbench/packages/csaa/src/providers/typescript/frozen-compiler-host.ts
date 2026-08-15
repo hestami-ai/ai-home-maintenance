@@ -4,7 +4,7 @@ import { isProxy } from 'node:util/types';
 import type { SemanticBudgets } from '../../contracts/semantic.js';
 import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
 import { sha256 } from '../../inventory/canonical.js';
-import { canonicalSemanticJson } from '../../semantic/canonical.js';
+import { canonicalSemanticJsonWitnessWithProgress } from '../../semantic/canonical.js';
 import type { SemanticOperationClock } from '../../semantic/operation-budget-ledger.js';
 import { validateProgramRecipePolicy } from '../../semantic/program-recipe-policy.js';
 import type { StaticSemanticOperationBudgetProviderBinding } from '../../semantic/operation-budget-provider-binding.js';
@@ -20,7 +20,9 @@ import {
 	type CompilerInputQuery,
 	type CompilerInputOperationBudgetWitness,
 	type FrozenCompilerCapture,
-	type VerifiedCompilerCapture
+	type VerifiedCompilerCapture,
+	type VerifiedCompilerProjectInputEntry,
+	type VerifiedCompilerProjectInputLookup
 } from './compiler-input-journal.js';
 import { FrozenCompilerPathResolver } from './compiler-paths.js';
 import {
@@ -72,6 +74,34 @@ export interface ReplayCompilerHostSession {
 	readonly host: ExtendedCompilerHost;
 }
 
+/** @internal Callbacks for one fresh CompilerHost backed only by a verified project lookup. */
+export interface VerifiedCompilerProjectInputHostCallbacks {
+	readonly assertWithinDeadline: () => void;
+	readonly onInput: (
+		entry: VerifiedCompilerProjectInputEntry,
+		sourceEncoding: VerifiedCompilerSourceEncoding | null
+	) => void;
+}
+
+export type VerifiedCompilerSourceEncoding = 'UTF16BE_BOM' | 'UTF16LE_BOM' | 'UTF8' | 'UTF8_BOM';
+
+class CompilerHostProgressError extends Error {
+	constructor(readonly original: unknown) {
+		super('Compiler host resource progress callback failed.');
+		this.name = 'CompilerHostProgressError';
+	}
+}
+
+function guardedHostProgress(onProgress: () => void): () => void {
+	return () => {
+		try {
+			onProgress();
+		} catch (error) {
+			throw new CompilerHostProgressError(error);
+		}
+	};
+}
+
 interface InspectedHostArray {
 	readonly field: string;
 	readonly length: number;
@@ -81,8 +111,10 @@ interface InspectedHostArray {
 function inspectHostArray(
 	value: readonly string[] | undefined,
 	field: string,
-	maxEntries: number
+	maxEntries: number,
+	onProgress: () => void
 ): InspectedHostArray {
+	onProgress();
 	if (value === undefined) return Object.freeze({ field, length: 0, value: Object.freeze([]) });
 	if (isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype)
 		throw new CompilerInputCaptureError('INVALID_QUERY', `${field} must be an inert array.`);
@@ -108,7 +140,8 @@ function normalizeReadDirectoryArrays(
 	extensionsValue: readonly string[] | undefined,
 	excludesValue: readonly string[] | undefined,
 	includesValue: readonly string[] | undefined,
-	budgets: SemanticBudgets
+	budgets: SemanticBudgets,
+	onProgress: () => void
 ): {
 	readonly excludes: readonly string[];
 	readonly extensions: readonly string[];
@@ -119,17 +152,20 @@ function normalizeReadDirectoryArrays(
 		inspectHostArray(
 			excludesValue,
 			'CompilerHost readDirectory excludes',
-			budgets.maxDirectoryEntries
+			budgets.maxDirectoryEntries,
+			onProgress
 		),
 		inspectHostArray(
 			effectiveExtensions,
 			'CompilerHost readDirectory extensions',
-			budgets.maxDirectoryEntries
+			budgets.maxDirectoryEntries,
+			onProgress
 		),
 		inspectHostArray(
 			includesValue,
 			'CompilerHost readDirectory includes',
-			budgets.maxDirectoryEntries
+			budgets.maxDirectoryEntries,
+			onProgress
 		)
 	];
 	const totalEntries = inspected.reduce((total, value) => total + value.length, 0);
@@ -141,19 +177,23 @@ function normalizeReadDirectoryArrays(
 	let metadataBytes = 0;
 	const normalized = new Map<string, readonly string[]>();
 	for (const value of inspected) {
+		onProgress();
 		const ownKeys = Reflect.ownKeys(value.value);
-		if (
-			ownKeys.length !== value.length + 1 ||
-			ownKeys.some(
-				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-			)
-		)
+		onProgress();
+		let exactKeys = ownKeys.length === value.length + 1;
+		for (const key of ownKeys) {
+			onProgress();
+			if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))
+				exactKeys = false;
+		}
+		if (!exactKeys)
 			throw new CompilerInputCaptureError(
 				'INVALID_QUERY',
 				`${value.field} must not contain holes, symbols, or expando properties.`
 			);
 		const result: string[] = [];
 		for (let index = 0; index < value.length; index += 1) {
+			onProgress();
 			const descriptor = Object.getOwnPropertyDescriptor(value.value, String(index));
 			if (
 				descriptor === undefined ||
@@ -171,7 +211,7 @@ function normalizeReadDirectoryArrays(
 					`${value.field} contains a string beyond the path-character budget.`
 				);
 			const addition =
-				Buffer.byteLength(canonicalSemanticJson(descriptor.value), 'utf8') +
+				canonicalSemanticJsonWitnessWithProgress(descriptor.value, onProgress).bytes +
 				(metadataBytes === 0 ? 0 : 1);
 			if (
 				!Number.isSafeInteger(metadataBytes + addition) ||
@@ -184,7 +224,27 @@ function normalizeReadDirectoryArrays(
 			metadataBytes += addition;
 			result.push(descriptor.value);
 		}
-		normalized.set(value.field, Object.freeze([...new Set(result)].sort()));
+		const unique = new Set<string>();
+		for (const entry of result) {
+			onProgress();
+			unique.add(entry);
+		}
+		const ordered: string[] = [];
+		for (const entry of unique) {
+			onProgress();
+			ordered.push(entry);
+		}
+		ordered.sort((left, right) => {
+			onProgress();
+			const length = Math.min(left.length, right.length);
+			for (let index = 0; index < length; index += 1) {
+				onProgress();
+				const difference = left.charCodeAt(index) - right.charCodeAt(index);
+				if (difference !== 0) return difference < 0 ? -1 : 1;
+			}
+			return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+		});
+		normalized.set(value.field, Object.freeze(ordered));
 	}
 	return Object.freeze({
 		excludes: normalized.get('CompilerHost readDirectory excludes')!,
@@ -204,14 +264,22 @@ function decodeCompilerText(bytes: Uint8Array): string {
 		const body = bytes.subarray(2);
 		if (body.byteLength % 2 !== 0)
 			throw new TypeError('UTF-16BE compiler input must contain complete code units.');
-		const swapped = body.slice();
-		for (let index = 0; index < swapped.length; index += 2)
-			[swapped[index], swapped[index + 1]] = [swapped[index + 1]!, swapped[index]!];
-		return new TextDecoder('utf-16le', { fatal: true }).decode(swapped);
+		return new TextDecoder('utf-16be', { fatal: true }).decode(body);
 	}
 	const start =
 		bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
 	return new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(start));
+}
+
+function compilerSourceEncoding(
+	bytes: Uint8Array | undefined
+): VerifiedCompilerSourceEncoding | null {
+	if (bytes === undefined) return null;
+	if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return 'UTF16LE_BOM';
+	if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return 'UTF16BE_BOM';
+	return bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
+		? 'UTF8_BOM'
+		: 'UTF8';
 }
 
 function scriptKind(fileName: string): ts.ScriptKind {
@@ -225,12 +293,15 @@ function scriptKind(fileName: string): ts.ScriptKind {
 interface HostInput {
 	readonly assertWithinDeadline: () => void;
 	readonly budgets: SemanticBudgets;
-	readonly capture: (query: CompilerInputQuery) => CapturedCompilerInput;
 	readonly poison: () => void;
 	readonly repositoryRoot: string;
 	readonly toAbsolute: (logicalPath: string) => string;
 	readonly toLogical: (path: string) => string;
 	readonly toLogicalPath: (path: string) => string;
+	readonly withCaptured: <Result>(
+		query: CompilerInputQuery,
+		consumer: (entry: CapturedCompilerInput) => Result
+	) => Result;
 }
 
 function assertRawHostPath(
@@ -301,7 +372,9 @@ function createHost(
 	const attempt = <T>(action: () => T): T => {
 		try {
 			input.assertWithinDeadline();
-			return action();
+			const result = action();
+			input.assertWithinDeadline();
+			return result;
 		} catch (error) {
 			input.poison();
 			throw error;
@@ -310,40 +383,50 @@ function createHost(
 	const queryPath = (path: string): string => boundedHostPath(path, input, input.toLogical);
 	const readFile = (fileName: string): string | undefined =>
 		attempt(() => {
-			const captured = input.capture({ logicalPath: queryPath(fileName), operation: 'READ_FILE' });
-			if (
-				captured.observation.operation !== 'READ_FILE' ||
-				captured.observation.result !== 'PRESENT' ||
-				captured.bytes === undefined
-			)
-				return undefined;
-			try {
-				return decodeCompilerText(captured.bytes);
-			} catch {
-				throw new CompilerInputCaptureError(
-					'INVALID_CAPTURE',
-					`Compiler input bytes are not valid supported source text: ${captured.observation.logicalPath}.`
-				);
-			}
+			return input.withCaptured(
+				{ logicalPath: queryPath(fileName), operation: 'READ_FILE' },
+				(captured) => {
+					if (
+						captured.observation.operation !== 'READ_FILE' ||
+						captured.observation.result !== 'PRESENT' ||
+						captured.bytes === undefined
+					)
+						return undefined;
+					try {
+						return decodeCompilerText(captured.bytes);
+					} catch {
+						throw new CompilerInputCaptureError(
+							'INVALID_CAPTURE',
+							`Compiler input bytes are not valid supported source text: ${captured.observation.logicalPath}.`
+						);
+					}
+				}
+			);
 		});
 	const host: ExtendedCompilerHost = {
-		createHash: (data) => sha256(data),
+		createHash: (data) => attempt(() => sha256(data)),
 		directoryExists(directoryName) {
 			return attempt(() => {
-				const observation = input.capture({
-					logicalPath: queryPath(directoryName),
-					operation: 'DIRECTORY_EXISTS'
-				}).observation;
-				return observation.operation === 'DIRECTORY_EXISTS' && observation.result === 'DIRECTORY';
+				return input.withCaptured(
+					{
+						logicalPath: queryPath(directoryName),
+						operation: 'DIRECTORY_EXISTS'
+					},
+					({ observation }) =>
+						observation.operation === 'DIRECTORY_EXISTS' && observation.result === 'DIRECTORY'
+				);
 			});
 		},
 		fileExists(fileName) {
 			return attempt(() => {
-				const observation = input.capture({
-					logicalPath: queryPath(fileName),
-					operation: 'FILE_EXISTS'
-				}).observation;
-				return observation.operation === 'FILE_EXISTS' && observation.result === 'PRESENT';
+				return input.withCaptured(
+					{
+						logicalPath: queryPath(fileName),
+						operation: 'FILE_EXISTS'
+					},
+					({ observation }) =>
+						observation.operation === 'FILE_EXISTS' && observation.result === 'PRESENT'
+				);
 			});
 		},
 		getCanonicalFileName(fileName) {
@@ -351,20 +434,29 @@ function createHost(
 		},
 		getCurrentDirectory() {
 			return attempt(() => {
-				input.capture({ logicalPath: '.', operation: 'CURRENT_DIRECTORY' });
+				input.withCaptured({ logicalPath: '.', operation: 'CURRENT_DIRECTORY' }, () => undefined);
 				return input.repositoryRoot;
 			});
 		},
-		getDefaultLibFileName: () => ts.getDefaultLibFilePath(materialized.compilerOptions),
+		getDefaultLibFileName: () =>
+			attempt(() => ts.getDefaultLibFilePath(materialized.compilerOptions)),
 		getDirectories(directoryName) {
 			return attempt(() => {
-				const observation = input.capture({
-					logicalPath: queryPath(directoryName),
-					operation: 'GET_DIRECTORIES'
-				}).observation;
-				return observation.operation === 'GET_DIRECTORIES'
-					? observation.resultEntries.map(input.toAbsolute)
-					: [];
+				return input.withCaptured(
+					{
+						logicalPath: queryPath(directoryName),
+						operation: 'GET_DIRECTORIES'
+					},
+					({ observation }) => {
+						if (observation.operation !== 'GET_DIRECTORIES') return [];
+						const result: string[] = [];
+						for (const logicalPath of observation.resultEntries) {
+							input.assertWithinDeadline();
+							result.push(input.toAbsolute(logicalPath));
+						}
+						return result;
+					}
+				);
 			});
 		},
 		getEnvironmentVariable: () => undefined,
@@ -389,41 +481,54 @@ function createHost(
 					extensions,
 					excludes,
 					includes,
-					input.budgets
+					input.budgets,
+					input.assertWithinDeadline
 				);
-				const observation = input.capture({
-					depth: depth ?? null,
-					...parameters,
-					logicalPath: boundedHostPath(rootDir, input, input.toLogical),
-					operation: 'READ_DIRECTORY'
-				}).observation;
-				return observation.operation === 'READ_DIRECTORY'
-					? observation.resultEntries.map(input.toAbsolute)
-					: [];
+				return input.withCaptured(
+					{
+						depth: depth ?? null,
+						...parameters,
+						logicalPath: boundedHostPath(rootDir, input, input.toLogical),
+						operation: 'READ_DIRECTORY'
+					},
+					({ observation }) => {
+						if (observation.operation !== 'READ_DIRECTORY') return [];
+						const result: string[] = [];
+						for (const logicalPath of observation.resultEntries) {
+							input.assertWithinDeadline();
+							result.push(input.toAbsolute(logicalPath));
+						}
+						return result;
+					}
+				);
 			});
 		},
 		readFile,
 		realpath(path) {
 			return attempt(() => {
-				const observation = input.capture({
-					logicalPath: queryPath(path),
-					operation: 'REALPATH'
-				}).observation;
-				return observation.operation === 'REALPATH' && observation.result === 'RESOLVED'
-					? input.toAbsolute(observation.resolvedLogicalPath)
-					: path;
+				return input.withCaptured(
+					{
+						logicalPath: queryPath(path),
+						operation: 'REALPATH'
+					},
+					({ observation }) =>
+						observation.operation === 'REALPATH' && observation.result === 'RESOLVED'
+							? input.toAbsolute(observation.resolvedLogicalPath)
+							: path
+				);
 			});
 		},
 		toLogicalPath: (path) => attempt(() => boundedHostPath(path, input, input.toLogicalPath)),
 		useCaseSensitiveFileNames() {
 			return attempt(() => {
-				const observation = input.capture({
-					logicalPath: '.',
-					operation: 'USE_CASE_SENSITIVE_FILE_NAMES'
-				}).observation;
-				return (
-					observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
-					observation.result === 'CASE_SENSITIVE'
+				return input.withCaptured(
+					{
+						logicalPath: '.',
+						operation: 'USE_CASE_SENSITIVE_FILE_NAMES'
+					},
+					({ observation }) =>
+						observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
+						observation.result === 'CASE_SENSITIVE'
 				);
 			});
 		},
@@ -454,33 +559,169 @@ function canonicalProjectKey(
 	}
 }
 
-function freezeSnapshot<T>(value: T): T {
-	if (value !== null && typeof value === 'object') {
-		for (const child of Object.values(value as Record<string, unknown>)) freezeSnapshot(child);
-		Object.freeze(value);
+interface MaterializedRecipeSnapshot {
+	readonly digest: string;
+	readonly value: MaterializedProgramRecipe;
+}
+
+interface MaterializedRecipeCloneBudget {
+	readonly maximum: number;
+	nodes: number;
+}
+
+function cloneCanonicalSnapshotValue(
+	value: unknown,
+	onProgress: () => void,
+	budget: MaterializedRecipeCloneBudget
+): unknown {
+	onProgress();
+	budget.nodes += 1;
+	if (!Number.isSafeInteger(budget.nodes) || budget.nodes > budget.maximum)
+		throw new CompilerInputCaptureError(
+			'BUDGET_EXCEEDED',
+			'Materialized compiler recipe exceeds its bounded snapshot population.'
+		);
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+	if (typeof value === 'number') return value;
+	if (typeof value !== 'object' || isProxy(value))
+		throw new TypeError('Materialized compiler recipe contains a non-data value.');
+	if (Array.isArray(value)) {
+		if (Reflect.getPrototypeOf(value) !== Array.prototype)
+			throw new TypeError('Materialized compiler recipe arrays must use Array.prototype.');
+		const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
+		const length =
+			lengthDescriptor !== undefined && 'value' in lengthDescriptor
+				? lengthDescriptor.value
+				: undefined;
+		if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0)
+			throw new TypeError('Materialized compiler recipe contains an invalid array length.');
+		if (length > budget.maximum - budget.nodes)
+			throw new CompilerInputCaptureError(
+				'BUDGET_EXCEEDED',
+				'Materialized compiler recipe array exceeds its bounded snapshot population.'
+			);
+		onProgress();
+		const ownKeys = Reflect.ownKeys(value);
+		onProgress();
+		let exactKeys = ownKeys.length === length + 1;
+		for (const key of ownKeys) {
+			onProgress();
+			if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))
+				exactKeys = false;
+		}
+		if (!exactKeys)
+			throw new TypeError('Materialized compiler recipe arrays must be dense exact data arrays.');
+		const result: unknown[] = [];
+		for (let index = 0; index < length; index += 1) {
+			onProgress();
+			const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+				throw new TypeError('Materialized compiler recipe arrays must contain data elements.');
+			result.push(cloneCanonicalSnapshotValue(descriptor.value, onProgress, budget));
+		}
+		return Object.freeze(result);
 	}
-	return value;
+	const prototype = Reflect.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Materialized compiler recipe records must use a plain prototype.');
+	onProgress();
+	const ownKeys = Reflect.ownKeys(value);
+	onProgress();
+	if (ownKeys.length > budget.maximum - budget.nodes)
+		throw new CompilerInputCaptureError(
+			'BUDGET_EXCEEDED',
+			'Materialized compiler recipe record exceeds its bounded snapshot population.'
+		);
+	const result: Record<string, unknown> = {};
+	for (const key of ownKeys) {
+		onProgress();
+		if (typeof key !== 'string')
+			throw new TypeError('Materialized compiler recipe records must not contain symbol keys.');
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Materialized compiler recipe records must contain data properties.');
+		Object.defineProperty(result, key, {
+			configurable: true,
+			enumerable: true,
+			value: cloneCanonicalSnapshotValue(descriptor.value, onProgress, budget),
+			writable: true
+		});
+	}
+	return Object.freeze(result);
+}
+
+function compareTextWithProgress(left: string, right: string, onProgress: () => void): number {
+	const length = Math.min(left.length, right.length);
+	for (let index = 0; index < length; index += 1) {
+		onProgress();
+		const difference = left.charCodeAt(index) - right.charCodeAt(index);
+		if (difference !== 0) return difference < 0 ? -1 : 1;
+	}
+	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+}
+
+function sameCanonicalSnapshotValue(
+	left: unknown,
+	right: unknown,
+	onProgress: () => void
+): boolean {
+	onProgress();
+	if (typeof left !== typeof right) return false;
+	if (left === null || right === null) return left === right;
+	if (typeof left !== 'object' || typeof right !== 'object') {
+		if (typeof left === 'string' && typeof right === 'string')
+			return compareTextWithProgress(left, right, onProgress) === 0;
+		return left === right;
+	}
+	if (Array.isArray(left) || Array.isArray(right)) {
+		if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+		for (let index = 0; index < left.length; index += 1) {
+			onProgress();
+			if (!sameCanonicalSnapshotValue(left[index], right[index], onProgress)) return false;
+		}
+		return true;
+	}
+	const leftKeys = Object.keys(left).sort((first, second) =>
+		compareTextWithProgress(first, second, onProgress)
+	);
+	onProgress();
+	const rightKeys = Object.keys(right).sort((first, second) =>
+		compareTextWithProgress(first, second, onProgress)
+	);
+	onProgress();
+	if (leftKeys.length !== rightKeys.length) return false;
+	for (let index = 0; index < leftKeys.length; index += 1) {
+		onProgress();
+		const key = leftKeys[index]!;
+		if (
+			compareTextWithProgress(key, rightKeys[index]!, onProgress) !== 0 ||
+			!sameCanonicalSnapshotValue(
+				(left as Record<string, unknown>)[key],
+				(right as Record<string, unknown>)[key],
+				onProgress
+			)
+		)
+			return false;
+	}
+	return true;
 }
 
 function snapshotMaterializedRecipe(
-	materialized: MaterializedProgramRecipe
-): MaterializedProgramRecipe {
+	materialized: MaterializedProgramRecipe,
+	maxNodes: number,
+	onProgress: () => void = () => undefined
+): MaterializedRecipeSnapshot {
+	const progress = guardedHostProgress(onProgress);
 	try {
-		canonicalSemanticJson(materialized);
-		return freezeSnapshot(structuredClone(materialized));
+		const value = cloneCanonicalSnapshotValue(materialized, progress, {
+			maximum: maxNodes,
+			nodes: 0
+		}) as MaterializedProgramRecipe;
+		const digest = canonicalSemanticJsonWitnessWithProgress(value, progress).sha256;
+		progress();
+		return Object.freeze({ digest, value });
 	} catch (error) {
-		if (error instanceof CompilerInputCaptureError) throw error;
-		throw new CompilerInputCaptureError(
-			'INVALID_QUERY',
-			'Materialized compiler recipe is not inert canonical data.'
-		);
-	}
-}
-
-function materializedRecipeDigest(materialized: MaterializedProgramRecipe): string {
-	try {
-		return sha256(canonicalSemanticJson(materialized));
-	} catch (error) {
+		if (error instanceof CompilerHostProgressError) throw error.original;
 		if (error instanceof CompilerInputCaptureError) throw error;
 		throw new CompilerInputCaptureError(
 			'INVALID_QUERY',
@@ -491,15 +732,20 @@ function materializedRecipeDigest(materialized: MaterializedProgramRecipe): stri
 
 function recipeIdentity(
 	recipe: ProgramRecipe,
-	materialized: MaterializedProgramRecipe
+	materializedRecipeDigest: string,
+	onProgress: () => void = () => undefined
 ): { readonly materializedRecipeDigest: string; readonly projectResolutionDigest: string } {
+	const progress = guardedHostProgress(onProgress);
 	try {
+		progress();
 		const validated = validateProgramRecipePolicy(recipe);
+		progress();
 		return Object.freeze({
-			materializedRecipeDigest: materializedRecipeDigest(materialized),
+			materializedRecipeDigest,
 			projectResolutionDigest: validated.projectResolutionDigest
 		});
 	} catch (error) {
+		if (error instanceof CompilerHostProgressError) throw error.original;
 		if (error instanceof CompilerInputCaptureError) throw error;
 		throw new CompilerInputCaptureError(
 			'INVALID_QUERY',
@@ -511,22 +757,201 @@ function recipeIdentity(
 function assertExactMaterializedProjection(
 	recipe: ProgramRecipe,
 	materialized: MaterializedProgramRecipe,
-	repositoryRoot: string
+	repositoryRoot: string,
+	onProgress: () => void = () => undefined
 ): void {
+	const progress = guardedHostProgress(onProgress);
 	try {
+		progress();
 		const expected = materializeProgramRecipe(recipe, repositoryRoot);
-		if (canonicalSemanticJson(expected) !== canonicalSemanticJson(materialized))
+		progress();
+		if (!sameCanonicalSnapshotValue(expected, materialized, progress))
 			throw new CompilerInputCaptureError(
 				'INVALID_QUERY',
 				'Materialized compiler inputs do not reproduce the authoritative ProgramRecipe projection.'
 			);
 	} catch (error) {
+		if (error instanceof CompilerHostProgressError) throw error.original;
 		if (error instanceof CompilerInputCaptureError) throw error;
 		throw new CompilerInputCaptureError(
 			'INVALID_QUERY',
 			'Materialized compiler inputs could not be related to the authoritative ProgramRecipe.'
 		);
 	}
+}
+
+function createBoundVerifiedCompilerProjectInputHost(
+	materialized: MaterializedProgramRecipe,
+	lookup: VerifiedCompilerProjectInputLookup,
+	budgets: SemanticBudgets,
+	callbacks: VerifiedCompilerProjectInputHostCallbacks,
+	repositoryRoot: string
+): ExtendedCompilerHost {
+	let poisoned = false;
+	const poison = (): void => {
+		poisoned = true;
+	};
+	const host = createHost(materialized, {
+		assertWithinDeadline: () => {
+			if (poisoned)
+				throw new CompilerInputCaptureError(
+					'INVALID_CAPTURE',
+					'Verified compiler project input host is poisoned by an earlier failed operation.'
+				);
+			callbacks.assertWithinDeadline();
+		},
+		budgets,
+		withCaptured<Result>(
+			query: CompilerInputQuery,
+			consumer: (entry: CapturedCompilerInput) => Result
+		): Result {
+			let consumed = false;
+			let result: Result | undefined;
+			const found = lookup.withAttributedQueryForVerifiedHost(
+				query,
+				callbacks.assertWithinDeadline,
+				(entry) => {
+					callbacks.onInput(
+						Object.freeze({
+							attributedInvocationCount: entry.attributedInvocationCount,
+							observation: entry.observation,
+							query: entry.query
+						}),
+						compilerSourceEncoding(entry.bytes)
+					);
+					result = consumer(entry);
+					consumed = true;
+				}
+			);
+			callbacks.assertWithinDeadline();
+			if (!found || !consumed)
+				throw new CompilerInputCaptureError(
+					'CONTEXT_UNAVAILABLE',
+					'Fresh compiler Program requested an input absent from the verified project attribution.'
+				);
+			return result as Result;
+		},
+		poison,
+		repositoryRoot,
+		toAbsolute(logicalPath) {
+			const absolutePath = lookup.toRecordedAbsolute(logicalPath);
+			callbacks.assertWithinDeadline();
+			return absolutePath;
+		},
+		toLogical(path) {
+			const logicalPath = lookup.toRecordedLogical(path);
+			callbacks.assertWithinDeadline();
+			return logicalPath;
+		},
+		toLogicalPath(path) {
+			const logicalPath = lookup.toRecordedLogical(path);
+			callbacks.assertWithinDeadline();
+			return logicalPath;
+		}
+	});
+	callbacks.assertWithinDeadline();
+	return host;
+}
+
+/**
+ * @internal Creates one read-only CompilerHost whose complete filesystem authority is the exact
+ * project-attributed verified capture. A query absent from that capture fails closed; this helper
+ * never consults `ts.sys`, the live filesystem, or a fallback host.
+ */
+export function createVerifiedCompilerProjectInputHost(
+	recipe: ProgramRecipe,
+	materializedValue: MaterializedProgramRecipe,
+	lookup: VerifiedCompilerProjectInputLookup,
+	budgetsValue: SemanticBudgets,
+	callbacks: VerifiedCompilerProjectInputHostCallbacks
+): ExtendedCompilerHost {
+	const budgets = normalizeSemanticBudgets(budgetsValue);
+	const repositoryRoot = lookup.toRecordedAbsolute('.');
+	callbacks.assertWithinDeadline();
+	preflightMaterializedConfigPath(materializedValue, { budgets, repositoryRoot });
+	const snapshot = snapshotMaterializedRecipe(
+		materializedValue,
+		budgets.maxSnapshotBytes,
+		callbacks.assertWithinDeadline
+	);
+	const materialized = snapshot.value;
+	const identity = recipeIdentity(recipe, snapshot.digest, callbacks.assertWithinDeadline);
+	const projectKey = canonicalProjectKey(materialized, {
+		budgets,
+		repositoryRoot,
+		toLogical(path) {
+			const logicalPath = lookup.toRecordedLogical(path);
+			callbacks.assertWithinDeadline();
+			return logicalPath;
+		}
+	});
+	if (
+		projectKey !== lookup.attribution.projectKey ||
+		identity.materializedRecipeDigest !== lookup.attribution.materializedRecipeDigest ||
+		identity.projectResolutionDigest !== lookup.attribution.projectResolutionDigest
+	)
+		throw new CompilerInputCaptureError(
+			'INVALID_CAPTURE',
+			'Verified compiler project lookup does not reproduce the requested ProgramRecipe.'
+		);
+	return createBoundVerifiedCompilerProjectInputHost(
+		materialized,
+		lookup,
+		budgets,
+		callbacks,
+		repositoryRoot
+	);
+}
+
+/**
+ * @internal Trust-only CAP013 path. The exact attached semantic-snapshot capability has already
+ * proved and publicly validated the ProgramRecipe; this path independently binds the checkpointed
+ * materialized projection and its retained resolution digest without repeating legacy recipe
+ * policy/canonical materialization.
+ */
+export function createPrevalidatedVerifiedCompilerProjectInputHost(
+	materializedValue: MaterializedProgramRecipe,
+	projectResolutionDigest: string,
+	lookup: VerifiedCompilerProjectInputLookup,
+	budgetsValue: SemanticBudgets,
+	callbacks: VerifiedCompilerProjectInputHostCallbacks
+): ExtendedCompilerHost {
+	const budgets = normalizeSemanticBudgets(budgetsValue);
+	const repositoryRoot = lookup.toRecordedAbsolute('.');
+	callbacks.assertWithinDeadline();
+	preflightMaterializedConfigPath(materializedValue, { budgets, repositoryRoot });
+	const snapshot = snapshotMaterializedRecipe(
+		materializedValue,
+		budgets.maxSnapshotBytes,
+		callbacks.assertWithinDeadline
+	);
+	const materialized = snapshot.value;
+	const projectKey = canonicalProjectKey(materialized, {
+		budgets,
+		repositoryRoot,
+		toLogical(path) {
+			const logicalPath = lookup.toRecordedLogical(path);
+			callbacks.assertWithinDeadline();
+			return logicalPath;
+		}
+	});
+	callbacks.assertWithinDeadline();
+	if (
+		projectKey !== lookup.attribution.projectKey ||
+		snapshot.digest !== lookup.attribution.materializedRecipeDigest ||
+		projectResolutionDigest !== lookup.attribution.projectResolutionDigest
+	)
+		throw new CompilerInputCaptureError(
+			'INVALID_CAPTURE',
+			'Prevalidated compiler project lookup does not reproduce the attached semantic snapshot.'
+		);
+	return createBoundVerifiedCompilerProjectInputHost(
+		materialized,
+		lookup,
+		budgets,
+		callbacks,
+		repositoryRoot
+	);
 }
 
 export function createCapturingCompilerEnvironment(
@@ -574,9 +999,16 @@ export function createCapturingCompilerEnvironment(
 					budgets,
 					repositoryRoot: paths.repositoryRoot
 				});
-				const snapshot = snapshotMaterializedRecipe(materialized);
-				assertExactMaterializedProjection(recipe, snapshot, paths.repositoryRoot);
-				recipeIdentity(recipe, snapshot);
+				const capturedSnapshot = snapshotMaterializedRecipe(
+					materialized,
+					budgets.maxSnapshotBytes,
+					() => journal.assertWithinDeadline()
+				);
+				const snapshot = capturedSnapshot.value;
+				assertExactMaterializedProjection(recipe, snapshot, paths.repositoryRoot, () =>
+					journal.assertWithinDeadline()
+				);
+				recipeIdentity(recipe, capturedSnapshot.digest, () => journal.assertWithinDeadline());
 				const hostInput = {
 					assertWithinDeadline: () => journal.assertWithinDeadline(),
 					budgets,
@@ -598,7 +1030,10 @@ export function createCapturingCompilerEnvironment(
 				journal.assertWithinDeadline();
 				const host = createHost(snapshot, {
 					...hostInput,
-					capture: (query) => journal.capture(query, key)
+					withCaptured: <Result>(
+						query: CompilerInputQuery,
+						consumer: (entry: CapturedCompilerInput) => Result
+					): Result => consumer(journal.capture(query, key))
 				});
 				journal.assertWithinDeadline();
 				projectKeys.add(key);
@@ -713,8 +1148,13 @@ export function createReplayCompilerEnvironment(
 					budgets: journal.semanticBudgets,
 					repositoryRoot: journal.repositoryRoot
 				});
-				const snapshot = snapshotMaterializedRecipe(materialized);
-				recipeIdentity(recipe, snapshot);
+				const replaySnapshot = snapshotMaterializedRecipe(
+					materialized,
+					journal.semanticBudgets.maxSnapshotBytes,
+					() => journal.assertWithinDeadline()
+				);
+				const snapshot = replaySnapshot.value;
+				recipeIdentity(recipe, replaySnapshot.digest, () => journal.assertWithinDeadline());
 				const hostInput = {
 					assertWithinDeadline: () => journal.assertWithinDeadline(),
 					budgets: journal.semanticBudgets,
@@ -736,7 +1176,10 @@ export function createReplayCompilerEnvironment(
 				journal.assertWithinDeadline();
 				const host = createHost(snapshot, {
 					...hostInput,
-					capture: (query) => journal.replay(query, key)
+					withCaptured: <Result>(
+						query: CompilerInputQuery,
+						consumer: (entry: CapturedCompilerInput) => Result
+					): Result => consumer(journal.replay(query, key))
 				});
 				journal.assertWithinDeadline();
 				projectKeys.add(key);

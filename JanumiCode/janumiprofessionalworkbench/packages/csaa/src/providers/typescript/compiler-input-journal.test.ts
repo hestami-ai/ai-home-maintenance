@@ -30,6 +30,7 @@ import {
 	ReplayCompilerInputJournal,
 	createVerifiedCompilerProjectInputLookup,
 	createVerifiedCompilerProjectInputLookupSet,
+	exactVerifiedCompilerInputQueryBucketEntry,
 	issueFrozenCompilerCaptureOperationBudgetWitness,
 	issueReplayCompilerInputOperationBudgetWitness,
 	normalizeSemanticBudgets,
@@ -915,6 +916,15 @@ describe('sealed capture, freshness, and replay', () => {
 		const readQuery = { logicalPath: 'src/index.ts', operation: 'READ_FILE' as const };
 		capture.capture(readQuery);
 		capture.capture(readQuery);
+		const directoryQuery = {
+			depth: null,
+			excludes: ['**/generated/**'],
+			extensions: ['.ts'],
+			includes: ['src/**'],
+			logicalPath: '.',
+			operation: 'READ_DIRECTORY' as const
+		};
+		capture.capture(directoryQuery);
 		const other = projectBinding(root, 'other/tsconfig.json');
 		capture.journal.registerProject('other/tsconfig.json', other.recipe, other.materialized);
 		const otherQuery = { logicalPath: 'other/missing.ts', operation: 'FILE_EXISTS' as const };
@@ -955,6 +965,45 @@ describe('sealed capture, freshness, and replay', () => {
 		const second = lookup.lookupAttributedQuery(readQuery);
 		expect(second?.bytes).not.toBe(first.bytes);
 		expect(second?.bytes?.[0]).not.toBe(first.bytes[0]);
+		let borrowedFirstByte: number | undefined;
+		let borrowedProgress = 0;
+		expect(
+			lookup.withAttributedQueryForVerifiedHost(
+				readQuery,
+				() => {
+					borrowedProgress += 1;
+				},
+				(entry) => {
+					expect(Object.isFrozen(entry)).toBe(true);
+					expect(entry.query).toBe(second?.query);
+					expect(entry.observation).toBe(second?.observation);
+					borrowedFirstByte = entry.bytes?.[0];
+				}
+			)
+		).toBe(true);
+		expect(borrowedProgress).toBeGreaterThan(0);
+		expect(borrowedFirstByte).toBe(second?.bytes?.[0]);
+		expect(borrowedFirstByte).not.toBe(first.bytes[0]);
+		const deadlineFailure = new Error('injected verified lookup deadline');
+		let normalizationProgress = 0;
+		let normalizationError: unknown;
+		try {
+			lookup.lookupAttributedQuery(directoryQuery, () => {
+				normalizationProgress += 1;
+				if (normalizationProgress === 8) throw deadlineFailure;
+			});
+		} catch (error) {
+			normalizationError = error;
+		}
+		expect(normalizationProgress).toBe(8);
+		expect(normalizationError).toBe(deadlineFailure);
+		expect(
+			lookup.withAttributedQueryForVerifiedHost(
+				directoryQuery,
+				() => undefined,
+				() => undefined
+			)
+		).toBe(true);
 		expect(lookup.lookupAttributedQuery(otherQuery)).toBeUndefined();
 		expect(lookup.toRecordedLogical(root)).toBe('.');
 		expect(lookup.toRecordedAbsolute('.')).toBe(capture.paths.repositoryRoot);
@@ -1013,6 +1062,39 @@ describe('sealed capture, freshness, and replay', () => {
 					...binding,
 					materializedRecipeDigest: 'c'.repeat(64)
 				}),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
+	});
+
+	it('resolves fixed-size verified query digest collisions by exact fieldwise query identity', () => {
+		const first = Object.freeze({ logicalPath: 'src/a.ts', operation: 'FILE_EXISTS' as const });
+		const second = Object.freeze({ logicalPath: 'src/b.ts', operation: 'FILE_EXISTS' as const });
+		const collisionBucket = Object.freeze([
+			Object.freeze({ query: first, witness: 'first' }),
+			Object.freeze({ query: second, witness: 'second' })
+		]);
+		expect(
+			exactVerifiedCompilerInputQueryBucketEntry(collisionBucket, {
+				logicalPath: 'src/b.ts',
+				operation: 'FILE_EXISTS'
+			})?.witness
+		).toBe('second');
+		expect(
+			exactVerifiedCompilerInputQueryBucketEntry(collisionBucket, {
+				logicalPath: 'src/c.ts',
+				operation: 'FILE_EXISTS'
+			})
+		).toBeUndefined();
+		expectCode(
+			() =>
+				exactVerifiedCompilerInputQueryBucketEntry(
+					Object.freeze([
+						...collisionBucket,
+						Object.freeze({ query: second, witness: 'duplicate' })
+					]),
+					second
+				),
 			CompilerInputCaptureError,
 			'INVALID_CAPTURE'
 		);
