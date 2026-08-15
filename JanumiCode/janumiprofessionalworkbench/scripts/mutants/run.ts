@@ -348,9 +348,25 @@ function timed<T>(leg: string, fn: () => T): T {
 }
 
 function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | null {
-	const types = timed(`tsc ${pkgOf(m.file)}`, () =>
-		sh('bunx', ['tsc', '--noEmit', '-p', `${pkgOf(m.file)}/tsconfig.json`])
-	);
+	// ⚠ A `.svelte` MUTANT MUST BE CHECKED BY THE COMPILER THAT CAN READ IT (REG-F-175). `tsc` does not load
+	// `.svelte` AT ALL — measured: `tsc --noEmit -p apps/rph-demo/tsconfig.json --listFiles` reports 1640 files
+	// and ZERO of them `.svelte`, because the app's config extends the generated `.svelte-kit/tsconfig.json`.
+	// Six ledger entries target `.svelte` files, so for those six this leg was typechecking a program that
+	// **never contained the mutated file**: `NO_COMPILE` was structurally unreachable, the leg's time was spent
+	// proving nothing, and a `KILLED` could not exclude *"the page simply failed to build"* — which is the
+	// separation `compileVerdict` exists to provide.
+	//
+	// ⚠ IT INVOKES THE APP'S OWN SCRIPT RATHER THAN REIMPLEMENTING ITS COMMAND. `apps/rph-demo`'s `check` is
+	// `svelte-kit sync && svelte-check --tsconfig ./tsconfig.json`, and `svelte-check` reads 1660 files including
+	// every `.svelte` — a SUPERSET of what `tsc` saw. Calling the script by name means the gate cannot drift from
+	// what the app actually checks: change the app's checker and this follows, with nothing to remember. The
+	// harness was compiling the app with a WEAKER compiler than the app's own gate, and copying the command here
+	// would have re-created that gap the next time the app changed.
+	const isSvelte = m.file.endsWith('.svelte');
+	const pkg = pkgOf(m.file);
+	const types = isSvelte
+		? timed(`svelte-check ${pkg}`, () => sh('bun', ['run', '--cwd', pkg, 'check']))
+		: timed(`tsc ${pkg}`, () => sh('bunx', ['tsc', '--noEmit', '-p', `${pkg}/tsconfig.json`]));
 	const compiles = types.status === 0;
 	// A mutant may be declared as EXPECTED not to compile (`expectNoCompile`). For those, refusing to typecheck IS
 	// the guarantee: the defect is UNEXPRESSIBLE rather than merely caught, which is stronger — a test can be
