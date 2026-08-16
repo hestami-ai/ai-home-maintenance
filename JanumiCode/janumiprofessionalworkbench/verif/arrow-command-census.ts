@@ -17,6 +17,7 @@ import ts from 'typescript';
 import { isExcludedMachine, STATE_MACHINES, STEP_COMMAND_SPECS,
 	PWU_LIFECYCLE_COMMAND_SPECS,
 	PWU_GENERIC_SETTER_SPECS,
+	PWU_RECOVERY_COMMAND_SPECS,
 	PWU_LIFECYCLE_MACHINE
 } from '@janumipwb/rph-domain';
 import * as CONTRACT_SCHEMAS from '@janumipwb/rph-contracts';
@@ -548,6 +549,27 @@ function computeDeclaredArrows(): DeclaredArrow[] {
 				from,
 				to: spec.target,
 				site: `PWU_GENERIC_SETTER_SPECS.${spec.target}`
+			});
+		}
+	}
+	// THE FIFTH IDIOM, AND IT IS THE SAME DATA LOOP AGAIN — JAN-PWUWP W-5.5, REG-F-193. `UnblockPwu`’s
+	// target is a FUNCTION OF ITS SOURCE (a PWU blocked out of PLANNED returns to PLANNED), so it resolves the
+	// target at runtime from the recorded origin and its handler declares nothing a syntactic reader could see.
+	// That is the identical shape REG-F-114 found in `advancePwuLifecycle` and REG-F-119 found in the generic
+	// setter, and it takes the identical remedy for the third time: the COMMAND declares its arrows and this
+	// reads the declaration as DATA. Reading a declaration cannot fabricate one; inferring a missing half can.
+	//
+	// ⚠ THIS WAS NOT ANTICIPATED — IT WAS CAUGHT BY THIS CENSUS REDDENING, WHICH IS EXACTLY ITS JOB. W-5.5
+	// landed the four arrows and C-0 reported all four as *"arrows no command can perform"*: a new command
+	// invisible to the instrument built to find invisible commands. Keyed by commandType rather than by target,
+	// because one command performs all four and, unlike the setter’s rows, its targets do not identify them.
+	for (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {
+		for (const a of spec.arrows) {
+			arrows.push({
+				machine: PWU_LIFECYCLE_MACHINE,
+				from: a.from,
+				to: a.to,
+				site: `PWU_RECOVERY_COMMAND_SPECS.${spec.commandType}`
 			});
 		}
 	}

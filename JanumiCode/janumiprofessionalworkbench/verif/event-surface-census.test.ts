@@ -83,6 +83,12 @@ const EMITTED_2026_08_04 = new Set([
 	// wants every arrow NAMED, not because either needs authorizing.
 	'PwuBlocked',
 	'PwuEscalated',
+	// + 2026-08-16, JAN-PWUWP W-5.5 (REG-D-043). `PwuUnblocked` — the way back out of BLOCKED and ESCALATED,
+	// authored from scratch like `PwuEscalated` was. Written down here because this snapshot is hand-maintained
+	// BY DESIGN: the guard cannot observe emissions across vitest workers, so a new emitter that nobody records
+	// reads as UNEMITTED. It reddened on exactly that basis before this line existed, which is the mechanism
+	// working rather than a nuisance.
+	'PwuUnblocked',
 	'PwuBaselined',
 	'PwuAbandoned',
 	'PwuRejected',

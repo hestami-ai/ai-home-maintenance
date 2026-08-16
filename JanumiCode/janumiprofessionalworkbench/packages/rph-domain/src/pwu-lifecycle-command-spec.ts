@@ -282,3 +282,96 @@ export const PWU_GENERIC_SETTER_SPECS: Readonly<Record<string, PwuLifecycleComma
 		sourceStates: ['RECOMPOSING']
 	}
 };
+
+// ── THE RECOVERY COMMAND'S ARROWS — JAN-PWUWP W-5.5, under REG-D-043 and REG-F-193 ───────────────────────────
+//
+// ⚠ A THIRD TABLE, SHAPED DIFFERENTLY FROM THE OTHER TWO ON PURPOSE. Every command above declares a single
+// `target` plus the sources it claims, because for all nineteen of those the target is a CONSTANT. The recovery
+// command's target is a FUNCTION OF ITS SOURCE — a PWU blocked out of PLANNED returns to PLANNED, one blocked
+// out of EXECUTING returns to EXECUTING — so no single `target` can describe it. Widening
+// `PwuLifecycleCommandSpec.target` to admit a marker would put a non-state value in a field nineteen rows and
+// every reader treat as a state. The shape follows the thing, rather than the thing being bent to fit the shape.
+//
+// ── AND THE OWNERSHIP TABLE WAS DELIBERATELY *NOT* RE-KEYED TO MATCH (REG-F-193) ─────────────────────────────
+// The obvious move was to re-key `PWU_SEMANTIC_LIFECYCLE_COMMANDS` from target to arrow. It was REFUTED by
+// measurement: `generic-setter-scope.test.ts` CONTROL 2 is the SOLE pin on the ownership guard running LAST, its
+// subject is `PROPOSED->READY`, and that arrow is not among the 49 any command declares — so under a pure arrow
+// key the lookup would miss whether it ran first or last and **that mutant would become UNKILLABLE**. No ledger
+// mutant backs it up either. The guard is a UNION instead: arrow first for precision, the eleven-row target
+// table retained as a fail-closed backstop. See `ownerOfArrow` below.
+//
+// ⚠ DERIVED FROM §8.2 REVERSED, AND `BLOCKED -> READY` IS THE DISCRIMINATING ABSENCE. §8.2 ratifies exactly
+// three in-arrows to BLOCKED and one to ESCALATED; these four are those pairings traversed the other way and
+// nothing else. READY is not among them. Had this set been chosen for convenience rather than derived, READY —
+// the state a caller would most naturally want to resume at — is exactly what would have crept in.
+export interface PwuArrow {
+	readonly from: WorkLifecycleState;
+	readonly to: WorkLifecycleState;
+}
+
+export interface PwuRecoveryCommandSpec {
+	readonly commandType: string;
+	readonly eventType: string;
+	/** The explicit `from -> to` pairs this command claims. Held equal to the machine by `verif/`, both ways. */
+	readonly arrows: readonly PwuArrow[];
+}
+
+export const PWU_RECOVERY_COMMAND_SPECS: Readonly<Record<string, PwuRecoveryCommandSpec>> = {
+	UnblockPwu: {
+		commandType: 'UnblockPwu',
+		eventType: 'PwuUnblocked',
+		arrows: [
+			{ from: 'BLOCKED', to: 'SHAPING' },
+			{ from: 'BLOCKED', to: 'PLANNED' },
+			{ from: 'BLOCKED', to: 'EXECUTING' },
+			{ from: 'ESCALATED', to: 'EVIDENCE_PENDING' }
+		]
+	}
+};
+
+/**
+ * The targets the recovery command declares for a PWU currently in `from`.
+ *
+ * ⚠ THE CARDINALITY OF THIS RESULT IS THE DESIGN, not an implementation detail. Where it returns exactly ONE
+ * target the origin is DERIVABLE from the declaration and no recorded field is needed — which is why
+ * `PwuEscalated` deliberately carries no `escalatedFrom`: ESCALATED has one ratified in-arrow, so recovery from
+ * it is determined by a DECLARED ARTIFACT rather than by event ORDERING, and CON-000 AX-6 forbids only the
+ * latter. Where it returns MORE than one, the origin must have been RECORDED (`PwuBlocked.blockedFrom`), and a
+ * PWU blocked before that field existed fails closed (AX-8).
+ *
+ * **So "does this state need a recorded origin?" is answered BY THE TABLE rather than by a hardcoded state
+ * list.** If ESCALATED ever gains a second in-arrow, escalation recovery degrades to fail-closed on its own
+ * instead of quietly picking one of two. A control pins the count at one so that degradation is loud rather
+ * than merely safe.
+ */
+export function declaredRecoveryTargets(from: string): readonly WorkLifecycleState[] {
+	return Object.values(PWU_RECOVERY_COMMAND_SPECS)
+		.flatMap((s) => s.arrows)
+		.filter((a) => a.from === from)
+		.map((a) => a.to);
+}
+
+/**
+ * Which semantically named command, if any, OWNS this arrow — the UNION REG-F-193 settled on.
+ *
+ * ARROW FIRST, for the precision W-5.5 needs: `BLOCKED -> PLANNED` belongs to the recovery command while
+ * `READY -> PLANNED` remains the generic setter's, and a target key cannot say both.
+ *
+ * TARGET SECOND, AND IT IS A BACKSTOP RATHER THAN A FALLBACK: an arrow into a target some command owns is
+ * refused even when no command declares that exact pairing, so the refused set is a SUPERSET of both keys and
+ * the change cannot widen anything. Measured before adopting rather than argued: the two sets are identical
+ * today at 49 arrows, with the symmetric difference empty in both directions.
+ *
+ * `ownedTargets` is passed in rather than imported because the table lives in `rph-application` — the boundary
+ * runs the other way, and inverting it here would be a dependency violation for a lookup.
+ */
+export function ownerOfArrow(
+	from: string,
+	to: string,
+	ownedTargets: Readonly<Record<string, string | undefined>>
+): string | undefined {
+	for (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {
+		if (spec.arrows.some((a) => a.from === from && a.to === to)) return spec.commandType;
+	}
+	return ownedTargets[to];
+}

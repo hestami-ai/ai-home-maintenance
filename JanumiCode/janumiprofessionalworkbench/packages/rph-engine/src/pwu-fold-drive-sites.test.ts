@@ -17,6 +17,7 @@
 //
 // A twelfth lifecycle command added without either fails this test ON ARRIVAL rather than two increments later.
 import { PWU_SEMANTIC_LIFECYCLE_COMMANDS } from '@janumipwb/rph-application';
+import { PWU_RECOVERY_COMMAND_SPECS } from '@janumipwb/rph-domain';
 import { BINDINGS } from '@janumipwb/rph-contracts';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
@@ -73,17 +74,39 @@ const EXPLICIT_DRIVE_SITES: Readonly<Record<string, { file: string; title: strin
 	PwuEscalated: {
 		file: '../../rph-application/src/handlers/block-escalate.test.ts',
 		title: 'CONTROL — an ESCALATED PWU rebuilds from its own event stream'
+	},
+	PwuUnblocked: {
+		file: '../../rph-application/src/handlers/block-escalate.test.ts',
+		title: 'CONTROL — an unblocked PWU rebuilds from its own event stream'
 	}
 };
 
-/** The event each semantically-owned arrow emits, read from the ratified binding table rather than restated. */
+/**
+ * The event each semantically-owned arrow emits, read from the ratified binding table rather than restated.
+ *
+ * ⚠⚠ THE POPULATION IS DRAWN FROM **TWO** TABLES SINCE W-5.5, AND DRAWING IT FROM ONE WAS ABOUT TO REPEAT THIS
+ * FILE'S OWN DEFECT A THIRD TIME. This control's header promises that *"a twelfth lifecycle command added
+ * without either fails this test ON ARRIVAL"* — but it enumerated commands by walking
+ * `PWU_SEMANTIC_LIFECYCLE_COMMANDS`, which is keyed by TARGET and therefore cannot hold the recovery command:
+ * its target is a function of its source, so it lives in `PWU_RECOVERY_COMMAND_SPECS` instead. `UnblockPwu`
+ * would have been INVISIBLE here and `PwuUnblocked` would have shipped folded-but-undriven — exactly what W-1
+ * shipped and W-5 shipped again. **The list did not rot; the DERIVATION stopped being total over commands**,
+ * which is a failure a control deriving its own population cannot see by construction. Keyed by a LABEL rather
+ * than a target now, because the recovery command has no single one.
+ */
 function ownedEvents(): Map<string, string> {
 	const byCommand = new Map(BINDINGS.map((b) => [b.commandType, b.eventType]));
 	const out = new Map<string, string>();
-	for (const [target, commandType] of Object.entries(PWU_SEMANTIC_LIFECYCLE_COMMANDS)) {
+	const add = (label: string, commandType: string) => {
 		const eventType = byCommand.get(commandType);
 		expect(eventType, `no binding row gives ${commandType} an event`).toBeDefined();
-		out.set(target, eventType!);
+		out.set(label, eventType!);
+	};
+	for (const [target, commandType] of Object.entries(PWU_SEMANTIC_LIFECYCLE_COMMANDS)) {
+		add(target, commandType);
+	}
+	for (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {
+		add(spec.arrows.map((a) => `${a.from}->${a.to}`).join(' | '), spec.commandType);
 	}
 	return out;
 }
@@ -163,7 +186,10 @@ describe('REG-F-084 — every owned PWU lifecycle event is emitted by some test'
 			'PwuInvalidated',
 			'PwuRejected',
 			'PwuReshapingStarted',
-			'PwuSuperseded'
+			'PwuSuperseded',
+			// W-5.5. The seed never blocks, so it can never unblock either — the recovery event is uncovered by
+			// the reference undertaking for the same structural reason PwuBlocked is, and is explicitly driven.
+			'PwuUnblocked'
 		]);
 	});
 });

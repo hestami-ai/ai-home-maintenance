@@ -233,6 +233,30 @@
 					"note": "§8.2 exception"
 				},
 				{
+					"from": "BLOCKED",
+					"to": "SHAPING",
+					"trigger": "Impediment cleared",
+					"note": "JAN-PWUWP W-5.5 under REG-D-043. DERIVED, NOT INVENTED: this is §8.2’s in-arrow SHAPING → BLOCKED traversed in the other direction, and no state pairing appears here that the corpus does not already contain. ⚠ BLOCKED → READY IS DELIBERATELY ABSENT: READY is not a ratified in-arrow to BLOCKED, and it is the discriminating case proving this set was derived from §8.2 rather than from convenience. Recovery returns the PWU to the state it was blocked OUT OF — read from PwuBlocked.blockedFrom, never guessed; a block predating that field fails closed (CON-000 AX-8)."
+				},
+				{
+					"from": "BLOCKED",
+					"to": "PLANNED",
+					"trigger": "Runtime dependency restored",
+					"note": "JAN-PWUWP W-5.5 under REG-D-043. DERIVED, NOT INVENTED: this is §8.2’s in-arrow PLANNED → BLOCKED traversed in the other direction, and no state pairing appears here that the corpus does not already contain. ⚠ BLOCKED → READY IS DELIBERATELY ABSENT: READY is not a ratified in-arrow to BLOCKED, and it is the discriminating case proving this set was derived from §8.2 rather than from convenience. Recovery returns the PWU to the state it was blocked OUT OF — read from PwuBlocked.blockedFrom, never guessed; a block predating that field fails closed (CON-000 AX-8)."
+				},
+				{
+					"from": "BLOCKED",
+					"to": "EXECUTING",
+					"trigger": "Runtime dependency restored",
+					"note": "JAN-PWUWP W-5.5 under REG-D-043. DERIVED, NOT INVENTED: this is §8.2’s in-arrow EXECUTING → BLOCKED traversed in the other direction, and no state pairing appears here that the corpus does not already contain. ⚠ BLOCKED → READY IS DELIBERATELY ABSENT: READY is not a ratified in-arrow to BLOCKED, and it is the discriminating case proving this set was derived from §8.2 rather than from convenience. Recovery returns the PWU to the state it was blocked OUT OF — read from PwuBlocked.blockedFrom, never guessed; a block predating that field fails closed (CON-000 AX-8)."
+				},
+				{
+					"from": "ESCALATED",
+					"to": "EVIDENCE_PENDING",
+					"trigger": "Escalation resolved",
+					"note": "JAN-PWUWP W-5.5 under REG-D-043. DERIVED, NOT INVENTED: this is §8.2’s in-arrow EVIDENCE_PENDING → ESCALATED traversed in the other direction, and no state pairing appears here that the corpus does not already contain. ⚠ BLOCKED → READY IS DELIBERATELY ABSENT: READY is not a ratified in-arrow to BLOCKED, and it is the discriminating case proving this set was derived from §8.2 rather than from convenience. Recovery returns the PWU to the state it was blocked OUT OF — read from PwuBlocked.blockedFrom, never guessed; a block predating that field fails closed (CON-000 AX-8). ESCALATED needs no origin field: it has exactly ONE ratified in-arrow, so the recovery target is derivable from the DECLARED MACHINE rather than from event ORDERING — which AX-6 permits. A control holds that in-arrow count at one."
+				},
+				{
 					"from": "UNDER_ASSURANCE",
 					"to": "REJECTED",
 					"trigger": "Blocking finding",

@@ -1575,6 +1575,31 @@
 			]
 		},
 		{
+			"commandType": "UnblockPwu",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+			"emitsEvent": "PwuUnblocked",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "BLOCKED | ESCALATED",
+			"drivesTo": "SHAPING | PLANNED | EXECUTING | EVIDENCE_PENDING",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-16, under REG-D-029 / REG-D-043 / JAN-PWUWP W-5.5). The ACT is RULED: the sponsor ruled directly that a recovery act EXISTS for BLOCKED and ESCALATED rather than declaring them closed (REG-D-043), which is what REG-F-083 had declined to decide — \"authoring a SHAPE for a ratified act is not the same as authoring a new ACT\". The ARROWS are DERIVED from §8.2 reversed, not invented. The SHAPE below is AUTHORED: do NOT treat this sourceSection as proof it is ratified. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT, and it carries NO authority guard for the same reason BlockPwu and EscalatePwu carry none: §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion, and recovery is none of them. Making trouble easy to report and its resolution hard to record would be the same defect wearing the opposite costume.",
+			"payloadFields": [
+				{
+					"field": "recoveryReason",
+					"required": true,
+					"type": "string",
+					"note": "Required, and it is the whole substantive contract, exactly as blockReason is for BlockPwu: a block records WHY work stopped, so its reversal must record why it may resume. An unexplained resumption is an unexplained halt read backwards."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			],
+			"note": "⚠⚠ THERE IS DELIBERATELY NO TARGET FIELD, AND ITS ABSENCE IS THE GUARANTEE. The state a PWU resumes at is DERIVED from PwuBlocked.blockedFrom — the state it was actually blocked out of — and is never supplied by the caller. A caller-chosen target would permit SHAPING → BLOCKED → EXECUTING, silently skipping PLANNED, which is the precise failure REG-D-043 identified when it derived this arrow set. Where the origin was never recorded (a block predating W-5.5) the command REFUSES rather than guessing (CON-000 AX-8). ESCALATED needs no recorded origin because it has exactly ONE ratified in-arrow, so its target is derivable from the DECLARED MACHINE rather than from event ORDERING — the distinction CON-000 AX-6 draws."
+		},
+		{
 			"commandType": "BaselinePwu",
 			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuBaselined",
@@ -5953,6 +5978,33 @@
 			]
 		},
 		{
+			"eventType": "PwuUnblocked",
+			"aggregateType": "ProfessionalWorkUnit",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-16, under REG-D-029 / REG-D-043 / JAN-PWUWP W-5.5). The ACT is RULED: the sponsor ruled directly that a recovery act EXISTS for BLOCKED and ESCALATED rather than declaring them closed (REG-D-043), which is what REG-F-083 had declined to decide — \"authoring a SHAPE for a ratified act is not the same as authoring a new ACT\". The ARROWS are DERIVED from §8.2 reversed, not invented. The SHAPE below is AUTHORED: do NOT treat this sourceSection as proof it is ratified. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT, and it carries NO authority guard for the same reason BlockPwu and EscalatePwu carry none: §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion, and recovery is none of them. Making trouble easy to report and its resolution hard to record would be the same defect wearing the opposite costume.",
+			"payloadFields": [
+				{
+					"field": "recoveryReason",
+					"required": true,
+					"type": "string",
+					"note": "Why the impediment no longer holds."
+				},
+				{
+					"field": "recoveredFrom",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "BLOCKED or ESCALATED — the state left. Mirrors PwuBlocked.blockedFrom so the pair of events records the round trip explicitly rather than leaving it to be reconstructed from ORDERING (CON-000 AX-6)."
+				},
+				{
+					"field": "workLifecycleState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "The state resumed at — {BLOCKED}->{SHAPING,PLANNED,EXECUTING} or {ESCALATED}->{EVIDENCE_PENDING}. Mirrors how every other named PWU event records its resulting axis, except PwuBaselined, which uses newState and cost a replay divergence to discover."
+				}
+			]
+		},
+		{
 			"eventType": "PwuBaselined",
 			"aggregateType": "ProfessionalWorkUnit",
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)",
@@ -8222,6 +8274,38 @@
 			"from": "EVIDENCE_PENDING",
 			"to": "ESCALATED",
 			"note": "JAN-PWUWP W-5. One in-arrow. ESCALATE is a ratified §37 ControlAction whose event had to be authored."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "BLOCKED",
+			"to": "SHAPING",
+			"note": "JAN-PWUWP W-5.5. §8.2’s SHAPING->BLOCKED reversed."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "BLOCKED",
+			"to": "PLANNED",
+			"note": "JAN-PWUWP W-5.5. §8.2’s PLANNED->BLOCKED reversed."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "BLOCKED",
+			"to": "EXECUTING",
+			"note": "JAN-PWUWP W-5.5. §8.2’s EXECUTING->BLOCKED reversed."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "ESCALATED",
+			"to": "EVIDENCE_PENDING",
+			"note": "JAN-PWUWP W-5.5. §8.2’s EVIDENCE_PENDING->ESCALATED reversed. ⚠ FOUR CONCRETE ROWS RATHER THAN ONE UNION ROW: \"BLOCKED | ESCALATED\" -> \"SHAPING | PLANNED | EXECUTING | EVIDENCE_PENDING\" would claim a 4x4 PRODUCT, twelve arrows of which the machine has none. The pairing is the content here, so each pair is its own row."
 		}
 	],
 	"conflicts": [

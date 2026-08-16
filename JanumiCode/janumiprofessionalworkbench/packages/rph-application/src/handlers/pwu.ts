@@ -44,8 +44,11 @@ import type {
 	PwuShapingStartedPayload,
 	PwuStateChangedPayload,
 	PwuSupersededPayload,
+	PwuUnblockedPayload,
 	ReshapePwuPayload,
-	SupersedePwuPayload
+	SupersedePwuPayload,
+	UnblockPwuPayload,
+	WorkLifecycleState
 } from '@janumipwb/rph-contracts';
 import {
 	canAdvanceWorkLifecycle,
@@ -71,7 +74,10 @@ import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
 import {
 	checkDeclaredSource,
+	declaredRecoveryTargets,
+	ownerOfArrow,
 	PWU_LIFECYCLE_COMMAND_SPECS,
+	PWU_RECOVERY_COMMAND_SPECS,
 	type PwuLifecycleCommandSpec
 } from '@janumipwb/rph-domain';
 
@@ -871,6 +877,132 @@ export const escalatePwu: CommandHandler = (ctx, command) => {
 };
 
 /**
+ * UnblockPwu — BLOCKED -> {SHAPING, PLANNED, EXECUTING} and ESCALATED -> EVIDENCE_PENDING.
+ * JAN-PWUWP W-5.5, under REG-D-043 (the sponsor ruled the ACT exists) and REG-D-029 (which grants its SHAPE).
+ *
+ * ⚠⚠ IT TAKES NO TARGET, AND THAT ABSENCE IS THE GUARANTEE THIS COMMAND OFFERS. The state a PWU resumes at is
+ * READ from the `blockedFrom` its own `PwuBlocked` recorded — never supplied by the caller, and never inferred.
+ * A caller-chosen target would permit `SHAPING -> BLOCKED -> EXECUTING`, silently skipping PLANNED, which is
+ * the exact failure REG-D-043 identified when it derived this arrow set from §8.2 reversed. So the record
+ * decides where the work resumes, not the person asking for it to resume.
+ *
+ * ⚠ AND WHERE THE RECORD CANNOT SAY, IT REFUSES. A PWU blocked before `blockedFrom` existed carries no origin,
+ * and there is no honest way to recover one: folding the event prefix would infer the origin from ORDERING,
+ * which CON-000 AX-6 forbids in terms. So it fails closed (AX-8) with a message that says which event is
+ * deficient rather than a generic refusal — the operator's next move is to abandon or supersede, and they
+ * should not have to guess that from a bare rejection.
+ *
+ * THE TWO CASES ARE ONE MECHANISM, distinguished by the DECLARATION rather than by a hardcoded state list:
+ * `declaredRecoveryTargets` returns ONE target for ESCALATED (its single ratified in-arrow makes the origin
+ * derivable without any recorded field) and THREE for BLOCKED (so the origin must have been recorded). If
+ * ESCALATED ever gains a second in-arrow, this degrades to fail-closed on its own rather than picking one.
+ */
+export const unblockPwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as UnblockPwuPayload;
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const axes = axesOf(loaded.state);
+	const from = axes.workLifecycleState;
+
+	const candidates = declaredRecoveryTargets(from);
+	if (candidates.length === 0) {
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`UnblockPwu does not declare any arrow out of ${from} — it recovers only from BLOCKED and ESCALATED ` +
+				`(REG-D-043, derived from DOC-002 §8.2 reversed). This is an UNDECLARED ARROW, not an illegal ` +
+				`transition (REG-F-114).`,
+			[id]
+		);
+	}
+
+	// ONE candidate ⇒ the origin is determined by the DECLARED MACHINE and needs no recorded field. More than
+	// one ⇒ only the record can say, and the record is `PwuBlocked.blockedFrom`.
+	let target = candidates[0]!;
+	if (candidates.length > 1) {
+		const origin = recordedBlockOrigin(ctx, id);
+		if (origin === undefined) {
+			return reject(
+				command,
+				'RPH_EVIDENCE_MISSING',
+				`PWU ${id} cannot be unblocked: its PwuBlocked event records no ${'blockedFrom'}, so the state it ` +
+					`was blocked out of is not recorded anywhere. Recovering it would mean inferring the origin from ` +
+					`event ORDERING, which CON-000 AX-6 forbids — *"professional meaning is never inferred from … ` +
+					`ordering"*. Blocks recorded before JAN-PWUWP W-5.5 fail closed here by design (AX-8); abandon or ` +
+					`supersede this PWU instead.`,
+				[id]
+			);
+		}
+		if (!candidates.includes(origin)) {
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`PWU ${id} records blockedFrom=${origin}, which UnblockPwu does not declare as a recovery target ` +
+					`from ${from} — it claims [${candidates.join(', ')}]. The recorded origin and the declared arrow ` +
+					`set disagree, and that disagreement is the finding (REG-F-114).`,
+				[id]
+			);
+		}
+		target = origin;
+	}
+
+	const advance = canAdvanceWorkLifecycle(from, target, axes);
+	if (!advance.ok) {
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`Cannot recover PWU ${id} ${from} -> ${target}${advance.reason ? ': ' + advance.reason : ''}`
+		);
+	}
+
+	const newRevision = loaded.revision + 1;
+	const next = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		lifecycleStatus: target,
+		workLifecycleState: target
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: PWU_RECOVERY_COMMAND_SPECS.UnblockPwu!.eventType,
+		aggregateType: PWU,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: {
+			recoveryReason: p.recoveryReason,
+			recoveredFrom: from as PwuUnblockedPayload['recoveredFrom'],
+			workLifecycleState: target as PwuUnblockedPayload['workLifecycleState']
+		} satisfies PwuUnblockedPayload
+	});
+	return commitState(ctx, command, {
+		objectType: PWU,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/**
+ * The origin recorded by this PWU's most recent `PwuBlocked`, or undefined when none was recorded.
+ *
+ * ⚠ THE **MOST RECENT**, AND THAT IS NOT AN ORDERING INFERENCE. A PWU may be blocked, recovered and blocked
+ * again; the origin that governs THIS recovery is the one the CURRENT block recorded. Reading the latest
+ * `PwuBlocked` selects WHICH RECORD to read — it does not derive the origin FROM the ordering, which is what
+ * CON-000 AX-6 forbids. The value itself is still a field somebody wrote down at the time.
+ */
+function recordedBlockOrigin(ctx: HandlerContext, id: string): WorkLifecycleState | undefined {
+	const blocks = ctx.store
+		.readAggregateEvents(PWU, id)
+		.filter((e) => e.eventType === 'PwuBlocked');
+	const latest = blocks.at(-1);
+	if (!latest) return undefined;
+	const origin = (latest.payload as { blockedFrom?: string }).blockedFrom;
+	return origin as WorkLifecycleState | undefined;
+}
+
+/**
  * BaselinePwu — SATISFIED | RECOMPOSED -> BASELINED. JAN-PWUWP W-4.5, under REG-D-029.
  *
  * ⚠ WHY THIS COMMAND HAD TO EXIST BEFORE THE SETTER RETIRES. `promoteBaseline` advances `Baseline.status` and
@@ -1276,9 +1408,17 @@ function rejectArrowOwnedBySemanticCommand(
 	newState: string
 ): CommandResult | undefined {
 	if (newState === currentWorkLifecycleState) return undefined;
-	const owner = (PWU_SEMANTIC_LIFECYCLE_COMMANDS as Readonly<Record<string, string | undefined>>)[
-		newState
-	];
+	// W-5.5 / REG-F-193 — A UNION, ARROW FIRST AND TARGET AS A FAIL-CLOSED BACKSTOP. The arrow limb is what
+	// lets `BLOCKED -> PLANNED` belong to the recovery command while `READY -> PLANNED` stays the setter's own;
+	// a target key cannot say both, and that is the whole of collision 1. The target limb is retained rather
+	// than replaced so the refused set is a SUPERSET of both keys — re-keying outright would have made
+	// `generic-setter-scope.test.ts` CONTROL 2's ordering mutant UNKILLABLE, since its subject `PROPOSED->READY`
+	// is an arrow no command declares and only the TARGET limb can match it.
+	const owner = ownerOfArrow(
+		currentWorkLifecycleState,
+		newState,
+		PWU_SEMANTIC_LIFECYCLE_COMMANDS as Readonly<Record<string, string | undefined>>
+	);
 	if (owner === undefined) return undefined;
 	return reject(
 		command,

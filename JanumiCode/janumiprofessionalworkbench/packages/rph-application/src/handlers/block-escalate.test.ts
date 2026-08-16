@@ -204,6 +204,74 @@ describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 		replayMatchesMaterialized();
 	});
 
+	// ── W-5.5: THE WAY BACK ──────────────────────────────────────────────────────────────────────────────────
+	// REG-D-043 ruled the recovery ACT exists; the arrows are §8.2's in-arrows reversed. Recovery returns the
+	// PWU to the state it was blocked OUT OF, so the assertion is on WHICH state it lands in, never merely that
+	// it moved — a command that always resumed at SHAPING would pass "it is no longer BLOCKED".
+	it.each([
+		['SHAPING', 'SHAPING'],
+		['PLANNED', 'PLANNED'],
+		['EXECUTING', 'EXECUTING']
+	] as const)('UnblockPwu returns a PWU blocked out of %s to %s', (from, expected) => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, from);
+		ok(dispatch('BlockPwu', { blockReason: 'r' }), `block from ${from}`);
+		expect(lifecycle()).toBe('BLOCKED');
+		ok(dispatch('UnblockPwu', { recoveryReason: 'dependency restored' }), `unblock to ${expected}`);
+		expect(lifecycle()).toBe(expected);
+		expect(emitted()).toContain('PwuUnblocked');
+	});
+
+	it('UnblockPwu returns an ESCALATED PWU to EVIDENCE_PENDING — its ONE ratified in-arrow, so no origin is needed', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'EVIDENCE_PENDING');
+		ok(dispatch('EscalatePwu', { escalationReason: 'r' }), 'escalate');
+		ok(dispatch('UnblockPwu', { recoveryReason: 'evidence obtained after all' }), 'de-escalate');
+		expect(lifecycle()).toBe('EVIDENCE_PENDING');
+	});
+
+	// ⚠ THE FAIL-CLOSED CASE, AND IT IS THE ONE THAT MATTERS MOST. A PWU blocked before `blockedFrom` existed
+	// carries no origin. The only ways to produce one are to fold the event prefix — which CON-000 AX-6 forbids
+	// — or to guess. So it REFUSES (AX-8).
+	//
+	// The arrangement seeds BLOCKED directly, committing no events, which is a FAITHFUL pre-W-5.5 history rather
+	// than a doctored one: what the recovery command actually faces is a PWU sitting in BLOCKED whose stream
+	// records no origin, and it must not matter whether that is because the field did not exist yet or because
+	// the event is absent entirely. Both are "the record cannot say".
+	it('UnblockPwu REFUSES a block that recorded no origin, rather than guessing one', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'BLOCKED');
+		const r = dispatch('UnblockPwu', { recoveryReason: 'anything' });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
+		expect(r.error?.message ?? '').toContain('ordering');
+		expect(lifecycle(), 'it must stay BLOCKED rather than land somewhere plausible').toBe('BLOCKED');
+	});
+
+	it('UnblockPwu refuses a PWU that is neither BLOCKED nor ESCALATED — an UNDECLARED ARROW, not an illegal one', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'EXECUTING');
+		const r = dispatch('UnblockPwu', { recoveryReason: 'nothing to recover from' });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message ?? '').toContain('UNDECLARED ARROW');
+		expect(lifecycle()).toBe('EXECUTING');
+	});
+
+	// ⚠ THE ARROW THAT WAS DELIBERATELY NOT ADDED. BLOCKED -> READY is not a §8.2 in-arrow reversed, and it is
+	// the discriminating case proving this set was derived rather than chosen: READY is the state a caller would
+	// most naturally want to resume at. A PWU blocked out of SHAPING resumes at SHAPING, never at READY.
+	it('CONTROL — recovery never reaches READY, the target convenience would have added', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'SHAPING');
+		ok(dispatch('BlockPwu', { blockReason: 'r' }), 'block');
+		ok(dispatch('UnblockPwu', { recoveryReason: 'cleared' }), 'unblock');
+		expect(lifecycle(), 'SHAPING is where it was blocked from; READY is not a declared recovery target').toBe(
+			'SHAPING'
+		);
+	});
+
+	it('CONTROL — an unblocked PWU rebuilds from its own event stream', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'PLANNED');
+		ok(dispatch('BlockPwu', { blockReason: 'r' }), 'block');
+		ok(dispatch('UnblockPwu', { recoveryReason: 'cleared' }), 'unblock');
+		replayMatchesMaterialized();
+	});
+
 	// ── W-5.5: THE ORIGIN IS RECORDED, NOT INFERRED ──────────────────────────────────────────────────────────
 	// `PwuBlocked` carried `blockReason`, `missingObjectIds?` and a `workLifecycleState` set to BLOCKED itself —
 	// so the DEDICATED arrow recorded strictly LESS than the GENERIC `PwuStateChanged`, which carries
@@ -293,12 +361,24 @@ describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 			};
 		});
 
-		// EVERY arrow refused, and every one of them refused BY ARROW ABSENCE — no in-arrow exists, so the
-		// legality check refuses before ownership is ever consulted, and nothing redirects the caller.
-		expect(outcomes, 'BLOCKED has no way back, and the reason is the machine — not command ownership').toEqual([
-			{ arrow: 'BLOCKED->SHAPING', status: 'REJECTED', code: 'RPH_ILLEGAL_STATE_TRANSITION', redirected: false },
-			{ arrow: 'BLOCKED->PLANNED', status: 'REJECTED', code: 'RPH_ILLEGAL_STATE_TRANSITION', redirected: false },
-			{ arrow: 'BLOCKED->EXECUTING', status: 'REJECTED', code: 'RPH_ILLEGAL_STATE_TRANSITION', redirected: false },
+		// ⚠⚠ UPDATED BY W-5.5, AND THE SHAPE OF THE UPDATE IS THE WHOLE POINT OF HAVING WRITTEN IT THIS WAY.
+		// **`status` is identical on all four rows before and after this increment.** What moved is the CODE, on
+		// three of them: the three arrows W-5.5 ratified are now refused because `UnblockPwu` OWNS them, not
+		// because the machine lacks them — so the setter never gained one, and the caller is redirected to the
+		// command that does own it. Had this control asserted only `status`, it would have been green on both
+		// sides of the exact transition it exists to notice, and REG-F-193 would have been an unverified essay.
+		//
+		// THE FOURTH ROW IS UNCHANGED, AND IT IS THE DISCRIMINATING ABSENCE. `BLOCKED -> READY` is still refused
+		// as ILLEGAL because W-5.5 deliberately did not add it: READY is not a §8.2 in-arrow reversed. It is the
+		// row that shows the other three moved for a REASON rather than because a guard was loosened.
+		expect(
+			outcomes,
+			'BLOCKED still has no way back through the SETTER — three arrows now belong to UnblockPwu, and READY ' +
+				'remains no arrow at all'
+		).toEqual([
+			{ arrow: 'BLOCKED->SHAPING', status: 'REJECTED', code: 'RPH_INVARIANT_VIOLATION', redirected: true },
+			{ arrow: 'BLOCKED->PLANNED', status: 'REJECTED', code: 'RPH_INVARIANT_VIOLATION', redirected: true },
+			{ arrow: 'BLOCKED->EXECUTING', status: 'REJECTED', code: 'RPH_INVARIANT_VIOLATION', redirected: true },
 			{ arrow: 'BLOCKED->READY', status: 'REJECTED', code: 'RPH_ILLEGAL_STATE_TRANSITION', redirected: false }
 		]);
 		expect(lifecycle()).toBe('BLOCKED');

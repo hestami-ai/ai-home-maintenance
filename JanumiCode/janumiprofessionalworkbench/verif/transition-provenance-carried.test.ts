@@ -43,14 +43,14 @@ describe('REG-F-045 — the vocab\'s provenance survives generation', () => {
 				vocabReconstructed: vrows.filter((t) => /RECONSTRUCT/i.test(t.note ?? '')).length
 			},
 			'REG-F-045 recorded 180 noted / 120 RECONSTRUCTED; unchanged since 2026-08-06'
-		).toEqual({ vocabRows: 211, vocabNoted: 180, vocabReconstructed: 120 });
+		).toEqual({ vocabRows: 215, vocabNoted: 184, vocabReconstructed: 120 });
 
 		const grows = Object.values(generated).flatMap((m) => m.transitions);
 		expect({
 			generatedArrows: grows.length,
 			generatedNoted: grows.filter((t) => t.note).length,
 			generatedReconstructed: grows.filter((t) => /RECONSTRUCT/i.test(t.note ?? '')).length
-		}).toEqual({ generatedArrows: 304, generatedNoted: 273, generatedReconstructed: 180 });
+		}).toEqual({ generatedArrows: 308, generatedNoted: 277, generatedReconstructed: 180 });
 	});
 
 	// The remedy's own words: every row the vocab marks RECONSTRUCTED must still say so downstream.

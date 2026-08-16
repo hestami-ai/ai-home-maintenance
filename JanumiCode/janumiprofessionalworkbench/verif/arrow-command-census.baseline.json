@@ -145,7 +145,7 @@
 		"PwuType.status",
 		"Undertaking.status"
 	],
-	"total": 295,
+	"total": 299,
 	"dead": [
 		"AssuranceAssessment.state  REQUESTED -> CANCELLED",
 		"ExecutionPlan.status  PROPOSED -> SUPERSEDED"

@@ -135,6 +135,11 @@ describe('validate', () => {
 		// `IntentSupersededPayload` has existed since the vocab was written, ratified and unemitted, because the
 		// corpus named the event and the six arrows into SUPERSEDED but no command to reach them. Only the
 		// COMMAND shape is new, and only its NAME is authored.
-		expect(buildContractRegistry().ids()).toHaveLength(352);
+		// 352 -> 354 (2026-08-16, JAN-PWUWP W-5.5 / REG-D-043): `UnblockPwuPayload` and `PwuUnblockedPayload`.
+		// TWO, and both are new for the same reason: unlike BLOCKED and ESCALATED, whose events the corpus had
+		// already named, the corpus names no recovery event at all — REG-F-083 declined to author one precisely
+		// because the ACT was unruled. The sponsor ruled it (REG-D-043), so both shapes are authored together.
+		// ⚠ `blockedFrom` on `PwuBlocked` adds NO id: it is a field on an existing payload, not a new contract.
+		expect(buildContractRegistry().ids()).toHaveLength(354);
 	});
 });

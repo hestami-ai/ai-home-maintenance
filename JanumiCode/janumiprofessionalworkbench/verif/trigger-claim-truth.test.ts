@@ -28,8 +28,8 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	// so a change in what the extractor understands cannot pass as a change in what the corpus says.
 	it('PINNED — how much of the ratified trigger surface yields a claim at all', () => {
 		expect(triggerCoverage()).toEqual({
-			transitions: 304,
-			withTrigger: 304,
+			transitions: 308,
+			withTrigger: 308,
 			namingAKnownCommand: 68,
 			claims: 70
 		});
@@ -134,7 +134,7 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 		for (const [name, m] of Object.entries(M))
 			for (const t of m.transitions) byArrow[provenanceOfArrow(name, t.from, t.to)]! += 1;
 		expect(byArrow, 'arrow-level, from each transition note').toEqual({
-			VERBATIM: 97,
+			VERBATIM: 101,
 			RECONSTRUCTED: 182,
 			OTHER: 25
 		});

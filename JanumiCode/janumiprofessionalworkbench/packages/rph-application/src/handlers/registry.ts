@@ -24,7 +24,8 @@ import {
 	proposePwu,
 	rejectPwu,
 	reshapePwu,
-	supersedePwu
+	supersedePwu,
+	unblockPwu
 } from './pwu.js';
 import {
 	activateExecutionPlan,
@@ -147,6 +148,9 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// W-5: neither is a §5.2 act — PER-3 wants every arrow named, not every arrow authorized.
 	BlockPwu: blockPwu,
 	EscalatePwu: escalatePwu,
+	// W-5.5 (REG-D-043): the deferred half of W-5 — the way back out of both. Same reasoning on authority: if
+	// reporting trouble needs no §5.2 act, neither does recording that it is over.
+	UnblockPwu: unblockPwu,
 	RejectPwu: rejectPwu,
 	// Execution plan + steps + runtime bindings (DOC-002 §20, §21, §22)
 	ProposeExecutionPlan: proposeExecutionPlan,

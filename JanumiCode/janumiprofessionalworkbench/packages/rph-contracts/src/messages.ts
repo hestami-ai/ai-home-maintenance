@@ -411,6 +411,11 @@ export const EscalatePwuPayloadSchema = z.strictObject({
 	supportingObjectIds: z.array(z.string()).optional()
 });
 export type EscalatePwuPayload = z.infer<typeof EscalatePwuPayloadSchema>;
+export const UnblockPwuPayloadSchema = z.strictObject({
+	recoveryReason: z.string(),
+	supportingObjectIds: z.array(z.string()).optional()
+});
+export type UnblockPwuPayload = z.infer<typeof UnblockPwuPayloadSchema>;
 export const BaselinePwuPayloadSchema = z.strictObject({
 	baselineId: z.string(),
 	reasonCode: z.string().optional(),
@@ -1410,6 +1415,12 @@ export const PwuEscalatedPayloadSchema = z.strictObject({
 	workLifecycleState: WorkLifecycleStateSchema
 });
 export type PwuEscalatedPayload = z.infer<typeof PwuEscalatedPayloadSchema>;
+export const PwuUnblockedPayloadSchema = z.strictObject({
+	recoveryReason: z.string(),
+	recoveredFrom: WorkLifecycleStateSchema,
+	workLifecycleState: WorkLifecycleStateSchema
+});
+export type PwuUnblockedPayload = z.infer<typeof PwuUnblockedPayloadSchema>;
 export const PwuBaselinedPayloadSchema = z.strictObject({
 	pwuId: z.string(),
 	baselineId: z.string(),
@@ -2093,6 +2104,12 @@ export const COMMANDS = {
 		emitsEvent: 'PwuEscalated',
 		firstSlice: false
 	},
+	UnblockPwu: {
+		payload: UnblockPwuPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
+		emitsEvent: 'PwuUnblocked',
+		firstSlice: false
+	},
 	BaselinePwu: {
 		payload: BaselinePwuPayloadSchema,
 		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
@@ -2638,6 +2655,7 @@ export const EVENTS = {
 	ObligationWaived: { payload: ObligationWaivedPayloadSchema, aggregateType: 'Obligation' },
 	PwuAbandoned: { payload: PwuAbandonedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuEscalated: { payload: PwuEscalatedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
+	PwuUnblocked: { payload: PwuUnblockedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuBaselined: { payload: PwuBaselinedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuBlocked: { payload: PwuBlockedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuChallenged: { payload: PwuChallengedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
@@ -3387,5 +3405,33 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'PWU.workLifecycleState',
 		from: 'EVIDENCE_PENDING',
 		to: 'ESCALATED'
+	},
+	{
+		commandType: 'UnblockPwu',
+		eventType: 'PwuUnblocked',
+		machine: 'PWU.workLifecycleState',
+		from: 'BLOCKED',
+		to: 'SHAPING'
+	},
+	{
+		commandType: 'UnblockPwu',
+		eventType: 'PwuUnblocked',
+		machine: 'PWU.workLifecycleState',
+		from: 'BLOCKED',
+		to: 'PLANNED'
+	},
+	{
+		commandType: 'UnblockPwu',
+		eventType: 'PwuUnblocked',
+		machine: 'PWU.workLifecycleState',
+		from: 'BLOCKED',
+		to: 'EXECUTING'
+	},
+	{
+		commandType: 'UnblockPwu',
+		eventType: 'PwuUnblocked',
+		machine: 'PWU.workLifecycleState',
+		from: 'ESCALATED',
+		to: 'EVIDENCE_PENDING'
 	}
 ];
