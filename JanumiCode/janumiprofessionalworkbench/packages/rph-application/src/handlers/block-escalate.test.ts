@@ -204,6 +204,50 @@ describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 		replayMatchesMaterialized();
 	});
 
+	// ── W-5.5: THE ORIGIN IS RECORDED, NOT INFERRED ──────────────────────────────────────────────────────────
+	// `PwuBlocked` carried `blockReason`, `missingObjectIds?` and a `workLifecycleState` set to BLOCKED itself —
+	// so the DEDICATED arrow recorded strictly LESS than the GENERIC `PwuStateChanged`, which carries
+	// `previousState`, and it dropped exactly the datum a recovery needs. The alternative was to fold the event
+	// prefix at recovery time; CON-000 AX-6 forbids that — *"professional meaning is never inferred from …
+	// ordering"* — so the origin is READ from the loaded aggregate and written down.
+	//
+	// DRIVEN FROM ALL THREE RATIFIED SOURCES, not one. A single case would be satisfied by hardcoding the
+	// state that case happens to use, which is the shape of defect this file's CONTROL 3 already records.
+	it.each(['SHAPING', 'PLANNED', 'EXECUTING'] as const)(
+		'PwuBlocked records blockedFrom=%s — the state recovery must return to',
+		(from) => {
+			seedPwuWorkLifecycleState_FIXTURE(store, PWU, from);
+			ok(dispatch('BlockPwu', { blockReason: 'r' }), `block from ${from}`);
+			const blocked = store
+				.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU)
+				.filter((e) => e.eventType === 'PwuBlocked');
+			expect(blocked, 'exactly one PwuBlocked').toHaveLength(1);
+			expect(blocked[0]!.payload as Record<string, unknown>).toMatchObject({
+				blockedFrom: from,
+				workLifecycleState: 'BLOCKED'
+			});
+		}
+	);
+
+	// CONTROL — the field is not a constant wearing a variable's name. Every case above asserts the value it
+	// seeded, so all three must differ from each other for the assertions to have distinguished anything.
+	it('CONTROL — blockedFrom takes THREE distinct values across the three ratified in-arrows', () => {
+		const seen = new Set<unknown>();
+		for (const from of ['SHAPING', 'PLANNED', 'EXECUTING'] as const) {
+			// The fixture forces the axis, so the same PWU can be walked back and re-blocked; each pass appends
+			// one more PwuBlocked and the LAST is this pass's.
+			seedPwuWorkLifecycleState_FIXTURE(store, PWU, from);
+			ok(dispatch('BlockPwu', { blockReason: 'r' }), `block from ${from}`);
+			const blocked = store
+				.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU)
+				.filter((e) => e.eventType === 'PwuBlocked');
+			seen.add((blocked.at(-1)!.payload as Record<string, unknown>).blockedFrom);
+		}
+		expect(seen, 'a hardcoded origin would collapse these to one').toEqual(
+			new Set(['SHAPING', 'PLANNED', 'EXECUTING'])
+		);
+	});
+
 	// ── CONTROL 4: BLOCKED IS A ONE-WAY DOOR, and the machine does not advertise it ──────────────────────────
 	// BLOCKED is NOT in `terminalStates`, yet its only out-arrows are ABANDONED and SUPERSEDED. The roadmap's
 	// W-5 named an `UnblockPwu`; there is no arrow for one to perform. Asserted so the absence is a recorded

@@ -5994,6 +5994,13 @@
 					"note": "id-ref[]"
 				},
 				{
+					"field": "blockedFrom",
+					"required": false,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "The state the PWU was in when it was blocked, and therefore the state a recovery returns it to. RECORDED rather than derived by folding the event prefix: CON-000 AX-6 forbids inferring professional meaning from ORDERING, and a prefix fold is exactly that inference (REG-F-192). OPTIONAL, and the optionality is deliberate — events written before JAN-PWUWP W-5.5 do not carry it and must still REPLAY, so the fail-closed sits at the point of USE: UnblockPwu REFUSES a PWU whose block predates this field rather than guessing an origin (CON-000 AX-8). ⚠ NOTE THE ASYMMETRY WITH PwuEscalated, WHICH DELIBERATELY GETS NO SUCH FIELD. ESCALATED has exactly ONE ratified in-arrow (EVIDENCE_PENDING), so its recovery target is derivable from the DECLARED MACHINE rather than from event order — which AX-6 permits. A mirror field there would be content with no consumer; the derivation is instead held by a control that reddens if ESCALATED ever gains a second in-arrow."
+				},
+				{
 					"field": "workLifecycleState",
 					"required": true,
 					"type": "enum",

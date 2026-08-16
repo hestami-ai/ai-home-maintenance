@@ -488,8 +488,15 @@ function advancePwuLifecycle(
 		readonly mutate?: (current: Record<string, unknown>) => Record<string, unknown>;
 		/** Build the EVENT payload from the committed next state. Without this the event carries
 		 * `command.payload` — a command payload masquerading as an event payload, which is the defect
-		 * Increment 22 fixed elsewhere. Supply it for any event whose payload is actually specified. */
-		readonly eventPayload?: (nextState: Record<string, unknown>) => unknown;
+		 * Increment 22 fixed elsewhere. Supply it for any event whose payload is actually specified.
+		 *
+		 * ⚠ `priorAxes` IS THE STATE THE PWU IS MOVING FROM, AND IT IS PASSED SO NO EVENT HAS TO INFER IT
+		 * (JAN-PWUWP W-5.5). `PwuBlocked` needs its origin to make recovery possible, and the two ways to get
+		 * one are to READ it here or to FOLD the event prefix at recovery time. CON-000 AX-6 settles that:
+		 * *"Professional meaning is never inferred from null fields, missing values, attachment, proximity,
+		 * **ordering**, storage location, or UI placement."* A prefix fold infers from ORDERING. This reads the
+		 * loaded aggregate, which is not an inference at all. */
+		readonly eventPayload?: (nextState: Record<string, unknown>, priorAxes: PwuAxes) => unknown;
 	}
 ) {
 	const id = command.targetAggregateId;
@@ -519,7 +526,7 @@ function advancePwuLifecycle(
 		aggregateType: PWU,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload: args.eventPayload ? args.eventPayload(next) : command.payload
+		payload: args.eventPayload ? args.eventPayload(next, axes) : command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: PWU,
@@ -822,10 +829,14 @@ export const blockPwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as BlockPwuPayload;
 	return advancePwuLifecycle(ctx, command, {
 		spec: PWU_LIFECYCLE_COMMAND_SPECS.BlockPwu,
-		eventPayload: (next) =>
+		eventPayload: (next, prior) =>
 			({
 				blockReason: p.blockReason,
 				...(p.missingObjectIds ? { missingObjectIds: p.missingObjectIds } : {}),
+				// W-5.5. The state this PWU is being blocked OUT OF, and therefore the one a recovery returns it
+				// to. Without it `PwuBlocked` records strictly LESS than the generic `PwuStateChanged`, which
+				// carries `previousState` — the dedicated arrow dropping exactly the datum recovery needs.
+				blockedFrom: prior.workLifecycleState as PwuBlockedPayload['blockedFrom'],
 				workLifecycleState: next.workLifecycleState as PwuBlockedPayload['workLifecycleState']
 			}) satisfies PwuBlockedPayload
 	});

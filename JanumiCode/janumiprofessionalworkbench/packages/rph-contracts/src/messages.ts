@@ -1419,6 +1419,7 @@ export type PwuBaselinedPayload = z.infer<typeof PwuBaselinedPayloadSchema>;
 export const PwuBlockedPayloadSchema = z.strictObject({
 	blockReason: z.string(),
 	missingObjectIds: z.array(z.string()).optional(),
+	blockedFrom: WorkLifecycleStateSchema.optional(),
 	workLifecycleState: WorkLifecycleStateSchema
 });
 export type PwuBlockedPayload = z.infer<typeof PwuBlockedPayloadSchema>;
