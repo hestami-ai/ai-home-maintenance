@@ -39,6 +39,10 @@ function artifact(path: string, source: string): CapturedArtifactRecord {
 interface SubjectOptions {
 	readonly excluded?: readonly string[];
 	readonly omitBytes?: readonly string[];
+	// Bytes that are NOT the UTF-8 encoding of the source string, so the fatal decoder can be reached. The rest of
+	// the row (size, digest, classification) still derives from the source, which is exactly the mismatch a
+	// corrupted artifact presents.
+	readonly rawBytes?: ReadonlyMap<string, Uint8Array>;
 }
 
 function frozenSubject(
@@ -56,7 +60,8 @@ function frozenSubject(
 			continue;
 		}
 		rows.push(artifact(path, source));
-		if (!omitBytes.has(path)) bytes.set(path, encoder.encode(source));
+		const raw = options.rawBytes?.get(path);
+		if (!omitBytes.has(path)) bytes.set(path, raw ?? encoder.encode(source));
 	}
 	rows.sort((left, right) => left.path.localeCompare(right.path));
 	const subject = {
@@ -210,5 +215,134 @@ describe('resolveFrozenModuleClosure', () => {
 		});
 		expect(result.findings.map((entry) => entry.code)).toEqual(['CLOSURE_BUDGET_EXHAUSTED']);
 		expect(result.paths).toEqual([]);
+	});
+
+	/**
+	 * ⚠⚠ C9–C14 CLOSE A GAP THAT WAS DERIVED FROM THE CODE, NOT NOTICED IN THE TESTS. Of the ELEVEN finding codes
+	 * this module can emit, C1–C8 observed only FIVE. The six below were unreachable by any assertion in the
+	 * repository, which means six of this module's refusals could have been deleted outright and every suite would
+	 * still have passed. `SPECIFIER_AMBIGUOUS` is the sharpest of them: it is the one refusal the file argues for
+	 * in prose — *"Returning the first present candidate would be a PREFERENCE — a bet on which file the runtime
+	 * picks... The wager is the class of thing under repair"* — and nothing checked that the bet was still refused.
+	 *
+	 * ⚠ `omitBytes` in this file's own harness was authored, threaded, and consumed by NO test until C13. An
+	 * option built to make a failure reachable, and then not reached, is the same shape of gap one layer down.
+	 */
+
+	// C9 — THE REFUSAL THE FILE ARGUES FOR. Candidate generation is WIDE and selection is STRICT: two present
+	// candidates must REFUSE, never pick. Pins the candidate ORDER too, so a narrowing of generation is also caught.
+	it('refuses to bet when a specifier resolves to more than one present candidate', () => {
+		const result = closure(
+			new Map([
+				[
+					ANALYZER,
+					`import { thing } from './synthetic-dep.js';\nexport const use = () => thing;\n`
+				],
+				[DEP, `export const thing = 1;\n`],
+				['verif/synthetic-dep.js', `export const thing = 1;\n`]
+			])
+		);
+		expect(result.findings).toEqual([
+			{
+				code: 'SPECIFIER_AMBIGUOUS',
+				importerPath: ANALYZER,
+				path: ANALYZER,
+				resolvedCandidate: `${DEP} | verif/synthetic-dep.js`,
+				specifier: './synthetic-dep.js'
+			}
+		]);
+		expect(result.paths).toEqual([]);
+	});
+
+	// C10 — AN UNDECIDABLE EDGE IS A REFUSAL, NOT AN ABSENCE. A dynamic import of a variable cannot be resolved
+	// from bytes; treating it as "no edge" is precisely how a capsule ships without a module the analyzer loads.
+	it('refuses a dynamic import whose specifier is not a literal rather than ignoring it', () => {
+		const result = closure(
+			new Map([
+				[ANALYZER, `const spec = './synthetic-dep.js';\nexport const use = () => import(spec);\n`],
+				[DEP, `export const thing = 1;\n`]
+			])
+		);
+		expect(result.findings).toEqual([
+			{
+				code: 'SPECIFIER_NOT_LITERAL',
+				importerPath: ANALYZER,
+				path: ANALYZER,
+				resolvedCandidate: null,
+				specifier: null
+			}
+		]);
+		expect(result.paths).toEqual([]);
+	});
+
+	// C11 — A FILE THE PARSER REJECTS HAS NO KNOWABLE IMPORT GRAPH, so an empty specifier list from it is a
+	// silent lie. This is the one case where "we found no imports" and "we could not look" are indistinguishable.
+	it('refuses a source the parser rejects instead of reading no imports from it', () => {
+		const result = closure(
+			new Map([
+				[ANALYZER, `import { thing } from './synthetic-dep.js';\nexport const broken = (;\n`],
+				[DEP, `export const thing = 1;\n`]
+			])
+		);
+		expect(result.findings.map((entry) => entry.code)).toEqual(['SOURCE_SYNTAX_INVALID']);
+		expect(result.findings[0]?.path).toBe(ANALYZER);
+		expect(result.paths).toEqual([]);
+	});
+
+	// C12 — THE DECODER IS FATAL ON PURPOSE. A lossy decode would substitute U+FFFD and hand the parser a file
+	// that is not the one on disk, so the closure would describe bytes nobody has.
+	it('refuses bytes that are not valid UTF-8 rather than decoding them lossily', () => {
+		const result = closure(
+			new Map([
+				[
+					ANALYZER,
+					`import { thing } from './synthetic-dep.js';\nexport const use = () => thing;\n`
+				],
+				[DEP, `export const thing = 1;\n`]
+			]),
+			{ rawBytes: new Map([[DEP, Uint8Array.from([0x21, 0xff, 0xfe, 0x0a])]]) }
+		);
+		expect(result.findings.map((entry) => entry.code)).toEqual(['SOURCE_UNDECODABLE']);
+		expect(result.findings[0]?.path).toBe(DEP);
+		expect(result.paths).toEqual([]);
+	});
+
+	// C13 — A ROW WITHOUT BYTES IS NOT AN EMPTY FILE. The manifest can list an artifact the byte store cannot
+	// produce; reading that as "no imports" is the silent-empty-closure defect this module exists to remove.
+	it('refuses a manifest row whose frozen bytes are unavailable', () => {
+		const result = closure(
+			new Map([
+				[
+					ANALYZER,
+					`import { thing } from './synthetic-dep.js';\nexport const use = () => thing;\n`
+				],
+				[DEP, `export const thing = 1;\n`]
+			]),
+			{ omitBytes: [DEP] }
+		);
+		expect(result.findings.map((entry) => entry.code)).toEqual(['BYTES_UNAVAILABLE']);
+		expect(result.findings[0]?.path).toBe(DEP);
+		expect(result.paths).toEqual([]);
+	});
+
+	// C14 — THE REQUEST ITSELF IS CHECKED, and all three arms matter: a caller that asks for nothing, a budget
+	// that permits nothing, and a duplicate entry that would make the walk's "enters at most once" claim false.
+	it('refuses an entry population that is empty, unbudgeted, or duplicated', () => {
+		const subject = frozenSubject(new Map([[ANALYZER, `export const use = 1;\n`]]));
+		const request = { entryPaths: [ANALYZER], maxClosureNodes: 32, subject };
+		expect(
+			resolveFrozenModuleClosure({ ...request, entryPaths: [] }).findings.map((e) => e.code)
+		).toEqual(['ENTRY_INVALID']);
+		expect(
+			resolveFrozenModuleClosure({ ...request, maxClosureNodes: 0 }).findings.map((e) => e.code)
+		).toEqual(['ENTRY_INVALID']);
+		expect(
+			resolveFrozenModuleClosure({ ...request, entryPaths: [ANALYZER, ANALYZER] }).findings.map(
+				(e) => e.code
+			)
+		).toEqual(['ENTRY_INVALID']);
+		// The CONTROL for this control: the same request WITHOUT any of those three faults must succeed, or the
+		// three reds above would prove only that the helper is broken.
+		expect(resolveFrozenModuleClosure(request).findings).toEqual([]);
 	});
 });

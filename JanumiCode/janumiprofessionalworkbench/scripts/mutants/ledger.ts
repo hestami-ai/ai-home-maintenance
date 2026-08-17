@@ -3035,5 +3035,75 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.test.ts'],
 		why: 'REG-F-195 W-6: an import the capsule cannot resolve must refuse the population, because a silently empty closure IS the defect that broke the merge',
 		source: 'DESIGN-derived-capsule-closure.md W-6'
+	},
+	/*
+	 * ⚠⚠ THE MODULE THE WHOLE PROGRAMME RESTS ON, WHICH UNTIL NOW HELD NONE OF THESE. `subject/analyzer-closure.ts`
+	 * is the derivation every capsule now depends on. It shipped with eight controls and nothing that could show
+	 * any of them capable of failing.
+	 *
+	 * ⚠ AND THE GAP WAS WIDER THAN "NO MUTANTS", derived from the code rather than noticed in the tests: of the
+	 * ELEVEN finding codes the module can emit, the original eight controls observed FIVE. Six refusals could have
+	 * been deleted outright with every suite still green. C9-C14 close that; the four mutants below hold the
+	 * sharpest of them plus the module's central law.
+	 */
+	{
+		id: 'F196-the-resolver-bets-on-a-candidate-instead-of-refusing',
+		file: 'packages/csaa/src/subject/analyzer-closure.ts',
+		// THE ONE REFUSAL THIS FILE ARGUES FOR IN PROSE, and until C9 nothing checked the bet was still refused:
+		// "Returning the first present candidate would be a PREFERENCE — a bet on which file the runtime picks.
+		// Requiring exactly one present candidate is a REFUSAL. The wager is the class of thing under repair."
+		// This mutation makes the wager. It is the shape a well-meaning "just resolve it" fix would take, and it
+		// is silent: a capsule would bind a real, present, WRONG file and the worker would run happily against it.
+		find: "\tif (present.length > 1) return { kind: 'AMBIGUOUS', present };",
+		replace:
+			"\tif (present.length > 1) return { kind: 'RESOLVED', path: present[0]! }; // MUTANT: prefers, not refuses",
+		expectRed: ['packages/csaa/src/subject/analyzer-closure.test.ts'],
+		why: 'REG-F-196: two present candidates is an undecidable question about the runtime, and answering it by position is a guess the capsule cannot audit',
+		source: 'REG-F-196 Finding 2'
+	},
+	{
+		id: 'F196-an-undecidable-edge-is-read-as-no-edge',
+		file: 'packages/csaa/src/subject/analyzer-closure.ts',
+		// A dynamic `import(variable)` cannot be resolved from bytes. Treating it as ABSENT rather than as a
+		// REFUSAL is exactly the defect the whole programme exists to remove — the capsule ships without a module
+		// the analyzer will load, and nothing anywhere says so. Reclassifying it as BARE is the plausible mistake:
+		// bare specifiers are legitimately collected-and-not-traversed, so it reads as "handled".
+		find: "\t\treturn fault('SPECIFIER_NOT_LITERAL', null, null);",
+		replace: "\t\treturn { kind: 'BARE', specifier: '<non-literal>' }; // MUTANT: undecidable read as absent",
+		expectRed: ['packages/csaa/src/subject/analyzer-closure.test.ts'],
+		why: 'REG-F-196: "we could not decide" and "there is nothing here" are different facts, and only one of them is safe to build a capsule from',
+		source: 'REG-F-196 Finding 2'
+	},
+	{
+		id: 'F196-the-decoder-substitutes-bytes-nobody-has',
+		file: 'packages/csaa/src/subject/analyzer-closure.ts',
+		// ONE WORD, AND IT IS THE WHOLE GUARANTEE. A non-fatal decoder substitutes U+FFFD for invalid sequences
+		// and hands the parser a file that is not the one in the byte store — so the closure would be a true
+		// statement about a text nobody has, derived from a subject that is supposed to be byte-frozen. It also
+		// would not throw, would not warn, and would usually still parse.
+		// Anchored on CONTENT without leading whitespace (ledger rule #4) — my first attempt counted three tabs
+		// where the file has two, and the anchor gate caught it before it could become a claim nobody can perform.
+		find: "text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);",
+		replace:
+			"text = new TextDecoder('utf-8', { fatal: false }).decode(bytes); // MUTANT: lossy decode",
+		expectRed: ['packages/csaa/src/subject/analyzer-closure.test.ts'],
+		why: 'REG-F-196: a byte-frozen subject decoded lossily is no longer byte-frozen, and the closure silently describes a file that does not exist',
+		source: 'REG-F-196 Finding 2'
+	},
+	{
+		id: 'F196-the-fail-closed-law-ships-a-partial-closure',
+		file: 'packages/csaa/src/subject/analyzer-closure.ts',
+		// THE CENTRAL LAW: `paths` is empty IFF `findings` is non-empty. There is no partial closure, because a
+		// partial closure is precisely what the capsule cannot survive — it is the ORIGINAL defect, a member list
+		// that is quietly short. This mutation keeps the findings (so a caller that reads them still sees them)
+		// and ships the paths anyway, which is the most plausible "why throw away the work we did" softening.
+		// ⚠ BOTH PROVIDERS DEPEND ON THIS LAW rather than on their own checks: their diagnostics arms assume that
+		// a non-empty `findings` guarantees an empty selection.
+		find: '\tif (findings.length > 0) return failed(findings);',
+		replace:
+			'\t// MUTANT: findings reported, partial closure shipped anyway (law was: paths empty IFF findings non-empty)',
+		expectRed: ['packages/csaa/src/subject/analyzer-closure.test.ts'],
+		why: 'REG-F-196: a closure that reports a problem AND returns a population invites the caller to use the population, which is the hand-enumerated defect with a diagnostic attached',
+		source: 'REG-F-196 Finding 2'
 	}
 ];
