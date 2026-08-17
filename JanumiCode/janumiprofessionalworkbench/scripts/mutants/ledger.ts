@@ -2649,8 +2649,25 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	// This repository has the precedent and states it in `run.ts`: the atomicity guard "shipped with no ledger
 	// entry and a comment saying so", because a fake measurement is worse than a declared absence. Same here —
 	// the guard is commented at its site with its trigger condition, and the register entry says it is unguarded.
-	// ⚠ IT BECOMES KILLABLE THE DAY THE SUITE GOES GREEN, which is also the day it becomes NECESSARY. Whoever
-	// fixes that suite should add the mutant in the same commit.
+	// ⚠ ~~IT BECOMES KILLABLE THE DAY THE SUITE GOES GREEN, which is also the day it becomes NECESSARY. Whoever
+	// fixes that suite should add the mutant in the same commit.~~
+	//
+	// ⚠⚠ CORRECTED 2026-08-17 (REG-F-195): THAT DAY CAME — the CSAA suite went green at `0018a34b` — AND THE
+	// MUTANT IS STILL NOT DECLARABLE, for a second reason this note did not anticipate. The green was NECESSARY
+	// AND NOT SUFFICIENT. `run.ts` has ZERO exports, executes on import, and is imported by nothing: a walk over
+	// every .ts/.tsx/.svelte/.js/.mjs outside node_modules|dist|.svelte-kit|.turbo|coverage finds 0 importers,
+	// while the same walk finds `verdict.js` and `measured.js` imported from `verif/`, so the search reaches.
+	// The parent runner holds the UNMUTATED module in memory and no spawned child loads it, so a mutation here
+	// is a no-op for every process the harness starts — the entry would report SURVIVED and be RIGHT to, which
+	// is the outcome this note exists to refuse. `verif/control-verdict.test.ts:3-7` states the general form:
+	// "the mutation ledger cannot mutate what nothing observes."
+	//
+	// THE BLOCKER IS AN OBSERVER, NOT A GREEN SUITE. The remedy is REG-F-165's move performed a second time:
+	// lift the freshness DECISION ("is this report the one THIS run produced?") out of `run.ts` into an exported
+	// pure predicate in `verdict.ts`, consumed by `controlVerdict`, its arms asserted in
+	// `verif/control-verdict.test.ts` beside the existing undefined / [] / populated cases. The `rmSync` stays
+	// where it is — it is the EFFECT; what must become checkable is the decision it protects. Only then declare
+	// the mutant, re-deriving its `find` byte-exact from `verdict.ts` at that commit.
 	{
 		id: 'F120-the-playwright-anchor-is-deleted-as-redundant',
 		file: 'scripts/mutants/measured.ts',
