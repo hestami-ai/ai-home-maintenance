@@ -27,6 +27,23 @@ const HANDLERS = new URL('../packages/rph-application/src/handlers/', import.met
 	'$1'
 );
 
+/**
+ * THE DEFAULT SORT ORDER, WRITTEN DOWN — S2871, and it is a pin rather than a style fix.
+ *
+ * A bare `.sort()` orders by UTF-16 code unit, and this census's emitted order is pinned by baselines and by a
+ * csaa capsule digest, so it is behaviour and not presentation. `Number(a > b) - Number(a < b)` reproduces that
+ * exact ordering branchlessly for the string arrays below.
+ *
+ * ⚠ NOT `localeCompare`, WHICH IS THE OBVIOUS AND WRONG SUBSTITUTION. It collates case, punctuation and digits
+ * differently from code-unit order, so swapping it in here would move rows in every pinned list while looking
+ * like a tidy-up. Where a sort in this file ALREADY declares `localeCompare`, that comparator is its emitted
+ * order and is kept exactly as written.
+ *
+ * Declared ONCE and shared: three inline copies of one comparator body is S4144, and worse, three places for the
+ * order to drift apart.
+ */
+const byCodeUnitOrder = (a: string, b: string): number => Number(a > b) - Number(a < b);
+
 export interface DeclaredArrow {
 	readonly machine: string;
 	readonly from: string;
@@ -40,9 +57,23 @@ function handlerFiles(): string[] {
 	// this census seeing it. That is the whole reason the population is not enumerated here.
 	return readdirSync(HANDLERS)
 		.filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'kit.ts')
-		.sort();
+		.sort(byCodeUnitOrder);
 }
 
+/**
+ * Refuse, loudly and terminally.
+ *
+ * ⚠ `: never` IS LOAD-BEARING ACROSS A CALL BOUNDARY, AND IT DID NOT USED TO BE. Every refusal below was once
+ * `return fail(...)` written directly inside a `visit`, so even a hypothetical collect-and-continue `fail` would
+ * still have abandoned that whole site. After the 2026-08-17 decomposition the identical calls live in
+ * `declaredMachine`, `readablePrecondition`, `declaredTargets`, `declaredSources`, `factoryCallTuplesOrFail` and
+ * `recordBirthEntry` — helpers that RETURN TO A CALLER WHICH CONTINUES. If this ever stops throwing, `visit`
+ * proceeds with `machine === undefined` and pushes `{ machine: undefined, … }` arrows into the census, and the
+ * births walk moves to the next entry instead of abandoning the node. Neither would be caught by the tests, which
+ * assert over a census that never got built. So: this function MUST throw on every path, and its `never` return
+ * type is the only thing enforcing that. Do not soften it into a diagnostics collector without first re-inlining
+ * each refusal at its site.
+ */
 const fail = (site: string, why: string): never => {
 	throw new Error(`arrow-command-census: ${site} — ${why}`);
 };
@@ -329,66 +360,19 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 
 	const visit = (node: ts.Node): void => {
 		ts.forEachChild(node, visit);
-		if (!ts.isCallExpression(node)) return;
-		if (!ts.isIdentifier(node.expression) || !ADVANCE_PRIMITIVES.has(node.expression.text)) return;
-		const spec = node.arguments[2];
-		if (!spec || !ts.isObjectLiteralExpression(spec)) return;
+		const spec = primitiveSpec(node, ADVANCE_PRIMITIVES);
+		if (!spec) return;
 		sites += 1;
 		const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
 		const site = `${sf.fileName}:${line}`;
 
 		// MACHINE
-		const mp = prop(spec, 'machine');
-		if (!mp || !ts.isPropertyAssignment(mp)) return fail(site, 'declares no `machine`');
-		const machine = ts.isStringLiteral(mp.initializer)
-			? mp.initializer.text
-			: ts.isIdentifier(mp.initializer)
-				? (consts.get(mp.initializer.text) ??
-					fail(site, `machine \`${mp.initializer.text}\` is not a top-level string const`))
-				: fail(site, 'machine is neither a string literal nor a named constant');
-		if (!STATE_MACHINES[machine])
-			fail(site, `names machine \`${machine}\`, which transitions.data.ts does not declare`);
+		const machine = declaredMachine(spec, consts, site);
 
 		// TARGET — a literal/const head, or a computed one whose RANGE must be declared.
-		const tp = prop(spec, 'target');
-		if (!tp) return fail(site, 'declares no `target`');
-		let targets: string[];
-		const staticTarget =
-			ts.isPropertyAssignment(tp) && ts.isStringLiteral(tp.initializer)
-				? tp.initializer.text
-				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
-					? consts.get(tp.initializer.text)
-					: undefined;
-		/** The factory parameter the TARGET came from, when it came from one BY CALL SITE — REG-F-124. */
-		let targetParam: string | undefined;
-		if (staticTarget !== undefined) {
-			targets = [staticTarget];
-		} else {
-			// An explicit declaration WINS over inference. Trying inference first once let it answer for a site
-			// that had already declared its range, and the census reported four built arrows as uncovered.
-			const declared = declaredRange(sf, spec, site);
-			const name = ts.isShorthandPropertyAssignment(tp)
-				? tp.name.text
-				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
-					? tp.initializer.text
-					: undefined;
-			if (declared) {
-				targets = declared;
-			} else {
-				const viaFactory =
-					(name ? factoryParameter(sf, node, name) : undefined) ??
-					fail(
-						site,
-						'computes its target and declares no `targetStates`. A computed range is not statically ' +
-							'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
-							'arrows it drives unaudited'
-					);
-				targets = viaFactory.values;
-				// Only the CALL-SITE arm carries per-call structure; a literal TYPE is a range and pairs with
-				// nothing. See `factoryCallTuples`.
-				if (viaFactory.arm === 'calls') targetParam = name;
-			}
-		}
+		// `targetParam` is the factory parameter the TARGET came from, when it came from one BY CALL SITE —
+		// REG-F-124.
+		const { targets, targetParam } = declaredTargets(sf, node, spec, consts, site);
 
 		// SOURCES — `fromStates(...)` read from the precondition AT THIS LITERAL, and from nowhere else.
 		//
@@ -401,32 +385,10 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 		// EFFECTIVE — nil arithmetic effect by luck, not by soundness. That site now declares at the literal, and
 		// this walk REFUSES rather than infers: reading a declaration cannot fabricate one; inferring a missing
 		// half can.
-		const pp = prop(spec, 'precondition');
-		if (!pp)
-			return fail(
-				site,
-				'declares no `precondition`. Every advance site names its source set with `fromStates(…)` in the ' +
-					'literal; the census reads a from-half from nowhere else (REG-F-114)'
-			);
-		if (
-			ts.isShorthandPropertyAssignment(pp) ||
-			(ts.isPropertyAssignment(pp) && ts.isIdentifier(pp.initializer))
-		)
-			return fail(
-				site,
-				'passes its `precondition` through a bare name the walk cannot see into. A `fromStates(…)` hidden ' +
-					'behind that name would leave this site read as un-narrowed and its from-half taken from the ' +
-					"machine's in-edges — a fabricated declaration (REG-F-114). Compose the precondition in this " +
-					'literal; `governance.ts:293` was this exact shape'
-			);
-		if (!ts.isPropertyAssignment(pp))
-			return fail(site, '`precondition` is not a property assignment the walk can read');
+		const pp = readablePrecondition(spec, site);
 		let call: ts.CallExpression | undefined;
 		const find = (n: ts.Node) => {
-			if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'fromStates') {
-				call ??= n;
-			}
-			ts.forEachChild(n, find);
+			call = firstFromStatesCall(n);
 		};
 		find(pp.initializer);
 		if (call === undefined)
@@ -436,25 +398,9 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 					'from STATE_MACHINES (REG-F-114) — if this command is genuinely un-narrowed by source state, ' +
 					'that is a new idiom to be taught deliberately, with its own ruling, not defaulted into'
 			);
-		let sources: string[];
-		/** The factory parameter the SOURCES came from, when they came from one BY CALL SITE — REG-F-124. */
-		let sourcesParam: string | undefined;
-		const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
-		if (direct.length > 0) sources = direct;
-		else {
-			// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
-			const spread = call.arguments.find(ts.isSpreadElement);
-			const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
-			const viaFactory =
-				(id ? factoryParameter(sf, node, id) : undefined) ??
-				fail(
-					site,
-					'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
-						'an unreadable source list would contribute zero arrows and read as full coverage'
-				);
-			sources = viaFactory.values;
-			if (viaFactory.arm === 'calls') sourcesParam = id;
-		}
+		// `sourcesParam` is the factory parameter the SOURCES came from, when they came from one BY CALL SITE —
+		// REG-F-124.
+		const { sources, sourcesParam } = declaredSources(sf, node, call, site);
 
 		// ── EMISSION — PAIRED WHEN BOTH HALVES CAME FROM THE SAME CALLS, CROSSED OTHERWISE (REG-F-124) ────────
 		//
@@ -472,25 +418,241 @@ export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow
 		// UNSETTLED question, deliberately untouched here: it is a question about what the SITES declare, and this
 		// is a fix to what the READER fabricates. Conflating them would put one movement inside another.
 		if (targetParam !== undefined && sourcesParam !== undefined) {
-			const tuples =
-				factoryCallTuples(sf, node, targetParam, sourcesParam, site) ??
-				fail(
-					site,
-					`resolves BOTH its target and its sources from factory \`${targetParam}\`/\`${sourcesParam}\` ` +
-						'but no call to that factory could be read. Never crossed as a fallback: the cross product ' +
-						'of two flattened parameter sets manufactures arrows no call declares (REG-F-124)'
-				);
+			const tuples = factoryCallTuplesOrFail(sf, node, targetParam, sourcesParam, site);
 			for (const { targets: perCallTargets, sources: perCallSources } of tuples)
 				for (const to of perCallTargets)
 					for (const f of perCallSources) arrows.push({ machine, from: f, to, site });
 		} else {
-			for (const to of targets) {
-				for (const f of sources) arrows.push({ machine, from: f, to, site });
-			}
+			emitCrossProduct(arrows, targets, sources, machine, site);
 		}
 	};
 	visit(sf);
 	return { arrows, sites };
+}
+
+// ── THE PIECES OF THAT WALK, LIFTED OUT WITHOUT MOVING ITS TWO ANCHORED BLOCKS ───────────────────────────────
+//
+// Extracted for readability ONLY (SonarQube S3776 on `visit`), and the extraction was scoped AROUND the two
+// blocks the mutation ledger anchors byte-for-byte — the no-readable-fromStates refusal (REG-F-122) and the
+// paired emission (REG-F-124) — which stay in `visit` at their original depth and indentation.
+//
+// ⚠ AN ANCHORED BLOCK IS NOT REFACTORABLE TEXT. The ledger matches its `find` payload INCLUDING LEADING TABS, so
+// reindenting one — which is what lifting it into a helper does — silently retires the mutant that guards it and
+// the suite stays green over a guard that can no longer be graded. Nothing below this line may quote an anchored
+// block verbatim either: a second occurrence is as fatal as none.
+
+/** The spec literal of a call to one of `primitives`, or undefined when this node is not such a site. */
+function primitiveSpec(
+	node: ts.Node,
+	primitives: ReadonlySet<string>
+): ts.ObjectLiteralExpression | undefined {
+	if (!ts.isCallExpression(node)) return undefined;
+	if (!ts.isIdentifier(node.expression) || !primitives.has(node.expression.text)) return undefined;
+	const spec = node.arguments[2];
+	return spec && ts.isObjectLiteralExpression(spec) ? spec : undefined;
+}
+
+/** The `machine` a site declares — a literal or a top-level string const, and one transitions.data.ts knows. */
+/**
+ * The machine name a `machine:` initializer denotes — a string literal, or a top-level const that resolves.
+ *
+ * The three arms are the nested ternary this replaced (S3358), in the same order and with the same values,
+ * INCLUDING the `?? fail(…)` on the named-const arm: a const that resolves to nothing is a REFUSAL, not an
+ * `undefined` machine. Written as `return fail(…)` rather than `machine = fail(…)` deliberately — assigning from
+ * a `never`-returning call trips S3699, and `return fail(…)` is this file's existing idiom for the same effect.
+ */
+function machineNameFrom(
+	initializer: ts.Expression,
+	consts: Map<string, string>,
+	site: string
+): string {
+	if (ts.isStringLiteral(initializer)) return initializer.text;
+	if (ts.isIdentifier(initializer))
+		return (
+			consts.get(initializer.text) ??
+			fail(site, `machine \`${initializer.text}\` is not a top-level string const`)
+		);
+	return fail(site, 'machine is neither a string literal nor a named constant');
+}
+
+function declaredMachine(
+	spec: ts.ObjectLiteralExpression,
+	consts: Map<string, string>,
+	site: string
+): string {
+	const mp = prop(spec, 'machine');
+	if (!mp || !ts.isPropertyAssignment(mp)) return fail(site, 'declares no `machine`');
+	const machine = machineNameFrom(mp.initializer, consts, site);
+	if (!STATE_MACHINES[machine])
+		fail(site, `names machine \`${machine}\`, which transitions.data.ts does not declare`);
+	return machine;
+}
+
+/** A `target` stated outright — a string literal, or a name resolving to a top-level string const. */
+function staticTargetOf(
+	tp: ts.ObjectLiteralElementLike,
+	consts: Map<string, string>
+): string | undefined {
+	// S3358. Both arms of the nested ternary re-tested `isPropertyAssignment`, so hoisting that test changes no
+	// value: a non-assignment yielded `undefined` before and yields it here. The const-miss still returns
+	// `undefined` (a name bound to no top-level string const is NOT a static target, and `declaredTargets` then
+	// goes on to try the declared range) rather than refusing.
+	if (!ts.isPropertyAssignment(tp)) return undefined;
+	if (ts.isStringLiteral(tp.initializer)) return tp.initializer.text;
+	if (ts.isIdentifier(tp.initializer)) return consts.get(tp.initializer.text);
+	return undefined;
+}
+
+/** The NAME a computed `target` is bound to — how its factory parameter is found. */
+function targetBindingName(tp: ts.ObjectLiteralElementLike): string | undefined {
+	// S3358 — same three answers, same order.
+	if (ts.isShorthandPropertyAssignment(tp)) return tp.name.text;
+	if (ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)) return tp.initializer.text;
+	return undefined;
+}
+
+/**
+ * The target states a site declares, and the factory parameter they came from when they came from one BY CALL
+ * SITE (REG-F-124) — `targetParam` is undefined for every arm that carries no per-call structure.
+ *
+ * ⚠ `declaredRange` IS CALLED BEFORE THE BINDING NAME IS READ, AND THAT ORDER IS LOAD-BEARING: it can `fail()`,
+ * and an explicit declaration must WIN over inference. Trying inference first once let it answer for a site that
+ * had already declared its range, and the census reported four built arrows as uncovered.
+ */
+function declaredTargets(
+	sf: ts.SourceFile,
+	node: ts.Node,
+	spec: ts.ObjectLiteralExpression,
+	consts: Map<string, string>,
+	site: string
+): { targets: string[]; targetParam: string | undefined } {
+	const tp = prop(spec, 'target');
+	if (!tp) return fail(site, 'declares no `target`');
+	const staticTarget = staticTargetOf(tp, consts);
+	if (staticTarget !== undefined) return { targets: [staticTarget], targetParam: undefined };
+
+	const declared = declaredRange(sf, spec, site);
+	const name = targetBindingName(tp);
+	if (declared) return { targets: declared, targetParam: undefined };
+
+	const viaFactory =
+		(name ? factoryParameter(sf, node, name) : undefined) ??
+		fail(
+			site,
+			'computes its target and declares no `targetStates`. A computed range is not statically ' +
+				'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
+				'arrows it drives unaudited'
+		);
+	// Only the CALL-SITE arm carries per-call structure; a literal TYPE is a range and pairs with nothing.
+	// See `factoryCallTuples`.
+	return { targets: viaFactory.values, targetParam: viaFactory.arm === 'calls' ? name : undefined };
+}
+
+/** The `precondition` property, refusing every shape the walk cannot see a `fromStates(…)` inside. */
+function readablePrecondition(spec: ts.ObjectLiteralExpression, site: string): ts.PropertyAssignment {
+	const pp = prop(spec, 'precondition');
+	if (!pp)
+		return fail(
+			site,
+			'declares no `precondition`. Every advance site names its source set with `fromStates(…)` in the ' +
+				'literal; the census reads a from-half from nowhere else (REG-F-114)'
+		);
+	if (
+		ts.isShorthandPropertyAssignment(pp) ||
+		(ts.isPropertyAssignment(pp) && ts.isIdentifier(pp.initializer))
+	)
+		return fail(
+			site,
+			'passes its `precondition` through a bare name the walk cannot see into. A `fromStates(…)` hidden ' +
+				'behind that name would leave this site read as un-narrowed and its from-half taken from the ' +
+				"machine's in-edges — a fabricated declaration (REG-F-114). Compose the precondition in this " +
+				'literal; `governance.ts:293` was this exact shape'
+		);
+	if (!ts.isPropertyAssignment(pp))
+		return fail(site, '`precondition` is not a property assignment the walk can read');
+	return pp;
+}
+
+/**
+ * The FIRST `fromStates(…)` call in `n`'s subtree, in document order — the traversal the `find` closure runs.
+ *
+ * ⚠ THE CALLBACK HAS A BLOCK BODY DELIBERATELY. `ts.forEachChild` STOPS at the first truthy return, so an
+ * expression body (`(c) => (found ??= firstFromStatesCall(c))`) would abort the sibling walk the moment a hit
+ * appeared — a different traversal wearing the same shape. The block returns undefined, so every child is
+ * visited exactly as the recursive closure this replaced did, and `??=` keeps the FIRST hit.
+ */
+function firstFromStatesCall(n: ts.Node): ts.CallExpression | undefined {
+	if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'fromStates') {
+		return n;
+	}
+	let found: ts.CallExpression | undefined;
+	ts.forEachChild(n, (c) => {
+		found ??= firstFromStatesCall(c);
+	});
+	return found;
+}
+
+/**
+ * The source states a `fromStates(…)` declares, and the factory parameter they came from when they came from one
+ * BY CALL SITE (REG-F-124). Never dropped silently — an unreadable list would read as full coverage.
+ */
+function declaredSources(
+	sf: ts.SourceFile,
+	node: ts.Node,
+	call: ts.CallExpression,
+	site: string
+): { sources: string[]; sourcesParam: string | undefined } {
+	const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
+	if (direct.length > 0) return { sources: direct, sourcesParam: undefined };
+	// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
+	const spread = call.arguments.find(ts.isSpreadElement);
+	const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
+	const viaFactory =
+		(id ? factoryParameter(sf, node, id) : undefined) ??
+		fail(
+			site,
+			'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
+				'an unreadable source list would contribute zero arrows and read as full coverage'
+		);
+	return { sources: viaFactory.values, sourcesParam: viaFactory.arm === 'calls' ? id : undefined };
+}
+
+/** `factoryCallTuples`, refusing rather than falling back to a cross product — see REG-F-124 above. */
+function factoryCallTuplesOrFail(
+	sf: ts.SourceFile,
+	node: ts.Node,
+	targetParam: string,
+	sourcesParam: string,
+	site: string
+): { targets: string[]; sources: string[] }[] {
+	return (
+		factoryCallTuples(sf, node, targetParam, sourcesParam, site) ??
+		fail(
+			site,
+			`resolves BOTH its target and its sources from factory \`${targetParam}\`/\`${sourcesParam}\` ` +
+				'but no call to that factory could be read. Never crossed as a fallback: the cross product ' +
+				'of two flattened parameter sets manufactures arrows no call declares (REG-F-124)'
+		)
+	);
+}
+
+/**
+ * The CROSSED arm of the emission — every declared target against every declared source.
+ *
+ * ⚠ THIS IS THE CORRECT READING AT EVERY SITE THAT REACHES IT, not a fallback. Two sites deliberately declare a
+ * full rectangle (`recordClaimAssessment` 4×5, `authorizeRuntimeBinding` 2×2) with no per-call tuples in the
+ * source to recover. Pushes into the caller's `arrows` — the same array object, never a copy.
+ */
+function emitCrossProduct(
+	arrows: DeclaredArrow[],
+	targets: readonly string[],
+	sources: readonly string[],
+	machine: string,
+	site: string
+): void {
+	for (const to of targets) {
+		for (const f of sources) arrows.push({ machine, from: f, to, site });
+	}
 }
 
 function computeDeclaredArrows(): DeclaredArrow[] {
@@ -665,10 +827,12 @@ export function unratifiedDeclarations(): {
 		if (a.from === a.to && !explicitlyIllegal) machineAdmittedSelfEdges.push(key);
 		else overClaimed.push(key);
 	}
-	return {
-		overClaimed: overClaimed.sort((x, y) => x.localeCompare(y)),
-		machineAdmittedSelfEdges: machineAdmittedSelfEdges.sort((x, y) => x.localeCompare(y))
-	};
+	// S4043: the in-place sorts are their own statements rather than expressions inside the returned literal.
+	// Both arrays are LOCAL and were built by the loop above, so sorting in place mutates nothing shared, and the
+	// `localeCompare` comparator is kept EXACTLY — it is the order the two pinned lists are asserted in.
+	overClaimed.sort((x, y) => x.localeCompare(y));
+	machineAdmittedSelfEdges.sort((x, y) => x.localeCompare(y));
+	return { overClaimed, machineAdmittedSelfEdges };
 }
 
 export function initialStateFictions(): { machine: string; declared: string; actuallyBornIn: string[] }[] {
@@ -719,83 +883,106 @@ function computeBirthStates(): Map<string, Set<string>> {
 		// needs, and the old early-out (`births:` only) would have skipped every file it exists to catch.
 		if (!source.includes('births:') && !source.includes('expectedRevision: undefined')) continue;
 		const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
-		const visit = (node: ts.Node): void => {
-			ts.forEachChild(node, visit);
-			if (!ts.isCallExpression(node)) return;
-			if (!ts.isIdentifier(node.expression) || !BIRTH_PRIMITIVES.has(node.expression.text)) return;
-			const spec = node.arguments[2];
-			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
-			const p = prop(spec, 'births');
-			const site = `${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
-			// ⚠ THE RATCHET (REG-F-086): A CREATION THAT DECLARES NO BIRTH IS A FAILURE, NOT A SKIP.
-			//
-			// Until now `births` was declare-if-you-like, so a new creation simply did not appear — and a machine
-			// that never appears is `unanalysed`, which reads as "not yet reached" rather than "nobody said". The
-			// two are opposite claims. `CommitArgs` defines a create in terms a reader can check —
-			// `expectedRevision: undefined` means *"the aggregate must NOT yet exist"* — so the census asks that
-			// question of the code rather than of a list someone maintains.
-			//
-			// ⚠ NO EXEMPTION IS NEEDED FOR `createObject`'s OWN DELEGATION, AND I SHIPPED ONE BEFORE CHECKING.
-			//
-			// `createObject` commits through `commitState`, so its inner call IS a creation declaring no `births` —
-			// its caller declares them a frame up. I wrote a structural exemption for exactly that ("this call sits
-			// inside another birth primitive"), and its mutant SURVIVED: `handlerFiles()` has excluded `kit.ts`
-			// since long before any of this, so the census never walks the delegating site and the exemption
-			// guarded a case that cannot arise. **A guard for an impossible case is a hollow** — the defect this
-			// programme keeps recording, authored here inside the fix for a census. Deleted rather than kept "just
-			// in case", because the mutant that proved it dead is the only thing that would have kept it honest.
-			//
-			// If `kit.ts` is ever brought into the population, this ratchet will fire on that delegating call —
-			// which is CORRECT, and the moment to decide deliberately rather than to have pre-decided blindly.
-			if (!p && createsAggregate(spec)) {
-				return fail(
-					site,
-					'commits a CREATION (`expectedRevision: undefined`) and declares no `births`. The occupancy ' +
-						'census seeds from births, so an undeclared creation makes its machine unanalysable — which ' +
-						'reads as "no state is reachable yet" rather than "nobody said". Declare the machine and the ' +
-						'state this command actually commits it into'
-				);
-			}
-			if (!p || !ts.isPropertyAssignment(p)) return;
-			if (!ts.isArrayLiteralExpression(p.initializer)) {
-				return fail(site, '`births` must be an array literal so the census can read it');
-			}
-			for (const entry of p.initializer.elements) {
-				if (!ts.isObjectLiteralExpression(entry)) fail(site, 'each `births` entry must be an object literal');
-				const obj = entry as ts.ObjectLiteralExpression;
-				const machineProp = prop(obj, 'machine');
-				const valuesProp = prop(obj, 'values');
-				if (
-					!machineProp ||
-					!ts.isPropertyAssignment(machineProp) ||
-					!ts.isStringLiteral(machineProp.initializer)
-				) {
-					return fail(site, '`births[].machine` must be a string literal');
-				}
-				const machine = machineProp.initializer.text;
-				if (!STATE_MACHINES[machine]) fail(site, `births names unknown machine \`${machine}\``);
-				if (!valuesProp || !ts.isPropertyAssignment(valuesProp)) {
-					return fail(site, '`births[].values` is required');
-				}
-				const values = literalsIn(valuesProp.initializer);
-				if (values.length === 0) fail(site, '`births[].values` yielded no string literals');
-				for (const v of values) {
-					if (!STATE_MACHINES[machine]?.states.includes(v)) {
-						fail(site, `births declares \`${v}\`, which is not a state of ${machine}`);
-					}
-					const set = out.get(machine) ?? new Set<string>();
-					set.add(v);
-					out.set(machine, set);
-					declarations += 1;
-				}
-			}
-		};
-		visit(sf);
+		// ⚠ THE COUNT COMES BACK BY RETURN VALUE, AND IT HAS TO. `out` is a Map and travels by reference, but
+		// `declarations` is a NUMBER — a helper incrementing its own copy would leave this one at zero, and
+		// `if (declarations === 0) fail(…)` below is the ONLY thing that would ever have said so.
+		declarations += birthDeclarationsInFile(sf, file, out);
 	}
 	if (declarations === 0) {
 		fail('births', 'no `births` declarations found at all — the occupancy census would be vacuous');
 	}
 	return out;
+}
+
+/** Every `births` declaration one source file holds, seeded into `out`, and how many rows it contributed. */
+function birthDeclarationsInFile(
+	sf: ts.SourceFile,
+	file: string,
+	out: Map<string, Set<string>>
+): number {
+	let declarations = 0;
+	const visit = (node: ts.Node): void => {
+		ts.forEachChild(node, visit);
+		const spec = primitiveSpec(node, BIRTH_PRIMITIVES);
+		if (!spec) return;
+		const p = prop(spec, 'births');
+		const site = `${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
+		// ⚠ THE RATCHET (REG-F-086): A CREATION THAT DECLARES NO BIRTH IS A FAILURE, NOT A SKIP.
+		//
+		// Until now `births` was declare-if-you-like, so a new creation simply did not appear — and a machine
+		// that never appears is `unanalysed`, which reads as "not yet reached" rather than "nobody said". The
+		// two are opposite claims. `CommitArgs` defines a create in terms a reader can check —
+		// `expectedRevision: undefined` means *"the aggregate must NOT yet exist"* — so the census asks that
+		// question of the code rather than of a list someone maintains.
+		//
+		// ⚠ NO EXEMPTION IS NEEDED FOR `createObject`'s OWN DELEGATION, AND I SHIPPED ONE BEFORE CHECKING.
+		//
+		// `createObject` commits through `commitState`, so its inner call IS a creation declaring no `births` —
+		// its caller declares them a frame up. I wrote a structural exemption for exactly that ("this call sits
+		// inside another birth primitive"), and its mutant SURVIVED: `handlerFiles()` has excluded `kit.ts`
+		// since long before any of this, so the census never walks the delegating site and the exemption
+		// guarded a case that cannot arise. **A guard for an impossible case is a hollow** — the defect this
+		// programme keeps recording, authored here inside the fix for a census. Deleted rather than kept "just
+		// in case", because the mutant that proved it dead is the only thing that would have kept it honest.
+		//
+		// If `kit.ts` is ever brought into the population, this ratchet will fire on that delegating call —
+		// which is CORRECT, and the moment to decide deliberately rather than to have pre-decided blindly.
+		if (!p && createsAggregate(spec)) {
+			return fail(
+				site,
+				'commits a CREATION (`expectedRevision: undefined`) and declares no `births`. The occupancy ' +
+					'census seeds from births, so an undeclared creation makes its machine unanalysable — which ' +
+					'reads as "no state is reachable yet" rather than "nobody said". Declare the machine and the ' +
+					'state this command actually commits it into'
+			);
+		}
+		if (!p || !ts.isPropertyAssignment(p)) return;
+		if (!ts.isArrayLiteralExpression(p.initializer)) {
+			return fail(site, '`births` must be an array literal so the census can read it');
+		}
+		for (const entry of p.initializer.elements) declarations += recordBirthEntry(entry, site, out);
+	};
+	visit(sf);
+	return declarations;
+}
+
+/**
+ * ONE `births[]` entry, seeded into `out`, returning how many (machine, state) rows it declared.
+ *
+ * ⚠ THE TALLY IS RETURNED AND NOT INCREMENTED THROUGH A PARAMETER. `out` is a Map and travels by reference; a
+ * NUMBER does not, so a helper that "incremented" a copy would leave the caller's count at zero — and
+ * `if (declarations === 0) fail(…)` is the only assertion in this file that reads it.
+ */
+function recordBirthEntry(entry: ts.Node, site: string, out: Map<string, Set<string>>): number {
+	if (!ts.isObjectLiteralExpression(entry)) fail(site, 'each `births` entry must be an object literal');
+	const obj = entry as ts.ObjectLiteralExpression;
+	const machineProp = prop(obj, 'machine');
+	const valuesProp = prop(obj, 'values');
+	if (
+		!machineProp ||
+		!ts.isPropertyAssignment(machineProp) ||
+		!ts.isStringLiteral(machineProp.initializer)
+	) {
+		return fail(site, '`births[].machine` must be a string literal');
+	}
+	const machine = machineProp.initializer.text;
+	if (!STATE_MACHINES[machine]) fail(site, `births names unknown machine \`${machine}\``);
+	if (!valuesProp || !ts.isPropertyAssignment(valuesProp)) {
+		return fail(site, '`births[].values` is required');
+	}
+	const values = literalsIn(valuesProp.initializer);
+	if (values.length === 0) fail(site, '`births[].values` yielded no string literals');
+	let declarations = 0;
+	for (const v of values) {
+		if (!STATE_MACHINES[machine]?.states.includes(v)) {
+			fail(site, `births declares \`${v}\`, which is not a state of ${machine}`);
+		}
+		const set = out.get(machine) ?? new Set<string>();
+		set.add(v);
+		out.set(machine, set);
+		declarations += 1;
+	}
+	return declarations;
 }
 
 /**
@@ -869,10 +1056,13 @@ export function deadCovered(): { dead: string[]; unanalysed: string[] } {
 	}
 	const analysed = new Set([...occ.keys()].filter((m) => complete.has(m)));
 	const unanalysed = [...new Set(arrows.map((a) => a.machine))].filter((m) => !analysed.has(m));
-	return {
-		dead: [...new Set(dead)].sort((x, y) => x.localeCompare(y)),
-		unanalysed: unanalysed.sort((x, y) => x.localeCompare(y))
-	};
+	// S4043, and the de-duplication stays where it was: `distinctDead` is a FRESH array (spread of a Set), so
+	// sorting it in place cannot disturb `dead`, and `unanalysed` is likewise fresh from `.filter` above. Same
+	// `localeCompare` comparator as before — this order is pinned.
+	const distinctDead = [...new Set(dead)];
+	distinctDead.sort((x, y) => x.localeCompare(y));
+	unanalysed.sort((x, y) => x.localeCompare(y));
+	return { dead: distinctDead, unanalysed };
 }
 
 /**
@@ -971,11 +1161,13 @@ export function census(): { uncovered: string[]; orphans: string[]; total: numbe
 		}
 	}
 	const declared = new Set(arrows.map((a) => a.machine));
-	return {
-		uncovered: uncovered.sort(),
-		orphans: Object.keys(STATE_MACHINES)
-			.filter((m) => !declared.has(m) && !isExcludedMachine(m))
-			.sort(),
-		total
-	};
+	// S4043 + S2871. Both sorts are their own statements now, and both spell out the DEFAULT order they used to
+	// take implicitly — `uncovered` is local to this function and `orphans` is fresh from `.filter`, so neither
+	// in-place sort touches shared state.
+	uncovered.sort(byCodeUnitOrder);
+	const orphans = Object.keys(STATE_MACHINES).filter(
+		(m) => !declared.has(m) && !isExcludedMachine(m)
+	);
+	orphans.sort(byCodeUnitOrder);
+	return { uncovered, orphans, total };
 }
