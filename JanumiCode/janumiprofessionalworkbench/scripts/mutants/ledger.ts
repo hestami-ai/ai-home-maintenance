@@ -2958,8 +2958,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	 * show any of them capable of failing.
 	 *
 	 * ⚠ AND THE OBVIOUS EXPLANATION IS WRONG, WHICH IS WHY IT IS WRITTEN DOWN. `EXCLUDED_PROJECTS = ['csaa']` in
-	 * `run.ts` looks like a blanket bar on csaa mutants. It is not: `run.ts:652`/`:655` apply `projectFilters()`
-	 * ONLY when `target.length === 0`, so the exclusion reaches CONTROLS and the BASELINE — the whole-workspace
+	 * `run.ts` looks like a blanket bar on csaa mutants. It is not: `vitestVictimArgs()` in `run.ts` applies
+	 * `projectFilters()` ONLY when `target.length === 0` — one hoisted `projects` binding feeding both argv arms —
+	 * so the exclusion reaches CONTROLS and the BASELINE — the whole-workspace
 	 * runs REG-F-136 was protecting from csaa's 5000ms timeouts — and never reaches a mutant that NAMES its victim.
 	 * A named-victim csaa mutant has always been declarable. Nobody had declared one. Reading the exclusion as
 	 * "csaa cannot be mutated" would have retired a real gap by misreading a filter.

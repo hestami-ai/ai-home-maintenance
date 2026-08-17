@@ -142,11 +142,11 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 		expect(new Set(arrows.map((a) => a.machine)).size).toBeGreaterThan(10);
 		// The most-repeated text: 17 arrows, one disposition. A reader that de-duplicated arrows would drop 16.
 		expect(
-			arrows.filter((a) => a.guard === 'Authorized decision (Decision.decisionType=ABANDON)').length
-		).toBe(17);
+			arrows.filter((a) => a.guard === 'Authorized decision (Decision.decisionType=ABANDON)')
+		).toHaveLength(17);
 		// Not PWU-only — the ledger covers the assurance, governance and execution machines too.
 		expect(new Set(arrows.map((a) => a.machine))).toContain('Baseline.status');
-		expect(guardTexts().length).toBe(new Set(guardTexts()).size);
+		expect(guardTexts()).toHaveLength(new Set(guardTexts()).size);
 	});
 
 	// ── CONTROL 2: THE UNCLASSIFIED CHECK CAN ACTUALLY FAIL ─────────────────────────────────────────────────

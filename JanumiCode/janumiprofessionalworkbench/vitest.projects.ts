@@ -47,7 +47,7 @@ export function packagesWithTests(): string[] {
 	const pkgDir = join(ROOT, 'packages');
 	return readdirSync(pkgDir)
 		.filter((name) => countTests(join(pkgDir, name, 'src')) > 0)
-		.sort();
+		.sort((a, b) => Number(a > b) - Number(a < b));
 }
 
 /**
@@ -61,7 +61,7 @@ export function appsWithTests(): string[] {
 	if (!existsSync(appDir)) return [];
 	return readdirSync(appDir)
 		.filter((name) => countTests(join(appDir, name, 'src')) > 0)
-		.sort();
+		.sort((a, b) => Number(a > b) - Number(a < b));
 }
 
 /**

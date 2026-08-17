@@ -567,6 +567,140 @@ function victimWasGreen(target: readonly string[]): boolean {
 	return green;
 }
 
+/**
+ * Which timing leg this mutant's test run is charged to.
+ *
+ * Split out of `runMutant` so the three-way choice is a statement rather than a nested ternary. `isE2eTarget` is
+ * still called HERE, first, for the reason it always was: it is what THROWS on a victim set that mixes e2e and unit
+ * specs, and that throw must keep happening at this exact point in the sequence — mutation already on disk, the
+ * `finally` restore already armed.
+ */
+function suiteLeg(target: readonly string[]): string {
+	if (isE2eTarget(target)) return 'playwright';
+	return target.length === 0 ? 'vitest WHOLE-SUITE' : 'vitest targeted';
+}
+
+/**
+ * The `bunx vitest` argv for one mutant's victim run.
+ *
+ * The JSON reporter is added only when a report is actually wanted (`jsonReportFor`), and the project filter only to
+ * a WHOLE-SUITE run — an empty target — identically in both shapes, which is why the filter is computed once above
+ * the branch rather than repeated inside each arm.
+ */
+function vitestVictimArgs(target: readonly string[], jsonTo: string | undefined): string[] {
+	const projects = target.length === 0 ? projectFilters() : [];
+	if (jsonTo === undefined) return ['vitest', 'run', ...CONFIRM_RED, ...projects, ...target];
+	return [
+		'vitest',
+		'run',
+		...CONFIRM_RED,
+		'--reporter=default',
+		'--reporter=json',
+		`--outputFile=${jsonTo}`,
+		...projects,
+		...target
+	];
+}
+
+/** Run this mutant's victims — Playwright or vitest — charged to the leg `suiteLeg` names. */
+function runVictimSuites(
+	target: readonly string[],
+	jsonTo: string | undefined,
+	mutantEnv: NodeJS.ProcessEnv
+): ReturnType<typeof sh> {
+	const leg = suiteLeg(target);
+	return timed(leg, () =>
+		isE2eTarget(target)
+			? runPlaywright(target, mutantEnv)
+			: sh('bunx', vitestVictimArgs(target, jsonTo), ROOT, mutantEnv)
+	);
+}
+
+/**
+ * ⚠ NAME THE SUITE, DO NOT JUST REPORT THE MARKER. The first version of this verdict quoted the timeout
+ * text and stopped there, and diagnosing the next blocking run meant inferring the culprit from the
+ * milliseconds in the marker. That is the same shortfall REG-F-116 is about, one notch smaller: a
+ * verdict is worth what the reader can CHECK, and the failing suites are already in the report a
+ * control writes. Absent (a named victim writes no report) it says so rather than guessing.
+ *
+ * `undefined` covers BOTH "no report was asked for" and "the report could not be read" — they are the same sentence
+ * to the reader, and `failedFiles` is called only when a report was asked for, so its report-deleting side effect
+ * still happens exactly when it did before.
+ */
+function timedOutSuiteLocation(jsonTo: string | undefined): string {
+	const failing = jsonTo === undefined ? undefined : failedFiles(jsonTo);
+	if (failing === undefined)
+		return 'no report was written, so the timed-out suite cannot be named here — re-run with MUTANTS_HARVEST=1';
+	if (failing.length === 0) return 'the report names no failing suite';
+	return `in: ${failing.slice(0, 3).join(', ')}`;
+}
+
+function timedOutResult(
+	m: DeclaredMutant,
+	timedOut: string,
+	jsonTo: string | undefined,
+	out: string
+): Result {
+	const where = timedOutSuiteLocation(jsonTo);
+	return {
+		mutant: m,
+		verdict: 'INCONCLUSIVE',
+		// The observed text is QUOTED rather than summarised, because the entire finding is that a verdict
+		// asserted something the reader could not check.
+		detail: `the run TIMED OUT (${timedOut}) ${where} — it did not measure this mutation, so neither KILLED nor SURVIVED is available. Fix the slow test; do not raise the timeout. ${summarise(out)}`
+	};
+}
+
+/**
+ * Everything the post-run grading arms read. Bundled into ONE argument rather than six positional ones so no call
+ * site can transpose two booleans that both mean "green".
+ */
+interface GradeInputs {
+	readonly m: DeclaredMutant;
+	readonly run: ReturnType<typeof sh>;
+	readonly out: string;
+	readonly target: readonly string[];
+	readonly unnamed: boolean;
+	readonly baselineGreen: boolean;
+}
+
+/**
+ * The arms that read `run.status` and state a conclusion, in the order they must be asked. Reached only once the
+ * timeout check above has established that this run MEASURED the mutation at all.
+ */
+function gradeRunOutcome({ m, run, out, target, unnamed, baselineGreen }: GradeInputs): Result {
+	const victims = HARVEST ? readVictims() : undefined;
+	// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
+	// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
+	// survival is the PASS and a KILL is the finding, because a test that reddens when only prose changed is
+	// asserting on prose.
+	//
+	// ⚠ "A KILL" MEANS A **NEW** RED, NOT A NON-ZERO EXIT — REG-F-116's second limb. A control runs the WHOLE
+	// workspace, so its exit status is a claim about every test in the repository, and reading it as a claim
+	// about this prose edit is only sound if the suite was green to begin with. On this gate's first run it was
+	// not: one pinned literal in another package's unit test was red, and all THREE declared controls reported
+	// `SURVIVED — something asserts on prose`. Three false findings from one unrelated failure. The exit status
+	// cannot answer "did this mutation redden anything"; the DIFFERENCE against the unmutated baseline can, and
+	// it is the only question actually being asked.
+	// ⚠ DID THE PROCESS FINISH AT ALL? ASKED FIRST, BECAUSE EVERY ARM BELOW READS `status` AND CONCLUDES
+	// SOMETHING ABOUT THE MUTATION (REG-F-168). A child killed by a signal, a spawn that failed, or a
+	// `maxBuffer` overrun arrives here with `status` non-zero or null and used to be scored KILLED — the
+	// runner stating a finding about the guard on the strength of a process that never reported a test result.
+	// This is REG-F-116's rule applied to the fields it did not reach: a non-measurement must say so.
+	const incomplete = nonCompletion(run);
+	if (incomplete !== null) return { mutant: m, verdict: 'INCONCLUSIVE', detail: incomplete, victims };
+	if (m.expectSurvive !== undefined) return controlVerdict(m, run.status === 0);
+	if (unnamed)
+		return {
+			mutant: m,
+			verdict: run.status === 0 ? 'SURVIVED' : 'KILLED_UNNAMED',
+			detail: summarise(out),
+			victims
+		};
+	const graded = gradeNamedVictim(baselineGreen, run.status === 0, target.join(', '), summarise(out));
+	return { mutant: m, verdict: graded.verdict, detail: graded.detail, victims };
+}
+
 function runMutant(m: DeclaredMutant): Result {
 	const pre = preApplyVerdict(m);
 	if ('result' in pre) return pre.result;
@@ -632,30 +766,7 @@ function runMutant(m: DeclaredMutant): Result {
 		// Deleting BEFORE the spawn is strictly stronger than deleting after the read: it also covers an invocation
 		// killed mid-flight, whose report would otherwise be inherited by the next run entirely.
 		if (jsonTo !== undefined) rmSync(jsonTo, { force: true });
-		const leg = isE2eTarget(target)
-			? 'playwright'
-			: target.length === 0
-				? 'vitest WHOLE-SUITE'
-				: 'vitest targeted';
-		const run = timed(leg, () => isE2eTarget(target)
-			? runPlaywright(target, mutantEnv)
-			: sh(
-					'bunx',
-					jsonTo !== undefined
-						? [
-								'vitest',
-								'run',
-								...CONFIRM_RED,
-								'--reporter=default',
-								'--reporter=json',
-								`--outputFile=${jsonTo}`,
-								...(target.length === 0 ? projectFilters() : []),
-								...target
-							]
-						: ['vitest', 'run', ...CONFIRM_RED, ...(target.length === 0 ? projectFilters() : []), ...target],
-					ROOT,
-					mutantEnv
-				));
+		const run = runVictimSuites(target, jsonTo, mutantEnv);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
 		// ⚠ DID THIS RUN MEASURE THE MUTATION? ASKED BEFORE ANY VERDICT IS ATTRIBUTED (REG-F-116, JAN-VERIF V-4b).
 		//
@@ -676,57 +787,8 @@ function runMutant(m: DeclaredMutant): Result {
 		// INCONCLUSIVE rather than KILLED, and its author must say so deliberately. That is the correct polarity —
 		// the ledger's claim is "this named test reddens BECAUSE it asserts the guard", which a hang cannot establish.
 		const timedOut = timeoutEvidence(out);
-		if (timedOut !== null) {
-			// ⚠ NAME THE SUITE, DO NOT JUST REPORT THE MARKER. The first version of this verdict quoted the timeout
-			// text and stopped there, and diagnosing the next blocking run meant inferring the culprit from the
-			// milliseconds in the marker. That is the same shortfall REG-F-116 is about, one notch smaller: a
-			// verdict is worth what the reader can CHECK, and the failing suites are already in the report a
-			// control writes. Absent (a named victim writes no report) it says so rather than guessing.
-			const failing = jsonTo === undefined ? undefined : failedFiles(jsonTo);
-			const where =
-				failing === undefined
-					? 'no report was written, so the timed-out suite cannot be named here — re-run with MUTANTS_HARVEST=1'
-					: failing.length === 0
-						? 'the report names no failing suite'
-						: `in: ${failing.slice(0, 3).join(', ')}`;
-			return {
-				mutant: m,
-				verdict: 'INCONCLUSIVE',
-				// The observed text is QUOTED rather than summarised, because the entire finding is that a verdict
-				// asserted something the reader could not check.
-				detail: `the run TIMED OUT (${timedOut}) ${where} — it did not measure this mutation, so neither KILLED nor SURVIVED is available. Fix the slow test; do not raise the timeout. ${summarise(out)}`
-			};
-		}
-		const victims = HARVEST ? readVictims() : undefined;
-		// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
-		// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
-		// survival is the PASS and a KILL is the finding, because a test that reddens when only prose changed is
-		// asserting on prose.
-		//
-		// ⚠ "A KILL" MEANS A **NEW** RED, NOT A NON-ZERO EXIT — REG-F-116's second limb. A control runs the WHOLE
-		// workspace, so its exit status is a claim about every test in the repository, and reading it as a claim
-		// about this prose edit is only sound if the suite was green to begin with. On this gate's first run it was
-		// not: one pinned literal in another package's unit test was red, and all THREE declared controls reported
-		// `SURVIVED — something asserts on prose`. Three false findings from one unrelated failure. The exit status
-		// cannot answer "did this mutation redden anything"; the DIFFERENCE against the unmutated baseline can, and
-		// it is the only question actually being asked.
-		// ⚠ DID THE PROCESS FINISH AT ALL? ASKED FIRST, BECAUSE EVERY ARM BELOW READS `status` AND CONCLUDES
-		// SOMETHING ABOUT THE MUTATION (REG-F-168). A child killed by a signal, a spawn that failed, or a
-		// `maxBuffer` overrun arrives here with `status` non-zero or null and used to be scored KILLED — the
-		// runner stating a finding about the guard on the strength of a process that never reported a test result.
-		// This is REG-F-116's rule applied to the fields it did not reach: a non-measurement must say so.
-		const incomplete = nonCompletion(run);
-		if (incomplete !== null) return { mutant: m, verdict: 'INCONCLUSIVE', detail: incomplete, victims };
-		if (m.expectSurvive !== undefined) return controlVerdict(m, run.status === 0);
-		if (unnamed)
-			return {
-				mutant: m,
-				verdict: run.status === 0 ? 'SURVIVED' : 'KILLED_UNNAMED',
-				detail: summarise(out),
-				victims
-			};
-		const graded = gradeNamedVictim(baselineGreen, run.status === 0, target.join(', '), summarise(out));
-		return { mutant: m, verdict: graded.verdict, detail: graded.detail, victims };
+		if (timedOut !== null) return timedOutResult(m, timedOut, jsonTo, out);
+		return gradeRunOutcome({ m, run, out, target, unnamed, baselineGreen });
 	} finally {
 		writeFileSync(`${ROOT}${m.file}`, original, 'utf8');
 		rmSync(JOURNAL, { force: true });
@@ -744,10 +806,10 @@ function runMutant(m: DeclaredMutant): Result {
  * project. Named explicitly rather than inferred from the presence of a tsconfig, because a MISSING tsconfig must
  * stay loud: it means the mutated file is under no type gate at all, which is REG-F-097's whole subject.
  */
-const NESTED_ROOTS = ['packages', 'apps'];
+const NESTED_ROOTS = new Set(['packages', 'apps']);
 const pkgOf = (file: string): string => {
 	const parts = file.split('/');
-	return NESTED_ROOTS.includes(parts[0] ?? '') ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
+	return NESTED_ROOTS.has(parts[0] ?? '') ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
 };
 
 /** The app that owns the Playwright project. Its config, its webServer, its `bunx playwright test`. */
@@ -933,6 +995,15 @@ const errorLines = (s: string): string =>
 // (REG-F-097), which is the same reason the unread-refusal ratchet could die unnoticed. Kept at the repo's one
 // declared lib level rather than raising a second one for two lines: a divergent `lib` in tooling is the kind of
 // thing that gets copied into a package.
+//
+// ⚠ AND THE ANSI STRIPPER STAYS A `new RegExp(String.raw…)` RATHER THAN A REGEX LITERAL, WHICH SONAR (S6325) ASKS
+// FOR AND WHICH IS INDEED THE IDENTICAL PATTERN. The pattern's FIRST CHARACTER IS A RAW ESC (0x1b) — invisible in
+// every editor and in the Sonar message itself, which renders it as if the pattern began with `\[`. ESLint's
+// `no-control-regex` (on by default via `js.configs.recommended`, and `eslint .` covers `scripts/`) inspects only
+// `Literal` nodes: a regex literal is one and would be REPORTED, a `String.raw` tagged template is not and is
+// therefore not reached. So the "cosmetic" rewrite converts a clean lint into a failing one, and there is no
+// spelling of ESC that escapes the rule — it checks the raw character, `\x…` and `\u…` alike. Measured against the
+// installed rule source, not assumed.
 const summarise = (s: string): string =>
 	(s
 		.split('\n')

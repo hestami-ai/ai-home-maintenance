@@ -107,7 +107,12 @@ function sentencesOf(text: string): { line: number; section: string; text: strin
 	const lines = text.split('\n');
 	const paras = paragraphIndex(lines);
 	lines.forEach((raw, i) => {
-		const heading = /^#{1,4}\s+(.*)$/.exec(raw);
+		// `(?!\s)` pins `\s+` to the MAXIMAL whitespace run. It changes no answer: `.` cannot cross a line
+		// terminator, so `(.*)$` succeeds from a position only if the rest of the line holds none — and if that
+		// holds anywhere inside the run it holds at its end, so the shorter runs greedy `\s+` would have
+		// backtracked into can never rescue a failure. Same accepted language, same capture; what goes away is
+		// the quadratic `\s+`/`.*` handoff those doomed retries cost on a line like `#   x\ry`.
+		const heading = /^#{1,4}\s+(?!\s)(.*)$/.exec(raw);
 		if (heading) {
 			section = heading[1]!.trim();
 			return;

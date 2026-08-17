@@ -90,7 +90,7 @@ function commandsNamedIn(trigger: string): string[] {
 	const out = new Set<string>();
 	for (const [, token] of trigger.matchAll(/\b([a-z]+[A-Z][a-zA-Z]*)\b/g)) {
 		const commandType = token!.charAt(0).toUpperCase() + token!.slice(1);
-		if (Object.prototype.hasOwnProperty.call(registry, commandType)) out.add(commandType);
+		if (Object.hasOwn(registry, commandType)) out.add(commandType);
 	}
 	return [...out];
 }

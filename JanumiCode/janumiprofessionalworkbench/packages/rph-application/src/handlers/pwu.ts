@@ -390,18 +390,10 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		// drift to a NON-member was already refused. Drift to a DIFFERENT VALID MEMBER — `PLANNED` for
 		// `NOT_PLANNED` — was refused by nothing at all until this array named the value.
 		births: [
-			{
-				machine: 'PWU.workLifecycleState',
-				statusField: 'workLifecycleState',
-				values: ['PROPOSED']
-			},
+			{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] },
 			{ machine: 'PWU.executionState', statusField: 'executionState', values: ['NOT_PLANNED'] },
 			{ machine: 'PWU.assuranceState', statusField: 'assuranceState', values: ['UNASSESSED'] },
-			{
-				machine: 'PWU.shapeIntegrityState',
-				statusField: 'shapeIntegrityState',
-				values: ['UNKNOWN']
-			}
+			{ machine: 'PWU.shapeIntegrityState', statusField: 'shapeIntegrityState', values: ['UNKNOWN'] }
 		]
 	});
 };

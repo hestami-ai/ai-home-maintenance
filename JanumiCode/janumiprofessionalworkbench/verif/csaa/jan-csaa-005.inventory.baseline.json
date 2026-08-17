@@ -2465,7 +2465,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "c20f7047ce694c857056a1ec1d5080a154735b6efe3c91134e2fa980bdf25565",
+    "configurationDigest": "8387f0e615b3b9bdb7b97f2da3fc055f05c0da4d4da73a63292775706aca6246",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2782,9 +2782,9 @@
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
-          "bytes": 705,
+          "bytes": 1708,
           "path": "sonar-project.properties",
-          "sha256": "c45f6425c368843f4006f2dcaa0b951cef5b99dc65d797ffdc2952ee3b8cf563"
+          "sha256": "99d9aba88b28d00fdb2617a53989b951469cc05f66a22ec7ea676bca7792a562"
         },
         {
           "artifactClass": "PROJECT_CONFIGURATION",
@@ -2818,9 +2818,9 @@
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
-          "bytes": 7252,
+          "bytes": 7330,
           "path": "vitest.projects.ts",
-          "sha256": "b3f7cab87101653ebac21a741319ef0ca7169350d5297a63f95d22e68db382f4"
+          "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
         }
       ],
       "generatedContexts": [
@@ -5624,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "a6f9eb622ee3fb724abbf2d955b9a84773f135d0976e4c99b890b22e6025d8f9",
+    "fileManifestDigest": "7a25449c1d0eacc28ec62c4a9510460e07b6dd18112084f6a2e026ab3486488e",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -9247,9 +9247,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 85738,
+        "bytes": 85708,
         "path": "packages/rph-application/src/handlers/pwu.ts",
-        "sha256": "eb723670879639ad55d23e382142409882387cb918c5360a94ad80dbb280963b",
+        "sha256": "41276c4821eedf63615963fc62bacc77b08a9fdf540485e32dae3bf3ba5d5273",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11900,9 +11900,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 259208,
+        "bytes": 259288,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "e1d1b94f14c81ee26703a4b18ff74345f444909b6772fedc3619b5f5b4d283a3",
+        "sha256": "1599d58a80777edec7793d3ef9f53d913a6cc48c3275ca4c315e947831934caf",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -11914,9 +11914,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 72859,
+        "bytes": 76214,
         "path": "scripts/mutants/run.ts",
-        "sha256": "38822ce7ad5b7642f65e90db735ea0034bf6a599cf099d5be222b58a6f7818c8",
+        "sha256": "937e4a9b10d585138810e021993dac96ec1b6c39eb86f6bd0988e3104c712f24",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -11935,9 +11935,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 17009,
+        "bytes": 17523,
         "path": "scripts/spec-obligations.ts",
-        "sha256": "32d158e94fa13826e5eb72b9b85a30473f9aff5c756b5c05934863089b00b041",
+        "sha256": "63ef09425f7ec6701770fc4c3333d28c2abffa2f500a6d71de7343c81671302e",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -11949,9 +11949,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 705,
+        "bytes": 1708,
         "path": "sonar-project.properties",
-        "sha256": "c45f6425c368843f4006f2dcaa0b951cef5b99dc65d797ffdc2952ee3b8cf563",
+        "sha256": "99d9aba88b28d00fdb2617a53989b951469cc05f66a22ec7ea676bca7792a562",
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       },
       {
@@ -12054,9 +12054,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11335,
+        "bytes": 11581,
         "path": "verif/canon-provenance.ts",
-        "sha256": "ea1b095ee570f12df9c82af22597206cf89e40ff6462786ebe3be23ad0188494",
+        "sha256": "6595e657fe43947e7b0e0a8dd915f4be4f088f5b790ebc096f86e335edcf00d1",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12145,9 +12145,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 19240,
+        "bytes": 19242,
         "path": "verif/guard-enforcement-ledger.test.ts",
-        "sha256": "715d9565151ff383904e4246c78fce27a51e9161fe48a066bd33fd47babdf90e",
+        "sha256": "b380cd640755c1069e0b3c589868abf7c040d940b8213499aa63ac578d07b2c9",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12271,9 +12271,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 10279,
+        "bytes": 10256,
         "path": "verif/trigger-claim-truth.ts",
-        "sha256": "f15c79ea09d4933c20d779c497e2e0b32586027347b59a8c0dbc134e3c40acd5",
+        "sha256": "29243cce92163a607537fad36c54af50af7d4946eaaff3427abe4875c95f1e34",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12299,9 +12299,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 6083,
+        "bytes": 6211,
         "path": "verif/unread-refusal-guard.ts",
-        "sha256": "224b75b8637b559f7cb2d5b84ccfba506351b0b9fe1f1aae8a030ebd6d389f44",
+        "sha256": "f31b294e4d6431c49f38ec2087e9e8f2e5908c56a8025c4054d2689637865f46",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12320,13 +12320,13 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 7252,
+        "bytes": 7330,
         "path": "vitest.projects.ts",
-        "sha256": "b3f7cab87101653ebac21a741319ef0ca7169350d5297a63f95d22e68db382f4",
+        "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74",
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "028b58cd845a6100f93cf16710702d4adefe91f79b93ca252151c0d12faf18f1",
+    "subjectId": "b65d6c1ec5dec3696dbd7e6c37cc18a960bccaf775eefd823e5feb065e18b84b",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14721,7 +14721,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "e1d1b94f14c81ee26703a4b18ff74345f444909b6772fedc3619b5f5b4d283a3",
+      "contentSha256": "1599d58a80777edec7793d3ef9f53d913a6cc48c3275ca4c315e947831934caf",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -14753,7 +14753,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/run.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "38822ce7ad5b7642f65e90db735ea0034bf6a599cf099d5be222b58a6f7818c8",
+      "contentSha256": "937e4a9b10d585138810e021993dac96ec1b6c39eb86f6bd0988e3104c712f24",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -14804,7 +14804,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/spec-obligations.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "32d158e94fa13826e5eb72b9b85a30473f9aff5c756b5c05934863089b00b041",
+      "contentSha256": "63ef09425f7ec6701770fc4c3333d28c2abffa2f500a6d71de7343c81671302e",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15006,7 +15006,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/canon-provenance.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "ea1b095ee570f12df9c82af22597206cf89e40ff6462786ebe3be23ad0188494",
+      "contentSha256": "6595e657fe43947e7b0e0a8dd915f4be4f088f5b790ebc096f86e335edcf00d1",
       "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15201,7 +15201,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/guard-enforcement-ledger.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "715d9565151ff383904e4246c78fce27a51e9161fe48a066bd33fd47babdf90e",
+      "contentSha256": "b380cd640755c1069e0b3c589868abf7c040d940b8213499aa63ac578d07b2c9",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -15491,7 +15491,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/trigger-claim-truth.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "f15c79ea09d4933c20d779c497e2e0b32586027347b59a8c0dbc134e3c40acd5",
+      "contentSha256": "29243cce92163a607537fad36c54af50af7d4946eaaff3427abe4875c95f1e34",
       "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15538,7 +15538,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/unread-refusal-guard.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "224b75b8637b559f7cb2d5b84ccfba506351b0b9fe1f1aae8a030ebd6d389f44",
+      "contentSha256": "f31b294e4d6431c49f38ec2087e9e8f2e5908c56a8025c4054d2689637865f46",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [

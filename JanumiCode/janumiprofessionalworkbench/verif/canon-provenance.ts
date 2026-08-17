@@ -83,7 +83,9 @@ export function provenanceIndex(): Map<string, ClauseProvenance> {
 
 function buildProvenanceIndex(): Map<string, ClauseProvenance> {
 	const out = new Map<string, ClauseProvenance>();
-	for (const file of readdirSync(CANON).sort()) {
+	// Explicit comparator (SonarLint S2871). It is the DEFAULT UTF-16 order written out, not a new order: entry
+	// order decides which sidecar wins the `first entry wins` rule below, so this must not change.
+	for (const file of readdirSync(CANON).sort((a, b) => Number(a > b) - Number(a < b))) {
 		if (!file.includes('provenance.md')) continue;
 		for (const raw of readFileSync(new URL(file, CANON), 'utf8').split('\n')) {
 			// Both observed primary formats: `- ID: citation` and `- ID citation`. Section-keyed repair notes

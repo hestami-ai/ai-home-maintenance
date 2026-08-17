@@ -42,7 +42,8 @@ const pending: PendingRefusal[] = [];
 
 /** The shallowest `*.test.ts` frame — the line that issued the command, or the helper that issued it for a test. */
 function testFrame(): string {
-	const frames = (new Error().stack ?? '').match(/[^\s()]+\.test\.ts:\d+:\d+/g);
+	// The message is scanned too — `.stack` starts `Error: <message>` — so it must never look like a test frame.
+	const frames = (new Error('stack probe').stack ?? '').match(/[^\s()]+\.test\.ts:\d+:\d+/g);
 	if (!frames) return '(no test frame)';
 	return frames
 		.slice(0, 2)
