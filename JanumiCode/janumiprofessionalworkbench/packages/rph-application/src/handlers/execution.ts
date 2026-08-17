@@ -315,10 +315,10 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 	};
 	return createObject(ctx, command, {
 		objectType: PLAN,
-		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
-		// ⚠ `initialState` FOR THIS MACHINE IS ONE OF REG-F-071'S FOUR LIARS. It declares PROPOSED; no handler ever
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
+		// ⚠ `initialState` FOR THIS MACHINE IS ONE OF REG-F-071'S LIARS (the set is pinned by name — REG-F-125). It declares PROPOSED; no handler ever
 		// writes PROPOSED, and the state has zero in-arrows. Declaring it here 'to match the spec' would assert an
-		// occupancy that does not exist — kit.ts:546 names this exact machine as the trap.
+		// occupancy that does not exist — the `births` docblock on `createObject` in kit.ts names this exact machine as the trap.
 		births: [{ machine: 'ExecutionPlan.status', statusField: 'status', values: ['UNDER_REVIEW'] }],
 		aggregateId: p.executionPlanId,
 		state,
@@ -539,7 +539,7 @@ export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command
  *
  * The ≥1-SUCCEEDED clause (JAN-EXECPLAN-DR-003 DWP-02 / §19 L3-M7): once 3C-iii's SkipExecutionStep makes SKIPPED
  *   reachable, an ALL-SKIPPED plan would satisfy the allow-list yet have PRODUCED NOTHING — it must not "complete".
- *   The ratified PWU-level `rejectUnbackedExecutionSuccess` (pwu.ts:649) requires a SUCCEEDED step for the PWU to
+ *   The ratified PWU-level `rejectUnbackedExecutionSuccess` (in pwu.ts) requires a SUCCEEDED step for the PWU to
  *   claim execution success; this clause aligns the plan-level rule with it, so the two planes cannot diverge (a plan
  *   "COMPLETED" whose PWU cannot claim success). Exec ≠ assurance (INV-5): this moves only `status`.
  */
@@ -958,7 +958,7 @@ function advanceStep(
 	// it can contradict the event it is recorded beside.
 	const newRevision = loaded.revision + 1;
 	// ONE payload object, ONE makeEvent call. If a later edit builds the payload twice — once for the overlay, once
-	// for the commit — they can drift and the identity silently breaks. `execution-branch-settlement.test.ts` asserts
+	// for the commit — they can drift and the identity silently breaks. `execrem-wp10-branch-settlement.test.ts` asserts
 	// state == event as the standing guard on that.
 	const basePayload =
 		typeof args.eventPayload === 'function' ? args.eventPayload(step) : args.eventPayload;
@@ -1054,7 +1054,7 @@ function advanceStep(
  * (The §15.3 allowlist limb that once sat here is WITHDRAWN — see the note at the end of this function.)
  *
  * THE KERNEL'S CODE IS CARRIED INTO THE MESSAGE, NOT RETURNED AS ONE. `RPH_BINDING_NOT_AUTHORIZED` is
- * `bindingPermitsExecution`'s label; the ratified `RphErrorCodeSchema` is a closed 15-value enum that does not
+ * `bindingPermitsExecution`'s label; the ratified `RphErrorCodeSchema` is a closed ~~15~~ 16-value enum (REG-F-144) that does not
  * contain it. Same discipline as `validateStepCompletion` (WP-11): refuse with a ratified code, name the kernel's
  * verdict in the message so a caller can tell the limbs apart.
  *
@@ -1207,7 +1207,15 @@ function bindingAuthorityRefusal(
 }
 
 /**
- * StartExecutionStep — a step QUEUED -> RUNNING (only under an ACTIVE plan). Two prechecks, in order:
+ * StartExecutionStep — a step QUEUED -> RUNNING (only under an ACTIVE plan). Gates, in order: FIRST every limb its
+ * STEP_COMMAND_SPECS row declares — evaluated by `stepAuthorityRefusal`, of which (1) below is the first, and Start
+ * declares a REQUIRES_* value in EVERY column that function reads — THEN this handler's own precheck (2).
+ *
+ * ~~Two prechecks, in order:~~ counted (1) and (2) alone and missed the pwuOpenness, bindingAuthority (JAN-REVREM
+ * RW-0) and inputReadiness (JAN-CAPBIND WP-3 / N-3) limbs; found by REG-F-125's sweep. The limbs are deliberately NOT
+ * re-listed here with their rules — a prose list beside the declared table is the drift the table exists to end,
+ * WP-8's "an omission is invisible in a list that does not exist".
+ *
  *  1. plan-ACTIVE (RPH-EXE-002): a superseded/terminal plan opens no new step (mirrors the retry precheck).
  *  2. Linear start-gate (JAN-EXECPLAN-DR-003 DWP-01 / RPH-EXE-005, Fork F): a step may start ONLY when every EARLIER
  *     step (array index in plan.steps) is terminal-success (SUCCEEDED/SKIPPED) — so nothing runs out of order. Array
@@ -1468,7 +1476,15 @@ export const failExecutionStep: CommandHandler = (ctx, command) => {
 // between making them look like one. A comment asserting that two copies agree is exactly what R3 had to correct.
 
 /**
- * RetryExecutionStep — a FAILED step -> QUEUED (re-attempt). Two prechecks, in order:
+ * RetryExecutionStep — a FAILED step -> QUEUED (re-attempt).
+ *
+ * ~~Two prechecks, in order:~~ the same undercount its sibling carried at the Start docblock, corrected in the
+ * same sweep (REG-F-125) and recorded here rather than silently mirrored: this command's STEP_COMMAND_SPECS row
+ * declares SIX limbs — planLiveness, pwuOpenness, branchDecision, bindingAuthority, inputReadiness and
+ * retryBudget — all evaluated by `stepAuthorityRefusal` before anything below runs. Item (1) is the DECLARED
+ * planLiveness column, not a separate handler precheck, so counting it here double-counted one limb while
+ * omitting four. The limbs are deliberately not re-listed with their rules — a prose list beside the declared
+ * table is the drift the table exists to end. What follows is what this HANDLER adds on top of them:
  *  1. RPH-EXE-002 / §35.1 (DWP-02, §19 L3-5): a retry RE-OPENS the attempt cycle, so a SUPERSEDED/terminal plan must
  *     reject it — not only StartExecutionStep. Mirrors the start precheck so both reject a non-ACTIVE plan identically.
  *  2. RPH-EXE-008 (DWP-04): the ready-made kernel `retryDecision` caps retries at the plan's RetryPolicy maxAttempts
@@ -1631,10 +1647,12 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 };
 
 /**
- * CancelExecutionStep — a step READY|QUEUED|RUNNING|WAITING -> CANCELLED (JAN-EXECPLAN-DR-003 DWP-02 / §26.4). Cancel
- * is CLEANUP, not new work: it is permitted even under a SUPERSEDED/terminal plan (RPH-EXE-002 forbids OPENING new
- * work/attempts, not terminating an existing step), so there is DELIBERATELY no plan-ACTIVE precheck — the
- * ExecutionStep.stepState machine (checkTransition, from READY/QUEUED/RUNNING/WAITING) alone gates the source state
+ * CancelExecutionStep — a step READY|QUEUED|RUNNING|WAITING|FAILED -> CANCELLED (JAN-EXECPLAN-DR-003 DWP-02 / §26.4).
+ * Cancel is CLEANUP, not new work: it is permitted even under a SUPERSEDED/terminal plan (RPH-EXE-002 forbids OPENING
+ * new work/attempts, not terminating an existing step), so there is DELIBERATELY no plan-ACTIVE precheck — the
+ * ExecutionStep.stepState machine (checkTransition, from READY/QUEUED/RUNNING/WAITING/FAILED — FAILED since JAN-EXECREM
+ * WP-5 AUTHORED the FAILED -> CANCELLED arrow; both clauses above named four states until REG-F-125's sweep) alone
+ * gates the source state
  * (§19 L3-M11). The `reason` is recorded on the event so the governed stream names the control action. Exec ≠
  * assurance (INV-5): the cancel moves only stepState.
  */
@@ -1651,21 +1669,6 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 	});
 };
 
-/**
- * PruneExecutionStep — a not-taken/unreachable step QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 / D5, hardened DWP-07).
- *
- * A SYSTEM prune of a BRANCH's not-taken arm (or its transitively-unreachable downstream). It does NOT route through
- * canSkipStep because the plan's own declared branch logic — not an operator — excludes the step, so no waiver applies.
- * That exemption is only defensible if the step really IS excluded, and it was NOT checked: the sole precheck was
- * plan-ACTIVE, so ANY QUEUED/READY step could be driven to terminal-success SKIPPED with no waiver, including a
- * MANDATORY step on the taken path of a plan with no transitions at all. That is precisely the outcome §21.1's
- * canSkipStep exists to refuse. The prunability check below closes that back door: prune is now authorised by the SAME
- * pure read-model the UI offers it from, exactly as startExecutionStep is authorised by startStepGate.
- *
- * Deadness itself is NOT recorded (DWP-08): it is STRUCTURAL — the gate computes reachability from the graph — so it
- * cannot be bypassed by reaching SKIPPED through some other command, and needs no persisted flag (which also means
- * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
- */
 /**
  * Render derived prune provenance into event-payload fields, switching on its CAUSE (JAN-REVREM RW-7 / N-8).
  *
@@ -1699,6 +1702,25 @@ function prunePayloadProvenance(provenance: PruneProvenance | undefined): Record
 	};
 }
 
+/**
+ * PruneExecutionStep — a not-taken/unreachable step NOT_READY|READY|QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 /
+ * D5, hardened DWP-07). ~~QUEUED -> SKIPPED~~ named one of the three states
+ * `STEP_COMMAND_SPECS.PruneExecutionStep.sourceStates` declares; NOT_READY is in that set for D5's own anti-deadlock
+ * reason — a not-taken arm that never became READY must still be clearable, or the plan deadlocks (the machine's
+ * NOT_READY -> SKIPPED arrow in transitions.data.ts records the same reason). Found by REG-F-125's sweep.
+ *
+ * A SYSTEM prune of a BRANCH's not-taken arm (or its transitively-unreachable downstream). It does NOT route through
+ * canSkipStep because the plan's own declared branch logic — not an operator — excludes the step, so no waiver applies.
+ * That exemption is only defensible if the step really IS excluded, and it was NOT checked: the sole precheck was
+ * plan-ACTIVE, so ANY QUEUED/READY step could be driven to terminal-success SKIPPED with no waiver, including a
+ * MANDATORY step on the taken path of a plan with no transitions at all. That is precisely the outcome §21.1's
+ * canSkipStep exists to refuse. The prunability check below closes that back door: prune is now authorised by the SAME
+ * pure read-model the UI offers it from, exactly as startExecutionStep is authorised by startStepGate.
+ *
+ * Deadness itself is NOT recorded (DWP-08): it is STRUCTURAL — the gate computes reachability from the graph — so it
+ * cannot be bypassed by reaching SKIPPED through some other command, and needs no persisted flag (which also means
+ * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
+ */
 export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string };
 	// JAN-EXECREM WP-14 / F-37 — prune provenance is DERIVED from the graph that AUTHORIZED the prune.

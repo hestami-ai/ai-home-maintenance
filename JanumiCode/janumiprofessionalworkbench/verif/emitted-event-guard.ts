@@ -5,8 +5,18 @@
 // `packages/rph-engine/src/emitted-event-conformance.test.ts` already does this — over the events the Reference
 // Undertaking happens to emit. Its register comment read "THE REGISTER IS NOW CLEARED — every event this system
 // emits conforms to its own declared shape", down from twelve, each fixed deliberately. That sentence is true as
-// written and reads as far more than it is: the drive emits 34 of the catalog's 132 declared types, so the
-// register was cleared over a quarter of the population and silent about the rest.
+// written and reads as far more than it is: the drive emitted 34 of the catalog's THEN-132 declared types, so
+// the register was cleared over a quarter of the population AS IT THEN STOOD, and silent about the rest.
+//
+// ⚠ BOTH FIGURES ARE DATED ON PURPOSE (MEASURED 2026-08-04), AND ONLY ONE OF THEM IS RE-MEASURED HERE. As of
+// 2026-08-13 `EVENTS` declares 142, not 132. The 34 is deliberately NOT re-derived and must not be guessed:
+// deriving it needs the whole-suite instrumentation that produced it, which scope note 2 below records no single
+// vitest worker can perform. (For DIRECTION only, and it is a RECORD rather than a re-run:
+// `verif/event-surface-census.test.ts`'s hand-maintained `EMITTED_2026_08_04` now lists ~~109~~ 110 of the
+// 142 — re-counted 2026-08-14 (REG-F-147). ⚠ THE ORIGINAL FIGURE IS LEFT VISIBLE BECAUSE THIS SENTENCE IS
+// A DATED RECORD, and the one event between them is the point: `IntentSuperseded` was appended to that
+// list the same day this note was written (REG-F-131), so the two were never wrong together — they were
+// written hours apart and only one moved.)
 //
 // IT TOOK ONE NEW DISPATCH TO EXPOSE THAT. Closing RPH-FIX-005 made the drive record its first ever artifact, and
 // the register immediately grew an entry (`ArtifactRecorded` carried an `artifactId` its strict shape rejects).
@@ -51,9 +61,10 @@
 // ── SCOPE, stated so this is not read as more than it is (the mistake it exists to correct) ──────────────────
 //
 //  1. It observes what the SUITE emits. A declared event type no test ever produces is still unmeasured — 43 of
-//     the 132 remain in that state, and no gate can reach them without a dispatch that emits them. This file
-//     shrinks that blind spot from 98 to 43; it does not abolish it. `verif/event-surface-census.test.ts`
-//     (REG-F-021) is what keeps those 43 from drifting: it holds the DECLARED / BOUND / EMITTED sets against each
+//     the THEN-132 remained in that state as measured 2026-08-04, and no gate can reach them without a dispatch
+//     that emits them. This file shrank that blind spot from 98 to 43; it does not abolish it.
+//     `verif/event-surface-census.test.ts` (REG-F-021) is what keeps them from drifting: it holds the DECLARED /
+//     BOUND / EMITTED sets against each
 //     other, so a declared event that nothing binds and nothing produces is counted rather than merely absent.
 //  2. IT CANNOT DETECT A STALE LEDGER ROW. Vitest runs each project in its own worker, so `violations` is
 //     per-worker and no worker sees the whole catalog — an entry here for a type nothing emits any more would sit

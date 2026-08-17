@@ -1,0 +1,221 @@
+# DESIGN — the nineteen unratified declarations (REG-F-121's pinned finding)
+
+**Status: DESIGN IN PROGRESS — enumeration and mechanism MEASURED (2026-08-13); per-site dispositions pending
+the checks in §4. No change lands from this doc until it carries a roadmap section.**
+
+## 1. The population, enumerated (measured 2026-08-13, census at commit `6262faa0`)
+
+19 distinct declared arrows no machine ratifies, from FOUR sites. The shape: each site declares
+`fromStates × targetStates` as a RECTANGLE; the machine ratifies a sparse subset; these are the difference.
+
+| # | Arrow | Site |
+|---|-------|------|
+| 1 | `Claim.status CONDITIONALLY_SUPPORTED -> REJECTED` | assurance.ts:770 |
+| 2 | `Claim.status CONDITIONALLY_SUPPORTED -> SUPPORTED` | assurance.ts:770 |
+| 3 | `Claim.status CONDITIONALLY_SUPPORTED -> UNDER_ASSESSMENT` | assurance.ts:770 |
+| 4 | `Claim.status CONTESTED -> CONTESTED` **(self)** | assurance.ts:770 |
+| 5 | `Claim.status CONTESTED -> SUPPORTED` | assurance.ts:770 |
+| 6 | `Claim.status CONTESTED -> UNDER_ASSESSMENT` | assurance.ts:770 |
+| 7 | `Claim.status OPEN -> CONTESTED` | assurance.ts:770 |
+| 8 | `Claim.status OPEN -> REJECTED` | assurance.ts:770 |
+| 9 | `Claim.status OPEN -> SUPPORTED` | assurance.ts:770 |
+| 10 | `Claim.status SUPPORTED -> REJECTED` | assurance.ts:770 |
+| 11 | `Claim.status SUPPORTED -> SUPPORTED` **(self)** | assurance.ts:770 |
+| 12 | `Claim.status SUPPORTED -> UNDER_ASSESSMENT` | assurance.ts:770 |
+| 13 | `Claim.status UNDER_ASSESSMENT -> UNDER_ASSESSMENT` **(self)** | assurance.ts:770 |
+| 14 | `ExecutionPlan.status ACTIVE -> ACTIVE` **(self)** | execution.ts:668 |
+| 15 | `RuntimeBinding.authorizationStatus PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED` **(self)** | runtime-binding.ts:119 |
+| 16 | `ValidatorRegistryEntry.status ACTIVE -> ACTIVE` **(self)** | validator-registry.ts:82 |
+| 17 | `ValidatorRegistryEntry.status DEGRADED -> DEGRADED` **(self)** | validator-registry.ts:82 |
+| 18 | `ValidatorRegistryEntry.status DISABLED -> DEGRADED` | validator-registry.ts:82 |
+| 19 | `ValidatorRegistryEntry.status DISABLED -> DISABLED` **(self)** | validator-registry.ts:82 |
+
+8 self-transitions; 11 non-self pairs. `assurance.ts:770` alone contributes 13.
+
+## 2. The mechanism split (measured: `stateMachine.ts` + `checkTransition`)
+
+`classifyTransition` consults `illegal` first, then classifies `from === to` as **NOOP**, then the machine's
+transition list. `advanceStatus` goes through `checkTransition`, which admits **LEGAL or NOOP**
+(`stateMachine.ts:59-65` records the split as deliberate — JAN-CMDPRE). Therefore, unless a site's
+precondition narrows further:
+
+- **The 8 self-transitions CAN FIRE at runtime.** Their sites' `fromStates` include the target state, so the
+  precondition admits the pair and `checkTransition` admits the NOOP. These are **performed-but-unratified**
+  arrows — the dangerous class: live behavior no ratified machine models.
+- **The 11 non-self pairs CANNOT FIRE.** `checkTransition` refuses them (not ratified, not NOOP). These are
+  **over-claimed declarations** — the census reports a capability the command does not have. The direction of
+  error is the safe one (noisy false coverage-claims, no hidden behavior), but REG-F-119 recorded exactly this
+  as "fabricated coverage arriving through a declaration instead of an inference."
+
+⚠ Per-arrow confirmation is still owed: a site's `guard` or additional predicates could refuse a NOOP the
+machine admits (the governance handlers do exactly this). The mechanism split above is the DEFAULT, not the
+per-site fact.
+
+## 3. Disposition hypotheses — stated as hypotheses, not decisions
+
+- **The 11 over-claims:** narrow the declarations to the machine's actual pairs. Repository-side honesty, no
+  behavior change, count drops 175 → 164 declared / unratified 19 → 8. The rectangle idiom cannot express a
+  sparse relation, so narrowing may require per-target `fromStates` (split calls) or a spec-table idiom
+  (STEP_COMMAND_SPECS shape). NOTE the REG-F-122 constraint: whatever idiom is used must keep the from-half
+  readable at the site — no helper-composed preconditions.
+- **The 8 self-transitions:** three possible dispositions, PER SITE, and they are not interchangeable:
+  (a) the NOOP re-issue is a DEFECT (duplicate event, like governance's REVOKED->REVOKED) → refuse via
+  precondition, arrow disappears from declarations;
+  (b) the NOOP re-issue is MEANINGFUL (re-assessment recording new evidence at unchanged status — the HOLD
+  shape) → the machine is incomplete; a self-arrow needs RATIFICATION (canon-tier, sponsor question, goes on
+  the ratification-owed list — NOT decidable repository-side);
+  (c) already ruled by JAN-CMDPRE (its DWP series decided NOOP handling per command; RESIDUALS R1-R6 were
+  recorded as "none a defect") → cite the ruling, mark the arrow as deliberately-admitted, and pin it as such.
+
+## 4. Checks that decide §3 — MUST be done before any roadmap is written
+
+1. **Search the register + JAN-CMDPRE design corpus (Deferrals/Disclosed) for these exact sites.** Four of six
+   "open" governance questions in a prior pass were already answered. The CMDPRE residuals R1-R6 are the most
+   likely home of a prior ruling on these self-edges.
+2. **Read the four sites** (assurance.ts:770, execution.ts:668, runtime-binding.ts:119,
+   validator-registry.ts:82): what the command means, what its guard already refuses, what event a NOOP
+   re-issue appends, and whether `docs/_working/ROADMAP-claim-assessment.md` already covers the Claim site.
+3. **Drive one self-edge end-to-end** before claiming it fires: construct the aggregate in the state, issue the
+   command targeting the same state, observe ACCEPT + event append (or a refusal that reclassifies it). The
+   mechanism argument in §2 is not a substitute for driving the engine (verify-the-recorded-remedy).
+4. Only then: the roadmap section, with a predicted red per change and the pinned finding's count updated
+   deliberately (19 → 8 → per-site dispositions).
+
+## 4a. Check results so far (2026-08-13, same session)
+
+**Check 1 — DONE, negative.** JAN-CMDPRE RESIDUALS R1–R6 do NOT cover these sites (R1 bumpPwaSemanticVersion,
+R2 conversation batches, R3 expectedRevision, R4 retraction, R5 projection contradiction, R6 the
+advancePwuLifecycle family). The self-edges are genuinely unruled. One precedent found: `ChangePwuState`'s
+DWP-02 vacuity predicate deliberately ADMITS partial NOOPs, refusing only the all-axes NOOP (RESIDUALS.md:86)
+— so deliberate NOOP-admission with a narrow refusal is an established shape.
+
+**Check 2, site 1 of 4 — DONE, and it REFRAMES the 13 Claim arrows.** `assurance.ts:770` is
+`recordClaimAssessment` (REG-D-024 / REG-F-044), and its rectangle is DELIBERATE, documented at the site:
+`fromStates(...)` = "every non-terminal claim state"; `targetStates: Object.keys(CLAIM_STATUS_EVENT)` keeps one
+source of truth; and pair-legality is DELEGATED to the machine — *"Which DESTINATIONS are legal from each is
+the machine's judgement; duplicating it here would create a second, drifting copy of the arrow table
+(REG-F-027's shape)."* So §3's "narrow the declarations" hypothesis is REFUTED FOR THIS SITE by the site's own
+recorded design: the 11 Claim non-self pairs are not a defect of the site, they are the rectangle idiom meeting
+the census's per-pair arrow semantics. The census question becomes: DECLARED (the rectangle, what the site
+claims) vs PERFORMABLE (rectangle ∩ machine, plus the NOOP self-edges within the rectangle that
+`checkTransition` admits). Both are honest answers to different questions; REG-F-121 pinned the difference so
+it stays visible, and any change must keep it visible rather than absorbing it.
+
+**Also material:** the `Claim.status` machine is AUTHORED, not ratified — all 15 arrows, disclosed in the vocab
+("Transitions RECONSTRUCTED … NO explicit matrix", REG-F-045). So for Claim, "ratify a HOLD self-arrow" (§3
+option b) is an AUTHORING act with disclosure (the REG-D-024 pattern), not a sponsor ratification — a lower bar
+than §3 assumed, but still a deliberate act with its own register entry, never a silent absorption.
+
+**Check 2, sites 2–4 — DONE (2026-08-13), and site 4 is a NEW INSTRUMENT DEFECT.**
+
+- **Site 2, `execution.ts:668` (#14 `ExecutionPlan ACTIVE -> ACTIVE`): ALREADY RULED.** It is
+  `applyTacticalChange`, and the docstring says it in terms: *"The DECLARED HOLD (JAN-CMDPRE DWP-05; DS-001
+  §5): a tactical change is a legitimate REPEATED action on a live plan, so ACTIVE -> ACTIVE is admitted, not
+  refused."* Disposition: cite DWP-05, mark deliberately-admitted. A ledger mutant already exercises it.
+- **Site 3, `runtime-binding.ts:119` (#15): a REAL single-site rectangle**, like Claim's. `authorizeRuntimeBinding`
+  derives its target (AUTHORIZED | PARTIALLY_AUTHORIZED, range declared) from whether the grant covers the
+  request (JAN-PARTAUTH, closing N-6); fromStates includes PARTIALLY_AUTHORIZED. So
+  PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED CAN fire (a second partial grant that still does not cover) —
+  check JAN-PARTAUTH-DS-001 for whether the repeat-partial case was considered before disposing.
+- **⚠ Site 4, `validator-registry.ts:82` (#16–#19): ALL FOUR ARE CENSUS FABRICATIONS — no call declares them.**
+  The four `statusChange` calls declare exactly FIVE arrows (`ACTIVE->DEGRADED`, `DEGRADED->ACTIVE`,
+  `ACTIVE->DISABLED`, `DEGRADED->DISABLED`, `DISABLED->ACTIVE`), all ratified. But the census's
+  `factoryParameter` resolves a parameter by UNIONING literals across ALL call sites, so it reads
+  union(targets) × union(froms) = 9 arrows — manufacturing 4 no single call declares. Same defect family as
+  REG-F-122 (the instrument fabricating declarations), different mechanism: UNION instead of inference. These
+  4 also CANNOT FIRE — each handler's runtime `fromStates` is its own narrow list.
+
+**⚠ CORRECTION TO §2's mechanism split, forced by the per-site reads (REG-F-120's lesson, caught in the same
+doc that cited it):** "the 8 self-transitions CAN FIRE" was the mechanism DEFAULT, and per-site reading refutes
+it for 4 of 8. Fires: Claim's three (#4, #11, #13), ExecutionPlan's one (#14, ruled), RuntimeBinding's one
+(#15). Cannot fire: validator-registry's three self-edges + `DISABLED -> DEGRADED` (#16–#19, phantoms).
+
+**The census fix this implies (own increment, own re-pin, REG-F-124 candidate):** `factoryParameter` must pair
+per CALL SITE — (target, froms) per call — not union across them. Predicted movement when fixed:
+`distinctArrowsDeclared` 175 → 171, unratified 19 → 15. This is a DROP that removes fabrication, the same
+shape REG-F-122 recorded; the register entry must say so before a reader mistakes it for lost coverage.
+
+**Checks 3 + 4 for #15 — DONE (2026-08-13), and they settle the DISPOSITION QUESTION for every self-edge.**
+
+`JAN-PARTAUTH-DS-001` §3 considers the repeat-authorization case directly and adds a monotonicity guard
+(`G ⊉ G₀` REFUSED). Reading the LIVE handler (`runtime-binding.ts:187-257`) rather than the design: the N-22
+limb refuses only `from === to && added.length === 0` — *"the defect is NOTHING CHANGED, not THE STATUS STAYED
+THE SAME."* So #15 **is reachable and deliberate**, and it is DRIVEN END-TO-END by an existing green test:
+`partauth-derived-outcome.test.ts` *"THE PLATFORM CASE: three approvers each add a capability, reaching
+AUTHORIZED"* (22 passed, run 2026-08-13). §4.3's drive requirement is discharged by a test that already exists —
+no new fixture needed.
+
+**⚠ AND THE HANDLER'S OWN REASONING RETIRES §3's OPTION (b) FOR ALL SELF-EDGES.** Quoting `runtime-binding.ts:221-228`:
+
+> *"MY FIRST FORMULATION REFUSED EVERY `from === to`, AND IT WAS OVER-BROAD … The reasoning was: the machine's
+> arrows out of PARTIALLY_AUTHORIZED are to AUTHORIZED and to REVOKED, with no self-loop, therefore a
+> self-transition is illegal. But `checkTransition` admits `from === to` as a NOOP by design, and THIS CODEBASE
+> ALREADY HAS TWO GENUINE SAME-STATE HOLDS (`ApplyTacticalChange`…; the ChangePwuState path likewise) — they
+> simply declare their target rather than omitting it. **A same-state transition is not forbidden here; it is
+> UNDECLARED, which is a different thing.**"*
+
+So a HOLD needs **no new machine arrow and no ratification act** — §3(b) was my invention, and the repository had
+already reasoned past it. This also means **the pinned 19 conflates two different populations**, which is the
+real finding: (a) same-state HOLDS, admitted by design via the NOOP rule, needing only honest declaration; and
+(b) genuine cross-state pairs no machine ratifies — rectangle over-claims and union fabrications. Any disposition
+must keep those apart rather than resolve them to one number.
+
+**⚠ A LIVE DEFECT FOUND WHILE CHECKING — superseded prose contradicting live code in the same function.**
+`runtime-binding.ts:170-186` still carries the WITHDRAWN first formulation as if operative: *"There is NO
+self-loop. A further authorization must therefore COMPLETE the request"* and *"DISCLOSED CONSEQUENCE, recorded
+as N-22 … this makes INCREMENTAL multi-party authorization … inexpressible … that is a new arrow with its own
+trigger, which is a ratification act and not mine to author."* Sixty lines below, the live code says the exact
+opposite and says so explicitly: *"SO THE DISCLOSED COST IS WITHDRAWN … it needs no new arrow and therefore no
+ratification act."* **The stale half makes a RATIFICATION claim**, so a reader trusting it concludes sponsor
+action is required where none is — which is precisely the conclusion I drew an hour ago before reading further.
+Fourth instance of the orphaned/superseded-docstring class (REG-F-120 found three). Fix it in its own increment,
+and note the class keeps being found ONE AT A TIME by incidental reading, which argues for a derived sweep.
+
+## 4b. THE CHALLENGE TO MY OWN REFRAME, AND ITS RESOLUTION (2026-08-13, measured)
+
+The REG-F-124 audit landed a hit on §4a's framing and it was right to: *"DECLARED vs PERFORMABLE … authored
+today, in a working doc, unratified. It is doing load-bearing work"* — against `arrow-command-census.ts:1`,
+which says the instrument reports arrows a registered command **"can actually perform"**. If a rectangle lets
+the census call an arrow covered that nothing can perform, the reframe is a redefinition that stops it measuring
+its own stated subject.
+
+**RESOLVED — and by arithmetic rather than by argument, because a re-reading that makes a finding vanish needs
+more verification than the finding did.** Two measurements, both on the live tree:
+
+1. **An unratified corner can NEVER enter the coverage numerator.** `ratifiedArrowsCovered` is
+   `|distinct declared ∩ ratified|`, so a pair no machine ratifies is excluded by construction. Measured: **0**
+   of the 15 unratified rows appear in it. The rectangle's over-claim lands ONLY in REG-F-121's secondary
+   "declared but ratified by nothing" list — never in the primary measure.
+2. **Every ratified corner that DOES enter coverage is genuinely performable — checked, not assumed**, because
+   this is the census's own declared-dangerous direction (*"reporting an arrow traversable when nothing can
+   perform it"*, which its header calls unreachable by construction). Ten corners enter: seven at
+   `assurance.ts:770`, three at `runtime-binding.ts:119`. **At BOTH sites the target is structurally independent
+   of the source state** — `recordClaimAssessment` takes `target` from `payload.targetStatus` and narrows
+   sources with an unrestricted `fromStates`; `authorizeRuntimeBinding` DERIVES its target from
+   (requested, granted), which does not read `authorizationStatus`. With no coupling between the halves, every
+   (source, target) the machine ratifies is a pair the command really can drive. The three RuntimeBinding
+   corners are driven green by `partauth-derived-outcome.test.ts`; none of the Claim seven is in the census's
+   `dead` set, and the site's only guard constrains SUPPORTED on a DATA condition, not a structural one.
+
+**So the census keeps measuring exactly what its first line claims, and the reframe describes the SECONDARY
+diagnostic only.** §4a stated it too broadly — as though DECLARED and PERFORMABLE were two readings of the whole
+instrument — and that is corrected here.
+
+**⚠ BUT THE AUDIT'S INSTINCT SURVIVES IN A SHARPER FORM, which is why the challenge was worth answering rather
+than dismissing.** The secondary list is not one population but THREE, and they take different remedies:
+- **(a) reader fabrications** — declared by nothing, ratified by nothing. Four, all `ValidatorRegistryEntry`,
+  FIXED at REG-F-124. This category is now empty and must stay so.
+- **(b) rectangle corners that CANNOT fire** — `Claim.status`'s 13. `checkTransition` refuses them, so the site
+  over-claims a capability it does not have. Honest-but-imprecise declaration; the remedy is about the SITE.
+- **(c) rectangle corners that CAN fire and are DELIBERATE** — `RuntimeBinding`'s
+  `PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED`, plus the same-state HOLDS. Here the declaration is right and
+  the MACHINE is the incomplete artifact, or the hold simply needs declaring (§4a's precedent).
+**Nothing may quote "15 unratified" as one number without saying which of the three it means.**
+
+## 5. What this doc refuses to do
+
+- No `transitions.data.ts` edit — machines are reconstructed from ratified corpus; adding self-arrows is a
+  ratification act, not a repository act (REG-F-114's whole lesson, from the other side).
+- No blanket rule for the 8 self-edges. The governance NOOPs were defects; a re-assessment NOOP may be the
+  product working. A conclusion measured on one member of a class must not be written as a rule about the
+  class (REG-F-120).

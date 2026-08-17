@@ -110,10 +110,13 @@ describe('the mutant ledger is internally coherent', () => {
 		).toEqual([]);
 	});
 
-	// ── V-3c: THE UNNAMED-VICTIM RATCHET, CHECKED IN SECONDS RATHER THAN IN THIRTY MINUTES ───────────────────
+	// ── V-3c: THE UNNAMED-VICTIM RATCHET, CHECKED IN SECONDS RATHER THAN IN THIRTY-SEVEN MINUTES ─────────────
 	//
 	// `run.ts` also fails on KILLED_UNNAMED, and that is the authoritative gate — it observes the mutant actually
-	// being killed by the suite it names. But it is a ~30-minute run, so it is the WRONG place to learn that a
+	// being killed by the suite it names. But it is a **44-47 minute run (a BAND, not a point: REG-F-174 measured
+	// a +16.3% run-to-run swing on a leg nothing changed, so any tighter figure would be machine variance quoted
+	// as a measurement; it was ~37 min before REG-F-171 bought attribution, and before REG-F-164 this said
+	// "~30-minute", undated and wrong)**, so it is the WRONG place to learn that a
 	// field was left blank: the feedback arrives long after the commit that caused it, which is how a records
 	// defect accumulates for eighteen work packages while being truthfully reported every single run.
 	//
@@ -226,6 +229,58 @@ describe('the mutant ledger is internally coherent', () => {
 		// And with nothing applied, BOTH are reported — otherwise the first assertion would also pass on a reader
 		// that silently drops rows.
 		expect(unanchored(rotted, undefined).map((s) => s.split(':')[0])).toEqual(['applied', 'other']);
+	});
+
+	// ── REG-F-162: A NAMED VICTIM THAT NO LONGER EXISTS IS SCORED AS A KILL ─────────────────────────────────
+	//
+	// ⚠ THIS IS A FALSE **KILLED**, NOT A MISSING CHECK, WHICH IS WHY IT IS GATED RATHER THAN NOTED. `run.ts`
+	// invokes `bunx vitest run <victim>` and reads ONE bit — the exit status. Every project sets
+	// `passWithNoTests: false`, so vitest exits NON-ZERO when the named path matches nothing, and the runner
+	// attributes that failure to the mutation: **the entry reports KILLED and the guard is recorded as proven by
+	// a suite that is not there.**
+	//
+	// The anchor census above catches the mirror case — the mutated FILE moving — and has since REG-F-100. The
+	// VICTIM moving was never checked, and the two rot by the same mechanism: an ordinary rename, committed by
+	// someone who never opened the ledger. A rename is the worst shape of it, because `git diff --name-only`
+	// reports only the DESTINATION, so nothing in a review shows the old path going stale.
+	//
+	// CHEAP BY CONSTRUCTION, and that is the argument for putting it here rather than in the runner: this file
+	// already runs inside `bun run test` in milliseconds, so all 220 entries are checked on every commit —
+	// whereas the runner only learns of the rot when it reaches that entry, ~40 minutes in, and then mis-reports
+	// it. **A check that runs where the evidence is cheap beats one that runs where the failure happens.**
+	function missingVictims(population: readonly { id: string; expectRed: readonly string[] }[]): string[] {
+		return population.flatMap((m) =>
+			m.expectRed
+				.filter((v) => !existsSync(`${REPO_ROOT}${v}`))
+				.map((v) => `${m.id}: VICTIM MISSING — ${v}`)
+		);
+	}
+
+	it('every NAMED victim still exists on disk, so a rename cannot be scored as a kill', () => {
+		expect(
+			missingVictims(DECLARED_MUTANTS),
+			'mutant(s) naming a victim suite that is GONE. `run.ts` reads only the exit status, and vitest exits ' +
+				'non-zero on an unmatched path under `passWithNoTests: false` — so this entry would report KILLED ' +
+				'and record the guard as proven by a suite that does not exist. Re-point `expectRed` at the suite ' +
+				'that now carries the assertions, or retire the entry with `supersededBy`. See REG-F-162.'
+		).toEqual([]);
+	});
+
+	// CONTROL — the assertion above is satisfied both by a reader that resolves every path and by one that
+	// resolves NONE and returns `[]` regardless. This holds the discriminating half on a fixture, for the reason
+	// REG-F-122 gives: the failing case cannot exist in the real population while the population is healthy, so
+	// a test over the real ledger alone can never enter the arm it exists to prove.
+	it('CONTROL — the victim census actually reads the filesystem, and reports only the missing', () => {
+		const fixture = [
+			{ id: 'present', expectRed: ['verif/mutant-ledger.test.ts'] },
+			{ id: 'gone', expectRed: ['verif/a-suite-that-was-never-written.test.ts'] }
+		];
+		expect(missingVictims(fixture).map((s) => s.split(':')[0])).toEqual(['gone']);
+		expect(missingVictims([]), 'an empty population yields no offenders').toEqual([]);
+		expect(
+			missingVictims([{ id: 'no-victim', expectRed: [] }]),
+			'a CONTROL names no victim by design and must never be reported here'
+		).toEqual([]);
 	});
 
 	it('names exactly ONE victim per mutant, because a longer list is a LOWER bar', () => {

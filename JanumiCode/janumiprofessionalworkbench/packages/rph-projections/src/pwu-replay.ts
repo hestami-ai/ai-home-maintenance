@@ -113,6 +113,13 @@ export function applyPwuAxisEvent(
 		// `PwuBlocked`/`PwuEscalated` are added HERE, in the commit that mints their commands — W-4.5 discovered
 		// what happens otherwise: an emitter with no fold diverges the rebuild from the object, and the seed
 		// exercises too little to notice.
+		//
+		// ⚠ `PwuUnblocked` (W-5.5) LANDS UNDER THE SAME RULE AND UNDER ITS CORRECTION. Being in the right commit
+		// is NECESSARY AND NOT SUFFICIENT: W-5 added the two rows above in exactly the right commit and both were
+		// still DEAD CODE, because the reference seed blocks and escalates nothing, so a mutant deleting them
+		// left 1203 tests green. The seed cannot unblock either — it never blocks — so `PwuUnblocked` is DRIVEN
+		// by a named test that emits it and asserts replay equivalence, registered in
+		// `pwu-fold-drive-sites.test.ts`. Listing it here proves nothing on its own.
 		case 'PwuMarkedReady':
 		case 'PwuShapingStarted':
 		case 'PwuChallenged':
@@ -122,7 +129,8 @@ export function applyPwuAxisEvent(
 		case 'PwuAbandoned':
 		case 'PwuRejected':
 		case 'PwuBlocked':
-		case 'PwuEscalated': {
+		case 'PwuEscalated':
+		case 'PwuUnblocked': {
 			// The named single-axis events. Each declares `workLifecycleState`; two also carry
 			// shapeIntegrityState. Absent axes carry forward — they were not part of this transition.
 			if (!axes) return axes;

@@ -31,7 +31,23 @@ const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ROOTS = ['packages', 'apps/rph-demo/src'];
 const WINDOW = 14;
 
+/**
+ * ⚠ MEMOIZED — REG-F-116, the fifth verif file found carrying this. Four tests in this file call `sources()`, and
+ * each call walked `packages` + `apps/rph-demo/src` and `readFileSync`'d **every** production `.ts` in them. The
+ * corpus grew sharply when `packages/csaa` landed, so the same whole-tree read now happens four times over a much
+ * larger tree.
+ *
+ * MEASURED: this file's CONTROL costs ~1059ms in isolation and **5082ms with a second vitest running — over the
+ * 5000ms default, so it FAILS.** A tipped test inside a mutation CONTROL's whole-suite run becomes a verdict about
+ * an unrelated mutation, which is the defect REG-F-116 exists for.
+ */
+let sourcesCache: { path: string; text: string }[] | undefined;
 function sources(): { path: string; text: string }[] {
+	sourcesCache ??= readSources();
+	return sourcesCache;
+}
+
+function readSources(): { path: string; text: string }[] {
 	const out: { path: string; text: string }[] = [];
 	const walk = (abs: string, rel: string): void => {
 		for (const entry of readdirSync(abs)) {

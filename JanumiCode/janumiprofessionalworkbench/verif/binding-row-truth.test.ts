@@ -47,7 +47,34 @@ const AUDIT = auditClaims(CLAIMS);
 //   * `ExecutionStep.stepState` is not an aggregate at all — steps are a nested collection inside the PLAN, with
 //     no entry in OBJECT_SCHEMAS, so `births[].statusField` (a key lookup on the created object) cannot reach it.
 // So this list no longer shrinks by declaring more births; each remaining member needs a different decision.
-const UNANALYSED = ['ExecutionStep.stepState', 'Intent.intentStatus', 'PWU.workLifecycleState'];
+// ⚠ 3 -> 18 UNDER REG-F-118, THEN 18 -> 17 UNDER REG-F-119, AND THE SHRINK IS THE POINT OF THE SECOND.
+// `unanalysed` carries TWO causes: **no declared birth** (the original) and **incomplete arrow coverage** (added
+// by REG-F-118, and nearly universal — a machine whose arrows are partly undeclared cannot support ANY
+// unreachability claim, because `occupiable()` under-estimates).
+//
+// `PWU.workLifecycleState` LEAVES here because REG-F-119 declared the generic setter's eight spine arrows, taking
+// it to 57/57. **It is the first PWU axis to become occupancy-analysable, and the first machine of any size to
+// do so** — the four that qualified before carry 5, 5, 6 and 5 arrows. Its analysis then reported ZERO dead
+// arrows, which is the retroactive proof that the 35 REG-F-118 withdrew were false rather than merely unproven.
+const UNANALYSED = [
+	'Assumption.status',
+	'AssuranceAssessment.state',
+	'AssuranceObservation.disposition',
+	'Baseline.status',
+	'Claim.status',
+	'Constraint.status',
+	'Decision.status',
+	'DecompositionContract.status',
+	'Evidence.status',
+	'ExecutionPlan.status',
+	'ExecutionStep.stepState',
+	'Harness.status',
+	'Intent.intentStatus',
+	'Obligation.status',
+	'PwuType.status',
+	'RecompositionContract.status',
+	'Undertaking.status'
+];
 
 describe('C-0c — every recorded command→transition claim is true of the handlers', () => {
 	it('no claim names a machine the controls have ruled is not a lifecycle', () => {
@@ -166,11 +193,22 @@ describe('C-0c — every recorded command→transition claim is true of the hand
 			claim({ machine: 'DecompositionContract.status', from: '(initial)', to: 'DRAFT' })
 		]);
 		expect(a.excluded.length, 'the retired disposition axis is no longer refused').toBe(2);
-		expect(a.deadFrom.length, 'REQUESTED is no longer seen as unoccupiable').toBe(1);
-		expect(a.deadTo.length, 'the two DRAFT landings are no longer seen as unoccupiable').toBe(2);
 		expect(a.notABirth.length, 'the birth check no longer distinguishes initialState from a real birth').toBe(
 			2
 		);
+		// ⚠ THE NUMBERS BELOW ARE UNCHANGED BY REG-F-118, AND THAT IS THE RESULT WORTH RECORDING. The completeness
+		// rule withdrew every occupancy-based deadness claim on a machine with undeclared arrows — and all three of
+		// these machines have them (`AssuranceAssessment.state` 11/19, and the two DRAFT landings likewise). I
+		// briefly rewrote this control to expect `deadFrom === []`, believing the detections were lost. **They were
+		// not.** They are re-derived on the SOUND ground instead: a state the ratified machine gives no in-arrow
+		// and no birth declares can never be occupied, whatever else is undeclared — `provablyUnoccupiable`.
+		//
+		// So the sound rule and the withdrawn one disagree about the METHOD, not the ANSWER, for these five rows.
+		// A control whose expectations survive a correction to its own instrument is evidence the finding was real
+		// rather than an artifact of how it was measured — which is the question REG-F-118 forced about every
+		// deadness claim in the repository, and the one this file can now answer YES to.
+		expect(a.deadFrom.length, 'REQUESTED is no longer seen as unoccupiable').toBe(1);
+		expect(a.deadTo.length, 'the two DRAFT landings are no longer seen as unoccupiable').toBe(2);
 		// And the arrow key really is the one C-0 would use, or the subset comparison above is comparing nothing.
 		expect(a.deadFromArrows).toContain('AssuranceAssessment.state  REQUESTED -> EVIDENCE_PENDING');
 	});

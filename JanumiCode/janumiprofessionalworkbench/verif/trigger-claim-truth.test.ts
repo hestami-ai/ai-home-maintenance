@@ -28,8 +28,8 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	// so a change in what the extractor understands cannot pass as a change in what the corpus says.
 	it('PINNED — how much of the ratified trigger surface yields a claim at all', () => {
 		expect(triggerCoverage()).toEqual({
-			transitions: 304,
-			withTrigger: 304,
+			transitions: 308,
+			withTrigger: 308,
 			namingAKnownCommand: 68,
 			claims: 70
 		});
@@ -71,10 +71,18 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	// REG-F-085, derived here from the machine rather than from the handler. `CompleteRecomposition`'s declared
 	// arrow lands in a contract state no command can produce — which is precisely why W-4.6's
 	// `CompletePwuRecomposition` cannot cite "Recomposition contract satisfied" and stays blocked.
+	// ⚠⚠ REG-F-085's ROW IS WITHDRAWN HERE, AND WITHDRAWN IS NOT FIXED — REG-F-118. The claim was
+	// `RecompositionContract.status COMPOSABLE -> SATISFIED [to SATISFIED is never occupied]`, and it was derived
+	// from `occupiable()` on a machine whose arrows are only partly declared. That reasoning under-estimates, so
+	// "never occupied" meant only "not shown reachable". Unlike REG-F-088's row — which survived on the sound
+	// ground that PROPOSED has ZERO ratified in-arrows — SATISFIED **does** have a ratified in-arrow (the very
+	// arrow under audit), so nothing here proves it unreachable.
+	//
+	// **THE UNDERLYING CONCERN MAY STILL BE REAL AND IS NOT DISPOSED OF**: W-4.6's `CompletePwuRecomposition` is
+	// blocked on exactly this, and the machine is still 7/15 covered. What changed is that this census can no
+	// longer be cited as the proof. Re-derive it — or declare the missing arrows and let the pin speak again.
 	it('PINNED DEFECT — ratified arrows landing in a state nothing can occupy', () => {
-		expect(AUDIT.deadTo, AUDIT.deadTo.join('\n')).toEqual([
-			'ratified.trigger: CompleteRecomposition -> (no event) : RecompositionContract.status COMPOSABLE -> SATISFIED  [to SATISFIED is never occupied]'
-		]);
+		expect(AUDIT.deadTo, AUDIT.deadTo.join('\n')).toEqual([]);
 	});
 
 	it('no ratified creation trigger lands where no handler declares a birth', () => {
@@ -83,11 +91,25 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 
 	// Inherited blindness, not new: PWU is invisible to both census readers (REG-F-086/087) and ExecutionStep is
 	// not an aggregate. Pinned so this control's scope cannot widen or narrow unnoticed either.
+	// ⚠ 3 -> 11 UNDER REG-F-118, THEN 11 -> 10 UNDER REG-F-119 — and the second number was left stale for exactly
+	// one commit, which is the third time this session that prose beside a live list rotted while the list moved.
+	// `PWU.workLifecycleState` left when its spine was declared and it reached 57/57. The GROWTH is the census
+	// WEAKER. `unanalysed` used to mean one thing — "no declared birth". It now carries a second, far more common
+	// cause: **incomplete arrow coverage**. A machine whose arrows are only partly declared cannot support ANY
+	// unreachability claim, because `occupiable()` grows along declared arrows and therefore under-estimates.
+	// Every machine added here was previously being judged on evidence that could not carry the judgement.
 	it('PINNED — which machines C-0d still cannot occupancy-check', () => {
 		expect(AUDIT.unanalysed).toEqual([
+			'AssuranceAssessment.state',
+			'Baseline.status',
+			'Claim.status',
+			'Decision.status',
+			'DecompositionContract.status',
+			'Evidence.status',
+			'ExecutionPlan.status',
 			'ExecutionStep.stepState',
 			'PWU.executionState',
-			'PWU.workLifecycleState'
+			'RecompositionContract.status'
 		]);
 	});
 
@@ -112,7 +134,7 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 		for (const [name, m] of Object.entries(M))
 			for (const t of m.transitions) byArrow[provenanceOfArrow(name, t.from, t.to)]! += 1;
 		expect(byArrow, 'arrow-level, from each transition note').toEqual({
-			VERBATIM: 97,
+			VERBATIM: 101,
 			RECONSTRUCTED: 182,
 			OTHER: 25
 		});
@@ -127,7 +149,10 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 		const offending = [...AUDIT.deadFrom, ...AUDIT.deadTo]
 			.map((row) => /: ([A-Za-z]+\.[A-Za-z]+) /.exec(row)?.[1])
 			.filter((m): m is string => Boolean(m));
-		expect(offending.length, 'if this is 0 the row-parse broke and the assertion below is vacuous').toBe(4);
+		// 4 -> 3 under REG-F-118: REG-F-085's occupancy-based row was withdrawn as unprovable on a machine with
+		// undeclared arrows. ⚠ THIS POPULATION CONTROL MATTERS MORE AFTER A WITHDRAWAL, NOT LESS — it is the only
+		// thing stopping the assertion below from going vacuously green as claims drain out of the set.
+		expect(offending.length, 'if this is 0 the row-parse broke and the assertion below is vacuous').toBe(3);
 		expect(
 			offending.filter((m) => provenanceOf(m) === 'VERBATIM'),
 			'a divergence on a VERBATIM machine indicts the handler outright — escalate it, do not just pin it'

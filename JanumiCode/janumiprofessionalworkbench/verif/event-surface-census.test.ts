@@ -11,9 +11,12 @@
 //   EMITTED   — what handlers actually commit, measured across the whole suite by `emitted-event-guard.ts`.
 //
 // THE THREE DISAGREE, and the disagreements are the finding rather than an accounting quirk:
-//   * events EMITTED but not BOUND — the engine produces events the binding table does not describe. Six of
-//     them, including every kernel-chosen recomposition outcome (`eventType: evaluation.event`), which no static
-//     command->event row can express.
+//   * events EMITTED but not BOUND — the engine produces events the binding table does not describe. ~~Six~~
+//     FIVE of them, including every kernel-chosen recomposition outcome (`eventType: evaluation.event`), which
+//     no static command->event row can express.
+//     ⚠ THIS FILE ALREADY CONTRADICTED ITSELF: the passage 130 lines below records the drop verbatim —
+//     "6 -> 5 (REG-F-021 increment 1)" — while this headline kept saying six. Corrected 2026-08-14
+//     (REG-F-147); re-derived by mirroring this file's own set algebra, EMITTED(110) \ BOUND(105) = 5.
 //   * events BOUND but never EMITTED — a command declares it produces an event and produces a different one.
 //     `RequestAssuranceAssessment` is bound to `AssuranceAssessmentRequested` and emits
 //     `AssuranceAssessmentStarted`. The corpus's own §26 trace expects `AssuranceAssessmentRequested` at seq 31,
@@ -58,6 +61,13 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-08-13, REG-F-131: `IntentSuperseded` acquires its FIRST emitter, `SupersedeIntent`. It had been a
+	// RATIFIED event (it is in the Canonical Domain Model's own event list) that was neither bound nor emitted —
+	// the corpus named the event and the six arrows into SUPERSEDED, and no command reached them, so an Intent
+	// could never terminate. Recorded by hand because this set is a PINNED SNAPSHOT: the emitter exists and is
+	// driven end-to-end in `sta6-superseded-intent.test.ts`, but no single vitest worker can see the whole
+	// suite's emissions, so an unrecorded emitter reads here as unemitted.
+	'IntentSuperseded',
 	// + 2026-08-09, JAN-PWUWP W-1 (REG-D-029): both acquired their FIRST emitter. `PwuAbandoned` and
 	// `PwuRejected` had been declared, registered and bound while NOTHING produced them — the two acts
 	// JPWB-DOC-001 §5.2 reserves to Governance were performed by a generic setter that emitted the generic
@@ -73,6 +83,12 @@ const EMITTED_2026_08_04 = new Set([
 	// wants every arrow NAMED, not because either needs authorizing.
 	'PwuBlocked',
 	'PwuEscalated',
+	// + 2026-08-16, JAN-PWUWP W-5.5 (REG-D-043). `PwuUnblocked` — the way back out of BLOCKED and ESCALATED,
+	// authored from scratch like `PwuEscalated` was. Written down here because this snapshot is hand-maintained
+	// BY DESIGN: the guard cannot observe emissions across vitest workers, so a new emitter that nobody records
+	// reads as UNEMITTED. It reddened on exactly that basis before this line existed, which is the mechanism
+	// working rather than a nuisance.
+	'PwuUnblocked',
 	'PwuBaselined',
 	'PwuAbandoned',
 	'PwuRejected',
@@ -137,7 +153,8 @@ describe('REG-F-021: the declared / bound / emitted event surfaces', () => {
 
 	// The engine produces events the binding table does not describe. NOT a defect to fix by deleting them: a
 	// kernel that CHOOSES its outcome event (`eventType: evaluation.event`) cannot be expressed as a static
-	// command->event row. The count is pinned so a SEVENTH cannot appear unnoticed.
+	// command->event row. The count is pinned so a ~~SEVENTH~~ SIXTH cannot appear unnoticed (REG-F-147 — the
+	// ordinal tracked the stale headline above rather than the pin below it).
 	//
 	// 6 -> 5 (REG-F-021 increment 1), AND THE DROP IS NOT PROGRESS — READ IT CAREFULLY. `AssuranceAssessmentStarted`
 	// left this list because increment 1 BOUND it, to `BeginAssuranceAssessment`, which is where the ratified §30

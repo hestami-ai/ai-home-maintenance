@@ -106,11 +106,40 @@ function canonArtifacts(): string[] {
 		.sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The canon artifacts, READ ONCE.
+ *
+ * ⚠ THIS WAS RE-READING EVERY ARTIFACT FOR EVERY RULE, and it turned the mutation gate into a coin flip.
+ * `canonFilesContaining` is called once per registered rule — ~112 of them — and each call did a `readdirSync`
+ * plus a full `readFileSync` of all six artifacts. Those six total ~1.19 MB and the REGISTER ALONE IS 80% OF IT (an earlier note said ~2.6 MB, which is the whole `docs/canon` directory including `JPWB-SPEC-001` at 1.25 MB — a file this filter EXCLUDES), so a single test was doing
+ * hundreds of large reads: 740ms in isolation, **6135ms under full-suite load, against a 5000ms default
+ * timeout.**
+ *
+ * THE FAILURE MODE IS WHAT MAKES IT WORTH FIXING PROPERLY RATHER THAN RAISING THE TIMEOUT. A declared CONTROL in
+ * the mutation ledger has no named victim, so `run.ts` invokes the WHOLE suite for it and treats any failure as
+ * "declared a CONTROL, but a test FAILED on it". A slow test tipping over its timeout therefore reports an
+ * unrelated control as SURVIVED and blocks the gate — which is exactly what happened, and it cost a long
+ * investigation down three wrong hypotheses before the message turned out to read `Test timed out`, not an
+ * assertion.
+ *
+ * AND IT WAS GETTING WORSE ON A SCHEDULE. `JPWB-REG-005` is one of the six artifacts re-read here, and it grows
+ * every time a finding is recorded — ten entries today alone. A test whose cost scales with the register is a
+ * test that will fail eventually no matter what the code does.
+ */
+let canonCorpus: readonly { readonly file: string; readonly text: string }[] | undefined;
+function canonCorpusOnce(): readonly { readonly file: string; readonly text: string }[] {
+	canonCorpus ??= canonArtifacts().map((f) => ({
+		file: f,
+		text: readFileSync(`${REPO_ROOT}docs/canon/${f}`, 'utf8')
+	}));
+	return canonCorpus;
+}
+
 /** Which canon artifacts contain `anchor` verbatim. Empty means the citation does not resolve. */
 function canonFilesContaining(anchor: string): string[] {
-	return canonArtifacts().filter((f) =>
-		readFileSync(`${REPO_ROOT}docs/canon/${f}`, 'utf8').includes(anchor)
-	);
+	return canonCorpusOnce()
+		.filter((a) => a.text.includes(anchor))
+		.map((a) => a.file);
 }
 
 /** The production files that mention `symbol` as a whole word. */
@@ -217,6 +246,60 @@ describe('WP-16 (c) — the register is TOTAL over the families it claims', () =
 			'NOT_A_COMMAND_REFUSAL',
 			'UNENFORCED_DISCLOSED'
 		]);
+	});
+
+	// ── THE HEADER'S OWN CENSUS IS DERIVED FROM THE ROWS, NOT TRUSTED (REG-F-141) ────────────────────────────
+	//
+	// That paragraph carried `29 / 25 / 58` while the module held `31 / 25 / 56` — stale in two arms, and
+	// UNGATED, so it could say anything indefinitely. It is the third instance in one session of the same shape:
+	// **a number written in prose that duplicates a number the code can derive is not documentation, it is a
+	// second copy with no checker** (REG-F-140 states the rule; `run.ts`'s 17→19 and the arm-3 gate's 4/57 were
+	// the other two, both rotted by the hand of the person editing the list beside them).
+	//
+	// ⚠ THE CHECK PARSES THE COMMENT DELIBERATELY, rather than the prose being softened to avoid numbers. The
+	// numbers are what give the paragraph its force — "barely a QUARTER" is an argument, not decoration — so the
+	// honest fix is to make the claim CHECKABLE, not to make it vaguer. A vaguer paragraph would have been the
+	// easier edit and would have removed the evidence rather than the defect.
+	it("the header's census matches the rows it describes", () => {
+		const src = readFileSync(new URL('./enforcement-register.ts', import.meta.url), 'utf8');
+		const m = /Of the (\d+) rows, (\d+) are\s*\/\/\s*ENFORCED, (\d+) are UNENFORCED_DISCLOSED and (\d+) are NOT_A_COMMAND_REFUSAL/.exec(
+			src.replace(/\r\n/g, '\n')
+		);
+		expect(m, 'the header census sentence moved or was reworded — re-derive it, do not delete this check').
+			not.toBeNull();
+
+		const live = { total: REGISTERED_RULE_IDS.length, ENFORCED: 0, UNENFORCED_DISCLOSED: 0, NOT_A_COMMAND_REFUSAL: 0 };
+		for (const id of REGISTERED_RULE_IDS) live[ENFORCEMENT_REGISTER[id].kind] += 1;
+
+		expect(
+			{
+				total: Number(m![1]),
+				ENFORCED: Number(m![2]),
+				UNENFORCED_DISCLOSED: Number(m![3]),
+				NOT_A_COMMAND_REFUSAL: Number(m![4])
+			},
+			'the header paragraph states a census that the rows contradict — update the PROSE, and the "honest headline" figure in the same sentence with it'
+		).toEqual(live);
+
+		// The same paragraph repeats the ENFORCED figure as its closing "honest headline". One number, two
+		// places, and only this assertion relates them.
+		expect(
+			src.replace(/\r\n/g, '\n'),
+			'the closing "honest headline is N" must carry the same ENFORCED count as the census above it'
+		).toContain(`the honest headline is ${live.ENFORCED}, not ${live.total}`);
+
+		// ⚠ AND THE ADJECTIVE, because the first version of this check STOPPED FOUR WORDS SHORT OF IT and greened
+		// on a sentence whose digits it had just verified and whose meaning the same edit had just falsified
+		// (REG-F-148). The paragraph reads "…and a MAJORITY states outcomes, permissions, or planes that do not
+		// exist" — a claim about arm 3's SHARE, which was true at 58 of 112 and false at 56. A gate that checks
+		// the numbers in a sentence and not the word they qualify is checking the citation, not the claim.
+		const armThreeIsMajority = live.NOT_A_COMMAND_REFUSAL * 2 > live.total;
+		expect(
+			src.replace(/\r\n/g, '\n').includes('and a MAJORITY states outcomes'),
+			armThreeIsMajority
+				? 'arm 3 IS a majority — the paragraph should say so'
+				: `arm 3 is ${live.NOT_A_COMMAND_REFUSAL} of ${live.total}, which is NOT a majority — the paragraph must not claim one`
+		).toBe(armThreeIsMajority);
 	});
 
 	it('every disposition carries its reason, and no reason is a stub', () => {

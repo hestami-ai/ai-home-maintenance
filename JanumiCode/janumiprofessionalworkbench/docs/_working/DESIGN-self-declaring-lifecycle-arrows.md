@@ -2,6 +2,18 @@
 
 **Builds REG-F-114's ruling on REG-F-087's residue.** Authored 2026-08-10.
 
+> **✅ LANDED (REG-F-114) — THIS DOCUMENT IS A DATED DESIGN, NOT A CURRENT MEASUREMENT.**
+> Every figure below was measured on **2026-08-10** and several have moved since. In particular
+> *“Census today: 115 of 304 arrows, 14 of 27 machines”* in §2 is that day’s reading; the increment
+> shipped the predicted +49 to the arrow (115 → 164), and the live figure is now **162 of 295 (54.9%)**
+> across **25** in-scope machines — the denominator having itself been corrected at REG-F-160, which
+> removed 9 arrows belonging to a machine `machine-exclusions.ts` had already ruled not-a-machine.
+>
+> **The dated numbers below are deliberately NOT rewritten.** They record what was true when the design
+> was authored, and a design doc whose measurements are silently updated can no longer be checked against
+> the decision it justified. The live figures are pinned by `verif/arrow-census-coverage.test.ts`, which
+> is the only place they may be read from.
+
 ---
 
 ## 1. The finding, in one line

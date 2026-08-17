@@ -13,6 +13,7 @@ import {
 	PROPERTY_COVERAGE,
 	type CoverageStatus
 } from './conformance-manifest.js';
+import { ENFORCEMENT_REGISTER, REGISTERED_RULE_IDS } from './enforcement-register.js';
 
 interface Rule {
 	readonly id: string;
@@ -167,10 +168,35 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         `obligationIds: []`, so the check would have quantified over nothing and passed.
 		//                         The drive now authors the obligations, and the check fails an empty population.
 		//                         `verif/deferral-honesty.test.ts` is the gate for the direction that was blind.
+		//   2026-08-13  40 -> 41  RPH-INT-007 alone, and its cite is a COMMAND-layer probe that DRIVES the
+		//                         arrangement rather than seeding it. The rule — "a superseded intent cannot
+		//                         authorize new PWUs" — could not be covered before, and NOT because nobody had
+		//                         written the check: its ANTECEDENT was command-unreachable, so no dispatch could
+		//                         be refused for it. Three increments made it coverable in order, deliberately:
+		//                         the guard landed first while the state was still unreachable (REG-F-129), the
+		//                         disposition was held back when moving it early reddened five checks (REG-F-130),
+		//                         and `SupersedeIntent` finally made the arrangement dispatchable (REG-F-131).
+		//                         ⚠ THIS +1 IS NOT A NEW CHECK OVER AN OLD CAPABILITY — it is a rule that became
+		//                         REFUSABLE. The distinction matters here more than usual, because a coverage
+		//                         number that rises when a capability is ADDED reads identically to one that rises
+		//                         when a test is added, and only this ledger separates them.
+		//   2026-08-13  41 -> 42  RPH-EVD-002 alone, and it is the OPPOSITE case to the line above: nothing became
+		//                        refusable here. The refusal had existed and been running since 2026-08-06, while
+		//                        the register recorded the rule as NOT_A_COMMAND_REFUSAL on the ground that "no
+		//                        handler anywhere drives the Claim.status machine". The +1 is a correction of the
+		//                        REGISTER, not an addition to the ENGINE — the capability was already there and
+		//                        the paperwork denied it for seven days (REG-F-133, REG-F-138).
+		//                        ⚠ AND THE CHECK IT NOW CITES DID NOT EXIST EITHER, which is why this is not a
+		//                        clerical +1. Measured before the move: with the guard's refusal code swapped to
+		//                        RPH_VALIDATION_SEMANTIC_FAILED the ENTIRE workspace stayed green — 269 files,
+		//                        2732 passed. `claim-assessment.test.ts` is 300 lines about this rule and asserts
+		//                        on no refusal code or message anywhere, so what was "covered" was the rule's
+		//                        NON-ACCEPTANCE, never its identity. The cite is the enforcement probe, which
+		//                        checks code and marker.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(40);
+		).toBe(42);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 
@@ -180,5 +206,74 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 			const abs = new URL(rel, repoRoot);
 			expect(existsSync(abs), `cited test file missing: ${rel}`).toBe(true);
 		}
+	});
+});
+
+/**
+ * Every disposition a manifest NOTE states about a rule, as (ruleId, disposition) pairs.
+ *
+ * The notes are prose, but the part worth checking is not: they name RULE IDS against a CLOSED THREE-WORD
+ * vocabulary, in the same package as the register that owns those ids. Clauses are split on `;` because that is
+ * how these notes are written — one disposition claim per clause — and a clause naming two dispositions is
+ * skipped rather than guessed at, which is why the reach is asserted separately below.
+ */
+function notedDispositions(): { ruleId: string; noted: string; actual: string }[] {
+	const DISPOSITIONS = ['UNENFORCED_DISCLOSED', 'NOT_A_COMMAND_REFUSAL', 'ENFORCED'] as const;
+	const notesToIds = new Map<string, Set<string>>();
+	for (const id of REGISTERED_RULE_IDS) {
+		const note = coverageFor(id)?.note;
+		if (note) notesToIds.set(note, (notesToIds.get(note) ?? new Set()).add(id));
+	}
+	const out: { ruleId: string; noted: string; actual: string }[] = [];
+	for (const [note, ids] of notesToIds) {
+		// The family is taken from a rule the note actually covers, never parsed out of the prose.
+		const family = [...ids][0]!.split('-').slice(0, 2).join('-');
+		for (const clause of note.split(';')) {
+			// ⚠ WORD-BOUNDARY, not `includes`. The first version of this reader used `includes` and reported
+			// RPH-EXE-004 as a contradiction because the note says "EXE-004 remains UNENFORCED" — in which
+			// `ENFORCED` is a SUBSTRING. It would have had me "correct" a note that was right, which is the
+			// instrument manufacturing the defect it exists to find. `\bENFORCED\b` matches neither `UNENFORCED`
+			// nor `UNENFORCED_DISCLOSED`, since neither position is a word boundary.
+			const named = DISPOSITIONS.filter((d) => new RegExp(`\\b${d}\\b`).test(clause));
+			if (named.length !== 1) continue;
+			for (const m of clause.matchAll(/\b(\d{3})\b/g)) {
+				const ruleId = `${family}-${m[1]}`;
+				const row = ENFORCEMENT_REGISTER[ruleId as keyof typeof ENFORCEMENT_REGISTER];
+				if (row) out.push({ ruleId, noted: named[0]!, actual: row.kind });
+			}
+		}
+	}
+	return out;
+}
+
+// ── THE MANIFEST AND THE REGISTER ARE COMPARED (REG-F-142) ──────────────────────────────────────────────────
+//
+// REG-F-140 found the register and the C-0b guard ledger contradicting each other for seven days, and could
+// only build a narrow gate because those two share NO join key. **This pair does.** Same package, rule ids on
+// both sides, a closed disposition vocabulary — the join is trivial, and nothing had ever made it.
+describe('the coverage manifest and the enforcement register agree about dispositions', () => {
+	it('no manifest note states a disposition the register contradicts', () => {
+		const wrong = notedDispositions().filter((c) => c.noted !== c.actual);
+		expect(
+			wrong,
+			`manifest notes contradicted by the register:\n${wrong
+				.map((c) => `  ${c.ruleId}: note says ${c.noted}, register says ${c.actual}`)
+				.join('\n')}`
+		).toEqual([]);
+	});
+
+	// CONTROL — `[]` is also what a parser that matched nothing returns, which is this check's characteristic
+	// failure: the ids are three bare digits inside English, and any rewording can silently empty the join.
+	it('CONTROL — the note reader resolves real claims across several families', () => {
+		const claims = notedDispositions();
+		expect(claims.length, 'the reader must find real disposition claims, or it is asserting over nothing').
+			toBeGreaterThan(15);
+		expect(
+			new Set(claims.map((c) => c.ruleId.split('-').slice(0, 2).join('-'))).size,
+			'and across more than one family, so a single reworded note cannot blind it'
+		).toBeGreaterThan(2);
+		// Every disposition it reports must be a real one, which fails if the vocabulary drifts.
+		for (const c of claims)
+			expect(['UNENFORCED_DISCLOSED', 'NOT_A_COMMAND_REFUSAL', 'ENFORCED']).toContain(c.actual);
 	});
 });

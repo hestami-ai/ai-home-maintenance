@@ -38,7 +38,7 @@ export const registerValidator: CommandHandler = (ctx, command, payload) => {
 	return createObject(ctx, command, {
 		objectType: ENTRY,
 		// JAN-PWUWP / REG-F-074 residue: traced from validator-registry.ts:51 (`status: 'ACTIVE'`, unconditional),
-		// not from the machine's `initialState` — which happens to agree here, but is a fiction on four machines
+		// not from the machine's `initialState` — which happens to agree here, but is a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)
 		// (REG-F-071), so agreement is corroboration and never the source.
 		// ⚠ THE LITERAL, NOT THE `MACHINE` CONST: the census requires `births[].machine` to be a string literal so
 		// it can be read from the AST without evaluating the module. Using the const threw outright — a loud

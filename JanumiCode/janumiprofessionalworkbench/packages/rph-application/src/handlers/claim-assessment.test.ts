@@ -235,4 +235,66 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 		expect(r.status, 'OPEN -> SUPPORTED is not an arrow the machine declares').not.toBe('ACCEPTED');
 		expect(claimStatus()).toBe('OPEN');
 	});
+	// ── 7. THE SAME-STATE RE-ISSUE (REG-F-127) ──────────────────────────────────────────────────────────────
+	//
+	// DRIVEN BEFORE IT WAS DESIGNED: a second, byte-identical RecordClaimAssessment at the SAME status was
+	// ACCEPTED and appended a second `ClaimSupported` — an event recording a change that did not happen, which
+	// is AX-7's permanent false entry in an append-only log. Same shape as governance's REVOKED -> REVOKED and
+	// as RuntimeBinding's N-22 before it was guarded.
+	//
+	// ⚠ THE RULE IS "NOTHING CHANGED", NOT "THE STATUS STAYED THE SAME", and the CONTROL below is what makes
+	// the difference assertable. `runtime-binding.ts` records itself adopting the broad form first and
+	// withdrawing it: a second assessment that reaches the same conclusion BY A DISTINCT ASSESSMENT is a real
+	// professional act, and refusing it would strand the incremental case. A guard that refused every
+	// `from === to` would pass the first test here and FAIL the second.
+	it('REFUSES a re-assessment that changes nothing — no second ClaimSupported for a change that did not happen', () => {
+		expect(assertClaim().status).toBe('ACCEPTED');
+		proposeEvidence(true);
+		expect(record('UNDER_ASSESSMENT').status).toBe('ACCEPTED');
+		expect(record('SUPPORTED', { assessmentId: 'asm-1' }).status).toBe('ACCEPTED');
+		expect(claimStatus()).toBe('SUPPORTED');
+
+		const again = record('SUPPORTED', { assessmentId: 'asm-1' });
+		expect(again.status, 'the identical re-issue records nothing new').not.toBe('ACCEPTED');
+		expect(
+			eventTypes().filter((e) => e === 'ClaimSupported'),
+			'exactly ONE ClaimSupported — a second would assert an assessment that did not occur'
+		).toHaveLength(1);
+	});
+
+	// THE CONTROL. Without it this guard is indistinguishable from narrowing `fromStates`, which is the
+	// over-refusal the RuntimeBinding lineage already made and withdrew.
+	it('CONTROL — a DISTINCT re-assessment at the same status is still ACCEPTED', () => {
+		expect(assertClaim().status).toBe('ACCEPTED');
+		proposeEvidence(true);
+		expect(record('UNDER_ASSESSMENT').status).toBe('ACCEPTED');
+		expect(record('SUPPORTED', { assessmentId: 'asm-1' }).status).toBe('ACCEPTED');
+
+		const second = record('SUPPORTED', {
+			assessmentId: 'asm-2',
+			rationale: 'a second assessor reached the same conclusion independently'
+		});
+		expect(
+			second.status,
+			'a distinct assessment reaching the same conclusion is a real act'
+		).toBe('ACCEPTED');
+		expect(eventTypes().filter((e) => e === 'ClaimSupported')).toHaveLength(2);
+	});
+
+	// The other two self-edges ride the same handler and their event payloads differ, so "nothing changed" is a
+	// different comparison on each arm — neither is assumed from the SUPPORTED case.
+	it('the rule covers the other machine-admitted self-edges too, on their own arms', () => {
+		expect(assertClaim().status).toBe('ACCEPTED');
+		expect(record('UNDER_ASSESSMENT', { assessmentId: 'asm-1' }).status).toBe('ACCEPTED');
+		expect(
+			record('UNDER_ASSESSMENT', { assessmentId: 'asm-1' }).status,
+			'UNDER_ASSESSMENT -> UNDER_ASSESSMENT with nothing new'
+		).not.toBe('ACCEPTED');
+
+		expect(record('CONTESTED', { rationale: 'inconclusive' }).status).toBe('ACCEPTED');
+		expect(
+			record('CONTESTED', { rationale: 'inconclusive' }).status,
+			'CONTESTED -> CONTESTED with nothing new'
+		).not.toBe('ACCEPTED');
+	});
 });

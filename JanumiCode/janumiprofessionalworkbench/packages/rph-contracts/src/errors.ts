@@ -52,7 +52,21 @@ export const RphErrorCodeSchema = z.enum([
 	// standard this work exists to serve. It is also the distinction each deployment tier routes DIFFERENTLY:
 	// in SaaS and Enterprise an unauthenticated command is a security event, in standalone it is a
 	// misconfiguration. A distinct code lets any host route it without string-matching a message.
-	'RPH_AUTHENTICATION_REQUIRED'
+	'RPH_AUTHENTICATION_REQUIRED',
+	// ── AUTHORED 2026-08-15 (REG-D-027/REG-F-057 · REG-F-181). Not from DOC-007 §25.1; disclosed, not blended. ──
+	// An idempotency key on record was reused for a DIFFERENT command — differing command type, target aggregate,
+	// or payload hash — so returning the prior result would report success for work that never happened (PER-5).
+	//
+	// WHY NOT REUSE `RPH_IDEMPOTENCY_DUPLICATE`: that one is the true REPLAY, which REG-F-010 records as correctly
+	// carrying NO error at all. Conflating them would make *"I already did this, here is the answer"* and *"you
+	// asked me something different under a key that is spoken for"* indistinguishable to a caller — and the second
+	// is a refusal while the first is a success.
+	//
+	// ⚠ IT TOOK EIGHT DAYS TO ARRIVE BECAUSE THE GROUND MOVED AND THE CONSUMERS WERE NEVER TOLD. Both call sites
+	// carried *"minting one is a sponsor act"*; REG-D-027/REG-F-057 settled on 2026-08-07 that it is a repository
+	// shape change through the contract procedure; the correction landed in THIS file, and the two consumers went
+	// on declining to mint on a ground that no longer existed (REG-F-144).
+	'RPH_IDEMPOTENCY_CONFLICT'
 ]);
 export type RphErrorCode = z.infer<typeof RphErrorCodeSchema>;
 
@@ -81,7 +95,16 @@ export const ERROR_CODE_CATEGORY: Readonly<Record<RphErrorCode, RphErrorCategory
 	// would be a second, larger shape change for no gain the code itself does not already carry. The CODE is
 	// what an operator routes on; the category is a coarse bucket, and "you may not act, because I cannot
 	// establish who you are" sits in it honestly.
-	RPH_AUTHENTICATION_REQUIRED: 'AUTHORIZATION'
+	RPH_AUTHENTICATION_REQUIRED: 'AUTHORIZATION',
+	// CONCURRENCY BY TWO INDEPENDENT PRECEDENTS, NOT BY TASTE (REG-F-181). `RPH_IDEMPOTENCY_DUPLICATE` — the
+	// sibling code for the same concept — is already CONCURRENCY, and so is `RPH_REVISION_CONFLICT`, the only
+	// other `*_CONFLICT` member. Same concept and same suffix, arrived at separately, agreeing.
+	//
+	// ⚠ AND THIS MOVES THE CATEGORY THE REUSE REFUSAL REPORTS, from VALIDATION to CONCURRENCY, because the old
+	// VALIDATION was an artifact of the BORROWED code rather than a judgment about the condition. `makeRphError`
+	// derives `category` from this map, so anything routing on category sees the refusal change buckets — pinned
+	// in `idempotency-key-reuse.test.ts` rather than left for someone to discover in a log.
+	RPH_IDEMPOTENCY_CONFLICT: 'CONCURRENCY'
 };
 
 /** The serialized error shape carried in CommandResult.error and event/observation payloads. */

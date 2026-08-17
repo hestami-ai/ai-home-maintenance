@@ -191,7 +191,7 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 			// The kernel's own verdict, carried into the message — `RPH_BINDING_NOT_AUTHORIZED` is NOT a ratified
-			// wire code (RphErrorCodeSchema is a closed 15-value enum), so it travels here or nowhere.
+			// wire code (RphErrorCodeSchema is a closed ~~15~~ 16-value enum — REG-F-144), so it travels here or nowhere.
 			expect(r.error?.message).toContain('RPH_BINDING_NOT_AUTHORIZED');
 			expect(r.error?.message).toContain(STATUS_MARKER);
 			expect(r.error?.message).toContain('REQUESTED');

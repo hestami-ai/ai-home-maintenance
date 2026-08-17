@@ -20,6 +20,9 @@
 // read. Two censuses over one table must not each keep their own idea of the table.
 import { readFileSync } from 'node:fs';
 import { STATE_MACHINES, isExcludedMachine } from '@janumipwb/rph-domain';
+// C-0's own key function, imported rather than re-implemented for the reason stated directly above: this file
+// joins two censuses, and a key format each kept privately would silently agree on nothing.
+import { arrowKey } from './arrow-command-census.js';
 
 /** What a declared guard text turned out to be, once someone read the code that performs its arrows. */
 export type GuardDisposition =
@@ -160,4 +163,58 @@ export function auditLedger(ledger: Readonly<Record<string, GuardRow>>): LedgerA
 		arrowCount: guardedArrows().length,
 		textCount: texts.length
 	};
+}
+
+/** An `ARROW_UNREACHABLE` row that the arrow census contradicts. */
+export interface UnreachabilityFault {
+	readonly guard: string;
+	/** The arrows a command DOES perform, in C-0's own `arrowKey` form. */
+	readonly coveredArrows: string[];
+}
+
+/**
+ * `ARROW_UNREACHABLE` rows whose arrows a command actually performs.
+ *
+ * ── WHY THIS EXISTS WHEN THE OTHER DISPOSITIONS HAVE NO CHECK ────────────────────────────────────────────────
+ * `ENFORCED` was the only checked disposition, on the ground written into this ledger's own test — *"ENFORCED is
+ * the only disposition that asserts something about the code, which is why it is the only one the adversarial
+ * pass attacked"*. **That ground is false.** `ARROW_UNREACHABLE` asserts that NO COMMAND PERFORMS THESE ARROWS,
+ * which is falsifiable, mechanically checkable, and WAS FALSE: `SupersedeIntent` covered all six
+ * `Intent.intentStatus -> SUPERSEDED` arrows while their row still read ARROW_UNREACHABLE, and nothing reddened.
+ *
+ * The asymmetry is the finding. `UNENFORCED` is an ADMISSION and needs no check — it understates, and
+ * over-admission is not a defect. `ARROW_UNREACHABLE` is a DISMISSAL: it says nothing is owed *because the arrow
+ * cannot fire*. A false dismissal reads as covered in exactly the way a false ENFORCED does. Every disposition
+ * that REMOVED an obligation was unchecked; the only checked one was the one that ADDED one.
+ *
+ * ⚠ THE COVERED SET IS INJECTED, and its keys come from C-0's `arrowKey`, not a private copy. This function
+ * joins two censuses, so its characteristic failure is a KEY-FORMAT MISMATCH — which returns `[]`, i.e. reads as
+ * "no faults" while comparing nothing. Injection is also what lets the CONTROL vary the input; a check whose
+ * input cannot be varied cannot be shown to discriminate.
+ */
+export function unreachabilityFaults(
+	ledger: Readonly<Record<string, GuardRow>>,
+	covered: ReadonlySet<string>
+): UnreachabilityFault[] {
+	// An empty covered set passes every row — a check that cannot fail. Refuse it rather than return green.
+	if (covered.size === 0)
+		throw new Error('unreachabilityFaults: the covered-arrow set is empty — the census reader is broken');
+
+	const byText = new Map<string, GuardedArrow[]>();
+	for (const a of guardedArrows()) {
+		const list = byText.get(a.guard);
+		if (list) list.push(a);
+		else byText.set(a.guard, [a]);
+	}
+
+	const out: UnreachabilityFault[] = [];
+	for (const [guard, arrows] of byText) {
+		if (ledger[guard]?.disposition !== 'ARROW_UNREACHABLE') continue;
+		const coveredArrows = arrows
+			.map((a) => arrowKey(a.machine, a.from, a.to))
+			.filter((k) => covered.has(k))
+			.sort((a, b) => a.localeCompare(b));
+		if (coveredArrows.length > 0) out.push({ guard, coveredArrows });
+	}
+	return out.sort((a, b) => a.guard.localeCompare(b.guard));
 }

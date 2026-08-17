@@ -67,11 +67,13 @@
 // declared set still bites; it says nothing about operators nobody thought of. Generated mutation (Stryker) is
 // the honest successor and is deliberately out of scope — recorded so this is not mistaken for completeness.
 //
-// ── A SECOND DISCLOSED LIMIT: THE SURFACE LAYER IS UNREACHABLE FROM THIS LEDGER (recorded 2026-07-28) ────────
+// ── A SECOND DISCLOSED LIMIT, CLOSED 2026-07-28 BY S-3 (recorded and struck the same day) ────────────────────
 //
-// The runner executes `bunx vitest run <victim>`. Playwright specs are not vitest specs, so **no guard whose only
-// red-proof is an e2e can be carried here** — and this ledger has, by census, zero entries with `file: 'apps/…'`
-// and zero `expectRed` naming an `*.e2e.ts`.
+// UNTIL 2026-07-28 the runner executed only `bunx vitest run <victim>`. Playwright specs are not vitest specs, so
+// **no guard whose only red-proof was an e2e could be carried here** — and this ledger HAD, by census, zero entries
+// with `file: 'apps/…'` and zero `expectRed` naming an `*.e2e.ts`. b06dfa99 closed that the same day: `isE2eTarget`
+// in run.ts dispatches an e2e victim set to Playwright. RE-MEASURED at HEAD rather than arithmetic-shifted, the
+// census is now 23 entries with `file: 'apps/…'` and 16 whose `expectRed` names an `*.e2e.ts`.
 //
 // THAT IS A GAP, NOT A POLICY, AND THE TEMPTING WORKAROUND IS THE DANGEROUS ONE. Naming an e2e file as the victim
 // would not fail cleanly: vitest would find no matching spec, exit non-zero under `passWithNoTests: false`, and
@@ -80,8 +82,9 @@
 //
 // The live instance: `runSteps` in `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts` was made atomic on
 // 2026-07-28 (JPWB-SPEC-001 `SPEC-001-INV-14`, FORK-23 (b)); its red-proof is `e2e/undertaking-atomicity.e2e.ts`,
-// which was written first and observed FAILING on the assessment-count assertion before the fix landed. **No
-// entry was added for it**, deliberately, because an honest one cannot be run today. Closing this needs the
+// which was written first and observed FAILING on the assessment-count assertion before the fix landed. No entry
+// was added for it AT THE TIME, deliberately, because an honest one could not then be run; the entry is now
+// `S3-runSteps-loses-atomicity` below, added by b06dfa99 the same day. Closing it required the
 // runner to dispatch e2e victims to Playwright — which is the same boundary JPWB-SPEC-001 FORK-19 rules on when
 // it adds a `SURFACE` layer to the enforcement register, whose `LAYER_BY_PACKAGE` likewise maps `packages/`
 // prefixes only and fail-closes every `apps/` path to `UNKNOWN`.
@@ -175,7 +178,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: 'if (!/^\\d+$/.test(trimmed)) return null;',
 		replace: 'if (!/^\\d*$/.test(trimmed)) return null;',
 		expectRed: ['apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts'],
-		why: "ONE CHARACTER IS THE WHOLE DEFENCE. `+`->`*` admits the empty string, `Number('')` is 0, and a form that round-tripped NOTHING then declares 'expect revision 0' — which MATCHES every freshly created aggregate, because createObject commits `newRevision: alsoEvents.length` (kit.ts:563). MEASURED end to end on /baselines: under this mutant the `submit` step (acting on a row at revision 0) is ACCEPTED and its e2e assertion stays GREEN; only `approve` (revision 1) reddens. So the defect hides behind the first step of the only test that drives it. Observed at unit level: reddens exactly 2 of 8 assertions — the empty-string case and the discrimination case — leaving the other 6 green.",
+		why: "ONE CHARACTER IS THE WHOLE DEFENCE. `+`->`*` admits the empty string, `Number('')` is 0, and a form that round-tripped NOTHING then declares 'expect revision 0' — which MATCHES every freshly created aggregate, because createObject commits `newRevision: alsoEvents.length` (kit.ts). MEASURED end to end on /baselines: under this mutant the `submit` step (acting on a row at revision 0) is ACCEPTED and its e2e assertion stays GREEN; only `approve` (revision 1) reddens. So the defect hides behind the first step of the only test that drives it. Observed at unit level: reddens exactly 2 of 8 assertions — the empty-string case and the discrimination case — leaving the other 6 green.",
 		source: 'DOC-003 §9 PER-4; SPEC-001 §11.4.22 item 2'
 	},
 	{
@@ -762,8 +765,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	// ── JAN-VERIF V-2: the OLDER ledger, harvested from JAN-EXECREM WP-2..WP-15 ──────────────────────────
 	//
 	// These are the entries most likely to have rotted: the code has moved through fifteen further work packages
-	// since each was written. NONE of them names the test it reddens — their work packages declared the mutation
-	// and never said which suite catches it — so each runs PACKAGE-WIDE and reports KILLED_UNNAMED. That is a
+	// since each was written. AS HARVESTED, none of them named the test it reddens — their work packages declared
+	// the mutation and never said which suite catches it — so each ran without a named victim and reported
+	// KILLED_UNNAMED. Such a run is WHOLE-WORKSPACE, never PACKAGE-WIDE: scoping a mutant to its own package was the
+	// wrong first attempt, and `targetSuites` in run.ts records why. JAN-VERIF V-3 then MEASURED and NAMED them —
+	// re-measured at HEAD, 9 of the 10 entries below carry a victim and the tenth is a `duplicateOf`, which reports
+	// DUPLICATE before anything is applied — and an empty `expectRed` on a mutant expected to be KILLED is now
+	// BLOCKING: it reports KILLED_UNNAMED, which `unnamedVictims` in run.ts folds into `failures`. That is a
 	// weaker claim, honestly labelled: it establishes the guard is tested somewhere, not that a named test does
 	// it. Guessing a victim would have been worse than admitting the gap, because a guessed victim is how a
 	// mutant comes to pass for the wrong reason.
@@ -1866,8 +1874,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// NOT A HYPOTHETICAL — this is the first implementation of the scope, restored. It closed over the
 		// Undertaking's PWU ids alone, which is the obvious reading of "belongs to this Undertaking" and is wrong:
 		// only the per-PWU FITNESS assessments name a PWU, while the three de-minimis FLOOR assessments per PWU name
-		// the EVIDENCE the step produced (`reference-undertaking.ts:602`). The result emptied the OWNING
-		// Undertaking's Assurance tab — a leak fix that over-corrected into hiding the subject's own records.
+		// the EVIDENCE the step produced (`reference-undertaking.ts`, the `satisfyFloor(evidenceId)` call). The
+		// result emptied the OWNING Undertaking's Assurance tab — a leak fix that over-corrected into hiding the
+		// subject's own records.
 		//
 		// It was caught by a CONTROL, never by the leak case, and that is the transferable lesson: scoping
 		// EVERYTHING to nothing satisfies a leak test perfectly. Any scope guard needs both halves.
@@ -1881,8 +1890,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		id: 'S1-baseline-items-stringify-to-object-Object',
 		file: 'packages/rph-engine/src/queries.ts',
 		// ALSO A RESTORED REAL DEFECT. `BASELINE.itemObjectVersions` is `BaselineItemVersion[]` — records of
-		// `{ objectId, semanticVersion, contentHash }` (`objects.ts:139-144`, `:674`) — not a string list and not a
-		// map, though the vocab field name reads like both. `String(entry)` yields "[object Object]", which matches
+		// `{ objectId, semanticVersion, contentHash }` (`objects.ts`, `BaselineItemVersionSchema`; the field itself
+		// is `BaselineObjectSchema.itemObjectVersions`) — not a string list and not a map, though the vocab field name
+		// reads like both. `String(entry)` yields "[object Object]", which matches
 		// no id, so every Baseline silently leaves the owning Undertaking's scope.
 		//
 		// The failure is SILENT in the direction that looks correct: an over-narrow scope shows less, and "less" is
@@ -2446,5 +2456,482 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/register-status.test.ts'],
 		why: "THE FALSE POSITIVE THAT WOULD GET THE GATE LOOSENED. Without the code-span strip, any entry that DESCRIBES the status convention — quoting the marker inside backticks — is counted as carrying extra live statuses and is reported as an offender. REG-F-113 is exactly such an entry, so the gate's first act was to reject the entry announcing it. ⚠ THE DANGER IS THE OBVIOUS REPAIR, NOT THE FAILURE: faced with a false positive on a correct entry, the tempting fix is to relax the rule (ignore lines containing backticks, or drop the exactly-one requirement), and either would let a genuinely statusless entry through forever. Prose about a status is not a status, and stripping code spans is the narrowest rule that separates them — narrower than ignoring backticked lines, because a real status line may cite a rule id in code. Predicted red: the offender limb names REG-F-113 itself.",
 		source: 'REG-F-113'
+	},
+	{
+		id: 'F114-the-declared-source-set-stops-being-checked',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "if (!declared.ok) return reject(command, 'RPH_ILLEGAL_STATE_TRANSITION', declared.reason!);",
+		replace: "",
+		expectRed: ['packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts'],
+		why: "THE DECLARATION BECOMES A COMMENT. With this line gone the spec still exists, the census still reads it, and the table still agrees with the machine — but nothing CHECKS it at dispatch, so a command performs any arrow the machine allows regardless of what it claims. ⚠ THIS MUTANT WAS UNKILLABLE WHEN I FIRST WENT TO DECLARE IT, and that is why its victim file exists. No real spec is narrower than its machine, so no command can be driven from a state it fails to claim while the machine permits it; and the refusal reuses RPH_ILLEGAL_STATE_TRANSITION — exactly what canAdvanceWorkLifecycle returns — while NO test in the repository asserted the MESSAGE. A guard whose removal is invisible: the shape this programme keeps finding, arriving inside the fix for it. What makes it observable is the ORDER, chosen for a different reason: the declared-set check runs FIRST, so a machine-forbidden state now reports 'UNDECLARED ARROW' where it used to report 'Cannot advance PWU'. Same code, different sentence — and the sentence is the assertion.",
+		source: 'REG-F-114 / A-5'
+	},
+	{
+		id: 'F114-a-spec-quietly-drops-an-arrow',
+		file: 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts',
+		find: "sourceStates: ['SHAPING', 'PLANNED', 'EXECUTING']",
+		replace: "sourceStates: ['SHAPING', 'EXECUTING']",
+		expectRed: ['verif/lifecycle-arrow-declarations.test.ts'],
+		why: "THE DRIFT GUARD, KILLED BY MUTATING WHAT IT GUARDS RATHER THAN THE GUARD ITSELF. `BlockPwu` claims SHAPING, PLANNED and EXECUTING because the machine declares all three in-edges to BLOCKED; dropping PLANNED leaves a ratified arrow no command claims, and the agreement gate's 'every command-owned arrow is claimed by its spec' limb reports `PLANNED->BLOCKED`. That limb is the entire present value of the table — the specs narrow nothing today, so all they buy is that a machine in-edge cannot go unimplemented in silence. ⚠ IT REPLACES A MUTANT THAT SURVIVED, AND THE SURVIVAL WAS THE FINDING: `F114-a-machine-arrow-goes-unclaimed-quietly` deleted the gate's OWN assertion, so the only test that could have objected was the one being disabled. A mutation of an assertion is unkillable by that assertion — measured, not reasoned: it reported SURVIVED with all 7 cases green. To hold a guard, mutate the thing it guards.",
+		source: 'REG-F-114 / A-5 — replaces F114-a-machine-arrow-goes-unclaimed-quietly, which SURVIVED'
+	},
+	// ── REG-F-116, THE RUNNER'S OWN ATTRIBUTION ─────────────────────────────────────────────────────────────────
+	//
+	// Every verdict in `run.ts` is inferred from ONE bit — the exit status — and V-4a proved that bit can be
+	// non-zero for a reason that never touched the mutation. `timeoutEvidence` is what separates "measured and bad"
+	// from "not measured". It is the first logic in this harness to be under test at all: `run.ts` exports nothing
+	// and 700 lines of gate logic have never had a single assertion made about them, which is why the predicate was
+	// extracted rather than inlined.
+	{
+		id: 'F116-a-hung-arrangement-is-graded-as-a-kill',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/^[ \\t]*Error: (?:Test|Hook) timed out in \\d+ms/m,',
+		replace: '\t/^[ \\t]*Error: Test timed out in \\d+ms/m,',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "A SLOW ARRANGEMENT STOPS COUNTING AS A NON-MEASUREMENT. Vitest words a hung `beforeEach` differently from a hung assertion — `Error: Hook timed out in 10000ms` — and a fixture that never completed measures the mutation exactly as little as a body that never completed. With `Hook` dropped, a mutant whose victim hangs in setup is graded KILLED and the guard is recorded as proven by a test that never reached its first assertion. Predicted red: the HOOK case alone; the vitest, Playwright and all three CONTROL cases stay green.",
+		source: 'REG-F-116 / JAN-VERIF V-4b'
+	},
+	{
+		id: 'F116-the-e2e-runner-loses-its-timeout-marker',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m',
+		replace: '\t/^[ \\t]*Test timeout of \\d+ms elapsed/m',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE OTHER RUNNER GOES BLIND. `run.ts` reaches `apps/` through Playwright, which reports timeouts in words vitest never uses; a marker list that covers only vitest leaves every e2e victim's timeout graded as a verdict. ⚠ THIS IS THE HALF MOST LIKELY TO ROT SILENTLY, because the e2e path is the rarer one and a stale marker fails OPEN — it produces confident KILLED rows, not errors. The same shape S-3 recorded when an unmatched vitest filter produced `KILLED` from the file-matcher rather than from any guard. Predicted red: the Playwright case alone.",
+		source: 'REG-F-116 / JAN-VERIF V-4b'
+	},
+	{
+		id: 'F116-the-instrument-reads-its-subjects-data-as-its-own-signal',
+		file: 'scripts/mutants/measured.ts',
+		find:
+			'\t/^[ \\t]*Error: (?:Test|Hook) timed out in \\d+ms/m,\n\t/^[ \\t]*Test timeout of \\d+ms exceeded/m',
+		replace: '\t/(?:Test|Hook) timed out in \\d+ms/,\n\t/Test timeout of \\d+ms exceeded/',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE DEFECT AS IT ACTUALLY SHIPPED, RESTORED — this is not a hypothetical mutation, it is the first version of this file. `run.ts` scans the CHILD'S stdout, so a test that ASSERTS on timeout text prints that text into stdout the moment it fails: vitest renders the expected value on a line of its own, in quotes, `\"Hook timed out in 10000ms\"`. Un-anchored, the check reads the FIXTURE OF THE FAILING TEST as a diagnostic from the runner and reports INCONCLUSIVE for a mutant its victim killed cleanly. ⚠ MEASURED, NOT FEARED: the first run of the two mutants above both reported INCONCLUSIVE for exactly this reason, and the only reason a third did not is that `run.ts` holds the unmutated function in memory while the child holds the mutated one. Third sighting of one shape — REG-F-110 (the census could not run under the runner that mutates anchors), REG-F-113 (prose ABOUT a status counted as a status), this. Predicted red: the fixture-quoting CONTROL, plus the two vitest cases that assert the `Error: ` prefix.",
+		source: 'REG-F-116 / feedback: a control needs its own mutant'
+	},
+	{
+		id: 'F116-the-timeout-check-widens-and-nothing-is-ever-measured',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m\n];',
+		replace: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m,\n\t/timed out/\n];',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE OTHER CONTROL'S OWN MUTANT, and it is the failure mode a REPAIR would introduce. Faced with a timeout the markers missed, the obvious fix is to add a loose fallback — and a loose fallback reads the WORDS IN A TEST TITLE as evidence of a timeout, so every genuine failure in a suite named after timeouts is reported INCONCLUSIVE. A gate that answers 'not measured' to everything blocks forever while proving nothing, which is strictly worse than the false KILL it was widened to prevent. ⚠ THE FIXTURE IS THE V-4a REPAIR'S OWN TEST TITLE, deliberately: the tests most likely to carry those words are the ones written to stop timeouts. Predicted red: both CONTROL cases; the three positive cases stay green because the added marker is last and the specific ones still win.",
+		source: 'REG-F-116 / feedback: a control needs its own mutant'
+	},
+	// ── REG-F-117, THE INTENT ARROWS ────────────────────────────────────────────────────────────────────────────
+	//
+	// REG-F-114 recorded `advanceIntent` as "an identical second slice" of the PWU work. It is not: all five sites
+	// ALREADY declared their source set (`precondition: fromStates(...)`, required by the type since JAN-CMDPRE
+	// DWP-06) and it was ALREADY enforced before `checkTransition`. Only the machine attribution was missing,
+	// because the primitive closed over a module constant instead of being told. These three hold the two halves
+	// that are now load-bearing — the census reading the sites, and the sites declaring truthfully.
+	{
+		id: 'F117-the-census-stops-reading-advanceIntent',
+		file: 'verif/arrow-command-census.ts',
+		find: "const ADVANCE_PRIMITIVES: ReadonlySet<string> = new Set(['advanceStatus', 'advanceIntent']);",
+		replace: "const ADVANCE_PRIMITIVES: ReadonlySet<string> = new Set(['advanceStatus']);",
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE READER GOES BACK TO ONE PRIMITIVE AND SIX ARROWS VANISH. This is the exact state the repository was in before REG-F-117: `Intent.intentStatus` invisible to the census, not because the commands failed to declare their arrows but because the reader only knew one primitive's name. ⚠ IT MUST BE KILLED BY THE COVERAGE PIN AND NOT BY A COUNT SOMEWHERE ELSE — the pin exists to make any movement in either direction loud, and this is the direction that LOOKS like nothing happened: coverage silently drops and every conclusion drawn from the census becomes wrong by six arrows. Predicted red: `declarationRows` 174 -> 168 and `machinesSeen` 16 -> 15 on the PINNED test, and `Intent.intentStatus` returning to the census-blind set. ⚠ THIS CITATION HAS NOW MOVED THREE TIMES AND WAS RE-MEASURED EACH TIME, NEVER ARITHMETIC-SHIFTED: `arrowsSeen` 170 -> 164 until REG-F-119 added 8 rows; `declarationRows` 178 -> 172 after REG-F-121 renamed the field (the old name counted ROWS while its percentage claimed ARROWS); 174 -> 168 after REG-F-124 stopped the census manufacturing 4 arrows. The delta stays 6 because this mutant removes a PRIMITIVE and REG-F-124 removed a FABRICATION — unrelated populations — but that is a fact to be measured, not assumed, which is why the number was re-derived rather than adjusted.",
+		source: 'REG-F-117'
+	},
+	{
+		id: 'F117-a-site-declares-a-machine-it-does-not-drive',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\t\tmachine: MACHINE,\n\t\ttarget: 'UNDER_DISCOVERY',",
+		replace: "\t\tmachine: 'PWU.workLifecycleState',\n\t\ttarget: 'UNDER_DISCOVERY',",
+		expectRed: ['packages/rph-application/src/handlers/intent.test.ts'],
+		why: "THE DECLARATION IS LOAD-BEARING, AND THIS IS WHAT PROVES IT RATHER THAN ASSERTING IT. `machine` was added so the census could attribute an arrow — a field added for a reader is exactly how a hollow is born, and all five sites pass the same constant, so replacing `args.machine` with the module constant inside the primitive would change nothing any test could see. What makes it real is that `checkTransition` READS it: declaring a machine this command does not drive validates an Intent arrow against the PWU state machine, which has no RAW state, so the command is refused. ⚠ MEASURED BEFORE BEING DECLARED — applied by hand, 4 of 6 tests in the victim redden. Predicted red: `intent.test.ts` alone; the census still sees six arrows because the SITE still declares six.",
+		source: 'REG-F-117'
+	},
+	{
+		id: 'F117-the-only-multi-source-site-loses-an-arrow',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\t\tprecondition: fromStates('FORMALIZED', 'REVISED'),",
+		replace: "\t\tprecondition: fromStates('FORMALIZED'),",
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE CENSUS READS THE SOURCE SET, NOT THE SITE COUNT — and `ApproveIntent` is the only site that can tell the difference, because it is the only one declaring TWO sources. Five sites yielding six arrows is the whole claim; a reader that counted sites would report five and be indistinguishable from a correct one on every other command. Dropping REVISED also removes the ratified re-approval cycle (REVISED -> APPROVED), which the handler's own docstring says it exists to keep. ⚠ ITS `why` IS ALSO A RECORD OF A DELIBERATE WIDENING: that precondition is authored from the MACHINE and is deliberately wider than the vocab's `drivesFrom` (FORMALIZED only, DS-001 D4) — so this mutant would silently restore the vocab's narrower claim, which is the disagreement the site was written to resolve. Predicted red: `declarationRows` 174 -> 173 on the PINNED test (was `arrowsSeen` 170 -> 169, then 178 -> 177; re-measured at REG-F-124, not shifted — see the sibling entry).",
+		source: 'REG-F-117'
+	},
+	{
+		id: 'F117-a-replayed-revision-can-void-an-approval',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\t\tprecondition: fromStates('APPROVED'),",
+		replace: "\t\tprecondition: fromStates('APPROVED', 'REVISED'),",
+		expectRed: ['packages/rph-application/src/handlers/command-reissue-guard.test.ts'],
+		why: "THE FIFTH `advanceIntent` SITE, WHICH HAD NO MUTANT — found while checking whether DWP-03's claim to cover \"each\" site was true. It covers four; `ReviseIntent` is held elsewhere, by JAN-NOOP-01's `semanticVersion inflation cannot void an approval`. ⚠ AND THE OBVIOUS REASON TO SKIP THIS MUTANT IS FALSE, WHICH IS WHY IT EXISTS: the refusal code is `RPH_ILLEGAL_STATE_TRANSITION`, the same code `checkTransition` returns, so the precondition looks redundant — the machine has no `REVISED -> REVISED` arrow and would surely refuse anyway. **Measured: it does NOT.** With this widening the re-issue is ACCEPTED, because a self-transition is ABSORBED rather than refused — exactly the \"absorbed as a NOOP yet still bumped semanticVersion\" behaviour the handler's own comment records. Since `ApproveIntent` requires `approvedSemanticVersion === current`, that replayed no-op silently VOIDS an outstanding approval. The precondition is the only thing standing between those two facts. Predicted red: 1 test in the named victim, measured before declaring.",
+		source: 'REG-F-117 / JAN-CMDPRE DWP-03 residue'
+	},
+	// ── REG-F-118, THE TWO GROUNDS FOR A DEADNESS CLAIM ─────────────────────────────────────────────────────────
+	//
+	// A dead arrow invites deleting code, so the census may only assert one on evidence that carries it. Two
+	// independent grounds now do: the SOUND one (no ratified in-arrow and no birth) needs no coverage at all, and
+	// the WEAK one (occupancy) is gated on complete coverage. Each needs its own mutant, because either could be
+	// removed while the other kept the summary looking plausible.
+	{
+		id: 'F118-the-sound-deadness-ground-stops-proving-anything',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tconst unreachable = (def?.states ?? []).filter((s) => !hasInArrow.has(s) && !born.has(s));',
+		replace: '\t\tconst unreachable = (def?.states ?? []).filter((s) => hasInArrow.has(s) && born.has(s));',
+		expectRed: ['verif/trigger-claim-truth.test.ts'],
+		why: "THE GROUND THAT SURVIVES PARTIAL COVERAGE STOPS FINDING ANYTHING, and REG-F-088 and REG-F-089 go quiet. Inverting the predicate makes `provablyUnoccupiable` report states that DO have an in-arrow and ARE born — the opposite population, which is empty of anything interesting. ⚠ THE POINT IS WHAT IT DOES **NOT** BREAK: the occupancy ground is untouched, so the summary still reports a plausible census and only the three ratified-trigger rows vanish. Those three are the whole of C-0d's PINNED DEFECT set and the only deadness claims in the repository that partial coverage cannot dismiss. Predicted red: C-0d's `ratified arrows whose command cannot reach the source state`, whose expectations were never edited when the completeness rule landed — which is why they are the right victim.",
+		source: 'REG-F-118'
+	},
+	{
+		id: 'F118-completeness-stops-gating-the-occupancy-ground',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (!complete.has(a.machine)) continue;\n\t\tif (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));',
+		replace: '\t\tif (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE STATE THE REPOSITORY WAS IN UNTIL REG-F-118, RESTORED. Without the gate, `occupiable()` — which grows along DECLARED arrows and therefore UNDER-estimates — is read as unreachability on machines whose arrows are only partly declared, and the census goes from 2 provable dead arrows to 37. Thirty-five of those are false, including the whole PWU spine READY -> PLANNED -> EXECUTING -> ... , states the workbench occupies every day. ⚠ THIS IS THE FAIL-OPEN DIRECTION AND IT LOOKS LIKE A RICHER RESULT: more findings, all confidently worded, each inviting someone to delete a ratified arrow. Predicted red: C-0's `lists every COVERED arrow whose source state can never be occupied`.",
+		source: 'REG-F-118'
+	},
+	{
+		id: 'F118-a-creation-stops-declaring-its-birth',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find:
+			"\t\tbirths: [{ machine: 'Intent.intentStatus', statusField: 'intentStatus', values: ['RAW'] }]\n\t});",
+		replace: '\t});',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE RATCHET'S POSITIVE CASE, which had no mutant until the one I wrote first SURVIVED and taught me what to hold instead. A `commitState` site that CREATES (`expectedRevision: undefined`) and declares no `births` must FAIL the census, not be skipped — because a machine that never appears is `unanalysed`, which reads as *\"not yet reached\"* rather than *\"nobody said\"*, and those are opposite claims. Removing this declaration reproduces exactly the state `Intent.intentStatus` was in before REG-F-086. ⚠ IT REPLACES `F118-the-birth-ratchets-exemption-stops-being-structural`, WHICH SURVIVED AND WAS RIGHT TO: I had added a structural exemption so `createObject`'s own delegating call would not trip the ratchet, but `handlerFiles()` has excluded `kit.ts` since long before any of this, so the census never walks that site. **The exemption guarded a case that cannot arise — a hollow, authored inside the fix for a census — and only its mutant said so.** Predicted red: C-0's suite, which cannot build a birth map at all.",
+		source: 'REG-F-118 — replaces F118-the-birth-ratchets-exemption-stops-being-structural, which SURVIVED'
+	},
+	// ── REG-F-119, THE GENERIC SETTER'S SPINE ───────────────────────────────────────────────────────────────────
+	//
+	// Three properties, three mutants, because each fails differently: the census must READ the table, the table
+	// must AGREE with the machine, and the accountability gate must stay FALSIFIABLE now that two tables between
+	// them claim all 57 arrows.
+	{
+		id: 'F119-the-census-stops-reading-the-setter-table',
+		file: 'verif/arrow-command-census.ts',
+		find: '\tfor (const spec of Object.values(PWU_GENERIC_SETTER_SPECS)) {',
+		// ⚠ REFORMULATED IN ITS OWN COMMIT (ledger rule #5). The first spelling was `Object.values({})`, which
+		// reported NO_COMPILE — `{}` widens `spec` to `unknown`, so the mutation was measuring tsc rather than the
+		// guard. `.slice(0, 0)` keeps the type and empties the population, which is also the more realistic drift:
+		// a reader that silently narrows its own input is the defect this census exists to catch.
+		replace: '\tfor (const spec of Object.values(PWU_GENERIC_SETTER_SPECS).slice(0, 0)) {',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE SPINE GOES BACK TO BEING INVISIBLE. This is the exact state the repository was in before REG-F-119: forty-nine PERIPHERAL arrows visible (abandon, supersede, block, challenge) and the eight the workbench actually drives — READY -> PLANNED -> EXECUTING -> ... -> RECOMPOSED — read by nothing, because `ChangePwuState` takes its target from `payload.newState` at runtime and its call site declares nothing. ⚠ THE DANGEROUS PART IS WHAT STAYS GREEN: the machine simply drops back to 49/57, which is no longer COMPLETE, so under REG-F-118 it silently stops being occupancy-analysable and every unreachability question about it becomes unanswerable again — quietly, with no test naming that as the loss. Predicted red: `arrowsSeen` 178 -> 170 on the coverage pin.",
+		source: 'REG-F-119'
+	},
+	{
+		id: 'F119-a-transcribed-source-drifts-from-the-machine',
+		file: 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts',
+		find: "\tEXECUTING: {\n\t\tcommandType: 'ChangePwuState',\n\t\ttarget: 'EXECUTING',\n\t\teventType: 'PwuStateChanged',\n\t\tsourceStates: ['PLANNED']",
+		replace: "\tEXECUTING: {\n\t\tcommandType: 'ChangePwuState',\n\t\ttarget: 'EXECUTING',\n\t\teventType: 'PwuStateChanged',\n\t\tsourceStates: ['READY']",
+		expectRed: ['verif/lifecycle-arrow-declarations.test.ts'],
+		why: "THE WHOLE RISK OF TRANSCRIBING RATHER THAN DERIVING, AND THE REASON THE AGREEMENT GATE HAD TO BE EXTENDED IN THE SAME COMMIT. A hand-written `sourceStates` can simply be WRONG — here `EXECUTING` is declared reachable from `READY`, which the machine does not ratify (its only in-edge is `PLANNED`). Before REG-F-119 extended `claimedArrows()` to span both tables, this drift would have been READ BY THE CENSUS and AUDITED BY NOTHING: the census would report `READY -> EXECUTING` as a covered arrow the machine never declared, which is fabricated coverage — the precise failure REG-F-114 forbade, arriving through a declaration instead of an inference. Predicted red: BOTH A-2 directions — the spec claims an arrow the machine does not declare, AND the real `PLANNED -> EXECUTING` becomes unclaimed.",
+		source: 'REG-F-119'
+	},
+	{
+		id: 'F119-the-accountability-gate-is-handed-a-derived-set',
+		file: 'verif/lifecycle-arrow-declarations.test.ts',
+		find: '\tObject.values(PWU_GENERIC_SETTER_SPECS).map((s) => s.target)\n);',
+		replace:
+			"\tObject.keys(STATE_MACHINES['PWU.workLifecycleState']?.states ?? {}).length >= 0\n\t\t? (STATE_MACHINES['PWU.workLifecycleState']?.states ?? []).filter(\n\t\t\t\t(s) => !COMMAND_TARGETS_FOR_CONTROL.has(s)\n\t\t\t)\n\t\t: []\n);",
+		expectNoCompile:
+			'DERIVING THE SETTER TARGETS CANNOT EVEN BE WRITTEN HERE without inventing a second owned-set constant, because `COMMAND_TARGETS` is declared BELOW this point. The mutation names `COMMAND_TARGETS_FOR_CONTROL`, which does not exist, so it fails to compile.',
+		why: "THE GUARANTEE IS THE ONE REG-F-119 EXISTS FOR: if the two target sets were computed as COMPLEMENTS of each other, `COMMAND_TARGETS ∪ GENERIC_TARGETS` would cover all twenty states BY CONSTRUCTION and the accountability test — *\"no arrow is unaccounted for\"* — could never fail. A control that cannot fail, authored inside the increment meant to strengthen it, which is this repository's most-repeated defect. ⚠ RECORDED HONESTLY AS THE WEAKER FENCE IT IS: a declaration-order accident is what makes the derived form awkward to write, not a rule anyone stated, and TYPE_PREVENTED here means 'this particular spelling does not compile' rather than 'the mistake is unreachable'. Someone who wanted the derived form could hoist a constant and get it. The real defence is the transcription itself plus the both-directions agreement gate; this row exists so that the day the derived form DOES compile, the ledger reports the change rather than absorbing it.",
+		expectRed: [],
+		source: 'REG-F-119'
+	},
+	// ── REG-F-120, FROM AN AUDIT OF THIS SESSION'S OWN COMMITS ──────────────────────────────────────────────────
+	//
+	// ⚠ ONLY ONE OF THE TWO FIXES GETS A MUTANT, AND THE OTHER'S ABSENCE IS THE RECORD.
+	//
+	// The leaked-report fix (`rmSync` before the spawn in `run.ts`) guards a condition NO CURRENT TEST CAN REACH:
+	// it needs a control that PASSES — leaving `.control-run.json` behind — followed by one that exits non-zero
+	// without writing a report. Today no control passes, because one suite is red, so every control takes the
+	// differencing path and `failedFiles` deletes the report on the way through. **A mutant for it would report
+	// SURVIVED and be RIGHT to.** Declaring one anyway would either block the gate on a false finding or teach
+	// someone to weaken the mutant until it passed.
+	//
+	// This repository has the precedent and states it in `run.ts`: the atomicity guard "shipped with no ledger
+	// entry and a comment saying so", because a fake measurement is worse than a declared absence. Same here —
+	// the guard is commented at its site with its trigger condition, and the register entry says it is unguarded.
+	// ⚠ IT BECOMES KILLABLE THE DAY THE SUITE GOES GREEN, which is also the day it becomes NECESSARY. Whoever
+	// fixes that suite should add the mutant in the same commit.
+	{
+		id: 'F120-the-playwright-anchor-is-deleted-as-redundant',
+		file: 'scripts/mutants/measured.ts',
+		find: '\t/^[ \\t]*Test timeout of \\d+ms exceeded/m',
+		replace: '\t/Test timeout of \\d+ms exceeded/',
+		expectRed: ['verif/mutant-verdict.test.ts'],
+		why: "THE DELETION A READER IS ACTIVELY INVITED TO MAKE, AND WHICH WAS UNGUARDED FOR AS LONG AS THE ANCHOR EXISTED. The two vitest markers carry a `Error: ` prefix AND a line anchor, and the prefix does the separating on its own — measured: drop `^[ \\t]*` from them and all cases stay green. So the anchor LOOKS redundant, and REG-F-116's own summary said as much (\"the runner's own prefix does\"). ⚠ THE PLAYWRIGHT MARKER HAS NO PREFIX. Its anchor is its entire defence against a quoted fixture, and every poisoning fixture written for REG-F-116 was vitest-shaped, so dropping THIS anchor was green too — the e2e half of the self-poisoning hole could have been re-opened by someone acting correctly on the vitest evidence. Measured before declaring: with the quoted-Playwright fixture added, this mutation reddens that control ALONE (1 failed / 7 passed).",
+		source: 'REG-F-120 — from the 43-agent audit of this session'
+	},
+	{
+		id: 'F122-the-census-resumes-inferring-the-from-half',
+		file: 'verif/arrow-command-census.ts',
+		find: "\t\tfind(pp.initializer);\n\t\tif (call === undefined)\n\t\t\treturn fail(\n\t\t\t\tsite,\n\t\t\t\t'declares a precondition with no readable `fromStates(…)`. The census does NOT infer a from-half ' +\n\t\t\t\t\t'from STATE_MACHINES (REG-F-114) — if this command is genuinely un-narrowed by source state, ' +\n\t\t\t\t\t'that is a new idiom to be taught deliberately, with its own ruling, not defaulted into'\n\t\t\t);",
+		replace:
+			'\t\tfind(pp.initializer);\n\t\tif (call === undefined) {\n\t\t\tfor (const to of targets)\n\t\t\t\tfor (const f of STATE_MACHINES[machine]!.transitions.filter((t) => t.to === to).map((t) => t.from))\n\t\t\t\t\tarrows.push({ machine, from: f, to, site });\n\t\t\treturn;\n\t\t}',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE RESURRECTION, VERBATIM. This is the expression REG-F-122 deleted — the census's own REG-F-114 violation: with no readable `fromStates`, the from-half is taken from the MACHINE'S in-edges, and a fabricated arrow enters the census indistinguishable from a declared one. Measured while it was live: exactly ONE of 46 sites ever reached it (`governance.ts:293`), and its fabrication coincided with the callers' real declaration only because `Decision.status` has a single in-arrow to EFFECTIVE — luck, not soundness. ⚠ THE VICTIM IS A SYNTHETIC FIXTURE BY NECESSITY, AND THE REPO-WIDE PINS CANNOT KILL THIS MUTANT: after REG-F-122 every real site declares a readable `fromStates`, so against the live tree this fallback is DEAD CODE and the coverage pins stay bit-identical under the mutation. The predicate-only fixture in the victim is the entire population of the failing arm — which is why `declaredArrowsInFile` is exported as a seam. Predicted red: 'refuses a precondition with no readable fromStates' alone; the two uninspectable-name refusals and the reading CONTROL all stay green.",
+		source: 'REG-F-122'
+	},
+	{
+		id: 'F124-the-factory-parameters-are-crossed-again',
+		file: 'verif/arrow-command-census.ts',
+		find:
+			'\t\t\tfor (const { targets: perCallTargets, sources: perCallSources } of tuples)\n' +
+			'\t\t\t\tfor (const to of perCallTargets)\n' +
+			'\t\t\t\t\tfor (const f of perCallSources) arrows.push({ machine, from: f, to, site });',
+		replace:
+			'\t\t\tvoid tuples;\n' +
+			'\t\t\tfor (const to of targets) for (const f of sources) arrows.push({ machine, from: f, to, site });',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE RECTANGLE, RESTORED — the reader goes back to crossing two flattened factory parameters and manufacturing arrows no call declares. This is the state the census shipped in for its whole life until REG-F-124: `validator-registry.ts`'s four `statusChange` calls declare FIVE arrows between them and were read as NINE, and the four extra sat in REG-F-121's pinned unratified list looking exactly like commands over-claiming. ⚠ NOTE THE ARITHMETIC IN THE MUTATION, because it is the finding: `tuples` is still computed (so the `fail()` arm is untouched and this measures the EMISSION alone) and is then discarded in favour of the crossed sets. ⚠ AND THE VICTIM IS THE SYNTHETIC FIXTURE, NOT THE COUNT PINS, DELIBERATELY: `arrow-census-coverage.test.ts` WOULD also redden (174 -> 178), but a count pin cannot say WHICH reading is right — it fails identically whether the number moved by fabrication or by a real declaration landing. The two-call fixture with disjoint targets and disjoint sources is the only assertion that distinguishes paired from crossed, and it is why one call would not do (a single tuple's cross product IS that tuple). Predicted red: 'pairs a factory's (target, sources) PER CALL instead of crossing the flattened sets' — measured ALONE before declaring.",
+		source: 'REG-F-124 — from the 7-agent adversarial audit that corrected the finding three times'
+	},
+	{
+		id: 'F125-the-fiction-census-reads-the-diagram-again',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (!born.has(declared))',
+		replace: '\t\tif (born.has(declared))',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "THE PREDICATE INVERTED, WHICH IS THE ONLY WAY THIS DERIVATION CAN LIE WITHOUT LOOKING BROKEN. `initialStateFictions()` answers \"does any creation write the state the machine calls initial?\" — flip the sense and it reports the machines that AGREE as fictions and stays silent about the five that do not. ⚠ AND THE POINT IS THAT THE COUNT WOULD STILL LOOK PLAUSIBLE: the inverted set is non-empty (every machine born exactly where it declares), so a reader checking only \"is the number about right\" sees a list of similar length and no failure. That is precisely how the ORIGINAL defect survived — REG-F-071 measured four, the answer became five, and fourteen comments across nine files went on asserting four because nothing compared the claim to the machines. Predicted red: the by-NAME pin AND both controls (`Intent`/`PWU` would now appear, and the birth-declaration scope check would fail on machines that have none) — measured before declaring.",
+		source: 'REG-F-125'
+	},
+	{
+		id: 'F127-the-reassessment-rule-widens-to-every-self-edge',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		find:
+			'\t\tconst adds = (CLAIM_REASSESSMENT_DISCRIMINATORS[target] ?? []).some(\n' +
+			'\t\t\t(f) => supplied[f] !== undefined && !isDeepStrictEqual(supplied[f], before[f])\n' +
+			'\t\t);',
+		replace: '\t\tconst adds = false;\n\t\tvoid supplied;',
+		expectRed: ['packages/rph-application/src/handlers/claim-assessment.test.ts'],
+		why: "THE OVER-BROAD FORMULATION — the one this repository has already adopted and withdrawn ONCE, at `runtime-binding.ts` N-22, whose own comment records it: *\"MY FIRST FORMULATION REFUSED EVERY `from === to`, AND IT WAS OVER-BROAD … the defect is 'NOTHING CHANGED', not 'THE STATUS STAYED THE SAME'.\"* With `adds` forced false, every same-state re-assessment is refused, including a genuinely DISTINCT one by a second assessor — which is what DIFFERENT_AGENT independence looks like, so the guard would strand the act the assurance plane most wants. ⚠ AND THE DUPLICATE-REFUSAL TESTS STAY GREEN UNDER IT, which is the entire reason this mutant exists: a widened guard still refuses the identical re-issue, so the two tests that MOTIVATED the fix cannot tell the narrow rule from the broad one. Only the CONTROL can. Measured before declaring: reddens `CONTROL — a DISTINCT re-assessment at the same status is still ACCEPTED` ALONE (1 failed / 8 passed).",
+		source: 'REG-F-127'
+	},
+	{
+		id: 'F128-the-split-collapses-back-into-one-list',
+		file: 'verif/arrow-command-census.ts',
+		find: '\t\tif (a.from === a.to && !explicitlyIllegal) machineAdmittedSelfEdges.push(key);\n\t\telse overClaimed.push(key);',
+		replace: '\t\tvoid explicitlyIllegal;\n\t\toverClaimed.push(key);',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE SPLIT STOPS DISCRIMINATING — every unratified declaration is reported as an over-claim and the self-edge list empties. This is the state the pin was in for its whole life before REG-F-128: ONE population, one number, and no way to say which kind of thing moved. ⚠ THE HAZARD IT GUARDS IS SPECIFIC, and it is why the CONTROL exists rather than the two name-pins alone: a collapsed classifier still produces two lists of the right TYPE, and if someone re-pinned the names to match it the suite would be green over a classifier that classifies nothing. The control asserts the discrimination itself — no `from !== to` pair may sit in the self-edge list, no self-edge may sit in the over-claim list, and the two must be disjoint — so it fails on the SHAPE rather than on the contents. ⚠ AND THIS MATTERS MORE SINCE REG-F-127: the five machine-admitted self-edges went two different ways (three were duplicate-append DEFECTS and are now refused; two are deliberate HOLDS), so a reader who cannot tell the categories apart cannot look up which disposition applies to the arrow in front of them. Predicted red: the by-name self-edge pin AND the CONTROL.",
+		source: 'REG-F-128'
+	},
+	{
+		id: 'F129-the-creation-gate-reuses-the-readiness-set',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "\tif ((intentObj.state as { intentStatus?: string }).intentStatus === 'SUPERSEDED') {",
+		replace:
+			"\tif (\n\t\t!['PROVISIONAL', 'FORMALIZED', 'APPROVED', 'REVISED'].includes(\n" +
+			"\t\t\tString((intentObj.state as { intentStatus?: string }).intentStatus)\n\t\t)\n\t) {",
+		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
+		why: "THE TEMPTING REUSE, AND THE ONE THE MOTIVATING TEST CANNOT SEE. STA-6 has FOUR clauses and two of them are about intent maturity, so the obvious move when writing the creation gate is to reach for the set the READINESS gate already uses — `INTENT_AT_LEAST_PROVISIONAL` (pwuGuards.ts), which is {PROVISIONAL, FORMALIZED, APPROVED, REVISED}. This mutation is that reuse, spelled inline. ⚠ THE SUPERSEDED TEST STAYS GREEN UNDER IT — a widened gate still refuses SUPERSEDED — so the test that MOTIVATED this guard cannot distinguish the ratified rule from a gate four times too wide. Only the controls can. And the over-refusal is not hypothetical: proposing under a RAW intent is the repository's normal pattern, measured at 56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` without maturing it in between. Predicted red, measured before declaring: the RAW control AND the WITHDRAWN non-rule pin, 2 failed / 2 passed — clause (a) governs readiness, clause (d) governs creation, and this is what keeps them apart.",
+		source: 'REG-F-129'
+	},
+	{
+		id: 'F134-the-dismissal-check-returns-nothing',
+		file: 'verif/guard-enforcement-ledger.ts',
+		find: "\t\tif (ledger[guard]?.disposition !== 'ARROW_UNREACHABLE') continue;",
+		replace:
+			"\t\tif (ledger[guard]?.disposition !== 'ARROW_UNREACHABLE') continue;\n" +
+			'\t\tif (arrows.length >= 0) continue;',
+		expectRed: ['verif/guard-enforcement-ledger.test.ts'],
+		why: "THE CHECK STOPS CHECKING WHILE READING AS GREEN. `unreachabilityFaults` returns [] unconditionally, which is EXACTLY what a correct ledger also produces — so the main assertion cannot tell the two apart, and that is the whole reason CONTROL 5 exists rather than the assertion alone. ⚠ THIS IS NOT A HYPOTHETICAL SHAPE: the identical failure is what let \"Replacement intent identified\" sit false for four commits. There was no check at all, and no-check and check-that-returns-nothing are indistinguishable from the outside. MEASURED BEFORE DECLARING by neutering the function by hand: 1 failed / 13 passed, and the one failure was CONTROL 5 — the main test stayed GREEN under it, which is the point. Predicted red: CONTROL 5 alone.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-two-censuses-key-arrows-differently',
+		file: 'verif/guard-enforcement-ledger.ts',
+		find: '\t\t\t.map((a) => arrowKey(a.machine, a.from, a.to))',
+		replace: '\t\t\t.map((a) => `${a.machine} ${a.from} -> ${a.to}`)',
+		expectRed: ['verif/guard-enforcement-ledger.test.ts'],
+		why: "THE JOIN SILENTLY AGREES ON NOTHING. This function joins TWO censuses — C-0b's guarded arrows and C-0's covered set — and its characteristic failure is therefore not a wrong answer but a KEY-FORMAT MISMATCH, which yields an empty intersection and reads as \"no faults\". Swapping the shared `arrowKey` for a private format is the mutation the file's own header warns against in its second paragraph: two censuses over one table must not each keep their own idea of the table. ⚠ AND IT IS THE MUTATION MOST LIKELY TO BE WRITTEN BY ACCIDENT, because a hand-rolled `${machine} ${from} -> ${to}` differs from the real key by ONE SPACE and nothing about it looks wrong. Predicted red: CONTROL 5 — not the main assertion, which a mismatched join leaves green.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-successor-is-merely-required-to-exist',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: "\tif (successor?.objectType !== 'INTENT') {",
+		replace: '\tif (!successor) {',
+		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
+		why: "THE SUCCESSOR GOES BACK TO BEING THE CALLER’S WORD. Weakening the resolution to an EXISTENCE test (`!successor`) is the tempting version, and it is precisely the shape `proposePwu`’s PWU-002 already has — which DISCLOSES its own hole at pwu.ts:255: \"a non-INTENT id would carry intentStatus: undefined and pass this check\". ⚠ THE GHOST-SUCCESSOR TEST STAYS GREEN UNDER THIS MUTATION, because a nonexistent id fails an existence test too; only the NOT-AN-INTENT case can tell the two apart. That is why this arrow departs from PWU-002 rather than copying it, and why the decoy PWU exists in the suite. Predicted red: \"REFUSES a supersession whose successor is not an INTENT\" alone.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-an-intent-may-supersede-itself',
+		file: 'packages/rph-application/src/handlers/intent.ts',
+		find: '\tif (p.supersedingIntentId === command.targetAggregateId) {',
+		replace: '\tif (false as boolean) {',
+		expectRed: ['packages/rph-application/src/handlers/sta6-superseded-intent.test.ts'],
+		why: "THE SELF-SUPERSESSION ARM IS DELETED. Without it an intent can name ITSELF its own replacement, which moves it to a TERMINAL state whose recorded successor is the dead intent — the stranding this increment exists to close, reached by a second route that the existence-and-type check cannot see (the intent trivially exists and is trivially an INTENT). ⚠ EVERY OTHER TEST IN THE SUITE STAYS GREEN, including the ghost and decoy refusals and the CONTROL, so this arm has exactly one witness and the mutation proves it is a real one rather than a defensive line nothing reaches. Predicted red: \"REFUSES an intent superseding itself\" alone.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-enforcedAt-citation-is-the-literal-it-is-checked-against',
+		file: 'packages/rph-domain/src/enforcement-register.ts',
+		find: "\t\t\t'packages/rph-application/src/handlers/execution.ts \u2014 activateExecutionPlan / canActivatePlan',",
+		replace: "\t\t\t'packages/',",
+		expectRed: [],
+		why: "THE CITATION IS REPLACED BY THE LITERAL IT IS CHECKED AGAINST. `enforcedAt` is supposed to name the site that refuses; the ONLY assertion on it in the whole repository is `toContain(‘packages/’)` at enforcement-register.test.ts:255, so the bare string \"packages/\" satisfies it while naming no file, no function and no line. This mutation is that string.",
+		expectSurvive: "SURVIVAL IS THE FINDING, AND IT IS THE EVIDENCE REG-F-134 PROMISED — a claim that a check CANNOT FAIL must be demonstrated, not asserted. The field's own doc comment already concedes it (\"Prose, checked by a reader, not by the gate\"), and one directory over verif/guard-enforcement-ledger.ts demands an anchor that resolves EXACTLY ONCE in the file it names — the unofficial instrument is stricter than the canonical one. ⚠ A KILL HERE IS THE GOOD NEWS AND MUST BE ACTED ON, NOT SILENCED: it means someone content-gated `enforcedAt`, at which point this entry is RETIRED deliberately and REG-F-134’s open limb closes.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-a-declared-mutation-need-not-exist',
+		file: 'packages/rph-domain/src/enforcement-register.ts',
+		find: "\t\t\t'delete the `if (!check.ok)` arm in activateExecutionPlan',",
+		replace: "\t\t\t'delete the `if (!thisFunctionDoesNotExist)` arm in aHandlerThatWasNeverWritten',",
+		expectRed: [],
+		why: "A DECLARED MUTATION IS REPLACED BY ONE THAT DOES NOT EXIST. `declaredMutations` is supposed to say what to break to prove the guard; the ONLY assertion on it in the whole repository is `.length > 0` at enforcement-register.test.ts:256, so the strings need not name mutations that exist, apply, or redden anything. This mutation replaces a real entry with an invented one.",
+		expectSurvive: "SURVIVAL IS THE FINDING. ⚠ AND THE DEEPER GAP IS THAT THE TWO SYSTEMS ARE UNLINKED: this ledger — the file you are reading — is where mutations actually live, and `enforcement-register.ts` mentions it nowhere. Searched scripts/mutants/ledger.ts for the RPH-EVD-002 guard text and rule id: 0 hits; positive control CLAIM_REASSESSMENT_DISCRIMINATORS in the same file: 1 hit, so the search discriminates. Making `declaredMutations` resolve to ledger ids is a separate work package, filed rather than smuggled into a disposition move. ⚠ A KILL HERE MEANS THE JOIN WAS BUILT — retire this entry deliberately.",
+		source: 'REG-F-134'
+	},
+	{
+		id: 'F134-the-evd002-refusal-code-is-unpinned',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// `RPH_INVARIANT_VIOLATION` occurs three times in this file, so the anchor MUST carry the message line
+		// beneath it to satisfy the exactly-once rule.
+		find:
+			"\t\t\t\t'RPH_INVARIANT_VIOLATION',\n" +
+			'\t\t\t\t`Claim ${command.targetAggregateId} cannot be SUPPORTED: no ADMISSIBLE evidence supports it `',
+		replace:
+			"\t\t\t\t'RPH_VALIDATION_SEMANTIC_FAILED',\n" +
+			'\t\t\t\t`Claim ${command.targetAggregateId} cannot be SUPPORTED: no ADMISSIBLE evidence supports it `',
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
+		why: "THE REFUSAL CHANGES IDENTITY WHILE STAYING A REFUSAL. ⚠ THIS MUTATION WAS MEASURED SURVIVING BEFORE THE PROBE EXISTED, and that measurement is the entire justification for REG-F-138: with the code swapped, the whole workspace stayed GREEN — 269 files, 2732 passed, nothing anywhere reddened. It survived because (a) `claim-assessment.test.ts` is 300 lines about this rule and asserts on NO `error.code` or message anywhere (positive control: `assumption-falsification.test.ts:223` DOES assert `r.error?.code`, same grep shape, different answer); (b) the message is untouched, so the guard-ledger anchor still resolves; and (c) `RPH_VALIDATION_SEMANTIC_FAILED` is not a key of `STATUS_FOR_CODE`, so the status stays REJECTED and every `.not.toBe(‘ACCEPTED’)` stays green. What was \"covered\" was the rule’s NON-ACCEPTANCE, never its IDENTITY. Predicted red now: the WP-16 (c) enforcement probe, whose `classifyRefusal` compares `code === refusalCode`.",
+		source: 'REG-F-138'
+	},
+	{
+		id: 'F134-admissible-collapses-into-present',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// ⚠ TWO LINES, because the identical ADMISSIBLE test appears TWICE in this file — assurance.ts:705 in
+		// `claimsWithAdmissibleEvidence` (the GUARD's set) and :935 in `admissibleEvidenceFor` (the MUTATE
+		// path). Only the following line distinguishes them, and only the first is the one this rule refuses on.
+		find:
+			"\t\tif (!st || String(st.status) !== 'ADMISSIBLE') continue;\n" +
+			'\t\tif (!Array.isArray(st.supportsClaimIds)) continue;',
+		replace:
+			"\t\tif (!st) continue;\n" +
+			'\t\tif (!Array.isArray(st.supportsClaimIds)) continue;',
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
+		why: "ADMISSIBLE COLLAPSES INTO MERELY PRESENT — the one distinction this rule exists to draw. RPH-EVD-002 is the single NON-FORGEABLE refusal in this command precisely because admissibility is a fact the ENGINE holds: evidence reaches ADMISSIBLE only through `AdmitEvidence`, and the guard folds COMMITTED events rather than reading the payload. Weakening the status test to a presence check hands that fact back to the caller, who can then reach SUPPORTED on evidence it merely PROPOSED. ⚠ THE ENFORCEMENT PROBE’S CONTROL CANNOT SEE THIS — the control ADMITS its evidence, so it stays ACCEPTED either way; only the OBSERVED arm, whose evidence was never admitted, flips from REJECTED to ACCEPTED. That asymmetry is why the probe carries two claim aggregates instead of asserting a refusal alone.",
+		source: 'REG-F-138'
+	},
+	// ── REG-F-159: THE GUARD THE OCCUPANCY CENSUS RESTS ON, AND THE DECLARATION THAT FEEDS IT ────────────────
+	//
+	// These two are a PAIR and they fail in opposite directions, which is what distinguishes a real gate from
+	// one that merely refuses a lot: the first kills the ENFORCEMENT, the second kills the DECLARATION.
+	{
+		id: 'F159-birth-drift-refusal-neutered',
+		file: 'packages/rph-application/src/handlers/kit.ts',
+		// TWO LINES: `for (const b of births ?? []) {` alone would be unique, but anchoring on the CONDITION is
+		// what makes the mutation the one described — the loop is not the guard, the predicate is.
+		find:
+			'\t\tconst actual = state[b.statusField];\n' +
+			"\t\tif (typeof actual !== 'string' || !b.values.includes(actual)) {",
+		replace: '\t\tconst actual = state[b.statusField];\n\t\tif (false as boolean) {',
+		expectRed: ['packages/rph-application/src/handlers/birth-drift.test.ts'],
+		why: "THE OCCUPANCY CENSUS'S ONLY RUNTIME DEFENCE, AND IT WAS MEASURED UNFALSIFIABLE BEFORE ITS TEST EXISTED. `refuseOnBirthDrift` runs at BOTH commit seams and its header states the stake: a declaration that has drifted from the code makes the census confidently wrong, which is worse than no census. MEASURED 2026-08-14 with this exact mutation applied: the `rph-application` project ran 99 files / 884 tests, ALL PASSING — every declaration in the repository agrees with the state its site commits, which is what the census passing MEANS, so no production path ever entered the refusing arm and no test ever constructed one. A guard nothing distinguishes from `return null` is this programme's hollow, sitting underneath the instrument that finds hollows. `birth-drift.test.ts` enters the arm directly with synthetic declarations, and reddens on 3 of its 5 cases here while both `toBeNull` controls correctly HOLD — the discrimination that stops it reddening with the herd.",
+		source: 'REG-F-159'
+	},
+	{
+		id: 'F159-fourth-birth-declaration-deleted',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find:
+			"\t\t\t{ machine: 'PWU.shapeIntegrityState', statusField: 'shapeIntegrityState', values: ['UNKNOWN'] }",
+		replace:
+			"\t\t\t{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] }",
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "A DECLARATION SILENTLY STOPS BEING MADE, AND NOTHING ELSE IN THE REPOSITORY NOTICES. Deleting an entry does not break any commit — `refuseOnBirthDrift` simply stops checking that axis — so the failure mode is a machine quietly returning to `unanalysable`, which every occupancy layer reads as \"nobody said\" and skips. ⚠ THE REPLACEMENT IS A DUPLICATE OF AN EXISTING ENTRY RATHER THAN A DELETION, deliberately: it keeps the array's LENGTH at four, so a pin counting entries would stay green and only a pin naming MACHINES can catch it. That is the REG-F-121 shape — a count improves by destroying the evidence — and it is why the REG-F-159 pin asserts machine and value rather than size.",
+		source: 'REG-F-159'
+	},
+	// ── REG-F-160: THE POPULATION ITSELF ────────────────────────────────────────────────────────────────────
+	//
+	// One mutant on the LIST (can it grow silently?) and one on the READER (does C-0c actually consult it?).
+	{
+		id: 'F160-a-real-coverage-gap-is-moved-into-the-exclusion-list',
+		file: 'packages/rph-domain/src/machine-exclusions.ts',
+		find: '/** True when `machine` is a declared key that no control should treat as a lifecycle. */',
+		replace:
+			"Object.assign(NOT_STATE_MACHINES as Record<string, string>, {\n" +
+			"\t'Harness.status': 'a plausible-sounding reason that cites nothing'\n" +
+			'});\n' +
+			'/** True when `machine` is a declared key that no control should treat as a lifecycle. */',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "THE ALLOWLIST ROT `machine-exclusions.ts` NAMES IN ITS OWN HEADER, PERFORMED. It warns that *\"moving a real gap in here would be the allowlist rot this repository keeps recording\"* — and until REG-F-160 NOTHING CHECKED THAT LIST'S MEMBERSHIP. The move is cheap and flattering in both directions at once: `Harness.status` is a genuine coverage gap (harness.ts has exactly one commit site, the `createObject` birth at :34), so excluding it SHORTENS the blind list AND RAISES the coverage percentage by shrinking the denominator. PRIMARY VICTIM: the new `PINNED — exactly which machines are EXCLUDED from the population` pin, which asserts the membership BY NAME WITH ARROW COUNTS. The blind-list pin and the coverage-figures pin also redden, and that is the design rather than a weakness — the point is that this cannot happen quietly, not that exactly one assertion notices.",
+		source: 'REG-F-160'
+	},
+	{
+		id: 'F160-the-coverage-figures-stop-asking-the-population',
+		file: 'verif/arrow-census-coverage.test.ts',
+		find: '\t\tconst declared = inScopeMachines();',
+		replace: '\t\tconst declared = Object.keys(MACHINES);',
+		expectRed: ['verif/arrow-census-coverage.test.ts'],
+		why: "C-0c REVERTS TO ITS OWN IDEA OF THE TABLE — the exact state REG-F-160 found it in, and the state `machine-exclusions.ts` exists to prevent: *\"Two censuses over one table must not each keep their own idea of the table.\"* Three instruments applied `isExcludedMachine` (C-0 :944/:955, C-0b :83, binding-row-truth :249) and this one did not, so `arrowsRatified` carried 9 arrows belonging to `AssuranceAssessment.disposition` — a machine over a field the ratified object schema DOES NOT HAVE (`z.strictObject`; `commitState` validates the produced state), permanently uncoverable. ISOLATING BY CONSTRUCTION: this anchors the FIGURES site alone, so only the `machinesDeclared/arrowsRatified` pin reddens (25 -> 27, 295 -> 304) while the blind-list pin and the excluded-set pin stay green — which is what distinguishes 'the figures consult the population' from 'something somewhere consults it'.",
+		source: 'REG-F-160'
+	},
+	// ── REG-F-161: TWO READ BRANCHES STARVED BY A BIRTH-ONLY MACHINE ────────────────────────────────────────
+	//
+	// Both are CONTROLS whose SURVIVAL is the finding, and both retire together the day an observation-disposition
+	// command is authored — at which point a KILL is the signal, not a regression.
+	{
+		id: 'F161-the-baseline-waiver-escape-is-starved',
+		file: 'packages/rph-application/src/handlers/governance.ts',
+		find: "\t\t\twaived: disposition === 'WAIVED'",
+		replace: '\t\t\twaived: false',
+		expectRed: [],
+		why: "RPH-BAS-003's WAIVER ESCAPE CANNOT FIRE, AND THE SUBSTITUTION IS EXACT. `AssuranceObservation.disposition` has ONE write in the repository — the birth at `assurance.ts:2324`, value `OPEN` — verified by the write funnel (`objectType: OBSERVATION` occurs at exactly one commit site) rather than by grep. So `disposition === 'WAIVED'` is permanently false, and `findOpenBlockingObservations`' `if (o.blocking && !o.waived)` reduces to `if (o.blocking)`. ⚠ NOT A LOCAL FILTER PROBLEM, WHICH WAS THE FIRST HYPOTHESIS AND IT WAS WRONG: `UNSETTLED_DISPOSITIONS` three lines above DOES contain `WAIVED`, so the value is admitted and then can never occur.",
+		expectSurvive: "SURVIVAL IS THE FINDING. MEASURED 2026-08-14 with this exact substitution: `rph-application` + `rph-domain` ran 132 files / 1464 tests, ALL PASSING. ⚠ AND `governance.test.ts:242` ASSERTS THE WAIVED CASE — it passes `waived: true` STRAIGHT INTO the kernel predicate, bypassing the producer, so the kernel branch is tested while the production path that would elicit it cannot exist. FAIL-CLOSED: the gate is STRICTER than canon intends, never laxer — a waived blocking finding is refused rather than excused — so this is a dead branch, not a hole. ⚠ A KILL MEANS AN OBSERVATION-DISPOSITION COMMAND WAS BUILT — retire this entry deliberately and re-drive RPH-BAS-003's C-0b row.",
+		source: 'REG-F-161'
+	},
+	{
+		id: 'F161-the-floor-gate-resolved-finding-filter-is-starved',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: "\t\tif (s.disposition && s.disposition !== 'OPEN') continue; // already resolved/waived elsewhere",
+		replace: '\t\t// already resolved/waived elsewhere',
+		expectRed: [],
+		why: "THE SAME STARVATION AT THE OTHER END OF THE SYSTEM, AND ITS POLARITY IS WORTH RECORDING SEPARATELY. `openFindingCodes` skips observations whose disposition is anything but `OPEN`; since `OPEN` is the only value ever written, the `continue` never fires and the filter excludes nothing. So a waiver must name EVERY finding code the assessment ever raised, including any that were resolved — which is again STRICTER, not laxer.",
+		expectSurvive: "SURVIVAL IS THE FINDING. MEASURED 2026-08-14 with this exact deletion: `rph-application` + `rph-domain` + `rph-assurance` ran 137 files / 1511 tests, ALL PASSING. ⚠ PAIRED WITH `F161-the-baseline-waiver-escape-is-starved` — one root cause, two consumers, and BOTH fail closed, which is why this is filed as a dead-branch census rather than as a defect needing a hotfix. A KILL means the disposition machine acquired a writer; retire both entries together.",
+		source: 'REG-F-161'
+	},
+	// ── JAN-PWUWP W-5.5 (REG-D-043 / REG-F-193 / REG-F-194) ──────────────────────────────────────────────────
+	// ⚠ THESE FOUR EXIST BECAUSE THE GATE WAS GREEN AND SAID NOTHING. The W-5.5 run measured 205 distinct
+	// mutations — IDENTICAL IN EVERY CELL to the run before it — while the increment added a command, a guard
+	// limb, a census idiom and a fail-closed refusal. A search of this ledger for `unblock|blockedfrom|
+	// ownerofarrow|recovery_command|recoverytargets` returned 0, with `handlers/pwu.ts` (4) and
+	// `arrow-command-census.ts` (8) as positive controls proving the search reached the file. Green over the OLD
+	// surface is not a pass on the new one.
+	{
+		id: 'F193-the-union-guard-loses-its-arrow-limb',
+		file: 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts',
+		find: '\tfor (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {\n\t\tif (spec.arrows.some((a) => a.from === from && a.to === to)) return spec.commandType;\n\t}\n',
+		replace: '',
+		expectRed: ['packages/rph-application/src/handlers/block-escalate.test.ts'],
+		why: "REG-F-193's WHOLE RULING IN ONE MUTANT. Ownership is a UNION — arrow first, the eleven-row target table as a fail-closed backstop — because a target key cannot say that `BLOCKED -> PLANNED` belongs to `UnblockPwu` while `READY -> PLANNED` stays the generic setter's. Delete the arrow limb and the lookup falls through to the target table, where PLANNED is NOT owned, so `ChangePwuState` performs recovery: exactly the hole W-5.5 landed three parts in one commit to avoid, and it was MEASURED at that value (BLOCKED -> PLANNED returns ACCEPTED).",
+		source: 'REG-F-193'
+	},
+	{
+		id: 'F193-recovery-guesses-an-origin-it-was-never-told',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: '\t\tconst origin = recordedBlockOrigin(ctx, id);',
+		replace: '\t\tconst origin = recordedBlockOrigin(ctx, id) ?? candidates[0]!;',
+		expectRed: ['packages/rph-application/src/handlers/block-escalate.test.ts'],
+		why: "THE FAIL-CLOSED HALF OF AX-8, AND THE ONLY MUTANT THAT CAN SHOW IT IS LOAD-BEARING. A PWU blocked before `blockedFrom` existed records no origin, and the two ways to produce one are to fold the event prefix — which CON-000 AX-6 forbids, *'never inferred from ... ordering'* — or to guess. This mutant guesses, plausibly, by taking the first declared candidate. It is the shape a well-meaning fix would take, which is why the refusal needs a mutant rather than a comment.",
+		source: 'REG-F-193'
+	},
+	{
+		id: 'F193-the-cardinality-branch-stops-deciding-anything',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: '\tif (candidates.length > 1) {',
+		replace: '\tif (candidates.length > 0) {',
+		expectRed: ['packages/rph-application/src/handlers/block-escalate.test.ts'],
+		why: "WHETHER A RECORDED ORIGIN IS OWED IS DECIDED BY THE DECLARATION'S CARDINALITY, NOT BY A HARDCODED STATE LIST — which is why `PwuEscalated` deliberately carries no `escalatedFrom`. ESCALATED has ONE ratified in-arrow, so its target is derivable from the DECLARED MACHINE (permitted by AX-6) rather than from event ordering (forbidden). Widen the branch to `> 0` and ESCALATED recovery demands an origin no escalation event records, so it fails closed and de-escalation becomes unperformable. Kills the claim that the `> 1` is incidental.",
+		source: 'REG-F-193'
+	},
+	{
+		id: 'F194-the-census-goes-blind-to-the-recovery-command-again',
+		file: 'verif/arrow-command-census.ts',
+		find: '\tfor (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {',
+		replace: '\t\tfor (const spec of [] as (typeof PWU_RECOVERY_COMMAND_SPECS)[string][]) {',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "REG-F-114's DEFECT HAS NOW RECURRED THREE TIMES AND THIS IS THE FIRST MUTANT THAT WOULD CATCH THE FOURTH. `UnblockPwu` resolves its target at runtime, so a syntactic reader sees no arrow; the fifth data idiom reads the DECLARATION instead. Starve that loop and all four recovery arrows return to *'arrows no command can perform'* and coverage falls 166 -> 162 — which is precisely the state C-0 reported when W-5.5 first landed, before the idiom existed. The idiom was added in response to a red; nothing until now would have noticed it being removed.",
+		source: 'REG-F-194'
 	}
 ];

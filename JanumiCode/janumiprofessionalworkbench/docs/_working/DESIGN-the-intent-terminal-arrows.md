@@ -1,0 +1,123 @@
+# DESIGN — Intent at 6/15: the nine terminal arrows nothing performs
+
+**Status: DESIGN — all findings below are MEASURED (2026-08-13). No code change proposed yet; §5 states what
+must land TOGETHER if anything lands at all.**
+
+## 1. The gap, measured
+
+`Intent.intentStatus` ratifies 15 arrows; commands declare 6. The uncovered 9 are ALL terminal-bound, and they
+split by trigger, not evenly:
+
+| Trigger | Arrows | Sources |
+|---|---|---|
+| **Supersede** | 6 | RAW, UNDER_DISCOVERY, PROVISIONAL, FORMALIZED, APPROVED, REVISED (every non-terminal state) |
+| **Withdraw** | 3 | RAW, UNDER_DISCOVERY, PROVISIONAL **only** |
+
+⚠ The Withdraw asymmetry is a semantic statement the machine makes deliberately: an intent that has been
+FORMALIZED, APPROVED or REVISED **cannot be withdrawn — it can only be superseded.** Any command design that
+offered Withdraw from those states would contradict the ratified machine.
+
+## 2. The corpus is ASYMMETRIC too, and it decides the disposition
+
+Derived from `packages/rph-contracts/vocab/m3-commands-events.json` and `messages.ts`:
+
+- **`IntentSuperseded` EXISTS as a ratified event NAME** (cited DOC-002 §26.2), with an **UNRATIFIED-AUTHORED**
+  shape — `{ supersedingIntentId, intentStatus }`, annotated *"Do NOT treat this sourceSection as proof the
+  shape is ratified"*. Its own field note reads **`"(any active)->SUPERSEDED"`**, which is the 6 arrows.
+- **`IntentWithdrawn` DOES NOT EXIST — no event, no payload schema, no name in the corpus.** `WithdrawIntent`
+  likewise occurs nowhere. Checked in both directions: grepped for content (`IntentWithdrawn`, `WithdrawIntent`)
+  across `packages/`, and enumerated every `Intent`-matching contract export.
+
+**The precedent that settles this is in this repository already**, at `recordClaimAssessment`
+(`assurance.ts:~755`): states with a ratified event name are performable; a state with **neither a ratified
+event nor a consumer** is deliberately left unreachable, because *"a state reached by an INVENTED event looks
+governed, where a state nothing can reach is visible."* (REG-D-024.)
+
+So: **the honest ceiling for Intent is 12/15, not 15/15.** The 3 Withdraw arrows should stay uncovered and
+VISIBLE. Closing them would require minting an event name the corpus does not have.
+
+## 3. ⚠ THE TRAP, RECORDED IN ADVANCE BY THE REPOSITORY ITSELF
+
+`packages/rph-domain/src/enforcement-register.ts` `RPH-INT-007` (kind `NOT_A_COMMAND_REFUSAL`) closes the rule
+*"a superseded intent cannot authorize new PWUs"* (JPWB-DOC-003 §5 STA-6) on the ground that **SUPERSEDED is
+command-unreachable**. Its final sentence:
+
+> *"THE RESIDUE, stated because it is real: if SUPERSEDED ever becomes reachable, this rule becomes a live
+> UNENFORCED_DISCLOSED row on the same day."*
+
+And the mechanism, quoted from the same entry: `proposePwu` *"loads the intent, checks that it EXISTS, then
+narrows it to `{ ontologyId, ontologyVersion }` and copies those two fields; it never reads `intentStatus`, so a
+superseded intent would sail through."*
+
+**Therefore a `SupersedeIntent` command cannot land alone.** Shipping it without the companion guard would
+convert a closed register row into a live governance hole in the same commit — a superseded intent authorizing
+new PWUs — and the register would be telling the truth about a system that had just acquired the defect.
+
+## 4. Why this was found before it was built
+
+The standing practice is to grep the enforcement register and the per-programme design corpus BEFORE designing.
+Done here, it returned the trigger condition for a defect this increment would otherwise have created. Recorded
+because the cost of the alternative is concrete: six new arrows, a green gate, and STA-6 silently unenforced.
+
+## 5. What must land TOGETHER (the increment's shape, not yet its roadmap)
+
+1. `proposePwu` reads `intentStatus` and refuses a ~~SUPERSEDED (and WITHDRAWN)~~ **SUPERSEDED** intent —
+   **red-first, and it can be written and landed BEFORE any supersede command exists**, since the guard is
+   testable by seeding. Landing it first means RPH-INT-007 never has a window in which it is live-and-unenforced.
+
+   **⚠ THE `(and WITHDRAWN)` WAS MY ERROR, AND IT REPEATS ONE THE REGISTER ALREADY RATIFIED AS AN ERROR.** STA-6
+   names *"a superseded intent"* and nothing else; grepping the ratified Canonical Domain Model for `WITHDRAWN`
+   returns exactly two hits — the enum member and the §6.2 matrix row — and §6.3's seven invariants never mention
+   it. My ground for adding it was `terminalStates: ['SUPERSEDED','WITHDRAWN']`, i.e. *the two terminal states
+   should behave alike* — and **REG-F-083 records that `terminalStates` is WHOLLY A REPOSITORY SHAPE**: *"The
+   ratified Canonical Domain Model contains the word 'terminal' ZERO times."* So the inference reasons from a
+   repository artifact as though it were canon. **Refuse SUPERSEDED only.** The asymmetry is itself ratified —
+   Supersede has six in-arrows ("any active"), Withdraw only three ("permitted only from these three early
+   states"), so the two are not interchangeable in the corpus either.
+
+   **SCOPE: every PWU, root and non-root.** Clause (d) carries no root qualifier, unlike clause (a)'s "A root
+   PWU". Every proposal already loads its intent (PWU-002's existence check), so the status read costs nothing.
+
+   **⚠ AND IT MUST NOT REUSE `INTENT_AT_LEAST_PROVISIONAL`** (`pwuGuards.ts:92-97` = PROVISIONAL | FORMALIZED |
+   APPROVED | REVISED). That set serves clause (a) at READINESS. Using it at CREATION would refuse RAW and
+   UNDER_DISCOVERY — and **56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` never mature
+   the intent in between**, so proposing under a RAW intent is the normal, deliberate pattern
+   (`disclosure-observed.test.ts:395-397` states it in terms). Reusing the readiness set would strand it.
+
+   **PRE-EXISTING GAP, RECORDED AND NOT FIXED HERE:** `proposePwu` never asserts the referent's `objectType`, so
+   `intentId` may name a non-Intent object whose `intentStatus` is `undefined`. A `=== 'SUPERSEDED'` test admits
+   it — but so does today's existence-only check, so this guard does not worsen it. Closing it is a change to
+   PWU-002's own rule and belongs in its own increment, not smuggled in beside a canon-grounded one.
+2. Only then, `SupersedeIntent` + `IntentSuperseded` emission, with the shape's authored status disclosed as
+   `recordClaimAssessment` disclosed its own (REG-D-024 pattern).
+
+   **⚠ THE COMMAND NAME IS AUTHORED, AND THE BASIS IS VERIFIED RATHER THAN ASSUMED FROM PRECEDENT.** Checked
+   2026-08-13: `SupersedeIntent` appears NOWHERE in canon — the only hits in `docs/canon` are my own register
+   entries — and there is no `SupersedeIntentPayloadSchema`. So minting it is an authoring act, and it needs the
+   same three-part ground `recordClaimAssessment` stood on, each limb re-verified here:
+   - **The EVENT is ratified.** `IntentSuperseded` is in the ratified Canonical Domain Model's event list
+     (`…Canonical Domain Model…md:1534`), and `IntentSupersededPayloadSchema` exists in `messages.ts:1365`,
+     shape marked `UNRATIFIED-AUTHORED` and cited to DOC-002 §26.2.
+   - **The STATE and its arrows are ratified.** Six in-arrows, one from every non-terminal state, each carrying
+     *"VERBATIM §6.2. 'Any active' = any non-terminal state"*.
+   - **A command is PRESUPPOSED by canon, not invented.** PER-3 (DOC-003:345): *"Canonical state is mutated only
+     through authenticated, authorized, semantically named commands … No generic CRUD/PATCH path … bypasses this
+     pipeline."* So a ratified state with ratified in-arrows and a ratified event MUST be reached by a command;
+     the corpus leaves only its NAME unstated.
+   - **And the asymmetry is the tell.** The ratified event list names six Intent events, and FIVE of them
+     (`IntentCaptured`, `IntentDiscoveryStarted`, `IntentFormalized`, `IntentApproved`, `IntentRevised`) already
+     have commands. Only the supersede one does not — an implementation gap, not a corpus exclusion.
+
+   Disclosed exactly as REG-D-024 required: the NAME is authored, the SHAPE is authored, and both are recorded
+   in the register rather than presented as ratified.
+3. `RPH-INT-007`'s register row is rewritten in the same commit as (2): its `NOT_A_COMMAND_REFUSAL` ground
+   (unreachability) expires the moment the command exists, and the row must move to ENFORCED — with the guard
+   from (1) as its probe — rather than be left describing a world that ended.
+4. The 3 Withdraw arrows: **no command.** Recorded as deliberately uncovered with the REG-D-024 reasoning, so
+   the census's uncovered list keeps naming them.
+
+## 6. Predicted movement, stated before measuring
+
+`ratifiedArrowsCovered` +6 (156 → 162) and Intent 6/15 → 12/15, IF and only if all four items land. The count
+must NOT be quoted from this doc — it is a prediction, and REG-F-118 exists because a number was pinned in
+advance. Measure it from the census at the time.

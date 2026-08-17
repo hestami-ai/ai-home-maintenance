@@ -17,8 +17,9 @@
 // is exactly what idempotency exists to avoid. Recorded as owed rather than approximated.
 //
 // THE ERROR CODE IS A RATIFIED ONE CARRYING A LABEL, per the WP-11 discipline REG-F-012 names.
-// `RPH_IDEMPOTENCY_CONFLICT` would be the natural code and is NOT among the ratified fifteen; minting one is a
-// sponsor act, not a repository one. `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which
+// `RPH_IDEMPOTENCY_CONFLICT` would be the natural code and is NOT among the ratified fifteen; ~~minting one
+// is a sponsor act, not a repository one~~.
+// ⚠ THE AUTHORITY CLAIM ABOVE IS REFUTED, AND THIS COMMENT IS WHY IT MATTERED (REG-F-144). REG-D-027/REG-F-057 settled on 2026-08-07 that minting an error code is **a repository shape change, through the contract procedure — NOT a sponsor act**: REG-D-004 makes the repository authoritative for "error codes" by name, and DOC-004 §5 routes enum extension through the contract procedure. `packages/rph-contracts/src/errors.ts` records the correction AND records that THIS SITE is what the refuted claim was blocking — *"a code comment in command-bus.ts that refused to mint a needed code on the strength of it"*. ⚠ AND THE COUNT SENTENCE THAT STOOD HERE WAS ITSELF THE CONFLATION THIS COMMIT REVERTED ELSEWHERE (corrected REG-F-148). It read "the ratified set is no longer fifteen". **It still is fifteen.** `errors.ts` states the split explicitly — "Fifteen transcribed from DOC-007 §25.1 ... plus one AUTHORED addition disclosed inline below" — and the sixteenth member carries "AUTHORED 2026-08-07 (REG-D-027). Not from DOC-007 §25.1; **disclosed rather than blended in**". So the RATIFIED set is fifteen and the WIRE ENUM is sixteen, and writing "the ratified set is no longer fifteen" blends in the very member that was deliberately kept separate. `RPH_IDEMPOTENCY_CONFLICT` is in NEITHER set, which is why the struck limb above was TRUE and is restored, and why minting it remains a real contract change. **The workaround below therefore stands on a ground that was removed seven days ago.** Minting `RPH_IDEMPOTENCY_CONFLICT` is now AVAILABLE — it is a contract change with schema, storage, fixture and test coordination, so it is filed as its own work package rather than smuggled into a comment fix. `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which
 // REG-F-010 records as correctly carrying no error at all. So the refusal uses
 // `RPH_VALIDATION_SEMANTIC_FAILED` — the command is semantically inapplicable given the receipt on record — and
 // puts `IDEMPOTENCY_KEY_REUSED` in the message where a reader and a future code can both find it.
@@ -80,11 +81,27 @@ describe('REG-F-012: an idempotency key is bound to the command that claimed it'
 			key
 		);
 
+	// ⚠ THE CODE ITSELF IS ASSERTED HERE, AND NOTHING ASSERTED IT BEFORE (REG-F-181). Every assertion in this file
+	// reads the MESSAGE — `toContain('IDEMPOTENCY_KEY_REUSED')` — because for eight days the label WAS the contract:
+	// the refusal borrowed `RPH_VALIDATION_SEMANTIC_FAILED` and carried its real meaning in prose. That left the
+	// mint with no test that could notice it: swapping the code while keeping the label would have passed this
+	// whole suite unchanged, which is a contract change no gate could see. So the code assertion is written FIRST
+	// and driven RED before the enum is touched.
+	//
+	// THE CATEGORY IS ASSERTED BESIDE IT, because minting moves it. `makeRphError` derives `category` from
+	// `ERROR_CODE_CATEGORY`, so this refusal leaves VALIDATION for CONCURRENCY — and CONCURRENCY is not a
+	// preference: `RPH_IDEMPOTENCY_DUPLICATE` (the sibling idempotency code) and `RPH_REVISION_CONFLICT` (the only
+	// other `*_CONFLICT`) are both CONCURRENCY already. Anything routing on category sees this move, so it is
+	// pinned rather than left to be discovered.
 	it('a DIFFERENT target under the same key is refused, not swallowed', () => {
 		expect(capture(INTENT_A, KEY).status, 'the first command claims the key').toBe('ACCEPTED');
 
 		const second = capture(INTENT_B, KEY);
 		expect(second.status, JSON.stringify(second.error)).toBe('REJECTED');
+		expect(second.error?.code, 'the refusal names the condition in its CODE, not only in prose').toBe(
+			'RPH_IDEMPOTENCY_CONFLICT'
+		);
+		expect(second.error?.category, 'and it routes as a conflict, like its two siblings').toBe('CONCURRENCY');
 		expect(second.error?.message).toContain('IDEMPOTENCY_KEY_REUSED');
 		expect(
 			store.loadObject(INTENT_B),

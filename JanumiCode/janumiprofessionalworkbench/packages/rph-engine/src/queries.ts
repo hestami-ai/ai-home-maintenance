@@ -85,7 +85,8 @@ export type QueryScope =
  * A TWO-HOP CLOSURE (PWUs ONLY) WAS TRIED FIRST AND WAS WRONG, which is worth recording because the error is
  * invisible from the object model alone. Of the reference seed's assessments, only the per-PWU *fitness* ones name
  * a PWU as subject; the three de-minimis FLOOR assessments per PWU name the **Evidence** the step produced
- * (`reference-undertaking.ts:602`, `satisfyFloor(evidenceId)`). Scoping to PWU ids alone therefore emptied the
+ * (`reference-undertaking.ts`'s `satisfyFloor(evidenceId)` — cited by SYMBOL because the `:602` that stood here
+ * has drifted, and re-pinning a number only re-arms the trap). Scoping to PWU ids alone therefore emptied the
  * owning Undertaking's own Assurance tab — caught by the CONTROL case in `undertaking-scope.e2e.ts`, which exists
  * precisely because scoping everything to nothing satisfies a leak test. That is FORK-9's NON-EXAMPLE in the
  * flesh: INV-02 forbids presenting objects OUTSIDE the scope, never presenting the subject's own.
@@ -128,8 +129,10 @@ function undertakingObjectIds(handle: EngineHandle, undertakingId: string): Set<
  *
  * TWO SHAPES, because the four subject-bindable types do not agree on one. Assessment, observation and decision
  * carry `subjectObjectIds: string[]`. BASELINE carries `itemObjectVersions: BaselineItemVersion[]` — an array of
- * `{ objectId, semanticVersion, contentHash }` records, NOT a list of ids and NOT a map (`objects.ts:139-144`,
- * `:674`). An earlier revision of this function assumed the latter two in turn; both stringified the records into
+ * `{ objectId, semanticVersion, contentHash }` records, NOT a list of ids and NOT a map (`objects.ts`'s
+ * `BaselineItemVersionSchema` and `BaselineObjectSchema.itemObjectVersions` — cited by SYMBOL because the
+ * `:139-144` / `:674` that stood here have drifted). An earlier revision of this function assumed the latter
+ * two in turn; both stringified the records into
  * `"[object Object]"`, which matched nothing and silently emptied the owning Undertaking's Baselines tab. It was
  * caught by the CONTROL case rather than by the leak case, because a scope that admits nothing satisfies a leak
  * test perfectly.

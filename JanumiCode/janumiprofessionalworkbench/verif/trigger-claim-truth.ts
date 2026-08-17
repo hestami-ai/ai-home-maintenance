@@ -40,6 +40,38 @@ import type { TransitionClaim } from './binding-row-truth.js';
 
 const M2_VOCAB = new URL('../packages/rph-domain/vocab/m2-transitions.json', import.meta.url);
 
+/**
+ * The transition vocab, READ AND PARSED ONCE.
+ *
+ * ⚠ THIS WAS RE-READ AND RE-PARSED PER ARROW, AND IT IS THE SAME DEFECT AS V-4a IN A DIFFERENT FILE.
+ * `provenanceOfArrow` is called once per arrow — **304 of them** — and each call did a full `readFileSync` plus
+ * `JSON.parse` of this vocab; a row with no note then falls through to `provenanceOf`, which parsed it AGAIN. So a
+ * single test performed on the order of 400 parses of the same file. Measured at **3813ms against the 5000ms
+ * DEFAULT timeout — 76% of its budget** — which made it the closest non-CSAA test in the repository to tipping.
+ *
+ * WHY THAT IS A GATE DEFECT AND NOT A SLOW TEST. A declared CONTROL in the mutation ledger runs the WHOLE suite,
+ * so any test that tips its timeout under load becomes a verdict about an unrelated mutation (REG-F-116). This one
+ * was next in line, and it was found by MEASURING which tests sit closest to their budget rather than by guessing
+ * which look expensive — the derivation is in the register entry, and it named exactly one file.
+ *
+ * ⚠ FOUND BY DERIVING THE POPULATION, WHICH IS THE PART THAT GENERALISES. The instinct was to audit the 24 verif
+ * files that call `readFileSync` for the same pattern; that is enumeration, and it would have "fixed" files that
+ * cost nothing while missing the criterion. The criterion is duration against declared budget, and it is a
+ * measurement the suite already emits.
+ */
+let m2Spec: M2Spec | undefined;
+interface M2Spec {
+	readonly machines: readonly {
+		readonly name: string;
+		readonly sourceSection?: string;
+		readonly transitions?: readonly { from?: string; to?: string; note?: string }[];
+	}[];
+}
+function m2Once(): M2Spec {
+	m2Spec ??= JSON.parse(readFileSync(M2_VOCAB, 'utf8')) as M2Spec;
+	return m2Spec;
+}
+
 type Machine = { transitions: readonly { from: string; to: string; trigger?: string }[] };
 
 const MACHINES = STATE_MACHINES as unknown as Record<string, Machine>;
@@ -83,10 +115,7 @@ export type TriggerProvenance = 'VERBATIM' | 'RECONSTRUCTED' | 'OTHER';
  * the row it came from. My first scan for multi-source rows checked `|`, `(` and `,` and missed every one.
  */
 export function provenanceOfArrow(machine: string, from: string, to: string): TriggerProvenance {
-	const spec = JSON.parse(readFileSync(M2_VOCAB, 'utf8')) as {
-		machines: { name: string; transitions?: { from?: string; to?: string; note?: string }[] }[];
-	};
-	const rows = spec.machines.find((m) => m.name === machine)?.transitions ?? [];
+	const rows = m2Once().machines.find((m) => m.name === machine)?.transitions ?? [];
 	const row = rows.find(
 		(t) => (t.from ?? '').split('/').includes(from) && t.to === to
 	);
@@ -104,10 +133,7 @@ export function provenanceOf(machine: string): TriggerProvenance {
 	// and returned 'OTHER' for EVERY machine — including `PWU.workLifecycleState`, which is known VERBATIM. That
 	// uniform negative is the tell, and it is the fourth instrument failure of the day; the control case is the
 	// only thing that distinguishes it from a real answer.
-	const spec = JSON.parse(readFileSync(M2_VOCAB, 'utf8')) as {
-		machines: { name: string; sourceSection?: string }[];
-	};
-	const src = spec.machines.find((m) => m.name === machine)?.sourceSection ?? '';
+	const src = m2Once().machines.find((m) => m.name === machine)?.sourceSection ?? '';
 	// Order matters: a source can say BOTH ("enum (VERBATIM). Transitions RECONSTRUCTED…"), and it is the
 	// TRANSITIONS whose provenance this control depends on, so RECONSTRUCTED wins the tie.
 	if (/RECONSTRUCT/i.test(src)) return 'RECONSTRUCTED';

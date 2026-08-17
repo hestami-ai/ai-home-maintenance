@@ -46,7 +46,17 @@ const key = (u: Unreachable) => `${u.machine}.${u.state}`;
  *
  * JAN-CMDPRE-SPEC-001 §2 excludes them by name: *"Two non-transition entries in the same table are noted and
  * excluded: `AggregateAssuranceDisposition` (transitions.data.ts:1591) and any `initialState: undefined` rollup
- * carry no transitions and are **computed dispositions, not state machines**."* A computed disposition has no
+ * carry no transitions and are **computed dispositions, not state machines**."*
+ *
+ * [Editorial, 2026-08-13 — the QUOTATION above is left VERBATIM and the ratified spec is not edited. Both ends
+ * of its pointer have DRIFTED: `AggregateAssuranceDisposition` now begins at transitions.data.ts:2287, and
+ * :1591 falls inside `AssuranceAssessment.disposition` — the OTHER `NOT_STATE_MACHINES` key, retired by
+ * REG-F-068 — so the pointer now lands on the one place guaranteed to conflate the two exclusions. This is not
+ * one stale number: §2's own preamble says every machine is "cited by line", and the whole block predates a
+ * regeneration of transitions.data.ts (it cites `ValidatorRegistryEntry.status` at 1607-1615, now :2305, and
+ * `ExecutionStep.stepState` at 1421-1488, now :1980). Correcting the single number quoted here would imply the
+ * rest are sound; re-citing §2 is a change to a ratified document, not this file's to make.] A computed
+ * disposition has no
  * arrows because nothing MOVES it — it is derived from the things it summarises. Counting its states as
  * "unreachable" is a category error, and this file made it: the first version of this finding reported ELEVEN
  * unreachable states, six of which were this rollup's.

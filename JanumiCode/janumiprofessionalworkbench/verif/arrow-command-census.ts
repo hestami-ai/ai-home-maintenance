@@ -16,6 +16,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { isExcludedMachine, STATE_MACHINES, STEP_COMMAND_SPECS,
 	PWU_LIFECYCLE_COMMAND_SPECS,
+	PWU_GENERIC_SETTER_SPECS,
+	PWU_RECOVERY_COMMAND_SPECS,
 	PWU_LIFECYCLE_MACHINE
 } from '@janumipwb/rph-domain';
 import * as CONTRACT_SCHEMAS from '@janumipwb/rph-contracts';
@@ -107,8 +109,22 @@ function enclosingFunction(node: ts.Node): { fn: ts.SignatureDeclaration; name: 
  * Two handler families build handlers from a factory, so the arrows are declared at the factory's CALL SITES:
  * `makeDecisionEffective(target: 'EFFECTIVE', …)` states its range in the TYPE; `statusChange('DEGRADED', …,
  * ['ACTIVE'])` states it in the arguments. Both are read here — a parameter's literal type first, then callers.
+ *
+ * ⚠ `arm` IS LOAD-BEARING, NOT DIAGNOSTIC (REG-F-124). A `'type'` answer is a RANGE — one set, no per-call
+ * structure to recover. A `'calls'` answer is a FLATTENED UNION of values that were CORRELATED at each call, and
+ * that correlation is exactly what `factoryCallTuples` below re-reads. Only a `'calls'` answer may be paired;
+ * pairing a `'type'` answer would invent per-call tuples the source does not have.
  */
-function factoryParameter(sf: ts.SourceFile, at: ts.Node, paramName: string): string[] | undefined {
+interface FactoryValues {
+	readonly values: string[];
+	readonly arm: 'type' | 'calls';
+}
+
+function factoryParameter(
+	sf: ts.SourceFile,
+	at: ts.Node,
+	paramName: string
+): FactoryValues | undefined {
 	const enclosing = enclosingFunction(at);
 	if (!enclosing) return undefined;
 	const index = enclosing.fn.parameters.findIndex(
@@ -119,7 +135,7 @@ function factoryParameter(sf: ts.SourceFile, at: ts.Node, paramName: string): st
 	const declared = enclosing.fn.parameters[index]?.type;
 	if (declared) {
 		const fromType = literalsIn(declared);
-		if (fromType.length > 0) return fromType; // the type says it
+		if (fromType.length > 0) return { values: fromType, arm: 'type' }; // the type says it
 	}
 
 	const found = new Set<string>();
@@ -135,7 +151,80 @@ function factoryParameter(sf: ts.SourceFile, at: ts.Node, paramName: string): st
 		ts.forEachChild(n, walk);
 	};
 	walk(sf);
-	return found.size > 0 ? [...found] : undefined;
+	return found.size > 0 ? { values: [...found], arm: 'calls' } : undefined;
+}
+
+/**
+ * The (targets, sources) pairs a factory's CALL SITES supply, PAIRED PER CALL — REG-F-124.
+ *
+ * ── THE DEFECT THIS EXISTS TO END, STATED AS THE MECHANISM AND NOT AS THE SYMPTOM ────────────────────────────
+ *
+ * `factoryParameter` answers ONE parameter at a time and flattens its answers into a Set. When BOTH the target
+ * and the source list come from the factory's parameters, the caller then CROSS-PRODUCTS the two flattened sets
+ * — so a factory called N times with correlated (target, froms) tuples yields |∪targets| × |∪froms| arrows.
+ *
+ * **The correlation EXISTS in the source; the reader discarded it and then re-inflated the flattened remains
+ * into a rectangle.** That is a fabrication by the INSTRUMENT: it emits arrows no call site declares, which is
+ * the same wrong that REG-F-114 and REG-F-122 forbade, arriving by a third route (union, not inference).
+ *
+ * MEASURED at the one live site, `validator-registry.ts`'s `statusChange`: four calls declare FIVE arrows
+ * between them (`disableValidator` legitimately declares two, `['ACTIVE','DEGRADED'] -> DISABLED`), and the
+ * machine ratifies exactly those five. The census read NINE — manufacturing `ACTIVE -> ACTIVE`,
+ * `DEGRADED -> DEGRADED`, `DISABLED -> DISABLED` and `DISABLED -> DEGRADED`, all four of which appeared in
+ * REG-F-121's pinned "declared but ratified by no machine" list as though a COMMAND had claimed them.
+ *
+ * ⚠ NOTE THE ARITHMETIC, because the obvious formulation is wrong: this is NOT "N calls become N²". The truth
+ * is Σᵢ|targetsᵢ|×|sourcesᵢ| = 5 against |∪t|×|∪s| = 9. A rule phrased in CALL COUNTS is false, and stating it
+ * that way once already produced a wrong prediction.
+ *
+ * ⚠ AND IT MUST NEVER BE "FIXED" BY CONSULTING THE MACHINE. Three of the four fabrications are self-edges, and
+ * `classifyTransition` calls `from === to` a NOOP which `checkTransition` ADMITS (`ValidatorRegistryEntry.status`
+ * declares `illegal: []`). A reader that filtered its own output against `STATE_MACHINES` would re-mint them and
+ * would be REG-F-114's forbidden inference wearing a filter's clothes.
+ */
+function factoryCallTuples(
+	sf: ts.SourceFile,
+	at: ts.Node,
+	targetParam: string,
+	sourcesParam: string,
+	site: string
+): { targets: string[]; sources: string[] }[] | undefined {
+	const enclosing = enclosingFunction(at);
+	if (!enclosing) return undefined;
+	const idx = (name: string) =>
+		enclosing.fn.parameters.findIndex((p) => ts.isIdentifier(p.name) && p.name.text === name);
+	const ti = idx(targetParam);
+	const si = idx(sourcesParam);
+	if (ti < 0 || si < 0) return undefined;
+
+	const tuples: { targets: string[]; sources: string[] }[] = [];
+	const walk = (n: ts.Node) => {
+		if (
+			ts.isCallExpression(n) &&
+			ts.isIdentifier(n.expression) &&
+			n.expression.text === enclosing.name
+		) {
+			const targets = n.arguments[ti] ? literalsIn(n.arguments[ti] as ts.Node) : [];
+			const sources = n.arguments[si] ? literalsIn(n.arguments[si] as ts.Node) : [];
+			// ⚠ FAILS RATHER THAN SKIPS, and the difference is this census's oldest lesson (see the file header:
+			// a silent drop reads as full coverage). Under the UNION a call passing a computed value was rescued
+			// by its literal-passing siblings; under pairing it would contribute NOTHING and the arrows it really
+			// declares would vanish with no test naming the loss. There is no live instance of this today — all
+			// four `statusChange` calls pass literals — so the arm is held by a SYNTHETIC fixture through
+			// `declaredArrowsInFile`, exactly as REG-F-122's arms are.
+			if (targets.length === 0 || sources.length === 0)
+				fail(
+					site,
+					`is built by factory \`${enclosing.name}\`, and one of its calls passes a non-literal ` +
+						`target or source list. The census pairs a factory's arguments PER CALL and cannot read ` +
+						`a computed one; declare it literally at the call rather than leaving its arrows unaudited`
+				);
+			tuples.push({ targets, sources });
+		}
+		ts.forEachChild(n, walk);
+	};
+	walk(sf);
+	return tuples.length > 0 ? tuples : undefined;
 }
 
 /** The declared range of a computed `target`: a literal list, a table's keys, or a ratified enum's options. */
@@ -184,60 +273,109 @@ function declaredRange(
 }
 
 /** Every arrow a command declares it can perform. Throws on any shape it cannot read — never skips a site. */
+/**
+ * ⚠ MEMOIZED — REG-F-116. Each of these two walks parses EVERY handler file with the TypeScript compiler
+ * (`ts.createSourceFile`), and they are pure functions of a source tree that cannot change inside one vitest module
+ * run. `declaredArrows()` alone is called three times in `arrow-census-coverage.test.ts` and again from other
+ * suites, so the compiler was re-parsing the whole handler directory once per call.
+ *
+ * MEASURED UNDER LOAD, WHICH IS THE CONDITION THAT DECIDES A GATE. That file's CONTROL costs 4345ms in isolation
+ * and **15727ms with a second vitest running — over its declared 15_000 budget, so it FAILS.** A declared control
+ * runs the whole suite, so a control that tips its own timeout is reported as a verdict about an unrelated mutation
+ * (REG-F-116's subject). The amplification is ~4×, far more than CPU contention explains: it is I/O between
+ * workers, and the fix is to stop asking for the same bytes.
+ *
+ * SAFE BECAUSE THE INPUT IS FROZEN FOR THE RUN, and unsafe to memoize anywhere it is not — the mutation runner
+ * mutates files BETWEEN vitest invocations, never during one, so a fresh process always re-reads.
+ */
+/**
+ * The advance PRIMITIVES whose call sites declare an arrow — REG-F-117.
+ *
+ * ⚠ THIS IS A SET OF NAMES, NOT A SET OF IDIOMS, AND THE DIFFERENCE IS THE WHOLE POINT. Both entries are read by
+ * the SAME walk below: `machine`, `target`, and `fromStates(...)` inside `precondition`. Nothing downstream
+ * branches on which primitive it was. REG-F-114 weighed *"teach the reader every idiom"* — fragile, and how C-0b
+ * dropped 30% — against normalising the handlers, and ruled a third way: **make the idiom self-declaring.**
+ * `advanceIntent` already declared its source set (`fromStates`, REQUIRED since JAN-CMDPRE DWP-06) and already
+ * enforced it before `checkTransition`; the only thing this reader could not recover was WHICH MACHINE, because
+ * that primitive closed over a module constant instead of being told. It is now told, so the two idioms converge
+ * and this list grows by a NAME rather than by a code path.
+ *
+ * ⚠ A THIRD ENTRY MUST EARN ITS PLACE THE SAME WAY. Adding a primitive here that does NOT declare `machine`,
+ * `target` and its source set will `fail()` at its first call site rather than silently contributing partial
+ * arrows — which is the behaviour that keeps this list from becoming a way to widen coverage without widening
+ * declarations.
+ */
+const ADVANCE_PRIMITIVES: ReadonlySet<string> = new Set(['advanceStatus', 'advanceIntent']);
+
+let arrowsCache: DeclaredArrow[] | undefined;
 export function declaredArrows(): DeclaredArrow[] {
+	arrowsCache ??= computeDeclaredArrows();
+	return arrowsCache;
+}
+
+/**
+ * Every arrow ONE source file declares, plus how many advance-primitive sites it holds.
+ *
+ * EXPORTED AS A SEAM, AND THE RATCHET'S OWN POSITIVE CASE IS WHY (REG-F-122). The refusals in the SOURCES block
+ * below had exactly one live instance (`governance.ts:293`, a shorthand `precondition`), and it left the
+ * repository in the same commit that made them refusals — so no test over the real handler tree can ever enter
+ * their failing arms again. Only a SYNTHETIC source file can hold them red, which requires the per-file walk to
+ * take a `ts.SourceFile` instead of closing over the handler directory.
+ */
+export function declaredArrowsInFile(sf: ts.SourceFile): { arrows: DeclaredArrow[]; sites: number } {
 	const arrows: DeclaredArrow[] = [];
 	let sites = 0;
+	const consts = stringConsts(sf);
 
-	for (const file of handlerFiles()) {
-		const source = readFileSync(HANDLERS + file, 'utf8');
-		const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
-		const consts = stringConsts(sf);
+	const visit = (node: ts.Node): void => {
+		ts.forEachChild(node, visit);
+		if (!ts.isCallExpression(node)) return;
+		if (!ts.isIdentifier(node.expression) || !ADVANCE_PRIMITIVES.has(node.expression.text)) return;
+		const spec = node.arguments[2];
+		if (!spec || !ts.isObjectLiteralExpression(spec)) return;
+		sites += 1;
+		const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+		const site = `${sf.fileName}:${line}`;
 
-		const visit = (node: ts.Node): void => {
-			ts.forEachChild(node, visit);
-			if (!ts.isCallExpression(node)) return;
-			if (!ts.isIdentifier(node.expression) || node.expression.text !== 'advanceStatus') return;
-			const spec = node.arguments[2];
-			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
-			sites += 1;
-			const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-			const site = `${file}:${line}`;
+		// MACHINE
+		const mp = prop(spec, 'machine');
+		if (!mp || !ts.isPropertyAssignment(mp)) return fail(site, 'declares no `machine`');
+		const machine = ts.isStringLiteral(mp.initializer)
+			? mp.initializer.text
+			: ts.isIdentifier(mp.initializer)
+				? (consts.get(mp.initializer.text) ??
+					fail(site, `machine \`${mp.initializer.text}\` is not a top-level string const`))
+				: fail(site, 'machine is neither a string literal nor a named constant');
+		if (!STATE_MACHINES[machine])
+			fail(site, `names machine \`${machine}\`, which transitions.data.ts does not declare`);
 
-			// MACHINE
-			const mp = prop(spec, 'machine');
-			if (!mp || !ts.isPropertyAssignment(mp)) return fail(site, 'declares no `machine`');
-			const machine = ts.isStringLiteral(mp.initializer)
-				? mp.initializer.text
-				: ts.isIdentifier(mp.initializer)
-					? (consts.get(mp.initializer.text) ??
-						fail(site, `machine \`${mp.initializer.text}\` is not a top-level string const`))
-					: fail(site, 'machine is neither a string literal nor a named constant');
-			const def = STATE_MACHINES[machine];
-			if (!def) fail(site, `names machine \`${machine}\`, which transitions.data.ts does not declare`);
-
-			// TARGET — a literal/const head, or a computed one whose RANGE must be declared.
-			const tp = prop(spec, 'target');
-			if (!tp) return fail(site, 'declares no `target`');
-			let targets: string[];
-			const staticTarget =
-				ts.isPropertyAssignment(tp) && ts.isStringLiteral(tp.initializer)
+		// TARGET — a literal/const head, or a computed one whose RANGE must be declared.
+		const tp = prop(spec, 'target');
+		if (!tp) return fail(site, 'declares no `target`');
+		let targets: string[];
+		const staticTarget =
+			ts.isPropertyAssignment(tp) && ts.isStringLiteral(tp.initializer)
+				? tp.initializer.text
+				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
+					? consts.get(tp.initializer.text)
+					: undefined;
+		/** The factory parameter the TARGET came from, when it came from one BY CALL SITE — REG-F-124. */
+		let targetParam: string | undefined;
+		if (staticTarget !== undefined) {
+			targets = [staticTarget];
+		} else {
+			// An explicit declaration WINS over inference. Trying inference first once let it answer for a site
+			// that had already declared its range, and the census reported four built arrows as uncovered.
+			const declared = declaredRange(sf, spec, site);
+			const name = ts.isShorthandPropertyAssignment(tp)
+				? tp.name.text
+				: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
 					? tp.initializer.text
-					: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
-						? consts.get(tp.initializer.text)
-						: undefined;
-			if (staticTarget !== undefined) {
-				targets = [staticTarget];
+					: undefined;
+			if (declared) {
+				targets = declared;
 			} else {
-				// An explicit declaration WINS over inference. Trying inference first once let it answer for a site
-				// that had already declared its range, and the census reported four built arrows as uncovered.
-				const declared = declaredRange(sf, spec, site);
-				const name = ts.isShorthandPropertyAssignment(tp)
-					? tp.name.text
-					: ts.isPropertyAssignment(tp) && ts.isIdentifier(tp.initializer)
-						? tp.initializer.text
-						: undefined;
-				targets =
-					declared ??
+				const viaFactory =
 					(name ? factoryParameter(sf, node, name) : undefined) ??
 					fail(
 						site,
@@ -245,45 +383,125 @@ export function declaredArrows(): DeclaredArrow[] {
 							'knowable; declare it (advanceStatus checks it at runtime too) rather than leaving the ' +
 							'arrows it drives unaudited'
 					);
+				targets = viaFactory.values;
+				// Only the CALL-SITE arm carries per-call structure; a literal TYPE is a range and pairs with
+				// nothing. See `factoryCallTuples`.
+				if (viaFactory.arm === 'calls') targetParam = name;
 			}
+		}
 
-			// SOURCES — `fromStates(...)` anywhere in the precondition. Absent is legal (a predicate-only
-			// precondition) and means the command is not narrowed by source state.
-			const pp = prop(spec, 'precondition');
-			let sources: string[] | undefined;
-			if (pp && ts.isPropertyAssignment(pp)) {
-				let call: ts.CallExpression | undefined;
-				const find = (n: ts.Node) => {
-					if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'fromStates') {
-						call ??= n;
-					}
-					ts.forEachChild(n, find);
-				};
-				find(pp.initializer);
-				if (call) {
-					const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
-					if (direct.length > 0) sources = direct;
-					else {
-						// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
-						const spread = call.arguments.find(ts.isSpreadElement);
-						const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
-						sources =
-							(id ? factoryParameter(sf, node, id) : undefined) ??
-							fail(
-								site,
-								'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
-									'an unreadable source list would contribute zero arrows and read as full coverage'
-							);
-					}
-				}
+		// SOURCES — `fromStates(...)` read from the precondition AT THIS LITERAL, and from nowhere else.
+		//
+		// ⚠ THE EXPRESSION THAT USED TO CLOSE THIS BLOCK WAS THE CENSUS'S OWN REG-F-114 VIOLATION (REG-F-122):
+		// `sources ?? def.transitions.filter((t) => t.to === to).map((t) => t.from)` — when no `fromStates` was
+		// readable, the walk silently substituted the MACHINE'S in-edges for the site's declaration. Measured
+		// before removal: exactly ONE of 46 sites ever reached it (`governance.ts:293`, a shorthand
+		// `precondition` bound to a factory parameter), and there the substitution happened to coincide with the
+		// callers' declared `fromStates('PROPOSED')` only because `Decision.status` has a single in-arrow to
+		// EFFECTIVE — nil arithmetic effect by luck, not by soundness. That site now declares at the literal, and
+		// this walk REFUSES rather than infers: reading a declaration cannot fabricate one; inferring a missing
+		// half can.
+		const pp = prop(spec, 'precondition');
+		if (!pp)
+			return fail(
+				site,
+				'declares no `precondition`. Every advance site names its source set with `fromStates(…)` in the ' +
+					'literal; the census reads a from-half from nowhere else (REG-F-114)'
+			);
+		if (
+			ts.isShorthandPropertyAssignment(pp) ||
+			(ts.isPropertyAssignment(pp) && ts.isIdentifier(pp.initializer))
+		)
+			return fail(
+				site,
+				'passes its `precondition` through a bare name the walk cannot see into. A `fromStates(…)` hidden ' +
+					'behind that name would leave this site read as un-narrowed and its from-half taken from the ' +
+					"machine's in-edges — a fabricated declaration (REG-F-114). Compose the precondition in this " +
+					'literal; `governance.ts:293` was this exact shape'
+			);
+		if (!ts.isPropertyAssignment(pp))
+			return fail(site, '`precondition` is not a property assignment the walk can read');
+		let call: ts.CallExpression | undefined;
+		const find = (n: ts.Node) => {
+			if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'fromStates') {
+				call ??= n;
 			}
-
-			for (const to of targets) {
-				const from = sources ?? def!.transitions.filter((t) => t.to === to).map((t) => t.from);
-				for (const f of from) arrows.push({ machine, from: f, to, site });
-			}
+			ts.forEachChild(n, find);
 		};
-		visit(sf);
+		find(pp.initializer);
+		if (call === undefined)
+			return fail(
+				site,
+				'declares a precondition with no readable `fromStates(…)`. The census does NOT infer a from-half ' +
+					'from STATE_MACHINES (REG-F-114) — if this command is genuinely un-narrowed by source state, ' +
+					'that is a new idiom to be taught deliberately, with its own ruling, not defaulted into'
+			);
+		let sources: string[];
+		/** The factory parameter the SOURCES came from, when they came from one BY CALL SITE — REG-F-124. */
+		let sourcesParam: string | undefined;
+		const direct = call.arguments.filter(ts.isStringLiteral).map((a) => a.text);
+		if (direct.length > 0) sources = direct;
+		else {
+			// `fromStates(...from)` — the sources are a factory parameter; the CALL SITES hold them.
+			const spread = call.arguments.find(ts.isSpreadElement);
+			const id = spread && ts.isIdentifier(spread.expression) ? spread.expression.text : undefined;
+			const viaFactory =
+				(id ? factoryParameter(sf, node, id) : undefined) ??
+				fail(
+					site,
+					'declares a fromStates(…) whose source states are unreadable. Never dropped silently: ' +
+						'an unreadable source list would contribute zero arrows and read as full coverage'
+				);
+			sources = viaFactory.values;
+			if (viaFactory.arm === 'calls') sourcesParam = id;
+		}
+
+		// ── EMISSION — PAIRED WHEN BOTH HALVES CAME FROM THE SAME CALLS, CROSSED OTHERWISE (REG-F-124) ────────
+		//
+		// ⚠ THE SCOPE IS THE ARMS, NOT THE SHAPE, AND GETTING THAT WRONG DESTROYS REAL COVERAGE. Two other sites
+		// emit a full rectangle — `assurance.ts`'s `recordClaimAssessment` (4 targets × 5 sources) and
+		// `runtime-binding.ts`'s `authorizeRuntimeBinding` (2 × 2) — and at BOTH the rectangle is what the site
+		// deliberately declares: the targets come from a table or a declared range, the sources from a literal
+		// `fromStates(…)`, and there are no per-call tuples in the source to recover. `recordClaimAssessment`
+		// says so where it declares them: *"Which DESTINATIONS are legal from each is the machine's judgement;
+		// duplicating it here would create a second, drifting copy of the arrow table"*. A fix scoped to "stop
+		// emitting rectangles" would silently drop the ratified Claim arrows that rectangle really does declare —
+		// removing fabrication AND truth together. Scoped to the ARMS, exactly one site pairs today.
+		//
+		// Whether those two rectangles OVER-CLAIM (they declare pairs the machines do not ratify) is a live and
+		// UNSETTLED question, deliberately untouched here: it is a question about what the SITES declare, and this
+		// is a fix to what the READER fabricates. Conflating them would put one movement inside another.
+		if (targetParam !== undefined && sourcesParam !== undefined) {
+			const tuples =
+				factoryCallTuples(sf, node, targetParam, sourcesParam, site) ??
+				fail(
+					site,
+					`resolves BOTH its target and its sources from factory \`${targetParam}\`/\`${sourcesParam}\` ` +
+						'but no call to that factory could be read. Never crossed as a fallback: the cross product ' +
+						'of two flattened parameter sets manufactures arrows no call declares (REG-F-124)'
+				);
+			for (const { targets: perCallTargets, sources: perCallSources } of tuples)
+				for (const to of perCallTargets)
+					for (const f of perCallSources) arrows.push({ machine, from: f, to, site });
+		} else {
+			for (const to of targets) {
+				for (const f of sources) arrows.push({ machine, from: f, to, site });
+			}
+		}
+	};
+	visit(sf);
+	return { arrows, sites };
+}
+
+function computeDeclaredArrows(): DeclaredArrow[] {
+	const arrows: DeclaredArrow[] = [];
+	let sites = 0;
+
+	for (const file of handlerFiles()) {
+		const source = readFileSync(HANDLERS + file, 'utf8');
+		const perFile = declaredArrowsInFile(ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true));
+		arrows.push(...perFile.arrows);
+		sites += perFile.sites;
 	}
 
 	if (sites === 0) fail('extractor', 'found no advanceStatus call sites at all — it is broken');
@@ -319,34 +537,226 @@ export function declaredArrows(): DeclaredArrow[] {
 			});
 		}
 	}
+	// THE FOURTH IDIOM, AND IT IS THE SAME DATA LOOP — REG-F-119. `ChangePwuState` takes its target from
+	// `payload.newState` at runtime, so its call site declares nothing at all; the eight arrows it performs are the
+	// PWU's main lifecycle spine and were invisible while forty-nine peripheral ones were visible. Keyed by TARGET
+	// rather than by commandType, because one command performs all eight — the site must name WHICH row, or eight
+	// arrows would share one locator and a drifted row could not be pointed at.
+	for (const spec of Object.values(PWU_GENERIC_SETTER_SPECS)) {
+		for (const from of spec.sourceStates) {
+			arrows.push({
+				machine: PWU_LIFECYCLE_MACHINE,
+				from,
+				to: spec.target,
+				site: `PWU_GENERIC_SETTER_SPECS.${spec.target}`
+			});
+		}
+	}
+	// THE FIFTH IDIOM, AND IT IS THE SAME DATA LOOP AGAIN — JAN-PWUWP W-5.5, REG-F-193. `UnblockPwu`’s
+	// target is a FUNCTION OF ITS SOURCE (a PWU blocked out of PLANNED returns to PLANNED), so it resolves the
+	// target at runtime from the recorded origin and its handler declares nothing a syntactic reader could see.
+	// That is the identical shape REG-F-114 found in `advancePwuLifecycle` and REG-F-119 found in the generic
+	// setter, and it takes the identical remedy for the third time: the COMMAND declares its arrows and this
+	// reads the declaration as DATA. Reading a declaration cannot fabricate one; inferring a missing half can.
+	//
+	// ⚠ THIS WAS NOT ANTICIPATED — IT WAS CAUGHT BY THIS CENSUS REDDENING, WHICH IS EXACTLY ITS JOB. W-5.5
+	// landed the four arrows and C-0 reported all four as *"arrows no command can perform"*: a new command
+	// invisible to the instrument built to find invisible commands. Keyed by commandType rather than by target,
+	// because one command performs all four and, unlike the setter’s rows, its targets do not identify them.
+	for (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {
+		for (const a of spec.arrows) {
+			arrows.push({
+				machine: PWU_LIFECYCLE_MACHINE,
+				from: a.from,
+				to: a.to,
+				site: `PWU_RECOVERY_COMMAND_SPECS.${spec.commandType}`
+			});
+		}
+	}
 	return arrows;
 }
 
 /**
  * The states a CREATION can bring an object into existence in, read from the `births` declarations at the
- * `createObject` sites (`kit.ts`), which `createObject` also checks at runtime.
+ * `createObject` AND `commitState` sites — `BIRTH_PRIMITIVES` below is that pair — which BOTH primitives also
+ * check at runtime: `refuseOnBirthDrift` is called from each of them in `kit.ts`. Named by FUNCTION and not by
+ * line, because a `kit.ts:NNN` pointer is exactly the rot the rest of this sweep is repairing.
  *
- * ⚠ READ FROM THE DECLARATIONS AND NOT FROM `initialState`, WHICH LIES (REG-F-071). Four machines declare an
- * initial state the engine never writes. Seeding occupancy from `initialState` would mark a state occupied
- * because a diagram says so — the exact substitution of declaration for behaviour this whole file exists to
- * refuse.
+ * ⚠ READ FROM THE DECLARATIONS AND NOT FROM `initialState`, WHICH LIES (REG-F-071). Seeding occupancy from
+ * `initialState` would mark a state occupied because a diagram says so — the exact substitution of declaration
+ * for behaviour this whole file exists to refuse.
+ *
+ * ⚠ HOW MANY MACHINES LIE IS NOT WRITTEN HERE, AND THAT IS THE FIX (REG-F-125). This sentence read "Four
+ * machines declare an initial state the engine never writes" — and by the time anyone checked, it was FIVE.
+ * The same clause had been copied to fourteen sites across nine files, so one measurement taken once in
+ * 2026-08-02 was still being asserted by fourteen comments, none of which anything gated. `initialStateFictions()`
+ * below DERIVES the set, and `arrow-command-census.test.ts` pins it BY NAME; every one of those fourteen sites
+ * now points here instead of carrying its own copy of a number.
  */
+/** Memoized for the same reason as `declaredArrows` — a second full TypeScript parse of the same directory. */
+let birthsCache: Map<string, Set<string>> | undefined;
 export function birthStates(): Map<string, Set<string>> {
+	birthsCache ??= computeBirthStates();
+	return birthsCache;
+}
+
+/**
+ * REG-F-071's finding, DERIVED instead of remembered — the machines whose declared `initialState` is a state no
+ * creation ever writes (REG-F-125).
+ *
+ * ⚠ SCOPED TO MACHINES THAT DECLARE A BIRTH, and the scope is the whole care of it. A machine with NO `births`
+ * declaration is not evidence that its `initialState` is a fiction — it is evidence that nothing here can tell,
+ * which is C-0c's `unanalysed` set and a different claim entirely. Counting those as liars would inflate this
+ * set with machines whose creation path this census simply cannot see, which is the "absence of evidence read as
+ * evidence of absence" shape recorded against this programme more than once.
+ *
+ * Returned sorted so the pin is stable, and as pairs so the failure output names the CONTRADICTION (declared vs
+ * actually written) rather than just the machine — a pin whose message is only a name makes the reader go
+ * looking for what changed.
+ */
+/**
+ * The declared arrows NO machine ratifies, SPLIT by the only criterion that separates them mechanically —
+ * REG-F-128, from `ROADMAP-the-fifteen-unratified.md` §0.
+ *
+ * ── WHY A SPLIT AND NOT A COUNT ──────────────────────────────────────────────────────────────────────────────
+ * REG-F-121 pinned this population as ONE NUMBER so the question would stay visible. REG-F-124 then proved a
+ * count can be wrong in a way its own framing cannot express: four of the nineteen were declared by nothing and
+ * ratified by nothing — the CENSUS had minted them — and the pinned question ("are the declarations wrong or the
+ * machines incomplete?") had no third answer. A number that cannot express its own categories is the same defect
+ * one level up.
+ *
+ * ── THE CRITERION IS EXACT AND READS ONLY THE DECLARATION ────────────────────────────────────────────────────
+ * `advanceStatus` commits only what `checkTransition` admits, and `checkTransition` admits LEGAL **or NOOP**.
+ * Unratified ⇒ not LEGAL. **So an unratified pair can reach the store only as a NOOP — only when `from === to`.**
+ * `classifyTransition` consults `illegal` BEFORE the NOOP shortcut, so a self-edge the machine lists illegal does
+ * NOT qualify, and that list is the only thing consulted here.
+ *
+ * ⚠ NO MACHINE INFERENCE. This reads `from`/`to` off the DECLARATION and the machine's `illegal` list only —
+ * never `transitions`. Deriving the split from the arrow table would be REG-F-114's forbidden inference wearing a
+ * classifier's clothes, and would silently repair a real over-claim into a clean category.
+ *
+ * ⚠ AND `machineAdmitted` IS NOT `performable` — the distinction REG-F-127 then proved in practice. The criterion
+ * establishes what the MACHINE would admit; the SITE's guard decides the rest. Of the five machine-admitted
+ * self-edges, three (`Claim.status`) are now REFUSED by a precondition because a second identical assessment
+ * appended a duplicate event, while two are deliberate HOLDS (`ExecutionPlan ACTIVE -> ACTIVE`, JAN-CMDPRE
+ * DWP-05; `RuntimeBinding PARTIALLY -> PARTIALLY`, N-22). **The same shape was a defect on one machine and
+ * correct behaviour on another**, which is why this function classifies and does not judge.
+ */
+export function unratifiedDeclarations(): {
+	overClaimed: string[];
+	machineAdmittedSelfEdges: string[];
+} {
+	const ratified = new Set<string>();
+	for (const [name, def] of Object.entries(STATE_MACHINES))
+		for (const t of def.transitions) ratified.add(arrowKey(name, t.from, t.to));
+
+	const overClaimed: string[] = [];
+	const machineAdmittedSelfEdges: string[] = [];
+	const seen = new Set<string>();
+	for (const a of declaredArrows()) {
+		const key = arrowKey(a.machine, a.from, a.to);
+		if (ratified.has(key) || seen.has(key)) continue;
+		seen.add(key);
+		const illegal = (STATE_MACHINES[a.machine]?.illegal ?? []) as readonly {
+			from: string;
+			to: string;
+		}[];
+		const explicitlyIllegal = illegal.some((i) => i.from === a.from && i.to === a.to);
+		if (a.from === a.to && !explicitlyIllegal) machineAdmittedSelfEdges.push(key);
+		else overClaimed.push(key);
+	}
+	return {
+		overClaimed: overClaimed.sort((x, y) => x.localeCompare(y)),
+		machineAdmittedSelfEdges: machineAdmittedSelfEdges.sort((x, y) => x.localeCompare(y))
+	};
+}
+
+export function initialStateFictions(): { machine: string; declared: string; actuallyBornIn: string[] }[] {
+	const births = birthStates();
+	const out: { machine: string; declared: string; actuallyBornIn: string[] }[] = [];
+	for (const machine of Object.keys(STATE_MACHINES).sort((a, b) => a.localeCompare(b))) {
+		const declared = STATE_MACHINES[machine]?.initialState;
+		if (declared === undefined) continue;
+		const born = births.get(machine);
+		if (born === undefined) continue; // no declared birth — unanalysable, NOT a liar. See above.
+		if (!born.has(declared))
+			out.push({
+				machine,
+				declared,
+				actuallyBornIn: [...born].sort((a, b) => a.localeCompare(b))
+			});
+	}
+	return out;
+}
+
+/**
+ * The primitives at whose call sites a BIRTH is declared — REG-F-086, and the same shape as `ADVANCE_PRIMITIVES`.
+ *
+ * `createObject` was the only one, which is exactly why `Intent.intentStatus` and `PWU.workLifecycleState` had no
+ * declarable birth: `captureIntent` and `proposePwu` commit through `commitState` directly. REG-F-086 recorded that
+ * as *"the birth cannot be declared"* — the blocker was real, the conclusion was not. **A declaration mechanism
+ * attached to one primitive does not reach the sites that use another.**
+ */
+const BIRTH_PRIMITIVES: ReadonlySet<string> = new Set(['createObject', 'commitState']);
+
+/** Does this commit spec CREATE the aggregate? `CommitArgs` defines it: `expectedRevision: undefined`. */
+function createsAggregate(spec: ts.ObjectLiteralExpression): boolean {
+	const p = prop(spec, 'expectedRevision');
+	return (
+		!!p &&
+		ts.isPropertyAssignment(p) &&
+		ts.isIdentifier(p.initializer) &&
+		p.initializer.text === 'undefined'
+	);
+}
+
+function computeBirthStates(): Map<string, Set<string>> {
 	const out = new Map<string, Set<string>>();
 	let declarations = 0;
 	for (const file of handlerFiles()) {
 		const source = readFileSync(HANDLERS + file, 'utf8');
-		if (!source.includes('births:')) continue;
+		// A file matters if it DECLARES a birth or CONTAINS a creation — the second half is what the ratchet below
+		// needs, and the old early-out (`births:` only) would have skipped every file it exists to catch.
+		if (!source.includes('births:') && !source.includes('expectedRevision: undefined')) continue;
 		const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
 		const visit = (node: ts.Node): void => {
 			ts.forEachChild(node, visit);
 			if (!ts.isCallExpression(node)) return;
-			if (!ts.isIdentifier(node.expression) || node.expression.text !== 'createObject') return;
+			if (!ts.isIdentifier(node.expression) || !BIRTH_PRIMITIVES.has(node.expression.text)) return;
 			const spec = node.arguments[2];
 			if (!spec || !ts.isObjectLiteralExpression(spec)) return;
 			const p = prop(spec, 'births');
-			if (!p || !ts.isPropertyAssignment(p)) return;
 			const site = `${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
+			// ⚠ THE RATCHET (REG-F-086): A CREATION THAT DECLARES NO BIRTH IS A FAILURE, NOT A SKIP.
+			//
+			// Until now `births` was declare-if-you-like, so a new creation simply did not appear — and a machine
+			// that never appears is `unanalysed`, which reads as "not yet reached" rather than "nobody said". The
+			// two are opposite claims. `CommitArgs` defines a create in terms a reader can check —
+			// `expectedRevision: undefined` means *"the aggregate must NOT yet exist"* — so the census asks that
+			// question of the code rather than of a list someone maintains.
+			//
+			// ⚠ NO EXEMPTION IS NEEDED FOR `createObject`'s OWN DELEGATION, AND I SHIPPED ONE BEFORE CHECKING.
+			//
+			// `createObject` commits through `commitState`, so its inner call IS a creation declaring no `births` —
+			// its caller declares them a frame up. I wrote a structural exemption for exactly that ("this call sits
+			// inside another birth primitive"), and its mutant SURVIVED: `handlerFiles()` has excluded `kit.ts`
+			// since long before any of this, so the census never walks the delegating site and the exemption
+			// guarded a case that cannot arise. **A guard for an impossible case is a hollow** — the defect this
+			// programme keeps recording, authored here inside the fix for a census. Deleted rather than kept "just
+			// in case", because the mutant that proved it dead is the only thing that would have kept it honest.
+			//
+			// If `kit.ts` is ever brought into the population, this ratchet will fire on that delegating call —
+			// which is CORRECT, and the moment to decide deliberately rather than to have pre-decided blindly.
+			if (!p && createsAggregate(spec)) {
+				return fail(
+					site,
+					'commits a CREATION (`expectedRevision: undefined`) and declares no `births`. The occupancy ' +
+						'census seeds from births, so an undeclared creation makes its machine unanalysable — which ' +
+						'reads as "no state is reachable yet" rather than "nobody said". Declare the machine and the ' +
+						'state this command actually commits it into'
+				);
+			}
+			if (!p || !ts.isPropertyAssignment(p)) return;
 			if (!ts.isArrayLiteralExpression(p.initializer)) {
 				return fail(site, '`births` must be an array literal so the census can read it');
 			}
@@ -417,22 +827,120 @@ export function occupiable(): Map<string, Set<string>> {
  * with no `births` declaration cannot be analysed — every state would look unoccupiable and every covered arrow
  * dead, which is a 100% false-positive rate dressed as a finding. Silently skipping them would be the census
  * narrowing its own population again, so `unanalysed` is an output the test pins.
+ *
+ * ⚠⚠ AND A BIRTH IS NOT ENOUGH — COMPLETE ARROW COVERAGE IS ALSO REQUIRED (REG-F-118), which is the same argument
+ * at a lower false-positive rate, and it went unstated for as long as this function has existed.
+ *
+ * `occupiable()` grows from the birth along DECLARED arrows. When a machine's declared set is a SUBSET of its
+ * ratified set, occupancy is an UNDER-estimate — so reachability can be proven (you got there) but UNreachability
+ * never can (you may simply not have been able to see the road). **"Never occupied" then means "not shown
+ * reachable", and those are different claims.** The polarity is the dangerous one: a DEAD arrow invites deleting
+ * code or a ratified arrow, so acting on a false one removes something real.
+ *
+ * MEASURED THE DAY THIS RULE WAS ADDED, and it is why the rule is not a precaution: **every single machine then
+ * reporting dead arrows had PARTIAL coverage** — `PWU.workLifecycleState` 49/57 (35 dead), `Assumption.status`
+ * 9/17 (5), `Claim.status` 7/15 (4), `AssuranceAssessment.state` 11/19 (1), `ExecutionPlan.status` 10/11 (1).
+ * **Not one dead-arrow claim in the repository rested on complete coverage.** The PWU case is the clearest: its
+ * eight undeclared arrows form one unbroken chain — READY -> PLANNED -> EXECUTING -> EVIDENCE_PENDING ->
+ * UNDER_ASSURANCE -> SATISFIED -> RECOMPOSING -> RECOMPOSED, the main lifecycle spine the workbench drives every
+ * day — so occupancy stopped at READY and called thirteen live states unreachable.
+ *
+ * `unanalysed` therefore carries TWO causes that share a remedy but not a diagnosis: **no declared birth**, and
+ * **incomplete arrow coverage**. Both make occupancy unanswerable; only the first is about a missing `births`.
  */
 export function deadCovered(): { dead: string[]; unanalysed: string[] } {
 	const occ = occupiable();
 	const arrows = declaredArrows();
+	const complete = occupancyAnalysable();
+	const provable = provablyUnoccupiable();
 	const dead: string[] = [];
 	for (const a of arrows) {
 		const set = occ.get(a.machine);
 		if (!set) continue; // no declared birth — reported as unanalysed, never as dead
+		// TWO INDEPENDENT GROUNDS, and the first needs no arrow coverage: a source state the ratified machine gives
+		// no in-arrow and no birth declares can never be occupied, whatever is or is not declared elsewhere.
+		if (provable.get(a.machine)?.has(a.from)) {
+			dead.push(arrowKey(a.machine, a.from, a.to));
+			continue;
+		}
+		// INCOMPLETE COVERAGE CANNOT SUPPORT THE WEAKER, OCCUPANCY-BASED CLAIM. See the note above.
+		if (!complete.has(a.machine)) continue;
 		if (!set.has(a.from)) dead.push(arrowKey(a.machine, a.from, a.to));
 	}
-	const analysed = new Set(occ.keys());
+	const analysed = new Set([...occ.keys()].filter((m) => complete.has(m)));
 	const unanalysed = [...new Set(arrows.map((a) => a.machine))].filter((m) => !analysed.has(m));
 	return {
 		dead: [...new Set(dead)].sort((x, y) => x.localeCompare(y)),
 		unanalysed: unanalysed.sort((x, y) => x.localeCompare(y))
 	};
+}
+
+/**
+ * States that are PROVABLY unoccupiable — and this proof needs no arrow coverage at all (REG-F-118).
+ *
+ * ⚠ IT IS A DIFFERENT ARGUMENT FROM OCCUPANCY, WHICH IS WHY IT SURVIVES WHERE OCCUPANCY DOES NOT. `occupiable()`
+ * reasons forward from a birth along DECLARED arrows, so an undeclared arrow can always rescue a state and no
+ * negative claim is safe. This reasons from the RATIFIED machine: if the corpus declares **no arrow at all** into
+ * a state, then no command can ever move into it — `checkTransition` would refuse, declared or not — so the state
+ * is reachable ONLY by birth. If no birth declares it either, nothing can ever be in it. **Missing declarations
+ * cannot rescue it, because the arrows that would do so are not ratified.**
+ *
+ * THIS IS WHAT SAVED REG-F-088 when the completeness rule withdrew the occupancy-based version of it.
+ * `ExecutionPlan.status` has ZERO ratified arrows into `PROPOSED` and its handler births `UNDER_REVIEW`, so the
+ * recorded claim that `ProposeExecutionPlan` lands in PROPOSED is false of the code — provably, on 10/11 coverage,
+ * where the occupancy argument was worthless. **A sound rule and a weaker one disagree about the method, not
+ * about the answer; keeping both is how the finding survived its own instrument being corrected.**
+ */
+export function provablyUnoccupiable(): Map<string, Set<string>> {
+	const births = birthStates();
+	const out = new Map<string, Set<string>>();
+	for (const [machine, def] of Object.entries(STATE_MACHINES)) {
+		const born = births.get(machine);
+		// No birth declared at all is a DIFFERENT report (`unanalysed`) — it means nobody said, not that nothing can.
+		if (!born) continue;
+		const hasInArrow = new Set((def?.transitions ?? []).map((t) => t.to));
+		const unreachable = (def?.states ?? []).filter((s) => !hasInArrow.has(s) && !born.has(s));
+		if (unreachable.length > 0) out.set(machine, new Set(unreachable));
+	}
+	return out;
+}
+
+/**
+ * The machines whose occupancy may be TRUSTED for a NEGATIVE claim — a declared birth AND complete arrow coverage.
+ *
+ * ⚠ EVERY CONSUMER OF UNREACHABILITY MUST ASK THIS, NOT `occupiable()` DIRECTLY (REG-F-118). `occupiable()`
+ * answers *"which states did I reach"*, which is sound as a POSITIVE claim and unsound as a NEGATIVE one: with
+ * arrows missing it UNDER-estimates, so "not in the set" means **not shown reachable**, never **unreachable**.
+ * Three layers were reading it as the latter — C-0's `deadCovered`, C-0c's `auditClaims` (`deadFrom`/`deadTo`),
+ * and C-0d through `auditClaims`. Shared here so the rule cannot hold in one layer and lapse in the next.
+ */
+export function occupancyAnalysable(): ReadonlySet<string> {
+	const complete = machinesWithCompleteArrowCoverage(declaredArrows());
+	const born = birthStates();
+	return new Set([...complete].filter((m) => born.has(m)));
+}
+
+/**
+ * The machines whose DECLARED arrows are the whole of their RATIFIED arrows — the only ones a deadness claim can
+ * be made about (REG-F-118).
+ *
+ * Derived by comparing against `STATE_MACHINES`, never by a list: a machine joins the moment its last arrow is
+ * declared and leaves the moment the ratified set grows, with no one to remember either.
+ *
+ * ⚠ THIS BLOCK SPENT THREE COMMITS ABOVE THE WRONG FUNCTION (REG-F-120). Inserting `provablyUnoccupiable` beneath
+ * it left two docstrings stacked, so this one documented nothing and a reader met it as the preamble to a
+ * different rule — the completeness argument attached to the proof that does NOT need completeness, which is the
+ * one distinction those two functions exist to keep apart. Moved, not deleted: it was always correct about its
+ * real owner.
+ */
+function machinesWithCompleteArrowCoverage(arrows: readonly DeclaredArrow[]): ReadonlySet<string> {
+	const seen = new Set(arrows.map((a) => arrowKey(a.machine, a.from, a.to)));
+	const out = new Set<string>();
+	for (const [machine, def] of Object.entries(STATE_MACHINES)) {
+		const all = def?.transitions ?? [];
+		if (all.length > 0 && all.every((t) => seen.has(arrowKey(machine, t.from, t.to)))) out.add(machine);
+	}
+	return out;
 }
 
 export const arrowKey = (machine: string, from: string, to: string) => `${machine}  ${from} -> ${to}`;

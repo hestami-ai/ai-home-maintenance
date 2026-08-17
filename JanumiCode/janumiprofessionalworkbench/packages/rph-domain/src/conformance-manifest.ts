@@ -76,6 +76,13 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED, and a per-id COVERED
 	// row for any of the other six would collide with the register's "no disclosed rule is certified COVERED" gate.
 	'RPH-EVD-007': 'packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts',
+	// ADDED 2026-08-13 when RPH-EVD-002 moved NOT_A_COMMAND_REFUSAL -> ENFORCED (REG-F-138). The comment above
+	// said "Only EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED" — true when
+	// written, and now two. It cites the enforcement probe rather than `claim-assessment.test.ts`, and the reason
+	// is measured rather than stylistic: that file is 300 lines about this rule and asserts on NO refusal code or
+	// message anywhere, so with the guard's code swapped the whole workspace stayed green. The probe is the only
+	// COMMAND-layer artifact that pins the refusal's identity rather than merely its non-acceptance.
+	'RPH-EVD-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ADDED 2026-08-02 when REG-F-008's remediation moved EVD-003 from disclosed to ENFORCED. It cites the
 	// enforcement probe rather than the admissibility-gate test because that test's fixture is the SCOPE limb,
 	// which is EVD-007; this rule's refusal is the CONTENT limb, and the two must not share their evidence.
@@ -91,15 +98,30 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// guarantee on the strength of a publish-path refusal. The row is now UNENFORCED_DISCLOSED.
 	'RPH-ASR-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-ASR-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
-	// The RPH-INT tranche (2026-08-02). Three of seven are ENFORCED and cite their probes; the other four are
-	// NOT_A_COMMAND_REFUSAL and carry no per-id row, because their statements describe what an ACCEPTED command
-	// produces rather than anything a dispatch could be refused for.
+	// The RPH-INT tranche (2026-08-02). ~~Three~~ FOUR of seven are ENFORCED and cite their probes; the other
+	// ~~four~~ THREE are NOT_A_COMMAND_REFUSAL and carry no per-id row, because their statements describe what an
+	// ACCEPTED command produces rather than anything a dispatch could be refused for.
+	//
+	// ⚠ RPH-INT-007 JOINED ON 2026-08-13 (REG-F-132) AND ITS ABSENCE UNTIL THEN WAS CORRECT. Its rule — "a
+	// superseded intent cannot authorize new PWUs" — was NOT_A_COMMAND_REFUSAL because its ANTECEDENT was
+	// command-unreachable: nothing could put an Intent into SUPERSEDED, so no dispatch could be refused for it.
+	// `SupersedeIntent` (REG-F-131) made the arrangement dispatchable and the guard that had been waiting since
+	// REG-F-129 finally has something to refuse. The cited probe DRIVES the supersession through the bus rather
+	// than seeding the status, which is what lets this row cite a COMMAND-layer observation at all.
 	'RPH-INT-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-INT-005': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
-	// The RPH-PWU tranche, five of ten (2026-08-02). Only the two ENFORCED rows appear; the family is NOT yet
+	'RPH-INT-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	// The RPH-PWU tranche, five of ten (2026-08-02). Only the two ENFORCED rows appear; ~~the family is NOT yet
 	// total in the register (RPH-PWU-003/007/008 are investigated and owed), which is why RPH-PWU is absent from
-	// TOTAL_OVER_FAMILIES.
+	// TOTAL_OVER_FAMILIES.~~
+	// ⚠ ALL THREE LIMBS WENT FALSE THE SAME DAY THEY WERE WRITTEN (corrected 2026-08-14, REG-F-146). Derived by
+	// importing ENFORCEMENT_REGISTER: RPH-PWU has TEN of ten rows, every one dispositioned — 003/007/008 are
+	// UNENFORCED_DISCLOSED (which IS a disposition, so it cannot ground non-totality) and each carries an
+	// OBSERVED_ADMISSION guard — and `RPH-PWU-` IS in TOTAL_OVER_FAMILIES. The note landed at 87f07183 and the
+	// family joined the list at ec12b5d9, hours later on 2026-08-02. `enforcement-register.ts` already rebuts it
+	// by id ("THE RPH-PWU FAMILY — CLOSED AT TEN OF TEN") and even records the absence in the PAST TENSE.
+	// The tranche-scoped first clause is left standing: it is correct about that tranche.
 	'RPH-PWU-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ── THE RPH-PER CITES, ALL FOUR CORRECTED 2026-08-02 WHILE DISPOSITIONING THE FAMILY ─────────────────────
@@ -133,8 +155,11 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
 	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
 	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
-	// RPH-ASM-006 — the only ASM rule with a live kernel caller, cited per-id with its dispatch probe. Its five
-	// siblings have no caller at all, which is why this is the family's only COMMAND-layer cite.
+	// RPH-ASM-006 — ~~the only ASM rule with a live kernel caller~~ ONE OF TWO (corrected 2026-08-14,
+	// REG-F-146: `assessFalsification` gained a production caller in `handlers/assurance.ts` when
+	// `FalsifyAssumption` was authored, REG-F-069). ~~Its five siblings have no caller at all~~ — FOUR of the
+	// five do not. This remains the family's only COMMAND-layer cite, which is a fact about the MANIFEST and is
+	// unaffected by the correction.
 	'RPH-ASM-006': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// The four PROMOTION-GATE rows, cited per-id 2026-08-02 with their dispatch probes. BAS-003/004/006 share one
 	// joined finding-code message; GOV-003 refuses at a later arm of the same handler with its own sentence.
@@ -194,9 +219,13 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	// This row read COVERED, "RPH-ASM-001..006 by id", on a PURE_KERNEL file. The register disposed RPH-ASM-002
 	// and RPH-ASM-005 UNENFORCED_DISCLOSED — each with a dead-predicate census — and the gate rejected the pair.
 	//
-	// THE FAMILY-LEVEL FACT IS THE ONE WORTH CARRYING: FIVE of the six ASM rules have a dedicated kernel predicate
-	// referenced by exactly one non-test file — its own definition module, rph-domain/src/decomposition.ts. Only
-	// the authorize-new-work predicate behind ASM-006 has a live caller. The cited test file is honest and its
+	// THE FAMILY-LEVEL FACT IS THE ONE WORTH CARRYING: ~~FIVE~~ FOUR of the six ASM rules have a dedicated kernel
+	// predicate referenced by exactly one non-test file — its own definition module,
+	// rph-domain/src/decomposition.ts. ~~Only the authorize-new-work predicate behind ASM-006 has a live
+	// caller.~~ TWO have live callers: `canAuthorizeNewWork` (ASM-006, from handlers/execution.ts) and
+	// `assessFalsification` (from handlers/assurance.ts). Corrected 2026-08-14 (REG-F-146); the re-measured
+	// figure in `enforcement-register.ts` ("FOUR DEAD PREDICATES OUT OF SIX RULES", 2026-08-13) was already
+	// right and these two sites had not been brought to it — one measurement, three restatements, two stale. The cited test file is honest and its
 	// assertions hold; what it cannot see is that nothing in the running engine asks any of the other five. That
 	// is DS-001 §4 item 2 at family scale rather than rule scale.
 	//
@@ -316,8 +345,13 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// INT-005 are ENFORCED and now cited by id above (both refused by approveIntent's precheck, in that order),
 		// while INT-006 and INT-007 are not pending a test at all — the register disposes them as
 		// NOT_A_COMMAND_REFUSAL, INT-006 because its six consequents are outcomes (two of which need an
-		// impact-analysis plane that does not exist) and INT-007 because its antecedent is command-unreachable.
-		note: 'INT-003/004/005 ENFORCED and cited by id above; INT-001/002/006/007 are NOT_A_COMMAND_REFUSAL in enforcement-register.ts (INT-001/002 describe what an accepted command produces; INT-006 enumerates outcomes; INT-007 has a command-unreachable antecedent). The enforcement question is answered in the register, not by this row.'
+		// impact-analysis plane that does not exist)~~ and INT-007 because its antecedent is command-unreachable~~
+		// — INT-007 LEFT arm 3 on 2026-08-13: `SupersedeIntent` (REG-F-131) made SUPERSEDED reachable and the
+		// register disposes it ENFORCED (REG-F-132), as the `note` below now records. ⚠ THIS COMMENT SAT AS
+		// UNCHANGED CONTEXT IN THE VERY HUNK THAT CORRECTED THAT NOTE (REG-F-142), in the commit that wrote the
+		// rule "a prose summary beside the field it summarises is a second copy with no checker" — and the gate
+		// that commit added reads `coverageFor(id)?.note`, the FIELD only, so it provably cannot see this line.
+		note: 'INT-003/004/005/007 ENFORCED and cited by id above; INT-001/002/006 are NOT_A_COMMAND_REFUSAL in enforcement-register.ts (INT-001/002 describe what an accepted command produces; INT-006 enumerates outcomes). The struck ground for INT-007 — ~~a command-unreachable antecedent~~ — held until 2026-08-13, when `SupersedeIntent` made SUPERSEDED reachable (REG-F-132); this note was left stale by that same commit and caught by the gate added at REG-F-142. The enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-PWU': {
 		status: 'PARTIAL',
@@ -337,8 +371,10 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// PURE_KERNEL predicate test; both are now dispositioned UNENFORCED_DISCLOSED and OBSERVED being admitted
 		// through a live dispatch. It also claimed "the EVD-005 cascade pending", which JAN-EXECREM WIRE #4 had
 		// already closed to the extent the rule permits (the impact is recorded on the event; the state changes the
-		// rule names are command-unreachable). Per-family status stays PARTIAL: only EVD-007 is enforced.
-		note: 'EVD-007 (admission evaluates the evidence) ENFORCED and cited by id above; EVD-001/003/004 are dispositioned UNENFORCED_DISCLOSED in enforcement-register.ts with observed admissions; EVD-002/005/006 are NOT_A_COMMAND_REFUSAL there. The kernel predicate is asserted here; the enforcement question is answered in the register, not by this row.'
+		// rule names are command-unreachable). Per-family status stays PARTIAL: ~~only EVD-007 is enforced~~ — THREE are
+		// (EVD-002/003/007), corrected 2026-08-14 with the note below. A prose summary beside the field it summarises is
+		// a second copy with no checker (REG-F-141); this one is covered now only because the FIELD is gated.
+		note: 'EVD-002/003/007 ENFORCED and cited by id above; EVD-001/004 are dispositioned UNENFORCED_DISCLOSED in enforcement-register.ts with observed admissions; EVD-005/006 are NOT_A_COMMAND_REFUSAL there. ~~EVD-001/003/004 ... UNENFORCED_DISCLOSED; EVD-002/005/006 ... NOT_A_COMMAND_REFUSAL~~ — STALE IN TWO LIMBS AND FOR DIFFERENT LENGTHS OF TIME, which is why the gate at REG-F-142 checks every id rather than the sentence: EVD-003 moved to ENFORCED on 2026-08-02 (REG-F-008\'s remediation, twelve days) and EVD-002 on 2026-08-13 (REG-F-138, one day) — and REG-F-138 EDITED THIS FILE, adding the COMMAND-layer cite 270 lines above while leaving this contradiction untouched. The kernel predicate is asserted here; the enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-TRC': {
 		status: 'PARTIAL',

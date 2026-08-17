@@ -213,8 +213,13 @@ describe('JPWB retained guard-enforcement ledger real-subject integration', () =
 		expect(first.observation.rawEvidence.audit).toEqual({
 			arrowCount: 146,
 			counts: [
-				{ count: 22, disposition: 'ARROW_UNREACHABLE' },
-				{ count: 14, disposition: 'ENFORCED' },
+				// The merge flips "Replacement intent identified" from ARROW_UNREACHABLE to ENFORCED, with a real
+				// site at packages/rph-application/src/handlers/intent.ts:421 and a real anchor. A legitimate
+				// baseline move, not a weakening: the enforcedWithoutSite / enforcedAnchorBroken assertions below
+				// are deliberately untouched, so a row that claimed ENFORCED without a resolvable site would
+				// still redden this test.
+				{ count: 21, disposition: 'ARROW_UNREACHABLE' },
+				{ count: 15, disposition: 'ENFORCED' },
 				{ count: 2, disposition: 'REDUNDANT_WITH_MACHINE' },
 				{ count: 44, disposition: 'UNENFORCED' }
 			],

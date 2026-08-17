@@ -21,8 +21,13 @@
 // `derived.filter(x => !KNOWN.has(x))` would not, and that difference is the whole design.
 //
 // ── THE UNDERCOUNT THIS PINS, WHICH IS THE REASON THE EXTRACTOR IS TESTED SEPARATELY ─────────────────────────
-// The obvious pattern `^\t(\w+): async \(` finds ELEVEN actions in `pwa/[id]` and there are SEVENTEEN. Six are
-// non-async one-liners (`submitForReview: ({ params }) => advancePwa(…)`). I hit that undercount while
+// The obvious pattern `^\t(\w+): async \(` finds ~~ELEVEN~~ SIXTEEN actions in `pwa/[id]` and there are
+// SEVENTEEN. ~~Six are non-async one-liners (`submitForReview: ({ params }) => advancePwa(…)`).~~ ONE is
+// non-async (`discardAgentCandidate`), and the `submitForReview` one-liner this sentence cited has since
+// become async. Re-derived 2026-08-14 (REG-F-146) by running the quoted regex over the committed route.
+// ⚠ THE UNDERCOUNT IS NOW ONE ACTION RATHER THAN SIX — AND THAT MAKES THE PIN MORE NECESSARY, NOT LESS:
+// a census that is wrong by six invites an independent count, while one wrong by a single action reads as
+// right. The extractor is exercised against synthetic sources below for exactly that reason. I hit that undercount while
 // enumerating for the roadmap and only caught it because an independent count disagreed. A silent undercount in
 // a census is worse than no census, so `extractActionKeys` is exercised against synthetic sources below,
 // including that exact shape.

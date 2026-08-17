@@ -1458,6 +1458,11 @@
       "meaning": "The acting principal could not be established from authenticated context, so the command cannot be attributed and is refused before any effect (DOC-003 §9 PER-3; DOC-004 §5). DISTINCT FROM RPH_AUTHORITY_INSUFFICIENT, which means the principal IS known and may not act - an operator must be able to tell 'I do not know who you are' from 'I know who you are and you may not' without parsing a message string, in every deployment tier. AUTHORED 2026-08-07 under REG-D-027, NOT from DOC-007 §25.1, and disclosed as such: REG-D-004 names error codes as repository shape and DOC-004 §5 routes enum extension to the repository's contract procedure, so this is a shape change and not a sponsor act."
     },
     {
+      "code": "RPH_IDEMPOTENCY_CONFLICT",
+      "category": "",
+      "meaning": "An idempotency key on record was reused for a DIFFERENT command — differing command type, target aggregate, or payload hash — so returning the prior result would report success for work that never happened (DOC-003 PER-5). DISTINCT FROM RPH_IDEMPOTENCY_DUPLICATE, which is the true REPLAY and correctly carries no error at all (REG-F-010). AUTHORED 2026-08-15 under REG-D-027/REG-F-057, NOT from DOC-007 §25.1, and disclosed as such: REG-D-004 names error codes as repository shape and DOC-004 §5 routes enum extension to the repository's contract procedure, so this is a shape change and not a sponsor act. Its category is CONCURRENCY by two independent precedents rather than by preference — RPH_IDEMPOTENCY_DUPLICATE, the sibling code for the same concept, and RPH_REVISION_CONFLICT, the only other *_CONFLICT code, are both CONCURRENCY already."
+    },
+    {
       "code": "VALIDATOR_FAILED",
       "category": "Validator execution failure",
       "meaning": "DOC-004 §34.1 — validator failed to EXECUTE. NOT an assurance rejection: yields an execution error + incomplete assessment + retry/alternate-validator/escalation. Also a state-machine state (ASSESSING→VALIDATOR_FAILED, §30). Only backticked error token in DOC-004."

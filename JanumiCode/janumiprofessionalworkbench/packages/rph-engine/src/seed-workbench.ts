@@ -325,7 +325,9 @@ export function seedAdditivePolicies(handle: AuthedEngineHandle): void {
  *
  * The two fields §9.1 mandates and DOC-004 ratifies for almost none of its 99 codes (it binds `INTENT_EXPANSION`
  * to MATERIAL in §33's worked example; the corrected count is in ontology.types.ts) are resolved without inventing them:
- * an authored annotation if the ontology carries one (11 codes do), otherwise the policy's OWN `failureSeverity`
+ * an authored annotation if the ontology carries one (~~11~~ ALL 99 do — DRIVEN over `ontology.seedPolicies`
+ * 2026-08-13: 12 policies, 99 finding codes, 99 fully annotated, 0 fallbacks, so both `??` arms below are
+ * currently unexercised for the shipped catalog), otherwise the policy's OWN `failureSeverity`
  * and the humanized code. So an unannotated finding inherits its policy's declared severity rather than a severity
  * someone made up — the same structural rule `findingsFor` already applies to claims and control actions.
  */

@@ -1416,7 +1416,7 @@
 		},
 		{
 			"commandType": "ReviseIntent",
-			"targetAggregateType": "Intent",
+			"targetAggregateType": "INTENT",
 			"emitsEvent": "IntentRevised",
 			"drivesMachine": "Intent.intentStatus",
 			"drivesFrom": "APPROVED",
@@ -1438,8 +1438,32 @@
 			]
 		},
 		{
+			"commandType": "SupersedeIntent",
+			"targetAggregateType": "INTENT",
+			"emitsEvent": "IntentSuperseded",
+			"drivesMachine": "Intent.intentStatus",
+			"drivesFrom": "RAW|UNDER_DISCOVERY|PROVISIONAL|FORMALIZED|APPROVED|REVISED",
+			"drivesTo": "SUPERSEDED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-13, REG-F-131): THE COMMAND NAME IS AUTHORED \u2014 `SupersedeIntent` appears NOWHERE in canon \u2014 and so is this payload shape. THE EVENT IS RATIFIED: `IntentSuperseded` is in the Canonical Domain Model's event list, and its own vocab row notes \"(any active)->SUPERSEDED\". THE COMMAND IS PRESUPPOSED RATHER THAN INVENTED: JPWB-DOC-003 \u00a79 PER-3 states canonical state is mutated ONLY through \"authenticated, authorized, semantically named commands\" with no bypass, so a ratified state with ratified in-arrows and a ratified event MUST be reached by a command \u2014 the corpus leaves only its NAME unstated. THE ASYMMETRY IS THE TELL: the ratified list names SIX Intent events and FIVE already have commands; only supersede did not, which is an implementation gap rather than a corpus exclusion. `drivesFrom` is the machine's six ratified in-arrows, each row noting \"VERBATIM \u00a76.2. 'Any active' = any non-terminal state\". Do NOT treat this sourceSection as proof the shape is ratified; ratification pending, on the REG-D-024 precedent that authored `recordClaimAssessment`. Cited: DOC-002 \u00a726.2 (IntentSuperseded); JPWB-DOC-003 \u00a75 STA-6; JPWB-DOC-003 \u00a79 PER-3.",
+			"payloadFields": [
+				{
+					"field": "supersedingIntentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref. REQUIRED, and not by my choice: the ratified `IntentSupersededPayloadSchema` already declares it required, so a supersession names its successor or the event cannot be built."
+				},
+				{
+					"field": "rationale",
+					"required": false,
+					"type": "string",
+					"note": "AUTHORED, and OPTIONAL deliberately: the corpus states no rationale requirement for this act, and demanding one would enforce an inference \u2014 the error REG-F-129 records being made on this same increment's guard scope."
+				}
+			]
+		},
+		{
 			"commandType": "ChallengePwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuChallenged",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "READY",
@@ -1462,7 +1486,7 @@
 		},
 		{
 			"commandType": "AbandonPwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuAbandoned",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "(any active)",
@@ -1492,7 +1516,7 @@
 		},
 		{
 			"commandType": "BlockPwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuBlocked",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "SHAPING | PLANNED | EXECUTING",
@@ -1522,7 +1546,7 @@
 		},
 		{
 			"commandType": "EscalatePwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuEscalated",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "EVIDENCE_PENDING",
@@ -1551,8 +1575,33 @@
 			]
 		},
 		{
+			"commandType": "UnblockPwu",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+			"emitsEvent": "PwuUnblocked",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "BLOCKED | ESCALATED",
+			"drivesTo": "SHAPING | PLANNED | EXECUTING | EVIDENCE_PENDING",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-16, under REG-D-029 / REG-D-043 / JAN-PWUWP W-5.5). The ACT is RULED: the sponsor ruled directly that a recovery act EXISTS for BLOCKED and ESCALATED rather than declaring them closed (REG-D-043), which is what REG-F-083 had declined to decide — \"authoring a SHAPE for a ratified act is not the same as authoring a new ACT\". The ARROWS are DERIVED from §8.2 reversed, not invented. The SHAPE below is AUTHORED: do NOT treat this sourceSection as proof it is ratified. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT, and it carries NO authority guard for the same reason BlockPwu and EscalatePwu carry none: §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion, and recovery is none of them. Making trouble easy to report and its resolution hard to record would be the same defect wearing the opposite costume.",
+			"payloadFields": [
+				{
+					"field": "recoveryReason",
+					"required": true,
+					"type": "string",
+					"note": "Required, and it is the whole substantive contract, exactly as blockReason is for BlockPwu: a block records WHY work stopped, so its reversal must record why it may resume. An unexplained resumption is an unexplained halt read backwards."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 §37 control-action record: evidence/observations considered."
+				}
+			],
+			"note": "⚠⚠ THERE IS DELIBERATELY NO TARGET FIELD, AND ITS ABSENCE IS THE GUARANTEE. The state a PWU resumes at is DERIVED from PwuBlocked.blockedFrom — the state it was actually blocked out of — and is never supplied by the caller. A caller-chosen target would permit SHAPING → BLOCKED → EXECUTING, silently skipping PLANNED, which is the precise failure REG-D-043 identified when it derived this arrow set. Where the origin was never recorded (a block predating W-5.5) the command REFUSES rather than guessing (CON-000 AX-8). ESCALATED needs no recorded origin because it has exactly ONE ratified in-arrow, so its target is derivable from the DECLARED MACHINE rather than from event ORDERING — the distinction CON-000 AX-6 draws."
+		},
+		{
 			"commandType": "BaselinePwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuBaselined",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "SATISFIED | RECOMPOSED",
@@ -1582,7 +1631,7 @@
 		},
 		{
 			"commandType": "RejectPwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuRejected",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "UNDER_ASSURANCE",
@@ -1618,7 +1667,7 @@
 		},
 		{
 			"commandType": "ReshapePwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuReshapingStarted",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "EXECUTING",
@@ -1641,7 +1690,7 @@
 		},
 		{
 			"commandType": "InvalidatePwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuInvalidated",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "SATISFIED|CONDITIONALLY_SATISFIED|RECOMPOSED",
@@ -1664,7 +1713,7 @@
 		},
 		{
 			"commandType": "SupersedePwu",
-			"targetAggregateType": "ProfessionalWorkUnit",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuSuperseded",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "(any non-baselined)",
@@ -1682,7 +1731,7 @@
 		},
 		{
 			"commandType": "ProposeDecomposition",
-			"targetAggregateType": "DecompositionContract",
+			"targetAggregateType": "DECOMPOSITION_CONTRACT",
 			"emitsEvent": "DecompositionProposed",
 			"drivesMachine": "DecompositionContract.status",
 			"drivesFrom": "(initial)",
@@ -1759,7 +1808,7 @@
 		},
 		{
 			"commandType": "ValidateDecomposition",
-			"targetAggregateType": "DecompositionContract",
+			"targetAggregateType": "DECOMPOSITION_CONTRACT",
 			"emitsEvent": "DecompositionValidated",
 			"drivesMachine": "DecompositionContract.status",
 			"drivesFrom": "UNDER_REVIEW",
@@ -1788,7 +1837,7 @@
 		},
 		{
 			"commandType": "ReviseDecomposition",
-			"targetAggregateType": "DecompositionContract",
+			"targetAggregateType": "DECOMPOSITION_CONTRACT",
 			"emitsEvent": "DecompositionRevised",
 			"drivesMachine": "DecompositionContract.status",
 			"drivesFrom": "(prior)",
@@ -1866,7 +1915,7 @@
 		},
 		{
 			"commandType": "BeginRecomposition",
-			"targetAggregateType": "RecompositionContract",
+			"targetAggregateType": "RECOMPOSITION_CONTRACT",
 			"emitsEvent": "RecompositionStarted",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "SATISFIED",
@@ -1884,7 +1933,7 @@
 		},
 		{
 			"commandType": "CompleteRecomposition",
-			"targetAggregateType": "RecompositionContract",
+			"targetAggregateType": "RECOMPOSITION_CONTRACT",
 			"emitsEvent": "RecompositionCompleted",
 			"drivesMachine": "PWU.workLifecycleState",
 			"drivesFrom": "RECOMPOSING",
@@ -1920,7 +1969,7 @@
 		},
 		{
 			"commandType": "InvalidateEvidence",
-			"targetAggregateType": "Evidence",
+			"targetAggregateType": "EVIDENCE",
 			"emitsEvent": "EvidenceInvalidated",
 			"drivesMachine": "Evidence.status",
 			"drivesFrom": "ADMISSIBLE",
@@ -1943,7 +1992,7 @@
 		},
 		{
 			"commandType": "RequestWaiver",
-			"targetAggregateType": "Decision",
+			"targetAggregateType": "DECISION",
 			"emitsEvent": "WaiverRequested",
 			"drivesMachine": "Decision.status",
 			"drivesFrom": "(initial)",
@@ -2018,7 +2067,7 @@
 		},
 		{
 			"commandType": "GrantWaiver",
-			"targetAggregateType": "Decision",
+			"targetAggregateType": "DECISION",
 			"emitsEvent": "WaiverGranted",
 			"drivesMachine": "Decision.status",
 			"drivesFrom": "PROPOSED",
@@ -2041,7 +2090,7 @@
 		},
 		{
 			"commandType": "DenyWaiver",
-			"targetAggregateType": "Decision",
+			"targetAggregateType": "DECISION",
 			"emitsEvent": "WaiverDenied",
 			"drivesMachine": "Decision.status",
 			"drivesFrom": "PROPOSED",
@@ -2058,7 +2107,7 @@
 		},
 		{
 			"commandType": "RetryExecutionStep",
-			"targetAggregateType": "ExecutionPlan",
+			"targetAggregateType": "EXECUTION_PLAN",
 			"emitsEvent": "ExecutionStepRetried",
 			"drivesMachine": "ExecutionStep.stepState",
 			"drivesFrom": "FAILED",
@@ -2082,7 +2131,7 @@
 		},
 		{
 			"commandType": "ApplyTacticalChange",
-			"targetAggregateType": "ExecutionPlan",
+			"targetAggregateType": "EXECUTION_PLAN",
 			"emitsEvent": "TacticalChangeApplied",
 			"drivesMachine": "ExecutionPlan.status",
 			"drivesFrom": "ACTIVE",
@@ -2116,7 +2165,7 @@
 		},
 		{
 			"commandType": "CancelExecutionPlan",
-			"targetAggregateType": "ExecutionPlan",
+			"targetAggregateType": "EXECUTION_PLAN",
 			"emitsEvent": "ExecutionTerminated",
 			"drivesMachine": "ExecutionPlan.status",
 			"drivesFrom": "ACTIVE",
@@ -2188,7 +2237,7 @@
 		},
 		{
 			"commandType": "RevokeDecision",
-			"targetAggregateType": "Decision",
+			"targetAggregateType": "DECISION",
 			"emitsEvent": "DecisionRevoked",
 			"drivesMachine": "Decision.status",
 			"drivesFrom": "EFFECTIVE",
@@ -2206,7 +2255,7 @@
 		},
 		{
 			"commandType": "SupersedeBaseline",
-			"targetAggregateType": "Baseline",
+			"targetAggregateType": "BASELINE",
 			"emitsEvent": "BaselineSuperseded",
 			"drivesMachine": "Baseline.status",
 			"drivesFrom": "AUTHORITATIVE",
@@ -5929,6 +5978,33 @@
 			]
 		},
 		{
+			"eventType": "PwuUnblocked",
+			"aggregateType": "ProfessionalWorkUnit",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-16, under REG-D-029 / REG-D-043 / JAN-PWUWP W-5.5). The ACT is RULED: the sponsor ruled directly that a recovery act EXISTS for BLOCKED and ESCALATED rather than declaring them closed (REG-D-043), which is what REG-F-083 had declined to decide — \"authoring a SHAPE for a ratified act is not the same as authoring a new ACT\". The ARROWS are DERIVED from §8.2 reversed, not invented. The SHAPE below is AUTHORED: do NOT treat this sourceSection as proof it is ratified. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT, and it carries NO authority guard for the same reason BlockPwu and EscalatePwu carry none: §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion, and recovery is none of them. Making trouble easy to report and its resolution hard to record would be the same defect wearing the opposite costume.",
+			"payloadFields": [
+				{
+					"field": "recoveryReason",
+					"required": true,
+					"type": "string",
+					"note": "Why the impediment no longer holds."
+				},
+				{
+					"field": "recoveredFrom",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "BLOCKED or ESCALATED — the state left. Mirrors PwuBlocked.blockedFrom so the pair of events records the round trip explicitly rather than leaving it to be reconstructed from ORDERING (CON-000 AX-6)."
+				},
+				{
+					"field": "workLifecycleState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "The state resumed at — {BLOCKED}->{SHAPING,PLANNED,EXECUTING} or {ESCALATED}->{EVIDENCE_PENDING}. Mirrors how every other named PWU event records its resulting axis, except PwuBaselined, which uses newState and cost a replay divergence to discover."
+				}
+			]
+		},
+		{
 			"eventType": "PwuBaselined",
 			"aggregateType": "ProfessionalWorkUnit",
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)",
@@ -5968,6 +6044,13 @@
 					"required": false,
 					"type": "string[]",
 					"note": "id-ref[]"
+				},
+				{
+					"field": "blockedFrom",
+					"required": false,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "The state the PWU was in when it was blocked, and therefore the state a recovery returns it to. RECORDED rather than derived by folding the event prefix: CON-000 AX-6 forbids inferring professional meaning from ORDERING, and a prefix fold is exactly that inference (REG-F-192). OPTIONAL, and the optionality is deliberate — events written before JAN-PWUWP W-5.5 do not carry it and must still REPLAY, so the fail-closed sits at the point of USE: UnblockPwu REFUSES a PWU whose block predates this field rather than guessing an origin (CON-000 AX-8). ⚠ NOTE THE ASYMMETRY WITH PwuEscalated, WHICH DELIBERATELY GETS NO SUCH FIELD. ESCALATED has exactly ONE ratified in-arrow (EVIDENCE_PENDING), so its recovery target is derivable from the DECLARED MACHINE rather than from event order — which AX-6 permits. A mirror field there would be content with no consumer; the derivation is instead held by a control that reddens if ESCALATED ever gains a second in-arrow."
 				},
 				{
 					"field": "workLifecycleState",
@@ -8191,6 +8274,38 @@
 			"from": "EVIDENCE_PENDING",
 			"to": "ESCALATED",
 			"note": "JAN-PWUWP W-5. One in-arrow. ESCALATE is a ratified §37 ControlAction whose event had to be authored."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "BLOCKED",
+			"to": "SHAPING",
+			"note": "JAN-PWUWP W-5.5. §8.2’s SHAPING->BLOCKED reversed."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "BLOCKED",
+			"to": "PLANNED",
+			"note": "JAN-PWUWP W-5.5. §8.2’s PLANNED->BLOCKED reversed."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "BLOCKED",
+			"to": "EXECUTING",
+			"note": "JAN-PWUWP W-5.5. §8.2’s EXECUTING->BLOCKED reversed."
+		},
+		{
+			"commandType": "UnblockPwu",
+			"eventType": "PwuUnblocked",
+			"machine": "PWU.workLifecycleState",
+			"from": "ESCALATED",
+			"to": "EVIDENCE_PENDING",
+			"note": "JAN-PWUWP W-5.5. §8.2’s EVIDENCE_PENDING->ESCALATED reversed. ⚠ FOUR CONCRETE ROWS RATHER THAN ONE UNION ROW: \"BLOCKED | ESCALATED\" -> \"SHAPING | PLANNED | EXECUTING | EVIDENCE_PENDING\" would claim a 4x4 PRODUCT, twelve arrows of which the machine has none. The pairing is the content here, so each pair is its own row."
 		}
 	],
 	"conflicts": [

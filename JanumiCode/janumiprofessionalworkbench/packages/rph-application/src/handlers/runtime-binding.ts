@@ -70,7 +70,7 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 	};
 	return createObject(ctx, command, {
 		objectType: BINDING,
-		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on four machines).
+		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
 		// ⚠ NOTE THE FIELD: `authorizationStatus`, not `status`. `lifecycleStatus` mirrors the same value here, so a
 		// wrong statusField would still parse — createObject's own birth check (kit.ts:567) is what catches it.
 		births: [{ machine: 'RuntimeBinding.authorizationStatus', statusField: 'authorizationStatus', values: ['REQUESTED'] }],
@@ -204,7 +204,7 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 			});
 			if (!check.ok)
 				// The kernel's label travels in the MESSAGE: `RPH_CAPABILITY_NOT_REQUESTED` is not a member of the
-				// ratified 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
+				// ratified ~~15~~ 16-value RphErrorCodeSchema (REG-F-144), so it goes there or nowhere (the WP-11 discipline).
 				return reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',

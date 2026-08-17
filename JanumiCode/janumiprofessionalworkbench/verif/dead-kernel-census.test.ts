@@ -319,8 +319,25 @@ function kernelExports(files: readonly string[]): Map<string, string> {
 	return out;
 }
 
-/** Symbols with NO call site in any production file other than their own declaration. */
+/**
+ * Symbols with NO call site in any production file other than their own declaration.
+ *
+ * ⚠ MEMOIZED — REG-F-116. This reads EVERY non-test `.ts` under every package and app `src` tree and then runs one
+ * regex per kernel export across all of them; the census test and its CONTROL both call it with no arguments, so
+ * the whole corpus was read and scanned twice. The corpus grew sharply when `packages/csaa` landed (~680 files),
+ * which is what pushed this over its budget.
+ *
+ * MEASURED: 1024ms in isolation, **6519ms with a second vitest running — over the 5000ms DEFAULT, so it FAILS.**
+ * A test that tips its timeout is reported by the mutation runner as a verdict about an unrelated mutation, which
+ * is the defect REG-F-116 exists for. Pure function of a tree that cannot change inside one vitest run.
+ */
+let uncalledCache: string[] | undefined;
 function uncalledKernelExports(): string[] {
+	uncalledCache ??= computeUncalledKernelExports();
+	return uncalledCache;
+}
+
+function computeUncalledKernelExports(): string[] {
 	const files = productionSources();
 	const texts = new Map(files.map((rel) => [rel, readFileSync(`${REPO_ROOT}${rel}`, 'utf8')]));
 	const exports = kernelExports(files);

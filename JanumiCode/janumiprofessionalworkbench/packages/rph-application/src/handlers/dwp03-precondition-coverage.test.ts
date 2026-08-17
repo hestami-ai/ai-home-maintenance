@@ -37,8 +37,24 @@ function harness() {
 	return { store, engine, d, stateOf, eventsOfType };
 }
 
-// ─────────────────────────────────────────── Intent (advanceIntent, 4 sites) ───────────────────────────────────
-describe('DWP-03 intent — each advanceIntent site refuses a re-issue on its own machine in-arrows', () => {
+// ─────────────────────────────────── Intent (advanceIntent — 4 of the 5 sites) ─────────────────────────────────
+//
+// ⚠ THE HEADER SAID "4 sites" AND THE TITLE SAID "each", AND THERE ARE FIVE. Corrected under REG-F-117, which is
+// what made the count checkable at all: `advanceIntent` has five call sites — BeginIntentDiscovery, ProvisionIntent,
+// FormalizeIntent, ApproveIntent and **ReviseIntent** — each with a REQUIRED `precondition: fromStates(...)`.
+//
+// THE FIFTH IS COVERED, ELSEWHERE, AND MORE STRONGLY. `command-reissue-guard.test.ts` → JAN-NOOP-01 →
+// *"ReviseIntent — semanticVersion inflation cannot void an approval"* drives a fully approved intent, revises it
+// once, and asserts the second revision is REJECTED with the semanticVersion held still and exactly one
+// `IntentRevised` event. That is this file's property plus the consequence that makes it matter.
+//
+// ⚠ WHY THE CROSS-REFERENCE IS THE FIX RATHER THAN A FIFTH CASE HERE. Auditing DWP-03 alone yields "ReviseIntent's
+// precondition is untested", which is FALSE — and the natural second conclusion, that the guard is unkillable
+// because `checkTransition` would refuse the arrow anyway, is ALSO false. **Measured, not reasoned:** widening
+// `fromStates('APPROVED')` to include `'REVISED'` makes the re-issue **ACCEPTED**, because a self-transition
+// REVISED -> REVISED is absorbed rather than refused. The precondition is the only thing standing between a
+// replayed no-op and a silently voided approval. Two plausible readings, both wrong, both cheap to check.
+describe('DWP-03 intent — four of the five advanceIntent sites refuse a re-issue on their own machine in-arrows', () => {
 	let h: ReturnType<typeof harness>;
 	const INT = 'int_01ARZ3NDEKTSV4RRFFQ69G5W00';
 	const ver = () => Number((h.stateOf(INT) as { semanticVersion?: number }).semanticVersion ?? 1);

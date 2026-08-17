@@ -267,6 +267,66 @@ export interface CommitArgs {
 	 * unvalidated payload in behind a valid one.
 	 */
 	readonly alsoEvents?: readonly DomainEvent[];
+	/**
+	 * THE STATE MACHINES THIS COMMIT BRINGS INTO EXISTENCE — REG-F-086, and it is CHECKED, never merely recorded.
+	 *
+	 * ⚠ WHY IT IS HERE AND NOT ONLY ON `createObject`. The occupancy census seeds from declared births and grows
+	 * along declared arrows; a machine with arrows and no birth is `unanalysed` — it cannot be asked which of its
+	 * states are reachable, so it cannot be asked which of its "covered" arrows are DEAD. Three machines sat there,
+	 * and two of them — `Intent.intentStatus` and `PWU.workLifecycleState` — are created by `captureIntent` and
+	 * `proposePwu`, which commit through THIS function and never call `createObject`. REG-F-086 recorded that as
+	 * "the birth cannot be declared". The blocker was real; the conclusion was not. **A declaration mechanism
+	 * attached to one primitive does not reach the sites that use another** — the same shape REG-F-114 and
+	 * REG-F-117 each corrected for arrows.
+	 *
+	 * ⚠ `createObject` DOES NOT FORWARD ITS OWN `births` INTO THIS FIELD, deliberately. It delegates to this
+	 * function, so forwarding would run the check twice — and, worse, the forwarding site would read
+	 * `births: args.births`, which is not an array literal and which the census refuses to read by design. Both
+	 * primitives declare their own and call the same checker.
+	 *
+	 * See `refuseOnBirthDrift` for why a mismatch REFUSES rather than warns.
+	 */
+	readonly births?: readonly BirthDeclaration[];
+}
+
+/** One machine brought into existence by a commit, and the states it may be born into. */
+export interface BirthDeclaration {
+	readonly machine: string;
+	readonly statusField: string;
+	readonly values: readonly string[];
+}
+
+/**
+ * Refuse a commit whose DECLARED birth disagrees with the state it is actually committing.
+ *
+ * WHY A RUNTIME REFUSAL AND NOT A COMMENT — the reason is `createObject`'s and it is unchanged by being shared:
+ * the occupancy census reads these declarations to decide which states can ever be occupied, and therefore which
+ * "covered" arrows are dead. **A declaration that drifts from the code makes that census confidently wrong**, which
+ * is worse than no census. A field only a census reads is the hollow this programme keeps finding.
+ *
+ * Returns the rejecting result, or `null` when every declaration matches (including when none is declared).
+ */
+export function refuseOnBirthDrift(
+	command: DomainCommand,
+	state: Record<string, unknown>,
+	aggregateId: string,
+	births: readonly BirthDeclaration[] | undefined
+): CommandResult | null {
+	for (const b of births ?? []) {
+		const actual = state[b.statusField];
+		if (typeof actual !== 'string' || !b.values.includes(actual)) {
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`${command.commandType}: declared birth for ${b.machine} is [${b.values.join(', ')}] at ` +
+					`\`${b.statusField}\`, but the created object carries ${JSON.stringify(actual)}. Refused rather ` +
+					`than committed: the occupancy census trusts this declaration to decide which states can ever ` +
+					`be reached, so a declaration that has drifted from the code makes that census confidently wrong.`,
+				[aggregateId]
+			);
+		}
+	}
+	return null;
 }
 
 const SCHEMA_BY_TYPE = OBJECT_SCHEMAS as Record<string, { schema: ZodType } | undefined>;
@@ -283,10 +343,19 @@ const SCHEMA_BY_TYPE = OBJECT_SCHEMAS as Record<string, { schema: ZodType } | un
  * economy REG-D-013 forbids, so **the guarantee moved rather than lapsing**: optional at the schema, mandatory at
  * the state that implies it.
  *
- * EXPRESSED AS THE EXEMPT SET, DELIBERATELY, BECAUSE THAT FAILS CLOSED. The three pre-start states are named; every
- * other state — ASSESSING and all eleven terminal dispositions — requires the field. A state added later therefore
- * defaults to REQUIRING `startedAt`. The positive form (list the states that require it) would default a new state
- * to exempt, which is the direction that loses the guarantee silently.
+ * EXPRESSED AS THE EXEMPT SET, DELIBERATELY, BECAUSE THAT FAILS CLOSED. Four states are named — the three pre-start
+ * states and CANCELLED (see the note on the array below); every other state — ASSESSING and the other ten terminal
+ * dispositions — requires the field. A state added later therefore defaults to REQUIRING `startedAt`. The positive
+ * form (list the states that require it) would default a new state to exempt, which is the direction that loses the
+ * guarantee silently.
+ *
+ * ⚠ THIS SAID ~~"The three pre-start states are named; every other state — ASSESSING and all eleven terminal
+ * dispositions — requires the field"~~ WHILE `exemptStates` BELOW HELD FOUR — corrected 2026-08-13, struck rather
+ * than deleted because that sentence is what a reader counts from. CANCELLED was added to the exempt set by
+ * REG-F-021 R-1 (2026-08-05, e58f45e4) and this paragraph was not re-derived with it, so it went on asserting the
+ * 3-exempt/12-requires split that was true when written and false from R-1 on; of §30's 15 states it is now 4
+ * exempt and 11 requiring. Same class as P-5: **a count in prose beside a live table is a count nothing checks.**
+ * `exemptStates` is the authority; the numbers in this paragraph are narrative only.
  */
 const STATE_CONDITIONAL_FIELDS: Readonly<
 	Record<string, { statusField: string; exemptStates: readonly string[]; required: readonly string[] }>
@@ -334,6 +403,10 @@ export function commitState(
 	command: DomainCommand,
 	args: CommitArgs
 ): CommandResult {
+	// FIRST, before the schema lookup and before anything is written: a commit whose declared birth disagrees with
+	// the state it carries must not proceed. See `CommitArgs.births`.
+	const drift = refuseOnBirthDrift(command, args.nextState, args.aggregateId, args.births);
+	if (drift) return drift;
 	const entry = SCHEMA_BY_TYPE[args.objectType];
 	if (!entry) {
 		return reject(
@@ -563,27 +636,15 @@ export function createObject(
 		 * lands EVIDENCE_PENDING or READY on the same command). Listing extras to be safe would widen the
 		 * occupancy claim, which is the direction that hides dead arrows.
 		 */
-		readonly births?: readonly {
-			readonly machine: string;
-			readonly statusField: string;
-			readonly values: readonly string[];
-		}[];
+		readonly births?: readonly BirthDeclaration[];
 	}
 ): CommandResult {
-	for (const b of args.births ?? []) {
-		const actual = args.state[b.statusField];
-		if (typeof actual !== 'string' || !b.values.includes(actual)) {
-			return reject(
-				command,
-				'RPH_INVARIANT_VIOLATION',
-				`${command.commandType}: declared birth for ${b.machine} is [${b.values.join(', ')}] at ` +
-					`\`${b.statusField}\`, but the created object carries ${JSON.stringify(actual)}. Refused rather ` +
-					`than committed: the occupancy census trusts this declaration to decide which states can ever ` +
-					`be reached, so a declaration that has drifted from the code makes that census confidently wrong.`,
-				[args.aggregateId]
-			);
-		}
-	}
+	// ⚠ THE SAME CHECKER `commitState` RUNS, AND `births` IS NOT FORWARDED TO IT (REG-F-086). Forwarding would run
+	// this twice and would write `births: args.births` at the delegating call site — not an array literal, which
+	// the birth census refuses to read, and rightly: a declaration it cannot read is a declaration it would have
+	// to guess at.
+	const drift = refuseOnBirthDrift(command, args.state, args.aggregateId, args.births);
+	if (drift) return drift;
 	const event = makeEvent(ctx, command, {
 		eventType: args.eventType,
 		aggregateType: args.objectType,

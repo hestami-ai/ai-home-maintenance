@@ -1862,8 +1862,14 @@ describe('live JPWB and inventory projection', () => {
 		expect(counts.get('tsconfig.json')).toBe(0);
 		expect(counts.get('packages/rph-contracts/tsconfig.json')).toBe(28);
 		expect(counts.get('packages/rph-contracts/tsconfig.build.json')).toBe(10);
-		expect(counts.get('scripts/tsconfig.json')).toBe(6);
-		expect(counts.get('verif/tsconfig.json')).toBe(40);
+		// Both re-derived from the tree, not copied: the register's recorded remedies were 6->7 and 40->41 and
+		// BOTH were stale. `scripts/` gained mutants/measured.ts and mutants/verdict.ts (+2); `verif/` gained
+		// control-verdict, mutant-verdict, observation-command-surface, register-citations and
+		// unreachability-grounds test files (+5). Cross-checked against `git ls-tree` at the pre-merge HEAD
+		// (6 and 40) plus the merge's own add-list.
+		expect(counts.get('scripts/tsconfig.json')).toBe(8);
+		// ⚠ This line never executed while the one above was red — it was MASKED, and it had moved too.
+		expect(counts.get('verif/tsconfig.json')).toBe(45);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(82);
 		expect(
 			subject.projects.find((project) => project.configPath === 'apps/rph-demo/tsconfig.json')

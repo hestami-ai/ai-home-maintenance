@@ -2,15 +2,15 @@
   "artifactPopulations": [
     {
       "artifactClass": "CONFIGURATION",
-      "discovered": 58,
+      "discovered": 59,
       "excluded": 0,
       "failed": 0,
-      "included": 58,
+      "included": 59,
       "provenance": [
         "subject.selectedFiles#artifactClass=CONFIGURATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 58
+      "successfullyInventoried": 59
     },
     {
       "artifactClass": "GENERATED_SOURCE",
@@ -38,51 +38,51 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 13,
+      "discovered": 15,
       "excluded": 0,
       "failed": 0,
-      "included": 13,
+      "included": 15,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 13
+      "successfullyInventoried": 15
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 316,
+      "discovered": 317,
       "excluded": 0,
       "failed": 0,
-      "included": 316,
+      "included": 317,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 316
+      "successfullyInventoried": 317
     },
     {
       "artifactClass": "TEST",
-      "discovered": 359,
+      "discovered": 364,
       "excluded": 0,
       "failed": 0,
-      "included": 359,
+      "included": 364,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 359
+      "successfullyInventoried": 364
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 40,
+      "discovered": 45,
       "excluded": 0,
       "failed": 0,
-      "included": 40,
+      "included": 45,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 40
+      "successfullyInventoried": 45
     }
   ],
   "assuranceSurfaces": {
@@ -147,6 +147,7 @@
         "apps/rph-demo/e2e/support/harness.ts",
         "apps/rph-demo/e2e/theme.e2e.ts",
         "apps/rph-demo/e2e/traceability.e2e.ts",
+        "apps/rph-demo/e2e/tsconfig.json",
         "apps/rph-demo/e2e/uncertainty-disclosure.e2e.ts",
         "apps/rph-demo/e2e/undertaking-abandon.e2e.ts",
         "apps/rph-demo/e2e/undertaking-atomicity.e2e.ts",
@@ -280,6 +281,7 @@
         "packages/csaa/src/semantic/validate-snapshot.test.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.test.ts",
         "packages/csaa/src/semantic/validate-wire-shape.test.ts",
+        "packages/csaa/src/subject/analyzer-closure.test.ts",
         "packages/csaa/src/subject/subject.test.ts",
         "packages/rph-application/src/command-envelope-identity.test.ts",
         "packages/rph-application/src/command-envelope-validation.test.ts",
@@ -298,6 +300,7 @@
         "packages/rph-application/src/handlers/baseline-open-blocking-observation.test.ts",
         "packages/rph-application/src/handlers/baseline-stale-decision-version.test.ts",
         "packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts",
+        "packages/rph-application/src/handlers/birth-drift.test.ts",
         "packages/rph-application/src/handlers/block-escalate.test.ts",
         "packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts",
         "packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts",
@@ -364,10 +367,12 @@
         "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
         "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+        "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "packages/rph-application/src/handlers/pwu.test.ts",
         "packages/rph-application/src/handlers/recomposition.test.ts",
         "packages/rph-application/src/handlers/rejection-authority.test.ts",
         "packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts",
+        "packages/rph-application/src/handlers/sta6-superseded-intent.test.ts",
         "packages/rph-application/src/handlers/state-conditional-fields.test.ts",
         "packages/rph-application/src/handlers/state-conditional-wiring.test.ts",
         "packages/rph-application/src/handlers/step-strength-authority.test.ts",
@@ -465,6 +470,7 @@
         "packages/rph-persistence/src/schema-migration.test.ts",
         "packages/rph-persistence/src/sqlite-storage-adapter.test.ts",
         "packages/rph-ports/src/defaults/logger.test.ts",
+        "packages/rph-product-realization-pwa/src/doc003-carriage.test.ts",
         "packages/rph-product-realization-pwa/src/doc004-conformance.test.ts",
         "packages/rph-product-realization-pwa/src/ontology.test.ts",
         "packages/rph-product-realization-pwa/src/verif-2d-ontology-validator.test.ts",
@@ -500,6 +506,7 @@
         "verif/causation-provenance.test.ts",
         "verif/command-dispatch-census.test.ts",
         "verif/contract-number-census.test.ts",
+        "verif/control-verdict.test.ts",
         "verif/dead-kernel-census.test.ts",
         "verif/deferral-honesty.test.ts",
         "verif/emitted-event-guard.test.ts",
@@ -508,9 +515,12 @@
         "verif/guard-enforcement-ledger.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
+        "verif/mutant-verdict.test.ts",
+        "verif/observation-command-surface.test.ts",
         "verif/optimistic-concurrency-surface.test.ts",
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/recomposition-ungoverned.test.ts",
+        "verif/register-citations.test.ts",
         "verif/register-status.test.ts",
         "verif/route-action-census.test.ts",
         "verif/source-is-reviewable.test.ts",
@@ -519,7 +529,8 @@
         "verif/tracker-deferrals.test.ts",
         "verif/transition-provenance-carried.test.ts",
         "verif/trigger-claim-truth.test.ts",
-        "verif/trust-boundary.test.ts"
+        "verif/trust-boundary.test.ts",
+        "verif/unreachability-grounds.test.ts"
       ],
       "passWithNoTestsValues": [
         false
@@ -1620,7 +1631,7 @@
       "categories": [
         "TYPE_CHECK"
       ],
-      "command": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+      "command": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p ./e2e/tsconfig.json",
       "name": "check-types",
       "owner": "apps/rph-demo",
       "provenance": [
@@ -2283,6 +2294,7 @@
       ],
       "provenance": [
         "apps/rph-demo/.svelte-kit/tsconfig.json",
+        "apps/rph-demo/e2e/tsconfig.json",
         "apps/rph-demo/tsconfig.json",
         "bun.lock",
         "package.json",
@@ -2448,7 +2460,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "c6b5548df828ebd26d50758d912d929a52a5768cfe5c2b9ae83ae35f06bad9d9",
+    "configurationDigest": "c20f7047ce694c857056a1ec1d5080a154735b6efe3c91134e2fa980bdf25565",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2465,9 +2477,9 @@
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
-          "bytes": 1095,
+          "bytes": 1391,
           "path": ".gitignore",
-          "sha256": "cb1e923c187e3980b08861de599de2a969965794261bb21457ff6b3d84b68816"
+          "sha256": "dcd948301a6811ce236b218d9bb4a7ccd43f6410e6e58295c6cb4a138ba0e452"
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
@@ -2488,10 +2500,16 @@
           "sha256": "c01d35eee60b3cb21e230c392c72c947234d7f406b83959a042a63e09db454c4"
         },
         {
+          "artifactClass": "PROJECT_CONFIGURATION",
+          "bytes": 151,
+          "path": "apps/rph-demo/e2e/tsconfig.json",
+          "sha256": "6fa2c79f9d8c0c9b5a5639b83d4f5a3ba5e2c2996d4af2f7ada2ff18927e21f3"
+        },
+        {
           "artifactClass": "MANIFEST",
-          "bytes": 2024,
+          "bytes": 2063,
           "path": "apps/rph-demo/package.json",
-          "sha256": "f2b2947cade96e83f58e8e6064adec5e44dca20822fbf982cbe0ee20ea1251a7"
+          "sha256": "b8816c7774f5aec6a07ca278ab2ba125bd0812d94f7da9761bf00654f008c29a"
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
@@ -2802,6 +2820,12 @@
       ],
       "generatedContexts": [
         {
+          "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
+          "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+          "selectedInput": true,
+          "sha256": "c01d35eee60b3cb21e230c392c72c947234d7f406b83959a042a63e09db454c4"
+        },
+        {
           "consumerProject": "apps/rph-demo/tsconfig.json",
           "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
           "selectedInput": true,
@@ -2809,6 +2833,101 @@
         }
       ],
       "projects": [
+        {
+          "compilerOptions": {
+            "allowJs": true,
+            "checkJs": true,
+            "configFilePath": "apps/rph-demo/e2e/tsconfig.json",
+            "esModuleInterop": true,
+            "forceConsistentCasingInFileNames": true,
+            "isolatedModules": true,
+            "lib": [
+              "lib.esnext.d.ts",
+              "lib.dom.d.ts",
+              "lib.dom.iterable.d.ts"
+            ],
+            "module": 99,
+            "moduleResolution": 100,
+            "noEmit": true,
+            "paths": {
+              "$app/types": [
+                "./types/index.d.ts"
+              ],
+              "$lib": [
+                "../src/lib"
+              ],
+              "$lib/*": [
+                "../src/lib/*"
+              ]
+            },
+            "pathsBasePath": "apps/rph-demo/.svelte-kit",
+            "resolveJsonModule": true,
+            "rootDirs": [
+              "apps/rph-demo",
+              "apps/rph-demo/.svelte-kit/types"
+            ],
+            "skipLibCheck": true,
+            "sourceMap": true,
+            "strict": true,
+            "target": 99,
+            "types": [
+              "node"
+            ],
+            "verbatimModuleSyntax": true
+          },
+          "configClosureDigest": "9a9a8097a775b35194662d8b8d8959304ff16c24dc3409d08985d7e40ccb3d54",
+          "configPath": "apps/rph-demo/e2e/tsconfig.json",
+          "kind": "PROJECT",
+          "projectReferences": [],
+          "projectResolutionDigest": "9834e6bf94e4f45e35ce20f289556072c5e19d95af37efec20e9f0bdc96f9880",
+          "provider": {
+            "id": "typescript",
+            "version": "5.9.3"
+          },
+          "rootNames": [
+            "apps/rph-demo/e2e/agent-retention.e2e.ts",
+            "apps/rph-demo/e2e/agent-sse.e2e.ts",
+            "apps/rph-demo/e2e/agent-ui.e2e.ts",
+            "apps/rph-demo/e2e/assurance-floor.e2e.ts",
+            "apps/rph-demo/e2e/baselines.e2e.ts",
+            "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
+            "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-flow.e2e.ts",
+            "apps/rph-demo/e2e/execution-plan.e2e.ts",
+            "apps/rph-demo/e2e/execution-sequencing.e2e.ts",
+            "apps/rph-demo/e2e/execution-tier3.e2e.ts",
+            "apps/rph-demo/e2e/global-setup.ts",
+            "apps/rph-demo/e2e/global-teardown.ts",
+            "apps/rph-demo/e2e/graph-validation.e2e.ts",
+            "apps/rph-demo/e2e/policy-manager.e2e.ts",
+            "apps/rph-demo/e2e/pwa-authoring-backbone.e2e.ts",
+            "apps/rph-demo/e2e/pwa-authoring-delegation.e2e.ts",
+            "apps/rph-demo/e2e/pwa-authoring-rich.e2e.ts",
+            "apps/rph-demo/e2e/pwa-authoring.e2e.ts",
+            "apps/rph-demo/e2e/pwa-coherence.e2e.ts",
+            "apps/rph-demo/e2e/pwa-delete.e2e.ts",
+            "apps/rph-demo/e2e/pwa-designer-gallery.e2e.ts",
+            "apps/rph-demo/e2e/pwa-instantiation.e2e.ts",
+            "apps/rph-demo/e2e/pwa-lifecycle-deprecate.e2e.ts",
+            "apps/rph-demo/e2e/pwa-node-graph.e2e.ts",
+            "apps/rph-demo/e2e/pwa-walkthrough.e2e.ts",
+            "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
+            "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
+            "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+            "apps/rph-demo/e2e/smoke.e2e.ts",
+            "apps/rph-demo/e2e/support/gallery.ts",
+            "apps/rph-demo/e2e/support/harness.ts",
+            "apps/rph-demo/e2e/theme.e2e.ts",
+            "apps/rph-demo/e2e/traceability.e2e.ts",
+            "apps/rph-demo/e2e/uncertainty-disclosure.e2e.ts",
+            "apps/rph-demo/e2e/undertaking-abandon.e2e.ts",
+            "apps/rph-demo/e2e/undertaking-atomicity.e2e.ts",
+            "apps/rph-demo/e2e/undertaking-pwu.e2e.ts",
+            "apps/rph-demo/e2e/undertaking-scope.e2e.ts",
+            "apps/rph-demo/e2e/undertaking-scroll.e2e.ts",
+            "apps/rph-demo/playwright.config.ts"
+          ]
+        },
         {
           "compilerOptions": {
             "allowJs": true,
@@ -2974,7 +3093,7 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "6956206051b3624e3f2802ab1204dbfef81bafbf0bf4d67f13f5a78b6e4fbd60",
+          "projectResolutionDigest": "b4930a6bbc2cc30d53ed409bc598cf08e5b1fb885490d91dddb626c11be32daa",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3112,6 +3231,7 @@
             "packages/csaa/src/semantic/validate-snapshot.ts",
             "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
             "packages/csaa/src/semantic/validate-wire-shape.ts",
+            "packages/csaa/src/subject/analyzer-closure.ts",
             "packages/csaa/src/subject/artifacts.ts",
             "packages/csaa/src/subject/capture-model.ts",
             "packages/csaa/src/subject/capture.ts",
@@ -3159,7 +3279,7 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d5a579c54e40de36f9c2db81fa85ae292029a1e93e99078ea51206d27fc68761",
+          "projectResolutionDigest": "cfc3c9457e3503277fc50cf01af01252d11d50aaf839a99d82e40c652e9aa06a",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3390,6 +3510,8 @@
             "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
             "packages/csaa/src/semantic/validate-wire-shape.test.ts",
             "packages/csaa/src/semantic/validate-wire-shape.ts",
+            "packages/csaa/src/subject/analyzer-closure.test.ts",
+            "packages/csaa/src/subject/analyzer-closure.ts",
             "packages/csaa/src/subject/artifacts.ts",
             "packages/csaa/src/subject/capture-model.ts",
             "packages/csaa/src/subject/capture.ts",
@@ -3500,7 +3622,7 @@
           "configPath": "packages/rph-application/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "9354d2331a5ac1c286786c39140cb598adc24a5065975727d0bea3086240d25f",
+          "projectResolutionDigest": "f2f9be1da1ea74703d9bd0877f0d23ef0a43e13e31dba7da72faf55785c91b9a",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3530,6 +3652,7 @@
             "packages/rph-application/src/handlers/baseline-open-blocking-observation.test.ts",
             "packages/rph-application/src/handlers/baseline-stale-decision-version.test.ts",
             "packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts",
+            "packages/rph-application/src/handlers/birth-drift.test.ts",
             "packages/rph-application/src/handlers/block-escalate.test.ts",
             "packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts",
             "packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts",
@@ -3606,6 +3729,7 @@
             "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
             "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+            "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
             "packages/rph-application/src/handlers/pwu.test.ts",
             "packages/rph-application/src/handlers/pwu.ts",
             "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -3615,6 +3739,7 @@
             "packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts",
             "packages/rph-application/src/handlers/runtime-binding.ts",
             "packages/rph-application/src/handlers/skip-authorization.ts",
+            "packages/rph-application/src/handlers/sta6-superseded-intent.test.ts",
             "packages/rph-application/src/handlers/state-conditional-fields.test.ts",
             "packages/rph-application/src/handlers/state-conditional-wiring.test.ts",
             "packages/rph-application/src/handlers/step-strength-authority.test.ts",
@@ -4485,12 +4610,13 @@
           "configPath": "packages/rph-product-realization-pwa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "6964e98513e1d473336e6a7410a2057d097eae32e312adf1a000bbf1e48b6aef",
+          "projectResolutionDigest": "36a8911420ca2b86fdccfde2f4251b223fc02de2a3ce69633bf373438b7a1d22",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/rph-product-realization-pwa/src/doc003-carriage.test.ts",
             "packages/rph-product-realization-pwa/src/doc004-conformance.test.ts",
             "packages/rph-product-realization-pwa/src/gen/gen-ontology.ts",
             "packages/rph-product-realization-pwa/src/index.ts",
@@ -4668,7 +4794,7 @@
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "b51f388e7a533308a7ace0d1ca4fd4926369f60aa0cf90e383f436de99005a37",
+          "projectResolutionDigest": "b9f2a2933f5e9c8332983622f7e69071ee9de935d013dfd3afc6d2929622af85",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4677,8 +4803,10 @@
             "scripts/csaa-inventory.ts",
             "scripts/csaa-product-boundary.ts",
             "scripts/mutants/ledger.ts",
+            "scripts/mutants/measured.ts",
             "scripts/mutants/run.ts",
             "scripts/mutants/show.ts",
+            "scripts/mutants/verdict.ts",
             "scripts/spec-obligations.ts"
           ]
         },
@@ -4751,7 +4879,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "8d562ecfe907ba9f8bb3bbc79394990f17f90234951c3a3ef7dd5f0add31140d",
+          "projectResolutionDigest": "0f25e97cae80403cfd8e737bc131d5c424968870e9a38c84d375efb4b2132252",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4772,6 +4900,7 @@
             "verif/causation-provenance.test.ts",
             "verif/command-dispatch-census.test.ts",
             "verif/contract-number-census.test.ts",
+            "verif/control-verdict.test.ts",
             "verif/dead-kernel-census.test.ts",
             "verif/deferral-honesty.test.ts",
             "verif/emitted-event-guard.test.ts",
@@ -4783,9 +4912,12 @@
             "verif/guard-enforcement-ledger.ts",
             "verif/lifecycle-arrow-declarations.test.ts",
             "verif/mutant-ledger.test.ts",
+            "verif/mutant-verdict.test.ts",
+            "verif/observation-command-surface.test.ts",
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
             "verif/recomposition-ungoverned.test.ts",
+            "verif/register-citations.test.ts",
             "verif/register-status.test.ts",
             "verif/route-action-census.test.ts",
             "verif/source-is-reviewable.test.ts",
@@ -4796,6 +4928,7 @@
             "verif/trigger-claim-truth.test.ts",
             "verif/trigger-claim-truth.ts",
             "verif/trust-boundary.test.ts",
+            "verif/unreachability-grounds.test.ts",
             "verif/unread-refusal-guard.ts"
           ]
         }
@@ -5486,8 +5619,17 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "05f34c08d00de2911485e3a619f68ac8e83b9d07e379b463f403d982a9451a68",
+    "fileManifestDigest": "5778e9fe1e98e853e606d025204b3788daf1343c5540f1911825cd4f98ae8c7f",
     "generatedContexts": [
+      {
+        "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
+        "freshness": "UNKNOWN",
+        "freshnessBasis": "No generator-input identity or governed generation record was captured.",
+        "freshnessEvidence": [],
+        "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+        "selectedInput": true,
+        "sha256": "c01d35eee60b3cb21e230c392c72c947234d7f406b83959a042a63e09db454c4"
+      },
       {
         "consumerProject": "apps/rph-demo/tsconfig.json",
         "freshness": "UNKNOWN",
@@ -5525,6 +5667,13 @@
     "resolutionDiagnostics": [
       {
         "code": "GENERATED_CONTEXT_FRESHNESS_UNKNOWN",
+        "message": "Generated context freshness is unknown for apps/rph-demo/e2e/tsconfig.json.",
+        "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+        "phase": "FRESHNESS",
+        "severity": "WARNING"
+      },
+      {
+        "code": "GENERATED_CONTEXT_FRESHNESS_UNKNOWN",
         "message": "Generated context freshness is unknown for apps/rph-demo/tsconfig.json.",
         "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
         "phase": "FRESHNESS",
@@ -5533,7 +5682,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 934,
+    "selectedFileCount": 948,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -5551,9 +5700,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 1095,
+        "bytes": 1391,
         "path": ".gitignore",
-        "sha256": "cb1e923c187e3980b08861de599de2a969965794261bb21457ff6b3d84b68816",
+        "sha256": "dcd948301a6811ce236b218d9bb4a7ccd43f6410e6e58295c6cb4a138ba0e452",
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       },
       {
@@ -5803,9 +5952,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 8581,
+        "bytes": 9623,
         "path": "apps/rph-demo/e2e/policy-manager.e2e.ts",
-        "sha256": "ad0e20858833788e12add1169d5c13f718be4beff29a39af6782dd0f1104753c",
+        "sha256": "0f3d5ff0fc28cfc2e1cde8655de65c7a3d32bd4507f9d977ed5e6cbde759d312",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5922,9 +6071,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 4660,
+        "bytes": 5213,
         "path": "apps/rph-demo/e2e/support/harness.ts",
-        "sha256": "417957af82e7852d978348b84b73c6e42cf59146dd59ea7351de8e9702689ece",
+        "sha256": "32dcde3c3389662ce35f08a20dcb5b21ade75518591209d0b7437a5caa78c7ae",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -5940,6 +6089,13 @@
         "path": "apps/rph-demo/e2e/traceability.e2e.ts",
         "sha256": "f9d729d3770edb31df21875959336eab03e003f85246a9fb2efd010ce9574444",
         "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "CONFIGURATION",
+        "bytes": 151,
+        "path": "apps/rph-demo/e2e/tsconfig.json",
+        "sha256": "6fa2c79f9d8c0c9b5a5639b83d4f5a3ba5e2c2996d4af2f7ada2ff18927e21f3",
+        "subjectArtifactClass": "PROJECT_CONFIGURATION"
       },
       {
         "artifactClass": "TEST",
@@ -5985,9 +6141,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 2024,
+        "bytes": 2063,
         "path": "apps/rph-demo/package.json",
-        "sha256": "f2b2947cade96e83f58e8e6064adec5e44dca20822fbf982cbe0ee20ea1251a7",
+        "sha256": "b8816c7774f5aec6a07ca278ab2ba125bd0812d94f7da9761bf00654f008c29a",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -6727,9 +6883,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 17989,
+        "bytes": 19488,
         "path": "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
-        "sha256": "218c4c42999347e6631a5d650551f8e17eb2ba1b94e3c58e65051fb8ea1a6cd7",
+        "sha256": "9d7b1ac074e4d3df24001d0e034c7c4be438c10af5f7c679fe3c82bf8393303c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7588,16 +7744,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 27581,
+        "bytes": 27890,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.test.ts",
-        "sha256": "974ce53d9f482c882bbb673c2a980dbb96f39319199c47a1dd72a3737547b8e2",
+        "sha256": "be08544798929e271ef93b0e43fd4885b38dff1d36f4895d87ba904089feef27",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 37951,
+        "bytes": 40931,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
-        "sha256": "5c1f60724dcb2a140e4e8e13445d4bbaebb47cf47660ca30fb074b16724074b8",
+        "sha256": "1f69460531206e0de9e13d416d58adb87010040d3137198e9bb349497e8293c5",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7609,9 +7765,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 33827,
+        "bytes": 33862,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/normalize-guard-enforcement-ledger.test.ts",
-        "sha256": "6db28c9def8b0cee81428de6fbc0f932c18dafe6df6f4482b3aff1747e539ccd",
+        "sha256": "4c0ca0ad711f17f29f023ebd9c3e5447fb8818b32921cf056f74b06c381a2beb",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -7630,23 +7786,23 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 10214,
+        "bytes": 10648,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
-        "sha256": "db4e333bab82574ba7831f560cae37bb2386d09402d6e713b62ce252a6d9d44f",
+        "sha256": "6a1b31608a69a3b64c2a7beb55d0dc20d15e14f0b78b97655d4a04ebdca76c0b",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 13800,
+        "bytes": 15101,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.test.ts",
-        "sha256": "576a576706a348ca0f9fa64df061a5fbc0a53fc44dde25771dd3dc0ca833ea20",
+        "sha256": "eaec811ceaaab22730fe49bddde1a643f6352f6306579d153202e6c8d4361218",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 33505,
+        "bytes": 34648,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.ts",
-        "sha256": "96272cfbcaede9db08fadee5a5056f6f111ec3bb00a391afbdfb370b5475d1cf",
+        "sha256": "e882945aa413e07d700baed9148be9b5bb258af1fd32305d8fe6aec4433a97d0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7672,37 +7828,37 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 2885,
+        "bytes": 2921,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger-hardening.test.ts",
-        "sha256": "6817ac4550fbe57080486b0dbfe7870dd514e0cfcd7c1819af1a12c1b39862ea",
+        "sha256": "bee72dd16cdf3a1d8ec8dadf1b07a309757e5ccfc8cb6be46110e03fe5c6e91b",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 26017,
+        "bytes": 26049,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
-        "sha256": "2ee97f1d9319a4349ef63c5a27598374c302fc43642e7ddd2286de998a02cb31",
+        "sha256": "ab05f1475a5f158b4ccc563a568dddb04047f8bd34982cf90e220e282bbb850c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 17799,
+        "bytes": 19269,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.test.ts",
-        "sha256": "33a43e2766ffb62e750c7dddae29f1b2e7f2282c518c83baa63df6a619bb2c5a",
+        "sha256": "901ebe31dc1b19b808867b1df30c15e0068d4683192686b34fb2a13e47c21b05",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 18689,
+        "bytes": 20484,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
-        "sha256": "cab8dcaed3036a034aa4cf7f864ea549ce4856c0988951b3f33e8fa9a1f8e283",
+        "sha256": "1fac28f655717e6c7bb466b1a1fa6bec70d5acf0be7423ab34d189cdbf5f2ed1",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 22383,
+        "bytes": 22665,
         "path": "packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.test.ts",
-        "sha256": "3590454371af3758904a27e91f5f123824bd5ce510c26e1e1219b86e5b46f416",
+        "sha256": "30b6083a0d706c4cb0675b22faa9efe0740a2b9b48b6a46268eec20dd835402a",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8231,6 +8387,20 @@
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
+        "artifactClass": "TEST",
+        "bytes": 7429,
+        "path": "packages/csaa/src/subject/analyzer-closure.test.ts",
+        "sha256": "04232a2a539bfc3e31fe5bda3b7745b03f54592a6b88f27d8375b9785f709114",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 13414,
+        "path": "packages/csaa/src/subject/analyzer-closure.ts",
+        "sha256": "7f0f63221e662f1ff95afd3429dfb58d37ef1519bd3e11be1ad6f50d84473b7b",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
         "artifactClass": "SOURCE",
         "bytes": 8011,
         "path": "packages/csaa/src/subject/artifacts.ts",
@@ -8316,9 +8486,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 70010,
+        "bytes": 70564,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "ed896fb28e4016a597034ecd3820d96b78eb7f32c6a8f6d1eaf86ea1afb55509",
+        "sha256": "b7c2350ddeb481edb3ea4d37e323e43d2e27673034b8d87367c3383ba995c003",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8351,9 +8521,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 30355,
+        "bytes": 32909,
         "path": "packages/rph-application/src/command-bus.ts",
-        "sha256": "ea7e5fda9b23211c971aca97d6394c9e9e3863f2319eda13a7db4d67d56b1170",
+        "sha256": "82c66cf22b4d97617640adcf8837ab615822231c9888a5ebe6cc8f1545c8a67b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8477,9 +8647,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 129199,
+        "bytes": 138273,
         "path": "packages/rph-application/src/handlers/assurance.ts",
-        "sha256": "eba696a1e6f9624de563915163a0dfa934d2ef0b63520ece14b327bbeab0d935",
+        "sha256": "b4d5df6ab5bded2102b00d83819add0130129c7e10d8377310e30a62a15708c4",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8519,9 +8689,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11119,
+        "bytes": 5981,
+        "path": "packages/rph-application/src/handlers/birth-drift.test.ts",
+        "sha256": "dbb079de4a4c12f4a94aaf8795b1153154cbb0ebca7ab97b3f77fc9efca66455",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 23049,
         "path": "packages/rph-application/src/handlers/block-escalate.test.ts",
-        "sha256": "f2c3735f43b47db12848dfdc86f90016ed446aa1c625fe93595ca8f06cecb27c",
+        "sha256": "9eeb75777dd44baca401ce042ad81cbc96068b6a9a8ab7f768e03b5972c92925",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8540,9 +8717,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11956,
+        "bytes": 15440,
         "path": "packages/rph-application/src/handlers/claim-assessment.test.ts",
-        "sha256": "c05f462ad0b06ac19ca7edac5750491ffc483ccfd5f0799c8aed57e103f7a46b",
+        "sha256": "7402c1e9525d775713f87d64ba911d5b76b8082f92194ddbe05464aa0f17c7cf",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8617,9 +8794,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 42710,
+        "bytes": 43422,
         "path": "packages/rph-application/src/handlers/decomposition.ts",
-        "sha256": "15e6390b20012e0fa0d394367ee6aea1a7466f54a09ff23784d92661bd96e234",
+        "sha256": "3517ac85c99c9c46dd4a92ea67031dd7cbcee6ef4c12f0d4ba4672e0a4d36e78",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8631,9 +8808,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 17287,
+        "bytes": 18737,
         "path": "packages/rph-application/src/handlers/dwp03-precondition-coverage.test.ts",
-        "sha256": "5f3d148f070185e5145fc97023d4de2edee5b738555ea47d90f05821e6ab6f59",
+        "sha256": "538171f0b8ed6aa86fac39730972cdade0aef056805f7b5d702c49cbe26bb7e8",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8694,9 +8871,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 26413,
+        "bytes": 26434,
         "path": "packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts",
-        "sha256": "0e7e95cadd1ac563de8083496d8e7bf0e38cbf1d76c99098628af74380e94999",
+        "sha256": "3085f3f6939686301a974d01e8d1d1b6e535f899c3b4b3d6a6ba2cf3ae0bfed8",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8757,9 +8934,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 78179,
+        "bytes": 85165,
         "path": "packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts",
-        "sha256": "5f0442cdaa21ccf55509907184a3d4793951c6c69f7b7a652bf0954adcde0361",
+        "sha256": "490e396453282a23e95a3f1bcb5823825ecb5de1d784c6c35ff89774ac211391",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8890,9 +9067,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 106237,
+        "bytes": 108389,
         "path": "packages/rph-application/src/handlers/execution.ts",
-        "sha256": "253b65a4996e9cde7df17c962a5c09ec22fc3f86ba28529b870677be128bd6d4",
+        "sha256": "ea57e164ad2ac5358f82ab72569a9d57bfad71353dee5f93d995bc45c612fac3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8932,9 +9109,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 59568,
+        "bytes": 61541,
         "path": "packages/rph-application/src/handlers/governance.ts",
-        "sha256": "7c423bf90a74ec2c7ee37f97b8b2c1d30746b8a0a818083a1fe6c4d75141f99b",
+        "sha256": "467ef369cb2369c0128188bbc6d550ff9004db1b4fd5c979f68dbc22e0f1caa5",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8946,9 +9123,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 2773,
+        "bytes": 2853,
         "path": "packages/rph-application/src/handlers/harness.ts",
-        "sha256": "45fe1a7debd3783ac21b62195fbcc37389be80d38ea4798a281c3ab8276c963d",
+        "sha256": "20df5b36c219992081ed454b4ebbacf74b4cb547596a1d37f505f9ae44d11bc8",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8960,16 +9137,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 14226,
+        "bytes": 23628,
         "path": "packages/rph-application/src/handlers/intent.ts",
-        "sha256": "555da72606c9fba3a082c9d6fbe8a295675ce3c5f3b27022408b1e9224a5a7ae",
+        "sha256": "82da29611cc9739d58430ef3f6b76fb6bbfd469a7adcb8693a6f2ed395f7f106",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 37700,
+        "bytes": 41760,
         "path": "packages/rph-application/src/handlers/kit.ts",
-        "sha256": "ce00e9e89238b91dba932b769e5c8c9e4fb8411b926e7efd06b16d24c7bda544",
+        "sha256": "632ba675b5039c9a8dd895a2eb4b0acbb86cf2e2851e14e9ac19340a4a785393",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8988,9 +9165,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 4463,
+        "bytes": 4623,
         "path": "packages/rph-application/src/handlers/obligation-constraint.ts",
-        "sha256": "0080921afaa8f8dfcb14dfc06ba63f6fb60e78eb798478955fd7ee4b87997b41",
+        "sha256": "ae980215331a29d946e87eba84c616de0268ea0a9075801bd4f6fed612d342bd",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9023,9 +9200,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 51000,
+        "bytes": 51240,
         "path": "packages/rph-application/src/handlers/pwa-authoring.ts",
-        "sha256": "4b593e6e79e6fb3d3e10193dac51af0fd78c3cb6038add3cadb530927664b8dd",
+        "sha256": "93bc595e4ad18ca317a67721bf5e301c998d43133e283a8cfa02e3d74b6be1fe",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9051,6 +9228,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 6968,
+        "path": "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
+        "sha256": "2bddb4930408df42c5e80bc0034dcf2eab326fae2d88ba77e6fc3af876b7f045",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 50635,
         "path": "packages/rph-application/src/handlers/pwu.test.ts",
         "sha256": "9084961e85d6bd6058888e787a46af526723e2e52d1b9e34b48a94801ae808a9",
@@ -9058,9 +9242,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 70850,
+        "bytes": 85765,
         "path": "packages/rph-application/src/handlers/pwu.ts",
-        "sha256": "aaf16adc180723e17c3bcbbcdf2491bcceb88262c5c8e8a9e9dea3a564324107",
+        "sha256": "170c264f65b25ac651211e5c8cd7b8e661b867368941bef6bb27c31d87ec00f2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9072,9 +9256,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8329,
+        "bytes": 8612,
         "path": "packages/rph-application/src/handlers/registry.ts",
-        "sha256": "b881918023ddc453384b3ef537a01bd7228b444e31be96f3e31af81e6b6bf1c5",
+        "sha256": "1e328785aeeba78ebff435374426b6d93a313b2e1c0912754974af966d9337f0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9100,9 +9284,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 23071,
+        "bytes": 23170,
         "path": "packages/rph-application/src/handlers/runtime-binding.ts",
-        "sha256": "d16d36bd6b64939eeac2d710808b59633f292791849eb0c19e2d5537c805a301",
+        "sha256": "d126adad176f697de5804d9123581a338076cf1c7439ee8a8d5cb248a8ad7aa7",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9111,6 +9295,13 @@
         "path": "packages/rph-application/src/handlers/skip-authorization.ts",
         "sha256": "bbc341c7948eb77b97412dd7b384f5a901dba86d6c3fe4eb5447636465d2c662",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 16851,
+        "path": "packages/rph-application/src/handlers/sta6-superseded-intent.test.ts",
+        "sha256": "95de1d66af001aaec37ea237db25c72d01a93f09cc9192b0a450f0488edd3581",
+        "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "TEST",
@@ -9142,9 +9333,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 6636,
+        "bytes": 6716,
         "path": "packages/rph-application/src/handlers/validator-registry.ts",
-        "sha256": "1d3085a9b793b6ef9e9d3be0dbd503b41aea42fcea4bedd95d89ae15a00aff19",
+        "sha256": "86ae62e5679245230ff0558b8963dd68b5a1bec823b83ed17bcdc54a6586db61",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9177,9 +9368,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 18227,
+        "bytes": 21296,
         "path": "packages/rph-application/src/idempotency-key-reuse.test.ts",
-        "sha256": "938c418f87148d98cd70e4113f524e1ec852161762d8e9dbf3c4ba7a91189e8e",
+        "sha256": "5d9642cd0a24922c5b713302da90dc2217105c4347da315bb20e2baaabae90cf",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10010,9 +10201,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 2551,
+        "bytes": 2591,
         "path": "packages/rph-contracts/schemas/objects/CommandResult.json",
-        "sha256": "7b42cafdbc54c3aa772d6b8deedd8791b764ee3329599fca12734567832d1e48",
+        "sha256": "5cedba733f0df9d5c904c8f28fa58035927c3ca47f2ec3b7703e08c9b10b1419",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -10136,9 +10327,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 1713,
+        "bytes": 1749,
         "path": "packages/rph-contracts/schemas/objects/RphError.json",
-        "sha256": "4db109a0885db0072cb36d3e837aa9f46837f017df8d8d1d407f9b208b6f6983",
+        "sha256": "e50da7ce6a7dc11957f07a30907330ae866712d69341ccc5dfeeba97bd6fc06b",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -10220,9 +10411,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 6829,
+        "bytes": 8795,
         "path": "packages/rph-contracts/src/errors.ts",
-        "sha256": "0e43b42728aa001cb033ecde9d3ebc2ea119ec5f9acd255fe329f0904112428e",
+        "sha256": "0bc11d4aee7be9e363298b609351e718814e783085804856cd5f88b695f5ea4b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10318,9 +10509,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 122672,
+        "bytes": 124397,
         "path": "packages/rph-contracts/src/messages.ts",
-        "sha256": "a612a065fb6390a60017b5b4d5ee20d90369e66c6aa7e8e1c8fec0f927dd6d9c",
+        "sha256": "fa970fc087bb0c3c02866355cfb298bbbbc67c1fd5576b735264e5c7ee13fd98",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -10346,9 +10537,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 10704,
+        "bytes": 11610,
         "path": "packages/rph-contracts/src/validate.test.ts",
-        "sha256": "f57b353c3e3f92692e14c262d2d7a784240b22489f8c6be73c5494b2446ad214",
+        "sha256": "8e8b7be8c92ff5f945891a01604539692ce172503aaee71dbf69577ce82ad477",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10374,9 +10565,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 91812,
+        "bytes": 92770,
         "path": "packages/rph-contracts/vocab/canonical-vocabulary.json",
-        "sha256": "03b2b7e73f8d27e1b6bc7c47f745d7a2883e3b7a2593495f4a12da79accf6f96",
+        "sha256": "bc8f5953b4729d12cae001452434c6a512cdde97c5261c38d4125f50519a0ec4",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -10388,9 +10579,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 358149,
+        "bytes": 367034,
         "path": "packages/rph-contracts/vocab/m3-commands-events.json",
-        "sha256": "589b1fb4ef00331b289d67db5d998d3e76eaf33f90eb7918b2ada37ed6bb4041",
+        "sha256": "ca8e8078f30771ee9ec01f65be6bcd6518a4fc2a4203338a982f11570f55bbda",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -10458,16 +10649,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 42735,
+        "bytes": 47126,
         "path": "packages/rph-domain/src/conformance-manifest.ts",
-        "sha256": "df25af4503413ad9bbdc829afea39470ed346b8436eed30887c27c630919f8fd",
+        "sha256": "df9ead52603901750772a62c3a87e8cbaeb644a40e499acd83e1332a7d3c2595",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11147,
+        "bytes": 17912,
         "path": "packages/rph-domain/src/conformance.test.ts",
-        "sha256": "65c6b70d4d049317b3b9c306c3b0e1c657475e56ac776881252fed926da533e9",
+        "sha256": "9cfb3f587dc3ab099998e96a7fd557589e0a9e20a8720b024fe492282c0060a8",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10493,16 +10684,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 40334,
+        "bytes": 45577,
         "path": "packages/rph-domain/src/enforcement-register.test.ts",
-        "sha256": "8b1497e00925d9f6b47c215b2c16f7ebba6161eeace2aa4887af3e65f535fe99",
+        "sha256": "54db35e7e982803b9ba51843d1cb541238fdb85915b3411ff5e71d9936809fe1",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 310116,
+        "bytes": 327347,
         "path": "packages/rph-domain/src/enforcement-register.ts",
-        "sha256": "0f6b3e816f96137ab4491a334b29bcdcefc32b47e193dfa7bc12c4dcbdb6fca6",
+        "sha256": "ff5e34ca6aab31e19f417ba9024065111158b5c775fc0dac9f09a0f081a14af3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10563,9 +10754,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 4396,
+        "bytes": 4753,
         "path": "packages/rph-domain/src/machine-exclusions.ts",
-        "sha256": "67c72b360757cdfcfe6f4003dc109bd10d6ba0b5d172139ae36ac9995de796a6",
+        "sha256": "f49cae7446a5c98c64d5546d76e485cfb7814c4d71708f550b24863b73cf3025",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10612,9 +10803,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 7894,
+        "bytes": 17511,
         "path": "packages/rph-domain/src/pwu-lifecycle-command-spec.ts",
-        "sha256": "3e1f0eee3b7aac0212d86a072bec7c6a988e7211969fcf20461605868aebeb61",
+        "sha256": "734f0b1b04225bf30aa45022d3ac39f006cbb2923a42a7c8e71464ed6847c589",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10654,9 +10845,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 17017,
+        "bytes": 17893,
         "path": "packages/rph-domain/src/state-reachability.test.ts",
-        "sha256": "657d47a902e678592a419e3100c439aa8c465d1b95aade20a673c1d5de748557",
+        "sha256": "b8f9945decb9076e03f7eb689c9c53024fe3f5a70524c71ce8409dbe11480a2e",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10738,9 +10929,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 58890,
+        "bytes": 60281,
         "path": "packages/rph-domain/src/transition-gate.ts",
-        "sha256": "1050960bec46fb35989db89d80747a099f0abd80a00ef4996fc76f0cb233ad68",
+        "sha256": "bf11696989f675fe8ec12d3a3350979d68b846b2e6886f83c4afe37b2223cec3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10752,9 +10943,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 90593,
+        "bytes": 93579,
         "path": "packages/rph-domain/src/transitions.data.ts",
-        "sha256": "2152601a4a29e5cddc3f5f6e06edac86a17ebc5347dcae891d7693b63d7c5cc7",
+        "sha256": "eb10b94193387bd837a4b847a489383424149013e30f702cc5af5c36c354354a",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -10808,9 +10999,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 83231,
+        "bytes": 86273,
         "path": "packages/rph-domain/vocab/m2-transitions.json",
-        "sha256": "0f5cc78223ea1c93ea64ba881e8d8198b0f200787bed05fff9396b00acba6e9d",
+        "sha256": "b6b52db77d7d878cd60dd66fe1c5a7a9f026f3316a395adc37ede53a2ef577c4",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -11011,9 +11202,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 8464,
+        "bytes": 10107,
         "path": "packages/rph-engine/src/pwu-fold-drive-sites.test.ts",
-        "sha256": "976824a11de224ff47113b61f8ac417cd726c40227d005fe837de19c997be394",
+        "sha256": "68905fcbd1a35883510f565bc4931b4533559c1de5288af9301cbbe915962b91",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11032,9 +11223,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 18281,
+        "bytes": 18542,
         "path": "packages/rph-engine/src/queries.ts",
-        "sha256": "6fd38c60c1ce7cb8aeda780282b92158f996e5d6317241ae256bd848f2012239",
+        "sha256": "67c4f3420d915254095e703430f39fb5b5bd8e2574ee7a423c367bf702b35655",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11074,9 +11265,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 14060,
+        "bytes": 14628,
         "path": "packages/rph-engine/src/replay-conformance.test.ts",
-        "sha256": "a0a22fd9f0aca7a30e7d23ec1a06b5abf6299f912e9e947abc7fc1766ba50cda",
+        "sha256": "2d72ec15255a7091146574aed050b92b3b3d071d0af864dee34ccc8cba602369",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11095,9 +11286,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8161,
+        "bytes": 8316,
         "path": "packages/rph-engine/src/replay.ts",
-        "sha256": "262a8a1705f6b2b48874d533f37a7354f210520ac66952facee93033205ed29a",
+        "sha256": "969bb5a7502c66a62d16890c2c93507396cea271502365a3e8374daadacd6377",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11123,9 +11314,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 24460,
+        "bytes": 24661,
         "path": "packages/rph-engine/src/seed-workbench.ts",
-        "sha256": "1be02dbc432257dfdd593b85854de58a41b4892d0d8c621a360397d1fa22318a",
+        "sha256": "ea60a7a72723ce5c3bb42217a298163e910aee726882358831f901f93c9285d9",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11305,6 +11496,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 11928,
+        "path": "packages/rph-product-realization-pwa/src/doc003-carriage.test.ts",
+        "sha256": "f5d43079d10ac5f76942d530a5eec8a5916a93f331eae87095b1fc95aeb460a4",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 43380,
         "path": "packages/rph-product-realization-pwa/src/doc004-conformance.test.ts",
         "sha256": "94c399f8826d44a2c11f6c6dbe398a1e167f392715a22e79ceec13041e6fd4a1",
@@ -11326,9 +11524,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 257590,
+        "bytes": 257727,
         "path": "packages/rph-product-realization-pwa/src/ontology.data.ts",
-        "sha256": "4a09b50bb4d6f061051255a7af0949af66f71f027d653d995ea190a9eec82e02",
+        "sha256": "dad8dbf2470378f042479ddb6581dfff62ba73ba2e9a91f5467aafe934a3b143",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -11375,9 +11573,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 293935,
+        "bytes": 294072,
         "path": "packages/rph-product-realization-pwa/vocab/m8-ontology.json",
-        "sha256": "aa53dea8a7aa1e95de0f4a4dff02f36f86b249b046b89898d7907e458b942194",
+        "sha256": "e03865920c105e18ddd9e8b2bc350d1672c3bb5eb5f1b45592fdc2e82f126323",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -11473,9 +11671,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 57041,
+        "bytes": 57593,
         "path": "packages/rph-projections/src/execution-view.ts",
-        "sha256": "705c199d5dba89138314959f13a99250ec612368b2fb5b82c25e6f532ba5d73b",
+        "sha256": "99c8884680e019577fc81c89a1fd362c58fa0982618c5b8ea045a9d045526cde",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11585,9 +11783,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 7379,
+        "bytes": 8003,
         "path": "packages/rph-projections/src/pwu-replay.ts",
-        "sha256": "73bd9b29ea9fff8b21b5e08ca9f317a513fa85749fe0b3dc9112d29808890589",
+        "sha256": "4344f9f1086e6cf47987b80627c1b842c90c4ac06446e2f83e3bf7f5f193b185",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11697,16 +11895,23 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 183500,
+        "bytes": 244763,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "948529523f9ea763b5a0006b3696676160bcedbc7479ae96972f9e46e198b8fd",
+        "sha256": "70382870f086b7f417cd024d65efe4b74cf3baf356269c75edeb6624c4ae80c9",
         "subjectArtifactClass": "SCRIPT"
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 36869,
+        "bytes": 6085,
+        "path": "scripts/mutants/measured.ts",
+        "sha256": "2dcdd0aeeced29f2f989067300de71d6a41bf21f3f073c7dd307b40877f644ad",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
+        "bytes": 72859,
         "path": "scripts/mutants/run.ts",
-        "sha256": "2eecf54fabf1fbe99d17f697560a5ecc0750af2385bcb1e559ef8d05796160a2",
+        "sha256": "38822ce7ad5b7642f65e90db735ea0034bf6a599cf099d5be222b58a6f7818c8",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -11714,6 +11919,13 @@
         "bytes": 991,
         "path": "scripts/mutants/show.ts",
         "sha256": "f8c470c02bead8cfa199d5315102e4b5b1fdf920e3022073c130405ee246a530",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
+        "bytes": 9511,
+        "path": "scripts/mutants/verdict.ts",
+        "sha256": "8842c850820675c963311d35b66586007c7b7fe783b655f1035f2c9c2505daef",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -11753,37 +11965,37 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 6349,
+        "bytes": 6450,
         "path": "verif/absence-claims.test.ts",
-        "sha256": "3dc353f0d7eff99458d3b7b8501f18691fc119170c8da4980a15847bff67adb9",
+        "sha256": "8e93162c9f76e21ad3399716768243b6bc9e7199b30161e57cdd1cb0d23488cd",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 6747,
+        "bytes": 26297,
         "path": "verif/arrow-census-coverage.test.ts",
-        "sha256": "9930beb43d32cbfefb7fd1d3ea430ff085685f93a289d1f7287a1721b119864c",
+        "sha256": "9c475669d7b4733118fc53eb734cce6be3d038649ac6f6ea2e724ae2c23a1505",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 8675,
+        "bytes": 7342,
         "path": "verif/arrow-command-census.baseline.json",
-        "sha256": "514654af4d67aa98a1ba27206f88e5b34077f6cf07f4860263f60d7589b6bb6d",
+        "sha256": "dcb9f055abe121b3df21fa150ef9721ccc7e070432d9c91de9c2271689a9fa7a",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 8035,
+        "bytes": 21701,
         "path": "verif/arrow-command-census.test.ts",
-        "sha256": "bfff45e99fde9fcb518458b2220cfd3fdaa80648d5d0299df69d5ed3edfeb694",
+        "sha256": "4fb1a23aa3923b9eb742cd2ccc90d36b29484393b1f1ffa454c500a20485a617",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 20334,
+        "bytes": 51463,
         "path": "verif/arrow-command-census.ts",
-        "sha256": "15bd3f67b982563844231877fc8a3ce996ccb6e61c2cb4bb532c83f9adee4554",
+        "sha256": "24ef29c57670dd76249e067b571c9788dee9d6aad44a82bc755568a1d8b3b3e8",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -11795,37 +12007,37 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 7686,
+        "bytes": 8541,
         "path": "verif/authority-resolution-census.test.ts",
-        "sha256": "84df947a5ed48b6483f826edf2313ea8be3e99995ba135632d1067a3f7f6edb1",
+        "sha256": "c142419ff7cebaed73c5cf8cde883278567bcc55e56778b0d085df04bfe01b13",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
         "bytes": 6598,
         "path": "verif/axis-influence.test.ts",
-        "sha256": "2adfcf273370da452afb4226f1da464b11740078babf74a5cb860fafb24e7923",
+        "sha256": "456b5191c154d02ddc42360402e986ed55614e247ee0c48af26a158a3a5bae43",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11880,
+        "bytes": 14137,
         "path": "verif/binding-row-truth.test.ts",
-        "sha256": "7e6e8cc4b8e83734a08f5a8418a935610ec89c75ff14deba53e1170f5fba945e",
+        "sha256": "1e2be0c45f394bbcf69951da7e9c4d864ac02dbfb30dcd0c79b0c4642fa989bf",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 10968,
+        "bytes": 13768,
         "path": "verif/binding-row-truth.ts",
-        "sha256": "24641327192e0b39886160e33a99bcab1b23bb5986de4ff5cc178fcc481a3c4b",
+        "sha256": "042e2634b93515a02ea38c0084d8312a58f228589c33e5e4d6db23a45beeb232",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 4775,
+        "bytes": 5896,
         "path": "verif/births-outside-the-census.test.ts",
-        "sha256": "8de1832d55e5c0892e4cb41c830ced70b1ed4f3adb0062d2e7c48cef5c63feca",
+        "sha256": "0a59c6fe066a31d936f8712e3b1e6215b6b57818cfdd9c6134bf05b8dfa3e53a",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -11837,9 +12049,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 8466,
+        "bytes": 11335,
         "path": "verif/canon-provenance.ts",
-        "sha256": "b6282417dc0ec36196d3950fd292b6e7a699a04f12b4f1c8c135d661de674b7b",
+        "sha256": "ea1b095ee570f12df9c82af22597206cf89e40ff6462786ebe3be23ad0188494",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -11864,6 +12076,13 @@
         "subjectArtifactClass": "VERIFICATION"
       },
       {
+        "artifactClass": "VERIFICATION",
+        "bytes": 11825,
+        "path": "verif/control-verdict.test.ts",
+        "sha256": "9d2c280dfb61413f97c5556abaa43317efee04b0756715f3f53172bf2f0d6280",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
         "artifactClass": "OTHER",
         "bytes": 1109,
         "path": "verif/csaa/fixtures/subject/README.md",
@@ -11872,9 +12091,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 24266,
+        "bytes": 25176,
         "path": "verif/dead-kernel-census.test.ts",
-        "sha256": "41ce8bb458d11f8739eb4b3e2cfe4c64bf92453f51e9de47a34b42f5cd662f85",
+        "sha256": "bcf1a49081e541bd859c23ff6f51222d8309bc2b25dcbf177ea6a59467fac743",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -11893,16 +12112,16 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11827,
+        "bytes": 12788,
         "path": "verif/emitted-event-guard.ts",
-        "sha256": "8337f9de45b8c46c2927bf7d91e698c369ce92ac2669fff20c495aac1c5fd15f",
+        "sha256": "1702a6e118ef12650ecb4cc53f6e41e85f29cc6843aacfb78bcda2c212fd31df",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 18585,
+        "bytes": 20140,
         "path": "verif/event-surface-census.test.ts",
-        "sha256": "e39b0d8fd56cef8931a5a23937eddf33ffbd3e2f65ebd3b41af266cff022f31d",
+        "sha256": "dce3a34da71ee14e368c2438a2dc90be8144d3256196131bf3185f1fe485d8cb",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -11914,37 +12133,51 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 106167,
+        "bytes": 110414,
         "path": "verif/guard-enforcement-ledger.data.ts",
-        "sha256": "3a463eef03f3ea4d4cdf9bf4c5dfcf00a6ea7bd76384ea9407cd0f0cd576d017",
+        "sha256": "9f42401a4346e908882dcbe2e8639c1a75ae241c46efe1f0512ec86837ef2876",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 9156,
+        "bytes": 19240,
         "path": "verif/guard-enforcement-ledger.test.ts",
-        "sha256": "f978b95a120444d8ded1b4ef39dae56c9dcf4cd73eb76f82446afea9ca5612e4",
+        "sha256": "715d9565151ff383904e4246c78fce27a51e9161fe48a066bd33fd47babdf90e",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 8166,
+        "bytes": 11346,
         "path": "verif/guard-enforcement-ledger.ts",
-        "sha256": "1aeab4efde15cdc99602c81ce4e09f5c7889870bc4cfdf8f4fc5d2247b9095e4",
+        "sha256": "44185eff221b859c0f870ae4751196bf1306afcbd993f3751c80bfddaa8a33be",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 8512,
+        "bytes": 15755,
         "path": "verif/lifecycle-arrow-declarations.test.ts",
-        "sha256": "0ea2d0145232704e8c6939971f74ad2c24144fe90f25e1344b53e5ac81be289e",
+        "sha256": "ddd9ba4b292a7328b24eb76c7b7e5d4d9daf284bddace114b212959fb71a2235",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 14615,
+        "bytes": 18267,
         "path": "verif/mutant-ledger.test.ts",
-        "sha256": "ce3e0b9908cbabbd320e8ad9a047abdfb101683e72ef206562cf50f08d1c7783",
+        "sha256": "006fa1ae882ca113a0e8775b68ae195566f93851eaceb99e0caf3dcb70e91338",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 9949,
+        "path": "verif/mutant-verdict.test.ts",
+        "sha256": "f103418a3c6e577dd64d4a00b6226055728874a885e6f189a7f44fad90d806d0",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 10019,
+        "path": "verif/observation-command-surface.test.ts",
+        "sha256": "eb191ecdcd6d40c58a0bb57f8b80174577e7a1e0a8402ec0a564d46d5702f077",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -11970,23 +12203,30 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 7385,
+        "bytes": 9579,
+        "path": "verif/register-citations.test.ts",
+        "sha256": "2f2bb709c8a5e0e641b4a239aaa7f9be6bc2fd7856f3f88536072562f10ab93d",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 7920,
         "path": "verif/register-status.test.ts",
-        "sha256": "270ca698736bc376e7fe0e1b53e509dbe7fa58cca9f4e287a1d7bc0dbd6ad6d5",
+        "sha256": "510a4c1d153f60eb3d16a2c3a7422a60e1c75706dba6d92f78d2440d073cb0cb",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11358,
+        "bytes": 11902,
         "path": "verif/route-action-census.test.ts",
-        "sha256": "f1523772e11df7b86425ceb3d50a27ffc45be5d66b8977d3be8323d0f206c811",
+        "sha256": "156e01ad200c8e295c2455fd4f1870bdf1dc1e18085deaa159f9b58d56d8a098",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 3008,
+        "bytes": 4262,
         "path": "verif/source-is-reviewable.test.ts",
-        "sha256": "88a5575babd62c48d045a7f3c7fd9c2fb29f98491118845c78bed137ab272ca3",
+        "sha256": "776dba78facf9b610307fe03f6a5768f71258aa74d3470cd145352a6a8133ecb",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12014,21 +12254,21 @@
         "artifactClass": "VERIFICATION",
         "bytes": 6901,
         "path": "verif/transition-provenance-carried.test.ts",
-        "sha256": "33695268b50a386a098a942efc413085420cb134a9456844c9be9f6b12dd10e2",
+        "sha256": "925f5aba791c998d2b4f9292dd4b6e501889df3c195e8071d04630c8f1e651bf",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 12510,
+        "bytes": 14579,
         "path": "verif/trigger-claim-truth.test.ts",
-        "sha256": "aeabf4b096baac0228a35580ca46e8a544c2487567a9b5d8867e8d3af64c2477",
+        "sha256": "792386e04805cc8d4e64f52a40e29ced94832bc7c96fba9f98f771a2f11371c1",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 8757,
+        "bytes": 10279,
         "path": "verif/trigger-claim-truth.ts",
-        "sha256": "50871b8bbefe655571ca8658a8f3c081b83acd8158bf085592806129e5671492",
+        "sha256": "f15c79ea09d4933c20d779c497e2e0b32586027347b59a8c0dbc134e3c40acd5",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12044,6 +12284,13 @@
         "path": "verif/tsconfig.json",
         "sha256": "34c23ff23898dd711b86f93fc3f4725f1aba6a246f8e92c1e02f67685739335e",
         "subjectArtifactClass": "PROJECT_CONFIGURATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 14033,
+        "path": "verif/unreachability-grounds.test.ts",
+        "sha256": "5e37628e08b704789235eec5c7fc46b87283bf56eac5b8c46e4d6b166f5de637",
+        "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
@@ -12074,10 +12321,136 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "c58cef3c695f948e98aa9cc3475cb77b97bdc7075f4a76edce3eed7955ca572d",
+    "subjectId": "bc035c6613ae5bd6b58766e5440d9468810568772b547c4993b4246d3889f7c3",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
+    {
+      "candidateArtifactCount": 52,
+      "compilerOptions": {
+        "noEmit": true,
+        "types": [
+          "node"
+        ]
+      },
+      "diagnostics": [],
+      "diagnosticsState": "RUN",
+      "exclude": null,
+      "extends": "../tsconfig.json",
+      "files": null,
+      "frameworkCandidates": [
+        "apps/rph-demo/src/lib/PwuTypeCard.svelte",
+        "apps/rph-demo/src/lib/ThemeToggle.svelte",
+        "apps/rph-demo/src/lib/WalkthroughPanel.svelte",
+        "apps/rph-demo/src/lib/behavior/PwuBehaviorPanel.svelte",
+        "apps/rph-demo/src/routes/+layout.svelte",
+        "apps/rph-demo/src/routes/+page.svelte",
+        "apps/rph-demo/src/routes/baselines/+page.svelte",
+        "apps/rph-demo/src/routes/decisions/+page.svelte",
+        "apps/rph-demo/src/routes/pwa/[id]/+page.svelte",
+        "apps/rph-demo/src/routes/undertakings/+page.svelte",
+        "apps/rph-demo/src/routes/undertakings/[id]/+page.svelte"
+      ],
+      "generatedContexts": [
+        {
+          "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
+          "freshness": "UNKNOWN",
+          "freshnessBasis": "No generator-input identity or governed generation record was captured.",
+          "freshnessEvidence": [],
+          "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+          "selectedInput": true,
+          "sha256": "c01d35eee60b3cb21e230c392c72c947234d7f406b83959a042a63e09db454c4"
+        }
+      ],
+      "include": [
+        "**/*.ts",
+        "../playwright.config.ts"
+      ],
+      "parseState": "PARSED",
+      "partialityReasons": [
+        {
+          "code": "FRAMEWORK_CANDIDATES_PRESENT",
+          "message": "11 framework candidate(s) remain outside the DWP-002 TypeScript compiler-root model.",
+          "path": "apps/rph-demo/e2e/tsconfig.json",
+          "provenance": [
+            "project.frameworkCandidates"
+          ]
+        },
+        {
+          "code": "GENERATED_CONTEXT_FRESHNESS_UNKNOWN",
+          "message": "Generated context freshness is unknown for apps/rph-demo/e2e/tsconfig.json.",
+          "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+          "provenance": [
+            "subject.diagnostics",
+            "subject.generatedContexts"
+          ]
+        },
+        {
+          "code": "GENERATED_CONTEXT_FRESHNESS_UNKNOWN",
+          "message": "Generated context freshness is unknown for apps/rph-demo/tsconfig.json.",
+          "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+          "provenance": [
+            "subject.diagnostics",
+            "subject.generatedContexts"
+          ]
+        }
+      ],
+      "path": "apps/rph-demo/e2e/tsconfig.json",
+      "provenance": [
+        "apps/rph-demo/e2e/tsconfig.json",
+        "apps/rph-demo/.svelte-kit/tsconfig.json",
+        "apps/rph-demo/e2e/tsconfig.json",
+        "apps/rph-demo/tsconfig.json"
+      ],
+      "references": [],
+      "resolvedRootFiles": [
+        "apps/rph-demo/e2e/agent-retention.e2e.ts",
+        "apps/rph-demo/e2e/agent-sse.e2e.ts",
+        "apps/rph-demo/e2e/agent-ui.e2e.ts",
+        "apps/rph-demo/e2e/assurance-floor.e2e.ts",
+        "apps/rph-demo/e2e/baselines.e2e.ts",
+        "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
+        "apps/rph-demo/e2e/decisions.e2e.ts",
+        "apps/rph-demo/e2e/execution-flow.e2e.ts",
+        "apps/rph-demo/e2e/execution-plan.e2e.ts",
+        "apps/rph-demo/e2e/execution-sequencing.e2e.ts",
+        "apps/rph-demo/e2e/execution-tier3.e2e.ts",
+        "apps/rph-demo/e2e/global-setup.ts",
+        "apps/rph-demo/e2e/global-teardown.ts",
+        "apps/rph-demo/e2e/graph-validation.e2e.ts",
+        "apps/rph-demo/e2e/policy-manager.e2e.ts",
+        "apps/rph-demo/e2e/pwa-authoring-backbone.e2e.ts",
+        "apps/rph-demo/e2e/pwa-authoring-delegation.e2e.ts",
+        "apps/rph-demo/e2e/pwa-authoring-rich.e2e.ts",
+        "apps/rph-demo/e2e/pwa-authoring.e2e.ts",
+        "apps/rph-demo/e2e/pwa-coherence.e2e.ts",
+        "apps/rph-demo/e2e/pwa-delete.e2e.ts",
+        "apps/rph-demo/e2e/pwa-designer-gallery.e2e.ts",
+        "apps/rph-demo/e2e/pwa-instantiation.e2e.ts",
+        "apps/rph-demo/e2e/pwa-lifecycle-deprecate.e2e.ts",
+        "apps/rph-demo/e2e/pwa-node-graph.e2e.ts",
+        "apps/rph-demo/e2e/pwa-walkthrough.e2e.ts",
+        "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
+        "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
+        "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+        "apps/rph-demo/e2e/smoke.e2e.ts",
+        "apps/rph-demo/e2e/support/gallery.ts",
+        "apps/rph-demo/e2e/support/harness.ts",
+        "apps/rph-demo/e2e/theme.e2e.ts",
+        "apps/rph-demo/e2e/traceability.e2e.ts",
+        "apps/rph-demo/e2e/uncertainty-disclosure.e2e.ts",
+        "apps/rph-demo/e2e/undertaking-abandon.e2e.ts",
+        "apps/rph-demo/e2e/undertaking-atomicity.e2e.ts",
+        "apps/rph-demo/e2e/undertaking-pwu.e2e.ts",
+        "apps/rph-demo/e2e/undertaking-scope.e2e.ts",
+        "apps/rph-demo/e2e/undertaking-scroll.e2e.ts",
+        "apps/rph-demo/playwright.config.ts"
+      ],
+      "resolvedRootState": "RESOLVED_DWP002",
+      "rootDisposition": "COMPILER_ROOTS",
+      "semanticOptionCoverage": "COMPLETE_RAW_DECLARATION",
+      "status": "PARTIAL"
+    },
     {
       "candidateArtifactCount": 93,
       "compilerOptions": {
@@ -12129,6 +12502,15 @@
           "path": "apps/rph-demo/tsconfig.json",
           "provenance": [
             "project.frameworkCandidates"
+          ]
+        },
+        {
+          "code": "GENERATED_CONTEXT_FRESHNESS_UNKNOWN",
+          "message": "Generated context freshness is unknown for apps/rph-demo/e2e/tsconfig.json.",
+          "path": "apps/rph-demo/.svelte-kit/tsconfig.json",
+          "provenance": [
+            "subject.diagnostics",
+            "subject.generatedContexts"
           ]
         },
         {
@@ -12238,7 +12620,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 145,
+      "candidateArtifactCount": 146,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -12397,6 +12779,7 @@
         "packages/csaa/src/semantic/validate-snapshot.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
         "packages/csaa/src/semantic/validate-wire-shape.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "packages/csaa/src/subject/artifacts.ts",
         "packages/csaa/src/subject/capture-model.ts",
         "packages/csaa/src/subject/capture.ts",
@@ -12417,7 +12800,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 239,
+      "candidateArtifactCount": 241,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -12669,6 +13052,8 @@
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
         "packages/csaa/src/semantic/validate-wire-shape.test.ts",
         "packages/csaa/src/semantic/validate-wire-shape.ts",
+        "packages/csaa/src/subject/analyzer-closure.test.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "packages/csaa/src/subject/artifacts.ts",
         "packages/csaa/src/subject/capture-model.ts",
         "packages/csaa/src/subject/capture.ts",
@@ -12745,7 +13130,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 122,
+      "candidateArtifactCount": 125,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -12796,6 +13181,7 @@
         "packages/rph-application/src/handlers/baseline-open-blocking-observation.test.ts",
         "packages/rph-application/src/handlers/baseline-stale-decision-version.test.ts",
         "packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts",
+        "packages/rph-application/src/handlers/birth-drift.test.ts",
         "packages/rph-application/src/handlers/block-escalate.test.ts",
         "packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts",
         "packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts",
@@ -12872,6 +13258,7 @@
         "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
         "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+        "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "packages/rph-application/src/handlers/pwu.test.ts",
         "packages/rph-application/src/handlers/pwu.ts",
         "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -12881,6 +13268,7 @@
         "packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts",
         "packages/rph-application/src/handlers/runtime-binding.ts",
         "packages/rph-application/src/handlers/skip-authorization.ts",
+        "packages/rph-application/src/handlers/sta6-superseded-intent.test.ts",
         "packages/rph-application/src/handlers/state-conditional-fields.test.ts",
         "packages/rph-application/src/handlers/state-conditional-wiring.test.ts",
         "packages/rph-application/src/handlers/step-strength-authority.test.ts",
@@ -13630,7 +14018,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 8,
+      "candidateArtifactCount": 9,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13657,6 +14045,7 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/rph-product-realization-pwa/src/doc003-carriage.test.ts",
         "packages/rph-product-realization-pwa/src/doc004-conformance.test.ts",
         "packages/rph-product-realization-pwa/src/gen/gen-ontology.ts",
         "packages/rph-product-realization-pwa/src/index.ts",
@@ -13795,7 +14184,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 6,
+      "candidateArtifactCount": 8,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -13827,8 +14216,10 @@
         "scripts/csaa-inventory.ts",
         "scripts/csaa-product-boundary.ts",
         "scripts/mutants/ledger.ts",
+        "scripts/mutants/measured.ts",
         "scripts/mutants/run.ts",
         "scripts/mutants/show.ts",
+        "scripts/mutants/verdict.ts",
         "scripts/spec-obligations.ts"
       ],
       "resolvedRootState": "RESOLVED_DWP002",
@@ -13867,7 +14258,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 40,
+      "candidateArtifactCount": 45,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -13911,6 +14302,7 @@
         "verif/causation-provenance.test.ts",
         "verif/command-dispatch-census.test.ts",
         "verif/contract-number-census.test.ts",
+        "verif/control-verdict.test.ts",
         "verif/dead-kernel-census.test.ts",
         "verif/deferral-honesty.test.ts",
         "verif/emitted-event-guard.test.ts",
@@ -13922,9 +14314,12 @@
         "verif/guard-enforcement-ledger.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
+        "verif/mutant-verdict.test.ts",
+        "verif/observation-command-surface.test.ts",
         "verif/optimistic-concurrency-surface.test.ts",
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/recomposition-ungoverned.test.ts",
+        "verif/register-citations.test.ts",
         "verif/register-status.test.ts",
         "verif/route-action-census.test.ts",
         "verif/source-is-reviewable.test.ts",
@@ -13935,6 +14330,7 @@
         "verif/trigger-claim-truth.test.ts",
         "verif/trigger-claim-truth.ts",
         "verif/trust-boundary.test.ts",
+        "verif/unreachability-grounds.test.ts",
         "verif/unread-refusal-guard.ts"
       ],
       "resolvedRootState": "RESOLVED_DWP002",
@@ -14318,10 +14714,11 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "948529523f9ea763b5a0006b3696676160bcedbc7479ae96972f9e46e198b8fd",
+      "contentSha256": "70382870f086b7f417cd024d65efe4b74cf3baf356269c75edeb6624c4ae80c9",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
+        "verif/arrow-census-coverage.test.ts",
         "verif/mutant-ledger.test.ts"
       ],
       "path": "scripts/mutants/ledger.ts",
@@ -14331,16 +14728,34 @@
       "role": "SCRIPT"
     },
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/measured.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "2dcdd0aeeced29f2f989067300de71d6a41bf21f3f073c7dd307b40877f644ad",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "gateCarriers": [
+        "verif/control-verdict.test.ts",
+        "verif/mutant-verdict.test.ts"
+      ],
+      "path": "scripts/mutants/measured.ts",
+      "provenance": [
+        "scripts/mutants/measured.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/run.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "2eecf54fabf1fbe99d17f697560a5ecc0750af2385bcb1e559ef8d05796160a2",
+      "contentSha256": "38822ce7ad5b7642f65e90db735ea0034bf6a599cf099d5be222b58a6f7818c8",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
         "package.json#/scripts/mutants",
         "package.json#/scripts/mutants:harvest",
         "package.json#/scripts/mutants:preflight",
+        "verif/control-verdict.test.ts",
         "verif/mutant-ledger.test.ts",
+        "verif/mutant-verdict.test.ts",
         "vitest.projects.ts#setupFiles"
       ],
       "path": "scripts/mutants/run.ts",
@@ -14365,6 +14780,21 @@
       "role": "SCRIPT"
     },
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/verdict.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "8842c850820675c963311d35b66586007c7b7fe783b655f1035f2c9c2505daef",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "gateCarriers": [
+        "verif/control-verdict.test.ts"
+      ],
+      "path": "scripts/mutants/verdict.ts",
+      "provenance": [
+        "scripts/mutants/verdict.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/spec-obligations.ts at execution time.",
       "associatedBaselines": [],
       "contentSha256": "32d158e94fa13826e5eb72b9b85a30473f9aff5c756b5c05934863089b00b041",
@@ -14383,7 +14813,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/absence-claims.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "3dc353f0d7eff99458d3b7b8501f18691fc119170c8da4980a15847bff67adb9",
+      "contentSha256": "8e93162c9f76e21ad3399716768243b6bc9e7199b30161e57cdd1cb0d23488cd",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14399,7 +14829,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/arrow-census-coverage.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "9930beb43d32cbfefb7fd1d3ea430ff085685f93a289d1f7287a1721b119864c",
+      "contentSha256": "9c475669d7b4733118fc53eb734cce6be3d038649ac6f6ea2e724ae2c23a1505",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14417,9 +14847,9 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "bfff45e99fde9fcb518458b2220cfd3fdaa80648d5d0299df69d5ed3edfeb694",
+      "contentSha256": "4fb1a23aa3923b9eb742cd2ccc90d36b29484393b1f1ffa454c500a20485a617",
       "disposition": "RETAIN_DELEGATED",
-      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "extractionMethod": "TYPESCRIPT_AST",
       "gateCarriers": [
         "bun run test:src -> verif",
         "verif/arrow-command-census.test.ts"
@@ -14435,13 +14865,16 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "15bd3f67b982563844231877fc8a3ce996ccb6e61c2cb4bb532c83f9adee4554",
+      "contentSha256": "24ef29c57670dd76249e067b571c9788dee9d6aad44a82bc755568a1d8b3b3e8",
       "disposition": "WRAP",
       "extractionMethod": "TYPESCRIPT_AST",
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.test.ts",
-        "verif/binding-row-truth.test.ts"
+        "verif/binding-row-truth.test.ts",
+        "verif/births-outside-the-census.test.ts",
+        "verif/guard-enforcement-ledger.test.ts",
+        "verif/unreachability-grounds.test.ts"
       ],
       "path": "verif/arrow-command-census.ts",
       "provenance": [
@@ -14468,7 +14901,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/authority-resolution-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "84df947a5ed48b6483f826edf2313ea8be3e99995ba135632d1067a3f7f6edb1",
+      "contentSha256": "c142419ff7cebaed73c5cf8cde883278567bcc55e56778b0d085df04bfe01b13",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14484,7 +14917,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/axis-influence.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "2adfcf273370da452afb4226f1da464b11740078babf74a5cb860fafb24e7923",
+      "contentSha256": "456b5191c154d02ddc42360402e986ed55614e247ee0c48af26a158a3a5bae43",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14500,7 +14933,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/binding-row-truth.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "7e6e8cc4b8e83734a08f5a8418a935610ec89c75ff14deba53e1170f5fba945e",
+      "contentSha256": "1e2be0c45f394bbcf69951da7e9c4d864ac02dbfb30dcd0c79b0c4642fa989bf",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14516,13 +14949,13 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/binding-row-truth.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "24641327192e0b39886160e33a99bcab1b23bb5986de4ff5cc178fcc481a3c4b",
+      "contentSha256": "042e2634b93515a02ea38c0084d8312a58f228589c33e5e4d6db23a45beeb232",
       "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
+        "verif/arrow-command-census.test.ts",
         "verif/binding-row-truth.test.ts",
-        "verif/births-outside-the-census.test.ts",
         "verif/trigger-claim-truth.test.ts"
       ],
       "path": "verif/binding-row-truth.ts",
@@ -14534,7 +14967,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/births-outside-the-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "8de1832d55e5c0892e4cb41c830ced70b1ed4f3adb0062d2e7c48cef5c63feca",
+      "contentSha256": "0a59c6fe066a31d936f8712e3b1e6215b6b57818cfdd9c6134bf05b8dfa3e53a",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14566,7 +14999,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/canon-provenance.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "b6282417dc0ec36196d3950fd292b6e7a699a04f12b4f1c8c135d661de674b7b",
+      "contentSha256": "ea1b095ee570f12df9c82af22597206cf89e40ff6462786ebe3be23ad0188494",
       "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -14627,9 +15060,25 @@
       "role": "TEST"
     },
     {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/control-verdict.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "9d2c280dfb61413f97c5556abaa43317efee04b0756715f3f53172bf2f0d6280",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/control-verdict.test.ts"
+      ],
+      "path": "verif/control-verdict.test.ts",
+      "provenance": [
+        "verif/control-verdict.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/dead-kernel-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "41ce8bb458d11f8739eb4b3e2cfe4c64bf92453f51e9de47a34b42f5cd662f85",
+      "contentSha256": "bcf1a49081e541bd859c23ff6f51222d8309bc2b25dcbf177ea6a59467fac743",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14677,7 +15126,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/emitted-event-guard.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "8337f9de45b8c46c2927bf7d91e698c369ce92ac2669fff20c495aac1c5fd15f",
+      "contentSha256": "1702a6e118ef12650ecb4cc53f6e41e85f29cc6843aacfb78bcda2c212fd31df",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -14694,7 +15143,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/event-surface-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "e39b0d8fd56cef8931a5a23937eddf33ffbd3e2f65ebd3b41af266cff022f31d",
+      "contentSha256": "dce3a34da71ee14e368c2438a2dc90be8144d3256196131bf3185f1fe485d8cb",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14728,12 +15177,13 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "3a463eef03f3ea4d4cdf9bf4c5dfcf00a6ea7bd76384ea9407cd0f0cd576d017",
+      "contentSha256": "9f42401a4346e908882dcbe2e8639c1a75ae241c46efe1f0512ec86837ef2876",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
         "verif/guard-enforcement-ledger.test.ts",
-        "verif/recomposition-ungoverned.test.ts"
+        "verif/recomposition-ungoverned.test.ts",
+        "verif/unreachability-grounds.test.ts"
       ],
       "path": "verif/guard-enforcement-ledger.data.ts",
       "provenance": [
@@ -14744,7 +15194,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/guard-enforcement-ledger.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "f978b95a120444d8ded1b4ef39dae56c9dcf4cd73eb76f82446afea9ca5612e4",
+      "contentSha256": "715d9565151ff383904e4246c78fce27a51e9161fe48a066bd33fd47babdf90e",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14760,12 +15210,14 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/guard-enforcement-ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "1aeab4efde15cdc99602c81ce4e09f5c7889870bc4cfdf8f4fc5d2247b9095e4",
+      "contentSha256": "44185eff221b859c0f870ae4751196bf1306afcbd993f3751c80bfddaa8a33be",
       "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
+        "verif/arrow-census-coverage.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
-        "verif/recomposition-ungoverned.test.ts"
+        "verif/recomposition-ungoverned.test.ts",
+        "verif/unreachability-grounds.test.ts"
       ],
       "path": "verif/guard-enforcement-ledger.ts",
       "provenance": [
@@ -14776,7 +15228,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/lifecycle-arrow-declarations.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "0ea2d0145232704e8c6939971f74ad2c24144fe90f25e1344b53e5ac81be289e",
+      "contentSha256": "ddd9ba4b292a7328b24eb76c7b7e5d4d9daf284bddace114b212959fb71a2235",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14792,7 +15244,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/mutant-ledger.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "ce3e0b9908cbabbd320e8ad9a047abdfb101683e72ef206562cf50f08d1c7783",
+      "contentSha256": "006fa1ae882ca113a0e8775b68ae195566f93851eaceb99e0caf3dcb70e91338",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14802,6 +15254,38 @@
       "path": "verif/mutant-ledger.test.ts",
       "provenance": [
         "verif/mutant-ledger.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/mutant-verdict.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "f103418a3c6e577dd64d4a00b6226055728874a885e6f189a7f44fad90d806d0",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/mutant-verdict.test.ts"
+      ],
+      "path": "verif/mutant-verdict.test.ts",
+      "provenance": [
+        "verif/mutant-verdict.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/observation-command-surface.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "eb191ecdcd6d40c58a0bb57f8b80174577e7a1e0a8402ec0a564d46d5702f077",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/observation-command-surface.test.ts"
+      ],
+      "path": "verif/observation-command-surface.test.ts",
+      "provenance": [
+        "verif/observation-command-surface.test.ts"
       ],
       "role": "TEST"
     },
@@ -14854,9 +15338,25 @@
       "role": "TEST"
     },
     {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-citations.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "2f2bb709c8a5e0e641b4a239aaa7f9be6bc2fd7856f3f88536072562f10ab93d",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/register-citations.test.ts"
+      ],
+      "path": "verif/register-citations.test.ts",
+      "provenance": [
+        "verif/register-citations.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-status.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "270ca698736bc376e7fe0e1b53e509dbe7fa58cca9f4e287a1d7bc0dbd6ad6d5",
+      "contentSha256": "510a4c1d153f60eb3d16a2c3a7422a60e1c75706dba6d92f78d2440d073cb0cb",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14872,7 +15372,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/route-action-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "f1523772e11df7b86425ceb3d50a27ffc45be5d66b8977d3be8323d0f206c811",
+      "contentSha256": "156e01ad200c8e295c2455fd4f1870bdf1dc1e18085deaa159f9b58d56d8a098",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14888,7 +15388,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/source-is-reviewable.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "88a5575babd62c48d045a7f3c7fd9c2fb29f98491118845c78bed137ab272ca3",
+      "contentSha256": "776dba78facf9b610307fe03f6a5768f71258aa74d3470cd145352a6a8133ecb",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14952,7 +15452,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/transition-provenance-carried.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "33695268b50a386a098a942efc413085420cb134a9456844c9be9f6b12dd10e2",
+      "contentSha256": "925f5aba791c998d2b4f9292dd4b6e501889df3c195e8071d04630c8f1e651bf",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14968,7 +15468,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/trigger-claim-truth.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "aeabf4b096baac0228a35580ca46e8a544c2487567a9b5d8867e8d3af64c2477",
+      "contentSha256": "792386e04805cc8d4e64f52a40e29ced94832bc7c96fba9f98f771a2f11371c1",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -14984,7 +15484,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/trigger-claim-truth.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "50871b8bbefe655571ca8658a8f3c081b83acd8158bf085592806129e5671492",
+      "contentSha256": "f15c79ea09d4933c20d779c497e2e0b32586027347b59a8c0dbc134e3c40acd5",
       "disposition": "WRAP",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15009,6 +15509,22 @@
       "path": "verif/trust-boundary.test.ts",
       "provenance": [
         "verif/trust-boundary.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/unreachability-grounds.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "5e37628e08b704789235eec5c7fc46b87283bf56eac5b8c46e4d6b166f5de637",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/unreachability-grounds.test.ts"
+      ],
+      "path": "verif/unreachability-grounds.test.ts",
+      "provenance": [
+        "verif/unreachability-grounds.test.ts"
       ],
       "role": "TEST"
     },
@@ -15165,7 +15681,7 @@
       "scripts": {
         "build": "svelte-kit sync && vite build",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-        "check-types": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+        "check-types": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p ./e2e/tsconfig.json",
         "dev": "svelte-kit sync && vite dev",
         "e2e": "node ../../node_modules/@sveltejs/kit/svelte-kit.js sync && node ../../node_modules/@playwright/test/cli.js test",
         "e2e:live": "node ../../node_modules/@sveltejs/kit/svelte-kit.js sync && node ../../node_modules/@playwright/test/cli.js test --config playwright.live.config.ts",

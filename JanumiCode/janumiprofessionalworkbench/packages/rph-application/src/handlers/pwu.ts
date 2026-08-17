@@ -44,8 +44,11 @@ import type {
 	PwuShapingStartedPayload,
 	PwuStateChangedPayload,
 	PwuSupersededPayload,
+	PwuUnblockedPayload,
 	ReshapePwuPayload,
-	SupersedePwuPayload
+	SupersedePwuPayload,
+	UnblockPwuPayload,
+	WorkLifecycleState
 } from '@janumipwb/rph-contracts';
 import {
 	canAdvanceWorkLifecycle,
@@ -71,7 +74,10 @@ import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
 import {
 	checkDeclaredSource,
+	declaredRecoveryTargets,
+	ownerOfArrow,
 	PWU_LIFECYCLE_COMMAND_SPECS,
+	PWU_RECOVERY_COMMAND_SPECS,
 	type PwuLifecycleCommandSpec
 } from '@janumipwb/rph-domain';
 
@@ -221,6 +227,48 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 			[p.pwuId]
 		);
 	}
+	// ── STA-6 (d): "a superseded intent cannot authorize new PWUs" — JPWB-DOC-003 §5, verbatim ────────────────
+	//
+	// ⚠ LANDED BEFORE THE COMMAND THAT MAKES ITS ANTECEDENT REACHABLE, which is the only ordering that works.
+	// `RPH-INT-007` closes this rule as NOT_A_COMMAND_REFUSAL purely because SUPERSEDED is command-unreachable.
+	// `SupersedeIntent` is the next increment; shipping it first would have delivered six new arrows, a green gate,
+	// and a governance rule that had quietly stopped being closed.
+	//
+	// ⚠ THAT ROW PREDICTED ITS OWN DESTINATION AND PREDICTED IT WRONG, corrected at REG-F-130 and repeated here
+	// because this docblock quoted it: it said the rule would become *"a live UNENFORCED_DISCLOSED row on the same
+	// day"*. It will not — an UNENFORCED_DISCLOSED row must carry a probe that DISPATCHES the arrangement and
+	// observes the engine ACCEPT it, and this guard REFUSES it, so no such probe could be written honestly. The
+	// destination is ENFORCED. **A prediction about a future disposition is a claim like any other**, and this one
+	// was made when only one arm looked available.
+	//
+	// ⚠ SUPERSEDED ONLY, AND WITHDRAWN IS DELIBERATELY ADMITTED. The design for this increment said "SUPERSEDED
+	// (and WITHDRAWN)" — an inference, and one this register has already ratified AS an error. STA-6 names *"a
+	// superseded intent"* and nothing else; the ratified domain model mentions WITHDRAWN only as an enum member
+	// and a matrix row, never in §6.3's invariants. The ground for pairing them was `terminalStates:
+	// ['SUPERSEDED','WITHDRAWN']` — and **REG-F-083 records that `terminalStates` is WHOLLY A REPOSITORY SHAPE**
+	// (*"the ratified Canonical Domain Model contains the word 'terminal' ZERO times"*). The corpus does not treat
+	// them alike either: Supersede has SIX in-arrows ("any active"), Withdraw only THREE.
+	//
+	// ⚠ AND IT IS NOT `INTENT_AT_LEAST_PROVISIONAL`, WHICH IS THE TEMPTING REUSE. That set (pwuGuards.ts) serves
+	// STA-6 clause (a) at READINESS and excludes RAW — so applying it at CREATION would refuse the repository's
+	// normal pattern: capture an intent and propose the work graph under it, maturing the intent later. Measured:
+	// 56 of the 71 files that dispatch both `CaptureIntent` and `ProposePwu` never mature it in between. Clause
+	// (a) governs readiness, clause (d) governs creation, and they take different sets.
+	//
+	// SCOPE IS EVERY PWU, root and child alike: clause (d) carries no root qualifier (clause (a) does), and this
+	// handler mints child PWUs too — `parentWorkUnitId` is a payload field here, not a separate creator.
+	//
+	// DISCLOSED, NOT FIXED HERE: PWU-002 above is existence-only and never asserts the referent's `objectType`, so
+	// a non-INTENT id would carry `intentStatus: undefined` and pass this check. That gap predates this guard and
+	// is unchanged by it; closing it changes PWU-002's own rule and belongs in its own increment.
+	if ((intentObj.state as { intentStatus?: string }).intentStatus === 'SUPERSEDED') {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposePwu cannot be authorized by intent ${p.intentId}: it is SUPERSEDED, and a superseded intent authorizes no new work (JPWB-DOC-003 §5 STA-6). Propose against the intent that superseded it.`,
+			[p.pwuId]
+		);
+	}
 	const intentState = intentObj.state as { ontologyId?: string; ontologyVersion?: string };
 	if (p.parentWorkUnitId && !ctx.store.loadObject(p.parentWorkUnitId)) {
 		return reject(
@@ -321,7 +369,34 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		newRevision: 0,
 		newSemanticVersion: 1,
 		nextState: pwu,
-		event
+		event,
+		// THE BIRTH OF ALL FOUR PWU AXES — REG-F-086 for the first, REG-F-159 for the other three, and it is what
+		// makes each machine ANALYSABLE rather than merely visible. REG-F-114 gave `workLifecycleState` 49 declared
+		// arrows; occupancy seeds from a birth and grows along those, so without a birth the census could see the
+		// arrows and still not say which states are reachable — and therefore not say which "covered" arrows are DEAD.
+		//
+		// ⚠ EVERY VALUE IS READ OFF `seededAxes` ABOVE — THE STATE THIS COMMAND COMMITS — NOT OFF `initialState`,
+		// which lies for five machines (REG-F-071). The declaration lives at the site that performs the birth
+		// because that is the only place that knows, and `commitState` REFUSES if the two disagree.
+		//
+		// ⚠ THREE OF THESE FOUR WERE MISSING FOR AS LONG AS THIS SITE HAS EXISTED, AND THE CONSEQUENCE WAS A CHECK
+		// THAT COULD NOT FIRE (REG-F-159). `seededAxes` commits four axes; this array declared one. Every occupancy
+		// layer then skipped the other three by an explicit guard — `deadCovered` (`if (!set) continue`),
+		// `provablyUnoccupiable` (`if (!born) continue`), `initialStateFictions`, `occupancyAnalysable` — so the
+		// 42-arrow declaration REG-F-157 measured on exactly these three machines (162/295 -> 204/295, the largest
+		// coverage movement available anywhere in this programme) would have been made with the ONLY instrument
+		// capable of contradicting it structurally silent. **A control that cannot fail, at the point the number is
+		// largest.** The 42 is refused on other grounds; this declaration removes the blind spot regardless.
+		//
+		// ⚠ AND THE GAP IT CLOSES AT RUNTIME IS NARROW AND REAL: the object schema types each axis as an ENUM, so
+		// drift to a NON-member was already refused. Drift to a DIFFERENT VALID MEMBER — `PLANNED` for
+		// `NOT_PLANNED` — was refused by nothing at all until this array named the value.
+		births: [
+			{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] },
+			{ machine: 'PWU.executionState', statusField: 'executionState', values: ['NOT_PLANNED'] },
+			{ machine: 'PWU.assuranceState', statusField: 'assuranceState', values: ['UNASSESSED'] },
+			{ machine: 'PWU.shapeIntegrityState', statusField: 'shapeIntegrityState', values: ['UNKNOWN'] }
+		]
 	});
 };
 
@@ -376,9 +451,28 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
 } as const satisfies Readonly<Record<string, string>>;
 
 /**
- * THE ANTI-ROT MECHANISM. `advancePwuLifecycle`'s `target` is narrowed to this union, so a SEVENTH semantic
+ * ⚠⚠ THE ANTI-ROT MECHANISM THIS TYPE PROVIDED IS GONE, AND I REMOVED IT MYSELF WITHOUT NOTICING (REG-F-120).
+ *
+ * The docstring here read: *"`advancePwuLifecycle`'s `target` is narrowed to this union, so a SEVENTH semantic
  * lifecycle command cannot be added without adding its row here — `check-types` fails before the new command's
- * arrow can quietly become reachable through the generic setter as well.
+ * arrow can quietly become reachable through the generic setter as well."* **That was true when written.**
+ *
+ * **REG-F-114 replaced that `target` parameter with `spec: PwuLifecycleCommandSpec`** (see its signature below),
+ * whose `target` is the WIDE `WorkLifecycleState`. From that commit on, nothing was narrowed and a twelfth
+ * command could be added with no row here and no type error. **The type has had ZERO consumers ever since** —
+ * only its own declaration and a re-export in `index.ts`.
+ *
+ * ⚠ AND I MAINTAINED ITS DOCUMENTATION AFTERWARDS. On 2026-08-13 I corrected the count in this very docstring
+ * from "SEVENTH" to "TWELFTH" as a P-5 records fix, having verified the number against the table and never asked
+ * whether the MECHANISM the sentence describes still existed. **A count is easy to check and a claim is not, so
+ * the easy half got audited and the load-bearing half did not.** That is the same shape as REG-F-118's finding
+ * one layer up: the positive half of a claim was correct, so the negative half was never questioned.
+ *
+ * KEPT, NOT DELETED, AND NARROWLY SCOPED TO WHAT IT NOW IS: a NAME for the owned set, useful to a reader and to
+ * `rejectArrowOwnedBySemanticCommand`'s intent, with NO enforcement behind it. **Nothing may cite it as a
+ * guarantee.** The protection that does exist is elsewhere and is real: the runtime lookup in
+ * `rejectArrowOwnedBySemanticCommand`, and `verif/lifecycle-arrow-declarations.test.ts`, which holds the two
+ * ownership sets DISJOINT and every ratified arrow ACCOUNTED FOR by one table or the other.
  */
 export type OwnedLifecycleTarget = keyof typeof PWU_SEMANTIC_LIFECYCLE_COMMANDS;
 
@@ -400,8 +494,15 @@ function advancePwuLifecycle(
 		readonly mutate?: (current: Record<string, unknown>) => Record<string, unknown>;
 		/** Build the EVENT payload from the committed next state. Without this the event carries
 		 * `command.payload` — a command payload masquerading as an event payload, which is the defect
-		 * Increment 22 fixed elsewhere. Supply it for any event whose payload is actually specified. */
-		readonly eventPayload?: (nextState: Record<string, unknown>) => unknown;
+		 * Increment 22 fixed elsewhere. Supply it for any event whose payload is actually specified.
+		 *
+		 * ⚠ `priorAxes` IS THE STATE THE PWU IS MOVING FROM, AND IT IS PASSED SO NO EVENT HAS TO INFER IT
+		 * (JAN-PWUWP W-5.5). `PwuBlocked` needs its origin to make recovery possible, and the two ways to get
+		 * one are to READ it here or to FOLD the event prefix at recovery time. CON-000 AX-6 settles that:
+		 * *"Professional meaning is never inferred from null fields, missing values, attachment, proximity,
+		 * **ordering**, storage location, or UI placement."* A prefix fold infers from ORDERING. This reads the
+		 * loaded aggregate, which is not an inference at all. */
+		readonly eventPayload?: (nextState: Record<string, unknown>, priorAxes: PwuAxes) => unknown;
 	}
 ) {
 	const id = command.targetAggregateId;
@@ -431,7 +532,7 @@ function advancePwuLifecycle(
 		aggregateType: PWU,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload: args.eventPayload ? args.eventPayload(next) : command.payload
+		payload: args.eventPayload ? args.eventPayload(next, axes) : command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: PWU,
@@ -553,7 +654,7 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 		return reject(
 			command,
 			'RPH_REVISION_CONFLICT',
-			`MarkPwuReady: expected semantic version ${p.expectedSemanticVersion}, but PWU ${command.targetAggregateId} is at semantic version ${loaded.semanticVersion} — the shape changed since readiness was attested (stale attestation).`
+			`MarkPwuReady: expected semantic version ${p.expectedSemanticVersion}, but PWU ${command.targetAggregateId} is at semantic version ${loaded.semanticVersion} — this caller states a version this PWU is not at, which is a caller reasoning about the wrong object or the wrong build. A PWU's semanticVersion cannot move (REG-F-109), so this is not a stale attestation.`
 		);
 	}
 	const readiness = checkPwuShapeReadiness(readinessFactsOf(ctx, loaded.state));
@@ -734,10 +835,14 @@ export const blockPwu: CommandHandler = (ctx, command) => {
 	const p = command.payload as BlockPwuPayload;
 	return advancePwuLifecycle(ctx, command, {
 		spec: PWU_LIFECYCLE_COMMAND_SPECS.BlockPwu,
-		eventPayload: (next) =>
+		eventPayload: (next, prior) =>
 			({
 				blockReason: p.blockReason,
 				...(p.missingObjectIds ? { missingObjectIds: p.missingObjectIds } : {}),
+				// W-5.5. The state this PWU is being blocked OUT OF, and therefore the one a recovery returns it
+				// to. Without it `PwuBlocked` records strictly LESS than the generic `PwuStateChanged`, which
+				// carries `previousState` — the dedicated arrow dropping exactly the datum recovery needs.
+				blockedFrom: prior.workLifecycleState as PwuBlockedPayload['blockedFrom'],
 				workLifecycleState: next.workLifecycleState as PwuBlockedPayload['workLifecycleState']
 			}) satisfies PwuBlockedPayload
 	});
@@ -770,6 +875,132 @@ export const escalatePwu: CommandHandler = (ctx, command) => {
 			}) satisfies PwuEscalatedPayload
 	});
 };
+
+/**
+ * UnblockPwu — BLOCKED -> {SHAPING, PLANNED, EXECUTING} and ESCALATED -> EVIDENCE_PENDING.
+ * JAN-PWUWP W-5.5, under REG-D-043 (the sponsor ruled the ACT exists) and REG-D-029 (which grants its SHAPE).
+ *
+ * ⚠⚠ IT TAKES NO TARGET, AND THAT ABSENCE IS THE GUARANTEE THIS COMMAND OFFERS. The state a PWU resumes at is
+ * READ from the `blockedFrom` its own `PwuBlocked` recorded — never supplied by the caller, and never inferred.
+ * A caller-chosen target would permit `SHAPING -> BLOCKED -> EXECUTING`, silently skipping PLANNED, which is
+ * the exact failure REG-D-043 identified when it derived this arrow set from §8.2 reversed. So the record
+ * decides where the work resumes, not the person asking for it to resume.
+ *
+ * ⚠ AND WHERE THE RECORD CANNOT SAY, IT REFUSES. A PWU blocked before `blockedFrom` existed carries no origin,
+ * and there is no honest way to recover one: folding the event prefix would infer the origin from ORDERING,
+ * which CON-000 AX-6 forbids in terms. So it fails closed (AX-8) with a message that says which event is
+ * deficient rather than a generic refusal — the operator's next move is to abandon or supersede, and they
+ * should not have to guess that from a bare rejection.
+ *
+ * THE TWO CASES ARE ONE MECHANISM, distinguished by the DECLARATION rather than by a hardcoded state list:
+ * `declaredRecoveryTargets` returns ONE target for ESCALATED (its single ratified in-arrow makes the origin
+ * derivable without any recorded field) and THREE for BLOCKED (so the origin must have been recorded). If
+ * ESCALATED ever gains a second in-arrow, this degrades to fail-closed on its own rather than picking one.
+ */
+export const unblockPwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as UnblockPwuPayload;
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const axes = axesOf(loaded.state);
+	const from = axes.workLifecycleState;
+
+	const candidates = declaredRecoveryTargets(from);
+	if (candidates.length === 0) {
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`UnblockPwu does not declare any arrow out of ${from} — it recovers only from BLOCKED and ESCALATED ` +
+				`(REG-D-043, derived from DOC-002 §8.2 reversed). This is an UNDECLARED ARROW, not an illegal ` +
+				`transition (REG-F-114).`,
+			[id]
+		);
+	}
+
+	// ONE candidate ⇒ the origin is determined by the DECLARED MACHINE and needs no recorded field. More than
+	// one ⇒ only the record can say, and the record is `PwuBlocked.blockedFrom`.
+	let target = candidates[0]!;
+	if (candidates.length > 1) {
+		const origin = recordedBlockOrigin(ctx, id);
+		if (origin === undefined) {
+			return reject(
+				command,
+				'RPH_EVIDENCE_MISSING',
+				`PWU ${id} cannot be unblocked: its PwuBlocked event records no ${'blockedFrom'}, so the state it ` +
+					`was blocked out of is not recorded anywhere. Recovering it would mean inferring the origin from ` +
+					`event ORDERING, which CON-000 AX-6 forbids — *"professional meaning is never inferred from … ` +
+					`ordering"*. Blocks recorded before JAN-PWUWP W-5.5 fail closed here by design (AX-8); abandon or ` +
+					`supersede this PWU instead.`,
+				[id]
+			);
+		}
+		if (!candidates.includes(origin)) {
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`PWU ${id} records blockedFrom=${origin}, which UnblockPwu does not declare as a recovery target ` +
+					`from ${from} — it claims [${candidates.join(', ')}]. The recorded origin and the declared arrow ` +
+					`set disagree, and that disagreement is the finding (REG-F-114).`,
+				[id]
+			);
+		}
+		target = origin;
+	}
+
+	const advance = canAdvanceWorkLifecycle(from, target, axes);
+	if (!advance.ok) {
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`Cannot recover PWU ${id} ${from} -> ${target}${advance.reason ? ': ' + advance.reason : ''}`
+		);
+	}
+
+	const newRevision = loaded.revision + 1;
+	const next = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		lifecycleStatus: target,
+		workLifecycleState: target
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: PWU_RECOVERY_COMMAND_SPECS.UnblockPwu!.eventType,
+		aggregateType: PWU,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: {
+			recoveryReason: p.recoveryReason,
+			recoveredFrom: from as PwuUnblockedPayload['recoveredFrom'],
+			workLifecycleState: target as PwuUnblockedPayload['workLifecycleState']
+		} satisfies PwuUnblockedPayload
+	});
+	return commitState(ctx, command, {
+		objectType: PWU,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/**
+ * The origin recorded by this PWU's most recent `PwuBlocked`, or undefined when none was recorded.
+ *
+ * ⚠ THE **MOST RECENT**, AND THAT IS NOT AN ORDERING INFERENCE. A PWU may be blocked, recovered and blocked
+ * again; the origin that governs THIS recovery is the one the CURRENT block recorded. Reading the latest
+ * `PwuBlocked` selects WHICH RECORD to read — it does not derive the origin FROM the ordering, which is what
+ * CON-000 AX-6 forbids. The value itself is still a field somebody wrote down at the time.
+ */
+function recordedBlockOrigin(ctx: HandlerContext, id: string): WorkLifecycleState | undefined {
+	const blocks = ctx.store
+		.readAggregateEvents(PWU, id)
+		.filter((e) => e.eventType === 'PwuBlocked');
+	const latest = blocks.at(-1);
+	if (!latest) return undefined;
+	const origin = (latest.payload as { blockedFrom?: string }).blockedFrom;
+	return origin as WorkLifecycleState | undefined;
+}
 
 /**
  * BaselinePwu — SATISFIED | RECOMPOSED -> BASELINED. JAN-PWUWP W-4.5, under REG-D-029.
@@ -999,23 +1230,6 @@ function rejectUnbackedDisposition(
 
 
 /**
- * EXECUTION SUCCESS MAY NOT BE ASSERTED — the third and last axis that was assigned rather than earned.
- *
- * `executionState: SUCCEEDED` is the premise of everything downstream: RPH-PWU-006's Given opens with "execution
- * succeeded", and §8.1 gates EXECUTING -> EVIDENCE_PENDING on "Execution state is SUCCEEDED". Until this guard,
- * that premise was a string the controller could type. The demo seed drove all thirteen PWUs to SUCCEEDED with
- * one hand-written Execution Plan between them, and never started or completed a single step.
- *
- * So: claiming SUCCEEDED requires citing an EXECUTION_PLAN that is FOR this PWU (`workUnitId`) and that has a
- * step which actually reached SUCCEEDED. That step's own completion is separately and independently guarded —
- * completeExecutionStep requires real output AND, for AI-produced results, a satisfied de minimis floor. Citing
- * the plan is what connects the PWU's claim to that already-defended fact.
- *
- * Only SUCCEEDED is guarded. The other executionState values (PLANNED/QUEUED/RUNNING/WAITING/FAILED) are
- * scheduling facts the controller legitimately owns, and FAILED in particular must never need permission to
- * record — a system that makes failure harder to report than success is worse than one that checks neither.
- */
-/**
  * WAIVED requires a granted WAIVER decision bound to this PWU at this version. JAN-PWUWP W-3, under REG-D-029.
  *
  * ⚠ THIS CLOSES A HOLE THE FILE ITSELF NAMED AND LEFT OPEN. `rejectUnbackedDisposition` short-circuits on
@@ -1083,6 +1297,23 @@ function rejectUnauthorizedWaiver(
 	);
 }
 
+/**
+ * EXECUTION SUCCESS MAY NOT BE ASSERTED — the third and last axis that was assigned rather than earned.
+ *
+ * `executionState: SUCCEEDED` is the premise of everything downstream: RPH-PWU-006's Given opens with "execution
+ * succeeded", and §8.1 gates EXECUTING -> EVIDENCE_PENDING on "Execution state is SUCCEEDED". Until this guard,
+ * that premise was a string the controller could type. The demo seed drove all thirteen PWUs to SUCCEEDED with
+ * one hand-written Execution Plan between them, and never started or completed a single step.
+ *
+ * So: claiming SUCCEEDED requires citing an EXECUTION_PLAN that is FOR this PWU (`workUnitId`) and that has a
+ * step which actually reached SUCCEEDED. That step's own completion is separately and independently guarded —
+ * completeExecutionStep requires real output AND, for AI-produced results, a satisfied de minimis floor. Citing
+ * the plan is what connects the PWU's claim to that already-defended fact.
+ *
+ * Only SUCCEEDED is guarded. The other executionState values (PLANNED/QUEUED/RUNNING/WAITING/FAILED) are
+ * scheduling facts the controller legitimately owns, and FAILED in particular must never need permission to
+ * record — a system that makes failure harder to report than success is worse than one that checks neither.
+ */
 function rejectUnbackedExecutionSuccess(
 	ctx: HandlerContext,
 	command: DomainCommand,
@@ -1177,9 +1408,17 @@ function rejectArrowOwnedBySemanticCommand(
 	newState: string
 ): CommandResult | undefined {
 	if (newState === currentWorkLifecycleState) return undefined;
-	const owner = (PWU_SEMANTIC_LIFECYCLE_COMMANDS as Readonly<Record<string, string | undefined>>)[
-		newState
-	];
+	// W-5.5 / REG-F-193 — A UNION, ARROW FIRST AND TARGET AS A FAIL-CLOSED BACKSTOP. The arrow limb is what
+	// lets `BLOCKED -> PLANNED` belong to the recovery command while `READY -> PLANNED` stays the setter's own;
+	// a target key cannot say both, and that is the whole of collision 1. The target limb is retained rather
+	// than replaced so the refused set is a SUPERSET of both keys — re-keying outright would have made
+	// `generic-setter-scope.test.ts` CONTROL 2's ordering mutant UNKILLABLE, since its subject `PROPOSED->READY`
+	// is an arrow no command declares and only the TARGET limb can match it.
+	const owner = ownerOfArrow(
+		currentWorkLifecycleState,
+		newState,
+		PWU_SEMANTIC_LIFECYCLE_COMMANDS as Readonly<Record<string, string | undefined>>
+	);
 	if (owner === undefined) return undefined;
 	return reject(
 		command,

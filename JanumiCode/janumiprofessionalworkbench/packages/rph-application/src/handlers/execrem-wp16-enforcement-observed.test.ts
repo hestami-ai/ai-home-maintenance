@@ -697,6 +697,34 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 	// `bumpSemanticVersion`, and only `reviseIntent` does. The controls below therefore approve v1 — and they had
 	// to be corrected to it, because the first draft assumed the rule was performed. See REG-F-009.
 
+	/** ProposePwu against a NAMED intent — the RPH-INT-007 arrangement needs to choose which intent authorizes. */
+	const proposePwuAgainstIntent = (pwuId: string, intentId: string) =>
+		dispatch(
+			'ProposePwu',
+			{
+				pwuId,
+				pwuKind: 'ARCHITECTURE',
+				title: 'Architecture Definition',
+				description: 'd',
+				intentId,
+				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				obligationIds: [],
+				constraintIds: [],
+				assumptionIds: [],
+				expectedOutputs: [],
+				assurancePolicyIds: [],
+				riskProfile: {
+					consequence: 'HIGH',
+					uncertainty: 'MEDIUM',
+					irreversibility: 'MEDIUM',
+					securitySensitivity: 'HIGH',
+					regulatoryExposure: 'LOW'
+				}
+			},
+			pwuId,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+
 	const captureIntent = (id: string) =>
 		ok(
 			dispatch(
@@ -1127,7 +1155,104 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// gate below rejects both a missing probe for an ENFORCED row and a probe for a row that is not.
 		// The three disclosed rows are observed being ADMITTED instead, in `disclosure-observed.test.ts`.
 		'RPH-EVD-001': null,
-		'RPH-EVD-002': null,
+		// ⚠ WAS `null` UNTIL 2026-08-13, ON A GROUND THAT EXPIRED SEVEN DAYS EARLIER. The row read
+		// NOT_A_COMMAND_REFUSAL because "no handler anywhere drives the Claim.status machine" — true when written,
+		// false from the moment `RecordClaimAssessment` was registered, and unnoticed because arm 3 has no probe
+		// and no selector (REG-F-133). The refusal it denies existing is headed with this rule's own id.
+		'RPH-EVD-002': {
+			arrangement:
+				'a claim in UNDER_ASSESSMENT with NO admissible evidence moved to SUPPORTED; the control is a second claim whose supporting evidence was proposed AND admitted',
+			run: () => {
+				// TWO CLAIM AGGREGATES, not one claim assessed twice: SUPPORTED is reached from UNDER_ASSESSMENT,
+				// so re-running the same claim would meet a different source state and measure a different guard.
+				const claim = (id: string) =>
+					ok(
+						dispatch(
+							'AssertClaim',
+							{
+								statement: 'the tenant isolation boundary holds',
+								claimType: 'COMPLETENESS',
+								subjectObjectIds: []
+							},
+							id,
+							'CLAIM'
+						),
+						`assert ${id}`
+					);
+				// ⚠ PROPOSE AND ADMIT ARE SEPARATE, and that separation is the whole rule. The first version of
+				// this probe gave the observed claim NO EVIDENCE AT ALL — which is refused, but for the WEAKER
+				// reason. `F134-admissible-collapses-into-present` (weakening the ADMISSIBLE test to a presence
+				// check) SURVIVED against it, because a claim with nothing is still a claim with nothing however
+				// the status test reads. The observed claim must therefore carry evidence that is PROPOSED and
+				// NEVER ADMITTED: present, and inadmissible. That is the only arrangement in which "ADMISSIBLE"
+				// and "PRESENT" give different answers, and it is exactly what the rule's own message says —
+				// "Evidence that is merely PROPOSED has not been admitted."
+				const propose = (claimId: string, evId: string) => {
+					ok(
+						dispatch(
+							'ProposeEvidence',
+							{
+								evidenceId: evId,
+								evidenceType: 'TEST_RESULT',
+								contentReference: { uri: 'ref://suite/tenant-isolation' },
+								producedBy: { actorId: 'ci-1', actorType: 'SERVICE', displayName: 'CI' },
+								supportsClaimIds: [claimId],
+								contradictsClaimIds: [],
+								scope: 'tenant isolation',
+								limitations: [],
+								capturedAt: TS
+							},
+							evId,
+							'EVIDENCE'
+						),
+						`propose ${evId}`
+					);
+				};
+				// PROPOSED evidence is PRESENT but not ADMISSIBLE. Only `AdmitEvidence` produces ADMISSIBLE, and
+				// the guard folds committed EVIDENCE state rather than reading the payload — which is what makes
+				// this the one non-forgeable refusal in the command.
+				const admit = (claimId: string, evId: string) =>
+					ok(
+						dispatch(
+							'AdmitEvidence',
+							{
+								admissibilityAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5F02',
+								admittedScope: 'tenant isolation',
+								admittedClaimIds: [claimId]
+							},
+							evId,
+							'EVIDENCE'
+						),
+						`admit ${evId}`
+					);
+				const assess = (claimId: string, targetStatus: string, extra: Record<string, unknown> = {}) =>
+					dispatch('RecordClaimAssessment', { targetStatus, ...extra }, claimId, 'CLAIM');
+
+				const CLAIM_OK = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE1';
+				const CLAIM_BAD = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE2';
+				claim(CLAIM_OK);
+				claim(CLAIM_BAD);
+				// The control's evidence is proposed AND admitted; the observed claim's is proposed and LEFT
+				// PROPOSED. Both claims therefore HAVE supporting evidence, and the ONLY difference between them
+				// is its admissibility — which is the difference the rule is about.
+				propose(CLAIM_OK, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE3');
+				admit(CLAIM_OK, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE3');
+				propose(CLAIM_BAD, 'evd_01ARZ3NDEKTSV4RRFFQ69G5FE6');
+
+				// ⚠ BOTH CLAIMS MUST REACH UNDER_ASSESSMENT FIRST. The guard runs BEFORE `checkTransition`, so a
+				// claim left in OPEN produces this same marker for an arrangement the rule is not about — the
+				// refusal would be real and the probe would still be measuring the wrong thing.
+				ok(assess(CLAIM_OK, 'UNDER_ASSESSMENT'), 'arrange control to UNDER_ASSESSMENT');
+				ok(assess(CLAIM_BAD, 'UNDER_ASSESSMENT'), 'arrange observed to UNDER_ASSESSMENT');
+
+				return {
+					// The control has ADMISSIBLE evidence and must be ACCEPTED — without it, a guard that refused
+					// every move to SUPPORTED would pass this row while enforcing nothing about admissibility.
+					control: assess(CLAIM_OK, 'SUPPORTED', { assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE4' }),
+					observed: assess(CLAIM_BAD, 'SUPPORTED', { assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE5' })
+				};
+			}
+		},
 		'RPH-EVD-003': {
 			arrangement:
 				'Evidence whose contentReference is {} — a source reference naming nothing — offered for admission (REG-F-008 remediation)',
@@ -1324,7 +1449,30 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-INT-001': null,
 		'RPH-INT-002': null,
 		'RPH-INT-006': null,
-		'RPH-INT-007': null,
+
+		// ⚠ THIS ROW WAS `NOT_A_COMMAND_REFUSAL` UNTIL 2026-08-13 AND COULD NOT BE PROBED AT ALL — its antecedent was
+		// COMMAND-UNREACHABLE, so there was no arrangement to dispatch. `SupersedeIntent` (REG-F-131) made one, and
+		// this probe is the observation the ENFORCED disposition now rests on (REG-F-132). No fixture anywhere in the
+		// chain: the intent is superseded through the bus, exactly as a professional would.
+		'RPH-INT-007': {
+			arrangement:
+				'ProposePwu against an intent that has been SUPERSEDED through the bus — work authorized by an intent that is no longer the authority',
+			run: () => {
+				const DEAD = 'int_01ARZ3NDEKTSV4RRFFQ69H6220';
+				const HEIR = 'int_01ARZ3NDEKTSV4RRFFQ69H6221';
+				captureIntent(DEAD);
+				captureIntent(HEIR);
+				ok(dispatch('SupersedeIntent', { supersedingIntentId: HEIR }, DEAD, 'INTENT'), `supersede ${DEAD}`);
+				// CONTROL: the SAME command against a LIVE intent. A handler that refused every proposal — or one that
+				// reused the READINESS set and so refused RAW — cannot green this row.
+				const LIVE = 'int_01ARZ3NDEKTSV4RRFFQ69H6222';
+				captureIntent(LIVE);
+				return {
+					control: proposePwuAgainstIntent('pwu_01ARZ3NDEKTSV4RRFFQ69H6223', LIVE),
+					observed: proposePwuAgainstIntent('pwu_01ARZ3NDEKTSV4RRFFQ69H6224', DEAD)
+				};
+			}
+		},
 		// ── THE FIRST SCHEMA-LAYER ROW (2026-08-02) ────────────────────────────────────────────────────────────
 		'RPH-CON-001': null,
 		'RPH-CON-003': null,

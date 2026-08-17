@@ -51,8 +51,37 @@ export interface ClauseProvenance {
 /** The statement's own provenance is the FIRST thing the citation names. */
 const AUTHORED_AT_CANON = /^(NEW\b|session consensus)/i;
 
-/** Every clause-keyed entry across the canon provenance sidecars, in either line format. */
+/**
+ * The register's lines, READ AND SPLIT ONCE — REG-F-116, and the third file to carry the same defect.
+ *
+ * ⚠ `ratifyingActsFor` IS CALLED PER CLAUSE AND WAS RE-READING THE WHOLE REGISTER EACH TIME. That file is over
+ * 3100 lines and **grows with every finding recorded**, so this cost rose every time this programme did its job —
+ * which is exactly what V-4a found in `enforcement-register.test.ts` and exactly why that one eventually tipped a
+ * timeout and blocked the mutation gate on a false verdict.
+ *
+ * MEASURED UNDER LOAD, WHICH IS THE CONDITION THAT MATTERS. In isolation this file's PINNED test costs 1489ms; with
+ * a second vitest running it costs **15933ms and TIMES OUT**. The amplification is ~10×, which is far more than CPU
+ * contention explains — it is I/O contention between workers, and the fix is to stop asking for the same bytes.
+ */
+let registerLines: readonly string[] | undefined;
+function registerLinesOnce(): readonly string[] {
+	registerLines ??= readFileSync(REGISTER, 'utf8').split('\n');
+	return registerLines;
+}
+
+/**
+ * Every clause-keyed entry across the canon provenance sidecars, in either line format.
+ *
+ * ⚠ MEMOIZED, because `provenanceOf(clause)` calls this ONCE PER CLAUSE and it re-read every sidecar in `docs/canon`
+ * each time. Same defect as the register read above, same fix, found in the same sweep.
+ */
+let clauseIndex: Map<string, ClauseProvenance> | undefined;
 export function provenanceIndex(): Map<string, ClauseProvenance> {
+	clauseIndex ??= buildProvenanceIndex();
+	return clauseIndex;
+}
+
+function buildProvenanceIndex(): Map<string, ClauseProvenance> {
 	const out = new Map<string, ClauseProvenance>();
 	for (const file of readdirSync(CANON).sort()) {
 		if (!file.includes('provenance.md')) continue;
@@ -95,16 +124,33 @@ export function provenanceOf(clause: string): ClauseProvenance | undefined {
 export function ratifyingActsFor(clause: string): string[] {
 	const acts: string[] = [];
 	let current: string | undefined;
-	for (const line of readFileSync(REGISTER, 'utf8').split('\n')) {
+	for (const line of registerLinesOnce()) {
 		const heading = /^#{2,4}\s+(REG-[A-Z]-\d+)\b/.exec(line);
 		if (heading) {
 			current = heading[1]!.startsWith('REG-D-') ? heading[1] : undefined;
 			continue;
 		}
 		if (!current) continue;
-		// Literal, not tolerant: censused across the register as 180 × `- **Merge target:** ` and 1 ×
-		// `- **Merge targets (a…`. Optional quantifiers here only bought SonarLint S8786 backtracking, and the
-		// paired test pins the population so a narrowing that loses lines fails there rather than silently.
+		// Literal, not tolerant: re-censused across the register 2026-08-13 (~~180~~) as 216 × `- **Merge target:** ` and 1 ×
+		// `- **Merge targets (a…`. The optional quantifiers exist for that second form; they also draw SonarLint
+		// S8786, so the tempting edit is to narrow this to `/^- \*\*Merge target:\*\* (.*)$/`.
+		//
+		// ⚠ DO NOT, AND DO NOT TRUST THE PAIRED TEST TO STOP YOU (REG-F-125's sweep). This line used to read
+		// *"the paired test pins the population so a narrowing that loses lines fails there rather than
+		// silently"* — and that was FALSE ON THE DAY IT WAS WRITTEN. **Measured, by making the narrowing and
+		// running the suite: `canon-provenance.test.ts` passes 7/7 while the REG-D merge lines this reader sees
+		// drop 42 → 41.** What is lost is REG-D-014's `- **Merge targets (applied same date):**`.
+		//
+		// THE REASON THE TEST CANNOT SEE IT is worth stating, because it bounds what the test CAN hold: the final
+		// control pins the RESULT — which clauses in the 69-entry index carry a ratifying act — and NOT the
+		// population of merge lines. A lost line is therefore invisible unless its target names an INDEXED CLAUSE,
+		// and REG-D-014's targets are artifact versions (`CON-000 v1.2.0; DOC-002 v1.1.0; …`), not clause ids.
+		// So the guard is real but PARTIAL: it catches a narrowing that changes which clauses carry acts, and
+		// nothing else.
+		//
+		// The consequence of getting this wrong is not cosmetic: `ratifyingActsFor` under-reporting makes a clause
+		// look unratified, which is what B3 reads to decide whether a divergence was permitted — a governing
+		// clause reported DEFECTIVE because a regex stopped matching. Re-census the register before narrowing.
 		const merge = /^- \*\*Merge targets?[:*]{0,3} ?(.*)$/.exec(line.trim());
 		if (!merge) continue;
 		// ⚠ TRAP 2, THIRD FORM — and I caused this one myself, minutes after gating against the first two.

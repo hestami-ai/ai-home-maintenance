@@ -28,7 +28,10 @@ export const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
 		'MECHANICALLY UN-WRITABLE — not unbuilt, impossible — and this is a citation rather than a resemblance: ' +
 		'the schema decides it, no judgement is being exercised. ' +
 		'SUCCESSOR: `AssuranceAssessment.state`, which really does perform six of the nine transitions the dead ' +
-		'machine describes (assurance.ts:1826, :1898). ' +
+		'machine describes — the six `machine: AssuranceAssessment.state` transition sites in assurance.ts. ' +
+		'CITED BY SYMBOL: the citation that stood here, `assurance.ts:1826, :1898`, never resolved FROM THIS ' +
+		'FILE. It was copied in from the register without being re-resolved, and on the day this file was ' +
+		'created neither number was a machine site. ' +
 		'NOT AN EXEMPTION: an EXEMPT entry would record "deliberately unbuilt", which is false — this cannot be ' +
 		'built without adding a field the ratified schema forbids. ' +
 		'⚠ THE ARROWS STAY IN transitions.data.ts DELIBERATELY. That file is GENERATED from ' +
@@ -38,7 +41,7 @@ export const NOT_STATE_MACHINES: Readonly<Record<string, string>> = {
 		'and two binding rows in rph-contracts/vocab/m3-commands-events.json named this dead axis as the machine ' +
 		'they drive, both wrong twice over — RequestAssuranceAssessment recorded `(initial) -> PENDING` when the ' +
 		'handler BIRTHS at EVIDENCE_PENDING/READY, and CompleteAssuranceAssessment was recorded here when ' +
-		'assurance.ts:1898 names `AssuranceAssessment.state`. ' +
+		'completeAssuranceAssessment names `AssuranceAssessment.state` at three sites in assurance.ts. ' +
 		"⚠ CORRECTION TO THIS NOTE'S OWN EARLIER TEXT: it said correcting those rows moves C-0's arrow total. IT " +
 		'DOES NOT. The total is computed over STATE_MACHINES, generated from m2-transitions.json; the corrected ' +
 		'rows are in m3-commands-events.json, which feeds messages.ts and nothing else. Measured: the ' +

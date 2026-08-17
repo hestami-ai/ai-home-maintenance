@@ -22,7 +22,13 @@
 import { readFileSync } from 'node:fs';
 import { BINDINGS } from '@janumipwb/rph-contracts';
 import { STATE_MACHINES, isExcludedMachine } from '@janumipwb/rph-domain';
-import { arrowKey, birthStates, occupiable } from './arrow-command-census.js';
+import {
+	arrowKey,
+	birthStates,
+	occupancyAnalysable,
+	occupiable,
+	provablyUnoccupiable
+} from './arrow-command-census.js';
 
 const VOCAB = new URL('../packages/rph-contracts/vocab/m3-commands-events.json', import.meta.url);
 
@@ -168,7 +174,34 @@ function auditTokens(c: TransitionClaim, bag: Bag): void {
 	}
 }
 
-/** Occupancy, for a machine whose births are declared and therefore analysable. */
+/**
+ * The deadness claim that needs NO arrow coverage — see `provablyUnoccupiable` (REG-F-118).
+ *
+ * A state the ratified machine gives no in-arrow, and no birth declares, can never hold an object: the arrows that
+ * would rescue it do not exist to be declared. So this fires on machines whose coverage is partial, where the
+ * occupancy argument below is worthless — which is exactly the case REG-F-088 rests on.
+ */
+function auditProvablyDead(c: TransitionClaim, unoccupiable: ReadonlySet<string>, bag: Bag): void {
+	if (unoccupiable.size === 0) return;
+	for (const s of statesOf(c.machine, c.from)) {
+		if (!unoccupiable.has(s)) continue;
+		bag.deadFrom.push(`${show(c)}  [from ${s} is never occupied]`);
+		for (const t of statesOf(c.machine, c.to)) bag.deadFromArrows.push(arrowKey(c.machine, s, t));
+	}
+	for (const s of statesOf(c.machine, c.to)) {
+		if (unoccupiable.has(s)) bag.deadTo.push(`${show(c)}  [to ${s} is never occupied]`);
+	}
+}
+
+/**
+ * Occupancy, for a machine whose births are declared AND whose arrows are completely declared.
+ *
+ * ⚠ ITS ONE-LINE DOCSTRING SPENT THREE COMMITS ABOVE `auditProvablyDead` INSTEAD (REG-F-120), because that
+ * function was inserted beneath it. It read *"for a machine whose births are declared and therefore analysable"* —
+ * which was true when written and became WRONG in the same session: REG-F-118 established that a birth is NOT
+ * sufficient, because `occupiable()` under-estimates while any arrow is undeclared. So the stray line asserted the
+ * superseded rule, sitting above the function that embodies the replacement. Restored to its owner and corrected.
+ */
 function auditOccupancy(c: TransitionClaim, occupied: ReadonlySet<string>, bag: Bag): void {
 	for (const s of statesOf(c.machine, c.from)) {
 		if (occupied.has(s)) continue;
@@ -185,7 +218,7 @@ function auditOccupancy(c: TransitionClaim, occupied: ReadonlySet<string>, bag: 
  *
  * `(initial) -> X` says this command brings the object into existence in X, so X must be a state some handler
  * DECLARES it births into — not merely a state reachable later by some other command. Both bad rows landed on
- * their machine's declared `initialState`, which REG-F-071 measured as a fiction on four machines: the author
+ * their machine's declared `initialState`, which REG-F-071 measured as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125): the author
  * read the diagram's entry point instead of the arrow the command actually takes. Occupancy alone would have
  * missed a landing state that some LATER command can reach; only the birth set answers "created where".
  */
@@ -199,6 +232,8 @@ function auditBirth(c: TransitionClaim, born: ReadonlySet<string>, bag: Bag): vo
 export function auditClaims(claims: readonly TransitionClaim[]): Audit {
 	const occ = occupiable();
 	const births = birthStates();
+	const analysable = occupancyAnalysable();
+	const provable = provablyUnoccupiable();
 	const bag: Bag = {
 		excluded: [],
 		unknown: [],
@@ -221,11 +256,18 @@ export function auditClaims(claims: readonly TransitionClaim[]): Audit {
 		}
 		auditTokens(c, bag);
 		const occupied = occ.get(c.machine);
-		if (!occupied) {
-			bag.unanalysed.add(c.machine);
-			continue;
-		}
-		auditOccupancy(c, occupied, bag);
+		// ⚠ THE COMPLETENESS RULE GATES **OCCUPANCY ONLY**, AND SCOPING IT WIDER WAS A REAL MISTAKE THIS CONTROL
+		// CAUGHT (REG-F-118). `auditOccupancy` files `deadFrom`/`deadTo` — UNREACHABILITY claims, unsound while a
+		// machine's arrows are partly undeclared, because `occupiable()` then UNDER-estimates. `auditBirth` is a
+		// different question entirely: it asks whether a creation claim lands where a handler DECLARES a birth,
+		// which reads `births` and never consults occupancy. Gating both behind one `continue` silently disabled a
+		// SOUND check — and the control that pins the five REG-F-068 rows in their right buckets went red, which is
+		// exactly what a control is for. **A soundness rule applied one scope too wide removes true findings.**
+		// THE SOUND GROUND FIRST: states the RATIFIED machine gives no in-arrow and no birth declares are dead
+		// whatever the coverage. Only the weaker occupancy argument needs completeness.
+		auditProvablyDead(c, provable.get(c.machine) ?? new Set<string>(), bag);
+		if (occupied && analysable.has(c.machine)) auditOccupancy(c, occupied, bag);
+		else bag.unanalysed.add(c.machine);
 		auditBirth(c, births.get(c.machine) ?? new Set<string>(), bag);
 	}
 

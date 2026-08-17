@@ -473,7 +473,10 @@ describe('JPWB generated state-machine topology observer', () => {
 		expect(outcome.outcome).toBe('complete');
 		expect(outcome.observation.coverage).toMatchObject({
 			crossAxisRules: 11,
-			legalTransitions: 304,
+			// 304 -> 308: W-5.5's UnblockPwu adds four transitions. ⚠ REG-F-194 recorded this remedy as
+			// "308 -> 312" and cited subject.test.ts:1707; both figures are wrong. Re-derived from the
+			// assertion diff and corroborated by counting the delta in transitions.data.ts (+4).
+			legalTransitions: 308,
 			machines: 27,
 			reconciles: true
 		});
