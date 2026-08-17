@@ -167,7 +167,7 @@ control and declare the leaked-report mutant on the same day.** This is not book
 
 ---
 
-### W-6 — The latent twin (scheduled, not bundled)
+### W-6 — The latent twin (✅ LANDED 2026-08-17, `a8cd9a1b` + `326118c2`)
 
 Retire the identical enumeration in `providers/jpwb-arrow-command-census/artifact-set.ts:148`.
 
@@ -175,6 +175,13 @@ Retire the identical enumeration in `providers/jpwb-arrow-command-census/artifac
 therefore needs C1's synthetic-subject treatment in its own right, or it is a change with no control. Open
 question 2 in the design asks whether this belongs here or in W-2; the honest default is here, so that a
 no-op change cannot ride in on another increment's green.
+
+**Outcome.** Landed with two synthetic-subject controls and THREE driven mutants (all KILLED, each reddening
+exactly one test). ⚠ **The "or it is a change with no control" clause was more binding than this roadmap knew:**
+the end-to-end capsule run that could have covered for a missing control is gated behind `CSAA_REPOSITORY_SMOKE=1`,
+is in neither `gate` nor `gate:fast` nor CI, and FAILS on `main` before reaching the arrow census — REG-F-196
+Finding 1. ⚠ **And the first mutant KILLED for a mechanism I had recorded wrongly**, which concealed a third guard
+whose failure is the only silent one of the three — REG-F-196 Finding 3.
 
 ---
 
