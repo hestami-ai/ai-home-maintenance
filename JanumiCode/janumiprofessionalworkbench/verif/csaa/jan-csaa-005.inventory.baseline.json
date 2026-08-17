@@ -720,7 +720,7 @@
       "state": "PARTIAL"
     },
     {
-      "explanation": "The ninth bounded DWP-004 increment implements the WRAP strategy through exact adapter jan-csaa-jpwb-guard-enforcement-ledger and method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0, preserving every retained guarded-arrow occurrence, distinct guard text, ledger classification, enforcement citation, anchor, and audit finding from the JPWB guard-enforcement ledger. It binds exact FrozenSubject artifacts, executes the retained analyzer and data exports in an isolated temporary byte capsule, verifies subject and executor integrity, and publishes deterministic raw and normalized evidence without changing the RETAINED_DELEGATED verifier authority, test gate, oracle, baseline, or source implementation. Process isolation is not a hostile-code security sandbox, retained subject initializers may execute inside the capsule, and worker duration/output guards cannot confine an intentionally detached descendant process. Public in-memory exact-shape validation must enumerate already-materialized plain-object keys; maxRecords bounds containers and array entries but is not a transport byte ceiling or an object-key enumeration bound. The retained Vitest authority is identity-bound but NOT_EXECUTED_BY_CSAA. Ledger classifications remain retained repository judgments: this wrapper does not prove guard dominance, reachability, runtime enforcement, command performability, effects, events, persistence behavior, replacement equivalence, or full JAN-CSAA-007/008 conformance.",
+      "explanation": "The ninth bounded DWP-004 increment implements the WRAP strategy through exact adapter jan-csaa-jpwb-guard-enforcement-ledger and method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0, preserving every retained guarded-arrow occurrence, distinct guard text, ledger classification, enforcement citation, anchor, and audit finding from the JPWB guard-enforcement ledger. It derives capsule membership as the transitive relative-import closure of the retained analyzer and data roots over frozen subject bytes, binds each closure member as an exact ANALYZER_DEPENDENCY_SOURCE FrozenSubject artifact fail-closed with no partial closure, and reports every undecidable specifier as a POPULATION_RECONCILIATION_FAILED diagnostic rather than dropping it silently. It executes the retained analyzer and data exports in an isolated temporary byte capsule, verifies subject and executor integrity, and publishes deterministic raw and normalized evidence without changing the RETAINED_DELEGATED verifier authority, test gate, oracle, baseline, or source implementation. Process isolation is not a hostile-code security sandbox, retained subject initializers may execute inside the capsule, and worker duration/output guards cannot confine an intentionally detached descendant process. Public in-memory exact-shape validation must enumerate already-materialized plain-object keys; maxRecords bounds containers and array entries but is not a transport byte ceiling or an object-key enumeration bound. The retained Vitest authority is identity-bound but NOT_EXECUTED_BY_CSAA. Ledger classifications remain retained repository judgments: this wrapper does not prove guard dominance, reachability, runtime enforcement, command performability, effects, events, persistence behavior, replacement equivalence, or full JAN-CSAA-007/008 conformance.",
       "id": "guard-enforcement-ledger",
       "provenance": [
         "packages/csaa/src/contracts/guard-enforcement-ledger.ts",
@@ -732,6 +732,7 @@
         "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts",
         "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "verif/guard-enforcement-ledger.data.ts",
         "verif/guard-enforcement-ledger.test.ts",
         "verif/guard-enforcement-ledger.ts"
@@ -794,6 +795,7 @@
         "packages/csaa/src/semantic/raw-semantic-model.ts",
         "packages/csaa/src/semantic/repository-smoke.test.ts",
         "packages/csaa/src/semantic/validate-snapshot.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.baseline.json",
         "verif/arrow-command-census.test.ts",
@@ -5619,7 +5621,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "5778e9fe1e98e853e606d025204b3788daf1343c5540f1911825cd4f98ae8c7f",
+    "fileManifestDigest": "1bad89f5e9051bdca507f028a23fcc745c24a8e0e01a10f2ca74969fb1a75d64",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -7576,16 +7578,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 119193,
+        "bytes": 119838,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "deb65d51dc19a8d6f3739985b54540fce6ec1c678fe4ec7e68a454c8b57b43a7",
+        "sha256": "e7996d0262bc800c04e582a915d54b501e148de0c87f285788684e92c9e1edc4",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 132210,
+        "bytes": 132463,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "04e215b302c3dd0ee17b389e98a56bde70c52ddd9f0e597f6d15dfc851f88683",
+        "sha256": "dd4f21c86638d4b80ad3007c6954e8796a84c62d1da73e64339cabf773cf8ec5",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -12321,7 +12323,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "bc035c6613ae5bd6b58766e5440d9468810568772b547c4993b4246d3889f7c3",
+    "subjectId": "c959cd119d9b7738b2b4f4916ded18f5cb3ad7642afdae2f7af295e455edaf86",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14515,6 +14517,7 @@
         "packages/csaa/src/semantic/validate-snapshot.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.test.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
         "packages/rph-contracts/vocab/m3-commands-events.json",
@@ -14639,6 +14642,7 @@
         "packages/csaa/src/semantic/validate-declaration-context-analysis.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.test.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
         "packages/rph-contracts/vocab/m3-commands-events.json",

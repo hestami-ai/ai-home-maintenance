@@ -195,5 +195,5 @@ W-4 is the only increment that may drop the REG-F-123 commit caveat.
 
 The 43 literal `verif/…` path sites across 14 non-test files (21 of them in `collect-inventory.ts`, including a
 `path === 'verif/arrow-command-census.ts'` special-case in the generator that publishes JAN-CSAA-005), and
-JAN-CSAA-005:347's generated over-claim that the provider "binds exact FrozenSubject artifacts". Both are recorded
+~~JAN-CSAA-005's generated over-claim~~ (**✅ corrected at its generator, `collect-inventory.ts`, and regenerated; the doc cell had meanwhile drifted from :347 to :355**). Both are recorded
 in the design's §8 and in REG-F-195, so the next occurrence is met with a record rather than a surprise.

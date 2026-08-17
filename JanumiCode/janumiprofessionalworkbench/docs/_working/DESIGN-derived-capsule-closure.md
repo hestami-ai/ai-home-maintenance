@@ -310,7 +310,7 @@ selector must be re-baselined against the new specifier-naming message, or it be
   `collect-inventory.ts` alone holds 21, including a `path === 'verif/arrow-command-census.ts'` special-case **in
   the very generator that publishes JAN-CSAA-005**. Out of scope here; recorded so the next occurrence is not
   discovered as a surprise.
-* **`JAN-CSAA-005:347`'s over-claim.** The Qualification cell states unqualified that the provider "binds exact
+* ~~**`JAN-CSAA-005`'s over-claim.**~~ **✅ CORRECTED 2026-08-17 at its generator and regenerated.** Originally: The Qualification cell states unqualified that the provider "binds exact
   FrozenSubject artifacts". That text is *generated* from `collect-inventory.ts` `capabilities()` (~:1168) into
   both the document region and `verif/csaa/jan-csaa-005.inventory.baseline.json`. Correcting the wording is a
   **code** change plus regeneration, or the doc and the baseline disagree and `csaa:inventory:check` stays red.

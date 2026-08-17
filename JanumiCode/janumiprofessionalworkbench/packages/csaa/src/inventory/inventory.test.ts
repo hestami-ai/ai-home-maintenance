@@ -2508,6 +2508,9 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/parse-worker-output.ts',
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.ts',
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/worker.ts',
+			// The module that DERIVES capsule membership. It is provenance for the guard-ledger capability even
+			// though it lives under subject/, because the Qualification cell now asserts the derivation.
+			'packages/csaa/src/subject/analyzer-closure.ts',
 			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
 			'packages/csaa/src/contracts/guard-classification-overlay.ts',
 			'packages/csaa/src/graph/build-guard-classification-overlay.ts',
