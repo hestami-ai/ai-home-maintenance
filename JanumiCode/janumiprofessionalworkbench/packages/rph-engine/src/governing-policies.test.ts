@@ -81,7 +81,7 @@ describe('selectGoverningPolicies — the exclusions actually fire (REG-F-029 re
 			selected,
 			'and the rest must survive — the exclusion is one policy, not a collapse'
 		).not.toContain('pol_baseline_promotion');
-		expect(selected.length).toBe(declared.length - 1);
+		expect(selected).toHaveLength(declared.length - 1);
 	});
 
 	it('CONTROL: an ASSESSED PWU excludes nothing — the exclusion above is the data, not the selector', () => {
@@ -93,7 +93,7 @@ describe('selectGoverningPolicies — the exclusions actually fire (REG-F-029 re
 			REFERENCE_UNDERTAKING.architecture
 		);
 		expect(excluded).toEqual([]);
-		expect(selected.length).toBe(declared.length);
+		expect(selected).toHaveLength(declared.length);
 		expect(declared.length, 'architecture declares four policies').toBeGreaterThan(1);
 	});
 

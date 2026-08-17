@@ -287,28 +287,8 @@ export class Engine {
 		//
 		// IDENTITY, NOT PRESENCE: `''` satisfies a NOT NULL column, so a presence-only check would leave a receipt
 		// keyed on nothing and let a second such command collide with it.
-		const missingIdentity = (['commandId', 'correlationId'] as const).filter((field) => {
-			const v: unknown = command[field];
-			return typeof v !== 'string' || v.length === 0;
-		});
-		if (missingIdentity.length > 0) {
-			const cid = typeof command.correlationId === 'string' ? command.correlationId : '';
-			return {
-				commandId: typeof command.commandId === 'string' ? command.commandId : '',
-				status: 'VALIDATION_FAILED',
-				producedEventIds: [],
-				error: makeRphError('RPH_VALIDATION_SCHEMA_FAILED', {
-					message:
-						`Command envelope is missing required identity: ${missingIdentity.join(', ')}. ` +
-						`These identify the command receipt and the event correlation, are NOT NULL in the store, ` +
-						`and cannot be defaulted — a command the engine cannot identify cannot be recorded as having ` +
-						`happened (REG-F-011).`,
-					correlationId: cid,
-					targetObjectIds:
-						typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []
-				})
-			};
-		}
+		const identityRefusal = refuseOnMissingIdentity(command);
+		if (identityRefusal) return identityRefusal;
 
 		const correlationId = command.correlationId;
 		const base = { commandId: command.commandId, producedEventIds: [] as string[] };
@@ -342,8 +322,7 @@ export class Engine {
 		// match against, so an envelope rule can now be cited the way RPH-CON-002 already is.
 		const envelope = validateAgainst(DomainCommandSchema, command, {
 			correlationId,
-			targetObjectIds:
-				typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []
+			targetObjectIds: targetObjectIdsOf(command)
 		});
 		if (!envelope.ok) {
 			return { ...base, status: 'VALIDATION_FAILED', error: envelope.error };
@@ -370,22 +349,9 @@ export class Engine {
 		// would mean two different things — "written before v2" and "we gave up" — and the second is a bypass: claim
 		// a key with a float, and every later reuse of that key skips the payload comparison. One marker, one
 		// meaning.
-		let payloadHash: string;
-		try {
-			payloadHash = contentHash(command.payload);
-		} catch (e) {
-			return {
-				...base,
-				status: 'VALIDATION_FAILED',
-				error: makeRphError('RPH_VALIDATION_SCHEMA_FAILED', {
-					message:
-						`Command payload cannot be canonicalized, so it cannot be bound to its idempotency key: ` +
-						`${e instanceof Error ? e.message : String(e)}`,
-					correlationId,
-					targetObjectIds: [command.targetAggregateId]
-				})
-			};
-		}
+		const hashed = hashPayloadOrRefuse(command, base, correlationId);
+		if ('error' in hashed) return hashed.error;
+		const payloadHash = hashed.payloadHash;
 
 		// 1. Idempotency: a replay of the same idempotencyKey returns the prior result, no new event.
 		const prior = this.store.getReceipt(command.idempotencyKey);
@@ -423,49 +389,7 @@ export class Engine {
 		// `RPH_IDEMPOTENCY_DUPLICATE` is ratified but belongs to the REPLAY, which REG-F-010 records as correctly
 		// carrying no error at all. So the label travels in the message where a reader and a future code can both
 		// find it.
-		const reused = prior
-			? [
-					prior.commandType !== command.commandType ? 'command type' : undefined,
-					prior.targetAggregateId !== command.targetAggregateId ? 'target aggregate' : undefined,
-					// `undefined` is the SKIP, not a mismatch — see above.
-					prior.payloadHash !== undefined && prior.payloadHash !== payloadHash
-						? 'payload'
-						: undefined
-				].filter((d): d is string => d !== undefined)
-			: [];
-		if (prior && reused.length > 0) {
-			this.logger.info('command.idempotency_key_reused', {
-				correlationId,
-				idempotencyKey: command.idempotencyKey,
-				differing: reused.join(', ')
-			});
-			return {
-				...base,
-				status: 'REJECTED',
-				error: makeRphError('RPH_IDEMPOTENCY_CONFLICT', {
-					message:
-						`IDEMPOTENCY_KEY_REUSED: key '${command.idempotencyKey}' was claimed by ` +
-						`${prior.commandType} on ${prior.targetAggregateId}, and this is ` +
-						`${command.commandType} on ${String(command.targetAggregateId)} — differing by ` +
-						`${reused.join(', ')}. A key identifies ONE command; returning the prior result here ` +
-						`would report success for work that never happened (DOC-003 PER-5).`,
-					correlationId,
-					targetObjectIds:
-						typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []
-				})
-			};
-		}
-		if (prior) {
-			this.logger.info('command.duplicate', {
-				correlationId,
-				idempotencyKey: command.idempotencyKey
-			});
-			return {
-				commandId: command.commandId,
-				status: 'DUPLICATE',
-				producedEventIds: [...prior.producedEventIds]
-			};
-		}
+		if (prior) return this.answerFromReceipt(prior, command, base, payloadHash, correlationId);
 
 		// 2. Validate the command payload against its contract.
 		const spec = (COMMANDS as unknown as Record<string, CommandSpec | undefined>)[
@@ -510,6 +434,57 @@ export class Engine {
 			logger: this.logger
 		};
 		return handler(ctx, command, parsed.value);
+	}
+
+	/**
+	 * Step 1's answer once a receipt for this idempotency key EXISTS: either the key was reused for a different
+	 * command (REJECTED, with the differing dimensions named) or this is a genuine replay (DUPLICATE, carrying the
+	 * prior result and no error). Extracted verbatim from `dispatchStamped`; the comparison set, the log events and
+	 * the two returned shapes are unchanged.
+	 */
+	private answerFromReceipt(
+		prior: CommandReceipt,
+		command: StampedCommand,
+		base: ResultBase,
+		payloadHash: string,
+		correlationId: string
+	): CommandResult {
+		const reused = [
+			prior.commandType !== command.commandType ? 'command type' : undefined,
+			prior.targetAggregateId !== command.targetAggregateId ? 'target aggregate' : undefined,
+			// `undefined` is the SKIP, not a mismatch — see the idempotency note in `dispatchStamped`.
+			prior.payloadHash !== undefined && prior.payloadHash !== payloadHash ? 'payload' : undefined
+		].filter((d): d is string => d !== undefined);
+		if (reused.length > 0) {
+			this.logger.info('command.idempotency_key_reused', {
+				correlationId,
+				idempotencyKey: command.idempotencyKey,
+				differing: reused.join(', ')
+			});
+			return {
+				...base,
+				status: 'REJECTED',
+				error: makeRphError('RPH_IDEMPOTENCY_CONFLICT', {
+					message:
+						`IDEMPOTENCY_KEY_REUSED: key '${command.idempotencyKey}' was claimed by ` +
+						`${prior.commandType} on ${prior.targetAggregateId}, and this is ` +
+						`${command.commandType} on ${String(command.targetAggregateId)} — differing by ` +
+						`${reused.join(', ')}. A key identifies ONE command; returning the prior result here ` +
+						`would report success for work that never happened (DOC-003 PER-5).`,
+					correlationId,
+					targetObjectIds: targetObjectIdsOf(command)
+				})
+			};
+		}
+		this.logger.info('command.duplicate', {
+			correlationId,
+			idempotencyKey: command.idempotencyKey
+		});
+		return {
+			commandId: command.commandId,
+			status: 'DUPLICATE',
+			producedEventIds: [...prior.producedEventIds]
+		};
 	}
 
 	/**
@@ -664,5 +639,76 @@ export class Engine {
 		const recovered = this.drainOutbox();
 		if (recovered > 0) this.logger.info('outbox.recovered', { count: recovered });
 		return recovered;
+	}
+}
+
+/** The persisted receipt as the store hands it back — narrowed to the present case. */
+type CommandReceipt = NonNullable<ReturnType<StorageAdapter['getReceipt']>>;
+
+/** The two envelope fields every refusal in the pipeline carries; spread into each returned result. */
+type ResultBase = { commandId: string; producedEventIds: string[] };
+
+/**
+ * The `targetObjectIds` an error carries when the field may not be a string at all — the DEFENSIVE form used on
+ * the paths that run before (or independently of) envelope validation. Paths that run after it keep addressing
+ * `[command.targetAggregateId]` directly, exactly as before.
+ */
+function targetObjectIdsOf(command: StampedCommand): string[] {
+	return typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : [];
+}
+
+/**
+ * REG-F-011's crash half, extracted: refuse a command missing either NOT NULL identity field, or `undefined` to
+ * continue. IDENTITY, NOT PRESENCE — `''` satisfies a NOT NULL column and would leave a receipt keyed on nothing.
+ */
+function refuseOnMissingIdentity(command: StampedCommand): CommandResult | undefined {
+	const missingIdentity = (['commandId', 'correlationId'] as const).filter((field) => {
+		const v: unknown = command[field];
+		return typeof v !== 'string' || v.length === 0;
+	});
+	if (missingIdentity.length === 0) return undefined;
+	const cid = typeof command.correlationId === 'string' ? command.correlationId : '';
+	return {
+		commandId: typeof command.commandId === 'string' ? command.commandId : '',
+		status: 'VALIDATION_FAILED',
+		producedEventIds: [],
+		error: makeRphError('RPH_VALIDATION_SCHEMA_FAILED', {
+			message:
+				`Command envelope is missing required identity: ${missingIdentity.join(', ')}. ` +
+				`These identify the command receipt and the event correlation, are NOT NULL in the store, ` +
+				`and cannot be defaulted — a command the engine cannot identify cannot be recorded as having ` +
+				`happened (REG-F-011).`,
+			correlationId: cid,
+			targetObjectIds: targetObjectIdsOf(command)
+		})
+	};
+}
+
+/**
+ * Step 0c, extracted: hash the payload so the idempotency key can be bound to it, or produce the classified
+ * refusal. `contentHash` THROWS on content canonical JSON rejects (a non-integer number), and `dispatch`'s
+ * contract is that it RETURNS a CommandResult — so the throw is converted here rather than escaping outward.
+ */
+function hashPayloadOrRefuse(
+	command: StampedCommand,
+	base: ResultBase,
+	correlationId: string
+): { payloadHash: string } | { error: CommandResult } {
+	try {
+		return { payloadHash: contentHash(command.payload) };
+	} catch (e) {
+		return {
+			error: {
+				...base,
+				status: 'VALIDATION_FAILED',
+				error: makeRphError('RPH_VALIDATION_SCHEMA_FAILED', {
+					message:
+						`Command payload cannot be canonicalized, so it cannot be bound to its idempotency key: ` +
+						`${e instanceof Error ? e.message : String(e)}`,
+					correlationId,
+					targetObjectIds: [command.targetAggregateId]
+				})
+			}
+		};
 	}
 }

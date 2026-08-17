@@ -103,7 +103,7 @@ export function resolveWaiverAuthorization(
 
 	// ASR-15 version-binding, and ASR-14 states the same rule from the waiver side in the sentence quoted above:
 	// a decision approving version n never authorizes version n+1.
-	const pinned = (decision.subjectSemanticVersions ?? {})[query.pwuId];
+	const pinned = decision.subjectSemanticVersions?.[query.pwuId];
 	if (pinned !== query.pwuSemanticVersion)
 		return {
 			ok: false,

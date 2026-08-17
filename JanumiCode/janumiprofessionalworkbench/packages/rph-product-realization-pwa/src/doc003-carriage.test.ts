@@ -49,7 +49,8 @@ const lines = readFileSync(DOC003, 'utf8').split(/\r?\n/);
 /** The contiguous `* item;` run beginning after the first line matching `anchor`. Throws if the anchor is gone. */
 function bulletsAfter(anchor: RegExp): string[] {
 	const at = lines.findIndex((l) => anchor.test(l.trim()));
-	if (at < 0) throw new Error(`RPH-DOC-003 no longer contains the anchor ${anchor} — the corpus moved.`);
+	if (at < 0)
+		throw new Error(`RPH-DOC-003 no longer contains the anchor ${anchor} — the corpus moved.`);
 	const items: string[] = [];
 	for (let i = at + 1; i < lines.length; i += 1) {
 		const line = lines[i]!.trim();
@@ -133,7 +134,9 @@ describe('REG-F-183 — every RPH-DOC-003 ontology population the seed claims to
 		// off-by-one was found in the first place (REG-F-183).
 		expect(runs.map((r) => r.length)).toEqual([5, 5, 6]);
 		const missing = runs.flat().filter((c) => !carries(c));
-		expect(missing, 'a profile selection criterion is not carried in the ratified wording').toEqual([]);
+		expect(missing, 'a profile selection criterion is not carried in the ratified wording').toEqual(
+			[]
+		);
 	});
 
 	// ── THE INPUTS TRANSCRIPTION, WHICH IS A CONVENTION THE SEED ALREADY FOLLOWS ────────────────────────────
@@ -170,7 +173,14 @@ describe('REG-F-183 — every RPH-DOC-003 ontology population the seed claims to
 						items.push(t.slice(2).replace(/[;.]$/, ''));
 					}
 					if (items.length > 0)
-						out.push({ n: m[1]!, kind: m[2]!.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_'), items });
+						out.push({
+							n: m[1]!,
+							kind: m[2]!
+								.trim()
+								.toUpperCase()
+								.replace(/[^A-Z0-9]+/g, '_'),
+							items
+						});
 					break;
 				}
 			});
@@ -194,7 +204,7 @@ describe('REG-F-183 — every RPH-DOC-003 ontology population the seed claims to
 			const inputs: readonly string[] = tpl !== undefined && 'inputs' in tpl ? tpl.inputs : [];
 			expect(
 				[...inputs],
-				'The seeded template no longer transcribes its section\'s inputs list exactly. Both divergences ' +
+				"The seeded template no longer transcribes its section's inputs list exactly. Both divergences " +
 					'this gate was built on were invisible to every other check: §8 REORDERED "user\'s originating ' +
 					'expression" into "originating user expression", and §18 DROPPED a word from "approved PWU ' +
 					'Instance shape". A word-bag or content search passes both. Restore the ratified wording; do ' +
@@ -209,7 +219,7 @@ describe('REG-F-183 — every RPH-DOC-003 ontology population the seed claims to
 	// also produces. These hold the discriminating half.
 	it('CONTROL — the reader resolves the real document, not an empty one', () => {
 		expect(lines.length, 'RPH-DOC-003 did not load').toBeGreaterThan(1000);
-		expect(POPULATIONS.flatMap((p) => p.items).length).toBe(20);
+		expect(POPULATIONS.flatMap((p) => p.items)).toHaveLength(20);
 	});
 
 	it('CONTROL — `carries` REJECTS a phrase of the same shape that is not in the seed', () => {

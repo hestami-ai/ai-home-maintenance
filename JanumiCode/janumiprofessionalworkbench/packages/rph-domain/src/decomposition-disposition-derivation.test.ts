@@ -58,8 +58,8 @@ describe('ValidateDecomposition.disposition is derived from the ratified machine
 		// Both sides must be non-trivial. An empty machine query and an unconstrained schema would agree on `[]`,
 		// and the assertion above would pass while measuring nothing — which is precisely the failure that let this
 		// field ship as `z.string()` in the first place.
-		expect(outcomesOfValidating().length).toBe(3);
-		expect(admittedDispositions().length).toBe(3);
+		expect(outcomesOfValidating()).toHaveLength(3);
+		expect(admittedDispositions()).toHaveLength(3);
 	});
 
 	it('does NOT admit the three non-outcome states, which the nearest ratified enum would have', () => {

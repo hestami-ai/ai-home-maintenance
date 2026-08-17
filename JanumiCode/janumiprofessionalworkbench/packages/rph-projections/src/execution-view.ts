@@ -28,6 +28,7 @@ import {
 	getMachine,
 	inEdgeDisposition,
 	STEP_COMMAND_SPECS,
+	type StepCommandSpec,
 	type StepCommandType,
 	// RW-6: the read-model consults the SAME decision the engine does, rather than re-deriving RPH-EXE-003's four
 	// checks and their load-bearing order.
@@ -386,6 +387,49 @@ const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(
 );
 
 /**
+ * BOTH refusals the `retryBudget` column governs, read off that ONE column (extracted from `planPermitsAffordance`,
+ * whose limbs are otherwise one `if` each). Returns true when the column does not govern this command at all.
+ *
+ * ── RPH-EXE-008, the FOURTH authority limb (JAN-RETRYCAP / N-12) ────────────────────────────────────────────
+ *
+ * AND IT IS THE ONE THAT SHOWS THE OTHER THREE WERE NOT ENOUGH. Those three are decided by DECLARED STATE, so
+ * R7's remedy — gate on the spec table's columns — could reach them. This refusal is decided by a COUNT OVER
+ * THE EVENT STREAM, and no column can hold a number that changes every time the step starts. A column-driven
+ * filter is blind to it BY CONSTRUCTION, which is why `retry` was offered on an exhausted step while the engine
+ * refused the click: F-29's fourth instance, in a place the fix for the third could not have covered.
+ *
+ * So the column says WHICH commands the cap governs and the FACTS say WHETHER this one is at it — the same
+ * split as `bindingAuthority` + `bindingAuthorityVerdict`, and for the same reason. The DECISION is
+ * `retryDecision`, the ratified kernel the engine calls; the cap comes from `retryCapFrom`, the same convention
+ * the engine applies. Nothing about RPH-EXE-008 is re-derived here.
+ *
+ * ── DOC-002 §36, the FIFTH authority limb (REG-E-025) ──────────────────────────────────────────────────────
+ *
+ * "Each failure class must map to permitted control actions." A step whose LAST failure class does not permit
+ * RETRY may not be retried, and the engine refuses it — so this read-model must not offer it. Gated on the
+ * same `retryBudget` column as the cap, because that column already names exactly the commands that ARE a
+ * RETRY control action; the decision is the kernel's `isPermittedForFailure`, the same call the handler makes.
+ *
+ * A DIFFERENT REFUSAL FROM THE CAP, not a duplicate of it: the cap counts attempts, this reads what the
+ * failure WAS. A step can be inside its budget and still forbidden to retry. The failure-class limb is asked
+ * FIRST, exactly as it was inline: a class that forbids RETRY refuses without consulting the cap at all.
+ */
+function retryBudgetPermits(
+	spec: StepCommandSpec,
+	retry: RetryInput | undefined,
+	lastFailureClass: string | undefined
+): boolean {
+	if (spec.retryBudget !== 'CONSUMES_RETRY_BUDGET') return true;
+	if (lastFailureClass !== undefined && !isPermittedForFailure(lastFailureClass, 'RETRY'))
+		return false;
+	if (retry !== undefined) {
+		const decision = retryDecision(retry);
+		if (!decision.mayRetry) return false;
+	}
+	return true;
+}
+
+/**
  * Would the ENGINE accept this affordance under a plan in `planStatus`?
  *
  * Reads `planLiveness` straight off the command's own spec row. That is the whole point: DWP-06 declares "No
@@ -428,37 +472,11 @@ function planPermitsAffordance(
 		const verdict = bindingAuthorityVerdict(binding.stepId, binding);
 		if (!verdict.ok) return false;
 	}
-	// ── RPH-EXE-008, the FOURTH authority limb (JAN-RETRYCAP / N-12) ────────────────────────────────────────────
-	//
-	// AND IT IS THE ONE THAT SHOWS THE OTHER THREE WERE NOT ENOUGH. Those three are decided by DECLARED STATE, so
-	// R7's remedy — gate on the spec table's columns — could reach them. This refusal is decided by a COUNT OVER
-	// THE EVENT STREAM, and no column can hold a number that changes every time the step starts. A column-driven
-	// filter is blind to it BY CONSTRUCTION, which is why `retry` was offered on an exhausted step while the engine
-	// refused the click: F-29's fourth instance, in a place the fix for the third could not have covered.
-	//
-	// So the column says WHICH commands the cap governs and the FACTS say WHETHER this one is at it — the same
-	// split as `bindingAuthority` + `bindingAuthorityVerdict`, and for the same reason. The DECISION is
-	// `retryDecision`, the ratified kernel the engine calls; the cap comes from `retryCapFrom`, the same convention
-	// the engine applies. Nothing about RPH-EXE-008 is re-derived here.
-	// ── DOC-002 §36, the FIFTH authority limb (REG-E-025) ──────────────────────────────────────────────────────
-	//
-	// "Each failure class must map to permitted control actions." A step whose LAST failure class does not permit
-	// RETRY may not be retried, and the engine refuses it — so this read-model must not offer it. Gated on the
-	// same `retryBudget` column as the cap, because that column already names exactly the commands that ARE a
-	// RETRY control action; the decision is the kernel's `isPermittedForFailure`, the same call the handler makes.
-	//
-	// A DIFFERENT REFUSAL FROM THE CAP, not a duplicate of it: the cap counts attempts, this reads what the
-	// failure WAS. A step can be inside its budget and still forbidden to retry.
-	if (
-		spec.retryBudget === 'CONSUMES_RETRY_BUDGET' &&
-		lastFailureClass !== undefined &&
-		!isPermittedForFailure(lastFailureClass, 'RETRY')
-	)
-		return false;
-	if (spec.retryBudget === 'CONSUMES_RETRY_BUDGET' && retry !== undefined) {
-		const decision = retryDecision(retry);
-		if (!decision.mayRetry) return false;
-	}
+	// ── The `retryBudget` column's TWO refusals — RPH-EXE-008's cap (N-12) and DOC-002 §36's failure-class mapping
+	// (REG-E-025) — both live in `retryBudgetPermits`, which reads the column ONCE. Extracted whole rather than
+	// split, because they are the two halves of one column's meaning and asking them apart is what let the second
+	// one ship without the first noticing. Order inside the helper is the order they had here.
+	if (!retryBudgetPermits(spec, retry, lastFailureClass)) return false;
 	// ── RPH-EXE-005, the FIFTH limb (N-21) ─────────────────────────────────────────────────────────────────────
 	//
 	// Gated on the COLUMN, so both arrows into RUNNING are covered by one line and a tenth command declaring
@@ -881,7 +899,8 @@ function withResolvedAuthority(
 		...withPwu,
 		steps: withPwu.steps.map((s) => {
 			if (s.runtimeBinding !== undefined) return s; // the row already knows better than the map
-			const facts = s.runtimeBindingId === undefined ? undefined : bindingFactsById[s.runtimeBindingId];
+			const facts =
+				s.runtimeBindingId === undefined ? undefined : bindingFactsById[s.runtimeBindingId];
 			return facts === undefined ? s : { ...s, runtimeBinding: facts };
 		})
 	};

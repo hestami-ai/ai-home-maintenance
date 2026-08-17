@@ -83,9 +83,10 @@ export function requireGoverningPolicies(handle: EngineHandle, pwuId: string): r
 	const { selected, excluded, declared } = selectGoverningPolicies(handle, pwuId);
 	if (selected.length === 0) {
 		const kind = (handle.loadObject(pwuId)?.state as { pwuKind?: string } | undefined)?.pwuKind;
+		const excludedList = excluded.map((e) => `${e.policyId}: ${e.reason}`).join('; ') || 'n/a';
 		throw new Error(
 			`No policy governs ${pwuId} (${String(kind)}). Declared [${declared.join(', ') || 'nothing'}]; ` +
-				`excluded [${excluded.map((e) => `${e.policyId}: ${e.reason}`).join('; ') || 'n/a'}]. A PWU nothing ` +
+				`excluded [${excludedList}]. A PWU nothing ` +
 				`can assess cannot be driven to a disposition — RPH-PWU-006 requires an assessment behind it.`
 		);
 	}

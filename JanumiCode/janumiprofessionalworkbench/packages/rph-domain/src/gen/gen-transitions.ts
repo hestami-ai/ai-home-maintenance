@@ -138,25 +138,52 @@ function buildLegalTransitions(
 ): RawTransition[] {
 	const legal: RawTransition[] = [];
 	for (const t of m.transitions) {
-		const before = legal.length;
-		if (stateSet.has(t.to))
-			for (const f of expandFrom(t.from, m.states, terminal)) {
-				if (stateSet.has(f)) legal.push({ ...t, from: f });
-			}
-		const landed = legal.length > before;
-		if (landed && t.unrepresentable)
-			throw new Error(
-				`${m.name}: row "${t.from}" -> ${t.to} is marked unrepresentable and produced ${legal.length - before} ` +
-					`edge(s). One of the two is now wrong — resolve it rather than leaving the row claiming both.`
-			);
-		if (!landed && !t.unrepresentable)
-			throw new Error(
-				`${m.name}: row "${t.from}" -> ${t.to} [${t.trigger ?? 'no trigger'}] produced NO edge and would ` +
-					`have been dropped silently. Either its from-state names something this machine declares (check ` +
-					`the quantifier spellings expandFrom accepts, and read why widening them is usually the wrong ` +
-					`fix), or the row is not an arrow at all — in which case give it an "unrepresentable" reason.`
-			);
+		const edges = expandRowEdges(t, m, stateSet, terminal);
+		assertRowLandedAsDeclared(m, t, edges.length);
+		legal.push(...edges);
 	}
+	return dedupeByEdgeKey(legal);
+}
+
+/**
+ * The concrete same-axis edges ONE raw row lands: nothing at all if the to-state belongs to another axis,
+ * otherwise one edge per expanded from-state that this machine actually declares. Order is the expansion order.
+ */
+function expandRowEdges(
+	t: RawTransition,
+	m: RawMachine,
+	stateSet: Set<string>,
+	terminal: string[]
+): RawTransition[] {
+	if (!stateSet.has(t.to)) return [];
+	const edges: RawTransition[] = [];
+	for (const f of expandFrom(t.from, m.states, terminal)) {
+		if (stateSet.has(f)) edges.push({ ...t, from: f });
+	}
+	return edges;
+}
+
+/**
+ * Fail loud when a row's landed-edge count contradicts what the row DECLARES about itself (REG-F-025):
+ * an `unrepresentable` row must land nothing, and a row without that annotation must land something.
+ */
+function assertRowLandedAsDeclared(m: RawMachine, t: RawTransition, landed: number): void {
+	if (landed > 0 && t.unrepresentable)
+		throw new Error(
+			`${m.name}: row "${t.from}" -> ${t.to} is marked unrepresentable and produced ${landed} ` +
+				`edge(s). One of the two is now wrong — resolve it rather than leaving the row claiming both.`
+		);
+	if (landed === 0 && !t.unrepresentable)
+		throw new Error(
+			`${m.name}: row "${t.from}" -> ${t.to} [${t.trigger ?? 'no trigger'}] produced NO edge and would ` +
+				`have been dropped silently. Either its from-state names something this machine declares (check ` +
+				`the quantifier spellings expandFrom accepts, and read why widening them is usually the wrong ` +
+				`fix), or the row is not an arrow at all — in which case give it an "unrepresentable" reason.`
+		);
+}
+
+/** Keep the FIRST edge for each `from->to` key, preserving order. */
+function dedupeByEdgeKey(legal: RawTransition[]): RawTransition[] {
 	const seen = new Set<string>();
 	return legal.filter((t) => {
 		const k = `${t.from}->${t.to}`;

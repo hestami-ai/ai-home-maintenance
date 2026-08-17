@@ -500,7 +500,10 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
  *  `precondition: fromStates('APPROVED', 'ACTIVE')` (JAN-CMDPRE DWP-05) — the machine's TWO in-arrows to CANCELLED
  *  (ExecutionPlan.status). NONE site: an already-CANCELLED re-issue was a NOOP appending a second ExecutionTerminated.
  *  Both sources are exercised by the mandatory two-source positive fixture (INV-5). */
-export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command: DomainCommand) => {
+export const cancelExecutionPlan: CommandHandler = (
+	ctx: HandlerContext,
+	command: DomainCommand
+) => {
 	const p = command.payload as CancelExecutionPlanPayload;
 	return advanceStatus(ctx, command, {
 		objectType: PLAN,
@@ -1639,7 +1642,7 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 				return reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',
-					`Cannot skip step ${p.stepId}: ${check.reason ?? 'skipping a mandatory step requires an authorized plan revision or waiver'} (§21.1). The step declares strength=${String(step.strength ?? 'MANDATORY (absent)')}, and only an ADVISORY step may be skipped unauthorized. Provide waiverOrRevisionId, or revise the plan to declare the step ADVISORY — which is itself a governed act.`
+					`Cannot skip step ${p.stepId}: ${check.reason ?? 'skipping a mandatory step requires an authorized plan revision or waiver'} (§21.1). The step declares strength=${asScalarString(step.strength ?? 'MANDATORY (absent)')}, and only an ADVISORY step may be skipped unauthorized. Provide waiverOrRevisionId, or revise the plan to declare the step ADVISORY — which is itself a governed act.`
 				);
 			return null;
 		}

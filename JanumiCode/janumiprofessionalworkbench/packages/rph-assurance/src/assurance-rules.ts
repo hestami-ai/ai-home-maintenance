@@ -129,7 +129,8 @@ function namesAnActor(value: unknown): boolean {
 function referencesContent(value: unknown): boolean {
 	if (value === undefined || value === null) return false;
 	if (typeof value === 'object') return Object.keys(value as object).length > 0;
-	return String(value).length > 0;
+	// Objects are handled above, so what reaches here is a primitive; the cast states that for `String`.
+	return String(value as string | number | boolean).length > 0;
 }
 export interface AdmissibilityResult {
 	readonly admissible: boolean;

@@ -87,7 +87,7 @@ describe('W2-INC-2 restart outbox recovery', () => {
 
 			// A second recovery finds nothing PENDING — no duplicate external side effect.
 			expect(engine2.recoverOutbox()).toBe(0);
-			expect(delivered.length).toBe(committed);
+			expect(delivered).toHaveLength(committed);
 		} finally {
 			store2.close();
 		}

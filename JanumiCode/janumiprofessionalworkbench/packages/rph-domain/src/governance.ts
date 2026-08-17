@@ -645,6 +645,31 @@ export interface ApplicabilityRuleView {
 }
 
 /**
+ * The §5.1 `expression` clause, applied AFTER every field this kernel can decide has already said "applies". An
+ * expression can only NARROW that standing verdict, never widen it — a subject already excluded by object type,
+ * kind or tags never reaches here. Three cases, and the last two are the load-bearing ones:
+ *   - no expression: the standing verdict stands (REQUIRED);
+ *   - an expression but no injected evaluator: REQUIRES_HUMAN_DETERMINATION — the condition is unevaluable on
+ *     THIS CALL, which is not the same as absent, and ignoring it would be the fail-open reading;
+ *   - an expression whose evaluation THROWS (malformed / out-of-grammar): also undecidable, never NOT_APPLICABLE.
+ *     Reading "did not evaluate" as "condition not met" would be a decided negative derived from not
+ *     understanding the input.
+ */
+function narrowByExpression(
+	expression: unknown,
+	subject: ApplicabilitySubject,
+	evaluate: ((expression: unknown, subject: ApplicabilitySubject) => boolean) | undefined
+): ApplicabilityOutcomeValue {
+	if (expression === undefined) return 'REQUIRED';
+	if (!evaluate) return 'REQUIRES_HUMAN_DETERMINATION'; // no evaluator supplied — see the note above
+	try {
+		return evaluate(expression, subject) ? 'REQUIRED' : 'NOT_APPLICABLE';
+	} catch {
+		return 'REQUIRES_HUMAN_DETERMINATION';
+	}
+}
+
+/**
  * Decide whether a policy applies to a subject, as a DOC-004 §5.2 `ApplicabilityOutcome`.
  *
  * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────────────────────────────────────
@@ -715,18 +740,8 @@ export function policyApplicability(
 	if ((rule.excludedTags ?? []).some((t) => tags.includes(t))) return 'NOT_APPLICABLE';
 	// Everything this kernel CAN decide says the policy applies. An expression is the last word: it can only
 	// NARROW the verdict reached above, never widen it — a subject already excluded by object type or kind is not
-	// re-admitted by an expression that happens to hold.
-	if (rule.expression !== undefined) {
-		if (!evaluate) return 'REQUIRES_HUMAN_DETERMINATION'; // no evaluator supplied — see the note above
-		// A malformed or out-of-grammar expression must not read as "condition not met", which would be a DECIDED
-		// negative derived from not understanding the input. It is undecidable, and says so.
-		try {
-			return evaluate(rule.expression, subject) ? 'REQUIRED' : 'NOT_APPLICABLE';
-		} catch {
-			return 'REQUIRES_HUMAN_DETERMINATION';
-		}
-	}
-	return 'REQUIRED';
+	// re-admitted by an expression that happens to hold. Absent expression => the verdict above stands (REQUIRED).
+	return narrowByExpression(rule.expression, subject, evaluate);
 }
 
 /** The §5.2 outcomes, as a local union so rph-domain stays free of a contracts import (pure kernel, string states). */

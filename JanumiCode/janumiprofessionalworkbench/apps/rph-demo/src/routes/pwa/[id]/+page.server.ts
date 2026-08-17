@@ -333,6 +333,95 @@ function bumpVersion(v: string): string {
 	return `${v}-v2`;
 }
 
+/** One row of the PWU-Type query, named so the version-migration helpers below can take it by type. */
+type PwuTypeRow = ReturnType<typeof listPwuTypes>[number];
+
+/** Copy a stored array-valued field through BY REFERENCE (never a clone), or an empty array when it is absent
+ *  or not an array — the shape every rule-array field of a successor policy is copied with. */
+function arrayOrEmpty(v: unknown): unknown[] {
+	return Array.isArray(v) ? v : [];
+}
+
+/** The content-preserving payload for a policy's successor version: every field of the predecessor copied
+ *  verbatim, under a fresh id and the new version string. */
+function successorPolicyPayload(
+	prev: Record<string, unknown>,
+	successorId: string,
+	newVersion: string
+): Record<string, unknown> {
+	return {
+		policyId: successorId,
+		version: newVersion,
+		name: String((prev.name ?? 'Policy') as string),
+		purpose: String((prev.purpose ?? '') as string),
+		rationale: String((prev.rationale ?? '') as string),
+		applicableObjectTypes: strList(prev.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
+		evaluatedClaimTypes: strList(prev.evaluatedClaimTypes, 'CORRECTNESS'),
+		criteria: arrayOrEmpty(prev.criteria),
+		evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
+		independenceRequirement: String((prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string),
+		findingDefinitions: arrayOrEmpty(prev.findingDefinitions),
+		waiverRules: arrayOrEmpty(prev.waiverRules),
+		requiredEvidence: arrayOrEmpty(prev.requiredEvidence),
+		optionalEvidence: arrayOrEmpty(prev.optionalEvidence),
+		dispositionRules: arrayOrEmpty(prev.dispositionRules),
+		escalationRules: arrayOrEmpty(prev.escalationRules),
+		permittedControlActions: strList(prev.permittedControlActions, 'ESCALATE')
+	};
+}
+
+/** Every live PWU Type that declares `policyId`, together with the subset whose owning PWA is still DRAFT.
+ *  Only the DRAFT-owned ones may have their reference migrated; the rest stay pinned to the historical id.
+ *  The query is workspace-wide (no pwaId), so these rows were never rendered by the policy manager. */
+function collectPolicyReferences(policyId: string) {
+	const referencingTypes = listPwuTypes(getEngine()).filter(
+		(t) =>
+			Array.isArray(t.state.requiredAssurancePolicyIds) &&
+			(t.state.requiredAssurancePolicyIds as string[]).includes(policyId)
+	);
+	const draftReferences = referencingTypes.filter((type) => {
+		const ownerId = String((type.state.pwaId ?? '') as string);
+		const owner = ownerId ? getObject(getEngine(), ownerId) : undefined;
+		return owner?.publicationStatus === 'DRAFT';
+	});
+	return { referencingTypes, draftReferences };
+}
+
+/** Repoint each DRAFT-owned reference from the predecessor policy to its successor, leaving that type's other
+ *  declared policy ids exactly as they were. */
+function migrateReferenceCommands(
+	draftReferences: readonly PwuTypeRow[],
+	policyId: string,
+	successorId: string
+): UiCommandInput[] {
+	return draftReferences.map((type) => {
+		const declared = type.state.requiredAssurancePolicyIds as string[];
+		return {
+			commandType: 'EditPwuType',
+			targetAggregateType: 'PWU_TYPE',
+			targetAggregateId: type.id,
+			payload: {
+				pwuTypeId: type.id,
+				requiredAssurancePolicyIds: declared.map((id) => (id === policyId ? successorId : id))
+			}
+		};
+	});
+}
+
+/**
+ * Surface a rolled-back policy-versioning batch.
+ *
+ * `refuse` rather than a bare fail(400): a rejected element carries its own CommandResult, and a per-command
+ * revision conflict surfaces there as status CONFLICT (only `dispatchBatchGuarded` reports a batch-level
+ * `guardConflict`). Forwarding it unconditionally as 400 would erase the one distinction this wiring exists
+ * to make.
+ */
+function refuseBatch(batch: ReturnType<typeof dispatchBatch>) {
+	const rejected = batch.failedIndex === undefined ? undefined : batch.results[batch.failedIndex];
+	if (rejected) return refuse(rejected);
+	return fail(400, { error: 'Policy versioning was rejected and rolled back.' });
+}
+
 /**
  * Advance the PWA publication FSM and surface any engine rejection to the form.
  *
@@ -348,7 +437,13 @@ function advancePwa(
 	payload: Record<string, unknown>,
 	expectedRevision: number
 ) {
-	const r = dispatch(commandType, 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, payload, expectedRevision);
+	const r = dispatch(
+		commandType,
+		'PROFESSIONAL_WORK_ARCHITECTURE',
+		pwaId,
+		payload,
+		expectedRevision
+	);
 	// `refuse` rather than a bare fail(400): this dropped `r.error.code`, so a CONFLICT was indistinguishable
 	// from a state-machine refusal — and once a revision is declared, telling those two apart is the only
 	// evidence the surface can offer about why the act did not happen.
@@ -628,9 +723,13 @@ export const actions: Actions = {
 				...(f.rationale ? { rationale: f.rationale } : {}),
 				...(f.evaluatedClaimTypes ? { evaluatedClaimTypes: f.evaluatedClaimTypes } : {}),
 				...(f.evaluatorRole ? { evaluatorRole: f.evaluatorRole } : {}),
-				...(f.independenceRequirement ? { independenceRequirement: f.independenceRequirement } : {}),
+				...(f.independenceRequirement
+					? { independenceRequirement: f.independenceRequirement }
+					: {}),
 				...(f.applicableObjectTypes ? { applicableObjectTypes: f.applicableObjectTypes } : {}),
-				...(f.permittedControlActions ? { permittedControlActions: f.permittedControlActions } : {}),
+				...(f.permittedControlActions
+					? { permittedControlActions: f.permittedControlActions }
+					: {}),
 				...(f.criteria.length ? { criteria: f.criteria } : {})
 			},
 			expectedRevision
@@ -658,43 +757,14 @@ export const actions: Actions = {
 			return fail(400, { error: 'Only active or suspended policies can be versioned.' });
 		const requested = String((form.get('version') ?? '') as string).trim();
 		const newVersion = requested || bumpVersion(String((prev.version ?? '1.0.0') as string));
-		const referencingTypes = listPwuTypes(getEngine()).filter(
-			(t) =>
-				Array.isArray(t.state.requiredAssurancePolicyIds) &&
-				(t.state.requiredAssurancePolicyIds as string[]).includes(policyId)
-		);
-		const draftReferences = referencingTypes.filter((type) => {
-			const ownerId = String((type.state.pwaId ?? '') as string);
-			const owner = ownerId ? getObject(getEngine(), ownerId) : undefined;
-			return owner?.publicationStatus === 'DRAFT';
-		});
+		const { referencingTypes, draftReferences } = collectPolicyReferences(policyId);
 		const successorId = mintUiId('pol');
 		const commands: UiCommandInput[] = [
 			{
 				commandType: 'CreateAssurancePolicy',
 				targetAggregateType: 'ASSURANCE_POLICY',
 				targetAggregateId: successorId,
-				payload: {
-					policyId: successorId,
-					version: newVersion,
-					name: String((prev.name ?? 'Policy') as string),
-					purpose: String((prev.purpose ?? '') as string),
-					rationale: String((prev.rationale ?? '') as string),
-					applicableObjectTypes: strList(prev.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
-					evaluatedClaimTypes: strList(prev.evaluatedClaimTypes, 'CORRECTNESS'),
-					criteria: Array.isArray(prev.criteria) ? prev.criteria : [],
-					evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
-					independenceRequirement: String(
-						(prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string
-					),
-					findingDefinitions: Array.isArray(prev.findingDefinitions) ? prev.findingDefinitions : [],
-					waiverRules: Array.isArray(prev.waiverRules) ? prev.waiverRules : [],
-					requiredEvidence: Array.isArray(prev.requiredEvidence) ? prev.requiredEvidence : [],
-					optionalEvidence: Array.isArray(prev.optionalEvidence) ? prev.optionalEvidence : [],
-					dispositionRules: Array.isArray(prev.dispositionRules) ? prev.dispositionRules : [],
-					escalationRules: Array.isArray(prev.escalationRules) ? prev.escalationRules : [],
-					permittedControlActions: strList(prev.permittedControlActions, 'ESCALATE')
-				}
+				payload: successorPolicyPayload(prev, successorId, newVersion)
 			},
 			{
 				commandType: 'ActivateAssurancePolicy',
@@ -702,17 +772,7 @@ export const actions: Actions = {
 				targetAggregateId: successorId,
 				payload: { policyId: successorId }
 			},
-			...draftReferences.map((type): UiCommandInput => ({
-				commandType: 'EditPwuType',
-				targetAggregateType: 'PWU_TYPE',
-				targetAggregateId: type.id,
-				payload: {
-					pwuTypeId: type.id,
-					requiredAssurancePolicyIds: (type.state.requiredAssurancePolicyIds as string[]).map(
-						(id) => (id === policyId ? successorId : id)
-					)
-				}
-			})),
+			...migrateReferenceCommands(draftReferences, policyId, successorId),
 			{
 				commandType: 'SupersedeAssurancePolicy',
 				targetAggregateType: 'ASSURANCE_POLICY',
@@ -733,16 +793,7 @@ export const actions: Actions = {
 			}
 		];
 		const batch = dispatchBatch(commands);
-		if (!batch.ok) {
-			const rejected =
-				batch.failedIndex === undefined ? undefined : batch.results[batch.failedIndex];
-			// `refuse` rather than a bare fail(400): a rejected element carries its own CommandResult, and a
-			// per-command revision conflict surfaces there as status CONFLICT (only `dispatchBatchGuarded`
-			// reports a batch-level `guardConflict`). Forwarding it unconditionally as 400 would erase the one
-			// distinction this wiring exists to make.
-			if (rejected) return refuse(rejected);
-			return fail(400, { error: 'Policy versioning was rejected and rolled back.' });
-		}
+		if (!batch.ok) return refuseBatch(batch);
 		return {
 			newVersion: successorId,
 			migratedReferences: draftReferences.length,

@@ -947,6 +947,57 @@ export function driveReferenceUndertaking(
 			);
 	};
 
+	/** ONE governing policy's share of step 4b: submit the evidence this undertaking GENUINELY HAS against that
+	 *  policy's gating requirements, and RETURN the ones it is short of. Extracted from `earnAssurance` verbatim —
+	 *  the command sequence it emits (ProposeEvidence / AdmitEvidence on first mint, then
+	 *  SubmitEvidenceForAssessment) is unchanged, and `evidenceForRequirement` is the SAME map, mutated in place, so
+	 *  a governed object minted for one policy is still reused by the next rather than minted twice. */
+	const submitRequiredEvidenceForPolicy = (ctx: {
+		readonly assurancePolicyId: string;
+		readonly assessmentId: string;
+		readonly claimId: string;
+		readonly disposition: string;
+	}): readonly { readonly id: string; readonly description: string }[] => {
+		const missing: { readonly id: string; readonly description: string }[] = [];
+		for (const req of gatingRequirements(ctx.assurancePolicyId, ctx.disposition)) {
+			const have = FIXTURE_EVIDENCE[req.id];
+			if (!have) {
+				missing.push(req);
+				continue;
+			}
+			let evId = evidenceForRequirement.get(req.id);
+			if (!evId) {
+				evId = mintId('evd');
+				evidenceForRequirement.set(req.id, evId);
+				// A REAL Evidence object, referencing a REAL governed object this drive created. `of` is the
+				// referent; if that object did not exist the reference would dangle and the fixture would be
+				// asserting an artifact it never made.
+				send('ProposeEvidence', 'EVIDENCE', evId, {
+					evidenceId: evId,
+					evidenceType: have.evidenceType,
+					contentReference: { kind: 'REFERENCE', objectId: have.of, note: have.note },
+					producedBy: ACTOR,
+					supportsClaimIds: [ctx.claimId],
+					contradictsClaimIds: [],
+					scope: `${req.description} (${have.note})`,
+					limitations: [],
+					capturedAt: '2026-07-12T00:00:00Z'
+				});
+				send('AdmitEvidence', 'EVIDENCE', evId, {
+					admissibilityAssessmentId: ctx.assessmentId,
+					admittedScope: req.description,
+					admittedClaimIds: [ctx.claimId]
+				});
+			}
+			send('SubmitEvidenceForAssessment', 'ASSURANCE_ASSESSMENT', ctx.assessmentId, {
+				evidenceId: evId,
+				satisfiesRequirementId: req.id,
+				evidenceType: have.evidenceType
+			});
+		}
+		return missing;
+	};
+
 	const earnAssurance = (
 		pwuId: string,
 		produced: { readonly claimId: string; readonly evidenceId: string },
@@ -1042,45 +1093,17 @@ export function driveReferenceUndertaking(
 		//     For each governing policy: submit the evidence this undertaking GENUINELY HAS, and find out what it
 		//     is short of. Both halves matter — submitting nothing would stall the drive, and submitting something
 		//     for everything would be the fiction.
-		const shortfall = new Map<string, readonly { readonly id: string; readonly description: string }[]>();
+		const shortfall = new Map<
+			string,
+			readonly { readonly id: string; readonly description: string }[]
+		>();
 		for (const [i, pid] of governing.entries()) {
-			const missing: { readonly id: string; readonly description: string }[] = [];
-			for (const req of gatingRequirements(pid, disposition)) {
-				const have = FIXTURE_EVIDENCE[req.id];
-				if (!have) {
-					missing.push(req);
-					continue;
-				}
-				let evId = evidenceForRequirement.get(req.id);
-				if (!evId) {
-					evId = mintId('evd');
-					evidenceForRequirement.set(req.id, evId);
-					// A REAL Evidence object, referencing a REAL governed object this drive created. `of` is the
-					// referent; if that object did not exist the reference would dangle and the fixture would be
-					// asserting an artifact it never made.
-					send('ProposeEvidence', 'EVIDENCE', evId, {
-						evidenceId: evId,
-						evidenceType: have.evidenceType,
-						contentReference: { kind: 'REFERENCE', objectId: have.of, note: have.note },
-						producedBy: ACTOR,
-						supportsClaimIds: [claimId],
-						contradictsClaimIds: [],
-						scope: `${req.description} (${have.note})`,
-						limitations: [],
-						capturedAt: '2026-07-12T00:00:00Z'
-					});
-					send('AdmitEvidence', 'EVIDENCE', evId, {
-						admissibilityAssessmentId: assessmentIds[i]!,
-						admittedScope: req.description,
-						admittedClaimIds: [claimId]
-					});
-				}
-				send('SubmitEvidenceForAssessment', 'ASSURANCE_ASSESSMENT', assessmentIds[i]!, {
-					evidenceId: evId,
-					satisfiesRequirementId: req.id,
-					evidenceType: have.evidenceType
-				});
-			}
+			const missing = submitRequiredEvidenceForPolicy({
+				assurancePolicyId: pid,
+				assessmentId: assessmentIds[i]!,
+				claimId,
+				disposition
+			});
 			if (missing.length > 0) shortfall.set(assessmentIds[i]!, missing);
 		}
 
@@ -1102,7 +1125,10 @@ export function driveReferenceUndertaking(
 		//     conditional outcome — and not something a driver should settle by lowering its own verdict.
 		if (shortfall.size > 0) {
 			const detail = [...shortfall]
-				.map(([asmId, missing]) => `${asmId}: ${missing.map((m) => `${m.id} (${m.description})`).join(', ')}`)
+				.map(([asmId, missing]) => {
+					const missingDetail = missing.map((m) => `${m.id} (${m.description})`).join(', ');
+					return `${asmId}: ${missingDetail}`;
+				})
 				.join(' | ');
 			throw new Error(
 				`Reference Undertaking cannot evidence required evidence that GATES the ${disposition} verdict it ` +

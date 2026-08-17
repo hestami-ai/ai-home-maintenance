@@ -5624,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "f4b184bd0c73abf4bb285115b5cb196bb5e24b3695aa3d390df37ae5bad08c59",
+    "fileManifestDigest": "a6f9eb622ee3fb724abbf2d955b9a84773f135d0976e4c99b890b22e6025d8f9",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -6657,9 +6657,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 40540,
+        "bytes": 42138,
         "path": "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
-        "sha256": "05405ac5062fa30326a5019a069a7409faf116a39da2bd8c3674d025f1490224",
+        "sha256": "f1684c3165765fe17184048bbd45815102df8a30234ab2571e19d6ddaf526e47",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8526,9 +8526,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 32909,
+        "bytes": 35198,
         "path": "packages/rph-application/src/command-bus.ts",
-        "sha256": "82c66cf22b4d97617640adcf8837ab615822231c9888a5ebe6cc8f1545c8a67b",
+        "sha256": "02bcc5a48f10a01270b8b7d5fbddec5fbdee46644b109d718a28081685129e9e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8652,9 +8652,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 138273,
+        "bytes": 140219,
         "path": "packages/rph-application/src/handlers/assurance.ts",
-        "sha256": "b4d5df6ab5bded2102b00d83819add0130129c7e10d8377310e30a62a15708c4",
+        "sha256": "84a124519cb67b341ec1a08a05fb9dd2e9733d20bb481bfa2a4578f0dfbfbe2c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9072,9 +9072,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 108389,
+        "bytes": 108401,
         "path": "packages/rph-application/src/handlers/execution.ts",
-        "sha256": "ea57e164ad2ac5358f82ab72569a9d57bfad71353dee5f93d995bc45c612fac3",
+        "sha256": "d97b66335f29c7b8a9da8c79dfc603670254068de906c3cf91db9411decb35d5",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9247,9 +9247,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 85765,
+        "bytes": 85738,
         "path": "packages/rph-application/src/handlers/pwu.ts",
-        "sha256": "170c264f65b25ac651211e5c8cd7b8e661b867368941bef6bb27c31d87ec00f2",
+        "sha256": "eb723670879639ad55d23e382142409882387cb918c5360a94ad80dbb280963b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9352,9 +9352,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 6875,
+        "bytes": 6869,
         "path": "packages/rph-application/src/handlers/waiver-authorization.ts",
-        "sha256": "f2ce0a0c5293bb3ecf8ca155a760eb42abe299b7764a0ccb348252a8f8285b8a",
+        "sha256": "daa6c1e22a6148aba90af2101dbd9cca5acab676df92401b2ddfc99c5bd5ec76",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9443,9 +9443,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 12423,
+        "bytes": 12555,
         "path": "packages/rph-assurance/src/assurance-rules.ts",
-        "sha256": "6244f68facb6eb99373e4274999609967fbdf85e1d1e59dc92bd08ea856378b2",
+        "sha256": "e2a27e3a6ba467252bf9040c669d61d6c661158096f459c96dec666c551456f4",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9534,9 +9534,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 35275,
+        "bytes": 35300,
         "path": "packages/rph-authoring/src/broker.ts",
-        "sha256": "f8b92516434397bae57f28805954e1de5ec11fd8b393d0c5fec7661994715add",
+        "sha256": "8ef2f98b19057944aa0a49b1d46bcb59497fd2ad195cdcecf3a5dfd919f9a6ae",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10668,9 +10668,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 4955,
+        "bytes": 4957,
         "path": "packages/rph-domain/src/decomposition-disposition-derivation.test.ts",
-        "sha256": "62e7143adfde2e6108cee55068820c6c81d547638aed0d4ca94b29f8182bfc8f",
+        "sha256": "e8585f723a7093775a4b3dc3146ae55c9eb43fcd8048b38740f54cc3cc586b69",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10731,9 +10731,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 12589,
+        "bytes": 13525,
         "path": "packages/rph-domain/src/gen/gen-transitions.ts",
-        "sha256": "04966d7d15a6ee1f70298c5656813a071d8e629dc0684d433ab241e10237ef2e",
+        "sha256": "6b40ae7daf97f8c39e0b1eef128bbb0f8f3b2c10da7b7d228e19b4d947222878",
         "subjectArtifactClass": "GENERATOR_SOURCE"
       },
       {
@@ -10745,9 +10745,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 36837,
+        "bytes": 37799,
         "path": "packages/rph-domain/src/governance.ts",
-        "sha256": "fe1fbde6ecf7b80df7afd1d6d523c43761d846508160f75a5ca61127403a704c",
+        "sha256": "9717832326c4bbe2f63da37df0d073490b21aa33f7e4d58d36e658ddb51520b8",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11123,16 +11123,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 9445,
+        "bytes": 9447,
         "path": "packages/rph-engine/src/governing-policies.test.ts",
-        "sha256": "6e3ae3096e0ff6c6635071cb0218e73fbe15e48d0858fe24e1ec875ed0f2329a",
+        "sha256": "9551d026e13a4711d83fba406e8c70567d5ef23ec7ed9b00666bd77c04f7fe40",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 5539,
+        "bytes": 5576,
         "path": "packages/rph-engine/src/governing-policies.ts",
-        "sha256": "aebd7b85bd18133fa3353e3c239d905963bca63f3a23c17ae826ed9378399126",
+        "sha256": "5e1f741d1378af1f077be8f24e8c666de5b18deb23c740117dba185a2664c05e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11165,9 +11165,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 4445,
+        "bytes": 4446,
         "path": "packages/rph-engine/src/outbox-recovery.test.ts",
-        "sha256": "5ead6a3defced0fce134244d7137d42cbfcdb41f5e55a5e0ce02015257b589fb",
+        "sha256": "87511688b008b498ae72bd3610c9655e09d0989624ff60c2522e0e5ff8ad7c84",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11263,9 +11263,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 70157,
+        "bytes": 71183,
         "path": "packages/rph-engine/src/reference-undertaking.ts",
-        "sha256": "fd8ec97ce766f56ba588b90f96286b34f896df8d533911f0defa4324d1bf3e15",
+        "sha256": "cdf23bd3a73f879de43b88a377136894ffe6a333871e9c208b9bb3e248eb2a76",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11403,9 +11403,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 10645,
+        "bytes": 10655,
         "path": "packages/rph-persistence/src/sqlite-storage-adapter.ts",
-        "sha256": "2a6845e3abff6ff44c9ba55866b7b740c6a3ca1798eb55f00b6a40a855535f8d",
+        "sha256": "7504925956fdebe63f3a14714b2026c8d222bedf78dbceccfe42aa636225ce26",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11501,9 +11501,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11928,
+        "bytes": 11991,
         "path": "packages/rph-product-realization-pwa/src/doc003-carriage.test.ts",
-        "sha256": "f5d43079d10ac5f76942d530a5eec8a5916a93f331eae87095b1fc95aeb460a4",
+        "sha256": "a5d290dee08caa2cafe45bb9687ef7d6bda8aba8275457cfe5a73e8df2ef4d05",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11676,9 +11676,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 57593,
+        "bytes": 58600,
         "path": "packages/rph-projections/src/execution-view.ts",
-        "sha256": "99c8884680e019577fc81c89a1fd362c58fa0982618c5b8ea045a9d045526cde",
+        "sha256": "55ece5190ad8e9acc1cc475af277f2cabfe2dc32580ec76eeff32fbcf480983e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12326,7 +12326,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "ce03a851aa5a494add13e1347561e790c310f1d79d7003c48a25b0332230f111",
+    "subjectId": "028b58cd845a6100f93cf16710702d4adefe91f79b93ca252151c0d12faf18f1",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [

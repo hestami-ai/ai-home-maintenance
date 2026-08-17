@@ -105,7 +105,10 @@ const ESCALATABLE_SEVERITIES: ReadonlySet<string> = new Set(['CRITICAL']);
  * open BLOCKING finding TO the REJECTED disposition; a rule that refused it would be refusing the ladder's own
  * answer.
  */
-const POSITIVE_DISPOSITIONS: ReadonlySet<string> = new Set(['SATISFIED', 'CONDITIONALLY_SATISFIED']);
+const POSITIVE_DISPOSITIONS: ReadonlySet<string> = new Set([
+	'SATISFIED',
+	'CONDITIONALLY_SATISFIED'
+]);
 
 /** Reject a policy whose escalationRules use the `escalateOnOpenSeverities` shortcut for a severity outside
  *  ESCALATABLE_SEVERITIES — fail closed at authoring rather than persist a silently-inert rule (Gate D would never act
@@ -250,7 +253,9 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		// `FLOOR_POLICY_ID_SET.has(p.policyId) ? 'ACTIVE' : 'DRAFT'`. Catalog policies are born DRAFT and must be
 		// activated; the three de minimis FLOOR policies are LOCKED and cannot be activated, so they MUST be born
 		// ACTIVE. Declaring only one would make the other genuinely-occupied state look unoccupiable.
-		births: [{ machine: 'AssurancePolicy.status', statusField: 'status', values: ['ACTIVE', 'DRAFT'] }],
+		births: [
+			{ machine: 'AssurancePolicy.status', statusField: 'status', values: ['ACTIVE', 'DRAFT'] }
+		],
 		aggregateId: p.policyId,
 		state,
 		eventType: 'AssurancePolicyCreated'
@@ -700,11 +705,11 @@ function claimsWithAdmissibleEvidence(ctx: HandlerContext): ReadonlySet<string> 
 	const supported = new Set<string>();
 	for (const id of evidenceIds) {
 		const st = ctx.store.loadObject(id)?.state as
-			| { status?: unknown; supportsClaimIds?: unknown }
-			| undefined;
+			{ status?: unknown; supportsClaimIds?: unknown } | undefined;
 		if (!st || String(st.status) !== 'ADMISSIBLE') continue;
 		if (!Array.isArray(st.supportsClaimIds)) continue;
-		for (const claimId of st.supportsClaimIds) if (typeof claimId === 'string') supported.add(claimId);
+		for (const claimId of st.supportsClaimIds)
+			if (typeof claimId === 'string') supported.add(claimId);
 	}
 	return supported;
 }
@@ -930,8 +935,7 @@ function admissibleEvidenceFor(ctx: HandlerContext, claimId: string): string[] {
 	const out: string[] = [];
 	for (const id of ids) {
 		const st = ctx.store.loadObject(id)?.state as
-			| { status?: unknown; supportsClaimIds?: unknown }
-			| undefined;
+			{ status?: unknown; supportsClaimIds?: unknown } | undefined;
 		if (!st || String(st.status) !== 'ADMISSIBLE') continue;
 		if (Array.isArray(st.supportsClaimIds) && st.supportsClaimIds.includes(claimId)) out.push(id);
 	}
@@ -1080,8 +1084,8 @@ export const falsifyAssumption: CommandHandler = (ctx, command, payload) => {
 	// read of an object this dispatch has already loaded synchronously. If the object is absent, `advanceStatus`
 	// rejects below and this value is never used.
 	const priorStatus = String(
-		(ctx.store.loadObject(command.targetAggregateId)?.state as Record<string, unknown> | undefined)
-			?.status ?? ''
+		((ctx.store.loadObject(command.targetAggregateId)?.state as Record<string, unknown> | undefined)
+			?.status ?? '') as Stringifiable
 	);
 	return advanceStatus(ctx, command, {
 		objectType: ASSUMPTION,
@@ -1114,8 +1118,8 @@ export const falsifyAssumption: CommandHandler = (ctx, command, payload) => {
 			const outcome = assessFalsification(
 				{
 					assumptionId: command.targetAggregateId,
-					materiality: String(nextState.materiality ?? ''),
-					status: String(nextState.status ?? ''),
+					materiality: String((nextState.materiality ?? '') as Stringifiable),
+					status: String((nextState.status ?? '') as Stringifiable),
 					affectedObjectIds: (nextState.affectedObjectIds as string[] | undefined) ?? []
 				},
 				p.contradictingEvidenceIds
@@ -1307,10 +1311,12 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 			(expr, subj) => evaluateApplicability(expr as never, subj)
 		);
 		if (applicabilityPermitsAssessment(outcome)) return null;
+		// Lifted out of the message template (S4624 nested template literal); rendered string is byte-identical.
+		const kindClause = typeof subject.pwuKind === 'string' ? `, kind ${subject.pwuKind}` : '';
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
-			`RequestAssuranceAssessment: assurance policy ${p.assurancePolicyId} does not apply to ${subjectId} (a ${subject.objectType}${typeof subject.pwuKind === 'string' ? `, kind ${subject.pwuKind}` : ''}) — its DOC-004 §5.1 applicability rule yields ${outcome}. Assessing work a policy does not govern would record a verdict against criteria written for something else.`,
+			`RequestAssuranceAssessment: assurance policy ${p.assurancePolicyId} does not apply to ${subjectId} (a ${subject.objectType}${kindClause}) — its DOC-004 §5.1 applicability rule yields ${outcome}. Assessing work a policy does not govern would record a verdict against criteria written for something else.`,
 			[p.assessmentId, p.assurancePolicyId, subjectId]
 		);
 	})();
@@ -1892,6 +1898,93 @@ function rejectForeclosedDisposition(
 	);
 }
 
+/** GATE D (#1b) — escalationRules ENFORCED: the ratified escalation trigger fires. When an escalation rule names an
+ *  ESCALATABLE severity that is still OPEN on this assessment, the assessment transitions ASSESSING → ESCALATED (the
+ *  ratified §30 arrow) and emits AssuranceAssessmentEscalated instead of completing to the recommended disposition.
+ *  Empty escalationRules → skip, and `openSeverities` is therefore not called at all (the memo stays cold). Returns
+ *  the escalation transition's result, or null (no rule matched — fall through to Gates A/C). */
+function escalateOnOpenObservation(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	escalationRules:
+		| ReadonlyArray<{ escalateOnOpenSeverities?: readonly string[]; escalationTarget?: string }>
+		| undefined,
+	openSeverities: () => Set<string>
+): CommandResult | null {
+	const rules = escalationRules ?? [];
+	if (rules.length === 0) return null;
+	const openSev = openSeverities();
+	const matchable = (r: { escalateOnOpenSeverities?: readonly string[] }): string[] => [
+		...new Set(
+			(r.escalateOnOpenSeverities ?? []).filter(
+				(s) => ESCALATABLE_SEVERITIES.has(s) && openSev.has(s)
+			)
+		)
+	];
+	const rule = rules.find((r) => matchable(r).length > 0);
+	if (!rule) return null;
+	const matched = matchable(rule);
+	const target = String(rule.escalationTarget ?? 'the policy escalation target');
+	return advanceStatus(ctx, command, {
+		objectType: ASSESSMENT,
+		statusField: 'assessmentState',
+		machine: 'AssuranceAssessment.state',
+		target: 'ESCALATED',
+		precondition: fromStates('ASSESSING'),
+		eventType: 'AssuranceAssessmentEscalated',
+		setLifecycleStatus: true,
+		eventPayload: () => ({
+			escalationReason: `open observation(s) of severity [${matched.join(', ')}] → escalation to ${target} per policy escalationRules (§10.3/§13)`,
+			disposition: 'ESCALATED'
+		})
+	});
+}
+
+/** GATE A (Increment R) — a POSITIVE disposition may not stand while its own mandatory evidence is unmet. §6.1's
+ *  requiredForDispositions declares which dispositions each requirement gates; a SATISFIED verdict that ignores its
+ *  required evidence certifies past its own gaps (§10.3). The received set is folded from the §32
+ *  AssuranceEvidenceReceived events (Increment Q) — the SAME required-minus-received the §38 view shows — so the gate
+ *  and the view agree. Negative dispositions (REJECTED / ESCALATED / INCONCLUSIVE) are deliberately NOT gated:
+ *  escalating or rejecting BECAUSE evidence is insufficient is the correct response, not a blocked one — so a
+ *  non-positive disposition returns null before any event is read. Returns a rejection or null (pass). */
+function rejectUnmetRequiredEvidence(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	disposition: string,
+	requiredEvidence: ReadonlyArray<{ id?: string; requiredForDispositions?: string }> | undefined
+): CommandResult | null {
+	if (!POSITIVE_DISPOSITIONS.has(disposition)) return null;
+	const received = new Set(
+		ctx.store
+			.readAllEvents()
+			.filter(
+				(e) =>
+					e.eventType === 'AssuranceEvidenceReceived' &&
+					(e.payload as { assessmentId?: string }).assessmentId === command.targetAggregateId
+			)
+			.map((e) => (e.payload as { satisfiesRequirementId?: string }).satisfiesRequirementId)
+			.filter((x): x is string => typeof x === 'string')
+	);
+	// requiredForDispositions: ALL gates every disposition; SATISFIED_ONLY only SATISFIED; CONDITIONAL_OR_SATISFIED
+	// gates both positive dispositions (and we are already inside the positive branch).
+	const gates = (rfd: string | undefined): boolean =>
+		rfd === 'ALL' ||
+		rfd === 'CONDITIONAL_OR_SATISFIED' ||
+		(rfd === 'SATISFIED_ONLY' && disposition === 'SATISFIED');
+	const unmet = (requiredEvidence ?? [])
+		.filter((r) => gates(r?.requiredForDispositions))
+		.filter(demandsAnInstance)
+		.map((r) => r?.id)
+		.filter((id): id is string => typeof id === 'string' && !received.has(id));
+	if (unmet.length === 0) return null;
+	return reject(
+		command,
+		'RPH_VALIDATION_SEMANTIC_FAILED',
+		`CompleteAssuranceAssessment: a ${disposition} disposition requires evidence for [${unmet.join(', ')}] (§6.1 requiredForDispositions) but none was submitted for those requirements — a positive disposition cannot stand with unmet mandatory evidence (§10.3). Submit it (SubmitEvidenceForAssessment) first, or return a non-satisfied disposition.`,
+		[command.targetAggregateId, ...unmet]
+	);
+}
+
 /** CompleteAssuranceAssessment — ASSESSING -> a terminal disposition read from the validator recommendation
  * (validatorResult.dispositionRecommendation). The AssuranceAssessment.state machine rejects the illegal
  * disposition transitions (INV-8/INV-9/INV-10). */
@@ -2032,8 +2125,7 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	)?.validatorResult?.validatorId;
 	if (typeof validatorIdOnResult === 'string') {
 		const entry = ctx.store.loadObject(validatorIdOnResult)?.state as
-			| { status?: string }
-			| undefined;
+			{ status?: string } | undefined;
 		if (entry?.status === 'DISABLED')
 			return reject(
 				command,
@@ -2117,74 +2209,24 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// (= {CRITICAL}); authoring already refused any other value here, and intersecting is defense-in-depth so the
 	// shortcut only ever fires for the one severity §10.3's default escalates — a policy overriding the default for
 	// another severity does so through EscalationRule.trigger (§13), not this field. Empty escalationRules → skip.
-	const escalationRules = policyState?.escalationRules ?? [];
-	if (escalationRules.length > 0) {
-		const openSev = openObservationSeverities();
-		const matchable = (r: { escalateOnOpenSeverities?: readonly string[] }): string[] => [
-			...new Set(
-				(r.escalateOnOpenSeverities ?? []).filter(
-					(s) => ESCALATABLE_SEVERITIES.has(s) && openSev.has(s)
-				)
-			)
-		];
-		const rule = escalationRules.find((r) => matchable(r).length > 0);
-		if (rule) {
-			const matched = matchable(rule);
-			const target = String(rule.escalationTarget ?? 'the policy escalation target');
-			return advanceStatus(ctx, command, {
-				objectType: ASSESSMENT,
-				statusField: 'assessmentState',
-				machine: 'AssuranceAssessment.state',
-				target: 'ESCALATED',
-				precondition: fromStates('ASSESSING'),
-				eventType: 'AssuranceAssessmentEscalated',
-				setLifecycleStatus: true,
-				eventPayload: () => ({
-					escalationReason: `open observation(s) of severity [${matched.join(', ')}] → escalation to ${target} per policy escalationRules (§10.3/§13)`,
-					disposition: 'ESCALATED'
-				})
-			});
-		}
-	}
+	const gateDEscalation = escalateOnOpenObservation(
+		ctx,
+		command,
+		policyState?.escalationRules,
+		openObservationSeverities
+	);
+	if (gateDEscalation) return gateDEscalation;
 
-	// GATE A (Increment R) — a POSITIVE disposition may not stand while its own mandatory evidence is unmet. §6.1's
-	// requiredForDispositions declares which dispositions each requirement gates; a SATISFIED verdict that ignores
-	// its required evidence certifies past its own gaps (§10.3). The received set is folded from the §32
-	// AssuranceEvidenceReceived events (Increment Q) — the SAME required-minus-received the §38 view shows — so the
-	// gate and the view agree. Negative dispositions (REJECTED / ESCALATED / INCONCLUSIVE) are deliberately NOT
-	// gated: escalating or rejecting BECAUSE evidence is insufficient is the correct response, not a blocked one.
-	if (disposition === 'SATISFIED' || disposition === 'CONDITIONALLY_SATISFIED') {
-		const received = new Set(
-			ctx.store
-				.readAllEvents()
-				.filter(
-					(e) =>
-						e.eventType === 'AssuranceEvidenceReceived' &&
-						(e.payload as { assessmentId?: string }).assessmentId === command.targetAggregateId
-				)
-				.map((e) => (e.payload as { satisfiesRequirementId?: string }).satisfiesRequirementId)
-				.filter((x): x is string => typeof x === 'string')
-		);
-		// requiredForDispositions: ALL gates every disposition; SATISFIED_ONLY only SATISFIED; CONDITIONAL_OR_SATISFIED
-		// gates both positive dispositions (and we are already inside the positive branch).
-		const gates = (rfd: string | undefined): boolean =>
-			rfd === 'ALL' ||
-			rfd === 'CONDITIONAL_OR_SATISFIED' ||
-			(rfd === 'SATISFIED_ONLY' && disposition === 'SATISFIED');
-		const unmet = (policyState?.requiredEvidence ?? [])
-			.filter((r) => gates(r?.requiredForDispositions))
-			.filter(demandsAnInstance)
-			.map((r) => r?.id)
-			.filter((id): id is string => typeof id === 'string' && !received.has(id));
-		if (unmet.length > 0) {
-			return reject(
-				command,
-				'RPH_VALIDATION_SEMANTIC_FAILED',
-				`CompleteAssuranceAssessment: a ${disposition} disposition requires evidence for [${unmet.join(', ')}] (§6.1 requiredForDispositions) but none was submitted for those requirements — a positive disposition cannot stand with unmet mandatory evidence (§10.3). Submit it (SubmitEvidenceForAssessment) first, or return a non-satisfied disposition.`,
-				[command.targetAggregateId, ...unmet]
-			);
-		}
-	}
+	// GATE A (Increment R) — a POSITIVE disposition may not stand while its own mandatory evidence is unmet (§6.1
+	// requiredForDispositions / §10.3). Negative dispositions (REJECTED / ESCALATED / INCONCLUSIVE) are deliberately
+	// NOT gated: escalating or rejecting BECAUSE evidence is insufficient is the correct response, not a blocked one.
+	const gateAReject = rejectUnmetRequiredEvidence(
+		ctx,
+		command,
+		disposition,
+		policyState?.requiredEvidence
+	);
+	if (gateAReject) return gateAReject;
 
 	// GATE C (#1a) — dispositionRules ENFORCED: the §10.3 foreclosure. The policy's rule for the recommended
 	// disposition may forbid it while an observation of certain severities is still OPEN ("an open MATERIAL finding
@@ -2325,7 +2367,9 @@ export const recordAssuranceObservation: CommandHandler = (ctx, command, payload
 		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
 		// ⚠ NOTE THE FIELD: `disposition`, not `status`. The envelope's `lifecycleStatus` is also 'OPEN' here, which
 		// is a coincidence of this handler and not the machine's field.
-		births: [{ machine: 'AssuranceObservation.disposition', statusField: 'disposition', values: ['OPEN'] }],
+		births: [
+			{ machine: 'AssuranceObservation.disposition', statusField: 'disposition', values: ['OPEN'] }
+		],
 		aggregateId: id,
 		state,
 		eventType: 'AssuranceObservationRecorded',

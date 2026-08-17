@@ -84,7 +84,8 @@ export class SqliteStorageAdapter implements StorageAdapter {
 	 * up at `SCHEMA_VERSION` with every column, or it is untouched and the next open retries.
 	 */
 	private enforceSchemaVersion(preExisting: boolean): void {
-		const row = this.db.prepare('PRAGMA user_version').get() as { user_version?: number } | undefined;
+		const row = this.db.prepare('PRAGMA user_version').get() as
+			{ user_version?: number } | undefined;
 		const current = row?.user_version ?? 0;
 		if (current === SCHEMA_VERSION) return;
 		if (current > SCHEMA_VERSION) {
@@ -96,7 +97,8 @@ export class SqliteStorageAdapter implements StorageAdapter {
 		}
 		// A pre-versioning store (user_version 0 with tables already present) IS a v1 store; a genuinely fresh one
 		// was just created at the current shape and needs no step.
-		const from = current === 0 ? (preExisting ? 1 : SCHEMA_VERSION) : current;
+		let from = current;
+		if (current === 0) from = preExisting ? 1 : SCHEMA_VERSION;
 		const steps = planMigration(from, SCHEMA_VERSION);
 		this.db.transaction(() => {
 			for (const step of steps) this.db.exec(step);

@@ -52,9 +52,15 @@ import type {
 } from '@janumipwb/rph-contracts';
 import {
 	canAdvanceWorkLifecycle,
+	checkDeclaredSource,
 	checkPwuShapeReadiness,
+	declaredRecoveryTargets,
+	ownerOfArrow,
 	planEvidencesExecutionSuccess,
+	PWU_LIFECYCLE_COMMAND_SPECS,
+	PWU_RECOVERY_COMMAND_SPECS,
 	satisfiesP1,
+	type PwuLifecycleCommandSpec,
 	type PwuReadinessFacts
 } from '@janumipwb/rph-domain';
 import {
@@ -72,14 +78,6 @@ import { evaluatePrecondition, predicate } from './command-precondition.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
-import {
-	checkDeclaredSource,
-	declaredRecoveryTargets,
-	ownerOfArrow,
-	PWU_LIFECYCLE_COMMAND_SPECS,
-	PWU_RECOVERY_COMMAND_SPECS,
-	type PwuLifecycleCommandSpec
-} from '@janumipwb/rph-domain';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -392,10 +390,18 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		// drift to a NON-member was already refused. Drift to a DIFFERENT VALID MEMBER — `PLANNED` for
 		// `NOT_PLANNED` — was refused by nothing at all until this array named the value.
 		births: [
-			{ machine: 'PWU.workLifecycleState', statusField: 'workLifecycleState', values: ['PROPOSED'] },
+			{
+				machine: 'PWU.workLifecycleState',
+				statusField: 'workLifecycleState',
+				values: ['PROPOSED']
+			},
 			{ machine: 'PWU.executionState', statusField: 'executionState', values: ['NOT_PLANNED'] },
 			{ machine: 'PWU.assuranceState', statusField: 'assuranceState', values: ['UNASSESSED'] },
-			{ machine: 'PWU.shapeIntegrityState', statusField: 'shapeIntegrityState', values: ['UNKNOWN'] }
+			{
+				machine: 'PWU.shapeIntegrityState',
+				statusField: 'shapeIntegrityState',
+				values: ['UNKNOWN']
+			}
 		]
 	});
 };
@@ -526,7 +532,11 @@ function advancePwuLifecycle(
 	const newRevision = loaded.revision + 1;
 	const base = nextEnvelope(loaded.state, command, newRevision);
 	const mutated = args.mutate ? args.mutate(base) : base;
-	const next = { ...mutated, lifecycleStatus: args.spec.target, workLifecycleState: args.spec.target };
+	const next = {
+		...mutated,
+		lifecycleStatus: args.spec.target,
+		workLifecycleState: args.spec.target
+	};
 	const event = makeEvent(ctx, command, {
 		eventType: args.spec.eventType,
 		aggregateType: PWU,
@@ -808,7 +818,9 @@ function baselineBacksPwu(ctx: HandlerContext, pwuId: string, baselineId: string
 	const obj = ctx.store.loadObject(baselineId);
 	if (obj?.objectType !== 'BASELINE') return false;
 	const s = obj.state as { status?: string; itemObjectVersions?: { objectId?: string }[] };
-	return s.status === 'AUTHORITATIVE' && (s.itemObjectVersions ?? []).some((v) => v.objectId === pwuId);
+	return (
+		s.status === 'AUTHORITATIVE' && (s.itemObjectVersions ?? []).some((v) => v.objectId === pwuId)
+	);
 }
 
 /**
@@ -993,9 +1005,7 @@ export const unblockPwu: CommandHandler = (ctx, command) => {
  * CON-000 AX-6 forbids. The value itself is still a field somebody wrote down at the time.
  */
 function recordedBlockOrigin(ctx: HandlerContext, id: string): WorkLifecycleState | undefined {
-	const blocks = ctx.store
-		.readAggregateEvents(PWU, id)
-		.filter((e) => e.eventType === 'PwuBlocked');
+	const blocks = ctx.store.readAggregateEvents(PWU, id).filter((e) => e.eventType === 'PwuBlocked');
 	const latest = blocks.at(-1);
 	if (!latest) return undefined;
 	const origin = (latest.payload as { blockedFrom?: string }).blockedFrom;
@@ -1228,7 +1238,6 @@ function rejectUnbackedDisposition(
  * C-0b's fourteen ENFORCED rows into nothing. The roadmap records the correction as R2.
  */
 
-
 /**
  * WAIVED requires a granted WAIVER decision bound to this PWU at this version. JAN-PWUWP W-3, under REG-D-029.
  *
@@ -1362,7 +1371,6 @@ function rejectUnbackedExecutionSuccess(
 	);
 }
 
-
 /**
  * ⚠ TWO GUARDS USED TO LIVE HERE AND ARE GONE — deleted, not disabled (JAN-PWUWP W-1).
  *
@@ -1431,7 +1439,6 @@ function rejectArrowOwnedBySemanticCommand(
 		[id]
 	);
 }
-
 
 /**
  * The workLifecycle axis either ADVANCES (a legal transition whose cross-axis guard holds against the NEW
@@ -1527,14 +1534,7 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	// being asked for a decision the setter should never have been adjudicating.
 	const unearned =
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
-		rejectUnauthorizedWaiver(
-			ctx,
-			command,
-			id,
-			p,
-			current.assuranceState,
-			loaded.semanticVersion
-		) ??
+		rejectUnauthorizedWaiver(ctx, command, id, p, current.assuranceState, loaded.semanticVersion) ??
 		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
 	if (unearned) return unearned;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or

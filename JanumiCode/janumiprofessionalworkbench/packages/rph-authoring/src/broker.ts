@@ -188,7 +188,7 @@ export interface BrokerDeps {
 	/** ISO clock (deterministic in tests). Defaults to wall-clock. */
 	readonly now?: () => string;
 	/** The actor recorded on every command. Defaults to an AGENT actor ("agent proposes"). */
-	readonly actor?: DomainCommand['issuedBy'];
+	readonly actor?: NonNullable<DomainCommand['issuedBy']>;
 	/** Namespaces command ids + idempotency keys so two brokers over one engine never collide. Defaults to 'broker'. */
 	readonly sessionId?: string;
 }
@@ -219,7 +219,8 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 		requiredInputs: arr(s.requiredInputs),
 		requiredOutputs: arr(s.requiredOutputs),
 		requiredAssurancePolicyIds: arr(s.requiredAssurancePolicyIds),
-		executionBoundary: s.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL',
+		executionBoundary:
+			s.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL',
 		...(s.boundaryContract ? { boundaryContract: s.boundaryContract as BoundaryContract } : {})
 	};
 }
@@ -452,9 +453,7 @@ export class PwaAuthoringBroker {
 			...(patch.executionBoundary !== undefined
 				? { executionBoundary: patch.executionBoundary }
 				: {}),
-			...(patch.boundaryContract !== undefined
-				? { boundaryContract: patch.boundaryContract }
-				: {})
+			...(patch.boundaryContract !== undefined ? { boundaryContract: patch.boundaryContract } : {})
 		};
 	}
 
@@ -750,7 +749,8 @@ export class PwaAuthoringBroker {
 			if (!contract)
 				return {
 					ok: false,
-					error: 'A DELEGATED_EXTERNAL PWU Type must declare a boundaryContract (STD-3): the external counterparty and the assurance policies it attests to.'
+					error:
+						'A DELEGATED_EXTERNAL PWU Type must declare a boundaryContract (STD-3): the external counterparty and the assurance policies it attests to.'
 				};
 			if (!contract.counterpartyLabel?.trim())
 				return {
@@ -760,7 +760,8 @@ export class PwaAuthoringBroker {
 			if (childIds.length > 0 || childRules.length > 0)
 				return {
 					ok: false,
-					error: 'A DELEGATED_EXTERNAL PWU Type is terminal (INV-1): it cannot declare permitted child types. Delegate the whole unit across the boundary, or keep it INTERNAL and decompose.'
+					error:
+						'A DELEGATED_EXTERNAL PWU Type is terminal (INV-1): it cannot declare permitted child types. Delegate the whole unit across the boundary, or keep it INTERNAL and decompose.'
 				};
 			return this.validatePolicyReferences(
 				contract.attestedAssurancePolicyIds ?? [],
@@ -770,7 +771,8 @@ export class PwaAuthoringBroker {
 		if (contract)
 			return {
 				ok: false,
-				error: 'Only a DELEGATED_EXTERNAL PWU Type may carry a boundaryContract (INV-1). Set executionBoundary to DELEGATED_EXTERNAL, or omit the contract.'
+				error:
+					'Only a DELEGATED_EXTERNAL PWU Type may carry a boundaryContract (INV-1). Set executionBoundary to DELEGATED_EXTERNAL, or omit the contract.'
 			};
 		return null;
 	}
