@@ -25,7 +25,8 @@ import {
 	type CompilerProjectProgramEvidence,
 	type CompilerProjectProgramInputRecord,
 	type CompilerProjectProgramLimits,
-	type CompilerProjectProgramRuntimeOptions
+	type CompilerProjectProgramRuntimeOptions,
+	type CompilerProjectProgramSession
 } from '../../semantic/compiler-project-program-capability.js';
 import { createMonotonicOperationClock } from '../../semantic/monotonic-operation-clock.js';
 import {
@@ -329,6 +330,8 @@ function exactPlainObject(
 	return result;
 }
 
+type DeclarationEmissionOnInput = NonNullable<CompilerProjectProgramRuntimeOptions['onInput']>;
+
 function optionalRuntimeOptions(value: unknown): CompilerProjectDeclarationEmissionRuntimeOptions {
 	if (value === undefined) return Object.freeze({});
 	if (
@@ -348,7 +351,7 @@ function optionalRuntimeOptions(value: unknown): CompilerProjectDeclarationEmiss
 	const result: {
 		checkpoint?: () => void;
 		now?: () => number;
-		onInput?: CompilerProjectProgramRuntimeOptions['onInput'];
+		onInput?: DeclarationEmissionOnInput;
 	} = {};
 	for (const key of ownKeys as string[]) {
 		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
@@ -363,7 +366,7 @@ function optionalRuntimeOptions(value: unknown): CompilerProjectDeclarationEmiss
 			);
 		if (key === 'checkpoint') result.checkpoint = descriptor.value as () => void;
 		else if (key === 'now') result.now = descriptor.value as () => number;
-		else result.onInput = descriptor.value as CompilerProjectProgramRuntimeOptions['onInput'];
+		else result.onInput = descriptor.value as DeclarationEmissionOnInput;
 	}
 	return Object.freeze(result);
 }
@@ -609,6 +612,62 @@ function copiedDenseProviderArray<Value>(
 	return Object.freeze(result);
 }
 
+function checkedCompilerOptionText(value: string): string {
+	if (value.length > HARD_MAX_PATH_CHARACTERS || !isUnicodeScalarString(value))
+		fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain invalid text.');
+	return value;
+}
+
+function checkedCompilerOptionNumber(value: number): number {
+	if (!Number.isFinite(value))
+		fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a non-finite number.');
+	return value;
+}
+
+function copiedCompilerOptionArray(
+	value: unknown,
+	ledger: ResourceLedger,
+	ancestors: WeakSet<object>,
+	depth: number
+): readonly unknown[] {
+	const entries = copiedDenseProviderArray<unknown>(
+		value,
+		HARD_MAX_COMPILER_OPTION_ARRAY_LENGTH,
+		ledger,
+		'Public TypeScript nested compiler-option array'
+	);
+	const copiedEntries: unknown[] = [];
+	ledger.preflight(entries.length);
+	for (const entry of entries)
+		copiedEntries.push(copiedCompilerOptionValue(entry, ledger, ancestors, depth + 1));
+	return Object.freeze(copiedEntries);
+}
+
+function copiedCompilerOptionRecord(
+	value: object,
+	ledger: ResourceLedger,
+	ancestors: WeakSet<object>,
+	depth: number
+): Readonly<Record<string, unknown>> {
+	if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
+		fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a non-plain object.');
+	const keys = Reflect.ownKeys(value);
+	if (keys.length > HARD_MAX_COMPILER_OPTION_KEYS)
+		fail('PROVIDER_FAILURE', 'Public TypeScript nested compiler options exceed the key ceiling.');
+	ledger.preflight(keys.length);
+	const result: Record<string, unknown> = {};
+	for (const key of keys) {
+		ledger.step();
+		if (typeof key !== 'string')
+			fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a symbol key.');
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain an accessor.');
+		result[key] = copiedCompilerOptionValue(descriptor.value, ledger, ancestors, depth + 1);
+	}
+	return Object.freeze(result);
+}
+
 function copiedCompilerOptionValue(
 	value: unknown,
 	ledger: ResourceLedger,
@@ -617,52 +676,16 @@ function copiedCompilerOptionValue(
 ): unknown {
 	ledger.step();
 	if (value === null || value === undefined || typeof value === 'boolean') return value;
-	if (typeof value === 'string') {
-		if (value.length > HARD_MAX_PATH_CHARACTERS || !isUnicodeScalarString(value))
-			fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain invalid text.');
-		return value;
-	}
-	if (typeof value === 'number') {
-		if (!Number.isFinite(value))
-			fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a non-finite number.');
-		return value;
-	}
+	if (typeof value === 'string') return checkedCompilerOptionText(value);
+	if (typeof value === 'number') return checkedCompilerOptionNumber(value);
 	if (typeof value !== 'object' || isProxy(value) || depth >= HARD_MAX_COMPILER_OPTION_DEPTH)
 		fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain an unsupported value.');
 	if (ancestors.has(value))
 		fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a cycle.');
 	ancestors.add(value);
 	try {
-		if (Array.isArray(value)) {
-			const entries = copiedDenseProviderArray<unknown>(
-				value,
-				HARD_MAX_COMPILER_OPTION_ARRAY_LENGTH,
-				ledger,
-				'Public TypeScript nested compiler-option array'
-			);
-			const copiedEntries: unknown[] = [];
-			ledger.preflight(entries.length);
-			for (const entry of entries)
-				copiedEntries.push(copiedCompilerOptionValue(entry, ledger, ancestors, depth + 1));
-			return Object.freeze(copiedEntries);
-		}
-		if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
-			fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a non-plain object.');
-		const keys = Reflect.ownKeys(value);
-		if (keys.length > HARD_MAX_COMPILER_OPTION_KEYS)
-			fail('PROVIDER_FAILURE', 'Public TypeScript nested compiler options exceed the key ceiling.');
-		ledger.preflight(keys.length);
-		const result: Record<string, unknown> = {};
-		for (const key of keys) {
-			ledger.step();
-			if (typeof key !== 'string')
-				fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain a symbol key.');
-			const descriptor = Object.getOwnPropertyDescriptor(value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				fail('PROVIDER_FAILURE', 'Public TypeScript compiler options contain an accessor.');
-			result[key] = copiedCompilerOptionValue(descriptor.value, ledger, ancestors, depth + 1);
-		}
-		return Object.freeze(result);
+		if (Array.isArray(value)) return copiedCompilerOptionArray(value, ledger, ancestors, depth);
+		return copiedCompilerOptionRecord(value, ledger, ancestors, depth);
 	} finally {
 		ancestors.delete(value);
 	}
@@ -845,38 +868,30 @@ function copiedProgramQuery(value: unknown, ledger: ResourceLedger): CompilerInp
 	return Object.freeze(query) as unknown as CompilerInputQuery;
 }
 
-function copiedProgramObservation(
-	value: unknown,
-	ledger: ResourceLedger
-): CompilerInputObservation {
-	const observation = copiedBoundedProviderObject(
-		value,
-		13,
-		ledger,
-		'Compiler Program input observation'
-	);
-	const operation = observation.operation;
-	const result = observation.result;
-	const baseKeys = ['id', 'invocationCount', 'logicalPath', 'origin', 'resultDigest'] as const;
-	let variantKeys: readonly string[];
-	if (operation === 'READ_FILE' && result === 'PRESENT')
-		variantKeys = ['byteBudgetClass', 'contentBytes', 'contentSha256', 'operation', 'result'];
-	else if (
-		(operation === 'READ_FILE' && result === 'ABSENT') ||
-		(operation === 'FILE_EXISTS' && (result === 'PRESENT' || result === 'ABSENT')) ||
-		(operation === 'DIRECTORY_EXISTS' && (result === 'DIRECTORY' || result === 'NOT_DIRECTORY')) ||
-		(operation === 'REALPATH' && result === 'ABSENT') ||
-		(operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
-			(result === 'CASE_SENSITIVE' || result === 'CASE_INSENSITIVE'))
-	)
-		variantKeys = ['operation', 'result'];
-	else if (
-		operation === 'GET_DIRECTORIES' &&
-		(result === 'DIRECTORY' || result === 'NOT_DIRECTORY')
-	)
-		variantKeys = ['operation', 'result', 'resultEntries', 'scannedEntries'];
-	else if (operation === 'READ_DIRECTORY' && (result === 'DIRECTORY' || result === 'NOT_DIRECTORY'))
-		variantKeys = [
+/**
+ * The exact variants whose only journalled fields are the operation and its status. Each disjunct
+ * of the original condition pinned a distinct operation, so dispatching on the operation first is
+ * the same predicate.
+ */
+function isProgramObservationStatusOnlyVariant(operation: unknown, result: unknown): boolean {
+	if (operation === 'READ_FILE') return result === 'ABSENT';
+	if (operation === 'FILE_EXISTS') return result === 'PRESENT' || result === 'ABSENT';
+	if (operation === 'DIRECTORY_EXISTS') return result === 'DIRECTORY' || result === 'NOT_DIRECTORY';
+	if (operation === 'REALPATH') return result === 'ABSENT';
+	if (operation === 'USE_CASE_SENSITIVE_FILE_NAMES')
+		return result === 'CASE_SENSITIVE' || result === 'CASE_INSENSITIVE';
+	return false;
+}
+
+function programObservationDirectoryVariantKeys(
+	operation: unknown,
+	result: unknown
+): readonly string[] | null {
+	if (result !== 'DIRECTORY' && result !== 'NOT_DIRECTORY') return null;
+	if (operation === 'GET_DIRECTORIES')
+		return ['operation', 'result', 'resultEntries', 'scannedEntries'];
+	if (operation === 'READ_DIRECTORY')
+		return [
 			'depth',
 			'excludes',
 			'extensions',
@@ -886,16 +901,23 @@ function copiedProgramObservation(
 			'resultEntries',
 			'scannedEntries'
 		];
-	else if (operation === 'REALPATH' && result === 'RESOLVED')
-		variantKeys = ['operation', 'resolvedLogicalPath', 'result'];
-	else if (operation === 'CURRENT_DIRECTORY' && result === 'RESOLVED')
-		variantKeys = ['operation', 'resolvedLogicalPath', 'result'];
-	else fail('CAPTURE_UNAVAILABLE', 'Compiler Program input observation has an invalid variant.');
-	requireExactProviderKeys(
-		observation,
-		[...baseKeys, ...variantKeys],
-		'Compiler Program input observation'
-	);
+	return null;
+}
+
+function programObservationVariantKeys(operation: unknown, result: unknown): readonly string[] {
+	if (operation === 'READ_FILE' && result === 'PRESENT')
+		return ['byteBudgetClass', 'contentBytes', 'contentSha256', 'operation', 'result'];
+	if (isProgramObservationStatusOnlyVariant(operation, result)) return ['operation', 'result'];
+	const directoryKeys = programObservationDirectoryVariantKeys(operation, result);
+	if (directoryKeys !== null) return directoryKeys;
+	if (operation === 'REALPATH' && result === 'RESOLVED')
+		return ['operation', 'resolvedLogicalPath', 'result'];
+	if (operation === 'CURRENT_DIRECTORY' && result === 'RESOLVED')
+		return ['operation', 'resolvedLogicalPath', 'result'];
+	fail('CAPTURE_UNAVAILABLE', 'Compiler Program input observation has an invalid variant.');
+}
+
+function validateProgramObservationBaseFields(observation: Record<string, unknown>): void {
 	if (
 		typeof observation.id !== 'string' ||
 		observation.id.length === 0 ||
@@ -914,65 +936,107 @@ function copiedProgramObservation(
 		!/^[a-f0-9]{64}$/u.test(observation.resultDigest)
 	)
 		fail('CAPTURE_UNAVAILABLE', 'Compiler Program input observation base fields are invalid.');
-	if (operation === 'READ_FILE' && result === 'PRESENT') {
-		if (
-			(observation.byteBudgetClass !== 'FROZEN_SUBJECT' &&
-				observation.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT') ||
-			typeof observation.contentBytes !== 'number' ||
-			!Number.isSafeInteger(observation.contentBytes) ||
-			observation.contentBytes < 0 ||
-			typeof observation.contentSha256 !== 'string' ||
-			!/^[a-f0-9]{64}$/u.test(observation.contentSha256)
-		)
-			fail('CAPTURE_UNAVAILABLE', 'Compiler Program READ_FILE content evidence is invalid.');
-	}
-	if (operation === 'GET_DIRECTORIES' || operation === 'READ_DIRECTORY') {
-		observation.resultEntries = copiedStringArray(
-			observation.resultEntries,
-			ledger,
-			'Compiler Program directory result entries'
-		);
-		if (
-			typeof observation.scannedEntries !== 'number' ||
-			!Number.isSafeInteger(observation.scannedEntries) ||
-			observation.scannedEntries < (observation.resultEntries as readonly string[]).length
-		)
-			fail('CAPTURE_UNAVAILABLE', 'Compiler Program directory scan count is invalid.');
-	}
-	if (operation === 'READ_DIRECTORY') {
-		if (
-			observation.depth !== null &&
-			(typeof observation.depth !== 'number' ||
-				!Number.isSafeInteger(observation.depth) ||
-				observation.depth < 0)
-		)
-			fail('CAPTURE_UNAVAILABLE', 'Compiler Program READ_DIRECTORY depth is invalid.');
-		observation.excludes = copiedStringArray(
-			observation.excludes,
-			ledger,
-			'Compiler Program READ_DIRECTORY observation excludes'
-		);
-		observation.extensions = copiedStringArray(
-			observation.extensions,
-			ledger,
-			'Compiler Program READ_DIRECTORY observation extensions'
-		);
-		observation.includes = copiedStringArray(
-			observation.includes,
-			ledger,
-			'Compiler Program READ_DIRECTORY observation includes'
-		);
-	}
-	if (result === 'RESOLVED') {
-		if (
-			typeof observation.resolvedLogicalPath !== 'string' ||
-			observation.resolvedLogicalPath.length === 0 ||
-			observation.resolvedLogicalPath.length > HARD_MAX_PATH_CHARACTERS ||
-			!isUnicodeScalarString(observation.resolvedLogicalPath) ||
-			(operation === 'CURRENT_DIRECTORY' && observation.resolvedLogicalPath !== '.')
-		)
-			fail('CAPTURE_UNAVAILABLE', 'Compiler Program resolved logical path is invalid.');
-	}
+}
+
+function validateProgramObservationReadFileEvidence(observation: Record<string, unknown>): void {
+	if (
+		(observation.byteBudgetClass !== 'FROZEN_SUBJECT' &&
+			observation.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT') ||
+		typeof observation.contentBytes !== 'number' ||
+		!Number.isSafeInteger(observation.contentBytes) ||
+		observation.contentBytes < 0 ||
+		typeof observation.contentSha256 !== 'string' ||
+		!/^[a-f0-9]{64}$/u.test(observation.contentSha256)
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program READ_FILE content evidence is invalid.');
+}
+
+function copiedProgramObservationDirectoryEntries(
+	observation: Record<string, unknown>,
+	ledger: ResourceLedger
+): void {
+	observation.resultEntries = copiedStringArray(
+		observation.resultEntries,
+		ledger,
+		'Compiler Program directory result entries'
+	);
+	if (
+		typeof observation.scannedEntries !== 'number' ||
+		!Number.isSafeInteger(observation.scannedEntries) ||
+		observation.scannedEntries < (observation.resultEntries as readonly string[]).length
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program directory scan count is invalid.');
+}
+
+function copiedProgramObservationReadDirectoryParameters(
+	observation: Record<string, unknown>,
+	ledger: ResourceLedger
+): void {
+	if (
+		observation.depth !== null &&
+		(typeof observation.depth !== 'number' ||
+			!Number.isSafeInteger(observation.depth) ||
+			observation.depth < 0)
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program READ_DIRECTORY depth is invalid.');
+	observation.excludes = copiedStringArray(
+		observation.excludes,
+		ledger,
+		'Compiler Program READ_DIRECTORY observation excludes'
+	);
+	observation.extensions = copiedStringArray(
+		observation.extensions,
+		ledger,
+		'Compiler Program READ_DIRECTORY observation extensions'
+	);
+	observation.includes = copiedStringArray(
+		observation.includes,
+		ledger,
+		'Compiler Program READ_DIRECTORY observation includes'
+	);
+}
+
+function validateProgramObservationResolvedPath(
+	observation: Record<string, unknown>,
+	operation: unknown
+): void {
+	if (
+		typeof observation.resolvedLogicalPath !== 'string' ||
+		observation.resolvedLogicalPath.length === 0 ||
+		observation.resolvedLogicalPath.length > HARD_MAX_PATH_CHARACTERS ||
+		!isUnicodeScalarString(observation.resolvedLogicalPath) ||
+		(operation === 'CURRENT_DIRECTORY' && observation.resolvedLogicalPath !== '.')
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program resolved logical path is invalid.');
+}
+
+function copiedProgramObservation(
+	value: unknown,
+	ledger: ResourceLedger
+): CompilerInputObservation {
+	const observation = copiedBoundedProviderObject(
+		value,
+		13,
+		ledger,
+		'Compiler Program input observation'
+	);
+	const operation = observation.operation;
+	const result = observation.result;
+	const baseKeys = ['id', 'invocationCount', 'logicalPath', 'origin', 'resultDigest'] as const;
+	const variantKeys = programObservationVariantKeys(operation, result);
+	requireExactProviderKeys(
+		observation,
+		[...baseKeys, ...variantKeys],
+		'Compiler Program input observation'
+	);
+	validateProgramObservationBaseFields(observation);
+	if (operation === 'READ_FILE' && result === 'PRESENT')
+		validateProgramObservationReadFileEvidence(observation);
+	if (operation === 'GET_DIRECTORIES' || operation === 'READ_DIRECTORY')
+		copiedProgramObservationDirectoryEntries(observation, ledger);
+	if (operation === 'READ_DIRECTORY')
+		copiedProgramObservationReadDirectoryParameters(observation, ledger);
+	if (result === 'RESOLVED') validateProgramObservationResolvedPath(observation, operation);
 	return Object.freeze(observation) as unknown as CompilerInputObservation;
 }
 
@@ -1028,10 +1092,10 @@ function copiedProgramInputRecord(
 	}) as CompilerProjectProgramInputRecord;
 }
 
-function copiedProgramEvidence(
+function copiedProgramEvidenceFields(
 	value: unknown,
 	ledger: ResourceLedger
-): DeclarationEmissionProgramEvidence {
+): Record<string, unknown> {
 	if (
 		value === null ||
 		typeof value !== 'object' ||
@@ -1060,6 +1124,10 @@ function copiedProgramEvidence(
 			);
 		copied[key] = descriptor.value;
 	}
+	return copied;
+}
+
+function validateProgramEvidenceScalars(copied: Record<string, unknown>): void {
 	for (const key of PROGRAM_EVIDENCE_COUNT_KEYS) {
 		const entry = copied[key];
 		if (typeof entry !== 'number' || !Number.isSafeInteger(entry) || entry < 0)
@@ -1096,6 +1164,14 @@ function copiedProgramEvidence(
 		)
 			fail('CAPTURE_UNAVAILABLE', `Finalized compiler Program evidence ${key} is invalid.`);
 	}
+}
+
+function copiedProgramEvidence(
+	value: unknown,
+	ledger: ResourceLedger
+): DeclarationEmissionProgramEvidence {
+	const copied = copiedProgramEvidenceFields(value, ledger);
+	validateProgramEvidenceScalars(copied);
 	const borrowedInputRecords = copiedDenseProviderArray<
 		CompilerProjectProgramEvidence['inputRecords'][number]
 	>(
@@ -1229,7 +1305,9 @@ function compareText(left: string, right: string, ledger: ResourceLedger): numbe
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
 }
 
 function sortedTextPopulation(
@@ -1354,6 +1432,35 @@ interface Utf8Witness {
 	readonly sha256: string;
 }
 
+/**
+ * The UTF-8 length of the code point starting at `index`, refusing lone UTF-16 surrogates. The
+ * scan strides by code UNIT, so this reads code units directly rather than whole code points.
+ */
+function utf8EncodedByteLength(
+	text: string,
+	index: number,
+	invalidTextCode: CompilerProjectDeclarationEmissionError['code'],
+	label: string
+): number {
+	const first = text.charCodeAt(index);
+	if (first <= 0x7f) return 1;
+	if (first <= 0x7ff) return 2;
+	if (first >= 0xd800 && first <= 0xdbff) {
+		const second = text.charCodeAt(index + 1);
+		if (index + 1 >= text.length || second < 0xdc00 || second > 0xdfff)
+			fail(invalidTextCode, `${label} contains a lone UTF-16 surrogate.`);
+		return 4;
+	}
+	if (first >= 0xdc00 && first <= 0xdfff)
+		fail(invalidTextCode, `${label} contains a lone UTF-16 surrogate.`);
+	return 3;
+}
+
+/** A four-byte UTF-8 encoding is exactly the one produced by a two-unit surrogate pair. */
+function utf8CodeUnitStride(encodedBytes: number): number {
+	return encodedBytes === 4 ? 2 : 1;
+}
+
 function utf8Witness(
 	text: string,
 	maxBytes: number,
@@ -1366,24 +1473,11 @@ function utf8Witness(
 	const hash = createHash('sha256');
 	for (let index = 0; index < text.length;) {
 		ledger.step();
-		const first = text.charCodeAt(index);
-		let codeUnits = 1;
-		let encodedBytes: number;
-		if (first <= 0x7f) encodedBytes = 1;
-		else if (first <= 0x7ff) encodedBytes = 2;
-		else if (first >= 0xd800 && first <= 0xdbff) {
-			const second = text.charCodeAt(index + 1);
-			if (index + 1 >= text.length || second < 0xdc00 || second > 0xdfff)
-				fail(invalidTextCode, `${label} contains a lone UTF-16 surrogate.`);
-			codeUnits = 2;
-			encodedBytes = 4;
-		} else if (first >= 0xdc00 && first <= 0xdfff) {
-			fail(invalidTextCode, `${label} contains a lone UTF-16 surrogate.`);
-		} else encodedBytes = 3;
+		const encodedBytes = utf8EncodedByteLength(text, index, invalidTextCode, label);
 		if (encodedBytes > maxBytes - bytes)
 			fail('BUDGET_EXCEEDED', 'Declaration emission exceeded maxOutputBytes.');
 		bytes += encodedBytes;
-		index += codeUnits;
+		index += utf8CodeUnitStride(encodedBytes);
 		if (index - chunkStart >= UTF8_HASH_CHUNK_CODE_UNITS) {
 			hash.update(text.slice(chunkStart, index), 'utf8');
 			chunkStart = index;
@@ -1395,73 +1489,129 @@ function utf8Witness(
 	return Object.freeze({ bytes, sha256: hash.digest('hex') });
 }
 
-function emissionWitness(
-	evidence: DeclarationEmissionProgramEvidence,
-	compilerOptionsDigest: string,
-	programSourcePopulationDigest: string,
-	semanticSourceId: SemanticSourceId,
-	selectedSourceLogicalPath: string,
-	outputs: readonly CompilerProjectDeclarationOutput[],
-	limits: CompilerProjectDeclarationEmissionLimits,
+type DeclarationEmissionInputRecord = DeclarationEmissionProgramEvidence['inputRecords'][number];
+
+/** The exact stage ordering the finalized input-attempt population must be monotone in. */
+function programInputRecordStageRank(stage: DeclarationEmissionInputRecord['stage']): number {
+	if (stage === 'PROGRAM_CONSTRUCTION') return 0;
+	if (stage === 'TYPE_CHECKER_CREATE') return 1;
+	if (stage === 'CALLER_ANALYSIS') return 2;
+	if (stage === 'DECLARATION_EMIT') return 3;
+	return -1;
+}
+
+function programInputRecordOrdinalsAreInvalid(
+	record: DeclarationEmissionInputRecord,
+	index: number,
+	stageRank: number,
+	priorStageRank: number
+): boolean {
+	return (
+		!Number.isSafeInteger(record.ordinal) ||
+		record.ordinal < 0 ||
+		!Number.isSafeInteger(record.invocationOrdinal) ||
+		record.invocationOrdinal < 0 ||
+		!Number.isSafeInteger(record.attributedInvocationCount) ||
+		record.attributedInvocationCount <= 0 ||
+		record.ordinal !== index ||
+		stageRank < priorStageRank ||
+		(record.stage !== 'DECLARATION_EMIT' &&
+			record.invocationOrdinal >= record.attributedInvocationCount)
+	);
+}
+
+function isPresentReadFileAttempt(record: DeclarationEmissionInputRecord): boolean {
+	return (
+		record.query.operation === 'READ_FILE' &&
+		record.observation.operation === 'READ_FILE' &&
+		record.observation.result === 'PRESENT'
+	);
+}
+
+function declarationEmitReplayReadBytes(
+	record: DeclarationEmissionInputRecord,
+	declarationEmitReadBytes: number
+): number {
+	if (record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT')
+		return safeAddEvidenceAmount(
+			declarationEmitReadBytes,
+			record.observation.contentBytes,
+			'Declaration-emission replay read bytes'
+		);
+	return declarationEmitReadBytes;
+}
+
+interface ProgramInputRecordPopulationSummary {
+	readonly declarationEmitInputRecords: number;
+	readonly declarationEmitReadBytes: number;
+	readonly ordinalPopulationReconciles: boolean;
+	readonly presentReadFileAttempts: number;
+}
+
+function summarizeProgramInputRecordPopulation(
+	records: DeclarationEmissionProgramEvidence['inputRecords'],
 	ledger: ResourceLedger
+): ProgramInputRecordPopulationSummary {
+	ledger.preflight(records.length);
+	let presentReadFileAttempts = 0;
+	let declarationEmitInputRecords = 0;
+	let declarationEmitReadBytes = 0;
+	let ordinalPopulationReconciles = true;
+	let priorStageRank = 0;
+	for (let index = 0; index < records.length; index += 1) {
+		ledger.step();
+		const record = records[index]!;
+		const stageRank = programInputRecordStageRank(record.stage);
+		if (programInputRecordOrdinalsAreInvalid(record, index, stageRank, priorStageRank))
+			ordinalPopulationReconciles = false;
+		if (stageRank >= 0) priorStageRank = stageRank;
+		if (record.stage === 'DECLARATION_EMIT') {
+			declarationEmitInputRecords += 1;
+			declarationEmitReadBytes = declarationEmitReplayReadBytes(record, declarationEmitReadBytes);
+		}
+		if (isPresentReadFileAttempt(record)) presentReadFileAttempts += 1;
+	}
+	return Object.freeze({
+		declarationEmitInputRecords,
+		declarationEmitReadBytes,
+		ordinalPopulationReconciles,
+		presentReadFileAttempts
+	});
+}
+
+interface EmissionWitnessInputs {
+	readonly compilerOptionsDigest: string;
+	readonly evidence: DeclarationEmissionProgramEvidence;
+	readonly ledger: ResourceLedger;
+	readonly limits: CompilerProjectDeclarationEmissionLimits;
+	readonly outputs: readonly CompilerProjectDeclarationOutput[];
+	readonly programSourcePopulationDigest: string;
+	readonly selectedSourceLogicalPath: string;
+	readonly semanticSourceId: SemanticSourceId;
+}
+
+function emissionWitness(
+	witnessInputs: EmissionWitnessInputs
 ): CompilerProjectDeclarationEmissionWitness {
+	const {
+		compilerOptionsDigest,
+		evidence,
+		ledger,
+		limits,
+		outputs,
+		programSourcePopulationDigest,
+		selectedSourceLogicalPath,
+		semanticSourceId
+	} = witnessInputs;
 	if (
 		evidence.inputRecords.length > limits.maxInputRecords ||
 		evidence.compilerHostCallbacks > limits.maxInputRecords ||
 		evidence.compilerHostReadBytes > limits.maxReadBytes
 	)
 		fail('BUDGET_EXCEEDED', 'Declaration emission exceeded its input/read budgets.');
-	ledger.preflight(evidence.inputRecords.length);
-	let presentReadFileAttempts = 0;
-	let declarationEmitInputRecords = 0;
-	let declarationEmitReadBytes = 0;
-	let ordinalPopulationReconciles = true;
-	let priorStageRank = 0;
-	for (let index = 0; index < evidence.inputRecords.length; index += 1) {
-		ledger.step();
-		const record = evidence.inputRecords[index]!;
-		const stageRank =
-			record.stage === 'PROGRAM_CONSTRUCTION'
-				? 0
-				: record.stage === 'TYPE_CHECKER_CREATE'
-					? 1
-					: record.stage === 'CALLER_ANALYSIS'
-						? 2
-						: record.stage === 'DECLARATION_EMIT'
-							? 3
-							: -1;
-		if (
-			!Number.isSafeInteger(record.ordinal) ||
-			record.ordinal < 0 ||
-			!Number.isSafeInteger(record.invocationOrdinal) ||
-			record.invocationOrdinal < 0 ||
-			!Number.isSafeInteger(record.attributedInvocationCount) ||
-			record.attributedInvocationCount <= 0 ||
-			record.ordinal !== index ||
-			stageRank < priorStageRank ||
-			(record.stage !== 'DECLARATION_EMIT' &&
-				record.invocationOrdinal >= record.attributedInvocationCount)
-		)
-			ordinalPopulationReconciles = false;
-		if (stageRank >= 0) priorStageRank = stageRank;
-		if (record.stage === 'DECLARATION_EMIT') {
-			declarationEmitInputRecords += 1;
-			if (record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT')
-				declarationEmitReadBytes = safeAddEvidenceAmount(
-					declarationEmitReadBytes,
-					record.observation.contentBytes,
-					'Declaration-emission replay read bytes'
-				);
-		}
-		if (
-			record.query.operation === 'READ_FILE' &&
-			record.observation.operation === 'READ_FILE' &&
-			record.observation.result === 'PRESENT'
-		)
-			presentReadFileAttempts += 1;
-	}
+	const population = summarizeProgramInputRecordPopulation(evidence.inputRecords, ledger);
 	if (
-		!ordinalPopulationReconciles ||
+		!population.ordinalPopulationReconciles ||
 		evidence.artifactParseInputRecords !== 0 ||
 		evidence.artifactParseReadBytes !== 0 ||
 		evidence.compilerHostCallbacks !==
@@ -1471,8 +1621,8 @@ function emissionWitness(
 		evidence.inputRecords.length !== evidence.compilerHostCallbacks ||
 		evidence.programCompilerHostCallbacks > evidence.attributedInputRecords ||
 		evidence.programCompilerHostReadBytes > evidence.attributedReadBytes ||
-		declarationEmitInputRecords !== evidence.declarationEmitInputRecords ||
-		declarationEmitReadBytes !== evidence.declarationEmitReadBytes
+		population.declarationEmitInputRecords !== evidence.declarationEmitInputRecords ||
+		population.declarationEmitReadBytes !== evidence.declarationEmitReadBytes
 	)
 		fail('CAPTURE_UNAVAILABLE', 'Finalized Program input-attempt population does not reconcile.');
 	const inputRecordsDigest = bracket(ledger, () =>
@@ -1501,7 +1651,7 @@ function emissionWitness(
 		programCompilerInputAttempts: evidence.compilerHostCallbacks,
 		programInputAttemptPopulationDigest: inputRecordsDigest,
 		programInputAttemptPopulationReconciles: true,
-		programPresentReadFileAttempts: presentReadFileAttempts,
+		programPresentReadFileAttempts: population.presentReadFileAttempts,
 		programReadBytes: evidence.compilerHostReadBytes,
 		programSourceFiles: evidence.programSourceFiles,
 		programSourceFilePopulationReconciles: true,
@@ -1515,20 +1665,14 @@ function emissionWitness(
 	});
 }
 
-/**
- * @internal Produces exactly one declaration and one declaration map for an exact authored
- * source in a freshly reconstructed, project-scoped public TypeScript Program.
- */
-export function emitCompilerProjectDeclaration(
-	inputsValue: unknown,
-	limitsValue: unknown,
-	runtimeValue: unknown = undefined
-): CompilerProjectDeclarationEmission {
-	const inputs = validateInputs(inputsValue);
-	const limits = validateEmitLimits(limitsValue);
-	const runtime = optionalRuntimeOptions(runtimeValue);
-	const ledger = resourceLedger(limits, runtime);
-	ledger.checkpoint();
+type SemanticProgramSelection = StaticSemanticSnapshot['programs'][number];
+type SemanticProjectSelection = StaticSemanticSnapshot['projects'][number];
+type SemanticSourceSelection = StaticSemanticSnapshot['sources'][number];
+
+function validateSelectionPreflight(
+	inputs: CompilerProjectDeclarationEmissionInputs,
+	limits: CompilerProjectDeclarationEmissionLimits
+): void {
 	if (
 		inputs.semanticSnapshot.projects.length > HARD_MAX_SNAPSHOT_POPULATION ||
 		inputs.semanticSnapshot.programs.length > HARD_MAX_SNAPSHOT_POPULATION ||
@@ -1544,28 +1688,15 @@ export function emitCompilerProjectDeclaration(
 		fail('BUDGET_EXCEEDED', 'Semantic snapshot selection populations exceed bounded preflight.');
 	if (inputs.logicalPath.length > limits.maxPathCharacters)
 		fail('BUDGET_EXCEEDED', 'Selected source path exceeds maxPathCharacters.');
-	const snapshot = inputs.semanticSnapshot;
-	if (inputs.frozenSubject.descriptor.subjectId !== snapshot.subjectId)
-		fail('CAPTURE_UNAVAILABLE', 'FrozenSubject and semantic snapshot subject identities differ.');
-	const project = uniqueMatch(
-		snapshot.projects,
-		(candidate) => candidate.id === inputs.semanticProjectId,
-		ledger,
-		'Declaration emission requires one exact semantic project.'
-	);
-	const program = uniqueMatch(
-		snapshot.programs,
-		(candidate) => candidate.id === inputs.semanticProgramId,
-		ledger,
-		'Declaration emission requires one exact semantic Program.'
-	);
-	const source = uniqueMatch(
-		snapshot.sources,
-		(candidate) =>
-			candidate.id === inputs.semanticSourceId && candidate.logicalPath === inputs.logicalPath,
-		ledger,
-		'Declaration emission requires one exact semantic source and logical path.'
-	);
+}
+
+function validateSelectionBindings(
+	project: SemanticProjectSelection,
+	program: SemanticProgramSelection,
+	source: SemanticSourceSelection,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	ledger: ResourceLedger
+): void {
 	if (
 		project.sourceIds.length > HARD_MAX_PROGRAM_SOURCE_FILES ||
 		program.sourceIds.length > HARD_MAX_PROGRAM_SOURCE_FILES ||
@@ -1590,6 +1721,45 @@ export function emitCompilerProjectDeclaration(
 			'SELECTION_UNAVAILABLE',
 			'Declaration emission supports only one authored, root, non-declaration semantic source.'
 		);
+}
+
+function validateExpectedProgramSourceCandidate(
+	candidate: SemanticSourceSelection,
+	acceptedSources: number,
+	program: SemanticProgramSelection,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	seenExpectedLogicalPaths: ReadonlySet<string>
+): void {
+	if (acceptedSources >= program.sourceIds.length)
+		fail(
+			'CAPTURE_UNAVAILABLE',
+			'Semantic Program source population exceeds its exact source-ID population.'
+		);
+	if (
+		acceptedSources >= HARD_MAX_PROGRAM_SOURCE_FILES ||
+		acceptedSources >= limits.maxProgramSourceFiles
+	)
+		fail('BUDGET_EXCEEDED', 'Semantic Program source population exceeds its bounded gate.');
+	if (
+		candidate.logicalPath.length > HARD_MAX_PATH_CHARACTERS ||
+		candidate.logicalPath.length > limits.maxPathCharacters
+	)
+		fail('BUDGET_EXCEEDED', 'Semantic Program source path exceeds maxPathCharacters.');
+	if (seenExpectedLogicalPaths.has(candidate.logicalPath))
+		fail('CAPTURE_UNAVAILABLE', 'Semantic Program repeats a logical source path.');
+}
+
+interface ExpectedProgramSourcePopulation {
+	readonly expectedProgramSourcePaths: readonly string[];
+	readonly expectedSourceIdentities: readonly SourceOriginProgramSourceIdentity[];
+}
+
+function collectExpectedProgramSourcePopulation(
+	snapshot: StaticSemanticSnapshot,
+	program: SemanticProgramSelection,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	ledger: ResourceLedger
+): ExpectedProgramSourcePopulation {
 	ledger.preflight(snapshot.sources.length);
 	const expectedProgramSourcePaths: string[] = [];
 	const expectedSourceIdentities: SourceOriginProgramSourceIdentity[] = [];
@@ -1597,23 +1767,13 @@ export function emitCompilerProjectDeclaration(
 	for (const candidate of snapshot.sources) {
 		ledger.step();
 		if (candidate.programId !== program.id) continue;
-		if (expectedProgramSourcePaths.length >= program.sourceIds.length)
-			fail(
-				'CAPTURE_UNAVAILABLE',
-				'Semantic Program source population exceeds its exact source-ID population.'
-			);
-		if (
-			expectedProgramSourcePaths.length >= HARD_MAX_PROGRAM_SOURCE_FILES ||
-			expectedProgramSourcePaths.length >= limits.maxProgramSourceFiles
-		)
-			fail('BUDGET_EXCEEDED', 'Semantic Program source population exceeds its bounded gate.');
-		if (
-			candidate.logicalPath.length > HARD_MAX_PATH_CHARACTERS ||
-			candidate.logicalPath.length > limits.maxPathCharacters
-		)
-			fail('BUDGET_EXCEEDED', 'Semantic Program source path exceeds maxPathCharacters.');
-		if (seenExpectedLogicalPaths.has(candidate.logicalPath))
-			fail('CAPTURE_UNAVAILABLE', 'Semantic Program repeats a logical source path.');
+		validateExpectedProgramSourceCandidate(
+			candidate,
+			expectedProgramSourcePaths.length,
+			program,
+			limits,
+			seenExpectedLogicalPaths
+		);
 		seenExpectedLogicalPaths.add(candidate.logicalPath);
 		expectedProgramSourcePaths.push(candidate.logicalPath);
 		expectedSourceIdentities.push(
@@ -1629,8 +1789,233 @@ export function emitCompilerProjectDeclaration(
 	}
 	if (expectedProgramSourcePaths.length !== program.sourceIds.length)
 		fail('CAPTURE_UNAVAILABLE', 'Semantic Program source population does not reconcile.');
-	const expectedSortedSourcePaths = sortedTextPopulation(expectedProgramSourcePaths, ledger);
-	const orderedSourceIdentities = sortedSourceIdentityPopulation(expectedSourceIdentities, ledger);
+	return { expectedProgramSourcePaths, expectedSourceIdentities };
+}
+
+function freshProgramSourceLogicalPath(
+	candidate: ts.SourceFile,
+	session: CompilerProjectProgramSession,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	ledger: ResourceLedger
+): string {
+	const fileName = bracket(ledger, () => candidate.fileName);
+	if (
+		typeof fileName !== 'string' ||
+		fileName.length === 0 ||
+		fileName.length > HARD_MAX_PATH_CHARACTERS ||
+		fileName.length > limits.maxPathCharacters
+	)
+		fail('PROVIDER_FAILURE', 'Public TypeScript SourceFile lacks a valid fileName.');
+	const logicalPath = bracket(ledger, () => session.toLogicalPath(fileName));
+	if (
+		logicalPath.length === 0 ||
+		logicalPath.length > HARD_MAX_PATH_CHARACTERS ||
+		logicalPath.length > limits.maxPathCharacters ||
+		!isUnicodeScalarString(logicalPath)
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Fresh Program returned an invalid logical source path.');
+	return logicalPath;
+}
+
+interface FreshProgramSourceScan {
+	readonly actualProgramSourcePaths: readonly string[];
+	readonly selectedSourceFile: ts.SourceFile;
+}
+
+function scanFreshProgramSources(
+	programSources: readonly ts.SourceFile[],
+	session: CompilerProjectProgramSession,
+	selectedLogicalPath: string,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	ledger: ResourceLedger
+): FreshProgramSourceScan {
+	let selectedSourceFile: ts.SourceFile | undefined;
+	let selectedProgramSourceMatches = 0;
+	const seenLogicalPaths = new Set<string>();
+	const actualProgramSourcePaths: string[] = [];
+	ledger.preflight(programSources.length);
+	for (const candidate of programSources) {
+		ledger.step();
+		const logicalPath = freshProgramSourceLogicalPath(candidate, session, limits, ledger);
+		if (seenLogicalPaths.has(logicalPath))
+			fail('CAPTURE_UNAVAILABLE', 'Fresh Program repeats a logical source path.');
+		seenLogicalPaths.add(logicalPath);
+		actualProgramSourcePaths.push(logicalPath);
+		if (logicalPath !== selectedLogicalPath) continue;
+		selectedProgramSourceMatches += 1;
+		selectedSourceFile = candidate;
+	}
+	if (selectedProgramSourceMatches !== 1 || selectedSourceFile === undefined)
+		fail('SELECTION_UNAVAILABLE', 'Selected semantic source is not exact in the fresh Program.');
+	return { actualProgramSourcePaths, selectedSourceFile };
+}
+
+function materializedSelectedSourceText(
+	selectedSourceFile: ts.SourceFile,
+	source: SemanticSourceSelection,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	ledger: ResourceLedger
+): string {
+	const selectedSourceText = bracket(ledger, () => selectedSourceFile.text);
+	if (
+		typeof selectedSourceText !== 'string' ||
+		selectedSourceText.length !== source.textLength ||
+		selectedSourceText.length > HARD_MAX_OUTPUT_STRING_CHARACTERS
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Fresh Program selected source text does not reconcile.');
+	const selectedSourceWitness = utf8Witness(
+		selectedSourceText,
+		Math.min(HARD_MAX_OUTPUT_BYTES, limits.maxReadBytes),
+		ledger,
+		'CAPTURE_UNAVAILABLE',
+		'Fresh Program selected source text'
+	);
+	if (
+		selectedSourceWitness.bytes !== source.bytes ||
+		selectedSourceWitness.sha256 !== source.contentSha256
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Fresh Program selected source content does not reconcile.');
+	return selectedSourceText;
+}
+
+function validateDeclarationCompilerOptions(compilerOptions: ts.CompilerOptions): void {
+	if (
+		compilerOptions.declaration !== true ||
+		compilerOptions.declarationMap !== true ||
+		compilerOptions.noEmit === true ||
+		compilerOptions.outFile !== undefined
+	)
+		fail(
+			'OPTIONS_UNSUPPORTED',
+			'Declaration emission requires declaration=true, declarationMap=true, noEmit must not be true, and outFile must be undefined.'
+		);
+}
+
+function validateDeclarationOutputRequest(
+	fileName: string,
+	content: string,
+	limits: CompilerProjectDeclarationEmissionLimits
+): void {
+	if (
+		typeof fileName !== 'string' ||
+		fileName.length === 0 ||
+		fileName.length > HARD_MAX_PATH_CHARACTERS ||
+		fileName.length > limits.maxPathCharacters ||
+		typeof content !== 'string'
+	)
+		fail('EMIT_UNAVAILABLE', 'Declaration output path or content is invalid.');
+	if (!isUnicodeScalarString(fileName))
+		fail('EMIT_UNAVAILABLE', 'Declaration output path is not Unicode scalar text.');
+}
+
+function validateEmittedDeclarationSource(
+	sourceFiles: readonly ts.SourceFile[] | undefined,
+	session: CompilerProjectProgramSession,
+	selectedLogicalPath: string,
+	limits: CompilerProjectDeclarationEmissionLimits,
+	ledger: ResourceLedger
+): void {
+	const emittedSourceFiles = copiedDenseProviderArray<ts.SourceFile>(
+		sourceFiles,
+		1,
+		ledger,
+		'Public TypeScript declaration-output source files',
+		'EMIT_UNAVAILABLE'
+	);
+	if (emittedSourceFiles.length !== 1)
+		fail(
+			'EMIT_UNAVAILABLE',
+			'Every declaration output must identify exactly one bounded source file.'
+		);
+	const emittedSourceFileName = bracket(ledger, () => emittedSourceFiles[0]!.fileName);
+	if (
+		typeof emittedSourceFileName !== 'string' ||
+		emittedSourceFileName.length === 0 ||
+		emittedSourceFileName.length > HARD_MAX_PATH_CHARACTERS ||
+		emittedSourceFileName.length > limits.maxPathCharacters
+	)
+		fail('EMIT_UNAVAILABLE', 'Declaration output source fileName is invalid.');
+	const emittedSourceLogicalPath = bracket(ledger, () =>
+		session.toLogicalPath(emittedSourceFileName)
+	);
+	if (emittedSourceLogicalPath !== selectedLogicalPath)
+		fail(
+			'EMIT_UNAVAILABLE',
+			'Every declaration output must identify the exact selected logical source.'
+		);
+}
+
+function validateDeclarationOutputLogicalPath(
+	logicalPath: string,
+	limits: CompilerProjectDeclarationEmissionLimits
+): void {
+	if (
+		logicalPath.length === 0 ||
+		logicalPath.length > HARD_MAX_PATH_CHARACTERS ||
+		logicalPath.length > limits.maxPathCharacters ||
+		!isUnicodeScalarString(logicalPath)
+	)
+		fail('EMIT_UNAVAILABLE', 'Declaration output logical path is invalid.');
+}
+
+function declarationOutputKind(fileName: string): CompilerProjectDeclarationOutput['kind'] {
+	if (fileName.endsWith('.d.ts.map')) return 'DECLARATION_MAP';
+	if (fileName.endsWith('.d.ts')) return 'DECLARATION';
+	fail('EMIT_UNAVAILABLE', 'Declaration emitter produced an output outside .d.ts.map and .d.ts.');
+}
+
+/**
+ * @internal Produces exactly one declaration and one declaration map for an exact authored
+ * source in a freshly reconstructed, project-scoped public TypeScript Program.
+ */
+export function emitCompilerProjectDeclaration(
+	inputsValue: unknown,
+	limitsValue: unknown,
+	runtimeValue: unknown = undefined
+): CompilerProjectDeclarationEmission {
+	const inputs = validateInputs(inputsValue);
+	const limits = validateEmitLimits(limitsValue);
+	const runtime = optionalRuntimeOptions(runtimeValue);
+	const ledger = resourceLedger(limits, runtime);
+	ledger.checkpoint();
+	validateSelectionPreflight(inputs, limits);
+	const snapshot = inputs.semanticSnapshot;
+	if (inputs.frozenSubject.descriptor.subjectId !== snapshot.subjectId)
+		fail('CAPTURE_UNAVAILABLE', 'FrozenSubject and semantic snapshot subject identities differ.');
+	const project = uniqueMatch(
+		snapshot.projects,
+		(candidate) => candidate.id === inputs.semanticProjectId,
+		ledger,
+		'Declaration emission requires one exact semantic project.'
+	);
+	const program = uniqueMatch(
+		snapshot.programs,
+		(candidate) => candidate.id === inputs.semanticProgramId,
+		ledger,
+		'Declaration emission requires one exact semantic Program.'
+	);
+	const source = uniqueMatch(
+		snapshot.sources,
+		(candidate) =>
+			candidate.id === inputs.semanticSourceId && candidate.logicalPath === inputs.logicalPath,
+		ledger,
+		'Declaration emission requires one exact semantic source and logical path.'
+	);
+	validateSelectionBindings(project, program, source, limits, ledger);
+	const expectedPopulation = collectExpectedProgramSourcePopulation(
+		snapshot,
+		program,
+		limits,
+		ledger
+	);
+	const expectedSortedSourcePaths = sortedTextPopulation(
+		expectedPopulation.expectedProgramSourcePaths,
+		ledger
+	);
+	const orderedSourceIdentities = sortedSourceIdentityPopulation(
+		expectedPopulation.expectedSourceIdentities,
+		ledger
+	);
 
 	const compilerLimits = effectiveProgramLimits(
 		inputs.compilerProgramLimits,
@@ -1672,39 +2057,13 @@ export function emitCompilerProjectDeclaration(
 		programSources.length > limits.maxProgramSourceFiles
 	)
 		fail('BUDGET_EXCEEDED', 'Declaration emission exceeded maxProgramSourceFiles.');
-	let selectedSourceFile: ts.SourceFile | undefined;
-	let selectedProgramSourceMatches = 0;
-	const seenLogicalPaths = new Set<string>();
-	const actualProgramSourcePaths: string[] = [];
-	ledger.preflight(programSources.length);
-	for (const candidate of programSources) {
-		ledger.step();
-		const fileName = bracket(ledger, () => candidate.fileName);
-		if (
-			typeof fileName !== 'string' ||
-			fileName.length === 0 ||
-			fileName.length > HARD_MAX_PATH_CHARACTERS ||
-			fileName.length > limits.maxPathCharacters
-		)
-			fail('PROVIDER_FAILURE', 'Public TypeScript SourceFile lacks a valid fileName.');
-		const logicalPath = bracket(ledger, () => session.toLogicalPath(fileName));
-		if (
-			logicalPath.length === 0 ||
-			logicalPath.length > HARD_MAX_PATH_CHARACTERS ||
-			logicalPath.length > limits.maxPathCharacters ||
-			!isUnicodeScalarString(logicalPath)
-		)
-			fail('CAPTURE_UNAVAILABLE', 'Fresh Program returned an invalid logical source path.');
-		if (seenLogicalPaths.has(logicalPath))
-			fail('CAPTURE_UNAVAILABLE', 'Fresh Program repeats a logical source path.');
-		seenLogicalPaths.add(logicalPath);
-		actualProgramSourcePaths.push(logicalPath);
-		if (logicalPath !== inputs.logicalPath) continue;
-		selectedProgramSourceMatches += 1;
-		selectedSourceFile = candidate;
-	}
-	if (selectedProgramSourceMatches !== 1 || selectedSourceFile === undefined)
-		fail('SELECTION_UNAVAILABLE', 'Selected semantic source is not exact in the fresh Program.');
+	const { actualProgramSourcePaths, selectedSourceFile } = scanFreshProgramSources(
+		programSources,
+		session,
+		inputs.logicalPath,
+		limits,
+		ledger
+	);
 	if (bracket(ledger, () => selectedSourceFile.isDeclarationFile))
 		fail('SELECTION_UNAVAILABLE', 'Fresh Program selected source is a declaration file.');
 	const actualSortedSourcePaths = sortedTextPopulation(actualProgramSourcePaths, ledger);
@@ -1713,25 +2072,12 @@ export function emitCompilerProjectDeclaration(
 	const programSourcePopulationDigest = bracket(ledger, () =>
 		sourceOriginProgramSourcePopulationDigest(orderedSourceIdentities, () => ledger.step())
 	);
-	const selectedSourceText = bracket(ledger, () => selectedSourceFile.text);
-	if (
-		typeof selectedSourceText !== 'string' ||
-		selectedSourceText.length !== source.textLength ||
-		selectedSourceText.length > HARD_MAX_OUTPUT_STRING_CHARACTERS
-	)
-		fail('CAPTURE_UNAVAILABLE', 'Fresh Program selected source text does not reconcile.');
-	const selectedSourceWitness = utf8Witness(
-		selectedSourceText,
-		Math.min(HARD_MAX_OUTPUT_BYTES, limits.maxReadBytes),
-		ledger,
-		'CAPTURE_UNAVAILABLE',
-		'Fresh Program selected source text'
+	const selectedSourceText = materializedSelectedSourceText(
+		selectedSourceFile,
+		source,
+		limits,
+		ledger
 	);
-	if (
-		selectedSourceWitness.bytes !== source.bytes ||
-		selectedSourceWitness.sha256 !== source.contentSha256
-	)
-		fail('CAPTURE_UNAVAILABLE', 'Fresh Program selected source content does not reconcile.');
 	const materializedSource = Object.freeze({
 		contentBytes: source.bytes,
 		contentSha256: source.contentSha256,
@@ -1749,16 +2095,7 @@ export function emitCompilerProjectDeclaration(
 	const compilerOptions = bracket(ledger, () =>
 		copiedCompilerOptions(compilerOptionsValue, ledger)
 	);
-	if (
-		compilerOptions.declaration !== true ||
-		compilerOptions.declarationMap !== true ||
-		compilerOptions.noEmit === true ||
-		compilerOptions.outFile !== undefined
-	)
-		fail(
-			'OPTIONS_UNSUPPORTED',
-			'Declaration emission requires declaration=true, declarationMap=true, noEmit must not be true, and outFile must be undefined.'
-		);
+	validateDeclarationCompilerOptions(compilerOptions);
 	const compilerOptionsDigest = bracket(
 		ledger,
 		() => canonicalSemanticJsonWitnessWithProgress(compilerOptions, () => ledger.step()).sha256
@@ -1781,74 +2118,23 @@ export function emitCompilerProjectDeclaration(
 		ledger.checkpoint();
 		if (outputs.length >= HARD_MAX_EMITTED_FILES || outputs.length >= limits.maxOutputFiles)
 			fail('BUDGET_EXCEEDED', 'Declaration emission exceeded maxOutputFiles.');
-		if (
-			typeof fileName !== 'string' ||
-			fileName.length === 0 ||
-			fileName.length > HARD_MAX_PATH_CHARACTERS ||
-			fileName.length > limits.maxPathCharacters ||
-			typeof content !== 'string'
-		)
-			fail('EMIT_UNAVAILABLE', 'Declaration output path or content is invalid.');
-		if (!isUnicodeScalarString(fileName))
-			fail('EMIT_UNAVAILABLE', 'Declaration output path is not Unicode scalar text.');
+		validateDeclarationOutputRequest(fileName, content, limits);
 		if (
 			content.length > HARD_MAX_OUTPUT_STRING_CHARACTERS - outputStringCharacters ||
 			content.length > limits.maxOutputStringCharacters - outputStringCharacters
 		)
 			fail('BUDGET_EXCEEDED', 'Declaration emission exceeded maxOutputStringCharacters.');
 		outputStringCharacters += content.length;
-		if (writeByteOrderMark !== false || content.charCodeAt(0) === 0xfeff)
+		if (writeByteOrderMark !== false || content.codePointAt(0) === 0xfeff)
 			fail('EMIT_UNAVAILABLE', 'Declaration outputs must be UTF-8 without a byte-order mark.');
-		const emittedSourceFiles = copiedDenseProviderArray<ts.SourceFile>(
-			sourceFiles,
-			1,
-			ledger,
-			'Public TypeScript declaration-output source files',
-			'EMIT_UNAVAILABLE'
-		);
-		if (emittedSourceFiles.length !== 1)
-			fail(
-				'EMIT_UNAVAILABLE',
-				'Every declaration output must identify exactly one bounded source file.'
-			);
-		const emittedSourceFileName = bracket(ledger, () => emittedSourceFiles[0]!.fileName);
-		if (
-			typeof emittedSourceFileName !== 'string' ||
-			emittedSourceFileName.length === 0 ||
-			emittedSourceFileName.length > HARD_MAX_PATH_CHARACTERS ||
-			emittedSourceFileName.length > limits.maxPathCharacters
-		)
-			fail('EMIT_UNAVAILABLE', 'Declaration output source fileName is invalid.');
-		const emittedSourceLogicalPath = bracket(ledger, () =>
-			session.toLogicalPath(emittedSourceFileName)
-		);
-		if (emittedSourceLogicalPath !== inputs.logicalPath)
-			fail(
-				'EMIT_UNAVAILABLE',
-				'Every declaration output must identify the exact selected logical source.'
-			);
+		validateEmittedDeclarationSource(sourceFiles, session, inputs.logicalPath, limits, ledger);
 		if (rawOutputPaths.has(fileName))
 			fail('EMIT_UNAVAILABLE', 'Declaration emitter repeated an output file path.');
 		const logicalPath = bracket(ledger, () => session.toLogicalPath(fileName));
-		if (
-			logicalPath.length === 0 ||
-			logicalPath.length > HARD_MAX_PATH_CHARACTERS ||
-			logicalPath.length > limits.maxPathCharacters ||
-			!isUnicodeScalarString(logicalPath)
-		)
-			fail('EMIT_UNAVAILABLE', 'Declaration output logical path is invalid.');
+		validateDeclarationOutputLogicalPath(logicalPath, limits);
 		if (logicalOutputPaths.has(logicalPath))
 			fail('EMIT_UNAVAILABLE', 'Declaration emitter repeated a normalized output path.');
-		const kind = fileName.endsWith('.d.ts.map')
-			? 'DECLARATION_MAP'
-			: fileName.endsWith('.d.ts')
-				? 'DECLARATION'
-				: null;
-		if (kind === null)
-			fail(
-				'EMIT_UNAVAILABLE',
-				'Declaration emitter produced an output outside .d.ts.map and .d.ts.'
-			);
+		const kind = declarationOutputKind(fileName);
 		const contentWitness = utf8Witness(
 			content,
 			Math.min(HARD_MAX_OUTPUT_BYTES - outputBytes, limits.maxOutputBytes - outputBytes),
@@ -1890,9 +2176,11 @@ export function emitCompilerProjectDeclaration(
 		fail('EMIT_UNAVAILABLE', 'Public TypeScript declaration emit was skipped or diagnostic.');
 	if (outputs.length !== 2 || declarationOutputs !== 1 || declarationMapOutputs !== 1)
 		fail('EMIT_UNAVAILABLE', 'Declaration emission requires exactly one .d.ts and one .d.ts.map.');
-	outputs.sort((left, right) =>
-		left.kind === right.kind ? 0 : left.kind === 'DECLARATION_MAP' ? -1 : 1
-	);
+	outputs.sort((left, right) => {
+		if (left.kind === right.kind) return 0;
+		if (left.kind === 'DECLARATION_MAP') return -1;
+		return 1;
+	});
 	Object.freeze(outputs);
 
 	const evidenceValue = bracket(ledger, () => session.finalize());
@@ -1909,16 +2197,16 @@ export function emitCompilerProjectDeclaration(
 				'CAPTURE_UNAVAILABLE',
 				'Finalized compiler session does not reconcile the exact selection.'
 			);
-		return emissionWitness(
-			evidence,
+		return emissionWitness({
 			compilerOptionsDigest,
-			programSourcePopulationDigest,
-			source.id,
-			inputs.logicalPath,
-			outputs,
+			evidence,
+			ledger,
 			limits,
-			ledger
-		);
+			outputs,
+			programSourcePopulationDigest,
+			selectedSourceLogicalPath: inputs.logicalPath,
+			semanticSourceId: source.id
+		});
 	});
 	ledger.checkpoint();
 	return Object.freeze({

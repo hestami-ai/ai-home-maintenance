@@ -32,6 +32,7 @@ import {
 	type ModuleResolutionTraceBuildInputs,
 	type ModuleResolutionTraceBuildOutcome,
 	type ModuleResolutionTraceDiagnostic,
+	type ModuleResolutionTraceId,
 	type ModuleResolutionTraceImporterWitness,
 	type ModuleResolutionTraceProgressEvent,
 	type ModuleResolutionTraceProgressPhase,
@@ -46,7 +47,7 @@ import {
 import { TYPESCRIPT_PROVIDER_VERSION, type StaticSemanticSnapshot } from '../contracts/semantic.js';
 import type { ProgramRecipe } from '../contracts/subject.js';
 import { validateConstructedProjectContextGraph } from '../graph/validate-project-context-graph.js';
-import { sha256 } from '../inventory/canonical.js';
+import { compareText, sha256 } from '../inventory/canonical.js';
 import {
 	type CompilerInputQuery,
 	type VerifiedCompilerProjectInputEntry,
@@ -210,118 +211,142 @@ function preflightLimits(value: unknown): {
 	};
 }
 
+type PlainDataWork =
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+interface PlainDataLimits {
+	readonly maxInputRecords: number;
+	readonly maxInputStringCharacters: number;
+}
+
+interface PlainDataScan {
+	readonly limits: PlainDataLimits;
+	readonly pending: PlainDataWork[];
+	records: number;
+	stringCharacters: number;
+}
+
+function chargePlainDataStringCharacters(scan: PlainDataScan, amount: number): void {
+	scan.stringCharacters += amount;
+	if (
+		!Number.isSafeInteger(scan.stringCharacters) ||
+		scan.stringCharacters > scan.limits.maxInputStringCharacters
+	)
+		throw new ModuleResolutionTraceFailure(
+			'BUDGET_EXCEEDED',
+			'Input string-character budget was exhausted.',
+			'REQUEST_BIND',
+			'$.request.budgets.maxInputStringCharacters'
+		);
+}
+
+function assertPlainDataRecordBudget(
+	scan: PlainDataScan,
+	additional: number,
+	message: string
+): void {
+	if (scan.records + additional > scan.limits.maxInputRecords)
+		throw new ModuleResolutionTraceFailure(
+			'BUDGET_EXCEEDED',
+			message,
+			'REQUEST_BIND',
+			'$.request.budgets.maxInputRecords'
+		);
+}
+
+function pushPlainDataArrayElements(scan: PlainDataScan, array: readonly unknown[]): void {
+	if (Reflect.getPrototypeOf(array) !== Array.prototype)
+		throw new TypeError('Input arrays must use Array.prototype.');
+	const count = array.length;
+	const ownKeys = Reflect.ownKeys(array);
+	if (
+		ownKeys.length !== count + 1 ||
+		ownKeys.some(
+			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
+		)
+	)
+		throw new TypeError('Input arrays must be dense exact data arrays.');
+	assertPlainDataRecordBudget(
+		scan,
+		count,
+		'Input array population exhausted the plain-data record budget.'
+	);
+	for (let index = count - 1; index >= 0; index -= 1) {
+		const key = String(index);
+		chargePlainDataStringCharacters(scan, key.length);
+		const descriptor = Reflect.getOwnPropertyDescriptor(array, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input arrays must contain enumerable data elements.');
+		scan.pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+}
+
+function pushPlainDataRecordProperties(scan: PlainDataScan, record: object): void {
+	const prototype = Reflect.getPrototypeOf(record);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Input records must use a plain prototype.');
+	const ownKeys = Reflect.ownKeys(record);
+	if (ownKeys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input records may not contain symbol keys.');
+	assertPlainDataRecordBudget(
+		scan,
+		ownKeys.length,
+		'Input property population exhausted the plain-data record budget.'
+	);
+	for (let index = ownKeys.length - 1; index >= 0; index -= 1) {
+		const key = ownKeys[index] as string;
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input keys must contain Unicode scalar text.');
+		chargePlainDataStringCharacters(scan, key.length);
+		const descriptor = Reflect.getOwnPropertyDescriptor(record, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input records must contain enumerable data properties.');
+		scan.pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+}
+
+function visitPlainDataValue(scan: PlainDataScan, active: WeakSet<object>, value: unknown): void {
+	scan.records += 1;
+	assertPlainDataRecordBudget(scan, 0, 'Input plain-data record budget was exhausted.');
+	if (typeof value === 'string') {
+		if (!isUnicodeScalarString(value))
+			throw new TypeError('Input strings must contain Unicode scalar text.');
+		chargePlainDataStringCharacters(scan, value.length);
+		return;
+	}
+	if (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	)
+		return;
+	if (typeof value !== 'object' || isProxy(value))
+		throw new TypeError('Inputs must contain only inert JSON-compatible plain data.');
+	if (active.has(value)) throw new TypeError('Input plain data may not contain cycles.');
+	active.add(value);
+	scan.pending.push({ kind: 'LEAVE', value });
+	if (Array.isArray(value)) pushPlainDataArrayElements(scan, value);
+	else pushPlainDataRecordProperties(scan, value);
+}
+
 function preflightPlainData(
 	value: unknown,
 	limits: { readonly maxInputRecords: number; readonly maxInputStringCharacters: number }
 ): PlainDataUsage {
-	type Work =
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Work[] = [{ kind: 'VISIT', value }];
-	const active = new WeakSet<object>();
-	let records = 0;
-	let stringCharacters = 0;
-	const addStringCharacters = (amount: number): void => {
-		stringCharacters += amount;
-		if (
-			!Number.isSafeInteger(stringCharacters) ||
-			stringCharacters > limits.maxInputStringCharacters
-		)
-			throw new ModuleResolutionTraceFailure(
-				'BUDGET_EXCEEDED',
-				'Input string-character budget was exhausted.',
-				'REQUEST_BIND',
-				'$.request.budgets.maxInputStringCharacters'
-			);
+	const scan: PlainDataScan = {
+		limits,
+		pending: [{ kind: 'VISIT', value }],
+		records: 0,
+		stringCharacters: 0
 	};
-	while (pending.length > 0) {
-		const work = pending.pop()!;
-		if (work.kind === 'LEAVE') {
-			active.delete(work.value);
-			continue;
-		}
-		records += 1;
-		if (records > limits.maxInputRecords)
-			throw new ModuleResolutionTraceFailure(
-				'BUDGET_EXCEEDED',
-				'Input plain-data record budget was exhausted.',
-				'REQUEST_BIND',
-				'$.request.budgets.maxInputRecords'
-			);
-		if (typeof work.value === 'string') {
-			if (!isUnicodeScalarString(work.value))
-				throw new TypeError('Input strings must contain Unicode scalar text.');
-			addStringCharacters(work.value.length);
-			continue;
-		}
-		if (
-			work.value === null ||
-			typeof work.value === 'boolean' ||
-			(typeof work.value === 'number' &&
-				Number.isSafeInteger(work.value) &&
-				!Object.is(work.value, -0))
-		)
-			continue;
-		if (typeof work.value !== 'object' || isProxy(work.value))
-			throw new TypeError('Inputs must contain only inert JSON-compatible plain data.');
-		if (active.has(work.value)) throw new TypeError('Input plain data may not contain cycles.');
-		active.add(work.value);
-		pending.push({ kind: 'LEAVE', value: work.value });
-		if (Array.isArray(work.value)) {
-			if (Reflect.getPrototypeOf(work.value) !== Array.prototype)
-				throw new TypeError('Input arrays must use Array.prototype.');
-			const count = work.value.length;
-			const ownKeys = Reflect.ownKeys(work.value);
-			if (
-				ownKeys.length !== count + 1 ||
-				ownKeys.some(
-					(key) =>
-						typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-				)
-			)
-				throw new TypeError('Input arrays must be dense exact data arrays.');
-			if (records + count > limits.maxInputRecords)
-				throw new ModuleResolutionTraceFailure(
-					'BUDGET_EXCEEDED',
-					'Input array population exhausted the plain-data record budget.',
-					'REQUEST_BIND',
-					'$.request.budgets.maxInputRecords'
-				);
-			for (let index = count - 1; index >= 0; index -= 1) {
-				const key = String(index);
-				addStringCharacters(key.length);
-				const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-				if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-					throw new TypeError('Input arrays must contain enumerable data elements.');
-				pending.push({ kind: 'VISIT', value: descriptor.value });
-			}
-			continue;
-		}
-		const prototype = Reflect.getPrototypeOf(work.value);
-		if (prototype !== Object.prototype && prototype !== null)
-			throw new TypeError('Input records must use a plain prototype.');
-		const ownKeys = Reflect.ownKeys(work.value);
-		if (ownKeys.some((key) => typeof key !== 'string'))
-			throw new TypeError('Input records may not contain symbol keys.');
-		if (records + ownKeys.length > limits.maxInputRecords)
-			throw new ModuleResolutionTraceFailure(
-				'BUDGET_EXCEEDED',
-				'Input property population exhausted the plain-data record budget.',
-				'REQUEST_BIND',
-				'$.request.budgets.maxInputRecords'
-			);
-		for (let index = ownKeys.length - 1; index >= 0; index -= 1) {
-			const key = ownKeys[index] as string;
-			if (!isUnicodeScalarString(key))
-				throw new TypeError('Input keys must contain Unicode scalar text.');
-			addStringCharacters(key.length);
-			const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Input records must contain enumerable data properties.');
-			pending.push({ kind: 'VISIT', value: descriptor.value });
-		}
+	const active = new WeakSet<object>();
+	while (scan.pending.length > 0) {
+		const work = scan.pending.pop()!;
+		if (work.kind === 'LEAVE') active.delete(work.value);
+		else visitPlainDataValue(scan, active, work.value);
 	}
-	return { records, stringCharacters };
+	return { records: scan.records, stringCharacters: scan.stringCharacters };
 }
 
 function barePackageName(value: string): boolean {
@@ -473,7 +498,7 @@ function deepFreeze<Value>(value: Value, seen = new WeakSet<object>()): Value {
 
 function boundedCounts(counts: Readonly<Record<string, number>>): Readonly<Record<string, number>> {
 	const result: Record<string, number> = {};
-	for (const key of Object.keys(counts).sort().slice(0, 16)) {
+	for (const key of Object.keys(counts).sort(compareText).slice(0, 16)) {
 		const value = counts[key];
 		if (Number.isSafeInteger(value) && value! >= 0) result[key] = value!;
 	}
@@ -838,11 +863,12 @@ function presentRead(
 	phase: ModuleResolutionTraceProgressPhase
 ): PresentReadEntry {
 	if (
-		entry === undefined ||
-		entry.query.operation !== 'READ_FILE' ||
+		entry?.query.operation !== 'READ_FILE' ||
 		entry.query.logicalPath !== logicalPath ||
 		entry.observation.operation !== 'READ_FILE' ||
 		entry.observation.result !== 'PRESENT' ||
+		// S6582 REFUSED — see build-command-event-contract-overlay.ts: the explicit `=== undefined` limb
+		// is the only thing keeping `sha256` from running on a missing buffer.
 		entry.bytes === undefined ||
 		entry.bytes.byteLength !== entry.observation.contentBytes ||
 		sha256(entry.bytes) !== entry.observation.contentSha256
@@ -992,8 +1018,7 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 		(record) => record.id === resolution.targetSourceId
 	);
 	if (
-		targetSource === undefined ||
-		targetSource.artifactClass !== 'CONTEXT_ONLY' ||
+		targetSource?.artifactClass !== 'CONTEXT_ONLY' ||
 		targetSource.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
 		!targetSource.declarationFile
 	)
@@ -1041,7 +1066,7 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 		semanticSnapshot,
 		semanticProject.configPath
 	);
-	if (lookup === undefined || lookup.subjectId !== request.subjectId)
+	if (lookup?.subjectId !== request.subjectId)
 		throw new ModuleResolutionTraceFailure(
 			'CAPTURE_INVALID',
 			'The exact semantic snapshot lacks its verified project-scoped compiler capture.',
@@ -1205,6 +1230,38 @@ interface ReplayState {
 	stage: ModuleResolutionAttemptStage;
 }
 
+function replayFailurePhase(state: ReplayState): ModuleResolutionTraceDiagnostic['phase'] {
+	return state.stage === 'IMPLIED_NODE_FORMAT' ? 'IMPLIED_NODE_FORMAT_RESOLVE' : 'MODULE_RESOLVE';
+}
+
+function chargeCapturedReadBytes(
+	state: ReplayState,
+	entry: VerifiedCompilerProjectInputEntry
+): void {
+	const { observation } = entry;
+	if (observation.operation !== 'READ_FILE' || observation.result !== 'PRESENT') return;
+	if (
+		// S6582 REFUSED — see build-command-event-contract-overlay.ts: the explicit `=== undefined` limb
+		// is the only thing keeping `sha256` from running on a missing buffer.
+		entry.bytes === undefined ||
+		entry.bytes.byteLength !== observation.contentBytes ||
+		sha256(entry.bytes) !== observation.contentSha256
+	)
+		throw new ModuleResolutionTraceFailure(
+			'CAPTURE_INVALID',
+			'A captured resolver input does not reproduce its recorded bytes.',
+			replayFailurePhase(state)
+		);
+	state.readBytes = checkedAdd(state.readBytes, observation.contentBytes);
+	if (state.readBytes > state.inputs.request.budgets.maxReadBytes)
+		throw new ModuleResolutionTraceFailure(
+			'BUDGET_EXCEEDED',
+			'The module-resolution read-byte budget was exhausted.',
+			replayFailurePhase(state),
+			'$.request.budgets.maxReadBytes'
+		);
+}
+
 function recordCapturedQuery(
 	state: ReplayState,
 	query: CompilerInputQuery
@@ -1214,7 +1271,7 @@ function recordCapturedQuery(
 		throw new ModuleResolutionTraceFailure(
 			'BUDGET_EXCEEDED',
 			'The module-resolution attempt budget was exhausted.',
-			state.stage === 'IMPLIED_NODE_FORMAT' ? 'IMPLIED_NODE_FORMAT_RESOLVE' : 'MODULE_RESOLVE',
+			replayFailurePhase(state),
 			'$.request.budgets.maxAttempts'
 		);
 	const candidateIncrement =
@@ -1230,7 +1287,7 @@ function recordCapturedQuery(
 		throw new ModuleResolutionTraceFailure(
 			'BUDGET_EXCEEDED',
 			'A module-resolution record or traversal budget was exhausted before a host callback.',
-			state.stage === 'IMPLIED_NODE_FORMAT' ? 'IMPLIED_NODE_FORMAT_RESOLVE' : 'MODULE_RESOLVE'
+			replayFailurePhase(state)
 		);
 	const entry = state.binding.lookup.lookupAttributedQuery(query);
 	if (
@@ -1245,7 +1302,7 @@ function recordCapturedQuery(
 		throw new ModuleResolutionTraceFailure(
 			'RESOLUTION_UNAVAILABLE',
 			'TypeScript requested an input absent from the verified project-scoped capture.',
-			state.stage === 'IMPLIED_NODE_FORMAT' ? 'IMPLIED_NODE_FORMAT_RESOLVE' : 'MODULE_RESOLVE',
+			replayFailurePhase(state),
 			'$.semanticSnapshot.compilerInputs'
 		);
 	const key = canonicalSemanticJson(query);
@@ -1261,26 +1318,7 @@ function recordCapturedQuery(
 		stage: state.stage
 	});
 	state.candidates = nextCandidates;
-	if (entry.observation.operation === 'READ_FILE' && entry.observation.result === 'PRESENT') {
-		if (
-			entry.bytes === undefined ||
-			entry.bytes.byteLength !== entry.observation.contentBytes ||
-			sha256(entry.bytes) !== entry.observation.contentSha256
-		)
-			throw new ModuleResolutionTraceFailure(
-				'CAPTURE_INVALID',
-				'A captured resolver input does not reproduce its recorded bytes.',
-				state.stage === 'IMPLIED_NODE_FORMAT' ? 'IMPLIED_NODE_FORMAT_RESOLVE' : 'MODULE_RESOLVE'
-			);
-		state.readBytes = checkedAdd(state.readBytes, entry.observation.contentBytes);
-		if (state.readBytes > budgets.maxReadBytes)
-			throw new ModuleResolutionTraceFailure(
-				'BUDGET_EXCEEDED',
-				'The module-resolution read-byte budget was exhausted.',
-				state.stage === 'IMPLIED_NODE_FORMAT' ? 'IMPLIED_NODE_FORMAT_RESOLVE' : 'MODULE_RESOLVE',
-				'$.request.budgets.maxReadBytes'
-			);
-	}
+	chargeCapturedReadBytes(state, entry);
 	return entry;
 }
 
@@ -1492,7 +1530,7 @@ function replayResolution(
 			node.text === inputs.request.specifier &&
 			ts.isImportDeclaration(node.parent) &&
 			node.parent.moduleSpecifier === node &&
-			node.parent.importClause?.isTypeOnly !== true
+			node.parent.importClause?.phaseModifier !== ts.SyntaxKind.TypeKeyword
 		)
 			matches.push(node);
 		ts.forEachChild(node, (child) => {
@@ -1686,6 +1724,54 @@ function bindTarget(
 	};
 }
 
+function candidateExclusionReason(
+	selected: boolean,
+	purpose: ModuleResolutionAttemptPurpose,
+	observationResult: 'ABSENT' | 'PRESENT'
+): ModuleResolutionCandidateRecord['exclusionReason'] {
+	if (selected) return null;
+	if (purpose === 'PACKAGE_METADATA') return 'PACKAGE_METADATA_NOT_A_MODULE_TARGET';
+	if (observationResult === 'ABSENT') return 'FILE_ABSENT';
+	return 'PRESENT_NOT_SELECTED';
+}
+
+function materializeResolutionCandidates(
+	attempts: readonly ModuleResolutionAttemptRecord[],
+	selectedAttemptId: ModuleResolutionAttemptRecord['id'],
+	traceId: ModuleResolutionTraceId
+): ModuleResolutionCandidateRecord[] {
+	const candidates: ModuleResolutionCandidateRecord[] = [];
+	for (const attempt of attempts) {
+		if (attempt.stage !== 'MODULE_RESOLUTION' || attempt.query.operation !== 'FILE_EXISTS')
+			continue;
+		if (
+			attempt.observation.operation !== 'FILE_EXISTS' ||
+			(attempt.observation.result !== 'PRESENT' && attempt.observation.result !== 'ABSENT')
+		)
+			throw new ModuleResolutionTraceFailure(
+				'CAPTURE_INVALID',
+				'A FILE_EXISTS attempt has inconsistent observation evidence.',
+				'MATERIALIZE'
+			);
+		const selected = attempt.id === selectedAttemptId;
+		const record = {
+			attemptId: attempt.id,
+			disposition: selected ? ('SELECTED' as const) : ('EXCLUDED' as const),
+			exclusionReason: candidateExclusionReason(
+				selected,
+				attempt.purpose,
+				attempt.observation.result
+			),
+			logicalPath: attempt.query.logicalPath,
+			observationResult: attempt.observation.result,
+			ordinal: candidates.length,
+			purpose: attempt.purpose as 'MODULE_TARGET_CANDIDATE' | 'PACKAGE_METADATA'
+		};
+		candidates.push({ ...record, id: moduleResolutionCandidateId(traceId, record) });
+	}
+	return candidates;
+}
+
 function materializeTrace(
 	inputs: ModuleResolutionTraceBuildInputs,
 	semanticValidationWitness: ModuleResolutionTraceSnapshot['semanticValidationWitness'],
@@ -1734,37 +1820,7 @@ function materializeTrace(
 		id: moduleResolutionAttemptId(traceId, attempt)
 	}));
 	const selectedAttempt = attempts[target.selectedAttemptOrdinal]!;
-	const candidates: ModuleResolutionCandidateRecord[] = [];
-	for (const attempt of attempts) {
-		if (attempt.stage !== 'MODULE_RESOLUTION' || attempt.query.operation !== 'FILE_EXISTS')
-			continue;
-		if (
-			attempt.observation.operation !== 'FILE_EXISTS' ||
-			(attempt.observation.result !== 'PRESENT' && attempt.observation.result !== 'ABSENT')
-		)
-			throw new ModuleResolutionTraceFailure(
-				'CAPTURE_INVALID',
-				'A FILE_EXISTS attempt has inconsistent observation evidence.',
-				'MATERIALIZE'
-			);
-		const selected = attempt.id === selectedAttempt.id;
-		const record = {
-			attemptId: attempt.id,
-			disposition: selected ? ('SELECTED' as const) : ('EXCLUDED' as const),
-			exclusionReason: selected
-				? null
-				: attempt.purpose === 'PACKAGE_METADATA'
-					? ('PACKAGE_METADATA_NOT_A_MODULE_TARGET' as const)
-					: attempt.observation.result === 'ABSENT'
-						? ('FILE_ABSENT' as const)
-						: ('PRESENT_NOT_SELECTED' as const),
-			logicalPath: attempt.query.logicalPath,
-			observationResult: attempt.observation.result,
-			ordinal: candidates.length,
-			purpose: attempt.purpose as 'MODULE_TARGET_CANDIDATE' | 'PACKAGE_METADATA'
-		};
-		candidates.push({ ...record, id: moduleResolutionCandidateId(traceId, record) });
-	}
+	const candidates = materializeResolutionCandidates(attempts, selectedAttempt.id, traceId);
 	const selectedCandidate = candidates.find((candidate) => candidate.disposition === 'SELECTED');
 	if (selectedCandidate === undefined)
 		throw new ModuleResolutionTraceFailure(

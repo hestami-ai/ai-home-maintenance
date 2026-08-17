@@ -183,6 +183,19 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function pushInspectableChildren(
+	stack: { readonly depth: number; readonly value: unknown }[],
+	depth: number,
+	value: object
+): void {
+	for (const key of Reflect.ownKeys(value)) {
+		if (key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor !== undefined && 'value' in descriptor)
+			stack.push({ depth: depth + 1, value: descriptor.value });
+	}
+}
+
 function retainedEvidenceAcceptancePopulation(value: unknown): {
 	readonly arrayEntries: number;
 	readonly maximumDepth: number;
@@ -201,12 +214,7 @@ function retainedEvidenceAcceptancePopulation(value: unknown): {
 		}
 		if (current.value === null || typeof current.value !== 'object') continue;
 		if (Array.isArray(current.value)) arrayEntries += current.value.length;
-		for (const key of Reflect.ownKeys(current.value)) {
-			if (key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(current.value, key);
-			if (descriptor !== undefined && 'value' in descriptor)
-				stack.push({ depth: current.depth + 1, value: descriptor.value });
-		}
+		pushInspectableChildren(stack, current.depth, current.value);
 	}
 	return { arrayEntries, maximumDepth, stringCharacters };
 }
@@ -287,31 +295,31 @@ function assertExecutor(value: unknown): asserts value is GuardEnforcementLedger
 	}
 }
 
-function assertRawEvidence(value: unknown): asserts value is GuardEnforcementLedgerRawEvidence {
-	const root = exactRecord(value, '$input.evidence', [
-		'analyzerPath',
-		'audit',
-		'dataPath',
-		'guardTexts',
-		'guardedArrows',
-		'ledgerRows',
-		'runtime',
-		'schemaVersion'
-	]);
-	if (recordData(root, 'analyzerPath') !== GUARD_ENFORCEMENT_LEDGER_ANALYZER_PATH)
-		fail('$input.evidence.analyzerPath', 'Raw evidence must use the retained analyzer path.');
-	if (recordData(root, 'dataPath') !== GUARD_ENFORCEMENT_LEDGER_DATA_PATH)
-		fail('$input.evidence.dataPath', 'Raw evidence must use the retained data path.');
-	if (recordData(root, 'schemaVersion') !== GUARD_ENFORCEMENT_LEDGER_WORKER_RESULT_SCHEMA_VERSION)
-		fail('$input.evidence.schemaVersion', 'Unsupported worker evidence schema.');
-	const runtime = exactRecord(recordData(root, 'runtime'), '$input.evidence.runtime', [
-		'bunVersion'
-	]);
-	text(recordData(runtime, 'bunVersion'), '$input.evidence.runtime.bunVersion');
+function assertGuardedArrowRecord(
+	value: unknown,
+	path: string,
+	guardTextSet: ReadonlySet<string>
+): void {
+	const arrow = exactRecord(value, path, ['from', 'guard', 'machine', 'to']);
+	for (const key of ['from', 'guard', 'machine', 'to'])
+		text(recordData(arrow, key), `${path}.${key}`);
+	if (!guardTextSet.has(recordData(arrow, 'guard') as string))
+		fail(`${path}.guard`, 'Arrow guard is absent from the distinct guard-text population.');
+}
 
-	const guardTexts = stringArray(recordData(root, 'guardTexts'), '$input.evidence.guardTexts');
-	if (guardTexts.length === 0)
-		fail('$input.evidence.guardTexts', 'Retained evidence must contain at least one guard text.');
+function assertGuardedArrowOrder(previousValue: unknown, currentValue: unknown): void {
+	const previous = previousValue as GuardEnforcementLedgerRawEvidence['guardedArrows'][number];
+	const current = currentValue as GuardEnforcementLedgerRawEvidence['guardedArrows'][number];
+	if (
+		compareTuple(
+			[previous.machine, previous.from, previous.to, previous.guard],
+			[current.machine, current.from, current.to, current.guard]
+		) > 0
+	)
+		fail('$input.evidence.guardedArrows', 'Arrow occurrences are not canonically ordered.');
+}
+
+function assertRawEvidenceGuardedArrows(root: PlainRecord, guardTexts: readonly string[]): void {
 	const guardTextSet = new Set(guardTexts);
 	const arrows = recordData(root, 'guardedArrows');
 	if (!Array.isArray(arrows)) fail('$input.evidence.guardedArrows', 'Expected an array.');
@@ -321,25 +329,8 @@ function assertRawEvidence(value: unknown): asserts value is GuardEnforcementLed
 			'Retained evidence must contain at least one guarded arrow.'
 		);
 	for (const [index, value] of arrows.entries()) {
-		const path = `$input.evidence.guardedArrows[${index}]`;
-		const arrow = exactRecord(value, path, ['from', 'guard', 'machine', 'to']);
-		for (const key of ['from', 'guard', 'machine', 'to'])
-			text(recordData(arrow, key), `${path}.${key}`);
-		if (!guardTextSet.has(recordData(arrow, 'guard') as string))
-			fail(`${path}.guard`, 'Arrow guard is absent from the distinct guard-text population.');
-		if (index > 0) {
-			const previous = arrows[
-				index - 1
-			] as GuardEnforcementLedgerRawEvidence['guardedArrows'][number];
-			const current = value as GuardEnforcementLedgerRawEvidence['guardedArrows'][number];
-			if (
-				compareTuple(
-					[previous.machine, previous.from, previous.to, previous.guard],
-					[current.machine, current.from, current.to, current.guard]
-				) > 0
-			)
-				fail('$input.evidence.guardedArrows', 'Arrow occurrences are not canonically ordered.');
-		}
+		assertGuardedArrowRecord(value, `$input.evidence.guardedArrows[${index}]`, guardTextSet);
+		if (index > 0) assertGuardedArrowOrder(arrows[index - 1], value);
 	}
 	const arrowGuardTexts = [
 		...new Set(
@@ -351,27 +342,33 @@ function assertRawEvidence(value: unknown): asserts value is GuardEnforcementLed
 			'$input.evidence.guardTexts',
 			'Distinct guard texts must exactly equal the sorted unique guarded-arrow text population.'
 		);
+}
 
+function assertLedgerRowRecord(value: unknown, path: string): PlainRecord {
+	const row = exactRecord(value, path, [
+		'disposition',
+		'enforcingAnchor',
+		'enforcingSite',
+		'evidence',
+		'guardText'
+	]);
+	disposition(recordData(row, 'disposition'), `${path}.disposition`);
+	for (const key of ['enforcingAnchor', 'enforcingSite']) {
+		const optional = recordData(row, key);
+		if (optional !== null) text(optional, `${path}.${key}`);
+	}
+	text(recordData(row, 'evidence'), `${path}.evidence`);
+	text(recordData(row, 'guardText'), `${path}.guardText`);
+	return row;
+}
+
+function assertRawEvidenceLedgerRows(root: PlainRecord): void {
 	const rows = recordData(root, 'ledgerRows');
 	if (!Array.isArray(rows)) fail('$input.evidence.ledgerRows', 'Expected an array.');
 	if (rows.length === 0)
 		fail('$input.evidence.ledgerRows', 'Retained evidence must contain at least one ledger row.');
 	for (const [index, value] of rows.entries()) {
-		const path = `$input.evidence.ledgerRows[${index}]`;
-		const row = exactRecord(value, path, [
-			'disposition',
-			'enforcingAnchor',
-			'enforcingSite',
-			'evidence',
-			'guardText'
-		]);
-		disposition(recordData(row, 'disposition'), `${path}.disposition`);
-		for (const key of ['enforcingAnchor', 'enforcingSite']) {
-			const optional = recordData(row, key);
-			if (optional !== null) text(optional, `${path}.${key}`);
-		}
-		text(recordData(row, 'evidence'), `${path}.evidence`);
-		text(recordData(row, 'guardText'), `${path}.guardText`);
+		const row = assertLedgerRowRecord(value, `$input.evidence.ledgerRows[${index}]`);
 		if (
 			index > 0 &&
 			compareText(
@@ -381,7 +378,9 @@ function assertRawEvidence(value: unknown): asserts value is GuardEnforcementLed
 		)
 			fail('$input.evidence.ledgerRows', 'Ledger rows must be unique and canonically ordered.');
 	}
+}
 
+function assertRawEvidenceAudit(root: PlainRecord): void {
 	const audit = exactRecord(recordData(root, 'audit'), '$input.evidence.audit', [
 		'arrowCount',
 		'counts',
@@ -413,6 +412,36 @@ function assertRawEvidence(value: unknown): asserts value is GuardEnforcementLed
 	}
 }
 
+function assertRawEvidence(value: unknown): asserts value is GuardEnforcementLedgerRawEvidence {
+	const root = exactRecord(value, '$input.evidence', [
+		'analyzerPath',
+		'audit',
+		'dataPath',
+		'guardTexts',
+		'guardedArrows',
+		'ledgerRows',
+		'runtime',
+		'schemaVersion'
+	]);
+	if (recordData(root, 'analyzerPath') !== GUARD_ENFORCEMENT_LEDGER_ANALYZER_PATH)
+		fail('$input.evidence.analyzerPath', 'Raw evidence must use the retained analyzer path.');
+	if (recordData(root, 'dataPath') !== GUARD_ENFORCEMENT_LEDGER_DATA_PATH)
+		fail('$input.evidence.dataPath', 'Raw evidence must use the retained data path.');
+	if (recordData(root, 'schemaVersion') !== GUARD_ENFORCEMENT_LEDGER_WORKER_RESULT_SCHEMA_VERSION)
+		fail('$input.evidence.schemaVersion', 'Unsupported worker evidence schema.');
+	const runtime = exactRecord(recordData(root, 'runtime'), '$input.evidence.runtime', [
+		'bunVersion'
+	]);
+	text(recordData(runtime, 'bunVersion'), '$input.evidence.runtime.bunVersion');
+
+	const guardTexts = stringArray(recordData(root, 'guardTexts'), '$input.evidence.guardTexts');
+	if (guardTexts.length === 0)
+		fail('$input.evidence.guardTexts', 'Retained evidence must contain at least one guard text.');
+	assertRawEvidenceGuardedArrows(root, guardTexts);
+	assertRawEvidenceLedgerRows(root);
+	assertRawEvidenceAudit(root);
+}
+
 export interface NormalizeGuardEnforcementLedgerInput {
 	readonly artifactSet: GuardEnforcementLedgerArtifactSetBinding;
 	readonly evidence: GuardEnforcementLedgerRawEvidence;
@@ -430,20 +459,34 @@ function frozenLimitations(): typeof GUARD_ENFORCEMENT_LEDGER_LIMITATIONS {
 	) as unknown as typeof GUARD_ENFORCEMENT_LEDGER_LIMITATIONS;
 }
 
-/** Pure, strict projection of retained worker evidence into the public CSAA contract. */
-export function normalizeGuardEnforcementLedgerObservation(
-	input: NormalizeGuardEnforcementLedgerInput
-): GuardEnforcementLedgerObservation {
+type GuardEnforcementLedgerRow = GuardEnforcementLedgerRawEvidence['ledgerRows'][number];
+
+interface ReconciledLedgerPopulations {
+	readonly declared: ReadonlySet<string>;
+	readonly expectedStale: readonly string[];
+	readonly expectedUnclassified: readonly string[];
+	readonly rowByText: ReadonlyMap<string, GuardEnforcementLedgerRow>;
+}
+
+interface RawOutputProjectionBase {
+	readonly bytes: number;
+	readonly evidenceContentDigest: string;
+	readonly schemaVersion: string;
+	readonly sha256: string;
+}
+
+function assertRequestArtifactCoherence(input: NormalizeGuardEnforcementLedgerInput): void {
 	const { artifactSet, evidence, executor, request } = input;
-	assertRequest(request);
-	assertExecutor(executor);
-	assertRawEvidence(evidence);
 	if (request.subjectId !== artifactSet.subjectId)
 		fail('$input.request.subjectId', 'Request and artifact-set subjects differ.');
 	if (request.artifactSetId !== artifactSet.id)
 		fail('$input.request.artifactSetId', 'Request and artifact-set identities differ.');
 	if (evidence.runtime.bunVersion !== executor.runtimeVersion)
 		fail('$input.evidence.runtime.bunVersion', 'Raw evidence and executor Bun versions differ.');
+}
+
+function assertRetainedArtifactBindings(input: NormalizeGuardEnforcementLedgerInput): void {
+	const { artifactSet, executor } = input;
 	const analyzerBindings = artifactSet.artifacts.filter(
 		(artifact) =>
 			artifact.path === GUARD_ENFORCEMENT_LEDGER_ANALYZER_PATH &&
@@ -473,7 +516,10 @@ export function normalizeGuardEnforcementLedgerObservation(
 			'$input.executor.retainedDataSha256',
 			'Executor retained-data identity does not bind the artifact set.'
 		);
+}
 
+function assertRetainedOutputBudgets(input: NormalizeGuardEnforcementLedgerInput): void {
+	const { artifactSet, evidence, request } = input;
 	const auditFindingCount =
 		evidence.audit.enforcedAnchorBroken.length +
 		evidence.audit.enforcedWithoutSite.length +
@@ -495,6 +541,10 @@ export function normalizeGuardEnforcementLedgerObservation(
 			'$input.request.budgets.maxArtifacts',
 			'Bound artifact population exceeds the caller acceptance budget.'
 		);
+}
+
+function assertMaterializationBudgets(input: NormalizeGuardEnforcementLedgerInput): void {
+	const { artifactSet, executor, request } = input;
 	const materializedBytes = artifactSet.coverage.totalBytes + executor.worker.bytes;
 	if (
 		!Number.isSafeInteger(materializedBytes) ||
@@ -528,6 +578,10 @@ export function normalizeGuardEnforcementLedgerObservation(
 			'$input.request.budgets.maxExternalModuleFiles',
 			'Bound external-module files exceed the caller environment-capture budget.'
 		);
+}
+
+function assertSanitizedEvidenceBudgets(input: NormalizeGuardEnforcementLedgerInput): void {
+	const { evidence, request } = input;
 	const acceptancePopulation = retainedEvidenceAcceptancePopulation(evidence);
 	if (acceptancePopulation.arrayEntries > request.budgets.maxRawArrayEntries)
 		fail(
@@ -544,7 +598,31 @@ export function normalizeGuardEnforcementLedgerObservation(
 			'$input.request.budgets.maxOutputStringCharacters',
 			'Sanitized evidence characters exceed the caller post-execution acceptance budget.'
 		);
+}
 
+function assertDispositionCountsReconcile(
+	evidence: GuardEnforcementLedgerRawEvidence,
+	rowByText: ReadonlyMap<string, GuardEnforcementLedgerRow>
+): void {
+	const expectedCounts = new Map<GuardEnforcementDisposition, number>();
+	for (const guardText of evidence.guardTexts) {
+		const row = rowByText.get(guardText);
+		if (row !== undefined)
+			expectedCounts.set(row.disposition, (expectedCounts.get(row.disposition) ?? 0) + 1);
+	}
+	const expectedCountRecords = [...expectedCounts]
+		.sort(([left], [right]) => compareText(left, right))
+		.map(([dispositionValue, count]) => ({ count, disposition: dispositionValue }));
+	if (canonicalSemanticJson(evidence.audit.counts) !== canonicalSemanticJson(expectedCountRecords))
+		fail(
+			'$input.evidence.audit.counts',
+			'Disposition counts do not reconcile with declared classifications.'
+		);
+}
+
+function reconcileLedgerPopulations(
+	evidence: GuardEnforcementLedgerRawEvidence
+): ReconciledLedgerPopulations {
 	const declared = new Set(evidence.guardTexts);
 	const rowByText = new Map(evidence.ledgerRows.map((row) => [row.guardText, row]));
 	const expectedUnclassified = evidence.guardTexts.filter((guardText) => !rowByText.has(guardText));
@@ -569,21 +647,60 @@ export function normalizeGuardEnforcementLedgerObservation(
 			'$input.evidence.audit.enforcedWithoutSite',
 			'Missing-site population does not reconcile.'
 		);
-	const expectedCounts = new Map<GuardEnforcementDisposition, number>();
-	for (const guardText of evidence.guardTexts) {
-		const row = rowByText.get(guardText);
-		if (row !== undefined)
-			expectedCounts.set(row.disposition, (expectedCounts.get(row.disposition) ?? 0) + 1);
-	}
-	const expectedCountRecords = [...expectedCounts]
-		.sort(([left], [right]) => compareText(left, right))
-		.map(([dispositionValue, count]) => ({ count, disposition: dispositionValue }));
-	if (canonicalSemanticJson(evidence.audit.counts) !== canonicalSemanticJson(expectedCountRecords))
-		fail(
-			'$input.evidence.audit.counts',
-			'Disposition counts do not reconcile with declared classifications.'
-		);
+	assertDispositionCountsReconcile(evidence, rowByText);
+	return { declared, expectedStale, expectedUnclassified, rowByText };
+}
 
+function assertTransportOutputBytes(
+	transportOutputBytes: Uint8Array,
+	maxStdoutBytes: number
+): void {
+	if (!(transportOutputBytes instanceof Uint8Array) || isProxy(transportOutputBytes))
+		fail('$input.transportOutputBytes', 'Worker transport output must be a non-Proxy Uint8Array.');
+	if (transportOutputBytes.byteLength === 0)
+		fail('$input.transportOutputBytes', 'Successful worker transport output must be nonempty.');
+	if (transportOutputBytes.byteLength > maxStdoutBytes)
+		fail(
+			'$input.request.budgets.maxStdoutBytes',
+			'Exact successful worker transport output exceeds the caller transport budget.'
+		);
+}
+
+function assertRawOutputWitness(
+	witness: GuardEnforcementLedgerRawOutputIdentity,
+	base: RawOutputProjectionBase
+): void {
+	positiveInteger(witness.bytes, '$input.rawOutputIdentity.bytes');
+	digest(witness.evidenceContentDigest, '$input.rawOutputIdentity.evidenceContentDigest');
+	digest(witness.sha256, '$input.rawOutputIdentity.sha256');
+	if (witness.evidenceContentDigest !== base.evidenceContentDigest)
+		fail(
+			'$input.rawOutputIdentity.evidenceContentDigest',
+			'Raw-output evidence projection digest does not reproduce.'
+		);
+	if (witness.schemaVersion !== base.schemaVersion)
+		fail('$input.rawOutputIdentity.schemaVersion', 'Raw-output and evidence schemas differ.');
+	if (witness.bytes !== base.bytes || witness.sha256 !== base.sha256)
+		fail(
+			'$input.rawOutputIdentity.sha256',
+			'Canonical raw-evidence output identity does not reproduce.'
+		);
+	if (
+		witness.id !==
+		guardEnforcementLedgerRawOutputId({
+			bytes: witness.bytes,
+			evidenceContentDigest: witness.evidenceContentDigest,
+			schemaVersion: witness.schemaVersion,
+			sha256: witness.sha256
+		})
+	)
+		fail('$input.rawOutputIdentity.id', 'Raw-output identity does not reproduce.');
+}
+
+function resolveRawOutputIdentity(
+	input: NormalizeGuardEnforcementLedgerInput
+): GuardEnforcementLedgerRawOutputIdentity {
+	const { evidence, request } = input;
 	if ((input.transportOutputBytes === undefined) === (input.rawOutputIdentity === undefined))
 		fail(
 			'$input.transportOutputBytes',
@@ -591,54 +708,18 @@ export function normalizeGuardEnforcementLedgerObservation(
 		);
 	let rawOutput: GuardEnforcementLedgerRawOutputIdentity;
 	const evidenceWitness = canonicalSemanticJsonWitness(evidence);
-	const evidenceContentDigest = evidenceWitness.sha256;
 	const rawOutputBase = {
 		bytes: evidenceWitness.bytes,
-		evidenceContentDigest,
+		evidenceContentDigest: evidenceWitness.sha256,
 		schemaVersion: evidence.schemaVersion,
 		sha256: evidenceWitness.sha256
 	};
 	if (input.transportOutputBytes !== undefined) {
-		if (!(input.transportOutputBytes instanceof Uint8Array) || isProxy(input.transportOutputBytes))
-			fail(
-				'$input.transportOutputBytes',
-				'Worker transport output must be a non-Proxy Uint8Array.'
-			);
-		if (input.transportOutputBytes.byteLength === 0)
-			fail('$input.transportOutputBytes', 'Successful worker transport output must be nonempty.');
-		if (input.transportOutputBytes.byteLength > request.budgets.maxStdoutBytes)
-			fail(
-				'$input.request.budgets.maxStdoutBytes',
-				'Exact successful worker transport output exceeds the caller transport budget.'
-			);
+		assertTransportOutputBytes(input.transportOutputBytes, request.budgets.maxStdoutBytes);
 		rawOutput = { ...rawOutputBase, id: guardEnforcementLedgerRawOutputId(rawOutputBase) };
 	} else {
 		const witness = input.rawOutputIdentity!;
-		positiveInteger(witness.bytes, '$input.rawOutputIdentity.bytes');
-		digest(witness.evidenceContentDigest, '$input.rawOutputIdentity.evidenceContentDigest');
-		digest(witness.sha256, '$input.rawOutputIdentity.sha256');
-		if (witness.evidenceContentDigest !== evidenceContentDigest)
-			fail(
-				'$input.rawOutputIdentity.evidenceContentDigest',
-				'Raw-output evidence projection digest does not reproduce.'
-			);
-		if (witness.schemaVersion !== evidence.schemaVersion)
-			fail('$input.rawOutputIdentity.schemaVersion', 'Raw-output and evidence schemas differ.');
-		if (witness.bytes !== rawOutputBase.bytes || witness.sha256 !== rawOutputBase.sha256)
-			fail(
-				'$input.rawOutputIdentity.sha256',
-				'Canonical raw-evidence output identity does not reproduce.'
-			);
-		if (
-			witness.id !==
-			guardEnforcementLedgerRawOutputId({
-				bytes: witness.bytes,
-				evidenceContentDigest: witness.evidenceContentDigest,
-				schemaVersion: witness.schemaVersion,
-				sha256: witness.sha256
-			})
-		)
-			fail('$input.rawOutputIdentity.id', 'Raw-output identity does not reproduce.');
+		assertRawOutputWitness(witness, rawOutputBase);
 		rawOutput = witness;
 	}
 	if (rawOutput.bytes > request.budgets.maxStdoutBytes)
@@ -646,6 +727,37 @@ export function normalizeGuardEnforcementLedgerObservation(
 			'$input.request.budgets.maxStdoutBytes',
 			'Canonical raw evidence exceeds the stdout budget and could not derive from accepted transport output.'
 		);
+	return rawOutput;
+}
+
+function ledgerStateFor(
+	isDeclared: boolean,
+	row: GuardEnforcementLedgerRow | undefined
+): 'CLASSIFIED' | 'STALE' | 'UNCLASSIFIED' {
+	if (!isDeclared) return 'STALE';
+	if (row === undefined) return 'UNCLASSIFIED';
+	return 'CLASSIFIED';
+}
+
+/** Pure, strict projection of retained worker evidence into the public CSAA contract. */
+export function normalizeGuardEnforcementLedgerObservation(
+	input: NormalizeGuardEnforcementLedgerInput
+): GuardEnforcementLedgerObservation {
+	const { artifactSet, evidence, executor, request } = input;
+	assertRequest(request);
+	assertExecutor(executor);
+	assertRawEvidence(evidence);
+	assertRequestArtifactCoherence(input);
+	assertRetainedArtifactBindings(input);
+
+	assertRetainedOutputBudgets(input);
+	assertMaterializationBudgets(input);
+	assertSanitizedEvidenceBudgets(input);
+
+	const { declared, expectedStale, expectedUnclassified, rowByText } =
+		reconcileLedgerPopulations(evidence);
+
+	const rawOutput = resolveRawOutputIdentity(input);
 	const observationId = guardEnforcementLedgerObservationId({
 		artifactSetId: artifactSet.id,
 		canonicalProfile: GUARD_ENFORCEMENT_LEDGER_CANONICAL_PROFILE,
@@ -695,11 +807,7 @@ export function normalizeGuardEnforcementLedgerObservation(
 			evidence: row?.evidence ?? null,
 			guardText,
 			id: guardIdByText.get(guardText)!,
-			ledgerState: isDeclared
-				? row === undefined
-					? ('UNCLASSIFIED' as const)
-					: ('CLASSIFIED' as const)
-				: ('STALE' as const)
+			ledgerState: ledgerStateFor(isDeclared, row)
 		};
 	});
 

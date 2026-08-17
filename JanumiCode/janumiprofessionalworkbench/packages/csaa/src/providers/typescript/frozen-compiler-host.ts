@@ -136,6 +136,111 @@ function inspectHostArray(
 	return Object.freeze({ field, length, value });
 }
 
+function exactDenseDataArrayKeys(
+	ownKeys: readonly (string | symbol)[],
+	length: number,
+	onProgress: () => void
+): boolean {
+	let exactKeys = ownKeys.length === length + 1;
+	for (const key of ownKeys) {
+		onProgress();
+		if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key)))
+			exactKeys = false;
+	}
+	return exactKeys;
+}
+
+function defaultedReadDirectoryExtensions(
+	extensionsValue: readonly string[] | undefined
+): readonly string[] {
+	if (extensionsValue === undefined) return Object.freeze(['']);
+	return extensionsValue;
+}
+
+function assertExactHostArrayKeys(inspected: InspectedHostArray, onProgress: () => void): void {
+	onProgress();
+	const ownKeys = Reflect.ownKeys(inspected.value);
+	onProgress();
+	if (!exactDenseDataArrayKeys(ownKeys, inspected.length, onProgress))
+		throw new CompilerInputCaptureError(
+			'INVALID_QUERY',
+			`${inspected.field} must not contain holes, symbols, or expando properties.`
+		);
+}
+
+function inertHostArrayEntryText(
+	inspected: InspectedHostArray,
+	index: number,
+	budgets: SemanticBudgets
+): string {
+	const descriptor = Object.getOwnPropertyDescriptor(inspected.value, String(index));
+	if (
+		descriptor === undefined ||
+		!descriptor.enumerable ||
+		!('value' in descriptor) ||
+		typeof descriptor.value !== 'string'
+	)
+		throw new CompilerInputCaptureError(
+			'INVALID_QUERY',
+			`${inspected.field} must be a dense string data array.`
+		);
+	if (descriptor.value.length > budgets.maxPathCharacters)
+		throw new CompilerInputCaptureError(
+			'BUDGET_EXCEEDED',
+			`${inspected.field} contains a string beyond the path-character budget.`
+		);
+	return descriptor.value;
+}
+
+function collectInertHostArrayStrings(
+	inspected: InspectedHostArray,
+	metadataBytes: number,
+	budgets: SemanticBudgets,
+	onProgress: () => void
+): { readonly metadataBytes: number; readonly values: readonly string[] } {
+	let totalMetadataBytes = metadataBytes;
+	const values: string[] = [];
+	for (let index = 0; index < inspected.length; index += 1) {
+		onProgress();
+		const text = inertHostArrayEntryText(inspected, index, budgets);
+		const addition =
+			canonicalSemanticJsonWitnessWithProgress(text, onProgress).bytes +
+			(totalMetadataBytes === 0 ? 0 : 1);
+		if (
+			!Number.isSafeInteger(totalMetadataBytes + addition) ||
+			totalMetadataBytes + addition > budgets.maxCompilerInputMetadataBytes
+		)
+			throw new CompilerInputCaptureError(
+				'BUDGET_EXCEEDED',
+				'CompilerHost readDirectory parameters exceed their UTF-8 metadata budget.'
+			);
+		totalMetadataBytes += addition;
+		values.push(text);
+	}
+	return { metadataBytes: totalMetadataBytes, values };
+}
+
+function orderedUniqueHostArrayEntries(
+	values: readonly string[],
+	onProgress: () => void
+): readonly string[] {
+	const unique = new Set<string>();
+	for (const entry of values) {
+		onProgress();
+		unique.add(entry);
+	}
+	const ordered: string[] = [];
+	for (const entry of unique) {
+		onProgress();
+		ordered.push(entry);
+	}
+	ordered.sort((left, right) => {
+		onProgress();
+		return compareTextWithProgress(left, right, onProgress);
+	});
+	return ordered;
+}
+
 function normalizeReadDirectoryArrays(
 	extensionsValue: readonly string[] | undefined,
 	excludesValue: readonly string[] | undefined,
@@ -147,7 +252,7 @@ function normalizeReadDirectoryArrays(
 	readonly extensions: readonly string[];
 	readonly includes: readonly string[];
 } {
-	const effectiveExtensions = extensionsValue === undefined ? Object.freeze(['']) : extensionsValue;
+	const effectiveExtensions = defaultedReadDirectoryExtensions(extensionsValue);
 	const inspected = [
 		inspectHostArray(
 			excludesValue,
@@ -177,73 +282,10 @@ function normalizeReadDirectoryArrays(
 	let metadataBytes = 0;
 	const normalized = new Map<string, readonly string[]>();
 	for (const value of inspected) {
-		onProgress();
-		const ownKeys = Reflect.ownKeys(value.value);
-		onProgress();
-		let exactKeys = ownKeys.length === value.length + 1;
-		for (const key of ownKeys) {
-			onProgress();
-			if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))
-				exactKeys = false;
-		}
-		if (!exactKeys)
-			throw new CompilerInputCaptureError(
-				'INVALID_QUERY',
-				`${value.field} must not contain holes, symbols, or expando properties.`
-			);
-		const result: string[] = [];
-		for (let index = 0; index < value.length; index += 1) {
-			onProgress();
-			const descriptor = Object.getOwnPropertyDescriptor(value.value, String(index));
-			if (
-				descriptor === undefined ||
-				!descriptor.enumerable ||
-				!('value' in descriptor) ||
-				typeof descriptor.value !== 'string'
-			)
-				throw new CompilerInputCaptureError(
-					'INVALID_QUERY',
-					`${value.field} must be a dense string data array.`
-				);
-			if (descriptor.value.length > budgets.maxPathCharacters)
-				throw new CompilerInputCaptureError(
-					'BUDGET_EXCEEDED',
-					`${value.field} contains a string beyond the path-character budget.`
-				);
-			const addition =
-				canonicalSemanticJsonWitnessWithProgress(descriptor.value, onProgress).bytes +
-				(metadataBytes === 0 ? 0 : 1);
-			if (
-				!Number.isSafeInteger(metadataBytes + addition) ||
-				metadataBytes + addition > budgets.maxCompilerInputMetadataBytes
-			)
-				throw new CompilerInputCaptureError(
-					'BUDGET_EXCEEDED',
-					'CompilerHost readDirectory parameters exceed their UTF-8 metadata budget.'
-				);
-			metadataBytes += addition;
-			result.push(descriptor.value);
-		}
-		const unique = new Set<string>();
-		for (const entry of result) {
-			onProgress();
-			unique.add(entry);
-		}
-		const ordered: string[] = [];
-		for (const entry of unique) {
-			onProgress();
-			ordered.push(entry);
-		}
-		ordered.sort((left, right) => {
-			onProgress();
-			const length = Math.min(left.length, right.length);
-			for (let index = 0; index < length; index += 1) {
-				onProgress();
-				const difference = left.charCodeAt(index) - right.charCodeAt(index);
-				if (difference !== 0) return difference < 0 ? -1 : 1;
-			}
-			return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
-		});
+		assertExactHostArrayKeys(value, onProgress);
+		const collected = collectInertHostArrayStrings(value, metadataBytes, budgets, onProgress);
+		metadataBytes = collected.metadataBytes;
+		const ordered = orderedUniqueHostArrayEntries(collected.values, onProgress);
 		normalized.set(value.field, Object.freeze(ordered));
 	}
 	return Object.freeze({
@@ -569,58 +611,51 @@ interface MaterializedRecipeCloneBudget {
 	nodes: number;
 }
 
-function cloneCanonicalSnapshotValue(
-	value: unknown,
+function inertSnapshotArrayLength(value: object): number {
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
+	const length =
+		lengthDescriptor !== undefined && 'value' in lengthDescriptor
+			? lengthDescriptor.value
+			: undefined;
+	if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0)
+		throw new TypeError('Materialized compiler recipe contains an invalid array length.');
+	return length;
+}
+
+function cloneCanonicalSnapshotArray(
+	value: object,
 	onProgress: () => void,
 	budget: MaterializedRecipeCloneBudget
 ): unknown {
-	onProgress();
-	budget.nodes += 1;
-	if (!Number.isSafeInteger(budget.nodes) || budget.nodes > budget.maximum)
+	if (Reflect.getPrototypeOf(value) !== Array.prototype)
+		throw new TypeError('Materialized compiler recipe arrays must use Array.prototype.');
+	const length = inertSnapshotArrayLength(value);
+	if (length > budget.maximum - budget.nodes)
 		throw new CompilerInputCaptureError(
 			'BUDGET_EXCEEDED',
-			'Materialized compiler recipe exceeds its bounded snapshot population.'
+			'Materialized compiler recipe array exceeds its bounded snapshot population.'
 		);
-	if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-	if (typeof value === 'number') return value;
-	if (typeof value !== 'object' || isProxy(value))
-		throw new TypeError('Materialized compiler recipe contains a non-data value.');
-	if (Array.isArray(value)) {
-		if (Reflect.getPrototypeOf(value) !== Array.prototype)
-			throw new TypeError('Materialized compiler recipe arrays must use Array.prototype.');
-		const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
-		const length =
-			lengthDescriptor !== undefined && 'value' in lengthDescriptor
-				? lengthDescriptor.value
-				: undefined;
-		if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0)
-			throw new TypeError('Materialized compiler recipe contains an invalid array length.');
-		if (length > budget.maximum - budget.nodes)
-			throw new CompilerInputCaptureError(
-				'BUDGET_EXCEEDED',
-				'Materialized compiler recipe array exceeds its bounded snapshot population.'
-			);
+	onProgress();
+	const ownKeys = Reflect.ownKeys(value);
+	onProgress();
+	if (!exactDenseDataArrayKeys(ownKeys, length, onProgress))
+		throw new TypeError('Materialized compiler recipe arrays must be dense exact data arrays.');
+	const result: unknown[] = [];
+	for (let index = 0; index < length; index += 1) {
 		onProgress();
-		const ownKeys = Reflect.ownKeys(value);
-		onProgress();
-		let exactKeys = ownKeys.length === length + 1;
-		for (const key of ownKeys) {
-			onProgress();
-			if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))
-				exactKeys = false;
-		}
-		if (!exactKeys)
-			throw new TypeError('Materialized compiler recipe arrays must be dense exact data arrays.');
-		const result: unknown[] = [];
-		for (let index = 0; index < length; index += 1) {
-			onProgress();
-			const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Materialized compiler recipe arrays must contain data elements.');
-			result.push(cloneCanonicalSnapshotValue(descriptor.value, onProgress, budget));
-		}
-		return Object.freeze(result);
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Materialized compiler recipe arrays must contain data elements.');
+		result.push(cloneCanonicalSnapshotValue(descriptor.value, onProgress, budget));
 	}
+	return Object.freeze(result);
+}
+
+function cloneCanonicalSnapshotRecord(
+	value: object,
+	onProgress: () => void,
+	budget: MaterializedRecipeCloneBudget
+): unknown {
 	const prototype = Reflect.getPrototypeOf(value);
 	if (prototype !== Object.prototype && prototype !== null)
 		throw new TypeError('Materialized compiler recipe records must use a plain prototype.');
@@ -650,6 +685,26 @@ function cloneCanonicalSnapshotValue(
 	return Object.freeze(result);
 }
 
+function cloneCanonicalSnapshotValue(
+	value: unknown,
+	onProgress: () => void,
+	budget: MaterializedRecipeCloneBudget
+): unknown {
+	onProgress();
+	budget.nodes += 1;
+	if (!Number.isSafeInteger(budget.nodes) || budget.nodes > budget.maximum)
+		throw new CompilerInputCaptureError(
+			'BUDGET_EXCEEDED',
+			'Materialized compiler recipe exceeds its bounded snapshot population.'
+		);
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+	if (typeof value === 'number') return value;
+	if (typeof value !== 'object' || isProxy(value))
+		throw new TypeError('Materialized compiler recipe contains a non-data value.');
+	if (Array.isArray(value)) return cloneCanonicalSnapshotArray(value, onProgress, budget);
+	return cloneCanonicalSnapshotRecord(value, onProgress, budget);
+}
+
 function compareTextWithProgress(left: string, right: string, onProgress: () => void): number {
 	const length = Math.min(left.length, right.length);
 	for (let index = 0; index < length; index += 1) {
@@ -657,30 +712,39 @@ function compareTextWithProgress(left: string, right: string, onProgress: () => 
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
 }
 
-function sameCanonicalSnapshotValue(
+function sameCanonicalSnapshotPrimitive(
 	left: unknown,
 	right: unknown,
 	onProgress: () => void
 ): boolean {
-	onProgress();
-	if (typeof left !== typeof right) return false;
-	if (left === null || right === null) return left === right;
-	if (typeof left !== 'object' || typeof right !== 'object') {
-		if (typeof left === 'string' && typeof right === 'string')
-			return compareTextWithProgress(left, right, onProgress) === 0;
-		return left === right;
+	if (typeof left === 'string' && typeof right === 'string')
+		return compareTextWithProgress(left, right, onProgress) === 0;
+	return left === right;
+}
+
+function sameCanonicalSnapshotArray(
+	left: unknown,
+	right: unknown,
+	onProgress: () => void
+): boolean {
+	if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index += 1) {
+		onProgress();
+		if (!sameCanonicalSnapshotValue(left[index], right[index], onProgress)) return false;
 	}
-	if (Array.isArray(left) || Array.isArray(right)) {
-		if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-		for (let index = 0; index < left.length; index += 1) {
-			onProgress();
-			if (!sameCanonicalSnapshotValue(left[index], right[index], onProgress)) return false;
-		}
-		return true;
-	}
+	return true;
+}
+
+function sameCanonicalSnapshotRecord(
+	left: Record<string, unknown>,
+	right: Record<string, unknown>,
+	onProgress: () => void
+): boolean {
 	const leftKeys = Object.keys(left).sort((first, second) =>
 		compareTextWithProgress(first, second, onProgress)
 	);
@@ -695,15 +759,30 @@ function sameCanonicalSnapshotValue(
 		const key = leftKeys[index]!;
 		if (
 			compareTextWithProgress(key, rightKeys[index]!, onProgress) !== 0 ||
-			!sameCanonicalSnapshotValue(
-				(left as Record<string, unknown>)[key],
-				(right as Record<string, unknown>)[key],
-				onProgress
-			)
+			!sameCanonicalSnapshotValue(left[key], right[key], onProgress)
 		)
 			return false;
 	}
 	return true;
+}
+
+function sameCanonicalSnapshotValue(
+	left: unknown,
+	right: unknown,
+	onProgress: () => void
+): boolean {
+	onProgress();
+	if (typeof left !== typeof right) return false;
+	if (left === null || right === null) return left === right;
+	if (typeof left !== 'object' || typeof right !== 'object')
+		return sameCanonicalSnapshotPrimitive(left, right, onProgress);
+	if (Array.isArray(left) || Array.isArray(right))
+		return sameCanonicalSnapshotArray(left, right, onProgress);
+	return sameCanonicalSnapshotRecord(
+		left as Record<string, unknown>,
+		right as Record<string, unknown>,
+		onProgress
+	);
 }
 
 function snapshotMaterializedRecipe(

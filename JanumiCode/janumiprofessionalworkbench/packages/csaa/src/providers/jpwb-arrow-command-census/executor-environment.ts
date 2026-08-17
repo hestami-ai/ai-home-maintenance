@@ -213,6 +213,112 @@ function sameStableFile(
 	);
 }
 
+function captureFailureCode(
+	moduleName: ArrowCommandCensusExternalModuleName | null
+): 'ENVIRONMENT_CAPTURE_FAILED' | 'EXTERNAL_MODULE_TREE_INVALID' {
+	return moduleName === null ? 'ENVIRONMENT_CAPTURE_FAILED' : 'EXTERNAL_MODULE_TREE_INVALID';
+}
+
+function requireCapturableRegularFile(
+	path: string,
+	label: string,
+	moduleName: ArrowCommandCensusExternalModuleName | null
+): void {
+	const lexical = lstatSync(path);
+	if (!lexical.isFile()) {
+		fail(captureFailureCode(moduleName), `${label} must be a regular file.`, path, moduleName);
+	}
+}
+
+function capturableFileStat(
+	descriptor: number,
+	path: string,
+	label: string,
+	moduleName: ArrowCommandCensusExternalModuleName | null
+) {
+	const before = fstatSync(descriptor);
+	if (!before.isFile() || !Number.isSafeInteger(before.size) || before.size < 0) {
+		fail(
+			captureFailureCode(moduleName),
+			`${label} has an unsupported file identity or size.`,
+			path,
+			moduleName
+		);
+	}
+	return before;
+}
+
+function requireCaptureByteBudget(
+	ledger: ExternalModuleBudgetLedger | undefined,
+	size: number,
+	path: string,
+	moduleName: ArrowCommandCensusExternalModuleName | null
+): void {
+	if (ledger !== undefined && ledger.bytes + size > ledger.maxBytes) {
+		fail(
+			'BUDGET_EXHAUSTED',
+			`External module bytes exceed the caller budget of ${ledger.maxBytes}.`,
+			path,
+			moduleName
+		);
+	}
+}
+
+interface CapturedFileBytes {
+	readonly bytes: number;
+	readonly chunks: Uint8Array[] | null;
+	readonly hash: ReturnType<typeof createHash>;
+}
+
+function readCapturedBytes(
+	descriptor: number,
+	size: number,
+	path: string,
+	label: string,
+	moduleName: ArrowCommandCensusExternalModuleName | null,
+	collectContent: boolean
+): CapturedFileBytes {
+	const hash = createHash('sha256');
+	const chunks = collectContent ? ([] as Uint8Array[]) : null;
+	const buffer = Buffer.allocUnsafe(64 * 1024);
+	let bytes = 0;
+	while (bytes < size) {
+		const count = readSync(descriptor, buffer, 0, Math.min(buffer.byteLength, size - bytes), bytes);
+		if (count === 0) {
+			fail(
+				'IDENTITY_CHANGED_DURING_CAPTURE',
+				`${label} changed while its bytes were captured.`,
+				path,
+				moduleName
+			);
+		}
+		const chunk = buffer.subarray(0, count);
+		hash.update(chunk);
+		if (chunks !== null) chunks.push(Uint8Array.from(chunk));
+		bytes += count;
+	}
+	if (readSync(descriptor, buffer, 0, 1, bytes) !== 0) {
+		fail(
+			'IDENTITY_CHANGED_DURING_CAPTURE',
+			`${label} changed while its bytes were captured.`,
+			path,
+			moduleName
+		);
+	}
+	return { bytes, chunks, hash };
+}
+
+function concatCapturedContent(chunks: Uint8Array[] | null, bytes: number): Uint8Array | undefined {
+	return chunks === null
+		? undefined
+		: Uint8Array.from(
+				Buffer.concat(
+					chunks.map((chunk) => Buffer.from(chunk)),
+					bytes
+				)
+			);
+}
+
 function captureFile(
 	path: string,
 	label: string,
@@ -222,67 +328,20 @@ function captureFile(
 ): CapturedFileIdentity {
 	let descriptor: number | undefined;
 	try {
-		const lexical = lstatSync(path);
-		if (!lexical.isFile()) {
-			fail(
-				moduleName === null ? 'ENVIRONMENT_CAPTURE_FAILED' : 'EXTERNAL_MODULE_TREE_INVALID',
-				`${label} must be a regular file.`,
-				path,
-				moduleName
-			);
-		}
+		requireCapturableRegularFile(path, label, moduleName);
 		descriptor = openSync(path, constants.O_RDONLY);
-		const before = fstatSync(descriptor);
-		if (!before.isFile() || !Number.isSafeInteger(before.size) || before.size < 0) {
-			fail(
-				moduleName === null ? 'ENVIRONMENT_CAPTURE_FAILED' : 'EXTERNAL_MODULE_TREE_INVALID',
-				`${label} has an unsupported file identity or size.`,
-				path,
-				moduleName
-			);
-		}
-		if (ledger !== undefined && ledger.bytes + before.size > ledger.maxBytes) {
-			fail(
-				'BUDGET_EXHAUSTED',
-				`External module bytes exceed the caller budget of ${ledger.maxBytes}.`,
-				path,
-				moduleName
-			);
-		}
+		const before = capturableFileStat(descriptor, path, label, moduleName);
+		requireCaptureByteBudget(ledger, before.size, path, moduleName);
 
-		const hash = createHash('sha256');
-		const chunks = collectContent ? ([] as Uint8Array[]) : null;
-		const buffer = Buffer.allocUnsafe(64 * 1024);
-		let bytes = 0;
-		while (bytes < before.size) {
-			const count = readSync(
-				descriptor,
-				buffer,
-				0,
-				Math.min(buffer.byteLength, before.size - bytes),
-				bytes
-			);
-			if (count === 0) {
-				fail(
-					'IDENTITY_CHANGED_DURING_CAPTURE',
-					`${label} changed while its bytes were captured.`,
-					path,
-					moduleName
-				);
-			}
-			const chunk = buffer.subarray(0, count);
-			hash.update(chunk);
-			if (chunks !== null) chunks.push(Uint8Array.from(chunk));
-			bytes += count;
-		}
-		if (readSync(descriptor, buffer, 0, 1, bytes) !== 0) {
-			fail(
-				'IDENTITY_CHANGED_DURING_CAPTURE',
-				`${label} changed while its bytes were captured.`,
-				path,
-				moduleName
-			);
-		}
+		const read = readCapturedBytes(
+			descriptor,
+			before.size,
+			path,
+			label,
+			moduleName,
+			collectContent
+		);
+		const bytes = read.bytes;
 		const after = fstatSync(descriptor);
 		if (!sameStableFile(before, after)) {
 			fail(
@@ -293,25 +352,17 @@ function captureFile(
 			);
 		}
 		if (ledger !== undefined) ledger.bytes += bytes;
-		const content =
-			chunks === null
-				? undefined
-				: Uint8Array.from(
-						Buffer.concat(
-							chunks.map((chunk) => Buffer.from(chunk)),
-							bytes
-						)
-					);
+		const content = concatCapturedContent(read.chunks, bytes);
 		return {
 			bytes,
 			...(content === undefined ? {} : { content }),
 			path,
-			sha256: hash.digest('hex')
+			sha256: read.hash.digest('hex')
 		};
 	} catch (error) {
 		if (error instanceof ArrowCommandCensusExecutorEnvironmentError) throw error;
 		return fail(
-			moduleName === null ? 'ENVIRONMENT_CAPTURE_FAILED' : 'EXTERNAL_MODULE_TREE_INVALID',
+			captureFailureCode(moduleName),
 			`${label} could not be captured as a stable regular file.`,
 			path,
 			moduleName

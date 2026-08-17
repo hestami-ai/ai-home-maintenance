@@ -338,6 +338,22 @@ function writeCapsule(
 	const written: { absolutePath: string; path: string; sha256: string }[] = [];
 	for (const artifact of artifactSet.artifacts) {
 		const bytes = readFrozenSubjectArtifact(subject, artifact.path);
+		// S6582 (`bytes?.byteLength`) IS REFUSED HERE, AND THE SHORTER SPELLING WAS TRIED AND REVERTED.
+		// `bytes === undefined ||` is the only thing keeping `sha256(bytes)` from being reached with a
+		// missing buffer. Under the optional chain, an artifact whose `bytes` is undefined AT RUNTIME
+		// makes `undefined !== undefined` FALSE, the `||` evaluates its right operand, and
+		// `createHash('sha256').update(undefined)` throws a raw TypeError — which is not an
+		// ObserveFailure, so this provider's closed ARTIFACT_SET_IDENTITY_MISMATCH/BIND refusal degrades
+		// into a terminal EXECUTOR_FAILED/EXECUTE with a null path and an UNCLASSIFIED_FAILURE progress
+		// record. All four are public output of this provider.
+		// ⚠ THE TYPE SYSTEM CANNOT SEE THIS: `artifact.bytes` is declared `number`, so optional-chain
+		// containment narrows `bytes` to Uint8Array in the right operand and the hole type-checks
+		// silently. The declaration is not a runtime guarantee about a caller-supplied artifact set —
+		// `denseArray` admits accessor properties (it checks `Reflect.ownKeys` NAMES, not descriptors),
+		// so the value read here need not be the value validation saw.
+		// The sibling `observe-state-machines.ts` DOES take the optional chain, and correctly: there the
+		// artifact comes from the validated frozen manifest behind an explicit `artifact.bytes !==
+		// request.artifact.bytes` refusal. Same expression, different guarantee — judge by context.
 		if (
 			bytes === undefined ||
 			bytes.byteLength !== artifact.bytes ||
@@ -561,6 +577,218 @@ function verifyRuntimeModulePath(value: string, moduleRoot: string, moduleName: 
 		);
 }
 
+/** Refuses any binding whose request, FrozenSubject capability and artifact set do not agree exactly. */
+function assertBoundSubjectAndArtifactSet(
+	request: ObserveArrowCommandCensusRequest,
+	artifactSet: ArrowCommandCensusArtifactSetBinding,
+	subject: FrozenSubject
+): void {
+	if (!isFrozenSubjectCapability(subject) || isProxy(subject))
+		fail(
+			'SUBJECT_CAPABILITY_UNAVAILABLE',
+			'BIND',
+			'Observer requires the exact FrozenSubject byte capability.',
+			'$dependencies.subject'
+		);
+	if (subject.descriptor.subjectId !== request.subjectId)
+		fail('SUBJECT_ID_MISMATCH', 'BIND', 'Request and FrozenSubject identities differ.');
+	if (artifactSet?.id !== request.artifactSetId || artifactSet.subjectId !== request.subjectId)
+		fail(
+			'ARTIFACT_SET_IDENTITY_MISMATCH',
+			'BIND',
+			'Request does not bind the supplied artifact set.'
+		);
+	if (artifactSet.artifacts.length > request.budgets.maxArtifacts)
+		fail(
+			'BUDGET_EXHAUSTED',
+			'BIND',
+			'Artifact population exceeds the caller budget.',
+			'$request.budgets.maxArtifacts'
+		);
+	const setValidation = validateArrowCommandCensusArtifactSet(artifactSet, subject, {
+		maxIssues: request.budgets.maxDiagnostics
+	});
+	if (setValidation.state !== 'VALID')
+		fail(
+			'ARTIFACT_SET_INVALID',
+			'BIND',
+			setValidation.issues[0]?.message ?? 'Artifact-set validation failed.',
+			setValidation.issues[0]?.path ?? null
+		);
+}
+
+function requireRetainedVerifier(
+	artifactSet: ArrowCommandCensusArtifactSetBinding
+): ArrowCommandCensusArtifactSetBinding['artifacts'][number] {
+	const analyzer = artifactSet.artifacts.find((artifact) => artifact.path === ANALYZER_PATH);
+	if (analyzer === undefined)
+		fail(
+			'ARTIFACT_SET_INVALID',
+			'BIND',
+			'Artifact set omits the retained verifier.',
+			ANALYZER_PATH
+		);
+	return analyzer;
+}
+
+function assertCapturedWorkerBytes(
+	workerBytes: Uint8Array,
+	worker: { readonly bytes: number; readonly sha256: string }
+): void {
+	if (workerBytes.byteLength !== worker.bytes || sha256(workerBytes) !== worker.sha256)
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'BIND',
+			'Worker bytes changed after executor capture.',
+			'$executor.worker'
+		);
+}
+
+/** Re-reads the materialized worker and recaptures the executor so identity drift during execution fails closed. */
+function assertPostExecutionExecutorIdentity(
+	capsuleWorker: string,
+	environment: ReturnType<typeof resolveArrowCommandCensusExecutorEnvironment>,
+	budgets: ObserveArrowCommandCensusRequest['budgets']
+): void {
+	const materializedWorkerBytes = readFileSync(capsuleWorker);
+	if (
+		sha256(materializedWorkerBytes) !== environment.identity.worker.sha256 ||
+		materializedWorkerBytes.byteLength !== environment.identity.worker.bytes
+	)
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'VALIDATE',
+			'Materialized worker bytes changed during execution.',
+			'$worker'
+		);
+	const recapturedEnvironment = resolveArrowCommandCensusExecutorEnvironment({
+		maxExternalModuleBytes: budgets.maxExternalModuleBytes,
+		maxExternalModuleFiles: budgets.maxExternalModuleFiles,
+		workerPath: WORKER_PATH
+	});
+	if (
+		canonicalSemanticJson(recapturedEnvironment.identity) !==
+		canonicalSemanticJson(environment.identity)
+	)
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'VALIDATE',
+			'Executor or external module bytes changed during execution.',
+			'$executor'
+		);
+}
+
+function assertRetainedVerifierAccepted(processResult: ProcessResult): void {
+	if (processResult.exitCode !== 0)
+		fail(
+			'EXECUTOR_FAILED',
+			'EXECUTE',
+			`Retained verifier exited with status ${String(processResult.exitCode)}; ${stderrIdentity(processResult.stderr)}.`,
+			'$worker'
+		);
+	if (processResult.stderr.byteLength !== 0)
+		fail(
+			'EXECUTOR_FAILED',
+			'EXECUTE',
+			'Retained verifier emitted stderr on a successful exit.',
+			'$worker'
+		);
+}
+
+function assertWorkerRuntimeMatchesCapture(
+	runtime: ReturnType<typeof parseArrowCommandCensusWorkerOutput>['runtime'],
+	executor: ReturnType<typeof resolveArrowCommandCensusExecutorEnvironment>['identity'],
+	moduleRoots: ReturnType<typeof resolveArrowCommandCensusExecutorEnvironment>['moduleRoots']
+): void {
+	const runtimeModules = new Map(executor.externalModules.map((module) => [module.name, module]));
+	if (
+		runtime.bunVersion !== executor.runtimeVersion ||
+		runtime.typescriptVersion !== runtimeModules.get('typescript')?.version ||
+		runtime.ulidVersion !== runtimeModules.get('ulid')?.version ||
+		runtime.zodVersion !== runtimeModules.get('zod')?.version
+	)
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'VALIDATE',
+			'Worker-reported runtime versions differ from pre-execution identities.',
+			'$worker.runtime'
+		);
+	verifyRuntimeModulePath(runtime.typescriptResolvedPath, moduleRoots.typescript, 'TypeScript');
+	verifyRuntimeModulePath(runtime.ulidResolvedPath, moduleRoots.ulid, 'ULID');
+	verifyRuntimeModulePath(runtime.zodResolvedPath, moduleRoots.zod, 'Zod');
+}
+
+/** Public failure projection: every unclassified error collapses to one closed EXECUTOR_FAILED diagnostic. */
+function observeFailureDiagnostic(error: unknown): ArrowCommandCensusDiagnostic {
+	if (error instanceof ObserveFailure) return error.diagnostic;
+	if (error instanceof ArrowCommandCensusExecutorEnvironmentError)
+		return {
+			code: error.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'EXECUTOR_FAILED',
+			message:
+				error.code === 'BUDGET_EXHAUSTED'
+					? 'Executor environment capture exceeded a caller operation budget.'
+					: `Executor environment capture failed closed (${error.code}).`,
+			path: publicExecutorErrorPath(error),
+			phase: 'BIND',
+			severity: 'ERROR'
+		};
+	if (error instanceof ArrowCommandCensusRawOutputError)
+		return {
+			code: 'RAW_OUTPUT_INVALID',
+			message: error.message,
+			path: error.path,
+			phase: 'NORMALIZE',
+			severity: 'ERROR'
+		};
+	if (error instanceof ArrowCommandCensusNormalizationError)
+		return {
+			code: 'OBSERVATION_VALIDATION_FAILED',
+			message: error.message,
+			path: error.path,
+			phase: 'VALIDATE',
+			severity: 'ERROR'
+		};
+	return {
+		code: 'EXECUTOR_FAILED',
+		message: 'Arrow-command census observation failed closed.',
+		path: null,
+		phase: 'EXECUTE',
+		severity: 'ERROR'
+	};
+}
+
+/** Returns the outcome the observation must carry once cleanup has run: unchanged unless cleanup itself failed. */
+function cleanupCapsule(
+	capsuleRoot: string | null,
+	progress: ArrowCommandCensusProgressRecorder,
+	maximumDiagnostics: number,
+	outcome: ObserveArrowCommandCensusOutcome
+): ObserveArrowCommandCensusOutcome {
+	if (capsuleRoot === null) {
+		progress.skip('CAPSULE_CLEANUP', { attempted: false, reason: 'CAPSULE_NOT_CREATED' });
+		return outcome;
+	}
+	progress.start('CAPSULE_CLEANUP', { attempted: true });
+	try {
+		rmSync(capsuleRoot, { force: true, recursive: true });
+		progress.complete({ attempted: true, succeeded: true });
+		return outcome;
+	} catch (error) {
+		progress.fail(error);
+		const cleanupDiagnostic: ArrowCommandCensusDiagnostic = {
+			code: 'EXECUTOR_FAILED',
+			message: 'Arrow-command census capsule cleanup failed; temporary material may remain.',
+			path: null,
+			phase: 'VALIDATE',
+			severity: 'ERROR'
+		};
+		return {
+			diagnostics: [cleanupDiagnostic].slice(0, maximumDiagnostics),
+			outcome: 'unavailable'
+		};
+	}
+}
+
 export interface ObserveArrowCommandCensusDependencies {
 	readonly artifactSet: ArrowCommandCensusArtifactSetBinding;
 	readonly subject: FrozenSubject;
@@ -592,38 +820,7 @@ export async function observeArrowCommandCensus(
 		maximumDiagnostics = request.budgets.maxDiagnostics;
 		const artifactSet = dependencies?.artifactSet;
 		const subject = dependencies?.subject;
-		if (!isFrozenSubjectCapability(subject) || isProxy(subject))
-			fail(
-				'SUBJECT_CAPABILITY_UNAVAILABLE',
-				'BIND',
-				'Observer requires the exact FrozenSubject byte capability.',
-				'$dependencies.subject'
-			);
-		if (subject.descriptor.subjectId !== request.subjectId)
-			fail('SUBJECT_ID_MISMATCH', 'BIND', 'Request and FrozenSubject identities differ.');
-		if (artifactSet?.id !== request.artifactSetId || artifactSet.subjectId !== request.subjectId)
-			fail(
-				'ARTIFACT_SET_IDENTITY_MISMATCH',
-				'BIND',
-				'Request does not bind the supplied artifact set.'
-			);
-		if (artifactSet.artifacts.length > request.budgets.maxArtifacts)
-			fail(
-				'BUDGET_EXHAUSTED',
-				'BIND',
-				'Artifact population exceeds the caller budget.',
-				'$request.budgets.maxArtifacts'
-			);
-		const setValidation = validateArrowCommandCensusArtifactSet(artifactSet, subject, {
-			maxIssues: request.budgets.maxDiagnostics
-		});
-		if (setValidation.state !== 'VALID')
-			fail(
-				'ARTIFACT_SET_INVALID',
-				'BIND',
-				setValidation.issues[0]?.message ?? 'Artifact-set validation failed.',
-				setValidation.issues[0]?.path ?? null
-			);
+		assertBoundSubjectAndArtifactSet(request, artifactSet, subject);
 		const artifactBytes = artifactSet.artifacts.reduce(
 			(total, artifact) => total + artifact.bytes,
 			0
@@ -645,14 +842,7 @@ export async function observeArrowCommandCensus(
 			maxExternalModuleFiles: request.budgets.maxExternalModuleFiles,
 			workerPath: WORKER_PATH
 		});
-		const analyzer = artifactSet.artifacts.find((artifact) => artifact.path === ANALYZER_PATH);
-		if (analyzer === undefined)
-			fail(
-				'ARTIFACT_SET_INVALID',
-				'BIND',
-				'Artifact set omits the retained verifier.',
-				ANALYZER_PATH
-			);
+		const analyzer = requireRetainedVerifier(artifactSet);
 		const executor = {
 			adapterId: ARROW_COMMAND_CENSUS_ADAPTER_ID,
 			adapterVersion: ARROW_COMMAND_CENSUS_OPERATION_VERSION,
@@ -661,16 +851,7 @@ export async function observeArrowCommandCensus(
 			retainedVerifierSha256: analyzer.sha256
 		};
 		const workerBytes = readFileSync(WORKER_PATH);
-		if (
-			workerBytes.byteLength !== executor.worker.bytes ||
-			sha256(workerBytes) !== executor.worker.sha256
-		)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'BIND',
-				'Worker bytes changed after executor capture.',
-				'$executor.worker'
-			);
+		assertCapturedWorkerBytes(workerBytes, executor.worker);
 		progress.complete({
 			executableBytes: executor.executableBytes,
 			executableSha256: executor.executableSha256,
@@ -745,32 +926,7 @@ export async function observeArrowCommandCensus(
 		});
 		progress.start('POST_EXECUTION_INTEGRITY_RECHECK');
 		verifyCapsuleBytes(written);
-		const materializedWorkerBytes = readFileSync(capsuleWorker);
-		if (
-			sha256(materializedWorkerBytes) !== executor.worker.sha256 ||
-			materializedWorkerBytes.byteLength !== executor.worker.bytes
-		)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Materialized worker bytes changed during execution.',
-				'$worker'
-			);
-		const recapturedEnvironment = resolveArrowCommandCensusExecutorEnvironment({
-			maxExternalModuleBytes: request.budgets.maxExternalModuleBytes,
-			maxExternalModuleFiles: request.budgets.maxExternalModuleFiles,
-			workerPath: WORKER_PATH
-		});
-		if (
-			canonicalSemanticJson(recapturedEnvironment.identity) !==
-			canonicalSemanticJson(environment.identity)
-		)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Executor or external module bytes changed during execution.',
-				'$executor'
-			);
+		assertPostExecutionExecutorIdentity(capsuleWorker, environment, request.budgets);
 		progress.complete({
 			executorRecaptureMatched: true,
 			subjectBytesMatched: true,
@@ -781,20 +937,7 @@ export async function observeArrowCommandCensus(
 			stderrBytes: processResult.stderr.byteLength,
 			stdoutBytes: processResult.stdout.byteLength
 		});
-		if (processResult.exitCode !== 0)
-			fail(
-				'EXECUTOR_FAILED',
-				'EXECUTE',
-				`Retained verifier exited with status ${String(processResult.exitCode)}; ${stderrIdentity(processResult.stderr)}.`,
-				'$worker'
-			);
-		if (processResult.stderr.byteLength !== 0)
-			fail(
-				'EXECUTOR_FAILED',
-				'EXECUTE',
-				'Retained verifier emitted stderr on a successful exit.',
-				'$worker'
-			);
+		assertRetainedVerifierAccepted(processResult);
 		progress.complete({ accepted: true });
 		progress.start('WORKER_OUTPUT_PARSE_AND_RUNTIME_RECONCILE', {
 			postExecutionAcceptanceBudgets: {
@@ -812,26 +955,7 @@ export async function observeArrowCommandCensus(
 			exactJson(processResult.stdout),
 			request.budgets
 		);
-		const runtimeModules = new Map(executor.externalModules.map((module) => [module.name, module]));
-		if (
-			parsed.runtime.bunVersion !== executor.runtimeVersion ||
-			parsed.runtime.typescriptVersion !== runtimeModules.get('typescript')?.version ||
-			parsed.runtime.ulidVersion !== runtimeModules.get('ulid')?.version ||
-			parsed.runtime.zodVersion !== runtimeModules.get('zod')?.version
-		)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Worker-reported runtime versions differ from pre-execution identities.',
-				'$worker.runtime'
-			);
-		verifyRuntimeModulePath(
-			parsed.runtime.typescriptResolvedPath,
-			environment.moduleRoots.typescript,
-			'TypeScript'
-		);
-		verifyRuntimeModulePath(parsed.runtime.ulidResolvedPath, environment.moduleRoots.ulid, 'ULID');
-		verifyRuntimeModulePath(parsed.runtime.zodResolvedPath, environment.moduleRoots.zod, 'Zod');
+		assertWorkerRuntimeMatchesCapture(parsed.runtime, executor, environment.moduleRoots);
 		progress.complete({
 			birthMachines: parsed.evidence.births.length,
 			declaredArrowOccurrences: parsed.evidence.declaredArrows.length,
@@ -874,67 +998,10 @@ export async function observeArrowCommandCensus(
 			: { diagnostics: [], observation: normalized.observation, outcome: 'complete' };
 	} catch (error) {
 		progress.fail(error);
-		const diagnostic: ArrowCommandCensusDiagnostic =
-			error instanceof ObserveFailure
-				? error.diagnostic
-				: error instanceof ArrowCommandCensusExecutorEnvironmentError
-					? {
-							code: error.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'EXECUTOR_FAILED',
-							message:
-								error.code === 'BUDGET_EXHAUSTED'
-									? 'Executor environment capture exceeded a caller operation budget.'
-									: `Executor environment capture failed closed (${error.code}).`,
-							path: publicExecutorErrorPath(error),
-							phase: 'BIND',
-							severity: 'ERROR'
-						}
-					: error instanceof ArrowCommandCensusRawOutputError
-						? {
-								code: 'RAW_OUTPUT_INVALID',
-								message: error.message,
-								path: error.path,
-								phase: 'NORMALIZE',
-								severity: 'ERROR'
-							}
-						: error instanceof ArrowCommandCensusNormalizationError
-							? {
-									code: 'OBSERVATION_VALIDATION_FAILED',
-									message: error.message,
-									path: error.path,
-									phase: 'VALIDATE',
-									severity: 'ERROR'
-								}
-							: {
-									code: 'EXECUTOR_FAILED',
-									message: 'Arrow-command census observation failed closed.',
-									path: null,
-									phase: 'EXECUTE',
-									severity: 'ERROR'
-								};
+		const diagnostic: ArrowCommandCensusDiagnostic = observeFailureDiagnostic(error);
 		outcome = { diagnostics: [diagnostic].slice(0, maximumDiagnostics), outcome: 'unavailable' };
 	} finally {
-		if (capsuleRoot === null)
-			progress.skip('CAPSULE_CLEANUP', { attempted: false, reason: 'CAPSULE_NOT_CREATED' });
-		else {
-			progress.start('CAPSULE_CLEANUP', { attempted: true });
-			try {
-				rmSync(capsuleRoot, { force: true, recursive: true });
-				progress.complete({ attempted: true, succeeded: true });
-			} catch (error) {
-				progress.fail(error);
-				const cleanupDiagnostic: ArrowCommandCensusDiagnostic = {
-					code: 'EXECUTOR_FAILED',
-					message: 'Arrow-command census capsule cleanup failed; temporary material may remain.',
-					path: null,
-					phase: 'VALIDATE',
-					severity: 'ERROR'
-				};
-				outcome = {
-					diagnostics: [cleanupDiagnostic].slice(0, maximumDiagnostics),
-					outcome: 'unavailable'
-				};
-			}
-		}
+		outcome = cleanupCapsule(capsuleRoot, progress, maximumDiagnostics, outcome);
 	}
 	return outcome;
 }

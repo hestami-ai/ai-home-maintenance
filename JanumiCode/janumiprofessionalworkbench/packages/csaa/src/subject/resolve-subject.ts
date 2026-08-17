@@ -1,9 +1,11 @@
 import type {
+	ProjectSubjectRecord,
 	ResolveSubjectRequest,
+	SubjectCompleteness,
 	SubjectDiagnostic,
 	SubjectResolutionOutcome
 } from '../contracts/subject.js';
-import { canonicalJson } from '../inventory/canonical.js';
+import { canonicalJson, compareText } from '../inventory/canonical.js';
 import { CaptureFailure, captureSubject } from './capture.js';
 import type { SubjectCapture } from './capture-model.js';
 import { reconcileConfigurationClosure } from './artifacts.js';
@@ -99,7 +101,7 @@ function canonicalizeAdditionalArtifacts(
 				);
 			return artifact.path;
 		})
-		.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+		.sort(compareText);
 	return {
 		...request,
 		scope: {
@@ -107,6 +109,106 @@ function canonicalizeAdditionalArtifacts(
 			kind: 'EXPLICIT_PROJECTS',
 			projects: [...request.scope.projects]
 		}
+	};
+}
+
+function requestWithRemainingBudget(
+	request: ResolveSubjectRequest,
+	deadline: number
+): ResolveSubjectRequest {
+	const remaining = deadline - Date.now();
+	if (remaining <= 0)
+		throw new CaptureFailure(
+			{
+				code: 'BUDGET_EXCEEDED',
+				message: 'Subject resolution exceeded its duration budget.',
+				path: null,
+				phase: 'RESOLVE',
+				severity: 'ERROR'
+			},
+			'unavailable'
+		);
+	return { ...request, budgets: { ...request.budgets, maxDurationMs: Math.max(1, remaining) } };
+}
+
+function isUnexpectedlyEmptySubject(
+	projects: readonly ProjectSubjectRecord[],
+	request: ResolveSubjectRequest
+): boolean {
+	return projects.length === 0 && request.expectEmpty !== true;
+}
+
+function emptySubjectOutcome(): SubjectResolutionOutcome {
+	return {
+		diagnostics: [
+			{
+				code: 'EMPTY_SUBJECT',
+				message: 'No TypeScript project was resolved for the requested subject.',
+				path: null,
+				phase: 'RESOLVE',
+				severity: 'ERROR'
+			}
+		],
+		outcome: 'incompatible'
+	};
+}
+
+function liveRecheckDetectedChange(
+	initialCapture: SubjectCapture,
+	options: InternalResolutionOptions,
+	remainingRequest: () => ResolveSubjectRequest
+): boolean {
+	if (options.skipLiveRecheck === true) return false;
+	const currentCapture = captureSubject(remainingRequest());
+	return captureSignature(initialCapture) !== captureSignature(currentCapture);
+}
+
+function resolutionCompleteness(
+	projects: readonly ProjectSubjectRecord[],
+	diagnostics: readonly SubjectDiagnostic[]
+): SubjectCompleteness {
+	if (projects.some((project) => project.status === 'PARTIAL')) return 'PARTIAL';
+	if (diagnostics.some((item) => item.severity !== 'INFO')) return 'PARTIAL';
+	return 'COMPLETE';
+}
+
+function isRetryableResolutionFailure(error: unknown): boolean {
+	if (error instanceof CaptureFailure)
+		return error.diagnostic.code === 'SUBJECT_CHANGED_DURING_RESOLUTION';
+	if (error instanceof ProjectDiscoveryFailure)
+		return error.diagnostic.code === 'SUBJECT_CHANGED_DURING_RESOLUTION';
+	return false;
+}
+
+function workspaceFailureCode(
+	outcome: WorkspaceDiscoveryFailure['outcome']
+): SubjectDiagnostic['code'] {
+	if (outcome === 'ambiguous') return 'PROJECT_AMBIGUOUS';
+	if (outcome === 'not-found') return 'CONFIG_REQUIRED_MISSING';
+	return 'CONFIG_MALFORMED';
+}
+
+function resolutionFailureOutcome(error: unknown, rootLocator: string): SubjectResolutionOutcome {
+	if (error instanceof CaptureFailure)
+		return { diagnostics: [error.diagnostic], outcome: error.outcome };
+	if (error instanceof ProjectDiscoveryFailure)
+		return { diagnostics: [error.diagnostic], outcome: error.outcome };
+	if (error instanceof WorkspaceDiscoveryFailure)
+		return {
+			diagnostics: [
+				{
+					code: workspaceFailureCode(error.outcome),
+					message: error.message,
+					path: null,
+					phase: 'RESOLVE',
+					severity: 'ERROR'
+				}
+			],
+			outcome: error.outcome
+		};
+	return {
+		diagnostics: [unexpectedDiagnostic(error, rootLocator)],
+		outcome: 'unavailable'
 	};
 }
 
@@ -122,21 +224,8 @@ export function resolveSubjectInternal(
 	options: InternalResolutionOptions = {}
 ): SubjectResolutionOutcome {
 	const deadline = Date.now() + request.budgets.maxDurationMs;
-	const remainingRequest = (): ResolveSubjectRequest => {
-		const remaining = deadline - Date.now();
-		if (remaining <= 0)
-			throw new CaptureFailure(
-				{
-					code: 'BUDGET_EXCEEDED',
-					message: 'Subject resolution exceeded its duration budget.',
-					path: null,
-					phase: 'RESOLVE',
-					severity: 'ERROR'
-				},
-				'unavailable'
-			);
-		return { ...request, budgets: { ...request.budgets, maxDurationMs: Math.max(1, remaining) } };
-	};
+	const remainingRequest = (): ResolveSubjectRequest =>
+		requestWithRemainingBudget(request, deadline);
 	for (let attempt = 1; attempt <= 2; attempt += 1) {
 		try {
 			const initialCapture = captureSubject(remainingRequest());
@@ -150,19 +239,8 @@ export function resolveSubjectInternal(
 				workspaceDiscovery.workspaces
 			);
 			remainingRequest();
-			if (projectDiscovery.projects.length === 0 && resolvedRequest.expectEmpty !== true) {
-				return {
-					diagnostics: [
-						{
-							code: 'EMPTY_SUBJECT',
-							message: 'No TypeScript project was resolved for the requested subject.',
-							path: null,
-							phase: 'RESOLVE',
-							severity: 'ERROR'
-						}
-					],
-					outcome: 'incompatible'
-				};
+			if (isUnexpectedlyEmptySubject(projectDiscovery.projects, resolvedRequest)) {
+				return emptySubjectOutcome();
 			}
 			const closureReconciled = reconcileConfigurationClosure(
 				initialCapture,
@@ -174,12 +252,9 @@ export function resolveSubjectInternal(
 				resolvedRequest
 			);
 			options.hooks?.beforeLiveRecheck?.(attempt);
-			if (options.skipLiveRecheck !== true) {
-				const currentCapture = captureSubject(remainingRequest());
-				if (captureSignature(initialCapture) !== captureSignature(currentCapture)) {
-					if (attempt < 2) continue;
-					return { diagnostics: [changedDiagnostic()], outcome: 'unavailable' };
-				}
+			if (liveRecheckDetectedChange(initialCapture, options, remainingRequest)) {
+				if (attempt < 2) continue;
+				return { diagnostics: [changedDiagnostic()], outcome: 'unavailable' };
 			}
 			const diagnostics = [
 				...workspaceDiscovery.diagnostics,
@@ -195,39 +270,11 @@ export function resolveSubjectInternal(
 				request: resolvedRequest,
 				workspaces: workspaceDiscovery.workspaces
 			});
-			const completeness =
-				projectDiscovery.projects.some((project) => project.status === 'PARTIAL') ||
-				diagnostics.some((item) => item.severity !== 'INFO')
-					? 'PARTIAL'
-					: 'COMPLETE';
+			const completeness = resolutionCompleteness(projectDiscovery.projects, diagnostics);
 			return { completeness, diagnostics, outcome: 'resolved', subject };
 		} catch (error) {
-			if (error instanceof CaptureFailure) {
-				if (error.diagnostic.code === 'SUBJECT_CHANGED_DURING_RESOLUTION' && attempt < 2) continue;
-				return { diagnostics: [error.diagnostic], outcome: error.outcome };
-			}
-			if (error instanceof ProjectDiscoveryFailure) {
-				if (error.diagnostic.code === 'SUBJECT_CHANGED_DURING_RESOLUTION' && attempt < 2) continue;
-				return { diagnostics: [error.diagnostic], outcome: error.outcome };
-			}
-			if (error instanceof WorkspaceDiscoveryFailure) {
-				const code =
-					error.outcome === 'ambiguous'
-						? 'PROJECT_AMBIGUOUS'
-						: error.outcome === 'not-found'
-							? 'CONFIG_REQUIRED_MISSING'
-							: 'CONFIG_MALFORMED';
-				return {
-					diagnostics: [
-						{ code, message: error.message, path: null, phase: 'RESOLVE', severity: 'ERROR' }
-					],
-					outcome: error.outcome
-				};
-			}
-			return {
-				diagnostics: [unexpectedDiagnostic(error, request.rootLocator)],
-				outcome: 'unavailable'
-			};
+			if (isRetryableResolutionFailure(error) && attempt < 2) continue;
+			return resolutionFailureOutcome(error, request.rootLocator);
 		}
 	}
 	return { diagnostics: [changedDiagnostic()], outcome: 'unavailable' };

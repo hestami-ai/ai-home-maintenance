@@ -2,7 +2,13 @@ import { lstatSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, posix, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { TYPESCRIPT_PROVIDER_VERSION, type SourceOrigin } from '../../contracts/semantic.js';
-import type { CapturedArtifactRecord, FrozenSubject } from '../../contracts/subject.js';
+import type {
+	CapturedArtifactRecord,
+	FrozenSubject,
+	ProjectSubjectRecord,
+	WorkspaceExportRecord
+} from '../../contracts/subject.js';
+import { compareText } from '../../inventory/canonical.js';
 
 function slash(path: string): string {
 	return path.replaceAll('\\', '/');
@@ -123,6 +129,36 @@ function parentDirectories(path: string): string[] {
 	return directories;
 }
 
+function recipeOutputRoots(project: ProjectSubjectRecord): readonly string[] {
+	const roots: string[] = [];
+	for (const key of ['declarationDir', 'outDir'] as const) {
+		const value = project.programRecipe.compilerOptions[key];
+		if (typeof value !== 'string' || value === '.') continue;
+		roots.push(canonicalLogicalSyntax(value, false));
+	}
+	return roots;
+}
+
+function exportDeclarationRoot(
+	workspacePath: string,
+	record: WorkspaceExportRecord
+): string | undefined {
+	const specifier = record.target;
+	if (
+		specifier === null ||
+		specifier.length === 0 ||
+		specifier.includes('\\') ||
+		specifier.startsWith('/') ||
+		/^[A-Za-z]:/u.test(specifier)
+	)
+		return undefined;
+	if (!record.conditions.includes('types') && !declarationPath(specifier)) return undefined;
+	const target = posix.normalize(posix.join(workspacePath, specifier));
+	if (target === '.' || target === '..' || target.startsWith('../')) return undefined;
+	const directory = posix.dirname(target);
+	return directory === '.' ? undefined : canonicalLogicalSyntax(directory, false);
+}
+
 interface WorkspaceAliasState {
 	readonly aliasPath: string;
 	readonly name: string;
@@ -187,6 +223,15 @@ export class FrozenCompilerPathResolver {
 			'Pinned TypeScript library root'
 		);
 		this.addVirtualDirectory('.');
+		this.indexFrozenArtifacts(subject);
+		this.indexGeneratedContexts(subject);
+		this.workspaceAliases = this.captureWorkspaceAliases(subject);
+		for (const alias of this.workspaceAliases)
+			if (alias.present) this.addWorkspaceAliasVirtualView(alias);
+		this.buildOutputPrefixes = this.collectBuildOutputPrefixes(subject);
+	}
+
+	private indexFrozenArtifacts(subject: FrozenSubject): void {
 		for (const artifact of subject.artifacts) {
 			canonicalLogicalSyntax(artifact.path, false);
 			const key = this.pathKey(artifact.path);
@@ -195,6 +240,9 @@ export class FrozenCompilerPathResolver {
 			this.artifactsByKey.set(key, artifact);
 			this.addVirtualFile(artifact.path);
 		}
+	}
+
+	private indexGeneratedContexts(subject: FrozenSubject): void {
 		for (const record of subject.generatedContexts) {
 			if (record.selectedInput) continue;
 			const path = canonicalLogicalSyntax(record.path, false);
@@ -210,6 +258,9 @@ export class FrozenCompilerPathResolver {
 			for (const directory of parentDirectories(path))
 				this.explicitContextDirectoryKeys.add(this.pathKey(directory));
 		}
+	}
+
+	private captureWorkspaceAliases(subject: FrozenSubject): readonly WorkspaceAliasState[] {
 		const aliasDefinitions = subject.workspaces
 			.map((workspace) => {
 				const workspacePath = canonicalLogicalSyntax(workspace.path, false);
@@ -220,41 +271,25 @@ export class FrozenCompilerPathResolver {
 				(left, right) => right.name.length - left.name.length || (left.name < right.name ? -1 : 1)
 			);
 		const aliasKeys = new Set<string>();
-		this.workspaceAliases = aliasDefinitions.map((alias) => {
+		return aliasDefinitions.map((alias) => {
 			const key = this.pathKey(alias.aliasPath);
 			if (aliasKeys.has(key))
 				failPath(`Workspace aliases collide under the compiler case policy: ${alias.name}.`);
 			aliasKeys.add(key);
 			return this.captureWorkspaceAliasState(alias);
 		});
-		for (const alias of this.workspaceAliases)
-			if (alias.present) this.addWorkspaceAliasVirtualView(alias);
+	}
+
+	private collectBuildOutputPrefixes(subject: FrozenSubject): readonly string[] {
 		const outputRoots = new Set<string>();
-		for (const project of subject.projects) {
-			for (const key of ['declarationDir', 'outDir'] as const) {
-				const value = project.programRecipe.compilerOptions[key];
-				if (typeof value === 'string' && value !== '.')
-					outputRoots.add(canonicalLogicalSyntax(value, false));
-			}
-		}
-		for (const workspace of subject.workspaces) {
+		for (const project of subject.projects)
+			for (const root of recipeOutputRoots(project)) outputRoots.add(root);
+		for (const workspace of subject.workspaces)
 			for (const record of workspace.exports) {
-				if (
-					record.target === null ||
-					record.target.length === 0 ||
-					record.target.includes('\\') ||
-					record.target.startsWith('/') ||
-					/^[A-Za-z]:/u.test(record.target)
-				)
-					continue;
-				if (!record.conditions.includes('types') && !declarationPath(record.target)) continue;
-				const target = posix.normalize(posix.join(workspace.path, record.target));
-				if (target === '.' || target === '..' || target.startsWith('../')) continue;
-				const directory = posix.dirname(target);
-				if (directory !== '.') outputRoots.add(canonicalLogicalSyntax(directory, false));
+				const root = exportDeclarationRoot(workspace.path, record);
+				if (root !== undefined) outputRoots.add(root);
 			}
-		}
-		this.buildOutputPrefixes = [...outputRoots].sort();
+		return [...outputRoots].sort(compareText);
 	}
 
 	private pathKey(path: string): string {
@@ -407,16 +442,16 @@ export class FrozenCompilerPathResolver {
 	}
 
 	isBoundaryPath(logicalPath: string): boolean {
-		return /^@boundary\/ancestor-[1-9][0-9]*\/node_modules(?:\/|$)/u.test(logicalPath);
+		return /^@boundary\/ancestor-[1-9]\d*\/node_modules(?:\/|$)/u.test(logicalPath);
 	}
 
 	workspaceAliasRoots(): readonly string[] {
-		return Object.freeze(this.workspaceAliases.map((alias) => alias.aliasPath).sort());
+		return Object.freeze(this.workspaceAliases.map((alias) => alias.aliasPath).sort(compareText));
 	}
 
 	workspaceAliasResolvedTarget(logicalPath: string): string | undefined {
 		const alias = this.workspaceAlias(logicalPath);
-		if (alias === undefined || alias.tail !== '' || !alias.present) return undefined;
+		if (alias?.tail !== '' || !alias.present) return undefined;
 		return alias.path;
 	}
 
@@ -587,7 +622,7 @@ export class FrozenCompilerPathResolver {
 		const direct = this.artifact(logicalPath);
 		if (direct !== undefined) return direct;
 		const alias = this.workspaceAlias(logicalPath);
-		if (alias === undefined || !alias.present) return undefined;
+		if (!alias?.present) return undefined;
 		const target = this.workspaceTarget(logicalPath);
 		return target === undefined ? undefined : this.artifactsByKey.get(this.pathKey(target));
 	}
@@ -733,9 +768,7 @@ export class FrozenCompilerPathResolver {
 		if (children === undefined) return Object.freeze([]);
 		return Object.freeze(
 			[...children.values()]
-				.sort((left, right) =>
-					left.logicalPath < right.logicalPath ? -1 : left.logicalPath > right.logicalPath ? 1 : 0
-				)
+				.sort((left, right) => compareText(left.logicalPath, right.logicalPath))
 				.map((child) => Object.freeze({ ...child }))
 		);
 	}

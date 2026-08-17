@@ -1,8 +1,13 @@
 import { isProxy } from 'node:util/types';
 import {
 	FULL_JAN_CSAA_007_CONFORMANCE,
+	type SemanticAstNodeRecord,
 	type SemanticModuleOccurrenceKind,
 	type SemanticModuleResolutionRecord,
+	type SemanticNodeId,
+	type SemanticProvenanceId,
+	type SemanticSourceId,
+	type SemanticSourceRecord,
 	type StaticSemanticSnapshot
 } from '../contracts/semantic.js';
 import {
@@ -18,14 +23,17 @@ import {
 	type ModuleDependencyGraphEdge,
 	type ModuleDependencyGraphEdgeId,
 	type ModuleDependencyGraphEpistemicState,
+	type ModuleDependencyGraphId,
 	type ModuleDependencyGraphIndexEntry,
 	type ModuleDependencyGraphLayer,
+	type ModuleDependencyGraphLayerId,
 	type ModuleDependencyGraphLimitation,
 	type ModuleDependencyGraphNode,
 	type ModuleDependencyGraphNodeId,
 	type ModuleDependencyGraphRelationKind,
 	type ModuleDependencyGraphSnapshot
 } from '../contracts/graph.js';
+import { compareText } from '../inventory/canonical.js';
 import { moduleDependencyGraphContentDigest } from './module-dependency-content.js';
 import { moduleDependencyGraphInputDigest } from './module-dependency-input.js';
 import {
@@ -35,7 +43,10 @@ import {
 	moduleDependencyGraphResolutionTargetNodeId,
 	moduleDependencyGraphSourceNodeId
 } from './ids.js';
-import { validateModuleDependencyGraph } from './validate-graph.js';
+import {
+	validateModuleDependencyGraph,
+	type ModuleDependencyGraphValidationIssue
+} from './validate-graph.js';
 
 const REQUEST_KEYS = [
 	'operationVersion',
@@ -62,6 +73,38 @@ function unavailable(
 	return { diagnostics: [diagnostic(code, message, phase, path)], outcome: 'unavailable' };
 }
 
+function requestFailure(error: unknown): ModuleDependencyGraphBuildOutcome {
+	return unavailable(
+		'REQUEST_INVALID',
+		error instanceof Error ? error.message : 'Invalid module dependency graph request.',
+		'REQUEST'
+	);
+}
+
+function projectionFailure(error: unknown): ModuleDependencyGraphBuildOutcome {
+	return unavailable(
+		'DANGLING_SEMANTIC_REFERENCE',
+		error instanceof Error
+			? `Module dependency graph projection failed closed: ${error.message}`
+			: 'Module dependency graph projection failed closed.',
+		'PROJECT'
+	);
+}
+
+function validationFailure(
+	issues: readonly ModuleDependencyGraphValidationIssue[]
+): ModuleDependencyGraphBuildOutcome {
+	const firstIssue = issues[0];
+	return unavailable(
+		'GRAPH_VALIDATION_FAILED',
+		firstIssue === undefined
+			? 'Module dependency graph validation failed without a diagnostic.'
+			: `Module dependency graph validation failed: ${firstIssue.message}`,
+		'VALIDATE',
+		firstIssue?.path ?? null
+	);
+}
+
 function materializeRequest(value: unknown): BuildModuleDependencyGraphRequest {
 	if (value === null || typeof value !== 'object' || Array.isArray(value) || isProxy(value))
 		throw new TypeError('Module dependency graph request must be a plain data object.');
@@ -71,8 +114,8 @@ function materializeRequest(value: unknown): BuildModuleDependencyGraphRequest {
 	const keys = Reflect.ownKeys(value);
 	if (keys.some((key) => typeof key !== 'string'))
 		throw new TypeError('Module dependency graph request rejects symbol keys.');
-	const actual = (keys as string[]).sort();
-	const expected = [...REQUEST_KEYS].sort();
+	const actual = (keys as string[]).sort(compareText);
+	const expected = [...REQUEST_KEYS].sort(compareText);
 	if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index]))
 		throw new TypeError(`Module dependency graph request requires exactly ${expected.join(', ')}.`);
 	const record = value as Record<string, unknown>;
@@ -88,6 +131,37 @@ function materializeRequest(value: unknown): BuildModuleDependencyGraphRequest {
 	if (record.operationVersion !== MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION)
 		throw new TypeError('Unsupported module dependency graph operation version.');
 	return record as unknown as BuildModuleDependencyGraphRequest;
+}
+
+function requestBindingFailure(
+	request: BuildModuleDependencyGraphRequest,
+	snapshot: StaticSemanticSnapshot
+): ModuleDependencyGraphBuildOutcome | null {
+	if (request.semanticSnapshotId !== snapshot.id)
+		return unavailable(
+			'SEMANTIC_SNAPSHOT_ID_MISMATCH',
+			'The request semanticSnapshotId does not match the supplied semantic snapshot.',
+			'REQUEST',
+			'$.semanticSnapshotId'
+		);
+	if (request.subjectId !== snapshot.subjectId)
+		return unavailable(
+			'SUBJECT_ID_MISMATCH',
+			'The request subjectId does not match the supplied semantic snapshot.',
+			'REQUEST',
+			'$.subjectId'
+		);
+	for (const capability of ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'] as const) {
+		const state = snapshot.capabilities.find((record) => record.capability === capability)?.state;
+		if (state === undefined || state === 'UNSUPPORTED')
+			return unavailable(
+				'SEMANTIC_CAPABILITY_UNAVAILABLE',
+				`The ${capability} semantic capability is required for module graph projection.`,
+				'PROJECT',
+				'$.capabilities'
+			);
+	}
+	return null;
 }
 
 function relationKind(kind: SemanticModuleOccurrenceKind): ModuleDependencyGraphRelationKind {
@@ -122,7 +196,7 @@ function aggregateEpistemic(
 }
 
 function compareId(left: { readonly id: string }, right: { readonly id: string }): number {
-	return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+	return compareText(left.id, right.id);
 }
 
 function compareLimitation(
@@ -131,7 +205,7 @@ function compareLimitation(
 ): number {
 	const leftKey = `${left.kind}\0${left.moduleResolutionId ?? ''}\0${left.sourceId ?? ''}`;
 	const rightKey = `${right.kind}\0${right.moduleResolutionId ?? ''}\0${right.sourceId ?? ''}`;
-	return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+	return compareText(leftKey, rightKey);
 }
 
 function limitationsFor(
@@ -192,6 +266,51 @@ function limitationsFor(
 	return limitations.sort(compareLimitation);
 }
 
+function assertModuleResolutionCoherent(
+	resolution: SemanticModuleResolutionRecord,
+	sourceById: ReadonlyMap<SemanticSourceId, SemanticSourceRecord>,
+	astNodeById: ReadonlyMap<SemanticNodeId, SemanticAstNodeRecord>,
+	provenanceIds: ReadonlySet<SemanticProvenanceId>
+): void {
+	const source = sourceById.get(resolution.sourceId);
+	const occurrence = astNodeById.get(resolution.nodeId);
+	if (source === undefined)
+		throw new Error(`Module resolution ${resolution.id} has a missing source.`);
+	if (occurrence?.sourceId !== resolution.sourceId)
+		throw new Error(`Module resolution ${resolution.id} has an invalid occurrence node.`);
+	if (!provenanceIds.has(resolution.provenanceId))
+		throw new Error(`Module resolution ${resolution.id} has missing provenance.`);
+	if (resolution.resolutionState === 'RESOLVED_SOURCE' && resolution.targetSourceId === null)
+		throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
+	if (resolution.targetSourceId !== null && !sourceById.has(resolution.targetSourceId))
+		throw new Error(`Module resolution ${resolution.id} references a missing target source.`);
+}
+
+function assertSemanticSnapshotCoherent(
+	snapshot: StaticSemanticSnapshot
+): ReadonlyMap<SemanticNodeId, SemanticAstNodeRecord> {
+	const sourceById = new Map(snapshot.sources.map((source) => [source.id, source]));
+	const astNodeById = new Map(snapshot.astNodes.map((node) => [node.id, node]));
+	const provenanceIds = new Set(snapshot.provenances.map((record) => record.id));
+	if (sourceById.size !== snapshot.sources.length)
+		throw new Error('The semantic source population contains duplicate IDs.');
+	if (astNodeById.size !== snapshot.astNodes.length)
+		throw new Error('The semantic AST-node population contains duplicate IDs.');
+	if (provenanceIds.size !== snapshot.provenances.length)
+		throw new Error('The semantic provenance population contains duplicate IDs.');
+	const resolutionIds = new Set<string>();
+	for (const resolution of snapshot.moduleResolutions) {
+		if (resolutionIds.has(resolution.id))
+			throw new Error(`Duplicate module resolution ID ${resolution.id}.`);
+		resolutionIds.add(resolution.id);
+		assertModuleResolutionCoherent(resolution, sourceById, astNodeById, provenanceIds);
+	}
+	for (const source of snapshot.sources)
+		if (!provenanceIds.has(source.provenanceId))
+			throw new Error(`Semantic source ${source.id} has missing provenance.`);
+	return astNodeById;
+}
+
 function makeIndexes(
 	nodes: readonly ModuleDependencyGraphNode[],
 	edges: readonly ModuleDependencyGraphEdge[],
@@ -205,11 +324,11 @@ function makeIndexes(
 		byNode.get(nodeId)?.push(edge.id);
 	}
 	return [...byNode.entries()]
-		.map(([nodeId, edgeIds]): ModuleDependencyGraphIndexEntry => ({
-			nodeId,
-			edgeIds: edgeIds.sort()
-		}))
-		.sort((left, right) => (left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0));
+		.map(([nodeId, edgeIds]): ModuleDependencyGraphIndexEntry => {
+			edgeIds.sort(compareText);
+			return { nodeId, edgeIds };
+		})
+		.sort((left, right) => compareText(left.nodeId, right.nodeId));
 }
 
 function coverageFor(
@@ -289,6 +408,39 @@ function partialDiagnostics(
 		);
 }
 
+function appendResolutionTargetNodes(
+	nodes: ModuleDependencyGraphNode[],
+	snapshot: StaticSemanticSnapshot,
+	astNodeById: ReadonlyMap<SemanticNodeId, SemanticAstNodeRecord>,
+	graphId: ModuleDependencyGraphId,
+	layerId: ModuleDependencyGraphLayerId
+): void {
+	for (const resolution of snapshot.moduleResolutions) {
+		if (resolution.targetSourceId !== null) continue;
+		if (resolution.resolutionState === 'RESOLVED_SOURCE')
+			throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
+		const occurrence = astNodeById.get(resolution.nodeId)!;
+		nodes.push({
+			epistemic: epistemicForResolution(resolution.resolutionState),
+			graphId,
+			id: moduleDependencyGraphResolutionTargetNodeId(graphId, resolution.id),
+			kind: 'RESOLUTION_TARGET',
+			layerId,
+			moduleResolutionId: resolution.id,
+			moduleSymbolId: resolution.moduleSymbolId,
+			provenanceIds: [resolution.provenanceId],
+			resolutionState: resolution.resolutionState,
+			semanticSnapshotId: snapshot.id,
+			sourceLocations: [
+				{ end: occurrence.end, sourceId: occurrence.sourceId, start: occurrence.start }
+			],
+			specifier: resolution.specifier,
+			specifierState: resolution.specifierState,
+			subjectId: snapshot.subjectId
+		});
+	}
+}
+
 export function buildModuleDependencyGraph(
 	requestValue: unknown,
 	snapshot: StaticSemanticSnapshot
@@ -297,68 +449,13 @@ export function buildModuleDependencyGraph(
 	try {
 		request = materializeRequest(requestValue);
 	} catch (error) {
-		return unavailable(
-			'REQUEST_INVALID',
-			error instanceof Error ? error.message : 'Invalid module dependency graph request.',
-			'REQUEST'
-		);
+		return requestFailure(error);
 	}
-	if (request.semanticSnapshotId !== snapshot.id)
-		return unavailable(
-			'SEMANTIC_SNAPSHOT_ID_MISMATCH',
-			'The request semanticSnapshotId does not match the supplied semantic snapshot.',
-			'REQUEST',
-			'$.semanticSnapshotId'
-		);
-	if (request.subjectId !== snapshot.subjectId)
-		return unavailable(
-			'SUBJECT_ID_MISMATCH',
-			'The request subjectId does not match the supplied semantic snapshot.',
-			'REQUEST',
-			'$.subjectId'
-		);
-	for (const capability of ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'] as const) {
-		const state = snapshot.capabilities.find((record) => record.capability === capability)?.state;
-		if (state === undefined || state === 'UNSUPPORTED')
-			return unavailable(
-				'SEMANTIC_CAPABILITY_UNAVAILABLE',
-				`The ${capability} semantic capability is required for module graph projection.`,
-				'PROJECT',
-				'$.capabilities'
-			);
-	}
+	const bindingFailure = requestBindingFailure(request, snapshot);
+	if (bindingFailure !== null) return bindingFailure;
 
 	try {
-		const sourceById = new Map(snapshot.sources.map((source) => [source.id, source]));
-		const astNodeById = new Map(snapshot.astNodes.map((node) => [node.id, node]));
-		const provenanceIds = new Set(snapshot.provenances.map((record) => record.id));
-		if (sourceById.size !== snapshot.sources.length)
-			throw new Error('The semantic source population contains duplicate IDs.');
-		if (astNodeById.size !== snapshot.astNodes.length)
-			throw new Error('The semantic AST-node population contains duplicate IDs.');
-		if (provenanceIds.size !== snapshot.provenances.length)
-			throw new Error('The semantic provenance population contains duplicate IDs.');
-		const resolutionIds = new Set<string>();
-		for (const resolution of snapshot.moduleResolutions) {
-			if (resolutionIds.has(resolution.id))
-				throw new Error(`Duplicate module resolution ID ${resolution.id}.`);
-			resolutionIds.add(resolution.id);
-			const source = sourceById.get(resolution.sourceId);
-			const occurrence = astNodeById.get(resolution.nodeId);
-			if (source === undefined)
-				throw new Error(`Module resolution ${resolution.id} has a missing source.`);
-			if (occurrence === undefined || occurrence.sourceId !== resolution.sourceId)
-				throw new Error(`Module resolution ${resolution.id} has an invalid occurrence node.`);
-			if (!provenanceIds.has(resolution.provenanceId))
-				throw new Error(`Module resolution ${resolution.id} has missing provenance.`);
-			if (resolution.resolutionState === 'RESOLVED_SOURCE' && resolution.targetSourceId === null)
-				throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
-			if (resolution.targetSourceId !== null && !sourceById.has(resolution.targetSourceId))
-				throw new Error(`Module resolution ${resolution.id} references a missing target source.`);
-		}
-		for (const source of snapshot.sources)
-			if (!provenanceIds.has(source.provenanceId))
-				throw new Error(`Semantic source ${source.id} has missing provenance.`);
+		const astNodeById = assertSemanticSnapshotCoherent(snapshot);
 
 		const graphInputDigest = moduleDependencyGraphInputDigest(snapshot);
 		const graphId = moduleDependencyGraphId({
@@ -396,30 +493,7 @@ export function buildModuleDependencyGraph(
 				)
 				.map((node) => [node.semanticSourceId, node])
 		);
-		for (const resolution of snapshot.moduleResolutions) {
-			if (resolution.targetSourceId !== null) continue;
-			if (resolution.resolutionState === 'RESOLVED_SOURCE')
-				throw new Error(`Resolved-source module resolution ${resolution.id} lacks its target.`);
-			const occurrence = astNodeById.get(resolution.nodeId)!;
-			nodes.push({
-				epistemic: epistemicForResolution(resolution.resolutionState),
-				graphId,
-				id: moduleDependencyGraphResolutionTargetNodeId(graphId, resolution.id),
-				kind: 'RESOLUTION_TARGET',
-				layerId,
-				moduleResolutionId: resolution.id,
-				moduleSymbolId: resolution.moduleSymbolId,
-				provenanceIds: [resolution.provenanceId],
-				resolutionState: resolution.resolutionState,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: [
-					{ end: occurrence.end, sourceId: occurrence.sourceId, start: occurrence.start }
-				],
-				specifier: resolution.specifier,
-				specifierState: resolution.specifierState,
-				subjectId: snapshot.subjectId
-			});
-		}
+		appendResolutionTargetNodes(nodes, snapshot, astNodeById, graphId, layerId);
 		nodes.sort(compareId);
 		const targetNodeByResolutionId = new Map(
 			nodes
@@ -479,7 +553,7 @@ export function buildModuleDependencyGraph(
 					.flatMap((node) => node.provenanceIds)
 					.concat(edges.flatMap((edge) => edge.provenanceIds))
 			)
-		].sort();
+		].sort(compareText);
 		const layer: ModuleDependencyGraphLayer = {
 			coverage,
 			edgeIds: edges.map((edge) => edge.id),
@@ -525,29 +599,13 @@ export function buildModuleDependencyGraph(
 			contentDigest: moduleDependencyGraphContentDigest(content)
 		};
 		const validation = validateModuleDependencyGraph(graph, snapshot);
-		if (validation.state !== 'VALID') {
-			const firstIssue = validation.issues[0];
-			return unavailable(
-				'GRAPH_VALIDATION_FAILED',
-				firstIssue === undefined
-					? 'Module dependency graph validation failed without a diagnostic.'
-					: `Module dependency graph validation failed: ${firstIssue.message}`,
-				'VALIDATE',
-				firstIssue?.path ?? null
-			);
-		}
+		if (validation.state !== 'VALID') return validationFailure(validation.issues);
 		return {
 			diagnostics: partialDiagnostics(limitations),
 			graph,
 			outcome: graph.health === 'COMPLETE' ? 'complete' : 'partial'
 		};
 	} catch (error) {
-		return unavailable(
-			'DANGLING_SEMANTIC_REFERENCE',
-			error instanceof Error
-				? `Module dependency graph projection failed closed: ${error.message}`
-				: 'Module dependency graph projection failed closed.',
-			'PROJECT'
-		);
+		return projectionFailure(error);
 	}
 }

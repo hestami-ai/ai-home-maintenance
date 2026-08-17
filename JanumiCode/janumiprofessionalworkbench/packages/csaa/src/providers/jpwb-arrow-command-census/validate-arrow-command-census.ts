@@ -58,7 +58,26 @@ function validateOptions(options: ArrowCommandCensusValidationOptions | undefine
 	}
 }
 
-function validateInternal(value: unknown, subject?: FrozenSubject): void {
+function assertPlainContainer(current: object): void {
+	if (isProxy(current)) invalid('INVALID_SHAPE', '$', 'Observation contains a Proxy value.');
+	const prototype = Reflect.getPrototypeOf(current);
+	if (
+		(Array.isArray(current) && prototype !== Array.prototype) ||
+		(!Array.isArray(current) && prototype !== Object.prototype && prototype !== null)
+	)
+		invalid('INVALID_SHAPE', '$', 'Observation containers must be plain JSON containers.');
+}
+
+function pushOwnDataValues(stack: unknown[], current: object): void {
+	for (const key of Reflect.ownKeys(current)) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+		if (descriptor === undefined || !('value' in descriptor))
+			invalid('INVALID_SHAPE', '$', 'Observation must contain data properties only.');
+		if (key !== 'length') stack.push(descriptor.value);
+	}
+}
+
+function assertPlainDataGraph(value: unknown): void {
 	const stack: unknown[] = [value];
 	const seen = new Set<object>();
 	while (stack.length > 0) {
@@ -66,47 +85,43 @@ function validateInternal(value: unknown, subject?: FrozenSubject): void {
 		if (current === null || typeof current !== 'object') continue;
 		if (seen.has(current)) continue;
 		seen.add(current);
-		if (isProxy(current)) invalid('INVALID_SHAPE', '$', 'Observation contains a Proxy value.');
-		const prototype = Reflect.getPrototypeOf(current);
-		if (
-			(Array.isArray(current) && prototype !== Array.prototype) ||
-			(!Array.isArray(current) && prototype !== Object.prototype && prototype !== null)
-		)
-			invalid('INVALID_SHAPE', '$', 'Observation containers must be plain JSON containers.');
-		for (const key of Reflect.ownKeys(current)) {
-			const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
-			if (descriptor === undefined || !('value' in descriptor))
-				invalid('INVALID_SHAPE', '$', 'Observation must contain data properties only.');
-			if (key !== 'length') stack.push(descriptor.value);
-		}
+		assertPlainContainer(current);
+		pushOwnDataValues(stack, current);
 	}
-	let actualCanonical: string;
+}
+
+function canonicalizeOrRefuse(value: unknown, message: string): string {
 	try {
-		actualCanonical = canonicalSemanticJson(value);
+		return canonicalSemanticJson(value);
 	} catch {
-		invalid(
-			'INVALID_SHAPE',
-			'$',
-			'Observation is not a canonicalizable plain-data semantic value.'
-		);
+		invalid('INVALID_SHAPE', '$', message);
 	}
-	const observation = value as ArrowCommandCensusObservation;
+}
+
+function assertArtifactSetReproduces(
+	observation: ArrowCommandCensusObservation,
+	subject: FrozenSubject | undefined
+): void {
 	const artifactSetValidation = validateArrowCommandCensusArtifactSet(
 		observation.artifactSet,
 		subject,
 		{ maxIssues: 1 }
 	);
-	if (artifactSetValidation.state !== 'VALID')
-		invalid(
-			artifactSetValidation.issues[0]?.code === 'CONTENT_DIGEST_MISMATCH'
-				? 'CONTENT_DIGEST_MISMATCH'
-				: 'POPULATION_MISMATCH',
-			'$.artifactSet',
-			artifactSetValidation.issues[0]?.message ?? 'Artifact-set validation failed.'
-		);
-	let rebuilt: ArrowCommandCensusObservation;
+	if (artifactSetValidation.state === 'VALID') return;
+	invalid(
+		artifactSetValidation.issues[0]?.code === 'CONTENT_DIGEST_MISMATCH'
+			? 'CONTENT_DIGEST_MISMATCH'
+			: 'POPULATION_MISMATCH',
+		'$.artifactSet',
+		artifactSetValidation.issues[0]?.message ?? 'Artifact-set validation failed.'
+	);
+}
+
+function rebuildObservation(
+	observation: ArrowCommandCensusObservation
+): ArrowCommandCensusObservation {
 	try {
-		rebuilt = normalizeArrowCommandCensusObservation({
+		return normalizeArrowCommandCensusObservation({
 			artifactSet: observation.artifactSet,
 			evidence: observation.rawEvidence,
 			executor: observation.executor,
@@ -123,27 +138,44 @@ function validateInternal(value: unknown, subject?: FrozenSubject): void {
 			invalid('RECONCILIATION_MISMATCH', error.path, error.message);
 		invalid('INVALID_SHAPE', '$', 'Observation reconstruction failed closed.');
 	}
-	let expectedCanonical: string;
-	try {
-		expectedCanonical = canonicalSemanticJson(rebuilt);
-	} catch {
-		invalid('INVALID_SHAPE', '$', 'Reconstructed observation is not canonicalizable.');
-	}
-	if (actualCanonical !== expectedCanonical) {
-		if (observation.id !== rebuilt.id)
-			invalid('IDENTITY_MISMATCH', '$.id', 'Observation identity does not reproduce.');
-		if (observation.contentDigest !== rebuilt.contentDigest)
-			invalid(
-				'CONTENT_DIGEST_MISMATCH',
-				'$.contentDigest',
-				'Observation content digest does not reproduce.'
-			);
+}
+
+function assertObservationReconciles(
+	observation: ArrowCommandCensusObservation,
+	rebuilt: ArrowCommandCensusObservation,
+	actualCanonical: string,
+	expectedCanonical: string
+): void {
+	if (actualCanonical === expectedCanonical) return;
+	if (observation.id !== rebuilt.id)
+		invalid('IDENTITY_MISMATCH', '$.id', 'Observation identity does not reproduce.');
+	if (observation.contentDigest !== rebuilt.contentDigest)
 		invalid(
-			'RECONCILIATION_MISMATCH',
-			'$',
-			'Observation differs from the canonical projection of its bound evidence.'
+			'CONTENT_DIGEST_MISMATCH',
+			'$.contentDigest',
+			'Observation content digest does not reproduce.'
 		);
-	}
+	invalid(
+		'RECONCILIATION_MISMATCH',
+		'$',
+		'Observation differs from the canonical projection of its bound evidence.'
+	);
+}
+
+function validateInternal(value: unknown, subject?: FrozenSubject): void {
+	assertPlainDataGraph(value);
+	const actualCanonical = canonicalizeOrRefuse(
+		value,
+		'Observation is not a canonicalizable plain-data semantic value.'
+	);
+	const observation = value as ArrowCommandCensusObservation;
+	assertArtifactSetReproduces(observation, subject);
+	const rebuilt = rebuildObservation(observation);
+	const expectedCanonical = canonicalizeOrRefuse(
+		rebuilt,
+		'Reconstructed observation is not canonicalizable.'
+	);
+	assertObservationReconciles(observation, rebuilt, actualCanonical, expectedCanonical);
 }
 
 export function validateArrowCommandCensusObservation(

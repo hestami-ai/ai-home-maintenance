@@ -20,6 +20,7 @@ import {
 	type ArrowCommandCensusDeclaredSiteRecord,
 	type ArrowCommandCensusExecutorIdentity,
 	type ArrowCommandCensusObservation,
+	type ArrowCommandCensusObservationId,
 	type ArrowCommandCensusRawDeclaredArrow,
 	type ArrowCommandCensusRawOutput,
 	type ArrowCommandCensusRawOutputIdentity,
@@ -205,12 +206,20 @@ function parseArrowKey(value: string, path: string): ArrowCommandCensusArrowReco
 	return { arrowKey: value, from, machine, to };
 }
 
+function commandDeclarationPath(locator: string): string | null {
+	if (/^STEP_COMMAND_SPECS\.[^\s]+$/u.test(locator))
+		return 'packages/rph-domain/src/step-command-spec.ts';
+	if (/^PWU_LIFECYCLE_COMMAND_SPECS\.[^\s]+$/u.test(locator))
+		return 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts';
+	return null;
+}
+
 function sourceSite(
 	locator: string,
 	path: string,
 	artifactSet: ArrowCommandCensusArtifactSetBinding
 ): ArrowCommandCensusSourceSite {
-	const handler = /^([^/\\:]+\.ts):([1-9][0-9]*)$/u.exec(locator);
+	const handler = /^([^/\\:]+\.ts):([1-9]\d*)$/u.exec(locator);
 	if (handler !== null) {
 		const line = Number(handler[2]);
 		if (!Number.isSafeInteger(line)) fail(path, 'Handler line is not a safe integer.');
@@ -226,11 +235,7 @@ function sourceSite(
 			path: handlerPath
 		};
 	}
-	const declarationPath = /^STEP_COMMAND_SPECS\.[^\s]+$/u.test(locator)
-		? 'packages/rph-domain/src/step-command-spec.ts'
-		: /^PWU_LIFECYCLE_COMMAND_SPECS\.[^\s]+$/u.test(locator)
-			? 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts'
-			: null;
+	const declarationPath = commandDeclarationPath(locator);
 	if (declarationPath !== null) {
 		const bindings = artifactSet.artifacts.filter(
 			(artifact) =>
@@ -264,31 +269,19 @@ function rawIdentity(evidence: ArrowCommandCensusRawOutput): ArrowCommandCensusR
 	return { ...base, id: arrowCommandCensusRawOutputId(base) };
 }
 
-export interface NormalizeArrowCommandCensusInput {
-	readonly artifactSet: ArrowCommandCensusArtifactSetBinding;
-	readonly evidence: ArrowCommandCensusRawOutput;
-	readonly executor: ArrowCommandCensusExecutorIdentity;
-	readonly request: ObserveArrowCommandCensusRequest;
-}
-
-export interface NormalizeArrowCommandCensusResult {
-	readonly baselineMismatch: boolean;
-	readonly observation: ArrowCommandCensusObservation;
-}
-
-/** Pure projection from bounded retained evidence into the CSAA observation contract. */
-export function normalizeArrowCommandCensusObservation(
-	input: NormalizeArrowCommandCensusInput
-): NormalizeArrowCommandCensusResult {
-	const { artifactSet, evidence, executor, request } = input;
-	assertExecutorIdentity(executor);
+function assertRequestBinding(
+	request: ObserveArrowCommandCensusRequest,
+	artifactSet: ArrowCommandCensusArtifactSetBinding
+): void {
 	if (request.subjectId !== artifactSet.subjectId)
 		fail('$input.request.subjectId', 'Request and artifact-set subjects differ.');
 	if (request.artifactSetId !== artifactSet.id)
 		fail('$input.request.artifactSetId', 'Request and artifact-set identities differ.');
 	if (request.operationVersion !== ARROW_COMMAND_CENSUS_OPERATION_VERSION)
 		fail('$input.request.operationVersion', 'Unsupported observation operation version.');
+}
 
+function assertCanonicalEvidencePopulations(evidence: ArrowCommandCensusRawOutput): void {
 	assertCanonicalStateMaps(evidence.births, '$input.evidence.births');
 	assertCanonicalStateMaps(evidence.occupiable, '$input.evidence.occupiable');
 	for (const [path, values] of [
@@ -307,6 +300,157 @@ export function normalizeArrowCommandCensusObservation(
 		['$input.evidence.baseline.uncovered', evidence.baseline.uncovered]
 	] as const)
 		for (const [index, value] of values.entries()) parseArrowKey(value, `${path}[${index}]`);
+}
+
+function assertUncoveredArrowsAreUndeclared(
+	uncoveredArrows: readonly ArrowCommandCensusArrowRecord[],
+	declaredArrowKeys: ReadonlySet<string>
+): void {
+	for (const [index, arrow] of uncoveredArrows.entries())
+		if (declaredArrowKeys.has(arrow.arrowKey))
+			fail(
+				`$input.evidence.census.uncovered[${index}]`,
+				'Uncovered arrow is also present in the retained declared-arrow population.'
+			);
+}
+
+function assertBirthMachinesAreOccupiable(
+	evidence: ArrowCommandCensusRawOutput,
+	occupiableByMachine: ReadonlyMap<string, ReadonlySet<string>>
+): void {
+	if (
+		evidence.births.length !== evidence.occupiable.length ||
+		evidence.births.some((entry) => !occupiableByMachine.has(entry.machine))
+	)
+		fail(
+			'$input.evidence.occupiable',
+			'Occupiable and birth machine populations must be identical.'
+		);
+}
+
+function assertBirthStatesAreOccupiable(
+	births: ArrowCommandCensusRawOutput['births'],
+	occupiableByMachine: ReadonlyMap<string, ReadonlySet<string>>
+): void {
+	for (const [index, entry] of births.entries()) {
+		const occupiableStates = occupiableByMachine.get(entry.machine)!;
+		if (entry.states.some((state) => !occupiableStates.has(state)))
+			fail(
+				`$input.evidence.births[${index}]`,
+				'Every birth state must be represented as occupiable.'
+			);
+	}
+}
+
+function assertDeadCoveredArrows(
+	deadCoveredArrows: readonly ArrowCommandCensusArrowRecord[],
+	declaredArrowKeys: ReadonlySet<string>,
+	occupiableByMachine: ReadonlyMap<string, ReadonlySet<string>>
+): void {
+	for (const [index, arrow] of deadCoveredArrows.entries()) {
+		if (!declaredArrowKeys.has(arrow.arrowKey))
+			fail(
+				`$input.evidence.deadCovered.dead[${index}]`,
+				'Dead-covered arrow is absent from the declared-arrow population.'
+			);
+		const occupiableStates = occupiableByMachine.get(arrow.machine);
+		if (occupiableStates === undefined || occupiableStates.has(arrow.from))
+			fail(
+				`$input.evidence.deadCovered.dead[${index}]`,
+				'Dead-covered arrow must name an analysed machine with an unoccupiable source.'
+			);
+	}
+}
+
+interface DeclaredSiteAccumulator {
+	readonly arrows: ArrowCommandCensusDeclaredArrowRecord[];
+	readonly id: ReturnType<typeof arrowCommandCensusDeclaredSiteId>;
+	readonly ordinal: number;
+	readonly source: ArrowCommandCensusSourceSite;
+}
+
+function resolveDeclaredSite(
+	siteByLocator: Map<string, DeclaredSiteAccumulator>,
+	locator: string,
+	index: number,
+	observationId: ArrowCommandCensusObservationId,
+	artifactSet: ArrowCommandCensusArtifactSetBinding
+): DeclaredSiteAccumulator {
+	const existing = siteByLocator.get(locator);
+	if (existing !== undefined) return existing;
+	const source = sourceSite(locator, `$input.evidence.declaredArrows[${index}].site`, artifactSet);
+	const site: DeclaredSiteAccumulator = {
+		arrows: [],
+		id: arrowCommandCensusDeclaredSiteId(observationId, source),
+		ordinal: siteByLocator.size,
+		source
+	};
+	siteByLocator.set(locator, site);
+	return site;
+}
+
+function projectDeclaredArrows(
+	evidence: ArrowCommandCensusRawOutput,
+	observationId: ArrowCommandCensusObservationId,
+	artifactSet: ArrowCommandCensusArtifactSetBinding
+): {
+	readonly declaredArrows: ArrowCommandCensusDeclaredArrowRecord[];
+	readonly declaredSites: ArrowCommandCensusDeclaredSiteRecord[];
+} {
+	const siteByLocator = new Map<string, DeclaredSiteAccumulator>();
+	const declaredArrows: ArrowCommandCensusDeclaredArrowRecord[] = [];
+	for (const [index, arrow] of evidence.declaredArrows.entries()) {
+		const site = resolveDeclaredSite(siteByLocator, arrow.site, index, observationId, artifactSet);
+		const ordinalAtSite = site.arrows.length;
+		const record: ArrowCommandCensusDeclaredArrowRecord = {
+			arrowKey: arrowKey(arrow.machine, arrow.from, arrow.to),
+			from: arrow.from,
+			id: arrowCommandCensusDeclaredArrowId(
+				observationId,
+				site.id,
+				ordinalAtSite,
+				arrow as ArrowCommandCensusRawDeclaredArrow
+			),
+			machine: arrow.machine,
+			ordinalAtSite,
+			siteId: site.id,
+			to: arrow.to
+		};
+		site.arrows.push(record);
+		declaredArrows.push(record);
+	}
+	const declaredSites: ArrowCommandCensusDeclaredSiteRecord[] = [...siteByLocator.values()].map(
+		(site) => ({
+			arrowIds: site.arrows.map((arrow) => arrow.id),
+			id: site.id,
+			ordinal: site.ordinal,
+			source: site.source
+		})
+	);
+	return { declaredArrows, declaredSites };
+}
+
+export interface NormalizeArrowCommandCensusInput {
+	readonly artifactSet: ArrowCommandCensusArtifactSetBinding;
+	readonly evidence: ArrowCommandCensusRawOutput;
+	readonly executor: ArrowCommandCensusExecutorIdentity;
+	readonly request: ObserveArrowCommandCensusRequest;
+}
+
+export interface NormalizeArrowCommandCensusResult {
+	readonly baselineMismatch: boolean;
+	readonly observation: ArrowCommandCensusObservation;
+}
+
+/** Pure projection from bounded retained evidence into the CSAA observation contract. */
+export function normalizeArrowCommandCensusObservation(
+	input: NormalizeArrowCommandCensusInput
+): NormalizeArrowCommandCensusResult {
+	const { artifactSet, evidence, executor, request } = input;
+	assertExecutorIdentity(executor);
+	assertRequestBinding(request, artifactSet);
+
+	assertCanonicalEvidencePopulations(evidence);
 
 	const uncoveredArrows = evidence.census.uncovered.map((value, index) =>
 		parseArrowKey(value, `$input.evidence.census.uncovered[${index}]`)
@@ -323,44 +467,13 @@ export function normalizeArrowCommandCensusObservation(
 	const declaredArrowKeys = new Set(
 		evidence.declaredArrows.map((arrow) => arrowKey(arrow.machine, arrow.from, arrow.to))
 	);
-	for (const [index, arrow] of uncoveredArrows.entries())
-		if (declaredArrowKeys.has(arrow.arrowKey))
-			fail(
-				`$input.evidence.census.uncovered[${index}]`,
-				'Uncovered arrow is also present in the retained declared-arrow population.'
-			);
+	assertUncoveredArrowsAreUndeclared(uncoveredArrows, declaredArrowKeys);
 	const occupiableByMachine = new Map(
 		evidence.occupiable.map((entry) => [entry.machine, new Set(entry.states)])
 	);
-	if (
-		evidence.births.length !== evidence.occupiable.length ||
-		evidence.births.some((entry) => !occupiableByMachine.has(entry.machine))
-	)
-		fail(
-			'$input.evidence.occupiable',
-			'Occupiable and birth machine populations must be identical.'
-		);
-	for (const [index, entry] of evidence.births.entries()) {
-		const occupiableStates = occupiableByMachine.get(entry.machine)!;
-		if (entry.states.some((state) => !occupiableStates.has(state)))
-			fail(
-				`$input.evidence.births[${index}]`,
-				'Every birth state must be represented as occupiable.'
-			);
-	}
-	for (const [index, arrow] of deadCoveredArrows.entries()) {
-		if (!declaredArrowKeys.has(arrow.arrowKey))
-			fail(
-				`$input.evidence.deadCovered.dead[${index}]`,
-				'Dead-covered arrow is absent from the declared-arrow population.'
-			);
-		const occupiableStates = occupiableByMachine.get(arrow.machine);
-		if (occupiableStates === undefined || occupiableStates.has(arrow.from))
-			fail(
-				`$input.evidence.deadCovered.dead[${index}]`,
-				'Dead-covered arrow must name an analysed machine with an unoccupiable source.'
-			);
-	}
+	assertBirthMachinesAreOccupiable(evidence, occupiableByMachine);
+	assertBirthStatesAreOccupiable(evidence.births, occupiableByMachine);
+	assertDeadCoveredArrows(deadCoveredArrows, declaredArrowKeys, occupiableByMachine);
 	const declaredMachines = [...new Set(evidence.declaredArrows.map((arrow) => arrow.machine))].sort(
 		compareText
 	);
@@ -396,57 +509,10 @@ export function normalizeArrowCommandCensusObservation(
 		subjectId: request.subjectId
 	});
 
-	const siteByLocator = new Map<
-		string,
-		{
-			readonly arrows: ArrowCommandCensusDeclaredArrowRecord[];
-			readonly id: ReturnType<typeof arrowCommandCensusDeclaredSiteId>;
-			readonly ordinal: number;
-			readonly source: ArrowCommandCensusSourceSite;
-		}
-	>();
-	const declaredArrows: ArrowCommandCensusDeclaredArrowRecord[] = [];
-	for (const [index, arrow] of evidence.declaredArrows.entries()) {
-		let site = siteByLocator.get(arrow.site);
-		if (site === undefined) {
-			const source = sourceSite(
-				arrow.site,
-				`$input.evidence.declaredArrows[${index}].site`,
-				artifactSet
-			);
-			site = {
-				arrows: [],
-				id: arrowCommandCensusDeclaredSiteId(observationId, source),
-				ordinal: siteByLocator.size,
-				source
-			};
-			siteByLocator.set(arrow.site, site);
-		}
-		const ordinalAtSite = site.arrows.length;
-		const record: ArrowCommandCensusDeclaredArrowRecord = {
-			arrowKey: arrowKey(arrow.machine, arrow.from, arrow.to),
-			from: arrow.from,
-			id: arrowCommandCensusDeclaredArrowId(
-				observationId,
-				site.id,
-				ordinalAtSite,
-				arrow as ArrowCommandCensusRawDeclaredArrow
-			),
-			machine: arrow.machine,
-			ordinalAtSite,
-			siteId: site.id,
-			to: arrow.to
-		};
-		site.arrows.push(record);
-		declaredArrows.push(record);
-	}
-	const declaredSites: ArrowCommandCensusDeclaredSiteRecord[] = [...siteByLocator.values()].map(
-		(site) => ({
-			arrowIds: site.arrows.map((arrow) => arrow.id),
-			id: site.id,
-			ordinal: site.ordinal,
-			source: site.source
-		})
+	const { declaredArrows, declaredSites } = projectDeclaredArrows(
+		evidence,
+		observationId,
+		artifactSet
 	);
 
 	const actual = {

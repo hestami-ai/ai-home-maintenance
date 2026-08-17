@@ -238,71 +238,118 @@ function relativeSourcePath(
 	return source;
 }
 
+/** The running top-level-key scanner state: string literal, escape, and container depth. */
+interface KeyScanState {
+	braceDepth: number;
+	bracketDepth: number;
+	escaped: boolean;
+	inString: boolean;
+	stringStart: number;
+}
+
+/** Reports the first index at or after `from` that is not JSON insignificant whitespace. */
+function skipJsonWhitespace(text: string, from: number, work: Progress): number {
+	let cursor = from;
+	while (cursor < text.length && /[\t\n\r ]/u.test(text[cursor]!)) {
+		work.step();
+		cursor += 1;
+	}
+	return cursor;
+}
+
+/** Decodes one already-delimited JSON string literal into the top-level key it names. */
+function decodeTopLevelKeyText(
+	text: string,
+	stringStart: number,
+	end: number,
+	work: Progress
+): string {
+	let key: string;
+	work.check();
+	try {
+		key = JSON.parse(text.slice(stringStart, end)) as string;
+	} catch {
+		work.check();
+		fail('JSON_INVALID', 'Source Map JSON contains an invalid top-level key.', stringStart);
+	}
+	work.check();
+	return key;
+}
+
+/**
+ * Consumes one character of an open string literal, recording a top-level key only when the
+ * literal closes directly inside the root object and is followed by a key separator.
+ */
+function scanStringCharacter(
+	text: string,
+	index: number,
+	character: string,
+	scan: KeyScanState,
+	keys: string[],
+	work: Progress
+): void {
+	if (scan.escaped) {
+		scan.escaped = false;
+		return;
+	}
+	if (character === '\\') {
+		scan.escaped = true;
+		return;
+	}
+	if (character !== '"') return;
+	scan.inString = false;
+	if (scan.braceDepth !== 1 || scan.bracketDepth !== 0) return;
+	const cursor = skipJsonWhitespace(text, index + 1, work);
+	if (text[cursor] !== ':') return;
+	keys.push(decodeTopLevelKeyText(text, scan.stringStart, index + 1, work));
+	if (keys.length > PROFILE_KEYS.length)
+		fail('SHAPE_INVALID', 'Source Map JSON contains more than six top-level keys.');
+}
+
+/** Tracks container depth outside string literals and opens the next string literal. */
+function scanStructuralCharacter(index: number, character: string, scan: KeyScanState): void {
+	switch (character) {
+		case '"':
+			scan.inString = true;
+			scan.stringStart = index;
+			break;
+		case '{':
+			scan.braceDepth += 1;
+			break;
+		case '}':
+			scan.braceDepth -= 1;
+			break;
+		case '[':
+			scan.bracketDepth += 1;
+			break;
+		case ']':
+			scan.bracketDepth -= 1;
+			break;
+	}
+}
+
 /**
  * JSON.parse retains only the last occurrence of a duplicate key. Scan the already-bounded JSON
  * text as well so the strict six-key profile cannot silently accept a duplicated top-level key.
  */
 function topLevelKeys(text: string, work: Progress): readonly string[] {
 	const keys: string[] = [];
-	let braceDepth = 0;
-	let bracketDepth = 0;
-	let escaped = false;
-	let inString = false;
-	let stringStart = -1;
+	const scan: KeyScanState = {
+		braceDepth: 0,
+		bracketDepth: 0,
+		escaped: false,
+		inString: false,
+		stringStart: -1
+	};
 
 	for (let index = 0; index < text.length; index += 1) {
 		work.step();
 		const character = text[index]!;
-		if (inString) {
-			if (escaped) {
-				escaped = false;
-				continue;
-			}
-			if (character === '\\') {
-				escaped = true;
-				continue;
-			}
-			if (character !== '"') continue;
-			inString = false;
-			if (braceDepth !== 1 || bracketDepth !== 0) continue;
-			let cursor = index + 1;
-			while (cursor < text.length && /[\t\n\r ]/u.test(text[cursor]!)) {
-				work.step();
-				cursor += 1;
-			}
-			if (text[cursor] !== ':') continue;
-			let key: string;
-			work.check();
-			try {
-				key = JSON.parse(text.slice(stringStart, index + 1)) as string;
-			} catch {
-				work.check();
-				fail('JSON_INVALID', 'Source Map JSON contains an invalid top-level key.', stringStart);
-			}
-			work.check();
-			keys.push(key);
-			if (keys.length > PROFILE_KEYS.length)
-				fail('SHAPE_INVALID', 'Source Map JSON contains more than six top-level keys.');
+		if (scan.inString) {
+			scanStringCharacter(text, index, character, scan, keys, work);
 			continue;
 		}
-		switch (character) {
-			case '"':
-				inString = true;
-				stringStart = index;
-				break;
-			case '{':
-				braceDepth += 1;
-				break;
-			case '}':
-				braceDepth -= 1;
-				break;
-			case '[':
-				bracketDepth += 1;
-				break;
-			case ']':
-				bracketDepth -= 1;
-				break;
-		}
+		scanStructuralCharacter(index, character, scan);
 	}
 	return keys;
 }
@@ -436,6 +483,130 @@ function boundedCoordinate(
 	return value;
 }
 
+/** The running mapping cursor: everything a segment's deltas accumulate against. */
+interface MappingState {
+	generatedColumn: number;
+	generatedLine: number;
+	originalColumn: number;
+	originalLine: number;
+	segmentsOnLine: number;
+	sourceIndex: number;
+}
+
+/** Opens the next generated line and refuses once the generated-line budget is spent. */
+function advanceGeneratedLine(
+	state: MappingState,
+	index: number,
+	limits: SourceMapV3DecodeLimits
+): number {
+	state.generatedLine += 1;
+	if (state.generatedLine + 1 > limits.maxGeneratedLines)
+		fail('BUDGET_EXCEEDED', 'Source Map mappings exceeds maxGeneratedLines.', index);
+	state.generatedColumn = 0;
+	state.segmentsOnLine = 0;
+	return index + 1;
+}
+
+/** Reads exactly the four VLQ fields of one mapped segment and reports the next cursor. */
+function readSegmentFields(
+	mappings: string,
+	segmentOffset: number,
+	limits: SourceMapV3DecodeLimits,
+	work: Progress
+): { readonly fields: readonly number[]; readonly next: number } {
+	const fields: number[] = [];
+	let index = segmentOffset;
+	while (index < mappings.length && mappings[index] !== ',' && mappings[index] !== ';') {
+		if (fields.length >= 4)
+			fail(
+				'MAPPINGS_INVALID',
+				'Source Map selected profile accepts only four-field mapped segments.',
+				segmentOffset
+			);
+		const decoded = decodeVlq(mappings, index, limits, work);
+		fields.push(decoded.value);
+		index = decoded.next;
+	}
+	if (fields.length !== 4)
+		fail(
+			'MAPPINGS_INVALID',
+			'Source Map selected profile accepts only four-field mapped segments.',
+			segmentOffset
+		);
+	return { fields, next: index };
+}
+
+/** Applies one segment's four deltas to the running state and appends the frozen segment. */
+function appendMappedSegment(
+	state: MappingState,
+	fields: readonly number[],
+	segmentOffset: number,
+	limits: SourceMapV3DecodeLimits,
+	segments: DecodedSourceMapV3Segment[]
+): void {
+	const nextGeneratedColumn = boundedCoordinate(
+		state.generatedColumn,
+		fields[0]!,
+		'Source Map generated column',
+		limits,
+		segmentOffset
+	);
+	if (state.segmentsOnLine > 0 && nextGeneratedColumn <= state.generatedColumn)
+		fail(
+			'MAPPINGS_INVALID',
+			'Source Map generated columns must be strictly increasing within each line.',
+			segmentOffset
+		);
+	state.generatedColumn = nextGeneratedColumn;
+	state.sourceIndex = boundedCoordinate(
+		state.sourceIndex,
+		fields[1]!,
+		'Source Map source index',
+		limits,
+		segmentOffset
+	);
+	if (state.sourceIndex !== 0)
+		fail(
+			'MAPPINGS_INVALID',
+			'Source Map segment source index must identify sources[0].',
+			segmentOffset
+		);
+	state.originalLine = boundedCoordinate(
+		state.originalLine,
+		fields[2]!,
+		'Source Map original line',
+		limits,
+		segmentOffset
+	);
+	state.originalColumn = boundedCoordinate(
+		state.originalColumn,
+		fields[3]!,
+		'Source Map original column',
+		limits,
+		segmentOffset
+	);
+	segments.push(
+		Object.freeze({
+			generatedColumn: state.generatedColumn,
+			generatedLine: state.generatedLine,
+			ordinal: segments.length,
+			originalColumn: state.originalColumn,
+			originalLine: state.originalLine,
+			sourceIndex: 0 as const
+		})
+	);
+	state.segmentsOnLine += 1;
+}
+
+/** Steps past a segment separator, refusing the empty segment a trailing comma would introduce. */
+function consumeSegmentSeparator(mappings: string, index: number): number {
+	if (mappings[index] !== ',') return index;
+	const next = index + 1;
+	if (next >= mappings.length || mappings[next] === ',' || mappings[next] === ';')
+		fail('MAPPINGS_INVALID', 'Source Map mappings contains an empty segment.', next);
+	return next;
+}
+
 function decodeMappings(
 	mappings: string,
 	limits: SourceMapV3DecodeLimits,
@@ -445,25 +616,22 @@ function decodeMappings(
 	readonly segments: readonly DecodedSourceMapV3Segment[];
 } {
 	const segments: DecodedSourceMapV3Segment[] = [];
-	let generatedColumn = 0;
-	let generatedLine = 0;
+	const state: MappingState = {
+		generatedColumn: 0,
+		generatedLine: 0,
+		originalColumn: 0,
+		originalLine: 0,
+		segmentsOnLine: 0,
+		sourceIndex: 0
+	};
 	let index = 0;
-	let originalColumn = 0;
-	let originalLine = 0;
-	let segmentsOnLine = 0;
-	let sourceIndex = 0;
 	if (limits.maxGeneratedLines < 1)
 		fail('BUDGET_EXCEEDED', 'Source Map mappings exceeds maxGeneratedLines.');
 
 	while (index < mappings.length) {
 		work.step();
 		if (mappings[index] === ';') {
-			generatedLine += 1;
-			if (generatedLine + 1 > limits.maxGeneratedLines)
-				fail('BUDGET_EXCEEDED', 'Source Map mappings exceeds maxGeneratedLines.', index);
-			generatedColumn = 0;
-			segmentsOnLine = 0;
-			index += 1;
+			index = advanceGeneratedLine(state, index, limits);
 			continue;
 		}
 		if (mappings[index] === ',')
@@ -472,91 +640,19 @@ function decodeMappings(
 			fail('BUDGET_EXCEEDED', 'Source Map mappings exceeds maxSegments.', index);
 
 		const segmentOffset = index;
-		const fields: number[] = [];
-		while (index < mappings.length && mappings[index] !== ',' && mappings[index] !== ';') {
-			if (fields.length >= 4)
-				fail(
-					'MAPPINGS_INVALID',
-					'Source Map selected profile accepts only four-field mapped segments.',
-					segmentOffset
-				);
-			const decoded = decodeVlq(mappings, index, limits, work);
-			fields.push(decoded.value);
-			index = decoded.next;
-		}
-		if (fields.length !== 4)
-			fail(
-				'MAPPINGS_INVALID',
-				'Source Map selected profile accepts only four-field mapped segments.',
-				segmentOffset
-			);
-
-		const nextGeneratedColumn = boundedCoordinate(
-			generatedColumn,
-			fields[0]!,
-			'Source Map generated column',
-			limits,
-			segmentOffset
-		);
-		if (segmentsOnLine > 0 && nextGeneratedColumn <= generatedColumn)
-			fail(
-				'MAPPINGS_INVALID',
-				'Source Map generated columns must be strictly increasing within each line.',
-				segmentOffset
-			);
-		generatedColumn = nextGeneratedColumn;
-		sourceIndex = boundedCoordinate(
-			sourceIndex,
-			fields[1]!,
-			'Source Map source index',
-			limits,
-			segmentOffset
-		);
-		if (sourceIndex !== 0)
-			fail(
-				'MAPPINGS_INVALID',
-				'Source Map segment source index must identify sources[0].',
-				segmentOffset
-			);
-		originalLine = boundedCoordinate(
-			originalLine,
-			fields[2]!,
-			'Source Map original line',
-			limits,
-			segmentOffset
-		);
-		originalColumn = boundedCoordinate(
-			originalColumn,
-			fields[3]!,
-			'Source Map original column',
-			limits,
-			segmentOffset
-		);
-		segments.push(
-			Object.freeze({
-				generatedColumn,
-				generatedLine,
-				ordinal: segments.length,
-				originalColumn,
-				originalLine,
-				sourceIndex: 0 as const
-			})
-		);
-		segmentsOnLine += 1;
+		const segment = readSegmentFields(mappings, segmentOffset, limits, work);
+		index = segment.next;
+		appendMappedSegment(state, segment.fields, segmentOffset, limits, segments);
 
 		if (index >= mappings.length) break;
-		if (mappings[index] === ',') {
-			index += 1;
-			if (index >= mappings.length || mappings[index] === ',' || mappings[index] === ';')
-				fail('MAPPINGS_INVALID', 'Source Map mappings contains an empty segment.', index);
-		}
+		index = consumeSegmentSeparator(mappings, index);
 	}
 	if (segments.length === 0)
 		fail('MAPPINGS_INVALID', 'Source Map selected profile requires at least one mapped segment.');
 	work.check();
 	const frozenSegments = Object.freeze(segments);
 	work.check();
-	return { generatedLines: generatedLine + 1, segments: frozenSegments };
+	return { generatedLines: state.generatedLine + 1, segments: frozenSegments };
 }
 
 /**

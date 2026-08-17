@@ -17,12 +17,16 @@ import {
 	type StateMachineGraphCoverage,
 	type StateMachineGraphEdge,
 	type StateMachineGraphEndpoint,
+	type StateMachineGraphId,
 	type StateMachineGraphIndexEntry,
+	type StateMachineGraphLayerId,
 	type StateMachineGraphLimitation,
 	type StateMachineGraphNode,
 	type StateMachineGraphRelationCode,
 	type StateMachineGraphRelationKind,
 	type StateMachineGraphSnapshot,
+	type StateMachineGraphSourceLocation,
+	type StateMachineSourceSpan,
 	type StateMachineTopologyObservation
 } from '../contracts/state-machine-graph.js';
 import {
@@ -103,6 +107,30 @@ const GRAPH_EPISTEMIC = {
 	supportBasis: 'DECLARED_GENERATED_TOPOLOGY'
 } as const;
 
+/** A refusal outcome, or `null` when the checked condition holds. */
+type GraphRefusal = StateMachineGraphBuildOutcome | null;
+
+type MachineNode = Extract<StateMachineGraphNode, { kind: 'MACHINE' }>;
+type StateNode = Extract<StateMachineGraphNode, { kind: 'STATE' }>;
+type FrontierNode = Extract<StateMachineGraphNode, { kind: 'CROSS_AXIS_FRONTIER' }>;
+
+interface ProjectionContext {
+	readonly graphId: StateMachineGraphId;
+	readonly layerId: StateMachineGraphLayerId;
+	readonly location: (span: StateMachineSourceSpan) => StateMachineGraphSourceLocation[];
+	readonly provenanceIds: readonly SemanticProvenanceId[];
+	readonly snapshot: StaticSemanticSnapshot;
+}
+
+type AddEdge = (
+	relationKind: StateMachineGraphRelationKind,
+	observationRecordId: string,
+	sourceEndpoint: StateMachineGraphEndpoint,
+	targetEndpoint: StateMachineGraphEndpoint,
+	spans: readonly { readonly end: number; readonly start: number }[],
+	fields: Pick<StateMachineGraphEdge, 'guard' | 'note' | 'reason' | 'trigger'>
+) => void;
+
 function diagnostic(
 	code: StateMachineGraphBuildDiagnostic['code'],
 	message: string,
@@ -121,6 +149,11 @@ function unavailable(
 	return { diagnostics: [diagnostic(code, message, phase, path)], outcome: 'unavailable' };
 }
 
+/** Reproduces default `Array#sort` (UTF-16 code-unit) order without a locale. */
+function compareText(left: string, right: string): number {
+	return Number(left > right) - Number(left < right);
+}
+
 function materializeDataObject(
 	value: unknown,
 	keys: readonly string[],
@@ -134,8 +167,8 @@ function materializeDataObject(
 	const ownKeys = Reflect.ownKeys(value);
 	if (ownKeys.some((key) => typeof key !== 'string'))
 		throw new TypeError(`${label} rejects symbol keys.`);
-	const actual = (ownKeys as string[]).sort();
-	const expected = [...keys].sort();
+	const actual = (ownKeys as string[]).sort(compareText);
+	const expected = [...keys].sort(compareText);
 	if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index]))
 		throw new TypeError(`${label} requires exactly ${expected.join(', ')}.`);
 	const record = value as Record<string, unknown>;
@@ -172,7 +205,7 @@ function materializeRequest(value: unknown): BuildStateMachineGraphRequest {
 }
 
 function compareId(left: { readonly id: string }, right: { readonly id: string }): number {
-	return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+	return compareText(left.id, right.id);
 }
 
 function makeIndexes(
@@ -185,9 +218,12 @@ function makeIndexes(
 		const nodeId = direction === 'FORWARD' ? edge.source.nodeId : edge.target.nodeId;
 		byNode.get(nodeId)?.push(edge.id);
 	}
-	return [...byNode.entries()]
-		.map(([nodeId, edgeIds]) => ({ edgeIds: edgeIds.sort(), nodeId }))
-		.sort((left, right) => (left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0));
+	const entries = [...byNode.entries()].map(([nodeId, edgeIds]) => {
+		edgeIds.sort(compareText);
+		return { edgeIds, nodeId };
+	});
+	entries.sort((left, right) => compareText(left.nodeId, right.nodeId));
+	return entries;
 }
 
 function coverageFor(
@@ -228,21 +264,43 @@ function coverageFor(
 	};
 }
 
-export function buildStateMachineGraph(
-	requestValue: unknown,
+function requestRefusal(error: unknown): StateMachineGraphBuildOutcome {
+	return unavailable(
+		'REQUEST_INVALID',
+		error instanceof Error ? error.message : 'Invalid state-machine graph request.',
+		'REQUEST'
+	);
+}
+
+function projectionRefusal(error: unknown): StateMachineGraphBuildOutcome {
+	return unavailable(
+		'GRAPH_VALIDATION_FAILED',
+		error instanceof Error
+			? `State-machine graph projection failed closed: ${error.message}`
+			: 'State-machine graph projection failed closed.',
+		'PROJECT'
+	);
+}
+
+function capabilityRefusal(snapshot: StaticSemanticSnapshot): GraphRefusal {
+	for (const capability of ['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const) {
+		const state = snapshot.capabilities.find((record) => record.capability === capability)?.state;
+		if (state === undefined || state === 'UNSUPPORTED')
+			return unavailable(
+				'SEMANTIC_CAPABILITY_UNAVAILABLE',
+				`${capability} is required.`,
+				'PROJECT',
+				'$.capabilities'
+			);
+	}
+	return null;
+}
+
+function bindingRefusal(
+	request: BuildStateMachineGraphRequest,
 	snapshot: StaticSemanticSnapshot,
 	observation: StateMachineTopologyObservation
-): StateMachineGraphBuildOutcome {
-	let request: BuildStateMachineGraphRequest;
-	try {
-		request = materializeRequest(requestValue);
-	} catch (error) {
-		return unavailable(
-			'REQUEST_INVALID',
-			error instanceof Error ? error.message : 'Invalid state-machine graph request.',
-			'REQUEST'
-		);
-	}
+): GraphRefusal {
 	if (request.semanticSnapshotId !== snapshot.id)
 		return unavailable(
 			'SEMANTIC_SNAPSHOT_ID_MISMATCH',
@@ -272,52 +330,354 @@ export function buildStateMachineGraph(
 			'VALIDATE',
 			observationValidation.issues[0]?.path ?? '$.observation'
 		);
-	for (const capability of ['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const) {
-		const state = snapshot.capabilities.find((record) => record.capability === capability)?.state;
-		if (state === undefined || state === 'UNSUPPORTED')
-			return unavailable(
-				'SEMANTIC_CAPABILITY_UNAVAILABLE',
-				`${capability} is required.`,
-				'PROJECT',
-				'$.capabilities'
-			);
+	return capabilityRefusal(snapshot);
+}
+
+function budgetRefusal(
+	request: BuildStateMachineGraphRequest,
+	observation: StateMachineTopologyObservation
+): GraphRefusal {
+	const guardedLegalTransitionIds = new Set(
+		observation.guardedTransitions.map((item) => item.legalTransitionId)
+	);
+	const prospectiveNodeCount =
+		observation.machines.length + observation.states.length + observation.crossAxisRules.length;
+	const prospectiveEdgeCount =
+		observation.states.length +
+		observation.legalTransitions.length -
+		guardedLegalTransitionIds.size +
+		observation.guardedTransitions.length +
+		observation.explicitlyIllegalTransitions.length +
+		observation.crossAxisRules.length;
+	if (
+		prospectiveNodeCount > request.budgets.maxNodes ||
+		prospectiveEdgeCount > request.budgets.maxEdges
+	)
+		return unavailable(
+			'BUDGET_EXHAUSTED',
+			'State-machine graph population exceeds the caller-supplied operation budget.',
+			'REQUEST',
+			'$.budgets'
+		);
+	return null;
+}
+
+/** The one semantic source that binds exactly to both the request and the observation. */
+function boundSource(
+	request: BuildStateMachineGraphRequest,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation
+): StaticSemanticSnapshot['sources'][number] | undefined {
+	const source = snapshot.sources.find(
+		(candidate) => candidate.id === request.source.semanticSourceId
+	);
+	if (source === undefined) return undefined;
+	if (
+		source.logicalPath !== request.source.logicalPath ||
+		source.projectId !== request.source.projectId ||
+		source.programId !== request.source.programId ||
+		source.logicalPath !== observation.artifact.path ||
+		source.bytes !== observation.artifact.bytes ||
+		source.contentSha256 !== observation.artifact.sha256 ||
+		source.origin !== 'GENERATED'
+	)
+		return undefined;
+	return source;
+}
+
+function buildMachineNodes(
+	context: ProjectionContext,
+	observation: StateMachineTopologyObservation
+): StateMachineGraphNode[] {
+	const { graphId, layerId, location, provenanceIds, snapshot } = context;
+	return observation.machines.map((machine) => ({
+		epistemic: GRAPH_EPISTEMIC,
+		graphId,
+		id: stateMachineGraphMachineNodeId(graphId, machine.id),
+		initialState: machine.initialState,
+		kind: 'MACHINE',
+		layerId,
+		name: machine.name,
+		observationMachineId: machine.id,
+		provenanceIds,
+		semanticSnapshotId: snapshot.id,
+		sourceLocations: location(machine.span),
+		sourceSection: machine.sourceSection,
+		subjectId: snapshot.subjectId,
+		terminalStates: machine.terminalStates
+	}));
+}
+
+function machineNodeIndex(nodes: readonly StateMachineGraphNode[]) {
+	const index = new Map<MachineNode['observationMachineId'], MachineNode>();
+	for (const node of nodes) {
+		if (node.kind === 'MACHINE') index.set(node.observationMachineId, node);
 	}
-	try {
-		const guardedLegalTransitionIds = new Set(
-			observation.guardedTransitions.map((item) => item.legalTransitionId)
+	return index;
+}
+
+function stateNodeIndex(nodes: readonly StateMachineGraphNode[]) {
+	const index = new Map<StateNode['observationStateId'], StateNode>();
+	for (const node of nodes) {
+		if (node.kind === 'STATE') index.set(node.observationStateId, node);
+	}
+	return index;
+}
+
+function frontierNodeIndex(nodes: readonly StateMachineGraphNode[]) {
+	const index = new Map<FrontierNode['observationRuleId'], FrontierNode>();
+	for (const node of nodes) {
+		if (node.kind === 'CROSS_AXIS_FRONTIER') index.set(node.observationRuleId, node);
+	}
+	return index;
+}
+
+function appendStateNodes(
+	context: ProjectionContext,
+	observation: StateMachineTopologyObservation,
+	machineNodeByObservationId: ReadonlyMap<MachineNode['observationMachineId'], MachineNode>,
+	nodes: StateMachineGraphNode[]
+): void {
+	const { graphId, layerId, location, provenanceIds, snapshot } = context;
+	for (const state of observation.states) {
+		const machine = machineNodeByObservationId.get(state.machineId);
+		if (machine === undefined) throw new Error(`State ${state.id} has no machine.`);
+		nodes.push({
+			epistemic: GRAPH_EPISTEMIC,
+			graphId,
+			id: stateMachineGraphStateNodeId(graphId, state.id),
+			initial: state.initial,
+			kind: 'STATE',
+			layerId,
+			machineNodeId: machine.id,
+			name: state.name,
+			observationStateId: state.id,
+			ordinal: state.ordinal,
+			provenanceIds,
+			semanticSnapshotId: snapshot.id,
+			sourceLocations: location(state.span),
+			subjectId: snapshot.subjectId,
+			terminal: state.terminal
+		});
+	}
+}
+
+function appendCrossAxisFrontierNodes(
+	context: ProjectionContext,
+	observation: StateMachineTopologyObservation,
+	nodes: StateMachineGraphNode[]
+): void {
+	const { graphId, layerId, location, provenanceIds, snapshot } = context;
+	for (const rule of observation.crossAxisRules)
+		nodes.push({
+			epistemic: GRAPH_EPISTEMIC,
+			from: rule.from,
+			graphId,
+			id: stateMachineGraphCrossAxisFrontierNodeId(graphId, rule.id),
+			kind: 'CROSS_AXIS_FRONTIER',
+			layerId,
+			machineName: rule.machineName,
+			observationRuleId: rule.id,
+			provenanceIds,
+			reason: rule.reason,
+			semanticSnapshotId: snapshot.id,
+			sourceLocations: location(rule.span),
+			subjectId: snapshot.subjectId,
+			to: rule.to
+		});
+}
+
+function makeAddEdge(context: ProjectionContext, edges: StateMachineGraphEdge[]): AddEdge {
+	const { graphId, layerId, location, provenanceIds, snapshot } = context;
+	return (relationKind, observationRecordId, sourceEndpoint, targetEndpoint, spans, fields) => {
+		const edge = {
+			...fields,
+			epistemic: GRAPH_EPISTEMIC,
+			graphId,
+			layerId,
+			method: STATE_MACHINE_GRAPH_METHOD,
+			observationRecordId,
+			provenanceIds,
+			relationCode: RELATION_CODES[relationKind],
+			relationKind,
+			semanticSnapshotId: snapshot.id,
+			source: sourceEndpoint,
+			sourceLocations: spans.flatMap(location),
+			subjectId: snapshot.subjectId,
+			target: targetEndpoint
+		};
+		edges.push({
+			...edge,
+			id: stateMachineGraphEdgeId({
+				graph: graphId,
+				observationRecordId,
+				relationKind,
+				source: sourceEndpoint,
+				target: targetEndpoint
+			})
+		});
+	};
+}
+
+function appendContainmentEdges(
+	observation: StateMachineTopologyObservation,
+	machineNodeByObservationId: ReadonlyMap<MachineNode['observationMachineId'], MachineNode>,
+	stateNodeByObservationId: ReadonlyMap<StateNode['observationStateId'], StateNode>,
+	addEdge: AddEdge
+): void {
+	for (const state of observation.states) {
+		const machine = machineNodeByObservationId.get(state.machineId)!;
+		const target = stateNodeByObservationId.get(state.id)!;
+		addEdge(
+			'CONTAINS_STATE',
+			state.id,
+			{ kind: 'MACHINE', nodeId: machine.id },
+			{ kind: 'STATE', nodeId: target.id },
+			[state.span],
+			{ guard: null, note: null, reason: null, trigger: null }
 		);
-		const prospectiveNodeCount =
-			observation.machines.length + observation.states.length + observation.crossAxisRules.length;
-		const prospectiveEdgeCount =
-			observation.states.length +
-			observation.legalTransitions.length -
-			guardedLegalTransitionIds.size +
-			observation.guardedTransitions.length +
-			observation.explicitlyIllegalTransitions.length +
-			observation.crossAxisRules.length;
-		if (
-			prospectiveNodeCount > request.budgets.maxNodes ||
-			prospectiveEdgeCount > request.budgets.maxEdges
-		)
-			return unavailable(
-				'BUDGET_EXHAUSTED',
-				'State-machine graph population exceeds the caller-supplied operation budget.',
-				'REQUEST',
-				'$.budgets'
+	}
+}
+
+function appendTransitionEdges(
+	observation: StateMachineTopologyObservation,
+	stateNodeByObservationId: ReadonlyMap<StateNode['observationStateId'], StateNode>,
+	addEdge: AddEdge
+): void {
+	const guardedByLegalId = new Map<
+		StateMachineTopologyObservation['legalTransitions'][number]['id'],
+		StateMachineTopologyObservation['guardedTransitions'][number][]
+	>();
+	for (const guarded of observation.guardedTransitions) {
+		const records = guardedByLegalId.get(guarded.legalTransitionId) ?? [];
+		records.push(guarded);
+		guardedByLegalId.set(guarded.legalTransitionId, records);
+	}
+	for (const transition of observation.legalTransitions) {
+		const guardedRecords = guardedByLegalId.get(transition.id) ?? [];
+		const sourceEndpoint = {
+			kind: 'STATE' as const,
+			nodeId: stateNodeByObservationId.get(transition.fromStateId)!.id
+		};
+		const targetEndpoint = {
+			kind: 'STATE' as const,
+			nodeId: stateNodeByObservationId.get(transition.toStateId)!.id
+		};
+		if (guardedRecords.length === 0)
+			addEdge(
+				'LEGAL_TRANSITION',
+				transition.id,
+				sourceEndpoint,
+				targetEndpoint,
+				[transition.span],
+				{
+					guard: transition.guard,
+					note: transition.note,
+					reason: null,
+					trigger: transition.trigger
+				}
 			);
-		const source = snapshot.sources.find(
-			(candidate) => candidate.id === request.source.semanticSourceId
+		else
+			for (const guarded of guardedRecords)
+				addEdge(
+					'GUARDED_LEGAL_TRANSITION',
+					guarded.id,
+					sourceEndpoint,
+					targetEndpoint,
+					[transition.span, guarded.span],
+					{
+						guard: transition.guard,
+						note: transition.note,
+						reason: guarded.reason,
+						trigger: transition.trigger
+					}
+				);
+	}
+}
+
+function appendIllegalTransitionEdges(
+	observation: StateMachineTopologyObservation,
+	stateNodeByObservationId: ReadonlyMap<StateNode['observationStateId'], StateNode>,
+	addEdge: AddEdge
+): void {
+	for (const transition of observation.explicitlyIllegalTransitions)
+		addEdge(
+			'EXPLICITLY_ILLEGAL_TRANSITION',
+			transition.id,
+			{ kind: 'STATE', nodeId: stateNodeByObservationId.get(transition.fromStateId)!.id },
+			{ kind: 'STATE', nodeId: stateNodeByObservationId.get(transition.toStateId)!.id },
+			[transition.span],
+			{ guard: null, note: null, reason: transition.reason, trigger: null }
 		);
-		if (
-			source === undefined ||
-			source.logicalPath !== request.source.logicalPath ||
-			source.projectId !== request.source.projectId ||
-			source.programId !== request.source.programId ||
-			source.logicalPath !== observation.artifact.path ||
-			source.bytes !== observation.artifact.bytes ||
-			source.contentSha256 !== observation.artifact.sha256 ||
-			source.origin !== 'GENERATED'
-		)
+}
+
+function appendCrossAxisEdges(
+	observation: StateMachineTopologyObservation,
+	machineNodeByObservationId: ReadonlyMap<MachineNode['observationMachineId'], MachineNode>,
+	frontierByRuleId: ReadonlyMap<FrontierNode['observationRuleId'], FrontierNode>,
+	addEdge: AddEdge
+): void {
+	for (const rule of observation.crossAxisRules) {
+		const machine = machineNodeByObservationId.get(rule.machineId)!;
+		const frontier = frontierByRuleId.get(rule.id)!;
+		addEdge(
+			'DECLARES_CROSS_AXIS_RULE',
+			rule.id,
+			{ kind: 'MACHINE', nodeId: machine.id },
+			{ kind: 'CROSS_AXIS_FRONTIER', nodeId: frontier.id },
+			[rule.span],
+			{ guard: null, note: null, reason: rule.reason, trigger: null }
+		);
+	}
+}
+
+function graphLimitations(snapshot: StaticSemanticSnapshot) {
+	if (snapshot.health === 'PARTIAL')
+		return [
+			...LIMITATIONS,
+			{
+				kind: 'SEMANTIC_INPUT_PARTIAL' as const,
+				reason: 'The selected semantic snapshot is partial.'
+			}
+		];
+	return [...LIMITATIONS];
+}
+
+function graphValidationRefusal(
+	graph: StateMachineGraphSnapshot,
+	request: BuildStateMachineGraphRequest,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation
+): GraphRefusal {
+	const validation = validateConstructedStateMachineGraph(graph, request, snapshot, observation);
+	if (validation.state !== 'VALID')
+		return unavailable(
+			'GRAPH_VALIDATION_FAILED',
+			validation.issues[0]?.message ?? 'State-machine graph validation failed.',
+			'VALIDATE',
+			validation.issues[0]?.path ?? null
+		);
+	return null;
+}
+
+export function buildStateMachineGraph(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation
+): StateMachineGraphBuildOutcome {
+	let request: BuildStateMachineGraphRequest;
+	try {
+		request = materializeRequest(requestValue);
+	} catch (error) {
+		return requestRefusal(error);
+	}
+	const bindingRefused = bindingRefusal(request, snapshot, observation);
+	if (bindingRefused !== null) return bindingRefused;
+	try {
+		const budgetRefused = budgetRefusal(request, observation);
+		if (budgetRefused !== null) return budgetRefused;
+		const source = boundSource(request, snapshot, observation);
+		if (source === undefined)
 			return unavailable(
 				'SOURCE_BINDING_MISMATCH',
 				'The observation and selected semantic source do not bind exactly.',
@@ -326,7 +686,7 @@ export function buildStateMachineGraph(
 			);
 		const provenanceIds = [source.provenanceId, source.syntaxProvenanceId]
 			.filter((id): id is SemanticProvenanceId => id !== null)
-			.sort();
+			.sort(compareText);
 		const graphInputDigest = stateMachineGraphInputDigest(request, snapshot, observation);
 		const graphId = stateMachineGraphId({
 			canonicalProfile: STATE_MACHINE_GRAPH_CANONICAL_PROFILE,
@@ -340,216 +700,33 @@ export function buildStateMachineGraph(
 			subjectId: snapshot.subjectId
 		});
 		const layerId = stateMachineGraphLayerId(graphId, 'JPWB_GENERATED_STATE_MACHINE_TOPOLOGY', 0);
-		const location = (span: { readonly end: number; readonly start: number }) => [
-			{ end: span.end, sourceId: source.id, start: span.start }
-		];
-		const nodes: StateMachineGraphNode[] = observation.machines.map((machine) => ({
-			epistemic: GRAPH_EPISTEMIC,
+		const context: ProjectionContext = {
 			graphId,
-			id: stateMachineGraphMachineNodeId(graphId, machine.id),
-			initialState: machine.initialState,
-			kind: 'MACHINE',
 			layerId,
-			name: machine.name,
-			observationMachineId: machine.id,
+			location: (span) => [{ end: span.end, sourceId: source.id, start: span.start }],
 			provenanceIds,
-			semanticSnapshotId: snapshot.id,
-			sourceLocations: location(machine.span),
-			sourceSection: machine.sourceSection,
-			subjectId: snapshot.subjectId,
-			terminalStates: machine.terminalStates
-		}));
-		const machineNodeByObservationId = new Map(
-			nodes
-				.filter(
-					(node): node is Extract<StateMachineGraphNode, { kind: 'MACHINE' }> =>
-						node.kind === 'MACHINE'
-				)
-				.map((node) => [node.observationMachineId, node])
-		);
-		for (const state of observation.states) {
-			const machine = machineNodeByObservationId.get(state.machineId);
-			if (machine === undefined) throw new Error(`State ${state.id} has no machine.`);
-			nodes.push({
-				epistemic: GRAPH_EPISTEMIC,
-				graphId,
-				id: stateMachineGraphStateNodeId(graphId, state.id),
-				initial: state.initial,
-				kind: 'STATE',
-				layerId,
-				machineNodeId: machine.id,
-				name: state.name,
-				observationStateId: state.id,
-				ordinal: state.ordinal,
-				provenanceIds,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: location(state.span),
-				subjectId: snapshot.subjectId,
-				terminal: state.terminal
-			});
-		}
-		for (const rule of observation.crossAxisRules)
-			nodes.push({
-				epistemic: GRAPH_EPISTEMIC,
-				from: rule.from,
-				graphId,
-				id: stateMachineGraphCrossAxisFrontierNodeId(graphId, rule.id),
-				kind: 'CROSS_AXIS_FRONTIER',
-				layerId,
-				machineName: rule.machineName,
-				observationRuleId: rule.id,
-				provenanceIds,
-				reason: rule.reason,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: location(rule.span),
-				subjectId: snapshot.subjectId,
-				to: rule.to
-			});
-		nodes.sort(compareId);
-		const stateNodeByObservationId = new Map(
-			nodes
-				.filter(
-					(node): node is Extract<StateMachineGraphNode, { kind: 'STATE' }> => node.kind === 'STATE'
-				)
-				.map((node) => [node.observationStateId, node])
-		);
-		const frontierByRuleId = new Map(
-			nodes
-				.filter(
-					(node): node is Extract<StateMachineGraphNode, { kind: 'CROSS_AXIS_FRONTIER' }> =>
-						node.kind === 'CROSS_AXIS_FRONTIER'
-				)
-				.map((node) => [node.observationRuleId, node])
-		);
-		const edges: StateMachineGraphEdge[] = [];
-		const addEdge = (
-			relationKind: StateMachineGraphRelationKind,
-			observationRecordId: string,
-			sourceEndpoint: StateMachineGraphEndpoint,
-			targetEndpoint: StateMachineGraphEndpoint,
-			spans: readonly { readonly end: number; readonly start: number }[],
-			fields: Pick<StateMachineGraphEdge, 'guard' | 'note' | 'reason' | 'trigger'>
-		): void => {
-			const edge = {
-				...fields,
-				epistemic: GRAPH_EPISTEMIC,
-				graphId,
-				layerId,
-				method: STATE_MACHINE_GRAPH_METHOD,
-				observationRecordId,
-				provenanceIds,
-				relationCode: RELATION_CODES[relationKind],
-				relationKind,
-				semanticSnapshotId: snapshot.id,
-				source: sourceEndpoint,
-				sourceLocations: spans.flatMap(location),
-				subjectId: snapshot.subjectId,
-				target: targetEndpoint
-			};
-			edges.push({
-				...edge,
-				id: stateMachineGraphEdgeId({
-					graph: graphId,
-					observationRecordId,
-					relationKind,
-					source: sourceEndpoint,
-					target: targetEndpoint
-				})
-			});
+			snapshot
 		};
-		for (const state of observation.states) {
-			const machine = machineNodeByObservationId.get(state.machineId)!;
-			const target = stateNodeByObservationId.get(state.id)!;
-			addEdge(
-				'CONTAINS_STATE',
-				state.id,
-				{ kind: 'MACHINE', nodeId: machine.id },
-				{ kind: 'STATE', nodeId: target.id },
-				[state.span],
-				{ guard: null, note: null, reason: null, trigger: null }
-			);
-		}
-		const guardedByLegalId = new Map<
-			StateMachineTopologyObservation['legalTransitions'][number]['id'],
-			StateMachineTopologyObservation['guardedTransitions'][number][]
-		>();
-		for (const guarded of observation.guardedTransitions) {
-			const records = guardedByLegalId.get(guarded.legalTransitionId) ?? [];
-			records.push(guarded);
-			guardedByLegalId.set(guarded.legalTransitionId, records);
-		}
-		for (const transition of observation.legalTransitions) {
-			const guardedRecords = guardedByLegalId.get(transition.id) ?? [];
-			const sourceEndpoint = {
-				kind: 'STATE' as const,
-				nodeId: stateNodeByObservationId.get(transition.fromStateId)!.id
-			};
-			const targetEndpoint = {
-				kind: 'STATE' as const,
-				nodeId: stateNodeByObservationId.get(transition.toStateId)!.id
-			};
-			if (guardedRecords.length === 0)
-				addEdge(
-					'LEGAL_TRANSITION',
-					transition.id,
-					sourceEndpoint,
-					targetEndpoint,
-					[transition.span],
-					{
-						guard: transition.guard,
-						note: transition.note,
-						reason: null,
-						trigger: transition.trigger
-					}
-				);
-			else
-				for (const guarded of guardedRecords)
-					addEdge(
-						'GUARDED_LEGAL_TRANSITION',
-						guarded.id,
-						sourceEndpoint,
-						targetEndpoint,
-						[transition.span, guarded.span],
-						{
-							guard: transition.guard,
-							note: transition.note,
-							reason: guarded.reason,
-							trigger: transition.trigger
-						}
-					);
-		}
-		for (const transition of observation.explicitlyIllegalTransitions)
-			addEdge(
-				'EXPLICITLY_ILLEGAL_TRANSITION',
-				transition.id,
-				{ kind: 'STATE', nodeId: stateNodeByObservationId.get(transition.fromStateId)!.id },
-				{ kind: 'STATE', nodeId: stateNodeByObservationId.get(transition.toStateId)!.id },
-				[transition.span],
-				{ guard: null, note: null, reason: transition.reason, trigger: null }
-			);
-		for (const rule of observation.crossAxisRules) {
-			const machine = machineNodeByObservationId.get(rule.machineId)!;
-			const frontier = frontierByRuleId.get(rule.id)!;
-			addEdge(
-				'DECLARES_CROSS_AXIS_RULE',
-				rule.id,
-				{ kind: 'MACHINE', nodeId: machine.id },
-				{ kind: 'CROSS_AXIS_FRONTIER', nodeId: frontier.id },
-				[rule.span],
-				{ guard: null, note: null, reason: rule.reason, trigger: null }
-			);
-		}
+		const nodes = buildMachineNodes(context, observation);
+		const machineNodeByObservationId = machineNodeIndex(nodes);
+		appendStateNodes(context, observation, machineNodeByObservationId, nodes);
+		appendCrossAxisFrontierNodes(context, observation, nodes);
+		nodes.sort(compareId);
+		const stateNodeByObservationId = stateNodeIndex(nodes);
+		const frontierByRuleId = frontierNodeIndex(nodes);
+		const edges: StateMachineGraphEdge[] = [];
+		const addEdge = makeAddEdge(context, edges);
+		appendContainmentEdges(
+			observation,
+			machineNodeByObservationId,
+			stateNodeByObservationId,
+			addEdge
+		);
+		appendTransitionEdges(observation, stateNodeByObservationId, addEdge);
+		appendIllegalTransitionEdges(observation, stateNodeByObservationId, addEdge);
+		appendCrossAxisEdges(observation, machineNodeByObservationId, frontierByRuleId, addEdge);
 		edges.sort(compareId);
-		const limitations =
-			snapshot.health === 'PARTIAL'
-				? [
-						...LIMITATIONS,
-						{
-							kind: 'SEMANTIC_INPUT_PARTIAL' as const,
-							reason: 'The selected semantic snapshot is partial.'
-						}
-					]
-				: [...LIMITATIONS];
+		const limitations = graphLimitations(snapshot);
 		const coverage = coverageFor(observation, nodes, edges);
 		if (!coverage.reconciles) throw new Error('State-machine graph coverage failed to reconcile.');
 		const layer = {
@@ -609,14 +786,8 @@ export function buildStateMachineGraph(
 			...content,
 			contentDigest: stateMachineGraphContentDigest(content)
 		};
-		const validation = validateConstructedStateMachineGraph(graph, request, snapshot, observation);
-		if (validation.state !== 'VALID')
-			return unavailable(
-				'GRAPH_VALIDATION_FAILED',
-				validation.issues[0]?.message ?? 'State-machine graph validation failed.',
-				'VALIDATE',
-				validation.issues[0]?.path ?? null
-			);
+		const validationRefused = graphValidationRefusal(graph, request, snapshot, observation);
+		if (validationRefused !== null) return validationRefused;
 		return {
 			diagnostics: [
 				diagnostic(
@@ -629,12 +800,6 @@ export function buildStateMachineGraph(
 			outcome: 'partial'
 		};
 	} catch (error) {
-		return unavailable(
-			'GRAPH_VALIDATION_FAILED',
-			error instanceof Error
-				? `State-machine graph projection failed closed: ${error.message}`
-				: 'State-machine graph projection failed closed.',
-			'PROJECT'
-		);
+		return projectionRefusal(error);
 	}
 }

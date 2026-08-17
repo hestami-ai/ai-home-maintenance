@@ -186,12 +186,7 @@ const SCALAR_ARRAY_PATH =
 
 type RequiredValueKind = 'array' | 'boolean' | 'integer' | 'record' | 'text';
 
-function requiredRecordFields(
-	value: unknown,
-	path: string,
-	requirements: Readonly<Record<string, RequiredValueKind>>,
-	options: ValidatedOptions
-): Record<string, unknown> {
+function plainRecordOrRefuse(value: unknown, path: string): object {
 	if (
 		value === null ||
 		typeof value !== 'object' ||
@@ -200,45 +195,53 @@ function requiredRecordFields(
 		(Reflect.getPrototypeOf(value) !== Object.prototype && Reflect.getPrototypeOf(value) !== null)
 	)
 		invalid('SHAPE_INVALID', path, 'Expected a plain, non-Proxy record.');
-	const result: Record<string, unknown> = {};
-	const allowed = new Set(Object.keys(requirements));
-	for (const [key, kind] of Object.entries(requirements)) {
-		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
-		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-			invalid('SHAPE_INVALID', `${path}.${key}`, 'Expected an enumerable data property.');
-		const field = descriptor.value;
-		if (kind === 'text' && typeof field !== 'string')
-			invalid('SHAPE_INVALID', `${path}.${key}`, 'Expected text.');
-		if (kind === 'boolean' && typeof field !== 'boolean')
-			invalid('SHAPE_INVALID', `${path}.${key}`, 'Expected boolean.');
-		if (kind === 'integer' && !Number.isSafeInteger(field))
-			invalid('SHAPE_INVALID', `${path}.${key}`, 'Expected a safe integer.');
-		if (kind === 'record' && (field === null || typeof field !== 'object' || Array.isArray(field)))
-			invalid('SHAPE_INVALID', `${path}.${key}`, 'Expected a record.');
-		if (kind === 'array') {
-			if (
-				!Array.isArray(field) ||
-				isProxy(field) ||
-				Reflect.getPrototypeOf(field) !== Array.prototype
-			)
-				invalid('SHAPE_INVALID', `${path}.${key}`, 'Expected a plain array.');
-			const lengthDescriptor = Reflect.getOwnPropertyDescriptor(field, 'length');
-			if (
-				lengthDescriptor === undefined ||
-				!('value' in lengthDescriptor) ||
-				!Number.isSafeInteger(lengthDescriptor.value) ||
-				(lengthDescriptor.value as number) < 0
-			)
-				invalid('SHAPE_INVALID', `${path}.${key}`, 'Array length is malformed.');
-			if ((lengthDescriptor.value as number) > options.maxRecords)
-				invalid(
-					'BUDGET_EXHAUSTED',
-					`${path}.${key}`,
-					'Array population exceeds the validation budget.'
-				);
-		}
-		result[key] = field;
-	}
+	return value;
+}
+
+function requiredDataProperty(value: object, key: string, fieldPath: string): PropertyDescriptor {
+	const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		invalid('SHAPE_INVALID', fieldPath, 'Expected an enumerable data property.');
+	return descriptor;
+}
+
+function requiredArrayField(field: unknown, fieldPath: string, options: ValidatedOptions): void {
+	if (!Array.isArray(field) || isProxy(field) || Reflect.getPrototypeOf(field) !== Array.prototype)
+		invalid('SHAPE_INVALID', fieldPath, 'Expected a plain array.');
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(field, 'length');
+	if (
+		lengthDescriptor === undefined ||
+		!('value' in lengthDescriptor) ||
+		!Number.isSafeInteger(lengthDescriptor.value) ||
+		(lengthDescriptor.value as number) < 0
+	)
+		invalid('SHAPE_INVALID', fieldPath, 'Array length is malformed.');
+	if ((lengthDescriptor.value as number) > options.maxRecords)
+		invalid('BUDGET_EXHAUSTED', fieldPath, 'Array population exceeds the validation budget.');
+}
+
+function requiredFieldKind(
+	kind: RequiredValueKind,
+	field: unknown,
+	fieldPath: string,
+	options: ValidatedOptions
+): void {
+	if (kind === 'text' && typeof field !== 'string')
+		invalid('SHAPE_INVALID', fieldPath, 'Expected text.');
+	if (kind === 'boolean' && typeof field !== 'boolean')
+		invalid('SHAPE_INVALID', fieldPath, 'Expected boolean.');
+	if (kind === 'integer' && !Number.isSafeInteger(field))
+		invalid('SHAPE_INVALID', fieldPath, 'Expected a safe integer.');
+	if (kind === 'record' && (field === null || typeof field !== 'object' || Array.isArray(field)))
+		invalid('SHAPE_INVALID', fieldPath, 'Expected a record.');
+	if (kind === 'array') requiredArrayField(field, fieldPath, options);
+}
+
+function assertExactRecordFieldPopulation(
+	value: object,
+	path: string,
+	allowed: ReadonlySet<string>
+): void {
 	let enumerableCount = 0;
 	for (const key in value) {
 		if (!Object.hasOwn(value, key)) continue;
@@ -248,6 +251,24 @@ function requiredRecordFields(
 	}
 	if (enumerableCount !== allowed.size)
 		invalid('SHAPE_INVALID', path, 'Record field population is not exact.');
+}
+
+function requiredRecordFields(
+	value: unknown,
+	path: string,
+	requirements: Readonly<Record<string, RequiredValueKind>>,
+	options: ValidatedOptions
+): Record<string, unknown> {
+	const record = plainRecordOrRefuse(value, path);
+	const result: Record<string, unknown> = {};
+	const allowed = new Set(Object.keys(requirements));
+	for (const [key, kind] of Object.entries(requirements)) {
+		const fieldPath = `${path}.${key}`;
+		const field = requiredDataProperty(record, key, fieldPath).value;
+		requiredFieldKind(kind, field, fieldPath, options);
+		result[key] = field;
+	}
+	assertExactRecordFieldPopulation(record, path, allowed);
 	return result;
 }
 
@@ -285,7 +306,7 @@ function preflightObservationStructure(value: unknown, options: ValidatedOptions
 		},
 		options
 	);
-	const artifactSet = requiredRecordFields(
+	requiredRecordFields(
 		root.artifactSet,
 		'$.artifactSet',
 		{
@@ -301,7 +322,6 @@ function preflightObservationStructure(value: unknown, options: ValidatedOptions
 		},
 		options
 	);
-	void artifactSet;
 	requiredRecordFields(
 		root.rawEvidence,
 		'$.rawEvidence',
@@ -377,7 +397,7 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function independentlyValidateSurface(observation: GuardEnforcementLedgerObservation): void {
+function validateObservationConstants(observation: GuardEnforcementLedgerObservation): void {
 	exactKeys(observation, '$', OBSERVATION_KEYS);
 	for (const [path, actual, expected] of [
 		[
@@ -428,6 +448,9 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 		]
 	] as const)
 		if (actual !== expected) invalid('INVALID_VALUE', path, 'Observation constant is unsupported.');
+}
+
+function validateObservationIdentity(observation: GuardEnforcementLedgerObservation): void {
 	if (typeof observation.subjectId !== 'string' || observation.subjectId.length === 0)
 		invalid('INVALID_VALUE', '$.subjectId', 'subjectId must be nonempty text.');
 	if (typeof observation.id !== 'string' || observation.id.length === 0)
@@ -442,7 +465,9 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 		canonicalSemanticJson(GUARD_ENFORCEMENT_LEDGER_LIMITATIONS)
 	)
 		invalid('POPULATION_MISMATCH', '$.limitations', 'Limitation population is not canonical.');
+}
 
+function validateBudgetsAndCoverage(observation: GuardEnforcementLedgerObservation): void {
 	exactKeys(observation.budgets, '$.budgets', BUDGET_KEYS);
 	for (const key of BUDGET_KEYS) positiveInteger(observation.budgets[key], `$.budgets.${key}`);
 	if (observation.budgets.maxExecutorDurationMs > GUARD_ENFORCEMENT_LEDGER_MAX_EXECUTOR_DURATION_MS)
@@ -456,7 +481,21 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 		nonnegativeInteger(observation.coverage[key], `$.coverage.${key}`);
 	if (observation.coverage.reconciles !== true)
 		invalid('POPULATION_MISMATCH', '$.coverage.reconciles', 'Coverage must reconcile.');
+}
 
+function validateLedgerRowEvidence(
+	ledgerRows: GuardEnforcementLedgerObservation['rawEvidence']['ledgerRows']
+): void {
+	for (const [index, row] of ledgerRows.entries())
+		if (typeof row.evidence !== 'string' || row.evidence.length === 0)
+			invalid(
+				'INVALID_VALUE',
+				`$.rawEvidence.ledgerRows[${index}].evidence`,
+				'Ledger evidence must be nonempty.'
+			);
+}
+
+function validateRawEvidencePopulation(observation: GuardEnforcementLedgerObservation): void {
 	const { rawEvidence } = observation;
 	if (!Array.isArray(rawEvidence.guardedArrows) || rawEvidence.guardedArrows.length === 0)
 		invalid(
@@ -485,13 +524,7 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 			'$.rawEvidence.guardTexts',
 			'Guard texts must exactly equal the unique guarded-arrow text population.'
 		);
-	for (const [index, row] of rawEvidence.ledgerRows.entries())
-		if (typeof row.evidence !== 'string' || row.evidence.length === 0)
-			invalid(
-				'INVALID_VALUE',
-				`$.rawEvidence.ledgerRows[${index}].evidence`,
-				'Ledger evidence must be nonempty.'
-			);
+	validateLedgerRowEvidence(rawEvidence.ledgerRows);
 	if (rawEvidence.audit.arrowCount !== rawEvidence.guardedArrows.length)
 		invalid(
 			'POPULATION_MISMATCH',
@@ -504,6 +537,10 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 			'$.rawEvidence.audit.textCount',
 			'Audit text count does not reconcile.'
 		);
+}
+
+function validateRecordedBudgets(observation: GuardEnforcementLedgerObservation): void {
+	const { rawEvidence } = observation;
 	const auditFindingCount =
 		rawEvidence.audit.enforcedAnchorBroken.length +
 		rawEvidence.audit.enforcedWithoutSite.length +
@@ -541,6 +578,10 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 			'$.budgets.maxStdoutBytes',
 			'Raw output exceeds the recorded budget.'
 		);
+}
+
+function validateProjectionReconciliation(observation: GuardEnforcementLedgerObservation): void {
+	const { rawEvidence } = observation;
 	if (observation.guardedArrows.length !== rawEvidence.guardedArrows.length)
 		invalid(
 			'POPULATION_MISMATCH',
@@ -577,6 +618,15 @@ function independentlyValidateSurface(observation: GuardEnforcementLedgerObserva
 	};
 	if (canonicalSemanticJson(observation.coverage) !== canonicalSemanticJson(expectedCoverage))
 		invalid('POPULATION_MISMATCH', '$.coverage', 'Coverage does not reproduce raw evidence.');
+}
+
+function independentlyValidateSurface(observation: GuardEnforcementLedgerObservation): void {
+	validateObservationConstants(observation);
+	validateObservationIdentity(observation);
+	validateBudgetsAndCoverage(observation);
+	validateRawEvidencePopulation(observation);
+	validateRecordedBudgets(observation);
+	validateProjectionReconciliation(observation);
 }
 
 function validateOptions(
@@ -622,6 +672,103 @@ function validateOptions(
 	}
 }
 
+function assertedStringCharacters(stringCharacters: number, options: ValidatedOptions): number {
+	if (stringCharacters > options.maxStringCharacters)
+		invalid(
+			'BUDGET_EXHAUSTED',
+			'$',
+			'Observation string population exceeds the validation budget.'
+		);
+	return stringCharacters;
+}
+
+function admitPlainTreeContainer(
+	current: object,
+	seen: Set<object>,
+	records: number,
+	options: ValidatedOptions
+): number {
+	if (seen.has(current)) invalid('SHAPE_INVALID', '$', 'Observation contains a cycle.');
+	seen.add(current);
+	const admitted = records + 1;
+	if (admitted > options.maxRecords)
+		invalid(
+			'BUDGET_EXHAUSTED',
+			'$',
+			'Observation container population exceeds the validation budget.'
+		);
+	if (isProxy(current)) invalid('SHAPE_INVALID', '$', 'Observation contains a Proxy value.');
+	return admitted;
+}
+
+function assertPlainTreeContainerPrototype(current: object, array: boolean): void {
+	const prototype = Reflect.getPrototypeOf(current);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		invalid('SHAPE_INVALID', '$', 'Observation containers must be plain JSON containers.');
+}
+
+function assertedPlainTreeArrayLength(
+	current: object,
+	records: number,
+	options: ValidatedOptions
+): number {
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(current, 'length');
+	if (
+		lengthDescriptor === undefined ||
+		!('value' in lengthDescriptor) ||
+		!Number.isSafeInteger(lengthDescriptor.value) ||
+		(lengthDescriptor.value as number) < 0
+	)
+		invalid('SHAPE_INVALID', '$', 'Observation array length is malformed.');
+	const arrayLength = lengthDescriptor.value as number;
+	if (arrayLength > options.maxRecords - records)
+		invalid('BUDGET_EXHAUSTED', '$', 'Observation array population exceeds the validation budget.');
+	return arrayLength;
+}
+
+function isExpandoArrayKey(key: string | symbol): boolean {
+	return typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key));
+}
+
+function assertDenseArrayKeys(keys: readonly (string | symbol)[], arrayLength: number): void {
+	if (keys.length !== arrayLength + 1 || keys.some(isExpandoArrayKey))
+		invalid('SHAPE_INVALID', '$', 'Observation arrays must be dense and have no expando fields.');
+}
+
+function expectsScalarValue(currentPath: string, key: string | symbol, array: boolean): boolean {
+	if (array) return SCALAR_ARRAY_PATH.test(currentPath);
+	return (
+		SCALAR_DATA_KEYS.has(String(key)) ||
+		(currentPath === '$.coverage' && COVERAGE_KEYS.includes(String(key) as never))
+	);
+}
+
+function isContainerValue(value: unknown): boolean {
+	return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
+
+function pushPlainTreeChildren(
+	stack: { readonly path: string; readonly value: unknown }[],
+	current: object,
+	keys: readonly (string | symbol)[],
+	currentPath: string,
+	array: boolean
+): void {
+	for (const key of keys) {
+		if (key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			invalid('SHAPE_INVALID', '$', 'Observation must contain enumerable data properties only.');
+		const childPath = array ? `${currentPath}[${String(key)}]` : `${currentPath}.${String(key)}`;
+		if (isContainerValue(descriptor.value) && expectsScalarValue(currentPath, key, array))
+			invalid('SHAPE_INVALID', childPath, 'Expected a scalar data value.');
+		stack.push({ path: childPath, value: descriptor.value });
+	}
+}
+
 function assertPlainTree(value: unknown, options: ValidatedOptions): string {
 	const stack: { readonly path: string; readonly value: unknown }[] = [{ path: '$', value }];
 	const seen = new Set<object>();
@@ -630,85 +777,36 @@ function assertPlainTree(value: unknown, options: ValidatedOptions): string {
 	while (stack.length > 0) {
 		const { path: currentPath, value: current } = stack.pop()!;
 		if (typeof current === 'string') {
-			stringCharacters += current.length;
-			if (stringCharacters > options.maxStringCharacters)
-				invalid(
-					'BUDGET_EXHAUSTED',
-					'$',
-					'Observation string population exceeds the validation budget.'
-				);
+			stringCharacters = assertedStringCharacters(stringCharacters + current.length, options);
 			continue;
 		}
 		if (current === null || typeof current !== 'object') continue;
-		if (seen.has(current)) invalid('SHAPE_INVALID', '$', 'Observation contains a cycle.');
-		seen.add(current);
-		records += 1;
-		if (records > options.maxRecords)
-			invalid(
-				'BUDGET_EXHAUSTED',
-				'$',
-				'Observation container population exceeds the validation budget.'
-			);
-		if (isProxy(current)) invalid('SHAPE_INVALID', '$', 'Observation contains a Proxy value.');
+		records = admitPlainTreeContainer(current, seen, records, options);
 		const array = Array.isArray(current);
-		const prototype = Reflect.getPrototypeOf(current);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			invalid('SHAPE_INVALID', '$', 'Observation containers must be plain JSON containers.');
+		assertPlainTreeContainerPrototype(current, array);
 		let arrayLength: number | null = null;
 		if (array) {
-			const lengthDescriptor = Reflect.getOwnPropertyDescriptor(current, 'length');
-			if (
-				lengthDescriptor === undefined ||
-				!('value' in lengthDescriptor) ||
-				!Number.isSafeInteger(lengthDescriptor.value) ||
-				(lengthDescriptor.value as number) < 0
-			)
-				invalid('SHAPE_INVALID', '$', 'Observation array length is malformed.');
-			arrayLength = lengthDescriptor.value as number;
-			if (arrayLength > options.maxRecords - records)
-				invalid(
-					'BUDGET_EXHAUSTED',
-					'$',
-					'Observation array population exceeds the validation budget.'
-				);
+			arrayLength = assertedPlainTreeArrayLength(current, records, options);
 			records += arrayLength;
 		}
 		const keys = Reflect.ownKeys(current);
-		if (
-			array &&
-			(keys.length !== (arrayLength as number) + 1 ||
-				keys.some(
-					(key) =>
-						typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-				))
-		)
-			invalid('SHAPE_INVALID', '$', 'Observation arrays must be dense and have no expando fields.');
-		for (const key of keys) {
-			if (key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				invalid('SHAPE_INVALID', '$', 'Observation must contain enumerable data properties only.');
-			const childPath = array ? `${currentPath}[${String(key)}]` : `${currentPath}.${String(key)}`;
-			if (
-				descriptor.value !== null &&
-				(typeof descriptor.value === 'object' || typeof descriptor.value === 'function') &&
-				((!array &&
-					(SCALAR_DATA_KEYS.has(String(key)) ||
-						(currentPath === '$.coverage' && COVERAGE_KEYS.includes(String(key) as never)))) ||
-					(array && SCALAR_ARRAY_PATH.test(currentPath)))
-			)
-				invalid('SHAPE_INVALID', childPath, 'Expected a scalar data value.');
-			stack.push({ path: childPath, value: descriptor.value });
-		}
+		if (array) assertDenseArrayKeys(keys, arrayLength as number);
+		pushPlainTreeChildren(stack, current, keys, currentPath, array);
 	}
 	try {
 		return canonicalSemanticJson(value);
 	} catch {
 		return invalid('SHAPE_INVALID', '$', 'Observation is not a canonicalizable semantic value.');
 	}
+}
+
+function artifactSetIssueCode(
+	code: GuardEnforcementLedgerValidationIssueCode | undefined,
+	subject: FrozenSubject | undefined
+): GuardEnforcementLedgerValidationIssueCode {
+	if (code === 'CONTENT_DIGEST_MISMATCH') return 'CONTENT_DIGEST_MISMATCH';
+	if (subject === undefined) return 'ARTIFACT_SET_INVALID';
+	return 'SUBJECT_MISMATCH';
 }
 
 function validateInternal(
@@ -727,11 +825,7 @@ function validateInternal(
 	);
 	if (artifactValidation.state !== 'VALID')
 		invalid(
-			artifactValidation.issues[0]?.code === 'CONTENT_DIGEST_MISMATCH'
-				? 'CONTENT_DIGEST_MISMATCH'
-				: subject === undefined
-					? 'ARTIFACT_SET_INVALID'
-					: 'SUBJECT_MISMATCH',
+			artifactSetIssueCode(artifactValidation.issues[0]?.code, subject),
 			'$.artifactSet',
 			artifactValidation.issues[0]?.message ?? 'Artifact-set validation failed.'
 		);

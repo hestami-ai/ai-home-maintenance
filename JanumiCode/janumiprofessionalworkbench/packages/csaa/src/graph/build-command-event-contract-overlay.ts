@@ -308,6 +308,32 @@ function artifactSelectorRecord(
 	};
 }
 
+function assertRequestBudgets(budgets: Record<string, unknown>): void {
+	for (const key of BUDGET_KEYS)
+		if (
+			!Number.isSafeInteger(budgets[key]) ||
+			(budgets[key] as number) < (key === 'maxDiagnostics' ? 1 : 0)
+		)
+			throw new TypeError(
+				`$inputs.request.budgets.${key} must be a ${
+					key === 'maxDiagnostics' ? 'positive' : 'nonnegative'
+				} safe integer.`
+			);
+}
+
+function assertRequestIdentityText(requestRecord: Record<string, unknown>): void {
+	for (const key of [
+		'arrowObservationId',
+		'commandHandlerGraphId',
+		'operationVersion',
+		'schemaVersion',
+		'semanticSnapshotId',
+		'subjectId'
+	] as const)
+		if (typeof requestRecord[key] !== 'string' || (requestRecord[key] as string).length === 0)
+			throw new TypeError(`$inputs.request.${key} must be nonempty text.`);
+}
+
 function materializeInputs(value: unknown): CommandEventContractOverlayBuildInputs {
 	const input = exactPlainRecord(value, INPUT_KEYS, '$inputs');
 	const semanticSnapshot = exactPlainRecord(
@@ -370,26 +396,8 @@ function materializeInputs(value: unknown): CommandEventContractOverlayBuildInpu
 	shallowDataRecord(semanticSnapshot.provider, '$inputs.semanticSnapshot.provider');
 	const requestRecord = exactPlainRecord(input.request, REQUEST_KEYS, '$inputs.request');
 	const budgets = exactPlainRecord(requestRecord.budgets, BUDGET_KEYS, '$inputs.request.budgets');
-	for (const key of BUDGET_KEYS)
-		if (
-			!Number.isSafeInteger(budgets[key]) ||
-			(budgets[key] as number) < (key === 'maxDiagnostics' ? 1 : 0)
-		)
-			throw new TypeError(
-				`$inputs.request.budgets.${key} must be a ${
-					key === 'maxDiagnostics' ? 'positive' : 'nonnegative'
-				} safe integer.`
-			);
-	for (const key of [
-		'arrowObservationId',
-		'commandHandlerGraphId',
-		'operationVersion',
-		'schemaVersion',
-		'semanticSnapshotId',
-		'subjectId'
-	] as const)
-		if (typeof requestRecord[key] !== 'string' || (requestRecord[key] as string).length === 0)
-			throw new TypeError(`$inputs.request.${key} must be nonempty text.`);
+	assertRequestBudgets(budgets);
+	assertRequestIdentityText(requestRecord);
 	if (requestRecord.schemaVersion !== COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION)
 		throw new TypeError('Unsupported command-event overlay request schema version.');
 	if (requestRecord.operationVersion !== COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION)
@@ -666,6 +674,47 @@ interface SelectedSemanticModel {
 	readonly symbolById: ReadonlyMap<string, SemanticSymbolRecord>;
 }
 
+function selectedSymbolIds(
+	declarations: readonly SemanticDeclarationRecord[],
+	references: readonly SemanticReferenceRecord[]
+): Set<string> {
+	const symbolIds = new Set<string>();
+	for (const declaration of declarations)
+		if (declaration.symbolId !== null) symbolIds.add(declaration.symbolId);
+	for (const reference of references)
+		if (reference.resolvedSymbolId !== null) symbolIds.add(reference.resolvedSymbolId);
+	return symbolIds;
+}
+
+function selectedNodesBySpan(
+	nodes: readonly SemanticAstNodeRecord[],
+	nodeById: ReadonlyMap<string, SemanticAstNodeRecord>
+): Map<string, SemanticAstNodeRecord[]> {
+	const nodesBySpan = new Map<string, SemanticAstNodeRecord[]>();
+	for (const node of nodes) {
+		if (node.parentId !== null && !nodeById.has(node.parentId))
+			throw new Error(`Selected semantic node ${node.id} has no selected parent.`);
+		addGrouped(nodesBySpan, `${node.kind}\0${node.start}\0${node.end}`, node);
+	}
+	return nodesBySpan;
+}
+
+function selectedReferencesByNode(
+	references: readonly SemanticReferenceRecord[],
+	nodeById: ReadonlyMap<string, SemanticAstNodeRecord>,
+	symbolById: ReadonlyMap<string, SemanticSymbolRecord>
+): Map<string, SemanticReferenceRecord[]> {
+	const referenceByNode = new Map<string, SemanticReferenceRecord[]>();
+	for (const reference of references) {
+		if (!nodeById.has(reference.nodeId))
+			throw new Error(`Selected semantic reference ${reference.id} has no selected node.`);
+		if (reference.resolvedSymbolId !== null && !symbolById.has(reference.resolvedSymbolId))
+			throw new Error(`Selected semantic reference ${reference.id} has no selected symbol.`);
+		addGrouped(referenceByNode, reference.nodeId, reference);
+	}
+	return referenceByNode;
+}
+
 function selectedSemanticModel(
 	snapshot: StaticSemanticSnapshot,
 	source: SemanticSourceRecord
@@ -681,27 +730,11 @@ function selectedSemanticModel(
 		'Selected semantic declaration'
 	);
 	const references = snapshot.references.filter((reference) => reference.sourceId === source.id);
-	const symbolIds = new Set<string>();
-	for (const declaration of declarations)
-		if (declaration.symbolId !== null) symbolIds.add(declaration.symbolId);
-	for (const reference of references)
-		if (reference.resolvedSymbolId !== null) symbolIds.add(reference.resolvedSymbolId);
+	const symbolIds = selectedSymbolIds(declarations, references);
 	const symbols = snapshot.symbols.filter((symbol) => symbolIds.has(symbol.id));
 	const symbolById = uniqueMap(symbols, (symbol) => symbol.id, 'Selected semantic symbol');
-	const nodesBySpan = new Map<string, SemanticAstNodeRecord[]>();
-	for (const node of nodes) {
-		if (node.parentId !== null && !nodeById.has(node.parentId))
-			throw new Error(`Selected semantic node ${node.id} has no selected parent.`);
-		addGrouped(nodesBySpan, `${node.kind}\0${node.start}\0${node.end}`, node);
-	}
-	const referenceByNode = new Map<string, SemanticReferenceRecord[]>();
-	for (const reference of references) {
-		if (!nodeById.has(reference.nodeId))
-			throw new Error(`Selected semantic reference ${reference.id} has no selected node.`);
-		if (reference.resolvedSymbolId !== null && !symbolById.has(reference.resolvedSymbolId))
-			throw new Error(`Selected semantic reference ${reference.id} has no selected symbol.`);
-		addGrouped(referenceByNode, reference.nodeId, reference);
-	}
+	const nodesBySpan = selectedNodesBySpan(nodes, nodeById);
+	const referenceByNode = selectedReferencesByNode(references, nodeById, symbolById);
 	for (const declaration of declarations)
 		if (declaration.nodeId !== null && !nodeById.has(declaration.nodeId))
 			throw new Error(`Selected semantic declaration ${declaration.id} has no selected node.`);
@@ -783,6 +816,12 @@ function frozenArtifact(
 		`Frozen ${path} artifact`
 	);
 	const bytes = readFrozenSubjectArtifact(subject, path);
+	// S6582 REFUSED: the explicit `=== undefined` limb is what keeps `sha256` from being reached with a
+	// missing buffer. Under `bytes?.byteLength`, an artifact whose `bytes` is undefined AT RUNTIME makes
+	// `undefined !== undefined` false, the `||` evaluates its right operand, and `update(undefined)`
+	// throws a raw TypeError instead of this closed refusal. `artifact.bytes` is declared `number`, so
+	// optional-chain narrowing hides the hole from the type-checker. Kept identical to the sibling
+	// `validate-command-event-contract-overlay.ts`, which states the same guard the same way.
 	if (
 		bytes === undefined ||
 		bytes.byteLength !== artifact.bytes ||
@@ -1060,9 +1099,7 @@ function parseEventContracts(
 				.map((id) => model.declarationById.get(id))
 				.filter(
 					(declaration): declaration is SemanticDeclarationRecord =>
-						declaration !== undefined &&
-						declaration.sourceId === source.id &&
-						declaration.name === `${eventName}PayloadSchema`
+						declaration?.sourceId === source.id && declaration.name === `${eventName}PayloadSchema`
 				),
 			`EVENTS.${eventName} terminal payload declaration`
 		);
@@ -1342,6 +1379,12 @@ function generatedPopulation(
 	}
 	if (graph.commandByName.size !== commands.length)
 		throw new Error('Generated COMMANDS and predecessor command population sizes differ.');
+	declaredLinks.sort(
+		(left, right) =>
+			compareText(left.commandName, right.commandName) ||
+			left.ordinal - right.ordinal ||
+			compareText(left.id, right.id)
+	);
 	return {
 		commands: mutableCommands
 			.map((item): CommandEventContractCommandRecord => ({
@@ -1349,12 +1392,7 @@ function generatedPopulation(
 				declaredLinkIds: [...item.linkIds].sort(compareText)
 			}))
 			.sort((left, right) => compareText(left.commandName, right.commandName)),
-		declaredLinks: declaredLinks.sort(
-			(left, right) =>
-				compareText(left.commandName, right.commandName) ||
-				left.ordinal - right.ordinal ||
-				compareText(left.id, right.id)
-		),
+		declaredLinks,
 		eventContracts,
 		missing
 	};
@@ -1826,8 +1864,7 @@ function assertGeneratedVocabParity(
 	for (const vocabCommand of vocab.commands) {
 		const generated = generatedCommandByName.get(vocabCommand.commandName);
 		if (
-			generated === undefined ||
-			generated.primary.eventName !== vocabCommand.primaryEvent ||
+			generated?.primary.eventName !== vocabCommand.primaryEvent ||
 			generated.additional.length !== vocabCommand.additionalEvents.length ||
 			generated.additional.some(
 				(item, index) => item.eventName !== vocabCommand.additionalEvents[index]
@@ -1987,6 +2024,245 @@ function buildIndexes(input: {
 	return { forwardIndex, reverseIndex };
 }
 
+function failureMessage(error: unknown, fallback: string): string {
+	return error instanceof Error ? error.message : fallback;
+}
+
+function overlayDiagnosticCode(
+	error: unknown,
+	encodedCode: string | undefined
+): CommandEventContractOverlayDiagnostic['code'] {
+	if (error instanceof RangeError) return 'BUDGET_EXCEEDED';
+	const knownCodes = new Set<CommandEventContractOverlayDiagnostic['code']>([
+		'ARROW_OBSERVATION_INVALID',
+		'COMMAND_HANDLER_GRAPH_INVALID',
+		'INPUT_IDENTITY_MISMATCH',
+		'INPUT_POPULATION_MISMATCH',
+		'SEMANTIC_CAPABILITY_UNAVAILABLE',
+		'SUBJECT_CAPABILITY_UNAVAILABLE',
+		'UNSUPPORTED_GENERATED_REGISTRY',
+		'UNSUPPORTED_RETAINED_CENSUS',
+		'UNSUPPORTED_VOCAB'
+	]);
+	if (knownCodes.has(encodedCode as CommandEventContractOverlayDiagnostic['code']))
+		return encodedCode as CommandEventContractOverlayDiagnostic['code'];
+	return 'INPUT_POPULATION_MISMATCH';
+}
+
+function bindOverlayArtifacts(inputs: CommandEventContractOverlayBuildInputs): {
+	readonly retainedFrozen: ReturnType<typeof frozenArtifact>;
+	readonly selected: ReturnType<typeof selectedRegistrySource>;
+	readonly sourceBytes: number;
+	readonly vocabFrozen: ReturnType<typeof frozenArtifact>;
+} {
+	const selected = selectedRegistrySource(inputs);
+	const vocabFrozen = frozenArtifact(inputs.subject, COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH);
+	const retainedFrozen = frozenArtifact(
+		inputs.subject,
+		COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH
+	);
+	const vocabSelector = commandEventContractVocabArtifactSelector(inputs.subject);
+	const retainedSelector = commandEventContractRetainedCensusArtifactSelector(inputs.subject);
+	if (
+		!sameArtifactSelector(inputs.request.vocabArtifact, vocabSelector) ||
+		!sameArtifactSelector(inputs.request.retainedCensusArtifact, retainedSelector)
+	)
+		throw new Error('INPUT_IDENTITY_MISMATCH\0Retained artifact selectors do not reconcile.');
+	return {
+		retainedFrozen,
+		selected,
+		sourceBytes:
+			selected.bytes.byteLength + vocabFrozen.bytes.byteLength + retainedFrozen.bytes.byteLength,
+		vocabFrozen
+	};
+}
+
+function parseGeneratedRegistrySurface(
+	inputs: CommandEventContractOverlayBuildInputs,
+	model: SelectedSemanticModel,
+	selected: ReturnType<typeof selectedRegistrySource>
+): {
+	readonly parsedCommands: ParsedCommandDeclaration[];
+	readonly parsedEvents: ParsedEventContract[];
+} {
+	try {
+		const registries = parseRegistries(inputs, model, selected);
+		const parsedCommands = parseCommandDeclarations(
+			registries.commandProperties,
+			registries.sourceFile,
+			model
+		);
+		const parsedEvents = parseEventContracts(
+			registries.eventProperties,
+			registries.sourceFile,
+			selected.source,
+			model
+		);
+		return { parsedCommands, parsedEvents };
+	} catch (error) {
+		throw new Error(
+			`UNSUPPORTED_GENERATED_REGISTRY\0${
+				error instanceof Error ? error.message : 'Generated registry parsing failed.'
+			}`
+		);
+	}
+}
+
+function parseVocabArtifact(bytes: Uint8Array): VocabPopulation {
+	try {
+		return parseVocab(decodeUtf8(bytes, COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH));
+	} catch (error) {
+		throw new Error(
+			`UNSUPPORTED_VOCAB\0${error instanceof Error ? error.message : 'Vocab parsing failed.'}`
+		);
+	}
+}
+
+function parseRetainedCensusArtifact(
+	overlayId: CommandEventContractOverlayId,
+	bytes: Uint8Array
+): CommandEventContractPinnedEmission[] {
+	try {
+		return parsePinnedEmissions(
+			overlayId,
+			decodeUtf8(bytes, COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH)
+		);
+	} catch (error) {
+		throw new Error(
+			`UNSUPPORTED_RETAINED_CENSUS\0${
+				error instanceof Error ? error.message : 'Retained census parsing failed.'
+			}`
+		);
+	}
+}
+
+function declaredSurfaceFrontiers(
+	overlayId: CommandEventContractOverlayId,
+	generated: GeneratedPopulation,
+	transitionBoundCommands: ReadonlySet<string>,
+	boundEventNames: ReadonlySet<string>,
+	pinnedEventNames: ReadonlySet<string>
+): CommandEventContractFrontier[] {
+	const frontiers: CommandEventContractFrontier[] = [];
+	for (const command of generated.commands)
+		if (!transitionBoundCommands.has(command.commandName))
+			frontiers.push(
+				makeFrontier(overlayId, 'COMMAND_WITHOUT_TRANSITION_BINDING', command.id, null, null)
+			);
+	for (const missing of generated.missing)
+		frontiers.push(
+			makeFrontier(
+				overlayId,
+				'GENERATED_EVENT_SCHEMA_UNRESOLVED',
+				missing.commandId,
+				null,
+				missing.eventName
+			)
+		);
+	for (const event of generated.eventContracts)
+		if (!boundEventNames.has(event.eventName) && !pinnedEventNames.has(event.eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'DECLARED_NEITHER_BOUND_NOR_PINNED_EMITTED',
+					null,
+					event.id,
+					event.eventName
+				)
+			);
+	return frontiers;
+}
+
+function retainedSurfaceFrontiers(
+	overlayId: CommandEventContractOverlayId,
+	eventByName: ReadonlyMap<string, CommandEventContractEventRecord>,
+	declaredEventNames: ReadonlySet<string>,
+	boundEventNames: ReadonlySet<string>,
+	pinnedEventNames: ReadonlySet<string>
+): CommandEventContractFrontier[] {
+	const frontiers: CommandEventContractFrontier[] = [];
+	for (const eventName of sortedUnique([...declaredEventNames, ...boundEventNames]))
+		if (declaredEventNames.has(eventName) !== boundEventNames.has(eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'GENERATED_RETAINED_BOUND_SET_MISMATCH',
+					null,
+					eventByName.get(eventName)?.id ?? null,
+					eventName
+				)
+			);
+	for (const eventName of sortedUnique(pinnedEventNames))
+		if (!boundEventNames.has(eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'PINNED_EMITTED_NOT_RETAINED_BOUND',
+					null,
+					eventByName.get(eventName)?.id ?? null,
+					eventName
+				)
+			);
+	for (const eventName of sortedUnique(boundEventNames))
+		if (!pinnedEventNames.has(eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'RETAINED_BOUND_NOT_PINNED_EMITTED',
+					null,
+					eventByName.get(eventName)?.id ?? null,
+					eventName
+				)
+			);
+	return frontiers;
+}
+
+function overlayCoverage(
+	generated: GeneratedPopulation,
+	contributions: readonly CommandEventContractBoundContribution[],
+	pinnedEmissions: readonly CommandEventContractPinnedEmission[],
+	frontiers: readonly CommandEventContractFrontier[],
+	boundEventNames: ReadonlySet<string>,
+	declaredEventNames: ReadonlySet<string>
+): CommandEventContractOverlayCoverage {
+	const commandWithoutBinding = frontiers.filter(
+		(frontier) => frontier.frontierKind === 'COMMAND_WITHOUT_TRANSITION_BINDING'
+	).length;
+	const declaredNeither = frontiers.filter(
+		(frontier) => frontier.frontierKind === 'DECLARED_NEITHER_BOUND_NOR_PINNED_EMITTED'
+	).length;
+	const generatedDifferences = frontiers.filter(
+		(frontier) => frontier.frontierKind === 'GENERATED_RETAINED_BOUND_SET_MISMATCH'
+	).length;
+	const pinnedNotBound = frontiers.filter(
+		(frontier) => frontier.frontierKind === 'PINNED_EMITTED_NOT_RETAINED_BOUND'
+	).length;
+	const boundNotPinned = frontiers.filter(
+		(frontier) => frontier.frontierKind === 'RETAINED_BOUND_NOT_PINNED_EMITTED'
+	).length;
+	return {
+		additionalDeclaredLinks: generated.declaredLinks.filter((link) => link.role === 'ADDITIONAL')
+			.length,
+		boundContributions: contributions.length,
+		boundDistinctEvents: boundEventNames.size,
+		boundRepeatedContributions: contributions.length - boundEventNames.size,
+		commandDeclaredDistinctEvents: declaredEventNames.size,
+		commandDeclaredLinks: generated.declaredLinks.length,
+		commands: generated.commands.length,
+		commandsWithoutTransitionBinding: commandWithoutBinding,
+		declaredNeitherBoundNorPinned: declaredNeither,
+		eventContracts: generated.eventContracts.length,
+		frontiers: frontiers.length,
+		generatedBoundSetDifferences: generatedDifferences,
+		missingEventContracts: generated.missing.length,
+		pinnedEmissions: pinnedEmissions.length,
+		pinnedEmittedNotBound: pinnedNotBound,
+		primaryDeclaredLinks: generated.declaredLinks.filter((link) => link.role === 'PRIMARY').length,
+		reconciles: generated.missing.length === 0 && generatedDifferences === 0,
+		retainedBoundNotPinnedEmitted: boundNotPinned
+	};
+}
+
 /** Builds a deterministic static command-to-event-contract overlay. */
 export function buildCommandEventContractOverlay(
 	inputsValue: CommandEventContractOverlayBuildInputs,
@@ -2002,7 +2278,7 @@ export function buildCommandEventContractOverlay(
 		return telemetry.finish(
 			unavailable(
 				'REQUEST_INVALID',
-				error instanceof Error ? error.message : 'Invalid command-event overlay inputs.',
+				failureMessage(error, 'Invalid command-event overlay inputs.'),
 				'REQUEST'
 			)
 		);
@@ -2022,64 +2298,21 @@ export function buildCommandEventContractOverlay(
 		});
 
 		telemetry.start('ARTIFACT_BIND');
-		const selected = selectedRegistrySource(inputs);
-		const vocabFrozen = frozenArtifact(inputs.subject, COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH);
-		const retainedFrozen = frozenArtifact(
-			inputs.subject,
-			COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH
-		);
-		const vocabSelector = commandEventContractVocabArtifactSelector(inputs.subject);
-		const retainedSelector = commandEventContractRetainedCensusArtifactSelector(inputs.subject);
-		if (
-			!sameArtifactSelector(inputs.request.vocabArtifact, vocabSelector) ||
-			!sameArtifactSelector(inputs.request.retainedCensusArtifact, retainedSelector)
-		)
-			throw new Error('INPUT_IDENTITY_MISMATCH\0Retained artifact selectors do not reconcile.');
-		const sourceBytes =
-			selected.bytes.byteLength + vocabFrozen.bytes.byteLength + retainedFrozen.bytes.byteLength;
+		const { retainedFrozen, selected, sourceBytes, vocabFrozen } = bindOverlayArtifacts(inputs);
 		if (sourceBytes > budgets.maxSourceBytes) throw new RangeError('maxSourceBytes exceeded.');
 		telemetry.complete({ artifacts: 3, sourceBytes });
 
 		telemetry.start('GENERATED_REGISTRY_PARSE');
 		diagnosticPhase = 'PARSE';
 		const model = selectedSemanticModel(inputs.semanticSnapshot, selected.source);
-		let registries: RegistryParse;
-		let parsedCommands: ParsedCommandDeclaration[];
-		let parsedEvents: ParsedEventContract[];
-		try {
-			registries = parseRegistries(inputs, model, selected);
-			parsedCommands = parseCommandDeclarations(
-				registries.commandProperties,
-				registries.sourceFile,
-				model
-			);
-			parsedEvents = parseEventContracts(
-				registries.eventProperties,
-				registries.sourceFile,
-				selected.source,
-				model
-			);
-		} catch (error) {
-			throw new Error(
-				`UNSUPPORTED_GENERATED_REGISTRY\0${
-					error instanceof Error ? error.message : 'Generated registry parsing failed.'
-				}`
-			);
-		}
+		const { parsedCommands, parsedEvents } = parseGeneratedRegistrySurface(inputs, model, selected);
 		if (parsedCommands.length > budgets.maxCommands) throw new RangeError('maxCommands exceeded.');
 		if (parsedEvents.length > budgets.maxEventContracts)
 			throw new RangeError('maxEventContracts exceeded.');
 		telemetry.complete({ commands: parsedCommands.length, events: parsedEvents.length });
 
 		telemetry.start('VOCAB_PARSE');
-		let vocab: VocabPopulation;
-		try {
-			vocab = parseVocab(decodeUtf8(vocabFrozen.bytes, COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH));
-		} catch (error) {
-			throw new Error(
-				`UNSUPPORTED_VOCAB\0${error instanceof Error ? error.message : 'Vocab parsing failed.'}`
-			);
-		}
+		const vocab = parseVocabArtifact(vocabFrozen.bytes);
 		assertGeneratedVocabParity(parsedCommands, parsedEvents, vocab);
 		const contributions = boundContributions(overlayId, vocab);
 		if (contributions.length > budgets.maxBoundContributions)
@@ -2087,19 +2320,7 @@ export function buildCommandEventContractOverlay(
 		telemetry.complete({ bindings: vocab.bindings.length, contributions: contributions.length });
 
 		telemetry.start('RETAINED_CENSUS_PARSE');
-		let pinnedEmissions: CommandEventContractPinnedEmission[];
-		try {
-			pinnedEmissions = parsePinnedEmissions(
-				overlayId,
-				decodeUtf8(retainedFrozen.bytes, COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH)
-			);
-		} catch (error) {
-			throw new Error(
-				`UNSUPPORTED_RETAINED_CENSUS\0${
-					error instanceof Error ? error.message : 'Retained census parsing failed.'
-				}`
-			);
-		}
+		const pinnedEmissions = parseRetainedCensusArtifact(overlayId, retainedFrozen.bytes);
 		if (pinnedEmissions.length > budgets.maxPinnedEmissions)
 			throw new RangeError('maxPinnedEmissions exceeded.');
 		telemetry.complete({ pinnedEmissions: pinnedEmissions.length });
@@ -2117,107 +2338,34 @@ export function buildCommandEventContractOverlay(
 		const boundEventNames = new Set(contributions.map((contribution) => contribution.eventName));
 		const pinnedEventNames = new Set(pinnedEmissions.map((emission) => emission.eventName));
 		const transitionBoundCommands = new Set(vocab.bindings.map((binding) => binding.commandName));
-		const frontiers: CommandEventContractFrontier[] = [];
-		for (const command of generated.commands)
-			if (!transitionBoundCommands.has(command.commandName))
-				frontiers.push(
-					makeFrontier(overlayId, 'COMMAND_WITHOUT_TRANSITION_BINDING', command.id, null, null)
-				);
-		for (const missing of generated.missing)
-			frontiers.push(
-				makeFrontier(
-					overlayId,
-					'GENERATED_EVENT_SCHEMA_UNRESOLVED',
-					missing.commandId,
-					null,
-					missing.eventName
-				)
-			);
-		for (const event of generated.eventContracts)
-			if (!boundEventNames.has(event.eventName) && !pinnedEventNames.has(event.eventName))
-				frontiers.push(
-					makeFrontier(
-						overlayId,
-						'DECLARED_NEITHER_BOUND_NOR_PINNED_EMITTED',
-						null,
-						event.id,
-						event.eventName
-					)
-				);
-		for (const eventName of sortedUnique([...declaredEventNames, ...boundEventNames]))
-			if (declaredEventNames.has(eventName) !== boundEventNames.has(eventName))
-				frontiers.push(
-					makeFrontier(
-						overlayId,
-						'GENERATED_RETAINED_BOUND_SET_MISMATCH',
-						null,
-						eventByName.get(eventName)?.id ?? null,
-						eventName
-					)
-				);
-		for (const eventName of sortedUnique(pinnedEventNames))
-			if (!boundEventNames.has(eventName))
-				frontiers.push(
-					makeFrontier(
-						overlayId,
-						'PINNED_EMITTED_NOT_RETAINED_BOUND',
-						null,
-						eventByName.get(eventName)?.id ?? null,
-						eventName
-					)
-				);
-		for (const eventName of sortedUnique(boundEventNames))
-			if (!pinnedEventNames.has(eventName))
-				frontiers.push(
-					makeFrontier(
-						overlayId,
-						'RETAINED_BOUND_NOT_PINNED_EMITTED',
-						null,
-						eventByName.get(eventName)?.id ?? null,
-						eventName
-					)
-				);
+		const frontiers = [
+			...declaredSurfaceFrontiers(
+				overlayId,
+				generated,
+				transitionBoundCommands,
+				boundEventNames,
+				pinnedEventNames
+			),
+			...retainedSurfaceFrontiers(
+				overlayId,
+				eventByName,
+				declaredEventNames,
+				boundEventNames,
+				pinnedEventNames
+			)
+		];
 		frontiers.sort((left, right) => compareText(left.id, right.id));
 		if (frontiers.length > budgets.maxFrontiers) throw new RangeError('maxFrontiers exceeded.');
 		telemetry.complete({ frontiers: frontiers.length });
 
-		const commandWithoutBinding = frontiers.filter(
-			(frontier) => frontier.frontierKind === 'COMMAND_WITHOUT_TRANSITION_BINDING'
-		).length;
-		const declaredNeither = frontiers.filter(
-			(frontier) => frontier.frontierKind === 'DECLARED_NEITHER_BOUND_NOR_PINNED_EMITTED'
-		).length;
-		const generatedDifferences = frontiers.filter(
-			(frontier) => frontier.frontierKind === 'GENERATED_RETAINED_BOUND_SET_MISMATCH'
-		).length;
-		const pinnedNotBound = frontiers.filter(
-			(frontier) => frontier.frontierKind === 'PINNED_EMITTED_NOT_RETAINED_BOUND'
-		).length;
-		const boundNotPinned = frontiers.filter(
-			(frontier) => frontier.frontierKind === 'RETAINED_BOUND_NOT_PINNED_EMITTED'
-		).length;
-		const coverage: CommandEventContractOverlayCoverage = {
-			additionalDeclaredLinks: generated.declaredLinks.filter((link) => link.role === 'ADDITIONAL')
-				.length,
-			boundContributions: contributions.length,
-			boundDistinctEvents: boundEventNames.size,
-			boundRepeatedContributions: contributions.length - boundEventNames.size,
-			commandDeclaredDistinctEvents: declaredEventNames.size,
-			commandDeclaredLinks: generated.declaredLinks.length,
-			commands: generated.commands.length,
-			commandsWithoutTransitionBinding: commandWithoutBinding,
-			declaredNeitherBoundNorPinned: declaredNeither,
-			eventContracts: generated.eventContracts.length,
-			frontiers: frontiers.length,
-			generatedBoundSetDifferences: generatedDifferences,
-			missingEventContracts: generated.missing.length,
-			pinnedEmissions: pinnedEmissions.length,
-			pinnedEmittedNotBound: pinnedNotBound,
-			primaryDeclaredLinks: generated.declaredLinks.filter((link) => link.role === 'PRIMARY')
-				.length,
-			reconciles: generated.missing.length === 0 && generatedDifferences === 0,
-			retainedBoundNotPinnedEmitted: boundNotPinned
-		};
+		const coverage = overlayCoverage(
+			generated,
+			contributions,
+			pinnedEmissions,
+			frontiers,
+			boundEventNames,
+			declaredEventNames
+		);
 		const { forwardIndex, reverseIndex } = buildIndexes({
 			boundContributions: contributions,
 			commands: generated.commands,
@@ -2338,25 +2486,9 @@ export function buildCommandEventContractOverlay(
 		telemetry.complete({ diagnostics: 0 });
 		return telemetry.finish({ diagnostics: [], outcome: 'partial', overlay });
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Command-event overlay failed closed.';
+		const message = failureMessage(error, 'Command-event overlay failed closed.');
 		const [encodedCode, detail] = message.split('\0', 2);
-		const knownCodes = new Set<CommandEventContractOverlayDiagnostic['code']>([
-			'ARROW_OBSERVATION_INVALID',
-			'COMMAND_HANDLER_GRAPH_INVALID',
-			'INPUT_IDENTITY_MISMATCH',
-			'INPUT_POPULATION_MISMATCH',
-			'SEMANTIC_CAPABILITY_UNAVAILABLE',
-			'SUBJECT_CAPABILITY_UNAVAILABLE',
-			'UNSUPPORTED_GENERATED_REGISTRY',
-			'UNSUPPORTED_RETAINED_CENSUS',
-			'UNSUPPORTED_VOCAB'
-		]);
-		const code =
-			error instanceof RangeError
-				? ('BUDGET_EXCEEDED' as const)
-				: knownCodes.has(encodedCode as CommandEventContractOverlayDiagnostic['code'])
-					? (encodedCode as CommandEventContractOverlayDiagnostic['code'])
-					: ('INPUT_POPULATION_MISMATCH' as const);
+		const code = overlayDiagnosticCode(error, encodedCode);
 		telemetry.fail({ diagnostics: 1 }, code);
 		return telemetry.finish(unavailable(code, detail ?? message, diagnosticPhase));
 	}

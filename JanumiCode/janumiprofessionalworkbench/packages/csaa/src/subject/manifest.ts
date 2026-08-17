@@ -10,7 +10,7 @@ import type {
 	WorkspaceSubjectRecord
 } from '../contracts/subject.js';
 import { SUBJECT_ID_ALGORITHM_VERSION, SUBJECT_SCHEMA_VERSION } from '../contracts/subject.js';
-import { canonicalJson, sha256 } from '../inventory/canonical.js';
+import { canonicalJson, compareText, sha256 } from '../inventory/canonical.js';
 import type { SubjectCapture } from './capture-model.js';
 import { attachFrozenSubjectBytes } from './frozen-store.js';
 import {
@@ -71,6 +71,44 @@ export function subjectConfigurationPreimage(
 	};
 }
 
+function addProjectRequiredPaths(required: Set<string>, project: ProjectSubjectRecord): void {
+	required.add(project.configPath);
+	for (const path of project.fileNames) required.add(path);
+	for (const path of project.frameworkCandidates) required.add(path);
+	for (const closure of project.configClosure) required.add(closure.path);
+}
+
+function workspaceIsWithinRequiredPaths(
+	workspace: WorkspaceSubjectRecord,
+	required: ReadonlySet<string>
+): boolean {
+	return [...required].some(
+		(path) => path === workspace.path || path.startsWith(`${workspace.path}/`)
+	);
+}
+
+function artifactIsWithinExplicitScope(
+	artifact: CapturedArtifactRecord,
+	scopedWorkspaces: readonly WorkspaceSubjectRecord[]
+): boolean {
+	if (artifact.primaryClass === 'LOCKFILE') return true;
+	return (
+		artifact.primaryClass === 'TOOL_CONFIGURATION' &&
+		(!artifact.path.includes('/') ||
+			scopedWorkspaces.some((workspace) => artifact.path.startsWith(`${workspace.path}/`)))
+	);
+}
+
+function assertAdditionalArtifactsCaptured(
+	capture: SubjectCapture,
+	additionalArtifacts: readonly string[]
+): void {
+	for (const path of additionalArtifacts) {
+		if (!capture.bytesByPath.has(path))
+			throw new Error(`Requested additional artifact was not captured: ${path}.`);
+	}
+}
+
 function applyExplicitScope(
 	capture: SubjectCapture,
 	request: ResolveSubjectRequest,
@@ -78,32 +116,19 @@ function applyExplicitScope(
 	workspaces: readonly WorkspaceSubjectRecord[]
 ): { readonly capture: SubjectCapture; readonly workspaces: readonly WorkspaceSubjectRecord[] } {
 	if (request.scope.kind !== 'EXPLICIT_PROJECTS') return { capture, workspaces };
+	const additionalArtifacts = request.scope.additionalArtifacts ?? [];
 	const required = new Set<string>();
-	for (const path of request.scope.additionalArtifacts ?? []) required.add(path);
-	for (const project of projects) {
-		required.add(project.configPath);
-		for (const path of project.fileNames) required.add(path);
-		for (const path of project.frameworkCandidates) required.add(path);
-		for (const closure of project.configClosure) required.add(closure.path);
-	}
+	for (const path of additionalArtifacts) required.add(path);
+	for (const project of projects) addProjectRequiredPaths(required, project);
 	const scopedWorkspaces = workspaces.filter((workspace) =>
-		[...required].some((path) => path === workspace.path || path.startsWith(`${workspace.path}/`))
+		workspaceIsWithinRequiredPaths(workspace, required)
 	);
 	required.add('package.json');
 	for (const workspace of scopedWorkspaces) required.add(workspace.manifestPath);
 	for (const artifact of capture.artifacts) {
-		if (artifact.primaryClass === 'LOCKFILE') required.add(artifact.path);
-		if (
-			artifact.primaryClass === 'TOOL_CONFIGURATION' &&
-			(!artifact.path.includes('/') ||
-				scopedWorkspaces.some((workspace) => artifact.path.startsWith(`${workspace.path}/`)))
-		)
-			required.add(artifact.path);
+		if (artifactIsWithinExplicitScope(artifact, scopedWorkspaces)) required.add(artifact.path);
 	}
-	for (const path of request.scope.additionalArtifacts ?? []) {
-		if (!capture.bytesByPath.has(path))
-			throw new Error(`Requested additional artifact was not captured: ${path}.`);
-	}
+	assertAdditionalArtifactsCaptured(capture, additionalArtifacts);
 	const artifacts = capture.artifacts.filter((artifact) => required.has(artifact.path));
 	const removed = capture.artifacts.filter((artifact) => !required.has(artifact.path));
 	const exclusions: ExcludedArtifactRecord[] = removed.map((artifact) => ({
@@ -171,7 +196,7 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 			subjectOutputPolicyId(inputs.request.outputs),
 			subjectFilterPolicyId(inputs.request)
 		])
-	].sort();
+	].sort(compareText);
 	const perimeter =
 		inputs.request.scope.kind === 'REPOSITORY'
 			? [
@@ -180,11 +205,11 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 							artifact.path.includes('/') ? artifact.path.split('/')[0]! : artifact.path
 						)
 					)
-				].sort()
+				].sort(compareText)
 			: [
 					...inputs.projects.map((project) => project.configPath),
 					...(inputs.request.scope.additionalArtifacts ?? [])
-				].sort();
+				].sort(compareText);
 	const identityPreimage = {
 		schemaVersion: SUBJECT_SCHEMA_VERSION,
 		subjectKind: inputs.request.subjectKind,

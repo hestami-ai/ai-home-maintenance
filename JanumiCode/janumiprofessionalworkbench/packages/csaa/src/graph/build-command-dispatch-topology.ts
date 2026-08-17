@@ -43,7 +43,6 @@ import {
 	type CommandDispatchPayloadValidationSemanticBinding,
 	type CommandDispatchPipelineNode,
 	type CommandDispatchTopologyBuildDiagnostic,
-	type CommandDispatchTopologyBuildDiagnosticCode,
 	type CommandDispatchTopologyBuildOutcome,
 	type CommandDispatchTopologyCommandBusSelector,
 	type CommandDispatchTopologyCoverage,
@@ -117,7 +116,7 @@ const TRANSPARENT_EXPRESSION_KINDS = new Set<number>([
 	ts.SyntaxKind.NonNullExpression
 ]);
 
-export type { CommandDispatchTopologyBuildDiagnosticCode };
+export type { CommandDispatchTopologyBuildDiagnosticCode } from '../contracts/command-dispatch-topology.js';
 
 export const COMMAND_DISPATCH_TOPOLOGY_PROGRESS_SCHEMA_VERSION =
 	'jan-csaa-command-dispatch-topology-progress/1.0.0' as const;
@@ -827,6 +826,381 @@ function layerProvenance(
 	]);
 }
 
+function failureMessage(error: unknown, fallback: string): string {
+	return error instanceof Error ? error.message : fallback;
+}
+
+function constructionFailure(error: unknown): CommandDispatchTopologyBuildOutcome {
+	const isBudget = error instanceof RangeError && /max[A-Z]/u.test(error.message);
+	return unavailable(
+		isBudget ? 'BUDGET_EXCEEDED' : 'UNSUPPORTED_DISPATCH_PIPELINE',
+		failureMessage(error, 'Command-dispatch topology construction failed closed.'),
+		'CLASSIFY'
+	);
+}
+
+function graphValidationFailureMessage(
+	validation: ReturnType<typeof validateCommandDispatchTopology>
+): string {
+	const summary = validation.issues
+		.slice(0, 3)
+		.map((issue) => `${issue.code}@${issue.path}: ${issue.message}`)
+		.join(', ');
+	const detail = summary.length === 0 ? '' : `: ${summary}`;
+	return `Constructed command-dispatch topology failed validation (${validation.state}${detail}).`;
+}
+
+function identityBindingFailure(
+	progress: ProgressRecorder,
+	request: BuildCommandDispatchTopologyRequest,
+	snapshot: StaticSemanticSnapshot,
+	commandHandlerGraph: CommandHandlerGraphSnapshot,
+	arrowObservation: ArrowCommandCensusObservation,
+	subject: FrozenSubject
+): CommandDispatchTopologyBuildOutcome | undefined {
+	if (request.semanticSnapshotId !== snapshot.id) {
+		progress.fail({ diagnostics: 1 });
+		return unavailable(
+			'SEMANTIC_SNAPSHOT_ID_MISMATCH',
+			'The requested semantic snapshot identity does not match.',
+			'REQUEST',
+			'$.semanticSnapshotId'
+		);
+	}
+	if (
+		request.commandHandlerGraphId !== commandHandlerGraph.id ||
+		commandHandlerGraph.semanticSnapshotId !== snapshot.id
+	) {
+		progress.fail({ diagnostics: 1 });
+		return unavailable(
+			'COMMAND_HANDLER_GRAPH_ID_MISMATCH',
+			'The requested predecessor graph identity or semantic binding does not match.',
+			'REQUEST',
+			'$.commandHandlerGraphId'
+		);
+	}
+	if (commandHandlerGraph.arrowObservationId !== arrowObservation.id) {
+		progress.fail({ diagnostics: 1 });
+		return unavailable(
+			'ARROW_OBSERVATION_MISMATCH',
+			'The predecessor graph is not bound to the supplied arrow observation.',
+			'BIND'
+		);
+	}
+	if (
+		request.subjectId !== snapshot.subjectId ||
+		request.subjectId !== commandHandlerGraph.subjectId ||
+		request.subjectId !== arrowObservation.subjectId ||
+		request.subjectId !== subject.descriptor.subjectId
+	) {
+		progress.fail({ diagnostics: 1 });
+		return unavailable(
+			'SUBJECT_ID_MISMATCH',
+			'The request, semantic snapshot, predecessor graph, observation, and subject identities differ.',
+			'BIND',
+			'$.subjectId'
+		);
+	}
+	return undefined;
+}
+
+function retainedCensusReference(
+	subject: FrozenSubject
+): ReturnType<typeof commandDispatchTopologyRetainedCensusReference> {
+	const reference = commandDispatchTopologyRetainedCensusReference(subject);
+	const retainedBytes = readFrozenSubjectArtifact(subject, reference.artifactPath);
+	const unreproduced = 'The retained census bytes do not reproduce their frozen identity.';
+	if (retainedBytes === undefined) throw new Error(unreproduced);
+	if (
+		retainedBytes.byteLength !== reference.artifactBytes ||
+		sha256(retainedBytes) !== reference.artifactContentSha256
+	)
+		throw new Error(unreproduced);
+	return reference;
+}
+
+function requiredSemanticCapabilitiesPresent(snapshot: StaticSemanticSnapshot): boolean {
+	return (['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const).every((required) =>
+		snapshot.capabilities.some(
+			(capability) => capability.capability === required && capability.state !== 'UNSUPPORTED'
+		)
+	);
+}
+
+function assertAstNodeBudget(
+	snapshot: StaticSemanticSnapshot,
+	budgets: BuildCommandDispatchTopologyRequest['budgets']
+): void {
+	if (snapshot.astNodes.length > budgets.maxAstNodes)
+		throw new RangeError(
+			`maxAstNodes exceeded: ${snapshot.astNodes.length} > ${budgets.maxAstNodes}.`
+		);
+}
+
+function commandBusBindingFailure(
+	progress: ProgressRecorder,
+	request: BuildCommandDispatchTopologyRequest,
+	selected: ReturnType<typeof selectCommandBus>,
+	subject: FrozenSubject
+): CommandDispatchTopologyBuildOutcome | undefined {
+	if (!selectorEqual(request.commandBus, selected.selector)) {
+		progress.fail({ diagnostics: 1 });
+		return unavailable(
+			'COMMAND_BUS_SELECTOR_MISMATCH',
+			'The caller-selected command bus does not match the independently selected semantic root.',
+			'BIND',
+			'$.commandBus'
+		);
+	}
+	const sourceArtifacts = subject.artifacts.filter(
+		(artifact) => artifact.path === selected.source.logicalPath
+	);
+	if (
+		sourceArtifacts.length !== 1 ||
+		sourceArtifacts[0]!.sha256 !== selected.source.contentSha256 ||
+		sourceArtifacts[0]!.bytes !== selected.source.bytes
+	) {
+		progress.fail({ diagnostics: 1 });
+		return unavailable(
+			'COMMAND_BUS_SELECTOR_MISMATCH',
+			'The selected semantic source is not exactly bound to the frozen subject.',
+			'BIND',
+			'$.commandBus'
+		);
+	}
+	return undefined;
+}
+
+function assertSourceByteBudget(
+	source: SemanticSourceRecord,
+	budgets: BuildCommandDispatchTopologyRequest['budgets']
+): void {
+	if (source.bytes > budgets.maxSourceBytes)
+		throw new RangeError(`maxSourceBytes exceeded: ${source.bytes} > ${budgets.maxSourceBytes}.`);
+}
+
+function selectedCommandParameterSymbolId(
+	snapshot: StaticSemanticSnapshot,
+	sourceId: SemanticSourceRecord['id'],
+	methodNodes: readonly SemanticAstNodeRecord[]
+): SemanticSymbolId {
+	const methodNodeIds = new Set(methodNodes.map((node) => node.id));
+	const commandParameters = snapshot.declarations.filter(
+		(declaration) =>
+			declaration.sourceId === sourceId &&
+			declaration.name === 'command' &&
+			declaration.kind === ts.SyntaxKind.Parameter &&
+			declaration.nodeId !== null &&
+			methodNodeIds.has(declaration.nodeId)
+	);
+	const symbolId = commandParameters[0]?.symbolId ?? null;
+	if (commandParameters.length !== 1 || symbolId === null)
+		throw new Error('The selected dispatch method must have one semantic command parameter.');
+	return symbolId;
+}
+
+function assertHandlerRegistryBinding(
+	commandHandlerGraph: CommandHandlerGraphSnapshot,
+	model: SemanticIndexes,
+	handlersLookup: LookupFact,
+	source: SemanticSourceRecord
+): void {
+	const declaration = model.declarationById.get(commandHandlerGraph.handlerRegistry.declarationId);
+	const registrySource = model.sourceById.get(commandHandlerGraph.handlerRegistry.sourceId);
+	const unresolved = 'The HANDLERS lookup does not resolve to the predecessor registry.';
+	const registrySymbolId = declaration?.symbolId ?? null;
+	if (registrySymbolId === null || registrySource === undefined) throw new Error(unresolved);
+	if (
+		handlersLookup.registrySymbolId !== registrySymbolId ||
+		registrySource.programId !== source.programId ||
+		registrySource.projectId !== source.projectId ||
+		commandHandlerGraph.handlerRegistry.programId !== source.programId ||
+		commandHandlerGraph.handlerRegistry.projectId !== source.projectId ||
+		commandHandlerGraph.handlerRegistry.projectConfigPath !==
+			COMMAND_DISPATCH_TOPOLOGY_COMMAND_BUS_PROJECT_CONFIG_PATH
+	)
+		throw new Error(unresolved);
+}
+
+function assertCommandKeyBindings(
+	commandsLookup: LookupFact,
+	handlersLookup: LookupFact,
+	validation: ValidationFact,
+	commandParameterSymbolId: SemanticSymbolId
+): void {
+	if (
+		commandsLookup.commandTypeSymbolId !== handlersLookup.commandTypeSymbolId ||
+		commandsLookup.commandBaseSymbolId !== handlersLookup.commandBaseSymbolId ||
+		commandsLookup.commandBaseSymbolId !== validation.commandBaseSymbolId ||
+		commandsLookup.commandBaseSymbolId !== commandParameterSymbolId
+	)
+		throw new Error('The dispatch lookups are not keyed by one exact command.commandType binding.');
+}
+
+function assertHandlerCommandArgument(
+	model: SemanticIndexes,
+	invocation: InvocationFact,
+	commandBaseSymbolId: SemanticSymbolId
+): void {
+	const handlerCommandArgument = model.nodeById.get(invocation.binding.commandArgumentNodeId)!;
+	if (
+		terminalSymbolId(exactReference(handlerCommandArgument, 'SYMBOL_USE', model), model) !==
+		commandBaseSymbolId
+	)
+		throw new Error('The handler invocation consumes a different command binding.');
+}
+
+function assertLexicalPipelineOrder(starts: readonly number[]): void {
+	if (starts.some((value, index) => index > 0 && value <= starts[index - 1]!))
+		throw new Error('The normalized dispatch pipeline is not in the required lexical order.');
+}
+
+function assertTargetPopulationWithinBudgets(
+	targets: readonly HandlerTargetNode[],
+	budgets: BuildCommandDispatchTopologyRequest['budgets']
+): void {
+	if (targets.length === 0)
+		throw new Error('The predecessor graph has no handler-target population to compose.');
+	if (targets.length > budgets.maxHandlerTargets)
+		throw new RangeError(
+			`maxHandlerTargets exceeded: ${targets.length} > ${budgets.maxHandlerTargets}.`
+		);
+	if (targets.length > budgets.maxEdges)
+		throw new RangeError(`maxEdges exceeded: ${targets.length} > ${budgets.maxEdges}.`);
+	if (budgets.maxNodes < 1) throw new RangeError('maxNodes cannot admit the pipeline node.');
+}
+
+function projectedReferences(
+	snapshot: StaticSemanticSnapshot,
+	referenceIds: readonly SemanticReferenceRecord['id'][]
+): SemanticReferenceRecord[] {
+	return referenceIds.map((id) => {
+		const reference = snapshot.references.find((candidate) => candidate.id === id);
+		if (reference === undefined) throw new Error('A projected reference identity is absent.');
+		return reference;
+	});
+}
+
+function assertRepresentedPipelineFacts(pipelineNode: CommandDispatchPipelineNode): void {
+	if (pipelineNode.sourceLocations.length !== 5)
+		throw new Error('The static dispatch pipeline must have five distinct fact locations.');
+}
+
+function upstreamEdgesByTarget(
+	commandHandlerGraph: CommandHandlerGraphSnapshot
+): Map<HandlerTargetNode['id'], CommandHandlerGraphEdge[]> {
+	const upstreamByTarget = new Map<HandlerTargetNode['id'], CommandHandlerGraphEdge[]>();
+	for (const edge of commandHandlerGraph.edges)
+		if (edge.relationKind === 'HANDLER_REGISTRATION_TO_TARGET')
+			addGrouped(upstreamByTarget, edge.target.nodeId, edge);
+	return upstreamByTarget;
+}
+
+function dispatchInferenceBasis(
+	pipelineNodeId: CommandDispatchPipelineNode['id'],
+	target: HandlerTargetNode,
+	upstreamEdges: readonly CommandHandlerGraphEdge[],
+	registrationNodes: readonly HandlerRegistrationNode[]
+): CommandDispatchTopologyInferenceBasis {
+	return {
+		assumptions: [
+			'The runtime command.commandType value may select any statically registered HANDLERS entry represented by the predecessor graph.'
+		],
+		limitationKinds: [
+			'HANDLER_TARGET_EDGES_ARE_CANDIDATE_ONLY',
+			'CONTROL_FLOW_AND_PATH_FEASIBILITY_NOT_ANALYZED',
+			'RUNTIME_DISPATCH_NOT_CLAIMED'
+		],
+		method: COMMAND_DISPATCH_TOPOLOGY_METHOD,
+		rationale:
+			'The selected dispatch pipeline indexes HANDLERS by command.commandType and invokes the resulting handler; without runtime values or control-flow evidence, every registered handler target is a candidate.',
+		supportingInputIds: sortedUnique([
+			pipelineNodeId,
+			target.id,
+			...upstreamEdges.map((edge) => edge.id),
+			...registrationNodes.map((registration) => registration.id)
+		])
+	};
+}
+
+interface DispatchEdgeContext {
+	readonly commandHandlerGraphId: CommandHandlerGraphSnapshot['id'];
+	readonly graphId: CommandDispatchPipelineNode['graphId'];
+	readonly inferenceLayerId: CommandDispatchPipelineNode['layerId'];
+	readonly pipelineNode: CommandDispatchPipelineNode;
+	readonly registrations: ReadonlyMap<HandlerRegistrationNode['id'], HandlerRegistrationNode>;
+	readonly semanticSnapshotId: CommandDispatchPipelineNode['semanticSnapshotId'];
+	readonly subjectId: CommandDispatchPipelineNode['subjectId'];
+	readonly upstreamByTarget: ReadonlyMap<HandlerTargetNode['id'], CommandHandlerGraphEdge[]>;
+}
+
+function dispatchTargetEdge(
+	target: HandlerTargetNode,
+	context: DispatchEdgeContext
+): CommandDispatchTopologyEdge {
+	const upstreamEdges = (context.upstreamByTarget.get(target.id) ?? []).sort((left, right) =>
+		compareText(left.id, right.id)
+	);
+	if (upstreamEdges.length === 0)
+		throw new Error(`Handler target ${target.id} has no upstream registration edge.`);
+	const supportingRegistrations = upstreamEdges.map((edge) => {
+		const registration = context.registrations.get(edge.source.nodeId);
+		if (registration === undefined)
+			throw new Error('An upstream target edge has no handler registration source.');
+		return registration;
+	});
+	const registeredCommandNames = sortedUnique(
+		supportingRegistrations.map((registration) => registration.commandName)
+	);
+	const basis = dispatchInferenceBasis(
+		context.pipelineNode.id,
+		target,
+		upstreamEdges,
+		supportingRegistrations
+	);
+	const source = {
+		graphId: context.graphId,
+		kind: 'STATIC_DISPATCH_PIPELINE' as const,
+		nodeId: context.pipelineNode.id
+	};
+	const targetEndpoint = {
+		graphId: context.commandHandlerGraphId,
+		kind: 'HANDLER_TARGET' as const,
+		nodeId: target.id
+	};
+	const edgeInput = {
+		graphId: context.graphId,
+		inferenceBasis: basis,
+		registeredCommandNames,
+		relationCode: 'IMPL-JPWB-CD-DISPATCH-TARGET-001' as const,
+		relationKind: 'STATIC_DISPATCH_PIPELINE_TO_HANDLER_TARGET' as const,
+		source,
+		target: targetEndpoint
+	};
+	return {
+		attribution: 'CANDIDATE',
+		commandHandlerGraphId: context.commandHandlerGraphId,
+		...edgeInput,
+		id: commandDispatchTopologyEdgeId(edgeInput),
+		layerId: context.inferenceLayerId,
+		method: COMMAND_DISPATCH_TOPOLOGY_METHOD,
+		provenanceIds: edgeProvenance(
+			context.pipelineNode,
+			target,
+			upstreamEdges,
+			supportingRegistrations
+		),
+		semanticSnapshotId: context.semanticSnapshotId,
+		sourceLocations: uniqueSourceLocations([
+			...context.pipelineNode.sourceLocations,
+			...target.sourceLocations,
+			...upstreamEdges.flatMap((edge) => edge.sourceLocations),
+			...supportingRegistrations.flatMap((registration) => registration.sourceLocations)
+		]),
+		subjectId: context.subjectId
+	};
+}
+
 /**
  * Build a static, implementation-local dispatch overlay from normalized semantic records only.
  * No subject source is decoded, reparsed, imported, or executed by this operation.
@@ -848,86 +1222,34 @@ export function buildCommandDispatchTopology(
 		progress.fail({ diagnostics: 1 });
 		return unavailable(
 			'REQUEST_INVALID',
-			error instanceof Error ? error.message : 'Invalid command-dispatch topology request.',
+			failureMessage(error, 'Invalid command-dispatch topology request.'),
 			'REQUEST'
 		);
 	}
 	try {
-		if (request.semanticSnapshotId !== snapshot.id) {
-			progress.fail({ diagnostics: 1 });
-			return unavailable(
-				'SEMANTIC_SNAPSHOT_ID_MISMATCH',
-				'The requested semantic snapshot identity does not match.',
-				'REQUEST',
-				'$.semanticSnapshotId'
-			);
-		}
-		if (
-			request.commandHandlerGraphId !== commandHandlerGraph.id ||
-			commandHandlerGraph.semanticSnapshotId !== snapshot.id
-		) {
-			progress.fail({ diagnostics: 1 });
-			return unavailable(
-				'COMMAND_HANDLER_GRAPH_ID_MISMATCH',
-				'The requested predecessor graph identity or semantic binding does not match.',
-				'REQUEST',
-				'$.commandHandlerGraphId'
-			);
-		}
-		if (commandHandlerGraph.arrowObservationId !== arrowObservation.id) {
-			progress.fail({ diagnostics: 1 });
-			return unavailable(
-				'ARROW_OBSERVATION_MISMATCH',
-				'The predecessor graph is not bound to the supplied arrow observation.',
-				'BIND'
-			);
-		}
-		if (
-			request.subjectId !== snapshot.subjectId ||
-			request.subjectId !== commandHandlerGraph.subjectId ||
-			request.subjectId !== arrowObservation.subjectId ||
-			request.subjectId !== subject.descriptor.subjectId
-		) {
-			progress.fail({ diagnostics: 1 });
-			return unavailable(
-				'SUBJECT_ID_MISMATCH',
-				'The request, semantic snapshot, predecessor graph, observation, and subject identities differ.',
-				'BIND',
-				'$.subjectId'
-			);
-		}
+		const identityFailure = identityBindingFailure(
+			progress,
+			request,
+			snapshot,
+			commandHandlerGraph,
+			arrowObservation,
+			subject
+		);
+		if (identityFailure !== undefined) return identityFailure;
 		let retainedCommandDispatchCensus: ReturnType<
 			typeof commandDispatchTopologyRetainedCensusReference
 		>;
 		try {
-			retainedCommandDispatchCensus = commandDispatchTopologyRetainedCensusReference(subject);
-			const retainedBytes = readFrozenSubjectArtifact(
-				subject,
-				retainedCommandDispatchCensus.artifactPath
-			);
-			if (
-				retainedBytes === undefined ||
-				retainedBytes.byteLength !== retainedCommandDispatchCensus.artifactBytes ||
-				sha256(retainedBytes) !== retainedCommandDispatchCensus.artifactContentSha256
-			)
-				throw new Error('The retained census bytes do not reproduce their frozen identity.');
+			retainedCommandDispatchCensus = retainedCensusReference(subject);
 		} catch (error) {
 			progress.fail({ diagnostics: 1 });
 			return unavailable(
 				'RETAINED_CENSUS_ARTIFACT_MISMATCH',
-				error instanceof Error
-					? error.message
-					: 'The retained command-dispatch census identity is unavailable.',
+				failureMessage(error, 'The retained command-dispatch census identity is unavailable.'),
 				'BIND'
 			);
 		}
-		if (
-			!(['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const).every((required) =>
-				snapshot.capabilities.some(
-					(capability) => capability.capability === required && capability.state !== 'UNSUPPORTED'
-				)
-			)
-		) {
+		if (!requiredSemanticCapabilitiesPresent(snapshot)) {
 			progress.fail({ diagnostics: 1 });
 			return unavailable(
 				'SEMANTIC_CAPABILITY_UNAVAILABLE',
@@ -959,10 +1281,7 @@ export function buildCommandDispatchTopology(
 		progress.complete({ validationIssues: 0 });
 
 		const model = indexes(snapshot);
-		if (snapshot.astNodes.length > request.budgets.maxAstNodes)
-			throw new RangeError(
-				`maxAstNodes exceeded: ${snapshot.astNodes.length} > ${request.budgets.maxAstNodes}.`
-			);
+		assertAstNodeBudget(snapshot, request.budgets);
 		progress.start('DISPATCH_SOURCE_SELECT', { semanticSources: snapshot.sources.length });
 		let selected: ReturnType<typeof selectCommandBus>;
 		try {
@@ -971,40 +1290,14 @@ export function buildCommandDispatchTopology(
 			progress.fail({ diagnostics: 1 });
 			return unavailable(
 				'COMMAND_BUS_SELECTOR_MISMATCH',
-				error instanceof Error ? error.message : 'The command-bus selector is ambiguous.',
+				failureMessage(error, 'The command-bus selector is ambiguous.'),
 				'BIND',
 				'$.commandBus'
 			);
 		}
-		if (!selectorEqual(request.commandBus, selected.selector)) {
-			progress.fail({ diagnostics: 1 });
-			return unavailable(
-				'COMMAND_BUS_SELECTOR_MISMATCH',
-				'The caller-selected command bus does not match the independently selected semantic root.',
-				'BIND',
-				'$.commandBus'
-			);
-		}
-		const sourceArtifacts = subject.artifacts.filter(
-			(artifact) => artifact.path === selected.source.logicalPath
-		);
-		if (
-			sourceArtifacts.length !== 1 ||
-			sourceArtifacts[0]!.sha256 !== selected.source.contentSha256 ||
-			sourceArtifacts[0]!.bytes !== selected.source.bytes
-		) {
-			progress.fail({ diagnostics: 1 });
-			return unavailable(
-				'COMMAND_BUS_SELECTOR_MISMATCH',
-				'The selected semantic source is not exactly bound to the frozen subject.',
-				'BIND',
-				'$.commandBus'
-			);
-		}
-		if (selected.source.bytes > request.budgets.maxSourceBytes)
-			throw new RangeError(
-				`maxSourceBytes exceeded: ${selected.source.bytes} > ${request.budgets.maxSourceBytes}.`
-			);
+		const commandBusFailure = commandBusBindingFailure(progress, request, selected, subject);
+		if (commandBusFailure !== undefined) return commandBusFailure;
+		assertSourceByteBudget(selected.source, request.budgets);
 		progress.complete({ selectedSources: 1, sourceBytes: selected.source.bytes });
 
 		progress.start('DISPATCH_SITE_DISCOVERY');
@@ -1029,79 +1322,31 @@ export function buildCommandDispatchTopology(
 		progress.complete({ dispatchFacts: 5, methodAstNodes: methodNodes.length });
 
 		progress.start('KEY_BINDING_RESOLVE');
-		const methodNodeIds = new Set(methodNodes.map((node) => node.id));
-		const commandParameters = snapshot.declarations.filter(
-			(declaration) =>
-				declaration.sourceId === selected.source.id &&
-				declaration.name === 'command' &&
-				declaration.kind === ts.SyntaxKind.Parameter &&
-				declaration.nodeId !== null &&
-				methodNodeIds.has(declaration.nodeId)
+		const commandParameterSymbolId = selectedCommandParameterSymbolId(
+			snapshot,
+			selected.source.id,
+			methodNodes
 		);
-		if (commandParameters.length !== 1 || commandParameters[0]!.symbolId === null)
-			throw new Error('The selected dispatch method must have one semantic command parameter.');
-		const handlerRegistryDeclaration = model.declarationById.get(
-			commandHandlerGraph.handlerRegistry.declarationId
-		);
-		const handlerRegistrySource = model.sourceById.get(
-			commandHandlerGraph.handlerRegistry.sourceId
-		);
-		if (
-			handlerRegistryDeclaration?.symbolId === null ||
-			handlerRegistryDeclaration?.symbolId === undefined ||
-			handlersLookup.registrySymbolId !== handlerRegistryDeclaration.symbolId ||
-			handlerRegistrySource === undefined ||
-			handlerRegistrySource.programId !== selected.source.programId ||
-			handlerRegistrySource.projectId !== selected.source.projectId ||
-			commandHandlerGraph.handlerRegistry.programId !== selected.source.programId ||
-			commandHandlerGraph.handlerRegistry.projectId !== selected.source.projectId ||
-			commandHandlerGraph.handlerRegistry.projectConfigPath !==
-				COMMAND_DISPATCH_TOPOLOGY_COMMAND_BUS_PROJECT_CONFIG_PATH
-		)
-			throw new Error('The HANDLERS lookup does not resolve to the predecessor registry.');
-		if (
-			commandsLookup.commandTypeSymbolId !== handlersLookup.commandTypeSymbolId ||
-			commandsLookup.commandBaseSymbolId !== handlersLookup.commandBaseSymbolId ||
-			commandsLookup.commandBaseSymbolId !== validation.commandBaseSymbolId ||
-			commandsLookup.commandBaseSymbolId !== commandParameters[0]!.symbolId
-		)
-			throw new Error(
-				'The dispatch lookups are not keyed by one exact command.commandType binding.'
-			);
-		const handlerCommandArgument = model.nodeById.get(invocation.binding.commandArgumentNodeId)!;
-		if (
-			terminalSymbolId(exactReference(handlerCommandArgument, 'SYMBOL_USE', model), model) !==
-			commandsLookup.commandBaseSymbolId
-		)
-			throw new Error('The handler invocation consumes a different command binding.');
+		assertHandlerRegistryBinding(commandHandlerGraph, model, handlersLookup, selected.source);
+		assertCommandKeyBindings(commandsLookup, handlersLookup, validation, commandParameterSymbolId);
+		assertHandlerCommandArgument(model, invocation, commandsLookup.commandBaseSymbolId);
 		progress.complete({ commandBindings: 1, commandTypeBindings: 1 });
 
 		progress.start('LOOKUP_FLOW_RESOLVE');
-		const orderedStarts = [
+		assertLexicalPipelineOrder([
 			commandsLookup.sourceLocation.start,
 			validation.sourceLocation.start,
 			handlersLookup.sourceLocation.start,
 			guard.sourceLocation.start,
 			invocation.sourceLocation.start
-		];
-		if (orderedStarts.some((value, index) => index > 0 && value <= orderedStarts[index - 1]!))
-			throw new Error('The normalized dispatch pipeline is not in the required lexical order.');
+		]);
 		progress.complete({ orderedStages: 5 });
 
 		progress.start('TARGET_COMPOSE');
 		const targets = commandHandlerGraph.nodes
 			.filter((node): node is HandlerTargetNode => node.kind === 'HANDLER_TARGET')
 			.sort((left, right) => compareText(left.id, right.id));
-		if (targets.length === 0)
-			throw new Error('The predecessor graph has no handler-target population to compose.');
-		if (targets.length > request.budgets.maxHandlerTargets)
-			throw new RangeError(
-				`maxHandlerTargets exceeded: ${targets.length} > ${request.budgets.maxHandlerTargets}.`
-			);
-		if (targets.length > request.budgets.maxEdges)
-			throw new RangeError(`maxEdges exceeded: ${targets.length} > ${request.budgets.maxEdges}.`);
-		if (request.budgets.maxNodes < 1)
-			throw new RangeError('maxNodes cannot admit the pipeline node.');
+		assertTargetPopulationWithinBudgets(targets, request.budgets);
 		const graphInputDigest = commandDispatchTopologyInputDigest(
 			request,
 			snapshot,
@@ -1121,7 +1366,7 @@ export function buildCommandDispatchTopology(
 		});
 		const derivationLayerId = commandDispatchTopologyDerivationLayerId(graphId);
 		const inferenceLayerId = commandDispatchTopologyInferenceLayerId(graphId);
-		const allBindingReferences = [
+		const allBindingReferences = projectedReferences(snapshot, [
 			commandsLookup.binding.commandTypeReferenceId,
 			commandsLookup.binding.registryReferenceId,
 			handlersLookup.binding.commandTypeReferenceId,
@@ -1129,11 +1374,7 @@ export function buildCommandDispatchTopology(
 			validation.binding.calleeReferenceId,
 			guard.binding.guardedHandlerReferenceId,
 			invocation.binding.calleeReferenceId
-		].map((id) => {
-			const reference = snapshot.references.find((candidate) => candidate.id === id);
-			if (reference === undefined) throw new Error('A projected reference identity is absent.');
-			return reference;
-		});
+		]);
 		const pipelineNode: CommandDispatchPipelineNode = {
 			attribution: 'EXACT_STATIC_SYNTAX',
 			commandBusDeclarationId: selected.declaration.id,
@@ -1166,93 +1407,24 @@ export function buildCommandDispatchTopology(
 			]),
 			subjectId: snapshot.subjectId
 		};
-		if (pipelineNode.sourceLocations.length !== 5)
-			throw new Error('The static dispatch pipeline must have five distinct fact locations.');
+		assertRepresentedPipelineFacts(pipelineNode);
 		const registrations = new Map(
 			commandHandlerGraph.nodes
 				.filter((node): node is HandlerRegistrationNode => node.kind === 'HANDLER_REGISTRATION')
 				.map((node) => [node.id, node])
 		);
-		const upstreamByTarget = new Map<HandlerTargetNode['id'], CommandHandlerGraphEdge[]>();
-		for (const edge of commandHandlerGraph.edges)
-			if (edge.relationKind === 'HANDLER_REGISTRATION_TO_TARGET')
-				addGrouped(upstreamByTarget, edge.target.nodeId, edge);
-		const inferenceBasis = (
-			target: HandlerTargetNode,
-			upstreamEdges: readonly CommandHandlerGraphEdge[],
-			registrationNodes: readonly HandlerRegistrationNode[]
-		): CommandDispatchTopologyInferenceBasis => ({
-			assumptions: [
-				'The runtime command.commandType value may select any statically registered HANDLERS entry represented by the predecessor graph.'
-			],
-			limitationKinds: [
-				'HANDLER_TARGET_EDGES_ARE_CANDIDATE_ONLY',
-				'CONTROL_FLOW_AND_PATH_FEASIBILITY_NOT_ANALYZED',
-				'RUNTIME_DISPATCH_NOT_CLAIMED'
-			],
-			method: COMMAND_DISPATCH_TOPOLOGY_METHOD,
-			rationale:
-				'The selected dispatch pipeline indexes HANDLERS by command.commandType and invokes the resulting handler; without runtime values or control-flow evidence, every registered handler target is a candidate.',
-			supportingInputIds: sortedUnique([
-				pipelineNode.id,
-				target.id,
-				...upstreamEdges.map((edge) => edge.id),
-				...registrationNodes.map((registration) => registration.id)
-			])
-		});
-		const edges = targets.map((target): CommandDispatchTopologyEdge => {
-			const upstreamEdges = (upstreamByTarget.get(target.id) ?? []).sort((left, right) =>
-				compareText(left.id, right.id)
-			);
-			if (upstreamEdges.length === 0)
-				throw new Error(`Handler target ${target.id} has no upstream registration edge.`);
-			const supportingRegistrations = upstreamEdges.map((edge) => {
-				const registration = registrations.get(edge.source.nodeId);
-				if (registration === undefined)
-					throw new Error('An upstream target edge has no handler registration source.');
-				return registration;
-			});
-			const registeredCommandNames = sortedUnique(
-				supportingRegistrations.map((registration) => registration.commandName)
-			);
-			const basis = inferenceBasis(target, upstreamEdges, supportingRegistrations);
-			const source = {
-				graphId,
-				kind: 'STATIC_DISPATCH_PIPELINE' as const,
-				nodeId: pipelineNode.id
-			};
-			const targetEndpoint = {
-				graphId: commandHandlerGraph.id,
-				kind: 'HANDLER_TARGET' as const,
-				nodeId: target.id
-			};
-			const edgeInput = {
-				graphId,
-				inferenceBasis: basis,
-				registeredCommandNames,
-				relationCode: 'IMPL-JPWB-CD-DISPATCH-TARGET-001' as const,
-				relationKind: 'STATIC_DISPATCH_PIPELINE_TO_HANDLER_TARGET' as const,
-				source,
-				target: targetEndpoint
-			};
-			return {
-				attribution: 'CANDIDATE',
-				commandHandlerGraphId: commandHandlerGraph.id,
-				...edgeInput,
-				id: commandDispatchTopologyEdgeId(edgeInput),
-				layerId: inferenceLayerId,
-				method: COMMAND_DISPATCH_TOPOLOGY_METHOD,
-				provenanceIds: edgeProvenance(pipelineNode, target, upstreamEdges, supportingRegistrations),
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: uniqueSourceLocations([
-					...pipelineNode.sourceLocations,
-					...target.sourceLocations,
-					...upstreamEdges.flatMap((edge) => edge.sourceLocations),
-					...supportingRegistrations.flatMap((registration) => registration.sourceLocations)
-				]),
-				subjectId: snapshot.subjectId
-			};
-		});
+		const upstreamByTarget = upstreamEdgesByTarget(commandHandlerGraph);
+		const edgeContext: DispatchEdgeContext = {
+			commandHandlerGraphId: commandHandlerGraph.id,
+			graphId,
+			inferenceLayerId,
+			pipelineNode,
+			registrations,
+			semanticSnapshotId: snapshot.id,
+			subjectId: snapshot.subjectId,
+			upstreamByTarget
+		};
+		const edges = targets.map((target) => dispatchTargetEdge(target, edgeContext));
 		edges.sort((left, right) => compareText(left.id, right.id));
 		progress.complete({ candidateEdges: edges.length, handlerTargets: targets.length });
 
@@ -1414,13 +1586,9 @@ export function buildCommandDispatchTopology(
 		);
 		if (graphValidation.state !== 'VALID') {
 			progress.fail({ diagnostics: graphValidation.issues.length });
-			const summary = graphValidation.issues
-				.slice(0, 3)
-				.map((issue) => `${issue.code}@${issue.path}: ${issue.message}`)
-				.join(', ');
 			return unavailable(
 				'GRAPH_VALIDATION_FAILED',
-				`Constructed command-dispatch topology failed validation (${graphValidation.state}${summary.length === 0 ? '' : `: ${summary}`}).`,
+				graphValidationFailureMessage(graphValidation),
 				'VALIDATE'
 			);
 		}
@@ -1437,14 +1605,8 @@ export function buildCommandDispatchTopology(
 			outcome: 'partial'
 		};
 	} catch (error) {
-		const isBudget = error instanceof RangeError && /max[A-Z]/u.test(error.message);
+		const failure = constructionFailure(error);
 		progress.fail({ diagnostics: 1 });
-		return unavailable(
-			isBudget ? 'BUDGET_EXCEEDED' : 'UNSUPPORTED_DISPATCH_PIPELINE',
-			error instanceof Error
-				? error.message
-				: 'Command-dispatch topology construction failed closed.',
-			'CLASSIFY'
-		);
+		return failure;
 	}
 }

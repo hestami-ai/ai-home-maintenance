@@ -6,6 +6,7 @@ import {
 	ARROW_COMMAND_CENSUS_ARTIFACT_SET_SCHEMA_VERSION,
 	ARROW_COMMAND_CENSUS_METHOD,
 	type ArrowCommandCensusArtifactBinding,
+	type ArrowCommandCensusArtifactSetBinding,
 	type ArrowCommandCensusArtifactSetCoverage,
 	type ArrowCommandCensusArtifactSetDiagnostic,
 	type ArrowCommandCensusArtifactUse,
@@ -156,6 +157,22 @@ function isHandlerSourcePath(path: string): boolean {
 }
 
 /**
+ * Each optional clause is built as its own top-level literal rather than inside the sentence, so the message
+ * text is assembled from flat pieces and reads the same as it always did.
+ */
+function undecidableClosureMessage(
+	code: string,
+	specifier: string | null,
+	importerPath: string | null,
+	resolvedCandidate: string | null
+): string {
+	const forSpecifier = specifier === null ? '' : ` for '${specifier}'`;
+	const inImporter = importerPath === null ? '' : ` in ${importerPath}`;
+	const withResolved = resolvedCandidate === null ? '' : ` (resolved to ${resolvedCandidate})`;
+	return `Retained executor import closure is undecidable: ${code}${forSpecifier}${inImporter}${withResolved}.`;
+}
+
+/**
  * The capsule must contain everything the retained executor IMPORTS, and that population is DERIVED from the
  * executor's own frozen source rather than listed above.
  *
@@ -186,7 +203,7 @@ function executorClosure(subject: FrozenSubject): {
 		diagnostics: closure.findings.map((f) =>
 			diagnostic(
 				'POPULATION_RECONCILIATION_FAILED',
-				`Retained executor import closure is undecidable: ${f.code}${f.specifier === null ? '' : ` for '${f.specifier}'`}${f.importerPath === null ? '' : ` in ${f.importerPath}`}${f.resolvedCandidate === null ? '' : ` (resolved to ${f.resolvedCandidate})`}.`,
+				undecidableClosureMessage(f.code, f.specifier, f.importerPath, f.resolvedCandidate),
 				f.path,
 				'RECONCILE'
 			)
@@ -408,18 +425,27 @@ interface DerivedPopulation {
 	readonly diagnostics: readonly ArrowCommandCensusArtifactSetDiagnostic[];
 }
 
-function derivePopulation(subject: FrozenSubject): DerivedPopulation {
-	const closureSelection = executorClosure(subject);
-	const diagnostics: ArrowCommandCensusArtifactSetDiagnostic[] = [...closureSelection.diagnostics];
+function eligibleRowsByPath(
+	subject: FrozenSubject,
+	closurePaths: ReadonlySet<string>
+): Map<string, CapturedArtifactRecord[]> {
 	const rowsByPath = new Map<string, CapturedArtifactRecord[]>();
 	for (const artifact of subject.artifacts) {
-		if (!isEligiblePath(artifact.path, closureSelection.paths)) continue;
+		if (!isEligiblePath(artifact.path, closurePaths)) continue;
 		const rows = rowsByPath.get(artifact.path) ?? [];
 		rows.push(artifact);
 		rowsByPath.set(artifact.path, rows);
 	}
+	return rowsByPath;
+}
+
+function collectExcludedArtifactDiagnostics(
+	subject: FrozenSubject,
+	closurePaths: ReadonlySet<string>,
+	diagnostics: ArrowCommandCensusArtifactSetDiagnostic[]
+): void {
 	for (const excluded of subject.excludedArtifacts) {
-		if (!isEligiblePath(excluded.path, closureSelection.paths)) continue;
+		if (!isEligiblePath(excluded.path, closurePaths)) continue;
 		if (OPTIONAL_ENVIRONMENT_PATHS.has(excluded.path)) continue;
 		diagnostics.push(
 			diagnostic(
@@ -430,9 +456,16 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 			)
 		);
 	}
-	// A derived closure member absent from the subject is exactly as fatal as a missing REQUIRED_PATH: the capsule
-	// would be written without it and the executor's dynamic import would fail inside the worker.
-	for (const path of [...REQUIRED_PATHS, ...closureSelection.paths]) {
+}
+
+// A derived closure member absent from the subject is exactly as fatal as a missing REQUIRED_PATH: the capsule
+// would be written without it and the executor's dynamic import would fail inside the worker.
+function collectMissingRequiredDiagnostics(
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>,
+	closurePaths: ReadonlySet<string>,
+	diagnostics: ArrowCommandCensusArtifactSetDiagnostic[]
+): void {
+	for (const path of [...REQUIRED_PATHS, ...closurePaths]) {
 		const count = rowsByPath.get(path)?.length ?? 0;
 		if (count === 0)
 			diagnostics.push(
@@ -444,6 +477,12 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 				)
 			);
 	}
+}
+
+function collectAmbiguousRowDiagnostics(
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>,
+	diagnostics: ArrowCommandCensusArtifactSetDiagnostic[]
+): void {
 	for (const [path, rows] of rowsByPath)
 		if (rows.length !== 1)
 			diagnostics.push(
@@ -454,6 +493,12 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 					'SELECT'
 				)
 			);
+}
+
+function collectCanonicalKeyCollisionDiagnostics(
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>,
+	diagnostics: ArrowCommandCensusArtifactSetDiagnostic[]
+): void {
 	const pathsByCanonicalKey = new Map<string, string[]>();
 	for (const [path] of rowsByPath) {
 		const key = canonicalPathKey(path);
@@ -462,16 +507,25 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 		pathsByCanonicalKey.set(key, paths);
 	}
 	for (const paths of pathsByCanonicalKey.values())
-		if (paths.length > 1)
+		if (paths.length > 1) {
+			// Ordered in place because the list was accumulated locally just above and is shared with nobody;
+			// the reported path is still read AFTER the ordering, exactly as it was.
+			paths.sort(compareText);
 			diagnostics.push(
 				diagnostic(
 					'AMBIGUOUS_REQUIRED_ARTIFACT',
-					`Eligible paths collide under canonical comparison: ${paths.sort(compareText).join(', ')}.`,
+					`Eligible paths collide under canonical comparison: ${paths.join(', ')}.`,
 					paths[0] ?? null,
 					'SELECT'
 				)
 			);
-	const eligiblePaths = [...rowsByPath.keys()];
+		}
+}
+
+function collectUnsupportedLayoutDiagnostics(
+	eligiblePaths: readonly string[],
+	diagnostics: ArrowCommandCensusArtifactSetDiagnostic[]
+): void {
 	for (const [label, predicate] of [
 		['direct handler', isHandlerSourcePath],
 		[
@@ -492,6 +546,17 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 					'RECONCILE'
 				)
 			);
+}
+
+function derivePopulation(subject: FrozenSubject): DerivedPopulation {
+	const closureSelection = executorClosure(subject);
+	const diagnostics: ArrowCommandCensusArtifactSetDiagnostic[] = [...closureSelection.diagnostics];
+	const rowsByPath = eligibleRowsByPath(subject, closureSelection.paths);
+	collectExcludedArtifactDiagnostics(subject, closureSelection.paths, diagnostics);
+	collectMissingRequiredDiagnostics(rowsByPath, closureSelection.paths, diagnostics);
+	collectAmbiguousRowDiagnostics(rowsByPath, diagnostics);
+	collectCanonicalKeyCollisionDiagnostics(rowsByPath, diagnostics);
+	collectUnsupportedLayoutDiagnostics([...rowsByPath.keys()], diagnostics);
 	const artifacts: ArrowCommandCensusArtifactBinding[] = [];
 	for (const [path, rows] of [...rowsByPath].sort(([left], [right]) => compareText(left, right))) {
 		if (rows.length !== 1) continue;
@@ -650,7 +715,7 @@ function denseArray(value: unknown): value is readonly unknown[] {
 	return (
 		keys.length === value.length + 1 &&
 		keys.every(
-			(key) => typeof key === 'string' && (key === 'length' || /^(?:0|[1-9][0-9]*)$/u.test(key))
+			(key) => typeof key === 'string' && (key === 'length' || /^(?:0|[1-9]\d*)$/u.test(key))
 		)
 	);
 }
@@ -665,6 +730,105 @@ function validStringArray(
 			(entry) => typeof entry === 'string' && (allowed === undefined || allowed.has(entry))
 		)
 	);
+}
+
+function artifactBindingIssue(
+	artifact: unknown,
+	path: string
+): ArrowCommandCensusValidationIssue | null {
+	if (
+		!exactPlainRecord(artifact, [
+			'bytes',
+			'canonicalPathKey',
+			'disposition',
+			'path',
+			'primaryClass',
+			'reason',
+			'roles',
+			'sha256',
+			'uses'
+		])
+	)
+		return { code: 'INVALID_SHAPE', message: 'Expected exact artifact binding.', path };
+	const roles = data(artifact, 'roles');
+	const uses = data(artifact, 'uses');
+	if (
+		!Number.isSafeInteger(data(artifact, 'bytes')) ||
+		(data(artifact, 'bytes') as number) < 0 ||
+		typeof data(artifact, 'canonicalPathKey') !== 'string' ||
+		!['ANALYZED', 'INVENTORY_ONLY'].includes(data(artifact, 'disposition') as string) ||
+		typeof data(artifact, 'path') !== 'string' ||
+		!PRIMARY_CLASSES.has(data(artifact, 'primaryClass') as ArtifactPrimaryClass) ||
+		typeof data(artifact, 'reason') !== 'string' ||
+		!validStringArray(roles, SEMANTIC_ROLES) ||
+		typeof data(artifact, 'sha256') !== 'string' ||
+		!SHA256.test(data(artifact, 'sha256') as string) ||
+		!validStringArray(uses, ARTIFACT_USE_SET)
+	)
+		return {
+			code: 'INVALID_VALUE',
+			message: 'Artifact binding contains an invalid value.',
+			path
+		};
+	return null;
+}
+
+function artifactBindingsIssue(
+	artifacts: readonly unknown[]
+): ArrowCommandCensusValidationIssue | null {
+	for (let index = 0; index < artifacts.length; index += 1) {
+		const issue = artifactBindingIssue(artifacts[index], `$.artifacts[${index}]`);
+		if (issue !== null) return issue;
+	}
+	return null;
+}
+
+function coverageValueIsValid(coverage: PlainRecord, key: string): boolean {
+	const entry = data(coverage, key);
+	if (key === 'reconciles') return typeof entry === 'boolean';
+	return Number.isSafeInteger(entry) && (entry as number) >= 0;
+}
+
+function coverageRecordIssue(coverage: unknown): ArrowCommandCensusValidationIssue | null {
+	const coverageKeys = [
+		'artifacts',
+		'baselineArtifacts',
+		'commandDeclarationArtifacts',
+		'contractSchemaArtifacts',
+		'environmentIdentityArtifacts',
+		'executorDependencyArtifacts',
+		'executorSourceArtifacts',
+		'executorTestArtifacts',
+		'handlerSourceArtifacts',
+		'packageManifestArtifacts',
+		'packageSourceArtifacts',
+		'reconciles',
+		'stateMachineDeclarationArtifacts'
+	] as const;
+	if (!exactPlainRecord(coverage, coverageKeys))
+		return {
+			code: 'INVALID_SHAPE',
+			message: 'Expected exact coverage record.',
+			path: '$.coverage'
+		};
+	for (const key of coverageKeys)
+		if (!coverageValueIsValid(coverage, key))
+			return {
+				code: 'INVALID_VALUE',
+				message: 'Coverage contains an invalid value.',
+				path: `$.coverage.${key}`
+			};
+	return null;
+}
+
+function digestAndIdentityIssue(value: PlainRecord): ArrowCommandCensusValidationIssue | null {
+	for (const key of ['artifactSetDigest', 'contentDigest'] as const)
+		if (typeof data(value, key) !== 'string' || !SHA256.test(data(value, key) as string))
+			return { code: 'INVALID_VALUE', message: 'Expected a SHA-256 digest.', path: `$.${key}` };
+	for (const key of ['id', 'method', 'schemaVersion', 'subjectId'] as const)
+		if (typeof data(value, key) !== 'string' || (data(value, key) as string).length === 0)
+			return { code: 'INVALID_VALUE', message: 'Expected non-empty text.', path: `$.${key}` };
+	return null;
 }
 
 function shapeIssue(value: unknown): ArrowCommandCensusValidationIssue | null {
@@ -688,84 +852,143 @@ function shapeIssue(value: unknown): ArrowCommandCensusValidationIssue | null {
 			message: 'Expected a dense artifact array.',
 			path: '$.artifacts'
 		};
-	for (let index = 0; index < artifacts.length; index += 1) {
-		const artifact = artifacts[index];
-		const path = `$.artifacts[${index}]`;
-		if (
-			!exactPlainRecord(artifact, [
-				'bytes',
-				'canonicalPathKey',
-				'disposition',
-				'path',
-				'primaryClass',
-				'reason',
-				'roles',
-				'sha256',
-				'uses'
-			])
-		)
-			return { code: 'INVALID_SHAPE', message: 'Expected exact artifact binding.', path };
-		const roles = data(artifact, 'roles');
-		const uses = data(artifact, 'uses');
-		if (
-			!Number.isSafeInteger(data(artifact, 'bytes')) ||
-			(data(artifact, 'bytes') as number) < 0 ||
-			typeof data(artifact, 'canonicalPathKey') !== 'string' ||
-			!['ANALYZED', 'INVENTORY_ONLY'].includes(data(artifact, 'disposition') as string) ||
-			typeof data(artifact, 'path') !== 'string' ||
-			!PRIMARY_CLASSES.has(data(artifact, 'primaryClass') as ArtifactPrimaryClass) ||
-			typeof data(artifact, 'reason') !== 'string' ||
-			!validStringArray(roles, SEMANTIC_ROLES) ||
-			typeof data(artifact, 'sha256') !== 'string' ||
-			!SHA256.test(data(artifact, 'sha256') as string) ||
-			!validStringArray(uses, ARTIFACT_USE_SET)
-		)
-			return {
-				code: 'INVALID_VALUE',
-				message: 'Artifact binding contains an invalid value.',
-				path
-			};
-	}
-	const coverage = data(value, 'coverage');
-	const coverageKeys = [
-		'artifacts',
-		'baselineArtifacts',
-		'commandDeclarationArtifacts',
-		'contractSchemaArtifacts',
-		'environmentIdentityArtifacts',
-		'executorDependencyArtifacts',
-		'executorSourceArtifacts',
-		'executorTestArtifacts',
-		'handlerSourceArtifacts',
-		'packageManifestArtifacts',
-		'packageSourceArtifacts',
-		'reconciles',
-		'stateMachineDeclarationArtifacts'
-	] as const;
-	if (!exactPlainRecord(coverage, coverageKeys))
+	const bindingIssue = artifactBindingsIssue(artifacts);
+	if (bindingIssue !== null) return bindingIssue;
+	const coverageIssue = coverageRecordIssue(data(value, 'coverage'));
+	if (coverageIssue !== null) return coverageIssue;
+	return digestAndIdentityIssue(value);
+}
+
+type IssueSink = (
+	code: ArrowCommandCensusValidationIssue['code'],
+	path: string,
+	message: string
+) => void;
+
+function validationOptionsIssue(
+	options: ArrowCommandCensusValidationOptions
+): ArrowCommandCensusValidationIssue | null {
+	if (!exactPlainRecord(options, options.maxIssues === undefined ? [] : ['maxIssues']))
 		return {
 			code: 'INVALID_SHAPE',
-			message: 'Expected exact coverage record.',
-			path: '$.coverage'
+			message: 'Expected exact validation options.',
+			path: '$options'
 		};
-	for (const key of coverageKeys)
-		if (
-			(key === 'reconciles' && typeof data(coverage, key) !== 'boolean') ||
-			(key !== 'reconciles' &&
-				(!Number.isSafeInteger(data(coverage, key)) || (data(coverage, key) as number) < 0))
-		)
-			return {
-				code: 'INVALID_VALUE',
-				message: 'Coverage contains an invalid value.',
-				path: `$.coverage.${key}`
-			};
-	for (const key of ['artifactSetDigest', 'contentDigest'] as const)
-		if (typeof data(value, key) !== 'string' || !SHA256.test(data(value, key) as string))
-			return { code: 'INVALID_VALUE', message: 'Expected a SHA-256 digest.', path: `$.${key}` };
-	for (const key of ['id', 'method', 'schemaVersion', 'subjectId'] as const)
-		if (typeof data(value, key) !== 'string' || (data(value, key) as string).length === 0)
-			return { code: 'INVALID_VALUE', message: 'Expected non-empty text.', path: `$.${key}` };
+	if (options.maxIssues !== undefined && !isPositiveSafeInteger(options.maxIssues))
+		return {
+			code: 'INVALID_VALUE',
+			message: 'maxIssues must be a positive safe integer.',
+			path: '$options.maxIssues'
+		};
 	return null;
+}
+
+function addIdentityIssues(
+	artifactSet: ArrowCommandCensusArtifactSetBinding,
+	subject: FrozenSubject | undefined,
+	add: IssueSink
+): void {
+	if (artifactSet.schemaVersion !== ARROW_COMMAND_CENSUS_ARTIFACT_SET_SCHEMA_VERSION)
+		add(
+			'UNSUPPORTED_SCHEMA_VERSION',
+			'$.schemaVersion',
+			'Unsupported artifact-set schema version.'
+		);
+	if (artifactSet.method !== ARROW_COMMAND_CENSUS_METHOD)
+		add(
+			'IDENTITY_MISMATCH',
+			'$.method',
+			'Artifact-set method is not the registered adapter method.'
+		);
+	if (subject !== undefined && artifactSet.subjectId !== subject.descriptor.subjectId)
+		add('IDENTITY_MISMATCH', '$.subjectId', 'Artifact set identifies a different FrozenSubject.');
+}
+
+function addArtifactOrderIssues(
+	artifacts: readonly ArrowCommandCensusArtifactBinding[],
+	add: IssueSink
+): void {
+	for (let index = 0; index < artifacts.length; index += 1) {
+		const current = artifacts[index]!;
+		if (index > 0 && compareText(artifacts[index - 1]!.path, current.path) >= 0)
+			add(
+				'NONCANONICAL_ORDER',
+				`$.artifacts[${index}].path`,
+				'Artifact paths must be strictly ordered.'
+			);
+		if (
+			new Set(current.uses).size !== current.uses.length ||
+			!sameStrings([...current.uses].sort(compareText), current.uses)
+		)
+			add(
+				'NONCANONICAL_ORDER',
+				`$.artifacts[${index}].uses`,
+				'Artifact uses must be unique and ordered.'
+			);
+	}
+}
+
+function addPopulationIssues(
+	derivedArtifacts: readonly ArrowCommandCensusArtifactBinding[],
+	actualArtifacts: readonly ArrowCommandCensusArtifactBinding[],
+	add: IssueSink
+): void {
+	if (derivedArtifacts.length !== actualArtifacts.length)
+		add(
+			'POPULATION_MISMATCH',
+			'$.artifacts',
+			'Artifact population length does not match the FrozenSubject.'
+		);
+	const maximum = Math.max(derivedArtifacts.length, actualArtifacts.length);
+	for (let index = 0; index < maximum; index += 1) {
+		const expected = derivedArtifacts[index];
+		const actual = actualArtifacts[index];
+		if (
+			expected === undefined ||
+			actual === undefined ||
+			canonicalJson(expected) !== canonicalJson(actual)
+		)
+			add(
+				'POPULATION_MISMATCH',
+				`$.artifacts[${index}]`,
+				'Artifact binding differs from the exact selected manifest row.'
+			);
+	}
+}
+
+function addReproductionIssues(
+	artifactSet: ArrowCommandCensusArtifactSetBinding,
+	derivedArtifacts: readonly ArrowCommandCensusArtifactBinding[],
+	add: IssueSink
+): void {
+	const expectedCoverage = coverageFor(derivedArtifacts);
+	if (canonicalJson(artifactSet.coverage) !== canonicalJson(expectedCoverage))
+		add(
+			'RECONCILIATION_MISMATCH',
+			'$.coverage',
+			'Coverage does not reproduce the selected population.'
+		);
+	const expectedArtifactSetDigest = arrowCommandCensusArtifactSetDigest(artifactSet.artifacts);
+	if (artifactSet.artifactSetDigest !== expectedArtifactSetDigest)
+		add(
+			'CONTENT_DIGEST_MISMATCH',
+			'$.artifactSetDigest',
+			'Artifact population digest does not reproduce.'
+		);
+	const expectedId = arrowCommandCensusArtifactSetId({
+		artifactSetDigest: artifactSet.artifactSetDigest,
+		method: artifactSet.method,
+		schemaVersion: artifactSet.schemaVersion,
+		subjectId: artifactSet.subjectId
+	});
+	if (artifactSet.id !== expectedId)
+		add('IDENTITY_MISMATCH', '$.id', 'Artifact-set identity does not reproduce.');
+	if (artifactSet.contentDigest !== arrowCommandCensusArtifactSetContentDigest(artifactSet))
+		add(
+			'CONTENT_DIGEST_MISMATCH',
+			'$.contentDigest',
+			'Artifact-set content digest does not reproduce.'
+		);
 }
 
 export function validateArrowCommandCensusArtifactSet(
@@ -774,28 +997,9 @@ export function validateArrowCommandCensusArtifactSet(
 	options: ArrowCommandCensusValidationOptions = {}
 ): ArrowCommandCensusValidationResult {
 	try {
-		let maxIssues = Number.POSITIVE_INFINITY;
-		if (!exactPlainRecord(options, options.maxIssues === undefined ? [] : ['maxIssues']))
-			return {
-				issues: [
-					{ code: 'INVALID_SHAPE', message: 'Expected exact validation options.', path: '$options' }
-				],
-				state: 'INVALID'
-			};
-		if (options.maxIssues !== undefined) {
-			if (!isPositiveSafeInteger(options.maxIssues))
-				return {
-					issues: [
-						{
-							code: 'INVALID_VALUE',
-							message: 'maxIssues must be a positive safe integer.',
-							path: '$options.maxIssues'
-						}
-					],
-					state: 'INVALID'
-				};
-			maxIssues = options.maxIssues;
-		}
+		const optionIssue = validationOptionsIssue(options);
+		if (optionIssue !== null) return { issues: [optionIssue], state: 'INVALID' };
+		const maxIssues = options.maxIssues ?? Number.POSITIVE_INFINITY;
 		const malformed = shapeIssue(value);
 		if (malformed !== null) return { issues: [malformed], state: 'INVALID' };
 		if (subject !== undefined && (!isFrozenSubjectCapability(subject) || isProxy(subject)))
@@ -809,98 +1013,20 @@ export function validateArrowCommandCensusArtifactSet(
 				],
 				state: 'INVALID'
 			};
-		const artifactSet =
-			value as import('../../contracts/arrow-command-census.js').ArrowCommandCensusArtifactSetBinding;
+		const artifactSet = value as ArrowCommandCensusArtifactSetBinding;
 		const allIssues: ArrowCommandCensusValidationIssue[] = [];
 		const add = (code: ArrowCommandCensusValidationIssue['code'], path: string, message: string) =>
 			allIssues.push({ code, message, path });
-		if (artifactSet.schemaVersion !== ARROW_COMMAND_CENSUS_ARTIFACT_SET_SCHEMA_VERSION)
-			add(
-				'UNSUPPORTED_SCHEMA_VERSION',
-				'$.schemaVersion',
-				'Unsupported artifact-set schema version.'
-			);
-		if (artifactSet.method !== ARROW_COMMAND_CENSUS_METHOD)
-			add(
-				'IDENTITY_MISMATCH',
-				'$.method',
-				'Artifact-set method is not the registered adapter method.'
-			);
-		if (subject !== undefined && artifactSet.subjectId !== subject.descriptor.subjectId)
-			add('IDENTITY_MISMATCH', '$.subjectId', 'Artifact set identifies a different FrozenSubject.');
-		for (let index = 0; index < artifactSet.artifacts.length; index += 1) {
-			const current = artifactSet.artifacts[index]!;
-			if (index > 0 && compareText(artifactSet.artifacts[index - 1]!.path, current.path) >= 0)
-				add(
-					'NONCANONICAL_ORDER',
-					`$.artifacts[${index}].path`,
-					'Artifact paths must be strictly ordered.'
-				);
-			if (
-				new Set(current.uses).size !== current.uses.length ||
-				!sameStrings([...current.uses].sort(compareText), current.uses)
-			)
-				add(
-					'NONCANONICAL_ORDER',
-					`$.artifacts[${index}].uses`,
-					'Artifact uses must be unique and ordered.'
-				);
-		}
+		addIdentityIssues(artifactSet, subject, add);
+		addArtifactOrderIssues(artifactSet.artifacts, add);
 		const derived =
 			subject === undefined
 				? { artifacts: artifactSet.artifacts, diagnostics: [] }
 				: derivePopulation(subject);
 		for (const cause of derived.diagnostics)
 			add('RECONCILIATION_MISMATCH', '$subject', cause.message);
-		if (derived.artifacts.length !== artifactSet.artifacts.length)
-			add(
-				'POPULATION_MISMATCH',
-				'$.artifacts',
-				'Artifact population length does not match the FrozenSubject.'
-			);
-		const maximum = Math.max(derived.artifacts.length, artifactSet.artifacts.length);
-		for (let index = 0; index < maximum; index += 1) {
-			const expected = derived.artifacts[index];
-			const actual = artifactSet.artifacts[index];
-			if (
-				expected === undefined ||
-				actual === undefined ||
-				canonicalJson(expected) !== canonicalJson(actual)
-			)
-				add(
-					'POPULATION_MISMATCH',
-					`$.artifacts[${index}]`,
-					'Artifact binding differs from the exact selected manifest row.'
-				);
-		}
-		const expectedCoverage = coverageFor(derived.artifacts);
-		if (canonicalJson(artifactSet.coverage) !== canonicalJson(expectedCoverage))
-			add(
-				'RECONCILIATION_MISMATCH',
-				'$.coverage',
-				'Coverage does not reproduce the selected population.'
-			);
-		const expectedArtifactSetDigest = arrowCommandCensusArtifactSetDigest(artifactSet.artifacts);
-		if (artifactSet.artifactSetDigest !== expectedArtifactSetDigest)
-			add(
-				'CONTENT_DIGEST_MISMATCH',
-				'$.artifactSetDigest',
-				'Artifact population digest does not reproduce.'
-			);
-		const expectedId = arrowCommandCensusArtifactSetId({
-			artifactSetDigest: artifactSet.artifactSetDigest,
-			method: artifactSet.method,
-			schemaVersion: artifactSet.schemaVersion,
-			subjectId: artifactSet.subjectId
-		});
-		if (artifactSet.id !== expectedId)
-			add('IDENTITY_MISMATCH', '$.id', 'Artifact-set identity does not reproduce.');
-		if (artifactSet.contentDigest !== arrowCommandCensusArtifactSetContentDigest(artifactSet))
-			add(
-				'CONTENT_DIGEST_MISMATCH',
-				'$.contentDigest',
-				'Artifact-set content digest does not reproduce.'
-			);
+		addPopulationIssues(derived.artifacts, artifactSet.artifacts, add);
+		addReproductionIssues(artifactSet, derived.artifacts, add);
 		if (allIssues.length === 0) return { issues: [], state: 'VALID' };
 		return {
 			issues: allIssues.slice(0, maxIssues),

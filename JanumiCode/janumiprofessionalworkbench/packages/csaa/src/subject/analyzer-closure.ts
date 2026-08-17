@@ -282,6 +282,50 @@ function validateEntries(
 	return findings;
 }
 
+interface ClosureAccumulator {
+	readonly bare: Set<string>;
+	readonly findings: FrozenModuleClosureFinding[];
+	readonly frontier: string[];
+	readonly paths: Set<string>;
+}
+
+/**
+ * Expands ONE already-parsed module into the accumulator, and decides one thing: whether the node budget was
+ * exhausted. Exhaustion is terminal — the caller stops the whole traversal on `true` — because a budget refusal
+ * must never degrade into a partial closure that keeps walking.
+ */
+function expandModuleEdges(
+	request: FrozenModuleClosureRequest,
+	rows: ReadonlySet<string>,
+	excluded: ReadonlySet<string>,
+	accumulator: ClosureAccumulator,
+	current: string,
+	source: ts.SourceFile
+): boolean {
+	for (const occurrence of collectModuleSpecifiers(source)) {
+		const edge = classifyEdge(rows, excluded, current, occurrence);
+		if (edge.kind === 'BARE') {
+			// The package boundary. Bare specifiers are COLLECTED, never traversed.
+			accumulator.bare.add(edge.specifier);
+			continue;
+		}
+		if (edge.kind === 'FINDING') {
+			accumulator.findings.push(edge.finding);
+			continue;
+		}
+		if (accumulator.paths.has(edge.path)) continue;
+		if (accumulator.paths.size >= request.maxClosureNodes) {
+			accumulator.findings.push(
+				finding('CLOSURE_BUDGET_EXHAUSTED', current, edge.specifier, edge.path, current)
+			);
+			return true;
+		}
+		accumulator.paths.add(edge.path);
+		accumulator.frontier.push(edge.path);
+	}
+	return false;
+}
+
 export function resolveFrozenModuleClosure(
 	request: FrozenModuleClosureRequest
 ): FrozenModuleClosure {
@@ -298,6 +342,7 @@ export function resolveFrozenModuleClosure(
 	const frontier = [...paths].sort(compareText);
 	const bare = new Set<string>();
 	const findings: FrozenModuleClosureFinding[] = [];
+	const accumulator: ClosureAccumulator = { bare, findings, frontier, paths };
 
 	while (frontier.length > 0) {
 		const current = frontier.shift()!;
@@ -308,30 +353,7 @@ export function resolveFrozenModuleClosure(
 			findings.push(parsed.finding);
 			continue;
 		}
-		let exhausted = false;
-		for (const occurrence of collectModuleSpecifiers(parsed.source)) {
-			const edge = classifyEdge(rows, excluded, current, occurrence);
-			if (edge.kind === 'BARE') {
-				// The package boundary. Bare specifiers are COLLECTED, never traversed.
-				bare.add(edge.specifier);
-				continue;
-			}
-			if (edge.kind === 'FINDING') {
-				findings.push(edge.finding);
-				continue;
-			}
-			if (paths.has(edge.path)) continue;
-			if (paths.size >= request.maxClosureNodes) {
-				findings.push(
-					finding('CLOSURE_BUDGET_EXHAUSTED', current, edge.specifier, edge.path, current)
-				);
-				exhausted = true;
-				break;
-			}
-			paths.add(edge.path);
-			frontier.push(edge.path);
-		}
-		if (exhausted) break;
+		if (expandModuleEdges(request, rows, excluded, accumulator, current, parsed.source)) break;
 	}
 
 	if (findings.length > 0) return failed(findings);

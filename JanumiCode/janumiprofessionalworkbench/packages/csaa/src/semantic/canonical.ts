@@ -109,6 +109,42 @@ const CANONICAL_BUFFER_LIMIT = 64 * 1024;
 const CANONICAL_BUFFER_CHUNK_LIMIT = 1_024;
 const CANONICAL_PROGRESS_CADENCE = 256;
 
+/** Bounded progress cadence shared by the resource-observable canonical traversals. */
+function createCanonicalProgressStep(
+	onProgress: CanonicalSemanticJsonProgress | undefined
+): () => void {
+	let workSinceProgress = 0;
+	return (): void => {
+		if (onProgress === undefined) return;
+		workSinceProgress += 1;
+		if (workSinceProgress < CANONICAL_PROGRESS_CADENCE) return;
+		workSinceProgress = 0;
+		onProgress();
+	};
+}
+
+/**
+ * The canonical JSON escape table, transcribed exactly. Keys are distinct UTF-16 code units, so a
+ * single lookup reproduces the ordered equality chain it replaces.
+ */
+const CANONICAL_JSON_SHORT_ESCAPES = new Map<number, string>([
+	[0x22, '\\"'],
+	[0x5c, '\\\\'],
+	[0x08, '\\b'],
+	[0x09, '\\t'],
+	[0x0a, '\\n'],
+	[0x0c, '\\f'],
+	[0x0d, '\\r']
+]);
+
+/** Returns the escape sequence for a code unit, or undefined when it is emitted verbatim. */
+function canonicalJsonEscapeSequence(code: number): string | undefined {
+	const shortEscape = CANONICAL_JSON_SHORT_ESCAPES.get(code);
+	if (shortEscape !== undefined) return shortEscape;
+	if (code < 0x20) return `\\u${code.toString(16).padStart(4, '0')}`;
+	return undefined;
+}
+
 function canonicalJsonEncodedPiece(
 	text: string,
 	index: number
@@ -122,24 +158,7 @@ function canonicalJsonEncodedPiece(
 	}
 	if (code >= 0xdc00 && code <= 0xdfff)
 		throw new TypeError('Semantic canonical JSON rejects lone UTF-16 surrogates.');
-	const encoded =
-		code === 0x22
-			? '\\"'
-			: code === 0x5c
-				? '\\\\'
-				: code === 0x08
-					? '\\b'
-					: code === 0x09
-						? '\\t'
-						: code === 0x0a
-							? '\\n'
-							: code === 0x0c
-								? '\\f'
-								: code === 0x0d
-									? '\\r'
-									: code < 0x20
-										? `\\u${code.toString(16).padStart(4, '0')}`
-										: text[index]!;
+	const encoded = canonicalJsonEscapeSequence(code) ?? text[index]!;
 	return { encoded, nextIndex: index + 1 };
 }
 
@@ -150,7 +169,107 @@ function compareUtf16CodeUnitStrings(left: string, right: string, step: () => vo
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
+}
+
+type CanonicalSemanticEntry = readonly [string, unknown];
+
+function dataDescriptor(input: object, key: PropertyKey): PropertyDescriptor {
+	const descriptor = Reflect.getOwnPropertyDescriptor(input, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		throw new TypeError('Semantic canonical JSON requires enumerable data properties.');
+	return descriptor;
+}
+
+function assertCanonicalSemanticNumber(input: number): void {
+	if (!Number.isFinite(input))
+		throw new TypeError('Semantic canonical JSON requires finite numbers.');
+	if (Number.isInteger(input) && !Number.isSafeInteger(input))
+		throw new TypeError('Semantic canonical JSON rejects unsafe integer values.');
+}
+
+/** Validates array shape (no expandos, dense, safe length) and returns the canonical length. */
+function canonicalSemanticArrayLength(input: readonly unknown[], step: () => void): number {
+	const ownKeys = Reflect.ownKeys(input);
+	for (const key of ownKeys) {
+		step();
+		if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key)))
+			throw new TypeError('Semantic canonical JSON rejects array expando properties.');
+	}
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(input, 'length');
+	const length =
+		lengthDescriptor !== undefined && 'value' in lengthDescriptor
+			? lengthDescriptor.value
+			: undefined;
+	if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0)
+		throw new TypeError('Semantic canonical JSON requires a valid array length.');
+	if (ownKeys.length !== length + 1)
+		throw new TypeError('Semantic canonical JSON rejects sparse arrays.');
+	return length;
+}
+
+function emitCanonicalSemanticArray(
+	input: readonly unknown[],
+	length: number,
+	emit: CanonicalChunkWriter,
+	step: () => void,
+	serialize: (value: unknown) => void
+): void {
+	emit('[');
+	for (let index = 0; index < length; index += 1) {
+		step();
+		if (index !== 0) emit(',');
+		serialize(dataDescriptor(input, String(index)).value);
+	}
+	emit(']');
+}
+
+/** Validates object shape and returns its entries in UTF-16 code-unit key order. */
+function canonicalSemanticObjectEntries(
+	input: object,
+	step: () => void,
+	assertUnicodeScalars: (text: string) => void
+): readonly CanonicalSemanticEntry[] {
+	const prototype = Reflect.getPrototypeOf(input) as object | null;
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Semantic canonical JSON requires plain objects.');
+	const ownKeys = Reflect.ownKeys(input);
+	for (const key of ownKeys) {
+		step();
+		if (typeof key !== 'string')
+			throw new TypeError('Semantic canonical JSON rejects symbol properties.');
+	}
+	return (ownKeys as string[])
+		.map((key) => {
+			step();
+			assertUnicodeScalars(key);
+			return [key, dataDescriptor(input, key).value] as const;
+		})
+		.sort(([left], [right]) => {
+			step();
+			return compareUtf16CodeUnitStrings(left, right, step);
+		});
+}
+
+function emitCanonicalSemanticObject(
+	entries: readonly CanonicalSemanticEntry[],
+	emit: CanonicalChunkWriter,
+	step: () => void,
+	writeCanonicalString: (text: string) => void,
+	serialize: (value: unknown) => void
+): void {
+	emit('{');
+	for (let index = 0; index < entries.length; index += 1) {
+		step();
+		if (index !== 0) emit(',');
+		const [key, child] = entries[index]!;
+		writeCanonicalString(key);
+		emit(':');
+		serialize(child);
+	}
+	emit('}');
 }
 
 function writeCanonicalSemanticJson(
@@ -159,14 +278,7 @@ function writeCanonicalSemanticJson(
 	onProgress?: CanonicalSemanticJsonProgress
 ): void {
 	const ancestors = new Set<object>();
-	let workSinceProgress = 0;
-	const step = (): void => {
-		if (onProgress === undefined) return;
-		workSinceProgress += 1;
-		if (workSinceProgress < CANONICAL_PROGRESS_CADENCE) return;
-		workSinceProgress = 0;
-		onProgress();
-	};
+	const step = createCanonicalProgressStep(onProgress);
 	const emit = (chunk: string): void => {
 		step();
 		write(chunk);
@@ -198,7 +310,7 @@ function writeCanonicalSemanticJson(
 			pieces = [];
 			bufferedCodeUnits = 0;
 		};
-		for (let index = 0; index < text.length; index += 1) {
+		for (let index = 0; index < text.length;) {
 			step();
 			const piece = canonicalJsonEncodedPiece(text, index);
 			if (piece.nextIndex === index + 2) {
@@ -206,18 +318,11 @@ function writeCanonicalSemanticJson(
 				bufferedCodeUnits += 2;
 			} else bufferedCodeUnits += 1;
 			pieces.push(piece.encoded);
-			index = piece.nextIndex - 1;
+			index = piece.nextIndex;
 			if (bufferedCodeUnits >= CANONICAL_PROGRESS_CADENCE) flush();
 		}
 		flush();
 		emit('"');
-	}
-
-	function dataDescriptor(input: object, key: PropertyKey): PropertyDescriptor {
-		const descriptor = Reflect.getOwnPropertyDescriptor(input, key);
-		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-			throw new TypeError('Semantic canonical JSON requires enumerable data properties.');
-		return descriptor;
 	}
 
 	function serialize(input: unknown): void {
@@ -235,10 +340,7 @@ function writeCanonicalSemanticJson(
 			return;
 		}
 		if (typeof input === 'number') {
-			if (!Number.isFinite(input))
-				throw new TypeError('Semantic canonical JSON requires finite numbers.');
-			if (Number.isInteger(input) && !Number.isSafeInteger(input))
-				throw new TypeError('Semantic canonical JSON rejects unsafe integer values.');
+			assertCanonicalSemanticNumber(input);
 			emit(JSON.stringify(input));
 			return;
 		}
@@ -249,59 +351,12 @@ function writeCanonicalSemanticJson(
 		ancestors.add(input);
 		try {
 			if (Array.isArray(input)) {
-				const ownKeys = Reflect.ownKeys(input);
-				for (const key of ownKeys) {
-					step();
-					if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))
-						throw new TypeError('Semantic canonical JSON rejects array expando properties.');
-				}
-				const lengthDescriptor = Reflect.getOwnPropertyDescriptor(input, 'length');
-				const length =
-					lengthDescriptor !== undefined && 'value' in lengthDescriptor
-						? lengthDescriptor.value
-						: undefined;
-				if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0)
-					throw new TypeError('Semantic canonical JSON requires a valid array length.');
-				if (ownKeys.length !== length + 1)
-					throw new TypeError('Semantic canonical JSON rejects sparse arrays.');
-				emit('[');
-				for (let index = 0; index < length; index += 1) {
-					step();
-					if (index !== 0) emit(',');
-					serialize(dataDescriptor(input, String(index)).value);
-				}
-				emit(']');
+				const length = canonicalSemanticArrayLength(input, step);
+				emitCanonicalSemanticArray(input, length, emit, step, serialize);
 				return;
 			}
-			const prototype = Reflect.getPrototypeOf(input) as object | null;
-			if (prototype !== Object.prototype && prototype !== null)
-				throw new TypeError('Semantic canonical JSON requires plain objects.');
-			const ownKeys = Reflect.ownKeys(input);
-			for (const key of ownKeys) {
-				step();
-				if (typeof key !== 'string')
-					throw new TypeError('Semantic canonical JSON rejects symbol properties.');
-			}
-			const entries = (ownKeys as string[])
-				.map((key) => {
-					step();
-					assertUnicodeScalars(key);
-					return [key, dataDescriptor(input, key).value] as const;
-				})
-				.sort(([left], [right]) => {
-					step();
-					return compareUtf16CodeUnitStrings(left, right, step);
-				});
-			emit('{');
-			for (let index = 0; index < entries.length; index += 1) {
-				step();
-				if (index !== 0) emit(',');
-				const [key, child] = entries[index]!;
-				writeCanonicalString(key);
-				emit(':');
-				serialize(child);
-			}
-			emit('}');
+			const entries = canonicalSemanticObjectEntries(input, step, assertUnicodeScalars);
+			emitCanonicalSemanticObject(entries, emit, step, writeCanonicalString, serialize);
 		} finally {
 			ancestors.delete(input);
 		}
@@ -336,14 +391,7 @@ export function compareCanonicalSemanticJsonStrings(
 	onProgress?: CanonicalSemanticJsonProgress
 ): number {
 	onProgress?.();
-	let workSinceProgress = 0;
-	const step = (): void => {
-		if (onProgress === undefined) return;
-		workSinceProgress += 1;
-		if (workSinceProgress < CANONICAL_PROGRESS_CADENCE) return;
-		workSinceProgress = 0;
-		onProgress();
-	};
+	const step = createCanonicalProgressStep(onProgress);
 	const leftUnits = canonicalJsonStringCodeUnits(left, step);
 	const rightUnits = canonicalJsonStringCodeUnits(right, step);
 	while (true) {
@@ -351,7 +399,9 @@ export function compareCanonicalSemanticJsonStrings(
 		const rightUnit = rightUnits.next();
 		if (leftUnit.done || rightUnit.done) {
 			onProgress?.();
-			return leftUnit.done === rightUnit.done ? 0 : leftUnit.done ? -1 : 1;
+			if (leftUnit.done === rightUnit.done) return 0;
+			if (leftUnit.done) return -1;
+			return 1;
 		}
 		if (leftUnit.value !== rightUnit.value) {
 			onProgress?.();
@@ -409,6 +459,39 @@ export function canonicalSemanticJsonWithProgress(
 }
 
 /**
+ * Bounded UTF-8 batching in front of a SHA-256 accumulator. The emitted byte order is exactly the
+ * order chunks are written, so batching never changes the digest preimage.
+ */
+function createCanonicalHashBuffer(hash: ReturnType<typeof createHash>): {
+	readonly write: (chunk: string, chunkBytes: number) => void;
+	readonly flush: () => void;
+} {
+	let buffered: string[] = [];
+	let bufferedBytes = 0;
+	const flush = (): void => {
+		if (buffered.length === 0) return;
+		hash.update(buffered.join(''), 'utf8');
+		buffered = [];
+		bufferedBytes = 0;
+	};
+	const write = (chunk: string, chunkBytes: number): void => {
+		if (chunkBytes >= CANONICAL_BUFFER_LIMIT) {
+			flush();
+			hash.update(chunk, 'utf8');
+			return;
+		}
+		if (
+			bufferedBytes + chunkBytes > CANONICAL_BUFFER_LIMIT ||
+			buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT
+		)
+			flush();
+		buffered.push(chunk);
+		bufferedBytes += chunkBytes;
+	};
+	return { write, flush };
+}
+
+/**
  * Computes the exact witness for the canonical UTF-8 representation while
  * retaining only a bounded batch of emitted canonical tokens.
  */
@@ -423,14 +506,7 @@ export function canonicalSemanticJsonWitnessWithProgress(
 ): CanonicalSemanticJsonWitness {
 	const hash = createHash('sha256');
 	let bytes = 0;
-	let buffered: string[] = [];
-	let bufferedBytes = 0;
-	const flush = (): void => {
-		if (buffered.length === 0) return;
-		hash.update(buffered.join(''), 'utf8');
-		buffered = [];
-		bufferedBytes = 0;
-	};
+	const buffer = createCanonicalHashBuffer(hash);
 	writeCanonicalSemanticJson(
 		value,
 		(chunk) => {
@@ -438,22 +514,11 @@ export function canonicalSemanticJsonWitnessWithProgress(
 			if (chunkBytes > Number.MAX_SAFE_INTEGER - bytes)
 				throw new TypeError('Semantic canonical JSON byte length exceeds safe-integer range.');
 			bytes += chunkBytes;
-			if (chunkBytes >= CANONICAL_BUFFER_LIMIT) {
-				flush();
-				hash.update(chunk, 'utf8');
-				return;
-			}
-			if (
-				bufferedBytes + chunkBytes > CANONICAL_BUFFER_LIMIT ||
-				buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT
-			)
-				flush();
-			buffered.push(chunk);
-			bufferedBytes += chunkBytes;
+			buffer.write(chunk, chunkBytes);
 		},
 		onProgress
 	);
-	flush();
+	buffer.flush();
 	onProgress?.();
 	const sha256 = hash.digest('hex');
 	onProgress?.();
@@ -476,34 +541,15 @@ export function canonicalSemanticJsonPrefixedSha256(
 	const hash = createHash('sha256');
 	hash.update(prefix, 'utf8');
 	onProgress?.();
-	let buffered: string[] = [];
-	let bufferedBytes = 0;
-	const flush = (): void => {
-		if (buffered.length === 0) return;
-		hash.update(buffered.join(''), 'utf8');
-		buffered = [];
-		bufferedBytes = 0;
-	};
+	const buffer = createCanonicalHashBuffer(hash);
 	writeCanonicalSemanticJson(
 		value,
 		(chunk) => {
-			const chunkBytes = Buffer.byteLength(chunk, 'utf8');
-			if (chunkBytes >= CANONICAL_BUFFER_LIMIT) {
-				flush();
-				hash.update(chunk, 'utf8');
-				return;
-			}
-			if (
-				bufferedBytes + chunkBytes > CANONICAL_BUFFER_LIMIT ||
-				buffered.length >= CANONICAL_BUFFER_CHUNK_LIMIT
-			)
-				flush();
-			buffered.push(chunk);
-			bufferedBytes += chunkBytes;
+			buffer.write(chunk, Buffer.byteLength(chunk, 'utf8'));
 		},
 		onProgress
 	);
-	flush();
+	buffer.flush();
 	onProgress?.();
 	const digest = hash.digest('hex');
 	onProgress?.();

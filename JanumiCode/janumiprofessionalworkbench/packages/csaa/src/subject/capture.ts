@@ -1,4 +1,11 @@
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	statSync,
+	type Dirent
+} from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import ts from 'typescript';
 import {
@@ -9,7 +16,7 @@ import {
 	type ResolveSubjectRequest,
 	type SubjectDiagnostic
 } from '../contracts/subject.js';
-import { sha256 } from '../inventory/canonical.js';
+import { compareText, sha256 } from '../inventory/canonical.js';
 import { classifyArtifact } from './artifacts.js';
 import type { FileFingerprint, SubjectCapture } from './capture-model.js';
 import {
@@ -62,6 +69,21 @@ function failure(
 	outcome: CaptureFailure['outcome'] = 'incompatible'
 ): never {
 	throw new CaptureFailure(diagnostic(code, message, path), outcome);
+}
+
+// A membership predicate only — never iterated and never emitted, so the Set carries no ordering
+// meaning and cannot reach a digest. `Array#includes` and `Set#has` both use SameValueZero, which is
+// identical for these string literals.
+const REQUIRED_CONFIGURATION_CLASSES = new Set([
+	'MANIFEST',
+	'LOCKFILE',
+	'TOOL_CONFIGURATION',
+	'PROJECT_CONFIGURATION',
+	'GENERATED_CONFIGURATION'
+]);
+
+function isRequiredConfigurationClass(primaryClass: string): boolean {
+	return REQUIRED_CONFIGURATION_CLASSES.has(primaryClass);
 }
 
 function rootFileCandidate(name: string): boolean {
@@ -119,7 +141,7 @@ function nearestExistingAncestor(realRoot: string, repositoryPath: string): stri
 	return real;
 }
 
-export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
+function assertSupportedRequestVersions(request: ResolveSubjectRequest): void {
 	if (
 		request.schemaVersion !== SUBJECT_REQUEST_SCHEMA_VERSION ||
 		request.policyVersion !== SUBJECT_POLICY_VERSION ||
@@ -131,6 +153,9 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 			null
 		);
 	}
+}
+
+function assertRequestPathsValid(request: ResolveSubjectRequest): void {
 	try {
 		validateRequestPaths(request);
 	} catch (error) {
@@ -141,19 +166,27 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 			'forbidden'
 		);
 	}
-	let realRoot: string;
+}
+
+function resolveRepositoryRootOrFail(rootLocator: string): string {
 	try {
-		realRoot = resolveRepositoryRoot(request.rootLocator);
+		return resolveRepositoryRoot(rootLocator);
 	} catch (error) {
 		failure(
 			'REPOSITORY_ROOT_INVALID',
 			error instanceof Error
-				? redactRoot(error.message, request.rootLocator, '<runtime>')
+				? redactRoot(error.message, rootLocator, '<runtime>')
 				: 'Invalid repository root.',
 			null,
 			'not-found'
 		);
 	}
+}
+
+export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
+	assertSupportedRequestVersions(request);
+	assertRequestPathsValid(request);
+	const realRoot = resolveRepositoryRootOrFail(request.rootLocator);
 	const started = Date.now();
 	const artifacts: CapturedArtifactRecord[] = [];
 	const excludedArtifacts: ExcludedArtifactRecord[] = [];
@@ -366,76 +399,88 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 		}
 	};
 
-	const walk = (directoryPath: string): void => {
-		checkBudget();
+	const readDirectoryEntries = (directoryPath: string): Dirent[] => {
 		const absolute = resolve(realRoot, ...directoryPath.split('/'));
-		let entries;
 		try {
 			confineDirectory(directoryPath);
 			const realDirectory = realpathSync(absolute);
-			entries = readdirSync(realDirectory, { withFileTypes: true });
+			return readdirSync(realDirectory, { withFileTypes: true });
 		} catch (error) {
 			if (error instanceof CaptureFailure) throw error;
 			failure('READ_FAILED', `Cannot enumerate ${directoryPath}.`, directoryPath, 'unavailable');
 		}
-		for (const entry of entries.sort((left, right) =>
-			left.name < right.name ? -1 : left.name > right.name ? 1 : 0
-		)) {
-			const path = `${directoryPath}/${entry.name}`;
-			let symbolicTargetIsDirectory = false;
-			if (entry.isSymbolicLink()) {
-				let realTarget: string;
-				try {
-					realTarget = realpathSync(resolve(realRoot, ...path.split('/')));
-				} catch {
-					failure('READ_FAILED', `Cannot resolve repository link ${path}.`, path, 'unavailable');
-				}
-				if (!isInsideRoot(realRoot, realTarget))
-					failure('SYMLINK_ESCAPE', `Repository link escapes root: ${path}.`, path, 'forbidden');
-				symbolicTargetIsDirectory = statSync(realTarget).isDirectory();
-			}
-			const entryIsDirectory = entry.isDirectory() || symbolicTargetIsDirectory;
-			if (entryIsDirectory) confineDirectory(path);
-			const outputDecision = exactOutputExclusion(path, request.outputs);
-			if (outputDecision !== null) {
-				if (!pathKeys.has(canonicalPathKey(path))) exclude(path, outputDecision);
-				continue;
-			}
-			if (entryIsDirectory) {
-				const decision = exclusionForDirectory(entry.name, path);
-				if (entry.name === '.svelte-kit') {
-					walkGeneratedContext(path);
-					continue;
-				}
-				if (decision !== null) {
-					exclude(path, decision, 'UNKNOWN');
-					continue;
-				}
-				walk(path);
-				continue;
-			}
-			const localStateDecision = sensitiveOrLocalStateExclusion(path);
-			if (localStateDecision !== null) {
-				exclude(path, localStateDecision);
-				continue;
-			}
-			const classification = classifyArtifact(path);
-			const requiredConfiguration = [
-				'MANIFEST',
-				'LOCKFILE',
-				'TOOL_CONFIGURATION',
-				'PROJECT_CONFIGURATION',
-				'GENERATED_CONFIGURATION'
-			].includes(classification.primaryClass);
-			if (!requiredConfiguration && !isRequestedPath(path, request)) {
-				exclude(path, {
-					policyId: subjectFilterPolicyId(request),
-					primaryClass: classification.primaryClass,
-					reason: 'Artifact excluded by bounded request filter.'
-				});
-				continue;
-			}
-			captureFile(path);
+	};
+
+	const linkTargetIsDirectory = (path: string, entry: Dirent): boolean => {
+		if (!entry.isSymbolicLink()) return false;
+		let realTarget: string;
+		try {
+			realTarget = realpathSync(resolve(realRoot, ...path.split('/')));
+		} catch {
+			failure('READ_FAILED', `Cannot resolve repository link ${path}.`, path, 'unavailable');
+		}
+		if (!isInsideRoot(realRoot, realTarget))
+			failure('SYMLINK_ESCAPE', `Repository link escapes root: ${path}.`, path, 'forbidden');
+		return statSync(realTarget).isDirectory();
+	};
+
+	const visitWalkedFile = (path: string): void => {
+		const localStateDecision = sensitiveOrLocalStateExclusion(path);
+		if (localStateDecision !== null) {
+			exclude(path, localStateDecision);
+			return;
+		}
+		const classification = classifyArtifact(path);
+		if (
+			!isRequiredConfigurationClass(classification.primaryClass) &&
+			!isRequestedPath(path, request)
+		) {
+			exclude(path, {
+				policyId: subjectFilterPolicyId(request),
+				primaryClass: classification.primaryClass,
+				reason: 'Artifact excluded by bounded request filter.'
+			});
+			return;
+		}
+		captureFile(path);
+	};
+
+	// Returns the directory to descend into, or null when this entry was handled without descent.
+	const visitWalkedDirectory = (entry: Dirent, path: string): string | null => {
+		const decision = exclusionForDirectory(entry.name, path);
+		if (entry.name === '.svelte-kit') {
+			walkGeneratedContext(path);
+			return null;
+		}
+		if (decision !== null) {
+			exclude(path, decision, 'UNKNOWN');
+			return null;
+		}
+		return path;
+	};
+
+	const visitWalkedEntry = (directoryPath: string, entry: Dirent): string | null => {
+		const path = `${directoryPath}/${entry.name}`;
+		const symbolicTargetIsDirectory = linkTargetIsDirectory(path, entry);
+		const entryIsDirectory = entry.isDirectory() || symbolicTargetIsDirectory;
+		if (entryIsDirectory) confineDirectory(path);
+		const outputDecision = exactOutputExclusion(path, request.outputs);
+		if (outputDecision !== null) {
+			if (!pathKeys.has(canonicalPathKey(path))) exclude(path, outputDecision);
+			return null;
+		}
+		if (entryIsDirectory) return visitWalkedDirectory(entry, path);
+		visitWalkedFile(path);
+		return null;
+	};
+
+	const walk = (directoryPath: string): void => {
+		checkBudget();
+		const entries = readDirectoryEntries(directoryPath);
+		entries.sort((left, right) => compareText(left.name, right.name));
+		for (const entry of entries) {
+			const descendInto = visitWalkedEntry(directoryPath, entry);
+			if (descendInto !== null) walk(descendInto);
 		}
 	};
 
@@ -455,51 +500,66 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 	const rootEntries = readdirSync(realRoot, { withFileTypes: true }).sort((left, right) =>
 		left.name < right.name ? -1 : 1
 	);
-	for (const entry of rootEntries) {
+	const captureRootFile = (name: string): void => {
+		const outputDecision = exactOutputExclusion(name, request.outputs);
+		if (outputDecision !== null) {
+			if (!pathKeys.has(canonicalPathKey(name))) exclude(name, outputDecision);
+			return;
+		}
+		if (
+			isRequiredConfigurationClass(classifyArtifact(name).primaryClass) ||
+			isRequestedPath(name, request)
+		) {
+			captureFile(name);
+			return;
+		}
+		exclude(name, {
+			policyId: subjectFilterPolicyId(request),
+			primaryClass: classifyArtifact(name).primaryClass,
+			reason: 'Artifact excluded by bounded request filter.'
+		});
+	};
+
+	const visitRootEntry = (entry: Dirent): void => {
 		const name = entry.name;
 		if (
 			rootFileCandidate(name) &&
 			name !== 'package.json' &&
 			(entry.isFile() || entry.isSymbolicLink())
-		) {
-			const outputDecision = exactOutputExclusion(name, request.outputs);
-			if (outputDecision !== null) {
-				if (!pathKeys.has(canonicalPathKey(name))) exclude(name, outputDecision);
-			} else if (
-				[
-					'MANIFEST',
-					'LOCKFILE',
-					'TOOL_CONFIGURATION',
-					'PROJECT_CONFIGURATION',
-					'GENERATED_CONFIGURATION'
-				].includes(classifyArtifact(name).primaryClass) ||
-				isRequestedPath(name, request)
-			)
-				captureFile(name);
-			else
-				exclude(name, {
-					policyId: subjectFilterPolicyId(request),
-					primaryClass: classifyArtifact(name).primaryClass,
-					reason: 'Artifact excluded by bounded request filter.'
-				});
-		}
-	}
-	const includedBases = [...new Set([...bases, 'scripts', 'verif', '.github'])].sort();
-	for (const base of includedBases) {
+		)
+			captureRootFile(name);
+	};
+
+	for (const entry of rootEntries) visitRootEntry(entry);
+	const includedBases = [...new Set([...bases, 'scripts', 'verif', '.github'])].sort(compareText);
+	const walkConfiguredBase = (base: string): void => {
 		const absolute = resolve(realRoot, base);
-		if (existsSync(absolute)) {
-			const realBase = realpathSync(absolute);
-			if (!isInsideRoot(realRoot, realBase))
-				failure(
-					'SYMLINK_ESCAPE',
-					`Configured subject root escapes repository: ${base}.`,
-					base,
-					'forbidden'
-				);
-			if (statSync(realBase).isDirectory()) walk(base);
-		}
-	}
-	for (const entry of rootEntries) {
+		if (!existsSync(absolute)) return;
+		const realBase = realpathSync(absolute);
+		if (!isInsideRoot(realRoot, realBase))
+			failure(
+				'SYMLINK_ESCAPE',
+				`Configured subject root escapes repository: ${base}.`,
+				base,
+				'forbidden'
+			);
+		if (statSync(realBase).isDirectory()) walk(base);
+	};
+	for (const base of includedBases) walkConfiguredBase(base);
+	const topLevelLinkTargetIsDirectory = (path: string, entry: Dirent): boolean => {
+		if (!entry.isSymbolicLink()) return false;
+		const target = realpathSync(resolve(realRoot, path));
+		if (!isInsideRoot(realRoot, target))
+			failure(
+				'SYMLINK_ESCAPE',
+				`Top-level repository link escapes root: ${path}.`,
+				path,
+				'forbidden'
+			);
+		return statSync(target).isDirectory();
+	};
+
+	const excludePerimeterEntry = (entry: Dirent): void => {
 		const path = entry.name;
 		if (
 			path === 'package.json' ||
@@ -507,19 +567,8 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 			includedBases.includes(path) ||
 			pathKeys.has(canonicalPathKey(path))
 		)
-			continue;
-		let symbolicDirectory = false;
-		if (entry.isSymbolicLink()) {
-			const target = realpathSync(resolve(realRoot, path));
-			if (!isInsideRoot(realRoot, target))
-				failure(
-					'SYMLINK_ESCAPE',
-					`Top-level repository link escapes root: ${path}.`,
-					path,
-					'forbidden'
-				);
-			symbolicDirectory = statSync(target).isDirectory();
-		}
+			return;
+		const symbolicDirectory = topLevelLinkTargetIsDirectory(path, entry);
 		if (entry.isDirectory() || symbolicDirectory) {
 			confineDirectory(path);
 			const decision = exclusionForDirectory(entry.name, path) ?? {
@@ -528,7 +577,7 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 				reason: 'Top-level region lies outside the configured code-analysis perimeter.'
 			};
 			exclude(path, decision, 'UNKNOWN');
-			continue;
+			return;
 		}
 		const local = sensitiveOrLocalStateExclusion(path);
 		exclude(
@@ -539,16 +588,21 @@ export function captureSubject(request: ResolveSubjectRequest): SubjectCapture {
 				reason: 'Top-level artifact lies outside the configured code-analysis perimeter.'
 			}
 		);
-	}
+	};
+
+	for (const entry of rootEntries) excludePerimeterEntry(entry);
 	if (artifacts.length === 0 && request.expectEmpty !== true)
 		failure('EMPTY_SUBJECT', 'Subject discovery selected no artifacts.', null);
+	artifacts.sort((left, right) => (left.path < right.path ? -1 : 1));
+	excludedArtifacts.sort((left, right) => (left.path < right.path ? -1 : 1));
+	const sortedDirectoryPaths = [...directoryPaths].sort(compareText);
 	const preliminary: SubjectCapture = {
-		artifacts: artifacts.sort((left, right) => (left.path < right.path ? -1 : 1)),
+		artifacts,
 		bytesByPath,
 		diagnostics: [],
-		directoryPaths: [...directoryPaths].sort(),
+		directoryPaths: sortedDirectoryPaths,
 		discoveredArtifactCount: discoveredPhysicalFiles,
-		excludedArtifacts: excludedArtifacts.sort((left, right) => (left.path < right.path ? -1 : 1)),
+		excludedArtifacts,
 		fingerprints,
 		realRoot,
 		typescriptDirectoryRecordings: new Map()

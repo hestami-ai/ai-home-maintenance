@@ -387,6 +387,9 @@ function writeCapsule(
 	const written: WrittenArtifact[] = [];
 	for (const artifact of artifactSet.artifacts) {
 		const bytes = readFrozenSubjectArtifact(subject, artifact.path);
+		// S6582 REFUSED — see build-command-event-contract-overlay.ts: the explicit `=== undefined` limb
+		// is the only thing keeping `sha256` from running on a missing buffer, and the declared `number`
+		// type of `artifact.bytes` hides that from the type-checker.
 		if (
 			bytes === undefined ||
 			bytes.byteLength !== artifact.bytes ||
@@ -665,6 +668,285 @@ export function classifyGuardEnforcementLedgerObservationOutcome(
 		: 'partial';
 }
 
+type ExecutorEnvironment = ReturnType<typeof resolveArrowCommandCensusExecutorEnvironment>;
+
+type ParsedWorkerRuntime = ReturnType<typeof parseGuardEnforcementLedgerWorkerOutput>['runtime'];
+
+interface BoundArtifactSet {
+	readonly artifactBytes: number;
+	readonly snapshot: GuardEnforcementLedgerArtifactSetBinding;
+	readonly subject: FrozenSubject;
+}
+
+/** Admits the closed dependency pair and the private snapshot every later phase reads. */
+function bindArtifactSetSnapshot(
+	request: ObserveGuardEnforcementLedgerRequest,
+	dependencies: ObserveGuardEnforcementLedgerDependencies
+): BoundArtifactSet {
+	const { artifactSet, subject } = closedDependencies(dependencies);
+	const setValidation = validateGuardEnforcementLedgerArtifactSet(artifactSet, subject, {
+		maxIssues: request.budgets.maxDiagnostics,
+		maxRecords: request.budgets.maxArtifacts,
+		maxStringCharacters: request.budgets.maxOutputStringCharacters
+	});
+	if (setValidation.state !== 'VALID')
+		fail(
+			setValidation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'ARTIFACT_SET_INVALID',
+			'BIND',
+			setValidation.issues[0]?.message ?? 'Artifact-set validation failed.',
+			setValidation.issues[0]?.path ?? null
+		);
+	const snapshot = structuredClone(artifactSet);
+	const snapshotValidation = validateGuardEnforcementLedgerArtifactSet(snapshot, subject, {
+		maxIssues: request.budgets.maxDiagnostics,
+		maxRecords: request.budgets.maxArtifacts,
+		maxStringCharacters: request.budgets.maxOutputStringCharacters
+	});
+	if (snapshotValidation.state !== 'VALID')
+		fail(
+			'ARTIFACT_SET_INVALID',
+			'BIND',
+			'Artifact-set snapshot validation failed.',
+			'$dependencies.artifactSet'
+		);
+	if (subject.descriptor.subjectId !== request.subjectId)
+		fail('SUBJECT_ID_MISMATCH', 'BIND', 'Request and FrozenSubject identities differ.');
+	if (snapshot.id !== request.artifactSetId || snapshot.subjectId !== request.subjectId)
+		fail(
+			'ARTIFACT_SET_IDENTITY_MISMATCH',
+			'BIND',
+			'Request does not bind the supplied artifact set.'
+		);
+	return {
+		artifactBytes: snapshot.artifacts.reduce((total, artifact) => total + artifact.bytes, 0),
+		snapshot,
+		subject
+	};
+}
+
+/** A retained selection the validated artifact set does not contain refuses at BIND. */
+function requireRetainedArtifact<T>(artifact: T | undefined, message: string, path: string): T {
+	if (artifact === undefined) fail('ARTIFACT_SET_INVALID', 'BIND', message, path);
+	return artifact;
+}
+
+/** Only the exact captured worker bytes may execute; drift on either side refuses. */
+function assertWorkerBytesMatch(
+	bytes: Uint8Array,
+	expected: { readonly bytes: number; readonly sha256: string },
+	phase: GuardEnforcementLedgerDiagnostic['phase'],
+	message: string,
+	path: string
+): void {
+	if (bytes.byteLength !== expected.bytes || sha256(bytes) !== expected.sha256)
+		fail('EXECUTOR_IDENTITY_MISMATCH', phase, message, path);
+}
+
+interface MaterializedCapsule {
+	readonly capsuleWorker: string;
+	readonly written: readonly WrittenArtifact[];
+}
+
+/** Materializes the read-only capsule that is the only thing the retained verifier may see. */
+function materializeCapsule(
+	capsuleRoot: string,
+	snapshot: GuardEnforcementLedgerArtifactSetBinding,
+	subject: FrozenSubject,
+	workerBytes: Uint8Array,
+	environment: ExecutorEnvironment,
+	maxMaterializedBytes: number
+): MaterializedCapsule {
+	if (/[%#\s]/u.test(capsuleRoot))
+		fail(
+			'EXECUTOR_FAILED',
+			'BIND',
+			'Retained analyzer requires a URL-safe capsule path.',
+			'$executor.capsule'
+		);
+	const written = writeCapsule(capsuleRoot, snapshot, subject, workerBytes, maxMaterializedBytes);
+	linkModule(capsuleRoot, 'typescript', environment.moduleRoots.typescript);
+	linkModule(capsuleRoot, 'ulid', environment.moduleRoots.ulid);
+	linkModule(capsuleRoot, 'zod', environment.moduleRoots.zod);
+	const capsuleWorker = join(capsuleRoot, '.csaa', 'worker.ts');
+	makeReadOnly([...written.map((artifact) => artifact.absolutePath), capsuleWorker]);
+	return { capsuleWorker, written };
+}
+
+/** Nothing the capsule executed may have moved the bytes witnessed before execution. */
+function verifyPostExecutionIntegrity(
+	request: ObserveGuardEnforcementLedgerRequest,
+	written: readonly WrittenArtifact[],
+	capsuleWorker: string,
+	environment: ExecutorEnvironment,
+	expectedWorker: { readonly bytes: number; readonly sha256: string }
+): void {
+	verifyCapsuleBytes(written);
+	assertWorkerBytesMatch(
+		readFileSync(capsuleWorker),
+		expectedWorker,
+		'VALIDATE',
+		'Materialized worker bytes changed.',
+		'$worker'
+	);
+	const recaptured = resolveArrowCommandCensusExecutorEnvironment({
+		maxExternalModuleBytes: request.budgets.maxExternalModuleBytes,
+		maxExternalModuleFiles: request.budgets.maxExternalModuleFiles,
+		workerPath: WORKER_PATH
+	});
+	if (canonicalSemanticJson(recaptured.identity) !== canonicalSemanticJson(environment.identity))
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'VALIDATE',
+			'Executor or external module bytes changed.',
+			'$executor'
+		);
+}
+
+/** A retained verifier is believed only when it exits clean and says nothing on stderr. */
+function acceptRetainedVerifierResult(processResult: ProcessResult): void {
+	if (processResult.exitCode !== 0)
+		fail(
+			'EXECUTOR_FAILED',
+			'EXECUTE',
+			`Retained analyzer exited with status ${String(processResult.exitCode)}; stderr SHA-256 ${sha256(processResult.stderr)}${stderrExcerpt(processResult.stderr)}.`,
+			'$worker'
+		);
+	if (processResult.stderr.byteLength !== 0)
+		fail(
+			'EXECUTOR_FAILED',
+			'EXECUTE',
+			'Retained analyzer emitted stderr on a successful exit.',
+			'$worker'
+		);
+}
+
+/** The worker's self-report must reproduce the executor capture module for module. */
+function reconcileWorkerRuntime(
+	runtime: ParsedWorkerRuntime,
+	executor: Pick<ExecutorEnvironment['identity'], 'externalModules' | 'runtimeVersion'>,
+	moduleRoots: ExecutorEnvironment['moduleRoots']
+): void {
+	const modules = new Map(executor.externalModules.map((module) => [module.name, module]));
+	if (runtime.bunVersion !== executor.runtimeVersion)
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'VALIDATE',
+			'Worker Bun version differs from the captured executor.',
+			'$worker.runtime'
+		);
+	for (const name of ['typescript', 'ulid', 'zod'] as const) {
+		const module = modules.get(name);
+		if (module === undefined)
+			fail(
+				'EXECUTOR_IDENTITY_MISMATCH',
+				'VALIDATE',
+				'Executor module population is incomplete.',
+				'$executor.externalModules'
+			);
+		const reportedVersion = runtime[`${name}Version`];
+		const reportedPath = runtime[`${name}ResolvedPath`];
+		if (reportedVersion !== module.version)
+			fail(
+				'EXECUTOR_IDENTITY_MISMATCH',
+				'VALIDATE',
+				`Worker-reported ${name} version differs from capture.`,
+				'$worker.runtime'
+			);
+		verifyRuntimePath(reportedPath, moduleRoots[name], name);
+	}
+	if (!modules.has('typescript') || !modules.has('ulid') || !modules.has('zod'))
+		fail(
+			'EXECUTOR_IDENTITY_MISMATCH',
+			'VALIDATE',
+			'Executor module population is incomplete.',
+			'$executor.externalModules'
+		);
+}
+
+/** Independent public validation is the acceptance gate for the projected observation. */
+function assertObservationValidates(
+	normalized: ReturnType<typeof normalizeGuardEnforcementLedgerObservation>,
+	subject: FrozenSubject
+): 'VALID' {
+	const observationValidation = validateGuardEnforcementLedgerObservation(normalized, subject);
+	if (observationValidation.state !== 'VALID')
+		fail(
+			'OBSERVATION_VALIDATION_FAILED',
+			'VALIDATE',
+			observationValidation.issues[0]?.message ??
+				'Independent public observation validation failed.',
+			observationValidation.issues[0]?.path ?? '$observation'
+		);
+	return observationValidation.state;
+}
+
+/** Classifies a thrown failure into its closed diagnostic, in the order the observer refuses. */
+function observationFailureDiagnostic(error: unknown): GuardEnforcementLedgerDiagnostic {
+	if (error instanceof ObserveFailure) return error.diagnostic;
+	if (error instanceof ArrowCommandCensusExecutorEnvironmentError)
+		return {
+			code: error.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'EXECUTOR_FAILED',
+			message: 'Executor environment capture failed closed.',
+			path: '$executor',
+			phase: 'BIND',
+			severity: 'ERROR'
+		};
+	if (error instanceof GuardEnforcementLedgerRawOutputError)
+		return {
+			code: 'RAW_OUTPUT_INVALID',
+			message: error.message,
+			path: error.path,
+			phase: 'NORMALIZE',
+			severity: 'ERROR'
+		};
+	if (error instanceof GuardEnforcementLedgerNormalizationError)
+		return {
+			code: 'OBSERVATION_VALIDATION_FAILED',
+			message: error.message,
+			path: error.path,
+			phase: 'VALIDATE',
+			severity: 'ERROR'
+		};
+	return {
+		code: 'EXECUTOR_FAILED',
+		message: 'Guard-enforcement ledger observation failed closed.',
+		path: null,
+		phase: 'EXECUTE',
+		severity: 'ERROR'
+	};
+}
+
+/** Cleanup is best-effort but never silent: a failed removal replaces the outcome. */
+function cleanupCapsule(
+	capsuleRoot: string | null,
+	progress: ProgressRecorder,
+	maximumDiagnostics: number
+): ObserveGuardEnforcementLedgerOutcome | null {
+	if (capsuleRoot === null) {
+		progress.skip('CAPSULE_CLEANUP', { attempted: false, reason: 'CAPSULE_NOT_CREATED' });
+		return null;
+	}
+	progress.start('CAPSULE_CLEANUP', { attempted: true });
+	try {
+		rmSync(capsuleRoot, { force: true, recursive: true });
+		progress.complete({ attempted: true, succeeded: true });
+		return null;
+	} catch (error) {
+		progress.fail(error);
+		const cleanupDiagnostic: GuardEnforcementLedgerDiagnostic = {
+			code: 'EXECUTOR_FAILED',
+			message: 'Guard-ledger capsule cleanup failed; temporary material may remain.',
+			path: null,
+			phase: 'VALIDATE',
+			severity: 'ERROR'
+		};
+		return {
+			diagnostics: [cleanupDiagnostic].slice(0, maximumDiagnostics),
+			outcome: 'unavailable'
+		};
+	}
+}
+
 export async function observeGuardEnforcementLedger(
 	requestValue: ObserveGuardEnforcementLedgerRequest,
 	dependencies: ObserveGuardEnforcementLedgerDependencies,
@@ -689,51 +971,11 @@ export async function observeGuardEnforcementLedger(
 		const request = closedRequest(requestValue);
 		maximumDiagnostics = request.budgets.maxDiagnostics;
 		progress.start('REQUEST_AND_ARTIFACT_BIND');
-		const { artifactSet, subject } = closedDependencies(dependencies);
-		const setValidation = validateGuardEnforcementLedgerArtifactSet(artifactSet, subject, {
-			maxIssues: request.budgets.maxDiagnostics,
-			maxRecords: request.budgets.maxArtifacts,
-			maxStringCharacters: request.budgets.maxOutputStringCharacters
-		});
-		if (setValidation.state !== 'VALID')
-			fail(
-				setValidation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'ARTIFACT_SET_INVALID',
-				'BIND',
-				setValidation.issues[0]?.message ?? 'Artifact-set validation failed.',
-				setValidation.issues[0]?.path ?? null
-			);
-		const artifactSetSnapshot = structuredClone(artifactSet);
-		const snapshotValidation = validateGuardEnforcementLedgerArtifactSet(
-			artifactSetSnapshot,
-			subject,
-			{
-				maxIssues: request.budgets.maxDiagnostics,
-				maxRecords: request.budgets.maxArtifacts,
-				maxStringCharacters: request.budgets.maxOutputStringCharacters
-			}
-		);
-		if (snapshotValidation.state !== 'VALID')
-			fail(
-				'ARTIFACT_SET_INVALID',
-				'BIND',
-				'Artifact-set snapshot validation failed.',
-				'$dependencies.artifactSet'
-			);
-		if (subject.descriptor.subjectId !== request.subjectId)
-			fail('SUBJECT_ID_MISMATCH', 'BIND', 'Request and FrozenSubject identities differ.');
-		if (
-			artifactSetSnapshot.id !== request.artifactSetId ||
-			artifactSetSnapshot.subjectId !== request.subjectId
-		)
-			fail(
-				'ARTIFACT_SET_IDENTITY_MISMATCH',
-				'BIND',
-				'Request does not bind the supplied artifact set.'
-			);
-		const artifactBytes = artifactSetSnapshot.artifacts.reduce(
-			(total, artifact) => total + artifact.bytes,
-			0
-		);
+		const {
+			artifactBytes,
+			snapshot: artifactSetSnapshot,
+			subject
+		} = bindArtifactSetSnapshot(request, dependencies);
 		progress.complete({
 			artifactBytes,
 			artifactSetId: artifactSetSnapshot.id,
@@ -751,26 +993,16 @@ export async function observeGuardEnforcementLedger(
 			maxExternalModuleFiles: request.budgets.maxExternalModuleFiles,
 			workerPath: WORKER_PATH
 		});
-		const analyzer = artifactSetSnapshot.artifacts.find(
-			(artifact) => artifact.path === ANALYZER_PATH
+		const analyzer = requireRetainedArtifact(
+			artifactSetSnapshot.artifacts.find((artifact) => artifact.path === ANALYZER_PATH),
+			'Artifact set omits the retained analyzer.',
+			ANALYZER_PATH
 		);
-		const dataArtifact = artifactSetSnapshot.artifacts.find(
-			(artifact) => artifact.path === DATA_PATH
+		const dataArtifact = requireRetainedArtifact(
+			artifactSetSnapshot.artifacts.find((artifact) => artifact.path === DATA_PATH),
+			'Artifact set omits the retained ledger data.',
+			DATA_PATH
 		);
-		if (analyzer === undefined)
-			fail(
-				'ARTIFACT_SET_INVALID',
-				'BIND',
-				'Artifact set omits the retained analyzer.',
-				ANALYZER_PATH
-			);
-		if (dataArtifact === undefined)
-			fail(
-				'ARTIFACT_SET_INVALID',
-				'BIND',
-				'Artifact set omits the retained ledger data.',
-				DATA_PATH
-			);
 		const executor = {
 			adapterId: GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
 			adapterVersion: GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
@@ -781,16 +1013,13 @@ export async function observeGuardEnforcementLedger(
 			retainedDataSha256: dataArtifact.sha256
 		};
 		const workerBytes = readFileSync(WORKER_PATH);
-		if (
-			workerBytes.byteLength !== executor.worker.bytes ||
-			sha256(workerBytes) !== executor.worker.sha256
-		)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'BIND',
-				'Worker bytes changed after executor capture.',
-				'$executor.worker'
-			);
+		assertWorkerBytesMatch(
+			workerBytes,
+			executor.worker,
+			'BIND',
+			'Worker bytes changed after executor capture.',
+			'$executor.worker'
+		);
 		progress.complete({
 			runtime: executor.runtime,
 			runtimeVersion: executor.runtimeVersion,
@@ -803,25 +1032,14 @@ export async function observeGuardEnforcementLedger(
 			maxMaterializedBytes: request.budgets.maxMaterializedBytes
 		});
 		capsuleRoot = mkdtempSync(join(tmpdir(), 'jcsaa-guard-'));
-		if (/[%#\s]/u.test(capsuleRoot))
-			fail(
-				'EXECUTOR_FAILED',
-				'BIND',
-				'Retained analyzer requires a URL-safe capsule path.',
-				'$executor.capsule'
-			);
-		const written = writeCapsule(
+		const { capsuleWorker, written } = materializeCapsule(
 			capsuleRoot,
 			artifactSetSnapshot,
 			subject,
 			workerBytes,
+			environment,
 			request.budgets.maxMaterializedBytes
 		);
-		linkModule(capsuleRoot, 'typescript', environment.moduleRoots.typescript);
-		linkModule(capsuleRoot, 'ulid', environment.moduleRoots.ulid);
-		linkModule(capsuleRoot, 'zod', environment.moduleRoots.zod);
-		const capsuleWorker = join(capsuleRoot, '.csaa', 'worker.ts');
-		makeReadOnly([...written.map((artifact) => artifact.absolutePath), capsuleWorker]);
 		progress.complete({
 			artifacts: written.length,
 			externalModuleLinks: executor.externalModules.length,
@@ -857,30 +1075,7 @@ export async function observeGuardEnforcementLedger(
 		});
 
 		progress.start('POST_EXECUTION_INTEGRITY_RECHECK');
-		verifyCapsuleBytes(written);
-		const materializedWorker = readFileSync(capsuleWorker);
-		if (
-			materializedWorker.byteLength !== executor.worker.bytes ||
-			sha256(materializedWorker) !== executor.worker.sha256
-		)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Materialized worker bytes changed.',
-				'$worker'
-			);
-		const recaptured = resolveArrowCommandCensusExecutorEnvironment({
-			maxExternalModuleBytes: request.budgets.maxExternalModuleBytes,
-			maxExternalModuleFiles: request.budgets.maxExternalModuleFiles,
-			workerPath: WORKER_PATH
-		});
-		if (canonicalSemanticJson(recaptured.identity) !== canonicalSemanticJson(environment.identity))
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Executor or external module bytes changed.',
-				'$executor'
-			);
+		verifyPostExecutionIntegrity(request, written, capsuleWorker, environment, executor.worker);
 		progress.complete({
 			executorRecaptureMatched: true,
 			subjectBytesMatched: true,
@@ -892,20 +1087,7 @@ export async function observeGuardEnforcementLedger(
 			stderrBytes: processResult.stderr.byteLength,
 			stdoutBytes: processResult.stdout.byteLength
 		});
-		if (processResult.exitCode !== 0)
-			fail(
-				'EXECUTOR_FAILED',
-				'EXECUTE',
-				`Retained analyzer exited with status ${String(processResult.exitCode)}; stderr SHA-256 ${sha256(processResult.stderr)}${stderrExcerpt(processResult.stderr)}.`,
-				'$worker'
-			);
-		if (processResult.stderr.byteLength !== 0)
-			fail(
-				'EXECUTOR_FAILED',
-				'EXECUTE',
-				'Retained analyzer emitted stderr on a successful exit.',
-				'$worker'
-			);
+		acceptRetainedVerifierResult(processResult);
 		progress.complete({ accepted: true });
 
 		progress.start('WORKER_OUTPUT_PARSE_AND_RUNTIME_RECONCILE');
@@ -913,41 +1095,7 @@ export async function observeGuardEnforcementLedger(
 			exactJson(processResult.stdout),
 			request.budgets
 		);
-		const modules = new Map(executor.externalModules.map((module) => [module.name, module]));
-		if (parsed.runtime.bunVersion !== executor.runtimeVersion)
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Worker Bun version differs from the captured executor.',
-				'$worker.runtime'
-			);
-		for (const name of ['typescript', 'ulid', 'zod'] as const) {
-			const module = modules.get(name);
-			if (module === undefined)
-				fail(
-					'EXECUTOR_IDENTITY_MISMATCH',
-					'VALIDATE',
-					'Executor module population is incomplete.',
-					'$executor.externalModules'
-				);
-			const reportedVersion = parsed.runtime[`${name}Version`];
-			const reportedPath = parsed.runtime[`${name}ResolvedPath`];
-			if (reportedVersion !== module.version)
-				fail(
-					'EXECUTOR_IDENTITY_MISMATCH',
-					'VALIDATE',
-					`Worker-reported ${name} version differs from capture.`,
-					'$worker.runtime'
-				);
-			verifyRuntimePath(reportedPath, environment.moduleRoots[name], name);
-		}
-		if (!modules.has('typescript') || !modules.has('ulid') || !modules.has('zod'))
-			fail(
-				'EXECUTOR_IDENTITY_MISMATCH',
-				'VALIDATE',
-				'Executor module population is incomplete.',
-				'$executor.externalModules'
-			);
+		reconcileWorkerRuntime(parsed.runtime, executor, environment.moduleRoots);
 		progress.complete({
 			guardedArrows: parsed.evidence.guardedArrows.length,
 			guardTexts: parsed.evidence.guardTexts.length,
@@ -962,15 +1110,7 @@ export async function observeGuardEnforcementLedger(
 			transportOutputBytes: processResult.stdout,
 			request
 		});
-		const observationValidation = validateGuardEnforcementLedgerObservation(normalized, subject);
-		if (observationValidation.state !== 'VALID')
-			fail(
-				'OBSERVATION_VALIDATION_FAILED',
-				'VALIDATE',
-				observationValidation.issues[0]?.message ??
-					'Independent public observation validation failed.',
-				observationValidation.issues[0]?.path ?? '$observation'
-			);
+		const validationState = assertObservationValidates(normalized, subject);
 		const auditFindingCount =
 			normalized.rawEvidence.audit.enforcedAnchorBroken.length +
 			normalized.rawEvidence.audit.enforcedWithoutSite.length +
@@ -982,7 +1122,7 @@ export async function observeGuardEnforcementLedger(
 			observationId: normalized.id,
 			rawOutputId: normalized.rawOutput.id,
 			rawOutputSha256: normalized.rawOutput.sha256,
-			validationState: observationValidation.state
+			validationState
 		});
 		outcome = {
 			diagnostics: [],
@@ -991,64 +1131,11 @@ export async function observeGuardEnforcementLedger(
 		};
 	} catch (error) {
 		progress.fail(error);
-		const diagnostic: GuardEnforcementLedgerDiagnostic =
-			error instanceof ObserveFailure
-				? error.diagnostic
-				: error instanceof ArrowCommandCensusExecutorEnvironmentError
-					? {
-							code: error.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'EXECUTOR_FAILED',
-							message: 'Executor environment capture failed closed.',
-							path: '$executor',
-							phase: 'BIND',
-							severity: 'ERROR'
-						}
-					: error instanceof GuardEnforcementLedgerRawOutputError
-						? {
-								code: 'RAW_OUTPUT_INVALID',
-								message: error.message,
-								path: error.path,
-								phase: 'NORMALIZE',
-								severity: 'ERROR'
-							}
-						: error instanceof GuardEnforcementLedgerNormalizationError
-							? {
-									code: 'OBSERVATION_VALIDATION_FAILED',
-									message: error.message,
-									path: error.path,
-									phase: 'VALIDATE',
-									severity: 'ERROR'
-								}
-							: {
-									code: 'EXECUTOR_FAILED',
-									message: 'Guard-enforcement ledger observation failed closed.',
-									path: null,
-									phase: 'EXECUTE',
-									severity: 'ERROR'
-								};
+		const diagnostic: GuardEnforcementLedgerDiagnostic = observationFailureDiagnostic(error);
 		outcome = { diagnostics: [diagnostic].slice(0, maximumDiagnostics), outcome: 'unavailable' };
 	} finally {
-		if (capsuleRoot === null)
-			progress.skip('CAPSULE_CLEANUP', { attempted: false, reason: 'CAPSULE_NOT_CREATED' });
-		else {
-			progress.start('CAPSULE_CLEANUP', { attempted: true });
-			try {
-				rmSync(capsuleRoot, { force: true, recursive: true });
-				progress.complete({ attempted: true, succeeded: true });
-			} catch (error) {
-				progress.fail(error);
-				const cleanupDiagnostic: GuardEnforcementLedgerDiagnostic = {
-					code: 'EXECUTOR_FAILED',
-					message: 'Guard-ledger capsule cleanup failed; temporary material may remain.',
-					path: null,
-					phase: 'VALIDATE',
-					severity: 'ERROR'
-				};
-				outcome = {
-					diagnostics: [cleanupDiagnostic].slice(0, maximumDiagnostics),
-					outcome: 'unavailable'
-				};
-			}
-		}
+		const cleanupOutcome = cleanupCapsule(capsuleRoot, progress, maximumDiagnostics);
+		if (cleanupOutcome !== null) outcome = cleanupOutcome;
 	}
 	progress.flush();
 	return outcome;

@@ -287,8 +287,8 @@ function exactDataRecord(
 	if (ownKeys.some((key) => typeof key !== 'string')) {
 		return fail(code, `${label} must not contain symbol properties.`);
 	}
-	const actual = [...(ownKeys as string[])].sort();
-	const expected = [...expectedKeys].sort();
+	const actual = [...(ownKeys as string[])].sort(compare);
+	const expected = [...expectedKeys].sort(compare);
 	if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
 		return fail(code, `${label} must contain exactly its declared fields.`);
 	}
@@ -440,7 +440,7 @@ function enumValue<T extends string>(
 }
 
 function compare(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	return Number(left > right) - Number(left < right);
 }
 
 function freezeRecord<T extends object>(value: T): Readonly<T> {
@@ -633,6 +633,200 @@ function populationManifest(
 	);
 }
 
+interface PopulationClaimContext {
+	readonly budgets: SemanticBudgets;
+	readonly limit: number;
+	readonly limitKey: SemanticOperationLimitKey;
+	readonly phase: SemanticOperationBudgetPhase;
+	readonly population: SemanticOperationPopulationKind;
+}
+
+function assertUniqueClaimMembers(
+	members: readonly string[],
+	phase: SemanticOperationBudgetPhase
+): void {
+	for (let index = 1; index < members.length; index += 1) {
+		if (members[index - 1] === members[index]) {
+			return fail('INVALID_INPUT', 'Population claim members must be unique.', { phase });
+		}
+	}
+}
+
+function assertUniqueContributionKeys(
+	contributions: readonly SemanticOperationSumContribution[],
+	phase: SemanticOperationBudgetPhase
+): void {
+	for (let index = 1; index < contributions.length; index += 1) {
+		if (contributions[index - 1]!.key === contributions[index]!.key) {
+			return fail('INVALID_INPUT', 'Population contribution keys must be unique.', {
+				phase
+			});
+		}
+	}
+}
+
+function materializeClaimMembers(
+	membersValue: unknown,
+	context: PopulationClaimContext,
+	check: () => void
+): { readonly evidenceBytes: number; readonly members: string[] } {
+	const values = inertDenseArray(
+		membersValue,
+		'Population claim members',
+		context.limit,
+		'INVALID_INPUT',
+		check,
+		(length) =>
+			fail('BUDGET_EXCEEDED', `${context.population} population exceeds ${context.limitKey}.`, {
+				attempted: length,
+				limit: context.limit,
+				limitKey: context.limitKey,
+				phase: context.phase
+			})
+	);
+	let evidenceBytes = 0;
+	const members = values.map((value, index) => {
+		const label = `Population claim members[${index}]`;
+		const member = scalarString(value, label);
+		const memberBytes = byteLengthWithin(
+			member,
+			label,
+			context.budgets.maxCompilerInputMetadataBytes,
+			'maxCompilerInputMetadataBytes',
+			'BUDGET_EXCEEDED',
+			context.phase
+		);
+		evidenceBytes = addEvidenceBytes(
+			evidenceBytes,
+			memberBytes,
+			context.budgets.maxSnapshotBytes,
+			'BUDGET_EXCEEDED',
+			context.phase
+		);
+		return member;
+	});
+	members.sort(compare);
+	assertUniqueClaimMembers(members, context.phase);
+	return { evidenceBytes, members };
+}
+
+function materializeClaimContributions(
+	contributionsValue: unknown,
+	context: PopulationClaimContext,
+	check: () => void
+): {
+	readonly amount: number;
+	readonly contributions: SemanticOperationSumContribution[];
+	readonly evidenceBytes: number;
+} {
+	const values = inertDenseArray(
+		contributionsValue,
+		'Population claim contributions',
+		context.limit,
+		'INVALID_INPUT',
+		check,
+		(length) =>
+			fail('BUDGET_EXCEEDED', `${context.population} population exceeds ${context.limitKey}.`, {
+				attempted: length,
+				limit: context.limit,
+				limitKey: context.limitKey,
+				phase: context.phase
+			})
+	);
+	let amount = 0;
+	let evidenceBytes = 0;
+	const contributions = values.map((value, index) => {
+		check();
+		const contribution = exactDataRecord(
+			value,
+			CONTRIBUTION_KEYS,
+			`Population claim contributions[${index}]`,
+			'INVALID_INPUT'
+		);
+		const addition = safeAmount(
+			contribution.amount,
+			`Population claim contributions[${index}].amount`
+		);
+		const attempted = amount + addition;
+		if (!Number.isSafeInteger(attempted) || attempted > context.limit) {
+			return fail(
+				'BUDGET_EXCEEDED',
+				`${context.population} population exceeds ${context.limitKey}.`,
+				{
+					...(Number.isSafeInteger(attempted) ? { attempted } : {}),
+					limit: context.limit,
+					limitKey: context.limitKey,
+					phase: context.phase
+				}
+			);
+		}
+		amount = attempted;
+		const label = `Population claim contributions[${index}].key`;
+		const key = scalarString(contribution.key, label);
+		const keyBytes = byteLengthWithin(
+			key,
+			label,
+			context.budgets.maxCompilerInputMetadataBytes,
+			'maxCompilerInputMetadataBytes',
+			'BUDGET_EXCEEDED',
+			context.phase
+		);
+		evidenceBytes = addEvidenceBytes(
+			evidenceBytes,
+			keyBytes,
+			context.budgets.maxSnapshotBytes,
+			'BUDGET_EXCEEDED',
+			context.phase
+		);
+		return freezeRecord({
+			amount: addition,
+			key
+		});
+	});
+	contributions.sort((left, right) => compare(left.key, right.key));
+	assertUniqueContributionKeys(contributions, context.phase);
+	return { amount, contributions, evidenceBytes };
+}
+
+function repeatsCountClaim(
+	existing: SemanticOperationPopulationClaimUsage | undefined,
+	members: readonly string[]
+): boolean {
+	return (
+		existing?.mode === 'COUNT' &&
+		existing.members.length === members.length &&
+		existing.members.every((member, index) => member === members[index])
+	);
+}
+
+function repeatsSumClaim(
+	existing: SemanticOperationPopulationClaimUsage | undefined,
+	contributions: readonly SemanticOperationSumContribution[]
+): boolean {
+	return (
+		existing?.mode === 'SUM' &&
+		existing.contributions.length === contributions.length &&
+		existing.contributions.every(
+			(contribution, index) =>
+				contribution.amount === contributions[index]!.amount &&
+				contribution.key === contributions[index]!.key
+		)
+	);
+}
+
+function assertNoConflictingClaim(
+	existing: SemanticOperationPopulationClaimUsage | undefined,
+	context: PopulationClaimContext
+): void {
+	if (existing !== undefined) {
+		return fail(
+			'CLAIM_CONFLICT',
+			`${context.phase} already has an incompatible ${context.population} claim.`,
+			{ phase: context.phase }
+		);
+	}
+}
+
 export class SemanticOperationBudgetLedger {
 	readonly limits!: SemanticOperationBudgetLimits;
 	readonly limitsDigest!: string;
@@ -658,23 +852,17 @@ export class SemanticOperationBudgetLedger {
 		clock: SemanticOperationClock = Date.now
 	) {
 		if (typeof clock !== 'function' || isProxy(clock)) {
-			return fail(
-				'INVALID_LIMITS',
-				'Semantic operation budget clock must be a non-Proxy function.'
-			);
+			fail('INVALID_LIMITS', 'Semantic operation budget clock must be a non-Proxy function.');
 		}
 		this.clock = clock;
 		const budgets = materializeBudgets(budgetsValue);
 		this.limits = freezeRecord({ budgets });
 		if (!Number.isSafeInteger(startedAtMs) || startedAtMs < 0) {
-			return fail(
-				'INVALID_LIMITS',
-				'Semantic operation start must be a non-negative safe integer.'
-			);
+			fail('INVALID_LIMITS', 'Semantic operation start must be a non-negative safe integer.');
 		}
 		const deadlineMs = startedAtMs + this.limits.budgets.maxDurationMs;
 		if (!Number.isSafeInteger(deadlineMs)) {
-			return fail('INVALID_LIMITS', 'Semantic operation deadline must be a safe integer.', {
+			fail('INVALID_LIMITS', 'Semantic operation deadline must be a safe integer.', {
 				limitKey: 'maxDurationMs'
 			});
 		}
@@ -740,7 +928,7 @@ export class SemanticOperationBudgetLedger {
 				SEMANTIC_OPERATION_POPULATION_KINDS
 			);
 			const definition = this.requiredClaims.get(claimKey({ phase, population }));
-			if (definition === undefined || definition.mode !== mode) {
+			if (definition?.mode !== mode) {
 				return fail('INVALID_INPUT', 'Population claim is not declared by the immutable plan.', {
 					phase
 				});
@@ -749,64 +937,20 @@ export class SemanticOperationBudgetLedger {
 			const limit = this.limit(limitKey);
 			const key = claimKey({ phase, population });
 			const existing = this.populationClaims.get(key);
-			let evidenceBytes = 0;
-			let stored: SemanticOperationPopulationClaimUsage;
+			const context: PopulationClaimContext = {
+				budgets: this.limits.budgets,
+				limit,
+				limitKey,
+				phase,
+				population
+			};
+			const check = () => this.assertWithinDeadline(phase);
 			if (mode === 'COUNT') {
-				const values = inertDenseArray(
-					record.members,
-					'Population claim members',
-					limit,
-					'INVALID_INPUT',
-					() => this.assertWithinDeadline(phase),
-					(length) =>
-						fail('BUDGET_EXCEEDED', `${population} population exceeds ${limitKey}.`, {
-							attempted: length,
-							limit,
-							limitKey,
-							phase
-						})
-				);
-				const members = values.map((value, index) => {
-					const label = `Population claim members[${index}]`;
-					const member = scalarString(value, label);
-					const memberBytes = byteLengthWithin(
-						member,
-						label,
-						this.limits.budgets.maxCompilerInputMetadataBytes,
-						'maxCompilerInputMetadataBytes',
-						'BUDGET_EXCEEDED',
-						phase
-					);
-					evidenceBytes = addEvidenceBytes(
-						evidenceBytes,
-						memberBytes,
-						this.limits.budgets.maxSnapshotBytes,
-						'BUDGET_EXCEEDED',
-						phase
-					);
-					return member;
-				});
-				members.sort(compare);
-				for (let index = 1; index < members.length; index += 1) {
-					if (members[index - 1] === members[index]) {
-						return fail('INVALID_INPUT', 'Population claim members must be unique.', { phase });
-					}
-				}
-				if (
-					existing !== undefined &&
-					existing.mode === 'COUNT' &&
-					existing.members.length === members.length &&
-					existing.members.every((member, index) => member === members[index])
-				) {
+				const { evidenceBytes, members } = materializeClaimMembers(record.members, context, check);
+				if (repeatsCountClaim(existing, members)) {
 					return;
 				}
-				if (existing !== undefined) {
-					return fail(
-						'CLAIM_CONFLICT',
-						`${phase} already has an incompatible ${population} claim.`,
-						{ phase }
-					);
-				}
+				assertNoConflictingClaim(existing, context);
 				const nextRetainedEvidenceBytes = addEvidenceBytes(
 					this.retainedEvidenceBytes,
 					evidenceBytes,
@@ -815,7 +959,7 @@ export class SemanticOperationBudgetLedger {
 					phase
 				);
 				const frozenMembers = Object.freeze(members);
-				stored = freezeRecord({
+				const stored = freezeRecord({
 					amount: frozenMembers.length,
 					limit,
 					limitKey,
@@ -829,92 +973,15 @@ export class SemanticOperationBudgetLedger {
 				this.populationClaims.set(key, stored);
 				this.retainedEvidenceBytes = nextRetainedEvidenceBytes;
 			} else {
-				const values = inertDenseArray(
+				const { amount, contributions, evidenceBytes } = materializeClaimContributions(
 					record.contributions,
-					'Population claim contributions',
-					limit,
-					'INVALID_INPUT',
-					() => this.assertWithinDeadline(phase),
-					(length) =>
-						fail('BUDGET_EXCEEDED', `${population} population exceeds ${limitKey}.`, {
-							attempted: length,
-							limit,
-							limitKey,
-							phase
-						})
+					context,
+					check
 				);
-				let amount = 0;
-				const contributions = values.map((value, index) => {
-					this.assertWithinDeadline(phase);
-					const contribution = exactDataRecord(
-						value,
-						CONTRIBUTION_KEYS,
-						`Population claim contributions[${index}]`,
-						'INVALID_INPUT'
-					);
-					const addition = safeAmount(
-						contribution.amount,
-						`Population claim contributions[${index}].amount`
-					);
-					const attempted = amount + addition;
-					if (!Number.isSafeInteger(attempted) || attempted > limit) {
-						return fail('BUDGET_EXCEEDED', `${population} population exceeds ${limitKey}.`, {
-							...(Number.isSafeInteger(attempted) ? { attempted } : {}),
-							limit,
-							limitKey,
-							phase
-						});
-					}
-					amount = attempted;
-					const label = `Population claim contributions[${index}].key`;
-					const key = scalarString(contribution.key, label);
-					const keyBytes = byteLengthWithin(
-						key,
-						label,
-						this.limits.budgets.maxCompilerInputMetadataBytes,
-						'maxCompilerInputMetadataBytes',
-						'BUDGET_EXCEEDED',
-						phase
-					);
-					evidenceBytes = addEvidenceBytes(
-						evidenceBytes,
-						keyBytes,
-						this.limits.budgets.maxSnapshotBytes,
-						'BUDGET_EXCEEDED',
-						phase
-					);
-					return freezeRecord({
-						amount: addition,
-						key
-					});
-				});
-				contributions.sort((left, right) => compare(left.key, right.key));
-				for (let index = 1; index < contributions.length; index += 1) {
-					if (contributions[index - 1]!.key === contributions[index]!.key) {
-						return fail('INVALID_INPUT', 'Population contribution keys must be unique.', {
-							phase
-						});
-					}
-				}
-				if (
-					existing !== undefined &&
-					existing.mode === 'SUM' &&
-					existing.contributions.length === contributions.length &&
-					existing.contributions.every(
-						(contribution, index) =>
-							contribution.amount === contributions[index]!.amount &&
-							contribution.key === contributions[index]!.key
-					)
-				) {
+				if (repeatsSumClaim(existing, contributions)) {
 					return;
 				}
-				if (existing !== undefined) {
-					return fail(
-						'CLAIM_CONFLICT',
-						`${phase} already has an incompatible ${population} claim.`,
-						{ phase }
-					);
-				}
+				assertNoConflictingClaim(existing, context);
 				const nextRetainedEvidenceBytes = addEvidenceBytes(
 					this.retainedEvidenceBytes,
 					evidenceBytes,
@@ -923,7 +990,7 @@ export class SemanticOperationBudgetLedger {
 					phase
 				);
 				const frozenContributions = Object.freeze(contributions);
-				stored = freezeRecord({
+				const stored = freezeRecord({
 					amount,
 					contributions: frozenContributions,
 					limit,

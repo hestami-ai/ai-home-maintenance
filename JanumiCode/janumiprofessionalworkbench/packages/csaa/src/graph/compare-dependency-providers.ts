@@ -125,26 +125,30 @@ function isUnicodeScalarString(value: unknown): value is string {
 	return true;
 }
 
-function validateRequest(value: unknown): DependencyProviderComparisonDiagnostic[] {
-	const diagnostics: DependencyProviderComparisonDiagnostic[] = [];
-	const request = isRecord(value) ? value : null;
-	const budgets = request !== null && isRecord(request.budgets) ? request.budgets : null;
-	const resolutionContext =
-		request !== null && isRecord(request.resolutionContext) ? request.resolutionContext : null;
-	const negativeCoverage =
-		request !== null && isRecord(request.negativeCoverage) ? request.negativeCoverage : null;
-	const diagnosticBudget =
-		budgets !== null && Number.isSafeInteger(budgets.maxDiagnostics)
-			? Math.max(1, Math.min(100_000, budgets.maxDiagnostics as number))
-			: 1;
-	const add = (message: string, path: string): void => {
-		if (diagnostics.length < diagnosticBudget)
-			diagnostics.push({ code: 'REQUEST_INVALID', message, path });
-	};
-	if (request === null) {
-		add('Comparison request must be an object.', '$request');
-		return diagnostics;
-	}
+type RequestDiagnosticSink = (message: string, path: string) => void;
+
+function requestSubRecord(
+	request: Record<string, unknown> | null,
+	field: string
+): Record<string, unknown> | null {
+	if (request === null) return null;
+	const nested = request[field];
+	return isRecord(nested) ? nested : null;
+}
+
+function resolveDiagnosticBudget(budgets: Record<string, unknown> | null): number {
+	return budgets !== null && Number.isSafeInteger(budgets.maxDiagnostics)
+		? Math.max(1, Math.min(100_000, budgets.maxDiagnostics as number))
+		: 1;
+}
+
+function addContractShapeDiagnostics(
+	request: Record<string, unknown>,
+	budgets: Record<string, unknown> | null,
+	resolutionContext: Record<string, unknown> | null,
+	negativeCoverage: Record<string, unknown> | null,
+	add: RequestDiagnosticSink
+): void {
 	if (
 		!hasExactKeys(request, [
 			'budgets',
@@ -185,6 +189,12 @@ function validateRequest(value: unknown): DependencyProviderComparisonDiagnostic
 			'Negative coverage must contain exactly the versioned contract fields.',
 			'$request.negativeCoverage'
 		);
+}
+
+function addContractIdentityDiagnostics(
+	request: Record<string, unknown>,
+	add: RequestDiagnosticSink
+): void {
 	if (request.schemaVersion !== DEPENDENCY_PROVIDER_COMPARISON_REQUEST_SCHEMA_VERSION)
 		add('Unsupported comparison request schema version.', '$request.schemaVersion');
 	if (request.operationVersion !== DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION)
@@ -199,6 +209,12 @@ function validateRequest(value: unknown): DependencyProviderComparisonDiagnostic
 			'dependencyCruiserObservationId must be a non-empty string.',
 			'$request.dependencyCruiserObservationId'
 		);
+}
+
+function addBudgetRangeDiagnostics(
+	budgets: Record<string, unknown> | null,
+	add: RequestDiagnosticSink
+): void {
 	for (const [name, value, maximum] of [
 		['maxComparisonRecords', budgets?.maxComparisonRecords, 10_000_000],
 		['maxDiagnostics', budgets?.maxDiagnostics, 100_000],
@@ -210,6 +226,14 @@ function validateRequest(value: unknown): DependencyProviderComparisonDiagnostic
 				`$request.budgets.${name}`
 			);
 	}
+}
+
+function addResolutionContextDiagnostics(
+	budgets: Record<string, unknown> | null,
+	resolutionContext: Record<string, unknown> | null,
+	negativeCoverage: Record<string, unknown> | null,
+	add: RequestDiagnosticSink
+): void {
 	for (const [name, digest] of [
 		['compilerContextDigest', resolutionContext?.compilerContextDigest],
 		['providerContextDigest', resolutionContext?.providerContextDigest]
@@ -232,6 +256,27 @@ function validateRequest(value: unknown): DependencyProviderComparisonDiagnostic
 		)
 			add('Rationale must be non-empty and within maxRationaleCharacters.', path);
 	}
+}
+
+function validateRequest(value: unknown): DependencyProviderComparisonDiagnostic[] {
+	const diagnostics: DependencyProviderComparisonDiagnostic[] = [];
+	const request = isRecord(value) ? value : null;
+	const budgets = requestSubRecord(request, 'budgets');
+	const resolutionContext = requestSubRecord(request, 'resolutionContext');
+	const negativeCoverage = requestSubRecord(request, 'negativeCoverage');
+	const diagnosticBudget = resolveDiagnosticBudget(budgets);
+	const add = (message: string, path: string): void => {
+		if (diagnostics.length < diagnosticBudget)
+			diagnostics.push({ code: 'REQUEST_INVALID', message, path });
+	};
+	if (request === null) {
+		add('Comparison request must be an object.', '$request');
+		return diagnostics;
+	}
+	addContractShapeDiagnostics(request, budgets, resolutionContext, negativeCoverage, add);
+	addContractIdentityDiagnostics(request, add);
+	addBudgetRangeDiagnostics(budgets, add);
+	addResolutionContextDiagnostics(budgets, resolutionContext, negativeCoverage, add);
 	return diagnostics;
 }
 
@@ -274,130 +319,132 @@ function providerRelationIsInCompilerDomain(
 	);
 }
 
-function decideDisposition(
+interface DispositionDecision {
+	disposition: DependencyProviderComparisonDisposition;
+	rationale: string;
+}
+
+function decideUnmatchedProviderRelation(
 	group: MutableComparisonGroup,
-	summary: TargetSummary,
+	providerHealthy: boolean
+): DispositionDecision {
+	if (group.key.importerBinding === 'AMBIGUOUS_GRAPH_SOURCES')
+		return {
+			disposition: 'AMBIGUOUS_AGGREGATE',
+			rationale:
+				'The provider importer path matches multiple compiler source identities; no Program was selected.'
+		};
+	if (group.key.importerSemanticSourceId === null)
+		return {
+			disposition: 'INCOMPARABLE_EXCLUDED_OR_OUTSIDE_PERIMETER',
+			rationale: 'The dependency-cruiser importer has no source identity in this compiler graph.'
+		};
+	if (!providerRelationIsInCompilerDomain(group.providerDependencies))
+		return {
+			disposition: 'INCOMPARABLE_PROVIDER_DOMAIN',
+			rationale:
+				'The provider relation kind is outside the current compiler module-occurrence graph domain.'
+		};
+	if (!providerHealthy)
+		return {
+			disposition: 'UNKNOWN_PROVIDER_PARTIAL',
+			rationale:
+				'The provider observation is partial, so an unmatched provider relation remains unknown.'
+		};
+	return {
+		disposition: 'OBSERVED_MISSING_RELATION',
+		rationale:
+			'The provider relation has no compiler counterpart; this is an observed difference, not a qualified conflict.'
+	};
+}
+
+function decideUnmatchedCompilerRelation(
+	group: MutableComparisonGroup,
 	sourceWasCruised: boolean,
 	sourceBindingAmbiguous: boolean,
-	providerHealthy: boolean,
-	providerBaseMappingQualified: boolean
-): { disposition: DependencyProviderComparisonDisposition; rationale: string } {
-	const compilerCount = group.compilerEdges.length;
-	const providerCount = group.providerDependencies.length;
-	if (compilerCount === 0) {
-		if (group.key.importerBinding === 'AMBIGUOUS_GRAPH_SOURCES')
-			return {
-				disposition: 'AMBIGUOUS_AGGREGATE',
-				rationale:
-					'The provider importer path matches multiple compiler source identities; no Program was selected.'
-			};
-		if (group.key.importerSemanticSourceId === null)
-			return {
-				disposition: 'INCOMPARABLE_EXCLUDED_OR_OUTSIDE_PERIMETER',
-				rationale: 'The dependency-cruiser importer has no source identity in this compiler graph.'
-			};
-		if (!providerRelationIsInCompilerDomain(group.providerDependencies))
-			return {
-				disposition: 'INCOMPARABLE_PROVIDER_DOMAIN',
-				rationale:
-					'The provider relation kind is outside the current compiler module-occurrence graph domain.'
-			};
-		if (!providerHealthy)
-			return {
-				disposition: 'UNKNOWN_PROVIDER_PARTIAL',
-				rationale:
-					'The provider observation is partial, so an unmatched provider relation remains unknown.'
-			};
+	providerHealthy: boolean
+): DispositionDecision {
+	if (group.key.normalizedSpecifier === null)
 		return {
-			disposition: 'OBSERVED_MISSING_RELATION',
-			rationale:
-				'The provider relation has no compiler counterpart; this is an observed difference, not a qualified conflict.'
+			disposition: 'INCOMPARABLE_PROVIDER_DOMAIN',
+			rationale: 'Non-literal compiler module syntax has no dependency-cruiser aggregate join key.'
 		};
-	}
-	if (providerCount === 0) {
-		if (group.key.normalizedSpecifier === null)
-			return {
-				disposition: 'INCOMPARABLE_PROVIDER_DOMAIN',
-				rationale:
-					'Non-literal compiler module syntax has no dependency-cruiser aggregate join key.'
-			};
-		if (sourceBindingAmbiguous)
-			return {
-				disposition: 'AMBIGUOUS_AGGREGATE',
-				rationale:
-					'The importer path has multiple compiler source identities, so provider absence cannot be attributed to this Program.'
-			};
-		if (!sourceWasCruised)
-			return {
-				disposition: 'INCOMPARABLE_EXCLUDED_OR_OUTSIDE_PERIMETER',
-				rationale: 'The compiler importer was not present in the provider module population.'
-			};
-		if (!providerHealthy)
-			return {
-				disposition: 'UNKNOWN_PROVIDER_PARTIAL',
-				rationale: 'The provider observation is partial, so provider absence is unknown.'
-			};
+	if (sourceBindingAmbiguous)
 		return {
-			disposition: 'OBSERVED_MISSING_RELATION',
+			disposition: 'AMBIGUOUS_AGGREGATE',
 			rationale:
-				'The compiler relation has no provider counterpart; this is an observed difference, not a qualified conflict.'
+				'The importer path has multiple compiler source identities, so provider absence cannot be attributed to this Program.'
 		};
-	}
+	if (!sourceWasCruised)
+		return {
+			disposition: 'INCOMPARABLE_EXCLUDED_OR_OUTSIDE_PERIMETER',
+			rationale: 'The compiler importer was not present in the provider module population.'
+		};
+	if (!providerHealthy)
+		return {
+			disposition: 'UNKNOWN_PROVIDER_PARTIAL',
+			rationale: 'The provider observation is partial, so provider absence is unknown.'
+		};
+	return {
+		disposition: 'OBSERVED_MISSING_RELATION',
+		rationale:
+			'The compiler relation has no provider counterpart; this is an observed difference, not a qualified conflict.'
+	};
+}
 
-	if (
+function aggregateTargetsAreAmbiguous(summary: TargetSummary): boolean {
+	return (
 		summary.compilerKinds.length !== 1 ||
 		summary.providerKinds.length !== 1 ||
 		(summary.compilerKinds[0] === 'LOCAL' && summary.compilerPaths.length !== 1) ||
 		(summary.providerKinds[0] === 'RESOLVED_LOCAL_PATH' && summary.providerPaths.length !== 1)
-	)
-		return {
-			disposition: 'AMBIGUOUS_AGGREGATE',
-			rationale:
-				'At least one aggregate contains multiple target states or identities; no target was selected.'
-		};
+	);
+}
 
-	const compilerKind = summary.compilerKinds[0]!;
-	const providerKind = summary.providerKinds[0]!;
-	if (compilerKind === 'UNSUPPORTED')
-		return {
-			disposition: 'INCOMPARABLE_PROVIDER_DOMAIN',
-			rationale: 'The compiler explicitly marked this module occurrence unsupported.'
-		};
-	if (compilerKind === 'LOCAL' && providerKind === 'RESOLVED_LOCAL_PATH') {
-		if (summary.compilerPaths[0] === summary.providerPaths[0]) {
-			if (!providerBaseMappingQualified)
-				return {
-					disposition: 'INCOMPARABLE_RESOLUTION_CONTEXT',
-					rationale:
-						'The local target strings match, but the provider base-directory mapping to the subject is unqualified.'
-				};
-			const collapsed =
-				compilerCount > 1 ||
-				providerCount > 1 ||
-				uniqueSorted(group.compilerEdges.map((edge) => edge.relationKind)).length > 1;
-			return collapsed
-				? {
-						disposition: 'CORROBORATED_COLLAPSED_RELATION',
-						rationale:
-							'Both providers identify the same local target; dependency-cruiser collapses one or more compiler occurrence distinctions.'
-					}
-				: {
-						disposition: 'AGREE_EXACT_TARGET',
-						rationale: 'Both providers identify the same canonical local source target.'
-					};
-		}
-		return providerBaseMappingQualified
+function decideLocalTargetRelation(
+	group: MutableComparisonGroup,
+	summary: TargetSummary,
+	providerBaseMappingQualified: boolean
+): DispositionDecision {
+	if (summary.compilerPaths[0] === summary.providerPaths[0]) {
+		if (!providerBaseMappingQualified)
+			return {
+				disposition: 'INCOMPARABLE_RESOLUTION_CONTEXT',
+				rationale:
+					'The local target strings match, but the provider base-directory mapping to the subject is unqualified.'
+			};
+		const collapsed =
+			group.compilerEdges.length > 1 ||
+			group.providerDependencies.length > 1 ||
+			uniqueSorted(group.compilerEdges.map((edge) => edge.relationKind)).length > 1;
+		return collapsed
 			? {
-					disposition: 'OBSERVED_TARGET_DIFFERENCE',
+					disposition: 'CORROBORATED_COLLAPSED_RELATION',
 					rationale:
-						'Both providers resolved the specifier to different canonical local targets; no conflict authority is claimed.'
+						'Both providers identify the same local target; dependency-cruiser collapses one or more compiler occurrence distinctions.'
 				}
 			: {
-					disposition: 'INCOMPARABLE_RESOLUTION_CONTEXT',
-					rationale:
-						'Local target strings differ while the provider base-directory mapping is unqualified.'
+					disposition: 'AGREE_EXACT_TARGET',
+					rationale: 'Both providers identify the same canonical local source target.'
 				};
 	}
+	return providerBaseMappingQualified
+		? {
+				disposition: 'OBSERVED_TARGET_DIFFERENCE',
+				rationale:
+					'Both providers resolved the specifier to different canonical local targets; no conflict authority is claimed.'
+			}
+		: {
+				disposition: 'INCOMPARABLE_RESOLUTION_CONTEXT',
+				rationale:
+					'Local target strings differ while the provider base-directory mapping is unqualified.'
+			};
+}
+
+function decideTargetClassRelation(
+	compilerKind: string,
+	providerKind: string
+): DispositionDecision {
 	if (compilerKind === 'UNRESOLVED' && providerKind === 'UNRESOLVED')
 		return {
 			disposition: 'AGREE_UNRESOLVED',
@@ -431,6 +478,43 @@ function decideDisposition(
 		rationale:
 			'Target-class differences are retained, but the provider ontologies lack a qualified identity mapping.'
 	};
+}
+
+function decideDisposition(
+	group: MutableComparisonGroup,
+	summary: TargetSummary,
+	sourceWasCruised: boolean,
+	sourceBindingAmbiguous: boolean,
+	providerHealthy: boolean,
+	providerBaseMappingQualified: boolean
+): DispositionDecision {
+	if (group.compilerEdges.length === 0)
+		return decideUnmatchedProviderRelation(group, providerHealthy);
+	if (group.providerDependencies.length === 0)
+		return decideUnmatchedCompilerRelation(
+			group,
+			sourceWasCruised,
+			sourceBindingAmbiguous,
+			providerHealthy
+		);
+
+	if (aggregateTargetsAreAmbiguous(summary))
+		return {
+			disposition: 'AMBIGUOUS_AGGREGATE',
+			rationale:
+				'At least one aggregate contains multiple target states or identities; no target was selected.'
+		};
+
+	const compilerKind = summary.compilerKinds[0]!;
+	const providerKind = summary.providerKinds[0]!;
+	if (compilerKind === 'UNSUPPORTED')
+		return {
+			disposition: 'INCOMPARABLE_PROVIDER_DOMAIN',
+			rationale: 'The compiler explicitly marked this module occurrence unsupported.'
+		};
+	if (compilerKind === 'LOCAL' && providerKind === 'RESOLVED_LOCAL_PATH')
+		return decideLocalTargetRelation(group, summary, providerBaseMappingQualified);
+	return decideTargetClassRelation(compilerKind, providerKind);
 }
 
 function comparisonRecordId(
@@ -489,12 +573,12 @@ function comparisonContentDigest(
 	return sha256(canonicalSemanticJson(comparison));
 }
 
-export function compareDependencyProviders(
+function inputShapeOutcome(
 	request: CompareDependencyProvidersRequest,
 	semanticSnapshot: StaticSemanticSnapshot,
 	graph: ModuleDependencyGraphSnapshot,
 	observation: DependencyCruiserObservation
-): DependencyProviderComparisonOutcome {
+): DependencyProviderComparisonOutcome | null {
 	const requestDiagnostics = validateRequest(request);
 	if (requestDiagnostics.length > 0)
 		return { diagnostics: requestDiagnostics, outcome: 'unavailable' };
@@ -520,7 +604,15 @@ export function compareDependencyProviders(
 			],
 			outcome: 'unavailable'
 		};
+	return null;
+}
 
+function identityMismatchOutcome(
+	request: CompareDependencyProvidersRequest,
+	semanticSnapshot: StaticSemanticSnapshot,
+	graph: ModuleDependencyGraphSnapshot,
+	observation: DependencyCruiserObservation
+): DependencyProviderComparisonOutcome | null {
 	const identityDiagnostics: DependencyProviderComparisonDiagnostic[] = [];
 	const mismatch = (message: string, path: string): void => {
 		if (identityDiagnostics.length < request.budgets.maxDiagnostics)
@@ -548,7 +640,15 @@ export function compareDependencyProviders(
 		);
 	if (identityDiagnostics.length > 0)
 		return { diagnostics: identityDiagnostics, outcome: 'unavailable' };
+	return null;
+}
 
+function snapshotValidationOutcome(
+	request: CompareDependencyProvidersRequest,
+	semanticSnapshot: StaticSemanticSnapshot,
+	graph: ModuleDependencyGraphSnapshot,
+	observation: DependencyCruiserObservation
+): DependencyProviderComparisonOutcome | null {
 	const graphValidation = validateModuleDependencyGraph(graph, semanticSnapshot, {
 		maxIssues: request.budgets.maxDiagnostics
 	});
@@ -575,8 +675,12 @@ export function compareDependencyProviders(
 				})),
 			outcome: 'unavailable'
 		};
+	return null;
+}
 
-	const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+function buildSourcesByPath(
+	graph: ModuleDependencyGraphSnapshot
+): Map<string, ModuleDependencyGraphSourceNode[]> {
 	const sourcesByPath = new Map<string, ModuleDependencyGraphSourceNode[]>();
 	for (const node of graph.nodes) {
 		if (node.kind !== 'SOURCE') continue;
@@ -584,6 +688,79 @@ export function compareDependencyProviders(
 		sources.push(node);
 		sourcesByPath.set(node.logicalPath, sources);
 	}
+	return sourcesByPath;
+}
+
+function compilerGroupKey(
+	edge: ModuleDependencyGraphEdge,
+	source: ModuleDependencyGraphSourceNode
+): DependencyProviderComparisonKey {
+	return {
+		importerBinding: 'EXACT_GRAPH_SOURCE',
+		importerSemanticSourceId: source.semanticSourceId,
+		moduleSystem: compilerModuleSystem(edge),
+		normalizedSpecifier: edge.specifier === null ? null : normalizeSpecifier(edge.specifier),
+		sourcePath: source.logicalPath,
+		typeOnlyPartition: 'COARSENED_NOT_COMPARED'
+	};
+}
+
+function importerBindingFor(
+	sources: readonly ModuleDependencyGraphSourceNode[]
+): DependencyProviderComparisonKey['importerBinding'] {
+	if (sources.length === 0) return 'NO_GRAPH_SOURCE';
+	if (sources.length === 1) return 'EXACT_GRAPH_SOURCE';
+	return 'AMBIGUOUS_GRAPH_SOURCES';
+}
+
+function providerGroupKey(
+	dependency: DependencyCruiserDependencyObservation,
+	sources: readonly ModuleDependencyGraphSourceNode[]
+): DependencyProviderComparisonKey {
+	return {
+		importerBinding: importerBindingFor(sources),
+		importerSemanticSourceId: sources.length === 1 ? sources[0]!.semanticSourceId : null,
+		moduleSystem: providerModuleSystem(dependency),
+		normalizedSpecifier: normalizeSpecifier(dependency.moduleSpecifier),
+		sourcePath: dependency.sourcePath,
+		typeOnlyPartition: 'COARSENED_NOT_COMPARED'
+	};
+}
+
+function collectCompilerGroups(
+	edges: readonly ModuleDependencyGraphEdge[],
+	nodeById: ReadonlyMap<string, ModuleDependencyGraphSnapshot['nodes'][number]>,
+	groupFor: (key: DependencyProviderComparisonKey) => MutableComparisonGroup | undefined
+): void {
+	for (const edge of edges) {
+		const source = nodeById.get(edge.source.nodeId);
+		if (source?.kind !== 'SOURCE') continue;
+		const group = groupFor(compilerGroupKey(edge, source));
+		if (!group) break;
+		group.compilerEdges.push(edge);
+	}
+}
+
+function collectProviderGroups(
+	dependencies: readonly DependencyCruiserDependencyObservation[],
+	sourcesByPath: ReadonlyMap<string, ModuleDependencyGraphSourceNode[]>,
+	groupFor: (key: DependencyProviderComparisonKey) => MutableComparisonGroup | undefined
+): void {
+	for (const dependency of dependencies) {
+		const sources = sourcesByPath.get(dependency.sourcePath) ?? [];
+		const group = groupFor(providerGroupKey(dependency, sources));
+		if (!group) break;
+		group.providerDependencies.push(dependency);
+	}
+}
+
+function buildComparisonGroups(
+	request: CompareDependencyProvidersRequest,
+	graph: ModuleDependencyGraphSnapshot,
+	observation: DependencyCruiserObservation,
+	nodeById: ReadonlyMap<string, ModuleDependencyGraphSnapshot['nodes'][number]>,
+	sourcesByPath: ReadonlyMap<string, ModuleDependencyGraphSourceNode[]>
+): { budgetExceeded: boolean; groups: Map<string, MutableComparisonGroup> } {
 	const groups = new Map<string, MutableComparisonGroup>();
 	let comparisonBudgetExceeded = false;
 	const groupFor = (key: DependencyProviderComparisonKey): MutableComparisonGroup | undefined => {
@@ -598,41 +775,114 @@ export function compareDependencyProviders(
 		groups.set(text, created);
 		return created;
 	};
-	for (const edge of graph.edges) {
-		const source = nodeById.get(edge.source.nodeId);
-		if (source?.kind !== 'SOURCE') continue;
-		const group = groupFor({
-			importerBinding: 'EXACT_GRAPH_SOURCE',
-			importerSemanticSourceId: source.semanticSourceId,
-			moduleSystem: compilerModuleSystem(edge),
-			normalizedSpecifier: edge.specifier === null ? null : normalizeSpecifier(edge.specifier),
-			sourcePath: source.logicalPath,
-			typeOnlyPartition: 'COARSENED_NOT_COMPARED'
-		});
-		if (!group) break;
-		group.compilerEdges.push(edge);
-	}
+	collectCompilerGroups(graph.edges, nodeById, groupFor);
 	if (!comparisonBudgetExceeded)
-		for (const dependency of observation.dependencies) {
-			const sources = sourcesByPath.get(dependency.sourcePath) ?? [];
-			const group = groupFor({
-				importerBinding:
-					sources.length === 0
-						? 'NO_GRAPH_SOURCE'
-						: sources.length === 1
-							? 'EXACT_GRAPH_SOURCE'
-							: 'AMBIGUOUS_GRAPH_SOURCES',
-				importerSemanticSourceId: sources.length === 1 ? sources[0]!.semanticSourceId : null,
-				moduleSystem: providerModuleSystem(dependency),
-				normalizedSpecifier: normalizeSpecifier(dependency.moduleSpecifier),
-				sourcePath: dependency.sourcePath,
-				typeOnlyPartition: 'COARSENED_NOT_COMPARED'
-			});
-			if (!group) break;
-			group.providerDependencies.push(dependency);
-		}
+		collectProviderGroups(observation.dependencies, sourcesByPath, groupFor);
+	return { budgetExceeded: comparisonBudgetExceeded, groups };
+}
 
-	if (comparisonBudgetExceeded)
+function buildLimitations(
+	records: readonly DependencyProviderComparisonRecord[],
+	request: CompareDependencyProvidersRequest
+): DependencyProviderComparisonLimitation[] {
+	const limitations: DependencyProviderComparisonLimitation[] = [
+		{
+			affectedRecordCount: records.filter((record) => record.assessment === 'OBSERVED_DIFFERENCE')
+				.length,
+			kind: 'CONFLICT_QUALIFICATION_UNAVAILABLE',
+			rationale:
+				'This contract has no validated context-equivalence or closed-perimeter attestation, so observed differences cannot become conflicts.'
+		},
+		{
+			affectedRecordCount: records.filter(
+				(record) => record.compiler.occurrenceCount > 0 && record.dependencyCruiser.rowCount > 0
+			).length,
+			kind: 'PROVIDER_AGGREGATES_OCCURRENCES',
+			rationale:
+				'dependency-cruiser dependency rows aggregate syntax occurrences and never replace compiler occurrence edges.'
+		},
+		{
+			affectedRecordCount: records.length,
+			kind: 'TYPE_ONLY_PARTITION_NOT_REPRODUCED',
+			rationale:
+				"The current compiler graph does not reproduce dependency-cruiser's element-level type-only partition, so comparison uses a coarser key."
+		}
+	];
+	limitations.push({
+		affectedRecordCount: records.filter(
+			(record) => record.disposition === 'INCOMPARABLE_RESOLUTION_CONTEXT'
+		).length,
+		kind: 'RESOLUTION_CONTEXT_NOT_PROVEN_EQUIVALENT',
+		rationale: request.resolutionContext.rationale
+	});
+	limitations.push({
+		affectedRecordCount: records.filter(
+			(record) => record.compiler.occurrenceCount === 0 || record.dependencyCruiser.rowCount === 0
+		).length,
+		kind: 'NEGATIVE_COVERAGE_NOT_CLOSED',
+		rationale: request.negativeCoverage.rationale
+	});
+	const providerDomainCount = records.filter(
+		(record) => record.disposition === 'INCOMPARABLE_PROVIDER_DOMAIN'
+	).length;
+	if (providerDomainCount > 0)
+		limitations.push({
+			affectedRecordCount: providerDomainCount,
+			kind: 'PROVIDER_DOMAIN_OUTSIDE_COMPILER_GRAPH',
+			rationale:
+				'Some dependency-cruiser dependency kinds or compiler non-literal occurrences are outside the current graph overlap.'
+		});
+	const targetModelCount = records.filter(
+		(record) => record.disposition === 'PRESENCE_ONLY_TARGET_MODEL_DIFFERENT'
+	).length;
+	if (targetModelCount > 0)
+		limitations.push({
+			affectedRecordCount: targetModelCount,
+			kind: 'TARGET_MODEL_DIFFERENCE',
+			rationale:
+				'Compiler ambient/external targets and dependency-cruiser runtime/core targets do not share an exact artifact identity.'
+		});
+	limitations.sort((left, right) => compareText(left.kind, right.kind));
+	return limitations;
+}
+
+function rationaleBudgetExceeded(
+	records: readonly DependencyProviderComparisonRecord[],
+	limitations: readonly DependencyProviderComparisonLimitation[],
+	maxRationaleCharacters: number
+): boolean {
+	return (
+		records.some((record) => record.rationale.length > maxRationaleCharacters) ||
+		limitations.some((limitation) => limitation.rationale.length > maxRationaleCharacters)
+	);
+}
+
+export function compareDependencyProviders(
+	request: CompareDependencyProvidersRequest,
+	semanticSnapshot: StaticSemanticSnapshot,
+	graph: ModuleDependencyGraphSnapshot,
+	observation: DependencyCruiserObservation
+): DependencyProviderComparisonOutcome {
+	const inputFailure = inputShapeOutcome(request, semanticSnapshot, graph, observation);
+	if (inputFailure !== null) return inputFailure;
+
+	const identityFailure = identityMismatchOutcome(request, semanticSnapshot, graph, observation);
+	if (identityFailure !== null) return identityFailure;
+
+	const snapshotFailure = snapshotValidationOutcome(request, semanticSnapshot, graph, observation);
+	if (snapshotFailure !== null) return snapshotFailure;
+
+	const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+	const sourcesByPath = buildSourcesByPath(graph);
+	const { budgetExceeded, groups } = buildComparisonGroups(
+		request,
+		graph,
+		observation,
+		nodeById,
+		sourcesByPath
+	);
+
+	if (budgetExceeded)
 		return {
 			diagnostics: [
 				{
@@ -695,70 +945,8 @@ export function compareDependencyProviders(
 		(total, record) => total + record.dependencyCruiser.rowCount,
 		0
 	);
-	const limitations: DependencyProviderComparisonLimitation[] = [
-		{
-			affectedRecordCount: records.filter((record) => record.assessment === 'OBSERVED_DIFFERENCE')
-				.length,
-			kind: 'CONFLICT_QUALIFICATION_UNAVAILABLE',
-			rationale:
-				'This contract has no validated context-equivalence or closed-perimeter attestation, so observed differences cannot become conflicts.'
-		},
-		{
-			affectedRecordCount: records.filter(
-				(record) => record.compiler.occurrenceCount > 0 && record.dependencyCruiser.rowCount > 0
-			).length,
-			kind: 'PROVIDER_AGGREGATES_OCCURRENCES',
-			rationale:
-				'dependency-cruiser dependency rows aggregate syntax occurrences and never replace compiler occurrence edges.'
-		},
-		{
-			affectedRecordCount: records.length,
-			kind: 'TYPE_ONLY_PARTITION_NOT_REPRODUCED',
-			rationale:
-				"The current compiler graph does not reproduce dependency-cruiser's element-level type-only partition, so comparison uses a coarser key."
-		}
-	];
-	limitations.push({
-		affectedRecordCount: records.filter(
-			(record) => record.disposition === 'INCOMPARABLE_RESOLUTION_CONTEXT'
-		).length,
-		kind: 'RESOLUTION_CONTEXT_NOT_PROVEN_EQUIVALENT',
-		rationale: request.resolutionContext.rationale
-	});
-	limitations.push({
-		affectedRecordCount: records.filter(
-			(record) => record.compiler.occurrenceCount === 0 || record.dependencyCruiser.rowCount === 0
-		).length,
-		kind: 'NEGATIVE_COVERAGE_NOT_CLOSED',
-		rationale: request.negativeCoverage.rationale
-	});
-	const providerDomainCount = records.filter(
-		(record) => record.disposition === 'INCOMPARABLE_PROVIDER_DOMAIN'
-	).length;
-	if (providerDomainCount > 0)
-		limitations.push({
-			affectedRecordCount: providerDomainCount,
-			kind: 'PROVIDER_DOMAIN_OUTSIDE_COMPILER_GRAPH',
-			rationale:
-				'Some dependency-cruiser dependency kinds or compiler non-literal occurrences are outside the current graph overlap.'
-		});
-	const targetModelCount = records.filter(
-		(record) => record.disposition === 'PRESENCE_ONLY_TARGET_MODEL_DIFFERENT'
-	).length;
-	if (targetModelCount > 0)
-		limitations.push({
-			affectedRecordCount: targetModelCount,
-			kind: 'TARGET_MODEL_DIFFERENCE',
-			rationale:
-				'Compiler ambient/external targets and dependency-cruiser runtime/core targets do not share an exact artifact identity.'
-		});
-	limitations.sort((left, right) => compareText(left.kind, right.kind));
-	if (
-		records.some((record) => record.rationale.length > request.budgets.maxRationaleCharacters) ||
-		limitations.some(
-			(limitation) => limitation.rationale.length > request.budgets.maxRationaleCharacters
-		)
-	)
+	const limitations = buildLimitations(records, request);
+	if (rationaleBudgetExceeded(records, limitations, request.budgets.maxRationaleCharacters))
 		return {
 			diagnostics: [
 				{

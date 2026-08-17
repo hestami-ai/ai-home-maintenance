@@ -134,6 +134,88 @@ function json(root: string, path: string, value: unknown): void {
 	write(root, path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+const commandEntry = (commandName: string, eventName: string): string => `
+	${commandName}: {
+		payload: StartWorkPayloadSchema,
+		targetAggregateType: 'WORK',
+		emitsEvent: '${eventName}',
+		firstSlice: false
+	}`;
+
+const EVENT_CONTRACT_MESSAGES = `export const StartWorkPayloadSchema = {};
+export const RuntimeOnlyPayloadSchema = {};
+export const UnbuiltPayloadSchema = {};
+export const WorkAuditedPayloadSchema = {};
+export const WorkStartedPayloadSchema = {};
+
+export const COMMANDS = {
+	StartWork: {
+		payload: StartWorkPayloadSchema,
+		targetAggregateType: 'WORK',
+		emitsEvent: 'WorkStarted',
+		alsoEmitsEvents: ['WorkAudited'],
+		firstSlice: false
+	}
+} as const;
+
+export const EVENTS = {
+	RuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },
+	Unbuilt: { payload: UnbuiltPayloadSchema, aggregateType: 'Work' },
+	WorkAudited: { payload: WorkAuditedPayloadSchema, aggregateType: 'Work' },
+	WorkStarted: { payload: WorkStartedPayloadSchema, aggregateType: 'Work' }
+} as const;
+`;
+
+const TWO_COMMAND_EVENT_CONTRACT_MESSAGES = EVENT_CONTRACT_MESSAGES.replace(
+	'export const RuntimeOnlyPayloadSchema = {};',
+	'export const ResumeWorkPayloadSchema = {};\nexport const RuntimeOnlyPayloadSchema = {};'
+)
+	.replace(
+		"\tStartWork: {\n\t\tpayload: StartWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkStarted',\n\t\talsoEmitsEvents: ['WorkAudited'],\n\t\tfirstSlice: false\n\t}",
+		"\tResumeWork: {\n\t\tpayload: ResumeWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkResumed',\n\t\tfirstSlice: false\n\t},\n\tStartWork: {\n\t\tpayload: StartWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkStarted',\n\t\talsoEmitsEvents: ['WorkAudited'],\n\t\tfirstSlice: false\n\t}"
+	)
+	.replace(
+		"\tRuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },",
+		"\tRuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },\n\tWorkResumed: { payload: WorkResumedPayloadSchema, aggregateType: 'Work' },"
+	)
+	.replace(
+		'export const WorkAuditedPayloadSchema = {};',
+		'export const WorkAuditedPayloadSchema = {};\nexport const WorkResumedPayloadSchema = {};'
+	);
+
+/** Command-registry entry list for the plain (non event-contract) generated registry source. */
+function commandRegistryEntries(variant: HandlerFixtureVariant): string {
+	if (variant === 'EMPTY') return '';
+	if (variant === 'SHARED_DIRECT')
+		return `${commandEntry('StartWork', 'WorkStarted')},${commandEntry('ResumeWork', 'WorkResumed')}`;
+	return commandEntry('StartWork', 'WorkStarted');
+}
+
+/** Generated command-registry source for the variant, optionally rewritten by the caller. */
+function commandRegistrySource(
+	variant: HandlerFixtureVariant,
+	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform
+): string {
+	if (variant !== 'EVENT_CONTRACT' && variant !== 'EVENT_CONTRACT_TWO_COMMANDS')
+		return `export const StartWorkPayloadSchema = {};
+export const COMMANDS = {${commandRegistryEntries(variant)}
+} as const;
+`;
+	const messages =
+		variant === 'EVENT_CONTRACT_TWO_COMMANDS'
+			? TWO_COMMAND_EVENT_CONTRACT_MESSAGES
+			: EVENT_CONTRACT_MESSAGES;
+	return eventContractRegistrySourceTransform?.(messages) ?? messages;
+}
+
+/** Handler-registry entry list for the generated handler registry source. */
+function handlerRegistryEntries(variant: HandlerFixtureVariant): string {
+	if (variant === 'EMPTY') return '';
+	if (variant === 'SHARED_DIRECT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS')
+		return 'StartWork: startWork, ResumeWork: startWork';
+	return 'StartWork: startWork';
+}
+
 function createRepository(
 	variant: HandlerFixtureVariant,
 	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform
@@ -202,88 +284,17 @@ function createRepository(
 		]
 	});
 
-	const commandEntry = (commandName: string, eventName: string): string => `
-	${commandName}: {
-		payload: StartWorkPayloadSchema,
-		targetAggregateType: 'WORK',
-		emitsEvent: '${eventName}',
-		firstSlice: false
-	}`;
-	const eventContractMessages = `export const StartWorkPayloadSchema = {};
-export const RuntimeOnlyPayloadSchema = {};
-export const UnbuiltPayloadSchema = {};
-export const WorkAuditedPayloadSchema = {};
-export const WorkStartedPayloadSchema = {};
-
-export const COMMANDS = {
-	StartWork: {
-		payload: StartWorkPayloadSchema,
-		targetAggregateType: 'WORK',
-		emitsEvent: 'WorkStarted',
-		alsoEmitsEvents: ['WorkAudited'],
-		firstSlice: false
-	}
-} as const;
-
-export const EVENTS = {
-	RuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },
-	Unbuilt: { payload: UnbuiltPayloadSchema, aggregateType: 'Work' },
-	WorkAudited: { payload: WorkAuditedPayloadSchema, aggregateType: 'Work' },
-	WorkStarted: { payload: WorkStartedPayloadSchema, aggregateType: 'Work' }
-} as const;
-`;
-	const twoCommandEventContractMessages = eventContractMessages
-		.replace(
-			'export const RuntimeOnlyPayloadSchema = {};',
-			'export const ResumeWorkPayloadSchema = {};\nexport const RuntimeOnlyPayloadSchema = {};'
-		)
-		.replace(
-			"\tStartWork: {\n\t\tpayload: StartWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkStarted',\n\t\talsoEmitsEvents: ['WorkAudited'],\n\t\tfirstSlice: false\n\t}",
-			"\tResumeWork: {\n\t\tpayload: ResumeWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkResumed',\n\t\tfirstSlice: false\n\t},\n\tStartWork: {\n\t\tpayload: StartWorkPayloadSchema,\n\t\ttargetAggregateType: 'WORK',\n\t\temitsEvent: 'WorkStarted',\n\t\talsoEmitsEvents: ['WorkAudited'],\n\t\tfirstSlice: false\n\t}"
-		)
-		.replace(
-			"\tRuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },",
-			"\tRuntimeOnly: { payload: RuntimeOnlyPayloadSchema, aggregateType: 'Work' },\n\tWorkResumed: { payload: WorkResumedPayloadSchema, aggregateType: 'Work' },"
-		)
-		.replace(
-			'export const WorkAuditedPayloadSchema = {};',
-			'export const WorkAuditedPayloadSchema = {};\nexport const WorkResumedPayloadSchema = {};'
-		);
-	const commandEntries =
-		variant === 'EMPTY'
-			? ''
-			: variant === 'SHARED_DIRECT'
-				? `${commandEntry('StartWork', 'WorkStarted')},${commandEntry('ResumeWork', 'WorkResumed')}`
-				: commandEntry('StartWork', 'WorkStarted');
 	write(
 		root,
 		COMMAND_REGISTRY_PATH,
-		variant === 'EVENT_CONTRACT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS'
-			? (eventContractRegistrySourceTransform?.(
-					variant === 'EVENT_CONTRACT_TWO_COMMANDS'
-						? twoCommandEventContractMessages
-						: eventContractMessages
-				) ??
-					(variant === 'EVENT_CONTRACT_TWO_COMMANDS'
-						? twoCommandEventContractMessages
-						: eventContractMessages))
-			: `export const StartWorkPayloadSchema = {};
-export const COMMANDS = {${commandEntries}
-} as const;
-`
+		commandRegistrySource(variant, eventContractRegistrySourceTransform)
 	);
 	write(root, 'packages/rph-contracts/src/index.ts', "export * from './messages.js';\n");
-	const handlerEntries =
-		variant === 'EMPTY'
-			? ''
-			: variant === 'SHARED_DIRECT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS'
-				? 'StartWork: startWork, ResumeWork: startWork'
-				: 'StartWork: startWork';
 	write(
 		root,
 		HANDLER_REGISTRY_PATH,
 		`import { startWork } from './work.js';
-export const HANDLERS = { ${handlerEntries} } as const;
+export const HANDLERS = { ${handlerRegistryEntries(variant)} } as const;
 `
 	);
 	write(root, HANDLER_SOURCE_PATH, source);
@@ -367,6 +378,12 @@ export const CROSS_AXIS_RULES = [];
 		'verif/command-dispatch-census.test.ts',
 		'// Retained delegated fixture; CSAA records but does not execute this census.\n'
 	);
+	writeEventContractFixtures(root, variant);
+	writeGuardLedgerFixtures(root);
+	return { handlerSiteLine: handlerSiteLine(source), root };
+}
+
+function writeEventContractFixtures(root: string, variant: HandlerFixtureVariant): void {
 	if (variant === 'EVENT_CONTRACT' || variant === 'EVENT_CONTRACT_TWO_COMMANDS') {
 		json(root, 'packages/rph-contracts/vocab/m3-commands-events.json', {
 			bindings: [
@@ -459,6 +476,9 @@ void EMITTED_2026_08_04;
 `
 		);
 	}
+}
+
+function writeGuardLedgerFixtures(root: string): void {
 	write(
 		root,
 		'verif/guard-enforcement-ledger.ts',
@@ -490,7 +510,6 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 		'verif/guard-enforcement-ledger.test.ts',
 		'// Retained guard-ledger authority fixture; CSAA does not execute this test.\n'
 	);
-	return { handlerSiteLine: handlerSiteLine(source), root };
 }
 
 function subjectRequest(root: string): ResolveSubjectRequest {

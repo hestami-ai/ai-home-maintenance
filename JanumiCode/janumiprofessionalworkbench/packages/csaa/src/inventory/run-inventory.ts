@@ -129,6 +129,72 @@ function validateProducts(inventory: InventoryDocument, json: string, document: 
 	}
 }
 
+function readBaselineIfPresent(absoluteBaseline: string): string | null {
+	return existsSync(absoluteBaseline) ? readFileSync(absoluteBaseline, 'utf8') : null;
+}
+
+interface CheckModeInputs {
+	readonly absoluteBaseline: string;
+	readonly baselinePath: string;
+	readonly currentDocument: string;
+	readonly documentPath: string;
+	readonly expectedDocument: string;
+	readonly json: string;
+}
+
+function collectCheckDifferences(inputs: CheckModeInputs): InventoryDifference[] {
+	const currentJson = readBaselineIfPresent(inputs.absoluteBaseline);
+	const differences: InventoryDifference[] = [];
+	if (currentJson !== inputs.json) {
+		differences.push(difference(inputs.baselinePath, inputs.json, currentJson));
+	}
+	if (inputs.currentDocument !== inputs.expectedDocument) {
+		differences.push(
+			difference(inputs.documentPath, inputs.expectedDocument, inputs.currentDocument)
+		);
+	}
+	return differences;
+}
+
+function rollbackCommittedDocument(
+	absoluteDocument: string,
+	previousDocument: string,
+	error: unknown
+): void {
+	try {
+		const rollback = stageAtomic(absoluteDocument, previousDocument);
+		renameSync(rollback, absoluteDocument);
+	} catch (rollbackError) {
+		throw new Error(
+			`Inventory publication failed and document rollback failed: ${String(error)}; ${String(rollbackError)}`
+		);
+	}
+}
+
+function assertBaselineUnchangedAfterFailure(
+	absoluteBaseline: string,
+	currentJson: string | null,
+	json: string,
+	error: unknown
+): void {
+	// A baseline rename is the final operation; before it succeeds the old baseline remains intact.
+	if (
+		currentJson === null &&
+		existsSync(absoluteBaseline) &&
+		readFileSync(absoluteBaseline, 'utf8') !== json
+	) {
+		throw new Error(
+			`Inventory publication failed with an unexpected baseline state: ${String(error)}`
+		);
+	}
+}
+
+function discardStagedFiles(temporaries: readonly (string | null)[]): void {
+	for (const temporary of temporaries) {
+		if (temporary && existsSync(temporary)) unlinkSync(temporary);
+	}
+}
+
 export function runInventory(options: RunInventoryOptions): RunInventoryResult {
 	const repositoryRoot = resolve(options.repositoryRoot);
 	const documentPath = DEFAULT_DOCUMENT_PATH;
@@ -160,14 +226,14 @@ export function runInventory(options: RunInventoryOptions): RunInventoryResult {
 	validateProducts(inventory, json, expectedDocument);
 
 	if (options.mode === 'check') {
-		const currentJson = existsSync(absoluteBaseline)
-			? readFileSync(absoluteBaseline, 'utf8')
-			: null;
-		const differences: InventoryDifference[] = [];
-		if (currentJson !== json) differences.push(difference(baselinePath, json, currentJson));
-		if (currentDocument !== expectedDocument) {
-			differences.push(difference(documentPath, expectedDocument, currentDocument));
-		}
+		const differences = collectCheckDifferences({
+			absoluteBaseline,
+			baselinePath,
+			currentDocument,
+			documentPath,
+			expectedDocument,
+			json
+		});
 		return {
 			differences,
 			inventory,
@@ -178,7 +244,7 @@ export function runInventory(options: RunInventoryOptions): RunInventoryResult {
 		};
 	}
 
-	const currentJson = existsSync(absoluteBaseline) ? readFileSync(absoluteBaseline, 'utf8') : null;
+	const currentJson = readBaselineIfPresent(absoluteBaseline);
 	let stagedBaseline: string | null = null;
 	let stagedDocument: string | null = null;
 	let documentCommitted = false;
@@ -195,31 +261,13 @@ export function runInventory(options: RunInventoryOptions): RunInventoryResult {
 		stagedBaseline = null;
 	} catch (error) {
 		if (documentCommitted) {
-			try {
-				const rollback = stageAtomic(absoluteDocument, currentDocument);
-				renameSync(rollback, absoluteDocument);
-				documentCommitted = false;
-			} catch (rollbackError) {
-				throw new Error(
-					`Inventory publication failed and document rollback failed: ${String(error)}; ${String(rollbackError)}`
-				);
-			}
+			rollbackCommittedDocument(absoluteDocument, currentDocument, error);
+			documentCommitted = false;
 		}
-		// A baseline rename is the final operation; before it succeeds the old baseline remains intact.
-		if (
-			currentJson === null &&
-			existsSync(absoluteBaseline) &&
-			readFileSync(absoluteBaseline, 'utf8') !== json
-		) {
-			throw new Error(
-				`Inventory publication failed with an unexpected baseline state: ${String(error)}`
-			);
-		}
+		assertBaselineUnchangedAfterFailure(absoluteBaseline, currentJson, json, error);
 		throw error;
 	} finally {
-		for (const temporary of [stagedBaseline, stagedDocument]) {
-			if (temporary && existsSync(temporary)) unlinkSync(temporary);
-		}
+		discardStagedFiles([stagedBaseline, stagedDocument]);
 	}
 	return {
 		differences: [],

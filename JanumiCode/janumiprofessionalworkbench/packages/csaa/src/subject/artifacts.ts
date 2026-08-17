@@ -24,7 +24,7 @@ function isTest(path: string): boolean {
 	);
 }
 
-export function classifyArtifact(path: string, content?: string): ArtifactClassification {
+function classifyManifest(path: string): ArtifactClassification | undefined {
 	if (path === 'package.json' || path.endsWith('/package.json')) {
 		return {
 			disposition: 'ANALYZED',
@@ -33,6 +33,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 			roles: ['ANALYSIS_INPUT', 'EXPORT_DECLARATION', 'MANIFEST']
 		};
 	}
+	return undefined;
+}
+
+function classifyLockfile(path: string): ArtifactClassification | undefined {
 	if (/^(?:bun\.lock|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/u.test(path)) {
 		return {
 			disposition: 'ANALYZED',
@@ -41,6 +45,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 			roles: ['ANALYSIS_INPUT', 'CONFIGURATION']
 		};
 	}
+	return undefined;
+}
+
+function classifyRepositoryConfiguration(path: string): ArtifactClassification | undefined {
 	if (
 		path.startsWith('.github/') ||
 		/^(?:\.gitignore|\.prettierignore|\.prettierrc(?:\.json)?|bunfig\.toml)$/u.test(path)
@@ -52,6 +60,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 			roles: ['ANALYSIS_INPUT', 'CONFIGURATION']
 		};
 	}
+	return undefined;
+}
+
+function classifySvelteKitConfiguration(path: string): ArtifactClassification | undefined {
 	if (/(^|\/)\.svelte-kit\/tsconfig\.json$/u.test(path)) {
 		return {
 			disposition: 'ANALYZED',
@@ -60,6 +72,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 			roles: ['ANALYSIS_INPUT', 'CONFIGURATION', 'GENERATED']
 		};
 	}
+	return undefined;
+}
+
+function classifyProjectConfiguration(path: string): ArtifactClassification | undefined {
 	if (/(^|\/)tsconfig(?:\.[^/]+)?\.json$/u.test(path)) {
 		return {
 			disposition: 'ANALYZED',
@@ -68,6 +84,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 			roles: ['ANALYSIS_INPUT', 'CONFIGURATION']
 		};
 	}
+	return undefined;
+}
+
+function classifyToolConfiguration(path: string): ArtifactClassification | undefined {
 	if (
 		/(^|\/)(?:vite|vitest|svelte|eslint|prettier|turbo|sonar-project|dependency-cruiser)[^/]*\.(?:[cm]?[jt]s|json|ya?ml|properties)$/u.test(
 			path
@@ -86,6 +106,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 				: ['ANALYSIS_INPUT', 'CONFIGURATION']
 		};
 	}
+	return undefined;
+}
+
+function classifySourceJson(path: string): ArtifactClassification | undefined {
 	if (path.endsWith('.json') && hasSegment(path, 'src')) {
 		const generated =
 			hasSegment(path, 'gen') || hasSegment(path, 'generated') || path.endsWith('.generated.json');
@@ -100,6 +124,10 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 				: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION']
 		};
 	}
+	return undefined;
+}
+
+function classifySvelteSource(path: string): ArtifactClassification | undefined {
 	if (path.endsWith('.svelte')) {
 		return {
 			disposition: 'INVENTORY_ONLY',
@@ -109,69 +137,102 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 			roles: isTest(path) ? ['FRAMEWORK_CANDIDATE', 'TEST'] : ['FRAMEWORK_CANDIDATE', 'PRODUCTION']
 		};
 	}
-	if (/\.[cm]?[jt]sx?$/u.test(path)) {
-		if (/(^|\/)\.svelte-kit\//u.test(path))
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: 'GENERATED_SOURCE',
-				reason: 'Generated declaration is a consumed TypeScript project root.',
-				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
-			};
-		if (path.startsWith('verif/'))
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: 'VERIFICATION',
-				reason: 'Verification code is an explicit assurance input.',
-				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'VERIFICATION']
-			};
-		if (isTest(path))
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: 'TEST_SOURCE',
-				reason: 'Test source is an explicit compiler candidate.',
-				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'TEST']
-			};
-		if (/(^|\/)src\/gen\//u.test(path))
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: 'GENERATOR_SOURCE',
-				reason: 'Authored generator source produces governed artifacts.',
-				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATOR']
-			};
-		if (path.startsWith('scripts/') || hasSegment(path, 'scripts')) {
-			const generator = /(?:^|[-_.])(gen|generate|generator)(?:[-_.]|$)/u.test(path);
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: generator ? 'GENERATOR_SOURCE' : 'SCRIPT',
-				reason: generator
-					? 'Generator source produces governed artifacts.'
-					: 'Repository script participates in engineering behavior.',
-				roles: generator
-					? ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATOR', 'SCRIPT']
-					: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'SCRIPT']
-			};
-		}
-		if (content !== undefined && /^\uFEFF?\/\/ GENERATED FILE\b/u.test(content))
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: 'GENERATED_SOURCE',
-				reason: 'Generated-file provenance marker identifies generated source.',
-				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
-			};
-		if (/(^|\/)(generated|gen)(\/|$)/u.test(path) || /\.generated\.[cm]?[jt]sx?$/u.test(path))
-			return {
-				disposition: 'ANALYZED',
-				primaryClass: 'GENERATED_SOURCE',
-				reason: 'Generated source remains a compiler input with explicit provenance class.',
-				roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
-			};
+	return undefined;
+}
+
+function classifyScriptSource(path: string): ArtifactClassification | undefined {
+	if (path.startsWith('scripts/') || hasSegment(path, 'scripts')) {
+		const generator = /(?:^|[-_.])(gen|generate|generator)(?:[-_.]|$)/u.test(path);
 		return {
 			disposition: 'ANALYZED',
-			primaryClass: 'PRODUCTION_SOURCE',
-			reason: 'Authored source is a TypeScript compiler candidate.',
-			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION']
+			primaryClass: generator ? 'GENERATOR_SOURCE' : 'SCRIPT',
+			reason: generator
+				? 'Generator source produces governed artifacts.'
+				: 'Repository script participates in engineering behavior.',
+			roles: generator
+				? ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATOR', 'SCRIPT']
+				: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'SCRIPT']
 		};
 	}
+	return undefined;
+}
+
+function classifyCompilerSource(
+	path: string,
+	content: string | undefined
+): ArtifactClassification | undefined {
+	if (!/\.[cm]?[jt]sx?$/u.test(path)) return undefined;
+	if (/(^|\/)\.svelte-kit\//u.test(path))
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'GENERATED_SOURCE',
+			reason: 'Generated declaration is a consumed TypeScript project root.',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
+		};
+	if (path.startsWith('verif/'))
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'VERIFICATION',
+			reason: 'Verification code is an explicit assurance input.',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'VERIFICATION']
+		};
+	if (isTest(path))
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'TEST_SOURCE',
+			reason: 'Test source is an explicit compiler candidate.',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'TEST']
+		};
+	if (/(^|\/)src\/gen\//u.test(path))
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'GENERATOR_SOURCE',
+			reason: 'Authored generator source produces governed artifacts.',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATOR']
+		};
+	const scriptSource = classifyScriptSource(path);
+	if (scriptSource !== undefined) return scriptSource;
+	if (content !== undefined && /^\uFEFF?\/\/ GENERATED FILE\b/u.test(content))
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'GENERATED_SOURCE',
+			reason: 'Generated-file provenance marker identifies generated source.',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
+		};
+	if (/(^|\/)(generated|gen)(\/|$)/u.test(path) || /\.generated\.[cm]?[jt]sx?$/u.test(path))
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'GENERATED_SOURCE',
+			reason: 'Generated source remains a compiler input with explicit provenance class.',
+			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'GENERATED']
+		};
+	return {
+		disposition: 'ANALYZED',
+		primaryClass: 'PRODUCTION_SOURCE',
+		reason: 'Authored source is a TypeScript compiler candidate.',
+		roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'PRODUCTION']
+	};
+}
+
+export function classifyArtifact(path: string, content?: string): ArtifactClassification {
+	const manifest = classifyManifest(path);
+	if (manifest !== undefined) return manifest;
+	const lockfile = classifyLockfile(path);
+	if (lockfile !== undefined) return lockfile;
+	const repositoryConfiguration = classifyRepositoryConfiguration(path);
+	if (repositoryConfiguration !== undefined) return repositoryConfiguration;
+	const svelteKitConfiguration = classifySvelteKitConfiguration(path);
+	if (svelteKitConfiguration !== undefined) return svelteKitConfiguration;
+	const projectConfiguration = classifyProjectConfiguration(path);
+	if (projectConfiguration !== undefined) return projectConfiguration;
+	const toolConfiguration = classifyToolConfiguration(path);
+	if (toolConfiguration !== undefined) return toolConfiguration;
+	const sourceJson = classifySourceJson(path);
+	if (sourceJson !== undefined) return sourceJson;
+	const svelteSource = classifySvelteSource(path);
+	if (svelteSource !== undefined) return svelteSource;
+	const compilerSource = classifyCompilerSource(path, content);
+	if (compilerSource !== undefined) return compilerSource;
 	return {
 		disposition: 'INVENTORY_ONLY',
 		primaryClass: 'OTHER',
@@ -218,7 +279,7 @@ export function reconcileConfigurationClosure(
 						'ANALYSIS_INPUT' as const,
 						'COMPILER_CANDIDATE' as const
 					])
-				].sort()
+				].sort((a, b) => Number(a > b) - Number(a < b))
 			};
 		})
 	};

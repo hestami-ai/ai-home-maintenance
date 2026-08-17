@@ -86,7 +86,7 @@ function denseArray(value: unknown, path: string, budget?: ParseBudget): readonl
 	if (
 		own.length !== length + 1 ||
 		own.some(
-			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
 		)
 	)
 		fail(path, 'Expected a dense array without expando fields.');
@@ -245,35 +245,65 @@ function audit(value: unknown, path: string, budget: ParseBudget) {
 	};
 }
 
+interface JsonDepthNode {
+	readonly depth: number;
+	readonly path: string;
+	readonly value: unknown;
+}
+
+function admitJsonDepthNode(
+	current: JsonDepthNode,
+	maximum: number,
+	seen: Set<object>
+): object | undefined {
+	if (current.depth > maximum) fail(current.path, 'Raw JSON depth exceeds the caller budget.');
+	if (current.value === null || typeof current.value !== 'object') return undefined;
+	if (isProxy(current.value)) fail(current.path, 'Raw JSON must not contain Proxy values.');
+	if (seen.has(current.value)) fail(current.path, 'Raw JSON must be an unaliased acyclic tree.');
+	seen.add(current.value);
+	return current.value;
+}
+
+function assertPlainJsonContainer(container: object, path: string): void {
+	if (Array.isArray(container)) denseArray(container, path);
+	else {
+		const prototype = Reflect.getPrototypeOf(container);
+		if (prototype !== Object.prototype && prototype !== null)
+			fail(path, 'Raw JSON objects must be plain records.');
+	}
+}
+
+function admitJsonChildDescriptor(
+	container: object,
+	path: string,
+	key: string
+): PropertyDescriptor | undefined {
+	if (Array.isArray(container) && key === 'length') return undefined;
+	const descriptor = Reflect.getOwnPropertyDescriptor(container, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		fail(path, 'Raw JSON must contain enumerable data properties only.');
+	return descriptor;
+}
+
+function jsonChildPath(container: object, path: string, key: string): string {
+	return Array.isArray(container) ? `${path}[${key}]` : `${path}.${key}`;
+}
+
 function checkJsonDepth(value: unknown, maximum: number): void {
-	const stack: { readonly depth: number; readonly path: string; readonly value: unknown }[] = [
-		{ depth: 1, path: '$worker', value }
-	];
+	const stack: JsonDepthNode[] = [{ depth: 1, path: '$worker', value }];
 	const seen = new Set<object>();
 	while (stack.length > 0) {
 		const current = stack.pop()!;
-		if (current.depth > maximum) fail(current.path, 'Raw JSON depth exceeds the caller budget.');
-		if (current.value === null || typeof current.value !== 'object') continue;
-		if (isProxy(current.value)) fail(current.path, 'Raw JSON must not contain Proxy values.');
-		if (seen.has(current.value)) fail(current.path, 'Raw JSON must be an unaliased acyclic tree.');
-		seen.add(current.value);
-		if (Array.isArray(current.value)) denseArray(current.value, current.path);
-		else {
-			const prototype = Reflect.getPrototypeOf(current.value);
-			if (prototype !== Object.prototype && prototype !== null)
-				fail(current.path, 'Raw JSON objects must be plain records.');
-		}
-		for (const key of Reflect.ownKeys(current.value)) {
+		const container = admitJsonDepthNode(current, maximum, seen);
+		if (container === undefined) continue;
+		assertPlainJsonContainer(container, current.path);
+		for (const key of Reflect.ownKeys(container)) {
 			if (typeof key !== 'string') fail(current.path, 'Raw JSON must contain string keys only.');
-			const descriptor = Reflect.getOwnPropertyDescriptor(current.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
-				if (Array.isArray(current.value) && key === 'length') continue;
-				fail(current.path, 'Raw JSON must contain enumerable data properties only.');
-			}
-			if (key === 'length' && Array.isArray(current.value)) continue;
+			const descriptor = admitJsonChildDescriptor(container, current.path, key);
+			if (descriptor === undefined) continue;
 			stack.push({
 				depth: current.depth + 1,
-				path: Array.isArray(current.value) ? `${current.path}[${key}]` : `${current.path}.${key}`,
+				path: jsonChildPath(container, current.path, key),
 				value: descriptor.value
 			});
 		}

@@ -1,6 +1,6 @@
 import type { ArtifactPrimaryClass, ResolveSubjectRequest } from '../contracts/subject.js';
 import ts from 'typescript';
-import { canonicalJson, sha256 } from '../inventory/canonical.js';
+import { canonicalJson, compareText, sha256 } from '../inventory/canonical.js';
 import {
 	assertCanonicalRelativePath,
 	assertNoCanonicalPathCollisions,
@@ -138,17 +138,30 @@ const directoryRules = new Map<string, ExclusionDecision>([
 	]
 ]);
 
-export function validateRequestPaths(request: ResolveSubjectRequest): void {
-	for (const value of [...request.filters.include, ...request.filters.exclude]) {
+function assertExactPath(value: string, subject: string): void {
+	if (value.includes('*') || value.includes('?'))
+		throw new Error(`${subject} must be an exact path: ${value}`);
+}
+
+function validateFilterPatterns(filters: ResolveSubjectRequest['filters']): void {
+	for (const value of [...filters.include, ...filters.exclude]) {
 		validateBoundedPattern(value);
 	}
-	for (const output of request.outputs) {
+}
+
+function validateDeclaredOutputs(outputs: ResolveSubjectRequest['outputs']): void {
+	for (const output of outputs) {
 		assertCanonicalRelativePath(output);
-		if (output.includes('*') || output.includes('?'))
-			throw new Error(`Output must be an exact path: ${output}`);
+		assertExactPath(output, 'Output');
 	}
-	assertNoCanonicalPathCollisions(request.outputs);
-	for (const evidence of request.generatedContextEvidence ?? []) {
+	assertNoCanonicalPathCollisions(outputs);
+}
+
+function validateGeneratedContextEvidence(
+	evidenceRecords: ResolveSubjectRequest['generatedContextEvidence']
+): void {
+	const records = evidenceRecords ?? [];
+	for (const evidence of records) {
 		assertCanonicalRelativePath(evidence.path);
 		assertCanonicalRelativePath(evidence.source);
 		if (
@@ -158,31 +171,39 @@ export function validateRequestPaths(request: ResolveSubjectRequest): void {
 		)
 			throw new Error(`Generated-context evidence is incomplete: ${evidence.path}`);
 	}
-	assertNoCanonicalPathCollisions(
-		(request.generatedContextEvidence ?? []).map((evidence) => evidence.path)
-	);
-	if (request.scope.kind === 'EXPLICIT_PROJECTS') {
-		if (request.scope.projects.length === 0)
-			throw new Error('Explicit project scope must name at least one project.');
-		for (const project of request.scope.projects) assertCanonicalRelativePath(project);
-		assertNoCanonicalPathCollisions(request.scope.projects);
-		for (const artifact of request.scope.additionalArtifacts ?? []) {
-			assertCanonicalRelativePath(artifact);
-			if (artifact.includes('*') || artifact.includes('?'))
-				throw new Error(`Additional artifact must be an exact path: ${artifact}`);
-		}
-		assertNoCanonicalPathCollisions(request.scope.additionalArtifacts ?? []);
-		assertNoCanonicalPathCollisions([
-			...request.scope.projects,
-			...(request.scope.additionalArtifacts ?? [])
-		]);
+	assertNoCanonicalPathCollisions(records.map((evidence) => evidence.path));
+}
+
+function validateExplicitProjectScope(scope: ResolveSubjectRequest['scope']): void {
+	if (scope.kind !== 'EXPLICIT_PROJECTS') return;
+	if (scope.projects.length === 0)
+		throw new Error('Explicit project scope must name at least one project.');
+	for (const project of scope.projects) assertCanonicalRelativePath(project);
+	assertNoCanonicalPathCollisions(scope.projects);
+	const additionalArtifacts = scope.additionalArtifacts ?? [];
+	for (const artifact of additionalArtifacts) {
+		assertCanonicalRelativePath(artifact);
+		assertExactPath(artifact, 'Additional artifact');
 	}
-	if (request.operationVersion.trim() === '')
-		throw new Error('Operation version must be nonempty.');
-	for (const [name, budget] of Object.entries(request.budgets)) {
+	assertNoCanonicalPathCollisions(additionalArtifacts);
+	assertNoCanonicalPathCollisions([...scope.projects, ...additionalArtifacts]);
+}
+
+function validateBudgets(budgets: ResolveSubjectRequest['budgets']): void {
+	for (const [name, budget] of Object.entries(budgets)) {
 		if (!Number.isSafeInteger(budget) || budget <= 0)
 			throw new Error(`Budget ${name} must be a positive safe integer.`);
 	}
+}
+
+export function validateRequestPaths(request: ResolveSubjectRequest): void {
+	validateFilterPatterns(request.filters);
+	validateDeclaredOutputs(request.outputs);
+	validateGeneratedContextEvidence(request.generatedContextEvidence);
+	validateExplicitProjectScope(request.scope);
+	if (request.operationVersion.trim() === '')
+		throw new Error('Operation version must be nonempty.');
+	validateBudgets(request.budgets);
 }
 
 export function validateBoundedPattern(pattern: string): void {
@@ -202,7 +223,7 @@ export function validateBoundedPattern(pattern: string): void {
 }
 
 function escapeRegex(value: string): string {
-	return value.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
+	return value.replace(/[|\\{}()[\]^$+?.]/gu, String.raw`\$&`);
 }
 
 export function globMatches(path: string, glob: string): boolean {
@@ -330,7 +351,7 @@ export function sensitiveOrLocalStateExclusion(path: string): ExclusionDecision 
 }
 
 export function subjectOutputPolicyId(outputs: readonly string[]): string {
-	return `jan-csaa-exclude-output/1:${sha256(canonicalJson(outputs.map((path) => canonicalPathKey(path)).sort()))}`;
+	return `jan-csaa-exclude-output/1:${sha256(canonicalJson(outputs.map((path) => canonicalPathKey(path)).sort(compareText)))}`;
 }
 
 export function subjectFilterPolicyId(request: ResolveSubjectRequest): string {
@@ -339,7 +360,7 @@ export function subjectFilterPolicyId(request: ResolveSubjectRequest): string {
 	const scope =
 		request.scope.kind === 'REPOSITORY' ? request.scope : explicitScopePreimage(request);
 	const canonicalPatterns = (values: readonly string[]): string[] =>
-		[...new Set(values.map(normalize))].sort();
+		[...new Set(values.map(normalize))].sort(compareText);
 	return `jan-csaa-filter/1:${sha256(canonicalJson({ exclude: canonicalPatterns(request.filters.exclude), include: canonicalPatterns(request.filters.include), scope }))}`;
 }
 
@@ -352,18 +373,18 @@ function explicitScopePreimage(request: ResolveSubjectRequest): {
 		throw new Error('Explicit scope preimage requires an explicit-project request.');
 	const additionalArtifacts = (request.scope.additionalArtifacts ?? [])
 		.map((path) => canonicalPathKey(path))
-		.sort();
+		.sort(compareText);
 	return {
 		...(additionalArtifacts.length > 0 ? { additionalArtifacts } : {}),
 		kind: request.scope.kind,
-		projects: request.scope.projects.map((path) => canonicalPathKey(path)).sort()
+		projects: request.scope.projects.map((path) => canonicalPathKey(path)).sort(compareText)
 	};
 }
 
 function isReplacementTemporary(path: string, output: string): boolean {
-	const escaped = output.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+	const escaped = output.replace(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 	return new RegExp(
-		`^${escaped}\\.csaa-[0-9]+-[0-9]+\\.tmp$`,
+		String.raw`^${escaped}\.csaa-[0-9]+-[0-9]+\.tmp$`,
 		ts.sys.useCaseSensitiveFileNames ? 'u' : 'iu'
 	).test(path);
 }

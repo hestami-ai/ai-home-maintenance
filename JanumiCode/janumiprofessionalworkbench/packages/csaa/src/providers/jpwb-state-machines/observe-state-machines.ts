@@ -260,6 +260,10 @@ function boundBytes(
 			'READ'
 		);
 	const bytes = readFrozenSubjectArtifact(subject, request.artifact.path);
+	// S6582 REFUSED — see build-command-event-contract-overlay.ts. A preceding guard does pin
+	// `artifact.bytes` here, so the optional chain would be safe TODAY; the explicit limb is kept anyway
+	// so this fail-closed idiom reads identically at all six sites and does not depend on a guard
+	// several lines up staying where it is.
 	if (
 		bytes === undefined ||
 		bytes.byteLength !== artifact.bytes ||
@@ -602,6 +606,50 @@ function parseDeclaredTransitions(
 	return result;
 }
 
+function parseInitialState(
+	context: ParseContext,
+	node: ts.Expression,
+	stateByName: ReadonlyMap<string, StateMachineTopologyStateRecord>,
+	path: string
+): string | null {
+	if (ts.isIdentifier(node) && node.text === 'undefined') return null;
+	const initialState = stringLiteral(context, node, path);
+	if (!stateByName.has(initialState))
+		fail('MALFORMED_GENERATED_TABLE', path, 'Initial state is not declared by the machine.');
+	return initialState;
+}
+
+function bindGuardedTransitions(
+	legalTransitions: readonly StateMachineTopologyLegalTransitionRecord[],
+	guardedEdges: readonly StateMachineTopologyIllegalTransitionRecord[],
+	path: string
+): readonly StateMachineTopologyGuardedTransitionRecord[] {
+	const legalByKey = new Map(
+		legalTransitions.map((edge) => [`${edge.fromStateId}\0${edge.toStateId}`, edge])
+	);
+	const records: StateMachineTopologyGuardedTransitionRecord[] = [];
+	for (const edge of guardedEdges) {
+		const legal = legalByKey.get(`${edge.fromStateId}\0${edge.toStateId}`);
+		if (legal === undefined)
+			fail('MALFORMED_GENERATED_TABLE', path, 'Every guarded edge must match a legal transition.');
+		records.push({ ...edge, legalTransitionId: legal.id });
+	}
+	return records;
+}
+
+function assertIllegalEdgesAreNotLegal(
+	legalTransitions: readonly StateMachineTopologyLegalTransitionRecord[],
+	illegalEdges: readonly StateMachineTopologyIllegalTransitionRecord[],
+	path: string
+): void {
+	const legalKeys = new Set(
+		legalTransitions.map((edge) => `${edge.fromStateId}\0${edge.toStateId}`)
+	);
+	for (const edge of illegalEdges)
+		if (legalKeys.has(`${edge.fromStateId}\0${edge.toStateId}`))
+			fail('MALFORMED_GENERATED_TABLE', path, 'An explicitly illegal edge cannot also be legal.');
+}
+
 function parseMachines(
 	context: ParseContext,
 	initializer: ts.Expression
@@ -669,17 +717,12 @@ function parseMachines(
 			`${machinePath}.states`
 		);
 		const stateByName = new Map(parsedStates.states.map((state) => [state.name, state]));
-		const initialExpression = properties.get('initialState')!;
-		const initialState =
-			ts.isIdentifier(initialExpression) && initialExpression.text === 'undefined'
-				? null
-				: stringLiteral(context, initialExpression, `${machinePath}.initialState`);
-		if (initialState !== null && !stateByName.has(initialState))
-			fail(
-				'MALFORMED_GENERATED_TABLE',
-				`${machinePath}.initialState`,
-				'Initial state is not declared by the machine.'
-			);
+		const initialState = parseInitialState(
+			context,
+			properties.get('initialState')!,
+			stateByName,
+			`${machinePath}.initialState`
+		);
 		const terminalStateIds = parseStateIdList(
 			context,
 			properties.get('terminalStates')!,
@@ -709,28 +752,12 @@ function parseMachines(
 			properties.get('guarded')!,
 			`${machinePath}.guarded`
 		);
-		const legalKeys = new Set(machineLegal.map((edge) => `${edge.fromStateId}\0${edge.toStateId}`));
-		const legalByKey = new Map(
-			machineLegal.map((edge) => [`${edge.fromStateId}\0${edge.toStateId}`, edge])
+		const machineGuardedRecords = bindGuardedTransitions(
+			machineLegal,
+			machineGuarded,
+			`${machinePath}.guarded`
 		);
-		const machineGuardedRecords: StateMachineTopologyGuardedTransitionRecord[] = [];
-		for (const edge of machineGuarded) {
-			const legal = legalByKey.get(`${edge.fromStateId}\0${edge.toStateId}`);
-			if (legal === undefined)
-				fail(
-					'MALFORMED_GENERATED_TABLE',
-					`${machinePath}.guarded`,
-					'Every guarded edge must match a legal transition.'
-				);
-			machineGuardedRecords.push({ ...edge, legalTransitionId: legal.id });
-		}
-		for (const edge of machineIllegal)
-			if (legalKeys.has(`${edge.fromStateId}\0${edge.toStateId}`))
-				fail(
-					'MALFORMED_GENERATED_TABLE',
-					`${machinePath}.illegal`,
-					'An explicitly illegal edge cannot also be legal.'
-				);
+		assertIllegalEdgesAreNotLegal(machineLegal, machineIllegal, `${machinePath}.illegal`);
 		const terminalStateNames = terminalStateIds.map(
 			(id) => parsedStates.states.find((state) => state.id === id)!.name
 		);

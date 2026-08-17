@@ -14,7 +14,9 @@ import {
 import type { ProgramRecipe } from '../contracts/subject.js';
 import {
 	CompilerInputCaptureError,
+	type BorrowedVerifiedCompilerProjectInputEntry,
 	type CompilerInputQuery,
+	type CompilerProjectQueryAttribution,
 	type VerifiedCompilerProjectInputEntry,
 	type VerifiedCompilerProjectInputLookup
 } from '../providers/typescript/compiler-input-journal.js';
@@ -155,6 +157,16 @@ function rethrowCaptureError(error: unknown): never {
 	throw error;
 }
 
+/** Construction stages rethrow capture failures verbatim and refuse everything else as unavailable. */
+function rethrowProgramStageError(error: unknown, message: string): never {
+	if (
+		error instanceof CompilerProjectProgramCapabilityError ||
+		error instanceof CompilerInputCaptureError
+	)
+		return rethrowCaptureError(error);
+	fail('PROGRAM_UNAVAILABLE', message);
+}
+
 function captureBoundary<Value>(operation: () => Value): Value {
 	try {
 		return operation();
@@ -193,6 +205,11 @@ export class CompilerProjectProgramCapabilityError extends Error {
 	}
 }
 
+/** Branchless reproduction of the default `Array#sort` UTF-16 code-unit order for strings. */
+function compareDefaultStringOrder(left: string, right: string): number {
+	return Number(left > right) - Number(left < right);
+}
+
 function inertLimits(value: unknown): CompilerProjectProgramLimits {
 	if (
 		value === null ||
@@ -205,7 +222,8 @@ function inertLimits(value: unknown): CompilerProjectProgramLimits {
 	const descriptors = Object.getOwnPropertyDescriptors(value);
 	if (
 		Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string') ||
-		Object.keys(descriptors).sort().join('\0') !== [...LIMIT_KEYS].sort().join('\0')
+		Object.keys(descriptors).sort(compareDefaultStringOrder).join('\0') !==
+			[...LIMIT_KEYS].sort(compareDefaultStringOrder).join('\0')
 	)
 		fail('INPUT_INVALID', 'Compiler project Program limits have an invalid exact key set.');
 	const limits: Record<string, number> = {};
@@ -394,7 +412,9 @@ function compareText(left: string, right: string, onProgress: () => void): numbe
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
 }
 
 function sameCompilerInputQuery(
@@ -451,7 +471,7 @@ function exactProject(
 		programMatches += 1;
 		program = candidate;
 	}
-	if (programMatches !== 1 || program === undefined || program.projectId !== project.id)
+	if (programMatches !== 1 || program?.projectId !== project.id)
 		fail('INPUT_INVALID', 'Compiler project Program semantic project/program binding is invalid.');
 	onProgress();
 	const lookup = getStaticSemanticSnapshotCompilerProjectInputLookup(snapshot, configPath);
@@ -462,6 +482,164 @@ function exactProject(
 			'Exact semantic snapshot lacks a verified compiler project input capability.'
 		);
 	return { lookup, program, project };
+}
+
+/** The exact semantic source population of one Program, in the pinned code-unit emission order. */
+function expectedProgramSources(
+	snapshot: StaticSemanticSnapshot,
+	program: StaticSemanticSnapshot['programs'][number],
+	maxProgramSourceFiles: number,
+	onProgress: () => void
+): string[] {
+	if (program.sourceIds.length > maxProgramSourceFiles)
+		fail('BUDGET_EXCEEDED', 'Semantic Program source population exceeds its fresh-Program budget.');
+	const expectedSources: string[] = [];
+	for (const source of snapshot.sources) {
+		onProgress();
+		if (source.programId !== program.id) continue;
+		if (expectedSources.length >= program.sourceIds.length)
+			fail(
+				'CAPTURE_UNAVAILABLE',
+				'Semantic Program source IDs do not reproduce its exact source population.'
+			);
+		expectedSources.push(source.logicalPath);
+	}
+	expectedSources.sort((left, right) => {
+		onProgress();
+		return compareText(left, right, onProgress);
+	});
+	if (expectedSources.length !== program.sourceIds.length)
+		fail(
+			'CAPTURE_UNAVAILABLE',
+			'Semantic Program source IDs do not reproduce its exact source population.'
+		);
+	return expectedSources;
+}
+
+interface AttributedQueryPreflight {
+	attributedInputRecords: number;
+	attributedReadBytes: number;
+	readonly limitsByInputId: Map<SemanticContextInputId, number>;
+	readonly queriesByInputId: Map<SemanticContextInputId, CompilerInputQuery>;
+}
+
+/** Admits one attributed query into the preflight totals, or refuses the whole attribution. */
+function admitAttributedQuery(
+	preflight: AttributedQueryPreflight,
+	entry: BorrowedVerifiedCompilerProjectInputEntry,
+	attribution: CompilerProjectQueryAttribution,
+	limits: CompilerProjectProgramLimits,
+	onProgress: () => void
+): void {
+	if (
+		entry.attributedInvocationCount !== attribution.invocationCount ||
+		!sameCompilerInputQuery(entry.query, attribution.query, onProgress)
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Verified project attribution contains an unavailable query.');
+	const inputId = entry.observation.id;
+	if (preflight.limitsByInputId.has(inputId))
+		fail('CAPTURE_UNAVAILABLE', 'Verified project attribution repeats a context-input identity.');
+	preflight.limitsByInputId.set(inputId, attribution.invocationCount);
+	preflight.queriesByInputId.set(inputId, attribution.query);
+	preflight.attributedInputRecords = safeAdd(
+		preflight.attributedInputRecords,
+		attribution.invocationCount,
+		'Attributed compiler input records'
+	);
+	preflight.attributedReadBytes = safeAdd(
+		preflight.attributedReadBytes,
+		safeMultiply(
+			presentReadBytes(entry.observation),
+			attribution.invocationCount,
+			'Attributed compiler read bytes'
+		),
+		'Attributed compiler read bytes'
+	);
+	if (
+		preflight.attributedInputRecords > limits.maxProgramInputRecords ||
+		preflight.attributedReadBytes > limits.maxProgramReadBytes
+	)
+		fail(
+			'BUDGET_EXCEEDED',
+			'Verified project-attributed compiler inputs exceed the fresh-Program preflight budget.'
+		);
+}
+
+/** Proves every attributed query is available before any fresh-Program host callback runs. */
+function preflightAttributedQueries(
+	lookup: VerifiedCompilerProjectInputLookup,
+	limits: CompilerProjectProgramLimits,
+	assertWithinDeadline: () => void,
+	onProgress: () => void
+): AttributedQueryPreflight {
+	const preflight: AttributedQueryPreflight = {
+		attributedInputRecords: 0,
+		attributedReadBytes: 0,
+		limitsByInputId: new Map<SemanticContextInputId, number>(),
+		queriesByInputId: new Map<SemanticContextInputId, CompilerInputQuery>()
+	};
+	for (const attribution of lookup.attribution.queryInvocations) {
+		onProgress();
+		let found = false;
+		captureBoundary(() =>
+			lookup.withAttributedQueryForVerifiedHost(attribution.query, onProgress, (entry) => {
+				found = true;
+				admitAttributedQuery(preflight, entry, attribution, limits, onProgress);
+			})
+		);
+		assertWithinDeadline();
+		if (!found)
+			fail('CAPTURE_UNAVAILABLE', 'Verified project attribution contains an unavailable query.');
+	}
+	return preflight;
+}
+
+interface ReconciledProgramSources {
+	readonly actualSourceSet: ReadonlySet<string>;
+	readonly actualSources: readonly string[];
+}
+
+/** Proves the fresh Program reproduces the exact expected source population, in the same order. */
+function reconciledProgramSources(
+	program: ts.Program,
+	lookup: VerifiedCompilerProjectInputLookup,
+	expectedSources: readonly string[],
+	maxProgramSourceFiles: number,
+	assertWithinDeadline: () => void
+): ReconciledProgramSources {
+	const sourceProgress = resourceProgress(assertWithinDeadline);
+	const programSourceFiles = program.getSourceFiles();
+	assertWithinDeadline();
+	if (programSourceFiles.length > maxProgramSourceFiles)
+		fail('BUDGET_EXCEEDED', 'Fresh compiler Program exceeded maxProgramSourceFiles.');
+	const actualSources: string[] = [];
+	for (const source of programSourceFiles) {
+		sourceProgress.step();
+		actualSources.push(captureBoundary(() => lookup.toRecordedLogical(source.fileName)));
+		assertWithinDeadline();
+	}
+	actualSources.sort((left, right) => {
+		sourceProgress.step();
+		return compareText(left, right, sourceProgress.step);
+	});
+	const actualSourceSet = new Set<string>();
+	for (const logicalPath of actualSources) {
+		sourceProgress.step();
+		actualSourceSet.add(logicalPath);
+	}
+	let sourcesReconcile = actualSources.length === expectedSources.length;
+	for (let index = 0; index < actualSources.length && sourcesReconcile; index += 1) {
+		sourceProgress.step();
+		if (!sameText(actualSources[index]!, expectedSources[index]!, sourceProgress.step))
+			sourcesReconcile = false;
+	}
+	sourceProgress.finish();
+	if (!sourcesReconcile)
+		fail(
+			'CAPTURE_UNAVAILABLE',
+			'Fresh compiler Program does not reproduce the exact semantic Program source population.'
+		);
+	return { actualSourceSet, actualSources };
 }
 
 /**
@@ -507,87 +685,19 @@ export function createCompilerProjectProgramSession(
 			'Fresh compiler Program TypeScript version does not match snapshot.'
 		);
 
-	if (bound.program.sourceIds.length > limits.maxProgramSourceFiles)
-		fail('BUDGET_EXCEEDED', 'Semantic Program source population exceeds its fresh-Program budget.');
-	const expectedSources: string[] = [];
-	for (const source of snapshot.sources) {
-		setupProgress.step();
-		if (source.programId !== bound.program.id) continue;
-		if (expectedSources.length >= bound.program.sourceIds.length)
-			fail(
-				'CAPTURE_UNAVAILABLE',
-				'Semantic Program source IDs do not reproduce its exact source population.'
-			);
-		expectedSources.push(source.logicalPath);
-	}
-	expectedSources.sort((left, right) => {
-		setupProgress.step();
-		return compareText(left, right, setupProgress.step);
-	});
-	if (expectedSources.length !== bound.program.sourceIds.length)
-		fail(
-			'CAPTURE_UNAVAILABLE',
-			'Semantic Program source IDs do not reproduce its exact source population.'
-		);
+	const expectedSources = expectedProgramSources(
+		snapshot,
+		bound.program,
+		limits.maxProgramSourceFiles,
+		setupProgress.step
+	);
 
-	let attributedInputRecords = 0;
-	let attributedReadBytes = 0;
-	const attributedLimitsByInputId = new Map<SemanticContextInputId, number>();
-	const attributedQueriesByInputId = new Map<SemanticContextInputId, CompilerInputQuery>();
-	for (const attribution of bound.lookup.attribution.queryInvocations) {
-		setupProgress.step();
-		let found = false;
-		captureBoundary(() =>
-			bound.lookup.withAttributedQueryForVerifiedHost(
-				attribution.query,
-				setupProgress.step,
-				(entry) => {
-					found = true;
-					if (
-						entry.attributedInvocationCount !== attribution.invocationCount ||
-						!sameCompilerInputQuery(entry.query, attribution.query, setupProgress.step)
-					)
-						fail(
-							'CAPTURE_UNAVAILABLE',
-							'Verified project attribution contains an unavailable query.'
-						);
-					const inputId = entry.observation.id;
-					if (attributedLimitsByInputId.has(inputId))
-						fail(
-							'CAPTURE_UNAVAILABLE',
-							'Verified project attribution repeats a context-input identity.'
-						);
-					attributedLimitsByInputId.set(inputId, attribution.invocationCount);
-					attributedQueriesByInputId.set(inputId, attribution.query);
-					attributedInputRecords = safeAdd(
-						attributedInputRecords,
-						attribution.invocationCount,
-						'Attributed compiler input records'
-					);
-					attributedReadBytes = safeAdd(
-						attributedReadBytes,
-						safeMultiply(
-							presentReadBytes(entry.observation),
-							attribution.invocationCount,
-							'Attributed compiler read bytes'
-						),
-						'Attributed compiler read bytes'
-					);
-					if (
-						attributedInputRecords > limits.maxProgramInputRecords ||
-						attributedReadBytes > limits.maxProgramReadBytes
-					)
-						fail(
-							'BUDGET_EXCEEDED',
-							'Verified project-attributed compiler inputs exceed the fresh-Program preflight budget.'
-						);
-				}
-			)
-		);
-		assertWithinDeadline();
-		if (!found)
-			fail('CAPTURE_UNAVAILABLE', 'Verified project attribution contains an unavailable query.');
-	}
+	const {
+		attributedInputRecords,
+		attributedReadBytes,
+		limitsByInputId: attributedLimitsByInputId,
+		queriesByInputId: attributedQueriesByInputId
+	} = preflightAttributedQueries(bound.lookup, limits, assertWithinDeadline, setupProgress.step);
 	setupProgress.finish();
 
 	let finalized = false;
@@ -723,12 +833,7 @@ export function createCompilerProjectProgramSession(
 		host = captureBoundHost(prevalidatedHost);
 		assertWithinDeadline();
 	} catch (error) {
-		if (
-			error instanceof CompilerProjectProgramCapabilityError ||
-			error instanceof CompilerInputCaptureError
-		)
-			return rethrowCaptureError(error);
-		fail('PROGRAM_UNAVAILABLE', 'Fresh compiler Program host construction failed.');
+		rethrowProgramStageError(error, 'Fresh compiler Program host construction failed.');
 	}
 
 	let program: ts.Program;
@@ -746,46 +851,16 @@ export function createCompilerProjectProgramSession(
 		assertWithinDeadline();
 		stage = 'CALLER_ANALYSIS';
 	} catch (error) {
-		if (
-			error instanceof CompilerProjectProgramCapabilityError ||
-			error instanceof CompilerInputCaptureError
-		)
-			return rethrowCaptureError(error);
-		fail('PROGRAM_UNAVAILABLE', 'Fresh compiler Program construction failed.');
+		rethrowProgramStageError(error, 'Fresh compiler Program construction failed.');
 	}
 	assertWithinDeadline();
-	const sourceProgress = resourceProgress(assertWithinDeadline);
-	const programSourceFiles = program.getSourceFiles();
-	assertWithinDeadline();
-	if (programSourceFiles.length > limits.maxProgramSourceFiles)
-		fail('BUDGET_EXCEEDED', 'Fresh compiler Program exceeded maxProgramSourceFiles.');
-	const actualSources: string[] = [];
-	for (const source of programSourceFiles) {
-		sourceProgress.step();
-		actualSources.push(captureBoundary(() => bound.lookup.toRecordedLogical(source.fileName)));
-		assertWithinDeadline();
-	}
-	actualSources.sort((left, right) => {
-		sourceProgress.step();
-		return compareText(left, right, sourceProgress.step);
-	});
-	const actualSourceSet = new Set<string>();
-	for (const logicalPath of actualSources) {
-		sourceProgress.step();
-		actualSourceSet.add(logicalPath);
-	}
-	let sourcesReconcile = actualSources.length === expectedSources.length;
-	for (let index = 0; index < actualSources.length && sourcesReconcile; index += 1) {
-		sourceProgress.step();
-		if (!sameText(actualSources[index]!, expectedSources[index]!, sourceProgress.step))
-			sourcesReconcile = false;
-	}
-	sourceProgress.finish();
-	if (!sourcesReconcile)
-		fail(
-			'CAPTURE_UNAVAILABLE',
-			'Fresh compiler Program does not reproduce the exact semantic Program source population.'
-		);
+	const { actualSourceSet, actualSources } = reconciledProgramSources(
+		program,
+		bound.lookup,
+		expectedSources,
+		limits.maxProgramSourceFiles,
+		assertWithinDeadline
+	);
 
 	return Object.freeze({
 		checker,
@@ -862,8 +937,7 @@ export function createCompilerProjectProgramSession(
 					fail('CAPTURE_UNAVAILABLE', 'Explicit compiler source parse lacks captured bytes.');
 				const inputRecord = inputRecords[inputRecords.length - 1];
 				if (
-					inputRecord === undefined ||
-					inputRecord.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
+					inputRecord?.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
 					inputRecord.query.operation !== 'READ_FILE' ||
 					inputRecord.query.logicalPath !== logicalPath ||
 					inputRecord.observation.operation !== 'READ_FILE' ||
