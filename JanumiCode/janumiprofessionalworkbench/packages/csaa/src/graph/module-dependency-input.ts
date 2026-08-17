@@ -41,7 +41,7 @@ export interface ModuleDependencyGraphInputProjection {
 }
 
 function compareId(left: { readonly id: string }, right: { readonly id: string }): number {
-	return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+	return Number(left.id > right.id) - Number(left.id < right.id);
 }
 
 export function moduleDependencyGraphInputProjection(
@@ -57,8 +57,9 @@ export function moduleDependencyGraphInputProjection(
 					record.capability === 'TS_SYNTAX'
 			)
 			.map((record) => ({ ...record }))
-			.sort((left, right) =>
-				left.capability < right.capability ? -1 : left.capability > right.capability ? 1 : 0
+			.sort(
+				(left, right) =>
+					Number(left.capability > right.capability) - Number(left.capability < right.capability)
 			),
 		expectedEmpty: snapshot.expectedEmpty,
 		extractionVersion: snapshot.extractionVersion,

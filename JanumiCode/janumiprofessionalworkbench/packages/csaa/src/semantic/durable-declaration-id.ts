@@ -60,6 +60,10 @@ function malformed(message: string): never {
 	throw new TypeError(`Durable declaration identity input ${message}`);
 }
 
+function byCodeUnitOrder(a: string, b: string): number {
+	return Number(a > b) - Number(a < b);
+}
+
 function exactInputRecord(value: unknown): Record<keyof DurableDeclarationIdentityInput, unknown> {
 	if (value === null || typeof value !== 'object' || Array.isArray(value) || isProxy(value)) {
 		return malformed('must be a non-Proxy plain data object.');
@@ -72,8 +76,8 @@ function exactInputRecord(value: unknown): Record<keyof DurableDeclarationIdenti
 	if (ownKeys.some((key) => typeof key !== 'string')) {
 		return malformed('must not contain symbol properties.');
 	}
-	const actualKeys = [...(ownKeys as string[])].sort();
-	const expectedKeys = [...INPUT_KEYS].sort();
+	const actualKeys = [...(ownKeys as string[])].sort(byCodeUnitOrder);
+	const expectedKeys = [...INPUT_KEYS].sort(byCodeUnitOrder);
 	if (
 		actualKeys.length !== expectedKeys.length ||
 		actualKeys.some((key, index) => key !== expectedKeys[index])

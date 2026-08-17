@@ -58,7 +58,7 @@ function denseArray(value: unknown, path: string): readonly unknown[] {
 	if (
 		own.length !== value.length + 1 ||
 		own.some(
-			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
 		)
 	)
 		fail(path, 'Expected a dense array without expando fields.');

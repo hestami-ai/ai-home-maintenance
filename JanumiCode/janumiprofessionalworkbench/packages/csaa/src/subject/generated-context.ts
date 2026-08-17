@@ -129,6 +129,7 @@ export function reconcileGeneratedContext(
 			});
 		}
 	}
+	contexts.sort((left, right) => (left.consumerProject < right.consumerProject ? -1 : 1));
 	return {
 		capture: {
 			...capture,
@@ -139,9 +140,7 @@ export function reconcileGeneratedContext(
 			),
 			fingerprints
 		},
-		contexts: contexts.sort((left, right) =>
-			left.consumerProject < right.consumerProject ? -1 : 1
-		),
+		contexts,
 		diagnostics
 	};
 }

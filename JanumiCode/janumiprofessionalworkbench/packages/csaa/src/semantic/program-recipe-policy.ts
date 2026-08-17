@@ -185,8 +185,8 @@ function exactDataRecord(
 	expectedKeys: readonly string[]
 ): Readonly<Record<string, unknown>> {
 	const record = dataRecord(value, field);
-	const keys = Object.keys(record).sort();
-	const expected = [...expectedKeys].sort();
+	const keys = Object.keys(record).sort((a, b) => Number(a > b) - Number(a < b));
+	const expected = [...expectedKeys].sort((a, b) => Number(a > b) - Number(a < b));
 	if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index]))
 		invalid(`${field} must contain exactly: ${expected.join(', ')}.`);
 	return record;
@@ -211,7 +211,7 @@ function wireArray(value: unknown, field: string): readonly unknown[] {
 	if (
 		keys.length !== length + 1 ||
 		keys.some(
-			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+			(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
 		)
 	)
 		invalid(`${field} must be dense and contain no symbol or expando properties.`);
@@ -328,7 +328,7 @@ function validatePathsOption(
 					substitution.includes('\\') ||
 					substitution.startsWith('/') ||
 					/^[A-Za-z]:/u.test(substitution) ||
-					substitution.split('/').some((segment) => segment === '')
+					substitution.split('/').includes('')
 				)
 					invalid(
 						`compilerOptions.paths.${pattern}[${index}] must be a budgeted non-absolute slash-form TypeScript path substitution.`

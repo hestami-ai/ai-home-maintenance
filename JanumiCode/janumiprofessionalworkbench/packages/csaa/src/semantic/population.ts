@@ -17,7 +17,7 @@ function sortedUnique(values: readonly string[]): readonly string[] | null {
 		if (values[index - 1] === values[index]) return null;
 		if (values[index - 1]! > values[index]!) canonical = false;
 	}
-	const sorted = canonical ? values : [...values].sort();
+	const sorted = canonical ? values : [...values].sort((a, b) => Number(a > b) - Number(a < b));
 	for (let index = 1; index < sorted.length; index += 1)
 		if (sorted[index - 1] === sorted[index]) return null;
 	return sorted;
@@ -87,12 +87,14 @@ export function semanticPopulation(
 	const safeDiscovered = discoveredUnion ?? [];
 	const analyzedManifest = digest(safe.analyzed);
 	const contextOnlyManifest = digest(safe.contextOnly);
-	const includedManifest =
-		safeIncluded === safe.analyzed
-			? analyzedManifest
-			: safeIncluded === safe.contextOnly
-				? contextOnlyManifest
-				: digest(safeIncluded);
+	let includedManifest: string;
+	if (safeIncluded === safe.analyzed) {
+		includedManifest = analyzedManifest;
+	} else if (safeIncluded === safe.contextOnly) {
+		includedManifest = contextOnlyManifest;
+	} else {
+		includedManifest = digest(safeIncluded);
+	}
 	const discoveredManifest =
 		safeDiscovered === safeIncluded ? includedManifest : digest(safeDiscovered);
 	return {

@@ -67,7 +67,7 @@ export const AST_STRUCTURAL_ROLES = {
 } as const satisfies Readonly<Record<string, SemanticAstStructuralRole>>;
 
 export const SEMANTIC_AST_STRUCTURAL_ROLES: readonly SemanticAstStructuralRole[] =
-	Object.values(AST_STRUCTURAL_ROLES).sort();
+	Object.values(AST_STRUCTURAL_ROLES).sort((a, b) => Number(a > b) - Number(a < b));
 
 const SYNTAX_KIND_NAME_BY_CODE = new Map<number, string>();
 for (const [name, value] of Object.entries(ts.SyntaxKind)) {

@@ -6,7 +6,9 @@ export function sha256(bytes: string | Uint8Array): string {
 
 /** Locale- and ICU-independent UTF-16 code-unit ordering for canonical bytes. */
 export function compareText(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function canonicalValue(value: unknown): unknown {

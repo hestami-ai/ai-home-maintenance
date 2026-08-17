@@ -599,11 +599,17 @@ export type SemanticTypeParameterOwner =
 	| { readonly id: SemanticSignatureId; readonly kind: 'SIGNATURE' }
 	| { readonly id: SemanticDeclarationId; readonly kind: 'DECLARATION' };
 
+export type SemanticTypeParameterResolutionState =
+	| 'RESOLVED'
+	| 'MISSING'
+	| 'UNRESOLVED'
+	| 'UNSUPPORTED';
+
 export interface SemanticTypeParameterRecord {
-	readonly constraintState: 'RESOLVED' | 'MISSING' | 'UNRESOLVED' | 'UNSUPPORTED';
+	readonly constraintState: SemanticTypeParameterResolutionState;
 	readonly constraintTypeId: SemanticTypeId | null;
 	readonly declarationId: SemanticDeclarationId | null;
-	readonly defaultState: 'RESOLVED' | 'MISSING' | 'UNRESOLVED' | 'UNSUPPORTED';
+	readonly defaultState: SemanticTypeParameterResolutionState;
 	readonly defaultTypeId: SemanticTypeId | null;
 	readonly id: SemanticTypeParameterId;
 	readonly name: string;
@@ -730,7 +736,7 @@ export interface SemanticGenericInstantiationRelationRecord extends SemanticType
 }
 
 export interface SemanticParameterConstraintRelationRecord extends SemanticTypeRelationRecordBase {
-	readonly constraintState: 'RESOLVED' | 'MISSING' | 'UNRESOLVED' | 'UNSUPPORTED';
+	readonly constraintState: SemanticTypeParameterResolutionState;
 	readonly constraintTypeId: SemanticTypeId | null;
 	readonly kind: 'PARAMETER_CONSTRAINT';
 	readonly typeParameterId: SemanticTypeParameterId;

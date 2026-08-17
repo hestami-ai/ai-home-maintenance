@@ -20,7 +20,7 @@ function fail(message: string): never {
 }
 
 function canonicalPaths(values: readonly string[]): string {
-	return canonicalSemanticJson([...values].sort());
+	return canonicalSemanticJson([...values].sort((a, b) => Number(a > b) - Number(a < b)));
 }
 
 /**
@@ -61,8 +61,7 @@ export function attachVerifiedCompilerCaptureToStaticSemanticSnapshot(
 		if (
 			subjectProject === undefined ||
 			attribution === undefined ||
-			program === undefined ||
-			program.projectId !== project.id ||
+			program?.projectId !== project.id ||
 			project.programRecipe.configPath !== project.configPath ||
 			canonicalSemanticJson(project.programRecipe) !==
 				canonicalSemanticJson(subjectProject.programRecipe)

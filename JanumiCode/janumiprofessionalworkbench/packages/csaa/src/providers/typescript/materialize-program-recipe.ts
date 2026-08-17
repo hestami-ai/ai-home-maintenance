@@ -136,7 +136,7 @@ function validatePathSubstitutions(
 				substitution.includes('\\') ||
 				substitution.startsWith('/') ||
 				/^[A-Za-z]:/u.test(substitution) ||
-				substitution.split('/').some((segment) => segment === '')
+				substitution.split('/').includes('')
 			)
 				invalid(`${field} must be a non-absolute slash-form TypeScript path substitution.`);
 			const lexicalCandidate = resolve(effectiveBase, ...substitution.split('/'));
@@ -174,12 +174,14 @@ function materializeProgramRecipeUnsafe(
 		compilerOptions[key] = value;
 	}
 	if (recipe.compilerOptions.paths !== undefined) {
-		const effectiveBaseLogical =
+		const declaredBaseLogical =
 			typeof recipe.compilerOptions.baseUrl === 'string'
 				? recipe.compilerOptions.baseUrl
-				: typeof recipe.compilerOptions.pathsBasePath === 'string'
-					? recipe.compilerOptions.pathsBasePath
-					: posix.dirname(recipe.configPath);
+				: recipe.compilerOptions.pathsBasePath;
+		const effectiveBaseLogical =
+			typeof declaredBaseLogical === 'string'
+				? declaredBaseLogical
+				: posix.dirname(recipe.configPath);
 		const effectiveBase = materializePath(
 			repositoryRoot,
 			effectiveBaseLogical,

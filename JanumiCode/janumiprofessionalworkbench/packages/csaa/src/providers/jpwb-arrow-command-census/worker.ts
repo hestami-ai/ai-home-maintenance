@@ -33,11 +33,13 @@ export interface ArrowCommandCensusWorkerFindingSet {
 	readonly uncovered: readonly string[];
 }
 
+type ArrowCommandCensusWorkerCensusKey = 'orphans' | 'total' | 'uncovered';
+
 export interface ArrowCommandCensusWorkerResult {
 	readonly analyzerResolvedPath: string;
 	readonly baseline: ArrowCommandCensusWorkerFindingSet;
 	readonly birthStates: readonly ArrowCommandCensusWorkerStateMapEntry[];
-	readonly census: Pick<ArrowCommandCensusWorkerFindingSet, 'orphans' | 'total' | 'uncovered'>;
+	readonly census: Pick<ArrowCommandCensusWorkerFindingSet, ArrowCommandCensusWorkerCensusKey>;
 	readonly contractsResolvedPath: string;
 	readonly deadCovered: Pick<ArrowCommandCensusWorkerFindingSet, 'dead' | 'unanalysed'>;
 	readonly declaredArrows: readonly ArrowCommandCensusWorkerDeclaredArrow[];
@@ -85,8 +87,11 @@ function fail(message: string): never {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const compareText = (left: string, right: string): number =>
-	left < right ? -1 : left > right ? 1 : 0;
+const compareText = (left: string, right: string): number => {
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
+};
 
 const requireExactKeys = (
 	value: Record<string, unknown>,
@@ -115,7 +120,7 @@ const decodeUtf8 = (bytes: Uint8Array, label: string): string => {
 		// Preserve a leading BOM in the decoded text so the explicit rejection
 		// below is effective. The default decoder strips it before inspection.
 		const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-		if (text.charCodeAt(0) === 0xfeff) fail(`${label} must not contain a UTF-8 BOM`);
+		if (text.codePointAt(0) === 0xfeff) fail(`${label} must not contain a UTF-8 BOM`);
 		return text;
 	} catch (error) {
 		if (error instanceof Error && error.message.startsWith('arrow-command-census worker:'))
@@ -205,7 +210,7 @@ const parseStringArray = (value: unknown, label: string): string[] => {
 const parseFindingTriple = (
 	value: unknown,
 	label: string
-): Pick<ArrowCommandCensusWorkerFindingSet, 'orphans' | 'total' | 'uncovered'> => {
+): Pick<ArrowCommandCensusWorkerFindingSet, ArrowCommandCensusWorkerCensusKey> => {
 	if (!isRecord(value)) fail(`${label} must be an object`);
 	requireExactKeys(value, ['orphans', 'total', 'uncovered'], label);
 	if (!Number.isSafeInteger(value.total) || (value.total as number) < 0) {
@@ -327,7 +332,7 @@ const packageVersion = (bun: BunRuntime, packageName: string, from: string): str
 export const executeArrowCommandCensusWorker = async (
 	request: ArrowCommandCensusWorkerRequest
 ): Promise<ArrowCommandCensusWorkerResult> => {
-	if (Object.prototype.hasOwnProperty.call(process.env, 'PIN_ARROW_BASELINE')) {
+	if (Object.hasOwn(process.env, 'PIN_ARROW_BASELINE')) {
 		fail('PIN_ARROW_BASELINE is forbidden for retained-verifier observation');
 	}
 
@@ -426,7 +431,7 @@ export const executeArrowCommandCensusWorker = async (
 	let birthStates: ArrowCommandCensusWorkerStateMapEntry[];
 	let occupiable: ArrowCommandCensusWorkerStateMapEntry[];
 	let deadCovered: Pick<ArrowCommandCensusWorkerFindingSet, 'dead' | 'unanalysed'>;
-	let census: Pick<ArrowCommandCensusWorkerFindingSet, 'orphans' | 'total' | 'uncovered'>;
+	let census: Pick<ArrowCommandCensusWorkerFindingSet, ArrowCommandCensusWorkerCensusKey>;
 	try {
 		analyzer = requireRetainedAnalyzer(await import(pathToFileURL(analyzerResolvedPath).href));
 		declaredArrows = parseDeclaredArrows(analyzer.declaredArrows());

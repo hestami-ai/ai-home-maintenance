@@ -57,7 +57,7 @@ export interface StateMachineGraphInputProjection {
 }
 
 function compareId(left: { readonly id: string }, right: { readonly id: string }): number {
-	return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+	return Number(left.id > right.id) - Number(left.id < right.id);
 }
 
 export function stateMachineGraphInputProjection(

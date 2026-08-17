@@ -15,7 +15,7 @@ const EXCLUDED = new Set([
 	'playwright-report',
 	'test-results'
 ]);
-const SOURCE = /\.(?:c|m)?(?:j|t)sx?$|\.svelte$/;
+const SOURCE = /\.[cm]?[jt]sx?$|\.svelte$/;
 
 export interface ProductBoundaryViolation {
 	readonly moduleSpecifier: string;
@@ -93,7 +93,8 @@ export function inspectProductBoundary(repositoryRootInput: string): ProductBoun
 		if (statSync(root).isDirectory()) walk(root);
 	}
 	const violations: ProductBoundaryViolation[] = [];
-	for (const path of files.sort(compareText)) {
+	files.sort(compareText);
+	for (const path of files) {
 		for (const specifier of moduleSpecifiers(readFileSync(path, 'utf8'))) {
 			if (targetsCsaa(repositoryRoot, path, specifier)) {
 				violations.push({

@@ -20,6 +20,13 @@ interface PackageManifest {
 	readonly workspaces?: unknown;
 }
 
+/**
+ * Total order over strings that reproduces the default lexicographic (UTF-16 code unit)
+ * ordering: -1 when `left` sorts first, 1 when `right` sorts first, 0 when equivalent.
+ */
+const compareStrings = (left: string, right: string): number =>
+	Number(left > right) - Number(left < right);
+
 function parseManifest(capture: SubjectCapture, path: string): PackageManifest {
 	const bytes = capture.bytesByPath.get(path);
 	if (bytes === undefined) {
@@ -113,7 +120,7 @@ export function discoverWorkspaces(capture: SubjectCapture): WorkspaceDiscovery 
 	const names = new Map<string, string>();
 	const memberPaths = capture.directoryPaths
 		.filter((path) => patterns.some((pattern) => globMatches(path, pattern)))
-		.sort();
+		.sort(compareStrings);
 	for (const pattern of patterns) {
 		if (!memberPaths.some((path) => globMatches(path, pattern))) {
 			const error = new WorkspaceDiscoveryFailure('not-found');
@@ -128,7 +135,9 @@ export function discoverWorkspaces(capture: SubjectCapture): WorkspaceDiscovery 
 			error.message = `Workspace member has no captured package.json: ${path}`;
 			throw error;
 		}
-		const matchingPatterns = patterns.filter((pattern) => globMatches(path, pattern));
+		const matchingPatterns = patterns
+			.filter((pattern) => globMatches(path, pattern))
+			.sort(compareStrings);
 		const manifest = parseManifest(capture, manifestPath);
 		if (
 			typeof manifest.name !== 'string' ||
@@ -154,12 +163,13 @@ export function discoverWorkspaces(capture: SubjectCapture): WorkspaceDiscovery 
 			path,
 			private: manifest.private === true,
 			provenance: ['package.json#workspaces', manifestPath],
-			workspacePatterns: matchingPatterns.sort()
+			workspacePatterns: matchingPatterns
 		});
 	}
+	workspaces.sort((left, right) => (left.path < right.path ? -1 : 1));
 	return {
 		diagnostics: [],
-		workspaces: workspaces.sort((left, right) => (left.path < right.path ? -1 : 1))
+		workspaces
 	};
 }
 

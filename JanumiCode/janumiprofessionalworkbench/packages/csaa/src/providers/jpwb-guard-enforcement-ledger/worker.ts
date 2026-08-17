@@ -103,8 +103,11 @@ function fail(message: string): never {
 	throw new Error(`guard-enforcement-ledger worker: ${message}`);
 }
 
-const compareText = (left: string, right: string): number =>
-	left < right ? -1 : left > right ? 1 : 0;
+const compareText = (left: string, right: string): number => {
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
+};
 
 function compareTuple(left: readonly string[], right: readonly string[]): number {
 	for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
@@ -142,7 +145,7 @@ function requireInteger(value: unknown, label: string): number {
 function decodeUtf8(bytes: Uint8Array, label: string): string {
 	try {
 		const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-		if (text.charCodeAt(0) === 0xfeff) fail(`${label} must not contain a UTF-8 BOM`);
+		if (text.codePointAt(0) === 0xfeff) fail(`${label} must not contain a UTF-8 BOM`);
 		return text;
 	} catch (error) {
 		if (error instanceof Error && error.message.startsWith('guard-enforcement-ledger worker:'))
@@ -263,7 +266,7 @@ function requireAnalyzer(value: unknown): RetainedAnalyzerModule {
 
 function requireData(value: unknown): RetainedDataModule {
 	if (!isRecord(value)) fail('retained data module namespace must be an object');
-	if (!Object.prototype.hasOwnProperty.call(value, 'GUARD_LEDGER'))
+	if (!Object.hasOwn(value, 'GUARD_LEDGER'))
 		fail('retained data must export GUARD_LEDGER');
 	return value as unknown as RetainedDataModule;
 }
@@ -310,10 +313,10 @@ function parseLedgerRows(value: unknown): GuardEnforcementLedgerWorkerRow[] {
 		const label = `GUARD_LEDGER[${JSON.stringify(guardText)}]`;
 		const entry = value[guardText];
 		if (!isRecord(entry)) fail(`${label} must be an object`);
-		const allowedKeys = ['disposition', 'enforcingAnchor', 'enforcingSite', 'evidence'];
+		const allowedKeys = new Set(['disposition', 'enforcingAnchor', 'enforcingSite', 'evidence']);
 		const actualKeys = Object.keys(entry);
 		if (
-			actualKeys.some((key) => !allowedKeys.includes(key)) ||
+			actualKeys.some((key) => !allowedKeys.has(key)) ||
 			!actualKeys.includes('disposition') ||
 			!actualKeys.includes('evidence')
 		)

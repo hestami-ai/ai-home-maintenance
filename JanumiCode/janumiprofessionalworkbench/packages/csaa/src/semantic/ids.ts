@@ -50,8 +50,7 @@ import type {
 	SemanticRelatedDiagnostic
 } from '../contracts/semantic.js';
 import type { ProgramRecipe } from '../contracts/subject.js';
-import { sha256 } from '../inventory/canonical.js';
-import { canonicalJson } from '../inventory/canonical.js';
+import { canonicalJson, sha256 } from '../inventory/canonical.js';
 import { canonicalSemanticJson } from './canonical.js';
 import {
 	durableDeclarationIdentityPreimage,
@@ -60,13 +59,23 @@ import {
 
 const ID_ALGORITHM_VERSION = '1';
 
+/**
+ * Total order over strings that reproduces the default lexicographic (UTF-16 code unit)
+ * ordering: -1 when `left` sorts first, 1 when `right` sorts first, 0 when equivalent.
+ */
+const compareStrings = (left: string, right: string): number =>
+	Number(left > right) - Number(left < right);
+
 function id<Kind extends string>(
 	prefix: string,
 	family: string,
 	domain: string,
 	preimage: unknown
 ): Kind {
-	return `${prefix}:${family}-${sha256(`${domain}\0${ID_ALGORITHM_VERSION}\0${canonicalSemanticJson(preimage)}`)}` as Kind;
+	const preimageDigest = sha256(
+		`${domain}\0${ID_ALGORITHM_VERSION}\0${canonicalSemanticJson(preimage)}`
+	);
+	return `${prefix}:${family}-${preimageDigest}` as Kind;
 }
 
 export interface SemanticSnapshotIdentityInput {
@@ -240,12 +249,9 @@ export const semanticSnapshotId = (preimage: SemanticSnapshotIdentityInput): Sem
 	id<SemanticSnapshotId>('static', 'ts-snapshot', 'JAN-CSAA-TS-SNAPSHOT', {
 		...preimage,
 		assignabilityRequests: [...preimage.assignabilityRequests].sort((left, right) => {
-			const requestOrder =
-				left.requestId < right.requestId ? -1 : left.requestId > right.requestId ? 1 : 0;
+			const requestOrder = compareStrings(left.requestId, right.requestId);
 			if (requestOrder !== 0) return requestOrder;
-			const leftCanonical = canonicalSemanticJson(left);
-			const rightCanonical = canonicalSemanticJson(right);
-			return leftCanonical < rightCanonical ? -1 : leftCanonical > rightCanonical ? 1 : 0;
+			return compareStrings(canonicalSemanticJson(left), canonicalSemanticJson(right));
 		})
 	});
 export const semanticProjectId = (preimage: SemanticProjectIdentityInput): SemanticProjectId =>
@@ -281,8 +287,8 @@ export const semanticDurableDeclarationId = (
 		durableDeclarationIdentityPreimage(preimage)
 	);
 export const semanticSymbolId = (preimage: SemanticSymbolIdentityInput): SemanticSymbolId => {
-	const declarationIds = [...preimage.declarationIds].sort();
-	const fallbackReferenceNodeIds = [...preimage.fallbackReferenceNodeIds].sort();
+	const declarationIds = [...preimage.declarationIds].sort(compareStrings);
+	const fallbackReferenceNodeIds = [...preimage.fallbackReferenceNodeIds].sort(compareStrings);
 	if (
 		new Set(declarationIds).size !== declarationIds.length ||
 		new Set(fallbackReferenceNodeIds).size !== fallbackReferenceNodeIds.length
@@ -355,11 +361,9 @@ export const semanticDiagnosticId = (
 ): SemanticDiagnosticId =>
 	id<SemanticDiagnosticId>('diagnostic', 'typescript', 'JAN-CSAA-TS-DIAGNOSTIC', {
 		...preimage,
-		related: [...preimage.related].sort((left, right) => {
-			const leftCanonical = canonicalSemanticJson(left);
-			const rightCanonical = canonicalSemanticJson(right);
-			return leftCanonical < rightCanonical ? -1 : leftCanonical > rightCanonical ? 1 : 0;
-		})
+		related: [...preimage.related].sort((left, right) =>
+			compareStrings(canonicalSemanticJson(left), canonicalSemanticJson(right))
+		)
 	});
 export const semanticProvenanceId = (
 	preimage: SemanticProvenanceIdentityInput
@@ -382,7 +386,7 @@ export function compilerInputClosureDigest(
 	return sha256(
 		canonicalSemanticJson(
 			[...observations]
-				.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+				.sort((left, right) => compareStrings(left.id, right.id))
 				.map(({ id, ...observation }) => ({ id, ...observation }))
 		)
 	);

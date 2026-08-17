@@ -285,11 +285,17 @@ export type RawSemanticTypeParameterOwner =
 	| { readonly kind: 'SIGNATURE'; readonly signatureOrdinal: number }
 	| { readonly declarationOrdinal: number; readonly kind: 'DECLARATION' };
 
+type RawSemanticTypeParameterResolutionState =
+	| 'RESOLVED'
+	| 'MISSING'
+	| 'UNRESOLVED'
+	| 'UNSUPPORTED';
+
 export interface RawSemanticTypeParameter {
-	readonly constraintState: 'RESOLVED' | 'MISSING' | 'UNRESOLVED' | 'UNSUPPORTED';
+	readonly constraintState: RawSemanticTypeParameterResolutionState;
 	readonly constraintTypeOrdinal: number | null;
 	readonly declarationOrdinal: number | null;
-	readonly defaultState: 'RESOLVED' | 'MISSING' | 'UNRESOLVED' | 'UNSUPPORTED';
+	readonly defaultState: RawSemanticTypeParameterResolutionState;
 	readonly defaultTypeOrdinal: number | null;
 	readonly name: string;
 	readonly ordinal: number;
@@ -385,7 +391,7 @@ export interface RawSemanticGenericInstantiationRelation extends RawSemanticType
 }
 
 export interface RawSemanticParameterConstraintRelation extends RawSemanticTypeRelationBase {
-	readonly constraintState: 'RESOLVED' | 'MISSING' | 'UNRESOLVED' | 'UNSUPPORTED';
+	readonly constraintState: RawSemanticTypeParameterResolutionState;
 	readonly constraintTypeOrdinal: number | null;
 	readonly kind: 'PARAMETER_CONSTRAINT';
 	readonly typeParameterOrdinal: number;

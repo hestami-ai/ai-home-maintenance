@@ -11,7 +11,7 @@ function changedPaths(previous: FrozenSubject, current: FrozenSubject): string[]
 	const next = new Map(current.artifacts.map((artifact) => [artifact.path, artifact.sha256]));
 	return [...new Set([...prior.keys(), ...next.keys()])]
 		.filter((path) => prior.get(path) !== next.get(path))
-		.sort();
+		.sort((a, b) => Number(a > b) - Number(a < b));
 }
 
 export function verifyFrozenSubject(

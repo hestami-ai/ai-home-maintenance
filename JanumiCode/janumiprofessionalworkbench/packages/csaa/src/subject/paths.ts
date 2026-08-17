@@ -33,12 +33,14 @@ export function resolveRepositoryRoot(rootLocator: string): string {
 
 export function canonicalPathKey(path: string, platform?: PathPlatform | boolean): string {
 	const canonical = assertCanonicalRelativePath(path);
-	const caseSensitive =
-		platform === undefined
-			? ts.sys.useCaseSensitiveFileNames
-			: typeof platform === 'boolean'
-				? platform
-				: platform === 'posix';
+	let caseSensitive: boolean;
+	if (platform === undefined) {
+		caseSensitive = ts.sys.useCaseSensitiveFileNames;
+	} else if (typeof platform === 'boolean') {
+		caseSensitive = platform;
+	} else {
+		caseSensitive = platform === 'posix';
+	}
 	return caseSensitive ? canonical : canonical.toLowerCase();
 }
 

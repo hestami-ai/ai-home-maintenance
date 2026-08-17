@@ -351,9 +351,9 @@ export function createSourceOriginCorrelationFixture(): SourceOriginCorrelationF
 		const source = semanticSnapshot.sources.find(
 			(candidate) => candidate.logicalPath === SOURCE_ORIGIN_CORRELATION_FIXTURE_SOURCE_PATH
 		);
+		if (project === undefined || source === undefined)
+			throw new Error('CAP-014 semantic fixture lacks its exact root authored source.');
 		if (
-			project === undefined ||
-			source === undefined ||
 			source.projectId !== project.id ||
 			source.programId !== project.programId ||
 			!source.rootFile ||
