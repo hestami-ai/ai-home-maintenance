@@ -5624,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "7a25449c1d0eacc28ec62c4a9510460e07b6dd18112084f6a2e026ab3486488e",
+    "fileManifestDigest": "0cdc5c79656ed52046fb0dd9c80cc8a6baecc0b9493a33cc2cdef89eb52c0f37",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11935,9 +11935,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 17523,
+        "bytes": 20000,
         "path": "scripts/spec-obligations.ts",
-        "sha256": "63ef09425f7ec6701770fc4c3333d28c2abffa2f500a6d71de7343c81671302e",
+        "sha256": "b06d00b043acabdd85701eb6c977b372f834cb8f3a4955b612ec9fb3321c9b77",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12299,9 +12299,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 6211,
+        "bytes": 7557,
         "path": "verif/unread-refusal-guard.ts",
-        "sha256": "f31b294e4d6431c49f38ec2087e9e8f2e5908c56a8025c4054d2689637865f46",
+        "sha256": "120c57f539dd7946cc537b6104a00ecabc3640fcc53531caa135158e71e01e40",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12326,7 +12326,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "b65d6c1ec5dec3696dbd7e6c37cc18a960bccaf775eefd823e5feb065e18b84b",
+    "subjectId": "b68eb77b11cce54ab1460f9605802e49749fc042664412dd708994e2a91c5751",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14804,7 +14804,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/spec-obligations.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "63ef09425f7ec6701770fc4c3333d28c2abffa2f500a6d71de7343c81671302e",
+      "contentSha256": "b06d00b043acabdd85701eb6c977b372f834cb8f3a4955b612ec9fb3321c9b77",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15538,7 +15538,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/unread-refusal-guard.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "f31b294e4d6431c49f38ec2087e9e8f2e5908c56a8025c4054d2689637865f46",
+      "contentSha256": "120c57f539dd7946cc537b6104a00ecabc3640fcc53531caa135158e71e01e40",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [

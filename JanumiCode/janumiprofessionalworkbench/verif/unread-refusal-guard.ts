@@ -40,7 +40,26 @@ interface PendingRefusal {
 
 const pending: PendingRefusal[] = [];
 
-/** The shallowest `*.test.ts` frame — the line that issued the command, or the helper that issued it for a test. */
+/**
+ * The shallowest `*.test.ts` frame — the line that issued the command, or the helper that issued it for a test.
+ *
+ * ⚠ BOTH PATTERNS BELOW CARRY AN ACCEPTED S8786 (super-linear runtime), RULED 2026-08-17. Recorded here rather
+ * than in a skip-list so the next sweep does not re-open it, and so the reason travels with the code.
+ *
+ * THE DEFECT IS REAL: `[^\s()]` (and `[\w.-]`) include `.`, `:` and digits, so the greedy class overlaps the
+ * `\.test\.ts:` literal that follows it and backtracks — selecting the LAST `.test.ts:N:N` run inside a token.
+ *
+ * NO LANGUAGE-EQUIVALENT REWRITE EXISTS, and all three candidates were tried:
+ *   • forbidding a trailing dot drops inputs the original matches (`foo..test.ts:1:2`);
+ *   • atomic-group emulation `(?=([^\s()]+))\1` cannot backtrack and matches NOTHING, even `abc.test.ts:1:2`;
+ *   • a tempered token stops at the FIRST run instead of the last, changing the frame whenever a token holds two.
+ *
+ * WHY THAT SETTLES IT. This regex decides WHICH FRAME IS BLAMED in the "DISPATCH REFUSED AND NEVER READ"
+ * failure. A wrong "fix" does not stop the guard firing — it makes the guard point at the wrong line, sending
+ * the next reader to the wrong file. Against that, the cost is a polynomial term on an INTERNAL, BOUNDED V8
+ * stack string produced two lines below, never attacker-controlled: a hazard that cannot be reached, traded
+ * against a misattribution that would be believed.
+ */
 function testFrame(): string {
 	// The message is scanned too — `.stack` starts `Error: <message>` — so it must never look like a test frame.
 	const frames = (new Error('stack probe').stack ?? '').match(/[^\s()]+\.test\.ts:\d+:\d+/g);

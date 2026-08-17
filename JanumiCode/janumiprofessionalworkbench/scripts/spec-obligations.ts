@@ -31,15 +31,53 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SPEC = `${ROOT}docs/canon/JPWB-SPEC-001 Professional Projection and Workbench Surface.md`;
 
+// ── EVERY WAY THIS SPECIFICATION IS PERMITTED TO NAME A CHECK ────────────────────────────────────────────────
+//
+// DERIVED FROM §0.3's declared namespaces plus the prose forms the document actually uses, NOT invented here.
+// A namespace the spec mints and these patterns do not know is the defect described in the header — so when a
+// new one appears, it is added here in the same change. It goes in `CHECK_ID`'s namespace group.
+//
+// ⚠ WHY THIS IS FOUR NAMED PATTERNS AND NOT ONE ALTERNATION (2026-08-17). It was one regex, and that regex
+// carried two findings at once: S5843 (complexity 31 against 20) and S8786 (super-linear runtime). Both came
+// from the same shape. The complexity was dominated by ONE nested alternation — the nine-way namespace group
+// scored at DOUBLE weight for sitting inside the outer ten-way — so splitting removes the multiplier rather
+// than deleting any branch. Nothing about which strings match changed:
+//
+//   `/(A|B|C|D)/.test(s)`  ===  `[A,B,C,D].some((re) => re.test(s))`
+//
+// because both ask "does SOME alternative match at SOME position", and those two existentials commute. The
+// groups became non-capturing for the same reason the split is safe at all: these patterns are only ever
+// `.test()`ed (three call sites, all below), so no capture was ever read.
+//
+// VERIFIED EMPIRICALLY, not just argued: the full report over the real corpus — 1118 SHALLs, 735 in scope,
+// 725 bound, 10 unbound — is byte-identical before and after, and the selftest at the bottom still reports
+// both a hit and a miss.
+
+/** A check id in one of §0.3's declared namespaces, e.g. `SPEC-001-NF-22`, `SPEC-001-CHK-ABSENCE`. */
+const CHECK_ID = /SPEC-001-(?:PF|NF|SC|MU|CHK|FIX|PB|REV|FX)-[A-Z0-9][A-Z0-9-]*/i;
+
+/** The fixture-ordinal form the document also uses, e.g. `FX-O4-05`. */
+const FIXTURE_ID = /\bFX-O\d-\d+/i;
+
 /**
- * Every way this specification is permitted to name a check.
+ * A named test or e2e file, e.g. `query-scope.test.ts`.
  *
- * DERIVED FROM §0.3's declared namespaces plus the two prose forms the document actually uses, NOT invented here.
- * A namespace the spec mints and this pattern does not know is the defect described in the header — so when a new
- * one appears, it is added here in the same change.
+ * ⚠ THE LOOKBEHIND IS THE S8786 FIX AND IT CHANGES NOTHING. Unanchored, `[a-z0-9-]+` is retried from every
+ * offset inside a long run that is NOT followed by `.test.ts`, which is the O(n²) term. Pinning the match to a
+ * token START is boolean-equivalent for a `.test()`: if the pattern matches starting at i and position i-1 is
+ * also `[a-z0-9-]`, then it matches starting at i-1 too (one more character in the `+`) — so by induction a
+ * mid-token match implies a match at the token's start, which is exactly where the lookbehind permits it.
  */
-const NAMES_A_CHECK =
-	/(SPEC-001-(PF|NF|SC|MU|CHK|FIX|PB|REV|FX)-[A-Z0-9][A-Z0-9-]*|\bFX-O\d-\d+|[a-z0-9-]+\.(test|e2e)\.ts|(conformance|negative|positive) fixture|verifying check|verification of|conformance is established|verified by|asserted by)/i;
+const TEST_FILE = /(?<![a-z0-9-])[a-z0-9-]+\.(?:test|e2e)\.ts/i;
+
+/** The prose forms the specification actually uses to name a check. */
+const PROSE_CHECK =
+	/(?:conformance|negative|positive) fixture|verifying check|verification of|conformance is established|verified by|asserted by/i;
+
+const CHECK_PATTERNS = [CHECK_ID, FIXTURE_ID, TEST_FILE, PROSE_CHECK] as const;
+
+/** True when `s` names a check in any of the permitted forms. */
+const namesACheck = (s: string): boolean => CHECK_PATTERNS.some((re) => re.test(s));
 
 /** Sections whose SHALLs are NOT obligations of this specification, with the reason each is excluded. */
 const NOT_OBLIGATIONS: readonly (readonly [string, string])[] = [
@@ -64,7 +102,7 @@ interface Row {
 // ── THE SECOND DEFECT, FOUND 2026-07-29: THE WINDOW WAS WRONG, AND THE SELFTEST COULD NOT SEE IT ─────────────
 //
 // The header above describes a first counter that was wrong and wrongly trusted, and the selftest at the bottom
-// was the answer to it. That selftest exercises the MATCHER — it feeds `NAMES_A_CHECK` literal strings and
+// was the answer to it. That selftest exercises the MATCHER — it feeds `namesACheck` literal strings and
 // demands both a hit and a miss. It says NOTHING about the WINDOW, which is the other half of the measurement,
 // and the window was too narrow by roughly a factor of two.
 //
@@ -176,7 +214,7 @@ function measure(text: string, strict = false): Row[] {
 			line: s.line,
 			section: s.section,
 			inScope: !excludedBy,
-			bound: NAMES_A_CHECK.test(window),
+			bound: namesACheck(window),
 			text: s.text.replace(/\s+/g, ' ').trim().slice(0, 140)
 		});
 	}
@@ -199,8 +237,8 @@ const MUST_MATCH = [
 ];
 const MUST_NOT_MATCH = ['no check is named here', 'SHALL be explicit', 'see the section above', ''];
 const selftestFailures = [
-	...MUST_MATCH.filter((s) => !NAMES_A_CHECK.test(s)).map((s) => `should MATCH but did not: ${s}`),
-	...MUST_NOT_MATCH.filter((s) => NAMES_A_CHECK.test(s)).map(
+	...MUST_MATCH.filter((s) => !namesACheck(s)).map((s) => `should MATCH but did not: ${s}`),
+	...MUST_NOT_MATCH.filter((s) => namesACheck(s)).map(
 		(s) => `should NOT match but did: ${s}`
 	)
 ];
