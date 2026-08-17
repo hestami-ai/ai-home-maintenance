@@ -116,6 +116,7 @@ const SCALAR_DATA_KEYS = new Set([
 	'adapterId',
 	'adapterVersion',
 	'analyzerArtifacts',
+	'analyzerDependencyArtifacts',
 	'analyzerPath',
 	'arrowCount',
 	'authorityTestArtifacts',

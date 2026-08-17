@@ -24,6 +24,7 @@ describe('guard-enforcement-ledger observation validator hardening', () => {
 			contentDigest: 'x',
 			coverage: {
 				analyzerArtifacts: 0,
+				analyzerDependencyArtifacts: 0,
 				artifacts: 1,
 				authorityTestArtifacts: 0,
 				enforcementSiteArtifacts: 0,

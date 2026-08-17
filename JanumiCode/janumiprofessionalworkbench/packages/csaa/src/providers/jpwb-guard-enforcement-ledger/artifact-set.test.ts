@@ -192,6 +192,10 @@ describe('JPWB retained guard-enforcement-ledger artifact set', () => {
 		expect(second).toEqual({ artifactSet: first, diagnostics: [], outcome: 'complete' });
 		expect(first.coverage).toEqual({
 			analyzerArtifacts: 1,
+			// 0 here is CORRECT and is itself a fact worth pinning: this synthetic fixture's analyzer has no
+			// relative imports, so the derived closure is empty. It is the end-to-end run against the real
+			// subject, not this number, that witnesses the derivation doing work.
+			analyzerDependencyArtifacts: 0,
 			artifacts: 13,
 			authorityTestArtifacts: 1,
 			enforcementSiteArtifacts: 2,

@@ -34,6 +34,7 @@ import {
 	isFrozenSubjectCapability,
 	readFrozenSubjectArtifact
 } from '../../subject/frozen-store.js';
+import { resolveFrozenModuleClosure } from '../../subject/analyzer-closure.js';
 import { assertCanonicalRelativePath, canonicalPathKey } from '../../subject/paths.js';
 import { canonicalSemanticJsonWitness } from '../../semantic/canonical.js';
 import {
@@ -56,6 +57,9 @@ const OPTIONAL_ENVIRONMENT_PATHS = new Set([
 	'pnpm-lock.yaml',
 	'yarn.lock'
 ]);
+// Its OWN budget, deliberately not the artifact budget: sharing one number would couple two unrelated failure
+// modes, so a large subject could silently truncate the closure.
+const MAX_CLOSURE_NODES = 64;
 const REQUIRED_PATHS = [
 	...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
 	DOMAIN_MANIFEST_PATH,
@@ -66,7 +70,11 @@ const REQUIRED_PATHS = [
 	'packages/rph-contracts/src/index.ts'
 ] as const;
 
+// ⚠ This Set is a HAND-DUPLICATED MIRROR of the `GuardEnforcementLedgerArtifactUse` union and TypeScript does not
+// force the two to agree — `new Set<T>([...])` accepts any subset, so omitting a member here is type-legal and
+// would silently reject that member at validation instead of failing to compile. Edit both in lockstep.
 const ARTIFACT_USES = new Set<GuardEnforcementLedgerArtifactUse>([
+	'ANALYZER_DEPENDENCY_SOURCE',
 	'ANALYZER_SOURCE',
 	'AUTHORITY_TEST',
 	'ENVIRONMENT_IDENTITY',
@@ -385,12 +393,47 @@ function extractEnforcementSitePaths(subject: FrozenSubject): {
 	}
 }
 
+/**
+ * The capsule must contain everything the retained analyzer IMPORTS, and that population is DERIVED from the
+ * analyzer's own frozen source rather than listed here.
+ *
+ * ⚠⚠ ROOTED AT THE WORKER'S ACTUAL IMPORT ROOTS, NOT AT `GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS`. The
+ * worker dynamically imports exactly two modules — the analyzer and the ledger data. The third retained path is
+ * the authority TEST, which is materialised but never executed. Rooting at the convenient list would drag in the
+ * test's specifiers, including `vitest`, which the capsule cannot satisfy: `linkModule` junctions only
+ * typescript, ulid and zod. Fixing this defect by rooting at the obvious list would have created a new one.
+ */
+function analyzerClosure(subject: FrozenSubject): {
+	readonly diagnostics: readonly GuardEnforcementLedgerArtifactSetDiagnostic[];
+	readonly paths: ReadonlySet<string>;
+} {
+	const closure = resolveFrozenModuleClosure({
+		entryPaths: [GUARD_ENFORCEMENT_LEDGER_ANALYZER_PATH, GUARD_ENFORCEMENT_LEDGER_DATA_PATH],
+		maxClosureNodes: MAX_CLOSURE_NODES,
+		subject
+	});
+	return {
+		// A specifier the closure cannot resolve was SILENT before this existed, and that silence was the defect.
+		diagnostics: closure.findings.map((f) =>
+			diagnostic(
+				'POPULATION_RECONCILIATION_FAILED',
+				`Retained analyzer import closure is undecidable: ${f.code}${f.specifier === null ? '' : ` for '${f.specifier}'`}${f.importerPath === null ? '' : ` in ${f.importerPath}`}${f.resolvedCandidate === null ? '' : ` (resolved to ${f.resolvedCandidate})`}.`,
+				f.path,
+				'RECONCILE'
+			)
+		),
+		paths: new Set(closure.dependencies)
+	};
+}
+
 function usesForPath(
 	path: string,
-	enforcementSitePaths: ReadonlySet<string>
+	enforcementSitePaths: ReadonlySet<string>,
+	analyzerDependencyPaths: ReadonlySet<string>
 ): readonly GuardEnforcementLedgerArtifactUse[] {
 	const uses = new Set<GuardEnforcementLedgerArtifactUse>();
 	if (path === GUARD_ENFORCEMENT_LEDGER_ANALYZER_PATH) uses.add('ANALYZER_SOURCE');
+	if (analyzerDependencyPaths.has(path)) uses.add('ANALYZER_DEPENDENCY_SOURCE');
 	if (path === GUARD_ENFORCEMENT_LEDGER_DATA_PATH) uses.add('LEDGER_DATA');
 	if (path === GUARD_ENFORCEMENT_LEDGER_TEST_PATH) uses.add('AUTHORITY_TEST');
 	if (path === DOMAIN_MANIFEST_PATH || path === CONTRACTS_MANIFEST_PATH)
@@ -462,17 +505,18 @@ interface DerivedPopulation {
 
 function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 	const siteSelection = extractEnforcementSitePaths(subject);
-	const diagnostics = [...siteSelection.diagnostics];
+	const closureSelection = analyzerClosure(subject);
+	const diagnostics = [...siteSelection.diagnostics, ...closureSelection.diagnostics];
 	const rowsByPath = new Map<string, CapturedArtifactRecord[]>();
 	for (const artifact of subject.artifacts) {
-		const uses = usesForPath(artifact.path, siteSelection.paths);
+		const uses = usesForPath(artifact.path, siteSelection.paths, closureSelection.paths);
 		if (uses.length === 0) continue;
 		const rows = rowsByPath.get(artifact.path) ?? [];
 		rows.push(artifact);
 		rowsByPath.set(artifact.path, rows);
 	}
 	for (const excluded of subject.excludedArtifacts) {
-		const uses = usesForPath(excluded.path, siteSelection.paths);
+		const uses = usesForPath(excluded.path, siteSelection.paths, closureSelection.paths);
 		if (uses.length === 0 || OPTIONAL_ENVIRONMENT_PATHS.has(excluded.path)) continue;
 		diagnostics.push(
 			diagnostic(
@@ -483,7 +527,9 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 			)
 		);
 	}
-	for (const path of [...REQUIRED_PATHS, ...siteSelection.paths])
+	// A derived closure member absent from the subject is exactly as fatal as a missing REQUIRED_PATH: the capsule
+	// would be written without it and the analyzer's dynamic import would fail inside the worker.
+	for (const path of [...REQUIRED_PATHS, ...siteSelection.paths, ...closureSelection.paths])
 		if ((rowsByPath.get(path)?.length ?? 0) === 0)
 			diagnostics.push(
 				diagnostic(
@@ -523,7 +569,11 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 	const artifacts: GuardEnforcementLedgerArtifactBinding[] = [];
 	for (const [path, rows] of [...rowsByPath].sort(([left], [right]) => compareText(left, right))) {
 		if (rows.length !== 1) continue;
-		const result = bindArtifact(subject, rows[0]!, usesForPath(path, siteSelection.paths));
+		const result = bindArtifact(
+			subject,
+			rows[0]!,
+			usesForPath(path, siteSelection.paths, closureSelection.paths)
+		);
 		if (result.diagnostic !== undefined) diagnostics.push(result.diagnostic);
 		else artifacts.push(result.binding);
 	}
@@ -538,6 +588,7 @@ function coverageFor(
 	const totalBytes = artifacts.reduce((sum, artifact) => sum + artifact.bytes, 0);
 	return {
 		analyzerArtifacts: count('ANALYZER_SOURCE'),
+		analyzerDependencyArtifacts: count('ANALYZER_DEPENDENCY_SOURCE'),
 		artifacts: artifacts.length,
 		authorityTestArtifacts: count('AUTHORITY_TEST'),
 		enforcementSiteArtifacts: count('ENFORCEMENT_SITE_SOURCE'),
@@ -873,6 +924,7 @@ function shapeIssue(
 	if (
 		!exactPlainRecord(coverage, [
 			'analyzerArtifacts',
+			'analyzerDependencyArtifacts',
 			'artifacts',
 			'authorityTestArtifacts',
 			'enforcementSiteArtifacts',
@@ -886,6 +938,7 @@ function shapeIssue(
 		return { code: 'SHAPE_INVALID', message: 'Coverage shape is not exact.', path: '$.coverage' };
 	for (const key of [
 		'analyzerArtifacts',
+		'analyzerDependencyArtifacts',
 		'artifacts',
 		'authorityTestArtifacts',
 		'enforcementSiteArtifacts',

@@ -57,6 +57,7 @@ function artifactSet(): GuardEnforcementLedgerArtifactSetBinding {
 		canonicalProfile: GUARD_ENFORCEMENT_LEDGER_CANONICAL_PROFILE,
 		coverage: {
 			analyzerArtifacts: 1,
+			analyzerDependencyArtifacts: 0,
 			artifacts: 2,
 			authorityTestArtifacts: 0,
 			enforcementSiteArtifacts: 0,

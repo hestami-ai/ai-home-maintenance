@@ -1,7 +1,15 @@
 import type { ArtifactPrimaryClass, ArtifactSemanticRole } from './subject.js';
 
 export const GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_SCHEMA_VERSION =
-	'jan-csaa-guard-enforcement-ledger-artifact-set/1.0.0' as const;
+	// 1.0.0 -> 2.0.0. JAN-CSAA-007 §18.2 classes "add enum value to a closed enum" as MAJOR, and the classing is
+	// not merely formal here: a 1.0.0-labelled record produced by this code carries a `uses` value that a 1.0.0
+	// consumer rejects as INVALID_VALUE against its own `ARTIFACT_USES` set — same label, incompatible instances.
+	// ⚠ There is NO semver parsing anywhere in this package; conformance is strict byte-identical literal equality
+	// against this frozen string, so ANY change is a hard cut rather than a migration and a MINOR bump would buy
+	// nothing. The bump rotates four content-addressed identities (artifact-set id and contentDigest, observation
+	// id and contentDigest); no test pins those as literals, so the rotation is absorbed by the reproduction
+	// checks — but it is a real change of observable identity, not an inert relabelling.
+	'jan-csaa-guard-enforcement-ledger-artifact-set/2.0.0' as const;
 export const GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_REQUEST_SCHEMA_VERSION =
 	'jan-csaa-guard-enforcement-ledger-artifact-set-request/1.0.0' as const;
 export const GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_OPERATION_VERSION =
@@ -55,6 +63,13 @@ export type GuardEnforcementLedgerGuardId = string & {
 };
 
 export type GuardEnforcementLedgerArtifactUse =
+	/**
+	 * A module reached by the retained analyzer's own transitive relative-import closure, DERIVED from frozen
+	 * source rather than enumerated. Distinct from `ANALYZER_SOURCE` deliberately: reusing that member would
+	 * inflate `coverage.analyzerArtifacts` past 1 and break the `analyzerBindings.length !== 1` fail-closed in
+	 * `normalize-guard-enforcement-ledger.ts`, so the reuse is not merely mislabelled — it is a defect.
+	 */
+	| 'ANALYZER_DEPENDENCY_SOURCE'
 	| 'ANALYZER_SOURCE'
 	| 'AUTHORITY_TEST'
 	| 'ENVIRONMENT_IDENTITY'
@@ -76,6 +91,8 @@ export interface GuardEnforcementLedgerArtifactBinding {
 
 export interface GuardEnforcementLedgerArtifactSetCoverage {
 	readonly analyzerArtifacts: number;
+	/** Modules reached by the analyzer's derived import closure. Kept separate so `analyzerArtifacts` stays 1. */
+	readonly analyzerDependencyArtifacts: number;
 	readonly artifacts: number;
 	readonly authorityTestArtifacts: number;
 	readonly enforcementSiteArtifacts: number;
