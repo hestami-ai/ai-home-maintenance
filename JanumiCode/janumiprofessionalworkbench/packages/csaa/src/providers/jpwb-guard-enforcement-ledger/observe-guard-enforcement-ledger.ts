@@ -433,6 +433,28 @@ interface ProcessResult {
 	readonly stdout: Uint8Array;
 }
 
+const STDERR_EXCERPT_BYTES = 512;
+
+/**
+ * ⚠ The SHA-256 is an INTEGRITY TOKEN, not a diagnosis. Reporting it alone discarded the only human-readable
+ * evidence of why a worker died, and when the worker's own catch collapsed a Bun `ResolveMessage` into a
+ * path-free constant the result was a digest that was byte-identical on every run while naming nothing —
+ * determinism that looked like rigour and was in fact blindness.
+ *
+ * The excerpt is bounded so a flooding worker cannot turn a diagnostic into a payload, and whitespace is
+ * collapsed so a multi-line stack does not fracture the single-line diagnostic contract. The digest is
+ * retained unchanged: it remains the thing you compare, the excerpt is the thing you read.
+ */
+function stderrExcerpt(stderr: Uint8Array): string {
+	if (stderr.byteLength === 0) return '';
+	const text = new TextDecoder('utf-8', { fatal: false })
+		.decode(stderr.subarray(0, STDERR_EXCERPT_BYTES))
+		.replace(/\s+/gu, ' ')
+		.trim();
+	if (text.length === 0) return '';
+	return `; stderr: ${text}${stderr.byteLength > STDERR_EXCERPT_BYTES ? ' […]' : ''}`;
+}
+
 export async function executeGuardEnforcementLedgerWorkerProcess(
 	executable: string,
 	workerPath: string,
@@ -874,7 +896,7 @@ export async function observeGuardEnforcementLedger(
 			fail(
 				'EXECUTOR_FAILED',
 				'EXECUTE',
-				`Retained analyzer exited with status ${String(processResult.exitCode)}; stderr SHA-256 ${sha256(processResult.stderr)}.`,
+				`Retained analyzer exited with status ${String(processResult.exitCode)}; stderr SHA-256 ${sha256(processResult.stderr)}${stderrExcerpt(processResult.stderr)}.`,
 				'$worker'
 			);
 		if (processResult.stderr.byteLength !== 0)

@@ -501,15 +501,51 @@ export async function executeGuardEnforcementLedgerWorker(
 	};
 }
 
+/**
+ * ⚠ Bun raises a `ResolveMessage` when a module specifier cannot be resolved, and `ResolveMessage` is NOT
+ * `instanceof Error`. Collapsing every non-`Error` throwable to a constant discarded the single fact the
+ * operator needed — the specifier — and, because that constant carries no path, the parent's stderr digest
+ * was byte-identical on every run despite a randomly-named capsule root. An unresolvable import therefore
+ * reported itself as `unknown failure`, and the identical digest read as determinism rather than as the tell
+ * that the message was path-free.
+ *
+ * The fallback constant is kept for the genuinely opaque throwable, but it is now the last resort rather than
+ * the treatment of every non-`Error`.
+ */
+const UNKNOWN_WORKER_FAILURE = 'guard-enforcement-ledger worker: unknown failure';
+
+const nonEmptyText = (value: unknown): string | null =>
+	typeof value === 'string' && value.length > 0 ? value : null;
+
+const labelled = (label: string, value: unknown): string | null => {
+	const text = nonEmptyText(value);
+	return text === null ? null : `${label} ${text}`;
+};
+
+function describeThrowable(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	const direct = nonEmptyText(error);
+	if (direct !== null) return direct;
+	if (typeof error !== 'object' || error === null) return UNKNOWN_WORKER_FAILURE;
+	const bag = error as Record<string, unknown>;
+	// `specifier` and `referrer` are named explicitly rather than trusted to appear inside `message`: they are
+	// the two facts that make an unresolved import actionable, and neither is guaranteed by the text.
+	const parts = [
+		nonEmptyText(bag.name),
+		nonEmptyText(bag.message),
+		labelled('specifier', bag.specifier),
+		labelled('referrer', bag.referrer)
+	].filter((part): part is string => part !== null);
+	return parts.length > 0 ? parts.join('; ') : UNKNOWN_WORKER_FAILURE;
+}
+
 async function main(): Promise<void> {
 	try {
 		const request = parseGuardEnforcementLedgerWorkerRequest(readFileSync(0));
 		const result = await executeGuardEnforcementLedgerWorker(request);
 		process.stdout.write(`${JSON.stringify(result)}\n`);
 	} catch (error) {
-		const message =
-			error instanceof Error ? error.message : 'guard-enforcement-ledger worker: unknown failure';
-		process.stderr.write(`${message}\n`);
+		process.stderr.write(`${describeThrowable(error)}\n`);
 		process.exitCode = 1;
 	}
 }

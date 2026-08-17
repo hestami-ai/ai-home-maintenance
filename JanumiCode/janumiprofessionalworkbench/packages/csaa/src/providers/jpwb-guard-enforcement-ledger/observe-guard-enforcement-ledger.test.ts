@@ -430,4 +430,25 @@ describe('observeGuardEnforcementLedger', () => {
 		},
 		120_000
 	);
+
+	// ⚠ CONTROL — the digest is an INTEGRITY TOKEN, not a diagnosis. Replacing stderr entirely with its
+	// SHA-256 discarded the only human-readable evidence of why the worker died. Combined with the worker's
+	// own non-`Error` swallow, an unresolvable import that named its own missing file surfaced here as a
+	// constant-valued hash — and because that constant carried no path, the digest was byte-identical across
+	// runs, which read as determinism rather than as the tell that the text was path-free.
+	// This asserts the message carries the stderr TEXT *and* still carries the digest. Asserting only that
+	// the message is non-empty passes today and proves nothing.
+	it('carries the worker stderr text alongside the digest, not the digest alone', async () => {
+		const binding = currentBinding();
+		childProcessControl.mode = 'NONZERO_EXIT';
+		const outcome = await observeGuardEnforcementLedger(binding.request, {
+			artifactSet: binding.artifactSet,
+			subject: binding.subject
+		});
+		expect(outcome.outcome).toBe('unavailable');
+		const [diagnostic] = outcome.diagnostics;
+		expect(diagnostic).toMatchObject({ code: 'EXECUTOR_FAILED', phase: 'EXECUTE' });
+		expect(diagnostic?.message).toMatch(/synthetic failure/u);
+		expect(diagnostic?.message).toMatch(/SHA-256/u);
+	}, 120_000);
 });

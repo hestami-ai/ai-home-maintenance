@@ -347,6 +347,32 @@ describe('guard-enforcement ledger capsule worker', () => {
 		expect(execution.stderr).toMatch(/must export GUARD_LEDGER/u);
 	});
 
+	// ⚠ CONTROL — a specifier the capsule cannot resolve MUST reach the operator by name. Bun raises a
+	// `ResolveMessage`, which is NOT `instanceof Error`, so the catch at the foot of `worker.ts` replaced it
+	// with a path-free constant; because the surviving text carried no path, its SHA-256 was byte-identical on
+	// every run even though the capsule root is a random `mkdtempSync`, and the parent hashes stderr away
+	// entirely. An outage that named its own missing file was reported as `unknown failure`.
+	// The specifier here is deliberately NOT a real repository path: a control naming the file it was written
+	// for proves only that someone remembered that file. `toBeTruthy()` on stderr would pass today.
+	it('names the unresolvable specifier instead of reporting an unknown failure', () => {
+		const subject = fixture();
+		write(
+			join(subject.root, ...GUARD_ENFORCEMENT_LEDGER_ANALYZER_PATH.split('/')),
+			`import { absent } from './control-absent-dependency.js';
+			export const guardedArrows = () => [absent];
+			export const guardTexts = () => [];
+			export function auditLedger() {
+				return { unclassified: [], stale: [], enforcedWithoutSite: [], enforcedAnchorBroken: [],
+					counts: {}, arrowCount: 0, textCount: 0 };
+			}
+			`
+		);
+		const execution = runWorker(subject, subject.request);
+		expect(execution.status).not.toBe(0);
+		expect(execution.stdout).toBe('');
+		expect(execution.stderr).toMatch(/control-absent-dependency/u);
+	});
+
 	it('fails closed in-process across locator, module, export, and retained-value boundaries', async () => {
 		const run = async (
 			mutate: (subject: Fixture) => GuardEnforcementLedgerWorkerRequest,
