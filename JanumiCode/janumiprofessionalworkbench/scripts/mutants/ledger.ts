@@ -3099,6 +3099,12 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// and ships the paths anyway, which is the most plausible "why throw away the work we did" softening.
 		// ⚠ BOTH PROVIDERS DEPEND ON THIS LAW rather than on their own checks: their diagnostics arms assume that
 		// a non-empty `findings` guarantees an empty selection.
+		//
+		// ⚠ MEASURED BLUNTNESS, RECORDED RATHER THAN GLOSSED: this one reddens NINE tests where the other three
+		// redden one apiece, because nearly every control in the file asserts `paths` is `[]` on refusal. That is
+		// good news about the law's coverage and BAD news about this mutant's discrimination — a broad red cannot
+		// tell you WHICH property failed. It is kept because the law is worth holding at all, not because a
+		// nine-test red is strong evidence. A sharper replacement would target one arm of the law only.
 		find: '\tif (findings.length > 0) return failed(findings);',
 		replace:
 			'\t// MUTANT: findings reported, partial closure shipped anyway (law was: paths empty IFF findings non-empty)',
