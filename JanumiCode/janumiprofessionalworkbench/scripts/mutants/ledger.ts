@@ -2890,5 +2890,48 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "THE SAME STARVATION AT THE OTHER END OF THE SYSTEM, AND ITS POLARITY IS WORTH RECORDING SEPARATELY. `openFindingCodes` skips observations whose disposition is anything but `OPEN`; since `OPEN` is the only value ever written, the `continue` never fires and the filter excludes nothing. So a waiver must name EVERY finding code the assessment ever raised, including any that were resolved — which is again STRICTER, not laxer.",
 		expectSurvive: "SURVIVAL IS THE FINDING. MEASURED 2026-08-14 with this exact deletion: `rph-application` + `rph-domain` + `rph-assurance` ran 137 files / 1511 tests, ALL PASSING. ⚠ PAIRED WITH `F161-the-baseline-waiver-escape-is-starved` — one root cause, two consumers, and BOTH fail closed, which is why this is filed as a dead-branch census rather than as a defect needing a hotfix. A KILL means the disposition machine acquired a writer; retire both entries together.",
 		source: 'REG-F-161'
+	},
+	// ── JAN-PWUWP W-5.5 (REG-D-043 / REG-F-193 / REG-F-194) ──────────────────────────────────────────────────
+	// ⚠ THESE FOUR EXIST BECAUSE THE GATE WAS GREEN AND SAID NOTHING. The W-5.5 run measured 205 distinct
+	// mutations — IDENTICAL IN EVERY CELL to the run before it — while the increment added a command, a guard
+	// limb, a census idiom and a fail-closed refusal. A search of this ledger for `unblock|blockedfrom|
+	// ownerofarrow|recovery_command|recoverytargets` returned 0, with `handlers/pwu.ts` (4) and
+	// `arrow-command-census.ts` (8) as positive controls proving the search reached the file. Green over the OLD
+	// surface is not a pass on the new one.
+	{
+		id: 'F193-the-union-guard-loses-its-arrow-limb',
+		file: 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts',
+		find: '\tfor (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {\n\t\tif (spec.arrows.some((a) => a.from === from && a.to === to)) return spec.commandType;\n\t}\n',
+		replace: '',
+		expectRed: ['packages/rph-application/src/handlers/block-escalate.test.ts'],
+		why: "REG-F-193's WHOLE RULING IN ONE MUTANT. Ownership is a UNION — arrow first, the eleven-row target table as a fail-closed backstop — because a target key cannot say that `BLOCKED -> PLANNED` belongs to `UnblockPwu` while `READY -> PLANNED` stays the generic setter's. Delete the arrow limb and the lookup falls through to the target table, where PLANNED is NOT owned, so `ChangePwuState` performs recovery: exactly the hole W-5.5 landed three parts in one commit to avoid, and it was MEASURED at that value (BLOCKED -> PLANNED returns ACCEPTED).",
+		source: 'REG-F-193'
+	},
+	{
+		id: 'F193-recovery-guesses-an-origin-it-was-never-told',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: '\t\tconst origin = recordedBlockOrigin(ctx, id);',
+		replace: '\t\tconst origin = recordedBlockOrigin(ctx, id) ?? candidates[0]!;',
+		expectRed: ['packages/rph-application/src/handlers/block-escalate.test.ts'],
+		why: "THE FAIL-CLOSED HALF OF AX-8, AND THE ONLY MUTANT THAT CAN SHOW IT IS LOAD-BEARING. A PWU blocked before `blockedFrom` existed records no origin, and the two ways to produce one are to fold the event prefix — which CON-000 AX-6 forbids, *'never inferred from ... ordering'* — or to guess. This mutant guesses, plausibly, by taking the first declared candidate. It is the shape a well-meaning fix would take, which is why the refusal needs a mutant rather than a comment.",
+		source: 'REG-F-193'
+	},
+	{
+		id: 'F193-the-cardinality-branch-stops-deciding-anything',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: '\tif (candidates.length > 1) {',
+		replace: '\tif (candidates.length > 0) {',
+		expectRed: ['packages/rph-application/src/handlers/block-escalate.test.ts'],
+		why: "WHETHER A RECORDED ORIGIN IS OWED IS DECIDED BY THE DECLARATION'S CARDINALITY, NOT BY A HARDCODED STATE LIST — which is why `PwuEscalated` deliberately carries no `escalatedFrom`. ESCALATED has ONE ratified in-arrow, so its target is derivable from the DECLARED MACHINE (permitted by AX-6) rather than from event ordering (forbidden). Widen the branch to `> 0` and ESCALATED recovery demands an origin no escalation event records, so it fails closed and de-escalation becomes unperformable. Kills the claim that the `> 1` is incidental.",
+		source: 'REG-F-193'
+	},
+	{
+		id: 'F194-the-census-goes-blind-to-the-recovery-command-again',
+		file: 'verif/arrow-command-census.ts',
+		find: '\tfor (const spec of Object.values(PWU_RECOVERY_COMMAND_SPECS)) {',
+		replace: '\t\tfor (const spec of [] as (typeof PWU_RECOVERY_COMMAND_SPECS)[string][]) {',
+		expectRed: ['verif/arrow-command-census.test.ts'],
+		why: "REG-F-114's DEFECT HAS NOW RECURRED THREE TIMES AND THIS IS THE FIRST MUTANT THAT WOULD CATCH THE FOURTH. `UnblockPwu` resolves its target at runtime, so a syntactic reader sees no arrow; the fifth data idiom reads the DECLARATION instead. Starve that loop and all four recovery arrows return to *'arrows no command can perform'* and coverage falls 166 -> 162 — which is precisely the state C-0 reported when W-5.5 first landed, before the idiom existed. The idiom was added in response to a red; nothing until now would have noticed it being removed.",
+		source: 'REG-F-194'
 	}
 ];
