@@ -415,7 +415,11 @@ const JPWB_ARROW_COMMAND_CENSUS_PROVENANCE = [
 	'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
 	'packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts',
 	'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
-	'packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts'
+	'packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts',
+	// This provider's capsule membership is DERIVED too, as of W-6; this is the module that performs the
+	// derivation. Listed for the same reason as in the guard-enforcement-ledger provenance above — a claim of
+	// derived membership that cites no implementing file is the gap the claim was written to close.
+	'packages/csaa/src/subject/analyzer-closure.ts'
 ] as const;
 
 // Keep this inventory-layer projection reconciled in inventory.test.ts with the provider's

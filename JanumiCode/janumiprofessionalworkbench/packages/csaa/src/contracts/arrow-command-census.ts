@@ -1,7 +1,16 @@
 import type { ArtifactDisposition, ArtifactPrimaryClass, ArtifactSemanticRole } from './subject.js';
 
 export const ARROW_COMMAND_CENSUS_ARTIFACT_SET_SCHEMA_VERSION =
-	'jan-csaa-arrow-command-census-artifact-set/1.0.0' as const;
+	// 1.0.0 -> 2.0.0, for the identical reason as the guard-enforcement-ledger sibling and on the identical
+	// authority: JAN-CSAA-007 §18.2 classes "add enum value to a closed enum" as MAJOR, and the classing bites,
+	// because a 1.0.0-labelled record produced by this code carries a `uses` value a 1.0.0 consumer rejects as
+	// INVALID_VALUE against its own `ARTIFACT_USES` list — same label, incompatible instances.
+	// ⚠ There is NO semver parsing anywhere in this package; conformance is strict byte-identical literal equality
+	// against this frozen string, so ANY change is a hard cut rather than a migration and a MINOR bump would buy
+	// nothing. The bump rotates two content-addressed identities (artifact-set id and contentDigest); no test pins
+	// those as literals, so the rotation is absorbed by the reproduction checks — but it is a real change of
+	// observable identity, not an inert relabelling.
+	'jan-csaa-arrow-command-census-artifact-set/2.0.0' as const;
 export const ARROW_COMMAND_CENSUS_ARTIFACT_SET_REQUEST_SCHEMA_VERSION =
 	'jan-csaa-arrow-command-census-artifact-set-request/1.0.0' as const;
 export const ARROW_COMMAND_CENSUS_ARTIFACT_SET_OPERATION_VERSION =
@@ -55,6 +64,15 @@ export type ArrowCommandCensusArtifactUse =
 	| 'COMMAND_DECLARATIONS'
 	| 'CONTRACT_SCHEMA_SOURCE'
 	| 'ENVIRONMENT_IDENTITY'
+	// A module the retained executor TRANSITIVELY IMPORTS, derived from frozen bytes rather than enumerated.
+	// ⚠ SEPARATE FROM `EXECUTOR_SOURCE` ON PURPOSE, and NOT for the reason its sibling minted
+	// `ANALYZER_DEPENDENCY_SOURCE`. There, reuse would have broken a `length !== 1` fail-closed in the normalizer;
+	// here no such consumer exists — `observe-arrow-command-census.ts` finds the executor by PATH equality, and
+	// nothing in this provider counts EXECUTOR_SOURCE bindings. The independent reason stands on its own:
+	// `coverage.executorSourceArtifacts` would silently start counting DEPENDENCIES, so a published contract field
+	// would mean something other than its name, and its pinned `1` would become a function of whatever the
+	// executor happens to import that week — a constant pin converted into a moving target.
+	| 'EXECUTOR_DEPENDENCY_SOURCE'
 	| 'EXECUTOR_SOURCE'
 	| 'EXECUTOR_TEST'
 	| 'HANDLER_SOURCE'
@@ -80,6 +98,7 @@ export interface ArrowCommandCensusArtifactSetCoverage {
 	readonly commandDeclarationArtifacts: number;
 	readonly contractSchemaArtifacts: number;
 	readonly environmentIdentityArtifacts: number;
+	readonly executorDependencyArtifacts: number;
 	readonly executorSourceArtifacts: number;
 	readonly executorTestArtifacts: number;
 	readonly handlerSourceArtifacts: number;

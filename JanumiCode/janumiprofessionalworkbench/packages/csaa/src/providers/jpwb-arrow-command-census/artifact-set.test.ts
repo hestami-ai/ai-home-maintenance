@@ -207,6 +207,11 @@ describe('JPWB retained arrow-command census artifact set', () => {
 			commandDeclarationArtifacts: 2,
 			contractSchemaArtifacts: 1,
 			environmentIdentityArtifacts: 2,
+			// 0 here is CORRECT and is itself worth pinning: this fixture's executor source is a one-line stub with
+			// no relative imports, so the derived closure is empty. ⚠ THIS NUMBER IS NOT THE WITNESS — the control
+			// named 'derives the executor import closure...' below is, because it supplies an executor that DOES
+			// import, and the repository-population test above still reads 0 for the real executor.
+			executorDependencyArtifacts: 0,
 			executorSourceArtifacts: 1,
 			executorTestArtifacts: 2,
 			handlerSourceArtifacts: 1,
@@ -232,6 +237,66 @@ describe('JPWB retained arrow-command census artifact set', () => {
 		expect(validateArrowCommandCensusArtifactSet(first, subject)).toEqual({
 			issues: [],
 			state: 'VALID'
+		});
+	});
+
+	// ⚠⚠ THE WITNESS FOR THE DERIVED CLOSURE, AND THIS PROVIDER HAS NO OTHER ONE.
+	// The stub executor in the fixture above and the REAL executor in `verif/arrow-command-census.ts` both import
+	// nothing relative, so `executorDependencyArtifacts` reads 0 in every other test in this file. A wiring that
+	// had been deleted outright would look identical to all of them.
+	// ⚠ AND THE END-TO-END RUN CANNOT COVER FOR THEM, FOR TWO INDEPENDENT REASONS. The capsule spawn in
+	// `repository-smoke.test.ts` reads 0 as well — same executor — and it is OPT-IN behind
+	// `CSAA_REPOSITORY_SMOKE=1`, so it does not execute in `gate:fast` at all. The sibling provider could defer
+	// its witness to an end-to-end run; here there is no run to defer to. Without these two controls the change
+	// is decorative.
+	// Fixture paths are deliberately synthetic and NOT named after any real file, so a reader cannot mistake this
+	// for a statement about the repository's own census.
+	it('derives the executor import closure transitively from frozen bytes and binds every member', () => {
+		const subject = frozenSubject({
+			add: new Map([
+				[
+					'verif/arrow-command-census.ts',
+					"import { direct } from './synthetic-census-direct.js';\nexport const census = () => ({ total: direct });\n"
+				],
+				[
+					'verif/synthetic-census-direct.ts',
+					"export { transitive as direct } from './synthetic-census-transitive.js';\n"
+				],
+				['verif/synthetic-census-transitive.ts', 'export const transitive = 0;\n']
+			])
+		});
+		const artifactSet = complete(subject);
+		// TRANSITIVE, not merely direct: a resolver that followed one hop and stopped would read 1 here.
+		expect(artifactSet.coverage.executorDependencyArtifacts).toBe(2);
+		// The executor is NOT its own dependency, which is precisely what keeps this pin a constant 1 rather than
+		// a function of whatever the executor happens to import.
+		expect(artifactSet.coverage.executorSourceArtifacts).toBe(1);
+		expect(
+			artifactSet.artifacts.find((item) => item.path === 'verif/arrow-command-census.ts')?.uses
+		).toEqual(['EXECUTOR_SOURCE']);
+		// Selected AND bound. Threading the closure into selection but not into the binding site would satisfy the
+		// coverage counter above and still leave these `uses` empty.
+		for (const path of ['verif/synthetic-census-direct.ts', 'verif/synthetic-census-transitive.ts'])
+			expect(artifactSet.artifacts.find((item) => item.path === path)?.uses).toEqual([
+				'EXECUTOR_DEPENDENCY_SOURCE'
+			]);
+		expect(validateArrowCommandCensusArtifactSet(artifactSet, subject).state).toBe('VALID');
+	});
+
+	it('refuses the whole population when a derived closure member is absent from the frozen subject', () => {
+		const subject = frozenSubject({
+			add: new Map([
+				[
+					'verif/arrow-command-census.ts',
+					"import { absent } from './synthetic-census-absent.js';\nexport const census = () => ({ total: absent });\n"
+				]
+			])
+		});
+		// FAIL-CLOSED, not best-effort: the capsule would otherwise be written without the module and the
+		// executor's dynamic import would fail inside the worker — the exact defect this programme exists to fix.
+		expect(buildArrowCommandCensusArtifactSet(request(subject), { subject })).toMatchObject({
+			diagnostics: [{ code: 'POPULATION_RECONCILIATION_FAILED', phase: 'RECONCILE' }],
+			outcome: 'unavailable'
 		});
 	});
 

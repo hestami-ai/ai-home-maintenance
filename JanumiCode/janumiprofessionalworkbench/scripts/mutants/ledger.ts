@@ -2950,5 +2950,62 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/arrow-command-census.test.ts'],
 		why: "REG-F-114's DEFECT HAS NOW RECURRED THREE TIMES AND THIS IS THE FIRST MUTANT THAT WOULD CATCH THE FOURTH. `UnblockPwu` resolves its target at runtime, so a syntactic reader sees no arrow; the fifth data idiom reads the DECLARATION instead. Starve that loop and all four recovery arrows return to *'arrows no command can perform'* and coverage falls 166 -> 162 — which is precisely the state C-0 reported when W-5.5 first landed, before the idiom existed. The idiom was added in response to a red; nothing until now would have noticed it being removed.",
 		source: 'REG-F-194'
+	},
+	/*
+	 * ⚠⚠ THE FIRST TWO `packages/csaa` ENTRIES IN THIS LEDGER, AND THE ABSENCE THEY END WAS NOT A CHOICE ANYONE MADE.
+	 * Of the 224 entries above, ZERO name a csaa file — including `subject/analyzer-closure.ts`, the module the
+	 * whole derived-capsule programme rests on. It has eight controls and, until these entries, nothing that could
+	 * show any of them capable of failing.
+	 *
+	 * ⚠ AND THE OBVIOUS EXPLANATION IS WRONG, WHICH IS WHY IT IS WRITTEN DOWN. `EXCLUDED_PROJECTS = ['csaa']` in
+	 * `run.ts` looks like a blanket bar on csaa mutants. It is not: `run.ts:652`/`:655` apply `projectFilters()`
+	 * ONLY when `target.length === 0`, so the exclusion reaches CONTROLS and the BASELINE — the whole-workspace
+	 * runs REG-F-136 was protecting from csaa's 5000ms timeouts — and never reaches a mutant that NAMES its victim.
+	 * A named-victim csaa mutant has always been declarable. Nobody had declared one. Reading the exclusion as
+	 * "csaa cannot be mutated" would have retired a real gap by misreading a filter.
+	 *
+	 * ⚠ THE COROLLARY IS A GENUINE LIMIT AND IS NOT FIXED HERE: a csaa CONTROL (`expectSurvive`, `expectRed: []`)
+	 * still cannot be graded, because controls run the whole workspace MINUS csaa and would never observe the code.
+	 * Both entries below therefore name their victim. That is the STRONGER form in any case — but here it is also
+	 * the only available one, and a later reader must not mistake the constraint for a preference.
+	 */
+	{
+		id: 'F195-the-capsule-stops-labelling-what-the-executor-imports',
+		file: 'packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts',
+		// THE LATENT TWIN OF THE DEFECT THAT BROKE THE MERGE, in the sibling provider that had not yet been hit.
+		// The guard-enforcement-ledger capsule hand-enumerated its members; one correctly-motivated relative import
+		// emptied it and the worker died. This provider carried the identical enumeration and was saved only by the
+		// accident that `verif/arrow-command-census.ts` imports nothing relative.
+		//
+		// ⚠ THAT ACCIDENT IS ALSO WHY THIS MUTANT IS NECESSARY RATHER THAN DECORATIVE. The real executor's closure
+		// is EMPTY, so `executorDependencyArtifacts` reads 0 in the repository-population test, and the
+		// end-to-end capsule spawn in `repository-smoke.test.ts` reads 0 for the same reason AND is opt-in behind
+		// `CSAA_REPOSITORY_SMOKE=1`, so it never runs in `gate:fast`. Deleting the wiring outright would leave the
+		// entire standing gate green. The victim named below is the ONLY test in the repository that supplies an
+		// executor which actually imports, and it is the only thing standing between this wiring and silent removal.
+		find: "\tif (executorDependencyPaths.has(path)) uses.add('EXECUTOR_DEPENDENCY_SOURCE');",
+		replace: '\t// MUTANT: derived closure members are selected but never labelled',
+		expectRed: ['packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.test.ts'],
+		why: 'REG-F-195 W-6: a capsule member selected but left unlabelled is bound with empty `uses` — selected and unusable, which is a new failure rather than the old one fixed',
+		source: 'DESIGN-derived-capsule-closure.md W-6'
+	},
+	{
+		id: 'F195-an-undecidable-import-closure-goes-silent-again',
+		file: 'packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts',
+		// THE ORIGINAL DEFECT, EXACTLY — not an analogue of it. `resolveFrozenModuleClosure` obeys a fail-closed
+		// law: `paths` is empty IFF `findings` is non-empty. Drop the findings on the floor and an UNRESOLVABLE
+		// closure becomes indistinguishable from an EMPTY one, so the capsule is written without the module and
+		// the executor's dynamic import fails inside the worker with the 49-byte constant that started all of this.
+		//
+		// ⚠ DELIBERATELY NOT A MUTATION OF THE COVERAGE COUNTER. Attacking the count would prove only that one
+		// number follows another; this attacks the SILENCE, which is the property the programme exists to remove.
+		// Measured before declaring: reddens exactly one test across the six-file provider suite, and the sibling
+		// label mutant above reddens a different one — so neither is standing in for the other.
+		find: '\tconst diagnostics: ArrowCommandCensusArtifactSetDiagnostic[] = [...closureSelection.diagnostics];',
+		replace:
+			'\tconst diagnostics: ArrowCommandCensusArtifactSetDiagnostic[] = []; // MUTANT: closure findings discarded',
+		expectRed: ['packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.test.ts'],
+		why: 'REG-F-195 W-6: an import the capsule cannot resolve must refuse the population, because a silently empty closure IS the defect that broke the merge',
+		source: 'DESIGN-derived-capsule-closure.md W-6'
 	}
 ];

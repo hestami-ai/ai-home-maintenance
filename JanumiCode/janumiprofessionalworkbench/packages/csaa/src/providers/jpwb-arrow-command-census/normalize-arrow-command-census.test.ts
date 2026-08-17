@@ -108,6 +108,7 @@ function artifactSet(): ArrowCommandCensusArtifactSetBinding {
 			commandDeclarationArtifacts: 2,
 			contractSchemaArtifacts: 0,
 			environmentIdentityArtifacts: 0,
+			executorDependencyArtifacts: 0,
 			executorSourceArtifacts: 1,
 			executorTestArtifacts: 0,
 			handlerSourceArtifacts: 1,

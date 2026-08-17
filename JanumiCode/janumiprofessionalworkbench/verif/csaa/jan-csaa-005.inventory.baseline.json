@@ -627,6 +627,7 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.ts",
         "verif/arrow-command-census.baseline.json",
@@ -668,6 +669,7 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.ts",
         "verif/arrow-command-census.baseline.json",
@@ -833,6 +835,7 @@
         "packages/csaa/src/providers/jpwb-arrow-command-census/parse-worker-output.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts",
         "packages/csaa/src/providers/jpwb-arrow-command-census/worker.ts",
+        "packages/csaa/src/subject/analyzer-closure.ts",
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.ts",
         "verif/arrow-command-census.baseline.json",
@@ -5621,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "d21d41dae1eaa9e1d0cb8c192435d1c7fb34a4b0f1f1017d879fc1bcb7a58285",
+    "fileManifestDigest": "730b34705809e3530e4146319e7c454399639cce7f65f25233be1ebf2f301b2d",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -6808,9 +6811,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 21445,
+        "bytes": 23284,
         "path": "packages/csaa/src/contracts/arrow-command-census.ts",
-        "sha256": "1a3f0e3244090396fd96f3e49086cb730ba58829bb1ba0f26b4b28ef670c50b1",
+        "sha256": "f3cc0e1200da9dced366fd9f06f916af270a1bfcca7c4b3ddcbbe19827d4c778",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7578,9 +7581,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 119838,
+        "bytes": 120199,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "e7996d0262bc800c04e582a915d54b501e148de0c87f285788684e92c9e1edc4",
+        "sha256": "104878287b3d7daebf2cd6daa283f2b3ac555ddde6b1942e5e690c2494e91187",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7655,16 +7658,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 24655,
+        "bytes": 28269,
         "path": "packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.test.ts",
-        "sha256": "6ca527cb12c3878f11e3a40346c54d7ad814cbe348ec88e202cbe530d0e41ffd",
+        "sha256": "c1e90feb8ea5ce554119251529b473ea4b7503a3b0fd9b6740be535f08ef2446",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 28091,
+        "bytes": 32320,
         "path": "packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts",
-        "sha256": "16058c1ec00a839b4777c07e5033540d716c5c9cd628d10e50498f4b7f1dbc15",
+        "sha256": "9de38da243bf7128d790aad10a13df6e80c081345cd9d13adb187e46c7d6a11a",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7683,9 +7686,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 19217,
+        "bytes": 19252,
         "path": "packages/csaa/src/providers/jpwb-arrow-command-census/normalize-arrow-command-census.test.ts",
-        "sha256": "cb270f91313cfad50edd9e8c388d7298b29c9064233e7d10242717a181ea4be2",
+        "sha256": "4d0552f5873d7d0e691b93ff9327a3689ba51037f5e792b7331b3f8d72949242",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11897,9 +11900,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 246329,
+        "bytes": 250941,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "f0833d7293c7c69bf0ea4faf1845f1e22cec231a80d33db702e9879d4323ddaa",
+        "sha256": "050e1fe0f8875ba2cbe15373b8a7437d26a52ee00efa24163a61e8ef7314ec6e",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12323,7 +12326,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "f7c456fc05267915c6fd508f36d34aff58ab8954c860bfe5d02111c91b115042",
+    "subjectId": "f9696e73de7b1500f50180340be3f0d0016317448476a23d70f2dfe960676ebb",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14718,7 +14721,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "f0833d7293c7c69bf0ea4faf1845f1e22cec231a80d33db702e9879d4323ddaa",
+      "contentSha256": "050e1fe0f8875ba2cbe15373b8a7437d26a52ee00efa24163a61e8ef7314ec6e",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [

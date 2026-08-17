@@ -22,6 +22,7 @@ import type {
 	FrozenSubject
 } from '../../contracts/subject.js';
 import { canonicalJson, compareText, sha256 } from '../../inventory/canonical.js';
+import { resolveFrozenModuleClosure } from '../../subject/analyzer-closure.js';
 import { classifyArtifact } from '../../subject/artifacts.js';
 import {
 	isFrozenSubjectCapability,
@@ -57,6 +58,9 @@ const OPTIONAL_ENVIRONMENT_PATHS = new Set([
 	'pnpm-lock.yaml',
 	'yarn.lock'
 ]);
+// Its OWN budget, deliberately not the artifact budget: sharing one number would couple two unrelated failure
+// modes, so a large subject could silently truncate the closure.
+const MAX_CLOSURE_NODES = 64;
 
 const REQUIRED_PATHS = [
 	...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
@@ -70,11 +74,17 @@ const REQUIRED_PATHS = [
 	'packages/rph-contracts/src/index.ts'
 ] as const;
 
+// ⚠ THIS LIST IS A HAND-DUPLICATED MIRROR of the `ArrowCommandCensusArtifactUse` union, and `satisfies` does NOT
+// force the two to agree: it checks that every element is assignable to the union, never that every member of the
+// union is present. Omitting a member here is therefore TYPE-LEGAL and fails silently at validation — the binding
+// carrying it is rejected as INVALID_VALUE — instead of failing to compile. Edit both in lockstep. (The sibling
+// provider writes this as `new Set<T>([...])`, which has the identical subset hole in different syntax.)
 const ARTIFACT_USES = [
 	'BASELINE',
 	'COMMAND_DECLARATIONS',
 	'CONTRACT_SCHEMA_SOURCE',
 	'ENVIRONMENT_IDENTITY',
+	'EXECUTOR_DEPENDENCY_SOURCE',
 	'EXECUTOR_SOURCE',
 	'EXECUTOR_TEST',
 	'HANDLER_SOURCE',
@@ -145,9 +155,55 @@ function isHandlerSourcePath(path: string): boolean {
 	);
 }
 
-function usesForPath(path: string): readonly ArrowCommandCensusArtifactUse[] {
+/**
+ * The capsule must contain everything the retained executor IMPORTS, and that population is DERIVED from the
+ * executor's own frozen source rather than listed above.
+ *
+ * ⚠⚠ ROOTED AT THE ANALYZER ALONE, AND THE OMISSIONS ARE THE DESIGN. `ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS`
+ * holds four entries and only ONE of them is ever loaded as a module: `worker.ts:431` does
+ * `await import(analyzerResolvedPath)`, while the BASELINE is `readFileSync`-ed and JSON-parsed at `worker.ts:234`
+ * and the two AUTHORITY TESTS are materialised into the capsule but never executed. Rooting at the convenient
+ * four-entry list would drag the tests' specifiers in, `vitest` among them — a bare specifier the capsule cannot
+ * satisfy, since `linkModule` junctions only typescript, ulid and zod. Fixing this defect by rooting at the
+ * obvious list would have created a new one.
+ *
+ * The executor's four current imports — `node:fs`, `typescript`, `@janumipwb/rph-domain`,
+ * `@janumipwb/rph-contracts` — are all BARE, and `resolveFrozenModuleClosure` collects bare specifiers into
+ * `bareSpecifiers` rather than reporting them as findings. So this derivation returns an EMPTY closure today and
+ * the provider is unaffected. That is a fact about the executor as it stands, not a property of the wiring.
+ */
+function executorClosure(subject: FrozenSubject): {
+	readonly diagnostics: readonly ArrowCommandCensusArtifactSetDiagnostic[];
+	readonly paths: ReadonlySet<string>;
+} {
+	const closure = resolveFrozenModuleClosure({
+		entryPaths: [ANALYZER_PATH],
+		maxClosureNodes: MAX_CLOSURE_NODES,
+		subject
+	});
+	return {
+		// A specifier the closure cannot resolve was SILENT before this existed, and that silence was the defect.
+		diagnostics: closure.findings.map((f) =>
+			diagnostic(
+				'POPULATION_RECONCILIATION_FAILED',
+				`Retained executor import closure is undecidable: ${f.code}${f.specifier === null ? '' : ` for '${f.specifier}'`}${f.importerPath === null ? '' : ` in ${f.importerPath}`}${f.resolvedCandidate === null ? '' : ` (resolved to ${f.resolvedCandidate})`}.`,
+				f.path,
+				'RECONCILE'
+			)
+		),
+		// `dependencies` EXCLUDES the entry paths, which is why `EXECUTOR_SOURCE` stays exactly one binding and the
+		// executor never labels itself its own dependency.
+		paths: new Set(closure.dependencies)
+	};
+}
+
+function usesForPath(
+	path: string,
+	executorDependencyPaths: ReadonlySet<string>
+): readonly ArrowCommandCensusArtifactUse[] {
 	const uses = new Set<ArrowCommandCensusArtifactUse>();
 	if (path === ANALYZER_PATH) uses.add('EXECUTOR_SOURCE');
+	if (executorDependencyPaths.has(path)) uses.add('EXECUTOR_DEPENDENCY_SOURCE');
 	if (path === BASELINE_PATH) uses.add('BASELINE');
 	if ((AUTHORITY_TEST_PATHS as readonly string[]).includes(path)) uses.add('EXECUTOR_TEST');
 	if (path === DOMAIN_MANIFEST_PATH || path === CONTRACTS_MANIFEST_PATH)
@@ -172,8 +228,8 @@ function usesForPath(path: string): readonly ArrowCommandCensusArtifactUse[] {
 	return [...uses].sort(compareText);
 }
 
-function isEligiblePath(path: string): boolean {
-	return usesForPath(path).length > 0;
+function isEligiblePath(path: string, executorDependencyPaths: ReadonlySet<string>): boolean {
+	return usesForPath(path, executorDependencyPaths).length > 0;
 }
 
 function diagnostic(
@@ -353,16 +409,17 @@ interface DerivedPopulation {
 }
 
 function derivePopulation(subject: FrozenSubject): DerivedPopulation {
-	const diagnostics: ArrowCommandCensusArtifactSetDiagnostic[] = [];
+	const closureSelection = executorClosure(subject);
+	const diagnostics: ArrowCommandCensusArtifactSetDiagnostic[] = [...closureSelection.diagnostics];
 	const rowsByPath = new Map<string, CapturedArtifactRecord[]>();
 	for (const artifact of subject.artifacts) {
-		if (!isEligiblePath(artifact.path)) continue;
+		if (!isEligiblePath(artifact.path, closureSelection.paths)) continue;
 		const rows = rowsByPath.get(artifact.path) ?? [];
 		rows.push(artifact);
 		rowsByPath.set(artifact.path, rows);
 	}
 	for (const excluded of subject.excludedArtifacts) {
-		if (!isEligiblePath(excluded.path)) continue;
+		if (!isEligiblePath(excluded.path, closureSelection.paths)) continue;
 		if (OPTIONAL_ENVIRONMENT_PATHS.has(excluded.path)) continue;
 		diagnostics.push(
 			diagnostic(
@@ -373,7 +430,9 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 			)
 		);
 	}
-	for (const path of REQUIRED_PATHS) {
+	// A derived closure member absent from the subject is exactly as fatal as a missing REQUIRED_PATH: the capsule
+	// would be written without it and the executor's dynamic import would fail inside the worker.
+	for (const path of [...REQUIRED_PATHS, ...closureSelection.paths]) {
 		const count = rowsByPath.get(path)?.length ?? 0;
 		if (count === 0)
 			diagnostics.push(
@@ -436,7 +495,10 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 	const artifacts: ArrowCommandCensusArtifactBinding[] = [];
 	for (const [path, rows] of [...rowsByPath].sort(([left], [right]) => compareText(left, right))) {
 		if (rows.length !== 1) continue;
-		const result = bindArtifact(subject, rows[0]!, usesForPath(path));
+		// ⚠ THE BINDING SITE, not a selection site. Threading the closure into the two `isEligiblePath` calls above
+		// and forgetting this one would SELECT a dependency into the population and then bind it with an empty
+		// `uses` — selected but unusable, a new failure rather than the old one fixed.
+		const result = bindArtifact(subject, rows[0]!, usesForPath(path, closureSelection.paths));
 		if (result.diagnostic) diagnostics.push(result.diagnostic);
 		else artifacts.push(result.binding);
 	}
@@ -454,6 +516,7 @@ function coverageFor(
 		commandDeclarationArtifacts: count('COMMAND_DECLARATIONS'),
 		contractSchemaArtifacts: count('CONTRACT_SCHEMA_SOURCE'),
 		environmentIdentityArtifacts: count('ENVIRONMENT_IDENTITY'),
+		executorDependencyArtifacts: count('EXECUTOR_DEPENDENCY_SOURCE'),
 		executorSourceArtifacts: count('EXECUTOR_SOURCE'),
 		executorTestArtifacts: count('EXECUTOR_TEST'),
 		handlerSourceArtifacts: count('HANDLER_SOURCE'),
@@ -667,6 +730,7 @@ function shapeIssue(value: unknown): ArrowCommandCensusValidationIssue | null {
 		'commandDeclarationArtifacts',
 		'contractSchemaArtifacts',
 		'environmentIdentityArtifacts',
+		'executorDependencyArtifacts',
 		'executorSourceArtifacts',
 		'executorTestArtifacts',
 		'handlerSourceArtifacts',
