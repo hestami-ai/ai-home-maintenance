@@ -2983,10 +2983,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// `CSAA_REPOSITORY_SMOKE=1`, so it never runs in `gate:fast`. Deleting the wiring outright would leave the
 		// entire standing gate green. The victim named below is the ONLY test in the repository that supplies an
 		// executor which actually imports, and it is the only thing standing between this wiring and silent removal.
+		// ⚠ THE MECHANISM RECORDED HERE WAS WRONG ON FIRST WRITING, AND THE MUTANT KILLED ANYWAY — which is exactly
+		// why it needed driving rather than deriving. I wrote that dropping this rung leaves a member "selected but
+		// bound with empty `uses`". It does not. The rung feeds `isEligiblePath`, so the dependency never enters
+		// `rowsByPath` at all, and the required-presence loop — which includes the closure paths — then reports
+		// REQUIRED_ARTIFACT_MISSING and the whole population is refused: measured `outcome: 'unavailable'`, not a
+		// half-bound artifact. That is a STRONGER guard than the one I credited it with, and a KILL is not evidence
+		// that the sentence beside it is true. The "selected but unlabelled" failure is real but belongs to a
+		// DIFFERENT mutation, declared separately below.
 		find: "\tif (executorDependencyPaths.has(path)) uses.add('EXECUTOR_DEPENDENCY_SOURCE');",
-		replace: '\t// MUTANT: derived closure members are selected but never labelled',
+		replace: '\t// MUTANT: derived closure members are never labelled',
 		expectRed: ['packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.test.ts'],
-		why: 'REG-F-195 W-6: a capsule member selected but left unlabelled is bound with empty `uses` — selected and unusable, which is a new failure rather than the old one fixed',
+		why: 'REG-F-195 W-6: without the label a derived closure member is not eligible, so the capsule refuses the whole population rather than shipping without a module the executor imports',
+		source: 'DESIGN-derived-capsule-closure.md W-6'
+	},
+	{
+		id: 'F195-the-binding-site-forgets-what-selection-decided',
+		file: 'packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.ts',
+		// THE ONLY ONE OF THE THREE WHOSE FAILURE IS GENUINELY SILENT, and the reason it exists is that I checked
+		// a claim instead of repeating it. W-2 warns that `usesForPath` has a third caller which is the BINDING
+		// site, and that wiring only the selection sites leaves an artifact "selected but unusable". In THIS
+		// provider the parameter is required, so simply forgetting the call site is a COMPILE error — the trap as
+		// literally worded cannot happen here. Passing the WRONG set can, and does: selection still admits the
+		// dependency, the binding drops its `uses`, and the result is a valid-looking artifact set whose
+		// dependency counter silently reads 0. NO diagnostic, NO refusal — measured `expected +0 to be 2`.
+		//
+		// So the sibling's warning is sound in substance and wrong in mechanism for this file, and the guard it
+		// points at is the one most worth holding: the other two mutants fail LOUDLY, this one only changes a number.
+		find: '\t\tconst result = bindArtifact(subject, rows[0]!, usesForPath(path, closureSelection.paths));',
+		replace:
+			'\t\tconst result = bindArtifact(subject, rows[0]!, usesForPath(path, new Set())); // MUTANT: binding ignores the closure',
+		expectRed: ['packages/csaa/src/providers/jpwb-arrow-command-census/artifact-set.test.ts'],
+		why: 'REG-F-195 W-6: an artifact selected by the closure and then bound without it is materialised into the capsule with no recorded reason for being there, and nothing fails',
 		source: 'DESIGN-derived-capsule-closure.md W-6'
 	},
 	{

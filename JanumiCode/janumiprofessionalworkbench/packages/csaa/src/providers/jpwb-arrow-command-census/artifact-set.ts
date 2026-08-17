@@ -495,9 +495,12 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 	const artifacts: ArrowCommandCensusArtifactBinding[] = [];
 	for (const [path, rows] of [...rowsByPath].sort(([left], [right]) => compareText(left, right))) {
 		if (rows.length !== 1) continue;
-		// ⚠ THE BINDING SITE, not a selection site. Threading the closure into the two `isEligiblePath` calls above
-		// and forgetting this one would SELECT a dependency into the population and then bind it with an empty
-		// `uses` — selected but unusable, a new failure rather than the old one fixed.
+		// ⚠ THE BINDING SITE, not a selection site, and the ONLY one of the three whose failure is silent.
+		// Omitting the argument entirely is a compile error here, because the parameter is required — but passing
+		// the WRONG set is not: selection still admits the dependency, this call drops its `uses`, and the result
+		// is a valid-looking artifact set whose dependency counter reads 0 with no diagnostic and no refusal.
+		// Measured, not assumed: the two selection sites fail LOUDLY (`outcome: 'unavailable'`), this one only
+		// changes a number. Held by `F195-the-binding-site-forgets-what-selection-decided`.
 		const result = bindArtifact(subject, rows[0]!, usesForPath(path, closureSelection.paths));
 		if (result.diagnostic) diagnostics.push(result.diagnostic);
 		else artifacts.push(result.binding);
