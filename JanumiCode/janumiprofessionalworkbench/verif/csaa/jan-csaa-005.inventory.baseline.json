@@ -5624,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "acf780fed112af85003ee94dc5e2c7f64c0a3be0b1078cf9e5db086a9b774811",
+    "fileManifestDigest": "5388c4310c2f6328c471a407b50672e3bbbc95a1c9b4501726fcd0e361597f6f",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -6979,9 +6979,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 51539,
+        "bytes": 64024,
         "path": "packages/csaa/src/graph/build-call-graph.ts",
-        "sha256": "6c330982bab922b6c5ee253b7ee2bfc2b80d418270096819481474db01d81f07",
+        "sha256": "056acd1fde5d0ac77d21fafbfe7855350f93388e52d8102a5dee8ffdd5d9f8f1",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7042,9 +7042,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 74468,
+        "bytes": 88978,
         "path": "packages/csaa/src/graph/build-command-handler-graph.ts",
-        "sha256": "266a6a869d6121f1d504e0ce2b6d8a8ab7231aa3bb513bf4f76a719937c396fa",
+        "sha256": "287f85d9cc6c91c099213626ae8dd7c6497dcd62c44f60e26a4406c7f001eb2e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7070,9 +7070,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 60321,
+        "bytes": 77174,
         "path": "packages/csaa/src/graph/build-guard-classification-overlay.ts",
-        "sha256": "a32f79d5d5fc811477bdfc938b683e6072284e2b2e4c4c9dad7e3e3838eeff8d",
+        "sha256": "7c4a39cf2e770bf059e8e0cbb163a5b6fe3a62151c92cd346e081d933df3bb57",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7126,9 +7126,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 33996,
+        "bytes": 42987,
         "path": "packages/csaa/src/graph/build-read-write-access-graph.ts",
-        "sha256": "259b6c3c0c3a9d3cb59b4494eb4a02df07989e41bd892c3a6166ab54b04f17cc",
+        "sha256": "81e771fd103cbfbc1361d34997609010a80a521d3672ea4fc87a1b6b6fb48dba",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7441,9 +7441,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 87333,
+        "bytes": 103299,
         "path": "packages/csaa/src/graph/validate-command-handler-graph.ts",
-        "sha256": "409e7c1ecd20690846bc109147b2304a34421844903a8055b4b9da2576bf7c80",
+        "sha256": "8ec75b4c860b422ad25b954caaba2744c13ea863bc503f3b221075c6c924d761",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7469,9 +7469,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 48097,
+        "bytes": 54604,
         "path": "packages/csaa/src/graph/validate-graph.ts",
-        "sha256": "e6197f5cb5a3896f0bad4335db28e476a80e2b49cea7f094984059b765907bbd",
+        "sha256": "470e5e99fb41cc01c358ec0a7b01b5ab2fcd09b9408409a462e61e7c00abf2e0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7623,9 +7623,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 86297,
+        "bytes": 100860,
         "path": "packages/csaa/src/providers/dependency-cruiser/normalize-output.ts",
-        "sha256": "3b115344a6c8eabf2d5573a0f213eb52733f6bbb75874cdd1863879c06eb71cc",
+        "sha256": "c108d383189e40bb3035ed95bd05e7b04a5362bbcebe8d31fa96ba75f66e4871",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7945,9 +7945,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 64852,
+        "bytes": 73280,
         "path": "packages/csaa/src/providers/typescript/extract-static-raw.ts",
-        "sha256": "b9fecbf496d216c7deeedecd336e776d43875fc9739b3fa514d6a1cedf4bfeb9",
+        "sha256": "be3f633a0f6631b8136206b7e6120ebd3bb0a57867a9418b4074256ecac03fc2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7959,9 +7959,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 69298,
+        "bytes": 80539,
         "path": "packages/csaa/src/providers/typescript/extract-types.ts",
-        "sha256": "040d3fefbf0df6e4e536363f9f0b7a2b3d9193d3cb3fe038901becd16d1b2594",
+        "sha256": "f11688cce1c5d3c0c7ef70bbe3948324d089cb794ffc98b4e71ab90ed14c8a70",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8344,9 +8344,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 138600,
+        "bytes": 169438,
         "path": "packages/csaa/src/semantic/validate-declaration-context-analysis.ts",
-        "sha256": "49ef254da59dcb5614e141035cb21abaeb442e71b54c8fa8c197c062b3a4c6db",
+        "sha256": "afa56dd3d39686216584899140bb2cc0925048fcad26547a3c66199fc3b006af",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12326,7 +12326,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "8deb3a2b9894346d3508495c9e842e31be828929775bea1900baa18468524a1d",
+    "subjectId": "0c14e1feac4b611dd1e0de52ba58f3c70f0763bee7e8d9984b3f733131ff4000",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [

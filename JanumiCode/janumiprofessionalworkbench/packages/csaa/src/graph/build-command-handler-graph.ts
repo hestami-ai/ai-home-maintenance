@@ -35,6 +35,7 @@ import {
 	type CommandHandlerGraphBuildOutcome,
 	type CommandHandlerGraphCoverage,
 	type CommandHandlerGraphEdge,
+	type CommandHandlerGraphId,
 	type CommandHandlerGraphIndexEntry,
 	type CommandHandlerGraphLayer,
 	type CommandHandlerGraphLayerId,
@@ -265,6 +266,26 @@ function exactPlainRecord(
 	return value as Record<string, unknown>;
 }
 
+function assertPositiveBudgets(budgets: Record<string, unknown>): void {
+	for (const key of BUDGET_KEYS)
+		if (!Number.isSafeInteger(budgets[key]) || (budgets[key] as number) < 1)
+			throw new TypeError(`$request.budgets.${key} must be a positive safe integer.`);
+}
+
+function assertNonemptySelectorText(path: string, selector: Record<string, unknown>): void {
+	for (const key of SELECTOR_KEYS)
+		if (typeof selector[key] !== 'string' || (selector[key] as string).length === 0)
+			throw new TypeError(`${path}.${key} must be nonempty text.`);
+}
+
+function assertNonemptyRequestText(record: Record<string, unknown>): void {
+	for (const key of REQUEST_KEYS.filter(
+		(key) => key !== 'budgets' && key !== 'commandRegistry' && key !== 'handlerRegistry'
+	))
+		if (typeof record[key] !== 'string' || (record[key] as string).length === 0)
+			throw new TypeError(`$request.${key} must be nonempty text.`);
+}
+
 function materializeRequest(value: unknown): BuildCommandHandlerGraphRequest {
 	const record = exactPlainRecord(value, REQUEST_KEYS, '$request');
 	const budgets = exactPlainRecord(record.budgets, BUDGET_KEYS, '$request.budgets');
@@ -278,25 +299,14 @@ function materializeRequest(value: unknown): BuildCommandHandlerGraphRequest {
 		SELECTOR_KEYS,
 		'$request.handlerRegistry'
 	);
-	for (const key of BUDGET_KEYS)
-		if (!Number.isSafeInteger(budgets[key]) || (budgets[key] as number) < 1)
-			throw new TypeError(`$request.budgets.${key} must be a positive safe integer.`);
-	for (const [path, selector] of [
-		['$request.commandRegistry', commandRegistry],
-		['$request.handlerRegistry', handlerRegistry]
-	] as const)
-		for (const key of SELECTOR_KEYS)
-			if (typeof selector[key] !== 'string' || (selector[key] as string).length === 0)
-				throw new TypeError(`${path}.${key} must be nonempty text.`);
+	assertPositiveBudgets(budgets);
+	assertNonemptySelectorText('$request.commandRegistry', commandRegistry);
+	assertNonemptySelectorText('$request.handlerRegistry', handlerRegistry);
 	if (commandRegistry.exportName !== 'COMMANDS')
 		throw new TypeError('$request.commandRegistry.exportName must be COMMANDS.');
 	if (handlerRegistry.exportName !== 'HANDLERS')
 		throw new TypeError('$request.handlerRegistry.exportName must be HANDLERS.');
-	for (const key of REQUEST_KEYS.filter(
-		(key) => key !== 'budgets' && key !== 'commandRegistry' && key !== 'handlerRegistry'
-	))
-		if (typeof record[key] !== 'string' || (record[key] as string).length === 0)
-			throw new TypeError(`$request.${key} must be nonempty text.`);
+	assertNonemptyRequestText(record);
 	if (record.schemaVersion !== COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION)
 		throw new TypeError('Unsupported command-handler graph request schema version.');
 	if (record.operationVersion !== COMMAND_HANDLER_GRAPH_OPERATION_VERSION)
@@ -632,48 +642,89 @@ function callableFromDeclaration(
 	return value !== undefined && CALLABLE_KINDS.has(value.kind) ? value : null;
 }
 
+function unresolvedHandlerBinding(
+	handlerName: string,
+	member: RegistryMember,
+	handlerSymbol: SemanticSymbolRecord | null,
+	reference: SemanticReferenceRecord | null
+): HandlerBinding {
+	return {
+		factoryCallableNodeId: null,
+		handlerName,
+		handlerSymbol,
+		implementationNode: null,
+		implementationState: 'UNRESOLVED',
+		member,
+		reference
+	};
+}
+
+function factoryResultBinding(
+	declarations: readonly SemanticDeclarationRecord[],
+	model: GraphIndexes,
+	handlerName: string,
+	handlerSymbol: SemanticSymbolRecord,
+	member: RegistryMember,
+	reference: SemanticReferenceRecord
+): HandlerBinding | null {
+	const declarationInitializers = declarations.flatMap((declaration) =>
+		declaration.nodeId === null
+			? []
+			: (model.assignmentsByNode.get(declaration.nodeId) ?? []).filter(
+					(assignment) =>
+						assignment.assignmentKind === 'INITIALIZER' && assignment.valueNodeId !== null
+				)
+	);
+	if (declarationInitializers.length !== 1) return null;
+	const initializerNode = model.nodeById.get(declarationInitializers[0]!.valueNodeId!);
+	const invocation = model.invocationByNode.get(declarationInitializers[0]!.valueNodeId!);
+	if (initializerNode?.kind !== ts.SyntaxKind.CallExpression || invocation === undefined)
+		return null;
+	const factoryReferences = (model.referencesByNode.get(invocation.calleeNodeId) ?? []).filter(
+		(referenceItem) => referenceItem.resolvedSymbolId !== null
+	);
+	if (factoryReferences.length !== 1) return null;
+	const factory = model.symbolById.get(factoryReferences[0]!.resolvedSymbolId!);
+	const factoryCallables =
+		factory?.declarationIds
+			.map((id) => model.declarationById.get(id))
+			.filter((item): item is SemanticDeclarationRecord => item !== undefined)
+			.map((item) => callableFromDeclaration(item, model))
+			.filter((item): item is SemanticAstNodeRecord => item !== null) ?? [];
+	if (factoryCallables.length !== 1) return null;
+	return {
+		factoryCallableNodeId: factoryCallables[0]!.id,
+		handlerName,
+		handlerSymbol,
+		implementationNode: initializerNode,
+		implementationState: 'FACTORY_RESULT',
+		member,
+		reference
+	};
+}
+
 function resolveHandlerBindings(
 	members: readonly RegistryMember[],
 	model: GraphIndexes
 ): HandlerBinding[] {
 	return members.map((member): HandlerBinding => {
 		const handlerName = member.valueNode.syntacticIdentifierText;
-		if (handlerName === null)
-			return {
-				factoryCallableNodeId: null,
-				handlerName: '<unsupported>',
-				handlerSymbol: null,
-				implementationNode: null,
-				implementationState: 'UNRESOLVED',
-				member,
-				reference: null
-			};
+		if (handlerName === null) return unresolvedHandlerBinding('<unsupported>', member, null, null);
 		const references = (model.referencesByNode.get(member.valueNode.id) ?? []).filter(
 			(reference) => reference.role === 'SYMBOL_USE' || reference.role === 'IMPORT_EXPORT_BINDING'
 		);
 		const resolved = references.filter((reference) => reference.resolvedSymbolId !== null);
 		if (resolved.length !== 1)
-			return {
-				factoryCallableNodeId: null,
+			return unresolvedHandlerBinding(
 				handlerName,
-				handlerSymbol: null,
-				implementationNode: null,
-				implementationState: 'UNRESOLVED',
 				member,
-				reference: references.length === 1 ? references[0]! : null
-			};
+				null,
+				references.length === 1 ? references[0]! : null
+			);
 		const reference = resolved[0]!;
 		const handlerSymbol = model.symbolById.get(reference.resolvedSymbolId!);
 		if (handlerSymbol === undefined)
-			return {
-				factoryCallableNodeId: null,
-				handlerName,
-				handlerSymbol: null,
-				implementationNode: null,
-				implementationState: 'UNRESOLVED',
-				member,
-				reference
-			};
+			return unresolvedHandlerBinding(handlerName, member, null, reference);
 		const declarations = handlerSymbol.declarationIds
 			.map((id) => model.declarationById.get(id))
 			.filter((item): item is SemanticDeclarationRecord => item !== undefined);
@@ -690,51 +741,10 @@ function resolveHandlerBindings(
 				member,
 				reference
 			};
-		const declarationInitializers = declarations.flatMap((declaration) =>
-			declaration.nodeId === null
-				? []
-				: (model.assignmentsByNode.get(declaration.nodeId) ?? []).filter(
-						(assignment) =>
-							assignment.assignmentKind === 'INITIALIZER' && assignment.valueNodeId !== null
-					)
+		return (
+			factoryResultBinding(declarations, model, handlerName, handlerSymbol, member, reference) ??
+			unresolvedHandlerBinding(handlerName, member, handlerSymbol, reference)
 		);
-		if (declarationInitializers.length === 1) {
-			const initializerNode = model.nodeById.get(declarationInitializers[0]!.valueNodeId!);
-			const invocation = model.invocationByNode.get(declarationInitializers[0]!.valueNodeId!);
-			if (initializerNode?.kind === ts.SyntaxKind.CallExpression && invocation !== undefined) {
-				const factoryReferences = (
-					model.referencesByNode.get(invocation.calleeNodeId) ?? []
-				).filter((referenceItem) => referenceItem.resolvedSymbolId !== null);
-				if (factoryReferences.length === 1) {
-					const factory = model.symbolById.get(factoryReferences[0]!.resolvedSymbolId!);
-					const factoryCallables =
-						factory?.declarationIds
-							.map((id) => model.declarationById.get(id))
-							.filter((item): item is SemanticDeclarationRecord => item !== undefined)
-							.map((item) => callableFromDeclaration(item, model))
-							.filter((item): item is SemanticAstNodeRecord => item !== null) ?? [];
-					if (factoryCallables.length === 1)
-						return {
-							factoryCallableNodeId: factoryCallables[0]!.id,
-							handlerName,
-							handlerSymbol,
-							implementationNode: initializerNode,
-							implementationState: 'FACTORY_RESULT',
-							member,
-							reference
-						};
-				}
-			}
-		}
-		return {
-			factoryCallableNodeId: null,
-			handlerName,
-			handlerSymbol,
-			implementationNode: null,
-			implementationState: 'UNRESOLVED',
-			member,
-			reference
-		};
 	});
 }
 
@@ -794,7 +804,7 @@ function lineAt(text: string, offset: number): number {
 	if (!Number.isSafeInteger(offset) || offset < 0 || offset > text.length)
 		throw new RangeError('Semantic source offset is outside frozen source text.');
 	let line = 1;
-	for (let index = 0; index < offset; index += 1) if (text.charCodeAt(index) === 10) line += 1;
+	for (let index = 0; index < offset; index += 1) if (text.codePointAt(index) === 10) line += 1;
 	return line;
 }
 
@@ -828,7 +838,10 @@ function makeIndexes(
 		list.push(edge.id);
 	}
 	return [...grouped.entries()]
-		.map(([nodeId, edgeIds]) => ({ edgeIds: edgeIds.sort(compareText), nodeId }))
+		.map(([nodeId, edgeIds]) => {
+			edgeIds.sort(compareText);
+			return { edgeIds, nodeId };
+		})
 		.sort((left, right) => compareText(left.nodeId, right.nodeId));
 }
 
@@ -886,26 +899,125 @@ function layerProvenance(
 	]);
 }
 
-export function buildCommandHandlerGraph(
-	requestValue: unknown,
+type PhaseResult<Value> =
+	| { readonly refusal: CommandHandlerGraphBuildOutcome; readonly value: null }
+	| { readonly refusal: null; readonly value: Value };
+
+interface GraphBuildRun {
+	readonly observation: ArrowCommandCensusObservation;
+	readonly progress: ProgressRecorder;
+	readonly request: BuildCommandHandlerGraphRequest;
+	readonly snapshot: StaticSemanticSnapshot;
+	readonly subject: FrozenSubject;
+}
+
+interface BoundInputs {
+	readonly commandSource: SemanticSourceRecord;
+	readonly model: GraphIndexes;
+	readonly registrySource: SemanticSourceRecord;
+}
+
+interface ArtifactInputs {
+	readonly consumedBytes: number;
+	readonly directSourceByPath: ReadonlyMap<string, SemanticSourceRecord | null>;
+	readonly pwuTableSource: SemanticSourceRecord | null;
+	readonly sourceTextById: ReadonlyMap<string, string>;
+	readonly stepTableSource: SemanticSourceRecord | null;
+}
+
+interface RegistryInputs {
+	readonly commandMembers: readonly RegistryMember[];
+	readonly registrationMembers: readonly RegistryMember[];
+}
+
+interface BindingProducts {
+	readonly commandNodeByName: ReadonlyMap<string, CommandRegistryEntryNode>;
+	readonly commandNodes: readonly CommandRegistryEntryNode[];
+	readonly derivationLayerId: CommandHandlerGraphLayerId;
+	readonly graphId: CommandHandlerGraphId;
+	readonly graphInputDigest: string;
+	readonly inferenceLayerId: CommandHandlerGraphLayerId;
+	readonly registrationNodeByName: ReadonlyMap<string, HandlerRegistrationNode>;
+	readonly registrationNodes: readonly HandlerRegistrationNode[];
+	readonly resolvedTargets: readonly ResolvedHandlerTarget[];
+	readonly targetByCommand: ReadonlyMap<string, HandlerTargetNode>;
+	readonly targetNodeById: ReadonlyMap<CommandHandlerGraphNodeId, HandlerTargetNode>;
+}
+
+interface SiteAttributionContext {
+	readonly commandNodeByName: ReadonlyMap<string, CommandRegistryEntryNode>;
+	readonly directSourceByPath: ReadonlyMap<string, SemanticSourceRecord | null>;
+	readonly directTargetsByCallable: ReadonlyMap<string, HandlerTargetNode[]>;
+	readonly factoryTargetsByCallable: ReadonlyMap<string, HandlerTargetNode[]>;
+	readonly model: GraphIndexes;
+	readonly pwuTableSource: SemanticSourceRecord | null;
+	readonly snapshot: StaticSemanticSnapshot;
+	readonly sourceTextById: ReadonlyMap<string, string>;
+	readonly stepTableSource: SemanticSourceRecord | null;
+	readonly tableMembers: ReadonlyMap<
+		'STEP_COMMAND_SPECS' | 'PWU_LIFECYCLE_COMMAND_SPECS',
+		ReadonlyMap<string, RegistryMember>
+	>;
+}
+
+interface SiteResolution {
+	attribution: CommandArrowSiteNode['attribution'];
+	candidateTargetIds: CommandHandlerGraphNodeId[];
+	exactTargetIds: CommandHandlerGraphNodeId[];
+	invocationNode: SemanticAstNodeRecord | null;
+	source: SemanticSourceRecord | null;
+}
+
+interface GraphEmitContext {
+	readonly derivationLayerId: CommandHandlerGraphLayerId;
+	readonly edges: CommandHandlerGraphEdge[];
+	readonly frontiers: CommandHandlerFrontierNode[];
+	readonly graphId: CommandHandlerGraphId;
+	readonly inferenceLayerId: CommandHandlerGraphLayerId;
+	readonly snapshot: StaticSemanticSnapshot;
+}
+
+interface GraphAccumulator {
+	readonly commandNodeByName: ReadonlyMap<string, CommandRegistryEntryNode>;
+	readonly commandsByTarget: ReadonlyMap<CommandHandlerGraphNodeId, string[]>;
+	readonly commandsWithEvidence: Set<string>;
+	readonly nodes: CommandHandlerGraphNode[];
+	readonly siteNodeByObservationId: Map<string, CommandArrowSiteNode>;
+	readonly targetNodeById: ReadonlyMap<CommandHandlerGraphNodeId, HandlerTargetNode>;
+}
+
+interface MaterializedGraph {
+	readonly coverage: CommandHandlerGraphCoverage;
+	readonly edges: CommandHandlerGraphEdge[];
+	readonly layers: readonly [CommandHandlerGraphLayer, CommandHandlerGraphLayer];
+	readonly nodes: CommandHandlerGraphNode[];
+}
+
+function readSourceText(
+	subject: FrozenSubject,
+	source: SemanticSourceRecord,
+	sourceTextById: Map<string, string>,
+	consumedPaths: Set<string>
+): string {
+	const existing = sourceTextById.get(source.id);
+	if (existing !== undefined) return existing;
+	const bytes = readFrozenSubjectArtifact(subject, source.logicalPath);
+	if (bytes === undefined) throw new Error('A consumed frozen source artifact is unavailable.');
+	if (sha256(bytes) !== source.contentSha256)
+		throw new Error('A consumed frozen source differs from its semantic content identity.');
+	const text = decodeCompilerText(bytes);
+	consumedPaths.add(source.logicalPath);
+	sourceTextById.set(source.id, text);
+	return text;
+}
+
+function graphIdentityRefusal(
+	request: BuildCommandHandlerGraphRequest,
 	snapshot: StaticSemanticSnapshot,
 	observation: ArrowCommandCensusObservation,
 	subject: FrozenSubject,
-	options?: BuildCommandHandlerGraphOptions
-): CommandHandlerGraphBuildOutcome {
-	const progress = createProgressRecorder(options);
-	progress.start('REQUEST_BIND');
-	let request: BuildCommandHandlerGraphRequest;
-	try {
-		request = materializeRequest(requestValue);
-	} catch (error) {
-		progress.fail('REQUEST_INVALID');
-		return unavailable(
-			'REQUEST_INVALID',
-			error instanceof Error ? error.message : 'Invalid command-handler graph request.',
-			'REQUEST'
-		);
-	}
+	progress: ProgressRecorder
+): CommandHandlerGraphBuildOutcome | null {
 	if (request.semanticSnapshotId !== snapshot.id) {
 		progress.fail('SEMANTIC_SNAPSHOT_ID_MISMATCH');
 		return unavailable(
@@ -952,990 +1064,1369 @@ export function buildCommandHandlerGraph(
 			'BIND'
 		);
 	}
+	return null;
+}
 
+function bindGraphRequest(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot,
+	observation: ArrowCommandCensusObservation,
+	subject: FrozenSubject,
+	progress: ProgressRecorder
+): PhaseResult<BuildCommandHandlerGraphRequest> {
+	progress.start('REQUEST_BIND');
+	let request: BuildCommandHandlerGraphRequest;
 	try {
-		const model = indexes(snapshot);
-		if (snapshot.astNodes.length > request.budgets.maxAstNodes)
-			throw new RangeError(
-				`maxAstNodes exceeded: ${snapshot.astNodes.length} > ${request.budgets.maxAstNodes}.`
-			);
-		const selectedRegistries = selectJpwbCommandHandlerRegistries(snapshot);
-		if (
-			!selectorsEqual(request.commandRegistry, selectedRegistries.commandRegistry) ||
-			!selectorsEqual(request.handlerRegistry, selectedRegistries.handlerRegistry)
-		) {
-			progress.fail('REGISTRY_SELECTOR_MISMATCH');
-			return unavailable(
+		request = materializeRequest(requestValue);
+	} catch (error) {
+		progress.fail('REQUEST_INVALID');
+		return {
+			refusal: unavailable(
+				'REQUEST_INVALID',
+				error instanceof Error ? error.message : 'Invalid command-handler graph request.',
+				'REQUEST'
+			),
+			value: null
+		};
+	}
+	const refusal = graphIdentityRefusal(request, snapshot, observation, subject, progress);
+	if (refusal !== null) return { refusal, value: null };
+	return { refusal: null, value: request };
+}
+
+function prepareBoundInputs(run: GraphBuildRun): PhaseResult<BoundInputs> {
+	const { progress, request, snapshot } = run;
+	const model = indexes(snapshot);
+	if (snapshot.astNodes.length > request.budgets.maxAstNodes)
+		throw new RangeError(
+			`maxAstNodes exceeded: ${snapshot.astNodes.length} > ${request.budgets.maxAstNodes}.`
+		);
+	const selectedRegistries = selectJpwbCommandHandlerRegistries(snapshot);
+	if (
+		!selectorsEqual(request.commandRegistry, selectedRegistries.commandRegistry) ||
+		!selectorsEqual(request.handlerRegistry, selectedRegistries.handlerRegistry)
+	) {
+		progress.fail('REGISTRY_SELECTOR_MISMATCH');
+		return {
+			refusal: unavailable(
 				'REGISTRY_SELECTOR_MISMATCH',
 				'The caller-selected registry identities do not match the independently derived semantic roots.',
 				'BIND'
-			);
-		}
-		const commandSource = model.sourceById.get(request.commandRegistry.sourceId);
-		const registrySource = model.sourceById.get(request.handlerRegistry.sourceId);
-		if (commandSource === undefined || registrySource === undefined)
-			throw new Error('A selected registry source is absent from the semantic snapshot.');
-		progress.complete({ astNodes: snapshot.astNodes.length, registrySelectors: 2 });
-
-		progress.start('OBSERVATION_VALIDATE', {
-			declaredArrowOccurrences: observation.declaredArrows.length,
-			declaredSites: observation.declaredSites.length
-		});
-		const observationValidation = validateArrowCommandCensusObservation(observation, subject);
-		if (observationValidation.state !== 'VALID') {
-			progress.fail('ARROW_OBSERVATION_INVALID');
-			return unavailable(
-				'ARROW_OBSERVATION_INVALID',
-				`The arrow observation is not valid (${observationValidation.state}).`,
-				'BIND'
-			);
-		}
-		progress.complete({ validationState: observationValidation.state });
-
-		progress.start('ARTIFACT_READ');
-		const consumedPaths = new Set<string>();
-		const sourceTextById = new Map<string, string>();
-		const textFor = (source: SemanticSourceRecord): string => {
-			const existing = sourceTextById.get(source.id);
-			if (existing !== undefined) return existing;
-			const bytes = readFrozenSubjectArtifact(subject, source.logicalPath);
-			if (bytes === undefined) throw new Error('A consumed frozen source artifact is unavailable.');
-			if (sha256(bytes) !== source.contentSha256)
-				throw new Error('A consumed frozen source differs from its semantic content identity.');
-			const text = decodeCompilerText(bytes);
-			consumedPaths.add(source.logicalPath);
-			sourceTextById.set(source.id, text);
-			return text;
-		};
-		textFor(commandSource);
-		textFor(registrySource);
-		const directSourceByPath = new Map<string, SemanticSourceRecord | null>();
-		for (const site of observation.declaredSites)
-			if (
-				site.source.path !== null &&
-				site.source.line !== null &&
-				!directSourceByPath.has(site.source.path)
-			) {
-				const candidates = ownedSources(
-					snapshot,
-					model,
-					site.source.path,
-					HANDLER_REGISTRY_PROJECT
-				);
-				const source = candidates.length === 1 ? candidates[0]! : null;
-				directSourceByPath.set(site.source.path, source);
-				if (source !== null) textFor(source);
-			}
-		const needsStepTable = observation.declaredSites.some((site) =>
-			site.source.locator.startsWith('STEP_COMMAND_SPECS.')
-		);
-		const needsPwuTable = observation.declaredSites.some((site) =>
-			site.source.locator.startsWith('PWU_LIFECYCLE_COMMAND_SPECS.')
-		);
-		const stepTableSources = needsStepTable
-			? ownedSources(snapshot, model, STEP_COMMAND_SPEC_PATH, DOMAIN_PROJECT)
-			: [];
-		const pwuTableSources = needsPwuTable
-			? ownedSources(snapshot, model, PWU_COMMAND_SPEC_PATH, DOMAIN_PROJECT)
-			: [];
-		const stepTableSource = stepTableSources.length === 1 ? stepTableSources[0]! : null;
-		const pwuTableSource = pwuTableSources.length === 1 ? pwuTableSources[0]! : null;
-		if (stepTableSource !== null) textFor(stepTableSource);
-		if (pwuTableSource !== null) textFor(pwuTableSource);
-		const consumedBytes = [...consumedPaths].reduce((total, path) => {
-			const artifact = subject.artifacts.find((item) => item.path === path);
-			return total + (artifact?.bytes ?? 0);
-		}, 0);
-		if (consumedBytes > request.budgets.maxSourceBytes)
-			throw new RangeError(
-				`maxSourceBytes exceeded: ${consumedBytes} > ${request.budgets.maxSourceBytes}.`
-			);
-		progress.complete({ sourceBytes: consumedBytes, sourceFiles: consumedPaths.size });
-
-		progress.start('CONTRACT_PARSE');
-		const commandMembers = namedObjectRegistry(snapshot, model, commandSource, 'COMMANDS');
-		if (commandMembers.length > request.budgets.maxCommandRegistryEntries)
-			throw new RangeError(
-				`maxCommandRegistryEntries exceeded: ${commandMembers.length} > ${request.budgets.maxCommandRegistryEntries}.`
-			);
-		if (commandMembers.length === 0)
-			throw new Error('The selected JPWB COMMANDS registry is unexpectedly empty.');
-		progress.complete({ commandRegistryEntries: commandMembers.length });
-
-		progress.start('REGISTRY_PARSE');
-		const registrationMembers = namedObjectRegistry(snapshot, model, registrySource, 'HANDLERS');
-		if (registrationMembers.length > request.budgets.maxHandlerRegistryEntries)
-			throw new RangeError(
-				`maxHandlerRegistryEntries exceeded: ${registrationMembers.length} > ${request.budgets.maxHandlerRegistryEntries}.`
-			);
-		if (registrationMembers.length === 0)
-			throw new Error('The selected JPWB HANDLERS registry is unexpectedly empty.');
-		progress.complete({ handlerRegistryEntries: registrationMembers.length });
-
-		progress.start('BINDING_RESOLVE');
-		const handlerBindings = resolveHandlerBindings(registrationMembers, model);
-		const graphInputDigest = commandHandlerGraphInputDigest(request, snapshot, observation);
-		const graphId = commandHandlerGraphId({
-			arrowObservationId: observation.id,
-			canonicalProfile: COMMAND_HANDLER_GRAPH_CANONICAL_PROFILE,
-			graphInputDigest,
-			method: COMMAND_HANDLER_GRAPH_METHOD,
-			operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
-			schemaVersion: COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
-			semanticSnapshotId: snapshot.id,
-			subjectId: snapshot.subjectId
-		});
-		const derivationLayerId = commandHandlerDerivationLayerId(graphId);
-		const inferenceLayerId = commandHandlerInferenceLayerId(graphId);
-		const commandNodes = commandMembers.map((member): CommandRegistryEntryNode => ({
-			commandName: member.commandName,
-			declarationId: member.declaration?.id ?? null,
-			graphId,
-			id: commandRegistryEntryNodeId(graphId, member.propertyNode.id),
-			kind: 'COMMAND_REGISTRY_ENTRY',
-			layerId: derivationLayerId,
-			nameNodeId: member.nameNode.id,
-			programId: commandSource.programId,
-			projectId: commandSource.projectId,
-			propertyNodeId: member.propertyNode.id,
-			provenanceIds: declarationProvenance(member.declaration, commandSource),
-			semanticSnapshotId: snapshot.id,
-			sourceId: commandSource.id,
-			sourceLocations: [
-				{ end: member.nameNode.end, sourceId: commandSource.id, start: member.nameNode.start }
-			],
-			subjectId: snapshot.subjectId
-		}));
-		const commandNodeByName = new Map(commandNodes.map((node) => [node.commandName, node]));
-		const registrationNodes = handlerBindings.map((binding): HandlerRegistrationNode => ({
-			commandName: binding.member.commandName,
-			graphId,
-			handlerAliasSymbolId: binding.reference?.symbolId ?? null,
-			handlerName: binding.handlerName,
-			handlerTerminalSymbolId: binding.reference?.resolvedSymbolId ?? null,
-			id: handlerRegistrationNodeId(graphId, binding.member.propertyNode.id),
-			kind: 'HANDLER_REGISTRATION',
-			layerId: derivationLayerId,
-			nameNodeId: binding.member.nameNode.id,
-			programId: registrySource.programId,
-			projectId: registrySource.projectId,
-			propertyNodeId: binding.member.propertyNode.id,
-			provenanceIds: referenceProvenance(binding.reference, binding.handlerSymbol, registrySource),
-			semanticSnapshotId: snapshot.id,
-			sourceId: registrySource.id,
-			sourceLocations: [
-				{
-					end: binding.member.propertyNode.end,
-					sourceId: registrySource.id,
-					start: binding.member.propertyNode.start
-				}
-			],
-			subjectId: snapshot.subjectId,
-			targetNodeId: binding.member.valueNode.id,
-			targetReferenceId: binding.reference?.id ?? null
-		}));
-		const registrationNodeByName = new Map(
-			registrationNodes.map((node) => [node.commandName, node])
-		);
-		const targetNodeById = new Map<CommandHandlerGraphNodeId, HandlerTargetNode>();
-		const resolvedTargets: ResolvedHandlerTarget[] = [];
-		const targetByCommand = new Map<string, HandlerTargetNode>();
-		for (const binding of handlerBindings) {
-			if (binding.handlerSymbol === null || binding.implementationNode === null) continue;
-			const implementationSource = model.sourceById.get(binding.implementationNode.sourceId);
-			if (implementationSource === undefined)
-				throw new Error('A resolved handler target source is absent.');
-			const id = handlerTargetNodeId(graphId, {
-				nodeId: binding.implementationNode.id,
-				symbolId: binding.handlerSymbol.id
-			});
-			const candidate: HandlerTargetNode = {
-				bodyKind:
-					binding.implementationState === 'DIRECT'
-						? 'DIRECT_FUNCTION'
-						: 'FACTORY_CALL_RESULT_CANDIDATE',
-				declarationIds: [...binding.handlerSymbol.declarationIds].sort(compareText),
-				graphId,
-				handlerName: binding.handlerSymbol.name,
-				id,
-				kind: 'HANDLER_TARGET',
-				layerId: binding.implementationState === 'DIRECT' ? derivationLayerId : inferenceLayerId,
-				nodeId: binding.implementationNode.id,
-				programId: implementationSource.programId,
-				projectId: implementationSource.projectId,
-				provenanceIds: sortedUnique([
-					...sourceProvenance(implementationSource),
-					binding.handlerSymbol.provenanceId
-				]),
-				semanticSnapshotId: snapshot.id,
-				sourceId: implementationSource.id,
-				sourceLocations: [
-					{
-						end: binding.implementationNode.end,
-						sourceId: implementationSource.id,
-						start: binding.implementationNode.start
-					}
-				],
-				subjectId: snapshot.subjectId,
-				symbolId: binding.handlerSymbol.id
-			};
-			const existing = targetNodeById.get(id);
-			if (
-				existing !== undefined &&
-				(existing.bodyKind !== candidate.bodyKind ||
-					existing.handlerName !== candidate.handlerName ||
-					existing.sourceId !== candidate.sourceId)
-			)
-				throw new Error('One handler-target identity produced incompatible normalized values.');
-			const node = existing ?? candidate;
-			targetNodeById.set(id, node);
-			targetByCommand.set(binding.member.commandName, node);
-			resolvedTargets.push({ binding, node });
-		}
-		progress.complete({
-			directTargets: [...targetNodeById.values()].filter(
-				(node) => node.bodyKind === 'DIRECT_FUNCTION'
-			).length,
-			factoryCandidateTargets: [...targetNodeById.values()].filter(
-				(node) => node.bodyKind === 'FACTORY_CALL_RESULT_CANDIDATE'
-			).length,
-			resolvedRegistrations: targetByCommand.size,
-			unresolvedRegistrations: handlerBindings.length - targetByCommand.size
-		});
-
-		progress.start('SITE_ATTRIBUTION');
-		const directTargetsByCallable = new Map<string, HandlerTargetNode[]>();
-		const factoryTargetsByCallable = new Map<string, HandlerTargetNode[]>();
-		for (const resolved of resolvedTargets) {
-			if (resolved.binding.implementationState === 'DIRECT')
-				addGrouped(directTargetsByCallable, resolved.node.nodeId, resolved.node);
-			else if (resolved.binding.factoryCallableNodeId !== null)
-				addGrouped(factoryTargetsByCallable, resolved.binding.factoryCallableNodeId, resolved.node);
-		}
-		const tableMembers = new Map<
-			'STEP_COMMAND_SPECS' | 'PWU_LIFECYCLE_COMMAND_SPECS',
-			ReadonlyMap<string, RegistryMember>
-		>();
-		if (stepTableSource !== null)
-			tableMembers.set(
-				'STEP_COMMAND_SPECS',
-				new Map(
-					namedObjectRegistry(snapshot, model, stepTableSource, 'STEP_COMMAND_SPECS').map(
-						(member) => [member.commandName, member]
-					)
-				)
-			);
-		if (pwuTableSource !== null)
-			tableMembers.set(
-				'PWU_LIFECYCLE_COMMAND_SPECS',
-				new Map(
-					namedObjectRegistry(snapshot, model, pwuTableSource, 'PWU_LIFECYCLE_COMMAND_SPECS').map(
-						(member) => [member.commandName, member]
-					)
-				)
-			);
-		const siteProjections: SiteProjection[] = [];
-		for (const site of observation.declaredSites) {
-			const table = /^(STEP_COMMAND_SPECS|PWU_LIFECYCLE_COMMAND_SPECS)\.([^\s.]+)$/u.exec(
-				site.source.locator
-			);
-			if (table !== null) {
-				const tableName = table[1] as 'STEP_COMMAND_SPECS' | 'PWU_LIFECYCLE_COMMAND_SPECS';
-				const commandName = table[2]!;
-				const tableSource = tableName === 'STEP_COMMAND_SPECS' ? stepTableSource : pwuTableSource;
-				const member = tableMembers.get(tableName)?.get(commandName) ?? null;
-				const exact = commandNodeByName.has(commandName) && tableSource !== null && member !== null;
-				siteProjections.push({
-					attribution: exact ? 'TABLE_COMMAND' : 'UNRESOLVED',
-					candidateTargetIds: [],
-					commandName,
-					exactTargetIds: [],
-					observation: site,
-					provenanceIds: tableSource === null ? [] : sourceProvenance(tableSource),
-					semanticSiteNodeId: member?.propertyNode.id ?? null,
-					sourceId: tableSource?.id ?? null,
-					sourceLocations:
-						tableSource === null || member === null
-							? []
-							: [
-									{
-										end: member.propertyNode.end,
-										sourceId: tableSource.id,
-										start: member.propertyNode.start
-									}
-								]
-				});
-				continue;
-			}
-			let source: SemanticSourceRecord | null = null;
-			let invocationNode: SemanticAstNodeRecord | null = null;
-			let attribution: CommandArrowSiteNode['attribution'] = 'UNRESOLVED';
-			let exactTargetIds: CommandHandlerGraphNodeId[] = [];
-			let candidateTargetIds: CommandHandlerGraphNodeId[] = [];
-			if (site.source.path !== null && site.source.line !== null) {
-				source = directSourceByPath.get(site.source.path) ?? null;
-				if (source !== null) {
-					const text = sourceTextById.get(source.id);
-					if (text === undefined) throw new Error('A verified handler source text is absent.');
-					const invocations = snapshot.invocations.filter((invocation) => {
-						if (invocation.sourceId !== source!.id) return false;
-						const node = model.nodeById.get(invocation.nodeId);
-						const callee = model.nodeById.get(invocation.calleeNodeId);
-						return (
-							node !== undefined &&
-							callee?.syntacticIdentifierText === 'advanceStatus' &&
-							lineAt(text, node.start) === site.source.line
-						);
-					});
-					if (invocations.length === 1) {
-						invocationNode = model.nodeById.get(invocations[0]!.nodeId) ?? null;
-						if (invocationNode !== null) {
-							const ancestors = callableAncestors(invocationNode, model);
-							const direct =
-								ancestors.length === 0 ? [] : (directTargetsByCallable.get(ancestors[0]!.id) ?? []);
-							if (direct.length > 0) {
-								attribution = 'DIRECT_HANDLER';
-								exactTargetIds = sortedUnique(direct.map((node) => node.id));
-							} else {
-								const candidates = ancestors.flatMap(
-									(ancestor) => factoryTargetsByCallable.get(ancestor.id) ?? []
-								);
-								if (candidates.length > 0) {
-									attribution = 'FACTORY_SHARED';
-									candidateTargetIds = sortedUnique(candidates.map((node) => node.id));
-								}
-							}
-						}
-					}
-				}
-			}
-			siteProjections.push({
-				attribution,
-				candidateTargetIds,
-				commandName: null,
-				exactTargetIds,
-				observation: site,
-				provenanceIds: source === null ? [] : sourceProvenance(source),
-				semanticSiteNodeId: invocationNode?.id ?? null,
-				sourceId: source?.id ?? null,
-				sourceLocations:
-					source === null || invocationNode === null
-						? []
-						: [{ end: invocationNode.end, sourceId: source.id, start: invocationNode.start }]
-			});
-		}
-		progress.complete({
-			directHandlerSites: siteProjections.filter((site) => site.attribution === 'DIRECT_HANDLER')
-				.length,
-			factorySharedSites: siteProjections.filter((site) => site.attribution === 'FACTORY_SHARED')
-				.length,
-			tableCommandSites: siteProjections.filter((site) => site.attribution === 'TABLE_COMMAND')
-				.length,
-			unresolvedSites: siteProjections.filter((site) => site.attribution === 'UNRESOLVED').length
-		});
-
-		progress.start('GRAPH_MATERIALIZE');
-		const nodes: CommandHandlerGraphNode[] = [
-			...commandNodes,
-			...registrationNodes,
-			...targetNodeById.values()
-		];
-		const edges: CommandHandlerGraphEdge[] = [];
-		const frontiers: CommandHandlerFrontierNode[] = [];
-		const commandsWithEvidence = new Set<string>();
-		const commandsByTarget = new Map<CommandHandlerGraphNodeId, string[]>();
-		for (const [commandName, target] of targetByCommand)
-			addGrouped(commandsByTarget, target.id, commandName);
-
-		const addCommandRegistrationEdge = (
-			source: CommandRegistryEntryNode,
-			target: HandlerRegistrationNode
-		): void => {
-			const identity = {
-				attribution: 'EXACT' as const,
-				graphId,
-				inferenceBasis: null,
-				relationCode: 'IMPL-JPWB-CH-COMMAND-REGISTRATION-001' as const,
-				relationKind: 'COMMAND_REGISTRY_ENTRY_TO_HANDLER_REGISTRATION' as const,
-				source: { kind: 'COMMAND_REGISTRY_ENTRY' as const, nodeId: source.id },
-				target: { kind: 'HANDLER_REGISTRATION' as const, nodeId: target.id }
-			};
-			edges.push({
-				...identity,
-				id: commandHandlerGraphEdgeId(identity),
-				layerId: derivationLayerId,
-				method: COMMAND_HANDLER_GRAPH_METHOD,
-				provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-				subjectId: snapshot.subjectId
-			});
-		};
-		const addRegistrationTargetEdge = (
-			source: HandlerRegistrationNode,
-			target: HandlerTargetNode,
-			inferenceBasis: CommandHandlerInferenceBasis | null
-		): void => {
-			const attribution = inferenceBasis === null ? ('EXACT' as const) : ('CANDIDATE' as const);
-			const identity = {
-				attribution,
-				graphId,
-				inferenceBasis,
-				relationCode: 'IMPL-JPWB-CH-REGISTRATION-TARGET-001' as const,
-				relationKind: 'HANDLER_REGISTRATION_TO_TARGET' as const,
-				source: { kind: 'HANDLER_REGISTRATION' as const, nodeId: source.id },
-				target: { kind: 'HANDLER_TARGET' as const, nodeId: target.id }
-			};
-			if (inferenceBasis === null) {
-				edges.push({
-					...identity,
-					attribution: 'EXACT',
-					id: commandHandlerGraphEdgeId({ ...identity, attribution: 'EXACT' }),
-					inferenceBasis: null,
-					layerId: derivationLayerId,
-					method: COMMAND_HANDLER_GRAPH_METHOD,
-					provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-					semanticSnapshotId: snapshot.id,
-					sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-					subjectId: snapshot.subjectId
-				});
-			} else
-				edges.push({
-					...identity,
-					attribution: 'CANDIDATE',
-					id: commandHandlerGraphEdgeId({ ...identity, attribution: 'CANDIDATE' }),
-					inferenceBasis,
-					layerId: inferenceLayerId,
-					method: COMMAND_HANDLER_GRAPH_METHOD,
-					provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-					semanticSnapshotId: snapshot.id,
-					sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-					subjectId: snapshot.subjectId
-				});
-		};
-		const addTargetSiteEdge = (
-			source: HandlerTargetNode,
-			target: CommandArrowSiteNode,
-			inferenceBasis: CommandHandlerInferenceBasis | null
-		): void => {
-			const attribution = inferenceBasis === null ? ('EXACT' as const) : ('CANDIDATE' as const);
-			const identity = {
-				attribution,
-				graphId,
-				inferenceBasis,
-				relationCode: 'IMPL-JPWB-CH-TARGET-ARROW-SITE-001' as const,
-				relationKind: 'HANDLER_TARGET_TO_ARROW_SITE' as const,
-				source: { kind: 'HANDLER_TARGET' as const, nodeId: source.id },
-				target: { kind: 'DECLARED_ARROW_SITE' as const, nodeId: target.id }
-			};
-			if (inferenceBasis === null)
-				edges.push({
-					...identity,
-					attribution: 'EXACT',
-					id: commandHandlerGraphEdgeId({ ...identity, attribution: 'EXACT' }),
-					inferenceBasis: null,
-					layerId: derivationLayerId,
-					method: COMMAND_HANDLER_GRAPH_METHOD,
-					provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-					semanticSnapshotId: snapshot.id,
-					sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-					subjectId: snapshot.subjectId
-				});
-			else
-				edges.push({
-					...identity,
-					attribution: 'CANDIDATE',
-					id: commandHandlerGraphEdgeId({ ...identity, attribution: 'CANDIDATE' }),
-					inferenceBasis,
-					layerId: inferenceLayerId,
-					method: COMMAND_HANDLER_GRAPH_METHOD,
-					provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-					semanticSnapshotId: snapshot.id,
-					sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-					subjectId: snapshot.subjectId
-				});
-		};
-		const addCommandTableSiteEdge = (
-			source: CommandRegistryEntryNode,
-			target: CommandArrowSiteNode
-		): void => {
-			const identity = {
-				attribution: 'EXACT' as const,
-				graphId,
-				inferenceBasis: null,
-				relationCode: 'IMPL-JPWB-CH-COMMAND-TABLE-SITE-001' as const,
-				relationKind: 'COMMAND_REGISTRY_ENTRY_TO_TABLE_ARROW_SITE' as const,
-				source: { kind: 'COMMAND_REGISTRY_ENTRY' as const, nodeId: source.id },
-				target: { kind: 'DECLARED_ARROW_SITE' as const, nodeId: target.id }
-			};
-			edges.push({
-				...identity,
-				id: commandHandlerGraphEdgeId(identity),
-				layerId: derivationLayerId,
-				method: COMMAND_HANDLER_GRAPH_METHOD,
-				provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-				subjectId: snapshot.subjectId
-			});
-		};
-		const addSiteOccurrenceEdge = (
-			source: CommandArrowSiteNode,
-			target: CommandArrowOccurrenceNode
-		): void => {
-			const identity = {
-				attribution: 'EXACT' as const,
-				graphId,
-				inferenceBasis: null,
-				relationCode: 'IMPL-JPWB-CH-SITE-ARROW-001' as const,
-				relationKind: 'ARROW_SITE_TO_OCCURRENCE' as const,
-				source: { kind: 'DECLARED_ARROW_SITE' as const, nodeId: source.id },
-				target: { kind: 'DECLARED_ARROW_OCCURRENCE' as const, nodeId: target.id }
-			};
-			edges.push({
-				...identity,
-				id: commandHandlerGraphEdgeId(identity),
-				layerId: derivationLayerId,
-				method: COMMAND_HANDLER_GRAPH_METHOD,
-				provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
-				subjectId: snapshot.subjectId
-			});
-		};
-		const addCommandFrontier = (
-			frontierKind: 'COMMAND_WITHOUT_DECLARED_ARROW_EVIDENCE' | 'MISSING_HANDLER_REGISTRATION',
-			command: CommandRegistryEntryNode,
-			reason: string
-		): void => {
-			const identity = { commandNodeId: command.id, frontierKind };
-			frontiers.push({
-				...identity,
-				graphId,
-				id: commandHandlerFrontierNodeId(graphId, identity),
-				kind: 'FRONTIER',
-				layerId: inferenceLayerId,
-				provenanceIds: command.provenanceIds,
-				reason,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: command.sourceLocations,
-				subjectId: snapshot.subjectId
-			});
-		};
-		const addRegistrationFrontier = (
-			frontierKind:
-				| 'FACTORY_HANDLER_TARGET_NOT_CONFIRMED'
-				| 'UNDECLARED_HANDLER_REGISTRATION'
-				| 'UNRESOLVED_HANDLER_TARGET',
-			registration: HandlerRegistrationNode,
-			reason: string
-		): void => {
-			const identity = { frontierKind, registrationNodeId: registration.id };
-			frontiers.push({
-				...identity,
-				graphId,
-				id: commandHandlerFrontierNodeId(graphId, identity),
-				kind: 'FRONTIER',
-				layerId: inferenceLayerId,
-				provenanceIds: registration.provenanceIds,
-				reason,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: registration.sourceLocations,
-				subjectId: snapshot.subjectId
-			});
-		};
-		const addSiteFrontier = (
-			frontierKind: 'FACTORY_SITE_ATTRIBUTION_AMBIGUOUS' | 'SITE_OWNER_NOT_REGISTERED_HANDLER',
-			site: CommandArrowSiteNode,
-			reason: string
-		): void => {
-			const identity = { frontierKind, siteNodeId: site.id };
-			frontiers.push({
-				...identity,
-				graphId,
-				id: commandHandlerFrontierNodeId(graphId, identity),
-				kind: 'FRONTIER',
-				layerId: inferenceLayerId,
-				provenanceIds: site.provenanceIds,
-				reason,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: site.sourceLocations,
-				subjectId: snapshot.subjectId
-			});
-		};
-
-		for (const command of commandNodes) {
-			const registration = registrationNodeByName.get(command.commandName);
-			if (registration === undefined)
-				addCommandFrontier(
-					'MISSING_HANDLER_REGISTRATION',
-					command,
-					'The declared command has no static HANDLERS registry entry.'
-				);
-			else addCommandRegistrationEdge(command, registration);
-		}
-		for (const registration of registrationNodes) {
-			if (!commandNodeByName.has(registration.commandName))
-				addRegistrationFrontier(
-					'UNDECLARED_HANDLER_REGISTRATION',
-					registration,
-					'The HANDLERS registry entry has no declared COMMANDS key.'
-				);
-			const target = targetByCommand.get(registration.commandName);
-			if (target === undefined) {
-				addRegistrationFrontier(
-					'UNRESOLVED_HANDLER_TARGET',
-					registration,
-					'The registered handler does not resolve to one supported normalized callable target.'
-				);
-				continue;
-			}
-			if (target.bodyKind === 'DIRECT_FUNCTION')
-				addRegistrationTargetEdge(registration, target, null);
-			else {
-				const inferenceBasis: CommandHandlerInferenceBasis = {
-					assumptions: ['The registered factory call returns a callable command handler.'],
-					limitationKinds: ['FACTORY_ARROW_ATTRIBUTION_OPEN'],
-					method: COMMAND_HANDLER_GRAPH_METHOD,
-					rationale:
-						'The registry initializer is a compiler-resolved factory call, but callable return-value flow is not modeled.',
-					supportingInputIds: sortedUnique([
-						registration.propertyNodeId,
-						registration.targetNodeId,
-						...(registration.targetReferenceId === null ? [] : [registration.targetReferenceId]),
-						target.nodeId,
-						target.symbolId
-					])
-				};
-				addRegistrationTargetEdge(registration, target, inferenceBasis);
-				addRegistrationFrontier(
-					'FACTORY_HANDLER_TARGET_NOT_CONFIRMED',
-					registration,
-					'The registry initializer is a factory call; its returned callable is represented only as a candidate target.'
-				);
-			}
-		}
-
-		const siteNodeByObservationId = new Map<string, CommandArrowSiteNode>();
-		for (const projection of siteProjections) {
-			const siteNode: CommandArrowSiteNode = {
-				attribution: projection.attribution,
-				graphId,
-				id: commandArrowSiteNodeId(graphId, projection.observation.id),
-				kind: 'DECLARED_ARROW_SITE',
-				layerId: derivationLayerId,
-				observationSiteId: projection.observation.id,
-				observationSource: { ...projection.observation.source },
-				provenanceIds: [...projection.provenanceIds].sort(compareText),
-				semanticSiteNodeId: projection.semanticSiteNodeId,
-				semanticSnapshotId: snapshot.id,
-				sourceId: projection.sourceId,
-				sourceLocations: [...projection.sourceLocations],
-				subjectId: snapshot.subjectId
-			};
-			nodes.push(siteNode);
-			siteNodeByObservationId.set(projection.observation.id, siteNode);
-			if (projection.attribution === 'TABLE_COMMAND' && projection.commandName !== null) {
-				const command = commandNodeByName.get(projection.commandName);
-				if (command === undefined)
-					throw new Error('An exact table attribution has no represented command.');
-				addCommandTableSiteEdge(command, siteNode);
-				commandsWithEvidence.add(command.commandName);
-			} else if (projection.attribution === 'DIRECT_HANDLER') {
-				for (const targetId of projection.exactTargetIds) {
-					const target = targetNodeById.get(targetId);
-					if (target === undefined || target.bodyKind !== 'DIRECT_FUNCTION')
-						throw new Error('A direct site attribution has no direct handler target.');
-					addTargetSiteEdge(target, siteNode, null);
-					for (const commandName of commandsByTarget.get(target.id) ?? [])
-						commandsWithEvidence.add(commandName);
-				}
-			} else if (projection.attribution === 'FACTORY_SHARED') {
-				for (const targetId of projection.candidateTargetIds) {
-					const target = targetNodeById.get(targetId);
-					if (target === undefined || target.bodyKind !== 'FACTORY_CALL_RESULT_CANDIDATE')
-						throw new Error('A factory site attribution has no factory-result candidate target.');
-					const inferenceBasis: CommandHandlerInferenceBasis = {
-						assumptions: [
-							'A retained arrow site inside the shared factory may belong to this registered factory result.'
-						],
-						limitationKinds: ['FACTORY_ARROW_ATTRIBUTION_OPEN'],
-						method: COMMAND_HANDLER_GRAPH_METHOD,
-						rationale:
-							'The site is lexically enclosed by the resolved factory callable, but retained pooled literals cannot partition occurrences by factory instance.',
-						supportingInputIds: sortedUnique([
-							target.nodeId,
-							target.symbolId,
-							siteNode.observationSiteId,
-							...(siteNode.semanticSiteNodeId === null ? [] : [siteNode.semanticSiteNodeId])
-						])
-					};
-					addTargetSiteEdge(target, siteNode, inferenceBasis);
-					for (const commandName of commandsByTarget.get(target.id) ?? [])
-						commandsWithEvidence.add(commandName);
-				}
-				addSiteFrontier(
-					'FACTORY_SITE_ATTRIBUTION_AMBIGUOUS',
-					siteNode,
-					'The retained site is inside a shared factory and pooled arrow ranges cannot be partitioned among factory instances.'
-				);
-			} else
-				addSiteFrontier(
-					'SITE_OWNER_NOT_REGISTERED_HANDLER',
-					siteNode,
-					'The retained source site does not resolve to one supported registered handler or exact command table entry.'
-				);
-		}
-
-		for (const arrow of observation.declaredArrows) {
-			const siteNode = siteNodeByObservationId.get(arrow.siteId);
-			if (siteNode === undefined) throw new Error('A declared arrow has no represented site.');
-			const occurrence: CommandArrowOccurrenceNode = {
-				arrowKey: arrow.arrowKey,
-				from: arrow.from,
-				graphId,
-				id: commandArrowOccurrenceNodeId(graphId, arrow.id),
-				kind: 'DECLARED_ARROW_OCCURRENCE',
-				layerId: derivationLayerId,
-				machine: arrow.machine,
-				observationArrowId: arrow.id,
-				observationSiteId: arrow.siteId,
-				ordinalAtSite: arrow.ordinalAtSite,
-				provenanceIds: siteNode.provenanceIds,
-				semanticSnapshotId: snapshot.id,
-				sourceLocations: siteNode.sourceLocations,
-				subjectId: snapshot.subjectId,
-				to: arrow.to
-			};
-			nodes.push(occurrence);
-			addSiteOccurrenceEdge(siteNode, occurrence);
-		}
-
-		for (const command of commandNodes)
-			if (!commandsWithEvidence.has(command.commandName))
-				addCommandFrontier(
-					'COMMAND_WITHOUT_DECLARED_ARROW_EVIDENCE',
-					command,
-					'The retained arrow census reports no attributable transition declaration for this command; no absence-of-effect conclusion follows.'
-				);
-		nodes.push(...frontiers);
-		nodes.sort((left, right) => compareText(left.id, right.id));
-		edges.sort((left, right) => compareText(left.id, right.id));
-		enforceBudgets(request, {
-			astNodes: snapshot.astNodes.length,
-			commandRegistryEntries: commandMembers.length,
-			edges: edges.length,
-			frontiers: frontiers.length,
-			handlerRegistryEntries: registrationMembers.length,
-			nodes: nodes.length,
-			sourceBytes: consumedBytes
-		});
-		const missingHandlerRegistrations = commandNodes.filter(
-			(command) => !registrationNodeByName.has(command.commandName)
-		).length;
-		const undeclaredHandlerRegistrations = registrationNodes.filter(
-			(registration) => !commandNodeByName.has(registration.commandName)
-		).length;
-		const exactCommandRegistrations = commandNodes.length - missingHandlerRegistrations;
-		const exactEdges = edges.filter((edge) => edge.attribution === 'EXACT').length;
-		const candidateEdges = edges.length - exactEdges;
-		const coverage: CommandHandlerGraphCoverage = {
-			arrowAttributionClosure: 'OPEN',
-			candidateEdges,
-			commandRegistryClosure:
-				missingHandlerRegistrations === 0 && undeclaredHandlerRegistrations === 0
-					? 'CLOSED'
-					: 'OPEN',
-			commandsWithArrowEvidence: commandsWithEvidence.size,
-			commandsWithoutArrowEvidence: commandNodes.length - commandsWithEvidence.size,
-			directHandlerArrowSites: siteProjections.filter(
-				(site) => site.attribution === 'DIRECT_HANDLER'
-			).length,
-			discoveredArrowOccurrences: observation.declaredArrows.length,
-			discoveredArrowSites: observation.declaredSites.length,
-			discoveredCommandRegistryEntries: commandMembers.length,
-			discoveredHandlerRegistryEntries: registrationMembers.length,
-			edges: edges.length,
-			exactCommandRegistrations,
-			exactEdges,
-			factorySharedArrowSites: siteProjections.filter(
-				(site) => site.attribution === 'FACTORY_SHARED'
-			).length,
-			frontierNodes: frontiers.length,
-			handlerTargets: targetNodeById.size,
-			missingHandlerRegistrations,
-			reconciles:
-				exactCommandRegistrations + missingHandlerRegistrations === commandMembers.length &&
-				exactCommandRegistrations + undeclaredHandlerRegistrations === registrationMembers.length &&
-				siteNodeByObservationId.size === observation.declaredSites.length &&
-				edges.filter((edge) => edge.relationKind === 'ARROW_SITE_TO_OCCURRENCE').length ===
-					observation.declaredArrows.length,
-			representedArrowOccurrences: nodes.filter((node) => node.kind === 'DECLARED_ARROW_OCCURRENCE')
-				.length,
-			representedArrowSites: siteNodeByObservationId.size,
-			representedCommandRegistryEntries: commandNodes.length,
-			representedHandlerRegistryEntries: registrationNodes.length,
-			tableCommandArrowSites: siteProjections.filter((site) => site.attribution === 'TABLE_COMMAND')
-				.length,
-			undeclaredHandlerRegistrations
-		};
-		if (!coverage.reconciles) throw new Error('Command-handler graph coverage does not reconcile.');
-		for (const provenanceId of sortedUnique(nodes.flatMap((node) => node.provenanceIds)))
-			if (!model.provenances.has(provenanceId))
-				throw new Error('The graph references an unknown semantic provenance.');
-		const derivationNodes = nodes.filter((node) => node.layerId === derivationLayerId);
-		const inferenceNodes = nodes.filter((node) => node.layerId === inferenceLayerId);
-		const derivationEdges = edges.filter((edge) => edge.layerId === derivationLayerId);
-		const inferenceEdges = edges.filter((edge) => edge.layerId === inferenceLayerId);
-		if (
-			derivationNodes.length + inferenceNodes.length !== nodes.length ||
-			derivationEdges.length + inferenceEdges.length !== edges.length
-		)
-			throw new Error('Command-handler graph layers do not partition their populations.');
-		const makeLayer = (
-			layerId: CommandHandlerGraphLayerId,
-			kind: CommandHandlerGraphLayer['kind'],
-			layerNodes: readonly CommandHandlerGraphNode[],
-			layerEdges: readonly CommandHandlerGraphEdge[]
-		): CommandHandlerGraphLayer => {
-			const common = {
-				capabilityStatus: COMMAND_HANDLER_GRAPH_CAPABILITY_STATUS,
-				coverage,
-				edgeIds: layerEdges.map((edge) => edge.id),
-				graphId,
-				id: layerId,
-				limitations: COMMAND_HANDLER_GRAPH_LIMITATIONS.map((item) => ({ ...item })),
-				method: COMMAND_HANDLER_GRAPH_METHOD,
-				nodeIds: layerNodes.map((node) => node.id),
-				producer: { ...snapshot.provider },
-				provenanceIds: layerProvenance(layerNodes, layerEdges),
-				registryStatus: COMMAND_HANDLER_GRAPH_REGISTRY_STATUS,
-				semanticSnapshotId: snapshot.id,
-				subjectId: snapshot.subjectId
-			};
-			return kind === 'JPWB_COMMAND_HANDLER_DERIVATION'
-				? {
-						...common,
-						capability: COMMAND_HANDLER_GRAPH_DERIVATION_CAPABILITY,
-						kind,
-						ordinal: 0
-					}
-				: {
-						...common,
-						capability: COMMAND_HANDLER_GRAPH_INFERENCE_CAPABILITY,
-						kind,
-						ordinal: 1
-					};
-		};
-		const layers = [
-			makeLayer(
-				derivationLayerId,
-				'JPWB_COMMAND_HANDLER_DERIVATION',
-				derivationNodes,
-				derivationEdges
 			),
-			makeLayer(inferenceLayerId, 'JPWB_COMMAND_HANDLER_INFERENCE', inferenceNodes, inferenceEdges)
-		] as const;
-		progress.complete({
-			candidateEdges,
-			edges: edges.length,
-			exactEdges,
-			frontiers: frontiers.length,
-			nodes: nodes.length
-		});
-
-		progress.start('SERIALIZE');
-		const content = {
-			arrowObservationId: observation.id,
-			authorityTransfer: COMMAND_HANDLER_GRAPH_AUTHORITY_TRANSFER,
-			baselineChange: COMMAND_HANDLER_GRAPH_BASELINE_CHANGE,
-			budgets: { ...request.budgets },
-			canonicalProfile: COMMAND_HANDLER_GRAPH_CANONICAL_PROFILE,
-			capabilities: [
-				COMMAND_HANDLER_GRAPH_DERIVATION_CAPABILITY,
-				COMMAND_HANDLER_GRAPH_INFERENCE_CAPABILITY
-			] as const,
-			capabilityStatus: COMMAND_HANDLER_GRAPH_CAPABILITY_STATUS,
-			commandDispatchCensusIntegration: COMMAND_HANDLER_GRAPH_COMMAND_DISPATCH_CENSUS_INTEGRATION,
-			commandRegistry: { ...request.commandRegistry },
-			coverage,
-			edges,
-			forwardIndex: makeIndexes(nodes, edges, 'FORWARD'),
-			fullJanCsaa007Conformance: COMMAND_HANDLER_GRAPH_FULL_JAN_CSAA_007_CONFORMANCE,
-			fullJanCsaa008Conformance: COMMAND_HANDLER_GRAPH_FULL_JAN_CSAA_008_CONFORMANCE,
-			gateEffect: COMMAND_HANDLER_GRAPH_GATE_EFFECT,
-			graphAuthority: COMMAND_HANDLER_GRAPH_GRAPH_AUTHORITY,
-			graphInputDigest,
-			graphKind: 'JPWB_COMMAND_HANDLER_STATIC_PROJECTION' as const,
-			handlerRegistry: { ...request.handlerRegistry },
-			health: 'PARTIAL' as const,
-			id: graphId,
-			integrationStrategy: COMMAND_HANDLER_GRAPH_INTEGRATION_STRATEGY,
-			layers,
-			limitations: COMMAND_HANDLER_GRAPH_LIMITATIONS.map((item) => ({ ...item })),
-			method: COMMAND_HANDLER_GRAPH_METHOD,
-			nodes,
-			operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
-			oracleChange: COMMAND_HANDLER_GRAPH_ORACLE_CHANGE,
-			producer: { ...snapshot.provider },
-			registryStatus: COMMAND_HANDLER_GRAPH_REGISTRY_STATUS,
-			replacementEquivalence: COMMAND_HANDLER_GRAPH_REPLACEMENT_EQUIVALENCE,
-			retainedArrowVerifierAuthority: COMMAND_HANDLER_GRAPH_RETAINED_ARROW_VERIFIER_AUTHORITY,
-			reverseIndex: makeIndexes(nodes, edges, 'REVERSE'),
-			runtimeDispatchClosure: COMMAND_HANDLER_GRAPH_RUNTIME_DISPATCH_CLOSURE,
-			runtimePerformability: COMMAND_HANDLER_GRAPH_RUNTIME_PERFORMABILITY,
-			schemaVersion: COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
-			scope: COMMAND_HANDLER_GRAPH_SCOPE,
-			semanticExtractionVersion: snapshot.extractionVersion,
-			semanticSchemaVersion: snapshot.schemaVersion,
-			semanticSnapshotId: snapshot.id,
-			subjectId: snapshot.subjectId
+			value: null
 		};
-		const graph = { ...content, contentDigest: commandHandlerGraphContentDigest(content) };
-		const canonicalBytes = new TextEncoder().encode(JSON.stringify(graph)).byteLength;
-		progress.complete({
-			canonicalBytes
-		});
+	}
+	const commandSource = model.sourceById.get(request.commandRegistry.sourceId);
+	const registrySource = model.sourceById.get(request.handlerRegistry.sourceId);
+	if (commandSource === undefined || registrySource === undefined)
+		throw new Error('A selected registry source is absent from the semantic snapshot.');
+	progress.complete({ astNodes: snapshot.astNodes.length, registrySelectors: 2 });
+	return { refusal: null, value: { commandSource, model, registrySource } };
+}
 
-		progress.start('GRAPH_VALIDATE', { edges: graph.edges.length, nodes: graph.nodes.length });
-		const validation = validateConstructedCommandHandlerGraph(
-			graph,
-			snapshot,
-			observation,
-			subject,
-			graphInputDigest,
-			{
-				maxIssues: 1_000,
-				// These are validator traversal guards over the already materialized graph wire, not
-				// aliases for the independent graph-population or consumed-source budgets.
-				maxRecords: Math.max(1, canonicalBytes),
-				maxStringCharacters: Math.max(1, canonicalBytes)
-			}
+function validateObservationPhase(run: GraphBuildRun): CommandHandlerGraphBuildOutcome | null {
+	const { observation, progress, subject } = run;
+	progress.start('OBSERVATION_VALIDATE', {
+		declaredArrowOccurrences: observation.declaredArrows.length,
+		declaredSites: observation.declaredSites.length
+	});
+	const observationValidation = validateArrowCommandCensusObservation(observation, subject);
+	if (observationValidation.state !== 'VALID') {
+		progress.fail('ARROW_OBSERVATION_INVALID');
+		return unavailable(
+			'ARROW_OBSERVATION_INVALID',
+			`The arrow observation is not valid (${observationValidation.state}).`,
+			'BIND'
 		);
-		if (validation.state !== 'VALID') {
-			progress.fail('GRAPH_VALIDATION_FAILED');
-			const issueSummary = validation.issues
-				.slice(0, 3)
-				.map((issue) => `${issue.code}@${issue.path}: ${issue.message}`)
-				.join(', ');
-			return unavailable(
-				'GRAPH_VALIDATION_FAILED',
-				`Constructed command-handler graph failed validation (${validation.state}${issueSummary.length === 0 ? '' : `: ${issueSummary}`}).`,
-				'VALIDATE'
+	}
+	progress.complete({ validationState: observationValidation.state });
+	return null;
+}
+
+function indexDirectSources(
+	run: GraphBuildRun,
+	inputs: BoundInputs,
+	sourceTextById: Map<string, string>,
+	consumedPaths: Set<string>
+): Map<string, SemanticSourceRecord | null> {
+	const { observation, snapshot, subject } = run;
+	const directSourceByPath = new Map<string, SemanticSourceRecord | null>();
+	for (const site of observation.declaredSites)
+		if (
+			site.source.path !== null &&
+			site.source.line !== null &&
+			!directSourceByPath.has(site.source.path)
+		) {
+			const candidates = ownedSources(
+				snapshot,
+				inputs.model,
+				site.source.path,
+				HANDLER_REGISTRY_PROJECT
+			);
+			const source = candidates.length === 1 ? candidates[0]! : null;
+			directSourceByPath.set(site.source.path, source);
+			if (source !== null) readSourceText(subject, source, sourceTextById, consumedPaths);
+		}
+	return directSourceByPath;
+}
+
+function readGraphArtifacts(run: GraphBuildRun, inputs: BoundInputs): ArtifactInputs {
+	const { observation, progress, request, snapshot, subject } = run;
+	progress.start('ARTIFACT_READ');
+	const consumedPaths = new Set<string>();
+	const sourceTextById = new Map<string, string>();
+	readSourceText(subject, inputs.commandSource, sourceTextById, consumedPaths);
+	readSourceText(subject, inputs.registrySource, sourceTextById, consumedPaths);
+	const directSourceByPath = indexDirectSources(run, inputs, sourceTextById, consumedPaths);
+	const needsStepTable = observation.declaredSites.some((site) =>
+		site.source.locator.startsWith('STEP_COMMAND_SPECS.')
+	);
+	const needsPwuTable = observation.declaredSites.some((site) =>
+		site.source.locator.startsWith('PWU_LIFECYCLE_COMMAND_SPECS.')
+	);
+	const stepTableSources = needsStepTable
+		? ownedSources(snapshot, inputs.model, STEP_COMMAND_SPEC_PATH, DOMAIN_PROJECT)
+		: [];
+	const pwuTableSources = needsPwuTable
+		? ownedSources(snapshot, inputs.model, PWU_COMMAND_SPEC_PATH, DOMAIN_PROJECT)
+		: [];
+	const stepTableSource = stepTableSources.length === 1 ? stepTableSources[0]! : null;
+	const pwuTableSource = pwuTableSources.length === 1 ? pwuTableSources[0]! : null;
+	if (stepTableSource !== null)
+		readSourceText(subject, stepTableSource, sourceTextById, consumedPaths);
+	if (pwuTableSource !== null)
+		readSourceText(subject, pwuTableSource, sourceTextById, consumedPaths);
+	const consumedBytes = [...consumedPaths].reduce((total, path) => {
+		const artifact = subject.artifacts.find((item) => item.path === path);
+		return total + (artifact?.bytes ?? 0);
+	}, 0);
+	if (consumedBytes > request.budgets.maxSourceBytes)
+		throw new RangeError(
+			`maxSourceBytes exceeded: ${consumedBytes} > ${request.budgets.maxSourceBytes}.`
+		);
+	progress.complete({ sourceBytes: consumedBytes, sourceFiles: consumedPaths.size });
+	return { consumedBytes, directSourceByPath, pwuTableSource, sourceTextById, stepTableSource };
+}
+
+function parseRegistries(run: GraphBuildRun, inputs: BoundInputs): RegistryInputs {
+	const { progress, request, snapshot } = run;
+	const { commandSource, model, registrySource } = inputs;
+	progress.start('CONTRACT_PARSE');
+	const commandMembers = namedObjectRegistry(snapshot, model, commandSource, 'COMMANDS');
+	if (commandMembers.length > request.budgets.maxCommandRegistryEntries)
+		throw new RangeError(
+			`maxCommandRegistryEntries exceeded: ${commandMembers.length} > ${request.budgets.maxCommandRegistryEntries}.`
+		);
+	if (commandMembers.length === 0)
+		throw new Error('The selected JPWB COMMANDS registry is unexpectedly empty.');
+	progress.complete({ commandRegistryEntries: commandMembers.length });
+
+	progress.start('REGISTRY_PARSE');
+	const registrationMembers = namedObjectRegistry(snapshot, model, registrySource, 'HANDLERS');
+	if (registrationMembers.length > request.budgets.maxHandlerRegistryEntries)
+		throw new RangeError(
+			`maxHandlerRegistryEntries exceeded: ${registrationMembers.length} > ${request.budgets.maxHandlerRegistryEntries}.`
+		);
+	if (registrationMembers.length === 0)
+		throw new Error('The selected JPWB HANDLERS registry is unexpectedly empty.');
+	progress.complete({ handlerRegistryEntries: registrationMembers.length });
+	return { commandMembers, registrationMembers };
+}
+
+interface GraphIdentity {
+	readonly derivationLayerId: CommandHandlerGraphLayerId;
+	readonly graphId: CommandHandlerGraphId;
+	readonly inferenceLayerId: CommandHandlerGraphLayerId;
+}
+
+function handlerTargetCandidate(
+	binding: HandlerBinding,
+	handlerSymbol: SemanticSymbolRecord,
+	implementationNode: SemanticAstNodeRecord,
+	implementationSource: SemanticSourceRecord,
+	snapshot: StaticSemanticSnapshot,
+	identity: GraphIdentity
+): HandlerTargetNode {
+	return {
+		bodyKind:
+			binding.implementationState === 'DIRECT'
+				? 'DIRECT_FUNCTION'
+				: 'FACTORY_CALL_RESULT_CANDIDATE',
+		declarationIds: [...handlerSymbol.declarationIds].sort(compareText),
+		graphId: identity.graphId,
+		handlerName: handlerSymbol.name,
+		id: handlerTargetNodeId(identity.graphId, {
+			nodeId: implementationNode.id,
+			symbolId: handlerSymbol.id
+		}),
+		kind: 'HANDLER_TARGET',
+		layerId:
+			binding.implementationState === 'DIRECT'
+				? identity.derivationLayerId
+				: identity.inferenceLayerId,
+		nodeId: implementationNode.id,
+		programId: implementationSource.programId,
+		projectId: implementationSource.projectId,
+		provenanceIds: sortedUnique([
+			...sourceProvenance(implementationSource),
+			handlerSymbol.provenanceId
+		]),
+		semanticSnapshotId: snapshot.id,
+		sourceId: implementationSource.id,
+		sourceLocations: [
+			{
+				end: implementationNode.end,
+				sourceId: implementationSource.id,
+				start: implementationNode.start
+			}
+		],
+		subjectId: snapshot.subjectId,
+		symbolId: handlerSymbol.id
+	};
+}
+
+function collectHandlerTargets(
+	handlerBindings: readonly HandlerBinding[],
+	snapshot: StaticSemanticSnapshot,
+	model: GraphIndexes,
+	identity: GraphIdentity
+): {
+	readonly resolvedTargets: ResolvedHandlerTarget[];
+	readonly targetByCommand: Map<string, HandlerTargetNode>;
+	readonly targetNodeById: Map<CommandHandlerGraphNodeId, HandlerTargetNode>;
+} {
+	const targetNodeById = new Map<CommandHandlerGraphNodeId, HandlerTargetNode>();
+	const resolvedTargets: ResolvedHandlerTarget[] = [];
+	const targetByCommand = new Map<string, HandlerTargetNode>();
+	for (const binding of handlerBindings) {
+		if (binding.handlerSymbol === null || binding.implementationNode === null) continue;
+		const implementationSource = model.sourceById.get(binding.implementationNode.sourceId);
+		if (implementationSource === undefined)
+			throw new Error('A resolved handler target source is absent.');
+		const candidate = handlerTargetCandidate(
+			binding,
+			binding.handlerSymbol,
+			binding.implementationNode,
+			implementationSource,
+			snapshot,
+			identity
+		);
+		const existing = targetNodeById.get(candidate.id);
+		if (
+			existing !== undefined &&
+			(existing.bodyKind !== candidate.bodyKind ||
+				existing.handlerName !== candidate.handlerName ||
+				existing.sourceId !== candidate.sourceId)
+		)
+			throw new Error('One handler-target identity produced incompatible normalized values.');
+		const node = existing ?? candidate;
+		targetNodeById.set(candidate.id, node);
+		targetByCommand.set(binding.member.commandName, node);
+		resolvedTargets.push({ binding, node });
+	}
+	return { resolvedTargets, targetByCommand, targetNodeById };
+}
+
+function resolveGraphBindings(
+	run: GraphBuildRun,
+	inputs: BoundInputs,
+	registries: RegistryInputs
+): BindingProducts {
+	const { observation, progress, request, snapshot } = run;
+	const { commandSource, model, registrySource } = inputs;
+	const { commandMembers, registrationMembers } = registries;
+	progress.start('BINDING_RESOLVE');
+	const handlerBindings = resolveHandlerBindings(registrationMembers, model);
+	const graphInputDigest = commandHandlerGraphInputDigest(request, snapshot, observation);
+	const graphId = commandHandlerGraphId({
+		arrowObservationId: observation.id,
+		canonicalProfile: COMMAND_HANDLER_GRAPH_CANONICAL_PROFILE,
+		graphInputDigest,
+		method: COMMAND_HANDLER_GRAPH_METHOD,
+		operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+		schemaVersion: COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
+		semanticSnapshotId: snapshot.id,
+		subjectId: snapshot.subjectId
+	});
+	const derivationLayerId = commandHandlerDerivationLayerId(graphId);
+	const inferenceLayerId = commandHandlerInferenceLayerId(graphId);
+	const commandNodes = commandMembers.map((member): CommandRegistryEntryNode => ({
+		commandName: member.commandName,
+		declarationId: member.declaration?.id ?? null,
+		graphId,
+		id: commandRegistryEntryNodeId(graphId, member.propertyNode.id),
+		kind: 'COMMAND_REGISTRY_ENTRY',
+		layerId: derivationLayerId,
+		nameNodeId: member.nameNode.id,
+		programId: commandSource.programId,
+		projectId: commandSource.projectId,
+		propertyNodeId: member.propertyNode.id,
+		provenanceIds: declarationProvenance(member.declaration, commandSource),
+		semanticSnapshotId: snapshot.id,
+		sourceId: commandSource.id,
+		sourceLocations: [
+			{ end: member.nameNode.end, sourceId: commandSource.id, start: member.nameNode.start }
+		],
+		subjectId: snapshot.subjectId
+	}));
+	const commandNodeByName = new Map(commandNodes.map((node) => [node.commandName, node]));
+	const registrationNodes = handlerBindings.map((binding): HandlerRegistrationNode => ({
+		commandName: binding.member.commandName,
+		graphId,
+		handlerAliasSymbolId: binding.reference?.symbolId ?? null,
+		handlerName: binding.handlerName,
+		handlerTerminalSymbolId: binding.reference?.resolvedSymbolId ?? null,
+		id: handlerRegistrationNodeId(graphId, binding.member.propertyNode.id),
+		kind: 'HANDLER_REGISTRATION',
+		layerId: derivationLayerId,
+		nameNodeId: binding.member.nameNode.id,
+		programId: registrySource.programId,
+		projectId: registrySource.projectId,
+		propertyNodeId: binding.member.propertyNode.id,
+		provenanceIds: referenceProvenance(binding.reference, binding.handlerSymbol, registrySource),
+		semanticSnapshotId: snapshot.id,
+		sourceId: registrySource.id,
+		sourceLocations: [
+			{
+				end: binding.member.propertyNode.end,
+				sourceId: registrySource.id,
+				start: binding.member.propertyNode.start
+			}
+		],
+		subjectId: snapshot.subjectId,
+		targetNodeId: binding.member.valueNode.id,
+		targetReferenceId: binding.reference?.id ?? null
+	}));
+	const registrationNodeByName = new Map(registrationNodes.map((node) => [node.commandName, node]));
+	const identity: GraphIdentity = { derivationLayerId, graphId, inferenceLayerId };
+	const { resolvedTargets, targetByCommand, targetNodeById } = collectHandlerTargets(
+		handlerBindings,
+		snapshot,
+		model,
+		identity
+	);
+	progress.complete({
+		directTargets: [...targetNodeById.values()].filter(
+			(node) => node.bodyKind === 'DIRECT_FUNCTION'
+		).length,
+		factoryCandidateTargets: [...targetNodeById.values()].filter(
+			(node) => node.bodyKind === 'FACTORY_CALL_RESULT_CANDIDATE'
+		).length,
+		resolvedRegistrations: targetByCommand.size,
+		unresolvedRegistrations: handlerBindings.length - targetByCommand.size
+	});
+	return {
+		commandNodeByName,
+		commandNodes,
+		derivationLayerId,
+		graphId,
+		graphInputDigest,
+		inferenceLayerId,
+		registrationNodeByName,
+		registrationNodes,
+		resolvedTargets,
+		targetByCommand,
+		targetNodeById
+	};
+}
+
+function tableSiteProjection(
+	context: SiteAttributionContext,
+	site: ArrowCommandCensusObservation['declaredSites'][number],
+	tableName: 'STEP_COMMAND_SPECS' | 'PWU_LIFECYCLE_COMMAND_SPECS',
+	commandName: string
+): SiteProjection {
+	const tableSource =
+		tableName === 'STEP_COMMAND_SPECS' ? context.stepTableSource : context.pwuTableSource;
+	const member = context.tableMembers.get(tableName)?.get(commandName) ?? null;
+	const exact =
+		context.commandNodeByName.has(commandName) && tableSource !== null && member !== null;
+	return {
+		attribution: exact ? 'TABLE_COMMAND' : 'UNRESOLVED',
+		candidateTargetIds: [],
+		commandName,
+		exactTargetIds: [],
+		observation: site,
+		provenanceIds: tableSource === null ? [] : sourceProvenance(tableSource),
+		semanticSiteNodeId: member?.propertyNode.id ?? null,
+		sourceId: tableSource?.id ?? null,
+		sourceLocations:
+			tableSource === null || member === null
+				? []
+				: [
+						{
+							end: member.propertyNode.end,
+							sourceId: tableSource.id,
+							start: member.propertyNode.start
+						}
+					]
+	};
+}
+
+function applySiteAttribution(
+	context: SiteAttributionContext,
+	resolution: SiteResolution,
+	ancestors: readonly SemanticAstNodeRecord[]
+): void {
+	const direct =
+		ancestors.length === 0 ? [] : (context.directTargetsByCallable.get(ancestors[0]!.id) ?? []);
+	if (direct.length > 0) {
+		resolution.attribution = 'DIRECT_HANDLER';
+		resolution.exactTargetIds = sortedUnique(direct.map((node) => node.id));
+		return;
+	}
+	const candidates = ancestors.flatMap(
+		(ancestor) => context.factoryTargetsByCallable.get(ancestor.id) ?? []
+	);
+	if (candidates.length > 0) {
+		resolution.attribution = 'FACTORY_SHARED';
+		resolution.candidateTargetIds = sortedUnique(candidates.map((node) => node.id));
+	}
+}
+
+function resolveDeclaredSiteOwner(
+	context: SiteAttributionContext,
+	site: ArrowCommandCensusObservation['declaredSites'][number],
+	resolution: SiteResolution,
+	source: SemanticSourceRecord
+): void {
+	const text = context.sourceTextById.get(source.id);
+	if (text === undefined) throw new Error('A verified handler source text is absent.');
+	const invocations = context.snapshot.invocations.filter((invocation) => {
+		if (invocation.sourceId !== source.id) return false;
+		const node = context.model.nodeById.get(invocation.nodeId);
+		const callee = context.model.nodeById.get(invocation.calleeNodeId);
+		return (
+			node !== undefined &&
+			callee?.syntacticIdentifierText === 'advanceStatus' &&
+			lineAt(text, node.start) === site.source.line
+		);
+	});
+	if (invocations.length !== 1) return;
+	const invocationNode = context.model.nodeById.get(invocations[0]!.nodeId) ?? null;
+	resolution.invocationNode = invocationNode;
+	if (invocationNode === null) return;
+	applySiteAttribution(context, resolution, callableAncestors(invocationNode, context.model));
+}
+
+function directSiteProjection(
+	context: SiteAttributionContext,
+	site: ArrowCommandCensusObservation['declaredSites'][number]
+): SiteProjection {
+	const resolution: SiteResolution = {
+		attribution: 'UNRESOLVED',
+		candidateTargetIds: [],
+		exactTargetIds: [],
+		invocationNode: null,
+		source: null
+	};
+	if (site.source.path !== null && site.source.line !== null) {
+		const located = context.directSourceByPath.get(site.source.path) ?? null;
+		resolution.source = located;
+		if (located !== null) resolveDeclaredSiteOwner(context, site, resolution, located);
+	}
+	const { attribution, candidateTargetIds, exactTargetIds, invocationNode, source } = resolution;
+	return {
+		attribution,
+		candidateTargetIds,
+		commandName: null,
+		exactTargetIds,
+		observation: site,
+		provenanceIds: source === null ? [] : sourceProvenance(source),
+		semanticSiteNodeId: invocationNode?.id ?? null,
+		sourceId: source?.id ?? null,
+		sourceLocations:
+			source === null || invocationNode === null
+				? []
+				: [{ end: invocationNode.end, sourceId: source.id, start: invocationNode.start }]
+	};
+}
+
+function attributeArrowSites(
+	run: GraphBuildRun,
+	inputs: BoundInputs,
+	artifacts: ArtifactInputs,
+	bindings: BindingProducts
+): SiteProjection[] {
+	const { observation, progress, snapshot } = run;
+	const { model } = inputs;
+	const { pwuTableSource, stepTableSource } = artifacts;
+	progress.start('SITE_ATTRIBUTION');
+	const directTargetsByCallable = new Map<string, HandlerTargetNode[]>();
+	const factoryTargetsByCallable = new Map<string, HandlerTargetNode[]>();
+	for (const resolved of bindings.resolvedTargets) {
+		if (resolved.binding.implementationState === 'DIRECT')
+			addGrouped(directTargetsByCallable, resolved.node.nodeId, resolved.node);
+		else if (resolved.binding.factoryCallableNodeId !== null)
+			addGrouped(factoryTargetsByCallable, resolved.binding.factoryCallableNodeId, resolved.node);
+	}
+	const tableMembers = new Map<
+		'STEP_COMMAND_SPECS' | 'PWU_LIFECYCLE_COMMAND_SPECS',
+		ReadonlyMap<string, RegistryMember>
+	>();
+	if (stepTableSource !== null)
+		tableMembers.set(
+			'STEP_COMMAND_SPECS',
+			new Map(
+				namedObjectRegistry(snapshot, model, stepTableSource, 'STEP_COMMAND_SPECS').map(
+					(member) => [member.commandName, member]
+				)
+			)
+		);
+	if (pwuTableSource !== null)
+		tableMembers.set(
+			'PWU_LIFECYCLE_COMMAND_SPECS',
+			new Map(
+				namedObjectRegistry(snapshot, model, pwuTableSource, 'PWU_LIFECYCLE_COMMAND_SPECS').map(
+					(member) => [member.commandName, member]
+				)
+			)
+		);
+	const context: SiteAttributionContext = {
+		commandNodeByName: bindings.commandNodeByName,
+		directSourceByPath: artifacts.directSourceByPath,
+		directTargetsByCallable,
+		factoryTargetsByCallable,
+		model,
+		pwuTableSource,
+		snapshot,
+		sourceTextById: artifacts.sourceTextById,
+		stepTableSource,
+		tableMembers
+	};
+	const siteProjections: SiteProjection[] = [];
+	for (const site of observation.declaredSites) {
+		const table = /^(STEP_COMMAND_SPECS|PWU_LIFECYCLE_COMMAND_SPECS)\.([^\s.]+)$/u.exec(
+			site.source.locator
+		);
+		if (table === null) {
+			siteProjections.push(directSiteProjection(context, site));
+			continue;
+		}
+		const tableName = table[1] as 'STEP_COMMAND_SPECS' | 'PWU_LIFECYCLE_COMMAND_SPECS';
+		siteProjections.push(tableSiteProjection(context, site, tableName, table[2]!));
+	}
+	progress.complete({
+		directHandlerSites: siteProjections.filter((site) => site.attribution === 'DIRECT_HANDLER')
+			.length,
+		factorySharedSites: siteProjections.filter((site) => site.attribution === 'FACTORY_SHARED')
+			.length,
+		tableCommandSites: siteProjections.filter((site) => site.attribution === 'TABLE_COMMAND')
+			.length,
+		unresolvedSites: siteProjections.filter((site) => site.attribution === 'UNRESOLVED').length
+	});
+	return siteProjections;
+}
+
+function emitCommandRegistrationEdge(
+	emit: GraphEmitContext,
+	source: CommandRegistryEntryNode,
+	target: HandlerRegistrationNode
+): void {
+	const identity = {
+		attribution: 'EXACT' as const,
+		graphId: emit.graphId,
+		inferenceBasis: null,
+		relationCode: 'IMPL-JPWB-CH-COMMAND-REGISTRATION-001' as const,
+		relationKind: 'COMMAND_REGISTRY_ENTRY_TO_HANDLER_REGISTRATION' as const,
+		source: { kind: 'COMMAND_REGISTRY_ENTRY' as const, nodeId: source.id },
+		target: { kind: 'HANDLER_REGISTRATION' as const, nodeId: target.id }
+	};
+	emit.edges.push({
+		...identity,
+		id: commandHandlerGraphEdgeId(identity),
+		layerId: emit.derivationLayerId,
+		method: COMMAND_HANDLER_GRAPH_METHOD,
+		provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+		semanticSnapshotId: emit.snapshot.id,
+		sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+		subjectId: emit.snapshot.subjectId
+	});
+}
+
+function emitRegistrationTargetEdge(
+	emit: GraphEmitContext,
+	source: HandlerRegistrationNode,
+	target: HandlerTargetNode,
+	inferenceBasis: CommandHandlerInferenceBasis | null
+): void {
+	const attribution = inferenceBasis === null ? ('EXACT' as const) : ('CANDIDATE' as const);
+	const identity = {
+		attribution,
+		graphId: emit.graphId,
+		inferenceBasis,
+		relationCode: 'IMPL-JPWB-CH-REGISTRATION-TARGET-001' as const,
+		relationKind: 'HANDLER_REGISTRATION_TO_TARGET' as const,
+		source: { kind: 'HANDLER_REGISTRATION' as const, nodeId: source.id },
+		target: { kind: 'HANDLER_TARGET' as const, nodeId: target.id }
+	};
+	if (inferenceBasis === null) {
+		emit.edges.push({
+			...identity,
+			attribution: 'EXACT',
+			id: commandHandlerGraphEdgeId({ ...identity, attribution: 'EXACT' }),
+			inferenceBasis: null,
+			layerId: emit.derivationLayerId,
+			method: COMMAND_HANDLER_GRAPH_METHOD,
+			provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+			semanticSnapshotId: emit.snapshot.id,
+			sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+			subjectId: emit.snapshot.subjectId
+		});
+	} else
+		emit.edges.push({
+			...identity,
+			attribution: 'CANDIDATE',
+			id: commandHandlerGraphEdgeId({ ...identity, attribution: 'CANDIDATE' }),
+			inferenceBasis,
+			layerId: emit.inferenceLayerId,
+			method: COMMAND_HANDLER_GRAPH_METHOD,
+			provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+			semanticSnapshotId: emit.snapshot.id,
+			sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+			subjectId: emit.snapshot.subjectId
+		});
+}
+
+function emitTargetSiteEdge(
+	emit: GraphEmitContext,
+	source: HandlerTargetNode,
+	target: CommandArrowSiteNode,
+	inferenceBasis: CommandHandlerInferenceBasis | null
+): void {
+	const attribution = inferenceBasis === null ? ('EXACT' as const) : ('CANDIDATE' as const);
+	const identity = {
+		attribution,
+		graphId: emit.graphId,
+		inferenceBasis,
+		relationCode: 'IMPL-JPWB-CH-TARGET-ARROW-SITE-001' as const,
+		relationKind: 'HANDLER_TARGET_TO_ARROW_SITE' as const,
+		source: { kind: 'HANDLER_TARGET' as const, nodeId: source.id },
+		target: { kind: 'DECLARED_ARROW_SITE' as const, nodeId: target.id }
+	};
+	if (inferenceBasis === null)
+		emit.edges.push({
+			...identity,
+			attribution: 'EXACT',
+			id: commandHandlerGraphEdgeId({ ...identity, attribution: 'EXACT' }),
+			inferenceBasis: null,
+			layerId: emit.derivationLayerId,
+			method: COMMAND_HANDLER_GRAPH_METHOD,
+			provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+			semanticSnapshotId: emit.snapshot.id,
+			sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+			subjectId: emit.snapshot.subjectId
+		});
+	else
+		emit.edges.push({
+			...identity,
+			attribution: 'CANDIDATE',
+			id: commandHandlerGraphEdgeId({ ...identity, attribution: 'CANDIDATE' }),
+			inferenceBasis,
+			layerId: emit.inferenceLayerId,
+			method: COMMAND_HANDLER_GRAPH_METHOD,
+			provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+			semanticSnapshotId: emit.snapshot.id,
+			sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+			subjectId: emit.snapshot.subjectId
+		});
+}
+
+function emitCommandTableSiteEdge(
+	emit: GraphEmitContext,
+	source: CommandRegistryEntryNode,
+	target: CommandArrowSiteNode
+): void {
+	const identity = {
+		attribution: 'EXACT' as const,
+		graphId: emit.graphId,
+		inferenceBasis: null,
+		relationCode: 'IMPL-JPWB-CH-COMMAND-TABLE-SITE-001' as const,
+		relationKind: 'COMMAND_REGISTRY_ENTRY_TO_TABLE_ARROW_SITE' as const,
+		source: { kind: 'COMMAND_REGISTRY_ENTRY' as const, nodeId: source.id },
+		target: { kind: 'DECLARED_ARROW_SITE' as const, nodeId: target.id }
+	};
+	emit.edges.push({
+		...identity,
+		id: commandHandlerGraphEdgeId(identity),
+		layerId: emit.derivationLayerId,
+		method: COMMAND_HANDLER_GRAPH_METHOD,
+		provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+		semanticSnapshotId: emit.snapshot.id,
+		sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+		subjectId: emit.snapshot.subjectId
+	});
+}
+
+function emitSiteOccurrenceEdge(
+	emit: GraphEmitContext,
+	source: CommandArrowSiteNode,
+	target: CommandArrowOccurrenceNode
+): void {
+	const identity = {
+		attribution: 'EXACT' as const,
+		graphId: emit.graphId,
+		inferenceBasis: null,
+		relationCode: 'IMPL-JPWB-CH-SITE-ARROW-001' as const,
+		relationKind: 'ARROW_SITE_TO_OCCURRENCE' as const,
+		source: { kind: 'DECLARED_ARROW_SITE' as const, nodeId: source.id },
+		target: { kind: 'DECLARED_ARROW_OCCURRENCE' as const, nodeId: target.id }
+	};
+	emit.edges.push({
+		...identity,
+		id: commandHandlerGraphEdgeId(identity),
+		layerId: emit.derivationLayerId,
+		method: COMMAND_HANDLER_GRAPH_METHOD,
+		provenanceIds: sortedUnique([...source.provenanceIds, ...target.provenanceIds]),
+		semanticSnapshotId: emit.snapshot.id,
+		sourceLocations: mergeLocations(source.sourceLocations, target.sourceLocations),
+		subjectId: emit.snapshot.subjectId
+	});
+}
+
+function emitCommandFrontier(
+	emit: GraphEmitContext,
+	frontierKind: 'COMMAND_WITHOUT_DECLARED_ARROW_EVIDENCE' | 'MISSING_HANDLER_REGISTRATION',
+	command: CommandRegistryEntryNode,
+	reason: string
+): void {
+	const identity = { commandNodeId: command.id, frontierKind };
+	emit.frontiers.push({
+		...identity,
+		graphId: emit.graphId,
+		id: commandHandlerFrontierNodeId(emit.graphId, identity),
+		kind: 'FRONTIER',
+		layerId: emit.inferenceLayerId,
+		provenanceIds: command.provenanceIds,
+		reason,
+		semanticSnapshotId: emit.snapshot.id,
+		sourceLocations: command.sourceLocations,
+		subjectId: emit.snapshot.subjectId
+	});
+}
+
+function emitRegistrationFrontier(
+	emit: GraphEmitContext,
+	frontierKind:
+		| 'FACTORY_HANDLER_TARGET_NOT_CONFIRMED'
+		| 'UNDECLARED_HANDLER_REGISTRATION'
+		| 'UNRESOLVED_HANDLER_TARGET',
+	registration: HandlerRegistrationNode,
+	reason: string
+): void {
+	const identity = { frontierKind, registrationNodeId: registration.id };
+	emit.frontiers.push({
+		...identity,
+		graphId: emit.graphId,
+		id: commandHandlerFrontierNodeId(emit.graphId, identity),
+		kind: 'FRONTIER',
+		layerId: emit.inferenceLayerId,
+		provenanceIds: registration.provenanceIds,
+		reason,
+		semanticSnapshotId: emit.snapshot.id,
+		sourceLocations: registration.sourceLocations,
+		subjectId: emit.snapshot.subjectId
+	});
+}
+
+function emitSiteFrontier(
+	emit: GraphEmitContext,
+	frontierKind: 'FACTORY_SITE_ATTRIBUTION_AMBIGUOUS' | 'SITE_OWNER_NOT_REGISTERED_HANDLER',
+	site: CommandArrowSiteNode,
+	reason: string
+): void {
+	const identity = { frontierKind, siteNodeId: site.id };
+	emit.frontiers.push({
+		...identity,
+		graphId: emit.graphId,
+		id: commandHandlerFrontierNodeId(emit.graphId, identity),
+		kind: 'FRONTIER',
+		layerId: emit.inferenceLayerId,
+		provenanceIds: site.provenanceIds,
+		reason,
+		semanticSnapshotId: emit.snapshot.id,
+		sourceLocations: site.sourceLocations,
+		subjectId: emit.snapshot.subjectId
+	});
+}
+
+function emitCommandRegistrationEdges(
+	emit: GraphEmitContext,
+	commandNodes: readonly CommandRegistryEntryNode[],
+	registrationNodeByName: ReadonlyMap<string, HandlerRegistrationNode>
+): void {
+	for (const command of commandNodes) {
+		const registration = registrationNodeByName.get(command.commandName);
+		if (registration === undefined)
+			emitCommandFrontier(
+				emit,
+				'MISSING_HANDLER_REGISTRATION',
+				command,
+				'The declared command has no static HANDLERS registry entry.'
+			);
+		else emitCommandRegistrationEdge(emit, command, registration);
+	}
+}
+
+function emitRegistrationTargetEdges(
+	emit: GraphEmitContext,
+	registrationNodes: readonly HandlerRegistrationNode[],
+	commandNodeByName: ReadonlyMap<string, CommandRegistryEntryNode>,
+	targetByCommand: ReadonlyMap<string, HandlerTargetNode>
+): void {
+	for (const registration of registrationNodes) {
+		if (!commandNodeByName.has(registration.commandName))
+			emitRegistrationFrontier(
+				emit,
+				'UNDECLARED_HANDLER_REGISTRATION',
+				registration,
+				'The HANDLERS registry entry has no declared COMMANDS key.'
+			);
+		const target = targetByCommand.get(registration.commandName);
+		if (target === undefined) {
+			emitRegistrationFrontier(
+				emit,
+				'UNRESOLVED_HANDLER_TARGET',
+				registration,
+				'The registered handler does not resolve to one supported normalized callable target.'
+			);
+			continue;
+		}
+		if (target.bodyKind === 'DIRECT_FUNCTION')
+			emitRegistrationTargetEdge(emit, registration, target, null);
+		else {
+			const inferenceBasis: CommandHandlerInferenceBasis = {
+				assumptions: ['The registered factory call returns a callable command handler.'],
+				limitationKinds: ['FACTORY_ARROW_ATTRIBUTION_OPEN'],
+				method: COMMAND_HANDLER_GRAPH_METHOD,
+				rationale:
+					'The registry initializer is a compiler-resolved factory call, but callable return-value flow is not modeled.',
+				supportingInputIds: sortedUnique([
+					registration.propertyNodeId,
+					registration.targetNodeId,
+					...(registration.targetReferenceId === null ? [] : [registration.targetReferenceId]),
+					target.nodeId,
+					target.symbolId
+				])
+			};
+			emitRegistrationTargetEdge(emit, registration, target, inferenceBasis);
+			emitRegistrationFrontier(
+				emit,
+				'FACTORY_HANDLER_TARGET_NOT_CONFIRMED',
+				registration,
+				'The registry initializer is a factory call; its returned callable is represented only as a candidate target.'
 			);
 		}
-		progress.complete({ validationState: validation.state });
-		return {
-			diagnostics: [
-				diagnostic(
-					'GRAPH_PARTIAL',
-					'The projection closes supported static command registrations while retaining explicit factory, arrow-attribution, and runtime frontiers.',
-					'VALIDATE'
-				)
+	}
+}
+
+function emitDirectHandlerSiteEdges(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	projection: SiteProjection,
+	siteNode: CommandArrowSiteNode
+): void {
+	for (const targetId of projection.exactTargetIds) {
+		const target = accumulator.targetNodeById.get(targetId);
+		if (target?.bodyKind !== 'DIRECT_FUNCTION')
+			throw new Error('A direct site attribution has no direct handler target.');
+		emitTargetSiteEdge(emit, target, siteNode, null);
+		for (const commandName of accumulator.commandsByTarget.get(target.id) ?? [])
+			accumulator.commandsWithEvidence.add(commandName);
+	}
+}
+
+function emitFactorySharedSiteEdges(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	projection: SiteProjection,
+	siteNode: CommandArrowSiteNode
+): void {
+	for (const targetId of projection.candidateTargetIds) {
+		const target = accumulator.targetNodeById.get(targetId);
+		if (target?.bodyKind !== 'FACTORY_CALL_RESULT_CANDIDATE')
+			throw new Error('A factory site attribution has no factory-result candidate target.');
+		const inferenceBasis: CommandHandlerInferenceBasis = {
+			assumptions: [
+				'A retained arrow site inside the shared factory may belong to this registered factory result.'
 			],
-			graph,
-			outcome: 'partial'
+			limitationKinds: ['FACTORY_ARROW_ATTRIBUTION_OPEN'],
+			method: COMMAND_HANDLER_GRAPH_METHOD,
+			rationale:
+				'The site is lexically enclosed by the resolved factory callable, but retained pooled literals cannot partition occurrences by factory instance.',
+			supportingInputIds: sortedUnique([
+				target.nodeId,
+				target.symbolId,
+				siteNode.observationSiteId,
+				...(siteNode.semanticSiteNodeId === null ? [] : [siteNode.semanticSiteNodeId])
+			])
 		};
+		emitTargetSiteEdge(emit, target, siteNode, inferenceBasis);
+		for (const commandName of accumulator.commandsByTarget.get(target.id) ?? [])
+			accumulator.commandsWithEvidence.add(commandName);
+	}
+}
+
+function attributeSiteEvidence(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	projection: SiteProjection,
+	siteNode: CommandArrowSiteNode
+): void {
+	if (projection.attribution === 'TABLE_COMMAND' && projection.commandName !== null) {
+		const command = accumulator.commandNodeByName.get(projection.commandName);
+		if (command === undefined)
+			throw new Error('An exact table attribution has no represented command.');
+		emitCommandTableSiteEdge(emit, command, siteNode);
+		accumulator.commandsWithEvidence.add(command.commandName);
+		return;
+	}
+	if (projection.attribution === 'DIRECT_HANDLER') {
+		emitDirectHandlerSiteEdges(emit, accumulator, projection, siteNode);
+		return;
+	}
+	if (projection.attribution === 'FACTORY_SHARED') {
+		emitFactorySharedSiteEdges(emit, accumulator, projection, siteNode);
+		emitSiteFrontier(
+			emit,
+			'FACTORY_SITE_ATTRIBUTION_AMBIGUOUS',
+			siteNode,
+			'The retained site is inside a shared factory and pooled arrow ranges cannot be partitioned among factory instances.'
+		);
+		return;
+	}
+	emitSiteFrontier(
+		emit,
+		'SITE_OWNER_NOT_REGISTERED_HANDLER',
+		siteNode,
+		'The retained source site does not resolve to one supported registered handler or exact command table entry.'
+	);
+}
+
+function emitDeclaredArrowSites(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	siteProjections: readonly SiteProjection[]
+): void {
+	for (const projection of siteProjections) {
+		const siteNode: CommandArrowSiteNode = {
+			attribution: projection.attribution,
+			graphId: emit.graphId,
+			id: commandArrowSiteNodeId(emit.graphId, projection.observation.id),
+			kind: 'DECLARED_ARROW_SITE',
+			layerId: emit.derivationLayerId,
+			observationSiteId: projection.observation.id,
+			observationSource: { ...projection.observation.source },
+			provenanceIds: [...projection.provenanceIds].sort(compareText),
+			semanticSiteNodeId: projection.semanticSiteNodeId,
+			semanticSnapshotId: emit.snapshot.id,
+			sourceId: projection.sourceId,
+			sourceLocations: [...projection.sourceLocations],
+			subjectId: emit.snapshot.subjectId
+		};
+		accumulator.nodes.push(siteNode);
+		accumulator.siteNodeByObservationId.set(projection.observation.id, siteNode);
+		attributeSiteEvidence(emit, accumulator, projection, siteNode);
+	}
+}
+
+function emitDeclaredArrowOccurrences(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	observation: ArrowCommandCensusObservation
+): void {
+	for (const arrow of observation.declaredArrows) {
+		const siteNode = accumulator.siteNodeByObservationId.get(arrow.siteId);
+		if (siteNode === undefined) throw new Error('A declared arrow has no represented site.');
+		const occurrence: CommandArrowOccurrenceNode = {
+			arrowKey: arrow.arrowKey,
+			from: arrow.from,
+			graphId: emit.graphId,
+			id: commandArrowOccurrenceNodeId(emit.graphId, arrow.id),
+			kind: 'DECLARED_ARROW_OCCURRENCE',
+			layerId: emit.derivationLayerId,
+			machine: arrow.machine,
+			observationArrowId: arrow.id,
+			observationSiteId: arrow.siteId,
+			ordinalAtSite: arrow.ordinalAtSite,
+			provenanceIds: siteNode.provenanceIds,
+			semanticSnapshotId: emit.snapshot.id,
+			sourceLocations: siteNode.sourceLocations,
+			subjectId: emit.snapshot.subjectId,
+			to: arrow.to
+		};
+		accumulator.nodes.push(occurrence);
+		emitSiteOccurrenceEdge(emit, siteNode, occurrence);
+	}
+}
+
+function emitCommandsWithoutEvidence(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	commandNodes: readonly CommandRegistryEntryNode[]
+): void {
+	for (const command of commandNodes)
+		if (!accumulator.commandsWithEvidence.has(command.commandName))
+			emitCommandFrontier(
+				emit,
+				'COMMAND_WITHOUT_DECLARED_ARROW_EVIDENCE',
+				command,
+				'The retained arrow census reports no attributable transition declaration for this command; no absence-of-effect conclusion follows.'
+			);
+}
+
+function computeGraphCoverage(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	bindings: BindingProducts,
+	registries: RegistryInputs,
+	observation: ArrowCommandCensusObservation,
+	siteProjections: readonly SiteProjection[]
+): CommandHandlerGraphCoverage {
+	const { edges, frontiers } = emit;
+	const { commandsWithEvidence, nodes, siteNodeByObservationId } = accumulator;
+	const { commandMembers, registrationMembers } = registries;
+	const {
+		commandNodeByName,
+		commandNodes,
+		registrationNodeByName,
+		registrationNodes,
+		targetNodeById
+	} = bindings;
+	const missingHandlerRegistrations = commandNodes.filter(
+		(command) => !registrationNodeByName.has(command.commandName)
+	).length;
+	const undeclaredHandlerRegistrations = registrationNodes.filter(
+		(registration) => !commandNodeByName.has(registration.commandName)
+	).length;
+	const exactCommandRegistrations = commandNodes.length - missingHandlerRegistrations;
+	const exactEdges = edges.filter((edge) => edge.attribution === 'EXACT').length;
+	const candidateEdges = edges.length - exactEdges;
+	return {
+		arrowAttributionClosure: 'OPEN',
+		candidateEdges,
+		commandRegistryClosure:
+			missingHandlerRegistrations === 0 && undeclaredHandlerRegistrations === 0 ? 'CLOSED' : 'OPEN',
+		commandsWithArrowEvidence: commandsWithEvidence.size,
+		commandsWithoutArrowEvidence: commandNodes.length - commandsWithEvidence.size,
+		directHandlerArrowSites: siteProjections.filter((site) => site.attribution === 'DIRECT_HANDLER')
+			.length,
+		discoveredArrowOccurrences: observation.declaredArrows.length,
+		discoveredArrowSites: observation.declaredSites.length,
+		discoveredCommandRegistryEntries: commandMembers.length,
+		discoveredHandlerRegistryEntries: registrationMembers.length,
+		edges: edges.length,
+		exactCommandRegistrations,
+		exactEdges,
+		factorySharedArrowSites: siteProjections.filter((site) => site.attribution === 'FACTORY_SHARED')
+			.length,
+		frontierNodes: frontiers.length,
+		handlerTargets: targetNodeById.size,
+		missingHandlerRegistrations,
+		reconciles:
+			exactCommandRegistrations + missingHandlerRegistrations === commandMembers.length &&
+			exactCommandRegistrations + undeclaredHandlerRegistrations === registrationMembers.length &&
+			siteNodeByObservationId.size === observation.declaredSites.length &&
+			edges.filter((edge) => edge.relationKind === 'ARROW_SITE_TO_OCCURRENCE').length ===
+				observation.declaredArrows.length,
+		representedArrowOccurrences: nodes.filter((node) => node.kind === 'DECLARED_ARROW_OCCURRENCE')
+			.length,
+		representedArrowSites: siteNodeByObservationId.size,
+		representedCommandRegistryEntries: commandNodes.length,
+		representedHandlerRegistryEntries: registrationNodes.length,
+		tableCommandArrowSites: siteProjections.filter((site) => site.attribution === 'TABLE_COMMAND')
+			.length,
+		undeclaredHandlerRegistrations
+	};
+}
+
+function makeGraphLayer(
+	emit: GraphEmitContext,
+	coverage: CommandHandlerGraphCoverage,
+	layerId: CommandHandlerGraphLayerId,
+	kind: CommandHandlerGraphLayer['kind'],
+	layerNodes: readonly CommandHandlerGraphNode[],
+	layerEdges: readonly CommandHandlerGraphEdge[]
+): CommandHandlerGraphLayer {
+	const common = {
+		capabilityStatus: COMMAND_HANDLER_GRAPH_CAPABILITY_STATUS,
+		coverage,
+		edgeIds: layerEdges.map((edge) => edge.id),
+		graphId: emit.graphId,
+		id: layerId,
+		limitations: COMMAND_HANDLER_GRAPH_LIMITATIONS.map((item) => ({ ...item })),
+		method: COMMAND_HANDLER_GRAPH_METHOD,
+		nodeIds: layerNodes.map((node) => node.id),
+		producer: { ...emit.snapshot.provider },
+		provenanceIds: layerProvenance(layerNodes, layerEdges),
+		registryStatus: COMMAND_HANDLER_GRAPH_REGISTRY_STATUS,
+		semanticSnapshotId: emit.snapshot.id,
+		subjectId: emit.snapshot.subjectId
+	};
+	return kind === 'JPWB_COMMAND_HANDLER_DERIVATION'
+		? {
+				...common,
+				capability: COMMAND_HANDLER_GRAPH_DERIVATION_CAPABILITY,
+				kind,
+				ordinal: 0
+			}
+		: {
+				...common,
+				capability: COMMAND_HANDLER_GRAPH_INFERENCE_CAPABILITY,
+				kind,
+				ordinal: 1
+			};
+}
+
+function buildGraphLayers(
+	emit: GraphEmitContext,
+	accumulator: GraphAccumulator,
+	coverage: CommandHandlerGraphCoverage
+): readonly [CommandHandlerGraphLayer, CommandHandlerGraphLayer] {
+	const { edges } = emit;
+	const { nodes } = accumulator;
+	const derivationNodes = nodes.filter((node) => node.layerId === emit.derivationLayerId);
+	const inferenceNodes = nodes.filter((node) => node.layerId === emit.inferenceLayerId);
+	const derivationEdges = edges.filter((edge) => edge.layerId === emit.derivationLayerId);
+	const inferenceEdges = edges.filter((edge) => edge.layerId === emit.inferenceLayerId);
+	if (
+		derivationNodes.length + inferenceNodes.length !== nodes.length ||
+		derivationEdges.length + inferenceEdges.length !== edges.length
+	)
+		throw new Error('Command-handler graph layers do not partition their populations.');
+	return [
+		makeGraphLayer(
+			emit,
+			coverage,
+			emit.derivationLayerId,
+			'JPWB_COMMAND_HANDLER_DERIVATION',
+			derivationNodes,
+			derivationEdges
+		),
+		makeGraphLayer(
+			emit,
+			coverage,
+			emit.inferenceLayerId,
+			'JPWB_COMMAND_HANDLER_INFERENCE',
+			inferenceNodes,
+			inferenceEdges
+		)
+	] as const;
+}
+
+function materializeGraph(
+	run: GraphBuildRun,
+	inputs: BoundInputs,
+	artifacts: ArtifactInputs,
+	registries: RegistryInputs,
+	bindings: BindingProducts,
+	siteProjections: readonly SiteProjection[]
+): MaterializedGraph {
+	const { observation, progress, request, snapshot } = run;
+	progress.start('GRAPH_MATERIALIZE');
+	const nodes: CommandHandlerGraphNode[] = [
+		...bindings.commandNodes,
+		...bindings.registrationNodes,
+		...bindings.targetNodeById.values()
+	];
+	const emit: GraphEmitContext = {
+		derivationLayerId: bindings.derivationLayerId,
+		edges: [],
+		frontiers: [],
+		graphId: bindings.graphId,
+		inferenceLayerId: bindings.inferenceLayerId,
+		snapshot
+	};
+	const commandsByTarget = new Map<CommandHandlerGraphNodeId, string[]>();
+	for (const [commandName, target] of bindings.targetByCommand)
+		addGrouped(commandsByTarget, target.id, commandName);
+	const accumulator: GraphAccumulator = {
+		commandNodeByName: bindings.commandNodeByName,
+		commandsByTarget,
+		commandsWithEvidence: new Set<string>(),
+		nodes,
+		siteNodeByObservationId: new Map<string, CommandArrowSiteNode>(),
+		targetNodeById: bindings.targetNodeById
+	};
+	emitCommandRegistrationEdges(emit, bindings.commandNodes, bindings.registrationNodeByName);
+	emitRegistrationTargetEdges(
+		emit,
+		bindings.registrationNodes,
+		bindings.commandNodeByName,
+		bindings.targetByCommand
+	);
+	emitDeclaredArrowSites(emit, accumulator, siteProjections);
+	emitDeclaredArrowOccurrences(emit, accumulator, observation);
+	emitCommandsWithoutEvidence(emit, accumulator, bindings.commandNodes);
+	nodes.push(...emit.frontiers);
+	nodes.sort((left, right) => compareText(left.id, right.id));
+	emit.edges.sort((left, right) => compareText(left.id, right.id));
+	enforceBudgets(request, {
+		astNodes: snapshot.astNodes.length,
+		commandRegistryEntries: registries.commandMembers.length,
+		edges: emit.edges.length,
+		frontiers: emit.frontiers.length,
+		handlerRegistryEntries: registries.registrationMembers.length,
+		nodes: nodes.length,
+		sourceBytes: artifacts.consumedBytes
+	});
+	const coverage = computeGraphCoverage(
+		emit,
+		accumulator,
+		bindings,
+		registries,
+		observation,
+		siteProjections
+	);
+	if (!coverage.reconciles) throw new Error('Command-handler graph coverage does not reconcile.');
+	for (const provenanceId of sortedUnique(nodes.flatMap((node) => node.provenanceIds)))
+		if (!inputs.model.provenances.has(provenanceId))
+			throw new Error('The graph references an unknown semantic provenance.');
+	const layers = buildGraphLayers(emit, accumulator, coverage);
+	progress.complete({
+		candidateEdges: coverage.candidateEdges,
+		edges: emit.edges.length,
+		exactEdges: coverage.exactEdges,
+		frontiers: emit.frontiers.length,
+		nodes: nodes.length
+	});
+	return { coverage, edges: emit.edges, layers, nodes };
+}
+
+function constructCommandHandlerGraph(run: GraphBuildRun): CommandHandlerGraphBuildOutcome {
+	const { observation, progress, request, snapshot, subject } = run;
+	const prepared = prepareBoundInputs(run);
+	if (prepared.refusal !== null) return prepared.refusal;
+	const inputs = prepared.value;
+	const observationRefusal = validateObservationPhase(run);
+	if (observationRefusal !== null) return observationRefusal;
+	const artifacts = readGraphArtifacts(run, inputs);
+	const registries = parseRegistries(run, inputs);
+	const bindings = resolveGraphBindings(run, inputs, registries);
+	const siteProjections = attributeArrowSites(run, inputs, artifacts, bindings);
+	const { coverage, edges, layers, nodes } = materializeGraph(
+		run,
+		inputs,
+		artifacts,
+		registries,
+		bindings,
+		siteProjections
+	);
+	const { graphId, graphInputDigest } = bindings;
+
+	progress.start('SERIALIZE');
+	const content = {
+		arrowObservationId: observation.id,
+		authorityTransfer: COMMAND_HANDLER_GRAPH_AUTHORITY_TRANSFER,
+		baselineChange: COMMAND_HANDLER_GRAPH_BASELINE_CHANGE,
+		budgets: { ...request.budgets },
+		canonicalProfile: COMMAND_HANDLER_GRAPH_CANONICAL_PROFILE,
+		capabilities: [
+			COMMAND_HANDLER_GRAPH_DERIVATION_CAPABILITY,
+			COMMAND_HANDLER_GRAPH_INFERENCE_CAPABILITY
+		] as const,
+		capabilityStatus: COMMAND_HANDLER_GRAPH_CAPABILITY_STATUS,
+		commandDispatchCensusIntegration: COMMAND_HANDLER_GRAPH_COMMAND_DISPATCH_CENSUS_INTEGRATION,
+		commandRegistry: { ...request.commandRegistry },
+		coverage,
+		edges,
+		forwardIndex: makeIndexes(nodes, edges, 'FORWARD'),
+		fullJanCsaa007Conformance: COMMAND_HANDLER_GRAPH_FULL_JAN_CSAA_007_CONFORMANCE,
+		fullJanCsaa008Conformance: COMMAND_HANDLER_GRAPH_FULL_JAN_CSAA_008_CONFORMANCE,
+		gateEffect: COMMAND_HANDLER_GRAPH_GATE_EFFECT,
+		graphAuthority: COMMAND_HANDLER_GRAPH_GRAPH_AUTHORITY,
+		graphInputDigest,
+		graphKind: 'JPWB_COMMAND_HANDLER_STATIC_PROJECTION' as const,
+		handlerRegistry: { ...request.handlerRegistry },
+		health: 'PARTIAL' as const,
+		id: graphId,
+		integrationStrategy: COMMAND_HANDLER_GRAPH_INTEGRATION_STRATEGY,
+		layers,
+		limitations: COMMAND_HANDLER_GRAPH_LIMITATIONS.map((item) => ({ ...item })),
+		method: COMMAND_HANDLER_GRAPH_METHOD,
+		nodes,
+		operationVersion: COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+		oracleChange: COMMAND_HANDLER_GRAPH_ORACLE_CHANGE,
+		producer: { ...snapshot.provider },
+		registryStatus: COMMAND_HANDLER_GRAPH_REGISTRY_STATUS,
+		replacementEquivalence: COMMAND_HANDLER_GRAPH_REPLACEMENT_EQUIVALENCE,
+		retainedArrowVerifierAuthority: COMMAND_HANDLER_GRAPH_RETAINED_ARROW_VERIFIER_AUTHORITY,
+		reverseIndex: makeIndexes(nodes, edges, 'REVERSE'),
+		runtimeDispatchClosure: COMMAND_HANDLER_GRAPH_RUNTIME_DISPATCH_CLOSURE,
+		runtimePerformability: COMMAND_HANDLER_GRAPH_RUNTIME_PERFORMABILITY,
+		schemaVersion: COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
+		scope: COMMAND_HANDLER_GRAPH_SCOPE,
+		semanticExtractionVersion: snapshot.extractionVersion,
+		semanticSchemaVersion: snapshot.schemaVersion,
+		semanticSnapshotId: snapshot.id,
+		subjectId: snapshot.subjectId
+	};
+	const graph = { ...content, contentDigest: commandHandlerGraphContentDigest(content) };
+	const canonicalBytes = new TextEncoder().encode(JSON.stringify(graph)).byteLength;
+	progress.complete({
+		canonicalBytes
+	});
+
+	progress.start('GRAPH_VALIDATE', { edges: graph.edges.length, nodes: graph.nodes.length });
+	const validation = validateConstructedCommandHandlerGraph(
+		graph,
+		snapshot,
+		observation,
+		subject,
+		graphInputDigest,
+		{
+			maxIssues: 1_000,
+			// These are validator traversal guards over the already materialized graph wire, not
+			// aliases for the independent graph-population or consumed-source budgets.
+			maxRecords: Math.max(1, canonicalBytes),
+			maxStringCharacters: Math.max(1, canonicalBytes)
+		}
+	);
+	if (validation.state !== 'VALID') {
+		progress.fail('GRAPH_VALIDATION_FAILED');
+		const issueSummary = validation.issues
+			.slice(0, 3)
+			.map((issue) => `${issue.code}@${issue.path}: ${issue.message}`)
+			.join(', ');
+		const issueDetail = issueSummary.length === 0 ? '' : `: ${issueSummary}`;
+		return unavailable(
+			'GRAPH_VALIDATION_FAILED',
+			`Constructed command-handler graph failed validation (${validation.state}${issueDetail}).`,
+			'VALIDATE'
+		);
+	}
+	progress.complete({ validationState: validation.state });
+	return {
+		diagnostics: [
+			diagnostic(
+				'GRAPH_PARTIAL',
+				'The projection closes supported static command registrations while retaining explicit factory, arrow-attribution, and runtime frontiers.',
+				'VALIDATE'
+			)
+		],
+		graph,
+		outcome: 'partial'
+	};
+}
+
+export function buildCommandHandlerGraph(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot,
+	observation: ArrowCommandCensusObservation,
+	subject: FrozenSubject,
+	options?: BuildCommandHandlerGraphOptions
+): CommandHandlerGraphBuildOutcome {
+	const progress = createProgressRecorder(options);
+	const binding = bindGraphRequest(requestValue, snapshot, observation, subject, progress);
+	if (binding.refusal !== null) return binding.refusal;
+	try {
+		return constructCommandHandlerGraph({
+			observation,
+			progress,
+			request: binding.value,
+			snapshot,
+			subject
+		});
 	} catch (error) {
 		const isBudget = error instanceof RangeError && /max[A-Z]/u.test(error.message);
 		const code = isBudget ? 'BUDGET_EXCEEDED' : 'INPUT_INVALID';

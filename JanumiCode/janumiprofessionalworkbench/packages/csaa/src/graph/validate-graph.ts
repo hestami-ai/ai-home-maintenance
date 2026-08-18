@@ -286,8 +286,8 @@ function exactKeys(
 		}
 		actual.push(key);
 	}
-	actual.sort();
-	const wanted = [...expected].sort();
+	actual.sort(compareText);
+	const wanted = [...expected].sort(compareText);
 	if (canonicalSemanticJson(actual) !== canonicalSemanticJson(wanted)) {
 		issues.add(
 			'INVALID_SHAPE',
@@ -516,12 +516,24 @@ function shapeEdge(value: unknown, path: string, issues: IssueCollector): boolea
 	return valid;
 }
 
-function shapeGraph(
-	value: unknown,
+// Shapes every element of a candidate array, exactly reproducing the original
+// `if (plainArray(x)) for (...) valid = shape(...) && valid;` accumulation — a non-array
+// leaves the caller's verdict untouched because the enclosing scalar chain already rejected it.
+function shapeArrayElements(
+	values: unknown,
+	shape: (element: unknown, path: string, issues: IssueCollector) => boolean,
+	path: string,
 	issues: IssueCollector
-): value is ModuleDependencyGraphSnapshot {
-	if (!exactKeys(value, TOP_LEVEL_KEYS, '$', issues)) return false;
-	let valid =
+): boolean {
+	if (!plainArray(values)) return true;
+	let valid = true;
+	for (const [index, element] of values.entries())
+		valid = shape(element, `${path}[${index}]`, issues) && valid;
+	return valid;
+}
+
+function shapeGraphScalars(value: JsonRecord): boolean {
+	return (
 		scalarString(value.canonicalProfile) &&
 		scalarString(value.contentDigest) &&
 		plainArray(value.edges) &&
@@ -546,67 +558,63 @@ function shapeGraph(
 		scalarString(value.semanticExtractionVersion) &&
 		scalarString(value.semanticSchemaVersion) &&
 		scalarString(value.semanticSnapshotId) &&
+		scalarString(value.subjectId)
+	);
+}
+
+function shapeLayer(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value, LAYER_KEYS, path, issues)) return false;
+	let layerValid =
+		stringArray(value.edgeIds) &&
+		(value.epistemic === 'SUPPORTED' ||
+			value.epistemic === 'UNKNOWN' ||
+			value.epistemic === 'UNSUPPORTED' ||
+			value.epistemic === 'CONFLICTING') &&
+		scalarString(value.graphId) &&
+		scalarString(value.id) &&
+		value.kind === 'TYPESCRIPT_MODULE_RESOLUTION' &&
+		plainArray(value.limitations) &&
+		value.method === MODULE_DEPENDENCY_GRAPH_METHOD &&
+		stringArray(value.nodeIds) &&
+		value.ordinal === 0 &&
+		stringArray(value.provenanceIds) &&
+		plainRecord(value.producer) &&
+		scalarString(value.semanticSnapshotId) &&
 		scalarString(value.subjectId);
+	layerValid = shapeCoverage(value.coverage, `${path}.coverage`, issues) && layerValid;
+	layerValid = shapeProvider(value.producer, `${path}.producer`, issues) && layerValid;
+	layerValid =
+		shapeArrayElements(value.limitations, shapeLimitation, `${path}.limitations`, issues) &&
+		layerValid;
+	if (!layerValid)
+		issues.add('INVALID_SHAPE', path, 'Graph layer fields have invalid primitive values.');
+	return layerValid;
+}
+
+function shapeGraph(
+	value: unknown,
+	issues: IssueCollector
+): value is ModuleDependencyGraphSnapshot {
+	if (!exactKeys(value, TOP_LEVEL_KEYS, '$', issues)) return false;
+	let valid = shapeGraphScalars(value);
 	valid = shapeCoverage(value.coverage, '$.coverage', issues) && valid;
 	valid = shapeProvider(value.producer, '$.producer', issues) && valid;
-	if (plainArray(value.limitations))
-		for (const [index, limitation] of value.limitations.entries())
-			valid = shapeLimitation(limitation, `$.limitations[${index}]`, issues) && valid;
-	if (plainArray(value.layers)) {
-		for (const [index, layer] of value.layers.entries()) {
-			const path = `$.layers[${index}]`;
-			if (!exactKeys(layer, LAYER_KEYS, path, issues)) {
-				valid = false;
-				continue;
-			}
-			let layerValid =
-				stringArray(layer.edgeIds) &&
-				(layer.epistemic === 'SUPPORTED' ||
-					layer.epistemic === 'UNKNOWN' ||
-					layer.epistemic === 'UNSUPPORTED' ||
-					layer.epistemic === 'CONFLICTING') &&
-				scalarString(layer.graphId) &&
-				scalarString(layer.id) &&
-				layer.kind === 'TYPESCRIPT_MODULE_RESOLUTION' &&
-				plainArray(layer.limitations) &&
-				layer.method === MODULE_DEPENDENCY_GRAPH_METHOD &&
-				stringArray(layer.nodeIds) &&
-				layer.ordinal === 0 &&
-				stringArray(layer.provenanceIds) &&
-				plainRecord(layer.producer) &&
-				scalarString(layer.semanticSnapshotId) &&
-				scalarString(layer.subjectId);
-			layerValid = shapeCoverage(layer.coverage, `${path}.coverage`, issues) && layerValid;
-			layerValid = shapeProvider(layer.producer, `${path}.producer`, issues) && layerValid;
-			if (plainArray(layer.limitations))
-				for (const [limitationIndex, limitation] of layer.limitations.entries())
-					layerValid =
-						shapeLimitation(limitation, `${path}.limitations[${limitationIndex}]`, issues) &&
-						layerValid;
-			if (!layerValid)
-				issues.add('INVALID_SHAPE', path, 'Graph layer fields have invalid primitive values.');
-			valid = layerValid && valid;
-		}
-	}
-	if (plainArray(value.nodes))
-		for (const [index, node] of value.nodes.entries())
-			valid = shapeNode(node, `$.nodes[${index}]`, issues) && valid;
-	if (plainArray(value.edges))
-		for (const [index, edge] of value.edges.entries())
-			valid = shapeEdge(edge, `$.edges[${index}]`, issues) && valid;
-	for (const [field, entries] of [
-		['forwardIndex', value.forwardIndex],
-		['reverseIndex', value.reverseIndex]
-	] as const)
-		if (plainArray(entries))
-			for (const [index, entry] of entries.entries())
-				valid = shapeIndexEntry(entry, `$.${field}[${index}]`, issues) && valid;
+	valid = shapeArrayElements(value.limitations, shapeLimitation, '$.limitations', issues) && valid;
+	valid = shapeArrayElements(value.layers, shapeLayer, '$.layers', issues) && valid;
+	valid = shapeArrayElements(value.nodes, shapeNode, '$.nodes', issues) && valid;
+	valid = shapeArrayElements(value.edges, shapeEdge, '$.edges', issues) && valid;
+	valid =
+		shapeArrayElements(value.forwardIndex, shapeIndexEntry, '$.forwardIndex', issues) && valid;
+	valid =
+		shapeArrayElements(value.reverseIndex, shapeIndexEntry, '$.reverseIndex', issues) && valid;
 	if (!valid) issues.add('INVALID_SHAPE', '$', 'Graph fields have invalid primitive values.');
 	return valid;
 }
 
 function compareText(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function sortedUniqueStrings(
@@ -840,11 +848,7 @@ function graphWideReference(
 		issues.add('DANGLING_REFERENCE', `${path}.subjectId`, 'Record references another subject.');
 }
 
-function validateGraphSemantics(
-	graph: ModuleDependencyGraphSnapshot,
-	snapshot: StaticSemanticSnapshot,
-	issues: IssueCollector
-): void {
+function validateGraphVersions(graph: ModuleDependencyGraphSnapshot, issues: IssueCollector): void {
 	if (graph.schemaVersion !== MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION)
 		issues.add('UNSUPPORTED_SCHEMA_VERSION', '$.schemaVersion', graph.schemaVersion);
 	if (graph.operationVersion !== MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION)
@@ -859,6 +863,13 @@ function validateGraphSemantics(
 			'$.fullJanCsaa007Conformance',
 			'This bounded graph kernel must retain the explicit NOT_CLAIMED conformance state.'
 		);
+}
+
+function validateGraphBinding(
+	graph: ModuleDependencyGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
 	if (graph.semanticSnapshotId !== snapshot.id)
 		issues.add(
 			'DANGLING_REFERENCE',
@@ -893,6 +904,13 @@ function validateGraphSemantics(
 		);
 	if (!SHA256.test(graph.contentDigest))
 		issues.add('INVALID_VALUE', '$.contentDigest', 'Content digest must be lowercase SHA-256.');
+}
+
+function validateGraphInputDigest(
+	graph: ModuleDependencyGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
 	try {
 		const expectedInputDigest = moduleDependencyGraphInputDigest(snapshot);
 		if (graph.graphInputDigest !== expectedInputDigest)
@@ -908,7 +926,9 @@ function validateGraphSemantics(
 			error instanceof Error ? error.message : 'Graph input projection failed closed.'
 		);
 	}
+}
 
+function validateGraphIdentity(graph: ModuleDependencyGraphSnapshot, issues: IssueCollector): void {
 	const expectedGraphId = moduleDependencyGraphId({
 		canonicalProfile: graph.canonicalProfile,
 		graphInputDigest: graph.graphInputDigest,
@@ -925,15 +945,13 @@ function validateGraphSemantics(
 			'$.id',
 			'Graph identity does not match its request-bound preimage.'
 		);
+}
 
-	if (graph.layers.length !== 1) {
-		issues.add(
-			'POPULATION_MISMATCH',
-			'$.layers',
-			'Exactly one module-resolution layer is required.'
-		);
-		return;
-	}
+function validateGraphLayerIdentity(
+	graph: ModuleDependencyGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
 	const layer = graph.layers[0];
 	const expectedLayerId = moduleDependencyGraphLayerId(graph.id, layer.kind, layer.ordinal);
 	if (layer.id !== expectedLayerId)
@@ -945,7 +963,13 @@ function validateGraphSemantics(
 			'$.layers[0].producer',
 			'Layer producer does not match the semantic provider.'
 		);
+}
 
+function createGraphSemanticsState(
+	graph: ModuleDependencyGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+) {
 	const nodeById = validateIdPopulation(graph.nodes, '$.nodes', issues);
 	const edgeById = validateIdPopulation(graph.edges, '$.edges', issues);
 	const sourceById = new Map(snapshot.sources.map((record) => [record.id, record]));
@@ -964,260 +988,381 @@ function validateGraphSemantics(
 	const sourceNodeBySemanticId = new Map<string, (typeof sourceNodes)[number]>();
 	const targetNodeByResolutionId = new Map<string, (typeof targetNodes)[number]>();
 	const targetNodeCountByResolutionId = new Map<string, number>();
+	return {
+		edgeById,
+		edgesByResolution: new Map<string, ModuleDependencyGraphEdge[]>(),
+		graph,
+		issues,
+		layer: graph.layers[0],
+		nodeById,
+		occurrenceById,
+		provenanceById,
+		resolutionById,
+		snapshot,
+		sourceById,
+		sourceNodeBySemanticId,
+		sourceNodes,
+		targetNodeByResolutionId,
+		targetNodeCountByResolutionId,
+		targetNodes
+	};
+}
 
-	for (const [index, node] of graph.nodes.entries()) {
-		const path = `$.nodes[${index}]`;
-		graphWideReference(node, graph, layer.id, path, issues);
-		validateProvenanceIds(
-			node.provenanceIds,
-			snapshot,
-			provenanceById,
-			`${path}.provenanceIds`,
-			issues
-		);
-		canonicalObjectArray(node.sourceLocations, `${path}.sourceLocations`, issues);
-		for (const [locationIndex, location] of node.sourceLocations.entries()) {
-			const source = sourceById.get(location.sourceId);
-			if (source === undefined)
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.sourceLocations[${locationIndex}].sourceId`,
-					'Location references an absent source.'
-				);
-			else if (location.end > source.textLength)
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.sourceLocations[${locationIndex}].end`,
-					'Location exceeds its semantic source.'
-				);
-		}
-		if (node.kind === 'SOURCE') {
-			if (sourceNodeBySemanticId.has(node.semanticSourceId))
-				issues.add(
-					'DUPLICATE_ID',
-					`${path}.semanticSourceId`,
-					'A semantic source is represented by more than one graph node.'
-				);
-			else sourceNodeBySemanticId.set(node.semanticSourceId, node);
-			const source = sourceById.get(node.semanticSourceId);
-			if (source === undefined) {
-				issues.add('DANGLING_REFERENCE', `${path}.semanticSourceId`, 'Absent semantic source.');
-				continue;
-			}
-			if (
-				node.analysisDisposition !== source.analysisDisposition ||
-				node.logicalPath !== source.logicalPath ||
-				node.programId !== source.programId ||
-				node.projectId !== source.projectId
-			)
-				issues.add(
-					'INVALID_VALUE',
-					path,
-					'Source node does not reproduce its semantic source fields.'
-				);
-			try {
-				assertCanonicalRelativePath(node.logicalPath);
-			} catch {
-				issues.add(
-					'ABSOLUTE_PATH',
-					`${path}.logicalPath`,
-					'Graph source paths must be canonical repository-relative paths.'
-				);
-			}
-			if (node.id !== moduleDependencyGraphSourceNodeId(graph.id, source.id))
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Source-node identity mismatch.');
-			if (!same(node.provenanceIds, [source.provenanceId]))
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.provenanceIds`,
-					'Source-node provenance must be exactly the semantic source provenance.'
-				);
-			if (!same(node.sourceLocations, exactLocation(source.id, 0, source.textLength)))
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.sourceLocations`,
-					'Source-node location must cover its exact semantic source.'
-				);
-			if (node.epistemic !== 'SUPPORTED')
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Semantic source nodes are supported facts.'
-				);
-		} else {
-			targetNodeCountByResolutionId.set(
-				node.moduleResolutionId,
-				(targetNodeCountByResolutionId.get(node.moduleResolutionId) ?? 0) + 1
-			);
-			if (targetNodeByResolutionId.has(node.moduleResolutionId))
-				issues.add(
-					'DUPLICATE_ID',
-					`${path}.moduleResolutionId`,
-					'A module resolution has more than one graph-native endpoint.'
-				);
-			else targetNodeByResolutionId.set(node.moduleResolutionId, node);
-			const resolution = resolutionById.get(node.moduleResolutionId);
-			if (resolution === undefined) {
-				issues.add('DANGLING_REFERENCE', `${path}.moduleResolutionId`, 'Absent module resolution.');
-				continue;
-			}
-			if (resolution.resolutionState === 'RESOLVED_SOURCE')
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.resolutionState`,
-					'Resolved-source facts must target a SOURCE node, not a graph-native endpoint.'
-				);
-			if (
-				node.moduleSymbolId !== resolution.moduleSymbolId ||
-				node.resolutionState !== resolution.resolutionState ||
-				node.specifier !== resolution.specifier ||
-				node.specifierState !== resolution.specifierState
-			)
-				issues.add(
-					'INVALID_VALUE',
-					path,
-					'Graph-native target does not reproduce its module-resolution fact.'
-				);
-			if (node.id !== moduleDependencyGraphResolutionTargetNodeId(graph.id, resolution.id))
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Resolution-target identity mismatch.');
-			if (!same(node.provenanceIds, [resolution.provenanceId]))
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.provenanceIds`,
-					'Resolution-target provenance must be exactly the semantic resolution provenance.'
-				);
-			const occurrence = occurrenceById.get(resolution.nodeId);
-			if (
-				occurrence !== undefined &&
-				!same(
-					node.sourceLocations,
-					exactLocation(occurrence.sourceId, occurrence.start, occurrence.end)
-				)
-			)
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.sourceLocations`,
-					'Resolution target must cite the exact module occurrence.'
-				);
-			if (node.epistemic !== expectedEpistemic(resolution.resolutionState))
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Resolution-target epistemic state mismatch.'
-				);
-		}
-		if (issues.exhausted) return;
-	}
+// The working state of one graph-semantics validation, threaded by reference so that every
+// extracted phase writes into the same populations the original single function accumulated.
+type GraphSemanticsState = ReturnType<typeof createGraphSemanticsState>;
 
-	const edgesByResolution = new Map<string, ModuleDependencyGraphEdge[]>();
-	for (const [index, edge] of graph.edges.entries()) {
-		const path = `$.edges[${index}]`;
-		graphWideReference(edge, graph, layer.id, path, issues);
-		validateProvenanceIds(
-			edge.provenanceIds,
-			snapshot,
-			provenanceById,
-			`${path}.provenanceIds`,
-			issues
-		);
-		canonicalObjectArray(edge.sourceLocations, `${path}.sourceLocations`, issues);
-		const grouped = edgesByResolution.get(edge.moduleResolutionId) ?? [];
-		grouped.push(edge);
-		edgesByResolution.set(edge.moduleResolutionId, grouped);
-		const resolution = resolutionById.get(edge.moduleResolutionId);
-		if (resolution === undefined) {
-			issues.add('DANGLING_REFERENCE', `${path}.moduleResolutionId`, 'Absent module resolution.');
-			continue;
-		}
-		const occurrence = occurrenceById.get(resolution.nodeId);
-		if (occurrence === undefined) {
-			issues.add('DANGLING_REFERENCE', `${path}.occurrenceNodeId`, 'Absent occurrence AST node.');
-			continue;
-		}
-		if (occurrence.sourceId !== resolution.sourceId)
+function validateNodeSourceLocations(
+	state: GraphSemanticsState,
+	node: ModuleDependencyGraphNode,
+	path: string
+): void {
+	const { issues, sourceById } = state;
+	for (const [locationIndex, location] of node.sourceLocations.entries()) {
+		const source = sourceById.get(location.sourceId);
+		if (source === undefined)
 			issues.add(
 				'DANGLING_REFERENCE',
-				`${path}.occurrenceNodeId`,
-				'Module-resolution occurrence and importer source differ.'
+				`${path}.sourceLocations[${locationIndex}].sourceId`,
+				'Location references an absent source.'
 			);
-		if (
-			edge.occurrenceKind !== resolution.occurrenceKind ||
-			edge.occurrenceNodeId !== resolution.nodeId ||
-			edge.relationKind !== RELATION_KIND_BY_OCCURRENCE[resolution.occurrenceKind] ||
-			edge.resolutionState !== resolution.resolutionState ||
-			edge.specifier !== resolution.specifier ||
-			edge.specifierState !== resolution.specifierState ||
-			edge.typeOnly !== resolution.typeOnly
-		)
+		else if (location.end > source.textLength)
 			issues.add(
 				'INVALID_VALUE',
-				path,
-				'Graph edge collapses or changes its supporting module-resolution occurrence.'
+				`${path}.sourceLocations[${locationIndex}].end`,
+				'Location exceeds its semantic source.'
 			);
-		if (edge.method !== MODULE_DEPENDENCY_GRAPH_METHOD)
-			issues.add('INVALID_VALUE', `${path}.method`, 'Edge method mismatch.');
-		if (!same(edge.provenanceIds, [resolution.provenanceId]))
-			issues.add(
-				'DANGLING_REFERENCE',
-				`${path}.provenanceIds`,
-				'Edge provenance must be exactly its module-resolution provenance.'
-			);
-		if (
-			!same(
-				edge.sourceLocations,
-				exactLocation(occurrence.sourceId, occurrence.start, occurrence.end)
-			)
-		)
-			issues.add(
-				'INVALID_VALUE',
-				`${path}.sourceLocations`,
-				'Edge must cite the exact module occurrence location.'
-			);
-		const sourceNode = nodeById.get(edge.source.nodeId);
-		if (
-			edge.source.kind !== 'SOURCE' ||
-			sourceNode?.kind !== 'SOURCE' ||
-			sourceNode.semanticSourceId !== resolution.sourceId
-		)
-			issues.add(
-				'DANGLING_REFERENCE',
-				`${path}.source`,
-				'Edge source must be the exact importer SOURCE node.'
-			);
-		let expectedTarget: ModuleDependencyGraphNode | undefined;
-		if (resolution.targetSourceId !== null) {
-			expectedTarget = sourceNodeBySemanticId.get(resolution.targetSourceId);
-			if (edge.target.kind !== 'SOURCE' || expectedTarget?.kind !== 'SOURCE')
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.target`,
-					'A module resolution with a source target must use its semantic SOURCE node.'
-				);
-		} else {
-			expectedTarget = targetNodeByResolutionId.get(resolution.id);
-			if (edge.target.kind !== 'RESOLUTION_TARGET' || expectedTarget?.kind !== 'RESOLUTION_TARGET')
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.target`,
-					'A module resolution without a source target must retain its explicit graph-native endpoint.'
-				);
-		}
-		if (expectedTarget === undefined || edge.target.nodeId !== expectedTarget.id)
-			issues.add('DANGLING_REFERENCE', `${path}.target.nodeId`, 'Edge target identity mismatch.');
-		const expectedEdgeId = moduleDependencyGraphEdgeId({
-			graph: graph.id,
-			moduleResolutionId: resolution.id,
-			relationKind: edge.relationKind,
-			source: edge.source,
-			target: edge.target
-		});
-		if (edge.id !== expectedEdgeId)
-			issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module-dependency edge identity mismatch.');
-		if (edge.epistemic !== expectedEpistemic(resolution.resolutionState))
-			issues.add('INVALID_VALUE', `${path}.epistemic`, 'Edge epistemic state mismatch.');
-		if (issues.exhausted) return;
 	}
+}
 
+// Returns true when the remaining per-node checks are skipped, exactly as the original
+// `continue` did — including its skip of the end-of-iteration budget check.
+function validateSourceGraphNode(
+	state: GraphSemanticsState,
+	node: Extract<ModuleDependencyGraphNode, { readonly kind: 'SOURCE' }>,
+	path: string
+): boolean {
+	const { graph, issues, sourceById, sourceNodeBySemanticId } = state;
+	if (sourceNodeBySemanticId.has(node.semanticSourceId))
+		issues.add(
+			'DUPLICATE_ID',
+			`${path}.semanticSourceId`,
+			'A semantic source is represented by more than one graph node.'
+		);
+	else sourceNodeBySemanticId.set(node.semanticSourceId, node);
+	const source = sourceById.get(node.semanticSourceId);
+	if (source === undefined) {
+		issues.add('DANGLING_REFERENCE', `${path}.semanticSourceId`, 'Absent semantic source.');
+		return true;
+	}
+	if (
+		node.analysisDisposition !== source.analysisDisposition ||
+		node.logicalPath !== source.logicalPath ||
+		node.programId !== source.programId ||
+		node.projectId !== source.projectId
+	)
+		issues.add('INVALID_VALUE', path, 'Source node does not reproduce its semantic source fields.');
+	try {
+		assertCanonicalRelativePath(node.logicalPath);
+	} catch {
+		issues.add(
+			'ABSOLUTE_PATH',
+			`${path}.logicalPath`,
+			'Graph source paths must be canonical repository-relative paths.'
+		);
+	}
+	if (node.id !== moduleDependencyGraphSourceNodeId(graph.id, source.id))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Source-node identity mismatch.');
+	if (!same(node.provenanceIds, [source.provenanceId]))
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.provenanceIds`,
+			'Source-node provenance must be exactly the semantic source provenance.'
+		);
+	if (!same(node.sourceLocations, exactLocation(source.id, 0, source.textLength)))
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.sourceLocations`,
+			'Source-node location must cover its exact semantic source.'
+		);
+	if (node.epistemic !== 'SUPPORTED')
+		issues.add('INVALID_VALUE', `${path}.epistemic`, 'Semantic source nodes are supported facts.');
+	return false;
+}
+
+// Returns true when the remaining per-node checks are skipped, exactly as the original
+// `continue` did — including its skip of the end-of-iteration budget check.
+function validateResolutionTargetGraphNode(
+	state: GraphSemanticsState,
+	node: Extract<ModuleDependencyGraphNode, { readonly kind: 'RESOLUTION_TARGET' }>,
+	path: string
+): boolean {
+	const {
+		graph,
+		issues,
+		occurrenceById,
+		resolutionById,
+		targetNodeByResolutionId,
+		targetNodeCountByResolutionId
+	} = state;
+	targetNodeCountByResolutionId.set(
+		node.moduleResolutionId,
+		(targetNodeCountByResolutionId.get(node.moduleResolutionId) ?? 0) + 1
+	);
+	if (targetNodeByResolutionId.has(node.moduleResolutionId))
+		issues.add(
+			'DUPLICATE_ID',
+			`${path}.moduleResolutionId`,
+			'A module resolution has more than one graph-native endpoint.'
+		);
+	else targetNodeByResolutionId.set(node.moduleResolutionId, node);
+	const resolution = resolutionById.get(node.moduleResolutionId);
+	if (resolution === undefined) {
+		issues.add('DANGLING_REFERENCE', `${path}.moduleResolutionId`, 'Absent module resolution.');
+		return true;
+	}
+	if (resolution.resolutionState === 'RESOLVED_SOURCE')
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.resolutionState`,
+			'Resolved-source facts must target a SOURCE node, not a graph-native endpoint.'
+		);
+	if (
+		node.moduleSymbolId !== resolution.moduleSymbolId ||
+		node.resolutionState !== resolution.resolutionState ||
+		node.specifier !== resolution.specifier ||
+		node.specifierState !== resolution.specifierState
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Graph-native target does not reproduce its module-resolution fact.'
+		);
+	if (node.id !== moduleDependencyGraphResolutionTargetNodeId(graph.id, resolution.id))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Resolution-target identity mismatch.');
+	if (!same(node.provenanceIds, [resolution.provenanceId]))
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.provenanceIds`,
+			'Resolution-target provenance must be exactly the semantic resolution provenance.'
+		);
+	const occurrence = occurrenceById.get(resolution.nodeId);
+	if (
+		occurrence !== undefined &&
+		!same(
+			node.sourceLocations,
+			exactLocation(occurrence.sourceId, occurrence.start, occurrence.end)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.sourceLocations`,
+			'Resolution target must cite the exact module occurrence.'
+		);
+	if (node.epistemic !== expectedEpistemic(resolution.resolutionState))
+		issues.add('INVALID_VALUE', `${path}.epistemic`, 'Resolution-target epistemic state mismatch.');
+	return false;
+}
+
+function validateGraphNode(
+	state: GraphSemanticsState,
+	node: ModuleDependencyGraphNode,
+	path: string
+): boolean {
+	const { graph, issues, layer, provenanceById, snapshot } = state;
+	graphWideReference(node, graph, layer.id, path, issues);
+	validateProvenanceIds(
+		node.provenanceIds,
+		snapshot,
+		provenanceById,
+		`${path}.provenanceIds`,
+		issues
+	);
+	canonicalObjectArray(node.sourceLocations, `${path}.sourceLocations`, issues);
+	validateNodeSourceLocations(state, node, path);
+	if (node.kind === 'SOURCE') return validateSourceGraphNode(state, node, path);
+	return validateResolutionTargetGraphNode(state, node, path);
+}
+
+// Returns true when the issue budget was exhausted and validation must stop.
+function validateGraphNodes(state: GraphSemanticsState): boolean {
+	for (const [index, node] of state.graph.nodes.entries()) {
+		if (validateGraphNode(state, node, `$.nodes[${index}]`)) continue;
+		if (state.issues.exhausted) return true;
+	}
+	return false;
+}
+
+// Returns true when the remaining per-edge checks are skipped, exactly as the original
+// `continue` did — including its skip of the end-of-iteration budget check.
+function validateEdgeOccurrence(
+	state: GraphSemanticsState,
+	edge: ModuleDependencyGraphEdge,
+	resolution: SemanticModuleResolutionRecord,
+	path: string
+): boolean {
+	const { issues, occurrenceById } = state;
+	const occurrence = occurrenceById.get(resolution.nodeId);
+	if (occurrence === undefined) {
+		issues.add('DANGLING_REFERENCE', `${path}.occurrenceNodeId`, 'Absent occurrence AST node.');
+		return true;
+	}
+	if (occurrence.sourceId !== resolution.sourceId)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.occurrenceNodeId`,
+			'Module-resolution occurrence and importer source differ.'
+		);
+	if (
+		edge.occurrenceKind !== resolution.occurrenceKind ||
+		edge.occurrenceNodeId !== resolution.nodeId ||
+		edge.relationKind !== RELATION_KIND_BY_OCCURRENCE[resolution.occurrenceKind] ||
+		edge.resolutionState !== resolution.resolutionState ||
+		edge.specifier !== resolution.specifier ||
+		edge.specifierState !== resolution.specifierState ||
+		edge.typeOnly !== resolution.typeOnly
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Graph edge collapses or changes its supporting module-resolution occurrence.'
+		);
+	if (edge.method !== MODULE_DEPENDENCY_GRAPH_METHOD)
+		issues.add('INVALID_VALUE', `${path}.method`, 'Edge method mismatch.');
+	if (!same(edge.provenanceIds, [resolution.provenanceId]))
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.provenanceIds`,
+			'Edge provenance must be exactly its module-resolution provenance.'
+		);
+	if (
+		!same(
+			edge.sourceLocations,
+			exactLocation(occurrence.sourceId, occurrence.start, occurrence.end)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.sourceLocations`,
+			'Edge must cite the exact module occurrence location.'
+		);
+	return false;
+}
+
+function validateEdgeEndpoints(
+	state: GraphSemanticsState,
+	edge: ModuleDependencyGraphEdge,
+	resolution: SemanticModuleResolutionRecord,
+	path: string
+): void {
+	const { issues, nodeById, sourceNodeBySemanticId, targetNodeByResolutionId } = state;
+	const sourceNode = nodeById.get(edge.source.nodeId);
+	if (
+		edge.source.kind !== 'SOURCE' ||
+		sourceNode?.kind !== 'SOURCE' ||
+		sourceNode.semanticSourceId !== resolution.sourceId
+	)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.source`,
+			'Edge source must be the exact importer SOURCE node.'
+		);
+	let expectedTarget: ModuleDependencyGraphNode | undefined;
+	if (resolution.targetSourceId !== null) {
+		expectedTarget = sourceNodeBySemanticId.get(resolution.targetSourceId);
+		if (edge.target.kind !== 'SOURCE' || expectedTarget?.kind !== 'SOURCE')
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.target`,
+				'A module resolution with a source target must use its semantic SOURCE node.'
+			);
+	} else {
+		expectedTarget = targetNodeByResolutionId.get(resolution.id);
+		if (edge.target.kind !== 'RESOLUTION_TARGET' || expectedTarget?.kind !== 'RESOLUTION_TARGET')
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.target`,
+				'A module resolution without a source target must retain its explicit graph-native endpoint.'
+			);
+	}
+	if (edge.target.nodeId !== expectedTarget?.id)
+		issues.add('DANGLING_REFERENCE', `${path}.target.nodeId`, 'Edge target identity mismatch.');
+}
+
+function validateEdgeIdentity(
+	state: GraphSemanticsState,
+	edge: ModuleDependencyGraphEdge,
+	resolution: SemanticModuleResolutionRecord,
+	path: string
+): void {
+	const { graph, issues } = state;
+	const expectedEdgeId = moduleDependencyGraphEdgeId({
+		graph: graph.id,
+		moduleResolutionId: resolution.id,
+		relationKind: edge.relationKind,
+		source: edge.source,
+		target: edge.target
+	});
+	if (edge.id !== expectedEdgeId)
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module-dependency edge identity mismatch.');
+	if (edge.epistemic !== expectedEpistemic(resolution.resolutionState))
+		issues.add('INVALID_VALUE', `${path}.epistemic`, 'Edge epistemic state mismatch.');
+}
+
+// Returns true when the remaining per-edge checks are skipped, exactly as the original
+// `continue` did — including its skip of the end-of-iteration budget check.
+function validateGraphEdge(
+	state: GraphSemanticsState,
+	edge: ModuleDependencyGraphEdge,
+	path: string
+): boolean {
+	const { edgesByResolution, graph, issues, layer, provenanceById, resolutionById, snapshot } =
+		state;
+	graphWideReference(edge, graph, layer.id, path, issues);
+	validateProvenanceIds(
+		edge.provenanceIds,
+		snapshot,
+		provenanceById,
+		`${path}.provenanceIds`,
+		issues
+	);
+	canonicalObjectArray(edge.sourceLocations, `${path}.sourceLocations`, issues);
+	const grouped = edgesByResolution.get(edge.moduleResolutionId) ?? [];
+	grouped.push(edge);
+	edgesByResolution.set(edge.moduleResolutionId, grouped);
+	const resolution = resolutionById.get(edge.moduleResolutionId);
+	if (resolution === undefined) {
+		issues.add('DANGLING_REFERENCE', `${path}.moduleResolutionId`, 'Absent module resolution.');
+		return true;
+	}
+	if (validateEdgeOccurrence(state, edge, resolution, path)) return true;
+	validateEdgeEndpoints(state, edge, resolution, path);
+	validateEdgeIdentity(state, edge, resolution, path);
+	return false;
+}
+
+// Returns true when the issue budget was exhausted and validation must stop.
+function validateGraphEdges(state: GraphSemanticsState): boolean {
+	for (const [index, edge] of state.graph.edges.entries()) {
+		if (validateGraphEdge(state, edge, `$.edges[${index}]`)) continue;
+		if (state.issues.exhausted) return true;
+	}
+	return false;
+}
+
+function invalidGraphNativeEndpointPopulation(
+	resolution: SemanticModuleResolutionRecord,
+	targetCount: number
+): boolean {
+	return (
+		(resolution.targetSourceId !== null && targetCount !== 0) ||
+		(resolution.targetSourceId === null && targetCount !== 1)
+	);
+}
+
+// Returns true when the issue budget was exhausted and validation must stop.
+function validateResolutionPopulations(state: GraphSemanticsState): boolean {
+	const { edgesByResolution, issues, snapshot, targetNodeCountByResolutionId } = state;
 	for (const resolution of snapshot.moduleResolutions) {
 		const count = edgesByResolution.get(resolution.id)?.length ?? 0;
 		if (count !== 1)
@@ -1227,17 +1372,19 @@ function validateGraphSemantics(
 				`Module resolution ${resolution.id} must support exactly one distinct edge; received ${count}.`
 			);
 		const targetCount = targetNodeCountByResolutionId.get(resolution.id) ?? 0;
-		if (
-			(resolution.targetSourceId !== null && targetCount !== 0) ||
-			(resolution.targetSourceId === null && targetCount !== 1)
-		)
+		if (invalidGraphNativeEndpointPopulation(resolution, targetCount))
 			issues.add(
 				'POPULATION_MISMATCH',
 				'$.nodes',
 				`Module resolution ${resolution.id} has an invalid graph-native endpoint population.`
 			);
-		if (issues.exhausted) return;
+		if (issues.exhausted) return true;
 	}
+	return false;
+}
+
+function validateNodePopulations(state: GraphSemanticsState): void {
+	const { issues, snapshot, sourceById, sourceNodeBySemanticId, sourceNodes, targetNodes } = state;
 	if (
 		sourceNodes.length !== snapshot.sources.length ||
 		sourceNodeBySemanticId.size !== sourceById.size
@@ -1253,7 +1400,10 @@ function validateGraphSemantics(
 			'$.nodes',
 			'Graph-native target population does not match resolutions without source targets.'
 		);
+}
 
+function validateLayerManifests(state: GraphSemanticsState): void {
+	const { graph, issues, layer } = state;
 	const nodeIds = graph.nodes.map((node) => node.id).sort(compareText);
 	const edgeIds = graph.edges.map((edge) => edge.id).sort(compareText);
 	if (!same(layer.nodeIds, nodeIds))
@@ -1262,7 +1412,32 @@ function validateGraphSemantics(
 		issues.add('POPULATION_MISMATCH', '$.layers[0].edgeIds', 'Layer edge manifest mismatch.');
 	sortedUniqueStrings(layer.nodeIds, '$.layers[0].nodeIds', issues);
 	sortedUniqueStrings(layer.edgeIds, '$.layers[0].edgeIds', issues);
+}
 
+function validateIndexEntry(
+	state: GraphSemanticsState,
+	entry: ModuleDependencyGraphIndexEntry,
+	path: string
+): void {
+	const { edgeById, issues, nodeById } = state;
+	if (!nodeById.has(entry.nodeId))
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.nodeId`,
+			'Index entry references an absent graph node.'
+		);
+	sortedUniqueStrings(entry.edgeIds, `${path}.edgeIds`, issues);
+	for (const [edgeIndex, edgeId] of entry.edgeIds.entries())
+		if (!edgeById.has(edgeId))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.edgeIds[${edgeIndex}]`,
+				'Index entry references an absent graph edge.'
+			);
+}
+
+function validateGraphIndexes(state: GraphSemanticsState): void {
+	const { graph, issues } = state;
 	for (const [name, index, expected] of [
 		['forwardIndex', graph.forwardIndex, expectedIndex(graph.nodes, graph.edges, 'FORWARD')],
 		['reverseIndex', graph.reverseIndex, expectedIndex(graph.nodes, graph.edges, 'REVERSE')]
@@ -1272,22 +1447,8 @@ function validateGraphSemantics(
 			`$.${name}`,
 			issues
 		);
-		for (const [entryIndex, entry] of index.entries()) {
-			if (!nodeById.has(entry.nodeId))
-				issues.add(
-					'DANGLING_REFERENCE',
-					`$.${name}[${entryIndex}].nodeId`,
-					'Index entry references an absent graph node.'
-				);
-			sortedUniqueStrings(entry.edgeIds, `$.${name}[${entryIndex}].edgeIds`, issues);
-			for (const [edgeIndex, edgeId] of entry.edgeIds.entries())
-				if (!edgeById.has(edgeId))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`$.${name}[${entryIndex}].edgeIds[${edgeIndex}]`,
-						'Index entry references an absent graph edge.'
-					);
-		}
+		for (const [entryIndex, entry] of index.entries())
+			validateIndexEntry(state, entry, `$.${name}[${entryIndex}]`);
 		if (!same(index, expected))
 			issues.add(
 				'POPULATION_MISMATCH',
@@ -1295,7 +1456,10 @@ function validateGraphSemantics(
 				`${name} does not exactly reconcile graph endpoint navigation.`
 			);
 	}
+}
 
+function validateGraphDisclosure(state: GraphSemanticsState): void {
+	const { graph, issues, layer, snapshot } = state;
 	const coverage = expectedCoverage(snapshot);
 	if (!same(graph.coverage, coverage))
 		issues.add('POPULATION_MISMATCH', '$.coverage', 'Graph coverage does not reconcile inputs.');
@@ -1313,7 +1477,10 @@ function validateGraphSemantics(
 	const expectedHealth = coverage.closure === 'CLOSED' ? 'COMPLETE' : 'PARTIAL';
 	if (graph.health !== expectedHealth)
 		issues.add('INVALID_VALUE', '$.health', 'Graph health must reflect its exact closure state.');
+}
 
+function validateLayerProvenance(state: GraphSemanticsState): void {
+	const { graph, issues, layer, provenanceById, snapshot } = state;
 	const expectedLayerProvenance = [
 		...new Set(
 			graph.nodes
@@ -1334,7 +1501,9 @@ function validateGraphSemantics(
 			'$.layers[0].provenanceIds',
 			'Layer provenance manifest does not reconcile node and edge support.'
 		);
+}
 
+function validateContentDigest(graph: ModuleDependencyGraphSnapshot, issues: IssueCollector): void {
 	try {
 		if (graph.contentDigest !== moduleDependencyGraphContentDigest(graph))
 			issues.add(
@@ -1349,10 +1518,39 @@ function validateGraphSemantics(
 			error instanceof Error ? error.message : 'Graph content digest failed closed.'
 		);
 	}
+}
 
+function validateGraphSemantics(
+	graph: ModuleDependencyGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
+	validateGraphVersions(graph, issues);
+	validateGraphBinding(graph, snapshot, issues);
+	validateGraphInputDigest(graph, snapshot, issues);
+	validateGraphIdentity(graph, issues);
+	if (graph.layers.length !== 1) {
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.layers',
+			'Exactly one module-resolution layer is required.'
+		);
+		return;
+	}
+	validateGraphLayerIdentity(graph, snapshot, issues);
+	const state = createGraphSemanticsState(graph, snapshot, issues);
+	if (validateGraphNodes(state)) return;
+	if (validateGraphEdges(state)) return;
+	if (validateResolutionPopulations(state)) return;
+	validateNodePopulations(state);
+	validateLayerManifests(state);
+	validateGraphIndexes(state);
+	validateGraphDisclosure(state);
+	validateLayerProvenance(state);
+	validateContentDigest(graph, issues);
 	// Keep these maps live through validation: an extra unknown ID may otherwise
 	// be hidden by a correct-looking manifest or index.
-	if (nodeById.size !== graph.nodes.length || edgeById.size !== graph.edges.length)
+	if (state.nodeById.size !== graph.nodes.length || state.edgeById.size !== graph.edges.length)
 		issues.add('DUPLICATE_ID', '$', 'Graph populations contain duplicate identities.');
 }
 

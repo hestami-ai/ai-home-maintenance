@@ -208,7 +208,7 @@ function scalarString(value: unknown): value is string {
 
 function containsControlText(value: string): boolean {
 	for (let index = 0; index < value.length; index += 1) {
-		const code = value.charCodeAt(index);
+		const code = value.codePointAt(index)!;
 		if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return true;
 	}
 	return false;
@@ -418,13 +418,11 @@ function hasExactEnumerableKeys(value: JsonRecord, keys: readonly string[]): boo
 	const expected = new Set(keys);
 	let count = 0;
 	for (const key in value) {
-		if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+		if (!Object.hasOwn(value, key)) continue;
 		count += 1;
 		if (count > keys.length || !expected.has(key)) return false;
 	}
-	return (
-		count === keys.length && keys.every((key) => Object.prototype.hasOwnProperty.call(value, key))
-	);
+	return count === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 
 function exactInvocationKeys(value: JsonRecord, keys: readonly string[], path: string): void {
@@ -433,9 +431,14 @@ function exactInvocationKeys(value: JsonRecord, keys: readonly string[], path: s
 		fail('INVOCATION_INVALID', path, `Expected exact binding fields: ${wanted.join(', ')}.`);
 }
 
-function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
-	if (!plainRecord(binding))
-		fail('INVOCATION_INVALID', '$binding', 'Expected plain binding object.');
+type InvocationCandidate = DependencyCruiserInvocationBinding & JsonRecord;
+
+interface InvocationInputPaths {
+	readonly characters: number;
+	readonly paths: readonly string[];
+}
+
+function validateInvocationIdentity(binding: InvocationCandidate): void {
 	exactInvocationKeys(
 		binding,
 		[
@@ -466,6 +469,9 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 	)
 		fail('INVOCATION_INVALID', '$binding', 'Binding identity is unsupported or malformed.');
 	exactInvocationKeys(binding.provider, ['id', 'version'], '$binding.provider');
+}
+
+function validateProviderReportedBaseDirBinding(binding: InvocationCandidate): void {
 	if (!plainRecord(binding.providerReportedBaseDir))
 		fail(
 			'INVOCATION_INVALID',
@@ -497,6 +503,9 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 			'Provider-reported base-directory binding is malformed.'
 		);
 	}
+}
+
+function validateSubjectRootBinding(binding: InvocationCandidate): void {
 	if (
 		!plainRecord(binding.subjectRoot) ||
 		!nonnegativeInteger(binding.subjectRoot.bytes) ||
@@ -504,6 +513,9 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 	)
 		fail('INVOCATION_INVALID', '$binding.subjectRoot', 'Subject-root identity is malformed.');
 	exactInvocationKeys(binding.subjectRoot, ['bytes', 'sha256'], '$binding.subjectRoot');
+}
+
+function validateBudgetsBinding(binding: InvocationCandidate): void {
 	if (!plainRecord(binding.budgets))
 		fail('INVOCATION_INVALID', '$binding.budgets', 'Expected caller budgets.');
 	const budgetKeys = [
@@ -530,10 +542,16 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 		fail('INVOCATION_INVALID', '$binding.budgets', 'Budgets must be exact positive safe integers.');
 	if (binding.budgets.maxIssues > 100_000)
 		fail('INVOCATION_INVALID', '$binding.budgets.maxIssues', 'maxIssues exceeds validator bound.');
+}
+
+function validateBaseDirBinding(binding: InvocationCandidate): void {
 	if (!scalarString(binding.baseDir))
 		fail('INVOCATION_INVALID', '$binding.baseDir', 'Expected a canonical base directory.');
 	if (binding.baseDir !== '.')
 		canonicalPath(binding.baseDir, '$binding.baseDir', binding.budgets.maxPathLength);
+}
+
+function validateInputPathsBinding(binding: InvocationCandidate): InvocationInputPaths {
 	if (!Array.isArray(binding.inputPaths) || binding.inputPaths.length === 0)
 		fail('INVOCATION_INVALID', '$binding.inputPaths', 'At least one input path is required.');
 	if (binding.inputPaths.length > binding.budgets.maxInputPaths)
@@ -565,6 +583,10 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 		canonicalSemanticJson([...new Set(inputPaths)].sort(compareText))
 	)
 		fail('INVOCATION_INVALID', '$binding.inputPaths', 'Input paths must be sorted and unique.');
+	return { characters: inputPathCharacters, paths: inputPaths };
+}
+
+function validateConfigBinding(binding: InvocationCandidate): void {
 	if (
 		!plainRecord(binding.config) ||
 		!scalarString(binding.config.path) ||
@@ -573,6 +595,32 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 		fail('INVOCATION_INVALID', '$binding.config', 'Configuration binding is malformed.');
 	exactInvocationKeys(binding.config, ['path', 'sha256'], '$binding.config');
 	canonicalPath(binding.config.path, '$binding.config.path', binding.budgets.maxPathLength);
+}
+
+function validateCommandArgument(
+	binding: InvocationCandidate,
+	argument: string,
+	index: number
+): number {
+	const path = `$binding.command.args[${index}]`;
+	if (!scalarString(argument) || containsControlText(argument))
+		fail('INVOCATION_INVALID', path, 'Command argument must be scalar text without controls.');
+	if (argument.length > binding.budgets.maxStringLength)
+		fail('BUDGET_EXCEEDED', path, 'Command argument exceeds the string budget.');
+	if (
+		argument.startsWith('/') ||
+		argument.startsWith('\\\\') ||
+		argument.startsWith('//') ||
+		/^[A-Za-z]:/u.test(argument)
+	)
+		fail('INVOCATION_INVALID', path, 'Absolute or UNC command arguments are not admissible.');
+	return argument.length;
+}
+
+function validateCommandBinding(
+	binding: InvocationCandidate,
+	inputPaths: InvocationInputPaths
+): void {
 	if (
 		!plainRecord(binding.command) ||
 		!Array.isArray(binding.command.args) ||
@@ -596,37 +644,33 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 	if (binding.command.args.length === 0)
 		fail('INVOCATION_INVALID', '$binding.command.args', 'Closed argv grammar forbids empty argv.');
 	let commandCharacters = 0;
-	for (const [index, argument] of binding.command.args.entries()) {
-		const path = `$binding.command.args[${index}]`;
-		if (!scalarString(argument) || containsControlText(argument))
-			fail('INVOCATION_INVALID', path, 'Command argument must be scalar text without controls.');
-		if (argument.length > binding.budgets.maxStringLength)
-			fail('BUDGET_EXCEEDED', path, 'Command argument exceeds the string budget.');
-		commandCharacters += argument.length;
-		if (
-			argument.startsWith('/') ||
-			argument.startsWith('\\\\') ||
-			argument.startsWith('//') ||
-			/^[A-Za-z]:/u.test(argument)
-		)
-			fail('INVOCATION_INVALID', path, 'Absolute or UNC command arguments are not admissible.');
-	}
+	for (const [index, argument] of binding.command.args.entries())
+		commandCharacters += validateCommandArgument(binding, argument, index);
 	if (
 		commandCharacters > binding.budgets.maxTotalStringCharacters ||
-		commandCharacters + inputPathCharacters > binding.budgets.maxTotalStringCharacters
+		commandCharacters + inputPaths.characters > binding.budgets.maxTotalStringCharacters
 	)
 		fail(
 			'BUDGET_EXCEEDED',
 			'$binding.command.args',
 			'Invocation strings exceed the caller budget.'
 		);
-	const expectedArgs = [...inputPaths, '--config', binding.config.path, '--output-type', 'json'];
+	const expectedArgs = [
+		...inputPaths.paths,
+		'--config',
+		binding.config.path,
+		'--output-type',
+		'json'
+	];
 	if (!safeCanonicalEqual(binding.command.args, expectedArgs))
 		fail(
 			'INVOCATION_INVALID',
 			'$binding.command.args',
 			'Command arguments do not match the closed dependency-cruiser argv grammar.'
 		);
+}
+
+function validateRawBinding(binding: InvocationCandidate): void {
 	if (
 		!plainRecord(binding.raw) ||
 		!nonnegativeInteger(binding.raw.bytes) ||
@@ -636,162 +680,215 @@ function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
 	exactInvocationKeys(binding.raw, ['bytes', 'sha256'], '$binding.raw');
 }
 
+function validateInvocation(binding: DependencyCruiserInvocationBinding): void {
+	if (!plainRecord(binding))
+		fail('INVOCATION_INVALID', '$binding', 'Expected plain binding object.');
+	validateInvocationIdentity(binding);
+	validateProviderReportedBaseDirBinding(binding);
+	validateSubjectRootBinding(binding);
+	validateBudgetsBinding(binding);
+	validateBaseDirBinding(binding);
+	const inputPaths = validateInputPathsBinding(binding);
+	validateConfigBinding(binding);
+	validateCommandBinding(binding, inputPaths);
+	validateRawBinding(binding);
+}
+
+interface JsonArrayFrame {
+	readonly depth: number;
+	readonly index: number;
+	readonly keys: IterableIterator<string>;
+	readonly kind: 'ARRAY';
+	readonly path: string;
+	readonly value: readonly unknown[];
+}
+
+interface JsonExitFrame {
+	readonly kind: 'EXIT';
+	readonly value: object;
+}
+
+interface JsonObjectFrame {
+	readonly depth: number;
+	readonly keys: IterableIterator<string>;
+	readonly kind: 'OBJECT';
+	readonly path: string;
+	readonly value: JsonRecord;
+}
+
+interface JsonValueFrame {
+	readonly depth: number;
+	readonly kind: 'VALUE';
+	readonly path: string;
+	readonly value: unknown;
+}
+
+type JsonWorkFrame = JsonArrayFrame | JsonExitFrame | JsonObjectFrame | JsonValueFrame;
+
+interface JsonBudgetState {
+	readonly active: WeakSet<object>;
+	readonly binding: DependencyCruiserInvocationBinding;
+	characters: number;
+	readonly maxArrayEntries: number;
+	readonly stack: JsonWorkFrame[];
+}
+
+function* enumerableOwnKeys(value: object): IterableIterator<string> {
+	for (const key in value) if (Object.hasOwn(value, key)) yield key;
+}
+
+function pushArrayEntryFrames(state: JsonBudgetState, current: JsonArrayFrame, key: string): void {
+	const descriptor = Object.getOwnPropertyDescriptor(current.value, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		fail('RAW_SHAPE_INVALID', current.path, 'Array entries must be enumerable data properties.');
+	state.stack.push(
+		{ ...current, index: current.index + 1 },
+		{
+			depth: current.depth + 1,
+			kind: 'VALUE',
+			path: `${current.path}[${current.index}]`,
+			value: descriptor.value
+		}
+	);
+}
+
+function stepArrayFrame(state: JsonBudgetState, current: JsonArrayFrame): void {
+	const next = current.keys.next();
+	if (next.done) {
+		if (current.index !== current.value.length)
+			fail('RAW_SHAPE_INVALID', current.path, 'Sparse arrays are not admissible JSON evidence.');
+		return;
+	}
+	if (next.value !== String(current.index))
+		fail(
+			'RAW_SHAPE_INVALID',
+			current.path,
+			'Array expando properties or noncanonical indexes are not admissible JSON evidence.'
+		);
+	pushArrayEntryFrames(state, current, next.value);
+}
+
+function accountObjectKey(state: JsonBudgetState, path: string, key: string): void {
+	state.characters += key.length;
+	if (!scalarString(key)) fail('RAW_SHAPE_INVALID', path, 'Object key is not Unicode scalar text.');
+	if (key.length > state.binding.budgets.maxStringLength)
+		fail('BUDGET_EXCEEDED', path, 'Object key exceeds the caller budget.');
+	if (state.characters > state.binding.budgets.maxTotalStringCharacters)
+		fail('BUDGET_EXCEEDED', path, 'Total string population exceeds the caller budget.');
+}
+
+function stepObjectFrame(state: JsonBudgetState, current: JsonObjectFrame): void {
+	const next = current.keys.next();
+	if (next.done) return;
+	accountObjectKey(state, current.path, next.value);
+	const descriptor = Object.getOwnPropertyDescriptor(current.value, next.value);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		fail('RAW_SHAPE_INVALID', current.path, 'Object fields must be enumerable data properties.');
+	state.stack.push(current, {
+		depth: current.depth + 1,
+		kind: 'VALUE',
+		path: `${current.path}.${next.value}`,
+		value: descriptor.value
+	});
+}
+
+function accountJsonString(state: JsonBudgetState, path: string, value: string): void {
+	if (!isUnicodeScalarString(value))
+		fail('RAW_SHAPE_INVALID', path, 'String is not Unicode scalar text.');
+	if (value.length > state.binding.budgets.maxStringLength)
+		fail('BUDGET_EXCEEDED', path, 'String exceeds the caller budget.');
+	state.characters += value.length;
+	if (state.characters > state.binding.budgets.maxTotalStringCharacters)
+		fail('BUDGET_EXCEEDED', path, 'Total string population exceeds the caller budget.');
+}
+
+function pushArrayValueFrames(
+	state: JsonBudgetState,
+	current: JsonValueFrame,
+	value: readonly unknown[]
+): void {
+	if (state.active.has(value))
+		fail('RAW_SHAPE_INVALID', current.path, 'Cyclic values are not admissible JSON evidence.');
+	if (value.length > state.maxArrayEntries)
+		fail('BUDGET_EXCEEDED', current.path, 'Array population exceeds the caller budgets.');
+	state.active.add(value);
+	state.stack.push(
+		{ kind: 'EXIT', value },
+		{
+			depth: current.depth,
+			index: 0,
+			keys: enumerableOwnKeys(value),
+			kind: 'ARRAY',
+			path: current.path,
+			value
+		}
+	);
+}
+
+function pushObjectValueFrames(
+	state: JsonBudgetState,
+	current: JsonValueFrame,
+	value: object
+): void {
+	if (!plainRecord(value)) fail('RAW_SHAPE_INVALID', current.path, 'Expected plain JSON object.');
+	if (state.active.has(value))
+		fail('RAW_SHAPE_INVALID', current.path, 'Cyclic values are not admissible JSON evidence.');
+	state.active.add(value);
+	state.stack.push(
+		{ kind: 'EXIT', value },
+		{
+			depth: current.depth,
+			keys: enumerableOwnKeys(value),
+			kind: 'OBJECT',
+			path: current.path,
+			value
+		}
+	);
+}
+
+function stepValueFrame(state: JsonBudgetState, current: JsonValueFrame): void {
+	if (current.depth > state.binding.budgets.maxJsonDepth)
+		fail('BUDGET_EXCEEDED', current.path, 'JSON depth exceeds the caller budget.');
+	if (typeof current.value === 'string') accountJsonString(state, current.path, current.value);
+	else if (Array.isArray(current.value)) pushArrayValueFrames(state, current, current.value);
+	else if (current.value !== null && typeof current.value === 'object')
+		pushObjectValueFrames(state, current, current.value);
+	else if (
+		current.value !== null &&
+		typeof current.value !== 'boolean' &&
+		!finiteNumber(current.value)
+	)
+		fail('RAW_SHAPE_INVALID', current.path, 'Unsupported JSON scalar.');
+}
+
 function validateJsonBudget(
 	root: unknown,
 	binding: DependencyCruiserInvocationBinding,
 	rootPath = '$raw'
 ): void {
-	type WorkFrame =
-		| {
-				readonly depth: number;
-				readonly index: number;
-				readonly keys: IterableIterator<string>;
-				readonly kind: 'ARRAY';
-				readonly path: string;
-				readonly value: readonly unknown[];
-		  }
-		| { readonly kind: 'EXIT'; readonly value: object }
-		| {
-				readonly depth: number;
-				readonly keys: IterableIterator<string>;
-				readonly kind: 'OBJECT';
-				readonly path: string;
-				readonly value: JsonRecord;
-		  }
-		| {
-				readonly depth: number;
-				readonly kind: 'VALUE';
-				readonly path: string;
-				readonly value: unknown;
-		  };
-	function* enumerableOwnKeys(value: object): IterableIterator<string> {
-		for (const key in value) if (Object.prototype.hasOwnProperty.call(value, key)) yield key;
-	}
-	const maxArrayEntries = Math.max(
-		DEPENDENCY_TYPES.length,
-		64,
-		binding.budgets.maxCommandArgs,
-		binding.budgets.maxDependencies,
-		binding.budgets.maxDependents,
-		binding.budgets.maxInputPaths,
-		binding.budgets.maxModules,
-		binding.budgets.maxRules,
-		binding.budgets.maxSummaryViolations
-	);
-	const active = new WeakSet<object>();
-	const stack: WorkFrame[] = [{ depth: 0, kind: 'VALUE', path: rootPath, value: root }];
-	let characters = 0;
-	while (stack.length > 0) {
-		const current = stack.pop()!;
-		if (current.kind === 'EXIT') {
-			active.delete(current.value);
-			continue;
-		}
-		if (current.kind === 'ARRAY') {
-			const next = current.keys.next();
-			if (next.done) {
-				if (current.index !== current.value.length)
-					fail(
-						'RAW_SHAPE_INVALID',
-						current.path,
-						'Sparse arrays are not admissible JSON evidence.'
-					);
-				continue;
-			}
-			if (next.value !== String(current.index))
-				fail(
-					'RAW_SHAPE_INVALID',
-					current.path,
-					'Array expando properties or noncanonical indexes are not admissible JSON evidence.'
-				);
-			const descriptor = Object.getOwnPropertyDescriptor(current.value, next.value);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				fail(
-					'RAW_SHAPE_INVALID',
-					current.path,
-					'Array entries must be enumerable data properties.'
-				);
-			stack.push({ ...current, index: current.index + 1 });
-			stack.push({
-				depth: current.depth + 1,
-				kind: 'VALUE',
-				path: `${current.path}[${current.index}]`,
-				value: descriptor.value
-			});
-			continue;
-		}
-		if (current.kind === 'OBJECT') {
-			const next = current.keys.next();
-			if (next.done) continue;
-			characters += next.value.length;
-			if (!scalarString(next.value))
-				fail('RAW_SHAPE_INVALID', current.path, 'Object key is not Unicode scalar text.');
-			if (next.value.length > binding.budgets.maxStringLength)
-				fail('BUDGET_EXCEEDED', current.path, 'Object key exceeds the caller budget.');
-			if (characters > binding.budgets.maxTotalStringCharacters)
-				fail('BUDGET_EXCEEDED', current.path, 'Total string population exceeds the caller budget.');
-			const descriptor = Object.getOwnPropertyDescriptor(current.value, next.value);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				fail(
-					'RAW_SHAPE_INVALID',
-					current.path,
-					'Object fields must be enumerable data properties.'
-				);
-			stack.push(current);
-			stack.push({
-				depth: current.depth + 1,
-				kind: 'VALUE',
-				path: `${current.path}.${next.value}`,
-				value: descriptor.value
-			});
-			continue;
-		}
-		if (current.depth > binding.budgets.maxJsonDepth)
-			fail('BUDGET_EXCEEDED', current.path, 'JSON depth exceeds the caller budget.');
-		if (typeof current.value === 'string') {
-			if (!isUnicodeScalarString(current.value))
-				fail('RAW_SHAPE_INVALID', current.path, 'String is not Unicode scalar text.');
-			if (current.value.length > binding.budgets.maxStringLength)
-				fail('BUDGET_EXCEEDED', current.path, 'String exceeds the caller budget.');
-			characters += current.value.length;
-			if (characters > binding.budgets.maxTotalStringCharacters)
-				fail('BUDGET_EXCEEDED', current.path, 'Total string population exceeds the caller budget.');
-		} else if (Array.isArray(current.value)) {
-			if (active.has(current.value))
-				fail('RAW_SHAPE_INVALID', current.path, 'Cyclic values are not admissible JSON evidence.');
-			if (current.value.length > maxArrayEntries)
-				fail('BUDGET_EXCEEDED', current.path, 'Array population exceeds the caller budgets.');
-			active.add(current.value);
-			stack.push({ kind: 'EXIT', value: current.value });
-			stack.push({
-				depth: current.depth,
-				index: 0,
-				keys: enumerableOwnKeys(current.value),
-				kind: 'ARRAY',
-				path: current.path,
-				value: current.value
-			});
-		} else if (current.value !== null && typeof current.value === 'object') {
-			if (!plainRecord(current.value))
-				fail('RAW_SHAPE_INVALID', current.path, 'Expected plain JSON object.');
-			if (active.has(current.value))
-				fail('RAW_SHAPE_INVALID', current.path, 'Cyclic values are not admissible JSON evidence.');
-			active.add(current.value);
-			stack.push({ kind: 'EXIT', value: current.value });
-			stack.push({
-				depth: current.depth,
-				keys: enumerableOwnKeys(current.value),
-				kind: 'OBJECT',
-				path: current.path,
-				value: current.value
-			});
-		} else if (
-			current.value !== null &&
-			typeof current.value !== 'boolean' &&
-			!finiteNumber(current.value)
-		) {
-			fail('RAW_SHAPE_INVALID', current.path, 'Unsupported JSON scalar.');
-		}
+	const state: JsonBudgetState = {
+		active: new WeakSet<object>(),
+		binding,
+		characters: 0,
+		maxArrayEntries: Math.max(
+			DEPENDENCY_TYPES.length,
+			64,
+			binding.budgets.maxCommandArgs,
+			binding.budgets.maxDependencies,
+			binding.budgets.maxDependents,
+			binding.budgets.maxInputPaths,
+			binding.budgets.maxModules,
+			binding.budgets.maxRules,
+			binding.budgets.maxSummaryViolations
+		),
+		stack: [{ depth: 0, kind: 'VALUE', path: rootPath, value: root }]
+	};
+	while (state.stack.length > 0) {
+		const current = state.stack.pop()!;
+		if (current.kind === 'EXIT') state.active.delete(current.value);
+		else if (current.kind === 'ARRAY') stepArrayFrame(state, current);
+		else if (current.kind === 'OBJECT') stepObjectFrame(state, current);
+		else stepValueFrame(state, current);
 	}
 }
 
@@ -858,6 +955,59 @@ function validateMiniDependencies(value: unknown, path: string): void {
 	}
 }
 
+function validateViolationRule(item: JsonRecord, path: string): void {
+	if (!plainRecord(item.rule)) fail('RAW_SHAPE_INVALID', `${path}.rule`, 'Expected rule object.');
+	assertKnownKeys(item.rule, new Set(['name', 'severity']), `${path}.rule`);
+	required(item.rule, ['name', 'severity'], `${path}.rule`);
+	if (
+		!scalarString(item.rule.name) ||
+		!scalarString(item.rule.severity) ||
+		!SEVERITIES.has(item.rule.severity as never)
+	)
+		fail('RAW_SHAPE_INVALID', `${path}.rule`, 'Violation rule is malformed.');
+}
+
+function validateViolationMetrics(metrics: unknown, path: string): void {
+	if (!plainRecord(metrics))
+		fail('RAW_SHAPE_INVALID', `${path}.metrics`, 'Expected metrics object.');
+	assertKnownKeys(metrics, new Set(['from', 'to']), `${path}.metrics`);
+	for (const endpoint of ['from', 'to'] as const) {
+		const metric = metrics[endpoint];
+		if (
+			!plainRecord(metric) ||
+			Object.keys(metric).length !== 1 ||
+			!finiteNumber(metric.instability)
+		)
+			fail('RAW_SHAPE_INVALID', `${path}.metrics.${endpoint}`, 'Expected instability metric.');
+	}
+}
+
+function validateSummaryViolation(item: unknown, path: string): void {
+	if (!plainRecord(item)) fail('RAW_SHAPE_INVALID', path, 'Expected violation object.');
+	assertKnownKeys(
+		item,
+		new Set(['comment', 'cycle', 'from', 'metrics', 'rule', 'to', 'type', 'via']),
+		path
+	);
+	required(item, ['from', 'rule', 'to'], path);
+	if (!scalarString(item.from) || !scalarString(item.to))
+		fail('RAW_SHAPE_INVALID', path, 'Violation endpoints must be strings.');
+	if (
+		item.type !== undefined &&
+		(!scalarString(item.type) ||
+			!['cycle', 'dependency', 'folder', 'instability', 'module', 'reachability'].includes(
+				item.type
+			))
+	)
+		fail('RAW_SHAPE_INVALID', `${path}.type`, 'Unknown violation type.');
+	validateViolationRule(item, path);
+	if (item.cycle !== undefined) validateMiniDependencies(item.cycle, `${path}.cycle`);
+	if (item.via !== undefined) validateMiniDependencies(item.via, `${path}.via`);
+	if (item.comment !== undefined && !scalarString(item.comment))
+		fail('RAW_SHAPE_INVALID', `${path}.comment`, 'Expected string comment.');
+	if (item.metrics !== undefined) validateViolationMetrics(item.metrics, path);
+}
+
 function validateSummaryViolations(
 	value: unknown,
 	binding: DependencyCruiserInvocationBinding
@@ -866,53 +1016,8 @@ function validateSummaryViolations(
 		fail('RAW_SHAPE_INVALID', '$raw.summary.violations', 'Expected array.');
 	if (value.length > binding.budgets.maxSummaryViolations)
 		fail('BUDGET_EXCEEDED', '$raw.summary.violations', 'Violation population exceeds budget.');
-	for (const [index, item] of value.entries()) {
-		const path = `$raw.summary.violations[${index}]`;
-		if (!plainRecord(item)) fail('RAW_SHAPE_INVALID', path, 'Expected violation object.');
-		assertKnownKeys(
-			item,
-			new Set(['comment', 'cycle', 'from', 'metrics', 'rule', 'to', 'type', 'via']),
-			path
-		);
-		required(item, ['from', 'rule', 'to'], path);
-		if (!scalarString(item.from) || !scalarString(item.to))
-			fail('RAW_SHAPE_INVALID', path, 'Violation endpoints must be strings.');
-		if (
-			item.type !== undefined &&
-			(!scalarString(item.type) ||
-				!['cycle', 'dependency', 'folder', 'instability', 'module', 'reachability'].includes(
-					item.type
-				))
-		)
-			fail('RAW_SHAPE_INVALID', `${path}.type`, 'Unknown violation type.');
-		if (!plainRecord(item.rule)) fail('RAW_SHAPE_INVALID', `${path}.rule`, 'Expected rule object.');
-		assertKnownKeys(item.rule, new Set(['name', 'severity']), `${path}.rule`);
-		required(item.rule, ['name', 'severity'], `${path}.rule`);
-		if (
-			!scalarString(item.rule.name) ||
-			!scalarString(item.rule.severity) ||
-			!SEVERITIES.has(item.rule.severity as never)
-		)
-			fail('RAW_SHAPE_INVALID', `${path}.rule`, 'Violation rule is malformed.');
-		if (item.cycle !== undefined) validateMiniDependencies(item.cycle, `${path}.cycle`);
-		if (item.via !== undefined) validateMiniDependencies(item.via, `${path}.via`);
-		if (item.comment !== undefined && !scalarString(item.comment))
-			fail('RAW_SHAPE_INVALID', `${path}.comment`, 'Expected string comment.');
-		if (item.metrics !== undefined) {
-			if (!plainRecord(item.metrics))
-				fail('RAW_SHAPE_INVALID', `${path}.metrics`, 'Expected metrics object.');
-			assertKnownKeys(item.metrics, new Set(['from', 'to']), `${path}.metrics`);
-			for (const endpoint of ['from', 'to'] as const) {
-				const metric = item.metrics[endpoint];
-				if (
-					!plainRecord(metric) ||
-					Object.keys(metric).length !== 1 ||
-					!finiteNumber(metric.instability)
-				)
-					fail('RAW_SHAPE_INVALID', `${path}.metrics.${endpoint}`, 'Expected instability metric.');
-			}
-		}
-	}
+	for (const [index, item] of value.entries())
+		validateSummaryViolation(item, `$raw.summary.violations[${index}]`);
 }
 
 function makeReverseLinks(
@@ -938,12 +1043,15 @@ function makeReverseLinks(
 		groups.set(key, group);
 	}
 	return [...groups.entries()]
-		.map(([key, value]): DependencyCruiserReverseLink => ({
-			dependencyIds: value.dependencyIds.sort(compareText),
-			sourcePaths: [...value.sourcePaths].sort(compareText),
-			target: value.target,
-			targetKey: key
-		}))
+		.map(([key, value]): DependencyCruiserReverseLink => {
+			const dependencyIds = [...value.dependencyIds].sort(compareText);
+			return {
+				dependencyIds,
+				sourcePaths: [...value.sourcePaths].sort(compareText),
+				target: value.target,
+				targetKey: key
+			};
+		})
 		.sort((left, right) => compareText(left.targetKey, right.targetKey));
 }
 
@@ -1025,10 +1133,35 @@ function reconcileProviderBaseDir(
 	}
 }
 
-function normalize(
+interface NormalizationState {
+	readonly binding: DependencyCruiserInvocationBinding;
+	readonly dependencies: DependencyCruiserDependencyObservation[];
+	readonly dependencyIgnoredFields: Set<string>;
+	readonly dependencyKeys: Set<string>;
+	dependentsCount: number;
+	readonly localModules: DependencyCruiserLocalModuleObservation[];
+	readonly moduleIgnoredFields: Set<string>;
+	readonly nonLocalModules: DependencyCruiserNonLocalModuleObservation[];
+	readonly rawModuleBySource: Map<string, RawModule>;
+	readonly rawModuleByTarget: Map<string, RawModule>;
+	readonly rawModules: RawModule[];
+	readonly ruleBudget: { count: number };
+}
+
+interface RawRootShape {
+	readonly modules: readonly unknown[];
+	readonly summary: JsonRecord;
+}
+
+interface DependencyWireFields {
+	readonly moduleSpecifier: string;
+	readonly moduleSystem: string;
+}
+
+function assertRawRootShape(
 	root: JsonRecord,
 	binding: DependencyCruiserInvocationBinding
-): DependencyCruiserObservation {
+): RawRootShape {
 	assertKnownKeys(root, ROOT_KEYS, '$raw');
 	required(root, ['modules', 'summary'], '$raw');
 	if (!Array.isArray(root.modules))
@@ -1052,56 +1185,64 @@ function normalize(
 			'$raw.summary.optionsUsed.baseDir',
 			'No proof maps provider local paths to the bound repository subject root.'
 		);
+	return { modules: root.modules, summary };
+}
 
-	const rawModules: RawModule[] = [];
-	const rawModuleBySource = new Map<string, RawModule>();
-	const rawModuleByTarget = new Map<string, RawModule>();
-	const moduleIgnoredFields = new Set<string>();
-	const dependencyIgnoredFields = new Set<string>();
-	for (const [index, item] of root.modules.entries()) {
-		const path = `$raw.modules[${index}]`;
-		if (!plainRecord(item)) fail('RAW_SHAPE_INVALID', path, 'Expected module object.');
-		assertKnownKeys(item, MODULE_KEYS, path);
-		required(item, ['dependencies', 'source', 'valid'], path);
-		if (!scalarString(item.source))
-			fail('RAW_SHAPE_INVALID', `${path}.source`, 'Expected source string.');
-		if (!Array.isArray(item.dependencies))
-			fail('RAW_SHAPE_INVALID', `${path}.dependencies`, 'Expected dependencies array.');
-		for (const key of MODULE_IGNORED_KEYS)
-			if (Object.hasOwn(item, key)) moduleIgnoredFields.add(key);
-		for (const key of [
-			'consolidated',
-			'coreModule',
-			'couldNotResolve',
-			'followable',
-			'matchesDoNotFollow',
-			'matchesFocus',
-			'matchesHighlight',
-			'matchesReaches',
-			'orphan'
-		])
-			assertOptionalBoolean(item, key, path);
-		for (const key of ['checksum', 'license']) assertOptionalString(item, key, path);
-		assertOptionalFiniteNumber(item, 'instability', path);
-		const types =
-			item.dependencyTypes === undefined
-				? []
-				: normalizeDependencyTypes(item.dependencyTypes, `${path}.dependencyTypes`);
-		if (item.couldNotResolve === true && item.coreModule === true)
-			fail('RAW_SHAPE_INVALID', path, 'A module cannot be both core and unresolved.');
-		const target = classifyModule(item, item.source, types, binding, path);
-		const rawModule = { record: item, source: item.source, target, targetKey: targetKey(target) };
-		if (rawModuleBySource.has(item.source) || rawModuleByTarget.has(rawModule.targetKey))
-			fail('DUPLICATE_MODULE', path, 'Duplicate raw or normalized provider module.');
-		rawModules.push(rawModule);
-		rawModuleBySource.set(item.source, rawModule);
-		rawModuleByTarget.set(rawModule.targetKey, rawModule);
-	}
+function collectIgnoredFields(
+	item: JsonRecord,
+	ignored: ReadonlySet<string>,
+	sink: Set<string>
+): void {
+	for (const key of ignored) if (Object.hasOwn(item, key)) sink.add(key);
+}
 
+function assertModuleOptionalFields(item: JsonRecord, path: string): void {
+	for (const key of [
+		'consolidated',
+		'coreModule',
+		'couldNotResolve',
+		'followable',
+		'matchesDoNotFollow',
+		'matchesFocus',
+		'matchesHighlight',
+		'matchesReaches',
+		'orphan'
+	])
+		assertOptionalBoolean(item, key, path);
+	for (const key of ['checksum', 'license']) assertOptionalString(item, key, path);
+	assertOptionalFiniteNumber(item, 'instability', path);
+}
+
+function normalizeRawModule(item: unknown, path: string, state: NormalizationState): void {
+	if (!plainRecord(item)) fail('RAW_SHAPE_INVALID', path, 'Expected module object.');
+	assertKnownKeys(item, MODULE_KEYS, path);
+	required(item, ['dependencies', 'source', 'valid'], path);
+	if (!scalarString(item.source))
+		fail('RAW_SHAPE_INVALID', `${path}.source`, 'Expected source string.');
+	if (!Array.isArray(item.dependencies))
+		fail('RAW_SHAPE_INVALID', `${path}.dependencies`, 'Expected dependencies array.');
+	collectIgnoredFields(item, MODULE_IGNORED_KEYS, state.moduleIgnoredFields);
+	assertModuleOptionalFields(item, path);
+	const types =
+		item.dependencyTypes === undefined
+			? []
+			: normalizeDependencyTypes(item.dependencyTypes, `${path}.dependencyTypes`);
+	if (item.couldNotResolve === true && item.coreModule === true)
+		fail('RAW_SHAPE_INVALID', path, 'A module cannot be both core and unresolved.');
+	const target = classifyModule(item, item.source, types, state.binding, path);
+	const rawModule = { record: item, source: item.source, target, targetKey: targetKey(target) };
+	if (state.rawModuleBySource.has(item.source) || state.rawModuleByTarget.has(rawModule.targetKey))
+		fail('DUPLICATE_MODULE', path, 'Duplicate raw or normalized provider module.');
+	state.rawModules.push(rawModule);
+	state.rawModuleBySource.set(item.source, rawModule);
+	state.rawModuleByTarget.set(rawModule.targetKey, rawModule);
+}
+
+function assertDependencyPopulation(state: NormalizationState): void {
 	let dependencyCount = 0;
-	for (const rawModule of rawModules) {
+	for (const rawModule of state.rawModules) {
 		dependencyCount += (rawModule.record.dependencies as unknown[]).length;
-		if (dependencyCount > binding.budgets.maxDependencies)
+		if (dependencyCount > state.binding.budgets.maxDependencies)
 			fail(
 				'BUDGET_EXCEEDED',
 				'$raw.modules[*].dependencies',
@@ -1117,195 +1258,248 @@ function normalize(
 				'Bounded comparison adapter does not admit dependencies sourced by non-local modules.'
 			);
 	}
+}
 
-	const ruleBudget = { count: 0 };
-	const dependencies: DependencyCruiserDependencyObservation[] = [];
-	const dependencyKeys = new Set<string>();
-	for (const [moduleIndex, rawModule] of rawModules.entries()) {
+function assertDependencyShape(item: JsonRecord, path: string): DependencyWireFields {
+	assertKnownKeys(item, DEPENDENCY_KEYS, path);
+	required(
+		item,
+		[
+			'circular',
+			'coreModule',
+			'couldNotResolve',
+			'dependencyTypes',
+			'dynamic',
+			'exoticallyRequired',
+			'followable',
+			'module',
+			'moduleSystem',
+			'resolved',
+			'valid'
+		],
+		path
+	);
+	for (const key of [
+		'circular',
+		'coreModule',
+		'couldNotResolve',
+		'dynamic',
+		'exoticallyRequired',
+		'followable',
+		'matchesDoNotFollow',
+		'preCompilationOnly',
+		'typeOnly'
+	])
+		assertOptionalBoolean(item, key, path);
+	for (const key of ['exoticRequire', 'license', 'mimeType']) assertOptionalString(item, key, path);
+	assertOptionalFiniteNumber(item, 'instability', path);
+	if (!scalarString(item.module) || !scalarString(item.resolved))
+		fail('RAW_SHAPE_INVALID', path, 'Dependency module and resolved fields must be strings.');
+	if (!scalarString(item.moduleSystem) || !MODULE_SYSTEMS.has(item.moduleSystem))
+		fail('RAW_SHAPE_INVALID', `${path}.moduleSystem`, 'Unknown module system.');
+	if (
+		item.protocol !== undefined &&
+		(!scalarString(item.protocol) || !PROTOCOLS.has(item.protocol))
+	)
+		fail('RAW_SHAPE_INVALID', `${path}.protocol`, 'Unknown protocol.');
+	if (item.cycle !== undefined) validateMiniDependencies(item.cycle, `${path}.cycle`);
+	return { moduleSpecifier: item.module, moduleSystem: item.moduleSystem };
+}
+
+function normalizeDependencyItem(
+	item: unknown,
+	path: string,
+	sourcePath: string,
+	rawModule: RawModule,
+	state: NormalizationState
+): void {
+	if (!plainRecord(item)) fail('RAW_SHAPE_INVALID', path, 'Expected dependency object.');
+	const wire = assertDependencyShape(item, path);
+	collectIgnoredFields(item, DEPENDENCY_IGNORED_KEYS, state.dependencyIgnoredFields);
+	const types = normalizeDependencyTypes(item.dependencyTypes, `${path}.dependencyTypes`);
+	if (item.couldNotResolve === true && (item.coreModule === true || types.includes('core')))
+		fail('RAW_SHAPE_INVALID', path, 'A dependency cannot be both core and unresolved.');
+	const target = classifyDependency(item, types, state.binding, path);
+	const typeOnlyPartition = types.includes('type-only') ? 'TYPE_ONLY' : 'VALUE_OR_MIXED';
+	const key = `${sourcePath}\0${wire.moduleSpecifier}\0${wire.moduleSystem}\0${typeOnlyPartition}`;
+	if (state.dependencyKeys.has(key))
+		fail('DUPLICATE_DEPENDENCY', path, 'Duplicate normalized provider dependency key.');
+	state.dependencyKeys.add(key);
+	const rules = normalizeRules(
+		item.rules,
+		`${path}.rules`,
+		state.ruleBudget,
+		state.binding.budgets.maxRules
+	);
+	state.dependencies.push({
+		circular: item.circular as boolean,
+		coreModule: item.coreModule as boolean,
+		couldNotResolve: item.couldNotResolve as boolean,
+		dependencyTypes: types,
+		dynamic: item.dynamic as boolean,
+		exoticRequire: scalarString(item.exoticRequire) ? item.exoticRequire : null,
+		exoticallyRequired: item.exoticallyRequired as boolean,
+		followable: item.followable as boolean,
+		id: dependencyId(
+			state.binding.subjectId,
+			sourcePath,
+			wire.moduleSpecifier,
+			wire.moduleSystem,
+			typeOnlyPartition
+		),
+		instability: finiteNumber(item.instability) ? item.instability : null,
+		matchesDoNotFollow: triState(item.matchesDoNotFollow),
+		mimeType: scalarString(item.mimeType) ? item.mimeType : null,
+		moduleSpecifier: wire.moduleSpecifier,
+		moduleSystem: wire.moduleSystem as DependencyCruiserDependencyObservation['moduleSystem'],
+		preCompilationOnly: triState(item.preCompilationOnly),
+		protocol: scalarString(item.protocol)
+			? (item.protocol as DependencyCruiserDependencyObservation['protocol'])
+			: null,
+		rules,
+		sourceModuleId: moduleId(state.binding.subjectId, rawModule.target),
+		sourcePath,
+		target,
+		typeOnlyPartition,
+		typeOnly: triState(item.typeOnly),
+		valid: validateValidity(item.valid, rules, `${path}.valid`)
+	});
+}
+
+function normalizeDependencies(state: NormalizationState): void {
+	for (const [moduleIndex, rawModule] of state.rawModules.entries()) {
 		if (rawModule.target.kind !== 'RESOLVED_LOCAL_PATH') continue;
 		const sourcePath = rawModule.target.path;
-		for (const [dependencyIndex, item] of (rawModule.record.dependencies as unknown[]).entries()) {
-			const path = `$raw.modules[${moduleIndex}].dependencies[${dependencyIndex}]`;
-			if (!plainRecord(item)) fail('RAW_SHAPE_INVALID', path, 'Expected dependency object.');
-			assertKnownKeys(item, DEPENDENCY_KEYS, path);
-			required(
+		for (const [dependencyIndex, item] of (rawModule.record.dependencies as unknown[]).entries())
+			normalizeDependencyItem(
 				item,
-				[
-					'circular',
-					'coreModule',
-					'couldNotResolve',
-					'dependencyTypes',
-					'dynamic',
-					'exoticallyRequired',
-					'followable',
-					'module',
-					'moduleSystem',
-					'resolved',
-					'valid'
-				],
-				path
-			);
-			for (const key of [
-				'circular',
-				'coreModule',
-				'couldNotResolve',
-				'dynamic',
-				'exoticallyRequired',
-				'followable',
-				'matchesDoNotFollow',
-				'preCompilationOnly',
-				'typeOnly'
-			])
-				assertOptionalBoolean(item, key, path);
-			for (const key of ['exoticRequire', 'license', 'mimeType'])
-				assertOptionalString(item, key, path);
-			assertOptionalFiniteNumber(item, 'instability', path);
-			if (!scalarString(item.module) || !scalarString(item.resolved))
-				fail('RAW_SHAPE_INVALID', path, 'Dependency module and resolved fields must be strings.');
-			if (!scalarString(item.moduleSystem) || !MODULE_SYSTEMS.has(item.moduleSystem))
-				fail('RAW_SHAPE_INVALID', `${path}.moduleSystem`, 'Unknown module system.');
-			if (
-				item.protocol !== undefined &&
-				(!scalarString(item.protocol) || !PROTOCOLS.has(item.protocol))
-			)
-				fail('RAW_SHAPE_INVALID', `${path}.protocol`, 'Unknown protocol.');
-			if (item.cycle !== undefined) validateMiniDependencies(item.cycle, `${path}.cycle`);
-			for (const key of DEPENDENCY_IGNORED_KEYS)
-				if (Object.hasOwn(item, key)) dependencyIgnoredFields.add(key);
-			const types = normalizeDependencyTypes(item.dependencyTypes, `${path}.dependencyTypes`);
-			if (item.couldNotResolve === true && (item.coreModule === true || types.includes('core')))
-				fail('RAW_SHAPE_INVALID', path, 'A dependency cannot be both core and unresolved.');
-			const target = classifyDependency(item, types, binding, path);
-			const typeOnlyPartition = types.includes('type-only') ? 'TYPE_ONLY' : 'VALUE_OR_MIXED';
-			const key = `${sourcePath}\0${item.module}\0${item.moduleSystem}\0${typeOnlyPartition}`;
-			if (dependencyKeys.has(key))
-				fail('DUPLICATE_DEPENDENCY', path, 'Duplicate normalized provider dependency key.');
-			dependencyKeys.add(key);
-			const rules = normalizeRules(
-				item.rules,
-				`${path}.rules`,
-				ruleBudget,
-				binding.budgets.maxRules
-			);
-			dependencies.push({
-				circular: item.circular as boolean,
-				coreModule: item.coreModule as boolean,
-				couldNotResolve: item.couldNotResolve as boolean,
-				dependencyTypes: types,
-				dynamic: item.dynamic as boolean,
-				exoticRequire: scalarString(item.exoticRequire) ? item.exoticRequire : null,
-				exoticallyRequired: item.exoticallyRequired as boolean,
-				followable: item.followable as boolean,
-				id: dependencyId(
-					binding.subjectId,
-					sourcePath,
-					item.module,
-					item.moduleSystem,
-					typeOnlyPartition
-				),
-				instability: finiteNumber(item.instability) ? item.instability : null,
-				matchesDoNotFollow: triState(item.matchesDoNotFollow),
-				mimeType: scalarString(item.mimeType) ? item.mimeType : null,
-				moduleSpecifier: item.module,
-				moduleSystem: item.moduleSystem as DependencyCruiserDependencyObservation['moduleSystem'],
-				preCompilationOnly: triState(item.preCompilationOnly),
-				protocol: scalarString(item.protocol)
-					? (item.protocol as DependencyCruiserDependencyObservation['protocol'])
-					: null,
-				rules,
-				sourceModuleId: moduleId(binding.subjectId, rawModule.target),
+				`$raw.modules[${moduleIndex}].dependencies[${dependencyIndex}]`,
 				sourcePath,
-				target,
-				typeOnlyPartition,
-				typeOnly: triState(item.typeOnly),
-				valid: validateValidity(item.valid, rules, `${path}.valid`)
-			});
-		}
+				rawModule,
+				state
+			);
 	}
-	dependencies.sort((left, right) => compareText(left.id, right.id));
+	state.dependencies.sort((left, right) => compareText(left.id, right.id));
+}
 
-	const reverseLinks = makeReverseLinks(dependencies);
-	const reverseByTarget = new Map(reverseLinks.map((link) => [link.targetKey, link]));
-	let dependentsCount = 0;
-	const localModules: DependencyCruiserLocalModuleObservation[] = [];
-	const nonLocalModules: DependencyCruiserNonLocalModuleObservation[] = [];
-	for (const [moduleIndex, rawModule] of rawModules.entries()) {
-		const path = `$raw.modules[${moduleIndex}]`;
-		const record = rawModule.record;
-		const types =
-			record.dependencyTypes === undefined
-				? []
-				: normalizeDependencyTypes(record.dependencyTypes, `${path}.dependencyTypes`);
-		const rules = normalizeRules(
-			record.rules,
-			`${path}.rules`,
-			ruleBudget,
-			binding.budgets.maxRules
+function reconcileDependentsWitness(
+	record: JsonRecord,
+	path: string,
+	derivedDependents: readonly string[],
+	state: NormalizationState
+): 'ABSENT' | 'PRESENT_RECONCILED' {
+	if (record.dependents === undefined) return 'ABSENT';
+	if (!Array.isArray(record.dependents) || !record.dependents.every(scalarString))
+		fail('RAW_SHAPE_INVALID', `${path}.dependents`, 'Expected string dependents array.');
+	state.dependentsCount += record.dependents.length;
+	if (state.dependentsCount > state.binding.budgets.maxDependents)
+		fail('BUDGET_EXCEEDED', `${path}.dependents`, 'Dependent population exceeds budget.');
+	const normalizedWitness = record.dependents.map((source, index) => {
+		const dependent = state.rawModuleBySource.get(source);
+		if (dependent?.target.kind !== 'RESOLVED_LOCAL_PATH')
+			fail(
+				'DEPENDENTS_MISMATCH',
+				`${path}.dependents[${index}]`,
+				'Dependent witness does not name an admitted local module.'
+			);
+		return dependent.target.path;
+	});
+	const canonicalWitness = [...new Set(normalizedWitness)].sort(compareText);
+	if (
+		canonicalWitness.length !== normalizedWitness.length ||
+		canonicalSemanticJson(canonicalWitness) !== canonicalSemanticJson(derivedDependents)
+	)
+		fail(
+			'DEPENDENTS_MISMATCH',
+			`${path}.dependents`,
+			'Dependent witness disagrees with derived reverse links.'
 		);
-		const derivedDependents = reverseByTarget.get(rawModule.targetKey)?.sourcePaths ?? [];
-		let witness: 'ABSENT' | 'PRESENT_RECONCILED' = 'ABSENT';
-		if (record.dependents !== undefined) {
-			if (!Array.isArray(record.dependents) || !record.dependents.every(scalarString))
-				fail('RAW_SHAPE_INVALID', `${path}.dependents`, 'Expected string dependents array.');
-			dependentsCount += record.dependents.length;
-			if (dependentsCount > binding.budgets.maxDependents)
-				fail('BUDGET_EXCEEDED', `${path}.dependents`, 'Dependent population exceeds budget.');
-			const normalizedWitness = record.dependents.map((source, index) => {
-				const dependent = rawModuleBySource.get(source);
-				if (dependent?.target.kind !== 'RESOLVED_LOCAL_PATH')
-					fail(
-						'DEPENDENTS_MISMATCH',
-						`${path}.dependents[${index}]`,
-						'Dependent witness does not name an admitted local module.'
-					);
-				return dependent.target.path;
-			});
-			const canonicalWitness = [...new Set(normalizedWitness)].sort(compareText);
-			if (
-				canonicalWitness.length !== normalizedWitness.length ||
-				canonicalSemanticJson(canonicalWitness) !== canonicalSemanticJson(derivedDependents)
-			)
-				fail(
-					'DEPENDENTS_MISMATCH',
-					`${path}.dependents`,
-					'Dependent witness disagrees with derived reverse links.'
-				);
-			witness = 'PRESENT_RECONCILED';
-		}
-		const common = {
-			couldNotResolve: triState(record.couldNotResolve),
-			dependencyTypes: types,
-			dependentSourcePaths: derivedDependents,
-			dependentsWitness: witness,
-			followable: triState(record.followable),
-			id: moduleId(binding.subjectId, rawModule.target),
-			matchesDoNotFollow: triState(record.matchesDoNotFollow),
-			rules,
-			valid: validateValidity(record.valid, rules, `${path}.valid`)
-		} as const;
-		if (rawModule.target.kind === 'RESOLVED_LOCAL_PATH') {
-			const sourcePath = rawModule.target.path;
-			localModules.push({
-				...common,
-				dependencyIds: dependencies
-					.filter((dependency) => dependency.sourcePath === sourcePath)
-					.map((dependency) => dependency.id)
-					.sort(compareText),
-				sourcePath
-			});
-		} else {
-			nonLocalModules.push({
-				...common,
-				providerSource: rawModule.source,
-				target: rawModule.target
-			});
-		}
+	return 'PRESENT_RECONCILED';
+}
+
+function normalizeModuleObservation(
+	rawModule: RawModule,
+	path: string,
+	derivedDependents: readonly string[],
+	state: NormalizationState
+): void {
+	const record = rawModule.record;
+	const types =
+		record.dependencyTypes === undefined
+			? []
+			: normalizeDependencyTypes(record.dependencyTypes, `${path}.dependencyTypes`);
+	const rules = normalizeRules(
+		record.rules,
+		`${path}.rules`,
+		state.ruleBudget,
+		state.binding.budgets.maxRules
+	);
+	const witness = reconcileDependentsWitness(record, path, derivedDependents, state);
+	const common = {
+		couldNotResolve: triState(record.couldNotResolve),
+		dependencyTypes: types,
+		dependentSourcePaths: derivedDependents,
+		dependentsWitness: witness,
+		followable: triState(record.followable),
+		id: moduleId(state.binding.subjectId, rawModule.target),
+		matchesDoNotFollow: triState(record.matchesDoNotFollow),
+		rules,
+		valid: validateValidity(record.valid, rules, `${path}.valid`)
+	} as const;
+	if (rawModule.target.kind === 'RESOLVED_LOCAL_PATH') {
+		const sourcePath = rawModule.target.path;
+		state.localModules.push({
+			...common,
+			dependencyIds: state.dependencies
+				.filter((dependency) => dependency.sourcePath === sourcePath)
+				.map((dependency) => dependency.id)
+				.sort(compareText),
+			sourcePath
+		});
+	} else {
+		state.nonLocalModules.push({
+			...common,
+			providerSource: rawModule.source,
+			target: rawModule.target
+		});
 	}
-	localModules.sort((left, right) => compareText(left.sourcePath, right.sourcePath));
-	nonLocalModules.sort((left, right) =>
+}
+
+function normalizeModules(state: NormalizationState): readonly DependencyCruiserReverseLink[] {
+	const reverseLinks = makeReverseLinks(state.dependencies);
+	const reverseByTarget = new Map(reverseLinks.map((link) => [link.targetKey, link]));
+	for (const [moduleIndex, rawModule] of state.rawModules.entries())
+		normalizeModuleObservation(
+			rawModule,
+			`$raw.modules[${moduleIndex}]`,
+			reverseByTarget.get(rawModule.targetKey)?.sourcePaths ?? [],
+			state
+		);
+	state.localModules.sort((left, right) => compareText(left.sourcePath, right.sourcePath));
+	state.nonLocalModules.sort((left, right) =>
 		compareText(targetKey(left.target), targetKey(right.target))
 	);
+	return reverseLinks;
+}
 
+function reconcileViolationCounts(summary: JsonRecord): void {
+	const violationCounts = { error: 0, ignore: 0, info: 0, warn: 0 };
+	for (const item of summary.violations as JsonRecord[]) {
+		const severity = (item.rule as JsonRecord).severity as keyof typeof violationCounts;
+		violationCounts[severity] += 1;
+	}
+	for (const severity of ['error', 'info', 'warn'] as const)
+		if (summary[severity] !== violationCounts[severity])
+			fail(
+				'RAW_SHAPE_INVALID',
+				`$raw.summary.${severity}`,
+				'Summary severity count does not reconcile.'
+			);
+	if (summary.ignore !== undefined && summary.ignore !== violationCounts.ignore)
+		fail('RAW_SHAPE_INVALID', '$raw.summary.ignore', 'Summary severity count does not reconcile.');
+}
+
+function reconcileSummary(summary: JsonRecord, state: NormalizationState): void {
 	for (const key of ['error', 'info', 'totalCruised', 'warn'] as const)
 		if (!nonnegativeInteger(summary[key]))
 			fail('RAW_SHAPE_INVALID', `$raw.summary.${key}`, 'Expected nonnegative safe integer.');
@@ -1322,8 +1516,8 @@ function normalize(
 		);
 	if (summary.ruleSetUsed !== undefined && !plainRecord(summary.ruleSetUsed))
 		fail('RAW_SHAPE_INVALID', '$raw.summary.ruleSetUsed', 'Expected rule-set object.');
-	validateSummaryViolations(summary.violations, binding);
-	if (summary.totalCruised !== rawModules.length)
+	validateSummaryViolations(summary.violations, state.binding);
+	if (summary.totalCruised !== state.rawModules.length)
 		fail(
 			'RAW_SHAPE_INVALID',
 			'$raw.summary.totalCruised',
@@ -1331,28 +1525,21 @@ function normalize(
 		);
 	if (
 		summary.totalDependenciesCruised !== undefined &&
-		summary.totalDependenciesCruised !== dependencies.length
+		summary.totalDependenciesCruised !== state.dependencies.length
 	)
 		fail(
 			'RAW_SHAPE_INVALID',
 			'$raw.summary.totalDependenciesCruised',
 			'Summary dependency count does not reconcile.'
 		);
-	const violationCounts = { error: 0, ignore: 0, info: 0, warn: 0 };
-	for (const item of summary.violations as JsonRecord[]) {
-		const severity = (item.rule as JsonRecord).severity as keyof typeof violationCounts;
-		violationCounts[severity] += 1;
-	}
-	for (const severity of ['error', 'info', 'warn'] as const)
-		if (summary[severity] !== violationCounts[severity])
-			fail(
-				'RAW_SHAPE_INVALID',
-				`$raw.summary.${severity}`,
-				'Summary severity count does not reconcile.'
-			);
-	if (summary.ignore !== undefined && summary.ignore !== violationCounts.ignore)
-		fail('RAW_SHAPE_INVALID', '$raw.summary.ignore', 'Summary severity count does not reconcile.');
+	reconcileViolationCounts(summary);
+}
 
+function collectLimitations(
+	root: JsonRecord,
+	summary: JsonRecord,
+	state: NormalizationState
+): DependencyCruiserObservationLimitation[] {
 	const limitations: DependencyCruiserObservationLimitation[] = [];
 	limitations.push(
 		limitation(
@@ -1377,19 +1564,19 @@ function normalize(
 				'Provider cache revision data remains bound by the raw digest but is not interpreted.'
 			)
 		);
-	if (moduleIgnoredFields.size > 0)
+	if (state.moduleIgnoredFields.size > 0)
 		limitations.push(
 			limitation(
 				'MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED',
-				moduleIgnoredFields,
+				state.moduleIgnoredFields,
 				'Known optional provider module fields remain bound by the raw digest but are not interpreted.'
 			)
 		);
-	if (dependencyIgnoredFields.size > 0)
+	if (state.dependencyIgnoredFields.size > 0)
 		limitations.push(
 			limitation(
 				'DEPENDENCY_OPTIONAL_FIELDS_NOT_INTERPRETED',
-				dependencyIgnoredFields,
+				state.dependencyIgnoredFields,
 				'Known optional provider dependency fields remain bound by the raw digest but are not interpreted.'
 			)
 		);
@@ -1402,37 +1589,46 @@ function normalize(
 			)
 		);
 	limitations.sort((left, right) => compareText(left.code, right.code));
+	return limitations;
+}
 
+function buildObservation(
+	summary: JsonRecord,
+	state: NormalizationState,
+	limitations: readonly DependencyCruiserObservationLimitation[],
+	reverseLinks: readonly DependencyCruiserReverseLink[]
+): DependencyCruiserObservation {
+	const binding = state.binding;
 	const invocationDigest = sha256(canonicalSemanticJson(binding));
 	const withoutDigest: Omit<DependencyCruiserObservation, 'contentDigest'> = {
 		canonicalProfile: DEPENDENCY_CRUISER_CANONICAL_PROFILE,
-		dependencies,
+		dependencies: state.dependencies,
 		fullJanCsaa007Conformance: FULL_JAN_CSAA_007_CONFORMANCE,
 		health: limitations.length === 0 ? 'COMPLETE' : 'PARTIAL',
 		id: observationId(binding.subjectId, invocationDigest),
 		invocation: binding,
 		invocationDigest,
 		limitations,
-		modules: localModules,
-		nonLocalModules,
+		modules: state.localModules,
+		nonLocalModules: state.nonLocalModules,
 		operationVersion: DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION,
 		reverseLinks,
 		schemaVersion: DEPENDENCY_CRUISER_OBSERVATION_SCHEMA_VERSION,
 		subjectId: binding.subjectId,
 		summary: {
-			dependencyCount: dependencies.length,
+			dependencyCount: state.dependencies.length,
 			error: summary.error as number,
 			ignore: summary.ignore === undefined ? null : (summary.ignore as number),
 			info: summary.info as number,
-			localModuleCount: localModules.length,
-			nonLocalModuleCount: nonLocalModules.length,
+			localModuleCount: state.localModules.length,
+			nonLocalModuleCount: state.nonLocalModules.length,
 			optionsDigest: sha256(canonicalSemanticJson(summary.optionsUsed)),
 			providerTotalCruised: summary.totalCruised as number,
 			providerTotalDependenciesCruised:
 				summary.totalDependenciesCruised === undefined
 					? null
 					: (summary.totalDependenciesCruised as number),
-			rawModuleCount: rawModules.length,
+			rawModuleCount: state.rawModules.length,
 			rulesDigest:
 				summary.ruleSetUsed === undefined
 					? null
@@ -1446,6 +1642,35 @@ function normalize(
 		...withoutDigest,
 		contentDigest: sha256(canonicalSemanticJson(withoutDigest))
 	};
+}
+
+function normalize(
+	root: JsonRecord,
+	binding: DependencyCruiserInvocationBinding
+): DependencyCruiserObservation {
+	const { modules, summary } = assertRawRootShape(root, binding);
+	const state: NormalizationState = {
+		binding,
+		dependencies: [],
+		dependencyIgnoredFields: new Set(),
+		dependencyKeys: new Set(),
+		dependentsCount: 0,
+		localModules: [],
+		moduleIgnoredFields: new Set(),
+		nonLocalModules: [],
+		rawModuleBySource: new Map(),
+		rawModuleByTarget: new Map(),
+		rawModules: [],
+		ruleBudget: { count: 0 }
+	};
+	for (const [index, item] of modules.entries())
+		normalizeRawModule(item, `$raw.modules[${index}]`, state);
+	assertDependencyPopulation(state);
+	normalizeDependencies(state);
+	const reverseLinks = normalizeModules(state);
+	reconcileSummary(summary, state);
+	const limitations = collectLimitations(root, summary, state);
+	return buildObservation(summary, state, limitations, reverseLinks);
 }
 
 export function normalizeDependencyCruiserOutput(
@@ -1771,6 +1996,189 @@ const DEPENDENCY_FIELDS = [
 	'valid'
 ] as const;
 
+interface PreflightWork {
+	readonly dependencies: readonly unknown[];
+	readonly limitations: readonly unknown[];
+	readonly modules: readonly unknown[];
+	readonly nonLocalModules: readonly unknown[];
+	readonly reverseLinks: readonly unknown[];
+}
+
+interface PreflightState {
+	readonly binding: DependencyCruiserInvocationBinding;
+	dependencyManifestEntries: number;
+	dependentEntries: number;
+	readonly issues: ValidationIssues;
+	reverseDependencyEntries: number;
+	reverseSourceEntries: number;
+	ruleEntries: number;
+}
+
+function failPreflight(state: PreflightState, path: string, message: string): false {
+	state.issues.add('POPULATION_MISMATCH', path, message);
+	return false;
+}
+
+function preflightPopulationBounds(state: PreflightState, work: PreflightWork): boolean {
+	if (work.modules.length + work.nonLocalModules.length > state.binding.budgets.maxModules)
+		return failPreflight(
+			state,
+			'$.modules',
+			'Observation module population exceeds its embedded budget.'
+		);
+	if (work.dependencies.length > state.binding.budgets.maxDependencies)
+		return failPreflight(
+			state,
+			'$.dependencies',
+			'Observation dependency population exceeds its embedded budget.'
+		);
+	if (work.reverseLinks.length > state.binding.budgets.maxDependencies)
+		return failPreflight(
+			state,
+			'$.reverseLinks',
+			'Observation reverse-link population exceeds its embedded dependency budget.'
+		);
+	if (work.limitations.length > 6)
+		return failPreflight(
+			state,
+			'$.limitations',
+			'Observation limitation population exceeds its closed schema.'
+		);
+	return true;
+}
+
+function preflightModuleEntry(state: PreflightState, module: unknown): boolean {
+	if (!plainRecord(module)) return true;
+	if (
+		Array.isArray(module.dependencyTypes) &&
+		module.dependencyTypes.length > DEPENDENCY_TYPES.length
+	)
+		return failPreflight(
+			state,
+			'$.modules[*].dependencyTypes',
+			'Module dependency-type population exceeds the provider enum.'
+		);
+	if (Array.isArray(module.dependencyIds)) {
+		state.dependencyManifestEntries += module.dependencyIds.length;
+		if (state.dependencyManifestEntries > state.binding.budgets.maxDependencies)
+			return failPreflight(
+				state,
+				'$.modules[*].dependencyIds',
+				'Module dependency manifests exceed the embedded dependency budget.'
+			);
+	}
+	if (Array.isArray(module.dependentSourcePaths)) {
+		state.dependentEntries += module.dependentSourcePaths.length;
+		if (state.dependentEntries > state.binding.budgets.maxDependents)
+			return failPreflight(
+				state,
+				'$.modules[*].dependentSourcePaths',
+				'Module dependent manifests exceed the embedded dependent budget.'
+			);
+	}
+	if (Array.isArray(module.rules)) {
+		state.ruleEntries += module.rules.length;
+		if (state.ruleEntries > state.binding.budgets.maxRules)
+			return failPreflight(
+				state,
+				'$.modules[*].rules',
+				'Native rule population exceeds the embedded rule budget.'
+			);
+	}
+	return true;
+}
+
+function preflightDependencyEntry(state: PreflightState, dependency: unknown): boolean {
+	if (!plainRecord(dependency)) return true;
+	if (
+		Array.isArray(dependency.dependencyTypes) &&
+		dependency.dependencyTypes.length > DEPENDENCY_TYPES.length
+	)
+		return failPreflight(
+			state,
+			'$.dependencies[*].dependencyTypes',
+			'Dependency-type population exceeds the provider enum.'
+		);
+	if (Array.isArray(dependency.rules)) {
+		state.ruleEntries += dependency.rules.length;
+		if (state.ruleEntries > state.binding.budgets.maxRules)
+			return failPreflight(
+				state,
+				'$.dependencies[*].rules',
+				'Native rule population exceeds the embedded rule budget.'
+			);
+	}
+	return true;
+}
+
+function preflightReverseLinkEntry(state: PreflightState, reverseLink: unknown): boolean {
+	if (!plainRecord(reverseLink)) return true;
+	if (Array.isArray(reverseLink.dependencyIds)) {
+		state.reverseDependencyEntries += reverseLink.dependencyIds.length;
+		if (state.reverseDependencyEntries > state.binding.budgets.maxDependencies)
+			return failPreflight(
+				state,
+				'$.reverseLinks[*].dependencyIds',
+				'Reverse dependency manifests exceed the embedded dependency budget.'
+			);
+	}
+	if (Array.isArray(reverseLink.sourcePaths)) {
+		state.reverseSourceEntries += reverseLink.sourcePaths.length;
+		if (state.reverseSourceEntries > state.binding.budgets.maxDependents)
+			return failPreflight(
+				state,
+				'$.reverseLinks[*].sourcePaths',
+				'Reverse source manifests exceed the embedded dependent budget.'
+			);
+	}
+	return true;
+}
+
+function preflightManifestBudgets(state: PreflightState, work: PreflightWork): boolean {
+	for (const population of [work.modules, work.nonLocalModules])
+		for (const module of population) if (!preflightModuleEntry(state, module)) return false;
+	for (const dependency of work.dependencies)
+		if (!preflightDependencyEntry(state, dependency)) return false;
+	for (const reverseLink of work.reverseLinks)
+		if (!preflightReverseLinkEntry(state, reverseLink)) return false;
+	return true;
+}
+
+function preflightLimitationFields(
+	state: PreflightState,
+	limitations: readonly unknown[]
+): boolean {
+	for (const entry of limitations)
+		if (plainRecord(entry) && Array.isArray(entry.fields) && entry.fields.length > 64)
+			return failPreflight(
+				state,
+				'$.limitations[*].fields',
+				'Limitation field population exceeds the closed schema.'
+			);
+	return true;
+}
+
+function preflightJsonBudget(
+	state: PreflightState,
+	observation: DependencyCruiserObservation
+): boolean {
+	try {
+		validateJsonBudget(observation, state.binding, '$');
+	} catch (cause) {
+		if (cause instanceof NormalizationFailure) {
+			state.issues.add(
+				cause.diagnostic.code === 'BUDGET_EXCEEDED' ? 'POPULATION_MISMATCH' : 'INVALID_SHAPE',
+				cause.diagnostic.path,
+				cause.diagnostic.message
+			);
+			return false;
+		}
+		state.issues.add('INVALID_SHAPE', '$', 'Observation work preflight failed closed.');
+		return false;
+	}
+	return true;
+}
+
 function preflightObservationWork(
 	observation: DependencyCruiserObservation,
 	binding: DependencyCruiserInvocationBinding,
@@ -1783,130 +2191,705 @@ function preflightObservationWork(
 	const dependencies = Array.isArray(observation.dependencies) ? observation.dependencies : [];
 	const reverseLinks = Array.isArray(observation.reverseLinks) ? observation.reverseLinks : [];
 	const limitations = Array.isArray(observation.limitations) ? observation.limitations : [];
-	const failPreflight = (path: string, message: string): false => {
-		issues.add('POPULATION_MISMATCH', path, message);
-		return false;
+	const work: PreflightWork = { dependencies, limitations, modules, nonLocalModules, reverseLinks };
+	const state: PreflightState = {
+		binding,
+		dependencyManifestEntries: 0,
+		dependentEntries: 0,
+		issues,
+		reverseDependencyEntries: 0,
+		reverseSourceEntries: 0,
+		ruleEntries: 0
 	};
-	if (modules.length + nonLocalModules.length > binding.budgets.maxModules)
-		return failPreflight('$.modules', 'Observation module population exceeds its embedded budget.');
-	if (dependencies.length > binding.budgets.maxDependencies)
-		return failPreflight(
-			'$.dependencies',
-			'Observation dependency population exceeds its embedded budget.'
-		);
-	if (reverseLinks.length > binding.budgets.maxDependencies)
-		return failPreflight(
-			'$.reverseLinks',
-			'Observation reverse-link population exceeds its embedded dependency budget.'
-		);
-	if (limitations.length > 6)
-		return failPreflight(
-			'$.limitations',
-			'Observation limitation population exceeds its closed schema.'
-		);
+	if (!preflightPopulationBounds(state, work)) return false;
+	if (!preflightManifestBudgets(state, work)) return false;
+	if (!preflightLimitationFields(state, limitations)) return false;
+	return preflightJsonBudget(state, observation);
+}
 
-	let dependencyManifestEntries = 0;
-	let dependentEntries = 0;
-	let ruleEntries = 0;
-	for (const population of [modules, nonLocalModules]) {
-		for (const module of population) {
-			if (!plainRecord(module)) continue;
-			if (
-				Array.isArray(module.dependencyTypes) &&
-				module.dependencyTypes.length > DEPENDENCY_TYPES.length
+const LIMITATION_CODES = new Set<string>([
+	'DEPENDENCY_OPTIONAL_FIELDS_NOT_INTERPRETED',
+	'FOLDERS_NOT_INTERPRETED',
+	'MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED',
+	'PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY',
+	'REVISION_DATA_NOT_INTERPRETED',
+	'SUMMARY_VIOLATIONS_DIGEST_ONLY'
+]);
+
+type LocalModuleCandidate = DependencyCruiserLocalModuleObservation & JsonRecord;
+type DependencyCandidate = DependencyCruiserDependencyObservation & JsonRecord;
+
+interface ObservationValidationState {
+	readonly admittedLimitations: DependencyCruiserObservationLimitation[];
+	readonly admittedNonLocalModules: DependencyCruiserNonLocalModuleObservation[];
+	readonly dependencyById: Map<string, DependencyCruiserDependencyObservation>;
+	readonly dependencyKeys: Set<string>;
+	invocationValid: boolean;
+	readonly issues: ValidationIssues;
+	readonly limitationCodes: Set<string>;
+	readonly moduleById: Map<string, DependencyCruiserLocalModuleObservation>;
+	readonly moduleByPath: Map<string, DependencyCruiserLocalModuleObservation>;
+	readonly nonLocalKeys: Set<string>;
+	readonly observation: DependencyCruiserObservation;
+}
+
+interface DependencyFieldChecks {
+	readonly moduleSpecifierValid: boolean;
+	readonly moduleSystemValid: boolean;
+	readonly partitionValid: boolean;
+	readonly rulesValid: boolean;
+	readonly sourcePathValid: boolean;
+	readonly targetValid: boolean;
+	readonly typesValid: boolean;
+}
+
+function validateObservationVersions(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (
+		observation.schemaVersion !== DEPENDENCY_CRUISER_OBSERVATION_SCHEMA_VERSION ||
+		observation.operationVersion !== DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION ||
+		observation.canonicalProfile !== DEPENDENCY_CRUISER_CANONICAL_PROFILE
+	)
+		state.issues.add(
+			'UNSUPPORTED_SCHEMA_VERSION',
+			'$',
+			'Observation version or canonical profile is unsupported.'
+		);
+	if (observation.fullJanCsaa007Conformance !== FULL_JAN_CSAA_007_CONFORMANCE)
+		state.issues.add(
+			'INVALID_VALUE',
+			'$.fullJanCsaa007Conformance',
+			'Full JAN-CSAA-007 conformance is not claimed.'
+		);
+}
+
+function validateObservationIdentity(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (!scalarString(observation.subjectId) || !SHA256.test(observation.subjectId))
+		state.issues.add('INVALID_VALUE', '$.subjectId', 'Subject identity must be lowercase SHA-256.');
+	if (state.invocationValid && observation.subjectId !== observation.invocation.subjectId)
+		state.issues.add(
+			'IDENTITY_MISMATCH',
+			'$.subjectId',
+			'Subject and invocation identities disagree.'
+		);
+	if (!scalarString(observation.invocationDigest) || !SHA256.test(observation.invocationDigest))
+		state.issues.add('INVALID_VALUE', '$.invocationDigest', 'Invocation digest is invalid.');
+	else if (
+		state.invocationValid &&
+		observation.invocationDigest !== sha256(canonicalSemanticJson(observation.invocation))
+	)
+		state.issues.add('IDENTITY_MISMATCH', '$.invocationDigest', 'Invocation digest mismatch.');
+	if (
+		!scalarString(observation.id) ||
+		observation.id !== observationId(observation.subjectId, observation.invocationDigest)
+	)
+		state.issues.add('IDENTITY_MISMATCH', '$.id', 'Observation identity mismatch.');
+}
+
+function localModuleFlagsValid(module: LocalModuleCandidate): boolean {
+	let valid = true;
+	if (
+		!validTriState(module.couldNotResolve) ||
+		!validTriState(module.followable) ||
+		!validTriState(module.matchesDoNotFollow)
+	)
+		valid = false;
+	if (!['ABSENT', 'PRESENT_RECONCILED'].includes(module.dependentsWitness)) valid = false;
+	if (
+		typeof module.valid !== 'boolean' ||
+		!Array.isArray(module.rules) ||
+		module.valid === module.rules.length > 0
+	)
+		valid = false;
+	return valid;
+}
+
+function validateLocalModuleEntry(
+	state: ObservationValidationState,
+	module: DependencyCruiserLocalModuleObservation,
+	path: string
+): boolean {
+	if (!exactValidationKeys(module, LOCAL_MODULE_FIELDS, path, state.issues)) return false;
+	const sourcePathValid = validationPath(module.sourcePath);
+	const dependencyIdsValid = validationCanonicalStrings(module.dependencyIds);
+	const dependentPathsValid =
+		validationCanonicalStrings(module.dependentSourcePaths) &&
+		module.dependentSourcePaths.every(validationPath);
+	const typesValid = validateDependencyTypesArray(
+		module.dependencyTypes,
+		`${path}.dependencyTypes`,
+		state.issues
+	);
+	const rulesValid = validateRuleArray(module.rules, `${path}.rules`, state.issues);
+	let valid =
+		sourcePathValid && dependencyIdsValid && dependentPathsValid && typesValid && rulesValid;
+	if (!localModuleFlagsValid(module)) valid = false;
+	const identityValid =
+		sourcePathValid &&
+		scalarString(state.observation.subjectId) &&
+		scalarString(module.id) &&
+		module.id ===
+			moduleId(state.observation.subjectId, {
+				kind: 'RESOLVED_LOCAL_PATH',
+				path: module.sourcePath
+			});
+	if (!identityValid) {
+		state.issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module identity mismatch.');
+		valid = false;
+	}
+	if (
+		scalarString(module.id) &&
+		sourcePathValid &&
+		(state.moduleById.has(module.id) || state.moduleByPath.has(module.sourcePath))
+	) {
+		state.issues.add('POPULATION_MISMATCH', path, 'Duplicate local module identity or path.');
+		valid = false;
+	}
+	if (!valid) {
+		state.issues.add('INVALID_VALUE', path, 'Local module fields are invalid.');
+		return false;
+	}
+	state.moduleById.set(module.id, module as unknown as DependencyCruiserLocalModuleObservation);
+	state.moduleByPath.set(
+		module.sourcePath,
+		module as unknown as DependencyCruiserLocalModuleObservation
+	);
+	return true;
+}
+
+function validateLocalModules(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (!Array.isArray(observation.modules)) {
+		state.issues.add('INVALID_SHAPE', '$.modules', 'Expected local module array.');
+		return;
+	}
+	let populationValid = true;
+	for (const [index, module] of observation.modules.entries())
+		if (!validateLocalModuleEntry(state, module, `$.modules[${index}]`)) populationValid = false;
+	const sorted = populationValid
+		? [...state.moduleByPath.values()].sort((left, right) =>
+				compareText(left.sourcePath, right.sourcePath)
 			)
-				return failPreflight(
-					'$.modules[*].dependencyTypes',
-					'Module dependency-type population exceeds the provider enum.'
-				);
-			if (Array.isArray(module.dependencyIds)) {
-				dependencyManifestEntries += module.dependencyIds.length;
-				if (dependencyManifestEntries > binding.budgets.maxDependencies)
-					return failPreflight(
-						'$.modules[*].dependencyIds',
-						'Module dependency manifests exceed the embedded dependency budget.'
-					);
-			}
-			if (Array.isArray(module.dependentSourcePaths)) {
-				dependentEntries += module.dependentSourcePaths.length;
-				if (dependentEntries > binding.budgets.maxDependents)
-					return failPreflight(
-						'$.modules[*].dependentSourcePaths',
-						'Module dependent manifests exceed the embedded dependent budget.'
-					);
-			}
-			if (Array.isArray(module.rules)) {
-				ruleEntries += module.rules.length;
-				if (ruleEntries > binding.budgets.maxRules)
-					return failPreflight(
-						'$.modules[*].rules',
-						'Native rule population exceeds the embedded rule budget.'
-					);
-			}
+		: null;
+	if (sorted !== null && !safeCanonicalEqual(observation.modules, sorted))
+		state.issues.add(
+			'NONCANONICAL_ORDER',
+			'$.modules',
+			'Local modules are not canonically ordered.'
+		);
+}
+
+function validateNonLocalModuleEntry(
+	state: ObservationValidationState,
+	module: DependencyCruiserNonLocalModuleObservation,
+	path: string
+): boolean {
+	if (!exactValidationKeys(module, NONLOCAL_MODULE_FIELDS, path, state.issues)) return false;
+	const targetValid = validateTargetShape(module.target, `${path}.target`, state.issues);
+	const dependentPathsValid =
+		validationCanonicalStrings(module.dependentSourcePaths) &&
+		module.dependentSourcePaths.every(validationPath);
+	const typesValid = validateDependencyTypesArray(
+		module.dependencyTypes,
+		`${path}.dependencyTypes`,
+		state.issues
+	);
+	const rulesValid = validateRuleArray(module.rules, `${path}.rules`, state.issues);
+	// ⚠ THE PARAMETER TYPE IS A CLAIM UNDER TEST, NOT A FACT, so this comparison is NOT dead.
+	// `state.observation.nonLocalModules` is `readonly unknown[]` — this function is what proves each
+	// element matches its declared shape. The declared union excludes RESOLVED_LOCAL_PATH, so the
+	// type-checker calls the check unreachable, but a caller-supplied observation can carry exactly
+	// that kind and admitting it is the defect this guard refuses. Before extraction the loop variable
+	// was `any` (narrowed from `unknown[]` by Array.isArray) and the check compiled; giving the helper
+	// a concrete parameter type is what made TS prove it away. Read through a widened local so the
+	// RUNTIME guard survives the type system rather than being deleted by it.
+	let valid =
+		targetValid &&
+		// ⚠ THE CAST MUST STAY AT THE USE SITE, BEHIND `targetValid &&`. Hoisting this read into a
+		// `const` (which I did, to silence TS2367) makes it EAGER, and a non-local module with
+		// `target: null` then throws a TypeError instead of being recorded as an invalid entry —
+		// `validateTargetShape` has already added the INVALID_SHAPE issue and returned false, and the
+		// short-circuit is what stops the dereference.
+		// The cast itself is needed because the parameter type is a CLAIM UNDER TEST, not a fact:
+		// `state.observation.nonLocalModules` is `readonly unknown[]`, so the declared union (which
+		// excludes RESOLVED_LOCAL_PATH) lets TS prove this comparison dead when it is not.
+		(module.target as { readonly kind: string }).kind !== 'RESOLVED_LOCAL_PATH' &&
+		validationProviderReference(module.providerSource) &&
+		validTriState(module.couldNotResolve) &&
+		validTriState(module.followable) &&
+		validTriState(module.matchesDoNotFollow) &&
+		dependentPathsValid &&
+		typesValid &&
+		rulesValid &&
+		['ABSENT', 'PRESENT_RECONCILED'].includes(module.dependentsWitness) &&
+		typeof module.valid === 'boolean';
+	if (!Array.isArray(module.rules) || module.valid === module.rules.length > 0) valid = false;
+	if (targetValid) {
+		const key = targetKey(module.target);
+		if (state.nonLocalKeys.has(key)) {
+			state.issues.add('POPULATION_MISMATCH', path, 'Duplicate non-local module target.');
+			valid = false;
 		}
-	}
-	for (const dependency of dependencies) {
-		if (!plainRecord(dependency)) continue;
 		if (
-			Array.isArray(dependency.dependencyTypes) &&
-			dependency.dependencyTypes.length > DEPENDENCY_TYPES.length
+			!scalarString(module.id) ||
+			!scalarString(state.observation.subjectId) ||
+			module.id !== moduleId(state.observation.subjectId, module.target)
+		) {
+			state.issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module identity mismatch.');
+			valid = false;
+		}
+		if (valid) state.nonLocalKeys.add(key);
+	}
+	if (!valid) {
+		state.issues.add('INVALID_VALUE', path, 'Non-local module fields are invalid.');
+		return false;
+	}
+	state.admittedNonLocalModules.push(
+		module as unknown as DependencyCruiserNonLocalModuleObservation
+	);
+	return true;
+}
+
+function validateNonLocalModules(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (!Array.isArray(observation.nonLocalModules)) {
+		state.issues.add('INVALID_SHAPE', '$.nonLocalModules', 'Expected non-local module array.');
+		return;
+	}
+	let populationValid = true;
+	for (const [index, module] of observation.nonLocalModules.entries())
+		if (!validateNonLocalModuleEntry(state, module, `$.nonLocalModules[${index}]`))
+			populationValid = false;
+	const sorted = populationValid
+		? [...state.admittedNonLocalModules].sort((left, right) =>
+				compareText(targetKey(left.target), targetKey(right.target))
+			)
+		: null;
+	if (sorted !== null && !safeCanonicalEqual(observation.nonLocalModules, sorted))
+		state.issues.add(
+			'NONCANONICAL_ORDER',
+			'$.nonLocalModules',
+			'Non-local modules are not canonically ordered.'
+		);
+}
+
+function dependencyShapeValid(
+	dependency: DependencyCandidate,
+	checks: DependencyFieldChecks
+): boolean {
+	const valid =
+		checks.targetValid &&
+		checks.typesValid &&
+		checks.rulesValid &&
+		typeof dependency.circular === 'boolean' &&
+		typeof dependency.coreModule === 'boolean' &&
+		typeof dependency.couldNotResolve === 'boolean' &&
+		typeof dependency.dynamic === 'boolean' &&
+		typeof dependency.exoticallyRequired === 'boolean' &&
+		typeof dependency.followable === 'boolean' &&
+		(dependency.exoticRequire === null || scalarString(dependency.exoticRequire)) &&
+		(dependency.instability === null || finiteNumber(dependency.instability)) &&
+		validTriState(dependency.matchesDoNotFollow) &&
+		(dependency.mimeType === null || scalarString(dependency.mimeType)) &&
+		checks.moduleSpecifierValid &&
+		checks.moduleSystemValid &&
+		validTriState(dependency.preCompilationOnly) &&
+		(dependency.protocol === null || PROTOCOLS.has(dependency.protocol)) &&
+		checks.sourcePathValid &&
+		checks.partitionValid &&
+		validTriState(dependency.typeOnly) &&
+		typeof dependency.valid === 'boolean';
+	if (!Array.isArray(dependency.rules) || dependency.valid === dependency.rules.length > 0)
+		return false;
+	return valid;
+}
+
+function validateDependencyIdentity(
+	state: ObservationValidationState,
+	dependency: DependencyCandidate,
+	path: string
+): boolean {
+	let valid = true;
+	const expectedPartition = (dependency.dependencyTypes as readonly unknown[]).includes('type-only')
+		? 'TYPE_ONLY'
+		: 'VALUE_OR_MIXED';
+	if (dependency.typeOnlyPartition !== expectedPartition) {
+		state.issues.add(
+			'RECONCILIATION_MISMATCH',
+			`${path}.typeOnlyPartition`,
+			'Type-only identity partition disagrees with provider dependency types.'
+		);
+		valid = false;
+	}
+	const key = `${dependency.sourcePath}\0${dependency.moduleSpecifier}\0${dependency.moduleSystem}\0${dependency.typeOnlyPartition}`;
+	if (state.dependencyKeys.has(key)) {
+		state.issues.add('POPULATION_MISMATCH', path, 'Duplicate normalized dependency key.');
+		valid = false;
+	}
+	state.dependencyKeys.add(key);
+	if (
+		!scalarString(dependency.id) ||
+		!scalarString(state.observation.subjectId) ||
+		dependency.id !==
+			dependencyId(
+				state.observation.subjectId,
+				dependency.sourcePath,
+				dependency.moduleSpecifier,
+				dependency.moduleSystem,
+				dependency.typeOnlyPartition
+			)
+	) {
+		state.issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Dependency identity mismatch.');
+		valid = false;
+	}
+	return valid;
+}
+
+function dependencyEntryValid(
+	state: ObservationValidationState,
+	dependency: DependencyCandidate,
+	path: string
+): boolean {
+	const targetValid = validateTargetShape(dependency.target, `${path}.target`, state.issues);
+	const typesValid = validateDependencyTypesArray(
+		dependency.dependencyTypes,
+		`${path}.dependencyTypes`,
+		state.issues
+	);
+	const rulesValid = validateRuleArray(dependency.rules, `${path}.rules`, state.issues);
+	const sourcePathValid = validationPath(dependency.sourcePath);
+	const moduleSpecifierValid = validationProviderReference(dependency.moduleSpecifier);
+	const moduleSystemValid =
+		scalarString(dependency.moduleSystem) && MODULE_SYSTEMS.has(dependency.moduleSystem);
+	const partitionValid =
+		dependency.typeOnlyPartition === 'TYPE_ONLY' ||
+		dependency.typeOnlyPartition === 'VALUE_OR_MIXED';
+	let valid = dependencyShapeValid(dependency, {
+		moduleSpecifierValid,
+		moduleSystemValid,
+		partitionValid,
+		rulesValid,
+		sourcePathValid,
+		targetValid,
+		typesValid
+	});
+	const sourceModule = sourcePathValid ? state.moduleByPath.get(dependency.sourcePath) : undefined;
+	// S6582 REFUSED: `dependency.sourceModuleId !== sourceModule?.id` stops refusing when BOTH are
+	// undefined, and `dependency` is caller-supplied — a dependency with no sourceModuleId would
+	// silently reconcile against a module that was never found. Same family as the other guards
+	// this campaign restored across all four bands.
+	if (sourceModule === undefined || dependency.sourceModuleId !== sourceModule.id) {
+		state.issues.add(
+			'RECONCILIATION_MISMATCH',
+			`${path}.sourceModuleId`,
+			'Dependency source module is absent or mismatched.'
+		);
+		valid = false;
+	}
+	const identityCheckable =
+		targetValid &&
+		typesValid &&
+		sourcePathValid &&
+		moduleSpecifierValid &&
+		moduleSystemValid &&
+		partitionValid;
+	if (identityCheckable && !validateDependencyIdentity(state, dependency, path)) valid = false;
+	return valid;
+}
+
+function validateDependencyEntry(
+	state: ObservationValidationState,
+	dependency: DependencyCruiserDependencyObservation,
+	path: string
+): boolean {
+	if (!exactValidationKeys(dependency, DEPENDENCY_FIELDS, path, state.issues)) return false;
+	let valid = dependencyEntryValid(state, dependency, path);
+	if (scalarString(dependency.id) && state.dependencyById.has(dependency.id)) {
+		state.issues.add('POPULATION_MISMATCH', `${path}.id`, 'Duplicate dependency identity.');
+		valid = false;
+	}
+	if (!valid || !scalarString(dependency.id)) {
+		state.issues.add('INVALID_VALUE', path, 'Dependency fields are invalid.');
+		return false;
+	}
+	state.dependencyById.set(
+		dependency.id,
+		dependency as unknown as DependencyCruiserDependencyObservation
+	);
+	return true;
+}
+
+function validateObservationDependencies(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (!Array.isArray(observation.dependencies)) {
+		state.issues.add('INVALID_SHAPE', '$.dependencies', 'Expected dependency array.');
+		return;
+	}
+	let populationValid = true;
+	for (const [index, dependency] of observation.dependencies.entries())
+		if (!validateDependencyEntry(state, dependency, `$.dependencies[${index}]`))
+			populationValid = false;
+	const sorted = populationValid
+		? [...state.dependencyById.values()].sort((left, right) => compareText(left.id, right.id))
+		: null;
+	if (sorted !== null && !safeCanonicalEqual(observation.dependencies, sorted))
+		state.issues.add(
+			'NONCANONICAL_ORDER',
+			'$.dependencies',
+			'Dependencies are not canonically ordered.'
+		);
+}
+
+function reconcileObservationLinks(state: ObservationValidationState): void {
+	for (const [path, module] of state.moduleByPath) {
+		const expectedDependencies = [...state.dependencyById.values()]
+			.filter((dependency) => dependency.sourcePath === path)
+			.map((dependency) => dependency.id)
+			.sort(compareText);
+		if (!safeCanonicalEqual(module.dependencyIds, expectedDependencies))
+			state.issues.add(
+				'RECONCILIATION_MISMATCH',
+				'$.modules',
+				'Module dependency manifest mismatch.'
+			);
+	}
+	const expectedReverseLinks = makeReverseLinks([...state.dependencyById.values()]);
+	if (!safeCanonicalEqual(state.observation.reverseLinks, expectedReverseLinks))
+		state.issues.add(
+			'RECONCILIATION_MISMATCH',
+			'$.reverseLinks',
+			'Reverse links do not reconcile.'
+		);
+	const expectedDependents = new Map(
+		expectedReverseLinks.map((link) => [link.targetKey, link.sourcePaths])
+	);
+	for (const module of state.moduleByPath.values()) {
+		const expected =
+			expectedDependents.get(targetKey({ kind: 'RESOLVED_LOCAL_PATH', path: module.sourcePath })) ??
+			[];
+		if (!safeCanonicalEqual(module.dependentSourcePaths, expected))
+			state.issues.add(
+				'RECONCILIATION_MISMATCH',
+				'$.modules',
+				'Local module dependents do not reconcile.'
+			);
+	}
+	for (const module of state.admittedNonLocalModules) {
+		const expected = expectedDependents.get(targetKey(module.target)) ?? [];
+		if (!safeCanonicalEqual(module.dependentSourcePaths, expected))
+			state.issues.add(
+				'RECONCILIATION_MISMATCH',
+				'$.nonLocalModules',
+				'Non-local module dependents do not reconcile.'
+			);
+	}
+}
+
+function validateSummaryCounts(state: ObservationValidationState): void {
+	for (const key of [
+		'dependencyCount',
+		'error',
+		'info',
+		'localModuleCount',
+		'nonLocalModuleCount',
+		'providerTotalCruised',
+		'rawModuleCount',
+		'violationsCount',
+		'warn'
+	] as const)
+		if (!nonnegativeInteger(state.observation.summary[key]))
+			state.issues.add('INVALID_VALUE', `$.summary.${key}`, 'Expected nonnegative safe integer.');
+	if (
+		state.observation.summary.ignore !== null &&
+		!nonnegativeInteger(state.observation.summary.ignore)
+	)
+		state.issues.add(
+			'INVALID_VALUE',
+			'$.summary.ignore',
+			'Expected nullable nonnegative safe integer.'
+		);
+	if (
+		state.observation.summary.providerTotalDependenciesCruised !== null &&
+		!nonnegativeInteger(state.observation.summary.providerTotalDependenciesCruised)
+	)
+		state.issues.add(
+			'INVALID_VALUE',
+			'$.summary.providerTotalDependenciesCruised',
+			'Expected nullable count.'
+		);
+}
+
+function validateSummaryDigests(state: ObservationValidationState): void {
+	for (const key of ['optionsDigest', 'violationsDigest'] as const)
+		if (
+			!scalarString(state.observation.summary[key]) ||
+			!SHA256.test(state.observation.summary[key])
 		)
-			return failPreflight(
-				'$.dependencies[*].dependencyTypes',
-				'Dependency-type population exceeds the provider enum.'
-			);
-		if (Array.isArray(dependency.rules)) {
-			ruleEntries += dependency.rules.length;
-			if (ruleEntries > binding.budgets.maxRules)
-				return failPreflight(
-					'$.dependencies[*].rules',
-					'Native rule population exceeds the embedded rule budget.'
-				);
-		}
+			state.issues.add('INVALID_VALUE', `$.summary.${key}`, 'Expected lowercase SHA-256.');
+	if (
+		state.observation.summary.rulesDigest !== null &&
+		(!scalarString(state.observation.summary.rulesDigest) ||
+			!SHA256.test(state.observation.summary.rulesDigest))
+	)
+		state.issues.add(
+			'INVALID_VALUE',
+			'$.summary.rulesDigest',
+			'Expected nullable lowercase SHA-256.'
+		);
+}
+
+function summaryPopulationMismatched(state: ObservationValidationState): boolean {
+	const observation = state.observation;
+	return (
+		observation.summary.dependencyCount !== state.dependencyById.size ||
+		observation.summary.localModuleCount !== state.moduleByPath.size ||
+		observation.summary.nonLocalModuleCount !== state.nonLocalKeys.size ||
+		observation.summary.rawModuleCount !== state.moduleByPath.size + state.nonLocalKeys.size ||
+		observation.summary.providerTotalCruised !== observation.summary.rawModuleCount ||
+		(observation.summary.providerTotalDependenciesCruised !== null &&
+			observation.summary.providerTotalDependenciesCruised !== state.dependencyById.size)
+	);
+}
+
+function validateObservationSummary(state: ObservationValidationState): void {
+	// A shape issue is recorded by the exactness check itself; nothing further is reconcilable.
+	if (
+		!exactValidationKeys(
+			state.observation.summary,
+			[
+				'dependencyCount',
+				'error',
+				'ignore',
+				'info',
+				'localModuleCount',
+				'nonLocalModuleCount',
+				'optionsDigest',
+				'providerTotalCruised',
+				'providerTotalDependenciesCruised',
+				'rawModuleCount',
+				'rulesDigest',
+				'violationsCount',
+				'violationsDigest',
+				'warn'
+			],
+			'$.summary',
+			state.issues
+		)
+	)
+		return;
+	validateSummaryCounts(state);
+	validateSummaryDigests(state);
+	if (summaryPopulationMismatched(state))
+		state.issues.add(
+			'POPULATION_MISMATCH',
+			'$.summary',
+			'Observation population summary does not reconcile.'
+		);
+}
+
+function validateLimitationEntry(
+	state: ObservationValidationState,
+	entry: DependencyCruiserObservationLimitation,
+	path: string
+): boolean {
+	if (!exactValidationKeys(entry, ['code', 'fields', 'reason'], path, state.issues)) return false;
+	let valid =
+		scalarString(entry.code) &&
+		LIMITATION_CODES.has(entry.code) &&
+		validationCanonicalStrings(entry.fields) &&
+		entry.fields.length > 0 &&
+		scalarString(entry.reason) &&
+		entry.reason.length > 0;
+	if (!valid) state.issues.add('INVALID_VALUE', path, 'Limitation is invalid.');
+	if (scalarString(entry.code) && state.limitationCodes.has(entry.code)) {
+		state.issues.add('POPULATION_MISMATCH', `${path}.code`, 'Duplicate limitation code.');
+		valid = false;
 	}
-	let reverseDependencyEntries = 0;
-	let reverseSourceEntries = 0;
-	for (const reverseLink of reverseLinks) {
-		if (!plainRecord(reverseLink)) continue;
-		if (Array.isArray(reverseLink.dependencyIds)) {
-			reverseDependencyEntries += reverseLink.dependencyIds.length;
-			if (reverseDependencyEntries > binding.budgets.maxDependencies)
-				return failPreflight(
-					'$.reverseLinks[*].dependencyIds',
-					'Reverse dependency manifests exceed the embedded dependency budget.'
-				);
-		}
-		if (Array.isArray(reverseLink.sourcePaths)) {
-			reverseSourceEntries += reverseLink.sourcePaths.length;
-			if (reverseSourceEntries > binding.budgets.maxDependents)
-				return failPreflight(
-					'$.reverseLinks[*].sourcePaths',
-					'Reverse source manifests exceed the embedded dependent budget.'
-				);
-		}
+	if (!valid || !scalarString(entry.code)) return false;
+	state.limitationCodes.add(entry.code);
+	state.admittedLimitations.push(entry as unknown as DependencyCruiserObservationLimitation);
+	return true;
+}
+
+function validateObservationBaseDirMapping(state: ObservationValidationState): void {
+	const observation = state.observation;
+	const reported = observation.invocation.providerReportedBaseDir;
+	const mappingVerified =
+		reported.state === 'PRESENT' &&
+		((reported.representation === 'CANONICAL_RELATIVE' &&
+			reported.bytes === Buffer.byteLength(observation.invocation.baseDir, 'utf8') &&
+			reported.sha256 === sha256(observation.invocation.baseDir)) ||
+			(reported.representation === 'ABSOLUTE' &&
+				observation.invocation.baseDir === '.' &&
+				reported.bytes === observation.invocation.subjectRoot.bytes &&
+				reported.sha256 === observation.invocation.subjectRoot.sha256));
+	if (!mappingVerified)
+		state.issues.add(
+			'RECONCILIATION_MISMATCH',
+			'$.invocation',
+			'Invocation does not prove the provider base-directory mapping required by repository-qualified paths.'
+		);
+}
+
+function validateObservationLimitations(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (!Array.isArray(observation.limitations)) {
+		state.issues.add('INVALID_SHAPE', '$.limitations', 'Expected limitations array.');
+		return;
 	}
-	for (const entry of limitations) {
-		if (plainRecord(entry) && Array.isArray(entry.fields) && entry.fields.length > 64)
-			return failPreflight(
-				'$.limitations[*].fields',
-				'Limitation field population exceeds the closed schema.'
-			);
+	let populationValid = true;
+	for (const [index, entry] of observation.limitations.entries())
+		if (!validateLimitationEntry(state, entry, `$.limitations[${index}]`)) populationValid = false;
+	const sorted = populationValid
+		? [...state.admittedLimitations].sort((left, right) => compareText(left.code, right.code))
+		: null;
+	if (sorted !== null && !safeCanonicalEqual(observation.limitations, sorted))
+		state.issues.add(
+			'NONCANONICAL_ORDER',
+			'$.limitations',
+			'Limitations are not canonically ordered.'
+		);
+	if (!state.limitationCodes.has('PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY'))
+		state.issues.add(
+			'RECONCILIATION_MISMATCH',
+			'$.limitations',
+			'Uninterpreted provider resolution options require an explicit limitation.'
+		);
+	if (state.invocationValid) validateObservationBaseDirMapping(state);
+	const expectedHealth = observation.limitations.length === 0 ? 'COMPLETE' : 'PARTIAL';
+	if (observation.health !== expectedHealth)
+		state.issues.add(
+			'RECONCILIATION_MISMATCH',
+			'$.health',
+			'Health does not match declared limitations.'
+		);
+}
+
+function validateObservationContentDigest(state: ObservationValidationState): void {
+	const observation = state.observation;
+	if (!scalarString(observation.contentDigest) || !SHA256.test(observation.contentDigest)) {
+		state.issues.add(
+			'INVALID_VALUE',
+			'$.contentDigest',
+			'Content digest must be lowercase SHA-256.'
+		);
+		return;
 	}
 	try {
-		validateJsonBudget(observation, binding, '$');
-	} catch (cause) {
-		if (cause instanceof NormalizationFailure) {
-			issues.add(
-				cause.diagnostic.code === 'BUDGET_EXCEEDED' ? 'POPULATION_MISMATCH' : 'INVALID_SHAPE',
-				cause.diagnostic.path,
-				cause.diagnostic.message
+		if (observation.contentDigest !== dependencyCruiserObservationContentDigest(observation))
+			state.issues.add(
+				'CONTENT_DIGEST_MISMATCH',
+				'$.contentDigest',
+				'Observation content digest mismatch.'
 			);
-			return false;
-		}
-		issues.add('INVALID_SHAPE', '$', 'Observation work preflight failed closed.');
-		return false;
+	} catch {
+		state.issues.add(
+			'CONTENT_DIGEST_MISMATCH',
+			'$.contentDigest',
+			'Observation is not canonically serializable.'
+		);
 	}
-	return true;
 }
 
 function validateDependencyCruiserObservationInternal(
@@ -1953,533 +2936,36 @@ function validateDependencyCruiserObservationInternal(
 		)
 	)
 		return issues.result();
-	const observation = value as unknown as DependencyCruiserObservation;
-	if (
-		observation.schemaVersion !== DEPENDENCY_CRUISER_OBSERVATION_SCHEMA_VERSION ||
-		observation.operationVersion !== DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION ||
-		observation.canonicalProfile !== DEPENDENCY_CRUISER_CANONICAL_PROFILE
-	)
-		issues.add(
-			'UNSUPPORTED_SCHEMA_VERSION',
-			'$',
-			'Observation version or canonical profile is unsupported.'
-		);
-	if (observation.fullJanCsaa007Conformance !== FULL_JAN_CSAA_007_CONFORMANCE)
-		issues.add(
-			'INVALID_VALUE',
-			'$.fullJanCsaa007Conformance',
-			'Full JAN-CSAA-007 conformance is not claimed.'
-		);
-	const invocationValid = validateObservationInvocation(
-		observation.invocation,
+	const state: ObservationValidationState = {
+		admittedLimitations: [],
+		admittedNonLocalModules: [],
+		dependencyById: new Map(),
+		dependencyKeys: new Set(),
+		invocationValid: false,
+		issues,
+		limitationCodes: new Set(),
+		moduleById: new Map(),
+		moduleByPath: new Map(),
+		nonLocalKeys: new Set(),
+		observation: value as unknown as DependencyCruiserObservation
+	};
+	validateObservationVersions(state);
+	state.invocationValid = validateObservationInvocation(
+		state.observation.invocation,
 		'$.invocation',
 		issues
 	);
-	if (!invocationValid) return issues.result();
-	if (!preflightObservationWork(observation, observation.invocation, issues))
+	if (!state.invocationValid) return issues.result();
+	if (!preflightObservationWork(state.observation, state.observation.invocation, issues))
 		return issues.result();
-	if (!scalarString(observation.subjectId) || !SHA256.test(observation.subjectId))
-		issues.add('INVALID_VALUE', '$.subjectId', 'Subject identity must be lowercase SHA-256.');
-	if (invocationValid && observation.subjectId !== observation.invocation.subjectId)
-		issues.add('IDENTITY_MISMATCH', '$.subjectId', 'Subject and invocation identities disagree.');
-	if (!scalarString(observation.invocationDigest) || !SHA256.test(observation.invocationDigest))
-		issues.add('INVALID_VALUE', '$.invocationDigest', 'Invocation digest is invalid.');
-	else if (
-		invocationValid &&
-		observation.invocationDigest !== sha256(canonicalSemanticJson(observation.invocation))
-	)
-		issues.add('IDENTITY_MISMATCH', '$.invocationDigest', 'Invocation digest mismatch.');
-	if (
-		!scalarString(observation.id) ||
-		observation.id !== observationId(observation.subjectId, observation.invocationDigest)
-	)
-		issues.add('IDENTITY_MISMATCH', '$.id', 'Observation identity mismatch.');
-
-	const moduleById = new Map<string, DependencyCruiserLocalModuleObservation>();
-	const moduleByPath = new Map<string, DependencyCruiserLocalModuleObservation>();
-	if (!Array.isArray(observation.modules))
-		issues.add('INVALID_SHAPE', '$.modules', 'Expected local module array.');
-	else {
-		let populationValid = true;
-		for (const [index, module] of observation.modules.entries()) {
-			const path = `$.modules[${index}]`;
-			if (!exactValidationKeys(module, LOCAL_MODULE_FIELDS, path, issues)) {
-				populationValid = false;
-				continue;
-			}
-			const sourcePathValid = validationPath(module.sourcePath);
-			const dependencyIdsValid = validationCanonicalStrings(module.dependencyIds);
-			const dependentPathsValid =
-				validationCanonicalStrings(module.dependentSourcePaths) &&
-				module.dependentSourcePaths.every(validationPath);
-			const typesValid = validateDependencyTypesArray(
-				module.dependencyTypes,
-				`${path}.dependencyTypes`,
-				issues
-			);
-			const rulesValid = validateRuleArray(module.rules, `${path}.rules`, issues);
-			let valid =
-				sourcePathValid && dependencyIdsValid && dependentPathsValid && typesValid && rulesValid;
-			if (
-				!validTriState(module.couldNotResolve) ||
-				!validTriState(module.followable) ||
-				!validTriState(module.matchesDoNotFollow)
-			)
-				valid = false;
-			if (!['ABSENT', 'PRESENT_RECONCILED'].includes(module.dependentsWitness)) valid = false;
-			if (
-				typeof module.valid !== 'boolean' ||
-				!Array.isArray(module.rules) ||
-				module.valid === module.rules.length > 0
-			)
-				valid = false;
-			const identityValid =
-				sourcePathValid &&
-				scalarString(observation.subjectId) &&
-				scalarString(module.id) &&
-				module.id ===
-					moduleId(observation.subjectId, {
-						kind: 'RESOLVED_LOCAL_PATH',
-						path: module.sourcePath
-					});
-			if (!identityValid) {
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module identity mismatch.');
-				valid = false;
-			}
-			if (
-				scalarString(module.id) &&
-				sourcePathValid &&
-				(moduleById.has(module.id) || moduleByPath.has(module.sourcePath))
-			) {
-				issues.add('POPULATION_MISMATCH', path, 'Duplicate local module identity or path.');
-				valid = false;
-			}
-			if (!valid) {
-				issues.add('INVALID_VALUE', path, 'Local module fields are invalid.');
-				populationValid = false;
-				continue;
-			}
-			moduleById.set(module.id, module as unknown as DependencyCruiserLocalModuleObservation);
-			moduleByPath.set(
-				module.sourcePath,
-				module as unknown as DependencyCruiserLocalModuleObservation
-			);
-		}
-		const sorted = populationValid
-			? [...moduleByPath.values()].sort((left, right) =>
-					compareText(left.sourcePath, right.sourcePath)
-				)
-			: null;
-		if (sorted !== null && !safeCanonicalEqual(observation.modules, sorted))
-			issues.add('NONCANONICAL_ORDER', '$.modules', 'Local modules are not canonically ordered.');
-	}
-
-	const nonLocalKeys = new Set<string>();
-	const admittedNonLocalModules: DependencyCruiserNonLocalModuleObservation[] = [];
-	if (!Array.isArray(observation.nonLocalModules))
-		issues.add('INVALID_SHAPE', '$.nonLocalModules', 'Expected non-local module array.');
-	else {
-		let populationValid = true;
-		for (const [index, module] of observation.nonLocalModules.entries()) {
-			const path = `$.nonLocalModules[${index}]`;
-			if (!exactValidationKeys(module, NONLOCAL_MODULE_FIELDS, path, issues)) {
-				populationValid = false;
-				continue;
-			}
-			const targetValid = validateTargetShape(module.target, `${path}.target`, issues);
-			const dependentPathsValid =
-				validationCanonicalStrings(module.dependentSourcePaths) &&
-				module.dependentSourcePaths.every(validationPath);
-			const typesValid = validateDependencyTypesArray(
-				module.dependencyTypes,
-				`${path}.dependencyTypes`,
-				issues
-			);
-			const rulesValid = validateRuleArray(module.rules, `${path}.rules`, issues);
-			let valid =
-				targetValid &&
-				module.target.kind !== 'RESOLVED_LOCAL_PATH' &&
-				validationProviderReference(module.providerSource) &&
-				validTriState(module.couldNotResolve) &&
-				validTriState(module.followable) &&
-				validTriState(module.matchesDoNotFollow) &&
-				dependentPathsValid &&
-				typesValid &&
-				rulesValid &&
-				['ABSENT', 'PRESENT_RECONCILED'].includes(module.dependentsWitness) &&
-				typeof module.valid === 'boolean';
-			if (!Array.isArray(module.rules) || module.valid === module.rules.length > 0) valid = false;
-			if (targetValid) {
-				const key = targetKey(module.target);
-				if (nonLocalKeys.has(key)) {
-					issues.add('POPULATION_MISMATCH', path, 'Duplicate non-local module target.');
-					valid = false;
-				}
-				if (
-					!scalarString(module.id) ||
-					!scalarString(observation.subjectId) ||
-					module.id !== moduleId(observation.subjectId, module.target)
-				) {
-					issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Module identity mismatch.');
-					valid = false;
-				}
-				if (valid) nonLocalKeys.add(key);
-			}
-			if (!valid) {
-				issues.add('INVALID_VALUE', path, 'Non-local module fields are invalid.');
-				populationValid = false;
-				continue;
-			}
-			admittedNonLocalModules.push(module as unknown as DependencyCruiserNonLocalModuleObservation);
-		}
-		const sorted = populationValid
-			? [...admittedNonLocalModules].sort((left, right) =>
-					compareText(targetKey(left.target), targetKey(right.target))
-				)
-			: null;
-		if (sorted !== null && !safeCanonicalEqual(observation.nonLocalModules, sorted))
-			issues.add(
-				'NONCANONICAL_ORDER',
-				'$.nonLocalModules',
-				'Non-local modules are not canonically ordered.'
-			);
-	}
-
-	const dependencyById = new Map<string, DependencyCruiserDependencyObservation>();
-	const dependencyKeys = new Set<string>();
-	if (!Array.isArray(observation.dependencies))
-		issues.add('INVALID_SHAPE', '$.dependencies', 'Expected dependency array.');
-	else {
-		let populationValid = true;
-		for (const [index, dependency] of observation.dependencies.entries()) {
-			const path = `$.dependencies[${index}]`;
-			if (!exactValidationKeys(dependency, DEPENDENCY_FIELDS, path, issues)) {
-				populationValid = false;
-				continue;
-			}
-			const targetValid = validateTargetShape(dependency.target, `${path}.target`, issues);
-			const typesValid = validateDependencyTypesArray(
-				dependency.dependencyTypes,
-				`${path}.dependencyTypes`,
-				issues
-			);
-			const rulesValid = validateRuleArray(dependency.rules, `${path}.rules`, issues);
-			const sourcePathValid = validationPath(dependency.sourcePath);
-			const moduleSpecifierValid = validationProviderReference(dependency.moduleSpecifier);
-			const moduleSystemValid =
-				scalarString(dependency.moduleSystem) && MODULE_SYSTEMS.has(dependency.moduleSystem);
-			const partitionValid =
-				dependency.typeOnlyPartition === 'TYPE_ONLY' ||
-				dependency.typeOnlyPartition === 'VALUE_OR_MIXED';
-			let valid =
-				targetValid &&
-				typesValid &&
-				rulesValid &&
-				typeof dependency.circular === 'boolean' &&
-				typeof dependency.coreModule === 'boolean' &&
-				typeof dependency.couldNotResolve === 'boolean' &&
-				typeof dependency.dynamic === 'boolean' &&
-				typeof dependency.exoticallyRequired === 'boolean' &&
-				typeof dependency.followable === 'boolean' &&
-				(dependency.exoticRequire === null || scalarString(dependency.exoticRequire)) &&
-				(dependency.instability === null || finiteNumber(dependency.instability)) &&
-				validTriState(dependency.matchesDoNotFollow) &&
-				(dependency.mimeType === null || scalarString(dependency.mimeType)) &&
-				moduleSpecifierValid &&
-				moduleSystemValid &&
-				validTriState(dependency.preCompilationOnly) &&
-				(dependency.protocol === null || PROTOCOLS.has(dependency.protocol)) &&
-				sourcePathValid &&
-				partitionValid &&
-				validTriState(dependency.typeOnly) &&
-				typeof dependency.valid === 'boolean';
-			if (!Array.isArray(dependency.rules) || dependency.valid === dependency.rules.length > 0)
-				valid = false;
-			const sourceModule = sourcePathValid ? moduleByPath.get(dependency.sourcePath) : undefined;
-			if (sourceModule === undefined || dependency.sourceModuleId !== sourceModule.id) {
-				issues.add(
-					'RECONCILIATION_MISMATCH',
-					`${path}.sourceModuleId`,
-					'Dependency source module is absent or mismatched.'
-				);
-				valid = false;
-			}
-			if (
-				targetValid &&
-				typesValid &&
-				sourcePathValid &&
-				moduleSpecifierValid &&
-				moduleSystemValid &&
-				partitionValid
-			) {
-				const expectedPartition = (dependency.dependencyTypes as readonly unknown[]).includes(
-					'type-only'
-				)
-					? 'TYPE_ONLY'
-					: 'VALUE_OR_MIXED';
-				if (dependency.typeOnlyPartition !== expectedPartition) {
-					issues.add(
-						'RECONCILIATION_MISMATCH',
-						`${path}.typeOnlyPartition`,
-						'Type-only identity partition disagrees with provider dependency types.'
-					);
-					valid = false;
-				}
-				const key = `${dependency.sourcePath}\0${dependency.moduleSpecifier}\0${dependency.moduleSystem}\0${dependency.typeOnlyPartition}`;
-				if (dependencyKeys.has(key)) {
-					issues.add('POPULATION_MISMATCH', path, 'Duplicate normalized dependency key.');
-					valid = false;
-				}
-				dependencyKeys.add(key);
-				if (
-					!scalarString(dependency.id) ||
-					!scalarString(observation.subjectId) ||
-					dependency.id !==
-						dependencyId(
-							observation.subjectId,
-							dependency.sourcePath,
-							dependency.moduleSpecifier,
-							dependency.moduleSystem,
-							dependency.typeOnlyPartition
-						)
-				) {
-					issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Dependency identity mismatch.');
-					valid = false;
-				}
-			}
-			if (scalarString(dependency.id) && dependencyById.has(dependency.id)) {
-				issues.add('POPULATION_MISMATCH', `${path}.id`, 'Duplicate dependency identity.');
-				valid = false;
-			}
-			if (!valid || !scalarString(dependency.id)) {
-				issues.add('INVALID_VALUE', path, 'Dependency fields are invalid.');
-				populationValid = false;
-				continue;
-			}
-			dependencyById.set(
-				dependency.id,
-				dependency as unknown as DependencyCruiserDependencyObservation
-			);
-		}
-		const sorted = populationValid
-			? [...dependencyById.values()].sort((left, right) => compareText(left.id, right.id))
-			: null;
-		if (sorted !== null && !safeCanonicalEqual(observation.dependencies, sorted))
-			issues.add(
-				'NONCANONICAL_ORDER',
-				'$.dependencies',
-				'Dependencies are not canonically ordered.'
-			);
-	}
-
-	for (const [path, module] of moduleByPath) {
-		const expectedDependencies = [...dependencyById.values()]
-			.filter((dependency) => dependency.sourcePath === path)
-			.map((dependency) => dependency.id)
-			.sort(compareText);
-		if (!safeCanonicalEqual(module.dependencyIds, expectedDependencies))
-			issues.add('RECONCILIATION_MISMATCH', '$.modules', 'Module dependency manifest mismatch.');
-	}
-	const expectedReverseLinks = makeReverseLinks([...dependencyById.values()]);
-	if (!safeCanonicalEqual(observation.reverseLinks, expectedReverseLinks))
-		issues.add('RECONCILIATION_MISMATCH', '$.reverseLinks', 'Reverse links do not reconcile.');
-	const expectedDependents = new Map(
-		expectedReverseLinks.map((link) => [link.targetKey, link.sourcePaths])
-	);
-	for (const module of moduleByPath.values()) {
-		const expected =
-			expectedDependents.get(targetKey({ kind: 'RESOLVED_LOCAL_PATH', path: module.sourcePath })) ??
-			[];
-		if (!safeCanonicalEqual(module.dependentSourcePaths, expected))
-			issues.add(
-				'RECONCILIATION_MISMATCH',
-				'$.modules',
-				'Local module dependents do not reconcile.'
-			);
-	}
-	for (const module of admittedNonLocalModules) {
-		const expected = expectedDependents.get(targetKey(module.target)) ?? [];
-		if (!safeCanonicalEqual(module.dependentSourcePaths, expected))
-			issues.add(
-				'RECONCILIATION_MISMATCH',
-				'$.nonLocalModules',
-				'Non-local module dependents do not reconcile.'
-			);
-	}
-
-	if (
-		!exactValidationKeys(
-			observation.summary,
-			[
-				'dependencyCount',
-				'error',
-				'ignore',
-				'info',
-				'localModuleCount',
-				'nonLocalModuleCount',
-				'optionsDigest',
-				'providerTotalCruised',
-				'providerTotalDependenciesCruised',
-				'rawModuleCount',
-				'rulesDigest',
-				'violationsCount',
-				'violationsDigest',
-				'warn'
-			],
-			'$.summary',
-			issues
-		)
-	) {
-		// Shape issue already recorded.
-	} else {
-		for (const key of [
-			'dependencyCount',
-			'error',
-			'info',
-			'localModuleCount',
-			'nonLocalModuleCount',
-			'providerTotalCruised',
-			'rawModuleCount',
-			'violationsCount',
-			'warn'
-		] as const)
-			if (!nonnegativeInteger(observation.summary[key]))
-				issues.add('INVALID_VALUE', `$.summary.${key}`, 'Expected nonnegative safe integer.');
-		if (observation.summary.ignore !== null && !nonnegativeInteger(observation.summary.ignore))
-			issues.add(
-				'INVALID_VALUE',
-				'$.summary.ignore',
-				'Expected nullable nonnegative safe integer.'
-			);
-		if (
-			observation.summary.providerTotalDependenciesCruised !== null &&
-			!nonnegativeInteger(observation.summary.providerTotalDependenciesCruised)
-		)
-			issues.add(
-				'INVALID_VALUE',
-				'$.summary.providerTotalDependenciesCruised',
-				'Expected nullable count.'
-			);
-		for (const key of ['optionsDigest', 'violationsDigest'] as const)
-			if (!scalarString(observation.summary[key]) || !SHA256.test(observation.summary[key]))
-				issues.add('INVALID_VALUE', `$.summary.${key}`, 'Expected lowercase SHA-256.');
-		if (
-			observation.summary.rulesDigest !== null &&
-			(!scalarString(observation.summary.rulesDigest) ||
-				!SHA256.test(observation.summary.rulesDigest))
-		)
-			issues.add('INVALID_VALUE', '$.summary.rulesDigest', 'Expected nullable lowercase SHA-256.');
-		if (
-			observation.summary.dependencyCount !== dependencyById.size ||
-			observation.summary.localModuleCount !== moduleByPath.size ||
-			observation.summary.nonLocalModuleCount !== nonLocalKeys.size ||
-			observation.summary.rawModuleCount !== moduleByPath.size + nonLocalKeys.size ||
-			observation.summary.providerTotalCruised !== observation.summary.rawModuleCount ||
-			(observation.summary.providerTotalDependenciesCruised !== null &&
-				observation.summary.providerTotalDependenciesCruised !== dependencyById.size)
-		)
-			issues.add(
-				'POPULATION_MISMATCH',
-				'$.summary',
-				'Observation population summary does not reconcile.'
-			);
-	}
-
-	if (!Array.isArray(observation.limitations))
-		issues.add('INVALID_SHAPE', '$.limitations', 'Expected limitations array.');
-	else {
-		const codes = [
-			'DEPENDENCY_OPTIONAL_FIELDS_NOT_INTERPRETED',
-			'FOLDERS_NOT_INTERPRETED',
-			'MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED',
-			'PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY',
-			'REVISION_DATA_NOT_INTERPRETED',
-			'SUMMARY_VIOLATIONS_DIGEST_ONLY'
-		];
-		const limitationCodes = new Set<string>();
-		const admittedLimitations: DependencyCruiserObservationLimitation[] = [];
-		let populationValid = true;
-		for (const [index, entry] of observation.limitations.entries()) {
-			const path = `$.limitations[${index}]`;
-			if (!exactValidationKeys(entry, ['code', 'fields', 'reason'], path, issues)) {
-				populationValid = false;
-				continue;
-			}
-			let valid =
-				scalarString(entry.code) &&
-				codes.includes(entry.code) &&
-				validationCanonicalStrings(entry.fields) &&
-				entry.fields.length > 0 &&
-				scalarString(entry.reason) &&
-				entry.reason.length > 0;
-			if (!valid) issues.add('INVALID_VALUE', path, 'Limitation is invalid.');
-			if (scalarString(entry.code) && limitationCodes.has(entry.code)) {
-				issues.add('POPULATION_MISMATCH', `${path}.code`, 'Duplicate limitation code.');
-				valid = false;
-			}
-			if (!valid || !scalarString(entry.code)) {
-				populationValid = false;
-				continue;
-			}
-			limitationCodes.add(entry.code);
-			admittedLimitations.push(entry as unknown as DependencyCruiserObservationLimitation);
-		}
-		const sorted = populationValid
-			? [...admittedLimitations].sort((left, right) => compareText(left.code, right.code))
-			: null;
-		if (sorted !== null && !safeCanonicalEqual(observation.limitations, sorted))
-			issues.add('NONCANONICAL_ORDER', '$.limitations', 'Limitations are not canonically ordered.');
-		if (!limitationCodes.has('PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY'))
-			issues.add(
-				'RECONCILIATION_MISMATCH',
-				'$.limitations',
-				'Uninterpreted provider resolution options require an explicit limitation.'
-			);
-		if (invocationValid) {
-			const reported = observation.invocation.providerReportedBaseDir;
-			const mappingVerified =
-				reported.state === 'PRESENT' &&
-				((reported.representation === 'CANONICAL_RELATIVE' &&
-					reported.bytes === Buffer.byteLength(observation.invocation.baseDir, 'utf8') &&
-					reported.sha256 === sha256(observation.invocation.baseDir)) ||
-					(reported.representation === 'ABSOLUTE' &&
-						observation.invocation.baseDir === '.' &&
-						reported.bytes === observation.invocation.subjectRoot.bytes &&
-						reported.sha256 === observation.invocation.subjectRoot.sha256));
-			if (!mappingVerified)
-				issues.add(
-					'RECONCILIATION_MISMATCH',
-					'$.invocation',
-					'Invocation does not prove the provider base-directory mapping required by repository-qualified paths.'
-				);
-		}
-		const expectedHealth = observation.limitations.length === 0 ? 'COMPLETE' : 'PARTIAL';
-		if (observation.health !== expectedHealth)
-			issues.add(
-				'RECONCILIATION_MISMATCH',
-				'$.health',
-				'Health does not match declared limitations.'
-			);
-	}
-
-	if (!scalarString(observation.contentDigest) || !SHA256.test(observation.contentDigest))
-		issues.add('INVALID_VALUE', '$.contentDigest', 'Content digest must be lowercase SHA-256.');
-	else {
-		try {
-			if (observation.contentDigest !== dependencyCruiserObservationContentDigest(observation))
-				issues.add(
-					'CONTENT_DIGEST_MISMATCH',
-					'$.contentDigest',
-					'Observation content digest mismatch.'
-				);
-		} catch {
-			issues.add(
-				'CONTENT_DIGEST_MISMATCH',
-				'$.contentDigest',
-				'Observation is not canonically serializable.'
-			);
-		}
-	}
+	validateObservationIdentity(state);
+	validateLocalModules(state);
+	validateNonLocalModules(state);
+	validateObservationDependencies(state);
+	reconcileObservationLinks(state);
+	validateObservationSummary(state);
+	validateObservationLimitations(state);
+	validateObservationContentDigest(state);
 	return issues.result();
 }
 

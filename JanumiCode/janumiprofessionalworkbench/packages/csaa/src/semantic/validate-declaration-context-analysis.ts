@@ -337,7 +337,8 @@ function compareText(left: string, right: string, checkpoint: DeadlineCheckpoint
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
 	checkpoint();
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	return left.length > right.length ? 1 : 0;
 }
 
 function sameText(left: string, right: string, checkpoint: DeadlineCheckpoint): boolean {
@@ -454,6 +455,420 @@ function earlyRequestDuration(value: unknown): number | null {
 	return safePositive(maxDurationMs) ? maxDurationMs : null;
 }
 
+type DescriptorPath =
+	| { readonly root: string; readonly state: 'ROOT' }
+	| {
+			readonly arrayIndex: boolean;
+			readonly key: string;
+			readonly parent: DescriptorPath;
+			readonly state: 'CHILD';
+	  };
+
+type DescriptorFrame =
+	| {
+			readonly depth: number;
+			readonly path: DescriptorPath;
+			readonly state: 'VISIT';
+			readonly value: unknown;
+	  }
+	| {
+			readonly array: boolean;
+			readonly depth: number;
+			readonly index: number;
+			readonly keys: readonly string[];
+			readonly path: DescriptorPath;
+			readonly state: 'CHILDREN';
+			readonly value: object;
+	  }
+	| { readonly state: 'LEAVE'; readonly value: object };
+
+interface DescriptorWalkState {
+	readonly active: WeakSet<object>;
+	characters: number;
+	checkpoint: DeadlineCheckpoint;
+	readonly durationIssue: (() => DeclarationContextAnalysisValidationIssue | null) | undefined;
+	readonly limits: Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>;
+	readonly malformedCode: DeclarationContextAnalysisValidationIssue['code'];
+	readonly pending: DescriptorFrame[];
+	records: number;
+}
+
+interface DescriptorContainerScope {
+	readonly array: boolean;
+	readonly arrayLength: number | null;
+	readonly container: object;
+	readonly path: DescriptorPath;
+	readonly stringKeys: readonly string[];
+}
+
+function descriptorDurationProblem(
+	state: DescriptorWalkState
+): DeclarationContextAnalysisValidationIssue | null {
+	const problem = state.durationIssue?.();
+	return problem ?? null;
+}
+
+function assertDescriptorDuration(state: DescriptorWalkState): void {
+	const problem = descriptorDurationProblem(state);
+	if (problem !== null) throw new ValidationAbort(problem);
+}
+
+function renderDescriptorPath(state: DescriptorWalkState, path: DescriptorPath): string {
+	const children: Array<Extract<DescriptorPath, { readonly state: 'CHILD' }>> = [];
+	let current = path;
+	while (current.state === 'CHILD') {
+		assertDescriptorDuration(state);
+		children.push(current);
+		current = current.parent;
+	}
+	const pieces = [current.root];
+	for (let index = children.length - 1; index >= 0; index -= 1) {
+		assertDescriptorDuration(state);
+		const child = children[index]!;
+		if (child.arrayIndex) pieces.push('[', child.key, ']');
+		else pieces.push('.', child.key);
+	}
+	assertDescriptorDuration(state);
+	return pieces.join('');
+}
+
+function descriptorIssue(
+	state: DescriptorWalkState,
+	code: DeclarationContextAnalysisValidationIssue['code'],
+	message: string,
+	path: DescriptorPath
+): DeclarationContextAnalysisValidationIssue {
+	return issue(code, message, renderDescriptorPath(state, path));
+}
+
+function descriptorChildrenStep(
+	state: DescriptorWalkState,
+	frame: Extract<DescriptorFrame, { readonly state: 'CHILDREN' }>
+): DeclarationContextAnalysisValidationIssue | null {
+	const timingProblem = descriptorDurationProblem(state);
+	if (timingProblem !== null) return timingProblem;
+	if (frame.index === frame.keys.length) return null;
+	const key = frame.keys[frame.index]!;
+	state.pending.push({
+		array: frame.array,
+		depth: frame.depth,
+		index: frame.index + 1,
+		keys: frame.keys,
+		path: frame.path,
+		state: 'CHILDREN',
+		value: frame.value
+	});
+	if (frame.array && key === 'length') return null;
+	const childPath: DescriptorPath = {
+		arrayIndex: frame.array,
+		key,
+		parent: frame.path,
+		state: 'CHILD'
+	};
+	state.pending.push({
+		depth: frame.depth + 1,
+		path: childPath,
+		state: 'VISIT',
+		value: Reflect.getOwnPropertyDescriptor(frame.value, key)!.value
+	});
+	return null;
+}
+
+function descriptorStringIssue(
+	state: DescriptorWalkState,
+	text: string,
+	path: DescriptorPath
+): DeclarationContextAnalysisValidationIssue | null {
+	if (!isUnicodeScalarString(text, state.checkpoint))
+		return descriptorIssue(
+			state,
+			state.malformedCode,
+			'Strings must contain Unicode scalar text.',
+			path
+		);
+	if (text.length > state.limits.maxStringCharacters - state.characters)
+		return descriptorIssue(
+			state,
+			'BUDGET_EXHAUSTED',
+			'The descriptor string-character budget was exhausted.',
+			path
+		);
+	state.characters += text.length;
+	return null;
+}
+
+function isAcceptedDescriptorPrimitive(value: unknown): boolean {
+	return (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' &&
+			Number.isFinite(value) &&
+			(!Number.isInteger(value) || Number.isSafeInteger(value)) &&
+			!Object.is(value, -0))
+	);
+}
+
+function descriptorContainerShapeIssue(
+	state: DescriptorWalkState,
+	container: object,
+	path: DescriptorPath
+): DeclarationContextAnalysisValidationIssue | null {
+	if (isProxyValue(container))
+		return descriptorIssue(state, state.malformedCode, 'Proxy values are not accepted.', path);
+	if (state.active.has(container))
+		return descriptorIssue(state, state.malformedCode, 'Cyclic data is not accepted.', path);
+	const array = Array.isArray(container);
+	const prototype = Reflect.getPrototypeOf(container);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return descriptorIssue(
+			state,
+			state.malformedCode,
+			'Containers must have ordinary prototypes.',
+			path
+		);
+	return null;
+}
+
+function descriptorSymbolKeyIssue(
+	state: DescriptorWalkState,
+	keys: readonly (string | symbol)[],
+	path: DescriptorPath
+): DeclarationContextAnalysisValidationIssue | null {
+	for (const key of keys) {
+		const keyTimingProblem = descriptorDurationProblem(state);
+		if (keyTimingProblem !== null) return keyTimingProblem;
+		if (typeof key !== 'string')
+			return descriptorIssue(state, state.malformedCode, 'Symbol keys are not accepted.', path);
+	}
+	return null;
+}
+
+function descriptorKeyCharacterIssue(
+	state: DescriptorWalkState,
+	scope: DescriptorContainerScope
+): DeclarationContextAnalysisValidationIssue | null {
+	for (const key of scope.stringKeys) {
+		const keyTimingProblem = descriptorDurationProblem(state);
+		if (keyTimingProblem !== null) return keyTimingProblem;
+		if (scope.array && key === 'length') continue;
+		if (key.length > state.limits.maxStringCharacters - state.characters)
+			return descriptorIssue(
+				state,
+				'BUDGET_EXHAUSTED',
+				'The descriptor string-character budget was exhausted by a property key.',
+				scope.path
+			);
+		state.characters += key.length;
+		if (!isUnicodeScalarString(key, state.checkpoint))
+			return descriptorIssue(
+				state,
+				state.malformedCode,
+				'Property keys must contain Unicode scalar text.',
+				scope.path
+			);
+	}
+	return null;
+}
+
+interface DescriptorArrayIndexReading {
+	readonly index: number;
+	readonly timingProblem: DeclarationContextAnalysisValidationIssue | null;
+}
+
+function readDescriptorArrayIndex(
+	state: DescriptorWalkState,
+	key: string
+): DescriptorArrayIndexReading {
+	let arrayIndex = 0;
+	for (let characterIndex = 0; characterIndex < key.length; characterIndex += 1) {
+		const characterTimingProblem = descriptorDurationProblem(state);
+		if (characterTimingProblem !== null)
+			return { index: arrayIndex, timingProblem: characterTimingProblem };
+		const code = key.codePointAt(characterIndex)!;
+		if (code < 0x30 || code > 0x39) {
+			arrayIndex = Number.MAX_SAFE_INTEGER;
+			break;
+		}
+		const digit = code - 0x30;
+		if (arrayIndex > Math.floor((Number.MAX_SAFE_INTEGER - digit) / 10)) {
+			arrayIndex = Number.MAX_SAFE_INTEGER;
+			break;
+		}
+		arrayIndex = arrayIndex * 10 + digit;
+	}
+	return { index: arrayIndex, timingProblem: null };
+}
+
+function descriptorDenseArrayKeyIssue(
+	state: DescriptorWalkState,
+	scope: DescriptorContainerScope,
+	key: string
+): DeclarationContextAnalysisValidationIssue | null {
+	if (key.length === 0 || (key.length > 1 && key.codePointAt(0) === 0x30))
+		return descriptorIssue(
+			state,
+			state.malformedCode,
+			'Arrays must be dense without extra properties.',
+			scope.path
+		);
+	const reading = readDescriptorArrayIndex(state, key);
+	if (reading.timingProblem !== null) return reading.timingProblem;
+	if (reading.index >= scope.arrayLength! || String(reading.index) !== key)
+		return descriptorIssue(
+			state,
+			state.malformedCode,
+			'Arrays must be dense without extra properties.',
+			scope.path
+		);
+	return null;
+}
+
+function descriptorDenseArrayIssue(
+	state: DescriptorWalkState,
+	scope: DescriptorContainerScope
+): DeclarationContextAnalysisValidationIssue | null {
+	if (scope.stringKeys.length !== scope.arrayLength! + 1)
+		return descriptorIssue(
+			state,
+			state.malformedCode,
+			'Arrays must be dense ordinary arrays.',
+			scope.path
+		);
+	for (const key of scope.stringKeys) {
+		const keyTimingProblem = descriptorDurationProblem(state);
+		if (keyTimingProblem !== null) return keyTimingProblem;
+		if (key === 'length') continue;
+		const keyProblem = descriptorDenseArrayKeyIssue(state, scope, key);
+		if (keyProblem !== null) return keyProblem;
+	}
+	return null;
+}
+
+function descriptorPropertyDataIssue(
+	state: DescriptorWalkState,
+	scope: DescriptorContainerScope
+): DeclarationContextAnalysisValidationIssue | null {
+	for (let index = scope.stringKeys.length - 1; index >= 0; index -= 1) {
+		const keyTimingProblem = descriptorDurationProblem(state);
+		if (keyTimingProblem !== null) return keyTimingProblem;
+		const key = scope.stringKeys[index]!;
+		if (scope.array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(scope.container, key)!;
+		if (!descriptor.enumerable || !('value' in descriptor))
+			return descriptorIssue(
+				state,
+				state.malformedCode,
+				'Properties must be enumerable data properties.',
+				{ arrayIndex: scope.array, key, parent: scope.path, state: 'CHILD' }
+			);
+	}
+	return null;
+}
+
+function descriptorContainerKeyIssue(
+	state: DescriptorWalkState,
+	scope: DescriptorContainerScope
+): DeclarationContextAnalysisValidationIssue | null {
+	const characterProblem = descriptorKeyCharacterIssue(state, scope);
+	if (characterProblem !== null) return characterProblem;
+	if (scope.array) {
+		const denseProblem = descriptorDenseArrayIssue(state, scope);
+		if (denseProblem !== null) return denseProblem;
+	}
+	return descriptorPropertyDataIssue(state, scope);
+}
+
+function descriptorContainerIssue(
+	state: DescriptorWalkState,
+	frame: Extract<DescriptorFrame, { readonly state: 'VISIT' }>
+): DeclarationContextAnalysisValidationIssue | null {
+	if (typeof frame.value !== 'object')
+		return descriptorIssue(
+			state,
+			state.malformedCode,
+			'Only JSON-compatible data values are accepted.',
+			frame.path
+		);
+	const container = frame.value as object;
+	const shapeProblem = descriptorContainerShapeIssue(state, container, frame.path);
+	if (shapeProblem !== null) return shapeProblem;
+	const array = Array.isArray(container);
+	let arrayLength: number | null = null;
+	if (array) {
+		arrayLength = Reflect.getOwnPropertyDescriptor(container, 'length')!.value as number;
+		if (arrayLength > state.limits.maxRecords - state.records)
+			return descriptorIssue(
+				state,
+				'BUDGET_EXHAUSTED',
+				'The descriptor record budget was exhausted by an array population.',
+				frame.path
+			);
+	}
+	const keys = Reflect.ownKeys(container);
+	const symbolKeyProblem = descriptorSymbolKeyIssue(state, keys, frame.path);
+	if (symbolKeyProblem !== null) return symbolKeyProblem;
+	const stringKeys = keys as string[];
+	if (!array && keys.length > state.limits.maxRecords - state.records) {
+		return descriptorIssue(
+			state,
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by a property population.',
+			frame.path
+		);
+	}
+	const keyProblem = descriptorContainerKeyIssue(state, {
+		array,
+		arrayLength,
+		container,
+		path: frame.path,
+		stringKeys
+	});
+	if (keyProblem !== null) return keyProblem;
+	state.active.add(container);
+	state.pending.push(
+		{ state: 'LEAVE', value: container },
+		{
+			array,
+			depth: frame.depth,
+			index: 0,
+			keys: stringKeys,
+			path: frame.path,
+			state: 'CHILDREN',
+			value: container
+		}
+	);
+	return null;
+}
+
+function descriptorVisitStep(
+	state: DescriptorWalkState,
+	frame: Extract<DescriptorFrame, { readonly state: 'VISIT' }>
+): DeclarationContextAnalysisValidationIssue | null {
+	const timingProblem = descriptorDurationProblem(state);
+	if (timingProblem !== null) return timingProblem;
+	state.records += 1;
+	if (state.records > state.limits.maxRecords)
+		return descriptorIssue(
+			state,
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted.',
+			frame.path
+		);
+	if (frame.depth > state.limits.maxDepth)
+		return descriptorIssue(
+			state,
+			'BUDGET_EXHAUSTED',
+			'The descriptor depth budget was exhausted.',
+			frame.path
+		);
+	if (typeof frame.value === 'string') return descriptorStringIssue(state, frame.value, frame.path);
+	if (isAcceptedDescriptorPrimitive(frame.value)) return null;
+	return descriptorContainerIssue(state, frame);
+}
+
 /** Descriptor-only traversal: accessors, iterators, callbacks, and toJSON are never invoked. */
 function plainTreeIssue(
 	value: unknown,
@@ -462,267 +877,30 @@ function plainTreeIssue(
 	input = false,
 	durationIssue?: () => DeclarationContextAnalysisValidationIssue | null
 ): DeclarationContextAnalysisValidationIssue | null {
-	type DescriptorPath =
-		| { readonly root: string; readonly state: 'ROOT' }
-		| {
-				readonly arrayIndex: boolean;
-				readonly key: string;
-				readonly parent: DescriptorPath;
-				readonly state: 'CHILD';
-		  };
-	type Frame =
-		| {
-				readonly depth: number;
-				readonly path: DescriptorPath;
-				readonly state: 'VISIT';
-				readonly value: unknown;
-		  }
-		| {
-				readonly array: boolean;
-				readonly depth: number;
-				readonly index: number;
-				readonly keys: readonly string[];
-				readonly path: DescriptorPath;
-				readonly state: 'CHILDREN';
-				readonly value: object;
-		  }
-		| { readonly state: 'LEAVE'; readonly value: object };
-	const pending: Frame[] = [
-		{ depth: 0, path: { root: rootPath, state: 'ROOT' }, state: 'VISIT', value }
-	];
-	const active = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
-	const malformedCode = input ? 'INPUT_INVALID' : 'SHAPE_INVALID';
-	const assertDescriptorDuration = (): void => {
-		const problem = durationIssue?.();
-		if (problem !== undefined && problem !== null) throw new ValidationAbort(problem);
+	const state: DescriptorWalkState = {
+		active: new WeakSet<object>(),
+		characters: 0,
+		checkpoint: (): void => undefined,
+		durationIssue,
+		limits,
+		malformedCode: input ? 'INPUT_INVALID' : 'SHAPE_INVALID',
+		pending: [{ depth: 0, path: { root: rootPath, state: 'ROOT' }, state: 'VISIT', value }],
+		records: 0
 	};
-	const renderPath = (path: DescriptorPath): string => {
-		const children: Array<Extract<DescriptorPath, { readonly state: 'CHILD' }>> = [];
-		let current = path;
-		while (current.state === 'CHILD') {
-			assertDescriptorDuration();
-			children.push(current);
-			current = current.parent;
-		}
-		const pieces = [current.root];
-		for (let index = children.length - 1; index >= 0; index -= 1) {
-			assertDescriptorDuration();
-			const child = children[index]!;
-			if (child.arrayIndex) pieces.push('[', child.key, ']');
-			else pieces.push('.', child.key);
-		}
-		assertDescriptorDuration();
-		return pieces.join('');
+	state.checkpoint = (): void => {
+		assertDescriptorDuration(state);
 	};
-	const descriptorIssue = (
-		code: DeclarationContextAnalysisValidationIssue['code'],
-		message: string,
-		path: DescriptorPath
-	): DeclarationContextAnalysisValidationIssue => issue(code, message, renderPath(path));
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
+	while (state.pending.length > 0) {
+		const frame = state.pending.pop()!;
 		if (frame.state === 'LEAVE') {
-			active.delete(frame.value);
+			state.active.delete(frame.value);
 			continue;
 		}
-		if (frame.state === 'CHILDREN') {
-			const timingProblem = durationIssue?.();
-			if (timingProblem !== undefined && timingProblem !== null) return timingProblem;
-			if (frame.index === frame.keys.length) continue;
-			const key = frame.keys[frame.index]!;
-			pending.push({
-				array: frame.array,
-				depth: frame.depth,
-				index: frame.index + 1,
-				keys: frame.keys,
-				path: frame.path,
-				state: 'CHILDREN',
-				value: frame.value
-			});
-			if (frame.array && key === 'length') continue;
-			const childPath: DescriptorPath = {
-				arrayIndex: frame.array,
-				key,
-				parent: frame.path,
-				state: 'CHILD'
-			};
-			pending.push({
-				depth: frame.depth + 1,
-				path: childPath,
-				state: 'VISIT',
-				value: Reflect.getOwnPropertyDescriptor(frame.value, key)!.value
-			});
-			continue;
-		}
-		const timingProblem = durationIssue?.();
-		if (timingProblem !== undefined && timingProblem !== null) return timingProblem;
-		records += 1;
-		if (records > limits.maxRecords)
-			return descriptorIssue(
-				'BUDGET_EXHAUSTED',
-				'The descriptor record budget was exhausted.',
-				frame.path
-			);
-		if (frame.depth > limits.maxDepth)
-			return descriptorIssue(
-				'BUDGET_EXHAUSTED',
-				'The descriptor depth budget was exhausted.',
-				frame.path
-			);
-		if (typeof frame.value === 'string') {
-			if (!isUnicodeScalarString(frame.value, assertDescriptorDuration))
-				return descriptorIssue(
-					malformedCode,
-					'Strings must contain Unicode scalar text.',
-					frame.path
-				);
-			if (frame.value.length > limits.maxStringCharacters - characters)
-				return descriptorIssue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted.',
-					frame.path
-				);
-			characters += frame.value.length;
-			continue;
-		}
-		if (
-			frame.value === null ||
-			typeof frame.value === 'boolean' ||
-			(typeof frame.value === 'number' &&
-				Number.isFinite(frame.value) &&
-				(!Number.isInteger(frame.value) || Number.isSafeInteger(frame.value)) &&
-				!Object.is(frame.value, -0))
-		)
-			continue;
-		if (typeof frame.value !== 'object')
-			return descriptorIssue(
-				malformedCode,
-				'Only JSON-compatible data values are accepted.',
-				frame.path
-			);
-		if (isProxyValue(frame.value))
-			return descriptorIssue(malformedCode, 'Proxy values are not accepted.', frame.path);
-		if (active.has(frame.value))
-			return descriptorIssue(malformedCode, 'Cyclic data is not accepted.', frame.path);
-		const array = Array.isArray(frame.value);
-		const prototype = Reflect.getPrototypeOf(frame.value);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return descriptorIssue(
-				malformedCode,
-				'Containers must have ordinary prototypes.',
-				frame.path
-			);
-		let arrayLength: number | null = null;
-		if (array) {
-			arrayLength = Reflect.getOwnPropertyDescriptor(frame.value, 'length')!.value as number;
-			if (arrayLength > limits.maxRecords - records)
-				return descriptorIssue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor record budget was exhausted by an array population.',
-					frame.path
-				);
-		}
-		const keys = Reflect.ownKeys(frame.value);
-		for (const key of keys) {
-			const keyTimingProblem = durationIssue?.();
-			if (keyTimingProblem !== undefined && keyTimingProblem !== null) return keyTimingProblem;
-			if (typeof key !== 'string')
-				return descriptorIssue(malformedCode, 'Symbol keys are not accepted.', frame.path);
-		}
-		const stringKeys = keys as string[];
-		if (!array && keys.length > limits.maxRecords - records) {
-			return descriptorIssue(
-				'BUDGET_EXHAUSTED',
-				'The descriptor record budget was exhausted by a property population.',
-				frame.path
-			);
-		}
-		for (const key of stringKeys) {
-			const keyTimingProblem = durationIssue?.();
-			if (keyTimingProblem !== undefined && keyTimingProblem !== null) return keyTimingProblem;
-			if (array && key === 'length') continue;
-			if (key.length > limits.maxStringCharacters - characters)
-				return descriptorIssue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted by a property key.',
-					frame.path
-				);
-			characters += key.length;
-			if (!isUnicodeScalarString(key, assertDescriptorDuration))
-				return descriptorIssue(
-					malformedCode,
-					'Property keys must contain Unicode scalar text.',
-					frame.path
-				);
-		}
-		if (array) {
-			if (keys.length !== arrayLength! + 1)
-				return descriptorIssue(malformedCode, 'Arrays must be dense ordinary arrays.', frame.path);
-			for (const key of stringKeys) {
-				const keyTimingProblem = durationIssue?.();
-				if (keyTimingProblem !== undefined && keyTimingProblem !== null) return keyTimingProblem;
-				if (key === 'length') continue;
-				if (key.length === 0 || (key.length > 1 && key.charCodeAt(0) === 0x30))
-					return descriptorIssue(
-						malformedCode,
-						'Arrays must be dense without extra properties.',
-						frame.path
-					);
-				let arrayIndex = 0;
-				for (let characterIndex = 0; characterIndex < key.length; characterIndex += 1) {
-					const characterTimingProblem = durationIssue?.();
-					if (characterTimingProblem !== undefined && characterTimingProblem !== null)
-						return characterTimingProblem;
-					const code = key.charCodeAt(characterIndex);
-					if (code < 0x30 || code > 0x39) {
-						arrayIndex = Number.MAX_SAFE_INTEGER;
-						break;
-					}
-					const digit = code - 0x30;
-					if (arrayIndex > Math.floor((Number.MAX_SAFE_INTEGER - digit) / 10)) {
-						arrayIndex = Number.MAX_SAFE_INTEGER;
-						break;
-					}
-					arrayIndex = arrayIndex * 10 + digit;
-				}
-				if (arrayIndex >= arrayLength! || String(arrayIndex) !== key)
-					return descriptorIssue(
-						malformedCode,
-						'Arrays must be dense without extra properties.',
-						frame.path
-					);
-			}
-		}
-		for (let index = stringKeys.length - 1; index >= 0; index -= 1) {
-			const keyTimingProblem = durationIssue?.();
-			if (keyTimingProblem !== undefined && keyTimingProblem !== null) return keyTimingProblem;
-			const key = stringKeys[index]!;
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key)!;
-			if (!descriptor.enumerable || !('value' in descriptor))
-				return descriptorIssue(malformedCode, 'Properties must be enumerable data properties.', {
-					arrayIndex: array,
-					key,
-					parent: frame.path,
-					state: 'CHILD'
-				});
-		}
-		active.add(frame.value);
-		pending.push({ state: 'LEAVE', value: frame.value });
-		pending.push({
-			array,
-			depth: frame.depth,
-			index: 0,
-			keys: stringKeys,
-			path: frame.path,
-			state: 'CHILDREN',
-			value: frame.value
-		});
+		const problem =
+			frame.state === 'CHILDREN'
+				? descriptorChildrenStep(state, frame)
+				: descriptorVisitStep(state, frame);
+		if (problem !== null) return problem;
 	}
 	return null;
 }
@@ -744,6 +922,49 @@ type CanonicalFrame =
 	  }
 	| { readonly state: 'VALUE'; readonly value: unknown };
 
+function jsonEscapedCodeUnit(value: string, index: number, code: number): string {
+	switch (code) {
+		case 0x08:
+			return String.raw`\b`;
+		case 0x09:
+			return String.raw`\t`;
+		case 0x0a:
+			return String.raw`\n`;
+		case 0x0c:
+			return String.raw`\f`;
+		case 0x0d:
+			return String.raw`\r`;
+		case 0x22:
+			return String.raw`\"`;
+		case 0x5c:
+			return '\\\\';
+		default:
+			return code < 0x20 ? String.raw`\u${code.toString(16).padStart(4, '0')}` : value[index]!;
+	}
+}
+
+interface JsonStringUnit {
+	encoded: string;
+	width: number;
+}
+
+/** Reads one canonical JSON string unit at `index`, striding by UTF-16 code unit. */
+function readJsonStringUnit(unit: JsonStringUnit, value: string, index: number): void {
+	const code = value.charCodeAt(index);
+	if (code >= 0xd800 && code <= 0xdbff) {
+		const next = value.charCodeAt(index + 1);
+		if (!Number.isInteger(next) || next < 0xdc00 || next > 0xdfff)
+			throw new TypeError('Canonical JSON rejects lone UTF-16 surrogates.');
+		unit.encoded = value.slice(index, index + 2);
+		unit.width = 2;
+		return;
+	}
+	if (code >= 0xdc00 && code <= 0xdfff)
+		throw new TypeError('Canonical JSON rejects lone UTF-16 surrogates.');
+	unit.encoded = jsonEscapedCodeUnit(value, index, code);
+	unit.width = 1;
+}
+
 function* jsonStringChunks(
 	value: string,
 	checkpoint: DeadlineCheckpoint
@@ -755,50 +976,92 @@ function* jsonStringChunks(
 		yield buffered;
 		buffered = '';
 	};
+	const unit: JsonStringUnit = { encoded: '', width: 1 };
 	for (let index = 0; index < value.length; index += 1) {
 		checkpoint();
-		const code = value.charCodeAt(index);
-		let encoded: string;
-		if (code >= 0xd800 && code <= 0xdbff) {
-			const next = value.charCodeAt(index + 1);
-			if (!Number.isInteger(next) || next < 0xdc00 || next > 0xdfff)
-				throw new TypeError('Canonical JSON rejects lone UTF-16 surrogates.');
-			encoded = value.slice(index, index + 2);
-			index += 1;
-		} else if (code >= 0xdc00 && code <= 0xdfff) {
-			throw new TypeError('Canonical JSON rejects lone UTF-16 surrogates.');
-		} else {
-			switch (code) {
-				case 0x08:
-					encoded = '\\b';
-					break;
-				case 0x09:
-					encoded = '\\t';
-					break;
-				case 0x0a:
-					encoded = '\\n';
-					break;
-				case 0x0c:
-					encoded = '\\f';
-					break;
-				case 0x0d:
-					encoded = '\\r';
-					break;
-				case 0x22:
-					encoded = '\\"';
-					break;
-				case 0x5c:
-					encoded = '\\\\';
-					break;
-				default:
-					encoded = code < 0x20 ? `\\u${code.toString(16).padStart(4, '0')}` : value[index]!;
-			}
-		}
-		if (buffered.length + encoded.length > 1_024) yield* flush();
-		buffered += encoded;
+		readJsonStringUnit(unit, value, index);
+		index += unit.width - 1;
+		if (buffered.length + unit.encoded.length > 1_024) yield* flush();
+		buffered += unit.encoded;
 	}
 	yield* flush();
 	yield '"';
+}
+
+function* canonicalArrayChunks(
+	frame: Extract<CanonicalFrame, { readonly state: 'ARRAY' }>,
+	pending: CanonicalFrame[]
+): Generator<string, void, undefined> {
+	if (frame.index === frame.length) {
+		yield ']';
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	pending.push(
+		{ ...frame, index: frame.index + 1 },
+		{
+			state: 'VALUE',
+			value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
+		}
+	);
+}
+
+function* canonicalObjectChunks(
+	frame: Extract<CanonicalFrame, { readonly state: 'OBJECT' }>,
+	pending: CanonicalFrame[],
+	checkpoint: DeadlineCheckpoint
+): Generator<string, void, undefined> {
+	if (frame.index === frame.keys.length) {
+		yield '}';
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	const key = frame.keys[frame.index]!;
+	yield* jsonStringChunks(key, checkpoint);
+	yield ':';
+	pending.push(
+		{ ...frame, index: frame.index + 1 },
+		{ state: 'VALUE', value: Reflect.getOwnPropertyDescriptor(frame.object, key)!.value }
+	);
+}
+
+function* canonicalValueChunks(
+	input: unknown,
+	pending: CanonicalFrame[],
+	checkpoint: DeadlineCheckpoint
+): Generator<string, void, undefined> {
+	if (input === null) {
+		yield 'null';
+		return;
+	}
+	if (typeof input === 'string') {
+		yield* jsonStringChunks(input, checkpoint);
+		return;
+	}
+	if (typeof input === 'boolean') {
+		yield input ? 'true' : 'false';
+		return;
+	}
+	if (typeof input === 'number') {
+		if (!Number.isFinite(input) || (Number.isInteger(input) && !Number.isSafeInteger(input)))
+			throw new TypeError('Canonical JSON requires finite safe integer numbers.');
+		yield JSON.stringify(input);
+		return;
+	}
+	const objectInput = input as object;
+	if (Array.isArray(objectInput)) {
+		const length = Reflect.getOwnPropertyDescriptor(objectInput, 'length')!.value as number;
+		yield '[';
+		pending.push({ index: 0, length, state: 'ARRAY', value: objectInput });
+		return;
+	}
+	const keys = Reflect.ownKeys(objectInput) as string[];
+	keys.sort((left, right) => {
+		checkpoint();
+		return compareText(left, right, checkpoint);
+	});
+	yield '{';
+	pending.push({ index: 0, keys, object: objectInput, state: 'OBJECT' });
 }
 
 /** Validator-private canonical token stream over values already accepted by plainTreeIssue. */
@@ -811,67 +1074,14 @@ function* canonicalChunks(
 		checkpoint();
 		const frame = pending.pop()!;
 		if (frame.state === 'ARRAY') {
-			if (frame.index === frame.length) {
-				yield ']';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
-			});
+			yield* canonicalArrayChunks(frame, pending);
 			continue;
 		}
 		if (frame.state === 'OBJECT') {
-			if (frame.index === frame.keys.length) {
-				yield '}';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			const key = frame.keys[frame.index]!;
-			yield* jsonStringChunks(key, checkpoint);
-			yield ':';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.object, key)!.value
-			});
+			yield* canonicalObjectChunks(frame, pending, checkpoint);
 			continue;
 		}
-		const input = frame.value;
-		if (input === null) {
-			yield 'null';
-			continue;
-		}
-		if (typeof input === 'string') {
-			yield* jsonStringChunks(input, checkpoint);
-			continue;
-		}
-		if (typeof input === 'boolean') {
-			yield input ? 'true' : 'false';
-			continue;
-		}
-		if (typeof input === 'number') {
-			if (!Number.isFinite(input) || (Number.isInteger(input) && !Number.isSafeInteger(input)))
-				throw new TypeError('Canonical JSON requires finite safe integer numbers.');
-			yield JSON.stringify(input);
-			continue;
-		}
-		const objectInput = input as object;
-		if (Array.isArray(objectInput)) {
-			const length = Reflect.getOwnPropertyDescriptor(objectInput, 'length')!.value as number;
-			yield '[';
-			pending.push({ index: 0, length, state: 'ARRAY', value: objectInput });
-			continue;
-		}
-		const keys = Reflect.ownKeys(objectInput) as string[];
-		keys.sort((left, right) => {
-			checkpoint();
-			return compareText(left, right, checkpoint);
-		});
-		yield '{';
-		pending.push({ index: 0, keys, object: objectInput, state: 'OBJECT' });
+		yield* canonicalValueChunks(frame.value, pending, checkpoint);
 	}
 }
 
@@ -949,8 +1159,10 @@ function canonicalCompare(left: unknown, right: unknown, checkpoint: DeadlineChe
 		checkpoint();
 		const leftCodeUnit = nextCanonicalCodeUnit(leftCursor, checkpoint);
 		const rightCodeUnit = nextCanonicalCodeUnit(rightCursor, checkpoint);
-		if (leftCodeUnit === null || rightCodeUnit === null)
-			return leftCodeUnit === rightCodeUnit ? 0 : leftCodeUnit === null ? -1 : 1;
+		if (leftCodeUnit === null || rightCodeUnit === null) {
+			if (leftCodeUnit === rightCodeUnit) return 0;
+			return leftCodeUnit === null ? -1 : 1;
+		}
 		if (leftCodeUnit !== rightCodeUnit) return leftCodeUnit < rightCodeUnit ? -1 : 1;
 	}
 }
@@ -1001,9 +1213,12 @@ function cloneWire<T>(value: T, checkpoint: DeadlineCheckpoint): T {
 		checkpoint();
 		if (input === null || typeof input !== 'object') return input;
 		const source = input as Record<string, unknown> | unknown[];
-		const target: Record<string, unknown> | unknown[] = Array.isArray(source)
-			? new Array<unknown>(source.length)
-			: Object.create(Reflect.getPrototypeOf(source) === null ? null : Object.prototype);
+		let target: Record<string, unknown> | unknown[];
+		if (Array.isArray(source)) target = new Array<unknown>(source.length);
+		else {
+			const prototype = Reflect.getPrototypeOf(source) === null ? null : Object.prototype;
+			target = Object.create(prototype) as Record<string, unknown>;
+		}
 		pending.push({ source, target });
 		return target;
 	};
@@ -1761,42 +1976,39 @@ interface RootExportSpecifierCensusEntry {
 	readonly start: number;
 }
 
-function supportedDeclarationShape(
+function supportedDeclarationPlacement(
 	declaration: ts.Declaration,
-	sourceFile: ts.SourceFile,
-	checkpoint: DeadlineCheckpoint
-): SupportedDeclarationShape {
-	const topLevel = ts.isVariableDeclaration(declaration)
-		? ts.isVariableDeclarationList(declaration.parent) &&
+	sourceFile: ts.SourceFile
+): boolean {
+	if (ts.isVariableDeclaration(declaration))
+		return (
+			ts.isVariableDeclarationList(declaration.parent) &&
 			ts.isVariableStatement(declaration.parent.parent) &&
 			declaration.parent.parent.parent === sourceFile
-		: declaration.parent === sourceFile;
-	if (!topLevel)
-		failDerivation(
-			'INPUT_INVALID',
-			'Terminal declarations must use the supported top-level SourceFile placement.'
 		);
-	let kind: DeclarationContextDeclarationKind;
-	let nameNode: ts.Identifier | undefined;
-	if (ts.isVariableDeclaration(declaration)) {
-		kind = 'VARIABLE';
-		if (ts.isIdentifier(declaration.name)) nameNode = declaration.name;
-	} else if (ts.isFunctionDeclaration(declaration)) {
-		kind = 'FUNCTION';
-		nameNode = declaration.name;
-	} else if (ts.isClassDeclaration(declaration)) {
-		kind = 'CLASS';
-		nameNode = declaration.name;
-	} else if (ts.isInterfaceDeclaration(declaration)) {
-		kind = 'INTERFACE';
-		nameNode = declaration.name;
-	} else if (ts.isTypeAliasDeclaration(declaration)) {
-		kind = 'TYPE_ALIAS';
-		nameNode = declaration.name;
-	} else if (ts.isEnumDeclaration(declaration)) {
-		kind = 'ENUM';
-		nameNode = declaration.name;
-	} else if (ts.isModuleDeclaration(declaration)) {
+	return declaration.parent === sourceFile;
+}
+
+interface SupportedDeclarationKindBinding {
+	readonly kind: DeclarationContextDeclarationKind;
+	readonly nameNode: ts.Identifier | undefined;
+}
+
+function supportedDeclarationKind(declaration: ts.Declaration): SupportedDeclarationKindBinding {
+	if (ts.isVariableDeclaration(declaration))
+		return {
+			kind: 'VARIABLE',
+			nameNode: ts.isIdentifier(declaration.name) ? declaration.name : undefined
+		};
+	if (ts.isFunctionDeclaration(declaration))
+		return { kind: 'FUNCTION', nameNode: declaration.name };
+	if (ts.isClassDeclaration(declaration)) return { kind: 'CLASS', nameNode: declaration.name };
+	if (ts.isInterfaceDeclaration(declaration))
+		return { kind: 'INTERFACE', nameNode: declaration.name };
+	if (ts.isTypeAliasDeclaration(declaration))
+		return { kind: 'TYPE_ALIAS', nameNode: declaration.name };
+	if (ts.isEnumDeclaration(declaration)) return { kind: 'ENUM', nameNode: declaration.name };
+	if (ts.isModuleDeclaration(declaration)) {
 		if (
 			!ts.isIdentifier(declaration.name) ||
 			(declaration.flags & ts.NodeFlags.GlobalAugmentation) !== 0
@@ -1805,14 +2017,25 @@ function supportedDeclarationShape(
 				'INPUT_INVALID',
 				'String-literal modules and global augmentation are unsupported in the selected declaration surface.'
 			);
-		kind = 'NAMESPACE';
-		nameNode = declaration.name;
-	} else {
+		return { kind: 'NAMESPACE', nameNode: declaration.name };
+	}
+	failDerivation(
+		'INPUT_INVALID',
+		'The terminal symbol contains a declaration kind outside the supported v1 profile.'
+	);
+}
+
+function supportedDeclarationShape(
+	declaration: ts.Declaration,
+	sourceFile: ts.SourceFile,
+	checkpoint: DeadlineCheckpoint
+): SupportedDeclarationShape {
+	if (!supportedDeclarationPlacement(declaration, sourceFile))
 		failDerivation(
 			'INPUT_INVALID',
-			'The terminal symbol contains a declaration kind outside the supported v1 profile.'
+			'Terminal declarations must use the supported top-level SourceFile placement.'
 		);
-	}
+	const { kind, nameNode } = supportedDeclarationKind(declaration);
 	if (
 		nameNode === undefined ||
 		!isUnicodeScalarString(nameNode.text, checkpoint) ||
@@ -1874,11 +2097,9 @@ function censusTopLevelTerminalDeclaration(
 		node.parent.parent.parent === sourceFile;
 	const direct = node.parent === sourceFile;
 	const directName = direct && 'name' in node ? (node as ts.NamedDeclaration).name : undefined;
-	const nameNode = variable
-		? node.name
-		: directName !== undefined && ts.isIdentifier(directName)
-			? directName
-			: undefined;
+	let nameNode: ts.Identifier | undefined;
+	if (variable) nameNode = node.name;
+	else if (directName !== undefined && ts.isIdentifier(directName)) nameNode = directName;
 	if (nameNode === undefined || !sameText(nameNode.text, terminalName, checkpoint)) return null;
 	const supported =
 		ts.isClassDeclaration(node) ||
@@ -2145,6 +2366,1927 @@ interface DeriveInvalid {
 
 type DeriveResult = DeriveValid | DeriveInvalid;
 
+type DeriveSemanticSource =
+	DeclarationContextAnalysisBuildInputs['semanticSnapshot']['sources'][number];
+
+type DeriveProjectContextSource =
+	DeclarationContextAnalysisBuildInputs['projectContextGraph']['sources'][number];
+
+type CaptureEvidence = ReturnType<CompilerProjectProgramSession['finalize']>;
+
+type CaptureInputRecord = CaptureEvidence['inputRecords'][number];
+
+type ProgramEvidenceRecord = CaptureInputRecord & {
+	readonly stage: 'CALLER_ANALYSIS' | 'PROGRAM_CONSTRUCTION' | 'TYPE_CHECKER_CREATE';
+};
+
+type ParsedCapturedSource = ReturnType<CompilerProjectProgramSession['parseCapturedSourceFile']>;
+
+interface DeriveDeadline {
+	readonly assertWithinDeadline: DeadlineCheckpoint;
+	readonly durationLimit: number;
+	readonly operationElapsed: () => number;
+}
+
+interface DeriveTraversalCharge {
+	readonly charge: (amount: number) => void;
+	readonly total: () => number;
+}
+
+interface DeriveContext {
+	readonly analysisId: DeclarationContextAnalysisId;
+	readonly assertWithinDeadline: DeadlineCheckpoint;
+	readonly bound: BoundContext;
+	readonly chargeTraversal: (amount: number) => void;
+	readonly inputs: DeclarationContextAnalysisBuildInputs;
+	readonly provider: Readonly<DeclarationContextAnalysisValidationProvider>;
+	readonly session: CompilerProjectProgramSession;
+	readonly traversalTotal: () => number;
+}
+
+function deriveFailureResult(error: unknown): DeriveResult {
+	if (error instanceof DerivationFailure) return { problem: error.problem, state: 'INVALID' };
+	if (error instanceof CompilerProjectProgramCapabilityError)
+		return {
+			problem: issue(
+				error.code === 'BUDGET_EXCEEDED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
+				'Fresh captured TypeScript Program reconstruction failed closed.',
+				'$inputs.semanticSnapshot'
+			),
+			state: 'INVALID'
+		};
+	return {
+		problem: issue(
+			'INPUT_INVALID',
+			'Declaration-context inputs could not be independently replayed.',
+			'$inputs'
+		),
+		state: 'INVALID'
+	};
+}
+
+function createDeriveDeadline(
+	inputs: DeclarationContextAnalysisBuildInputs,
+	maxDurationMs: number,
+	provider: Readonly<DeclarationContextAnalysisValidationProvider>
+): DeriveDeadline {
+	const monotonicStartedAt = provider.monotonicNow();
+	if (!Number.isFinite(monotonicStartedAt) || monotonicStartedAt < 0)
+		failDerivation('INPUT_INVALID', 'The validation operation clock is unavailable.');
+	const durationLimit = Math.min(inputs.request.budgets.maxDurationMs, maxDurationMs);
+	let lastMonotonic = monotonicStartedAt;
+	const operationElapsed = (): number => {
+		const observed = provider.monotonicNow();
+		if (!Number.isFinite(observed) || observed < lastMonotonic || observed < monotonicStartedAt)
+			failDerivation('INPUT_INVALID', 'The validation monotonic clock failed closed.');
+		lastMonotonic = observed;
+		const elapsed = Math.floor(observed - monotonicStartedAt);
+		if (!safeNonnegative(elapsed))
+			failDerivation('INPUT_INVALID', 'The validation monotonic elapsed time is invalid.');
+		return elapsed;
+	};
+	const assertWithinDeadline = (): void => {
+		if (operationElapsed() > durationLimit)
+			failDerivation('BUDGET_EXHAUSTED', 'Declaration-context wall-clock budget was exhausted.');
+	};
+	return { assertWithinDeadline, durationLimit, operationElapsed };
+}
+
+function createDeriveTraversalCharge(
+	inputs: DeclarationContextAnalysisBuildInputs
+): DeriveTraversalCharge {
+	let progressiveTraversalSteps = 0;
+	return {
+		charge: (amount: number): void => {
+			if (amount > inputs.request.budgets.maxTraversalSteps - progressiveTraversalSteps)
+				failDerivation('BUDGET_EXHAUSTED', 'Declaration-context traversal budget was exhausted.');
+			progressiveTraversalSteps += amount;
+		},
+		total: (): number => progressiveTraversalSteps
+	};
+}
+
+function assertKnownInputDigestReproduces(
+	inputDigest: string,
+	knownInputDigest: string | undefined,
+	checkpoint: DeadlineCheckpoint
+): void {
+	if (knownInputDigest !== undefined && !sameText(inputDigest, knownInputDigest, checkpoint))
+		failDerivation(
+			'IDENTITY_MISMATCH',
+			'The trusted producer input digest does not reproduce independently.',
+			'$knownInputDigest'
+		);
+}
+
+function assertProviderRuntimeVersion(inputs: DeclarationContextAnalysisBuildInputs): void {
+	if (
+		ts.version !== TYPESCRIPT_PROVIDER_VERSION ||
+		inputs.semanticSnapshot.provider.version !== ts.version
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The TypeScript runtime does not match the validated CAP-001 provider version.'
+		);
+}
+
+function openDeriveSession(
+	inputs: DeclarationContextAnalysisBuildInputs,
+	provider: Readonly<DeclarationContextAnalysisValidationProvider>,
+	bound: BoundContext,
+	deadline: DeriveDeadline,
+	chargeTraversal: (amount: number) => void
+): CompilerProjectProgramSession {
+	const remainingDurationMs = deadline.durationLimit - deadline.operationElapsed();
+	if (remainingDurationMs <= 0)
+		failDerivation('BUDGET_EXHAUSTED', 'Declaration-context wall-clock budget was exhausted.');
+	return provider.createSession(
+		inputs.semanticSnapshot,
+		bound.configPath,
+		{
+			maxDurationMs: remainingDurationMs,
+			maxProgramInputRecords: inputs.request.budgets.maxCompilerInputAttempts,
+			maxProgramReadBytes: inputs.request.budgets.maxProgramReadBytes,
+			maxProgramSourceFiles: inputs.request.budgets.maxProgramSourceFiles,
+			maxTotalInputRecords: inputs.request.budgets.maxInputRecords,
+			maxTotalReadBytes: inputs.request.budgets.maxReadBytes
+		},
+		{
+			onInput() {
+				try {
+					chargeTraversal(1);
+				} catch (error) {
+					if (error instanceof DerivationFailure && error.problem.code === 'BUDGET_EXHAUSTED')
+						throw new CompilerProjectProgramCapabilityError(
+							'BUDGET_EXCEEDED',
+							error.problem.message
+						);
+					throw error;
+				}
+			}
+		}
+	);
+}
+
+function assertSessionSemanticBinding(context: DeriveContext): void {
+	const { assertWithinDeadline, bound, inputs, provider, session } = context;
+	const sessionIdentity = provider.sessionIdentity(session);
+	assertWithinDeadline();
+	if (
+		!sameText(sessionIdentity.semanticProgramId, bound.semanticProgram.id, assertWithinDeadline) ||
+		!sameText(sessionIdentity.semanticProjectId, bound.semanticProject.id, assertWithinDeadline) ||
+		!sameText(sessionIdentity.configPath, bound.configPath, assertWithinDeadline)
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The fresh captured Program does not bind the selected semantic context.'
+		);
+	if (bound.semanticProgram.sourceIds.length > inputs.request.budgets.maxProgramSourceFiles)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'The selected semantic Program source population exceeds its budget.'
+		);
+}
+
+function buildSemanticSourcePopulation(
+	context: DeriveContext
+): ReadonlyMap<string, DeriveSemanticSource> {
+	const { assertWithinDeadline, bound, inputs } = context;
+	const selectedSemanticSources = checkedFilter(
+		inputs.semanticSnapshot.sources,
+		(source) => sameText(source.programId, bound.semanticProgram.id, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	const semanticSourceByLogicalPath = new Map<string, DeriveSemanticSource>();
+	const semanticSourceIdPopulation = new Set<string>();
+	for (const sourceId of bound.semanticProgram.sourceIds) {
+		assertWithinDeadline();
+		semanticSourceIdPopulation.add(sourceId);
+	}
+	for (const source of selectedSemanticSources) {
+		assertWithinDeadline();
+		if (
+			semanticSourceByLogicalPath.has(source.logicalPath) ||
+			!semanticSourceIdPopulation.has(source.id) ||
+			!sameText(source.projectId, bound.semanticProject.id, assertWithinDeadline)
+		)
+			failDerivation(
+				'INPUT_INVALID',
+				'The selected semantic Program source population is not exact.'
+			);
+		semanticSourceByLogicalPath.set(source.logicalPath, source);
+	}
+	if (
+		selectedSemanticSources.length !== bound.semanticProgram.sourceIds.length ||
+		semanticSourceIdPopulation.size !== selectedSemanticSources.length
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The selected semantic Program source population is not closed.'
+		);
+	return semanticSourceByLogicalPath;
+}
+
+interface FreshProgramFile {
+	readonly logicalPath: string;
+	readonly sourceFile: ts.SourceFile;
+}
+
+interface FreshProgramScan {
+	readonly programFiles: readonly FreshProgramFile[];
+	readonly programParsedAstNodes: number;
+	readonly programSourceIdentities: readonly DeclarationContextProgramSourceIdentity[];
+	readonly programSourcesByLogicalPath: ReadonlyMap<string, ts.SourceFile>;
+	readonly semanticSourceIds: ReadonlySet<string>;
+}
+
+function scanFreshProgramSources(
+	context: DeriveContext,
+	semanticSourceByLogicalPath: ReadonlyMap<string, DeriveSemanticSource>
+): FreshProgramScan {
+	const { assertWithinDeadline, chargeTraversal, inputs, provider, session } = context;
+	const programSourceFiles = provider.programSourceFiles(session);
+	assertWithinDeadline();
+	if (programSourceFiles.length > inputs.request.budgets.maxProgramSourceFiles)
+		failDerivation('BUDGET_EXHAUSTED', 'Fresh Program source population exceeds its budget.');
+	const programFiles = checkedSort(
+		checkedMap(
+			programSourceFiles,
+			(sourceFile) => ({
+				logicalPath: session.toLogicalPath(sourceFile.fileName),
+				sourceFile
+			}),
+			assertWithinDeadline
+		),
+		(left, right) =>
+			compareText(left.logicalPath, right.logicalPath, assertWithinDeadline) ||
+			compareText(left.sourceFile.fileName, right.sourceFile.fileName, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	assertWithinDeadline();
+	chargeTraversal(programFiles.length);
+	let programParsedAstNodes = 0;
+	const programSourceIdentities: DeclarationContextProgramSourceIdentity[] = [];
+	const programSourcesByLogicalPath = new Map<string, ts.SourceFile>();
+	const semanticSourceIds = new Set<string>();
+	for (const entry of programFiles) {
+		assertWithinDeadline();
+		if (programSourcesByLogicalPath.has(entry.logicalPath))
+			failDerivation('INPUT_INVALID', 'Fresh Program repeats a canonical logical source path.');
+		programSourcesByLogicalPath.set(entry.logicalPath, entry.sourceFile);
+		programParsedAstNodes = safeAdd(
+			programParsedAstNodes,
+			countAstNodes(
+				entry.sourceFile,
+				inputs.request.budgets.maxProgramAstNodes - programParsedAstNodes,
+				'Fresh Program',
+				() => chargeTraversal(1),
+				assertWithinDeadline
+			),
+			'Fresh Program AST node population'
+		);
+		const semanticSource = semanticSourceForFile(semanticSourceByLogicalPath, entry.logicalPath);
+		if (
+			semanticSourceIds.has(semanticSource.id) ||
+			entry.sourceFile.text.length !== semanticSource.textLength ||
+			entry.sourceFile.isDeclarationFile !== semanticSource.declarationFile
+		)
+			failDerivation(
+				'INPUT_INVALID',
+				'Fresh Program source text or declaration classification differs from CAP-001.'
+			);
+		semanticSourceIds.add(semanticSource.id);
+		programSourceIdentities.push({
+			bytes: semanticSource.bytes,
+			contentSha256: semanticSource.contentSha256,
+			declarationFile: semanticSource.declarationFile,
+			logicalPath: semanticSource.logicalPath,
+			origin: semanticSource.origin,
+			semanticSourceId: semanticSource.id
+		});
+	}
+	return {
+		programFiles,
+		programParsedAstNodes,
+		programSourceIdentities,
+		programSourcesByLogicalPath,
+		semanticSourceIds
+	};
+}
+
+function bindProjectContextSources(context: DeriveContext): DeriveProjectContextSource[] {
+	const { assertWithinDeadline, bound, inputs } = context;
+	const selectedContextSources = checkedFilter(
+		inputs.projectContextGraph.sources,
+		(source) => sameText(source.programId, bound.contextProgram.id, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	const contextSourceById = new Map<string, DeriveProjectContextSource>();
+	for (const source of selectedContextSources) {
+		assertWithinDeadline();
+		contextSourceById.set(source.id, source);
+	}
+	if (bound.contextProgram.sourceIds.length > inputs.request.budgets.maxProgramSourceFiles)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'The selected project-context Program source population exceeds its budget.'
+		);
+	const contextProgramSourceIds = new Set<string>();
+	for (const sourceId of bound.contextProgram.sourceIds) {
+		assertWithinDeadline();
+		contextProgramSourceIds.add(sourceId);
+	}
+	if (
+		selectedContextSources.length !== bound.contextProgram.sourceIds.length ||
+		contextSourceById.size !== selectedContextSources.length ||
+		contextProgramSourceIds.size !== selectedContextSources.length
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The selected project-context Program has an invalid source population.'
+		);
+	const contextSources: DeriveProjectContextSource[] = [];
+	for (const sourceId of bound.contextProgram.sourceIds) {
+		assertWithinDeadline();
+		const source = contextSourceById.get(sourceId);
+		if (source === undefined)
+			failDerivation(
+				'INPUT_INVALID',
+				'The selected project-context Program has an invalid source population.'
+			);
+		contextSources.push(source);
+	}
+	return contextSources;
+}
+
+function assertContextSourceReconciliation(
+	context: DeriveContext,
+	contextSources: readonly DeriveProjectContextSource[],
+	programScan: FreshProgramScan
+): void {
+	const { assertWithinDeadline, bound } = context;
+	const { programFiles, programSourcesByLogicalPath, semanticSourceIds } = programScan;
+	let contextPopulationMismatch = contextSources.length !== programFiles.length;
+	for (const source of contextSources) {
+		assertWithinDeadline();
+		if (
+			!semanticSourceIds.has(source.semanticSourceId) ||
+			programSourcesByLogicalPath.get(source.logicalPath) === undefined ||
+			!sameText(source.semanticProgramId, bound.semanticProgram.id, assertWithinDeadline) ||
+			!sameText(source.semanticProjectId, bound.semanticProject.id, assertWithinDeadline)
+		)
+			contextPopulationMismatch = true;
+	}
+	if (contextPopulationMismatch)
+		failDerivation(
+			'INPUT_INVALID',
+			'Fresh Program sources do not exactly reconcile with the CAP-010 Program population.'
+		);
+}
+
+interface SelectedRootExportBinding {
+	readonly exportSymbols: readonly ts.Symbol[];
+	readonly rootExportSymbol: ts.Symbol;
+	readonly rootSourceFile: ts.SourceFile;
+}
+
+function bindSelectedRootExport(
+	context: DeriveContext,
+	programScan: FreshProgramScan
+): SelectedRootExportBinding {
+	const { assertWithinDeadline, bound, chargeTraversal, inputs, provider, session } = context;
+	const { programSourcesByLogicalPath } = programScan;
+	const rootSourceFile = programSourcesByLogicalPath.get(bound.targetSource.logicalPath);
+	const rootExternalModule =
+		rootSourceFile === undefined ? false : provider.isExternalModule(rootSourceFile);
+	assertWithinDeadline();
+	if (rootSourceFile === undefined || !rootSourceFile.isDeclarationFile || !rootExternalModule)
+		failDerivation(
+			'INPUT_INVALID',
+			'The CAP-011 selected target must be an external declaration module in the fresh Program.'
+		);
+	const moduleSymbol = provider.getSymbolAtLocation(session, rootSourceFile);
+	assertWithinDeadline();
+	if (moduleSymbol === undefined)
+		failDerivation(
+			'INPUT_INVALID',
+			'The selected declaration root has no public checker module symbol.'
+		);
+	const exportSymbols = provider.getExportsOfModule(session, moduleSymbol);
+	assertWithinDeadline();
+	if (exportSymbols.length > inputs.request.budgets.maxExportSymbols)
+		failDerivation('BUDGET_EXHAUSTED', 'Package-root export symbol budget was exhausted.');
+	chargeTraversal(exportSymbols.length);
+	const matchingExports: ts.Symbol[] = [];
+	for (const symbol of exportSymbols) {
+		assertWithinDeadline();
+		const name = provider.symbolName(symbol);
+		assertWithinDeadline();
+		if (!isUnicodeScalarString(name, assertWithinDeadline))
+			failDerivation('INPUT_INVALID', 'TypeScript returned a non-scalar public export name.');
+		if (sameText(name, inputs.request.exportName, assertWithinDeadline))
+			matchingExports.push(symbol);
+	}
+	if (matchingExports.length !== 1)
+		failDerivation(
+			'INPUT_INVALID',
+			'The exact requested package-root export must occur exactly once.',
+			'$inputs.request.exportName'
+		);
+	return { exportSymbols, rootExportSymbol: matchingExports[0]!, rootSourceFile };
+}
+
+interface ArtifactSeedCollector {
+	readonly add: (sourceFile: ts.SourceFile, role: DeclarationContextArtifactRole) => ArtifactSeed;
+	readonly seeds: ReadonlyMap<string, ArtifactSeed>;
+}
+
+function createArtifactSeedCollector(
+	context: DeriveContext,
+	semanticSourceByLogicalPath: ReadonlyMap<string, DeriveSemanticSource>
+): ArtifactSeedCollector {
+	const { assertWithinDeadline, inputs, session } = context;
+	const artifactSeeds = new Map<string, ArtifactSeed>();
+	const add = (sourceFile: ts.SourceFile, role: DeclarationContextArtifactRole): ArtifactSeed => {
+		const logicalPath = session.toLogicalPath(sourceFile.fileName);
+		const source = acceptedArtifactSource(semanticSourceByLogicalPath, logicalPath);
+		let seed = artifactSeeds.get(source.id);
+		if (seed === undefined) {
+			if (artifactSeeds.size >= inputs.request.budgets.maxArtifacts)
+				failDerivation('BUDGET_EXHAUSTED', 'Declaration artifact budget was exhausted.');
+			seed = { roles: new Set<DeclarationContextArtifactRole>(), source, sourceFile };
+			artifactSeeds.set(source.id, seed);
+		} else if (
+			seed.sourceFile !== sourceFile ||
+			!sameText(seed.source.logicalPath, logicalPath, assertWithinDeadline)
+		) {
+			failDerivation(
+				'INPUT_INVALID',
+				'One semantic artifact maps to inconsistent Program sources.'
+			);
+		}
+		seed.roles.add(role);
+		return seed;
+	};
+	return { add, seeds: artifactSeeds };
+}
+
+function assertAliasHopAdmissible(context: DeriveContext, hopCount: number): void {
+	if (hopCount !== 0)
+		failDerivation(
+			'INPUT_INVALID',
+			'Multi-hop selected export aliases are outside the supported v1 boundary.'
+		);
+	if (hopCount >= context.inputs.request.budgets.maxAliasHops)
+		failDerivation('BUDGET_EXHAUSTED', 'Alias-hop budget was exhausted before resolution.');
+}
+
+function aliasHopDeclarations(
+	context: DeriveContext,
+	aliasSymbol: ts.Symbol
+): readonly ts.Declaration[] {
+	const aliasDeclarations = context.provider.getDeclarations(aliasSymbol);
+	context.assertWithinDeadline();
+	if (aliasDeclarations?.length !== 1)
+		failDerivation(
+			'INPUT_INVALID',
+			'Every traversed alias symbol must have exactly one public declaration.'
+		);
+	return aliasDeclarations;
+}
+
+function selectedRootAliasDeclaration(
+	aliasDeclarations: readonly ts.Declaration[]
+): ts.ExportSpecifier {
+	const rootAliasDeclaration = aliasDeclarations[0]!;
+	if (!ts.isExportSpecifier(rootAliasDeclaration))
+		failDerivation(
+			'INPUT_INVALID',
+			'The selected root alias must be represented by one top-level ExportSpecifier.'
+		);
+	return rootAliasDeclaration;
+}
+
+function aliasHopArtifactSourceIds(
+	context: DeriveContext,
+	aliasDeclarations: readonly ts.Declaration[],
+	addArtifact: ArtifactSeedCollector['add']
+): ReadonlySet<string> {
+	const aliasSourceIds = new Set<string>();
+	for (const declaration of aliasDeclarations) {
+		context.assertWithinDeadline();
+		const declarationSourceFile = declaration.getSourceFile();
+		context.assertWithinDeadline();
+		const seed = addArtifact(declarationSourceFile, 'ALIAS_DECLARATION_CONTAINER');
+		aliasSourceIds.add(seed.source.id);
+	}
+	return aliasSourceIds;
+}
+
+function aliasHopTargetSymbol(
+	context: DeriveContext,
+	aliasSymbol: ts.Symbol,
+	visitedSymbols: Set<ts.Symbol>
+): ts.Symbol {
+	const targetSymbol = context.provider.getAliasedSymbol(context.session, aliasSymbol);
+	context.assertWithinDeadline();
+	if (visitedSymbols.has(targetSymbol))
+		failDerivation('INPUT_INVALID', 'Selected checker alias traversal is cyclic.');
+	visitedSymbols.add(targetSymbol);
+	return targetSymbol;
+}
+
+interface AliasHopNames {
+	readonly aliasName: string;
+	readonly targetName: string;
+}
+
+function aliasHopNames(
+	context: DeriveContext,
+	aliasSymbol: ts.Symbol,
+	targetSymbol: ts.Symbol
+): AliasHopNames {
+	const { assertWithinDeadline, provider } = context;
+	const aliasName = provider.symbolName(aliasSymbol);
+	assertWithinDeadline();
+	const targetName = provider.symbolName(targetSymbol);
+	assertWithinDeadline();
+	if (
+		!isUnicodeScalarString(aliasName, assertWithinDeadline) ||
+		!isUnicodeScalarString(targetName, assertWithinDeadline)
+	)
+		failDerivation('INPUT_INVALID', 'Alias traversal produced non-scalar symbol names.');
+	return { aliasName, targetName };
+}
+
+function orderedAliasSourceIds(
+	context: DeriveContext,
+	aliasSourceIds: ReadonlySet<string>
+): string[] {
+	const aliasDeclarationSourceIds: string[] = [];
+	for (const sourceId of aliasSourceIds) {
+		context.assertWithinDeadline();
+		aliasDeclarationSourceIds.push(sourceId);
+	}
+	return aliasDeclarationSourceIds;
+}
+
+interface AliasTraversal {
+	readonly aliasHopSeeds: readonly AliasHopSeed[];
+	readonly checkerRootAliasDeclaration: ts.ExportSpecifier | null;
+	readonly checkerRootExportSpecifierCensus: readonly RootExportSpecifierCensusEntry[];
+	readonly terminalSymbol: ts.Symbol;
+}
+
+function traverseSelectedExportAliases(
+	context: DeriveContext,
+	rootExportSymbol: ts.Symbol,
+	rootSourceFile: ts.SourceFile,
+	addArtifact: ArtifactSeedCollector['add']
+): AliasTraversal {
+	const { assertWithinDeadline, bound, chargeTraversal, inputs, provider } = context;
+	const aliasHopSeeds: AliasHopSeed[] = [];
+	const checkerRootExportSpecifierCensus: RootExportSpecifierCensusEntry[] = [];
+	let checkerRootAliasDeclaration: ts.ExportSpecifier | null = null;
+	const visitedSymbols = new Set<ts.Symbol>([rootExportSymbol]);
+	let terminalSymbol = rootExportSymbol;
+	while (true) {
+		const aliasSymbol = provider.isAliasSymbol(terminalSymbol);
+		assertWithinDeadline();
+		if (!aliasSymbol) break;
+		assertAliasHopAdmissible(context, aliasHopSeeds.length);
+		chargeTraversal(1);
+		const aliasDeclarations = aliasHopDeclarations(context, terminalSymbol);
+		if (terminalSymbol === rootExportSymbol) {
+			const rootAliasDeclaration = selectedRootAliasDeclaration(aliasDeclarations);
+			checkerRootAliasDeclaration = rootAliasDeclaration;
+			checkerRootExportSpecifierCensus.push(
+				rootExportSpecifierCensusEntry(
+					rootAliasDeclaration,
+					rootSourceFile,
+					bound.targetSource.logicalPath,
+					inputs.request.exportName,
+					assertWithinDeadline
+				)
+			);
+		}
+		const aliasSourceIds = aliasHopArtifactSourceIds(context, aliasDeclarations, addArtifact);
+		const targetSymbol = aliasHopTargetSymbol(context, terminalSymbol, visitedSymbols);
+		const { aliasName, targetName } = aliasHopNames(context, terminalSymbol, targetSymbol);
+		const aliasDeclarationSourceIds = orderedAliasSourceIds(context, aliasSourceIds);
+		const aliasSymbolFlagsMask = provider.symbolFlags(terminalSymbol);
+		assertWithinDeadline();
+		aliasHopSeeds.push({
+			aliasName,
+			aliasSourceIds: aliasDeclarationSourceIds,
+			aliasSymbolFlags: symbolFlags(aliasSymbolFlagsMask, assertWithinDeadline),
+			ordinal: aliasHopSeeds.length,
+			targetName
+		});
+		terminalSymbol = targetSymbol;
+	}
+	return {
+		aliasHopSeeds,
+		checkerRootAliasDeclaration,
+		checkerRootExportSpecifierCensus,
+		terminalSymbol
+	};
+}
+
+function resolveTerminalSymbolName(
+	context: DeriveContext,
+	terminalSymbol: ts.Symbol,
+	checkerRootAliasDeclaration: ts.ExportSpecifier | null
+): string {
+	const { assertWithinDeadline, provider } = context;
+	const terminalName = provider.symbolName(terminalSymbol);
+	assertWithinDeadline();
+	if (terminalName.length === 0 || !isUnicodeScalarString(terminalName, assertWithinDeadline))
+		failDerivation('INPUT_INVALID', 'The terminal checker symbol lacks a supported public name.');
+	if (
+		checkerRootAliasDeclaration !== null &&
+		(checkerRootAliasDeclaration.propertyName === undefined ||
+			!sameText(checkerRootAliasDeclaration.propertyName.text, terminalName, assertWithinDeadline))
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The selected root ExportSpecifier must name the terminal symbol directly without local indirection.'
+		);
+	return terminalName;
+}
+
+function resolveTerminalDeclarations(
+	context: DeriveContext,
+	terminalSymbol: ts.Symbol
+): readonly ts.Declaration[] {
+	const { assertWithinDeadline, chargeTraversal, inputs, provider } = context;
+	const terminalDeclarations = provider.getDeclarations(terminalSymbol);
+	assertWithinDeadline();
+	if (terminalDeclarations === undefined || terminalDeclarations.length === 0)
+		failDerivation('INPUT_INVALID', 'Terminal checker symbol lacks public declarations.');
+	if (terminalDeclarations.length > inputs.request.budgets.maxDeclarations)
+		failDerivation('BUDGET_EXHAUSTED', 'Terminal declaration budget was exhausted.');
+	const terminalDeclarationReferences = new Set<ts.Declaration>();
+	for (const declaration of terminalDeclarations) {
+		assertWithinDeadline();
+		if (terminalDeclarationReferences.has(declaration))
+			failDerivation('INPUT_INVALID', 'Terminal checker declarations repeat a reference identity.');
+		terminalDeclarationReferences.add(declaration);
+	}
+	chargeTraversal(terminalDeclarations.length);
+	return terminalDeclarations;
+}
+
+function bindTerminalArtifactSource(
+	context: DeriveContext,
+	terminalDeclarations: readonly ts.Declaration[],
+	addArtifact: ArtifactSeedCollector['add']
+): string | null {
+	const { assertWithinDeadline, bound } = context;
+	let terminalArtifactSourceId: string | null = null;
+	for (const declaration of terminalDeclarations) {
+		assertWithinDeadline();
+		const declarationSourceFile = declaration.getSourceFile();
+		assertWithinDeadline();
+		const seed = addArtifact(declarationSourceFile, 'TERMINAL_DECLARATION_CONTAINER');
+		if (terminalArtifactSourceId === null) terminalArtifactSourceId = seed.source.id;
+		else if (!sameText(terminalArtifactSourceId, seed.source.id, assertWithinDeadline))
+			failDerivation(
+				'INPUT_INVALID',
+				'Cross-file terminal declaration merging is outside the supported v1 boundary.'
+			);
+	}
+	if (
+		terminalArtifactSourceId === null ||
+		!sameText(terminalArtifactSourceId, bound.targetSource.id, assertWithinDeadline)
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The supported terminal symbol must be declared in the CAP-011 root declaration artifact.'
+		);
+	return terminalArtifactSourceId;
+}
+
+function buildCheckerTerminalCensus(
+	context: DeriveContext,
+	terminalDeclarations: readonly ts.Declaration[],
+	terminalName: string
+): DeclarationCensusEntry[] {
+	const { assertWithinDeadline, session } = context;
+	const checkerTerminalCensus = checkedSort(
+		checkedMap(
+			terminalDeclarations,
+			(declaration) => {
+				const declarationSourceFile = declaration.getSourceFile();
+				assertWithinDeadline();
+				return declarationCensusEntry(
+					declaration,
+					declarationSourceFile,
+					session.toLogicalPath(declarationSourceFile.fileName),
+					assertWithinDeadline
+				);
+			},
+			assertWithinDeadline
+		),
+		(left, right) => compareDeclarationCensus(left, right, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	let checkerTerminalNameMismatch = false;
+	for (const declaration of checkerTerminalCensus) {
+		assertWithinDeadline();
+		if (!sameText(declaration.name, terminalName, assertWithinDeadline))
+			checkerTerminalNameMismatch = true;
+	}
+	if (checkerTerminalNameMismatch)
+		failDerivation(
+			'INPUT_INVALID',
+			'Terminal declaration names do not reproduce the checker symbol name.'
+		);
+	return checkerTerminalCensus;
+}
+
+function orderArtifactSeeds(
+	context: DeriveContext,
+	artifactSeeds: ReadonlyMap<string, ArtifactSeed>
+): ArtifactSeed[] {
+	const { assertWithinDeadline } = context;
+	const unorderedArtifactSeeds: ArtifactSeed[] = [];
+	for (const seed of artifactSeeds.values()) {
+		assertWithinDeadline();
+		unorderedArtifactSeeds.push(seed);
+	}
+	return checkedSort(
+		unorderedArtifactSeeds,
+		(left, right) =>
+			compareText(left.source.logicalPath, right.source.logicalPath, assertWithinDeadline) ||
+			compareText(left.source.id, right.source.id, assertWithinDeadline),
+		assertWithinDeadline
+	);
+}
+
+interface FreshProgramLanguage {
+	readonly compilerOptionsDigest: string;
+	readonly languageVersionCode: ts.ScriptTarget;
+	readonly languageVersionName: string;
+}
+
+function assertFreshProgramCompilerOptions(context: DeriveContext): FreshProgramLanguage {
+	const { assertWithinDeadline, inputs, provider, session } = context;
+	const compilerOptions = provider.compilerOptions(session);
+	const compilerOptionsDigest = canonicalSha256(compilerOptions, assertWithinDeadline);
+	if (
+		!sameText(
+			compilerOptionsDigest,
+			inputs.moduleResolutionTrace.resolverEnvironment.compilerOptionsDigest,
+			assertWithinDeadline
+		)
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'Fresh Program compiler options do not reproduce the CAP-011 compiler-options digest.'
+		);
+	const languageVersionCode = compilerOptions.target ?? ts.ScriptTarget.Latest;
+	const languageVersionName = ts.ScriptTarget[languageVersionCode];
+	if (typeof languageVersionName !== 'string')
+		failDerivation('INPUT_INVALID', 'Program ScriptTarget lacks a public reverse enum name.');
+	return { compilerOptionsDigest, languageVersionCode, languageVersionName };
+}
+
+function assertSelectedArtifactDiagnostics(
+	context: DeriveContext,
+	orderedArtifactSeeds: readonly ArtifactSeed[]
+): void {
+	const { assertWithinDeadline, inputs, provider, session } = context;
+	let diagnosticCount = 0;
+	for (const artifact of orderedArtifactSeeds) {
+		assertWithinDeadline();
+		const syntacticDiagnostics = provider.syntacticDiagnostics(session, artifact.sourceFile);
+		assertWithinDeadline();
+		diagnosticCount = safeAdd(
+			diagnosticCount,
+			syntacticDiagnostics.length,
+			'Selected declaration artifact diagnostic population'
+		);
+		if (diagnosticCount > inputs.request.budgets.maxDiagnostics)
+			failDerivation(
+				'BUDGET_EXHAUSTED',
+				'Selected declaration artifact diagnostics exhausted the diagnostic budget.'
+			);
+		if (diagnosticCount !== 0)
+			failDerivation(
+				'INPUT_INVALID',
+				'Selected declaration artifacts must have no public Program syntactic diagnostics.'
+			);
+	}
+}
+
+interface ParsedArtifactSeed {
+	readonly artifact: ArtifactSeed;
+	readonly astNodes: number;
+	readonly inputRecordOrdinal: number;
+	readonly parsedSource: ParsedCapturedSource;
+}
+
+function assertIndependentArtifactParse(
+	context: DeriveContext,
+	artifact: ArtifactSeed,
+	parsedSource: ParsedCapturedSource,
+	languageVersionCode: ts.ScriptTarget
+): void {
+	const { assertWithinDeadline, provider } = context;
+	const parsedExternalModule = provider.isExternalModule(parsedSource.sourceFile);
+	assertWithinDeadline();
+	if (
+		parsedSource.contentBytes !== artifact.source.bytes ||
+		!sameText(parsedSource.contentSha256, artifact.source.contentSha256, assertWithinDeadline) ||
+		parsedSource.textLength !== artifact.source.textLength ||
+		!sameText(parsedSource.sourceFile.text, artifact.sourceFile.text, assertWithinDeadline) ||
+		parsedSource.sourceFile.languageVersion !== languageVersionCode ||
+		!parsedSource.sourceFile.isDeclarationFile ||
+		!parsedExternalModule
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'Independent declaration parse does not reproduce its Program and CAP-001 source.'
+		);
+	if (
+		parsedSource.sourceFile.referencedFiles.length !== 0 ||
+		parsedSource.sourceFile.typeReferenceDirectives.length !== 0 ||
+		parsedSource.sourceFile.libReferenceDirectives.length !== 0 ||
+		parsedSource.sourceFile.amdDependencies.length !== 0 ||
+		parsedSource.sourceFile.moduleName !== undefined ||
+		parsedSource.sourceFile.hasNoDefaultLib
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'Selected declaration artifacts contain unsupported triple-slash dependency, AMD metadata, or default-library directives.'
+		);
+}
+
+interface SelectedArtifactAstScope {
+	readonly independentRootExportSpecifierCensus: RootExportSpecifierCensusEntry[];
+	readonly independentTerminalCensus: DeclarationCensusEntry[];
+	readonly logicalPath: string;
+	readonly parsedSourceFile: ts.SourceFile;
+	readonly rootArtifactSelected: boolean;
+	readonly rootExportSpecifierLimit: number;
+	readonly terminalArtifactSelected: boolean;
+	readonly terminalDeclarationLimit: number;
+	readonly terminalName: string;
+}
+
+function assertSupportedSelectedDeclarationSyntax(node: ts.Node): void {
+	if (ts.isNamespaceExportDeclaration(node))
+		failDerivation(
+			'INPUT_INVALID',
+			'Selected declaration artifacts contain unsupported ambient namespace-export syntax.'
+		);
+	if (
+		ts.isModuleDeclaration(node) &&
+		(ts.isStringLiteral(node.name) || (node.flags & ts.NodeFlags.GlobalAugmentation) !== 0)
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'Selected declaration artifacts contain unsupported augmentation or ambient-effect syntax.'
+		);
+}
+
+function censusIndependentTerminalDeclaration(
+	context: DeriveContext,
+	scope: SelectedArtifactAstScope,
+	node: ts.Node
+): void {
+	const { assertWithinDeadline } = context;
+	refuseCollapsedTerminalNameBinding(
+		node,
+		scope.parsedSourceFile,
+		scope.terminalName,
+		assertWithinDeadline
+	);
+	const declaration = censusTopLevelTerminalDeclaration(
+		node,
+		scope.parsedSourceFile,
+		scope.logicalPath,
+		scope.terminalName,
+		assertWithinDeadline
+	);
+	if (declaration === null) return;
+	if (scope.independentTerminalCensus.length >= scope.terminalDeclarationLimit)
+		failDerivation(
+			'INPUT_INVALID',
+			'The independently parsed terminal declaration census does not reproduce the complete checker declaration multiset.'
+		);
+	scope.independentTerminalCensus.push(declaration);
+}
+
+function censusSelectedRootExportSpecifier(
+	context: DeriveContext,
+	scope: SelectedArtifactAstScope,
+	node: ts.Node
+): void {
+	const { assertWithinDeadline, inputs } = context;
+	if (
+		!ts.isExportSpecifier(node) ||
+		!sameText(node.name.text, inputs.request.exportName, assertWithinDeadline)
+	)
+		return;
+	if (scope.independentRootExportSpecifierCensus.length >= scope.rootExportSpecifierLimit)
+		failDerivation(
+			'INPUT_INVALID',
+			'The independently parsed selected root ExportSpecifier census does not reproduce the checker alias binding.'
+		);
+	scope.independentRootExportSpecifierCensus.push(
+		rootExportSpecifierCensusEntry(
+			node,
+			scope.parsedSourceFile,
+			scope.logicalPath,
+			inputs.request.exportName,
+			assertWithinDeadline
+		)
+	);
+}
+
+function selectedArtifactAstVisitor(
+	context: DeriveContext,
+	scope: SelectedArtifactAstScope
+): (node: ts.Node) => void {
+	return (node) => {
+		context.chargeTraversal(1);
+		assertSupportedSelectedDeclarationSyntax(node);
+		if (scope.terminalArtifactSelected) censusIndependentTerminalDeclaration(context, scope, node);
+		if (scope.rootArtifactSelected) censusSelectedRootExportSpecifier(context, scope, node);
+	};
+}
+
+interface SelectedArtifactParsePlan {
+	readonly languageVersionCode: ts.ScriptTarget;
+	readonly rootExportSpecifierLimit: number;
+	readonly terminalArtifactSourceId: string | null;
+	readonly terminalDeclarationLimit: number;
+	readonly terminalName: string;
+}
+
+interface SelectedArtifactParse {
+	readonly independentRootExportSpecifierCensus: readonly RootExportSpecifierCensusEntry[];
+	readonly independentTerminalCensus: readonly DeclarationCensusEntry[];
+	readonly parsedArtifactSeeds: readonly ParsedArtifactSeed[];
+	readonly selectedAstNodes: number;
+}
+
+function parseSelectedArtifacts(
+	context: DeriveContext,
+	orderedArtifactSeeds: readonly ArtifactSeed[],
+	plan: SelectedArtifactParsePlan
+): SelectedArtifactParse {
+	const { assertWithinDeadline, bound, inputs, provider, session } = context;
+	const parsedArtifactSeeds: ParsedArtifactSeed[] = [];
+	const independentRootExportSpecifierCensus: RootExportSpecifierCensusEntry[] = [];
+	const independentTerminalCensus: DeclarationCensusEntry[] = [];
+	let selectedAstNodes = 0;
+	for (const artifact of orderedArtifactSeeds) {
+		assertWithinDeadline();
+		const parsedSource = provider.parseCapturedSourceFile(session, artifact.source.logicalPath);
+		assertWithinDeadline();
+		assertIndependentArtifactParse(context, artifact, parsedSource, plan.languageVersionCode);
+		const terminalArtifactSelected =
+			plan.terminalArtifactSourceId !== null &&
+			sameText(artifact.source.id, plan.terminalArtifactSourceId, assertWithinDeadline);
+		const rootArtifactSelected = sameText(
+			artifact.source.id,
+			bound.targetSource.id,
+			assertWithinDeadline
+		);
+		const scope: SelectedArtifactAstScope = {
+			independentRootExportSpecifierCensus,
+			independentTerminalCensus,
+			logicalPath: artifact.source.logicalPath,
+			parsedSourceFile: parsedSource.sourceFile,
+			rootArtifactSelected,
+			rootExportSpecifierLimit: plan.rootExportSpecifierLimit,
+			terminalArtifactSelected,
+			terminalDeclarationLimit: plan.terminalDeclarationLimit,
+			terminalName: plan.terminalName
+		};
+		const astNodes = countAstNodes(
+			parsedSource.sourceFile,
+			inputs.request.budgets.maxParsedArtifactAstNodes - selectedAstNodes,
+			'Selected declaration artifact',
+			selectedArtifactAstVisitor(context, scope),
+			assertWithinDeadline
+		);
+		selectedAstNodes = safeAdd(
+			selectedAstNodes,
+			astNodes,
+			'Selected declaration AST node population'
+		);
+		parsedArtifactSeeds.push({
+			artifact,
+			astNodes,
+			inputRecordOrdinal: parsedSource.inputRecordOrdinal,
+			parsedSource
+		});
+	}
+	return {
+		independentRootExportSpecifierCensus,
+		independentTerminalCensus,
+		parsedArtifactSeeds,
+		selectedAstNodes
+	};
+}
+
+function assertIndependentCensusReproduction(
+	context: DeriveContext,
+	parse: SelectedArtifactParse,
+	checkerRootExportSpecifierCensus: readonly RootExportSpecifierCensusEntry[],
+	checkerTerminalCensus: readonly DeclarationCensusEntry[]
+): void {
+	const { assertWithinDeadline } = context;
+	const orderedIndependentRootExportSpecifierCensus = checkedSort(
+		parse.independentRootExportSpecifierCensus,
+		(left, right) => compareRootExportSpecifierCensus(left, right, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	const orderedCheckerRootExportSpecifierCensus = checkedSort(
+		checkerRootExportSpecifierCensus,
+		(left, right) => compareRootExportSpecifierCensus(left, right, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	if (
+		!equalRootExportSpecifierCensus(
+			orderedIndependentRootExportSpecifierCensus,
+			orderedCheckerRootExportSpecifierCensus,
+			assertWithinDeadline
+		)
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The independently parsed selected root ExportSpecifier census does not reproduce the checker alias binding.'
+		);
+	const orderedIndependentTerminalCensus = checkedSort(
+		parse.independentTerminalCensus,
+		(left, right) => compareDeclarationCensus(left, right, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	if (
+		!equalDeclarationCensus(
+			orderedIndependentTerminalCensus,
+			checkerTerminalCensus,
+			assertWithinDeadline
+		)
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'The independently parsed terminal declaration census does not reproduce the complete checker declaration multiset.'
+		);
+}
+
+function finalizeCaptureEvidence(
+	context: DeriveContext,
+	programSourceFileCount: number,
+	artifactCount: number
+): CaptureEvidence {
+	const { assertWithinDeadline, bound, inputs, provider, session } = context;
+	assertWithinDeadline();
+	const evidence = provider.finalizeSession(session);
+	assertWithinDeadline();
+	const contextInputIdsReconcile = equalStringPopulation(
+		evidence.contextInputIds,
+		inputs.moduleResolutionTrace.captureWitness.inputRecordIds,
+		assertWithinDeadline
+	);
+	if (
+		!sameText(evidence.subjectId, inputs.request.subjectId, assertWithinDeadline) ||
+		!sameText(evidence.semanticProgramId, bound.semanticProgram.id, assertWithinDeadline) ||
+		!sameText(evidence.semanticProjectId, bound.semanticProject.id, assertWithinDeadline) ||
+		!sameText(evidence.configPath, bound.configPath, assertWithinDeadline) ||
+		!sameText(
+			evidence.programContextDigest,
+			bound.semanticProgram.contextDigest,
+			assertWithinDeadline
+		) ||
+		!sameText(
+			inputs.moduleResolutionTrace.captureWitness.contextDigest,
+			inputs.semanticSnapshot.contextDigest,
+			assertWithinDeadline
+		) ||
+		!sameText(
+			evidence.materializedRecipeDigest,
+			inputs.moduleResolutionTrace.captureWitness.materializedRecipeDigest,
+			assertWithinDeadline
+		) ||
+		!sameText(
+			evidence.projectResolutionDigest,
+			inputs.moduleResolutionTrace.captureWitness.projectResolutionDigest,
+			assertWithinDeadline
+		) ||
+		!contextInputIdsReconcile ||
+		evidence.programSourceFiles !== programSourceFileCount ||
+		evidence.programCallbacksWithinAttributedInvocationBounds !== true ||
+		!safeNonnegative(evidence.attributedInputRecords) ||
+		!safeNonnegative(evidence.attributedReadBytes) ||
+		!safeNonnegative(evidence.attributedUniqueQueries) ||
+		evidence.attributedUniqueQueries > evidence.attributedInputRecords ||
+		evidence.artifactParseInputRecords !== artifactCount ||
+		evidence.compilerHostCallbacks !==
+			safeAdd(
+				evidence.programCompilerHostCallbacks,
+				evidence.artifactParseInputRecords,
+				'Total compiler input population'
+			) ||
+		evidence.compilerHostReadBytes !==
+			safeAdd(
+				evidence.programCompilerHostReadBytes,
+				evidence.artifactParseReadBytes,
+				'Total compiler read-byte population'
+			)
+	)
+		failDerivation('INPUT_INVALID', 'Fresh Program evidence does not reconcile with derivation.');
+	if (
+		evidence.attributedInputRecords > inputs.request.budgets.maxCompilerInputAttempts ||
+		evidence.attributedReadBytes > inputs.request.budgets.maxProgramReadBytes
+	)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Capture-attributed compiler input upper bounds exhausted the Program budgets.'
+		);
+	return evidence;
+}
+
+interface CapturedProgramSourceRead {
+	readonly bytes: number;
+	readonly contentSha256: string;
+	readonly origin: string;
+}
+
+interface ProgramEvidenceScan {
+	artifactReadBytes: number;
+	artifactSuffixStarted: boolean;
+	readonly capturedProgramSourceReads: Map<string, CapturedProgramSourceRead[]>;
+	readonly programEvidenceRecords: ProgramEvidenceRecord[];
+	programReadBytes: number;
+}
+
+function accumulateProgramEvidenceStage(
+	scan: ProgramEvidenceScan,
+	record: CaptureInputRecord
+): void {
+	if (record.stage === 'DECLARATION_ARTIFACT_PARSE') {
+		scan.artifactSuffixStarted = true;
+		return;
+	}
+	if (scan.artifactSuffixStarted)
+		failDerivation(
+			'INPUT_INVALID',
+			'Program/checker callbacks must form a dense prefix before artifact reads.'
+		);
+	scan.programEvidenceRecords.push(record as ProgramEvidenceRecord);
+}
+
+function accumulateProgramEvidenceRead(
+	scan: ProgramEvidenceScan,
+	record: CaptureInputRecord
+): void {
+	if (record.observation.operation !== 'READ_FILE' || record.observation.result !== 'PRESENT')
+		return;
+	if (record.stage === 'DECLARATION_ARTIFACT_PARSE') {
+		scan.artifactReadBytes = safeAdd(
+			scan.artifactReadBytes,
+			record.observation.contentBytes,
+			'Artifact read-byte population'
+		);
+		return;
+	}
+	scan.programReadBytes = safeAdd(
+		scan.programReadBytes,
+		record.observation.contentBytes,
+		'Program read-byte population'
+	);
+	let reads = scan.capturedProgramSourceReads.get(record.query.logicalPath);
+	if (reads === undefined) {
+		reads = [];
+		scan.capturedProgramSourceReads.set(record.query.logicalPath, reads);
+	}
+	reads.push({
+		bytes: record.observation.contentBytes,
+		contentSha256: record.observation.contentSha256,
+		origin: record.observation.origin
+	});
+}
+
+function scanProgramEvidenceRecords(
+	context: DeriveContext,
+	evidence: CaptureEvidence
+): ProgramEvidenceScan {
+	const { assertWithinDeadline, inputs } = context;
+	const scan: ProgramEvidenceScan = {
+		artifactReadBytes: 0,
+		artifactSuffixStarted: false,
+		capturedProgramSourceReads: new Map<string, CapturedProgramSourceRead[]>(),
+		programEvidenceRecords: [],
+		programReadBytes: 0
+	};
+	if (evidence.inputRecords.length > inputs.request.budgets.maxInputRecords)
+		failDerivation('BUDGET_EXHAUSTED', 'Compiler input record population exceeds its budget.');
+	for (let ordinal = 0; ordinal < evidence.inputRecords.length; ordinal += 1) {
+		assertWithinDeadline();
+		const record = evidence.inputRecords[ordinal]!;
+		if (record.ordinal !== ordinal)
+			failDerivation('INPUT_INVALID', 'Compiler input records are not globally dense.');
+		accumulateProgramEvidenceStage(scan, record);
+		accumulateProgramEvidenceRead(scan, record);
+	}
+	if (
+		scan.programEvidenceRecords.length !== evidence.programCompilerHostCallbacks ||
+		evidence.inputRecords.length !== evidence.compilerHostCallbacks ||
+		scan.programReadBytes !== evidence.programCompilerHostReadBytes ||
+		scan.artifactReadBytes !== evidence.artifactParseReadBytes
+	)
+		failDerivation('INPUT_INVALID', 'Fresh Program callback population or ordering is invalid.');
+	return scan;
+}
+
+function hasMatchingCapturedProgramRead(
+	context: DeriveContext,
+	source: DeclarationContextProgramSourceIdentity,
+	reads: readonly CapturedProgramSourceRead[] | undefined
+): boolean {
+	const { assertWithinDeadline } = context;
+	let matchingRead = false;
+	if (reads !== undefined)
+		for (const read of reads) {
+			assertWithinDeadline();
+			if (
+				read.bytes === source.bytes &&
+				sameText(read.contentSha256, source.contentSha256, assertWithinDeadline) &&
+				sameText(read.origin, source.origin, assertWithinDeadline)
+			)
+				matchingRead = true;
+		}
+	return matchingRead;
+}
+
+function assertCapturedProgramSourceWitnesses(
+	context: DeriveContext,
+	programSourceIdentities: readonly DeclarationContextProgramSourceIdentity[],
+	capturedProgramSourceReads: ReadonlyMap<string, CapturedProgramSourceRead[]>
+): void {
+	const { assertWithinDeadline } = context;
+	for (const source of programSourceIdentities) {
+		assertWithinDeadline();
+		const reads = capturedProgramSourceReads.get(source.logicalPath);
+		if (!hasMatchingCapturedProgramRead(context, source, reads))
+			failDerivation(
+				'INPUT_INVALID',
+				'Fresh Program source lacks a matching captured content witness.'
+			);
+	}
+}
+
+function sumPopulations(initial: number, populations: readonly number[], label: string): number {
+	let total = initial;
+	for (const population of populations) total = safeAdd(total, population, label);
+	return total;
+}
+
+interface DerivedPopulations {
+	readonly aliasHops: number;
+	readonly artifactReadBytes: number;
+	readonly artifacts: number;
+	readonly declarations: number;
+	readonly exportSymbols: number;
+	readonly programEvidenceRecords: number;
+	readonly programFiles: number;
+	readonly programParsedAstNodes: number;
+	readonly programReadBytes: number;
+	readonly selectedAstNodes: number;
+}
+
+interface ProspectiveAccounting {
+	readonly inputRecords: number;
+	readonly mergeRecords: number;
+	readonly outputRecords: number;
+	readonly readBytes: number;
+	readonly relationRecords: number;
+	readonly traversalSteps: number;
+}
+
+function computeProspectiveAccounting(
+	context: DeriveContext,
+	populations: DerivedPopulations
+): ProspectiveAccounting {
+	const { chargeTraversal, inputs, traversalTotal } = context;
+	const mergeRecords = populations.declarations > 1 ? 1 : 0;
+	let relationRecords = safeAdd(
+		populations.declarations,
+		populations.declarations,
+		'Declaration relation population'
+	);
+	if (mergeRecords === 1)
+		relationRecords = safeAdd(
+			relationRecords,
+			populations.declarations,
+			'Declaration merge relation population'
+		);
+	if (relationRecords > inputs.request.budgets.maxRelations)
+		failDerivation('BUDGET_EXHAUSTED', 'Declaration relation budget was exhausted.');
+	chargeTraversal(relationRecords);
+	const inputRecords = safeAdd(
+		populations.programEvidenceRecords,
+		populations.artifacts,
+		'Declaration-context input population'
+	);
+	const readBytes = safeAdd(
+		populations.programReadBytes,
+		populations.artifactReadBytes,
+		'Declaration-context read-byte population'
+	);
+	const traversalSteps = sumPopulations(
+		0,
+		[
+			populations.programEvidenceRecords,
+			populations.artifacts,
+			populations.programFiles,
+			populations.programParsedAstNodes,
+			populations.selectedAstNodes,
+			populations.exportSymbols,
+			populations.aliasHops,
+			populations.declarations,
+			relationRecords
+		],
+		'Declaration-context traversal population'
+	);
+	if (traversalTotal() !== traversalSteps)
+		failDerivation(
+			'INPUT_INVALID',
+			'Progressive declaration-context traversal accounting did not reconcile.'
+		);
+	const outputRecords = sumPopulations(
+		3,
+		[
+			populations.programEvidenceRecords,
+			populations.artifacts,
+			populations.artifacts,
+			populations.declarations,
+			mergeRecords,
+			relationRecords
+		],
+		'Declaration-context output population'
+	);
+	if (
+		populations.programEvidenceRecords > inputs.request.budgets.maxCompilerInputAttempts ||
+		inputRecords > inputs.request.budgets.maxInputRecords ||
+		populations.programReadBytes > inputs.request.budgets.maxProgramReadBytes ||
+		readBytes > inputs.request.budgets.maxReadBytes ||
+		relationRecords > inputs.request.budgets.maxRelations ||
+		traversalSteps > inputs.request.budgets.maxTraversalSteps ||
+		outputRecords > inputs.request.budgets.maxOutputRecords
+	)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Declaration-context materialization budget was exhausted before output allocation.'
+		);
+	return { inputRecords, mergeRecords, outputRecords, readBytes, relationRecords, traversalSteps };
+}
+
+function buildProgramInputAttempts(
+	context: DeriveContext,
+	programEvidenceRecords: readonly ProgramEvidenceRecord[]
+): DeclarationContextProgramInputAttemptRecord[] {
+	const { analysisId, assertWithinDeadline } = context;
+	return checkedMap(
+		programEvidenceRecords,
+		(record) => {
+			const withoutId: Omit<DeclarationContextProgramInputAttemptRecord, 'id'> = {
+				attributedInvocationCount: record.attributedInvocationCount,
+				invocationOrdinal: record.invocationOrdinal,
+				observation: cloneWire(record.observation, assertWithinDeadline),
+				ordinal: record.ordinal,
+				query: cloneWire(record.query, assertWithinDeadline),
+				stage: record.stage
+			};
+			return {
+				...withoutId,
+				id: independentRecordId<DeclarationContextProgramInputAttemptId>(
+					'declaration-context-program-input-attempt',
+					'JAN-CSAA-DECLARATION-CONTEXT-PROGRAM-INPUT-ATTEMPT',
+					analysisId,
+					withoutId,
+					assertWithinDeadline
+				)
+			};
+		},
+		assertWithinDeadline
+	);
+}
+
+interface ParseWitnessBinding {
+	readonly parseWitnessBySourceId: ReadonlyMap<string, DeclarationContextParseWitnessRecord>;
+	readonly parseWitnesses: DeclarationContextParseWitnessRecord[];
+}
+
+function buildParseWitnesses(
+	context: DeriveContext,
+	parsedArtifactSeeds: readonly ParsedArtifactSeed[],
+	evidence: CaptureEvidence,
+	language: FreshProgramLanguage
+): ParseWitnessBinding {
+	const { analysisId, assertWithinDeadline, bound } = context;
+	const parseWitnesses: DeclarationContextParseWitnessRecord[] = [];
+	const parseWitnessBySourceId = new Map<string, DeclarationContextParseWitnessRecord>();
+	for (const parsed of parsedArtifactSeeds) {
+		assertWithinDeadline();
+		const inputRecord = evidence.inputRecords[parsed.inputRecordOrdinal];
+		if (
+			inputRecord?.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
+			inputRecord.query.operation !== 'READ_FILE' ||
+			!sameText(
+				inputRecord.query.logicalPath,
+				parsed.artifact.source.logicalPath,
+				assertWithinDeadline
+			) ||
+			inputRecord.observation.operation !== 'READ_FILE' ||
+			inputRecord.observation.result !== 'PRESENT'
+		)
+			failDerivation('INPUT_INVALID', 'Independent declaration parse read witness is invalid.');
+		const withoutId: Omit<DeclarationContextParseWitnessRecord, 'id'> = {
+			astNodes: parsed.astNodes,
+			bytes: parsed.artifact.source.bytes,
+			compilerVersion: ts.version,
+			contentSha256: parsed.artifact.source.contentSha256,
+			decodedUtf16CodeUnits: parsed.parsedSource.textLength,
+			externalModule: true,
+			languageVersion: {
+				nativeCode: language.languageVersionCode,
+				nativeName: language.languageVersionName
+			},
+			logicalPath: parsed.artifact.source.logicalPath,
+			parseDiagnostics: [],
+			parseHealth: 'VALID',
+			parseMethod: 'TYPESCRIPT_PUBLIC_CREATE_SOURCE_FILE_OVER_EXACT_CAPTURED_BYTES',
+			programSourceReconciliation: 'EXACT_LOGICAL_PATH_CONTENT_SHA256_AND_SEMANTIC_SOURCE_ID',
+			scriptKind: { nativeCode: ts.ScriptKind.TS, nativeName: 'TS' },
+			semanticProgramId: bound.semanticProgram.id,
+			semanticProjectId: bound.semanticProject.id,
+			semanticSourceId: parsed.artifact.source.id,
+			sourceEncoding: parsed.parsedSource.encoding as DeclarationContextSourceEncoding,
+			sourceRead: {
+				attributedInvocationCount: inputRecord.attributedInvocationCount,
+				inputRecordOrdinal: inputRecord.ordinal,
+				invocationOrdinal: inputRecord.invocationOrdinal,
+				observation: cloneWire(inputRecord.observation, assertWithinDeadline),
+				query: {
+					logicalPath: inputRecord.query.logicalPath,
+					operation: 'READ_FILE'
+				},
+				stage: 'DECLARATION_ARTIFACT_PARSE'
+			},
+			statements: parsed.parsedSource.sourceFile.statements.length
+		};
+		const record: DeclarationContextParseWitnessRecord = {
+			...withoutId,
+			id: independentRecordId<DeclarationContextParseWitnessId>(
+				'declaration-context-parse-witness',
+				'JAN-CSAA-DECLARATION-CONTEXT-PARSE-WITNESS',
+				analysisId,
+				withoutId,
+				assertWithinDeadline
+			)
+		};
+		parseWitnesses.push(record);
+		parseWitnessBySourceId.set(parsed.artifact.source.id, record);
+	}
+	return { parseWitnessBySourceId, parseWitnesses };
+}
+
+function buildArtifactRecords(
+	context: DeriveContext,
+	orderedArtifactSeeds: readonly ArtifactSeed[],
+	parseWitnessBySourceId: ReadonlyMap<string, DeclarationContextParseWitnessRecord>
+): DeclarationContextArtifactRecord[] {
+	const { analysisId, assertWithinDeadline, bound } = context;
+	return checkedMap(
+		orderedArtifactSeeds,
+		(seed, ordinal) => {
+			const parseWitness = parseWitnessBySourceId.get(seed.source.id)!;
+			const roles: DeclarationContextArtifactRole[] = [];
+			for (const role of DECLARATION_CONTEXT_ANALYSIS_ARTIFACT_ROLE_ORDER) {
+				assertWithinDeadline();
+				if (seed.roles.has(role)) roles.push(role);
+			}
+			const withoutId: Omit<DeclarationContextArtifactRecord, 'id'> = {
+				artifactClass: 'CONTEXT_ONLY',
+				bytes: seed.source.bytes,
+				contentSha256: seed.source.contentSha256,
+				declarationFile: true,
+				declarationRole: 'EMITTED_DECLARATION',
+				extension: sourceExtension(seed.source.logicalPath),
+				logicalPath: seed.source.logicalPath,
+				ordinal,
+				origin: 'WORKSPACE_BUILD_DECLARATION',
+				parseWitnessId: parseWitness.id,
+				roles,
+				semanticProgramId: bound.semanticProgram.id,
+				semanticProjectId: bound.semanticProject.id,
+				semanticSourceId: seed.source.id
+			};
+			return {
+				...withoutId,
+				id: independentRecordId<DeclarationContextArtifactId>(
+					'declaration-context-artifact',
+					'JAN-CSAA-DECLARATION-CONTEXT-ARTIFACT',
+					analysisId,
+					withoutId,
+					assertWithinDeadline
+				)
+			};
+		},
+		assertWithinDeadline
+	);
+}
+
+interface ArtifactRecordIndex {
+	readonly artifactBySourceId: ReadonlyMap<string, DeclarationContextArtifactRecord>;
+	readonly rootArtifact: DeclarationContextArtifactRecord;
+	readonly terminalArtifact: DeclarationContextArtifactRecord;
+}
+
+function indexArtifactRecords(
+	context: DeriveContext,
+	artifacts: readonly DeclarationContextArtifactRecord[],
+	terminalArtifactSourceId: string | null
+): ArtifactRecordIndex {
+	const { assertWithinDeadline, bound } = context;
+	const artifactBySourceId = new Map<string, DeclarationContextArtifactRecord>();
+	for (const artifact of artifacts) {
+		assertWithinDeadline();
+		artifactBySourceId.set(artifact.semanticSourceId, artifact);
+	}
+	return {
+		artifactBySourceId,
+		rootArtifact: artifactBySourceId.get(bound.targetSource.id)!,
+		terminalArtifact: artifactBySourceId.get(terminalArtifactSourceId!)!
+	};
+}
+
+function buildAliasHopWitnesses(
+	context: DeriveContext,
+	aliasHopSeeds: readonly AliasHopSeed[],
+	artifactBySourceId: ReadonlyMap<string, DeclarationContextArtifactRecord>
+): DeclarationContextAliasHopWitness[] {
+	const { assertWithinDeadline } = context;
+	const aliasHops: DeclarationContextAliasHopWitness[] = [];
+	for (const seed of aliasHopSeeds) {
+		assertWithinDeadline();
+		const hopArtifacts: DeclarationContextArtifactRecord[] = [];
+		for (const sourceId of seed.aliasSourceIds) {
+			assertWithinDeadline();
+			const artifact = artifactBySourceId.get(sourceId);
+			if (artifact !== undefined) hopArtifacts.push(artifact);
+		}
+		const orderedHopArtifacts = checkedSort(
+			hopArtifacts,
+			(left, right) => left.ordinal - right.ordinal,
+			assertWithinDeadline
+		);
+		const aliasDeclarationArtifactIds = checkedMap(
+			orderedHopArtifacts,
+			(artifact) => artifact.id,
+			assertWithinDeadline
+		);
+		aliasHops.push({
+			aliasDeclarationArtifactIds,
+			aliasName: seed.aliasName,
+			aliasSymbolFlags: seed.aliasSymbolFlags,
+			ordinal: seed.ordinal,
+			resolutionApi: 'TYPESCRIPT_PUBLIC_TYPE_CHECKER_GET_ALIASED_SYMBOL',
+			targetName: seed.targetName
+		});
+	}
+	let lostAliasArtifact = false;
+	for (const hop of aliasHops) {
+		assertWithinDeadline();
+		if (hop.aliasDeclarationArtifactIds.length === 0) lostAliasArtifact = true;
+	}
+	if (lostAliasArtifact)
+		failDerivation('INPUT_INVALID', 'One alias hop lost its declaration-artifact identities.');
+	return aliasHops;
+}
+
+function buildDeclarationRecords(
+	context: DeriveContext,
+	terminalDeclarations: readonly ts.Declaration[],
+	terminalArtifact: DeclarationContextArtifactRecord,
+	terminalParseWitness: DeclarationContextParseWitnessRecord
+): DeclarationContextDeclarationRecord[] {
+	const { analysisId, assertWithinDeadline } = context;
+	const declarationWithoutIds = checkedSort(
+		checkedMap(
+			terminalDeclarations,
+			(declaration) => {
+				const declarationSourceFile = declaration.getSourceFile();
+				assertWithinDeadline();
+				return supportedDeclaration(
+					declaration,
+					declarationSourceFile,
+					terminalArtifact.id,
+					terminalParseWitness.id,
+					0,
+					assertWithinDeadline
+				);
+			},
+			assertWithinDeadline
+		),
+		(left, right) =>
+			left.start - right.start ||
+			left.end - right.end ||
+			left.nativeKind.nativeCode - right.nativeKind.nativeCode ||
+			compareText(left.name, right.name, assertWithinDeadline),
+		assertWithinDeadline
+	);
+	return checkedMap(
+		declarationWithoutIds,
+		(seed, ordinal) => {
+			const withoutId = { ...seed, ordinal };
+			return {
+				...withoutId,
+				id: independentRecordId<DeclarationContextDeclarationId>(
+					'declaration-context-declaration',
+					'JAN-CSAA-DECLARATION-CONTEXT-DECLARATION',
+					analysisId,
+					withoutId,
+					assertWithinDeadline
+				)
+			};
+		},
+		assertWithinDeadline
+	);
+}
+
+function buildTerminalSymbolRecord(
+	context: DeriveContext,
+	terminalSymbol: ts.Symbol,
+	terminalName: string,
+	terminalArtifact: DeclarationContextArtifactRecord,
+	declarations: readonly DeclarationContextDeclarationRecord[],
+	declarationIds: DeclarationContextDeclarationId[]
+): DeclarationContextTerminalSymbolRecord {
+	const { analysisId, assertWithinDeadline, bound, provider } = context;
+	const terminalSymbolFlagsMask = provider.symbolFlags(terminalSymbol);
+	assertWithinDeadline();
+	const terminalSymbolWithoutId: Omit<DeclarationContextTerminalSymbolRecord, 'id'> = {
+		declarationArtifactId: terminalArtifact.id,
+		declarationIds,
+		declarationSetClosure: 'COMPLETE_PUBLIC_CHECKER_DECLARATION_SET_SAME_ARTIFACT',
+		flags: symbolFlags(terminalSymbolFlagsMask, assertWithinDeadline),
+		mergeState: declarations.length === 1 ? 'SINGLE' : 'MERGED',
+		name: terminalName,
+		ordinal: 0,
+		semanticProgramId: bound.semanticProgram.id,
+		semanticProjectId: bound.semanticProject.id,
+		symbolMeaning: 'TERMINAL_CHECKER_SYMBOL_FOR_SELECTED_PACKAGE_ROOT_EXPORT'
+	};
+	return {
+		...terminalSymbolWithoutId,
+		id: independentRecordId<DeclarationContextTerminalSymbolId>(
+			'declaration-context-terminal-symbol',
+			'JAN-CSAA-DECLARATION-CONTEXT-TERMINAL-SYMBOL',
+			analysisId,
+			terminalSymbolWithoutId,
+			assertWithinDeadline
+		)
+	};
+}
+
+function buildExportBindingRecord(
+	context: DeriveContext,
+	rootExportSymbol: ts.Symbol,
+	aliasHops: DeclarationContextAliasHopWitness[],
+	exportSymbolsExamined: number,
+	rootArtifact: DeclarationContextArtifactRecord,
+	terminalSymbolRecord: DeclarationContextTerminalSymbolRecord
+): DeclarationContextExportBindingRecord {
+	const { analysisId, assertWithinDeadline, inputs, provider } = context;
+	const rootExportSymbolFlagsMask = provider.symbolFlags(rootExportSymbol);
+	assertWithinDeadline();
+	const exportBindingWithoutId: Omit<DeclarationContextExportBindingRecord, 'id'> = {
+		aliasHops,
+		exportName: inputs.request.exportName,
+		exportSymbolsExamined,
+		ordinal: 0,
+		resolutionKind:
+			aliasHops.length === 0 ? 'DIRECT_TERMINAL_SYMBOL' : 'ALIASED_TO_TERMINAL_SYMBOL',
+		rootArtifactId: rootArtifact.id,
+		rootExportSymbolFlags: symbolFlags(rootExportSymbolFlagsMask, assertWithinDeadline),
+		selectionApi: 'TYPESCRIPT_PUBLIC_TYPE_CHECKER_GET_EXPORTS_OF_MODULE',
+		terminalSymbolId: terminalSymbolRecord.id
+	};
+	return {
+		...exportBindingWithoutId,
+		id: independentRecordId<DeclarationContextExportBindingId>(
+			'declaration-context-export-binding',
+			'JAN-CSAA-DECLARATION-CONTEXT-EXPORT-BINDING',
+			analysisId,
+			exportBindingWithoutId,
+			assertWithinDeadline
+		)
+	};
+}
+
+function buildMergeRecords(
+	context: DeriveContext,
+	declarations: readonly DeclarationContextDeclarationRecord[],
+	declarationIds: DeclarationContextDeclarationId[],
+	terminalArtifact: DeclarationContextArtifactRecord,
+	terminalSymbolRecord: DeclarationContextTerminalSymbolRecord
+): DeclarationContextMergeRecord[] {
+	const { analysisId, assertWithinDeadline } = context;
+	const merges: DeclarationContextMergeRecord[] = [];
+	if (declarations.length > 1) {
+		const withoutId: Omit<DeclarationContextMergeRecord, 'id'> = {
+			declarationArtifactId: terminalArtifact.id,
+			declarationIds,
+			kind: 'COMPLETE_SAME_FILE_TERMINAL_SYMBOL_MERGE',
+			ordinal: 0,
+			terminalSymbolId: terminalSymbolRecord.id
+		};
+		merges.push({
+			...withoutId,
+			id: independentRecordId<DeclarationContextMergeId>(
+				'declaration-context-merge',
+				'JAN-CSAA-DECLARATION-CONTEXT-MERGE',
+				analysisId,
+				withoutId,
+				assertWithinDeadline
+			)
+		});
+	}
+	return merges;
+}
+
+function buildRelationRecords(
+	context: DeriveContext,
+	declarations: readonly DeclarationContextDeclarationRecord[],
+	merges: readonly DeclarationContextMergeRecord[],
+	terminalSymbolRecord: DeclarationContextTerminalSymbolRecord
+): DeclarationContextRelationRecord[] {
+	const { analysisId, assertWithinDeadline } = context;
+	const relationSeeds: DeclarationContextRelationRecordWithoutId[] = [];
+	for (const declaration of declarations) {
+		assertWithinDeadline();
+		relationSeeds.push(
+			{
+				artifactId: declaration.artifactId,
+				declarationId: declaration.id,
+				kind: 'DECLARES',
+				ordinal: 0
+			},
+			{
+				declarationId: declaration.id,
+				kind: 'CONTRIBUTES_TO',
+				ordinal: 0,
+				terminalSymbolId: terminalSymbolRecord.id
+			}
+		);
+		if (merges[0] !== undefined)
+			relationSeeds.push({
+				declarationId: declaration.id,
+				kind: 'MERGES_WITH',
+				mergeId: merges[0].id,
+				ordinal: 0,
+				terminalSymbolId: terminalSymbolRecord.id
+			});
+	}
+	const relationRank: Record<DeclarationContextRelationRecordWithoutId['kind'], number> = {
+		CONTRIBUTES_TO: 1,
+		DECLARES: 0,
+		MERGES_WITH: 2
+	};
+	const relationEndpoints = (record: DeclarationContextRelationRecordWithoutId): string => {
+		if (record.kind === 'DECLARES') return `${record.artifactId}\0${record.declarationId}`;
+		if (record.kind === 'CONTRIBUTES_TO')
+			return `${record.declarationId}\0${record.terminalSymbolId}`;
+		return `${record.declarationId}\0${record.mergeId}\0${record.terminalSymbolId}`;
+	};
+	const orderedRelationSeeds = checkedSort(
+		relationSeeds,
+		(left, right) =>
+			relationRank[left.kind] - relationRank[right.kind] ||
+			compareText(relationEndpoints(left), relationEndpoints(right), assertWithinDeadline),
+		assertWithinDeadline
+	);
+	return checkedMap(
+		orderedRelationSeeds,
+		(seed, ordinal): DeclarationContextRelationRecord => {
+			const withoutId = { ...seed, ordinal } as DeclarationContextRelationRecordWithoutId;
+			return {
+				...withoutId,
+				id: independentRecordId<DeclarationContextRelationId>(
+					'declaration-context-relation',
+					'JAN-CSAA-DECLARATION-CONTEXT-RELATION',
+					analysisId,
+					withoutId,
+					assertWithinDeadline
+				)
+			} as DeclarationContextRelationRecord;
+		},
+		assertWithinDeadline
+	);
+}
+
+function countProgramPresentReadFileAttempts(
+	context: DeriveContext,
+	programEvidenceRecords: readonly ProgramEvidenceRecord[]
+): number {
+	const { assertWithinDeadline } = context;
+	let programPresentReadFileAttempts = 0;
+	for (const record of programEvidenceRecords) {
+		assertWithinDeadline();
+		if (record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT')
+			programPresentReadFileAttempts += 1;
+	}
+	return programPresentReadFileAttempts;
+}
+
+interface MaterializedPopulations {
+	readonly aliasHops: number;
+	readonly artifactReadBytes: number;
+	readonly artifacts: number;
+	readonly declarations: number;
+	readonly exportSymbols: number;
+	readonly merges: number;
+	readonly parseWitnesses: number;
+	readonly programFiles: number;
+	readonly programInputAttempts: number;
+	readonly programParsedAstNodes: number;
+	readonly programReadBytes: number;
+	readonly relations: number;
+	readonly selectedAstNodes: number;
+}
+
+interface MaterializedAccounting {
+	readonly chargedTraversalSteps: number;
+	readonly inputRecords: number;
+	readonly outputRecords: number;
+	readonly readBytes: number;
+}
+
+function assertMaterializedAccounting(
+	populations: MaterializedPopulations,
+	prospective: ProspectiveAccounting
+): MaterializedAccounting {
+	const inputRecords = safeAdd(
+		populations.programInputAttempts,
+		populations.parseWitnesses,
+		'Declaration-context input population'
+	);
+	const readBytes = safeAdd(
+		populations.programReadBytes,
+		populations.artifactReadBytes,
+		'Declaration-context read-byte population'
+	);
+	if (inputRecords !== prospective.inputRecords || readBytes !== prospective.readBytes)
+		failDerivation(
+			'INPUT_INVALID',
+			'Declaration-context compiler input accounting did not reconcile.'
+		);
+	const chargedTraversalSteps = sumPopulations(
+		0,
+		[
+			populations.programInputAttempts,
+			populations.artifacts,
+			populations.programFiles,
+			populations.programParsedAstNodes,
+			populations.selectedAstNodes,
+			populations.exportSymbols,
+			populations.aliasHops,
+			populations.declarations,
+			populations.relations
+		],
+		'Declaration-context traversal population'
+	);
+	if (chargedTraversalSteps !== prospective.traversalSteps)
+		failDerivation('INPUT_INVALID', 'Declaration-context traversal accounting did not reconcile.');
+	const outputRecords = sumPopulations(
+		3,
+		[
+			populations.programInputAttempts,
+			populations.parseWitnesses,
+			populations.artifacts,
+			populations.declarations,
+			populations.merges,
+			populations.relations
+		],
+		'Declaration-context output population'
+	);
+	if (
+		outputRecords !== prospective.outputRecords ||
+		populations.relations !== prospective.relationRecords ||
+		populations.merges !== prospective.mergeRecords
+	)
+		failDerivation('INPUT_INVALID', 'Declaration-context output accounting did not reconcile.');
+	return { chargedTraversalSteps, inputRecords, outputRecords, readBytes };
+}
+
 function derive(
 	inputs: DeclarationContextAnalysisBuildInputs,
 	maxDurationMs: number,
@@ -2152,1151 +4294,129 @@ function derive(
 	knownInputDigest?: string
 ): DeriveResult {
 	try {
-		const monotonicStartedAt = provider.monotonicNow();
-		if (!Number.isFinite(monotonicStartedAt) || monotonicStartedAt < 0)
-			failDerivation('INPUT_INVALID', 'The validation operation clock is unavailable.');
-		const durationLimit = Math.min(inputs.request.budgets.maxDurationMs, maxDurationMs);
-		let lastMonotonic = monotonicStartedAt;
-		const operationElapsed = (): number => {
-			const observed = provider.monotonicNow();
-			if (!Number.isFinite(observed) || observed < lastMonotonic || observed < monotonicStartedAt)
-				failDerivation('INPUT_INVALID', 'The validation monotonic clock failed closed.');
-			lastMonotonic = observed;
-			const elapsed = Math.floor(observed - monotonicStartedAt);
-			if (!safeNonnegative(elapsed))
-				failDerivation('INPUT_INVALID', 'The validation monotonic elapsed time is invalid.');
-			return elapsed;
-		};
-		const assertWithinDeadline = (): void => {
-			if (operationElapsed() > durationLimit)
-				failDerivation('BUDGET_EXHAUSTED', 'Declaration-context wall-clock budget was exhausted.');
-		};
-		let progressiveTraversalSteps = 0;
-		const chargeTraversal = (amount: number): void => {
-			if (amount > inputs.request.budgets.maxTraversalSteps - progressiveTraversalSteps)
-				failDerivation('BUDGET_EXHAUSTED', 'Declaration-context traversal budget was exhausted.');
-			progressiveTraversalSteps += amount;
-		};
+		const deadline = createDeriveDeadline(inputs, maxDurationMs, provider);
+		const { assertWithinDeadline } = deadline;
+		const traversal = createDeriveTraversalCharge(inputs);
 		const inputDigest = independentInputDigest(inputs, assertWithinDeadline);
 		assertWithinDeadline();
-		if (
-			knownInputDigest !== undefined &&
-			!sameText(inputDigest, knownInputDigest, assertWithinDeadline)
-		)
-			failDerivation(
-				'IDENTITY_MISMATCH',
-				'The trusted producer input digest does not reproduce independently.',
-				'$knownInputDigest'
-			);
+		assertKnownInputDigestReproduces(inputDigest, knownInputDigest, assertWithinDeadline);
 		const analysisId = independentAnalysisId(inputs, inputDigest, assertWithinDeadline);
 		const bound = bindContext(inputs, assertWithinDeadline);
-		if (
-			ts.version !== TYPESCRIPT_PROVIDER_VERSION ||
-			inputs.semanticSnapshot.provider.version !== ts.version
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The TypeScript runtime does not match the validated CAP-001 provider version.'
-			);
-		const remainingDurationMs = durationLimit - operationElapsed();
-		if (remainingDurationMs <= 0)
-			failDerivation('BUDGET_EXHAUSTED', 'Declaration-context wall-clock budget was exhausted.');
-		const session = provider.createSession(
-			inputs.semanticSnapshot,
-			bound.configPath,
-			{
-				maxDurationMs: remainingDurationMs,
-				maxProgramInputRecords: inputs.request.budgets.maxCompilerInputAttempts,
-				maxProgramReadBytes: inputs.request.budgets.maxProgramReadBytes,
-				maxProgramSourceFiles: inputs.request.budgets.maxProgramSourceFiles,
-				maxTotalInputRecords: inputs.request.budgets.maxInputRecords,
-				maxTotalReadBytes: inputs.request.budgets.maxReadBytes
-			},
-			{
-				onInput() {
-					try {
-						chargeTraversal(1);
-					} catch (error) {
-						if (error instanceof DerivationFailure && error.problem.code === 'BUDGET_EXHAUSTED')
-							throw new CompilerProjectProgramCapabilityError(
-								'BUDGET_EXCEEDED',
-								error.problem.message
-							);
-						throw error;
-					}
-				}
-			}
-		);
+		assertProviderRuntimeVersion(inputs);
+		const session = openDeriveSession(inputs, provider, bound, deadline, traversal.charge);
 		assertWithinDeadline();
-		const sessionIdentity = provider.sessionIdentity(session);
-		assertWithinDeadline();
-		if (
-			!sameText(
-				sessionIdentity.semanticProgramId,
-				bound.semanticProgram.id,
-				assertWithinDeadline
-			) ||
-			!sameText(
-				sessionIdentity.semanticProjectId,
-				bound.semanticProject.id,
-				assertWithinDeadline
-			) ||
-			!sameText(sessionIdentity.configPath, bound.configPath, assertWithinDeadline)
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The fresh captured Program does not bind the selected semantic context.'
-			);
-		if (bound.semanticProgram.sourceIds.length > inputs.request.budgets.maxProgramSourceFiles)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'The selected semantic Program source population exceeds its budget.'
-			);
-		const selectedSemanticSources = checkedFilter(
-			inputs.semanticSnapshot.sources,
-			(source) => sameText(source.programId, bound.semanticProgram.id, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		const semanticSourceByLogicalPath = new Map<
-			string,
-			DeclarationContextAnalysisBuildInputs['semanticSnapshot']['sources'][number]
-		>();
-		const semanticSourceIdPopulation = new Set<string>();
-		for (const sourceId of bound.semanticProgram.sourceIds) {
-			assertWithinDeadline();
-			semanticSourceIdPopulation.add(sourceId);
-		}
-		for (const source of selectedSemanticSources) {
-			assertWithinDeadline();
-			if (
-				semanticSourceByLogicalPath.has(source.logicalPath) ||
-				!semanticSourceIdPopulation.has(source.id) ||
-				!sameText(source.projectId, bound.semanticProject.id, assertWithinDeadline)
-			)
-				failDerivation(
-					'INPUT_INVALID',
-					'The selected semantic Program source population is not exact.'
-				);
-			semanticSourceByLogicalPath.set(source.logicalPath, source);
-		}
-		if (
-			selectedSemanticSources.length !== bound.semanticProgram.sourceIds.length ||
-			semanticSourceIdPopulation.size !== selectedSemanticSources.length
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The selected semantic Program source population is not closed.'
-			);
-
-		const programSourceFiles = provider.programSourceFiles(session);
-		assertWithinDeadline();
-		if (programSourceFiles.length > inputs.request.budgets.maxProgramSourceFiles)
-			failDerivation('BUDGET_EXHAUSTED', 'Fresh Program source population exceeds its budget.');
-		const programFiles = checkedSort(
-			checkedMap(
-				programSourceFiles,
-				(sourceFile) => ({
-					logicalPath: session.toLogicalPath(sourceFile.fileName),
-					sourceFile
-				}),
-				assertWithinDeadline
-			),
-			(left, right) =>
-				compareText(left.logicalPath, right.logicalPath, assertWithinDeadline) ||
-				compareText(left.sourceFile.fileName, right.sourceFile.fileName, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		assertWithinDeadline();
-		chargeTraversal(programFiles.length);
-		let programParsedAstNodes = 0;
-		const programSourceIdentities: DeclarationContextProgramSourceIdentity[] = [];
-		const programSourcesByLogicalPath = new Map<string, ts.SourceFile>();
-		const semanticSourceIds = new Set<string>();
-		for (const entry of programFiles) {
-			assertWithinDeadline();
-			if (programSourcesByLogicalPath.has(entry.logicalPath))
-				failDerivation('INPUT_INVALID', 'Fresh Program repeats a canonical logical source path.');
-			programSourcesByLogicalPath.set(entry.logicalPath, entry.sourceFile);
-			programParsedAstNodes = safeAdd(
-				programParsedAstNodes,
-				countAstNodes(
-					entry.sourceFile,
-					inputs.request.budgets.maxProgramAstNodes - programParsedAstNodes,
-					'Fresh Program',
-					() => chargeTraversal(1),
-					assertWithinDeadline
-				),
-				'Fresh Program AST node population'
-			);
-			const semanticSource = semanticSourceForFile(semanticSourceByLogicalPath, entry.logicalPath);
-			if (
-				semanticSourceIds.has(semanticSource.id) ||
-				entry.sourceFile.text.length !== semanticSource.textLength ||
-				entry.sourceFile.isDeclarationFile !== semanticSource.declarationFile
-			)
-				failDerivation(
-					'INPUT_INVALID',
-					'Fresh Program source text or declaration classification differs from CAP-001.'
-				);
-			semanticSourceIds.add(semanticSource.id);
-			programSourceIdentities.push({
-				bytes: semanticSource.bytes,
-				contentSha256: semanticSource.contentSha256,
-				declarationFile: semanticSource.declarationFile,
-				logicalPath: semanticSource.logicalPath,
-				origin: semanticSource.origin,
-				semanticSourceId: semanticSource.id
-			});
-		}
-		const selectedContextSources = checkedFilter(
-			inputs.projectContextGraph.sources,
-			(source) => sameText(source.programId, bound.contextProgram.id, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		const contextSourceById = new Map<
-			string,
-			DeclarationContextAnalysisBuildInputs['projectContextGraph']['sources'][number]
-		>();
-		for (const source of selectedContextSources) {
-			assertWithinDeadline();
-			contextSourceById.set(source.id, source);
-		}
-		if (bound.contextProgram.sourceIds.length > inputs.request.budgets.maxProgramSourceFiles)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'The selected project-context Program source population exceeds its budget.'
-			);
-		const contextProgramSourceIds = new Set<string>();
-		for (const sourceId of bound.contextProgram.sourceIds) {
-			assertWithinDeadline();
-			contextProgramSourceIds.add(sourceId);
-		}
-		if (
-			selectedContextSources.length !== bound.contextProgram.sourceIds.length ||
-			contextSourceById.size !== selectedContextSources.length ||
-			contextProgramSourceIds.size !== selectedContextSources.length
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The selected project-context Program has an invalid source population.'
-			);
-		const contextSources: DeclarationContextAnalysisBuildInputs['projectContextGraph']['sources'][number][] =
-			[];
-		for (const sourceId of bound.contextProgram.sourceIds) {
-			assertWithinDeadline();
-			const source = contextSourceById.get(sourceId);
-			if (source === undefined)
-				failDerivation(
-					'INPUT_INVALID',
-					'The selected project-context Program has an invalid source population.'
-				);
-			contextSources.push(source);
-		}
-		let contextPopulationMismatch = contextSources.length !== programFiles.length;
-		for (const source of contextSources) {
-			assertWithinDeadline();
-			if (
-				!semanticSourceIds.has(source.semanticSourceId) ||
-				programSourcesByLogicalPath.get(source.logicalPath) === undefined ||
-				!sameText(source.semanticProgramId, bound.semanticProgram.id, assertWithinDeadline) ||
-				!sameText(source.semanticProjectId, bound.semanticProject.id, assertWithinDeadline)
-			)
-				contextPopulationMismatch = true;
-		}
-		if (contextPopulationMismatch)
-			failDerivation(
-				'INPUT_INVALID',
-				'Fresh Program sources do not exactly reconcile with the CAP-010 Program population.'
-			);
-
-		const rootSourceFile = programSourcesByLogicalPath.get(bound.targetSource.logicalPath);
-		const rootExternalModule =
-			rootSourceFile === undefined ? false : provider.isExternalModule(rootSourceFile);
-		assertWithinDeadline();
-		if (rootSourceFile === undefined || !rootSourceFile.isDeclarationFile || !rootExternalModule)
-			failDerivation(
-				'INPUT_INVALID',
-				'The CAP-011 selected target must be an external declaration module in the fresh Program.'
-			);
-		const moduleSymbol = provider.getSymbolAtLocation(session, rootSourceFile);
-		assertWithinDeadline();
-		if (moduleSymbol === undefined)
-			failDerivation(
-				'INPUT_INVALID',
-				'The selected declaration root has no public checker module symbol.'
-			);
-		const exportSymbols = provider.getExportsOfModule(session, moduleSymbol);
-		assertWithinDeadline();
-		if (exportSymbols.length > inputs.request.budgets.maxExportSymbols)
-			failDerivation('BUDGET_EXHAUSTED', 'Package-root export symbol budget was exhausted.');
-		chargeTraversal(exportSymbols.length);
-		const matchingExports: ts.Symbol[] = [];
-		for (const symbol of exportSymbols) {
-			assertWithinDeadline();
-			const name = provider.symbolName(symbol);
-			assertWithinDeadline();
-			if (!isUnicodeScalarString(name, assertWithinDeadline))
-				failDerivation('INPUT_INVALID', 'TypeScript returned a non-scalar public export name.');
-			if (sameText(name, inputs.request.exportName, assertWithinDeadline))
-				matchingExports.push(symbol);
-		}
-		if (matchingExports.length !== 1)
-			failDerivation(
-				'INPUT_INVALID',
-				'The exact requested package-root export must occur exactly once.',
-				'$inputs.request.exportName'
-			);
-		const rootExportSymbol = matchingExports[0]!;
-
-		const artifactSeeds = new Map<string, ArtifactSeed>();
-		const addArtifact = (
-			sourceFile: ts.SourceFile,
-			role: DeclarationContextArtifactRole
-		): ArtifactSeed => {
-			const logicalPath = session.toLogicalPath(sourceFile.fileName);
-			const source = acceptedArtifactSource(semanticSourceByLogicalPath, logicalPath);
-			let seed = artifactSeeds.get(source.id);
-			if (seed === undefined) {
-				if (artifactSeeds.size >= inputs.request.budgets.maxArtifacts)
-					failDerivation('BUDGET_EXHAUSTED', 'Declaration artifact budget was exhausted.');
-				seed = { roles: new Set<DeclarationContextArtifactRole>(), source, sourceFile };
-				artifactSeeds.set(source.id, seed);
-			} else if (
-				seed.sourceFile !== sourceFile ||
-				!sameText(seed.source.logicalPath, logicalPath, assertWithinDeadline)
-			) {
-				failDerivation(
-					'INPUT_INVALID',
-					'One semantic artifact maps to inconsistent Program sources.'
-				);
-			}
-			seed.roles.add(role);
-			return seed;
+		const context: DeriveContext = {
+			analysisId,
+			assertWithinDeadline,
+			bound,
+			chargeTraversal: traversal.charge,
+			inputs,
+			provider,
+			session,
+			traversalTotal: traversal.total
 		};
-		addArtifact(rootSourceFile, 'CAP011_SELECTED_DECLARATION_TARGET');
-		addArtifact(rootSourceFile, 'SELECTED_EXPORT_BINDING_CARRIER');
+		assertSessionSemanticBinding(context);
+		const semanticSourceByLogicalPath = buildSemanticSourcePopulation(context);
 
-		const aliasHopSeeds: AliasHopSeed[] = [];
-		const checkerRootExportSpecifierCensus: RootExportSpecifierCensusEntry[] = [];
-		let checkerRootAliasDeclaration: ts.ExportSpecifier | null = null;
-		const visitedSymbols = new Set<ts.Symbol>([rootExportSymbol]);
-		let terminalSymbol = rootExportSymbol;
-		while (true) {
-			const aliasSymbol = provider.isAliasSymbol(terminalSymbol);
-			assertWithinDeadline();
-			if (!aliasSymbol) break;
-			if (aliasHopSeeds.length !== 0)
-				failDerivation(
-					'INPUT_INVALID',
-					'Multi-hop selected export aliases are outside the supported v1 boundary.'
-				);
-			if (aliasHopSeeds.length >= inputs.request.budgets.maxAliasHops)
-				failDerivation('BUDGET_EXHAUSTED', 'Alias-hop budget was exhausted before resolution.');
-			chargeTraversal(1);
-			const aliasDeclarations = provider.getDeclarations(terminalSymbol);
-			assertWithinDeadline();
-			if (aliasDeclarations === undefined || aliasDeclarations.length !== 1)
-				failDerivation(
-					'INPUT_INVALID',
-					'Every traversed alias symbol must have exactly one public declaration.'
-				);
-			if (terminalSymbol === rootExportSymbol) {
-				const rootAliasDeclaration = aliasDeclarations[0]!;
-				if (!ts.isExportSpecifier(rootAliasDeclaration))
-					failDerivation(
-						'INPUT_INVALID',
-						'The selected root alias must be represented by one top-level ExportSpecifier.'
-					);
-				checkerRootAliasDeclaration = rootAliasDeclaration;
-				checkerRootExportSpecifierCensus.push(
-					rootExportSpecifierCensusEntry(
-						rootAliasDeclaration,
-						rootSourceFile,
-						bound.targetSource.logicalPath,
-						inputs.request.exportName,
-						assertWithinDeadline
-					)
-				);
-			}
-			const aliasSourceIds = new Set<string>();
-			for (const declaration of aliasDeclarations) {
-				assertWithinDeadline();
-				const declarationSourceFile = declaration.getSourceFile();
-				assertWithinDeadline();
-				const seed = addArtifact(declarationSourceFile, 'ALIAS_DECLARATION_CONTAINER');
-				aliasSourceIds.add(seed.source.id);
-			}
-			const targetSymbol = provider.getAliasedSymbol(session, terminalSymbol);
-			assertWithinDeadline();
-			if (visitedSymbols.has(targetSymbol))
-				failDerivation('INPUT_INVALID', 'Selected checker alias traversal is cyclic.');
-			visitedSymbols.add(targetSymbol);
-			const aliasName = provider.symbolName(terminalSymbol);
-			assertWithinDeadline();
-			const targetName = provider.symbolName(targetSymbol);
-			assertWithinDeadline();
-			if (
-				!isUnicodeScalarString(aliasName, assertWithinDeadline) ||
-				!isUnicodeScalarString(targetName, assertWithinDeadline)
-			)
-				failDerivation('INPUT_INVALID', 'Alias traversal produced non-scalar symbol names.');
-			const aliasDeclarationSourceIds: string[] = [];
-			for (const sourceId of aliasSourceIds) {
-				assertWithinDeadline();
-				aliasDeclarationSourceIds.push(sourceId);
-			}
-			const aliasSymbolFlagsMask = provider.symbolFlags(terminalSymbol);
-			assertWithinDeadline();
-			aliasHopSeeds.push({
-				aliasName,
-				aliasSourceIds: aliasDeclarationSourceIds,
-				aliasSymbolFlags: symbolFlags(aliasSymbolFlagsMask, assertWithinDeadline),
-				ordinal: aliasHopSeeds.length,
-				targetName
-			});
-			terminalSymbol = targetSymbol;
-		}
+		const programScan = scanFreshProgramSources(context, semanticSourceByLogicalPath);
+		const contextSources = bindProjectContextSources(context);
+		assertContextSourceReconciliation(context, contextSources, programScan);
 
-		const terminalName = provider.symbolName(terminalSymbol);
-		assertWithinDeadline();
-		if (terminalName.length === 0 || !isUnicodeScalarString(terminalName, assertWithinDeadline))
-			failDerivation('INPUT_INVALID', 'The terminal checker symbol lacks a supported public name.');
-		if (
-			checkerRootAliasDeclaration !== null &&
-			(checkerRootAliasDeclaration.propertyName === undefined ||
-				!sameText(
-					checkerRootAliasDeclaration.propertyName.text,
-					terminalName,
-					assertWithinDeadline
-				))
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The selected root ExportSpecifier must name the terminal symbol directly without local indirection.'
-			);
-		const terminalDeclarations = provider.getDeclarations(terminalSymbol);
-		assertWithinDeadline();
-		if (terminalDeclarations === undefined || terminalDeclarations.length === 0)
-			failDerivation('INPUT_INVALID', 'Terminal checker symbol lacks public declarations.');
-		if (terminalDeclarations.length > inputs.request.budgets.maxDeclarations)
-			failDerivation('BUDGET_EXHAUSTED', 'Terminal declaration budget was exhausted.');
-		const terminalDeclarationReferences = new Set<ts.Declaration>();
-		for (const declaration of terminalDeclarations) {
-			assertWithinDeadline();
-			if (terminalDeclarationReferences.has(declaration))
-				failDerivation(
-					'INPUT_INVALID',
-					'Terminal checker declarations repeat a reference identity.'
-				);
-			terminalDeclarationReferences.add(declaration);
-		}
-		chargeTraversal(terminalDeclarations.length);
-		let terminalArtifactSourceId: string | null = null;
-		for (const declaration of terminalDeclarations) {
-			assertWithinDeadline();
-			const declarationSourceFile = declaration.getSourceFile();
-			assertWithinDeadline();
-			const seed = addArtifact(declarationSourceFile, 'TERMINAL_DECLARATION_CONTAINER');
-			if (terminalArtifactSourceId === null) terminalArtifactSourceId = seed.source.id;
-			else if (!sameText(terminalArtifactSourceId, seed.source.id, assertWithinDeadline))
-				failDerivation(
-					'INPUT_INVALID',
-					'Cross-file terminal declaration merging is outside the supported v1 boundary.'
-				);
-		}
-		if (
-			terminalArtifactSourceId === null ||
-			!sameText(terminalArtifactSourceId, bound.targetSource.id, assertWithinDeadline)
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The supported terminal symbol must be declared in the CAP-011 root declaration artifact.'
-			);
-		const checkerTerminalCensus = checkedSort(
-			checkedMap(
-				terminalDeclarations,
-				(declaration) => {
-					const declarationSourceFile = declaration.getSourceFile();
-					assertWithinDeadline();
-					return declarationCensusEntry(
-						declaration,
-						declarationSourceFile,
-						session.toLogicalPath(declarationSourceFile.fileName),
-						assertWithinDeadline
-					);
-				},
-				assertWithinDeadline
-			),
-			(left, right) => compareDeclarationCensus(left, right, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		let checkerTerminalNameMismatch = false;
-		for (const declaration of checkerTerminalCensus) {
-			assertWithinDeadline();
-			if (!sameText(declaration.name, terminalName, assertWithinDeadline))
-				checkerTerminalNameMismatch = true;
-		}
-		if (checkerTerminalNameMismatch)
-			failDerivation(
-				'INPUT_INVALID',
-				'Terminal declaration names do not reproduce the checker symbol name.'
-			);
-		const unorderedArtifactSeeds: ArtifactSeed[] = [];
-		for (const seed of artifactSeeds.values()) {
-			assertWithinDeadline();
-			unorderedArtifactSeeds.push(seed);
-		}
-		const orderedArtifactSeeds = checkedSort(
-			unorderedArtifactSeeds,
-			(left, right) =>
-				compareText(left.source.logicalPath, right.source.logicalPath, assertWithinDeadline) ||
-				compareText(left.source.id, right.source.id, assertWithinDeadline),
-			assertWithinDeadline
-		);
+		const rootBinding = bindSelectedRootExport(context, programScan);
+		const { exportSymbols, rootExportSymbol, rootSourceFile } = rootBinding;
 
-		interface ParsedArtifactSeed {
-			readonly artifact: ArtifactSeed;
-			readonly astNodes: number;
-			readonly inputRecordOrdinal: number;
-			readonly parsedSource: ReturnType<typeof session.parseCapturedSourceFile>;
-		}
-		const parsedArtifactSeeds: ParsedArtifactSeed[] = [];
-		const independentlyParsedRootExportSpecifierCensus: RootExportSpecifierCensusEntry[] = [];
-		const independentlyParsedTerminalCensus: DeclarationCensusEntry[] = [];
-		let selectedAstNodes = 0;
-		const compilerOptions = provider.compilerOptions(session);
-		const compilerOptionsDigest = canonicalSha256(compilerOptions, assertWithinDeadline);
-		if (
-			!sameText(
-				compilerOptionsDigest,
-				inputs.moduleResolutionTrace.resolverEnvironment.compilerOptionsDigest,
-				assertWithinDeadline
-			)
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'Fresh Program compiler options do not reproduce the CAP-011 compiler-options digest.'
-			);
-		const languageVersionCode = compilerOptions.target ?? ts.ScriptTarget.Latest;
-		const languageVersionName = ts.ScriptTarget[languageVersionCode];
-		if (typeof languageVersionName !== 'string')
-			failDerivation('INPUT_INVALID', 'Program ScriptTarget lacks a public reverse enum name.');
-		let diagnosticCount = 0;
-		for (const artifact of orderedArtifactSeeds) {
-			assertWithinDeadline();
-			const syntacticDiagnostics = provider.syntacticDiagnostics(session, artifact.sourceFile);
-			assertWithinDeadline();
-			diagnosticCount = safeAdd(
-				diagnosticCount,
-				syntacticDiagnostics.length,
-				'Selected declaration artifact diagnostic population'
-			);
-			if (diagnosticCount > inputs.request.budgets.maxDiagnostics)
-				failDerivation(
-					'BUDGET_EXHAUSTED',
-					'Selected declaration artifact diagnostics exhausted the diagnostic budget.'
-				);
-			if (diagnosticCount !== 0)
-				failDerivation(
-					'INPUT_INVALID',
-					'Selected declaration artifacts must have no public Program syntactic diagnostics.'
-				);
-		}
-		for (const artifact of orderedArtifactSeeds) {
-			assertWithinDeadline();
-			const parsedSource = provider.parseCapturedSourceFile(session, artifact.source.logicalPath);
-			assertWithinDeadline();
-			const parsedExternalModule = provider.isExternalModule(parsedSource.sourceFile);
-			assertWithinDeadline();
-			if (
-				parsedSource.contentBytes !== artifact.source.bytes ||
-				!sameText(
-					parsedSource.contentSha256,
-					artifact.source.contentSha256,
-					assertWithinDeadline
-				) ||
-				parsedSource.textLength !== artifact.source.textLength ||
-				!sameText(parsedSource.sourceFile.text, artifact.sourceFile.text, assertWithinDeadline) ||
-				parsedSource.sourceFile.languageVersion !== languageVersionCode ||
-				!parsedSource.sourceFile.isDeclarationFile ||
-				!parsedExternalModule
-			)
-				failDerivation(
-					'INPUT_INVALID',
-					'Independent declaration parse does not reproduce its Program and CAP-001 source.'
-				);
-			if (
-				parsedSource.sourceFile.referencedFiles.length !== 0 ||
-				parsedSource.sourceFile.typeReferenceDirectives.length !== 0 ||
-				parsedSource.sourceFile.libReferenceDirectives.length !== 0 ||
-				parsedSource.sourceFile.amdDependencies.length !== 0 ||
-				parsedSource.sourceFile.moduleName !== undefined ||
-				parsedSource.sourceFile.hasNoDefaultLib
-			)
-				failDerivation(
-					'INPUT_INVALID',
-					'Selected declaration artifacts contain unsupported triple-slash dependency, AMD metadata, or default-library directives.'
-				);
-			const terminalArtifactSelected =
-				terminalArtifactSourceId !== null &&
-				sameText(artifact.source.id, terminalArtifactSourceId, assertWithinDeadline);
-			const rootArtifactSelected = sameText(
-				artifact.source.id,
-				bound.targetSource.id,
-				assertWithinDeadline
-			);
-			const astNodes = countAstNodes(
-				parsedSource.sourceFile,
-				inputs.request.budgets.maxParsedArtifactAstNodes - selectedAstNodes,
-				'Selected declaration artifact',
-				(node) => {
-					chargeTraversal(1);
-					if (ts.isNamespaceExportDeclaration(node))
-						failDerivation(
-							'INPUT_INVALID',
-							'Selected declaration artifacts contain unsupported ambient namespace-export syntax.'
-						);
-					if (
-						ts.isModuleDeclaration(node) &&
-						(ts.isStringLiteral(node.name) || (node.flags & ts.NodeFlags.GlobalAugmentation) !== 0)
-					)
-						failDerivation(
-							'INPUT_INVALID',
-							'Selected declaration artifacts contain unsupported augmentation or ambient-effect syntax.'
-						);
-					if (terminalArtifactSelected) {
-						refuseCollapsedTerminalNameBinding(
-							node,
-							parsedSource.sourceFile,
-							terminalName,
-							assertWithinDeadline
-						);
-						const declaration = censusTopLevelTerminalDeclaration(
-							node,
-							parsedSource.sourceFile,
-							artifact.source.logicalPath,
-							terminalName,
-							assertWithinDeadline
-						);
-						if (declaration !== null) {
-							if (independentlyParsedTerminalCensus.length >= terminalDeclarations.length)
-								failDerivation(
-									'INPUT_INVALID',
-									'The independently parsed terminal declaration census does not reproduce the complete checker declaration multiset.'
-								);
-							independentlyParsedTerminalCensus.push(declaration);
-						}
-					}
-					if (
-						rootArtifactSelected &&
-						ts.isExportSpecifier(node) &&
-						sameText(node.name.text, inputs.request.exportName, assertWithinDeadline)
-					) {
-						if (
-							independentlyParsedRootExportSpecifierCensus.length >=
-							checkerRootExportSpecifierCensus.length
-						)
-							failDerivation(
-								'INPUT_INVALID',
-								'The independently parsed selected root ExportSpecifier census does not reproduce the checker alias binding.'
-							);
-						independentlyParsedRootExportSpecifierCensus.push(
-							rootExportSpecifierCensusEntry(
-								node,
-								parsedSource.sourceFile,
-								artifact.source.logicalPath,
-								inputs.request.exportName,
-								assertWithinDeadline
-							)
-						);
-					}
-				},
-				assertWithinDeadline
-			);
-			selectedAstNodes = safeAdd(
-				selectedAstNodes,
-				astNodes,
-				'Selected declaration AST node population'
-			);
-			parsedArtifactSeeds.push({
-				artifact,
-				astNodes,
-				inputRecordOrdinal: parsedSource.inputRecordOrdinal,
-				parsedSource
-			});
-		}
-		const orderedIndependentRootExportSpecifierCensus = checkedSort(
-			independentlyParsedRootExportSpecifierCensus,
-			(left, right) => compareRootExportSpecifierCensus(left, right, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		const orderedCheckerRootExportSpecifierCensus = checkedSort(
+		const collector = createArtifactSeedCollector(context, semanticSourceByLogicalPath);
+		collector.add(rootSourceFile, 'CAP011_SELECTED_DECLARATION_TARGET');
+		collector.add(rootSourceFile, 'SELECTED_EXPORT_BINDING_CARRIER');
+
+		const {
+			aliasHopSeeds,
+			checkerRootAliasDeclaration,
 			checkerRootExportSpecifierCensus,
-			(left, right) => compareRootExportSpecifierCensus(left, right, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		if (
-			!equalRootExportSpecifierCensus(
-				orderedIndependentRootExportSpecifierCensus,
-				orderedCheckerRootExportSpecifierCensus,
-				assertWithinDeadline
-			)
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The independently parsed selected root ExportSpecifier census does not reproduce the checker alias binding.'
-			);
-		const orderedIndependentTerminalCensus = checkedSort(
-			independentlyParsedTerminalCensus,
-			(left, right) => compareDeclarationCensus(left, right, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		if (
-			!equalDeclarationCensus(
-				orderedIndependentTerminalCensus,
-				checkerTerminalCensus,
-				assertWithinDeadline
-			)
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'The independently parsed terminal declaration census does not reproduce the complete checker declaration multiset.'
-			);
+			terminalSymbol
+		} = traverseSelectedExportAliases(context, rootExportSymbol, rootSourceFile, collector.add);
 
-		assertWithinDeadline();
-		const evidence = provider.finalizeSession(session);
-		assertWithinDeadline();
-		const contextInputIdsReconcile = equalStringPopulation(
-			evidence.contextInputIds,
-			inputs.moduleResolutionTrace.captureWitness.inputRecordIds,
-			assertWithinDeadline
+		const terminalName = resolveTerminalSymbolName(
+			context,
+			terminalSymbol,
+			checkerRootAliasDeclaration
 		);
-		if (
-			!sameText(evidence.subjectId, inputs.request.subjectId, assertWithinDeadline) ||
-			!sameText(evidence.semanticProgramId, bound.semanticProgram.id, assertWithinDeadline) ||
-			!sameText(evidence.semanticProjectId, bound.semanticProject.id, assertWithinDeadline) ||
-			!sameText(evidence.configPath, bound.configPath, assertWithinDeadline) ||
-			!sameText(
-				evidence.programContextDigest,
-				bound.semanticProgram.contextDigest,
-				assertWithinDeadline
-			) ||
-			!sameText(
-				inputs.moduleResolutionTrace.captureWitness.contextDigest,
-				inputs.semanticSnapshot.contextDigest,
-				assertWithinDeadline
-			) ||
-			!sameText(
-				evidence.materializedRecipeDigest,
-				inputs.moduleResolutionTrace.captureWitness.materializedRecipeDigest,
-				assertWithinDeadline
-			) ||
-			!sameText(
-				evidence.projectResolutionDigest,
-				inputs.moduleResolutionTrace.captureWitness.projectResolutionDigest,
-				assertWithinDeadline
-			) ||
-			!contextInputIdsReconcile ||
-			evidence.programSourceFiles !== programFiles.length ||
-			evidence.programCallbacksWithinAttributedInvocationBounds !== true ||
-			!safeNonnegative(evidence.attributedInputRecords) ||
-			!safeNonnegative(evidence.attributedReadBytes) ||
-			!safeNonnegative(evidence.attributedUniqueQueries) ||
-			evidence.attributedUniqueQueries > evidence.attributedInputRecords ||
-			evidence.artifactParseInputRecords !== orderedArtifactSeeds.length ||
-			evidence.compilerHostCallbacks !==
-				safeAdd(
-					evidence.programCompilerHostCallbacks,
-					evidence.artifactParseInputRecords,
-					'Total compiler input population'
-				) ||
-			evidence.compilerHostReadBytes !==
-				safeAdd(
-					evidence.programCompilerHostReadBytes,
-					evidence.artifactParseReadBytes,
-					'Total compiler read-byte population'
-				)
-		)
-			failDerivation('INPUT_INVALID', 'Fresh Program evidence does not reconcile with derivation.');
-		if (
-			evidence.attributedInputRecords > inputs.request.budgets.maxCompilerInputAttempts ||
-			evidence.attributedReadBytes > inputs.request.budgets.maxProgramReadBytes
-		)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Capture-attributed compiler input upper bounds exhausted the Program budgets.'
-			);
+		const terminalDeclarations = resolveTerminalDeclarations(context, terminalSymbol);
+		const terminalArtifactSourceId = bindTerminalArtifactSource(
+			context,
+			terminalDeclarations,
+			collector.add
+		);
+		const checkerTerminalCensus = buildCheckerTerminalCensus(
+			context,
+			terminalDeclarations,
+			terminalName
+		);
+		const orderedArtifactSeeds = orderArtifactSeeds(context, collector.seeds);
 
-		type ProgramEvidenceRecord = (typeof evidence.inputRecords)[number] & {
-			readonly stage: 'CALLER_ANALYSIS' | 'PROGRAM_CONSTRUCTION' | 'TYPE_CHECKER_CREATE';
-		};
-		const programEvidenceRecords: ProgramEvidenceRecord[] = [];
-		let artifactSuffixStarted = false;
-		let independentlyCountedProgramReadBytes = 0;
-		let independentlyCountedArtifactReadBytes = 0;
-		interface CapturedProgramSourceRead {
-			readonly bytes: number;
-			readonly contentSha256: string;
-			readonly origin: string;
-		}
-		const capturedProgramSourceReads = new Map<string, CapturedProgramSourceRead[]>();
-		if (evidence.inputRecords.length > inputs.request.budgets.maxInputRecords)
-			failDerivation('BUDGET_EXHAUSTED', 'Compiler input record population exceeds its budget.');
-		for (let ordinal = 0; ordinal < evidence.inputRecords.length; ordinal += 1) {
-			assertWithinDeadline();
-			const record = evidence.inputRecords[ordinal]!;
-			if (record.ordinal !== ordinal)
-				failDerivation('INPUT_INVALID', 'Compiler input records are not globally dense.');
-			if (record.stage === 'DECLARATION_ARTIFACT_PARSE') artifactSuffixStarted = true;
-			else {
-				if (artifactSuffixStarted)
-					failDerivation(
-						'INPUT_INVALID',
-						'Program/checker callbacks must form a dense prefix before artifact reads.'
-					);
-				programEvidenceRecords.push(record as ProgramEvidenceRecord);
-			}
-			if (record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT') {
-				if (record.stage === 'DECLARATION_ARTIFACT_PARSE')
-					independentlyCountedArtifactReadBytes = safeAdd(
-						independentlyCountedArtifactReadBytes,
-						record.observation.contentBytes,
-						'Artifact read-byte population'
-					);
-				else {
-					independentlyCountedProgramReadBytes = safeAdd(
-						independentlyCountedProgramReadBytes,
-						record.observation.contentBytes,
-						'Program read-byte population'
-					);
-					let reads = capturedProgramSourceReads.get(record.query.logicalPath);
-					if (reads === undefined) {
-						reads = [];
-						capturedProgramSourceReads.set(record.query.logicalPath, reads);
-					}
-					reads.push({
-						bytes: record.observation.contentBytes,
-						contentSha256: record.observation.contentSha256,
-						origin: record.observation.origin
-					});
-				}
-			}
-		}
-		if (
-			programEvidenceRecords.length !== evidence.programCompilerHostCallbacks ||
-			evidence.inputRecords.length !== evidence.compilerHostCallbacks ||
-			independentlyCountedProgramReadBytes !== evidence.programCompilerHostReadBytes ||
-			independentlyCountedArtifactReadBytes !== evidence.artifactParseReadBytes
-		)
-			failDerivation('INPUT_INVALID', 'Fresh Program callback population or ordering is invalid.');
-		for (const source of programSourceIdentities) {
-			assertWithinDeadline();
-			const reads = capturedProgramSourceReads.get(source.logicalPath);
-			let matchingRead = false;
-			if (reads !== undefined)
-				for (const read of reads) {
-					assertWithinDeadline();
-					if (
-						read.bytes === source.bytes &&
-						sameText(read.contentSha256, source.contentSha256, assertWithinDeadline) &&
-						sameText(read.origin, source.origin, assertWithinDeadline)
-					)
-						matchingRead = true;
-				}
-			if (!matchingRead)
-				failDerivation(
-					'INPUT_INVALID',
-					'Fresh Program source lacks a matching captured content witness.'
-				);
-		}
-		const prospectiveMergeRecords = terminalDeclarations.length > 1 ? 1 : 0;
-		let prospectiveRelationRecords = safeAdd(
-			terminalDeclarations.length,
-			terminalDeclarations.length,
-			'Declaration relation population'
+		const language = assertFreshProgramCompilerOptions(context);
+		const { compilerOptionsDigest } = language;
+		assertSelectedArtifactDiagnostics(context, orderedArtifactSeeds);
+		const parse = parseSelectedArtifacts(context, orderedArtifactSeeds, {
+			languageVersionCode: language.languageVersionCode,
+			rootExportSpecifierLimit: checkerRootExportSpecifierCensus.length,
+			terminalArtifactSourceId,
+			terminalDeclarationLimit: terminalDeclarations.length,
+			terminalName
+		});
+		assertIndependentCensusReproduction(
+			context,
+			parse,
+			checkerRootExportSpecifierCensus,
+			checkerTerminalCensus
 		);
-		if (prospectiveMergeRecords === 1)
-			prospectiveRelationRecords = safeAdd(
-				prospectiveRelationRecords,
-				terminalDeclarations.length,
-				'Declaration merge relation population'
-			);
-		if (prospectiveRelationRecords > inputs.request.budgets.maxRelations)
-			failDerivation('BUDGET_EXHAUSTED', 'Declaration relation budget was exhausted.');
-		chargeTraversal(prospectiveRelationRecords);
-		const prospectiveInputRecords = safeAdd(
-			programEvidenceRecords.length,
-			orderedArtifactSeeds.length,
-			'Declaration-context input population'
-		);
-		const prospectiveReadBytes = safeAdd(
-			evidence.programCompilerHostReadBytes,
-			evidence.artifactParseReadBytes,
-			'Declaration-context read-byte population'
-		);
-		let prospectiveTraversalSteps = 0;
-		for (const charge of [
-			programEvidenceRecords.length,
-			orderedArtifactSeeds.length,
+
+		const { programFiles, programParsedAstNodes, programSourceIdentities } = programScan;
+		const { selectedAstNodes } = parse;
+		const evidence = finalizeCaptureEvidence(
+			context,
 			programFiles.length,
+			orderedArtifactSeeds.length
+		);
+		const evidenceScan = scanProgramEvidenceRecords(context, evidence);
+		const { programEvidenceRecords } = evidenceScan;
+		assertCapturedProgramSourceWitnesses(
+			context,
+			programSourceIdentities,
+			evidenceScan.capturedProgramSourceReads
+		);
+		const prospective = computeProspectiveAccounting(context, {
+			aliasHops: aliasHopSeeds.length,
+			artifactReadBytes: evidence.artifactParseReadBytes,
+			artifacts: orderedArtifactSeeds.length,
+			declarations: terminalDeclarations.length,
+			exportSymbols: exportSymbols.length,
+			programEvidenceRecords: programEvidenceRecords.length,
+			programFiles: programFiles.length,
 			programParsedAstNodes,
-			selectedAstNodes,
-			exportSymbols.length,
-			aliasHopSeeds.length,
-			terminalDeclarations.length,
-			prospectiveRelationRecords
-		])
-			prospectiveTraversalSteps = safeAdd(
-				prospectiveTraversalSteps,
-				charge,
-				'Declaration-context traversal population'
-			);
-		if (progressiveTraversalSteps !== prospectiveTraversalSteps)
-			failDerivation(
-				'INPUT_INVALID',
-				'Progressive declaration-context traversal accounting did not reconcile.'
-			);
-		let prospectiveOutputRecords = 3;
-		for (const population of [
-			programEvidenceRecords.length,
-			orderedArtifactSeeds.length,
-			orderedArtifactSeeds.length,
-			terminalDeclarations.length,
-			prospectiveMergeRecords,
-			prospectiveRelationRecords
-		])
-			prospectiveOutputRecords = safeAdd(
-				prospectiveOutputRecords,
-				population,
-				'Declaration-context output population'
-			);
-		if (
-			programEvidenceRecords.length > inputs.request.budgets.maxCompilerInputAttempts ||
-			prospectiveInputRecords > inputs.request.budgets.maxInputRecords ||
-			evidence.programCompilerHostReadBytes > inputs.request.budgets.maxProgramReadBytes ||
-			prospectiveReadBytes > inputs.request.budgets.maxReadBytes ||
-			prospectiveRelationRecords > inputs.request.budgets.maxRelations ||
-			prospectiveTraversalSteps > inputs.request.budgets.maxTraversalSteps ||
-			prospectiveOutputRecords > inputs.request.budgets.maxOutputRecords
-		)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Declaration-context materialization budget was exhausted before output allocation.'
-			);
+			programReadBytes: evidence.programCompilerHostReadBytes,
+			selectedAstNodes
+		});
 
-		const programInputAttempts: DeclarationContextProgramInputAttemptRecord[] = checkedMap(
-			programEvidenceRecords,
-			(record) => {
-				const withoutId: Omit<DeclarationContextProgramInputAttemptRecord, 'id'> = {
-					attributedInvocationCount: record.attributedInvocationCount,
-					invocationOrdinal: record.invocationOrdinal,
-					observation: cloneWire(record.observation, assertWithinDeadline),
-					ordinal: record.ordinal,
-					query: cloneWire(record.query, assertWithinDeadline),
-					stage: record.stage
-				};
-				return {
-					...withoutId,
-					id: independentRecordId<DeclarationContextProgramInputAttemptId>(
-						'declaration-context-program-input-attempt',
-						'JAN-CSAA-DECLARATION-CONTEXT-PROGRAM-INPUT-ATTEMPT',
-						analysisId,
-						withoutId,
-						assertWithinDeadline
-					)
-				};
-			},
-			assertWithinDeadline
+		const programInputAttempts = buildProgramInputAttempts(context, programEvidenceRecords);
+		const { parseWitnessBySourceId, parseWitnesses } = buildParseWitnesses(
+			context,
+			parse.parsedArtifactSeeds,
+			evidence,
+			language
 		);
 
-		const parseWitnesses: DeclarationContextParseWitnessRecord[] = [];
-		const parseWitnessBySourceId = new Map<string, DeclarationContextParseWitnessRecord>();
-		for (const parsed of parsedArtifactSeeds) {
-			assertWithinDeadline();
-			const inputRecord = evidence.inputRecords[parsed.inputRecordOrdinal];
-			if (
-				inputRecord === undefined ||
-				inputRecord.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
-				inputRecord.query.operation !== 'READ_FILE' ||
-				!sameText(
-					inputRecord.query.logicalPath,
-					parsed.artifact.source.logicalPath,
-					assertWithinDeadline
-				) ||
-				inputRecord.observation.operation !== 'READ_FILE' ||
-				inputRecord.observation.result !== 'PRESENT'
-			)
-				failDerivation('INPUT_INVALID', 'Independent declaration parse read witness is invalid.');
-			const withoutId: Omit<DeclarationContextParseWitnessRecord, 'id'> = {
-				astNodes: parsed.astNodes,
-				bytes: parsed.artifact.source.bytes,
-				compilerVersion: ts.version,
-				contentSha256: parsed.artifact.source.contentSha256,
-				decodedUtf16CodeUnits: parsed.parsedSource.textLength,
-				externalModule: true,
-				languageVersion: {
-					nativeCode: languageVersionCode,
-					nativeName: languageVersionName
-				},
-				logicalPath: parsed.artifact.source.logicalPath,
-				parseDiagnostics: [],
-				parseHealth: 'VALID',
-				parseMethod: 'TYPESCRIPT_PUBLIC_CREATE_SOURCE_FILE_OVER_EXACT_CAPTURED_BYTES',
-				programSourceReconciliation: 'EXACT_LOGICAL_PATH_CONTENT_SHA256_AND_SEMANTIC_SOURCE_ID',
-				scriptKind: { nativeCode: ts.ScriptKind.TS, nativeName: 'TS' },
-				semanticProgramId: bound.semanticProgram.id,
-				semanticProjectId: bound.semanticProject.id,
-				semanticSourceId: parsed.artifact.source.id,
-				sourceEncoding: parsed.parsedSource.encoding as DeclarationContextSourceEncoding,
-				sourceRead: {
-					attributedInvocationCount: inputRecord.attributedInvocationCount,
-					inputRecordOrdinal: inputRecord.ordinal,
-					invocationOrdinal: inputRecord.invocationOrdinal,
-					observation: cloneWire(inputRecord.observation, assertWithinDeadline),
-					query: {
-						logicalPath: inputRecord.query.logicalPath,
-						operation: 'READ_FILE'
-					},
-					stage: 'DECLARATION_ARTIFACT_PARSE'
-				},
-				statements: parsed.parsedSource.sourceFile.statements.length
-			};
-			const record: DeclarationContextParseWitnessRecord = {
-				...withoutId,
-				id: independentRecordId<DeclarationContextParseWitnessId>(
-					'declaration-context-parse-witness',
-					'JAN-CSAA-DECLARATION-CONTEXT-PARSE-WITNESS',
-					analysisId,
-					withoutId,
-					assertWithinDeadline
-				)
-			};
-			parseWitnesses.push(record);
-			parseWitnessBySourceId.set(parsed.artifact.source.id, record);
-		}
-
-		const artifacts: DeclarationContextArtifactRecord[] = checkedMap(
-			orderedArtifactSeeds,
-			(seed, ordinal) => {
-				const parseWitness = parseWitnessBySourceId.get(seed.source.id)!;
-				const roles: DeclarationContextArtifactRole[] = [];
-				for (const role of DECLARATION_CONTEXT_ANALYSIS_ARTIFACT_ROLE_ORDER) {
-					assertWithinDeadline();
-					if (seed.roles.has(role)) roles.push(role);
-				}
-				const withoutId: Omit<DeclarationContextArtifactRecord, 'id'> = {
-					artifactClass: 'CONTEXT_ONLY',
-					bytes: seed.source.bytes,
-					contentSha256: seed.source.contentSha256,
-					declarationFile: true,
-					declarationRole: 'EMITTED_DECLARATION',
-					extension: sourceExtension(seed.source.logicalPath),
-					logicalPath: seed.source.logicalPath,
-					ordinal,
-					origin: 'WORKSPACE_BUILD_DECLARATION',
-					parseWitnessId: parseWitness.id,
-					roles,
-					semanticProgramId: bound.semanticProgram.id,
-					semanticProjectId: bound.semanticProject.id,
-					semanticSourceId: seed.source.id
-				};
-				return {
-					...withoutId,
-					id: independentRecordId<DeclarationContextArtifactId>(
-						'declaration-context-artifact',
-						'JAN-CSAA-DECLARATION-CONTEXT-ARTIFACT',
-						analysisId,
-						withoutId,
-						assertWithinDeadline
-					)
-				};
-			},
-			assertWithinDeadline
-		);
-		const artifactBySourceId = new Map<string, DeclarationContextArtifactRecord>();
-		for (const artifact of artifacts) {
-			assertWithinDeadline();
-			artifactBySourceId.set(artifact.semanticSourceId, artifact);
-		}
-		const rootArtifact = artifactBySourceId.get(bound.targetSource.id)!;
-		const terminalArtifact = artifactBySourceId.get(terminalArtifactSourceId!)!;
-		const aliasHops: DeclarationContextAliasHopWitness[] = [];
-		for (const seed of aliasHopSeeds) {
-			assertWithinDeadline();
-			const hopArtifacts: DeclarationContextArtifactRecord[] = [];
-			for (const sourceId of seed.aliasSourceIds) {
-				assertWithinDeadline();
-				const artifact = artifactBySourceId.get(sourceId);
-				if (artifact !== undefined) hopArtifacts.push(artifact);
-			}
-			const orderedHopArtifacts = checkedSort(
-				hopArtifacts,
-				(left, right) => left.ordinal - right.ordinal,
-				assertWithinDeadline
-			);
-			const aliasDeclarationArtifactIds = checkedMap(
-				orderedHopArtifacts,
-				(artifact) => artifact.id,
-				assertWithinDeadline
-			);
-			aliasHops.push({
-				aliasDeclarationArtifactIds,
-				aliasName: seed.aliasName,
-				aliasSymbolFlags: seed.aliasSymbolFlags,
-				ordinal: seed.ordinal,
-				resolutionApi: 'TYPESCRIPT_PUBLIC_TYPE_CHECKER_GET_ALIASED_SYMBOL',
-				targetName: seed.targetName
-			});
-		}
-		let lostAliasArtifact = false;
-		for (const hop of aliasHops) {
-			assertWithinDeadline();
-			if (hop.aliasDeclarationArtifactIds.length === 0) lostAliasArtifact = true;
-		}
-		if (lostAliasArtifact)
-			failDerivation('INPUT_INVALID', 'One alias hop lost its declaration-artifact identities.');
+		const artifacts = buildArtifactRecords(context, orderedArtifactSeeds, parseWitnessBySourceId);
+		const artifactIndex = indexArtifactRecords(context, artifacts, terminalArtifactSourceId);
+		const { artifactBySourceId, rootArtifact, terminalArtifact } = artifactIndex;
+		const aliasHops = buildAliasHopWitnesses(context, aliasHopSeeds, artifactBySourceId);
 
 		const terminalParseWitness = parseWitnessBySourceId.get(terminalArtifact.semanticSourceId)!;
-		const declarationWithoutIds = checkedSort(
-			checkedMap(
-				terminalDeclarations,
-				(declaration) => {
-					const declarationSourceFile = declaration.getSourceFile();
-					assertWithinDeadline();
-					return supportedDeclaration(
-						declaration,
-						declarationSourceFile,
-						terminalArtifact.id,
-						terminalParseWitness.id,
-						0,
-						assertWithinDeadline
-					);
-				},
-				assertWithinDeadline
-			),
-			(left, right) =>
-				left.start - right.start ||
-				left.end - right.end ||
-				left.nativeKind.nativeCode - right.nativeKind.nativeCode ||
-				compareText(left.name, right.name, assertWithinDeadline),
-			assertWithinDeadline
-		);
-		const declarations: DeclarationContextDeclarationRecord[] = checkedMap(
-			declarationWithoutIds,
-			(seed, ordinal) => {
-				const withoutId = { ...seed, ordinal };
-				return {
-					...withoutId,
-					id: independentRecordId<DeclarationContextDeclarationId>(
-						'declaration-context-declaration',
-						'JAN-CSAA-DECLARATION-CONTEXT-DECLARATION',
-						analysisId,
-						withoutId,
-						assertWithinDeadline
-					)
-				};
-			},
-			assertWithinDeadline
+		const declarations = buildDeclarationRecords(
+			context,
+			terminalDeclarations,
+			terminalArtifact,
+			terminalParseWitness
 		);
 		const declarationIds = checkedMap(
 			declarations,
@@ -3304,195 +4424,56 @@ function derive(
 			assertWithinDeadline
 		);
 
-		const terminalSymbolFlagsMask = provider.symbolFlags(terminalSymbol);
-		assertWithinDeadline();
-		const terminalSymbolWithoutId: Omit<DeclarationContextTerminalSymbolRecord, 'id'> = {
-			declarationArtifactId: terminalArtifact.id,
-			declarationIds,
-			declarationSetClosure: 'COMPLETE_PUBLIC_CHECKER_DECLARATION_SET_SAME_ARTIFACT',
-			flags: symbolFlags(terminalSymbolFlagsMask, assertWithinDeadline),
-			mergeState: declarations.length === 1 ? 'SINGLE' : 'MERGED',
-			name: terminalName,
-			ordinal: 0,
-			semanticProgramId: bound.semanticProgram.id,
-			semanticProjectId: bound.semanticProject.id,
-			symbolMeaning: 'TERMINAL_CHECKER_SYMBOL_FOR_SELECTED_PACKAGE_ROOT_EXPORT'
-		};
-		const terminalSymbolRecord: DeclarationContextTerminalSymbolRecord = {
-			...terminalSymbolWithoutId,
-			id: independentRecordId<DeclarationContextTerminalSymbolId>(
-				'declaration-context-terminal-symbol',
-				'JAN-CSAA-DECLARATION-CONTEXT-TERMINAL-SYMBOL',
-				analysisId,
-				terminalSymbolWithoutId,
-				assertWithinDeadline
-			)
-		};
-		const rootExportSymbolFlagsMask = provider.symbolFlags(rootExportSymbol);
-		assertWithinDeadline();
-		const exportBindingWithoutId: Omit<DeclarationContextExportBindingRecord, 'id'> = {
+		const terminalSymbolRecord = buildTerminalSymbolRecord(
+			context,
+			terminalSymbol,
+			terminalName,
+			terminalArtifact,
+			declarations,
+			declarationIds
+		);
+		const exportBinding = buildExportBindingRecord(
+			context,
+			rootExportSymbol,
 			aliasHops,
-			exportName: inputs.request.exportName,
-			exportSymbolsExamined: exportSymbols.length,
-			ordinal: 0,
-			resolutionKind:
-				aliasHops.length === 0 ? 'DIRECT_TERMINAL_SYMBOL' : 'ALIASED_TO_TERMINAL_SYMBOL',
-			rootArtifactId: rootArtifact.id,
-			rootExportSymbolFlags: symbolFlags(rootExportSymbolFlagsMask, assertWithinDeadline),
-			selectionApi: 'TYPESCRIPT_PUBLIC_TYPE_CHECKER_GET_EXPORTS_OF_MODULE',
-			terminalSymbolId: terminalSymbolRecord.id
-		};
-		const exportBinding: DeclarationContextExportBindingRecord = {
-			...exportBindingWithoutId,
-			id: independentRecordId<DeclarationContextExportBindingId>(
-				'declaration-context-export-binding',
-				'JAN-CSAA-DECLARATION-CONTEXT-EXPORT-BINDING',
-				analysisId,
-				exportBindingWithoutId,
-				assertWithinDeadline
-			)
-		};
-
-		const merges: DeclarationContextMergeRecord[] = [];
-		if (declarations.length > 1) {
-			const withoutId: Omit<DeclarationContextMergeRecord, 'id'> = {
-				declarationArtifactId: terminalArtifact.id,
-				declarationIds,
-				kind: 'COMPLETE_SAME_FILE_TERMINAL_SYMBOL_MERGE',
-				ordinal: 0,
-				terminalSymbolId: terminalSymbolRecord.id
-			};
-			merges.push({
-				...withoutId,
-				id: independentRecordId<DeclarationContextMergeId>(
-					'declaration-context-merge',
-					'JAN-CSAA-DECLARATION-CONTEXT-MERGE',
-					analysisId,
-					withoutId,
-					assertWithinDeadline
-				)
-			});
-		}
-
-		const relationSeeds: DeclarationContextRelationRecordWithoutId[] = [];
-		for (const declaration of declarations) {
-			assertWithinDeadline();
-			relationSeeds.push({
-				artifactId: declaration.artifactId,
-				declarationId: declaration.id,
-				kind: 'DECLARES',
-				ordinal: 0
-			});
-			relationSeeds.push({
-				declarationId: declaration.id,
-				kind: 'CONTRIBUTES_TO',
-				ordinal: 0,
-				terminalSymbolId: terminalSymbolRecord.id
-			});
-			if (merges[0] !== undefined)
-				relationSeeds.push({
-					declarationId: declaration.id,
-					kind: 'MERGES_WITH',
-					mergeId: merges[0].id,
-					ordinal: 0,
-					terminalSymbolId: terminalSymbolRecord.id
-				});
-		}
-		const relationRank: Record<DeclarationContextRelationRecordWithoutId['kind'], number> = {
-			CONTRIBUTES_TO: 1,
-			DECLARES: 0,
-			MERGES_WITH: 2
-		};
-		const relationEndpoints = (record: DeclarationContextRelationRecordWithoutId): string => {
-			if (record.kind === 'DECLARES') return `${record.artifactId}\0${record.declarationId}`;
-			if (record.kind === 'CONTRIBUTES_TO')
-				return `${record.declarationId}\0${record.terminalSymbolId}`;
-			return `${record.declarationId}\0${record.mergeId}\0${record.terminalSymbolId}`;
-		};
-		const orderedRelationSeeds = checkedSort(
-			relationSeeds,
-			(left, right) =>
-				relationRank[left.kind] - relationRank[right.kind] ||
-				compareText(relationEndpoints(left), relationEndpoints(right), assertWithinDeadline),
-			assertWithinDeadline
-		);
-		const relations = checkedMap(
-			orderedRelationSeeds,
-			(seed, ordinal): DeclarationContextRelationRecord => {
-				const withoutId = { ...seed, ordinal } as DeclarationContextRelationRecordWithoutId;
-				return {
-					...withoutId,
-					id: independentRecordId<DeclarationContextRelationId>(
-						'declaration-context-relation',
-						'JAN-CSAA-DECLARATION-CONTEXT-RELATION',
-						analysisId,
-						withoutId,
-						assertWithinDeadline
-					)
-				} as DeclarationContextRelationRecord;
-			},
-			assertWithinDeadline
-		);
-
-		let programPresentReadFileAttempts = 0;
-		for (const record of programEvidenceRecords) {
-			assertWithinDeadline();
-			if (record.observation.operation === 'READ_FILE' && record.observation.result === 'PRESENT')
-				programPresentReadFileAttempts += 1;
-		}
-		const inputRecords = safeAdd(
-			programInputAttempts.length,
-			parseWitnesses.length,
-			'Declaration-context input population'
-		);
-		const readBytes = safeAdd(
-			evidence.programCompilerHostReadBytes,
-			evidence.artifactParseReadBytes,
-			'Declaration-context read-byte population'
-		);
-		if (inputRecords !== prospectiveInputRecords || readBytes !== prospectiveReadBytes)
-			failDerivation(
-				'INPUT_INVALID',
-				'Declaration-context compiler input accounting did not reconcile.'
-			);
-		let chargedTraversalSteps = 0;
-		for (const charge of [
-			programInputAttempts.length,
-			artifacts.length,
-			programFiles.length,
-			programParsedAstNodes,
-			selectedAstNodes,
 			exportSymbols.length,
-			aliasHops.length,
-			declarations.length,
-			relations.length
-		])
-			chargedTraversalSteps = safeAdd(
-				chargedTraversalSteps,
-				charge,
-				'Declaration-context traversal population'
-			);
-		if (chargedTraversalSteps !== prospectiveTraversalSteps)
-			failDerivation(
-				'INPUT_INVALID',
-				'Declaration-context traversal accounting did not reconcile.'
-			);
-		let outputRecords = 3;
-		for (const population of [
-			programInputAttempts.length,
-			parseWitnesses.length,
-			artifacts.length,
-			declarations.length,
-			merges.length,
-			relations.length
-		])
-			outputRecords = safeAdd(outputRecords, population, 'Declaration-context output population');
-		if (
-			outputRecords !== prospectiveOutputRecords ||
-			relations.length !== prospectiveRelationRecords ||
-			merges.length !== prospectiveMergeRecords
-		)
-			failDerivation('INPUT_INVALID', 'Declaration-context output accounting did not reconcile.');
+			rootArtifact,
+			terminalSymbolRecord
+		);
+
+		const merges = buildMergeRecords(
+			context,
+			declarations,
+			declarationIds,
+			terminalArtifact,
+			terminalSymbolRecord
+		);
+
+		const relations = buildRelationRecords(context, declarations, merges, terminalSymbolRecord);
+
+		const programPresentReadFileAttempts = countProgramPresentReadFileAttempts(
+			context,
+			programEvidenceRecords
+		);
+		const accounting = assertMaterializedAccounting(
+			{
+				aliasHops: aliasHops.length,
+				artifactReadBytes: evidence.artifactParseReadBytes,
+				artifacts: artifacts.length,
+				declarations: declarations.length,
+				exportSymbols: exportSymbols.length,
+				merges: merges.length,
+				parseWitnesses: parseWitnesses.length,
+				programFiles: programFiles.length,
+				programInputAttempts: programInputAttempts.length,
+				programParsedAstNodes,
+				programReadBytes: evidence.programCompilerHostReadBytes,
+				relations: relations.length,
+				selectedAstNodes
+			},
+			prospective
+		);
+		const { chargedTraversalSteps, inputRecords, outputRecords, readBytes } = accounting;
 		const programInputAttemptIds = checkedMap(
 			programInputAttempts,
 			(attempt) => attempt.id,
@@ -3626,25 +4607,197 @@ function derive(
 		assertWithinDeadline();
 		return { graph, state: 'VALID' };
 	} catch (error) {
-		if (error instanceof DerivationFailure) return { problem: error.problem, state: 'INVALID' };
-		if (error instanceof CompilerProjectProgramCapabilityError)
-			return {
-				problem: issue(
-					error.code === 'BUDGET_EXCEEDED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
-					'Fresh captured TypeScript Program reconstruction failed closed.',
-					'$inputs.semanticSnapshot'
-				),
-				state: 'INVALID'
-			};
-		return {
-			problem: issue(
-				'INPUT_INVALID',
-				'Declaration-context inputs could not be independently replayed.',
-				'$inputs'
-			),
-			state: 'INVALID'
-		};
+		return deriveFailureResult(error);
 	}
+}
+
+interface ValidationDeadlineState {
+	activeDurationMs: number;
+	lastObservedAt: number;
+	readonly startedAt: number;
+}
+
+interface ValidationRun extends ValidationDeadlineState {
+	duration: number;
+	readonly inputsValue: unknown;
+	readonly knownInputDigest: string | undefined;
+	readonly limits: ClosedOptions;
+	operationDurationMs: number;
+	readonly predecessorValidated: boolean;
+	readonly provider: Readonly<DeclarationContextAnalysisValidationProvider>;
+	readonly value: unknown;
+}
+
+function validationRemainingDuration(
+	state: ValidationDeadlineState,
+	maximum: number
+): DeclarationContextAnalysisValidationIssue | number {
+	let observed: number;
+	try {
+		observed = performance.now();
+	} catch {
+		return issue('INPUT_INVALID', 'The validation monotonic clock failed closed.');
+	}
+	if (!Number.isFinite(observed) || observed < state.lastObservedAt || observed < state.startedAt)
+		return issue('INPUT_INVALID', 'The validation monotonic clock failed closed.');
+	state.lastObservedAt = observed;
+	const elapsed = Math.floor(observed - state.startedAt);
+	if (!safeNonnegative(elapsed))
+		return issue('INPUT_INVALID', 'The validation monotonic elapsed time is invalid.');
+	const remaining = maximum - elapsed;
+	return safePositive(remaining)
+		? remaining
+		: issue('BUDGET_EXHAUSTED', 'The validation duration budget was exhausted.');
+}
+
+function validationDurationIssue(
+	state: ValidationDeadlineState,
+	maximum: number
+): DeclarationContextAnalysisValidationIssue | null {
+	const observation = validationRemainingDuration(state, maximum);
+	return typeof observation === 'number' ? null : observation;
+}
+
+function assertValidationDeadline(state: ValidationDeadlineState): void {
+	const problem = validationDurationIssue(state, state.activeDurationMs);
+	if (problem !== null) throw new ValidationAbort(problem);
+}
+
+function validateCandidateShell(
+	run: ValidationRun
+): DeclarationContextAnalysisValidationResult | null {
+	const candidateTreeIssue = plainTreeIssue(
+		run.value,
+		{
+			maxDepth: run.limits.maxDepth,
+			maxRecords: run.limits.maxRecords,
+			maxStringCharacters: run.limits.maxStringCharacters
+		},
+		'$',
+		false,
+		() => validationDurationIssue(run, run.activeDurationMs)
+	);
+	if (candidateTreeIssue !== null) return invalid(candidateTreeIssue);
+	const duration = validationRemainingDuration(run, run.activeDurationMs);
+	if (typeof duration !== 'number') return invalid(duration);
+	if (!plainRecord(run.value) || !exactKeys(run.value, SNAPSHOT_KEYS))
+		return invalid(
+			issue('SHAPE_INVALID', 'The declaration-context analysis snapshot shell must be exact.')
+		);
+	return null;
+}
+
+function validateInputShell(run: ValidationRun): DeclarationContextAnalysisValidationResult | null {
+	const broadInputIssue = plainTreeIssue(
+		run.inputsValue,
+		{
+			maxDepth: run.limits.maxDepth,
+			maxRecords: run.limits.maxInputRecords,
+			maxStringCharacters: run.limits.maxInputStringCharacters
+		},
+		'$inputs',
+		true,
+		() => validationDurationIssue(run, run.activeDurationMs)
+	);
+	if (broadInputIssue !== null) return invalid(broadInputIssue);
+	const shellIssue = inputShellIssue(run.inputsValue);
+	if (shellIssue !== null) return invalid(shellIssue);
+	const shellDuration = validationRemainingDuration(run, run.activeDurationMs);
+	if (typeof shellDuration !== 'number') return invalid(shellDuration);
+	const inputs = run.inputsValue as DeclarationContextAnalysisBuildInputs;
+	const closedRequestIssue = requestIssue(inputs, () => {
+		assertValidationDeadline(run);
+	});
+	if (closedRequestIssue !== null) return invalid(closedRequestIssue);
+	run.operationDurationMs = Math.min(
+		run.limits.maxDurationMs,
+		inputs.request.budgets.maxDurationMs
+	);
+	run.activeDurationMs = run.operationDurationMs;
+	const operationDuration = validationRemainingDuration(run, run.operationDurationMs);
+	if (typeof operationDuration !== 'number') return invalid(operationDuration);
+	return null;
+}
+
+function validateRequestBoundInputs(
+	run: ValidationRun
+): DeclarationContextAnalysisValidationResult | null {
+	const inputs = run.inputsValue as DeclarationContextAnalysisBuildInputs;
+	const deadline = (): void => {
+		assertValidationDeadline(run);
+	};
+	const requestInputIssue = plainTreeIssue(
+		run.inputsValue,
+		{
+			maxDepth: run.limits.maxDepth,
+			maxRecords: Math.min(run.limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
+			maxStringCharacters: Math.min(
+				run.limits.maxInputStringCharacters,
+				inputs.request.budgets.maxInputStringCharacters
+			)
+		},
+		'$inputs',
+		true,
+		() => validationDurationIssue(run, run.operationDurationMs)
+	);
+	if (requestInputIssue !== null) return invalid(requestInputIssue);
+	const parsedDuration = validationRemainingDuration(run, run.operationDurationMs);
+	if (typeof parsedDuration !== 'number') return invalid(parsedDuration);
+	if (!run.predecessorValidated) {
+		const problem = predecessorIssue(inputs, run.limits, deadline);
+		if (problem !== null) return invalid(problem);
+	}
+	const predecessorDuration = validationRemainingDuration(run, run.operationDurationMs);
+	if (typeof predecessorDuration !== 'number') return invalid(predecessorDuration);
+	const bindingProblem = inputBindingIssue(inputs, deadline);
+	if (bindingProblem !== null) return invalid(bindingProblem);
+	const bindingDuration = validationRemainingDuration(run, run.operationDurationMs);
+	if (typeof bindingDuration !== 'number') return invalid(bindingDuration);
+	run.duration = bindingDuration;
+	return null;
+}
+
+function validateAgainstDerivation(
+	run: ValidationRun
+): DeclarationContextAnalysisValidationResult | null {
+	const inputs = run.inputsValue as DeclarationContextAnalysisBuildInputs;
+	const deadline = (): void => {
+		assertValidationDeadline(run);
+	};
+	const expected = derive(inputs, run.duration, run.provider, run.knownInputDigest);
+	if (expected.state === 'INVALID') return invalid(expected.problem);
+	const derivedDuration = validationRemainingDuration(run, run.operationDurationMs);
+	if (typeof derivedDuration !== 'number') return invalid(derivedDuration);
+	const candidate = run.value as DeclarationContextAnalysisSnapshot;
+	if (
+		!sameText(candidate.inputDigest, expected.graph.inputDigest, deadline) ||
+		!sameText(candidate.id, expected.graph.id, deadline)
+	)
+		return invalid(
+			issue(
+				'IDENTITY_MISMATCH',
+				'The candidate analysis identities do not reproduce from the exact inputs.'
+			)
+		);
+	const reproducedContentDigest = independentContentDigest(candidate, deadline);
+	if (!sameText(candidate.contentDigest, reproducedContentDigest, deadline))
+		return invalid(
+			issue(
+				'CONTENT_DIGEST_MISMATCH',
+				'The declaration-context analysis content digest is invalid.',
+				'$.contentDigest'
+			)
+		);
+	if (!canonicalEqual(candidate, expected.graph, deadline))
+		return invalid(
+			issue(
+				'DERIVATION_MISMATCH',
+				'The candidate differs from the independently replayed declaration-context analysis.'
+			)
+		);
+	const finalDuration = validationRemainingDuration(run, run.operationDurationMs);
+	if (typeof finalDuration !== 'number') return invalid(finalDuration);
+	return null;
 }
 
 function validateInternal(
@@ -3666,142 +4819,28 @@ function validateInternal(
 	const limits = closeOptions(options);
 	if (limits === null)
 		return invalid(issue('SHAPE_INVALID', 'Validation options are invalid.', '$options'));
-	let validationLastObservedAt = validationStartedAt;
-	const remainingDuration = (
-		maximum: number
-	): DeclarationContextAnalysisValidationIssue | number => {
-		let observed: number;
-		try {
-			observed = performance.now();
-		} catch {
-			return issue('INPUT_INVALID', 'The validation monotonic clock failed closed.');
-		}
-		if (
-			!Number.isFinite(observed) ||
-			observed < validationLastObservedAt ||
-			observed < validationStartedAt
-		)
-			return issue('INPUT_INVALID', 'The validation monotonic clock failed closed.');
-		validationLastObservedAt = observed;
-		const elapsed = Math.floor(observed - validationStartedAt);
-		if (!safeNonnegative(elapsed))
-			return issue('INPUT_INVALID', 'The validation monotonic elapsed time is invalid.');
-		const remaining = maximum - elapsed;
-		return safePositive(remaining)
-			? remaining
-			: issue('BUDGET_EXHAUSTED', 'The validation duration budget was exhausted.');
-	};
-	const durationIssue = (maximum: number): DeclarationContextAnalysisValidationIssue | null => {
-		const observation = remainingDuration(maximum);
-		return typeof observation === 'number' ? null : observation;
-	};
 	const requestDurationMs = earlyRequestDuration(inputsValue);
-	let activeDurationMs = Math.min(limits.maxDurationMs, requestDurationMs ?? limits.maxDurationMs);
-	const assertValidationDeadline = (): void => {
-		const problem = durationIssue(activeDurationMs);
-		if (problem !== null) throw new ValidationAbort(problem);
+	const run: ValidationRun = {
+		activeDurationMs: Math.min(limits.maxDurationMs, requestDurationMs ?? limits.maxDurationMs),
+		duration: 0,
+		inputsValue,
+		knownInputDigest,
+		lastObservedAt: validationStartedAt,
+		limits,
+		operationDurationMs: limits.maxDurationMs,
+		predecessorValidated,
+		provider,
+		startedAt: validationStartedAt,
+		value
 	};
-	const candidateTreeIssue = plainTreeIssue(
-		value,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: limits.maxRecords,
-			maxStringCharacters: limits.maxStringCharacters
-		},
-		'$',
-		false,
-		() => durationIssue(activeDurationMs)
-	);
-	if (candidateTreeIssue !== null) return invalid(candidateTreeIssue);
-	let duration = remainingDuration(activeDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	if (!plainRecord(value) || !exactKeys(value, SNAPSHOT_KEYS))
-		return invalid(
-			issue('SHAPE_INVALID', 'The declaration-context analysis snapshot shell must be exact.')
-		);
-	const broadInputIssue = plainTreeIssue(
-		inputsValue,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: limits.maxInputRecords,
-			maxStringCharacters: limits.maxInputStringCharacters
-		},
-		'$inputs',
-		true,
-		() => durationIssue(activeDurationMs)
-	);
-	if (broadInputIssue !== null) return invalid(broadInputIssue);
-	const shellIssue = inputShellIssue(inputsValue);
-	if (shellIssue !== null) return invalid(shellIssue);
-	duration = remainingDuration(activeDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	const inputs = inputsValue as DeclarationContextAnalysisBuildInputs;
-	const closedRequestIssue = requestIssue(inputs, assertValidationDeadline);
-	if (closedRequestIssue !== null) return invalid(closedRequestIssue);
-	const operationDurationMs = Math.min(limits.maxDurationMs, inputs.request.budgets.maxDurationMs);
-	activeDurationMs = operationDurationMs;
-	duration = remainingDuration(operationDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	const requestInputIssue = plainTreeIssue(
-		inputsValue,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: Math.min(limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
-			maxStringCharacters: Math.min(
-				limits.maxInputStringCharacters,
-				inputs.request.budgets.maxInputStringCharacters
-			)
-		},
-		'$inputs',
-		true,
-		() => durationIssue(operationDurationMs)
-	);
-	if (requestInputIssue !== null) return invalid(requestInputIssue);
-	duration = remainingDuration(operationDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	if (!predecessorValidated) {
-		const problem = predecessorIssue(inputs, limits, assertValidationDeadline);
-		if (problem !== null) return invalid(problem);
-	}
-	duration = remainingDuration(operationDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	const bindingProblem = inputBindingIssue(inputs, assertValidationDeadline);
-	if (bindingProblem !== null) return invalid(bindingProblem);
-	duration = remainingDuration(operationDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	const expected = derive(inputs, duration, provider, knownInputDigest);
-	if (expected.state === 'INVALID') return invalid(expected.problem);
-	duration = remainingDuration(operationDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
-	const candidate = value as unknown as DeclarationContextAnalysisSnapshot;
-	if (
-		!sameText(candidate.inputDigest, expected.graph.inputDigest, assertValidationDeadline) ||
-		!sameText(candidate.id, expected.graph.id, assertValidationDeadline)
-	)
-		return invalid(
-			issue(
-				'IDENTITY_MISMATCH',
-				'The candidate analysis identities do not reproduce from the exact inputs.'
-			)
-		);
-	const reproducedContentDigest = independentContentDigest(candidate, assertValidationDeadline);
-	if (!sameText(candidate.contentDigest, reproducedContentDigest, assertValidationDeadline))
-		return invalid(
-			issue(
-				'CONTENT_DIGEST_MISMATCH',
-				'The declaration-context analysis content digest is invalid.',
-				'$.contentDigest'
-			)
-		);
-	if (!canonicalEqual(candidate, expected.graph, assertValidationDeadline))
-		return invalid(
-			issue(
-				'DERIVATION_MISMATCH',
-				'The candidate differs from the independently replayed declaration-context analysis.'
-			)
-		);
-	duration = remainingDuration(operationDurationMs);
-	if (typeof duration !== 'number') return invalid(duration);
+	const candidateResult = validateCandidateShell(run);
+	if (candidateResult !== null) return candidateResult;
+	const inputResult = validateInputShell(run);
+	if (inputResult !== null) return inputResult;
+	const boundResult = validateRequestBoundInputs(run);
+	if (boundResult !== null) return boundResult;
+	const derivationResult = validateAgainstDerivation(run);
+	if (derivationResult !== null) return derivationResult;
 	return { issues: [], state: 'VALID' };
 }
 

@@ -322,37 +322,49 @@ function fail(
 	throw new StaticRawExtractionError(code, message, path);
 }
 
-function checkExtractionDeadline(
-	input: Pick<ExtractStaticRawInput, 'assertWithinDeadline' | 'clock' | 'deadlineMs'>
+function deadlineFailureDetail(error: unknown): string {
+	return error instanceof Error &&
+		isUnicodeScalarString(error.message) &&
+		error.message.length <= 1_000
+		? `: ${error.message}`
+		: '';
+}
+
+function runDeadlineAssertion(
+	input: Pick<ExtractStaticRawInput, 'assertWithinDeadline' | 'deadlineMs'>
 ): void {
-	if (input.assertWithinDeadline !== undefined) {
-		try {
-			input.assertWithinDeadline();
-		} catch (error) {
-			if (error instanceof StaticRawExtractionError) throw error;
-			const detail =
-				error instanceof Error &&
-				isUnicodeScalarString(error.message) &&
-				error.message.length <= 1_000
-					? `: ${error.message}`
-					: '';
-			fail('DEADLINE_EXCEEDED', `Extraction deadline check failed closed${detail}.`);
-		}
-		if (!Number.isFinite(input.deadlineMs))
-			fail('DEADLINE_EXCEEDED', 'Static semantic extraction deadline is invalid.');
+	if (input.assertWithinDeadline === undefined) return;
+	try {
+		input.assertWithinDeadline();
+	} catch (error) {
+		if (error instanceof StaticRawExtractionError) throw error;
+		fail(
+			'DEADLINE_EXCEEDED',
+			`Extraction deadline check failed closed${deadlineFailureDetail(error)}.`
+		);
 	}
+	if (!Number.isFinite(input.deadlineMs))
+		fail('DEADLINE_EXCEEDED', 'Static semantic extraction deadline is invalid.');
+}
+
+function readDeadlineClock(input: Pick<ExtractStaticRawInput, 'clock'>): unknown {
 	let now: unknown;
 	try {
 		now = (input.clock ?? Date.now)();
 	} catch (error) {
-		const detail =
-			error instanceof Error &&
-			isUnicodeScalarString(error.message) &&
-			error.message.length <= 1_000
-				? `: ${error.message}`
-				: '';
-		fail('DEADLINE_EXCEEDED', `Extraction deadline clock failed closed${detail}.`);
+		fail(
+			'DEADLINE_EXCEEDED',
+			`Extraction deadline clock failed closed${deadlineFailureDetail(error)}.`
+		);
 	}
+	return now;
+}
+
+function checkExtractionDeadline(
+	input: Pick<ExtractStaticRawInput, 'assertWithinDeadline' | 'clock' | 'deadlineMs'>
+): void {
+	runDeadlineAssertion(input);
+	const now = readDeadlineClock(input);
 	if (!Number.isFinite(input.deadlineMs) || !Number.isSafeInteger(now) || (now as number) < 0)
 		fail('DEADLINE_EXCEEDED', 'Static semantic extraction deadline clock is invalid.');
 	if ((now as number) > input.deadlineMs)
@@ -388,6 +400,10 @@ class ExtractionGuard {
 			};
 		} else {
 			const state = extractionBudgetStates.get(input.budgetLedger);
+			// S6582 REFUSED, and this one is unsafe for the SIDE EFFECT, not the comparison: the right
+			// operand can THROW. `canonicalSemanticJson` refuses non-finite numbers, so on the
+			// unregistered-ledger path the optional chain evaluates a digest the original never computed
+			// and a forged ledger surfaces a raw TypeError instead of this module's INVALID_INPUT refusal.
 			if (
 				state === undefined ||
 				state.budgetsDigest !== sha256(canonicalSemanticJson(input.budgets))
@@ -541,7 +557,9 @@ function deepFreeze<T>(value: T, check: () => void = () => undefined): T {
 }
 
 function compareStrings(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function canonicalSet(values: readonly string[]): readonly string[] {
@@ -552,41 +570,52 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function cloneRawNumber(value: number, label: string): RawSemanticValue {
+	if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value)))
+		fail('INVALID_INPUT', `${label} contains a non-canonical number.`);
+	return value;
+}
+
+function cloneRawArray(
+	value: readonly unknown[],
+	label: string,
+	ancestors: Set<object>
+): RawSemanticValue {
+	const result: RawSemanticValue[] = [];
+	for (let index = 0; index < value.length; index += 1) {
+		if (!Object.hasOwn(value, index)) fail('INVALID_INPUT', `${label} contains a sparse array.`);
+		result.push(cloneRawValue(value[index], `${label}[${index}]`, ancestors));
+	}
+	return result;
+}
+
+function cloneRawObject(value: object, label: string, ancestors: Set<object>): RawSemanticValue {
+	const prototype = Object.getPrototypeOf(value) as object | null;
+	if (prototype !== Object.prototype && prototype !== null)
+		fail('INVALID_INPUT', `${label} must contain only plain data objects.`);
+	const result: Record<string, RawSemanticValue> = {};
+	for (const key of Object.keys(value).sort(compareStrings)) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			fail('INVALID_INPUT', `${label}.${key} must be an enumerable data property.`);
+		result[key] = cloneRawValue(descriptor.value, `${label}.${key}`, ancestors);
+	}
+	return result;
+}
+
 function cloneRawValue(
 	value: unknown,
 	label: string,
 	ancestors = new Set<object>()
 ): RawSemanticValue {
 	if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-	if (typeof value === 'number') {
-		if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value)))
-			fail('INVALID_INPUT', `${label} contains a non-canonical number.`);
-		return value;
-	}
+	if (typeof value === 'number') return cloneRawNumber(value, label);
 	if (typeof value !== 'object') fail('INVALID_INPUT', `${label} contains a non-data value.`);
 	if (ancestors.has(value)) fail('INVALID_INPUT', `${label} contains a cycle.`);
 	ancestors.add(value);
 	try {
-		if (Array.isArray(value)) {
-			const result: RawSemanticValue[] = [];
-			for (let index = 0; index < value.length; index += 1) {
-				if (!Object.hasOwn(value, index))
-					fail('INVALID_INPUT', `${label} contains a sparse array.`);
-				result.push(cloneRawValue(value[index], `${label}[${index}]`, ancestors));
-			}
-			return result;
-		}
-		const prototype = Object.getPrototypeOf(value) as object | null;
-		if (prototype !== Object.prototype && prototype !== null)
-			fail('INVALID_INPUT', `${label} must contain only plain data objects.`);
-		const result: Record<string, RawSemanticValue> = {};
-		for (const key of Object.keys(value).sort(compareStrings)) {
-			const descriptor = Object.getOwnPropertyDescriptor(value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				fail('INVALID_INPUT', `${label}.${key} must be an enumerable data property.`);
-			result[key] = cloneRawValue(descriptor.value, `${label}.${key}`, ancestors);
-		}
-		return result;
+		if (Array.isArray(value)) return cloneRawArray(value, label, ancestors);
+		return cloneRawObject(value, label, ancestors);
 	} finally {
 		ancestors.delete(value);
 	}
@@ -932,31 +961,129 @@ interface SourceSyntaxProjection {
 	readonly transientNodes: readonly ts.Node[];
 }
 
-function projectSourceSyntax(
-	sourceFile: ts.SourceFile,
-	sourceOrdinal: number,
-	guard: ExtractionGuard,
-	maxLiteralCharacters: number
-): SourceSyntaxProjection {
-	const nodes: RawSemanticAstNode[] = [];
-	const originalNodes: ts.Node[] = [];
-	const ordinalByNode = new WeakMap<ts.Node, number>();
-	const parentByNode = new WeakMap<ts.Node, ts.Node | null>();
-	parentByNode.set(sourceFile, null);
+interface PendingSyntaxNode {
+	readonly depth: number;
+	readonly node: ts.Node;
+	readonly parent: ts.Node | null;
+	readonly parentNodeOrdinal: number | null;
+	readonly siblingOrdinal: number;
+	readonly structuralRoles: readonly SemanticAstStructuralRole[];
+}
 
-	interface PendingNode {
-		readonly depth: number;
-		readonly node: ts.Node;
-		readonly parent: ts.Node | null;
-		readonly parentNodeOrdinal: number | null;
-		readonly siblingOrdinal: number;
-		readonly structuralRoles: readonly SemanticAstStructuralRole[];
+interface SourceSyntaxState {
+	readonly assignments: RawSemanticAssignment[];
+	readonly childrenByParent: Map<number, RawSemanticAstNode[]>;
+	readonly declarations: RawSemanticDeclarationCandidate[];
+	readonly guard: ExtractionGuard;
+	readonly invocations: RawSemanticInvocation[];
+	readonly literals: RawSemanticLiteral[];
+	readonly maxLiteralCharacters: number;
+	readonly nodes: RawSemanticAstNode[];
+	readonly ordinalByNode: WeakMap<ts.Node, number>;
+	readonly originalNodes: ts.Node[];
+	readonly sourceFile: ts.SourceFile;
+	readonly sourceOrdinal: number;
+}
+
+interface DeclarationExportBinding {
+	readonly exportCarrierNodeOrdinal: number | null;
+	readonly exportSyntax: RawSemanticDeclarationCandidate['exportSyntax'];
+}
+
+const CONDITIONAL_NAME_KINDS = new Set<number>([
+	ts.SyntaxKind.FunctionExpression,
+	ts.SyntaxKind.ClassExpression,
+	ts.SyntaxKind.ImportClause
+]);
+
+function retainAstNode(
+	state: SourceSyntaxState,
+	current: PendingSyntaxNode,
+	parentByNode: WeakMap<ts.Node, ts.Node | null>
+): number {
+	if (state.ordinalByNode.has(current.node))
+		fail(
+			'AST_PARENT_CONFLICT',
+			'The AST traversal encountered the same TypeScript node more than once.'
+		);
+	const registeredParent = parentByNode.get(current.node);
+	if (registeredParent !== current.parent)
+		fail('AST_PARENT_CONFLICT', 'A TypeScript AST node acquired two retained parents.');
+	state.guard.addAstNode(current.depth);
+	const [fullStart, start, end] = childSpan(current.node, state.sourceFile);
+	if (
+		![fullStart, start, end].every(Number.isSafeInteger) ||
+		fullStart < 0 ||
+		fullStart > start ||
+		start > end ||
+		end > state.sourceFile.text.length
+	)
+		fail('UNSUPPORTED_SYNTAX', 'TypeScript produced an invalid public AST span.');
+	const operatorKind = nodeOperator(current.node);
+	const operatorName = operatorKind === null ? null : syntaxKindName(operatorKind);
+	const nodeOrdinal = state.nodes.length;
+	state.ordinalByNode.set(current.node, nodeOrdinal);
+	state.originalNodes.push(current.node);
+	state.nodes.push({
+		end,
+		fullStart,
+		hasAssignmentInitializer: initializerParts(current.node) !== null,
+		kind: current.node.kind,
+		kindName: syntaxKindName(current.node.kind),
+		nodeOrdinal,
+		operatorKind,
+		operatorName,
+		parentNodeOrdinal: current.parentNodeOrdinal,
+		publicFlags: current.node.flags & PUBLIC_NODE_FLAG_MASK,
+		siblingOrdinal: current.siblingOrdinal,
+		sourceOrdinal: state.sourceOrdinal,
+		start,
+		structuralRoles: current.structuralRoles,
+		syntacticIdentifierText: syntacticIdentifierText(current.node)
+	});
+	state.guard.check();
+	return nodeOrdinal;
+}
+
+function pushRetainedChildren(
+	state: SourceSyntaxState,
+	current: PendingSyntaxNode,
+	nodeOrdinal: number,
+	parentByNode: WeakMap<ts.Node, ts.Node | null>,
+	pending: PendingSyntaxNode[]
+): void {
+	const children = retainedChildren(current.node, state.sourceFile, state.guard);
+	for (let childIndex = children.length - 1; childIndex >= 0; childIndex -= 1) {
+		state.guard.check();
+		const child = children[childIndex]!.child;
+		const knownParent = parentByNode.get(child);
+		if (knownParent !== undefined && knownParent !== current.node)
+			fail('AST_PARENT_CONFLICT', 'A TypeScript AST node acquired two retained parents.');
+		if (knownParent === current.node)
+			fail(
+				'AST_PARENT_CONFLICT',
+				'A TypeScript AST node was duplicated under one retained parent.'
+			);
+		parentByNode.set(child, current.node);
+		pending.push({
+			depth: current.depth + 1,
+			node: child,
+			parent: current.node,
+			parentNodeOrdinal: nodeOrdinal,
+			siblingOrdinal: childIndex,
+			structuralRoles: structuralRoles(current.node, child)
+		});
+		state.guard.check();
 	}
+}
 
-	const pending: PendingNode[] = [
+function traverseSourceSyntax(state: SourceSyntaxState): void {
+	const parentByNode = new WeakMap<ts.Node, ts.Node | null>();
+	parentByNode.set(state.sourceFile, null);
+	const pending: PendingSyntaxNode[] = [
 		{
 			depth: 0,
-			node: sourceFile,
+			node: state.sourceFile,
 			parent: null,
 			parentNodeOrdinal: null,
 			siblingOrdinal: 0,
@@ -964,327 +1091,321 @@ function projectSourceSyntax(
 		}
 	];
 	while (pending.length > 0) {
-		guard.check();
+		state.guard.check();
 		const current = pending.pop()!;
-		if (ordinalByNode.has(current.node))
-			fail(
-				'AST_PARENT_CONFLICT',
-				'The AST traversal encountered the same TypeScript node more than once.'
-			);
-		const registeredParent = parentByNode.get(current.node);
-		if (registeredParent !== current.parent)
-			fail('AST_PARENT_CONFLICT', 'A TypeScript AST node acquired two retained parents.');
-		guard.addAstNode(current.depth);
-		const [fullStart, start, end] = childSpan(current.node, sourceFile);
-		if (
-			![fullStart, start, end].every(Number.isSafeInteger) ||
-			fullStart < 0 ||
-			fullStart > start ||
-			start > end ||
-			end > sourceFile.text.length
-		)
-			fail('UNSUPPORTED_SYNTAX', 'TypeScript produced an invalid public AST span.');
-		const operatorKind = nodeOperator(current.node);
-		const operatorName = operatorKind === null ? null : syntaxKindName(operatorKind);
-		const ordinal = nodes.length;
-		ordinalByNode.set(current.node, ordinal);
-		originalNodes.push(current.node);
-		nodes.push({
-			end,
-			fullStart,
-			hasAssignmentInitializer: initializerParts(current.node) !== null,
-			kind: current.node.kind,
-			kindName: syntaxKindName(current.node.kind),
-			nodeOrdinal: ordinal,
-			operatorKind,
-			operatorName,
-			parentNodeOrdinal: current.parentNodeOrdinal,
-			publicFlags: current.node.flags & PUBLIC_NODE_FLAG_MASK,
-			siblingOrdinal: current.siblingOrdinal,
-			sourceOrdinal,
-			start,
-			structuralRoles: current.structuralRoles,
-			syntacticIdentifierText: syntacticIdentifierText(current.node)
-		});
-		guard.check();
-
-		const children = retainedChildren(current.node, sourceFile, guard);
-		for (let childIndex = children.length - 1; childIndex >= 0; childIndex -= 1) {
-			guard.check();
-			const child = children[childIndex]!.child;
-			const knownParent = parentByNode.get(child);
-			if (knownParent !== undefined && knownParent !== current.node)
-				fail('AST_PARENT_CONFLICT', 'A TypeScript AST node acquired two retained parents.');
-			if (knownParent === current.node)
-				fail(
-					'AST_PARENT_CONFLICT',
-					'A TypeScript AST node was duplicated under one retained parent.'
-				);
-			parentByNode.set(child, current.node);
-			pending.push({
-				depth: current.depth + 1,
-				node: child,
-				parent: current.node,
-				parentNodeOrdinal: ordinal,
-				siblingOrdinal: childIndex,
-				structuralRoles: structuralRoles(current.node, child)
-			});
-			guard.check();
-		}
+		const nodeOrdinal = retainAstNode(state, current, parentByNode);
+		pushRetainedChildren(state, current, nodeOrdinal, parentByNode, pending);
 	}
+}
 
-	const childrenByParent = new Map<number, RawSemanticAstNode[]>();
-	for (const node of nodes) {
-		guard.check();
+function indexChildrenByParent(state: SourceSyntaxState): void {
+	for (const node of state.nodes) {
+		state.guard.check();
 		if (node.parentNodeOrdinal !== null) {
-			const children = childrenByParent.get(node.parentNodeOrdinal) ?? [];
+			const children = state.childrenByParent.get(node.parentNodeOrdinal) ?? [];
 			children.push(node);
-			childrenByParent.set(node.parentNodeOrdinal, children);
+			state.childrenByParent.set(node.parentNodeOrdinal, children);
 		}
-		guard.check();
+		state.guard.check();
 	}
+}
 
-	const declarations: RawSemanticDeclarationCandidate[] = [];
-	const literals: RawSemanticLiteral[] = [];
-	const invocations: RawSemanticInvocation[] = [];
-	const assignments: RawSemanticAssignment[] = [];
-	const conditionalNameKinds = new Set<number>([
-		ts.SyntaxKind.FunctionExpression,
-		ts.SyntaxKind.ClassExpression,
-		ts.SyntaxKind.ImportClause
-	]);
+function retainedOrdinal(state: SourceSyntaxState, node: ts.Node, label: string): number {
+	const value = state.ordinalByNode.get(node);
+	if (value === undefined)
+		fail('AST_PARENT_CONFLICT', `${label} is not retained by the named AST traversal profile.`);
+	return value;
+}
 
-	function ordinal(node: ts.Node, label: string): number {
-		const value = ordinalByNode.get(node);
-		if (value === undefined)
-			fail('AST_PARENT_CONFLICT', `${label} is not retained by the named AST traversal profile.`);
-		return value;
+function directModifiers(
+	state: SourceSyntaxState,
+	nodeOrdinal: number
+): readonly { readonly code: number; readonly name: string }[] {
+	const byKey = new Map<string, { readonly code: number; readonly name: string }>();
+	for (const child of state.childrenByParent.get(nodeOrdinal) ?? []) {
+		state.guard.check();
+		if (isTypeScriptModifierKind(child.kind))
+			byKey.set(`${child.kind}:${child.kindName}`, { code: child.kind, name: child.kindName });
 	}
+	return [...byKey.values()].sort((left, right) =>
+		compareStrings(`${left.code}:${left.name}`, `${right.code}:${right.name}`)
+	);
+}
 
-	function directModifiers(
-		nodeOrdinal: number
-	): readonly { readonly code: number; readonly name: string }[] {
-		const byKey = new Map<string, { readonly code: number; readonly name: string }>();
-		for (const child of childrenByParent.get(nodeOrdinal) ?? []) {
-			guard.check();
-			if (isTypeScriptModifierKind(child.kind))
-				byKey.set(`${child.kind}:${child.kindName}`, { code: child.kind, name: child.kindName });
-		}
-		return [...byKey.values()].sort((left, right) =>
-			compareStrings(`${left.code}:${left.name}`, `${right.code}:${right.name}`)
-		);
-	}
-
-	function hasDeclareCarrier(nodeOrdinal: number): boolean {
-		const seen = new Set<number>();
-		let cursor: number | null = nodeOrdinal;
-		while (cursor !== null) {
-			guard.check();
-			if (seen.has(cursor)) fail('AST_PARENT_CONFLICT', 'AST parent relation contains a cycle.');
-			seen.add(cursor);
-			if (
-				(childrenByParent.get(cursor) ?? []).some(
-					(child) => child.kind === ts.SyntaxKind.DeclareKeyword
-				)
+function hasDeclareCarrier(state: SourceSyntaxState, nodeOrdinal: number): boolean {
+	const seen = new Set<number>();
+	let cursor: number | null = nodeOrdinal;
+	while (cursor !== null) {
+		state.guard.check();
+		if (seen.has(cursor)) fail('AST_PARENT_CONFLICT', 'AST parent relation contains a cycle.');
+		seen.add(cursor);
+		if (
+			(state.childrenByParent.get(cursor) ?? []).some(
+				(child) => child.kind === ts.SyntaxKind.DeclareKeyword
 			)
-				return true;
+		)
+			return true;
+		cursor = state.nodes[cursor]!.parentNodeOrdinal;
+	}
+	return false;
+}
+
+function variableStatementCarrier(state: SourceSyntaxState, nodeOrdinal: number): number | null {
+	const nodes = state.nodes;
+	let declarationOrdinal = nodeOrdinal;
+	if (nodes[nodeOrdinal]!.kind === ts.SyntaxKind.BindingElement) {
+		let cursor = nodes[nodeOrdinal]!.parentNodeOrdinal;
+		while (
+			cursor !== null &&
+			[
+				ts.SyntaxKind.ArrayBindingPattern,
+				ts.SyntaxKind.BindingElement,
+				ts.SyntaxKind.ObjectBindingPattern
+			].includes(nodes[cursor]!.kind)
+		)
 			cursor = nodes[cursor]!.parentNodeOrdinal;
-		}
-		return false;
-	}
+		if (cursor === null || nodes[cursor]!.kind !== ts.SyntaxKind.VariableDeclaration) return null;
+		declarationOrdinal = cursor;
+	} else if (nodes[nodeOrdinal]!.kind !== ts.SyntaxKind.VariableDeclaration) return null;
+	const listOrdinal = nodes[declarationOrdinal]!.parentNodeOrdinal;
+	if (listOrdinal === null || nodes[listOrdinal]!.kind !== ts.SyntaxKind.VariableDeclarationList)
+		return null;
+	const statementOrdinal = nodes[listOrdinal]!.parentNodeOrdinal;
+	return statementOrdinal !== null &&
+		nodes[statementOrdinal]!.kind === ts.SyntaxKind.VariableStatement
+		? statementOrdinal
+		: null;
+}
 
-	function variableStatementCarrier(nodeOrdinal: number): number | null {
-		let declarationOrdinal = nodeOrdinal;
-		if (nodes[nodeOrdinal]!.kind === ts.SyntaxKind.BindingElement) {
-			let cursor = nodes[nodeOrdinal]!.parentNodeOrdinal;
-			while (
-				cursor !== null &&
-				[
-					ts.SyntaxKind.ArrayBindingPattern,
-					ts.SyntaxKind.BindingElement,
-					ts.SyntaxKind.ObjectBindingPattern
-				].includes(nodes[cursor]!.kind)
-			)
-				cursor = nodes[cursor]!.parentNodeOrdinal;
-			if (cursor === null || nodes[cursor]!.kind !== ts.SyntaxKind.VariableDeclaration) return null;
-			declarationOrdinal = cursor;
-		} else if (nodes[nodeOrdinal]!.kind !== ts.SyntaxKind.VariableDeclaration) return null;
-		const listOrdinal = nodes[declarationOrdinal]!.parentNodeOrdinal;
-		if (listOrdinal === null || nodes[listOrdinal]!.kind !== ts.SyntaxKind.VariableDeclarationList)
-			return null;
-		const statementOrdinal = nodes[listOrdinal]!.parentNodeOrdinal;
-		return statementOrdinal !== null &&
-			nodes[statementOrdinal]!.kind === ts.SyntaxKind.VariableStatement
-			? statementOrdinal
-			: null;
-	}
-
-	for (let nodeOrdinal = 0; nodeOrdinal < nodes.length; nodeOrdinal += 1) {
-		guard.check();
-		const rawNode = nodes[nodeOrdinal]!;
-		const node = originalNodes[nodeOrdinal]!;
-		const candidateRole = semanticDeclarationCandidateRole(node.kind);
-		if (candidateRole !== null) {
-			const name = declarationNameNode(node);
-			if (!(conditionalNameKinds.has(node.kind) && name === undefined)) {
-				const nameNodeOrdinal = name === undefined ? null : ordinal(name, 'Declaration name');
-				const nameState =
-					name === undefined
-						? 'ANONYMOUS'
-						: semanticDeclarationNameState(name.kind, syntacticIdentifierText(name));
-				if (nameState === null)
-					fail(
-						'UNSUPPORTED_SYNTAX',
-						`Declaration candidate ${rawNode.kindName} has an unsupported name form.`
-					);
-				let syntacticName: string | null = null;
-				if (nameState === 'ATOMIC') {
-					if (ts.isIdentifier(name!) || ts.isPrivateIdentifier(name!)) syntacticName = name!.text;
-					else
-						syntacticName = sourceFile.text.slice(
-							nodes[nameNodeOrdinal!]!.start,
-							nodes[nameNodeOrdinal!]!.end
-						);
-					if (syntacticName.length === 0)
-						fail('UNSUPPORTED_SYNTAX', 'An atomic declaration name cannot be empty.');
-					if (!isUnicodeScalarString(syntacticName))
-						fail(
-							'UNSUPPORTED_SYNTAX',
-							'An atomic declaration name contains an unrepresentable lone UTF-16 surrogate.'
-						);
-				}
-				const localModifiers = directModifiers(nodeOrdinal);
-				const modifierNames = new Set(localModifiers.map((modifier) => modifier.name));
-				const variableCarrier = variableStatementCarrier(nodeOrdinal);
-				const carrierModifierNames = new Set(
-					variableCarrier === null
-						? []
-						: directModifiers(variableCarrier).map((modifier) => modifier.name)
+function atomicDeclarationName(
+	state: SourceSyntaxState,
+	name: ts.Node,
+	nameNodeOrdinal: number
+): string {
+	const syntacticName =
+		ts.isIdentifier(name) || ts.isPrivateIdentifier(name)
+			? name.text
+			: state.sourceFile.text.slice(
+					state.nodes[nameNodeOrdinal]!.start,
+					state.nodes[nameNodeOrdinal]!.end
 				);
-				let exportSyntax: RawSemanticDeclarationCandidate['exportSyntax'] = 'NONE';
-				let exportCarrierNodeOrdinal: number | null = null;
-				if (node.kind === ts.SyntaxKind.ExportSpecifier) {
-					exportSyntax = 'EXPORT_SPECIFIER';
-					exportCarrierNodeOrdinal = nodeOrdinal;
-				} else if (node.kind === ts.SyntaxKind.ExportAssignment) {
-					exportSyntax = 'EXPORT_ASSIGNMENT';
-					exportCarrierNodeOrdinal = nodeOrdinal;
-				} else if (
-					node.kind === ts.SyntaxKind.NamespaceExport ||
-					node.kind === ts.SyntaxKind.NamespaceExportDeclaration
-				) {
-					exportSyntax = 'NAMESPACE_EXPORT';
-					exportCarrierNodeOrdinal = nodeOrdinal;
-				} else if (modifierNames.has('DefaultKeyword')) {
-					exportSyntax = 'DEFAULT';
-					exportCarrierNodeOrdinal = nodeOrdinal;
-				} else if (modifierNames.has('ExportKeyword')) {
-					exportSyntax = 'EXPLICIT';
-					exportCarrierNodeOrdinal = nodeOrdinal;
-				} else if (variableCarrier !== null && carrierModifierNames.has('DefaultKeyword')) {
-					exportSyntax = 'DEFAULT';
-					exportCarrierNodeOrdinal = variableCarrier;
-				} else if (variableCarrier !== null && carrierModifierNames.has('ExportKeyword')) {
-					exportSyntax = 'EXPLICIT';
-					exportCarrierNodeOrdinal = variableCarrier;
-				}
-				declarations.push({
-					ambientSyntax: sourceFile.isDeclarationFile || hasDeclareCarrier(nodeOrdinal),
-					candidateRole,
-					exportCarrierNodeOrdinal,
-					exportSyntax,
-					localModifiers,
-					nameNodeOrdinal,
-					nameState,
-					nodeOrdinal,
-					sourceOrdinal,
-					syntacticName,
-					syntaxKind: rawNode.kind,
-					syntaxKindName: rawNode.kindName
-				});
-				guard.check();
-			}
-		}
+	if (syntacticName.length === 0)
+		fail('UNSUPPORTED_SYNTAX', 'An atomic declaration name cannot be empty.');
+	if (!isUnicodeScalarString(syntacticName))
+		fail(
+			'UNSUPPORTED_SYNTAX',
+			'An atomic declaration name contains an unrepresentable lone UTF-16 surrogate.'
+		);
+	return syntacticName;
+}
 
-		const literalDescriptor = semanticLiteralDescriptor(node.kind);
-		if (literalDescriptor !== null) {
-			const lexeme = sourceFile.text.slice(rawNode.start, rawNode.end);
-			let cooked: string | boolean | null;
-			if (node.kind === ts.SyntaxKind.TrueKeyword) cooked = true;
-			else if (node.kind === ts.SyntaxKind.FalseKeyword) cooked = false;
-			else if (node.kind === ts.SyntaxKind.NullKeyword) cooked = null;
-			else if (
-				'text' in node &&
-				typeof (node as ts.Node & { readonly text?: unknown }).text === 'string'
-			)
-				cooked = (node as ts.Node & { readonly text: string }).text;
-			else
-				fail('UNSUPPORTED_SYNTAX', `Literal node ${rawNode.kindName} has no public cooked text.`);
-			const valueLength = literalValueLength(cooked);
-			const nonScalar = typeof cooked === 'string' && !isUnicodeScalarString(cooked);
-			const valueEncoding = nonScalar
-				? ('UTF16_CODE_UNITS_LE' as const)
-				: literalDescriptor.valueEncoding;
-			const exact =
-				!nonScalar && (typeof cooked !== 'string' || valueLength <= maxLiteralCharacters);
-			literals.push({
-				lexemeLength: lexeme.length,
-				lexemeSha256: literalLexemeDigest(lexeme),
-				nodeOrdinal,
-				sourceOrdinal,
-				value: exact ? cooked : null,
-				valueEncoding,
-				valueLength,
-				valueSha256: literalValueDigest(valueEncoding, literalDescriptor.valueType, cooked),
-				valueState: exact ? 'EXACT' : 'DIGEST_ONLY',
-				valueType: literalDescriptor.valueType
-			});
-			guard.check();
-		}
+function declarationExportSyntax(
+	node: ts.Node,
+	nodeOrdinal: number,
+	modifierNames: ReadonlySet<string>,
+	variableCarrier: number | null,
+	carrierModifierNames: ReadonlySet<string>
+): DeclarationExportBinding {
+	if (node.kind === ts.SyntaxKind.ExportSpecifier)
+		return { exportCarrierNodeOrdinal: nodeOrdinal, exportSyntax: 'EXPORT_SPECIFIER' };
+	if (node.kind === ts.SyntaxKind.ExportAssignment)
+		return { exportCarrierNodeOrdinal: nodeOrdinal, exportSyntax: 'EXPORT_ASSIGNMENT' };
+	if (
+		node.kind === ts.SyntaxKind.NamespaceExport ||
+		node.kind === ts.SyntaxKind.NamespaceExportDeclaration
+	)
+		return { exportCarrierNodeOrdinal: nodeOrdinal, exportSyntax: 'NAMESPACE_EXPORT' };
+	if (modifierNames.has('DefaultKeyword'))
+		return { exportCarrierNodeOrdinal: nodeOrdinal, exportSyntax: 'DEFAULT' };
+	if (modifierNames.has('ExportKeyword'))
+		return { exportCarrierNodeOrdinal: nodeOrdinal, exportSyntax: 'EXPLICIT' };
+	if (variableCarrier !== null && carrierModifierNames.has('DefaultKeyword'))
+		return { exportCarrierNodeOrdinal: variableCarrier, exportSyntax: 'DEFAULT' };
+	if (variableCarrier !== null && carrierModifierNames.has('ExportKeyword'))
+		return { exportCarrierNodeOrdinal: variableCarrier, exportSyntax: 'EXPLICIT' };
+	return { exportCarrierNodeOrdinal: null, exportSyntax: 'NONE' };
+}
 
-		const invocationKind = semanticInvocationKind(node.kind);
-		if (invocationKind !== null) {
-			const parts = invocationParts(node);
-			if (parts === null)
-				fail('UNSUPPORTED_SYNTAX', 'Invocation taxonomy and public node shape disagree.');
-			invocations.push({
-				argumentNodeOrdinals: parts.arguments.map((argument) =>
-					ordinal(argument, 'Invocation argument')
-				),
-				calleeNodeOrdinal: ordinal(parts.callee, 'Invocation callee'),
-				invocationKind,
-				nodeOrdinal,
-				optional: invocationKind === 'CALL' && (node.flags & ts.NodeFlags.OptionalChain) !== 0,
-				sourceOrdinal,
-				templateNodeOrdinal:
-					parts.template === null ? null : ordinal(parts.template, 'Invocation template')
-			});
-			guard.check();
-		}
+function projectDeclarationCandidate(
+	state: SourceSyntaxState,
+	nodeOrdinal: number,
+	node: ts.Node,
+	rawNode: RawSemanticAstNode
+): void {
+	const candidateRole = semanticDeclarationCandidateRole(node.kind);
+	if (candidateRole === null) return;
+	const name = declarationNameNode(node);
+	if (CONDITIONAL_NAME_KINDS.has(node.kind) && name === undefined) return;
+	const nameNodeOrdinal =
+		name === undefined ? null : retainedOrdinal(state, name, 'Declaration name');
+	const nameState =
+		name === undefined
+			? 'ANONYMOUS'
+			: semanticDeclarationNameState(name.kind, syntacticIdentifierText(name));
+	if (nameState === null)
+		fail(
+			'UNSUPPORTED_SYNTAX',
+			`Declaration candidate ${rawNode.kindName} has an unsupported name form.`
+		);
+	const syntacticName =
+		nameState === 'ATOMIC' ? atomicDeclarationName(state, name!, nameNodeOrdinal!) : null;
+	const localModifiers = directModifiers(state, nodeOrdinal);
+	const modifierNames = new Set(localModifiers.map((modifier) => modifier.name));
+	const variableCarrier = variableStatementCarrier(state, nodeOrdinal);
+	const carrierModifierNames = new Set(
+		variableCarrier === null
+			? []
+			: directModifiers(state, variableCarrier).map((modifier) => modifier.name)
+	);
+	const exportBinding = declarationExportSyntax(
+		node,
+		nodeOrdinal,
+		modifierNames,
+		variableCarrier,
+		carrierModifierNames
+	);
+	state.declarations.push({
+		ambientSyntax: state.sourceFile.isDeclarationFile || hasDeclareCarrier(state, nodeOrdinal),
+		candidateRole,
+		exportCarrierNodeOrdinal: exportBinding.exportCarrierNodeOrdinal,
+		exportSyntax: exportBinding.exportSyntax,
+		localModifiers,
+		nameNodeOrdinal,
+		nameState,
+		nodeOrdinal,
+		sourceOrdinal: state.sourceOrdinal,
+		syntacticName,
+		syntaxKind: rawNode.kind,
+		syntaxKindName: rawNode.kindName
+	});
+	state.guard.check();
+}
 
-		const assignment = assignmentParts(node);
-		if (assignment !== null) {
-			assignments.push({
-				assignmentKind: assignment.kind,
-				nodeOrdinal,
-				operatorKind: assignment.operatorKind,
-				operatorName: syntaxKindName(assignment.operatorKind),
-				sourceOrdinal,
-				targetNodeOrdinal: ordinal(assignment.target, 'Assignment target'),
-				valueNodeOrdinal:
-					assignment.value === null ? null : ordinal(assignment.value, 'Assignment value')
-			});
-			guard.check();
-		}
+function literalCookedValue(node: ts.Node, rawNode: RawSemanticAstNode): string | boolean | null {
+	if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+	if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+	if (node.kind === ts.SyntaxKind.NullKeyword) return null;
+	if ('text' in node && typeof (node as ts.Node & { readonly text?: unknown }).text === 'string')
+		return (node as ts.Node & { readonly text: string }).text;
+	return fail('UNSUPPORTED_SYNTAX', `Literal node ${rawNode.kindName} has no public cooked text.`);
+}
+
+function projectLiteral(
+	state: SourceSyntaxState,
+	nodeOrdinal: number,
+	node: ts.Node,
+	rawNode: RawSemanticAstNode
+): void {
+	const literalDescriptor = semanticLiteralDescriptor(node.kind);
+	if (literalDescriptor === null) return;
+	const lexeme = state.sourceFile.text.slice(rawNode.start, rawNode.end);
+	const cooked = literalCookedValue(node, rawNode);
+	const valueLength = literalValueLength(cooked);
+	const nonScalar = typeof cooked === 'string' && !isUnicodeScalarString(cooked);
+	const valueEncoding = nonScalar
+		? ('UTF16_CODE_UNITS_LE' as const)
+		: literalDescriptor.valueEncoding;
+	const exact =
+		!nonScalar && (typeof cooked !== 'string' || valueLength <= state.maxLiteralCharacters);
+	state.literals.push({
+		lexemeLength: lexeme.length,
+		lexemeSha256: literalLexemeDigest(lexeme),
+		nodeOrdinal,
+		sourceOrdinal: state.sourceOrdinal,
+		value: exact ? cooked : null,
+		valueEncoding,
+		valueLength,
+		valueSha256: literalValueDigest(valueEncoding, literalDescriptor.valueType, cooked),
+		valueState: exact ? 'EXACT' : 'DIGEST_ONLY',
+		valueType: literalDescriptor.valueType
+	});
+	state.guard.check();
+}
+
+function projectInvocation(state: SourceSyntaxState, nodeOrdinal: number, node: ts.Node): void {
+	const invocationKind = semanticInvocationKind(node.kind);
+	if (invocationKind === null) return;
+	const parts = invocationParts(node);
+	if (parts === null)
+		fail('UNSUPPORTED_SYNTAX', 'Invocation taxonomy and public node shape disagree.');
+	state.invocations.push({
+		argumentNodeOrdinals: parts.arguments.map((argument) =>
+			retainedOrdinal(state, argument, 'Invocation argument')
+		),
+		calleeNodeOrdinal: retainedOrdinal(state, parts.callee, 'Invocation callee'),
+		invocationKind,
+		nodeOrdinal,
+		optional: invocationKind === 'CALL' && (node.flags & ts.NodeFlags.OptionalChain) !== 0,
+		sourceOrdinal: state.sourceOrdinal,
+		templateNodeOrdinal:
+			parts.template === null ? null : retainedOrdinal(state, parts.template, 'Invocation template')
+	});
+	state.guard.check();
+}
+
+function projectAssignment(state: SourceSyntaxState, nodeOrdinal: number, node: ts.Node): void {
+	const assignment = assignmentParts(node);
+	if (assignment === null) return;
+	state.assignments.push({
+		assignmentKind: assignment.kind,
+		nodeOrdinal,
+		operatorKind: assignment.operatorKind,
+		operatorName: syntaxKindName(assignment.operatorKind),
+		sourceOrdinal: state.sourceOrdinal,
+		targetNodeOrdinal: retainedOrdinal(state, assignment.target, 'Assignment target'),
+		valueNodeOrdinal:
+			assignment.value === null
+				? null
+				: retainedOrdinal(state, assignment.value, 'Assignment value')
+	});
+	state.guard.check();
+}
+
+function projectRetainedNodes(state: SourceSyntaxState): void {
+	for (let nodeOrdinal = 0; nodeOrdinal < state.nodes.length; nodeOrdinal += 1) {
+		state.guard.check();
+		const rawNode = state.nodes[nodeOrdinal]!;
+		const node = state.originalNodes[nodeOrdinal]!;
+		projectDeclarationCandidate(state, nodeOrdinal, node, rawNode);
+		projectLiteral(state, nodeOrdinal, node, rawNode);
+		projectInvocation(state, nodeOrdinal, node);
+		projectAssignment(state, nodeOrdinal, node);
 	}
+}
+
+function projectSourceSyntax(
+	sourceFile: ts.SourceFile,
+	sourceOrdinal: number,
+	guard: ExtractionGuard,
+	maxLiteralCharacters: number
+): SourceSyntaxProjection {
+	const state: SourceSyntaxState = {
+		assignments: [],
+		childrenByParent: new Map(),
+		declarations: [],
+		guard,
+		invocations: [],
+		literals: [],
+		maxLiteralCharacters,
+		nodes: [],
+		ordinalByNode: new WeakMap(),
+		originalNodes: [],
+		sourceFile,
+		sourceOrdinal
+	};
+
+	traverseSourceSyntax(state);
+	indexChildrenByParent(state);
+
+	projectRetainedNodes(state);
 
 	return {
-		assignments,
-		declarationCandidates: declarations,
-		invocations,
-		literals,
-		nodes,
-		transientNodes: originalNodes
+		assignments: state.assignments,
+		declarationCandidates: state.declarations,
+		invocations: state.invocations,
+		literals: state.literals,
+		nodes: state.nodes,
+		transientNodes: state.originalNodes
 	};
 }
 
@@ -1352,6 +1473,112 @@ function diagnosticSpan(
 	return { end, start: start! };
 }
 
+interface PendingDiagnostic extends Omit<RawSemanticDiagnosticOccurrence, 'occurrenceOrdinal'> {
+	readonly discoveryOrdinal: number;
+}
+
+function diagnosticLocationKind(
+	path: string | null,
+	source: RawSemanticSource | undefined
+): RawSemanticDiagnosticOccurrence['locationKind'] {
+	if (path === null) return 'NONE';
+	if (source === undefined) return 'PATH';
+	return 'SOURCE';
+}
+
+function rawRelatedDiagnostic(
+	input: ExtractStaticRawInput,
+	sourceByPath: ReadonlyMap<string, RawSemanticSource>,
+	related: ts.DiagnosticRelatedInformation,
+	guard: ExtractionGuard
+): RawSemanticRelatedDiagnostic {
+	guard.check();
+	if (!Number.isSafeInteger(related.code) || related.code < 1)
+		fail('DIAGNOSTIC_INVALID', 'TypeScript returned an invalid related diagnostic code.');
+	const path = related.file === undefined ? null : checkedLogicalPath(input, related.file.fileName);
+	const source = path === null ? undefined : sourceByPath.get(path);
+	const span = diagnosticSpan(related.start, related.length, source?.textLength);
+	return {
+		category: diagnosticCategory(related.category),
+		code: `TS${related.code}`,
+		...span,
+		message: diagnosticMessage(related.messageText, guard),
+		path
+	};
+}
+
+function pendingDiagnosticRecord(
+	input: ExtractStaticRawInput,
+	sourceByPath: ReadonlyMap<string, RawSemanticSource>,
+	familyInput: StaticRawDiagnosticFamilyInput,
+	diagnostic: ts.Diagnostic,
+	discoveryOrdinal: number,
+	guard: ExtractionGuard
+): PendingDiagnostic {
+	if (!Number.isSafeInteger(diagnostic.code) || diagnostic.code < 1)
+		fail('DIAGNOSTIC_INVALID', 'TypeScript returned an invalid diagnostic code.');
+	const path =
+		diagnostic.file === undefined ? null : checkedLogicalPath(input, diagnostic.file.fileName);
+	const source = path === null ? undefined : sourceByPath.get(path);
+	const span = diagnosticSpan(diagnostic.start, diagnostic.length, source?.textLength);
+	const message = diagnosticMessage(diagnostic.messageText, guard);
+	const related = (diagnostic.relatedInformation ?? [])
+		.map((item) => rawRelatedDiagnostic(input, sourceByPath, item, guard))
+		.sort((left, right) =>
+			compareStrings(canonicalSemanticJson(left), canonicalSemanticJson(right))
+		);
+	const characters =
+		messageCharacterCount(message) +
+		related.reduce((total, item) => total + messageCharacterCount(item.message), 0);
+	guard.addDiagnostic(characters);
+	return {
+		category: diagnosticCategory(diagnostic.category),
+		code: `TS${diagnostic.code}`,
+		discoveryOrdinal,
+		...span,
+		family: familyInput.family,
+		locationKind: diagnosticLocationKind(path, source),
+		message,
+		path,
+		related,
+		sourceOrdinal: source?.sourceOrdinal ?? null
+	};
+}
+
+function collectPendingDiagnostics(
+	input: ExtractStaticRawInput,
+	familyInputs: readonly StaticRawDiagnosticFamilyInput[],
+	sourceByPath: ReadonlyMap<string, RawSemanticSource>,
+	guard: ExtractionGuard
+): PendingDiagnostic[] {
+	const pending: PendingDiagnostic[] = [];
+	let discoveryOrdinal = 0;
+	for (const familyInput of familyInputs) {
+		guard.check();
+		if (familyInput.state === 'FAILED' && familyInput.diagnostics.length > 0)
+			fail(
+				'INVALID_INPUT',
+				`Failed diagnostic family ${familyInput.family} cannot retain diagnostics.`
+			);
+		for (const diagnostic of familyInput.diagnostics) {
+			guard.check();
+			pending.push(
+				pendingDiagnosticRecord(
+					input,
+					sourceByPath,
+					familyInput,
+					diagnostic,
+					discoveryOrdinal,
+					guard
+				)
+			);
+			discoveryOrdinal += 1;
+			guard.check();
+		}
+	}
+	return pending;
+}
+
 function projectDiagnostics(
 	input: ExtractStaticRawInput,
 	familyInputs: readonly StaticRawDiagnosticFamilyInput[],
@@ -1362,72 +1589,7 @@ function projectDiagnostics(
 	readonly families: readonly RawSemanticDiagnosticFamilyCoverage[];
 } {
 	const sourceByPath = new Map(sources.map((source) => [source.logicalPath, source] as const));
-	interface PendingDiagnostic extends Omit<RawSemanticDiagnosticOccurrence, 'occurrenceOrdinal'> {
-		readonly discoveryOrdinal: number;
-	}
-	const pending: PendingDiagnostic[] = [];
-	let discoveryOrdinal = 0;
-
-	function relatedDiagnostic(
-		related: ts.DiagnosticRelatedInformation
-	): RawSemanticRelatedDiagnostic {
-		guard.check();
-		if (!Number.isSafeInteger(related.code) || related.code < 1)
-			fail('DIAGNOSTIC_INVALID', 'TypeScript returned an invalid related diagnostic code.');
-		const path =
-			related.file === undefined ? null : checkedLogicalPath(input, related.file.fileName);
-		const source = path === null ? undefined : sourceByPath.get(path);
-		const span = diagnosticSpan(related.start, related.length, source?.textLength);
-		return {
-			category: diagnosticCategory(related.category),
-			code: `TS${related.code}`,
-			...span,
-			message: diagnosticMessage(related.messageText, guard),
-			path
-		};
-	}
-
-	for (const familyInput of familyInputs) {
-		guard.check();
-		if (familyInput.state === 'FAILED' && familyInput.diagnostics.length > 0)
-			fail(
-				'INVALID_INPUT',
-				`Failed diagnostic family ${familyInput.family} cannot retain diagnostics.`
-			);
-		for (const diagnostic of familyInput.diagnostics) {
-			guard.check();
-			if (!Number.isSafeInteger(diagnostic.code) || diagnostic.code < 1)
-				fail('DIAGNOSTIC_INVALID', 'TypeScript returned an invalid diagnostic code.');
-			const path =
-				diagnostic.file === undefined ? null : checkedLogicalPath(input, diagnostic.file.fileName);
-			const source = path === null ? undefined : sourceByPath.get(path);
-			const span = diagnosticSpan(diagnostic.start, diagnostic.length, source?.textLength);
-			const message = diagnosticMessage(diagnostic.messageText, guard);
-			const related = (diagnostic.relatedInformation ?? [])
-				.map(relatedDiagnostic)
-				.sort((left, right) =>
-					compareStrings(canonicalSemanticJson(left), canonicalSemanticJson(right))
-				);
-			const characters =
-				messageCharacterCount(message) +
-				related.reduce((total, item) => total + messageCharacterCount(item.message), 0);
-			guard.addDiagnostic(characters);
-			pending.push({
-				category: diagnosticCategory(diagnostic.category),
-				code: `TS${diagnostic.code}`,
-				discoveryOrdinal,
-				...span,
-				family: familyInput.family,
-				locationKind: path === null ? 'NONE' : source === undefined ? 'PATH' : 'SOURCE',
-				message,
-				path,
-				related,
-				sourceOrdinal: source?.sourceOrdinal ?? null
-			});
-			discoveryOrdinal += 1;
-			guard.check();
-		}
-	}
+	const pending = collectPendingDiagnostics(input, familyInputs, sourceByPath, guard);
 
 	pending.sort((left, right) => {
 		const { discoveryOrdinal: _leftOrdinal, ...leftPayload } = left;
@@ -1570,11 +1732,38 @@ function projectRecord(
 	};
 }
 
-function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemanticProjectExtraction {
-	const guard = new ExtractionGuard(input);
-	guard.check();
-	const includeTypes = input.includeTypes ?? false;
-	const assignabilityRequests = input.assignabilityRequests ?? [];
+interface ProgramSourceEntry {
+	readonly logicalPath: string;
+	readonly sourceFile: ts.SourceFile;
+}
+
+interface DeepSourceEntry {
+	readonly sourceFile: ts.SourceFile;
+	readonly sourceOrdinal: number;
+}
+
+interface SourceAnalysisDisposition {
+	readonly analysisDisposition: RawSemanticSource['analysisDisposition'];
+	readonly artifactClass: RawSemanticSource['artifactClass'];
+	readonly artifactRoles: readonly RawSemanticSource['artifactRoles'][number][];
+}
+
+interface RawSourceCollection {
+	readonly deepSources: DeepSourceEntry[];
+	readonly sourceFilesByOrdinal: ts.SourceFile[];
+	readonly sources: RawSemanticSource[];
+}
+
+interface SourceSyntaxCollection {
+	readonly assignments: RawSemanticAssignment[];
+	readonly astNodes: RawSemanticAstNode[];
+	readonly declarationCandidates: RawSemanticDeclarationCandidate[];
+	readonly invocations: RawSemanticInvocation[];
+	readonly literals: RawSemanticLiteral[];
+	readonly syntaxBySourceOrdinal: Map<number, SourceSyntaxProjection>;
+}
+
+function validateStaticRawInput(input: ExtractStaticRawInput): void {
 	if (ts.version !== TYPESCRIPT_PROVIDER_VERSION)
 		fail(
 			'IDENTITY_MISMATCH',
@@ -1596,10 +1785,12 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 		fail('INVALID_INPUT', 'Static extraction requires a safe absolute deadline.');
 	if (typeof input.resolveCheckerContextDigest !== 'function')
 		fail('INVALID_INPUT', 'Static extraction requires a checker context digest resolver.');
-	if (assignabilityRequests.length > 0 && !includeTypes)
+	if ((input.assignabilityRequests ?? []).length > 0 && !(input.includeTypes ?? false))
 		fail('INVALID_INPUT', 'Assignability requests require TS_TYPE extraction.');
 	validateFamilyInputs(input.diagnosticFamilies);
+}
 
+function validateRecipePolicies(input: ExtractStaticRawInput, guard: ExtractionGuard): void {
 	try {
 		validateProgramRecipePolicy(input.programRecipe, input.budgets.maxPathCharacters);
 		guard.check();
@@ -1617,8 +1808,13 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 			message
 		);
 	}
-	const authoritativeRecipe = rawRecipe(input.programRecipe);
-	const projectRecipe = rawRecipe(input.project.programRecipe);
+}
+
+function assertProjectIdentity(
+	input: ExtractStaticRawInput,
+	authoritativeRecipe: RawSemanticProgramRecipe,
+	projectRecipe: RawSemanticProgramRecipe
+): void {
 	if (
 		canonicalSemanticJson(authoritativeRecipe) !== canonicalSemanticJson(projectRecipe) ||
 		input.projectKey !== input.project.configPath ||
@@ -1641,14 +1837,17 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 		...input.project.frameworkCandidates
 	])
 		checkedExistingLogicalPath(input, path);
+}
 
-	const recipeRoots = canonicalSet(input.programRecipe.rootNames);
+function assertProgramRoots(input: ExtractStaticRawInput, recipeRoots: readonly string[]): void {
 	const programRoots = canonicalSet(
 		input.program.getRootFileNames().map((path) => checkedLogicalPath(input, path))
 	);
 	if (!sameStrings(recipeRoots, programRoots))
 		fail('IDENTITY_MISMATCH', 'Program roots do not reproduce the authoritative ProgramRecipe.');
+}
 
+function resolveProgramSourceFiles(input: ExtractStaticRawInput): readonly ProgramSourceEntry[] {
 	const programSourceFiles = input.program
 		.getSourceFiles()
 		.map((sourceFile) => ({
@@ -1660,124 +1859,184 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 		new Set(programSourceFiles.map((entry) => entry.logicalPath)).size !== programSourceFiles.length
 	)
 		fail('PATH_MAPPING_FAILED', 'Two Program sources map to the same logical path.');
+	return programSourceFiles;
+}
 
-	const sources: RawSemanticSource[] = [];
-	const sourceFilesByOrdinal: ts.SourceFile[] = [];
-	const deepSources: { readonly sourceFile: ts.SourceFile; readonly sourceOrdinal: number }[] = [];
+function resolveSourceEvidence(
+	input: ExtractStaticRawInput,
+	entry: ProgramSourceEntry
+): RawCompilerSourceBinding {
+	let evidence: RawCompilerSourceBinding | undefined;
+	try {
+		evidence = input.resolveCompilerSource(entry.logicalPath);
+	} catch {
+		fail(
+			'SOURCE_EVIDENCE_MISSING',
+			'Compiler source-evidence resolution failed closed.',
+			entry.logicalPath
+		);
+	}
+	const requiredEvidenceState = input.evidenceState ?? 'VERIFIED_COMPILER_INPUT';
+	if (
+		evidence?.verificationState !== requiredEvidenceState ||
+		evidence.logicalPath !== entry.logicalPath
+	)
+		fail(
+			'SOURCE_EVIDENCE_MISSING',
+			requiredEvidenceState === 'VERIFIED_COMPILER_INPUT'
+				? 'Program source has no exact finalized and rechecked compiler-input evidence.'
+				: 'Capture projection source has no exact captured compiler-input evidence.',
+			entry.logicalPath
+		);
+	if (
+		!Number.isSafeInteger(evidence.bytes) ||
+		evidence.bytes < 0 ||
+		!/^[a-f0-9]{64}$/u.test(evidence.contentSha256) ||
+		evidence.mapping.reason.length === 0
+	)
+		fail(
+			'SOURCE_EVIDENCE_MISSING',
+			'Verified source evidence has invalid bounded metadata.',
+			entry.logicalPath
+		);
+	return evidence;
+}
+
+function frozenSourceDisposition(
+	evidence: RawCompilerSourceBinding,
+	logicalPath: string
+): SourceAnalysisDisposition {
+	if (
+		evidence.artifact?.disposition !== 'ANALYZED' ||
+		!evidence.artifact.roles.includes('COMPILER_CANDIDATE')
+	)
+		fail(
+			'SOURCE_POLICY_MISMATCH',
+			'Frozen Program source is not an analyzed compiler candidate.',
+			logicalPath
+		);
+	return {
+		analysisDisposition: 'DEEP_INDEXED',
+		artifactClass: evidence.artifact.primaryClass,
+		artifactRoles: canonicalSet(
+			evidence.artifact.roles
+		) as readonly RawSemanticSource['artifactRoles'][number][]
+	};
+}
+
+function liveSourceDisposition(
+	evidence: RawCompilerSourceBinding,
+	entry: ProgramSourceEntry,
+	recipeRoots: readonly string[]
+): SourceAnalysisDisposition {
+	if (evidence.artifact !== null)
+		fail(
+			'SOURCE_POLICY_MISMATCH',
+			'Live compiler context cannot claim a frozen artifact classification.',
+			entry.logicalPath
+		);
+	if (recipeRoots.includes(entry.logicalPath))
+		fail(
+			'SOURCE_POLICY_MISMATCH',
+			'A compiler root cannot be represented as live context-only input.',
+			entry.logicalPath
+		);
+	return { analysisDisposition: 'CONTEXT_ONLY', artifactClass: 'CONTEXT_ONLY', artifactRoles: [] };
+}
+
+function sourceDisposition(
+	evidence: RawCompilerSourceBinding,
+	entry: ProgramSourceEntry,
+	recipeRoots: readonly string[]
+): SourceAnalysisDisposition {
+	return evidence.byteBudgetClass === 'FROZEN_SUBJECT'
+		? frozenSourceDisposition(evidence, entry.logicalPath)
+		: liveSourceDisposition(evidence, entry, recipeRoots);
+}
+
+function sourceScriptKindName(scriptKind: ts.ScriptKind, logicalPath: string): string {
+	const scriptKindName = ts.ScriptKind[scriptKind];
+	if (typeof scriptKindName !== 'string')
+		fail(
+			'UNSUPPORTED_SYNTAX',
+			`Program source has unknown ScriptKind ${String(scriptKind)}.`,
+			logicalPath
+		);
+	return scriptKindName;
+}
+
+function buildRawSource(
+	entry: ProgramSourceEntry,
+	evidence: RawCompilerSourceBinding,
+	disposition: SourceAnalysisDisposition,
+	recipeRoots: readonly string[],
+	sourceOrdinal: number
+): RawSemanticSource {
+	const scriptKind = scriptKindFromLogicalPath(entry.logicalPath);
+	const scriptKindName = sourceScriptKindName(scriptKind, entry.logicalPath);
+	return {
+		analysisDisposition: disposition.analysisDisposition,
+		artifactClass: disposition.artifactClass,
+		artifactRoles: disposition.artifactRoles,
+		bytes: evidence.bytes,
+		contentSha256: evidence.contentSha256,
+		declarationFile: entry.sourceFile.isDeclarationFile,
+		languageVariant:
+			scriptKind === ts.ScriptKind.TSX || scriptKind === ts.ScriptKind.JSX ? 'JSX' : 'Standard',
+		logicalPath: entry.logicalPath,
+		mapping: { ...evidence.mapping },
+		moduleKind: ts.isExternalModule(entry.sourceFile) ? 'MODULE' : 'SCRIPT',
+		origin: evidence.origin,
+		rootFile:
+			disposition.analysisDisposition === 'DEEP_INDEXED' && recipeRoots.includes(entry.logicalPath),
+		rootNodeOrdinal: disposition.analysisDisposition === 'DEEP_INDEXED' ? 0 : null,
+		scriptKind,
+		scriptKindName,
+		sourceOrdinal,
+		textLength: entry.sourceFile.text.length
+	};
+}
+
+function collectRawSources(
+	input: ExtractStaticRawInput,
+	programSourceFiles: readonly ProgramSourceEntry[],
+	recipeRoots: readonly string[],
+	guard: ExtractionGuard
+): RawSourceCollection {
+	const collection: RawSourceCollection = {
+		deepSources: [],
+		sourceFilesByOrdinal: [],
+		sources: []
+	};
 	for (const entry of programSourceFiles) {
 		guard.addSource(entry.logicalPath);
-		let evidence: RawCompilerSourceBinding | undefined;
-		try {
-			evidence = input.resolveCompilerSource(entry.logicalPath);
-		} catch {
-			fail(
-				'SOURCE_EVIDENCE_MISSING',
-				'Compiler source-evidence resolution failed closed.',
-				entry.logicalPath
-			);
-		}
-		const requiredEvidenceState = input.evidenceState ?? 'VERIFIED_COMPILER_INPUT';
-		if (
-			evidence === undefined ||
-			evidence.verificationState !== requiredEvidenceState ||
-			evidence.logicalPath !== entry.logicalPath
-		)
-			fail(
-				'SOURCE_EVIDENCE_MISSING',
-				requiredEvidenceState === 'VERIFIED_COMPILER_INPUT'
-					? 'Program source has no exact finalized and rechecked compiler-input evidence.'
-					: 'Capture projection source has no exact captured compiler-input evidence.',
-				entry.logicalPath
-			);
-		if (
-			!Number.isSafeInteger(evidence.bytes) ||
-			evidence.bytes < 0 ||
-			!/^[a-f0-9]{64}$/u.test(evidence.contentSha256) ||
-			evidence.mapping.reason.length === 0
-		)
-			fail(
-				'SOURCE_EVIDENCE_MISSING',
-				'Verified source evidence has invalid bounded metadata.',
-				entry.logicalPath
-			);
-		const rootFile = recipeRoots.includes(entry.logicalPath);
-		let analysisDisposition: RawSemanticSource['analysisDisposition'];
-		let artifactClass: RawSemanticSource['artifactClass'];
-		let artifactRoles: readonly RawSemanticSource['artifactRoles'][number][];
-		if (evidence.byteBudgetClass === 'FROZEN_SUBJECT') {
-			if (
-				evidence.artifact === null ||
-				evidence.artifact.disposition !== 'ANALYZED' ||
-				!evidence.artifact.roles.includes('COMPILER_CANDIDATE')
-			)
-				fail(
-					'SOURCE_POLICY_MISMATCH',
-					'Frozen Program source is not an analyzed compiler candidate.',
-					entry.logicalPath
-				);
-			analysisDisposition = 'DEEP_INDEXED';
-			artifactClass = evidence.artifact.primaryClass;
-			artifactRoles = canonicalSet(
-				evidence.artifact.roles
-			) as readonly RawSemanticSource['artifactRoles'][number][];
-		} else {
-			if (evidence.artifact !== null)
-				fail(
-					'SOURCE_POLICY_MISMATCH',
-					'Live compiler context cannot claim a frozen artifact classification.',
-					entry.logicalPath
-				);
-			if (rootFile)
-				fail(
-					'SOURCE_POLICY_MISMATCH',
-					'A compiler root cannot be represented as live context-only input.',
-					entry.logicalPath
-				);
-			analysisDisposition = 'CONTEXT_ONLY';
-			artifactClass = 'CONTEXT_ONLY';
-			artifactRoles = [];
-		}
-		const scriptKind = scriptKindFromLogicalPath(entry.logicalPath);
-		const scriptKindName = ts.ScriptKind[scriptKind];
-		if (typeof scriptKindName !== 'string')
-			fail(
-				'UNSUPPORTED_SYNTAX',
-				`Program source has unknown ScriptKind ${String(scriptKind)}.`,
-				entry.logicalPath
-			);
-		const sourceOrdinal = sources.length;
-		sources.push({
-			analysisDisposition,
-			artifactClass,
-			artifactRoles,
-			bytes: evidence.bytes,
-			contentSha256: evidence.contentSha256,
-			declarationFile: entry.sourceFile.isDeclarationFile,
-			languageVariant:
-				scriptKind === ts.ScriptKind.TSX || scriptKind === ts.ScriptKind.JSX ? 'JSX' : 'Standard',
-			logicalPath: entry.logicalPath,
-			mapping: { ...evidence.mapping },
-			moduleKind: ts.isExternalModule(entry.sourceFile) ? 'MODULE' : 'SCRIPT',
-			origin: evidence.origin,
-			rootFile: analysisDisposition === 'DEEP_INDEXED' && rootFile,
-			rootNodeOrdinal: analysisDisposition === 'DEEP_INDEXED' ? 0 : null,
-			scriptKind,
-			scriptKindName,
-			sourceOrdinal,
-			textLength: entry.sourceFile.text.length
-		});
-		sourceFilesByOrdinal.push(entry.sourceFile);
-		if (analysisDisposition === 'DEEP_INDEXED')
-			deepSources.push({ sourceFile: entry.sourceFile, sourceOrdinal });
+		const evidence = resolveSourceEvidence(input, entry);
+		const disposition = sourceDisposition(evidence, entry, recipeRoots);
+		const sourceOrdinal = collection.sources.length;
+		collection.sources.push(
+			buildRawSource(entry, evidence, disposition, recipeRoots, sourceOrdinal)
+		);
+		collection.sourceFilesByOrdinal.push(entry.sourceFile);
+		if (disposition.analysisDisposition === 'DEEP_INDEXED')
+			collection.deepSources.push({ sourceFile: entry.sourceFile, sourceOrdinal });
 		guard.check();
 	}
+	return collection;
+}
 
-	const astNodes: RawSemanticAstNode[] = [];
-	const declarationCandidates: RawSemanticDeclarationCandidate[] = [];
-	const literals: RawSemanticLiteral[] = [];
-	const invocations: RawSemanticInvocation[] = [];
-	const assignments: RawSemanticAssignment[] = [];
-	const syntaxBySourceOrdinal = new Map<number, SourceSyntaxProjection>();
+function collectSourceSyntax(
+	input: ExtractStaticRawInput,
+	deepSources: readonly DeepSourceEntry[],
+	guard: ExtractionGuard
+): SourceSyntaxCollection {
+	const collection: SourceSyntaxCollection = {
+		assignments: [],
+		astNodes: [],
+		declarationCandidates: [],
+		invocations: [],
+		literals: [],
+		syntaxBySourceOrdinal: new Map()
+	};
 	for (const deepSource of deepSources) {
 		guard.check();
 		const projection = projectSourceSyntax(
@@ -1786,14 +2045,49 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 			guard,
 			input.budgets.maxLiteralCharacters
 		);
-		syntaxBySourceOrdinal.set(deepSource.sourceOrdinal, projection);
-		astNodes.push(...projection.nodes);
-		declarationCandidates.push(...projection.declarationCandidates);
-		literals.push(...projection.literals);
-		invocations.push(...projection.invocations);
-		assignments.push(...projection.assignments);
+		collection.syntaxBySourceOrdinal.set(deepSource.sourceOrdinal, projection);
+		collection.astNodes.push(...projection.nodes);
+		collection.declarationCandidates.push(...projection.declarationCandidates);
+		collection.literals.push(...projection.literals);
+		collection.invocations.push(...projection.invocations);
+		collection.assignments.push(...projection.assignments);
 		guard.check();
 	}
+	return collection;
+}
+
+function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemanticProjectExtraction {
+	const guard = new ExtractionGuard(input);
+	guard.check();
+	const includeTypes = input.includeTypes ?? false;
+	const assignabilityRequests = input.assignabilityRequests ?? [];
+	validateStaticRawInput(input);
+
+	validateRecipePolicies(input, guard);
+	const authoritativeRecipe = rawRecipe(input.programRecipe);
+	const projectRecipe = rawRecipe(input.project.programRecipe);
+	assertProjectIdentity(input, authoritativeRecipe, projectRecipe);
+
+	const recipeRoots = canonicalSet(input.programRecipe.rootNames);
+	assertProgramRoots(input, recipeRoots);
+
+	const programSourceFiles = resolveProgramSourceFiles(input);
+
+	const { deepSources, sourceFilesByOrdinal, sources } = collectRawSources(
+		input,
+		programSourceFiles,
+		recipeRoots,
+		guard
+	);
+
+	const {
+		assignments,
+		astNodes,
+		declarationCandidates,
+		invocations,
+		literals,
+		syntaxBySourceOrdinal
+	} = collectSourceSyntax(input, deepSources, guard);
 	const symbolProjection = extractTypeScriptSymbols({
 		assignabilityRequests,
 		checker: input.checker,
