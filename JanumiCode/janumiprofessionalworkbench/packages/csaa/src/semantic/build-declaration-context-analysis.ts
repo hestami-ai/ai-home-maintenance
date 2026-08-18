@@ -2113,8 +2113,7 @@ function bindDeclarationArtifact(
 	const logicalPath = session.toLogicalPath(sourceFile.fileName);
 	const source = bound.sourceByLogicalPath.get(logicalPath);
 	if (
-		source === undefined ||
-		source.analysisDisposition !== 'CONTEXT_ONLY' ||
+		source?.analysisDisposition !== 'CONTEXT_ONLY' ||
 		source.artifactClass !== 'CONTEXT_ONLY' ||
 		source.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
 		source.declarationFile !== true ||
@@ -3187,8 +3186,7 @@ function materializeParseWitnesses(
 		deadline.step();
 		const inputRecord = derived.evidence.inputRecords[parsedArtifact.parsed.inputRecordOrdinal];
 		if (
-			inputRecord === undefined ||
-			inputRecord.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
+			inputRecord?.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
 			inputRecord.query.operation !== 'READ_FILE' ||
 			inputRecord.query.logicalPath !== parsedArtifact.artifact.logicalPath ||
 			inputRecord.observation.operation !== 'READ_FILE' ||

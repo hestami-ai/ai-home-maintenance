@@ -571,9 +571,12 @@ function validateStaticSemanticSnapshotUnsafe(
 		'typeRelations',
 		'types'
 	] as const;
-	for (const name of arrayNames) {
-		if (!Array.isArray(value[name])) issue('INVALID_SHAPE', `$.${name}`, 'Expected an array.');
+	function checkInvalidShape(shape: Record<string, unknown>): void {
+		for (const name of arrayNames) {
+			if (!Array.isArray(shape[name])) issue('INVALID_SHAPE', `$.${name}`, 'Expected an array.');
+		}
 	}
+	checkInvalidShape(value);
 	if (issues.length > 0) return { issues, state: 'INVALID' };
 
 	const snapshot = value as unknown as StaticSemanticSnapshot;
@@ -781,121 +784,130 @@ function validateStaticSemanticSnapshotUnsafe(
 			state: 'BUDGET_EXHAUSTED'
 		};
 
-	if (snapshot.canonicalProfile !== SEMANTIC_CANONICAL_PROFILE)
-		issue('INVALID_VALUE', '$.canonicalProfile', 'Unexpected semantic canonical profile.');
-	if (snapshot.astTraversalProfile !== SEMANTIC_AST_TRAVERSAL_PROFILE)
-		issue('INVALID_VALUE', '$.astTraversalProfile', 'Unexpected AST traversal profile.');
-	if (snapshot.extractionVersion !== SEMANTIC_EXTRACTION_VERSION)
-		issue('INVALID_VALUE', '$.extractionVersion', 'Unexpected extraction version.');
-	if (snapshot.operationVersion !== SEMANTIC_OPERATION_VERSION)
-		issue('INVALID_VALUE', '$.operationVersion', 'Unexpected semantic operation version.');
-	if (snapshot.fullJanCsaa007Conformance !== FULL_JAN_CSAA_007_CONFORMANCE)
-		issue(
-			'CONFORMANCE_OVERCLAIM',
-			'$.fullJanCsaa007Conformance',
-			'Slice 3B must not claim full JAN-CSAA-007 conformance.'
-		);
-	if (
-		snapshot.provider.id !== 'typescript' ||
-		snapshot.provider.version !== TYPESCRIPT_PROVIDER_VERSION ||
-		snapshot.provider.api !== 'PUBLIC_COMPILER_API'
-	) {
-		issue(
-			'INVALID_VALUE',
-			'$.provider',
-			'Snapshot must bind the public TypeScript 5.9.3 Compiler API.'
-		);
-	}
-	if (!SHA256.test(snapshot.subjectId))
-		issue('INVALID_VALUE', '$.subjectId', 'Subject identity must be lowercase SHA-256.');
-	if (
-		!SEMANTIC_BUDGET_KEYS.every(
-			(key) => Number.isSafeInteger(snapshot.budgets[key]) && snapshot.budgets[key] > 0
+	function checkCanonicalProfile(): void {
+		if (snapshot.canonicalProfile !== SEMANTIC_CANONICAL_PROFILE)
+			issue('INVALID_VALUE', '$.canonicalProfile', 'Unexpected semantic canonical profile.');
+		if (snapshot.astTraversalProfile !== SEMANTIC_AST_TRAVERSAL_PROFILE)
+			issue('INVALID_VALUE', '$.astTraversalProfile', 'Unexpected AST traversal profile.');
+		if (snapshot.extractionVersion !== SEMANTIC_EXTRACTION_VERSION)
+			issue('INVALID_VALUE', '$.extractionVersion', 'Unexpected extraction version.');
+		if (snapshot.operationVersion !== SEMANTIC_OPERATION_VERSION)
+			issue('INVALID_VALUE', '$.operationVersion', 'Unexpected semantic operation version.');
+		if (snapshot.fullJanCsaa007Conformance !== FULL_JAN_CSAA_007_CONFORMANCE)
+			issue(
+				'CONFORMANCE_OVERCLAIM',
+				'$.fullJanCsaa007Conformance',
+				'Slice 3B must not claim full JAN-CSAA-007 conformance.'
+			);
+		if (
+			snapshot.provider.id !== 'typescript' ||
+			snapshot.provider.version !== TYPESCRIPT_PROVIDER_VERSION ||
+			snapshot.provider.api !== 'PUBLIC_COMPILER_API'
+		) {
+			issue(
+				'INVALID_VALUE',
+				'$.provider',
+				'Snapshot must bind the public TypeScript 5.9.3 Compiler API.'
+			);
+		}
+		if (!SHA256.test(snapshot.subjectId))
+			issue('INVALID_VALUE', '$.subjectId', 'Subject identity must be lowercase SHA-256.');
+		if (
+			!SEMANTIC_BUDGET_KEYS.every(
+				(key) => Number.isSafeInteger(snapshot.budgets[key]) && snapshot.budgets[key] > 0
+			)
 		)
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets',
-			'Snapshot extraction budgets must be positive safe integers.'
-		);
-	if (canonicalBytes > snapshot.budgets.maxSnapshotBytes)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxSnapshotBytes',
-			'Canonical snapshot UTF-8 bytes exceed the producing extraction budget.'
-		);
-	if (snapshot.projects.length > snapshot.budgets.maxProjects)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxProjects',
-			'Retained project count exceeds the producing extraction budget.'
-		);
-	if (snapshot.sources.length > snapshot.budgets.maxSources)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxSources',
-			'Retained source count exceeds the producing extraction budget.'
-		);
-	if (snapshot.scopes.length > snapshot.budgets.maxScopes)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxScopes',
-			'Retained lexical-scope count exceeds the producing extraction budget.'
-		);
-	if (snapshot.astNodes.length > snapshot.budgets.maxAstNodes)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxAstNodes',
-			'Retained AST-node count exceeds the producing extraction budget.'
-		);
+			issue(
+				'INVALID_VALUE',
+				'$.budgets',
+				'Snapshot extraction budgets must be positive safe integers.'
+			);
+		if (canonicalBytes > snapshot.budgets.maxSnapshotBytes)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxSnapshotBytes',
+				'Canonical snapshot UTF-8 bytes exceed the producing extraction budget.'
+			);
+		if (snapshot.projects.length > snapshot.budgets.maxProjects)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxProjects',
+				'Retained project count exceeds the producing extraction budget.'
+			);
+		if (snapshot.sources.length > snapshot.budgets.maxSources)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxSources',
+				'Retained source count exceeds the producing extraction budget.'
+			);
+		if (snapshot.scopes.length > snapshot.budgets.maxScopes)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxScopes',
+				'Retained lexical-scope count exceeds the producing extraction budget.'
+			);
+		if (snapshot.astNodes.length > snapshot.budgets.maxAstNodes)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxAstNodes',
+				'Retained AST-node count exceeds the producing extraction budget.'
+			);
+	}
+	checkCanonicalProfile();
 	const diagnosticOccurrences = snapshot.diagnostics.reduce(
 		(total, diagnostic) => total + diagnostic.multiplicity,
 		0
 	);
-	if (
-		!Number.isSafeInteger(diagnosticOccurrences) ||
-		diagnosticOccurrences > snapshot.budgets.maxDiagnostics
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxDiagnostics',
-			'Retained diagnostic occurrence count exceeds the producing extraction budget.'
-		);
+	function checkBudgetsMaxDiagnostics(): void {
+		if (
+			!Number.isSafeInteger(diagnosticOccurrences) ||
+			diagnosticOccurrences > snapshot.budgets.maxDiagnostics
+		)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxDiagnostics',
+				'Retained diagnostic occurrence count exceeds the producing extraction budget.'
+			);
+	}
+	checkBudgetsMaxDiagnostics();
 	let diagnosticCharacters = 0;
 	let diagnosticCharactersOverflow = false;
-	for (const diagnostic of snapshot.diagnostics) {
-		const perOccurrence =
-			diagnosticMessageCharacterCount(diagnostic.message) +
-			diagnostic.related.reduce(
-				(total, related) => total + diagnosticMessageCharacterCount(related.message),
-				0
-			);
-		const contribution = perOccurrence * diagnostic.multiplicity;
-		if (
-			!Number.isSafeInteger(perOccurrence) ||
-			!Number.isSafeInteger(contribution) ||
-			!Number.isSafeInteger(diagnosticCharacters + contribution)
-		) {
-			diagnosticCharactersOverflow = true;
-			break;
+	function validateDiagnostics(): void {
+		for (const diagnostic of snapshot.diagnostics) {
+			const perOccurrence =
+				diagnosticMessageCharacterCount(diagnostic.message) +
+				diagnostic.related.reduce(
+					(total, related) => total + diagnosticMessageCharacterCount(related.message),
+					0
+				);
+			const contribution = perOccurrence * diagnostic.multiplicity;
+			if (
+				!Number.isSafeInteger(perOccurrence) ||
+				!Number.isSafeInteger(contribution) ||
+				!Number.isSafeInteger(diagnosticCharacters + contribution)
+			) {
+				diagnosticCharactersOverflow = true;
+				break;
+			}
+			diagnosticCharacters += contribution;
 		}
-		diagnosticCharacters += contribution;
+		if (
+			diagnosticCharactersOverflow ||
+			diagnosticCharacters > snapshot.budgets.maxDiagnosticCharacters
+		)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxDiagnosticCharacters',
+				'Retained diagnostic-message characters exceed the producing extraction budget.'
+			);
+		if (snapshot.compilerInputs.length > snapshot.budgets.maxCompilerQueries)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxCompilerQueries',
+				'Captured compiler query count exceeds the producing extraction budget.'
+			);
 	}
-	if (
-		diagnosticCharactersOverflow ||
-		diagnosticCharacters > snapshot.budgets.maxDiagnosticCharacters
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxDiagnosticCharacters',
-			'Retained diagnostic-message characters exceed the producing extraction budget.'
-		);
-	if (snapshot.compilerInputs.length > snapshot.budgets.maxCompilerQueries)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxCompilerQueries',
-			'Captured compiler query count exceeds the producing extraction budget.'
-		);
+	validateDiagnostics();
 	const compilerFactCount =
 		snapshot.aliases.length +
 		snapshot.declarations.length +
@@ -909,115 +921,133 @@ function validateStaticSemanticSnapshotUnsafe(
 		snapshot.typeParameters.length +
 		snapshot.typeRelations.length +
 		snapshot.types.length;
-	if (compilerFactCount > snapshot.budgets.maxCompilerFacts)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxCompilerFacts',
-			'Retained compiler fact count exceeds the producing compiler-fact budget.'
-		);
+	function checkBudgetsMaxCompilerFacts(): void {
+		if (compilerFactCount > snapshot.budgets.maxCompilerFacts)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxCompilerFacts',
+				'Retained compiler fact count exceeds the producing compiler-fact budget.'
+			);
+	}
+	checkBudgetsMaxCompilerFacts();
 	const compilerQueryInvocations = snapshot.compilerInputs.reduce(
 		(total, observation) => total + observation.invocationCount,
 		0
 	);
-	if (
-		!Number.isSafeInteger(compilerQueryInvocations) ||
-		compilerQueryInvocations > snapshot.budgets.maxCompilerQueryInvocations
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxCompilerQueryInvocations',
-			'Captured compiler query invocation count exceeds the producing extraction budget.'
-		);
+	function checkBudgetsMaxCompilerQueryInvocations(): void {
+		if (
+			!Number.isSafeInteger(compilerQueryInvocations) ||
+			compilerQueryInvocations > snapshot.budgets.maxCompilerQueryInvocations
+		)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxCompilerQueryInvocations',
+				'Captured compiler query invocation count exceeds the producing extraction budget.'
+			);
+	}
+	checkBudgetsMaxCompilerQueryInvocations();
 	const liveContextReadsByPath = new Map<
 		string,
 		Extract<CompilerInputObservation, { operation: 'READ_FILE'; result: 'PRESENT' }>
 	>();
-	for (const observation of snapshot.compilerInputs)
-		if (
-			observation.operation === 'READ_FILE' &&
-			observation.result === 'PRESENT' &&
-			observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT' &&
-			!liveContextReadsByPath.has(observation.logicalPath)
-		)
-			liveContextReadsByPath.set(observation.logicalPath, observation);
-	if (liveContextReadsByPath.size > snapshot.budgets.maxContextFiles)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxContextFiles',
-			'Captured live compiler-context file count exceeds the producing extraction budget.'
-		);
+	function validateCompilerInputs(): void {
+		for (const observation of snapshot.compilerInputs)
+			if (
+				observation.operation === 'READ_FILE' &&
+				observation.result === 'PRESENT' &&
+				observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT' &&
+				!liveContextReadsByPath.has(observation.logicalPath)
+			)
+				liveContextReadsByPath.set(observation.logicalPath, observation);
+		if (liveContextReadsByPath.size > snapshot.budgets.maxContextFiles)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxContextFiles',
+				'Captured live compiler-context file count exceeds the producing extraction budget.'
+			);
+	}
+	validateCompilerInputs();
 	const contextBytes = [...liveContextReadsByPath.values()].reduce(
 		(total, observation) => total + observation.contentBytes,
 		0
 	);
-	if (!Number.isSafeInteger(contextBytes) || contextBytes > snapshot.budgets.maxContextBytes)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxContextBytes',
-			'Captured compiler-context bytes exceed the producing extraction budget.'
-		);
-	for (const [index, observation] of snapshot.compilerInputs.entries()) {
-		if (
-			observation.operation === 'READ_FILE' &&
-			observation.result === 'PRESENT' &&
-			observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT' &&
-			observation.contentBytes > snapshot.budgets.maxContextFileBytes
-		)
+	function checkBudgetsMaxContextBytes(): void {
+		if (!Number.isSafeInteger(contextBytes) || contextBytes > snapshot.budgets.maxContextBytes)
 			issue(
 				'INVALID_VALUE',
-				`$.compilerInputs[${index}].contentBytes`,
-				'Captured live compiler-context file exceeds the per-file producing extraction budget.'
+				'$.budgets.maxContextBytes',
+				'Captured compiler-context bytes exceed the producing extraction budget.'
 			);
+		for (const [index, observation] of snapshot.compilerInputs.entries()) {
+			if (
+				observation.operation === 'READ_FILE' &&
+				observation.result === 'PRESENT' &&
+				observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT' &&
+				observation.contentBytes > snapshot.budgets.maxContextFileBytes
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.compilerInputs[${index}].contentBytes`,
+					'Captured live compiler-context file exceeds the per-file producing extraction budget.'
+				);
+		}
 	}
+	checkBudgetsMaxContextBytes();
 	const directoryEntryCount = snapshot.compilerInputs.reduce(
 		(total, observation) =>
 			total + ('scannedEntries' in observation ? observation.scannedEntries : 0),
 		0
 	);
-	if (
-		!Number.isSafeInteger(directoryEntryCount) ||
-		directoryEntryCount > snapshot.budgets.maxDirectoryEntries
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxDirectoryEntries',
-			'Captured directory entries exceed the total producing extraction budget.'
-		);
+	function checkBudgetsMaxDirectoryEntries(): void {
+		if (
+			!Number.isSafeInteger(directoryEntryCount) ||
+			directoryEntryCount > snapshot.budgets.maxDirectoryEntries
+		)
+			issue(
+				'INVALID_VALUE',
+				'$.budgets.maxDirectoryEntries',
+				'Captured directory entries exceed the total producing extraction budget.'
+			);
+	}
+	checkBudgetsMaxDirectoryEntries();
 	const compilerInputMetadataBytes = Buffer.byteLength(
 		canonicalSemanticJson(snapshot.compilerInputs),
 		'utf8'
 	);
-	if (compilerInputMetadataBytes > snapshot.budgets.maxCompilerInputMetadataBytes)
-		issue(
-			'INVALID_VALUE',
-			'$.budgets.maxCompilerInputMetadataBytes',
-			'Captured compiler-input metadata exceeds the producing extraction budget.'
-		);
-	if (
-		!SHA256.test(snapshot.contextDigest) ||
-		snapshot.contextDigest !== compilerInputClosureDigest(snapshot.compilerInputs)
-	)
-		issue(
-			'IDENTITY_MISMATCH',
-			'$.contextDigest',
-			'Context digest must bind the exact compiler-input observation closure.'
-		);
-	if (!isCanonicalSet(snapshot.limitations.map(limitationKey)))
-		issue('NONCANONICAL_ORDER', '$.limitations', 'Snapshot limitations must be a canonical set.');
-	for (const [index, limitation] of snapshot.limitations.entries()) {
-		if (limitation.reason.length === 0 || limitation.region.length === 0)
+	function checkBudgetsMaxCompilerInputMetadataBytes(): void {
+		if (compilerInputMetadataBytes > snapshot.budgets.maxCompilerInputMetadataBytes)
 			issue(
 				'INVALID_VALUE',
-				`$.limitations[${index}]`,
-				'Structured limitation reason and region must be non-empty.'
+				'$.budgets.maxCompilerInputMetadataBytes',
+				'Captured compiler-input metadata exceeds the producing extraction budget.'
 			);
-		if (limitation.closureEffect === 'FATAL')
+		if (
+			!SHA256.test(snapshot.contextDigest) ||
+			snapshot.contextDigest !== compilerInputClosureDigest(snapshot.compilerInputs)
+		)
 			issue(
-				'INVALID_VALUE',
-				`$.limitations[${index}].closureEffect`,
-				'A snapshot containing a fatal closure failure must not be emitted.'
+				'IDENTITY_MISMATCH',
+				'$.contextDigest',
+				'Context digest must bind the exact compiler-input observation closure.'
 			);
+		if (!isCanonicalSet(snapshot.limitations.map(limitationKey)))
+			issue('NONCANONICAL_ORDER', '$.limitations', 'Snapshot limitations must be a canonical set.');
+		for (const [index, limitation] of snapshot.limitations.entries()) {
+			if (limitation.reason.length === 0 || limitation.region.length === 0)
+				issue(
+					'INVALID_VALUE',
+					`$.limitations[${index}]`,
+					'Structured limitation reason and region must be non-empty.'
+				);
+			if (limitation.closureEffect === 'FATAL')
+				issue(
+					'INVALID_VALUE',
+					`$.limitations[${index}].closureEffect`,
+					'A snapshot containing a fatal closure failure must not be emitted.'
+				);
+		}
 	}
+	checkBudgetsMaxCompilerInputMetadataBytes();
 	const multiProgram = snapshot.programs.length > 1;
 	const typeRequested = snapshot.requestedCapabilities.includes('TS_TYPE');
 	const programBoundaryLimitations = snapshot.limitations.filter(
@@ -1025,174 +1055,195 @@ function validateStaticSemanticSnapshotUnsafe(
 			limitation.capability === 'TS_SYMBOL' &&
 			limitation.region === MULTI_PROGRAM_TS_SYMBOL_LIMITATION.region
 	);
-	if (
-		multiProgram &&
-		(programBoundaryLimitations.length !== 1 ||
-			!isMultiProgramTsSymbolLimitation(programBoundaryLimitations[0]!))
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.limitations',
-			'Multi-Program snapshots require the exact canonical TS_SYMBOL Program-boundary limitation once.'
-		);
-	if (!multiProgram && programBoundaryLimitations.length > 0)
-		issue(
-			'INVALID_VALUE',
-			'$.limitations',
-			'The TS_SYMBOL Program-boundary limitation is forbidden unless the snapshot contains multiple Programs.'
-		);
+	function checkLimitations(): void {
+		if (
+			multiProgram &&
+			(programBoundaryLimitations.length !== 1 ||
+				!isMultiProgramTsSymbolLimitation(programBoundaryLimitations[0]!))
+		)
+			issue(
+				'INVALID_VALUE',
+				'$.limitations',
+				'Multi-Program snapshots require the exact canonical TS_SYMBOL Program-boundary limitation once.'
+			);
+		if (!multiProgram && programBoundaryLimitations.length > 0)
+			issue(
+				'INVALID_VALUE',
+				'$.limitations',
+				'The TS_SYMBOL Program-boundary limitation is forbidden unless the snapshot contains multiple Programs.'
+			);
+	}
+	checkLimitations();
 	const typeProgramBoundaryLimitations = snapshot.limitations.filter(
 		(limitation) =>
 			limitation.capability === 'TS_TYPE' &&
 			limitation.region === MULTI_PROGRAM_TS_TYPE_LIMITATION.region
 	);
-	if (
-		multiProgram &&
-		typeRequested &&
-		(typeProgramBoundaryLimitations.length !== 1 ||
-			!isMultiProgramTsTypeLimitation(typeProgramBoundaryLimitations[0]!))
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.limitations',
-			'Multi-Program TS_TYPE snapshots require the exact canonical TS_TYPE Program-boundary limitation once.'
-		);
-	if ((!multiProgram || !typeRequested) && typeProgramBoundaryLimitations.length > 0)
-		issue(
-			'INVALID_VALUE',
-			'$.limitations',
-			'The TS_TYPE Program-boundary limitation is forbidden unless TS_TYPE is requested for multiple Programs.'
-		);
-
-	const requested = [...snapshot.requestedCapabilities];
-	if (!isCanonicalSet(requested))
-		issue(
-			'NONCANONICAL_ORDER',
-			'$.requestedCapabilities',
-			'Requested capabilities must be unique and canonically ordered.'
-		);
-	for (const capability of requested)
-		if (!CAPABILITIES.includes(capability))
+	function checkLimitations2(): void {
+		if (
+			multiProgram &&
+			typeRequested &&
+			(typeProgramBoundaryLimitations.length !== 1 ||
+				!isMultiProgramTsTypeLimitation(typeProgramBoundaryLimitations[0]!))
+		)
 			issue(
 				'INVALID_VALUE',
-				'$.requestedCapabilities',
-				`Unknown capability ${String(capability)}.`
+				'$.limitations',
+				'Multi-Program TS_TYPE snapshots require the exact canonical TS_TYPE Program-boundary limitation once.'
 			);
+		if ((!multiProgram || !typeRequested) && typeProgramBoundaryLimitations.length > 0)
+			issue(
+				'INVALID_VALUE',
+				'$.limitations',
+				'The TS_TYPE Program-boundary limitation is forbidden unless TS_TYPE is requested for multiple Programs.'
+			);
+	}
+	checkLimitations2();
+
+	const requested = [...snapshot.requestedCapabilities];
+	function checkRequestedCapabilities(): void {
+		if (!isCanonicalSet(requested))
+			issue(
+				'NONCANONICAL_ORDER',
+				'$.requestedCapabilities',
+				'Requested capabilities must be unique and canonically ordered.'
+			);
+		for (const capability of requested)
+			if (!CAPABILITIES.includes(capability))
+				issue(
+					'INVALID_VALUE',
+					'$.requestedCapabilities',
+					`Unknown capability ${String(capability)}.`
+				);
+	}
+	checkRequestedCapabilities();
 	const expectedRequestedCapabilities = typeRequested
 		? ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE']
 		: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'];
-	if (!sameMembers(requested, expectedRequestedCapabilities))
-		issue(
-			'INVALID_VALUE',
-			'$.requestedCapabilities',
-			'TS_TYPE may be requested only atop the required TS_PROJECT, TS_SYMBOL, and TS_SYNTAX prerequisite closure.'
-		);
+	function checkRequestedCapabilities2(): void {
+		if (!sameMembers(requested, expectedRequestedCapabilities))
+			issue(
+				'INVALID_VALUE',
+				'$.requestedCapabilities',
+				'TS_TYPE may be requested only atop the required TS_PROJECT, TS_SYMBOL, and TS_SYNTAX prerequisite closure.'
+			);
+	}
+	checkRequestedCapabilities2();
 	const assignabilityRequestIds = snapshot.assignabilityRequests.map(
 		(request) => request.requestId
 	);
-	if (
-		new Set(assignabilityRequestIds).size !== assignabilityRequestIds.length ||
-		!checkCanonicalOrder(assignabilityRequestIds)
-	)
-		issue(
-			'NONCANONICAL_ORDER',
-			'$.assignabilityRequests',
-			'Assignability requests must have unique identities and be canonically ordered by request identity.'
-		);
-	if (!typeRequested && snapshot.assignabilityRequests.length > 0)
-		issue(
-			'CONFORMANCE_OVERCLAIM',
-			'$.assignabilityRequests',
-			'Assignability requests require the TS_TYPE capability.'
-		);
+	function checkAssignabilityRequests(): void {
+		if (
+			new Set(assignabilityRequestIds).size !== assignabilityRequestIds.length ||
+			!checkCanonicalOrder(assignabilityRequestIds)
+		)
+			issue(
+				'NONCANONICAL_ORDER',
+				'$.assignabilityRequests',
+				'Assignability requests must have unique identities and be canonically ordered by request identity.'
+			);
+		if (!typeRequested && snapshot.assignabilityRequests.length > 0)
+			issue(
+				'CONFORMANCE_OVERCLAIM',
+				'$.assignabilityRequests',
+				'Assignability requests require the TS_TYPE capability.'
+			);
+	}
+	checkAssignabilityRequests();
 	const typeQueryModes = new Set([
 		'TYPE_AT_LOCATION',
 		'TYPE_FROM_TYPE_NODE',
 		'DECLARED_SYMBOL_TYPE',
 		'VALUE_SYMBOL_TYPE_AT_LOCATION'
 	]);
-	for (const [requestIndex, request] of snapshot.assignabilityRequests.entries()) {
-		const requestPath = `$.assignabilityRequests[${requestIndex}]`;
-		if (
-			request.requestId.length === 0 ||
-			request.requesterRef.length === 0 ||
-			!isUnicodeScalarString(request.requestId) ||
-			!isUnicodeScalarString(request.requesterRef)
-		)
-			issue(
-				'INVALID_VALUE',
-				requestPath,
-				'Assignability request identity and requester reference must be non-empty Unicode-scalar strings.'
-			);
-		for (const selectorName of ['source', 'target'] as const) {
-			const selector = request[selectorName];
-			const selectorPath = `${requestPath}.${selectorName}`;
-			path(selector.logicalPath, `${selectorPath}.logicalPath`);
+	function validateAssignabilityRequests(): void {
+		for (const [requestIndex, request] of snapshot.assignabilityRequests.entries()) {
+			const requestPath = `$.assignabilityRequests[${requestIndex}]`;
 			if (
-				!Number.isSafeInteger(selector.start) ||
-				!Number.isSafeInteger(selector.end) ||
-				selector.start < 0 ||
-				selector.end < selector.start ||
-				!Number.isSafeInteger(selector.syntaxKind) ||
-				typescriptSyntaxKindName(selector.syntaxKind) === null ||
-				!typeQueryModes.has(selector.queryMode)
+				request.requestId.length === 0 ||
+				request.requesterRef.length === 0 ||
+				!isUnicodeScalarString(request.requestId) ||
+				!isUnicodeScalarString(request.requesterRef)
 			)
 				issue(
 					'INVALID_VALUE',
-					selectorPath,
-					'Type selector must use a canonical logical path, valid UTF-16 span, public SyntaxKind, and closed query mode.'
+					requestPath,
+					'Assignability request identity and requester reference must be non-empty Unicode-scalar strings.'
 				);
+			for (const selectorName of ['source', 'target'] as const) {
+				const selector = request[selectorName];
+				const selectorPath = `${requestPath}.${selectorName}`;
+				path(selector.logicalPath, `${selectorPath}.logicalPath`);
+				if (
+					!Number.isSafeInteger(selector.start) ||
+					!Number.isSafeInteger(selector.end) ||
+					selector.start < 0 ||
+					selector.end < selector.start ||
+					!Number.isSafeInteger(selector.syntaxKind) ||
+					typescriptSyntaxKindName(selector.syntaxKind) === null ||
+					!typeQueryModes.has(selector.queryMode)
+				)
+					issue(
+						'INVALID_VALUE',
+						selectorPath,
+						'Type selector must use a canonical logical path, valid UTF-16 span, public SyntaxKind, and closed query mode.'
+					);
+			}
 		}
+		for (const [index, limitation] of snapshot.limitations.entries())
+			if (limitation.closureEffect !== 'NONE' && !requested.includes(limitation.capability))
+				issue(
+					'INVALID_VALUE',
+					`$.limitations[${index}]`,
+					'A closure-degrading limitation must name a requested capability.'
+				);
 	}
-	for (const [index, limitation] of snapshot.limitations.entries())
-		if (limitation.closureEffect !== 'NONE' && !requested.includes(limitation.capability))
-			issue(
-				'INVALID_VALUE',
-				`$.limitations[${index}]`,
-				'A closure-degrading limitation must name a requested capability.'
-			);
+	validateAssignabilityRequests();
 	const capabilityNames = snapshot.capabilities.map((entry) => entry.capability);
-	if (
-		!sameMembers(capabilityNames, CAPABILITIES) ||
-		new Set(capabilityNames).size !== CAPABILITIES.length ||
-		!isCanonicalSet(capabilityNames)
-	)
-		issue(
-			'INVALID_VALUE',
-			'$.capabilities',
-			'Capability records must cover all four semantic capability values exactly once in canonical order.'
-		);
-	for (const entry of snapshot.capabilities) {
-		if (entry.reason.length === 0)
-			issue(
-				'INVALID_VALUE',
-				'$.capabilities',
-				`${entry.capability} requires a non-empty support reason.`
-			);
+	function checkCapabilities(): void {
 		if (
-			entry.capability === 'TS_TYPE' &&
-			(typeRequested ? entry.state === 'UNSUPPORTED' : entry.state !== 'UNSUPPORTED')
+			!sameMembers(capabilityNames, CAPABILITIES) ||
+			new Set(capabilityNames).size !== CAPABILITIES.length ||
+			!isCanonicalSet(capabilityNames)
 		)
 			issue(
-				'CONFORMANCE_OVERCLAIM',
-				'$.capabilities',
-				typeRequested
-					? 'Requested TS_TYPE capability must be SUPPORTED or PARTIAL.'
-					: 'Unrequested TS_TYPE capability must remain UNSUPPORTED.'
-			);
-		if (
-			(entry.capability === 'TS_PROJECT' ||
-				entry.capability === 'TS_SYMBOL' ||
-				entry.capability === 'TS_SYNTAX') &&
-			entry.state === 'UNSUPPORTED'
-		) {
-			issue(
 				'INVALID_VALUE',
 				'$.capabilities',
-				`${entry.capability} is part of the implemented Slice 3B surface.`
+				'Capability records must cover all four semantic capability values exactly once in canonical order.'
 			);
+		for (const entry of snapshot.capabilities) {
+			if (entry.reason.length === 0)
+				issue(
+					'INVALID_VALUE',
+					'$.capabilities',
+					`${entry.capability} requires a non-empty support reason.`
+				);
+			if (
+				entry.capability === 'TS_TYPE' &&
+				(typeRequested ? entry.state === 'UNSUPPORTED' : entry.state !== 'UNSUPPORTED')
+			)
+				issue(
+					'CONFORMANCE_OVERCLAIM',
+					'$.capabilities',
+					typeRequested
+						? 'Requested TS_TYPE capability must be SUPPORTED or PARTIAL.'
+						: 'Unrequested TS_TYPE capability must remain UNSUPPORTED.'
+				);
+			if (
+				(entry.capability === 'TS_PROJECT' ||
+					entry.capability === 'TS_SYMBOL' ||
+					entry.capability === 'TS_SYNTAX') &&
+				entry.state === 'UNSUPPORTED'
+			) {
+				issue(
+					'INVALID_VALUE',
+					'$.capabilities',
+					`${entry.capability} is part of the implemented Slice 3B surface.`
+				);
+			}
 		}
 	}
+	checkCapabilities();
 
 	const snapshotIdentity = semanticSnapshotId({
 		assignabilityRequests: snapshot.assignabilityRequests,
@@ -1211,15 +1262,18 @@ function validateStaticSemanticSnapshotUnsafe(
 		schemaVersion: snapshot.schemaVersion,
 		subjectId: snapshot.subjectId
 	});
-	if (
-		!hasSemanticIdPrefix(snapshot.id, 'static', 'ts-snapshot') ||
-		snapshot.id !== snapshotIdentity
-	)
-		issue(
-			'IDENTITY_MISMATCH',
-			'$.id',
-			'Snapshot identity does not match its semantic input projection.'
-		);
+	function checkId(): void {
+		if (
+			!hasSemanticIdPrefix(snapshot.id, 'static', 'ts-snapshot') ||
+			snapshot.id !== snapshotIdentity
+		)
+			issue(
+				'IDENTITY_MISMATCH',
+				'$.id',
+				'Snapshot identity does not match its semantic input projection.'
+			);
+	}
+	checkId();
 
 	function idsAt(
 		records: readonly unknown[],
@@ -1247,8 +1301,11 @@ function validateStaticSemanticSnapshotUnsafe(
 
 	const projectIds = idsAt(snapshot.projects, '$.projects', 'semantic', 'project');
 	const programIds = idsAt(snapshot.programs, '$.programs', 'semantic', 'program');
-	idsAt(snapshot.sources, '$.sources', 'semantic', 'source');
-	idsAt(snapshot.scopes, '$.scopes', 'semantic', 'scope');
+	function checkSources(): void {
+		idsAt(snapshot.sources, '$.sources', 'semantic', 'source');
+		idsAt(snapshot.scopes, '$.scopes', 'semantic', 'scope');
+	}
+	checkSources();
 	const nodeIds = idsAt(snapshot.astNodes, '$.astNodes', 'semantic', 'node');
 	const declarationCandidateIds = idsAt(
 		snapshot.declarationCandidates,
@@ -1256,10 +1313,16 @@ function validateStaticSemanticSnapshotUnsafe(
 		'semantic',
 		'decl-candidate'
 	);
-	idsAt(snapshot.declarations, '$.declarations', 'semantic', 'declaration');
+	function checkDeclarations(): void {
+		idsAt(snapshot.declarations, '$.declarations', 'semantic', 'declaration');
+	}
+	checkDeclarations();
 	const symbolIds = idsAt(snapshot.symbols, '$.symbols', 'semantic', 'symbol');
 	const aliasIds = idsAt(snapshot.aliases, '$.aliases', 'semantic', 'alias');
-	idsAt(snapshot.references, '$.references', 'semantic', 'reference');
+	function checkReferences(): void {
+		idsAt(snapshot.references, '$.references', 'semantic', 'reference');
+	}
+	checkReferences();
 	const moduleResolutionIds = idsAt(
 		snapshot.moduleResolutions,
 		'$.moduleResolutions',
@@ -1302,52 +1365,55 @@ function validateStaticSemanticSnapshotUnsafe(
 		'analysis',
 		'context-input'
 	);
-	if (
-		!snapshot.requestedCapabilities.includes('TS_SYNTAX') &&
-		snapshot.astNodes.length +
-			snapshot.declarationCandidates.length +
-			snapshot.literals.length +
-			snapshot.invocations.length +
-			snapshot.assignments.length >
-			0
-	)
-		issue(
-			'CONFORMANCE_OVERCLAIM',
-			'$',
-			'TS_SYNTAX records cannot be emitted when syntax was not requested.'
-		);
-	if (
-		!snapshot.requestedCapabilities.includes('TS_SYMBOL') &&
-		snapshot.scopes.length +
-			snapshot.declarations.length +
-			snapshot.symbols.length +
-			snapshot.aliases.length +
-			snapshot.references.length +
-			snapshot.moduleResolutions.length +
-			snapshot.moduleExports.length >
-			0
-	)
-		issue(
-			'CONFORMANCE_OVERCLAIM',
-			'$',
-			'TS_SYMBOL records cannot be emitted when symbol analysis was not requested.'
-		);
-	if (
-		!typeRequested &&
-		snapshot.assignabilityRequests.length +
-			snapshot.overloadSets.length +
-			snapshot.signatureParameters.length +
-			snapshot.signatures.length +
-			snapshot.typeParameters.length +
-			snapshot.typeRelations.length +
-			snapshot.types.length >
-			0
-	)
-		issue(
-			'CONFORMANCE_OVERCLAIM',
-			'$',
-			'TS_TYPE requests and records cannot be emitted when type analysis was not requested.'
-		);
+	function checkConformanceOverclaim(): void {
+		if (
+			!snapshot.requestedCapabilities.includes('TS_SYNTAX') &&
+			snapshot.astNodes.length +
+				snapshot.declarationCandidates.length +
+				snapshot.literals.length +
+				snapshot.invocations.length +
+				snapshot.assignments.length >
+				0
+		)
+			issue(
+				'CONFORMANCE_OVERCLAIM',
+				'$',
+				'TS_SYNTAX records cannot be emitted when syntax was not requested.'
+			);
+		if (
+			!snapshot.requestedCapabilities.includes('TS_SYMBOL') &&
+			snapshot.scopes.length +
+				snapshot.declarations.length +
+				snapshot.symbols.length +
+				snapshot.aliases.length +
+				snapshot.references.length +
+				snapshot.moduleResolutions.length +
+				snapshot.moduleExports.length >
+				0
+		)
+			issue(
+				'CONFORMANCE_OVERCLAIM',
+				'$',
+				'TS_SYMBOL records cannot be emitted when symbol analysis was not requested.'
+			);
+		if (
+			!typeRequested &&
+			snapshot.assignabilityRequests.length +
+				snapshot.overloadSets.length +
+				snapshot.signatureParameters.length +
+				snapshot.signatures.length +
+				snapshot.typeParameters.length +
+				snapshot.typeRelations.length +
+				snapshot.types.length >
+				0
+		)
+			issue(
+				'CONFORMANCE_OVERCLAIM',
+				'$',
+				'TS_TYPE requests and records cannot be emitted when type analysis was not requested.'
+			);
+	}
+	checkConformanceOverclaim();
 	const projectById = indexBy(snapshot.projects, (record) => record.id);
 	const projectByConfigPath = indexBy(snapshot.projects, (record) => record.configPath);
 	const programById = indexBy(snapshot.programs, (record) => record.id);
@@ -1529,50 +1595,17 @@ function validateStaticSemanticSnapshotUnsafe(
 		}
 		return logicalPath;
 	}
-	if (frozenReads.length > 0 && frozenSubject === undefined)
-		issue(
-			'FROZEN_EVIDENCE_REQUIRED',
-			'$validationContext.frozenSubject',
-			'FROZEN_SUBJECT observations require the exact FrozenSubject artifact witness.'
-		);
-	if (frozenSubject !== undefined && frozenSubject.descriptor.subjectId !== snapshot.subjectId)
-		issue(
-			'FROZEN_EVIDENCE_REQUIRED',
-			'$validationContext.frozenSubject.descriptor.subjectId',
-			'FrozenSubject witness does not bind the semantic snapshot subject.'
-		);
-	if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
-		for (const observation of frozenReads) {
-			const artifactPath = frozenArtifactPath(observation.logicalPath);
-			const matchingArtifacts = frozenSubject.artifacts.filter(
-				(artifact) => artifact.canonicalPathKey === frozenPathKey(artifactPath)
-			);
-			const artifact = matchingArtifacts.length === 1 ? matchingArtifacts[0] : undefined;
-			if (
-				artifact === undefined ||
-				(caseSensitive && artifact.path !== artifactPath) ||
-				artifact.bytes !== observation.contentBytes ||
-				artifact.sha256 !== observation.contentSha256
-			) {
-				issue(
-					'FROZEN_EVIDENCE_REQUIRED',
-					'$validationContext.frozenSubject.artifacts',
-					`Frozen observation ${observation.logicalPath} does not match exactly one subject artifact by path, bytes, and digest.`
-				);
-			}
-		}
-	}
-	for (const source of snapshot.sources) {
+	function checkProjectsEntry(source: StaticSemanticSnapshot['sources'][number]): void {
 		appendGrouped(sourcesByProject, source.projectId, source);
 		appendGrouped(sourcesByProgram, source.programId, source);
 		const projectPathKey = `${source.projectId}\0${source.logicalPath}`;
 		if (!sourceByProjectPath.has(projectPathKey)) sourceByProjectPath.set(projectPathKey, source);
 	}
-	for (const node of snapshot.astNodes) {
+	function checkProjectsEntry2(node: StaticSemanticSnapshot['astNodes'][number]): void {
 		appendGrouped(nodesBySource, node.sourceId, node);
 		if (node.parentId !== null) appendGrouped(childrenByParent, node.parentId, node);
 	}
-	for (const diagnostic of snapshot.diagnostics) {
+	function checkProjectsEntry3(diagnostic: StaticSemanticSnapshot['diagnostics'][number]): void {
 		appendGrouped(diagnosticsByProject, diagnostic.projectId, diagnostic);
 		appendGrouped(
 			diagnosticsByProjectFamily,
@@ -1582,7 +1615,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		if (diagnostic.sourceId !== null)
 			appendGrouped(diagnosticsBySource, diagnostic.sourceId, diagnostic);
 	}
-	for (const project of snapshot.projects) {
+	function checkProjectsEntry4(project: StaticSemanticSnapshot['projects'][number]): void {
 		const projectProgram = programById.get(project.programId);
 		supportRefsByProject.set(
 			project.id,
@@ -1606,75 +1639,137 @@ function validateStaticSemanticSnapshotUnsafe(
 				);
 		}
 	}
-	if (projectByConfigPath.size !== snapshot.projects.length)
-		issue('DUPLICATE_ID', '$.projects', 'Project configuration paths must be unique.');
-	if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
-		const authoritativePaths = frozenSubject.projects.map((project) => project.configPath);
-		if (
-			new Set(authoritativePaths).size !== authoritativePaths.length ||
-			snapshot.projects.length !== authoritativePaths.length ||
-			!sameMembers(
-				snapshot.projects.map((project) => project.configPath),
-				authoritativePaths
-			)
-		)
+	function checkFrozenEvidenceRequiredOfProjects(): void {
+		if (frozenReads.length > 0 && frozenSubject === undefined)
 			issue(
 				'FROZEN_EVIDENCE_REQUIRED',
-				'$.projects',
-				'Snapshot projects must equal the complete FrozenSubject project population; INCOMPLETE projects remain present and partial.'
+				'$validationContext.frozenSubject',
+				'FROZEN_SUBJECT observations require the exact FrozenSubject artifact witness.'
 			);
-		for (const authoritative of frozenSubject.projects) {
-			const project = projectByConfigPath.get(authoritative.configPath);
-			if (project === undefined) continue;
-			if (
-				canonicalSemanticJson(project.programRecipe) !==
-					canonicalSemanticJson(authoritative.programRecipe) ||
-				project.configPath !== authoritative.configPath ||
-				project.kind !== authoritative.kind ||
-				project.rootDisposition !== authoritative.rootDisposition ||
-				!sameMembers(project.rootNames, authoritative.programRecipe.rootNames) ||
-				!sameMembers(project.projectReferences, authoritative.projectReferences) ||
-				!sameMembers(project.frameworkCandidates, authoritative.frameworkCandidates)
-			) {
-				issue(
-					'FROZEN_EVIDENCE_REQUIRED',
-					'$.projects',
-					`Project ${authoritative.configPath} does not reproduce its authoritative FrozenSubject recipe and discovery mirrors.`
+		if (frozenSubject !== undefined && frozenSubject.descriptor.subjectId !== snapshot.subjectId)
+			issue(
+				'FROZEN_EVIDENCE_REQUIRED',
+				'$validationContext.frozenSubject.descriptor.subjectId',
+				'FrozenSubject witness does not bind the semantic snapshot subject.'
+			);
+		if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
+			for (const observation of frozenReads) {
+				const artifactPath = frozenArtifactPath(observation.logicalPath);
+				const matchingArtifacts = frozenSubject.artifacts.filter(
+					(artifact) => artifact.canonicalPathKey === frozenPathKey(artifactPath)
 				);
+				const artifact = matchingArtifacts.length === 1 ? matchingArtifacts[0] : undefined;
+				if (
+					artifact === undefined ||
+					(caseSensitive && artifact.path !== artifactPath) ||
+					artifact.bytes !== observation.contentBytes ||
+					artifact.sha256 !== observation.contentSha256
+				) {
+					issue(
+						'FROZEN_EVIDENCE_REQUIRED',
+						'$validationContext.frozenSubject.artifacts',
+						`Frozen observation ${observation.logicalPath} does not match exactly one subject artifact by path, bytes, and digest.`
+					);
+				}
 			}
-			const authoritativeProjectEvidencePartial =
-				authoritative.rootDisposition === 'INCOMPLETE' ||
-				authoritative.typescriptDiagnostics.some(
-					(entry) => entry.severity === 'ERROR' || entry.code === 'TYPESCRIPT_PROJECT_PARTIAL'
-				);
+		}
+	}
+	function checkProjectsGroup(): void {
+		for (const source of snapshot.sources) checkProjectsEntry(source);
+		for (const node of snapshot.astNodes) checkProjectsEntry2(node);
+		for (const diagnostic of snapshot.diagnostics) checkProjectsEntry3(diagnostic);
+	}
+	function checkProjectsOfProjectsOfProjects(): void {
+		for (const project of snapshot.projects) checkProjectsEntry4(project);
+		if (projectByConfigPath.size !== snapshot.projects.length)
+			issue('DUPLICATE_ID', '$.projects', 'Project configuration paths must be unique.');
+	}
+	function checkProjectsOfProjectsOfProjects2(): void {
+		if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
+			const authoritativePaths = frozenSubject.projects.map((project) => project.configPath);
 			if (
-				authoritativeProjectEvidencePartial &&
-				(project.health !== 'PARTIAL' ||
-					!project.partialityReasons.some(
-						(reason) =>
-							reason.capability === 'TS_PROJECT' && reason.code === 'TYPESCRIPT_PROJECT_PARTIAL'
-					))
+				new Set(authoritativePaths).size !== authoritativePaths.length ||
+				snapshot.projects.length !== authoritativePaths.length ||
+				!sameMembers(
+					snapshot.projects.map((project) => project.configPath),
+					authoritativePaths
+				)
 			)
 				issue(
 					'FROZEN_EVIDENCE_REQUIRED',
 					'$.projects',
-					`Incomplete or configuration-partial frozen project ${authoritative.configPath} must remain explicitly TS_PROJECT partial.`
+					'Snapshot projects must equal the complete FrozenSubject project population; INCOMPLETE projects remain present and partial.'
 				);
+			for (const authoritative of frozenSubject.projects) {
+				const project = projectByConfigPath.get(authoritative.configPath);
+				if (project === undefined) continue;
+				if (
+					canonicalSemanticJson(project.programRecipe) !==
+						canonicalSemanticJson(authoritative.programRecipe) ||
+					project.configPath !== authoritative.configPath ||
+					project.kind !== authoritative.kind ||
+					project.rootDisposition !== authoritative.rootDisposition ||
+					!sameMembers(project.rootNames, authoritative.programRecipe.rootNames) ||
+					!sameMembers(project.projectReferences, authoritative.projectReferences) ||
+					!sameMembers(project.frameworkCandidates, authoritative.frameworkCandidates)
+				) {
+					issue(
+						'FROZEN_EVIDENCE_REQUIRED',
+						'$.projects',
+						`Project ${authoritative.configPath} does not reproduce its authoritative FrozenSubject recipe and discovery mirrors.`
+					);
+				}
+				const authoritativeProjectEvidencePartial =
+					authoritative.rootDisposition === 'INCOMPLETE' ||
+					authoritative.typescriptDiagnostics.some(
+						(entry) => entry.severity === 'ERROR' || entry.code === 'TYPESCRIPT_PROJECT_PARTIAL'
+					);
+				if (
+					authoritativeProjectEvidencePartial &&
+					(project.health !== 'PARTIAL' ||
+						!project.partialityReasons.some(
+							(reason) =>
+								reason.capability === 'TS_PROJECT' && reason.code === 'TYPESCRIPT_PROJECT_PARTIAL'
+						))
+				)
+					issue(
+						'FROZEN_EVIDENCE_REQUIRED',
+						'$.projects',
+						`Incomplete or configuration-partial frozen project ${authoritative.configPath} must remain explicitly TS_PROJECT partial.`
+					);
+			}
 		}
 	}
-	if (
-		new Set(snapshot.programs.map((program) => program.projectId)).size !== snapshot.programs.length
-	)
-		issue('DUPLICATE_ID', '$.programs', 'Each project may own exactly one Program.');
+	function checkProjectsOfProjects(): void {
+		checkProjectsOfProjectsOfProjects();
+		checkProjectsOfProjectsOfProjects2();
+	}
+	function checkProgramsOfProjects(): void {
+		if (
+			new Set(snapshot.programs.map((program) => program.projectId)).size !==
+			snapshot.programs.length
+		)
+			issue('DUPLICATE_ID', '$.programs', 'Each project may own exactly one Program.');
+	}
+	function checkProjects(): void {
+		checkFrozenEvidenceRequiredOfProjects();
+		checkProjectsGroup();
+		checkProjectsOfProjects();
+		checkProgramsOfProjects();
+	}
+	checkProjects();
 	const sourceProgramPaths = snapshot.sources.map(
 		(source) => `${source.programId}\0${source.logicalPath}`
 	);
-	if (new Set(sourceProgramPaths).size !== sourceProgramPaths.length)
-		issue(
-			'DUPLICATE_ID',
-			'$.sources',
-			'A Program may contain at most one source record per logical path.'
-		);
+	function checkSources2(): void {
+		if (new Set(sourceProgramPaths).size !== sourceProgramPaths.length)
+			issue(
+				'DUPLICATE_ID',
+				'$.sources',
+				'A Program may contain at most one source record per logical path.'
+			);
+	}
+	checkSources2();
 
 	function path(valueToCheck: string | null, jsonPath: string): void {
 		if (valueToCheck !== null && !isLogicalPath(valueToCheck))
@@ -2205,106 +2300,124 @@ function validateStaticSemanticSnapshotUnsafe(
 				'Degraded symbol facts require partial TS_SYMBOL provenance with a closure-degrading limitation bound to an unresolved region.'
 			);
 	}
-	for (const [index, record] of snapshot.provenances.entries())
+	function validateProvenancesEntry(
+		index: number,
+		record: StaticSemanticSnapshot['provenances'][number]
+	): void {
 		validateProvenanceRecord(record, `$.provenances[${index}]`);
-
-	for (const [index, project] of snapshot.projects.entries()) {
-		path(project.configPath, `$.projects[${index}].configPath`);
-		for (const rootName of project.rootNames) path(rootName, `$.projects[${index}].rootNames`);
-		for (const reference of project.projectReferences)
-			path(reference, `$.projects[${index}].projectReferences`);
-		for (const [candidateIndex, candidate] of project.frameworkCandidates.entries())
-			path(candidate, `$.projects[${index}].frameworkCandidates[${candidateIndex}]`);
-		for (const [reasonIndex, reason] of project.partialityReasons.entries())
-			path(reason.path, `$.projects[${index}].partialityReasons[${reasonIndex}].path`);
-		for (const rootName of project.programRecipe.rootNames)
-			path(rootName, `$.projects[${index}].programRecipe.rootNames`);
-		for (const reference of project.programRecipe.projectReferences)
-			path(reference, `$.projects[${index}].programRecipe.projectReferences`);
-		path(project.programRecipe.configPath, `$.projects[${index}].programRecipe.configPath`);
-		try {
-			validateProgramRecipePolicy(project.programRecipe, snapshot.budgets.maxPathCharacters);
-		} catch (error) {
-			issue(
-				error instanceof ProgramRecipePolicyError && error.message.includes('digest')
-					? 'IDENTITY_MISMATCH'
-					: 'INVALID_VALUE',
-				`$.projects[${index}].programRecipe`,
-				error instanceof Error
-					? error.message
-					: 'ProgramRecipe violates the shared materialization policy.'
-			);
+	}
+	function validateProvenancesEntry2(
+		index: number,
+		project: StaticSemanticSnapshot['projects'][number]
+	): void {
+		function checkIdentityMismatchOfProvenancesEntryGroup(): void {
+			path(project.configPath, `$.projects[${index}].configPath`);
+			for (const rootName of project.rootNames) path(rootName, `$.projects[${index}].rootNames`);
+			for (const reference of project.projectReferences)
+				path(reference, `$.projects[${index}].projectReferences`);
+			for (const [candidateIndex, candidate] of project.frameworkCandidates.entries())
+				path(candidate, `$.projects[${index}].frameworkCandidates[${candidateIndex}]`);
+			for (const [reasonIndex, reason] of project.partialityReasons.entries())
+				path(reason.path, `$.projects[${index}].partialityReasons[${reasonIndex}].path`);
+			for (const rootName of project.programRecipe.rootNames)
+				path(rootName, `$.projects[${index}].programRecipe.rootNames`);
 		}
-		if (
-			project.configPath !== project.programRecipe.configPath ||
-			project.kind !== project.programRecipe.kind ||
-			!sameMembers(project.rootNames, project.programRecipe.rootNames) ||
-			!sameMembers(project.projectReferences, project.programRecipe.projectReferences) ||
-			project.programRecipe.provider.id !== snapshot.provider.id ||
-			project.programRecipe.provider.version !== snapshot.provider.version
-		)
-			issue(
-				'IDENTITY_MISMATCH',
-				`$.projects[${index}].programRecipe`,
-				'Project mirrors do not reproduce the exact ProgramRecipe.'
-			);
-		for (const values of [
-			project.rootNames,
-			project.projectReferences,
-			project.sourceIds,
-			project.diagnosticIds,
-			project.contextInputIds,
-			project.frameworkCandidates
-		]) {
-			if (!isCanonicalSet(values))
+		function checkIdentityMismatchOfIdentityMismatchOfProvenancesEntry(): void {
+			for (const reference of project.programRecipe.projectReferences)
+				path(reference, `$.projects[${index}].programRecipe.projectReferences`);
+			path(project.programRecipe.configPath, `$.projects[${index}].programRecipe.configPath`);
+			try {
+				validateProgramRecipePolicy(project.programRecipe, snapshot.budgets.maxPathCharacters);
+			} catch (error) {
+				issue(
+					error instanceof ProgramRecipePolicyError && error.message.includes('digest')
+						? 'IDENTITY_MISMATCH'
+						: 'INVALID_VALUE',
+					`$.projects[${index}].programRecipe`,
+					error instanceof Error
+						? error.message
+						: 'ProgramRecipe violates the shared materialization policy.'
+				);
+			}
+			if (
+				project.configPath !== project.programRecipe.configPath ||
+				project.kind !== project.programRecipe.kind ||
+				!sameMembers(project.rootNames, project.programRecipe.rootNames) ||
+				!sameMembers(project.projectReferences, project.programRecipe.projectReferences) ||
+				project.programRecipe.provider.id !== snapshot.provider.id ||
+				project.programRecipe.provider.version !== snapshot.provider.version
+			)
+				issue(
+					'IDENTITY_MISMATCH',
+					`$.projects[${index}].programRecipe`,
+					'Project mirrors do not reproduce the exact ProgramRecipe.'
+				);
+			for (const values of [
+				project.rootNames,
+				project.projectReferences,
+				project.sourceIds,
+				project.diagnosticIds,
+				project.contextInputIds,
+				project.frameworkCandidates
+			]) {
+				if (!isCanonicalSet(values))
+					issue(
+						'NONCANONICAL_ORDER',
+						`$.projects[${index}]`,
+						'Project manifests must be canonical sets.'
+					);
+			}
+			if (
+				!isCanonicalSet(project.programRecipe.rootNames) ||
+				!isCanonicalSet(project.programRecipe.projectReferences)
+			)
 				issue(
 					'NONCANONICAL_ORDER',
-					`$.projects[${index}]`,
-					'Project manifests must be canonical sets.'
+					`$.projects[${index}].programRecipe`,
+					'ProgramRecipe roots and references must be canonical sets.'
 				);
 		}
-		if (
-			!isCanonicalSet(project.programRecipe.rootNames) ||
-			!isCanonicalSet(project.programRecipe.projectReferences)
-		)
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.projects[${index}].programRecipe`,
-				'ProgramRecipe roots and references must be canonical sets.'
-			);
-		for (const reference of project.projectReferences)
-			if (!projectByConfigPath.has(reference))
+		function checkDanglingReferenceOfIdentityMismatchOfProvenancesEntry(): void {
+			for (const reference of project.projectReferences)
+				if (!projectByConfigPath.has(reference))
+					issue(
+						'DANGLING_REFERENCE',
+						`$.projects[${index}].projectReferences`,
+						`Referenced project ${reference} is absent from the all-project closure.`
+					);
+			if (
+				project.rootDisposition === 'INTENTIONAL_EMPTY_SOLUTION'
+					? project.kind !== 'SOLUTION' || project.rootNames.length !== 0
+					: project.rootDisposition === 'COMPILER_ROOTS' && project.rootNames.length === 0
+			)
 				issue(
-					'DANGLING_REFERENCE',
-					`$.projects[${index}].projectReferences`,
-					`Referenced project ${reference} is absent from the all-project closure.`
+					'INVALID_VALUE',
+					`$.projects[${index}].rootDisposition`,
+					'Project root disposition is incoherent with kind and roots.'
 				);
-		if (
-			project.rootDisposition === 'INTENTIONAL_EMPTY_SOLUTION'
-				? project.kind !== 'SOLUTION' || project.rootNames.length !== 0
-				: project.rootDisposition === 'COMPILER_ROOTS' && project.rootNames.length === 0
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.projects[${index}].rootDisposition`,
-				'Project root disposition is incoherent with kind and roots.'
-			);
-		if (project.rootDisposition === 'INCOMPLETE' && project.health !== 'PARTIAL')
-			issue(
-				'INVALID_VALUE',
-				`$.projects[${index}].health`,
-				'Incomplete project roots require partial health.'
-			);
-		if (
-			project.health === 'PARTIAL'
-				? project.partialityReasons.length === 0
-				: project.partialityReasons.length > 0
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.projects[${index}].partialityReasons`,
-				'Project health and partiality reasons disagree.'
-			);
+			if (project.rootDisposition === 'INCOMPLETE' && project.health !== 'PARTIAL')
+				issue(
+					'INVALID_VALUE',
+					`$.projects[${index}].health`,
+					'Incomplete project roots require partial health.'
+				);
+			if (
+				project.health === 'PARTIAL'
+					? project.partialityReasons.length === 0
+					: project.partialityReasons.length > 0
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.projects[${index}].partialityReasons`,
+					'Project health and partiality reasons disagree.'
+				);
+		}
+		function checkIdentityMismatchOfProvenancesEntry2(): void {
+			checkIdentityMismatchOfProvenancesEntryGroup();
+			checkIdentityMismatchOfIdentityMismatchOfProvenancesEntry();
+			checkDanglingReferenceOfIdentityMismatchOfProvenancesEntry();
+		}
+		checkIdentityMismatchOfProvenancesEntry2();
 		const projectCapabilityPartial = project.partialityReasons.some(
 			(reason) => reason.capability === 'TS_PROJECT'
 		);
@@ -2314,56 +2427,59 @@ function validateStaticSemanticSnapshotUnsafe(
 			'TS_PROJECT',
 			`$.projects[${index}].provenanceId`
 		);
-		if (
-			projectProvenance !== undefined &&
-			projectCapabilityPartial !== (projectProvenance.epistemic.capabilityCoverage === 'partial')
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.projects[${index}].provenanceId`,
-				'Project-fact coverage must agree with TS_PROJECT-specific partiality without inheriting syntax-only losses.'
-			);
-		if (
-			!isCanonicalSet(
-				project.partialityReasons.map(
-					(reason) =>
-						`${reason.capability}\0${reason.code}\0${reason.path ?? ''}\0${reason.message}`
-				)
-			)
-		)
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.projects[${index}].partialityReasons`,
-				'Project partiality reasons must be a canonical set.'
-			);
-		for (const [reasonIndex, reason] of project.partialityReasons.entries())
+		function checkInvalidValueOfProvenancesEntry2(): void {
 			if (
-				reason.message.length === 0 ||
-				!snapshot.requestedCapabilities.includes(reason.capability)
+				projectProvenance !== undefined &&
+				projectCapabilityPartial !== (projectProvenance.epistemic.capabilityCoverage === 'partial')
 			)
 				issue(
 					'INVALID_VALUE',
-					`$.projects[${index}].partialityReasons[${reasonIndex}]`,
-					'Partiality reason must name a requested capability and a non-empty message.'
+					`$.projects[${index}].provenanceId`,
+					'Project-fact coverage must agree with TS_PROJECT-specific partiality without inheriting syntax-only losses.'
 				);
-		if (project.frameworkCandidates.length > 0 && project.health !== 'PARTIAL')
-			issue(
-				'INVALID_VALUE',
-				`$.projects[${index}].health`,
-				'Framework candidates require explicit project partiality.'
-			);
-		if (
-			project.frameworkCandidates.length > 0 &&
-			!project.partialityReasons.some(
-				(reason) =>
-					reason.capability === 'TS_SYNTAX' && reason.code === 'FRAMEWORK_CANDIDATES_UNSUPPORTED'
+			if (
+				!isCanonicalSet(
+					project.partialityReasons.map(
+						(reason) =>
+							`${reason.capability}\0${reason.code}\0${reason.path ?? ''}\0${reason.message}`
+					)
+				)
 			)
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.projects[${index}].partialityReasons`,
-				'Unsupported framework candidates must explicitly degrade TS_SYNTAX with FRAMEWORK_CANDIDATES_UNSUPPORTED.'
-			);
+				issue(
+					'NONCANONICAL_ORDER',
+					`$.projects[${index}].partialityReasons`,
+					'Project partiality reasons must be a canonical set.'
+				);
+			for (const [reasonIndex, reason] of project.partialityReasons.entries())
+				if (
+					reason.message.length === 0 ||
+					!snapshot.requestedCapabilities.includes(reason.capability)
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.projects[${index}].partialityReasons[${reasonIndex}]`,
+						'Partiality reason must name a requested capability and a non-empty message.'
+					);
+			if (project.frameworkCandidates.length > 0 && project.health !== 'PARTIAL')
+				issue(
+					'INVALID_VALUE',
+					`$.projects[${index}].health`,
+					'Framework candidates require explicit project partiality.'
+				);
+			if (
+				project.frameworkCandidates.length > 0 &&
+				!project.partialityReasons.some(
+					(reason) =>
+						reason.capability === 'TS_SYNTAX' && reason.code === 'FRAMEWORK_CANDIDATES_UNSUPPORTED'
+				)
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.projects[${index}].partialityReasons`,
+					'Unsupported framework candidates must explicitly degrade TS_SYNTAX with FRAMEWORK_CANDIDATES_UNSUPPORTED.'
+				);
+		}
+		checkInvalidValueOfProvenancesEntry2();
 		const parserRecoveryPaths = sortedUnique(
 			(diagnosticsByProject.get(project.id) ?? [])
 				.filter(
@@ -2371,302 +2487,349 @@ function validateStaticSemanticSnapshotUnsafe(
 				)
 				.map((diagnostic) => diagnostic.path ?? project.configPath)
 		);
-		for (const recoveryPath of parserRecoveryPaths)
-			for (const capability of ['TS_SYMBOL', 'TS_SYNTAX'] as const)
-				if (
-					!project.partialityReasons.some(
-						(reason) =>
-							reason.capability === capability &&
-							reason.code === 'TYPESCRIPT_PROJECT_PARTIAL' &&
-							(reason.path ?? project.configPath) === recoveryPath &&
-							/parser recovery/iu.test(reason.message)
+		function checkInvalidValueOfProvenancesEntry22(): void {
+			for (const recoveryPath of parserRecoveryPaths)
+				for (const capability of ['TS_SYMBOL', 'TS_SYNTAX'] as const)
+					if (
+						!project.partialityReasons.some(
+							(reason) =>
+								reason.capability === capability &&
+								reason.code === 'TYPESCRIPT_PROJECT_PARTIAL' &&
+								(reason.path ?? project.configPath) === recoveryPath &&
+								/parser recovery/iu.test(reason.message)
+						)
 					)
-				)
-					issue(
-						'INVALID_VALUE',
-						`$.projects[${index}].partialityReasons`,
-						`Retained SYNTACTIC ERROR diagnostics at ${recoveryPath} require an explicit ${capability} TYPESCRIPT_PROJECT_PARTIAL parser-recovery reason.`
-					);
+						issue(
+							'INVALID_VALUE',
+							`$.projects[${index}].partialityReasons`,
+							`Retained SYNTACTIC ERROR diagnostics at ${recoveryPath} require an explicit ${capability} TYPESCRIPT_PROJECT_PARTIAL parser-recovery reason.`
+						);
+		}
+		checkInvalidValueOfProvenancesEntry22();
 		const expected = semanticProjectId({
 			configPath: project.configPath,
 			projectResolutionDigest: project.programRecipe.projectResolutionDigest,
 			snapshotId: snapshot.id
 		});
-		if (project.id !== expected)
-			issue('IDENTITY_MISMATCH', `$.projects[${index}].id`, 'Project identity mismatch.');
+		function checkIdentityMismatchOfProvenancesEntry22(): void {
+			if (project.id !== expected)
+				issue('IDENTITY_MISMATCH', `$.projects[${index}].id`, 'Project identity mismatch.');
+		}
+		checkIdentityMismatchOfProvenancesEntry22();
 		const ownedProgram = programById.get(project.programId);
-		if (ownedProgram === undefined)
-			issue('DANGLING_REFERENCE', `$.projects[${index}].programId`, 'Project program is absent.');
-		else if (ownedProgram.projectId !== project.id)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.projects[${index}].programId`,
-				'Project points to a Program owned by another project.'
-			);
-		if (
-			!sameMembers(
-				project.sourceIds,
-				(sourcesByProject.get(project.id) ?? []).map((source) => source.id)
+		function checkDanglingReferenceOfProvenancesEntry2(): void {
+			if (ownedProgram === undefined)
+				issue('DANGLING_REFERENCE', `$.projects[${index}].programId`, 'Project program is absent.');
+			else if (ownedProgram.projectId !== project.id)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`$.projects[${index}].programId`,
+					'Project points to a Program owned by another project.'
+				);
+			if (
+				!sameMembers(
+					project.sourceIds,
+					(sourcesByProject.get(project.id) ?? []).map((source) => source.id)
+				)
 			)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`$.projects[${index}].sourceIds`,
-				'Project source manifest is incomplete.'
-			);
-		if (
-			!sameMembers(
-				project.diagnosticIds,
-				(diagnosticsByProject.get(project.id) ?? []).map((diagnostic) => diagnostic.id)
-			)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`$.projects[${index}].diagnosticIds`,
-				'Project diagnostic manifest is incomplete.'
-			);
-		for (const contextId of project.contextInputIds)
-			if (!contextById.has(contextId))
 				issue(
 					'DANGLING_REFERENCE',
-					`$.projects[${index}].contextInputIds`,
-					'Project context input is absent.'
+					`$.projects[${index}].sourceIds`,
+					'Project source manifest is incomplete.'
 				);
+			if (
+				!sameMembers(
+					project.diagnosticIds,
+					(diagnosticsByProject.get(project.id) ?? []).map((diagnostic) => diagnostic.id)
+				)
+			)
+				issue(
+					'DANGLING_REFERENCE',
+					`$.projects[${index}].diagnosticIds`,
+					'Project diagnostic manifest is incomplete.'
+				);
+			for (const contextId of project.contextInputIds)
+				if (!contextById.has(contextId))
+					issue(
+						'DANGLING_REFERENCE',
+						`$.projects[${index}].contextInputIds`,
+						'Project context input is absent.'
+					);
+		}
+		checkDanglingReferenceOfProvenancesEntry2();
 	}
-
-	for (const [index, program] of snapshot.programs.entries()) {
+	function validateProvenancesEntry3(
+		index: number,
+		program: StaticSemanticSnapshot['programs'][number]
+	): void {
 		const project = projectById.get(program.projectId);
-		if (!project)
-			issue('DANGLING_REFERENCE', `$.programs[${index}].projectId`, 'Program project is absent.');
-		else if (project.programId !== program.id)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.programs[${index}].id`,
-				'Program is not the program bound by its project.'
-			);
+		function checkDanglingReferenceOfProvenancesEntry3(): void {
+			if (!project)
+				issue('DANGLING_REFERENCE', `$.programs[${index}].projectId`, 'Program project is absent.');
+			else if (project.programId !== program.id)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`$.programs[${index}].id`,
+					'Program is not the program bound by its project.'
+				);
+		}
+		checkDanglingReferenceOfProvenancesEntry3();
 		const expected = semanticProgramId({
 			contextDigest: program.contextDigest,
 			projectId: program.projectId
 		});
-		if (program.id !== expected)
-			issue('IDENTITY_MISMATCH', `$.programs[${index}].id`, 'Program identity mismatch.');
+		function checkIdentityMismatchOfProvenancesEntry3(): void {
+			if (program.id !== expected)
+				issue('IDENTITY_MISMATCH', `$.programs[${index}].id`, 'Program identity mismatch.');
+		}
+		checkIdentityMismatchOfProvenancesEntry3();
 		const programSources = sourcesByProgram.get(program.id) ?? [];
 		const ownedSources = programSources.map((source) => source.id);
-		if (!sameMembers(program.sourceIds, ownedSources))
-			issue(
-				'DANGLING_REFERENCE',
-				`$.programs[${index}].sourceIds`,
-				'Program source manifest is incomplete.'
-			);
+		function checkDanglingReferenceOfProvenancesEntry32(): void {
+			if (!sameMembers(program.sourceIds, ownedSources))
+				issue(
+					'DANGLING_REFERENCE',
+					`$.programs[${index}].sourceIds`,
+					'Program source manifest is incomplete.'
+				);
+		}
+		checkDanglingReferenceOfProvenancesEntry32();
 		const ownedRoots = programSources
 			.filter((source) => source.rootFile)
 			.map((source) => source.id);
-		if (!sameMembers(program.rootSourceIds, ownedRoots))
-			issue(
-				'DANGLING_REFERENCE',
-				`$.programs[${index}].rootSourceIds`,
-				'Program root-source manifest is incomplete.'
-			);
-		if (
-			!isCanonicalSet(program.sourceIds) ||
-			!isCanonicalSet(program.rootSourceIds) ||
-			!isCanonicalSet(program.diagnosticIds)
-		)
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.programs[${index}]`,
-				'Program manifests must be canonical sets.'
-			);
+		function checkDanglingReferenceOfProvenancesEntry33(): void {
+			if (!sameMembers(program.rootSourceIds, ownedRoots))
+				issue(
+					'DANGLING_REFERENCE',
+					`$.programs[${index}].rootSourceIds`,
+					'Program root-source manifest is incomplete.'
+				);
+			if (
+				!isCanonicalSet(program.sourceIds) ||
+				!isCanonicalSet(program.rootSourceIds) ||
+				!isCanonicalSet(program.diagnosticIds)
+			)
+				issue(
+					'NONCANONICAL_ORDER',
+					`$.programs[${index}]`,
+					'Program manifests must be canonical sets.'
+				);
+		}
+		checkDanglingReferenceOfProvenancesEntry33();
 		const projectInputs =
 			project?.contextInputIds
 				.map((id) => contextById.get(id))
 				.filter((input) => input !== undefined) ?? [];
-		if (program.contextDigest !== compilerInputClosureDigest(projectInputs))
-			issue(
-				'IDENTITY_MISMATCH',
-				`$.programs[${index}].contextDigest`,
-				'Program context digest does not bind its exact project compiler observations.'
-			);
-		if (
-			!sameMembers(
-				program.diagnosticIds,
-				(diagnosticsByProject.get(program.projectId) ?? []).map((diagnostic) => diagnostic.id)
-			)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`$.programs[${index}].diagnosticIds`,
-				'Program diagnostic manifest is incomplete.'
-			);
-		if (
-			program.diagnosticFamilies.length !== DIAGNOSTIC_FAMILIES.length ||
-			!program.diagnosticFamilies.every(
-				(coverage, familyIndex) => coverage.family === DIAGNOSTIC_FAMILIES[familyIndex]
-			)
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.programs[${index}].diagnosticFamilies`,
-				'Program must report all six diagnostic families in registered order.'
-			);
-		for (const coverage of program.diagnosticFamilies) {
-			const familyRecords =
-				diagnosticsByProjectFamily.get(`${program.projectId}\0${coverage.family}`) ?? [];
-			const familyIds = familyRecords.map((diagnostic) => diagnostic.id).sort(compareText);
-			const occurrenceCount = familyRecords.reduce(
-				(total, diagnostic) => total + diagnostic.multiplicity,
-				0
-			);
-			if (
-				!isCanonicalSet(coverage.diagnosticIds) ||
-				coverage.recordCount !== coverage.diagnosticIds.length ||
-				coverage.recordCount !== familyRecords.length ||
-				coverage.occurrenceCount !== occurrenceCount ||
-				coverage.manifestDigest !== diagnosticManifestDigest(familyRecords) ||
-				!sameMembers(coverage.diagnosticIds, familyIds)
-			)
+		function checkIdentityMismatchOfProvenancesEntry32(): void {
+			if (program.contextDigest !== compilerInputClosureDigest(projectInputs))
 				issue(
-					'POPULATION_MISMATCH',
-					`$.programs[${index}].diagnosticFamilies`,
-					`${coverage.family} diagnostic coverage does not match emitted diagnostic records and occurrences.`
+					'IDENTITY_MISMATCH',
+					`$.programs[${index}].contextDigest`,
+					'Program context digest does not bind its exact project compiler observations.'
 				);
 			if (
-				coverage.state === 'NOT_APPLICABLE' ||
-				coverage.reason.length === 0 ||
-				(coverage.state === 'FAILED' && project?.health !== 'PARTIAL')
+				!sameMembers(
+					program.diagnosticIds,
+					(diagnosticsByProject.get(program.projectId) ?? []).map((diagnostic) => diagnostic.id)
+				)
+			)
+				issue(
+					'DANGLING_REFERENCE',
+					`$.programs[${index}].diagnosticIds`,
+					'Program diagnostic manifest is incomplete.'
+				);
+			if (
+				program.diagnosticFamilies.length !== DIAGNOSTIC_FAMILIES.length ||
+				!program.diagnosticFamilies.every(
+					(coverage, familyIndex) => coverage.family === DIAGNOSTIC_FAMILIES[familyIndex]
+				)
 			)
 				issue(
 					'INVALID_VALUE',
 					`$.programs[${index}].diagnosticFamilies`,
-					'Every Slice 3B diagnostic family must run or fail visibly with a reason.'
+					'Program must report all six diagnostic families in registered order.'
 				);
-			if (coverage.coverage === 'COMPLETE' && coverage.state !== 'RUN')
-				issue(
-					'INVALID_VALUE',
-					`$.programs[${index}].diagnosticFamilies`,
-					'Complete diagnostic coverage requires a successful run.'
+			for (const coverage of program.diagnosticFamilies) {
+				const familyRecords =
+					diagnosticsByProjectFamily.get(`${program.projectId}\0${coverage.family}`) ?? [];
+				const familyIds = familyRecords.map((diagnostic) => diagnostic.id).sort(compareText);
+				const occurrenceCount = familyRecords.reduce(
+					(total, diagnostic) => total + diagnostic.multiplicity,
+					0
 				);
-			if (coverage.coverage === 'BOUNDED' && project?.health !== 'PARTIAL')
-				issue(
-					'INVALID_VALUE',
-					`$.programs[${index}].diagnosticFamilies`,
-					'Bounded diagnostic coverage must roll up to explicit project partiality.'
-				);
+				if (
+					!isCanonicalSet(coverage.diagnosticIds) ||
+					coverage.recordCount !== coverage.diagnosticIds.length ||
+					coverage.recordCount !== familyRecords.length ||
+					coverage.occurrenceCount !== occurrenceCount ||
+					coverage.manifestDigest !== diagnosticManifestDigest(familyRecords) ||
+					!sameMembers(coverage.diagnosticIds, familyIds)
+				)
+					issue(
+						'POPULATION_MISMATCH',
+						`$.programs[${index}].diagnosticFamilies`,
+						`${coverage.family} diagnostic coverage does not match emitted diagnostic records and occurrences.`
+					);
+				if (
+					coverage.state === 'NOT_APPLICABLE' ||
+					coverage.reason.length === 0 ||
+					(coverage.state === 'FAILED' && project?.health !== 'PARTIAL')
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.programs[${index}].diagnosticFamilies`,
+						'Every Slice 3B diagnostic family must run or fail visibly with a reason.'
+					);
+				if (coverage.coverage === 'COMPLETE' && coverage.state !== 'RUN')
+					issue(
+						'INVALID_VALUE',
+						`$.programs[${index}].diagnosticFamilies`,
+						'Complete diagnostic coverage requires a successful run.'
+					);
+				if (coverage.coverage === 'BOUNDED' && project?.health !== 'PARTIAL')
+					issue(
+						'INVALID_VALUE',
+						`$.programs[${index}].diagnosticFamilies`,
+						'Bounded diagnostic coverage must roll up to explicit project partiality.'
+					);
+			}
 		}
+		checkIdentityMismatchOfProvenancesEntry32();
 		const rootSourceSet = new Set(program.rootSourceIds);
 		const rootPaths = programSources
 			.filter((source) => rootSourceSet.has(source.id))
 			.map((source) => source.logicalPath)
 			.sort(compareText);
-		if (project !== undefined && !sameMembers(rootPaths, project.rootNames))
-			issue(
-				'DANGLING_REFERENCE',
-				`$.programs[${index}].rootSourceIds`,
-				'Program root sources do not reproduce ProgramRecipe roots.'
+		function checkDanglingReferenceOfProvenancesEntry34(): void {
+			if (project !== undefined && !sameMembers(rootPaths, project.rootNames))
+				issue(
+					'DANGLING_REFERENCE',
+					`$.programs[${index}].rootSourceIds`,
+					'Program root sources do not reproduce ProgramRecipe roots.'
+				);
+			provenance(
+				program.provenanceId,
+				program.projectId,
+				'TS_PROJECT',
+				`$.programs[${index}].provenanceId`
 			);
-		provenance(
-			program.provenanceId,
-			program.projectId,
-			'TS_PROJECT',
-			`$.programs[${index}].provenanceId`
-		);
+		}
+		checkDanglingReferenceOfProvenancesEntry34();
 	}
-
-	for (const [index, source] of snapshot.sources.entries()) {
-		path(source.logicalPath, `$.sources[${index}].logicalPath`);
-		if (!projectById.has(source.projectId) || !programById.has(source.programId))
-			issue('DANGLING_REFERENCE', `$.sources[${index}]`, 'Source project or program is absent.');
-		if (programById.get(source.programId)?.projectId !== source.projectId)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.sources[${index}].programId`,
-				'Source program belongs to another project.'
-			);
+	function validateProvenancesEntry4(
+		index: number,
+		source: StaticSemanticSnapshot['sources'][number]
+	): void {
+		function checkDanglingReferenceOfProvenancesEntry4(): void {
+			path(source.logicalPath, `$.sources[${index}].logicalPath`);
+			if (!projectById.has(source.projectId) || !programById.has(source.programId))
+				issue('DANGLING_REFERENCE', `$.sources[${index}]`, 'Source project or program is absent.');
+			if (programById.get(source.programId)?.projectId !== source.projectId)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`$.sources[${index}].programId`,
+					'Source program belongs to another project.'
+				);
+		}
+		checkDanglingReferenceOfProvenancesEntry4();
 		const expected = semanticSourceId({
 			contentSha256: source.contentSha256,
 			logicalPath: source.logicalPath,
 			moduleKind: source.moduleKind,
 			programId: source.programId
 		});
-		if (source.id !== expected)
-			issue('IDENTITY_MISMATCH', `$.sources[${index}].id`, 'Source identity mismatch.');
-		if (
-			!SHA256.test(source.contentSha256) ||
-			!Number.isSafeInteger(source.bytes) ||
-			!Number.isSafeInteger(source.textLength) ||
-			source.bytes < 0 ||
-			source.textLength < 0
-		)
-			issue('INVALID_VALUE', `$.sources[${index}]`, 'Source byte and digest metadata is invalid.');
+		function checkIdentityMismatchOfProvenancesEntry4(): void {
+			if (source.id !== expected)
+				issue('IDENTITY_MISMATCH', `$.sources[${index}].id`, 'Source identity mismatch.');
+			if (
+				!SHA256.test(source.contentSha256) ||
+				!Number.isSafeInteger(source.bytes) ||
+				!Number.isSafeInteger(source.textLength) ||
+				source.bytes < 0 ||
+				source.textLength < 0
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.sources[${index}]`,
+					'Source byte and digest metadata is invalid.'
+				);
+		}
+		checkIdentityMismatchOfProvenancesEntry4();
 		const expectedScriptKindName = ts.ScriptKind[source.scriptKind];
 		const expectedLanguageVariant =
 			source.scriptKind === ts.ScriptKind.TSX || source.scriptKind === ts.ScriptKind.JSX
 				? 'JSX'
 				: 'Standard';
-		if (
-			typeof expectedScriptKindName !== 'string' ||
-			source.scriptKindName !== expectedScriptKindName ||
-			source.languageVariant !== expectedLanguageVariant
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.sources[${index}]`,
-				'Source script-kind code, name, and language variant must agree with the public TypeScript enum.'
-			);
-		if (
-			!isCanonicalSet(source.artifactRoles) ||
-			!source.artifactRoles.every((role) => ARTIFACT_ROLES.includes(role)) ||
-			!isCanonicalSet(source.diagnosticIds)
-		)
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.sources[${index}]`,
-				'Source roles and diagnostic manifests must be closed canonical sets.'
-			);
+		function checkInvalidValueOfProvenancesEntry4(): void {
+			if (
+				typeof expectedScriptKindName !== 'string' ||
+				source.scriptKindName !== expectedScriptKindName ||
+				source.languageVariant !== expectedLanguageVariant
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.sources[${index}]`,
+					'Source script-kind code, name, and language variant must agree with the public TypeScript enum.'
+				);
+			if (
+				!isCanonicalSet(source.artifactRoles) ||
+				!source.artifactRoles.every((role) => ARTIFACT_ROLES.includes(role)) ||
+				!isCanonicalSet(source.diagnosticIds)
+			)
+				issue(
+					'NONCANONICAL_ORDER',
+					`$.sources[${index}]`,
+					'Source roles and diagnostic manifests must be closed canonical sets.'
+				);
+		}
+		checkInvalidValueOfProvenancesEntry4();
 		const matchingReads =
 			presentReadsByProjectPath.get(`${source.projectId}\0${source.logicalPath}`) ?? [];
 		const expectedByteBudgetClass =
 			source.analysisDisposition === 'DEEP_INDEXED' ? 'FROZEN_SUBJECT' : 'LIVE_COMPILER_CONTEXT';
-		if (
-			matchingReads.length !== 1 ||
-			matchingReads[0]!.byteBudgetClass !== expectedByteBudgetClass ||
-			matchingReads[0]!.contentSha256 !== source.contentSha256 ||
-			matchingReads[0]!.contentBytes !== source.bytes ||
-			matchingReads[0]!.origin !== source.origin
-		) {
-			issue(
-				'IDENTITY_MISMATCH',
-				`$.sources[${index}]`,
-				`Every Program source must match exactly one project-attributed ${expectedByteBudgetClass} PRESENT READ_FILE observation by path, bytes, digest, and origin.`
-			);
-		}
-		if (source.analysisDisposition === 'DEEP_INDEXED') {
-			const rootNode = source.rootNodeId === null ? undefined : nodeById.get(source.rootNodeId);
+		function checkIdentityMismatchOfProvenancesEntry42(): void {
 			if (
-				source.artifactClass === 'CONTEXT_ONLY' ||
-				rootNode?.sourceId !== source.id ||
-				rootNode.parentId !== null ||
-				rootNode.kind !== ts.SyntaxKind.SourceFile ||
-				rootNode.structuralRoles.length !== 1 ||
-				rootNode.structuralRoles[0] !== AST_STRUCTURAL_ROLES.sourceFile
-			)
+				matchingReads.length !== 1 ||
+				matchingReads[0]!.byteBudgetClass !== expectedByteBudgetClass ||
+				matchingReads[0]!.contentSha256 !== source.contentSha256 ||
+				matchingReads[0]!.contentBytes !== source.bytes ||
+				matchingReads[0]!.origin !== source.origin
+			) {
 				issue(
-					'DANGLING_REFERENCE',
-					`$.sources[${index}].rootNodeId`,
-					'Deep-indexed source requires one subject-owned SourceFile root AST node.'
+					'IDENTITY_MISMATCH',
+					`$.sources[${index}]`,
+					`Every Program source must match exactly one project-attributed ${expectedByteBudgetClass} PRESENT READ_FILE observation by path, bytes, digest, and origin.`
 				);
-		} else if (
-			source.artifactClass !== 'CONTEXT_ONLY' ||
-			source.rootNodeId !== null ||
-			(nodesBySource.get(source.id)?.length ?? 0) > 0 ||
-			source.rootFile
-		) {
-			issue(
-				'INVALID_VALUE',
-				`$.sources[${index}].analysisDisposition`,
-				'Context-only sources must be represented without AST indexing or compiler-root standing.'
-			);
+			}
+			if (source.analysisDisposition === 'DEEP_INDEXED') {
+				const rootNode = source.rootNodeId === null ? undefined : nodeById.get(source.rootNodeId);
+				if (
+					source.artifactClass === 'CONTEXT_ONLY' ||
+					rootNode?.sourceId !== source.id ||
+					rootNode.parentId !== null ||
+					rootNode.kind !== ts.SyntaxKind.SourceFile ||
+					rootNode.structuralRoles.length !== 1 ||
+					rootNode.structuralRoles[0] !== AST_STRUCTURAL_ROLES.sourceFile
+				)
+					issue(
+						'DANGLING_REFERENCE',
+						`$.sources[${index}].rootNodeId`,
+						'Deep-indexed source requires one subject-owned SourceFile root AST node.'
+					);
+			} else if (
+				source.artifactClass !== 'CONTEXT_ONLY' ||
+				source.rootNodeId !== null ||
+				(nodesBySource.get(source.id)?.length ?? 0) > 0 ||
+				source.rootFile
+			) {
+				issue(
+					'INVALID_VALUE',
+					`$.sources[${index}].analysisDisposition`,
+					'Context-only sources must be represented without AST indexing or compiler-root standing.'
+				);
+			}
 		}
+		checkIdentityMismatchOfProvenancesEntry42();
 		const sourceProvenance = provenance(
 			source.provenanceId,
 			source.projectId,
@@ -2674,141 +2837,170 @@ function validateStaticSemanticSnapshotUnsafe(
 			`$.sources[${index}].provenanceId`,
 			source.id
 		);
-		if (
-			source.origin === 'UNKNOWN' ||
-			!['EXACT', 'NOT_APPLICABLE'].includes(source.mapping.state)
-		) {
-			const hasMappingLimitation = sourceProvenance?.limitations.some(
-				(limitation) =>
-					limitation.capability === 'TS_PROJECT' &&
-					limitation.closureEffect === 'DEGRADES_CLOSURE' &&
-					limitation.reason === source.mapping.reason &&
-					limitation.region === source.logicalPath &&
-					sourceProvenance.epistemic.unresolvedRegions.includes(limitation.region)
-			);
+		function checkInvalidValueOfProvenancesEntry42(): void {
 			if (
-				sourceProvenance?.epistemic.capabilityCoverage !== 'partial' ||
-				hasMappingLimitation !== true
-			)
+				source.origin === 'UNKNOWN' ||
+				!['EXACT', 'NOT_APPLICABLE'].includes(source.mapping.state)
+			) {
+				const hasMappingLimitation = sourceProvenance?.limitations.some(
+					(limitation) =>
+						limitation.capability === 'TS_PROJECT' &&
+						limitation.closureEffect === 'DEGRADES_CLOSURE' &&
+						limitation.reason === source.mapping.reason &&
+						limitation.region === source.logicalPath &&
+						sourceProvenance.epistemic.unresolvedRegions.includes(limitation.region)
+				);
+				if (
+					sourceProvenance?.epistemic.capabilityCoverage !== 'partial' ||
+					hasMappingLimitation !== true
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.sources[${index}].provenanceId`,
+						'Unknown or lossy source mapping requires partial TS_PROJECT provenance with its matching closure-degrading limitation and unresolved region.'
+					);
+			}
+			if (source.analysisDisposition === 'DEEP_INDEXED') {
+				if (source.syntaxProvenanceId === null)
+					issue(
+						'DANGLING_REFERENCE',
+						`$.sources[${index}].syntaxProvenanceId`,
+						'Deep-indexed source requires its exact TS_SYNTAX provenance binding.'
+					);
+				else
+					provenance(
+						source.syntaxProvenanceId,
+						source.projectId,
+						'TS_SYNTAX',
+						`$.sources[${index}].syntaxProvenanceId`,
+						source.id
+					);
+			} else if (source.syntaxProvenanceId !== null)
 				issue(
 					'INVALID_VALUE',
-					`$.sources[${index}].provenanceId`,
-					'Unknown or lossy source mapping requires partial TS_PROJECT provenance with its matching closure-degrading limitation and unresolved region.'
+					`$.sources[${index}].syntaxProvenanceId`,
+					'Context-only source must not claim TS_SYNTAX provenance.'
 				);
-		}
-		if (source.analysisDisposition === 'DEEP_INDEXED') {
-			if (source.syntaxProvenanceId === null)
+			if (
+				!sameMembers(
+					source.diagnosticIds,
+					(diagnosticsBySource.get(source.id) ?? []).map((diagnostic) => diagnostic.id)
+				)
+			)
 				issue(
 					'DANGLING_REFERENCE',
-					`$.sources[${index}].syntaxProvenanceId`,
-					'Deep-indexed source requires its exact TS_SYNTAX provenance binding.'
-				);
-			else
-				provenance(
-					source.syntaxProvenanceId,
-					source.projectId,
-					'TS_SYNTAX',
-					`$.sources[${index}].syntaxProvenanceId`,
-					source.id
-				);
-		} else if (source.syntaxProvenanceId !== null)
-			issue(
-				'INVALID_VALUE',
-				`$.sources[${index}].syntaxProvenanceId`,
-				'Context-only source must not claim TS_SYNTAX provenance.'
-			);
-		if (
-			!sameMembers(
-				source.diagnosticIds,
-				(diagnosticsBySource.get(source.id) ?? []).map((diagnostic) => diagnostic.id)
-			)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`$.sources[${index}].diagnosticIds`,
-				'Source diagnostic manifest must exactly cover every source-bound diagnostic.'
-			);
-		for (const diagnosticId of source.diagnosticIds)
-			if (diagnosticById.get(diagnosticId)?.sourceId !== source.id)
-				issue(
-					'CROSS_PROJECT_REFERENCE',
 					`$.sources[${index}].diagnosticIds`,
-					'Source diagnostic belongs elsewhere.'
+					'Source diagnostic manifest must exactly cover every source-bound diagnostic.'
 				);
+			for (const diagnosticId of source.diagnosticIds)
+				if (diagnosticById.get(diagnosticId)?.sourceId !== source.id)
+					issue(
+						'CROSS_PROJECT_REFERENCE',
+						`$.sources[${index}].diagnosticIds`,
+						'Source diagnostic belongs elsewhere.'
+					);
+		}
+		checkInvalidValueOfProvenancesEntry42();
 	}
+	function validateProvenances(): void {
+		for (const [index, record] of snapshot.provenances.entries())
+			validateProvenancesEntry(index, record);
+
+		for (const [index, project] of snapshot.projects.entries())
+			validateProvenancesEntry2(index, project);
+
+		for (const [index, program] of snapshot.programs.entries())
+			validateProvenancesEntry3(index, program);
+
+		for (const [index, source] of snapshot.sources.entries())
+			validateProvenancesEntry4(index, source);
+	}
+	validateProvenances();
 
 	const siblingKeys = new Set<string>();
-	for (const [index, node] of snapshot.astNodes.entries()) {
+	function validateAstNodesEntry(
+		index: number,
+		node: StaticSemanticSnapshot['astNodes'][number]
+	): void {
 		const source = sourceById.get(node.sourceId);
-		if (source?.analysisDisposition !== 'DEEP_INDEXED')
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.astNodes[${index}].sourceId`,
-				'Node source is absent or context-only.'
-			);
-		if (
-			!Number.isSafeInteger(node.fullStart) ||
-			!Number.isSafeInteger(node.start) ||
-			!Number.isSafeInteger(node.end) ||
-			node.fullStart < 0 ||
-			node.fullStart > node.start ||
-			node.start > node.end ||
-			(source && node.end > source.textLength)
-		)
-			issue('INVALID_VALUE', `$.astNodes[${index}]`, 'Node UTF-16 span is invalid.');
-		if (node.structuralRoles.length === 0 || !isCanonicalSet(node.structuralRoles))
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.astNodes[${index}].structuralRoles`,
-				'AST structural roles must be a non-empty canonical set.'
-			);
-		if (!node.structuralRoles.every((role) => SEMANTIC_AST_STRUCTURAL_ROLES.includes(role)))
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].structuralRoles`,
-				'AST structural roles must belong to the closed semantic role vocabulary.'
-			);
-		if (node.parentId === null) {
-			if (
-				node.structuralRoles.length !== 1 ||
-				node.structuralRoles[0] !== AST_STRUCTURAL_ROLES.sourceFile
-			)
+		function checkCrossProjectReferenceOfCrossProjectReferenceOfAstNodesEntry(): void {
+			if (source?.analysisDisposition !== 'DEEP_INDEXED')
 				issue(
-					'INVALID_VALUE',
-					`$.astNodes[${index}].structuralRoles`,
-					'A source root must carry exactly the source-file role.'
-				);
-		} else {
-			if (
-				!node.structuralRoles.includes(AST_STRUCTURAL_ROLES.genericChild) ||
-				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.sourceFile)
-			)
-				issue(
-					'INVALID_VALUE',
-					`$.astNodes[${index}].structuralRoles`,
-					'Every retained child must carry generic-child and must not carry source-file.'
-				);
-			const invocationRoleCount = [
-				AST_STRUCTURAL_ROLES.invocationCallee,
-				AST_STRUCTURAL_ROLES.invocationArgument,
-				AST_STRUCTURAL_ROLES.invocationTemplate
-			].filter((role) => node.structuralRoles.includes(role)).length;
-			if (invocationRoleCount > 1)
-				issue(
-					'INVALID_VALUE',
-					`$.astNodes[${index}].structuralRoles`,
-					'A child cannot simultaneously occupy multiple invocation roles.'
+					'CROSS_PROJECT_REFERENCE',
+					`$.astNodes[${index}].sourceId`,
+					'Node source is absent or context-only.'
 				);
 			if (
-				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentTarget) &&
-				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentValue)
+				!Number.isSafeInteger(node.fullStart) ||
+				!Number.isSafeInteger(node.start) ||
+				!Number.isSafeInteger(node.end) ||
+				node.fullStart < 0 ||
+				node.fullStart > node.start ||
+				node.start > node.end ||
+				(source && node.end > source.textLength)
 			)
+				issue('INVALID_VALUE', `$.astNodes[${index}]`, 'Node UTF-16 span is invalid.');
+			if (node.structuralRoles.length === 0 || !isCanonicalSet(node.structuralRoles))
 				issue(
-					'INVALID_VALUE',
+					'NONCANONICAL_ORDER',
 					`$.astNodes[${index}].structuralRoles`,
-					'A child cannot simultaneously be an assignment target and value.'
+					'AST structural roles must be a non-empty canonical set.'
 				);
 		}
+		function checkInvalidValueOfCrossProjectReferenceOfAstNodesEntry(): void {
+			if (!node.structuralRoles.every((role) => SEMANTIC_AST_STRUCTURAL_ROLES.includes(role)))
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}].structuralRoles`,
+					'AST structural roles must belong to the closed semantic role vocabulary.'
+				);
+			if (node.parentId === null) {
+				if (
+					node.structuralRoles.length !== 1 ||
+					node.structuralRoles[0] !== AST_STRUCTURAL_ROLES.sourceFile
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.astNodes[${index}].structuralRoles`,
+						'A source root must carry exactly the source-file role.'
+					);
+			} else {
+				if (
+					!node.structuralRoles.includes(AST_STRUCTURAL_ROLES.genericChild) ||
+					node.structuralRoles.includes(AST_STRUCTURAL_ROLES.sourceFile)
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.astNodes[${index}].structuralRoles`,
+						'Every retained child must carry generic-child and must not carry source-file.'
+					);
+				const invocationRoleCount = [
+					AST_STRUCTURAL_ROLES.invocationCallee,
+					AST_STRUCTURAL_ROLES.invocationArgument,
+					AST_STRUCTURAL_ROLES.invocationTemplate
+				].filter((role) => node.structuralRoles.includes(role)).length;
+				if (invocationRoleCount > 1)
+					issue(
+						'INVALID_VALUE',
+						`$.astNodes[${index}].structuralRoles`,
+						'A child cannot simultaneously occupy multiple invocation roles.'
+					);
+				if (
+					node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentTarget) &&
+					node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentValue)
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.astNodes[${index}].structuralRoles`,
+						'A child cannot simultaneously be an assignment target and value.'
+					);
+			}
+		}
+		function checkCrossProjectReferenceOfAstNodesEntry(): void {
+			checkCrossProjectReferenceOfCrossProjectReferenceOfAstNodesEntry();
+			checkInvalidValueOfCrossProjectReferenceOfAstNodesEntry();
+		}
+		checkCrossProjectReferenceOfAstNodesEntry();
 		const expected = semanticNodeId({
 			end: node.end,
 			fullStart: node.fullStart,
@@ -2819,165 +3011,191 @@ function validateStaticSemanticSnapshotUnsafe(
 			start: node.start,
 			structuralRoles: node.structuralRoles
 		});
-		if (node.id !== expected)
-			issue('IDENTITY_MISMATCH', `$.astNodes[${index}].id`, 'Node identity mismatch.');
-		if (typescriptSyntaxKindName(node.kind) !== node.kindName)
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].kindName`,
-				'AST kind code and name must agree with the public TypeScript enum.'
-			);
-		if (
-			node.publicFlags > PUBLIC_NODE_FLAG_MASK ||
-			(node.publicFlags & ~PUBLIC_NODE_FLAG_MASK) !== 0
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].publicFlags`,
-				'AST public flags must be a valid bit set from the public TypeScript NodeFlags surface.'
-			);
-		const identifierKind =
-			node.kind === ts.SyntaxKind.Identifier || node.kind === ts.SyntaxKind.PrivateIdentifier;
-		if (
-			identifierKind ? node.syntacticIdentifierText === null : node.syntacticIdentifierText !== null
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].syntacticIdentifierText`,
-				'Syntactic identifier text, including a recovered empty text, must be present exactly for Identifier and PrivateIdentifier nodes.'
-			);
-		if (
-			(node.operatorKind === null) !== (node.operatorName === null) ||
-			(node.operatorKind !== null &&
-				typescriptSyntaxKindName(node.operatorKind) !== node.operatorName)
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}]`,
-				'AST operator code and name must be present together and agree with the public TypeScript enum.'
-			);
-		if (node.hasAssignmentInitializer && !canHaveAssignmentInitializer(node.kind))
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].hasAssignmentInitializer`,
-				'Only the exact TypeScript syntax kinds with assignment initializers may assert one.'
-			);
-		if (
-			node.operatorKind !== null &&
-			![
-				ts.SyntaxKind.BinaryExpression,
-				ts.SyntaxKind.PrefixUnaryExpression,
-				ts.SyntaxKind.PostfixUnaryExpression
-			].includes(node.kind)
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].operatorKind`,
-				'Only retained operator-bearing expression nodes may carry an operator.'
-			);
-		if (
-			[
-				ts.SyntaxKind.BinaryExpression,
-				ts.SyntaxKind.PrefixUnaryExpression,
-				ts.SyntaxKind.PostfixUnaryExpression
-			].includes(node.kind) &&
-			node.operatorKind === null
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes[${index}].operatorKind`,
-				'Retained operator-bearing expression nodes require their public SyntaxKind operator.'
-			);
-		if (node.parentId !== null) {
-			const parent = nodeById.get(node.parentId);
-			if (!parent)
-				issue('DANGLING_REFERENCE', `$.astNodes[${index}].parentId`, 'Parent node is absent.');
-			else if (
-				parent.sourceId !== node.sourceId ||
-				parent.fullStart > node.fullStart ||
-				parent.end < node.end
+		function checkIdentityMismatchOfAstNodesEntry(): void {
+			if (node.id !== expected)
+				issue('IDENTITY_MISMATCH', `$.astNodes[${index}].id`, 'Node identity mismatch.');
+			if (typescriptSyntaxKindName(node.kind) !== node.kindName)
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}].kindName`,
+					'AST kind code and name must agree with the public TypeScript enum.'
+				);
+			if (
+				node.publicFlags > PUBLIC_NODE_FLAG_MASK ||
+				(node.publicFlags & ~PUBLIC_NODE_FLAG_MASK) !== 0
 			)
 				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`$.astNodes[${index}].parentId`,
-					'Parent is from another source or does not contain the child.'
+					'INVALID_VALUE',
+					`$.astNodes[${index}].publicFlags`,
+					'AST public flags must be a valid bit set from the public TypeScript NodeFlags surface.'
 				);
-			else {
-				const invocationRoles: ReadonlySet<string> = new Set<string>([
-					AST_STRUCTURAL_ROLES.invocationCallee,
-					AST_STRUCTURAL_ROLES.invocationArgument,
-					AST_STRUCTURAL_ROLES.invocationTemplate
-				]);
-				if (
-					node.structuralRoles.some((role) => invocationRoles.has(role)) &&
-					semanticInvocationKind(parent.kind) === null
-				)
-					issue(
-						'INVALID_VALUE',
-						`$.astNodes[${index}].structuralRoles`,
-						'Invocation structural roles require an invocation parent.'
-					);
-				if (
-					node.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName) &&
-					semanticDeclarationCandidateRole(parent.kind) === null
-				)
-					issue(
-						'INVALID_VALUE',
-						`$.astNodes[${index}].structuralRoles`,
-						'Declaration-name roles require a declaration-candidate parent.'
-					);
-				if (
-					(node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentTarget) ||
-						node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentValue)) &&
-					semanticAssignmentKind(parent) === null
-				)
-					issue(
-						'INVALID_VALUE',
-						`$.astNodes[${index}].structuralRoles`,
-						'Assignment structural roles require an assignment-bearing parent.'
-					);
+		}
+		checkIdentityMismatchOfAstNodesEntry();
+		const identifierKind =
+			node.kind === ts.SyntaxKind.Identifier || node.kind === ts.SyntaxKind.PrivateIdentifier;
+		function checkInvalidValueOfInvalidValueOfAstNodesEntry(): void {
+			if (
+				identifierKind
+					? node.syntacticIdentifierText === null
+					: node.syntacticIdentifierText !== null
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}].syntacticIdentifierText`,
+					'Syntactic identifier text, including a recovered empty text, must be present exactly for Identifier and PrivateIdentifier nodes.'
+				);
+			if (
+				(node.operatorKind === null) !== (node.operatorName === null) ||
+				(node.operatorKind !== null &&
+					typescriptSyntaxKindName(node.operatorKind) !== node.operatorName)
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}]`,
+					'AST operator code and name must be present together and agree with the public TypeScript enum.'
+				);
+		}
+		function checkInvalidValueOfInvalidValueOfAstNodesEntry2(): void {
+			if (node.hasAssignmentInitializer && !canHaveAssignmentInitializer(node.kind))
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}].hasAssignmentInitializer`,
+					'Only the exact TypeScript syntax kinds with assignment initializers may assert one.'
+				);
+			if (
+				node.operatorKind !== null &&
+				![
+					ts.SyntaxKind.BinaryExpression,
+					ts.SyntaxKind.PrefixUnaryExpression,
+					ts.SyntaxKind.PostfixUnaryExpression
+				].includes(node.kind)
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}].operatorKind`,
+					'Only retained operator-bearing expression nodes may carry an operator.'
+				);
+		}
+		function checkInvalidValueOfInvalidValueOfInvalidValueOfAstNodesEntry(): void {
+			if (
+				[
+					ts.SyntaxKind.BinaryExpression,
+					ts.SyntaxKind.PrefixUnaryExpression,
+					ts.SyntaxKind.PostfixUnaryExpression
+				].includes(node.kind) &&
+				node.operatorKind === null
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.astNodes[${index}].operatorKind`,
+					'Retained operator-bearing expression nodes require their public SyntaxKind operator.'
+				);
+		}
+		function checkDanglingReferenceOfInvalidValueOfInvalidValueOfAstNodesEntry(): void {
+			if (node.parentId !== null) {
+				function applyDanglingReferenceOfInvalidValueOfInvalidValueOfAstNodesEntry(): void {
+					// Re-asserts the caller's guard so the narrowing survives the function boundary.
+					if (node.parentId === null) return;
+					const parent = nodeById.get(node.parentId);
+					if (!parent)
+						issue('DANGLING_REFERENCE', `$.astNodes[${index}].parentId`, 'Parent node is absent.');
+					else if (
+						parent.sourceId !== node.sourceId ||
+						parent.fullStart > node.fullStart ||
+						parent.end < node.end
+					)
+						issue(
+							'CROSS_PROJECT_REFERENCE',
+							`$.astNodes[${index}].parentId`,
+							'Parent is from another source or does not contain the child.'
+						);
+					else {
+						const invocationRoles: ReadonlySet<string> = new Set<string>([
+							AST_STRUCTURAL_ROLES.invocationCallee,
+							AST_STRUCTURAL_ROLES.invocationArgument,
+							AST_STRUCTURAL_ROLES.invocationTemplate
+						]);
+						if (
+							node.structuralRoles.some((role) => invocationRoles.has(role)) &&
+							semanticInvocationKind(parent.kind) === null
+						)
+							issue(
+								'INVALID_VALUE',
+								`$.astNodes[${index}].structuralRoles`,
+								'Invocation structural roles require an invocation parent.'
+							);
+						if (
+							node.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName) &&
+							semanticDeclarationCandidateRole(parent.kind) === null
+						)
+							issue(
+								'INVALID_VALUE',
+								`$.astNodes[${index}].structuralRoles`,
+								'Declaration-name roles require a declaration-candidate parent.'
+							);
+						if (
+							(node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentTarget) ||
+								node.structuralRoles.includes(AST_STRUCTURAL_ROLES.assignmentValue)) &&
+							semanticAssignmentKind(parent) === null
+						)
+							issue(
+								'INVALID_VALUE',
+								`$.astNodes[${index}].structuralRoles`,
+								'Assignment structural roles require an assignment-bearing parent.'
+							);
+					}
+				}
+				applyDanglingReferenceOfInvalidValueOfInvalidValueOfAstNodesEntry();
 			}
 		}
+		function checkInvalidValueOfInvalidValueOfAstNodesEntry3(): void {
+			checkInvalidValueOfInvalidValueOfInvalidValueOfAstNodesEntry();
+			checkDanglingReferenceOfInvalidValueOfInvalidValueOfAstNodesEntry();
+		}
+		function checkInvalidValueOfAstNodesEntry(): void {
+			checkInvalidValueOfInvalidValueOfAstNodesEntry();
+			checkInvalidValueOfInvalidValueOfAstNodesEntry2();
+			checkInvalidValueOfInvalidValueOfAstNodesEntry3();
+		}
+		checkInvalidValueOfAstNodesEntry();
 		const siblingKey = `${node.sourceId}\0${node.parentId ?? '<root>'}\0${node.siblingOrdinal}`;
-		if (siblingKeys.has(siblingKey))
-			issue(
-				'DUPLICATE_ID',
-				`$.astNodes[${index}]`,
-				'Absolute sibling ordinal must be unique within a parent regardless of structural role.'
-			);
-		siblingKeys.add(siblingKey);
+		function checkDuplicateIdOfAstNodesEntry(): void {
+			if (siblingKeys.has(siblingKey))
+				issue(
+					'DUPLICATE_ID',
+					`$.astNodes[${index}]`,
+					'Absolute sibling ordinal must be unique within a parent regardless of structural role.'
+				);
+			siblingKeys.add(siblingKey);
+		}
+		checkDuplicateIdOfAstNodesEntry();
 	}
-	for (const [parentId, children] of childrenByParent) {
-		const ordinals = children
-			.map((node) => node.siblingOrdinal)
-			.sort((left, right) => left - right);
-		if (!ordinals.every((ordinal, index) => ordinal === index))
-			issue(
-				'INVALID_VALUE',
-				`$.astNodes.${parentId}`,
-				'Retained children must use the contiguous absolute order produced by the named AST traversal profile.'
-			);
-	}
-	for (const [sourceIndex, source] of snapshot.sources.entries()) {
-		if (source.analysisDisposition !== 'DEEP_INDEXED') continue;
+	function validateAstNodesEntry3(
+		sourceIndex: number,
+		source: StaticSemanticSnapshot['sources'][number]
+	): void {
+		if (source.analysisDisposition !== 'DEEP_INDEXED') return;
 		const sourceNodes = nodesBySource.get(source.id) ?? [];
 		const roots = sourceNodes.filter((node) => node.parentId === null);
-		if (
-			source.rootNodeId === null ||
-			roots.length !== 1 ||
-			roots[0]?.id !== source.rootNodeId ||
-			roots[0]?.kind !== ts.SyntaxKind.SourceFile ||
-			roots[0]?.siblingOrdinal !== 0
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`$.sources[${sourceIndex}].rootNodeId`,
-				'Deep-indexed source requires exactly one declared SourceFile root node at absolute ordinal zero.'
-			);
+		function checkDanglingReferenceOfAstNodesEntry3(): void {
+			if (
+				source.rootNodeId === null ||
+				roots.length !== 1 ||
+				roots[0]?.id !== source.rootNodeId ||
+				roots[0]?.kind !== ts.SyntaxKind.SourceFile ||
+				roots[0]?.siblingOrdinal !== 0
+			)
+				issue(
+					'DANGLING_REFERENCE',
+					`$.sources[${sourceIndex}].rootNodeId`,
+					'Deep-indexed source requires exactly one declared SourceFile root node at absolute ordinal zero.'
+				);
+		}
+		checkDanglingReferenceOfAstNodesEntry3();
 		const depthById = new Map<string, number>();
 		const terminalById = new Map<string, string | null>();
-		for (const node of sourceNodes) {
-			if (depthById.has(node.id)) continue;
+		function applyAstDepthBudget(node: (typeof sourceNodes)[number]): void {
+			if (depthById.has(node.id)) return;
 			const chain: StaticSemanticSnapshot['astNodes'][number][] = [];
 			const chainPositions = new Map<string, number>();
 			let cursor = node;
@@ -3022,41 +3240,74 @@ function validateStaticSemanticSnapshotUnsafe(
 					depthById.set(member.id, -1);
 					terminalById.set(member.id, null);
 				}
-				continue;
+				return;
 			}
 			let depth = baseDepth;
-			for (let chainIndex = chain.length - 1; chainIndex >= 0; chainIndex -= 1) {
-				const member = chain[chainIndex]!;
-				depth += 1;
-				depthById.set(member.id, depth);
-				terminalById.set(member.id, terminal);
-				if (depth > snapshot.budgets.maxAstDepth)
+			function checkBudgetsMaxastdepthOfapplyAstDepthBudget(): void {
+				for (let chainIndex = chain.length - 1; chainIndex >= 0; chainIndex -= 1) {
+					const member = chain[chainIndex]!;
+					depth += 1;
+					depthById.set(member.id, depth);
+					terminalById.set(member.id, terminal);
+					if (depth > snapshot.budgets.maxAstDepth)
+						issue(
+							'INVALID_VALUE',
+							'$.budgets.maxAstDepth',
+							`AST node ${member.id} exceeds the producing depth budget.`
+						);
+				}
+			}
+			checkBudgetsMaxastdepthOfapplyAstDepthBudget();
+			function checkDanglingReferenceOfapplyAstDepthBudget(): void {
+				if (terminal !== source.rootNodeId)
 					issue(
-						'INVALID_VALUE',
-						'$.budgets.maxAstDepth',
-						`AST node ${member.id} exceeds the producing depth budget.`
+						'DANGLING_REFERENCE',
+						`$.astNodes.${node.id}`,
+						'Every AST node must reach its declared source root.'
 					);
 			}
-			if (terminal !== source.rootNodeId)
+			checkDanglingReferenceOfapplyAstDepthBudget();
+		}
+		function checkBudgetsMaxAstDepthOfAstNodesEntry3(): void {
+			for (const node of sourceNodes) applyAstDepthBudget(node);
+		}
+		checkBudgetsMaxAstDepthOfAstNodesEntry3();
+	}
+	function validateAstNodes(): void {
+		for (const [index, node] of snapshot.astNodes.entries()) validateAstNodesEntry(index, node);
+		for (const [parentId, children] of childrenByParent) {
+			const ordinals = children
+				.map((node) => node.siblingOrdinal)
+				.sort((left, right) => left - right);
+			if (!ordinals.every((ordinal, index) => ordinal === index))
 				issue(
-					'DANGLING_REFERENCE',
-					`$.astNodes.${node.id}`,
-					'Every AST node must reach its declared source root.'
+					'INVALID_VALUE',
+					`$.astNodes.${parentId}`,
+					'Retained children must use the contiguous absolute order produced by the named AST traversal profile.'
 				);
 		}
+		for (const [sourceIndex, source] of snapshot.sources.entries())
+			validateAstNodesEntry3(sourceIndex, source);
 	}
+	validateAstNodes();
 
 	const globalScopesByProgram = new Map<string, StaticSemanticSnapshot['scopes'][number][]>();
 	const sourceRootScopesBySource = new Map<string, StaticSemanticSnapshot['scopes'][number][]>();
 	const scopesByOwnerNode = new Map<string, StaticSemanticSnapshot['scopes'][number][]>();
-	for (const [index, scope] of snapshot.scopes.entries()) {
+	function validateScopesEntry(
+		index: number,
+		scope: StaticSemanticSnapshot['scopes'][number]
+	): void {
 		const jsonPath = `$.scopes[${index}]`;
 		const project = projectById.get(scope.projectId);
 		const program = programById.get(scope.programId);
-		if (project === undefined || program === undefined)
-			issue('DANGLING_REFERENCE', jsonPath, 'Scope project or Program is absent.');
-		else if (project.programId !== scope.programId || program.projectId !== scope.projectId)
-			issue('CROSS_PROJECT_REFERENCE', jsonPath, 'Scope project and Program ownership disagree.');
+		function checkDanglingReferenceOfScopesEntry(): void {
+			if (project === undefined || program === undefined)
+				issue('DANGLING_REFERENCE', jsonPath, 'Scope project or Program is absent.');
+			else if (project.programId !== scope.programId || program.projectId !== scope.projectId)
+				issue('CROSS_PROJECT_REFERENCE', jsonPath, 'Scope project and Program ownership disagree.');
+		}
+		checkDanglingReferenceOfScopesEntry();
 
 		const expectedId = semanticScopeId({
 			domain: scope.domain,
@@ -3067,8 +3318,11 @@ function validateStaticSemanticSnapshotUnsafe(
 			sourceId: scope.sourceId,
 			start: scope.start
 		});
-		if (scope.id !== expectedId)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Scope identity mismatch.');
+		function checkIdentityMismatchOfScopesEntry(): void {
+			if (scope.id !== expectedId)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Scope identity mismatch.');
+		}
+		checkIdentityMismatchOfScopesEntry();
 
 		if (scope.kind === 'PROGRAM_GLOBAL') {
 			appendGrouped(globalScopesByProgram, scope.programId, scope);
@@ -3093,171 +3347,199 @@ function validateStaticSemanticSnapshotUnsafe(
 					'Program-global scope must not invent a source, parent, owner, or span.'
 				);
 			scopeDerivedProvenance(scope.provenanceId, scope.projectId, `${jsonPath}.provenanceId`);
-			continue;
+			return;
 		}
 
 		const source = scope.sourceId === null ? undefined : sourceById.get(scope.sourceId);
-		if (source === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Lexical scope source is absent.');
-		else if (source.projectId !== scope.projectId || source.programId !== scope.programId)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`${jsonPath}.sourceId`,
-				'Lexical scope source belongs to another project or Program.'
-			);
-		if (
-			scope.start === null ||
-			scope.end === null ||
-			!Number.isSafeInteger(scope.start) ||
-			!Number.isSafeInteger(scope.end) ||
-			scope.start < 0 ||
-			scope.start > scope.end ||
-			(source !== undefined && scope.end > source.textLength)
-		)
-			issue('INVALID_VALUE', jsonPath, 'Lexical-scope UTF-16 span is invalid.');
-		if (
-			scope.ownerKind === null ||
-			scope.ownerKindName === null ||
-			typescriptSyntaxKindName(scope.ownerKind) !== scope.ownerKindName
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.ownerKindName`,
-				'Scope owner kind code and name must agree with the public TypeScript enum.'
-			);
-		if (scope.ownerNodeId !== null) appendGrouped(scopesByOwnerNode, scope.ownerNodeId, scope);
+		function checkDanglingReferenceOfScopesEntry2(): void {
+			if (source === undefined)
+				issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Lexical scope source is absent.');
+			else if (source.projectId !== scope.projectId || source.programId !== scope.programId)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`${jsonPath}.sourceId`,
+					'Lexical scope source belongs to another project or Program.'
+				);
+			if (
+				scope.start === null ||
+				scope.end === null ||
+				!Number.isSafeInteger(scope.start) ||
+				!Number.isSafeInteger(scope.end) ||
+				scope.start < 0 ||
+				scope.start > scope.end ||
+				(source !== undefined && scope.end > source.textLength)
+			)
+				issue('INVALID_VALUE', jsonPath, 'Lexical-scope UTF-16 span is invalid.');
+			if (
+				scope.ownerKind === null ||
+				scope.ownerKindName === null ||
+				typescriptSyntaxKindName(scope.ownerKind) !== scope.ownerKindName
+			)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.ownerKindName`,
+					'Scope owner kind code and name must agree with the public TypeScript enum.'
+				);
+			if (scope.ownerNodeId !== null) appendGrouped(scopesByOwnerNode, scope.ownerNodeId, scope);
+		}
+		checkDanglingReferenceOfScopesEntry2();
 		const expectedDescriptor =
 			scope.ownerKind === null || source === undefined
 				? null
 				: semanticScopeBoundaryDescriptor(scope.ownerKind, source.moduleKind);
-		if (expectedDescriptor?.kind !== scope.kind || expectedDescriptor.domain !== scope.domain)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.kind`,
-				'Scope kind and domain must exactly match the supported owner-syntax taxonomy.'
-			);
-		if (
-			(scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE') !==
-			(scope.ownerKind === ts.SyntaxKind.SourceFile)
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.kind`,
-				'Only a source-root scope may be owned by a SourceFile.'
-			);
-		if (scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE') {
-			if (scope.sourceId !== null) appendGrouped(sourceRootScopesBySource, scope.sourceId, scope);
+		function checkInvalidValueOfScopesEntry(): void {
+			if (expectedDescriptor?.kind !== scope.kind || expectedDescriptor.domain !== scope.domain)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.kind`,
+					'Scope kind and domain must exactly match the supported owner-syntax taxonomy.'
+				);
 			if (
-				source !== undefined &&
-				(scope.kind !== semanticSourceScopeKind(source.moduleKind) ||
-					scope.end !== source.textLength)
+				(scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE') !==
+				(scope.ownerKind === ts.SyntaxKind.SourceFile)
 			)
 				issue(
 					'INVALID_VALUE',
-					jsonPath,
-					'Source-root scope must reproduce the source module role and terminal source extent.'
+					`${jsonPath}.kind`,
+					'Only a source-root scope may be owned by a SourceFile.'
 				);
-		}
-
-		const ownerNode = scope.ownerNodeId === null ? undefined : nodeById.get(scope.ownerNodeId);
-		if (source?.analysisDisposition === 'DEEP_INDEXED' && ownerNode === undefined)
-			issue(
-				'DANGLING_REFERENCE',
-				`${jsonPath}.ownerNodeId`,
-				'Deep-indexed lexical scope requires its retained public AST owner node.'
-			);
-		if (source?.analysisDisposition === 'CONTEXT_ONLY' && scope.ownerNodeId !== null)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.ownerNodeId`,
-				'Context-only lexical scope must not claim an AST owner node.'
-			);
-		if (
-			ownerNode !== undefined &&
-			(ownerNode.sourceId !== scope.sourceId ||
-				ownerNode.kind !== scope.ownerKind ||
-				ownerNode.kindName !== scope.ownerKindName ||
-				ownerNode.start !== scope.start ||
-				ownerNode.end !== scope.end)
-		)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`${jsonPath}.ownerNodeId`,
-				'Scope owner node must reproduce the same source, kind, and span.'
-			);
-
-		const parent = scope.parentScopeId === null ? undefined : scopeById.get(scope.parentScopeId);
-		if (parent === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.parentScopeId`, 'Lexical scope parent is absent.');
-		else {
-			if (parent.projectId !== scope.projectId || parent.programId !== scope.programId)
-				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`${jsonPath}.parentScopeId`,
-					'Lexical scope parent belongs to another project or Program.'
-				);
-			const isSourceRoot = scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE';
-			if (isSourceRoot ? parent.kind !== 'PROGRAM_GLOBAL' : parent.kind === 'PROGRAM_GLOBAL')
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.parentScopeId`,
-					'Source roots alone are direct children of the Program-global scope.'
-				);
-			if (parent.kind !== 'PROGRAM_GLOBAL') {
-				if (parent.sourceId !== scope.sourceId)
-					issue(
-						'CROSS_PROJECT_REFERENCE',
-						`${jsonPath}.parentScopeId`,
-						'Nested lexical scope and parent must share a source.'
-					);
+			if (scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE') {
+				if (scope.sourceId !== null) appendGrouped(sourceRootScopesBySource, scope.sourceId, scope);
 				if (
-					parent.start !== null &&
-					parent.end !== null &&
-					scope.start !== null &&
-					scope.end !== null &&
-					(parent.start > scope.start || parent.end < scope.end)
+					source !== undefined &&
+					(scope.kind !== semanticSourceScopeKind(source.moduleKind) ||
+						scope.end !== source.textLength)
 				)
 					issue(
 						'INVALID_VALUE',
-						`${jsonPath}.parentScopeId`,
-						'Nested lexical-scope span must be contained by its parent.'
+						jsonPath,
+						'Source-root scope must reproduce the source module role and terminal source extent.'
 					);
 			}
 		}
-		if (source !== undefined)
-			scopeDerivedProvenance(
-				scope.provenanceId,
-				scope.projectId,
-				`${jsonPath}.provenanceId`,
-				source.id
-			);
-	}
+		checkInvalidValueOfScopesEntry();
 
-	for (const [index, program] of snapshot.programs.entries())
+		const ownerNode = scope.ownerNodeId === null ? undefined : nodeById.get(scope.ownerNodeId);
+		function checkDanglingReferenceOfScopesEntry3(): void {
+			if (source?.analysisDisposition === 'DEEP_INDEXED' && ownerNode === undefined)
+				issue(
+					'DANGLING_REFERENCE',
+					`${jsonPath}.ownerNodeId`,
+					'Deep-indexed lexical scope requires its retained public AST owner node.'
+				);
+			if (source?.analysisDisposition === 'CONTEXT_ONLY' && scope.ownerNodeId !== null)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.ownerNodeId`,
+					'Context-only lexical scope must not claim an AST owner node.'
+				);
+			if (
+				ownerNode !== undefined &&
+				(ownerNode.sourceId !== scope.sourceId ||
+					ownerNode.kind !== scope.ownerKind ||
+					ownerNode.kindName !== scope.ownerKindName ||
+					ownerNode.start !== scope.start ||
+					ownerNode.end !== scope.end)
+			)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`${jsonPath}.ownerNodeId`,
+					'Scope owner node must reproduce the same source, kind, and span.'
+				);
+		}
+		checkDanglingReferenceOfScopesEntry3();
+
+		const parent = scope.parentScopeId === null ? undefined : scopeById.get(scope.parentScopeId);
+		function checkDanglingReferenceOfDanglingReferenceOfScopesEntry(): void {
+			if (parent === undefined) {
+				function applyMissingScopeParent(): void {
+					issue(
+						'DANGLING_REFERENCE',
+						`${jsonPath}.parentScopeId`,
+						'Lexical scope parent is absent.'
+					);
+				}
+				applyMissingScopeParent();
+			} else {
+				function applyPresentScopeParent(): void {
+					// Re-asserts the caller's guard so the narrowing survives the function boundary.
+					if (parent === undefined) return;
+					if (parent.projectId !== scope.projectId || parent.programId !== scope.programId)
+						issue(
+							'CROSS_PROJECT_REFERENCE',
+							`${jsonPath}.parentScopeId`,
+							'Lexical scope parent belongs to another project or Program.'
+						);
+					const isSourceRoot = scope.kind === 'SOURCE_SCRIPT' || scope.kind === 'SOURCE_MODULE';
+					if (isSourceRoot ? parent.kind !== 'PROGRAM_GLOBAL' : parent.kind === 'PROGRAM_GLOBAL')
+						issue(
+							'INVALID_VALUE',
+							`${jsonPath}.parentScopeId`,
+							'Source roots alone are direct children of the Program-global scope.'
+						);
+					if (parent.kind !== 'PROGRAM_GLOBAL') {
+						if (parent.sourceId !== scope.sourceId)
+							issue(
+								'CROSS_PROJECT_REFERENCE',
+								`${jsonPath}.parentScopeId`,
+								'Nested lexical scope and parent must share a source.'
+							);
+						if (
+							parent.start !== null &&
+							parent.end !== null &&
+							scope.start !== null &&
+							scope.end !== null &&
+							(parent.start > scope.start || parent.end < scope.end)
+						)
+							issue(
+								'INVALID_VALUE',
+								`${jsonPath}.parentScopeId`,
+								'Nested lexical-scope span must be contained by its parent.'
+							);
+					}
+				}
+				applyPresentScopeParent();
+			}
+		}
+		function checkDanglingReferenceOfScopesEntryGroup(): void {
+			if (source !== undefined)
+				scopeDerivedProvenance(
+					scope.provenanceId,
+					scope.projectId,
+					`${jsonPath}.provenanceId`,
+					source.id
+				);
+		}
+		function checkDanglingReferenceOfScopesEntry4(): void {
+			checkDanglingReferenceOfDanglingReferenceOfScopesEntry();
+			checkDanglingReferenceOfScopesEntryGroup();
+		}
+		checkDanglingReferenceOfScopesEntry4();
+	}
+	function validateScopesEntry2(
+		index: number,
+		program: StaticSemanticSnapshot['programs'][number]
+	): void {
 		if ((globalScopesByProgram.get(program.id)?.length ?? 0) !== 1)
 			issue(
 				'POPULATION_MISMATCH',
 				`$.programs[${index}].id`,
 				'Every Program requires exactly one Program-global scope.'
 			);
-	for (const [index, source] of snapshot.sources.entries())
+	}
+	function validateScopesEntry3(
+		index: number,
+		source: StaticSemanticSnapshot['sources'][number]
+	): void {
 		if ((sourceRootScopesBySource.get(source.id)?.length ?? 0) !== 1)
 			issue(
 				'POPULATION_MISMATCH',
 				`$.sources[${index}].id`,
 				'Every Program source requires exactly one source-root lexical scope.'
 			);
-
-	for (const [ownerNodeId, ownedScopes] of scopesByOwnerNode)
-		if (ownedScopes.length !== 1)
-			issue(
-				'DUPLICATE_ID',
-				'$.scopes',
-				`Retained scope owner ${ownerNodeId} must own exactly one semantic scope.`
-			);
-
-	for (const source of snapshot.sources) {
-		if (source.analysisDisposition !== 'DEEP_INDEXED') continue;
+	}
+	function validateScopesEntry5(source: StaticSemanticSnapshot['sources'][number]): void {
+		if (source.analysisDisposition !== 'DEEP_INDEXED') return;
 		for (const node of nodesBySource.get(source.id) ?? []) {
 			const descriptor = semanticScopeBoundaryDescriptor(node.kind, source.moduleKind);
 			const ownedScopes = scopesByOwnerNode.get(node.id) ?? [];
@@ -3269,11 +3551,13 @@ function validateStaticSemanticSnapshotUnsafe(
 				);
 		}
 	}
-
-	for (const [index, scope] of snapshot.scopes.entries()) {
-		if (scope.ownerNodeId === null) continue;
+	function validateScopesEntry6(
+		index: number,
+		scope: StaticSemanticSnapshot['scopes'][number]
+	): void {
+		if (scope.ownerNodeId === null) return;
 		const owner = nodeById.get(scope.ownerNodeId);
-		if (owner === undefined) continue;
+		if (owner === undefined) return;
 		let expectedParent: StaticSemanticSnapshot['scopes'][number] | undefined;
 		if (owner.parentId === null) {
 			expectedParent = (globalScopesByProgram.get(scope.programId) ?? [])[0];
@@ -3298,8 +3582,10 @@ function validateStaticSemanticSnapshotUnsafe(
 				'Scope parent must be the exact nearest supported retained boundary scope.'
 			);
 	}
-
-	for (const [index, scope] of snapshot.scopes.entries()) {
+	function validateScopesEntry7(
+		index: number,
+		scope: StaticSemanticSnapshot['scopes'][number]
+	): void {
 		const seen = new Set<string>();
 		let cursor: StaticSemanticSnapshot['scopes'][number] | undefined = scope;
 		let terminal: StaticSemanticSnapshot['scopes'][number] | undefined;
@@ -3328,6 +3614,28 @@ function validateStaticSemanticSnapshotUnsafe(
 				'Every scope must reach the one Program-global scope in its Program.'
 			);
 	}
+	function validateScopes(): void {
+		for (const [index, scope] of snapshot.scopes.entries()) validateScopesEntry(index, scope);
+
+		for (const [index, program] of snapshot.programs.entries())
+			validateScopesEntry2(index, program);
+		for (const [index, source] of snapshot.sources.entries()) validateScopesEntry3(index, source);
+
+		for (const [ownerNodeId, ownedScopes] of scopesByOwnerNode)
+			if (ownedScopes.length !== 1)
+				issue(
+					'DUPLICATE_ID',
+					'$.scopes',
+					`Retained scope owner ${ownerNodeId} must own exactly one semantic scope.`
+				);
+
+		for (const source of snapshot.sources) validateScopesEntry5(source);
+
+		for (const [index, scope] of snapshot.scopes.entries()) validateScopesEntry6(index, scope);
+
+		for (const [index, scope] of snapshot.scopes.entries()) validateScopesEntry7(index, scope);
+	}
+	validateScopes();
 
 	function bindingElementVariableDeclaration(
 		node: StaticSemanticSnapshot['astNodes'][number]
@@ -3420,15 +3728,18 @@ function validateStaticSemanticSnapshotUnsafe(
 	}
 
 	const conditionalWithInfer = new Set<string>();
-	for (const inferNode of snapshot.astNodes.filter(
-		(node) => node.kind === ts.SyntaxKind.InferType
-	)) {
-		let cursor = inferNode.parentId === null ? undefined : nodeById.get(inferNode.parentId);
-		while (cursor !== undefined) {
-			if (cursor.kind === ts.SyntaxKind.ConditionalType) conditionalWithInfer.add(cursor.id);
-			cursor = cursor.parentId === null ? undefined : nodeById.get(cursor.parentId);
+	function validateAstNodes2(): void {
+		for (const inferNode of snapshot.astNodes.filter(
+			(node) => node.kind === ts.SyntaxKind.InferType
+		)) {
+			let cursor = inferNode.parentId === null ? undefined : nodeById.get(inferNode.parentId);
+			while (cursor !== undefined) {
+				if (cursor.kind === ts.SyntaxKind.ConditionalType) conditionalWithInfer.add(cursor.id);
+				cursor = cursor.parentId === null ? undefined : nodeById.get(cursor.parentId);
+			}
 		}
 	}
+	validateAstNodes2();
 
 	function variableEnvironmentNode(
 		node: StaticSemanticSnapshot['astNodes'][number]
@@ -3490,22 +3801,25 @@ function validateStaticSemanticSnapshotUnsafe(
 	}
 
 	const directEvalEnvironments = new Set<string>();
-	for (const call of snapshot.astNodes.filter(
-		(node) => node.kind === ts.SyntaxKind.CallExpression
-	)) {
-		if ((call.publicFlags & ts.NodeFlags.OptionalChain) !== 0) continue;
-		const callee = (childrenByParent.get(call.id) ?? []).find((child) =>
-			child.structuralRoles.includes('invocation-callee')
-		);
-		const unwrapped = callee === undefined ? undefined : transparentEvalCalleeNode(callee);
-		if (
-			unwrapped?.kind === ts.SyntaxKind.Identifier &&
-			unwrapped.syntacticIdentifierText === 'eval'
-		) {
-			const environment = variableEnvironmentNode(call);
-			if (environment !== undefined) directEvalEnvironments.add(environment.id);
+	function validateAstNodes3(): void {
+		for (const call of snapshot.astNodes.filter(
+			(node) => node.kind === ts.SyntaxKind.CallExpression
+		)) {
+			if ((call.publicFlags & ts.NodeFlags.OptionalChain) !== 0) continue;
+			const callee = (childrenByParent.get(call.id) ?? []).find((child) =>
+				child.structuralRoles.includes('invocation-callee')
+			);
+			const unwrapped = callee === undefined ? undefined : transparentEvalCalleeNode(callee);
+			if (
+				unwrapped?.kind === ts.SyntaxKind.Identifier &&
+				unwrapped.syntacticIdentifierText === 'eval'
+			) {
+				const environment = variableEnvironmentNode(call);
+				if (environment !== undefined) directEvalEnvironments.add(environment.id);
+			}
 		}
 	}
+	validateAstNodes3();
 
 	function referenceRequiresUnsupportedScopeLink(
 		node: StaticSemanticSnapshot['astNodes'][number]
@@ -3733,113 +4047,132 @@ function validateStaticSemanticSnapshotUnsafe(
 			);
 	}
 
-	for (const [index, candidate] of snapshot.declarationCandidates.entries()) {
+	function validateDeclarationCandidatesEntry(
+		index: number,
+		candidate: StaticSemanticSnapshot['declarationCandidates'][number]
+	): void {
 		const node = nodeById.get(candidate.nodeId);
-		if (node?.sourceId !== candidate.sourceId)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.declarationCandidates[${index}].nodeId`,
-				'Declaration-candidate node belongs elsewhere or is absent.'
-			);
-		if (candidate.nameNodeId !== null)
-			nodeReference(
-				candidate.nameNodeId,
-				candidate.sourceId,
-				`$.declarationCandidates[${index}].nameNodeId`
-			);
+		function checkCrossProjectReferenceOfDeclarationCandidatesEntry(): void {
+			if (node?.sourceId !== candidate.sourceId)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`$.declarationCandidates[${index}].nodeId`,
+					'Declaration-candidate node belongs elsewhere or is absent.'
+				);
+			if (candidate.nameNodeId !== null)
+				nodeReference(
+					candidate.nameNodeId,
+					candidate.sourceId,
+					`$.declarationCandidates[${index}].nameNodeId`
+				);
+		}
+		checkCrossProjectReferenceOfDeclarationCandidatesEntry();
 		const nameNode = candidate.nameNodeId === null ? undefined : nodeById.get(candidate.nameNodeId);
-		if (
-			nameNode !== undefined &&
-			(nameNode.parentId !== candidate.nodeId ||
-				!nameNode.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName))
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].nameNodeId`,
-				'Candidate name must be the retained declaration-name child of the candidate node.'
-			);
+		function checkInvalidValueOfDeclarationCandidatesEntry(): void {
+			if (
+				nameNode !== undefined &&
+				(nameNode.parentId !== candidate.nodeId ||
+					!nameNode.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName))
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}].nameNodeId`,
+					'Candidate name must be the retained declaration-name child of the candidate node.'
+				);
+		}
+		checkInvalidValueOfDeclarationCandidatesEntry();
 		const expectedNameState =
 			nameNode === undefined
 				? 'ANONYMOUS'
 				: semanticDeclarationNameState(nameNode.kind, nameNode.syntacticIdentifierText);
-		if (expectedNameState === null || candidate.nameState !== expectedNameState)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].nameState`,
-				'Declaration name state must be derived exactly from the retained name-node SyntaxKind.'
-			);
-		if (
-			node !== undefined &&
-			(!declarationCandidateMatchesNode(node.kind, candidate.candidateRole, candidate.nameState) ||
-				candidate.syntaxKind !== node.kind ||
-				candidate.syntaxKindName !== node.kindName ||
-				typescriptSyntaxKindName(candidate.syntaxKind) !== candidate.syntaxKindName)
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}]`,
-				'Declaration-candidate syntax identity and bounded taxonomy must reproduce its retained AST node.'
-			);
+		function checkInvalidValueOfDeclarationCandidatesEntry2(): void {
+			if (expectedNameState === null || candidate.nameState !== expectedNameState)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}].nameState`,
+					'Declaration name state must be derived exactly from the retained name-node SyntaxKind.'
+				);
+			if (
+				node !== undefined &&
+				(!declarationCandidateMatchesNode(
+					node.kind,
+					candidate.candidateRole,
+					candidate.nameState
+				) ||
+					candidate.syntaxKind !== node.kind ||
+					candidate.syntaxKindName !== node.kindName ||
+					typescriptSyntaxKindName(candidate.syntaxKind) !== candidate.syntaxKindName)
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}]`,
+					'Declaration-candidate syntax identity and bounded taxonomy must reproduce its retained AST node.'
+				);
+		}
+		checkInvalidValueOfDeclarationCandidatesEntry2();
 		const expected = semanticDeclarationCandidateId({
 			candidateRole: candidate.candidateRole,
 			nodeId: candidate.nodeId,
 			syntaxKind: candidate.syntaxKind
 		});
-		if (candidate.id !== expected)
-			issue(
-				'IDENTITY_MISMATCH',
-				`$.declarationCandidates[${index}].id`,
-				'Declaration-candidate identity mismatch.'
-			);
-		if (
-			candidate.nameState === 'ANONYMOUS'
-				? candidate.nameNodeId !== null || candidate.syntacticName !== null
-				: candidate.nameNodeId === null
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}]`,
-				'Candidate name state must agree with its retained name node.'
-			);
-		if (
-			candidate.nameState === 'ATOMIC'
-				? candidate.syntacticName === null || candidate.syntacticName.length === 0
-				: candidate.syntacticName !== null
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].syntacticName`,
-				'Only atomic candidate names carry non-empty syntactic text.'
-			);
-		if (
-			candidate.nameState === 'ATOMIC' &&
-			nameNode?.syntacticIdentifierText != null &&
-			candidate.syntacticName !== nameNode.syntacticIdentifierText
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].syntacticName`,
-				'Atomic identifier names must reproduce their retained identifier text.'
-			);
-		if (candidate.nameState === 'ATOMIC' && nameNode?.syntacticIdentifierText === null) {
-			const nameLiteral = literalByNodeId.get(nameNode.id);
+		function checkIdentityMismatchOfDeclarationCandidatesEntry(): void {
+			if (candidate.id !== expected)
+				issue(
+					'IDENTITY_MISMATCH',
+					`$.declarationCandidates[${index}].id`,
+					'Declaration-candidate identity mismatch.'
+				);
 			if (
-				candidate.syntacticName === null ||
-				nameLiteral?.lexemeLength !== candidate.syntacticName.length ||
-				nameLiteral.lexemeSha256 !== sha256(candidate.syntacticName)
+				candidate.nameState === 'ANONYMOUS'
+					? candidate.nameNodeId !== null || candidate.syntacticName !== null
+					: candidate.nameNodeId === null
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}]`,
+					'Candidate name state must agree with its retained name node.'
+				);
+			if (
+				candidate.nameState === 'ATOMIC'
+					? candidate.syntacticName === null || candidate.syntacticName.length === 0
+					: candidate.syntacticName !== null
 			)
 				issue(
 					'INVALID_VALUE',
 					`$.declarationCandidates[${index}].syntacticName`,
-					'Atomic literal names must retain the exact scalar-safe source lexeme bound by the literal lexeme digest.'
+					'Only atomic candidate names carry non-empty syntactic text.'
+				);
+			if (
+				candidate.nameState === 'ATOMIC' &&
+				nameNode?.syntacticIdentifierText != null &&
+				candidate.syntacticName !== nameNode.syntacticIdentifierText
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}].syntacticName`,
+					'Atomic identifier names must reproduce their retained identifier text.'
+				);
+			if (candidate.nameState === 'ATOMIC' && nameNode?.syntacticIdentifierText === null) {
+				const nameLiteral = literalByNodeId.get(nameNode.id);
+				if (
+					candidate.syntacticName === null ||
+					nameLiteral?.lexemeLength !== candidate.syntacticName.length ||
+					nameLiteral.lexemeSha256 !== sha256(candidate.syntacticName)
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.declarationCandidates[${index}].syntacticName`,
+						'Atomic literal names must retain the exact scalar-safe source lexeme bound by the literal lexeme digest.'
+					);
+			}
+			if (candidate.exportCarrierNodeId !== null)
+				nodeReference(
+					candidate.exportCarrierNodeId,
+					candidate.sourceId,
+					`$.declarationCandidates[${index}].exportCarrierNodeId`
 				);
 		}
-		if (candidate.exportCarrierNodeId !== null)
-			nodeReference(
-				candidate.exportCarrierNodeId,
-				candidate.sourceId,
-				`$.declarationCandidates[${index}].exportCarrierNodeId`
-			);
+		checkIdentityMismatchOfDeclarationCandidatesEntry();
 		const localModifierChildren = (childrenByParent.get(candidate.nodeId) ?? []).filter((child) =>
 			isTypeScriptModifierKind(child.kind)
 		);
@@ -3855,38 +4188,41 @@ function validateStaticSemanticSnapshotUnsafe(
 		const expectedAmbientSyntax =
 			sourceById.get(candidate.sourceId)?.declarationFile === true ||
 			(node !== undefined && hasDeclareModifierCarrier(node));
-		if (candidate.ambientSyntax !== expectedAmbientSyntax)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].ambientSyntax`,
-				'Ambient syntax must exactly reproduce declaration-file or explicit/inherited declare-modifier context.'
-			);
-		if (
-			!isCanonicalSet(
-				candidate.localModifiers.map((modifier) => `${modifier.code}:${modifier.name}`)
-			)
-		)
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.declarationCandidates[${index}].localModifiers`,
-				'Declaration-candidate local modifiers must be a canonical set.'
-			);
-		for (const [modifierIndex, modifier] of candidate.localModifiers.entries())
-			if (typescriptSyntaxKindName(modifier.code) !== modifier.name)
+		function checkInvalidValueOfDeclarationCandidatesEntry3(): void {
+			if (candidate.ambientSyntax !== expectedAmbientSyntax)
 				issue(
 					'INVALID_VALUE',
-					`$.declarationCandidates[${index}].localModifiers[${modifierIndex}]`,
-					'Local modifier code and name must agree with the public TypeScript enum.'
+					`$.declarationCandidates[${index}].ambientSyntax`,
+					'Ambient syntax must exactly reproduce declaration-file or explicit/inherited declare-modifier context.'
 				);
-		if (
-			canonicalSemanticJson(candidate.localModifiers) !==
-			canonicalSemanticJson(expectedLocalModifiers)
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].localModifiers`,
-				'Local modifiers must reproduce the deduplicated set of direct modifier children from the named AST traversal profile.'
-			);
+			if (
+				!isCanonicalSet(
+					candidate.localModifiers.map((modifier) => `${modifier.code}:${modifier.name}`)
+				)
+			)
+				issue(
+					'NONCANONICAL_ORDER',
+					`$.declarationCandidates[${index}].localModifiers`,
+					'Declaration-candidate local modifiers must be a canonical set.'
+				);
+			for (const [modifierIndex, modifier] of candidate.localModifiers.entries())
+				if (typescriptSyntaxKindName(modifier.code) !== modifier.name)
+					issue(
+						'INVALID_VALUE',
+						`$.declarationCandidates[${index}].localModifiers[${modifierIndex}]`,
+						'Local modifier code and name must agree with the public TypeScript enum.'
+					);
+			if (
+				canonicalSemanticJson(candidate.localModifiers) !==
+				canonicalSemanticJson(expectedLocalModifiers)
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}].localModifiers`,
+					'Local modifiers must reproduce the deduplicated set of direct modifier children from the named AST traversal profile.'
+				);
+		}
+		checkInvalidValueOfDeclarationCandidatesEntry3();
 		const variableCarrier = node === undefined ? undefined : enclosingVariableStatement(node);
 		const carrierModifierNames = new Set(
 			(variableCarrier === undefined ? [] : (childrenByParent.get(variableCarrier.id) ?? []))
@@ -3899,16 +4235,24 @@ function validateStaticSemanticSnapshotUnsafe(
 			carrierModifierNames,
 			variableCarrier
 		);
-		if (
-			candidate.exportSyntax !== expectedExport.syntax ||
-			candidate.exportCarrierNodeId !== expectedExport.carrierId
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.declarationCandidates[${index}].exportSyntax`,
-				'Export syntax and carrier must distinguish node-local syntax from the exact enclosing variable-statement carrier.'
-			);
+		function checkInvalidValueOfDeclarationCandidatesEntry4(): void {
+			if (
+				candidate.exportSyntax !== expectedExport.syntax ||
+				candidate.exportCarrierNodeId !== expectedExport.carrierId
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.declarationCandidates[${index}].exportSyntax`,
+					'Export syntax and carrier must distinguish node-local syntax from the exact enclosing variable-statement carrier.'
+				);
+		}
+		checkInvalidValueOfDeclarationCandidatesEntry4();
 	}
+	function validateDeclarationCandidates(): void {
+		for (const [index, candidate] of snapshot.declarationCandidates.entries())
+			validateDeclarationCandidatesEntry(index, candidate);
+	}
+	validateDeclarationCandidates();
 
 	function symbolReference(
 		symbolId: string,
@@ -3957,110 +4301,125 @@ function validateStaticSemanticSnapshotUnsafe(
 		return scope;
 	}
 
-	for (const [index, declaration] of snapshot.declarations.entries()) {
+	function validateDeclarationsEntry(
+		index: number,
+		declaration: StaticSemanticSnapshot['declarations'][number]
+	): void {
 		const jsonPath = `$.declarations[${index}]`;
 		const source = sourceById.get(declaration.sourceId);
-		if (!hasSemanticIdPrefix(declaration.durableId, 'semantic', 'declaration-durable'))
-			issue('INVALID_VALUE', `${jsonPath}.durableId`, 'Invalid durable declaration identity.');
-		if (source === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Declaration source is absent.');
-		sourceScopeReference(
-			declaration.declaringScopeId,
-			declaration.scopeLinkState,
-			source,
-			`${jsonPath}.declaringScopeId`
-		);
-		if ((declaration.symbolBindingState === 'RESOLVED') !== (declaration.symbolId !== null))
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.symbolBindingState`,
-				'Declaration symbol-binding state must agree exactly with nullable symbol identity.'
-			);
-		if (
-			!Number.isSafeInteger(declaration.start) ||
-			!Number.isSafeInteger(declaration.end) ||
-			declaration.start < 0 ||
-			declaration.start > declaration.end ||
-			(source !== undefined && declaration.end > source.textLength)
-		)
-			issue('INVALID_VALUE', jsonPath, 'Declaration UTF-16 span is invalid.');
-		if (typescriptSyntaxKindName(declaration.kind) !== declaration.kindName)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.kindName`,
-				'Declaration kind code and name must agree with the public TypeScript enum.'
-			);
-		const expectedNamePresent = declaration.nameState === 'ATOMIC';
-		if (
-			expectedNamePresent
-				? declaration.name === null || declaration.name.length === 0
-				: declaration.name !== null
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.name`,
-				'Only an atomic declaration name may carry non-empty text.'
-			);
-		const node = declaration.nodeId === null ? undefined : nodeById.get(declaration.nodeId);
-		if (declaration.nodeId !== null && node === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.nodeId`, 'Declaration node is absent.');
-		else if (
-			node !== undefined &&
-			(node.sourceId !== declaration.sourceId ||
-				node.kind !== declaration.kind ||
-				node.kindName !== declaration.kindName ||
-				node.start !== declaration.start ||
-				node.end !== declaration.end)
-		)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`${jsonPath}.nodeId`,
-				'Declaration node must reproduce the same source, kind, and span.'
-			);
-		if (source?.analysisDisposition === 'DEEP_INDEXED' && node !== undefined)
-			validateRecomputedScopeLink(
+		function checkInvalidValueOfDeclarationsEntry(): void {
+			if (!hasSemanticIdPrefix(declaration.durableId, 'semantic', 'declaration-durable'))
+				issue('INVALID_VALUE', `${jsonPath}.durableId`, 'Invalid durable declaration identity.');
+			if (source === undefined)
+				issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Declaration source is absent.');
+			sourceScopeReference(
 				declaration.declaringScopeId,
 				declaration.scopeLinkState,
-				expectedDeclarationScopeLink(node),
+				source,
 				`${jsonPath}.declaringScopeId`
 			);
-		if (
-			source?.analysisDisposition === 'DEEP_INDEXED' &&
-			node !== undefined &&
-			isValidationParameterProperty(node) &&
-			(declaration.symbolBindingState !== 'UNSUPPORTED' || declaration.symbolId !== null)
-		)
-			issue(
-				'CONFORMANCE_OVERCLAIM',
-				`${jsonPath}.symbolBindingState`,
-				'Parameter-property declarations must expose the incompatible checker-symbol binding as unsupported.'
-			);
+			if ((declaration.symbolBindingState === 'RESOLVED') !== (declaration.symbolId !== null))
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.symbolBindingState`,
+					'Declaration symbol-binding state must agree exactly with nullable symbol identity.'
+				);
+			if (
+				!Number.isSafeInteger(declaration.start) ||
+				!Number.isSafeInteger(declaration.end) ||
+				declaration.start < 0 ||
+				declaration.start > declaration.end ||
+				(source !== undefined && declaration.end > source.textLength)
+			)
+				issue('INVALID_VALUE', jsonPath, 'Declaration UTF-16 span is invalid.');
+			if (typescriptSyntaxKindName(declaration.kind) !== declaration.kindName)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.kindName`,
+					'Declaration kind code and name must agree with the public TypeScript enum.'
+				);
+		}
+		checkInvalidValueOfDeclarationsEntry();
+		const expectedNamePresent = declaration.nameState === 'ATOMIC';
+		function checkInvalidValueOfDeclarationsEntry2(): void {
+			if (
+				expectedNamePresent
+					? declaration.name === null || declaration.name.length === 0
+					: declaration.name !== null
+			)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.name`,
+					'Only an atomic declaration name may carry non-empty text.'
+				);
+		}
+		checkInvalidValueOfDeclarationsEntry2();
+		const node = declaration.nodeId === null ? undefined : nodeById.get(declaration.nodeId);
+		function checkDanglingReferenceOfDeclarationsEntry(): void {
+			if (declaration.nodeId !== null && node === undefined)
+				issue('DANGLING_REFERENCE', `${jsonPath}.nodeId`, 'Declaration node is absent.');
+			else if (
+				node !== undefined &&
+				(node.sourceId !== declaration.sourceId ||
+					node.kind !== declaration.kind ||
+					node.kindName !== declaration.kindName ||
+					node.start !== declaration.start ||
+					node.end !== declaration.end)
+			)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`${jsonPath}.nodeId`,
+					'Declaration node must reproduce the same source, kind, and span.'
+				);
+			if (source?.analysisDisposition === 'DEEP_INDEXED' && node !== undefined)
+				validateRecomputedScopeLink(
+					declaration.declaringScopeId,
+					declaration.scopeLinkState,
+					expectedDeclarationScopeLink(node),
+					`${jsonPath}.declaringScopeId`
+				);
+			if (
+				source?.analysisDisposition === 'DEEP_INDEXED' &&
+				node !== undefined &&
+				isValidationParameterProperty(node) &&
+				(declaration.symbolBindingState !== 'UNSUPPORTED' || declaration.symbolId !== null)
+			)
+				issue(
+					'CONFORMANCE_OVERCLAIM',
+					`${jsonPath}.symbolBindingState`,
+					'Parameter-property declarations must expose the incompatible checker-symbol binding as unsupported.'
+				);
+		}
+		checkDanglingReferenceOfDeclarationsEntry();
 		const candidate =
 			declaration.candidateId === null
 				? undefined
 				: declarationCandidateById.get(declaration.candidateId);
-		if (declaration.candidateId !== null && candidate === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.candidateId`, 'Declaration candidate is absent.');
-		else if (
-			candidate !== undefined &&
-			(candidate.sourceId !== declaration.sourceId ||
-				candidate.nodeId !== declaration.nodeId ||
-				candidate.nameState !== declaration.nameState)
-		)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`${jsonPath}.candidateId`,
-				'Declaration candidate must bind the same source, node, and name state.'
-			);
-		if (
-			candidate !== undefined &&
-			declaration.ambient !== (source?.declarationFile === true || candidate.ambientSyntax)
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.ambient`,
-				'Declaration ambient state must reproduce its source and syntax candidate.'
-			);
+		function checkDanglingReferenceOfDeclarationsEntry2(): void {
+			if (declaration.candidateId !== null && candidate === undefined)
+				issue('DANGLING_REFERENCE', `${jsonPath}.candidateId`, 'Declaration candidate is absent.');
+			else if (
+				candidate !== undefined &&
+				(candidate.sourceId !== declaration.sourceId ||
+					candidate.nodeId !== declaration.nodeId ||
+					candidate.nameState !== declaration.nameState)
+			)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`${jsonPath}.candidateId`,
+					'Declaration candidate must bind the same source, node, and name state.'
+				);
+			if (
+				candidate !== undefined &&
+				declaration.ambient !== (source?.declarationFile === true || candidate.ambientSyntax)
+			)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.ambient`,
+					'Declaration ambient state must reproduce its source and syntax candidate.'
+				);
+		}
+		checkDanglingReferenceOfDeclarationsEntry2();
 		const expected = semanticDeclarationId({
 			end: declaration.end,
 			kind: declaration.kind,
@@ -4068,173 +4427,203 @@ function validateStaticSemanticSnapshotUnsafe(
 			sourceId: declaration.sourceId,
 			start: declaration.start
 		});
-		if (declaration.id !== expected)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Declaration identity mismatch.');
-		if (source !== undefined) {
-			try {
-				const expectedDurableId = semanticDurableDeclarationId({
-					ambient: declaration.ambient,
-					contentSha256: source.contentSha256,
-					declarationFile: source.declarationFile,
-					end: declaration.end,
-					kind: declaration.kind,
-					languageVariant: source.languageVariant,
-					logicalPath: source.logicalPath,
-					name: declaration.name,
-					nameState: declaration.nameState,
-					scriptKind: source.scriptKind,
-					start: declaration.start,
-					typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
-				});
-				if (declaration.durableId !== expectedDurableId)
+		function checkIdentityMismatchOfDeclarationsEntry(): void {
+			if (declaration.id !== expected)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Declaration identity mismatch.');
+			if (source !== undefined) {
+				try {
+					const expectedDurableId = semanticDurableDeclarationId({
+						ambient: declaration.ambient,
+						contentSha256: source.contentSha256,
+						declarationFile: source.declarationFile,
+						end: declaration.end,
+						kind: declaration.kind,
+						languageVariant: source.languageVariant,
+						logicalPath: source.logicalPath,
+						name: declaration.name,
+						nameState: declaration.nameState,
+						scriptKind: source.scriptKind,
+						start: declaration.start,
+						typescriptVersion: TYPESCRIPT_PROVIDER_VERSION
+					});
+					if (declaration.durableId !== expectedDurableId)
+						issue(
+							'IDENTITY_MISMATCH',
+							`${jsonPath}.durableId`,
+							'Durable declaration identity mismatch.'
+						);
+				} catch {
 					issue(
-						'IDENTITY_MISMATCH',
+						'INVALID_VALUE',
 						`${jsonPath}.durableId`,
-						'Durable declaration identity mismatch.'
+						'Durable declaration identity preimage is incoherent.'
 					);
-			} catch {
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.durableId`,
-					'Durable declaration identity preimage is incoherent.'
-				);
-			}
-			if (declaration.symbolId !== null)
-				symbolReference(declaration.symbolId, source.projectId, `${jsonPath}.symbolId`);
-			compilerSymbolProvenance(
-				declaration.bindingProvenanceId,
-				source.projectId,
-				`${jsonPath}.bindingProvenanceId`,
-				declaration.sourceId
-			);
-			scopeDerivedProvenance(
-				declaration.structuralProvenanceId,
-				source.projectId,
-				`${jsonPath}.structuralProvenanceId`,
-				declaration.sourceId
-			);
-			if (declaration.symbolBindingState === 'UNSUPPORTED')
-				degradedSymbolProvenance(
+				}
+				if (declaration.symbolId !== null)
+					symbolReference(declaration.symbolId, source.projectId, `${jsonPath}.symbolId`);
+				compilerSymbolProvenance(
 					declaration.bindingProvenanceId,
 					source.projectId,
 					`${jsonPath}.bindingProvenanceId`,
 					declaration.sourceId
 				);
-			if (declaration.scopeLinkState === 'UNSUPPORTED')
-				degradedSymbolProvenance(
+				scopeDerivedProvenance(
 					declaration.structuralProvenanceId,
 					source.projectId,
 					`${jsonPath}.structuralProvenanceId`,
 					declaration.sourceId
 				);
+				if (declaration.symbolBindingState === 'UNSUPPORTED')
+					degradedSymbolProvenance(
+						declaration.bindingProvenanceId,
+						source.projectId,
+						`${jsonPath}.bindingProvenanceId`,
+						declaration.sourceId
+					);
+				if (declaration.scopeLinkState === 'UNSUPPORTED')
+					degradedSymbolProvenance(
+						declaration.structuralProvenanceId,
+						source.projectId,
+						`${jsonPath}.structuralProvenanceId`,
+						declaration.sourceId
+					);
+			}
 		}
+		checkIdentityMismatchOfDeclarationsEntry();
 	}
-
-	for (const [index, symbol] of snapshot.symbols.entries()) {
+	function validateDeclarationsEntry2(
+		index: number,
+		symbol: StaticSemanticSnapshot['symbols'][number]
+	): void {
 		const jsonPath = `$.symbols[${index}]`;
 		const project = projectById.get(symbol.projectId);
 		const program = programById.get(symbol.programId);
-		if (project === undefined || program === undefined)
-			issue('DANGLING_REFERENCE', jsonPath, 'Symbol project or Program is absent.');
-		else if (program.projectId !== symbol.projectId || project.programId !== symbol.programId)
-			issue('CROSS_PROJECT_REFERENCE', jsonPath, 'Symbol project and Program disagree.');
-		if (symbol.name.length === 0 || !Number.isSafeInteger(symbol.flags) || symbol.flags < 0)
-			issue('INVALID_VALUE', jsonPath, 'Symbol name and public flag mask must be valid.');
-		if (
-			!isCanonicalSet(symbol.declarationIds) ||
-			!isCanonicalSet(symbol.fallbackReferenceNodeIds) ||
-			!isCanonicalSet(symbol.flagNames) ||
-			symbol.flagNames.some((name) => name.length === 0)
-		)
-			issue(
-				'NONCANONICAL_ORDER',
-				jsonPath,
-				'Symbol declaration, fallback-reference, and flag-name sets must be canonical.'
-			);
-		const usesDeclarations = symbol.identityBasis === 'DECLARATIONS';
-		if (
-			usesDeclarations
-				? symbol.declarationIds.length === 0 || symbol.fallbackReferenceNodeIds.length !== 0
-				: symbol.declarationIds.length !== 0 || symbol.fallbackReferenceNodeIds.length === 0
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.identityBasis`,
-				'Symbol identity basis must agree with its declaration or fallback-reference set.'
-			);
-		const expectedMergeState = expectedSymbolMergeState(symbol.declarationIds.length);
-		if (symbol.mergeState !== expectedMergeState)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.mergeState`,
-				'Symbol merge state must be derived from its declarations.'
-			);
-		for (const declarationId of symbol.declarationIds) {
-			if (!referenceCheck()) break;
-			const declaration = declarationById.get(declarationId as never);
-			const declarationSource =
-				declaration === undefined ? undefined : sourceById.get(declaration.sourceId);
-			if (declaration === undefined)
-				issue('DANGLING_REFERENCE', `${jsonPath}.declarationIds`, 'Symbol declaration is absent.');
-			else if (
-				declaration.symbolBindingState !== 'RESOLVED' ||
-				declaration.symbolId !== symbol.id ||
-				declarationSource?.projectId !== symbol.projectId
+		function checkDanglingReferenceOfDeclarationsEntry22(): void {
+			if (project === undefined || program === undefined)
+				issue('DANGLING_REFERENCE', jsonPath, 'Symbol project or Program is absent.');
+			else if (program.projectId !== symbol.projectId || project.programId !== symbol.programId)
+				issue('CROSS_PROJECT_REFERENCE', jsonPath, 'Symbol project and Program disagree.');
+			if (symbol.name.length === 0 || !Number.isSafeInteger(symbol.flags) || symbol.flags < 0)
+				issue('INVALID_VALUE', jsonPath, 'Symbol name and public flag mask must be valid.');
+			if (
+				!isCanonicalSet(symbol.declarationIds) ||
+				!isCanonicalSet(symbol.fallbackReferenceNodeIds) ||
+				!isCanonicalSet(symbol.flagNames) ||
+				symbol.flagNames.some((name) => name.length === 0)
 			)
 				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`${jsonPath}.declarationIds`,
-					'Symbol declaration does not point back from the same project.'
+					'NONCANONICAL_ORDER',
+					jsonPath,
+					'Symbol declaration, fallback-reference, and flag-name sets must be canonical.'
 				);
 		}
-		for (const nodeId of symbol.fallbackReferenceNodeIds) {
-			if (!referenceCheck()) break;
-			const node = nodeById.get(nodeId as never);
-			const nodeSource = node === undefined ? undefined : sourceById.get(node.sourceId);
-			if (node === undefined)
+		checkDanglingReferenceOfDeclarationsEntry22();
+		const usesDeclarations = symbol.identityBasis === 'DECLARATIONS';
+		function checkInvalidValueOfDeclarationsEntry22(): void {
+			if (
+				usesDeclarations
+					? symbol.declarationIds.length === 0 || symbol.fallbackReferenceNodeIds.length !== 0
+					: symbol.declarationIds.length !== 0 || symbol.fallbackReferenceNodeIds.length === 0
+			)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.identityBasis`,
+					'Symbol identity basis must agree with its declaration or fallback-reference set.'
+				);
+		}
+		checkInvalidValueOfDeclarationsEntry22();
+		const expectedMergeState = expectedSymbolMergeState(symbol.declarationIds.length);
+		function checkInvalidValueOfInvalidValueOfInvalidValueOfDeclarationsEntry(): void {
+			if (symbol.mergeState !== expectedMergeState)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.mergeState`,
+					'Symbol merge state must be derived from its declarations.'
+				);
+			for (const declarationId of symbol.declarationIds) {
+				if (!referenceCheck()) break;
+				const declaration = declarationById.get(declarationId as never);
+				const declarationSource =
+					declaration === undefined ? undefined : sourceById.get(declaration.sourceId);
+				if (declaration === undefined)
+					issue(
+						'DANGLING_REFERENCE',
+						`${jsonPath}.declarationIds`,
+						'Symbol declaration is absent.'
+					);
+				else if (
+					declaration.symbolBindingState !== 'RESOLVED' ||
+					declaration.symbolId !== symbol.id ||
+					declarationSource?.projectId !== symbol.projectId
+				)
+					issue(
+						'CROSS_PROJECT_REFERENCE',
+						`${jsonPath}.declarationIds`,
+						'Symbol declaration does not point back from the same project.'
+					);
+			}
+		}
+		function checkDanglingReferenceOfInvalidValueOfInvalidValueOfDeclarationsEntry(): void {
+			for (const nodeId of symbol.fallbackReferenceNodeIds) {
+				if (!referenceCheck()) break;
+				const node = nodeById.get(nodeId as never);
+				const nodeSource = node === undefined ? undefined : sourceById.get(node.sourceId);
+				if (node === undefined)
+					issue(
+						'DANGLING_REFERENCE',
+						`${jsonPath}.fallbackReferenceNodeIds`,
+						'Symbol fallback reference node is absent.'
+					);
+				else if (nodeSource?.projectId !== symbol.projectId)
+					issue(
+						'CROSS_PROJECT_REFERENCE',
+						`${jsonPath}.fallbackReferenceNodeIds`,
+						'Symbol fallback reference node belongs to another project.'
+					);
+			}
+		}
+		function checkInvalidValueOfInvalidValueOfDeclarationsEntry(): void {
+			checkInvalidValueOfInvalidValueOfInvalidValueOfDeclarationsEntry();
+			checkDanglingReferenceOfInvalidValueOfInvalidValueOfDeclarationsEntry();
+		}
+		function checkDanglingReferenceOfInvalidValueOfDeclarationsEntry(): void {
+			if (
+				symbol.valueDeclarationId !== null &&
+				!symbol.declarationIds.includes(symbol.valueDeclarationId)
+			)
 				issue(
 					'DANGLING_REFERENCE',
-					`${jsonPath}.fallbackReferenceNodeIds`,
-					'Symbol fallback reference node is absent.'
+					`${jsonPath}.valueDeclarationId`,
+					'Value declaration must belong to the symbol declaration set.'
 				);
-			else if (nodeSource?.projectId !== symbol.projectId)
+			try {
+				const expected = semanticSymbolId({
+					declarationIds: symbol.declarationIds,
+					fallbackReferenceNodeIds: symbol.fallbackReferenceNodeIds,
+					flags: symbol.flags,
+					identityBasis: symbol.identityBasis,
+					name: symbol.name,
+					programId: symbol.programId,
+					projectId: symbol.projectId
+				});
+				if (symbol.id !== expected)
+					issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Symbol identity mismatch.');
+			} catch {
 				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`${jsonPath}.fallbackReferenceNodeIds`,
-					'Symbol fallback reference node belongs to another project.'
+					'INVALID_VALUE',
+					`${jsonPath}.identityBasis`,
+					'Symbol identity preimage is incoherent.'
 				);
+			}
+			compilerSymbolProvenance(symbol.provenanceId, symbol.projectId, `${jsonPath}.provenanceId`);
 		}
-		if (
-			symbol.valueDeclarationId !== null &&
-			!symbol.declarationIds.includes(symbol.valueDeclarationId)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`${jsonPath}.valueDeclarationId`,
-				'Value declaration must belong to the symbol declaration set.'
-			);
-		try {
-			const expected = semanticSymbolId({
-				declarationIds: symbol.declarationIds,
-				fallbackReferenceNodeIds: symbol.fallbackReferenceNodeIds,
-				flags: symbol.flags,
-				identityBasis: symbol.identityBasis,
-				name: symbol.name,
-				programId: symbol.programId,
-				projectId: symbol.projectId
-			});
-			if (symbol.id !== expected)
-				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Symbol identity mismatch.');
-		} catch {
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.identityBasis`,
-				'Symbol identity preimage is incoherent.'
-			);
+		function checkInvalidValueOfDeclarationsEntry23(): void {
+			checkInvalidValueOfInvalidValueOfDeclarationsEntry();
+			checkDanglingReferenceOfInvalidValueOfDeclarationsEntry();
 		}
-		compilerSymbolProvenance(symbol.provenanceId, symbol.projectId, `${jsonPath}.provenanceId`);
+		checkInvalidValueOfDeclarationsEntry23();
 	}
-	for (const symbol of snapshot.symbols) {
+	function validateDeclarationsEntry3(symbol: StaticSemanticSnapshot['symbols'][number]): void {
 		const ownedDeclarations = snapshot.declarations
 			.filter((declaration) => declaration.symbolId === symbol.id)
 			.map((declaration) => declaration.id);
@@ -4245,10 +4634,10 @@ function validateStaticSemanticSnapshotUnsafe(
 				`Symbol ${symbol.id} declaration manifest is incomplete.`
 			);
 	}
-
-	if (aliasBySymbolId.size !== snapshot.aliases.length)
-		issue('DUPLICATE_ID', '$.aliases', 'Each alias symbol may have at most one alias record.');
-	for (const [index, alias] of snapshot.aliases.entries()) {
+	function validateDeclarationsEntry4(
+		index: number,
+		alias: StaticSemanticSnapshot['aliases'][number]
+	): void {
 		const jsonPath = `$.aliases[${index}]`;
 		const aliasSymbol = symbolById.get(alias.aliasSymbolId);
 		if (aliasSymbol === undefined)
@@ -4280,6 +4669,20 @@ function validateStaticSemanticSnapshotUnsafe(
 		if (alias.id !== expected)
 			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Alias identity mismatch.');
 	}
+	function validateDeclarations(): void {
+		for (const [index, declaration] of snapshot.declarations.entries())
+			validateDeclarationsEntry(index, declaration);
+
+		for (const [index, symbol] of snapshot.symbols.entries())
+			validateDeclarationsEntry2(index, symbol);
+		for (const symbol of snapshot.symbols) validateDeclarationsEntry3(symbol);
+
+		if (aliasBySymbolId.size !== snapshot.aliases.length)
+			issue('DUPLICATE_ID', '$.aliases', 'Each alias symbol may have at most one alias record.');
+		for (const [index, alias] of snapshot.aliases.entries())
+			validateDeclarationsEntry4(index, alias);
+	}
+	validateDeclarations();
 
 	const declarationCandidateByNameNodeId = new Map(
 		snapshot.declarationCandidates.flatMap((candidate) =>
@@ -4291,18 +4694,27 @@ function validateStaticSemanticSnapshotUnsafe(
 			declaration.candidateId === null ? [] : [[declaration.candidateId, declaration] as const]
 		)
 	);
-	for (const [index, reference] of snapshot.references.entries()) {
+	function validateReferencesEntry(
+		index: number,
+		reference: StaticSemanticSnapshot['references'][number]
+	): void {
 		const jsonPath = `$.references[${index}]`;
-		nodeReference(reference.nodeId, reference.sourceId, `${jsonPath}.nodeId`);
+		function checkReferencesEntryPart(): void {
+			nodeReference(reference.nodeId, reference.sourceId, `${jsonPath}.nodeId`);
+		}
+		checkReferencesEntryPart();
 		const source = sourceById.get(reference.sourceId);
-		if (source === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Reference source is absent.');
-		sourceScopeReference(
-			reference.containingScopeId,
-			reference.scopeLinkState,
-			source,
-			`${jsonPath}.containingScopeId`
-		);
+		function checkDanglingReferenceOfReferencesEntry(): void {
+			if (source === undefined)
+				issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Reference source is absent.');
+			sourceScopeReference(
+				reference.containingScopeId,
+				reference.scopeLinkState,
+				source,
+				`${jsonPath}.containingScopeId`
+			);
+		}
+		checkDanglingReferenceOfReferencesEntry();
 		const referenceNode = nodeById.get(reference.nodeId);
 		const namedCandidate = declarationCandidateByNameNodeId.get(reference.nodeId);
 		const namedDeclaration =
@@ -4311,94 +4723,114 @@ function validateStaticSemanticSnapshotUnsafe(
 			namedDeclaration?.nodeId === null || namedDeclaration?.nodeId === undefined
 				? undefined
 				: nodeById.get(namedDeclaration.nodeId);
-		if (
-			reference.role === 'DECLARATION_NAME' &&
-			namedDeclarationNode !== undefined &&
-			isValidationParameterProperty(namedDeclarationNode) &&
-			(reference.resolutionState !== 'UNSUPPORTED' ||
-				reference.symbolId !== null ||
-				reference.resolvedSymbolId !== null)
-		)
-			issue(
-				'CONFORMANCE_OVERCLAIM',
-				`${jsonPath}.resolutionState`,
-				'Parameter-property declaration-name references must preserve unsupported checker-symbol resolution.'
-			);
-		if (source?.analysisDisposition === 'DEEP_INDEXED' && referenceNode !== undefined) {
-			let expectedScopeLink: {
-				readonly scope: StaticSemanticSnapshot['scopes'][number] | undefined;
-				readonly state: 'RESOLVED' | 'UNSUPPORTED';
-			};
-			if (referenceRequiresUnsupportedScopeLink(referenceNode)) {
-				expectedScopeLink = { scope: undefined, state: 'UNSUPPORTED' };
-			} else if (reference.role === 'DECLARATION_NAME') {
-				const candidate = declarationCandidateByNameNodeId.get(reference.nodeId);
-				const declarationNode =
-					candidate === undefined ? undefined : nodeById.get(candidate.nodeId);
-				expectedScopeLink =
-					declarationNode === undefined
-						? {
-								scope: nearestRetainedScope(
-									referenceNode.parentId === null
-										? undefined
-										: nodeById.get(referenceNode.parentId),
-									true
-								),
-								state: 'RESOLVED'
-							}
-						: expectedDeclarationScopeLink(declarationNode);
-			} else {
-				expectedScopeLink = {
-					scope: nearestRetainedScope(
-						referenceNode.parentId === null ? undefined : nodeById.get(referenceNode.parentId),
-						true
-					),
-					state: 'RESOLVED'
-				};
-			}
-			validateRecomputedScopeLink(
-				reference.containingScopeId,
-				reference.scopeLinkState,
-				expectedScopeLink,
-				`${jsonPath}.containingScopeId`
-			);
+		function checkConformanceOverclaimOfConformanceOverclaimOfReferencesEntry(): void {
+			if (
+				reference.role === 'DECLARATION_NAME' &&
+				namedDeclarationNode !== undefined &&
+				isValidationParameterProperty(namedDeclarationNode) &&
+				(reference.resolutionState !== 'UNSUPPORTED' ||
+					reference.symbolId !== null ||
+					reference.resolvedSymbolId !== null)
+			)
+				issue(
+					'CONFORMANCE_OVERCLAIM',
+					`${jsonPath}.resolutionState`,
+					'Parameter-property declaration-name references must preserve unsupported checker-symbol resolution.'
+				);
 		}
-		if (source !== undefined) {
-			if (reference.symbolId !== null)
-				symbolReference(reference.symbolId, source.projectId, `${jsonPath}.symbolId`);
-			if (reference.resolvedSymbolId !== null)
-				symbolReference(
-					reference.resolvedSymbolId,
-					source.projectId,
-					`${jsonPath}.resolvedSymbolId`
-				);
-			compilerSymbolProvenance(
-				reference.resolutionProvenanceId,
-				source.projectId,
-				`${jsonPath}.resolutionProvenanceId`,
-				reference.sourceId
-			);
-			scopeDerivedProvenance(
-				reference.structuralProvenanceId,
-				source.projectId,
-				`${jsonPath}.structuralProvenanceId`,
-				reference.sourceId
-			);
-			if (reference.scopeLinkState === 'UNSUPPORTED')
-				degradedSymbolProvenance(
-					reference.structuralProvenanceId,
-					source.projectId,
-					`${jsonPath}.structuralProvenanceId`,
-					reference.sourceId
-				);
-			if (reference.resolutionState === 'UNRESOLVED' || reference.resolutionState === 'UNSUPPORTED')
-				degradedSymbolProvenance(
+		function checkConformanceOverclaimOfReferencesEntryGroup(): void {
+			if (source?.analysisDisposition === 'DEEP_INDEXED' && referenceNode !== undefined) {
+				function applyConformanceOverclaimOfReferencesEntryGroup(): void {
+					// Re-asserts the caller's guard so the narrowing survives the function boundary.
+					if (referenceNode === undefined) return;
+					let expectedScopeLink: {
+						readonly scope: StaticSemanticSnapshot['scopes'][number] | undefined;
+						readonly state: 'RESOLVED' | 'UNSUPPORTED';
+					};
+					if (referenceRequiresUnsupportedScopeLink(referenceNode)) {
+						expectedScopeLink = { scope: undefined, state: 'UNSUPPORTED' };
+					} else if (reference.role === 'DECLARATION_NAME') {
+						const candidate = declarationCandidateByNameNodeId.get(reference.nodeId);
+						const declarationNode =
+							candidate === undefined ? undefined : nodeById.get(candidate.nodeId);
+						expectedScopeLink =
+							declarationNode === undefined
+								? {
+										scope: nearestRetainedScope(
+											referenceNode.parentId === null
+												? undefined
+												: nodeById.get(referenceNode.parentId),
+											true
+										),
+										state: 'RESOLVED'
+									}
+								: expectedDeclarationScopeLink(declarationNode);
+					} else {
+						expectedScopeLink = {
+							scope: nearestRetainedScope(
+								referenceNode.parentId === null ? undefined : nodeById.get(referenceNode.parentId),
+								true
+							),
+							state: 'RESOLVED'
+						};
+					}
+					validateRecomputedScopeLink(
+						reference.containingScopeId,
+						reference.scopeLinkState,
+						expectedScopeLink,
+						`${jsonPath}.containingScopeId`
+					);
+				}
+				applyConformanceOverclaimOfReferencesEntryGroup();
+			}
+		}
+		function checkConformanceOverclaimOfReferencesEntryGroup2(): void {
+			if (source !== undefined) {
+				if (reference.symbolId !== null)
+					symbolReference(reference.symbolId, source.projectId, `${jsonPath}.symbolId`);
+				if (reference.resolvedSymbolId !== null)
+					symbolReference(
+						reference.resolvedSymbolId,
+						source.projectId,
+						`${jsonPath}.resolvedSymbolId`
+					);
+				compilerSymbolProvenance(
 					reference.resolutionProvenanceId,
 					source.projectId,
 					`${jsonPath}.resolutionProvenanceId`,
 					reference.sourceId
 				);
+				scopeDerivedProvenance(
+					reference.structuralProvenanceId,
+					source.projectId,
+					`${jsonPath}.structuralProvenanceId`,
+					reference.sourceId
+				);
+				if (reference.scopeLinkState === 'UNSUPPORTED')
+					degradedSymbolProvenance(
+						reference.structuralProvenanceId,
+						source.projectId,
+						`${jsonPath}.structuralProvenanceId`,
+						reference.sourceId
+					);
+				if (
+					reference.resolutionState === 'UNRESOLVED' ||
+					reference.resolutionState === 'UNSUPPORTED'
+				)
+					degradedSymbolProvenance(
+						reference.resolutionProvenanceId,
+						source.projectId,
+						`${jsonPath}.resolutionProvenanceId`,
+						reference.sourceId
+					);
+			}
 		}
+		function checkConformanceOverclaimOfReferencesEntry(): void {
+			checkConformanceOverclaimOfConformanceOverclaimOfReferencesEntry();
+			checkConformanceOverclaimOfReferencesEntryGroup();
+			checkConformanceOverclaimOfReferencesEntryGroup2();
+		}
+		checkConformanceOverclaimOfReferencesEntry();
 		const direct =
 			reference.resolutionState === 'RESOLVED_DIRECT' &&
 			reference.symbolId !== null &&
@@ -4414,23 +4846,26 @@ function validateStaticSemanticSnapshotUnsafe(
 			reference.resolutionState === 'UNSUPPORTED' &&
 			reference.symbolId === null &&
 			reference.resolvedSymbolId === null;
-		if (!direct && !alias && !unresolved && !unsupported)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.resolutionState`,
-				'Reference resolution state and symbol identities disagree.'
-			);
-		if (
-			reference.role === 'DECLARATION_NAME' &&
-			!nodeById
-				.get(reference.nodeId)
-				?.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName)
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.role`,
-				'Declaration-name reference must bind a retained declaration-name node.'
-			);
+		function checkInvalidValueOfReferencesEntry(): void {
+			if (!direct && !alias && !unresolved && !unsupported)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.resolutionState`,
+					'Reference resolution state and symbol identities disagree.'
+				);
+			if (
+				reference.role === 'DECLARATION_NAME' &&
+				!nodeById
+					.get(reference.nodeId)
+					?.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName)
+			)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.role`,
+					'Declaration-name reference must bind a retained declaration-name node.'
+				);
+		}
+		checkInvalidValueOfReferencesEntry();
 		const expected = semanticReferenceId({
 			nodeId: reference.nodeId,
 			resolvedSymbolId: reference.resolvedSymbolId,
@@ -4438,85 +4873,106 @@ function validateStaticSemanticSnapshotUnsafe(
 			role: reference.role,
 			symbolId: reference.symbolId
 		});
-		if (reference.id !== expected)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Reference identity mismatch.');
+		function checkIdentityMismatchOfReferencesEntry(): void {
+			if (reference.id !== expected)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Reference identity mismatch.');
+		}
+		checkIdentityMismatchOfReferencesEntry();
 	}
-
-	for (const [index, resolution] of snapshot.moduleResolutions.entries()) {
+	function validateReferencesEntry2(
+		index: number,
+		resolution: StaticSemanticSnapshot['moduleResolutions'][number]
+	): void {
 		const jsonPath = `$.moduleResolutions[${index}]`;
-		nodeReference(resolution.nodeId, resolution.sourceId, `${jsonPath}.nodeId`);
+		function checkReferencesEntry2Part(): void {
+			nodeReference(resolution.nodeId, resolution.sourceId, `${jsonPath}.nodeId`);
+		}
+		checkReferencesEntry2Part();
 		const source = sourceById.get(resolution.sourceId);
-		if (resolution.specifierState === 'LITERAL' && resolution.specifier === null)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.specifier`,
-				'Literal module occurrence requires its exact specifier text.'
-			);
-		if (resolution.specifierState === 'NON_LITERAL' && resolution.specifier !== null)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.specifier`,
-				'Nonliteral module occurrence cannot invent a specifier text.'
-			);
-		if (
-			resolution.specifierState === 'NON_LITERAL' &&
-			(resolution.occurrenceKind !== 'DYNAMIC_IMPORT' ||
-				resolution.resolutionState !== 'UNSUPPORTED')
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.specifierState`,
-				'Nonliteral module occurrences must be unsupported dynamic imports.'
-			);
-		if (resolution.occurrenceKind === 'IMPORT_TYPE' && !resolution.typeOnly)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.typeOnly`,
-				'ImportType module occurrences must be type-only.'
-			);
-		if (resolution.occurrenceKind === 'DYNAMIC_IMPORT' && resolution.typeOnly)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.typeOnly`,
-				'Dynamic imports are runtime module occurrences.'
-			);
-		if (source === undefined)
-			issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Module occurrence source is absent.');
-		if (source !== undefined) {
-			if (resolution.moduleSymbolId !== null)
-				symbolReference(resolution.moduleSymbolId, source.projectId, `${jsonPath}.moduleSymbolId`);
-			if (resolution.targetSourceId !== null) {
-				const target = sourceById.get(resolution.targetSourceId);
-				if (target === undefined)
-					issue(
-						'DANGLING_REFERENCE',
-						`${jsonPath}.targetSourceId`,
-						'Resolved module source is absent.'
-					);
-				else if (target.projectId !== source.projectId)
-					issue(
-						'CROSS_PROJECT_REFERENCE',
-						`${jsonPath}.targetSourceId`,
-						'Resolved module source belongs to another project context.'
-					);
-			}
-			compilerSymbolProvenance(
-				resolution.provenanceId,
-				source.projectId,
-				`${jsonPath}.provenanceId`,
-				resolution.sourceId
-			);
+		function checkInvalidValueOfInvalidValueOfReferencesEntry(): void {
+			if (resolution.specifierState === 'LITERAL' && resolution.specifier === null)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.specifier`,
+					'Literal module occurrence requires its exact specifier text.'
+				);
+			if (resolution.specifierState === 'NON_LITERAL' && resolution.specifier !== null)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.specifier`,
+					'Nonliteral module occurrence cannot invent a specifier text.'
+				);
 			if (
-				resolution.resolutionState === 'UNRESOLVED' ||
-				resolution.resolutionState === 'UNSUPPORTED'
+				resolution.specifierState === 'NON_LITERAL' &&
+				(resolution.occurrenceKind !== 'DYNAMIC_IMPORT' ||
+					resolution.resolutionState !== 'UNSUPPORTED')
 			)
-				degradedSymbolProvenance(
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.specifierState`,
+					'Nonliteral module occurrences must be unsupported dynamic imports.'
+				);
+			if (resolution.occurrenceKind === 'IMPORT_TYPE' && !resolution.typeOnly)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.typeOnly`,
+					'ImportType module occurrences must be type-only.'
+				);
+		}
+		function checkInvalidValueOfInvalidValueOfReferencesEntry2(): void {
+			if (resolution.occurrenceKind === 'DYNAMIC_IMPORT' && resolution.typeOnly)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.typeOnly`,
+					'Dynamic imports are runtime module occurrences.'
+				);
+			if (source === undefined)
+				issue('DANGLING_REFERENCE', `${jsonPath}.sourceId`, 'Module occurrence source is absent.');
+			if (source !== undefined) {
+				if (resolution.moduleSymbolId !== null)
+					symbolReference(
+						resolution.moduleSymbolId,
+						source.projectId,
+						`${jsonPath}.moduleSymbolId`
+					);
+				if (resolution.targetSourceId !== null) {
+					const target = sourceById.get(resolution.targetSourceId);
+					if (target === undefined)
+						issue(
+							'DANGLING_REFERENCE',
+							`${jsonPath}.targetSourceId`,
+							'Resolved module source is absent.'
+						);
+					else if (target.projectId !== source.projectId)
+						issue(
+							'CROSS_PROJECT_REFERENCE',
+							`${jsonPath}.targetSourceId`,
+							'Resolved module source belongs to another project context.'
+						);
+				}
+				compilerSymbolProvenance(
 					resolution.provenanceId,
 					source.projectId,
 					`${jsonPath}.provenanceId`,
 					resolution.sourceId
 				);
+				if (
+					resolution.resolutionState === 'UNRESOLVED' ||
+					resolution.resolutionState === 'UNSUPPORTED'
+				)
+					degradedSymbolProvenance(
+						resolution.provenanceId,
+						source.projectId,
+						`${jsonPath}.provenanceId`,
+						resolution.sourceId
+					);
+			}
 		}
+		function checkInvalidValueOfReferencesEntry2(): void {
+			checkInvalidValueOfInvalidValueOfReferencesEntry();
+			checkInvalidValueOfInvalidValueOfReferencesEntry2();
+		}
+		checkInvalidValueOfReferencesEntry2();
 		const resolvedSource =
 			resolution.resolutionState === 'RESOLVED_SOURCE' && resolution.targetSourceId !== null;
 		const resolvedNonSource =
@@ -4528,12 +4984,15 @@ function validateStaticSemanticSnapshotUnsafe(
 				resolution.resolutionState === 'UNSUPPORTED') &&
 			resolution.moduleSymbolId === null &&
 			resolution.targetSourceId === null;
-		if (!resolvedSource && !resolvedNonSource && !unresolved)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.resolutionState`,
-				'Module-resolution state and resolved targets disagree.'
-			);
+		function checkInvalidValueOfReferencesEntry22(): void {
+			if (!resolvedSource && !resolvedNonSource && !unresolved)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.resolutionState`,
+					'Module-resolution state and resolved targets disagree.'
+				);
+		}
+		checkInvalidValueOfReferencesEntry22();
 		const expected = semanticModuleResolutionId({
 			moduleSymbolId: resolution.moduleSymbolId,
 			nodeId: resolution.nodeId,
@@ -4544,12 +5003,26 @@ function validateStaticSemanticSnapshotUnsafe(
 			targetSourceId: resolution.targetSourceId,
 			typeOnly: resolution.typeOnly
 		});
-		if (resolution.id !== expected)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Module-resolution identity mismatch.');
+		function checkIdentityMismatchOfReferencesEntry2(): void {
+			if (resolution.id !== expected)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Module-resolution identity mismatch.');
+		}
+		checkIdentityMismatchOfReferencesEntry2();
 	}
+	function validateReferences(): void {
+		for (const [index, reference] of snapshot.references.entries())
+			validateReferencesEntry(index, reference);
+
+		for (const [index, resolution] of snapshot.moduleResolutions.entries())
+			validateReferencesEntry2(index, resolution);
+	}
+	validateReferences();
 
 	const exportKeys = new Set<string>();
-	for (const [index, moduleExport] of snapshot.moduleExports.entries()) {
+	function validateModuleExportsEntry(
+		index: number,
+		moduleExport: StaticSemanticSnapshot['moduleExports'][number]
+	): void {
 		const jsonPath = `$.moduleExports[${index}]`;
 		const source = sourceById.get(moduleExport.sourceId);
 		if (source === undefined)
@@ -4602,6 +5075,11 @@ function validateStaticSemanticSnapshotUnsafe(
 		if (moduleExport.id !== expected)
 			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Module-export identity mismatch.');
 	}
+	function validateModuleExports(): void {
+		for (const [index, moduleExport] of snapshot.moduleExports.entries())
+			validateModuleExportsEntry(index, moduleExport);
+	}
+	validateModuleExports();
 
 	function typeRecordReference(
 		typeId: string,
@@ -4780,58 +5258,66 @@ function validateStaticSemanticSnapshotUnsafe(
 		return [...unsupported].sort(compareText);
 	}
 
-	for (const [index, type] of snapshot.types.entries()) {
+	function validateTypesEntry(index: number, type: StaticSemanticSnapshot['types'][number]): void {
 		const jsonPath = `$.types[${index}]`;
-		programProjectReference(type.programId, type.projectId, jsonPath);
-		compilerTypeProvenance(type.provenanceId, type.projectId, `${jsonPath}.provenanceId`);
-		if (
-			type.displayProfile !== SEMANTIC_TYPE_DISPLAY_PROFILE ||
-			type.fingerprintProfile !== SEMANTIC_TYPE_FINGERPRINT_PROFILE ||
-			!SHA256.test(type.displaySha256) ||
-			!SHA256.test(type.fingerprintSha256) ||
-			type.displaySha256 !== sha256(type.display) ||
-			type.display.length === 0 ||
-			!isUnicodeScalarString(type.display)
-		)
-			issue(
-				'INVALID_VALUE',
-				jsonPath,
-				'Type display and fingerprint must use the frozen profiles, scalar representation, and exact SHA-256 digests.'
-			);
-		if (
-			!Number.isSafeInteger(type.flags) ||
-			type.flags < 0 ||
-			(type.objectFlags !== null &&
-				(!Number.isSafeInteger(type.objectFlags) || type.objectFlags < 0)) ||
-			!isCanonicalSet(type.flagNames) ||
-			!isCanonicalSet(type.objectFlagNames) ||
-			!isCanonicalSet(type.unsupportedStructureKinds) ||
-			!sameMembers(type.flagNames, publicFlagNames(type.flags, ts.TypeFlags)) ||
-			!sameMembers(
-				type.objectFlagNames,
-				type.objectFlags === null ? [] : publicFlagNames(type.objectFlags, ts.ObjectFlags)
-			) ||
-			((type.flags & ts.TypeFlags.Object) === 0) !== (type.objectFlags === null) ||
-			type.category !== expectedTypeCategory(type.flags) ||
-			!sameMembers(
-				type.unsupportedStructureKinds,
-				expectedUnsupportedTypeStructures(type.flags, type.objectFlags)
-			) ||
-			(type.structureState === 'COMPLETE') !== (type.unsupportedStructureKinds.length === 0)
-		)
-			issue(
-				'INVALID_VALUE',
-				jsonPath,
-				'Type flags, category, object flags, unsupported structures, and structure state are incoherent.'
-			);
+		function checkInvalidValueOfTypesEntry(): void {
+			programProjectReference(type.programId, type.projectId, jsonPath);
+			compilerTypeProvenance(type.provenanceId, type.projectId, `${jsonPath}.provenanceId`);
+			if (
+				type.displayProfile !== SEMANTIC_TYPE_DISPLAY_PROFILE ||
+				type.fingerprintProfile !== SEMANTIC_TYPE_FINGERPRINT_PROFILE ||
+				!SHA256.test(type.displaySha256) ||
+				!SHA256.test(type.fingerprintSha256) ||
+				type.displaySha256 !== sha256(type.display) ||
+				type.display.length === 0 ||
+				!isUnicodeScalarString(type.display)
+			)
+				issue(
+					'INVALID_VALUE',
+					jsonPath,
+					'Type display and fingerprint must use the frozen profiles, scalar representation, and exact SHA-256 digests.'
+				);
+			if (
+				!Number.isSafeInteger(type.flags) ||
+				type.flags < 0 ||
+				(type.objectFlags !== null &&
+					(!Number.isSafeInteger(type.objectFlags) || type.objectFlags < 0)) ||
+				!isCanonicalSet(type.flagNames) ||
+				!isCanonicalSet(type.objectFlagNames) ||
+				!isCanonicalSet(type.unsupportedStructureKinds) ||
+				!sameMembers(type.flagNames, publicFlagNames(type.flags, ts.TypeFlags)) ||
+				!sameMembers(
+					type.objectFlagNames,
+					type.objectFlags === null ? [] : publicFlagNames(type.objectFlags, ts.ObjectFlags)
+				) ||
+				((type.flags & ts.TypeFlags.Object) === 0) !== (type.objectFlags === null) ||
+				type.category !== expectedTypeCategory(type.flags) ||
+				!sameMembers(
+					type.unsupportedStructureKinds,
+					expectedUnsupportedTypeStructures(type.flags, type.objectFlags)
+				) ||
+				(type.structureState === 'COMPLETE') !== (type.unsupportedStructureKinds.length === 0)
+			)
+				issue(
+					'INVALID_VALUE',
+					jsonPath,
+					'Type flags, category, object flags, unsupported structures, and structure state are incoherent.'
+				);
+		}
+		checkInvalidValueOfTypesEntry();
 		const anchorKeys = type.acquisitionAnchors.map((anchor) => canonicalSemanticJson(anchor));
-		if (type.acquisitionAnchors.length === 0 || !isCanonicalSet(anchorKeys))
-			issue(
-				'NONCANONICAL_ORDER',
-				`${jsonPath}.acquisitionAnchors`,
-				'Type acquisition anchors must be a non-empty canonical set.'
-			);
-		for (const [anchorIndex, anchor] of type.acquisitionAnchors.entries()) {
+		function checkNoncanonicalOrderOfNoncanonicalOrderOfNoncanonicalOrderOfTypesEntry(): void {
+			if (type.acquisitionAnchors.length === 0 || !isCanonicalSet(anchorKeys))
+				issue(
+					'NONCANONICAL_ORDER',
+					`${jsonPath}.acquisitionAnchors`,
+					'Type acquisition anchors must be a non-empty canonical set.'
+				);
+		}
+		function applyAcquisitionAnchorOrder(
+			anchorIndex: number,
+			anchor: (typeof type.acquisitionAnchors)[number]
+		): void {
 			const anchorPath = `${jsonPath}.acquisitionAnchors[${anchorIndex}]`;
 			switch (anchor.kind) {
 				case 'NODE':
@@ -4894,275 +5380,345 @@ function validateStaticSemanticSnapshotUnsafe(
 					break;
 			}
 		}
-		if (type.symbolId !== null)
-			symbolProgramReference(type.symbolId, type.programId, type.projectId, `${jsonPath}.symbolId`);
-		if (type.aliasSymbolId !== null)
-			symbolProgramReference(
-				type.aliasSymbolId,
-				type.programId,
-				type.projectId,
-				`${jsonPath}.aliasSymbolId`
-			);
+		function checkInvalidValueOfNoncanonicalOrderOfNoncanonicalOrderOfTypesEntry(): void {
+			for (const [anchorIndex, anchor] of type.acquisitionAnchors.entries())
+				applyAcquisitionAnchorOrder(anchorIndex, anchor);
+		}
+		function checkNoncanonicalOrderOfNoncanonicalOrderOfTypesEntry(): void {
+			checkNoncanonicalOrderOfNoncanonicalOrderOfNoncanonicalOrderOfTypesEntry();
+			checkInvalidValueOfNoncanonicalOrderOfNoncanonicalOrderOfTypesEntry();
+		}
+		function checkNoncanonicalOrderOfTypesEntryGroup(): void {
+			if (type.symbolId !== null)
+				symbolProgramReference(
+					type.symbolId,
+					type.programId,
+					type.projectId,
+					`${jsonPath}.symbolId`
+				);
+			if (type.aliasSymbolId !== null)
+				symbolProgramReference(
+					type.aliasSymbolId,
+					type.programId,
+					type.projectId,
+					`${jsonPath}.aliasSymbolId`
+				);
+		}
+		function checkNoncanonicalOrderOfTypesEntry(): void {
+			checkNoncanonicalOrderOfNoncanonicalOrderOfTypesEntry();
+			checkNoncanonicalOrderOfTypesEntryGroup();
+		}
+		checkNoncanonicalOrderOfTypesEntry();
 		const expectedIdentityBasis = expectedTypeIdentityBasis(type);
-		if (type.identityBasis !== expectedIdentityBasis)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.identityBasis`,
-				'Type identity basis does not match its declaration and acquisition evidence.'
-			);
+		function checkInvalidValueOfTypesEntry2(): void {
+			if (type.identityBasis !== expectedIdentityBasis)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.identityBasis`,
+					'Type identity basis does not match its declaration and acquisition evidence.'
+				);
+		}
+		checkInvalidValueOfTypesEntry2();
 		const expectedId = semanticTypeId({
 			fingerprintProfile: type.fingerprintProfile,
 			fingerprintSha256: type.fingerprintSha256,
 			identityBasis: type.identityBasis,
 			programId: type.programId
 		});
-		if (type.id !== expectedId)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Type identity mismatch.');
+		function checkIdentityMismatchOfTypesEntry(): void {
+			if (type.id !== expectedId)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Type identity mismatch.');
+		}
+		checkIdentityMismatchOfTypesEntry();
 	}
+	function validateTypes(): void {
+		for (const [index, type] of snapshot.types.entries()) validateTypesEntry(index, type);
+	}
+	validateTypes();
 
 	const typeParameterOwnerOrdinalKeys = new Set<string>();
-	for (const [index, parameter] of snapshot.typeParameters.entries()) {
+	function validateTypeParametersEntry(
+		index: number,
+		parameter: StaticSemanticSnapshot['typeParameters'][number]
+	): void {
 		const jsonPath = `$.typeParameters[${index}]`;
-		programProjectReference(parameter.programId, parameter.projectId, jsonPath);
-		compilerTypeProvenance(parameter.provenanceId, parameter.projectId, `${jsonPath}.provenanceId`);
-		if (
-			!Number.isSafeInteger(parameter.ordinal) ||
-			parameter.ordinal < 0 ||
-			parameter.name.length === 0 ||
-			!isUnicodeScalarString(parameter.name)
-		)
-			issue(
-				'INVALID_VALUE',
-				jsonPath,
-				'Type parameter name and non-negative owner ordinal are invalid.'
+		function checkInvalidValueOfTypeParametersEntry(): void {
+			programProjectReference(parameter.programId, parameter.projectId, jsonPath);
+			compilerTypeProvenance(
+				parameter.provenanceId,
+				parameter.projectId,
+				`${jsonPath}.provenanceId`
 			);
-		typeParameterOwnerReference(
-			parameter.owner,
-			parameter.programId,
-			parameter.projectId,
-			`${jsonPath}.owner`
-		);
-		const ownerOrdinalKey = `${canonicalSemanticJson(parameter.owner)}\0${String(parameter.ordinal)}`;
-		if (typeParameterOwnerOrdinalKeys.has(ownerOrdinalKey))
-			issue(
-				'DUPLICATE_ID',
-				jsonPath,
-				'A type-parameter owner may contain at most one parameter at each ordinal.'
-			);
-		typeParameterOwnerOrdinalKeys.add(ownerOrdinalKey);
-		if (parameter.declarationId !== null)
-			declarationProgramReference(
-				parameter.declarationId,
+			if (
+				!Number.isSafeInteger(parameter.ordinal) ||
+				parameter.ordinal < 0 ||
+				parameter.name.length === 0 ||
+				!isUnicodeScalarString(parameter.name)
+			)
+				issue(
+					'INVALID_VALUE',
+					jsonPath,
+					'Type parameter name and non-negative owner ordinal are invalid.'
+				);
+			typeParameterOwnerReference(
+				parameter.owner,
 				parameter.programId,
 				parameter.projectId,
-				`${jsonPath}.declarationId`
+				`${jsonPath}.owner`
 			);
-		if (parameter.owner.kind === 'DECLARATION') {
-			const ownerDeclaration = declarationById.get(parameter.owner.id);
-			const parameterDeclaration =
-				parameter.declarationId === null ? undefined : declarationById.get(parameter.declarationId);
-			if (parameter.declarationId === null)
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.declarationId`,
-					'Declaration-owned type parameter must identify its distinct TypeParameterDeclaration.'
-				);
-			else if (parameter.declarationId === parameter.owner.id)
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.declarationId`,
-					'Type-parameter declaration must be distinct from its enclosing generic declaration owner.'
-				);
-			else if (
-				ownerDeclaration !== undefined &&
-				parameterDeclaration !== undefined &&
-				parameterDeclaration.sourceId !== ownerDeclaration.sourceId
-			)
-				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`${jsonPath}.declarationId`,
-					'Type-parameter declaration and its generic declaration owner must belong to the same source.'
-				);
-			else if (
-				ownerDeclaration !== undefined &&
-				parameterDeclaration !== undefined &&
-				(parameterDeclaration.start < ownerDeclaration.start ||
-					parameterDeclaration.end > ownerDeclaration.end)
-			)
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.declarationId`,
-					'Type-parameter declaration span must be contained by its enclosing generic declaration owner.'
-				);
 		}
-		typeRecordReference(
-			parameter.parameterTypeId,
-			parameter.programId,
-			parameter.projectId,
-			`${jsonPath}.parameterTypeId`
-		);
-		if (
-			parameter.owner.kind === 'SIGNATURE' &&
-			!typeById
-				.get(parameter.parameterTypeId)
-				?.acquisitionAnchors.some(
-					(anchor) =>
-						anchor.kind === 'SIGNATURE_COMPONENT' &&
-						anchor.signatureId === parameter.owner.id &&
-						anchor.componentKind === 'TYPE_PARAMETER' &&
-						anchor.componentOrdinal === parameter.ordinal
-				)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`${jsonPath}.parameterTypeId`,
-				'Signature type parameter must retain its exact Signature-component acquisition anchor.'
-			);
-		for (const [stateName, typeIdName] of [
-			['constraintState', 'constraintTypeId'],
-			['defaultState', 'defaultTypeId']
-		] as const) {
-			const state = parameter[stateName];
-			const referencedTypeId = parameter[typeIdName];
-			if ((state === 'RESOLVED') !== (referencedTypeId !== null))
+		checkInvalidValueOfTypeParametersEntry();
+		const ownerOrdinalKey = `${canonicalSemanticJson(parameter.owner)}\0${String(parameter.ordinal)}`;
+		function checkDuplicateIdOfDuplicateIdOfTypeParametersEntry(): void {
+			if (typeParameterOwnerOrdinalKeys.has(ownerOrdinalKey))
 				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.${stateName}`,
-					'Only RESOLVED type-parameter state may carry a resolved type identity.'
+					'DUPLICATE_ID',
+					jsonPath,
+					'A type-parameter owner may contain at most one parameter at each ordinal.'
 				);
-			if (referencedTypeId !== null)
-				typeRecordReference(
-					referencedTypeId,
+			typeParameterOwnerOrdinalKeys.add(ownerOrdinalKey);
+			if (parameter.declarationId !== null)
+				declarationProgramReference(
+					parameter.declarationId,
 					parameter.programId,
 					parameter.projectId,
-					`${jsonPath}.${typeIdName}`
+					`${jsonPath}.declarationId`
 				);
+			if (parameter.owner.kind === 'DECLARATION') {
+				const ownerDeclaration = declarationById.get(parameter.owner.id);
+				const parameterDeclaration =
+					parameter.declarationId === null
+						? undefined
+						: declarationById.get(parameter.declarationId);
+				if (parameter.declarationId === null)
+					issue(
+						'INVALID_VALUE',
+						`${jsonPath}.declarationId`,
+						'Declaration-owned type parameter must identify its distinct TypeParameterDeclaration.'
+					);
+				else if (parameter.declarationId === parameter.owner.id)
+					issue(
+						'INVALID_VALUE',
+						`${jsonPath}.declarationId`,
+						'Type-parameter declaration must be distinct from its enclosing generic declaration owner.'
+					);
+				else if (
+					ownerDeclaration !== undefined &&
+					parameterDeclaration !== undefined &&
+					parameterDeclaration.sourceId !== ownerDeclaration.sourceId
+				)
+					issue(
+						'CROSS_PROJECT_REFERENCE',
+						`${jsonPath}.declarationId`,
+						'Type-parameter declaration and its generic declaration owner must belong to the same source.'
+					);
+				else if (
+					ownerDeclaration !== undefined &&
+					parameterDeclaration !== undefined &&
+					(parameterDeclaration.start < ownerDeclaration.start ||
+						parameterDeclaration.end > ownerDeclaration.end)
+				)
+					issue(
+						'INVALID_VALUE',
+						`${jsonPath}.declarationId`,
+						'Type-parameter declaration span must be contained by its enclosing generic declaration owner.'
+					);
+			}
+		}
+		function checkDanglingReferenceOfDuplicateIdOfTypeParametersEntry(): void {
+			typeRecordReference(
+				parameter.parameterTypeId,
+				parameter.programId,
+				parameter.projectId,
+				`${jsonPath}.parameterTypeId`
+			);
 			if (
-				referencedTypeId !== null &&
+				parameter.owner.kind === 'SIGNATURE' &&
 				!typeById
-					.get(referencedTypeId)
+					.get(parameter.parameterTypeId)
 					?.acquisitionAnchors.some(
 						(anchor) =>
-							anchor.kind === 'TYPE_COMPONENT' &&
-							anchor.parentTypeId === parameter.parameterTypeId &&
-							anchor.componentKind ===
-								(stateName === 'constraintState' ? 'GENERIC_TARGET' : 'TYPE_ARGUMENT') &&
-							anchor.componentOrdinal === 0
+							anchor.kind === 'SIGNATURE_COMPONENT' &&
+							anchor.signatureId === parameter.owner.id &&
+							anchor.componentKind === 'TYPE_PARAMETER' &&
+							anchor.componentOrdinal === parameter.ordinal
 					)
 			)
 				issue(
 					'DANGLING_REFERENCE',
-					`${jsonPath}.${typeIdName}`,
-					'Resolved constraint or default type must retain its exact type-component acquisition anchor.'
+					`${jsonPath}.parameterTypeId`,
+					'Signature type parameter must retain its exact Signature-component acquisition anchor.'
 				);
+			for (const [stateName, typeIdName] of [
+				['constraintState', 'constraintTypeId'],
+				['defaultState', 'defaultTypeId']
+			] as const) {
+				const state = parameter[stateName];
+				const referencedTypeId = parameter[typeIdName];
+				if ((state === 'RESOLVED') !== (referencedTypeId !== null))
+					issue(
+						'INVALID_VALUE',
+						`${jsonPath}.${stateName}`,
+						'Only RESOLVED type-parameter state may carry a resolved type identity.'
+					);
+				if (referencedTypeId !== null)
+					typeRecordReference(
+						referencedTypeId,
+						parameter.programId,
+						parameter.projectId,
+						`${jsonPath}.${typeIdName}`
+					);
+				if (
+					referencedTypeId !== null &&
+					!typeById
+						.get(referencedTypeId)
+						?.acquisitionAnchors.some(
+							(anchor) =>
+								anchor.kind === 'TYPE_COMPONENT' &&
+								anchor.parentTypeId === parameter.parameterTypeId &&
+								anchor.componentKind ===
+									(stateName === 'constraintState' ? 'GENERIC_TARGET' : 'TYPE_ARGUMENT') &&
+								anchor.componentOrdinal === 0
+						)
+				)
+					issue(
+						'DANGLING_REFERENCE',
+						`${jsonPath}.${typeIdName}`,
+						'Resolved constraint or default type must retain its exact type-component acquisition anchor.'
+					);
+			}
 		}
+		function checkDuplicateIdOfTypeParametersEntry(): void {
+			checkDuplicateIdOfDuplicateIdOfTypeParametersEntry();
+			checkDanglingReferenceOfDuplicateIdOfTypeParametersEntry();
+		}
+		checkDuplicateIdOfTypeParametersEntry();
 		const expectedId = semanticTypeParameterId({
 			declarationId: parameter.declarationId,
 			ordinal: parameter.ordinal,
 			owner: parameter.owner
 		});
-		if (parameter.id !== expectedId)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Type-parameter identity mismatch.');
+		function checkIdentityMismatchOfTypeParametersEntry(): void {
+			if (parameter.id !== expectedId)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Type-parameter identity mismatch.');
+		}
+		checkIdentityMismatchOfTypeParametersEntry();
 	}
-
-	for (const [index, signature] of snapshot.signatures.entries()) {
+	function validateTypeParametersEntry2(
+		index: number,
+		signature: StaticSemanticSnapshot['signatures'][number]
+	): void {
 		const jsonPath = `$.signatures[${index}]`;
-		programProjectReference(signature.programId, signature.projectId, jsonPath);
-		compilerTypeProvenance(signature.provenanceId, signature.projectId, `${jsonPath}.provenanceId`);
-		if (
-			signature.fingerprintProfile !== SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE ||
-			!SHA256.test(signature.displaySha256) ||
-			!SHA256.test(signature.fingerprintSha256) ||
-			signature.displaySha256 !== sha256(signature.display) ||
-			signature.display.length === 0 ||
-			!isUnicodeScalarString(signature.display)
-		)
-			issue(
-				'INVALID_VALUE',
-				jsonPath,
-				'Signature display and fingerprint must use the frozen profile, scalar representation, and exact SHA-256 digests.'
+		function checkInvalidValueOfInvalidValueOfTypeParametersEntry(): void {
+			programProjectReference(signature.programId, signature.projectId, jsonPath);
+			compilerTypeProvenance(
+				signature.provenanceId,
+				signature.projectId,
+				`${jsonPath}.provenanceId`
 			);
-		signatureOwnerReference(
-			signature.owner,
-			signature.programId,
-			signature.projectId,
-			`${jsonPath}.owner`
-		);
-		if (signature.declarationId !== null)
-			declarationProgramReference(
-				signature.declarationId,
+			if (
+				signature.fingerprintProfile !== SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE ||
+				!SHA256.test(signature.displaySha256) ||
+				!SHA256.test(signature.fingerprintSha256) ||
+				signature.displaySha256 !== sha256(signature.display) ||
+				signature.display.length === 0 ||
+				!isUnicodeScalarString(signature.display)
+			)
+				issue(
+					'INVALID_VALUE',
+					jsonPath,
+					'Signature display and fingerprint must use the frozen profile, scalar representation, and exact SHA-256 digests.'
+				);
+			signatureOwnerReference(
+				signature.owner,
 				signature.programId,
 				signature.projectId,
-				`${jsonPath}.declarationId`
+				`${jsonPath}.owner`
 			);
-		if (
-			(signature.identityBasis === 'DECLARATION_ANCHORED' && signature.declarationId === null) ||
-			(signature.identityBasis === 'OWNER_ORDINAL' &&
-				(signature.providerOrdinal === null ||
-					!Number.isSafeInteger(signature.providerOrdinal) ||
-					signature.providerOrdinal < 0)) ||
-			(signature.providerOrdinal !== null &&
-				(!Number.isSafeInteger(signature.providerOrdinal) || signature.providerOrdinal < 0))
-		)
-			issue(
-				'INVALID_VALUE',
-				jsonPath,
-				'Signature identity basis, declaration, and provider ordinal are incoherent.'
+			if (signature.declarationId !== null)
+				declarationProgramReference(
+					signature.declarationId,
+					signature.programId,
+					signature.projectId,
+					`${jsonPath}.declarationId`
+				);
+		}
+		function checkInvalidValueOfInvalidValueOfTypeParametersEntry2(): void {
+			if (
+				(signature.identityBasis === 'DECLARATION_ANCHORED' && signature.declarationId === null) ||
+				(signature.identityBasis === 'OWNER_ORDINAL' &&
+					(signature.providerOrdinal === null ||
+						!Number.isSafeInteger(signature.providerOrdinal) ||
+						signature.providerOrdinal < 0)) ||
+				(signature.providerOrdinal !== null &&
+					(!Number.isSafeInteger(signature.providerOrdinal) || signature.providerOrdinal < 0))
+			)
+				issue(
+					'INVALID_VALUE',
+					jsonPath,
+					'Signature identity basis, declaration, and provider ordinal are incoherent.'
+				);
+			if (
+				(signature.owner.kind === 'DECLARATION' &&
+					signature.declarationId !== signature.owner.id) ||
+				(signature.owner.kind === 'SYMBOL' &&
+					signature.declarationId !== null &&
+					declarationById.get(signature.declarationId)?.symbolId !== signature.owner.id)
+			)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`${jsonPath}.owner`,
+					'Signature declaration and owner do not identify the same callable.'
+				);
+			if (
+				(signature.declarationRole === 'CONSTRUCT_SIGNATURE' &&
+					signature.signatureKind !== 'CONSTRUCT') ||
+				(signature.declarationRole === 'CALL_SIGNATURE' && signature.signatureKind !== 'CALL') ||
+				(signature.semanticKind === 'OVERLOAD_SIGNATURE' &&
+					![
+						'OVERLOAD_DECLARATION',
+						'AMBIENT_OVERLOAD',
+						'CALL_SIGNATURE',
+						'CONSTRUCT_SIGNATURE'
+					].includes(signature.declarationRole)) ||
+				(['OVERLOAD_DECLARATION', 'AMBIENT_OVERLOAD'].includes(signature.declarationRole) &&
+					signature.semanticKind !== 'OVERLOAD_SIGNATURE') ||
+				(signature.semanticKind === 'IMPLEMENTATION_SIGNATURE' &&
+					signature.declarationRole !== 'DECLARATION')
+			)
+				issue(
+					'INVALID_VALUE',
+					jsonPath,
+					'Signature kind, semantic kind, and declaration role are incoherent.'
+				);
+			typeRecordReference(
+				signature.returnTypeId,
+				signature.programId,
+				signature.projectId,
+				`${jsonPath}.returnTypeId`
 			);
-		if (
-			(signature.owner.kind === 'DECLARATION' && signature.declarationId !== signature.owner.id) ||
-			(signature.owner.kind === 'SYMBOL' &&
-				signature.declarationId !== null &&
-				declarationById.get(signature.declarationId)?.symbolId !== signature.owner.id)
-		)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`${jsonPath}.owner`,
-				'Signature declaration and owner do not identify the same callable.'
-			);
-		if (
-			(signature.declarationRole === 'CONSTRUCT_SIGNATURE' &&
-				signature.signatureKind !== 'CONSTRUCT') ||
-			(signature.declarationRole === 'CALL_SIGNATURE' && signature.signatureKind !== 'CALL') ||
-			(signature.semanticKind === 'OVERLOAD_SIGNATURE' &&
-				![
-					'OVERLOAD_DECLARATION',
-					'AMBIENT_OVERLOAD',
-					'CALL_SIGNATURE',
-					'CONSTRUCT_SIGNATURE'
-				].includes(signature.declarationRole)) ||
-			(['OVERLOAD_DECLARATION', 'AMBIENT_OVERLOAD'].includes(signature.declarationRole) &&
-				signature.semanticKind !== 'OVERLOAD_SIGNATURE') ||
-			(signature.semanticKind === 'IMPLEMENTATION_SIGNATURE' &&
-				signature.declarationRole !== 'DECLARATION')
-		)
-			issue(
-				'INVALID_VALUE',
-				jsonPath,
-				'Signature kind, semantic kind, and declaration role are incoherent.'
-			);
-		typeRecordReference(
-			signature.returnTypeId,
-			signature.programId,
-			signature.projectId,
-			`${jsonPath}.returnTypeId`
-		);
-		if (
-			!typeById
-				.get(signature.returnTypeId)
-				?.acquisitionAnchors.some(
-					(anchor) =>
-						anchor.kind === 'SIGNATURE_COMPONENT' &&
-						anchor.signatureId === signature.id &&
-						anchor.componentKind === 'RETURN' &&
-						anchor.componentOrdinal === 0
-				)
-		)
-			issue(
-				'DANGLING_REFERENCE',
-				`${jsonPath}.returnTypeId`,
-				'Signature return type must retain its exact Signature-component acquisition anchor.'
-			);
+			if (
+				!typeById
+					.get(signature.returnTypeId)
+					?.acquisitionAnchors.some(
+						(anchor) =>
+							anchor.kind === 'SIGNATURE_COMPONENT' &&
+							anchor.signatureId === signature.id &&
+							anchor.componentKind === 'RETURN' &&
+							anchor.componentOrdinal === 0
+					)
+			)
+				issue(
+					'DANGLING_REFERENCE',
+					`${jsonPath}.returnTypeId`,
+					'Signature return type must retain its exact Signature-component acquisition anchor.'
+				);
+		}
+		function checkInvalidValueOfTypeParametersEntry2(): void {
+			checkInvalidValueOfInvalidValueOfTypeParametersEntry();
+			checkInvalidValueOfInvalidValueOfTypeParametersEntry2();
+		}
+		checkInvalidValueOfTypeParametersEntry2();
 		const expectedParameters = snapshot.signatureParameters
 			.filter((parameter) => parameter.signatureId === signature.id)
 			.sort((left, right) => {
@@ -5176,66 +5732,83 @@ function validateStaticSemanticSnapshotUnsafe(
 			)
 			.sort((left, right) => left.ordinal - right.ordinal)
 			.map((parameter) => parameter.id);
-		if (
-			new Set(signature.parameterIds).size !== signature.parameterIds.length ||
-			canonicalSemanticJson(signature.parameterIds) !== canonicalSemanticJson(expectedParameters)
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.parameterIds`,
-				'Signature parameter membership must be complete, unique, and ordered as THIS then PARAMETER ordinal.'
-			);
-		if (
-			new Set(signature.typeParameterIds).size !== signature.typeParameterIds.length ||
-			canonicalSemanticJson(signature.typeParameterIds) !==
-				canonicalSemanticJson(expectedTypeParameters)
-		)
-			issue(
-				'INVALID_VALUE',
-				`${jsonPath}.typeParameterIds`,
-				'Signature type-parameter membership must be complete, unique, and ordered by ordinal.'
-			);
-		for (const parameterId of signature.parameterIds)
-			if (!signatureParameterById.has(parameterId))
+		function checkInvalidValueOfTypeParametersEntry22(): void {
+			if (
+				new Set(signature.parameterIds).size !== signature.parameterIds.length ||
+				canonicalSemanticJson(signature.parameterIds) !== canonicalSemanticJson(expectedParameters)
+			)
 				issue(
-					'DANGLING_REFERENCE',
+					'INVALID_VALUE',
 					`${jsonPath}.parameterIds`,
-					'Signature references an absent parameter.'
+					'Signature parameter membership must be complete, unique, and ordered as THIS then PARAMETER ordinal.'
 				);
-		for (const parameterId of signature.typeParameterIds)
-			typeParameterRecordReference(
-				parameterId,
-				signature.programId,
-				signature.projectId,
-				`${jsonPath}.typeParameterIds`
-			);
+			if (
+				new Set(signature.typeParameterIds).size !== signature.typeParameterIds.length ||
+				canonicalSemanticJson(signature.typeParameterIds) !==
+					canonicalSemanticJson(expectedTypeParameters)
+			)
+				issue(
+					'INVALID_VALUE',
+					`${jsonPath}.typeParameterIds`,
+					'Signature type-parameter membership must be complete, unique, and ordered by ordinal.'
+				);
+			for (const parameterId of signature.parameterIds)
+				if (!signatureParameterById.has(parameterId))
+					issue(
+						'DANGLING_REFERENCE',
+						`${jsonPath}.parameterIds`,
+						'Signature references an absent parameter.'
+					);
+			for (const parameterId of signature.typeParameterIds)
+				typeParameterRecordReference(
+					parameterId,
+					signature.programId,
+					signature.projectId,
+					`${jsonPath}.typeParameterIds`
+				);
+		}
+		checkInvalidValueOfTypeParametersEntry22();
 		let expectedId: string | null;
-		if (signature.identityBasis === 'DECLARATION_ANCHORED' && signature.declarationId !== null)
-			expectedId = semanticSignatureId({
-				declarationId: signature.declarationId,
-				identityBasis: 'DECLARATION_ANCHORED',
-				programId: signature.programId,
-				semanticKind: signature.semanticKind,
-				signatureKind: signature.signatureKind
-			});
-		else if (signature.providerOrdinal === null) expectedId = null;
-		else
-			expectedId = semanticSignatureId({
-				fingerprintProfile: signature.fingerprintProfile,
-				fingerprintSha256: signature.fingerprintSha256,
-				identityBasis: 'OWNER_ORDINAL',
-				owner: signature.owner,
-				programId: signature.programId,
-				providerOrdinal: signature.providerOrdinal,
-				semanticKind: signature.semanticKind,
-				signatureKind: signature.signatureKind
-			});
-		if (expectedId === null || signature.id !== expectedId)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Signature identity mismatch.');
+		function checkIdentityMismatchOfTypeParametersEntry2(): void {
+			if (signature.identityBasis === 'DECLARATION_ANCHORED' && signature.declarationId !== null)
+				expectedId = semanticSignatureId({
+					declarationId: signature.declarationId,
+					identityBasis: 'DECLARATION_ANCHORED',
+					programId: signature.programId,
+					semanticKind: signature.semanticKind,
+					signatureKind: signature.signatureKind
+				});
+			else if (signature.providerOrdinal === null) expectedId = null;
+			else
+				expectedId = semanticSignatureId({
+					fingerprintProfile: signature.fingerprintProfile,
+					fingerprintSha256: signature.fingerprintSha256,
+					identityBasis: 'OWNER_ORDINAL',
+					owner: signature.owner,
+					programId: signature.programId,
+					providerOrdinal: signature.providerOrdinal,
+					semanticKind: signature.semanticKind,
+					signatureKind: signature.signatureKind
+				});
+			if (expectedId === null || signature.id !== expectedId)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Signature identity mismatch.');
+		}
+		checkIdentityMismatchOfTypeParametersEntry2();
 	}
+	function validateTypeParameters(): void {
+		for (const [index, parameter] of snapshot.typeParameters.entries())
+			validateTypeParametersEntry(index, parameter);
+
+		for (const [index, signature] of snapshot.signatures.entries())
+			validateTypeParametersEntry2(index, signature);
+	}
+	validateTypeParameters();
 
 	const signatureParameterKeys = new Set<string>();
-	for (const [index, parameter] of snapshot.signatureParameters.entries()) {
+	function validateSignatureParametersEntry(
+		index: number,
+		parameter: StaticSemanticSnapshot['signatureParameters'][number]
+	): void {
 		const jsonPath = `$.signatureParameters[${index}]`;
 		const signature = signatureById.get(parameter.signatureId);
 		if (signature === undefined) {
@@ -5244,7 +5817,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				`${jsonPath}.signatureId`,
 				'Signature parameter references an absent Signature.'
 			);
-			continue;
+			return;
 		}
 		compilerTypeProvenance(parameter.provenanceId, signature.projectId, `${jsonPath}.provenanceId`);
 		if (
@@ -5313,8 +5886,10 @@ function validateStaticSemanticSnapshotUnsafe(
 		if (parameter.id !== expectedId)
 			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Signature-parameter identity mismatch.');
 	}
-
-	for (const [index, overloadSet] of snapshot.overloadSets.entries()) {
+	function validateSignatureParametersEntry2(
+		index: number,
+		overloadSet: StaticSemanticSnapshot['overloadSets'][number]
+	): void {
 		const jsonPath = `$.overloadSets[${index}]`;
 		programProjectReference(overloadSet.programId, overloadSet.projectId, jsonPath);
 		symbolProgramReference(
@@ -5335,6 +5910,14 @@ function validateStaticSemanticSnapshotUnsafe(
 		if (overloadSet.id !== expectedId)
 			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Overload-set identity mismatch.');
 	}
+	function validateSignatureParameters(): void {
+		for (const [index, parameter] of snapshot.signatureParameters.entries())
+			validateSignatureParametersEntry(index, parameter);
+
+		for (const [index, overloadSet] of snapshot.overloadSets.entries())
+			validateSignatureParametersEntry2(index, overloadSet);
+	}
+	validateSignatureParameters();
 
 	const constraintRelationsByParameter = new Map<
 		string,
@@ -5373,18 +5956,26 @@ function validateStaticSemanticSnapshotUnsafe(
 			)?.id ?? null
 		);
 	}
-	for (const [index, relation] of snapshot.typeRelations.entries()) {
+	function validateTypeRelationsEntry(
+		index: number,
+		relation: StaticSemanticSnapshot['typeRelations'][number]
+	): void {
 		const jsonPath = `$.typeRelations[${index}]`;
-		programProjectReference(relation.programId, relation.projectId, jsonPath);
-		compilerTypeProvenance(relation.provenanceId, relation.projectId, `${jsonPath}.provenanceId`);
+		function checkTypeRelationsEntryPart(): void {
+			programProjectReference(relation.programId, relation.projectId, jsonPath);
+			compilerTypeProvenance(relation.provenanceId, relation.projectId, `${jsonPath}.provenanceId`);
+		}
+		checkTypeRelationsEntryPart();
 		const { id: _id, provenanceId: _provenanceId, ...identityPreimage } = relation;
-		if (
-			relation.id !==
-			semanticTypeRelationId(identityPreimage as Parameters<typeof semanticTypeRelationId>[0])
-		)
-			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Type-relation identity mismatch.');
-		switch (relation.kind) {
-			case 'TYPE_OF': {
+		function checkIdentityMismatchOfTypeRelationsEntry(): void {
+			if (
+				relation.id !==
+				semanticTypeRelationId(identityPreimage as Parameters<typeof semanticTypeRelationId>[0])
+			)
+				issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Type-relation identity mismatch.');
+			function checkTypeRelationTypeOf(
+				relation: Extract<StaticSemanticSnapshot['typeRelations'][number], { kind: 'TYPE_OF' }>
+			): void {
 				typeSubjectReference(
 					relation.subject,
 					relation.programId,
@@ -5429,9 +6020,10 @@ function validateStaticSemanticSnapshotUnsafe(
 							'Confirmed TYPE_OF result must be retained as a matching type acquisition anchor.'
 						);
 				}
-				break;
 			}
-			case 'TYPE_ALIAS':
+			function checkTypeRelationTypeAlias(
+				relation: Extract<StaticSemanticSnapshot['typeRelations'][number], { kind: 'TYPE_ALIAS' }>
+			): void {
 				declarationProgramReference(
 					relation.aliasDeclarationId,
 					relation.programId,
@@ -5447,9 +6039,13 @@ function validateStaticSemanticSnapshotUnsafe(
 						relation.projectId,
 						`${jsonPath}.aliasedTypeId`
 					);
-				break;
-			case 'UNION_CONSTITUENT':
-			case 'INTERSECTION_CONSTITUENT': {
+			}
+			function checkTypeRelationIntersectionConstituent(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'UNION_CONSTITUENT' | 'INTERSECTION_CONSTITUENT' }
+				>
+			): void {
 				if (
 					relation.state !== 'CONFIRMED' ||
 					!Number.isSafeInteger(relation.ordinal) ||
@@ -5500,9 +6096,13 @@ function validateStaticSemanticSnapshotUnsafe(
 					`${relation.kind}\0${relation.compositeTypeId}`,
 					relation
 				);
-				break;
 			}
-			case 'GENERIC_INSTANTIATION':
+			function checkTypeRelationGenericInstantiation(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'GENERIC_INSTANTIATION' }
+				>
+			): void {
 				if (relation.state !== 'CONFIRMED')
 					issue(
 						'INVALID_VALUE',
@@ -5564,8 +6164,13 @@ function validateStaticSemanticSnapshotUnsafe(
 								'Generic argument order must be mirrored by exact type-component acquisition anchors.'
 							);
 				}
-				break;
-			case 'PARAMETER_CONSTRAINT': {
+			}
+			function checkTypeRelationParameterConstraint(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'PARAMETER_CONSTRAINT' }
+				>
+			): void {
 				typeParameterRecordReference(
 					relation.typeParameterId,
 					relation.programId,
@@ -5593,10 +6198,13 @@ function validateStaticSemanticSnapshotUnsafe(
 						`${jsonPath}.constraintTypeId`
 					);
 				appendGrouped(constraintRelationsByParameter, relation.typeParameterId, relation);
-				break;
 			}
-			case 'TYPE_EXTENSION':
-			case 'TYPE_IMPLEMENTATION':
+			function checkTypeRelationTypeImplementation(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'TYPE_EXTENSION' | 'TYPE_IMPLEMENTATION' }
+				>
+			): void {
 				if (relation.state !== 'CONFIRMED')
 					issue('INVALID_VALUE', `${jsonPath}.state`, 'Heritage type relations must be confirmed.');
 				typeRecordReference(
@@ -5625,42 +6233,14 @@ function validateStaticSemanticSnapshotUnsafe(
 						relation.projectId,
 						`${jsonPath}.heritageOccurrence.id`
 					);
-				break;
-			case 'ASSIGNABILITY': {
-				const request = snapshot.assignabilityRequests.find(
-					(candidate) => candidate.requestId === relation.requestId
-				);
-				const program = programById.get(relation.programId);
-				if (
-					request === undefined ||
-					relation.checkerContextDigest !== program?.contextDigest ||
-					!SHA256.test(relation.checkerContextDigest)
-				)
-					issue(
-						request === undefined ? 'DANGLING_REFERENCE' : 'IDENTITY_MISMATCH',
-						jsonPath,
-						'Assignability relation must bind a requested judgment and its exact Program checker context.'
-					);
-				if (
-					relation.state === 'CONFIRMED'
-						? relation.sourceTypeId === null ||
-							relation.targetTypeId === null ||
-							typeof relation.result !== 'boolean'
-						: relation.result !== null ||
-							(relation.sourceTypeId !== null && relation.targetTypeId !== null)
-				)
-					issue(
-						'INVALID_VALUE',
-						jsonPath,
-						'Assignability state, endpoint resolution, and Boolean judgment are incoherent.'
-					);
-				if (relation.sourceTypeId !== null)
-					typeRecordReference(
-						relation.sourceTypeId,
-						relation.programId,
-						relation.projectId,
-						`${jsonPath}.sourceTypeId`
-					);
+			}
+			function checkDanglingReferenceOfTypeRelationAssignability(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'ASSIGNABILITY' }
+				>,
+				request: StaticSemanticSnapshot['assignabilityRequests'][number] | undefined
+			): void {
 				if (relation.targetTypeId !== null)
 					typeRecordReference(
 						relation.targetTypeId,
@@ -5698,78 +6278,173 @@ function validateStaticSemanticSnapshotUnsafe(
 					`${relation.programId}\0${relation.requestId}`,
 					relation
 				);
-				break;
 			}
-			case 'OVERLOAD_MEMBERSHIP': {
-				if (
-					relation.state !== 'CONFIRMED' ||
-					!Number.isSafeInteger(relation.ordinal) ||
-					relation.ordinal < 0
-				)
-					issue(
-						'INVALID_VALUE',
-						jsonPath,
-						'Overload membership must be confirmed with a non-negative ordinal.'
-					);
-				const overloadSet = overloadSetById.get(relation.overloadSetId);
-				if (
-					overloadSet?.programId !== relation.programId ||
-					overloadSet.projectId !== relation.projectId
-				)
-					issue(
-						overloadSet === undefined ? 'DANGLING_REFERENCE' : 'CROSS_PROJECT_REFERENCE',
-						`${jsonPath}.overloadSetId`,
-						'Overload membership set is absent or belongs to another Program.'
-					);
-				signatureRecordReference(
-					relation.signatureId,
-					relation.programId,
-					relation.projectId,
-					`${jsonPath}.signatureId`
+			function checkTypeRelationAssignability(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'ASSIGNABILITY' }
+				>
+			): void {
+				const request = snapshot.assignabilityRequests.find(
+					(candidate) => candidate.requestId === relation.requestId
 				);
+				const program = programById.get(relation.programId);
+				function checkInvalidValueOfTypeRelationAssignability(): void {
+					if (
+						request === undefined ||
+						relation.checkerContextDigest !== program?.contextDigest ||
+						!SHA256.test(relation.checkerContextDigest)
+					)
+						issue(
+							request === undefined ? 'DANGLING_REFERENCE' : 'IDENTITY_MISMATCH',
+							jsonPath,
+							'Assignability relation must bind a requested judgment and its exact Program checker context.'
+						);
+					if (
+						relation.state === 'CONFIRMED'
+							? relation.sourceTypeId === null ||
+								relation.targetTypeId === null ||
+								typeof relation.result !== 'boolean'
+							: relation.result !== null ||
+								(relation.sourceTypeId !== null && relation.targetTypeId !== null)
+					)
+						issue(
+							'INVALID_VALUE',
+							jsonPath,
+							'Assignability state, endpoint resolution, and Boolean judgment are incoherent.'
+						);
+					if (relation.sourceTypeId !== null)
+						typeRecordReference(
+							relation.sourceTypeId,
+							relation.programId,
+							relation.projectId,
+							`${jsonPath}.sourceTypeId`
+						);
+				}
+				checkInvalidValueOfTypeRelationAssignability();
+				checkDanglingReferenceOfTypeRelationAssignability(relation, request);
+			}
+			function checkTypeRelationOverloadMembership(
+				relation: Extract<
+					StaticSemanticSnapshot['typeRelations'][number],
+					{ kind: 'OVERLOAD_MEMBERSHIP' }
+				>
+			): void {
+				function checkInvalidValueOfTypeRelationOverloadMembership(): void {
+					if (
+						relation.state !== 'CONFIRMED' ||
+						!Number.isSafeInteger(relation.ordinal) ||
+						relation.ordinal < 0
+					)
+						issue(
+							'INVALID_VALUE',
+							jsonPath,
+							'Overload membership must be confirmed with a non-negative ordinal.'
+						);
+				}
+				checkInvalidValueOfTypeRelationOverloadMembership();
+				const overloadSet = overloadSetById.get(relation.overloadSetId);
+				function checkTypeRelationOverloadMembershipPart(): void {
+					if (
+						overloadSet?.programId !== relation.programId ||
+						overloadSet.projectId !== relation.projectId
+					)
+						issue(
+							overloadSet === undefined ? 'DANGLING_REFERENCE' : 'CROSS_PROJECT_REFERENCE',
+							`${jsonPath}.overloadSetId`,
+							'Overload membership set is absent or belongs to another Program.'
+						);
+					signatureRecordReference(
+						relation.signatureId,
+						relation.programId,
+						relation.projectId,
+						`${jsonPath}.signatureId`
+					);
+				}
+				checkTypeRelationOverloadMembershipPart();
 				const signature = signatureById.get(relation.signatureId);
 				let roleMatches: boolean;
-				if (relation.role === 'IMPLEMENTATION_SIGNATURE')
-					roleMatches = signature?.semanticKind === 'IMPLEMENTATION_SIGNATURE';
-				else if (relation.role === 'OVERLOAD_DECLARATION' || relation.role === 'AMBIENT_OVERLOAD')
-					roleMatches =
-						signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
-						signature.declarationRole === relation.role;
-				else {
-					const expectedSignatureKind = relation.role === 'CALL_SIGNATURE' ? 'CALL' : 'CONSTRUCT';
-					roleMatches =
-						signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
-						signature.declarationRole === relation.role &&
-						signature.signatureKind === expectedSignatureKind;
+				function checkTypeRelationOverloadMembershipPart2(): void {
+					if (relation.role === 'IMPLEMENTATION_SIGNATURE')
+						roleMatches = signature?.semanticKind === 'IMPLEMENTATION_SIGNATURE';
+					else if (relation.role === 'OVERLOAD_DECLARATION' || relation.role === 'AMBIENT_OVERLOAD')
+						roleMatches =
+							signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
+							signature.declarationRole === relation.role;
+					else {
+						const expectedSignatureKind = relation.role === 'CALL_SIGNATURE' ? 'CALL' : 'CONSTRUCT';
+						roleMatches =
+							signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
+							signature.declarationRole === relation.role &&
+							signature.signatureKind === expectedSignatureKind;
+					}
 				}
+				checkTypeRelationOverloadMembershipPart2();
 				const callableOwnerSymbolIds = new Set<string>();
-				if (signature?.owner.kind === 'SYMBOL') callableOwnerSymbolIds.add(signature.owner.id);
-				else if (signature?.owner.kind === 'DECLARATION') {
-					const symbolId = declarationById.get(signature.owner.id)?.symbolId;
-					if (symbolId !== null && symbolId !== undefined) callableOwnerSymbolIds.add(symbolId);
-				} else if (signature?.owner.kind === 'TYPE') {
-					const ownerType = typeById.get(signature.owner.id);
-					if (ownerType?.symbolId !== null && ownerType?.symbolId !== undefined)
-						callableOwnerSymbolIds.add(ownerType.symbolId);
-					if (ownerType?.aliasSymbolId !== null && ownerType?.aliasSymbolId !== undefined)
-						callableOwnerSymbolIds.add(ownerType.aliasSymbolId);
+				function checkInvalidValueOfTypeRelationOverloadMembership2(): void {
+					if (signature?.owner.kind === 'SYMBOL') callableOwnerSymbolIds.add(signature.owner.id);
+					else if (signature?.owner.kind === 'DECLARATION') {
+						const symbolId = declarationById.get(signature.owner.id)?.symbolId;
+						if (symbolId !== null && symbolId !== undefined) callableOwnerSymbolIds.add(symbolId);
+					} else if (signature?.owner.kind === 'TYPE') {
+						const ownerType = typeById.get(signature.owner.id);
+						if (ownerType?.symbolId !== null && ownerType?.symbolId !== undefined)
+							callableOwnerSymbolIds.add(ownerType.symbolId);
+						if (ownerType?.aliasSymbolId !== null && ownerType?.aliasSymbolId !== undefined)
+							callableOwnerSymbolIds.add(ownerType.aliasSymbolId);
+					}
+					if (
+						!roleMatches ||
+						(overloadSet !== undefined && !callableOwnerSymbolIds.has(overloadSet.callableSymbolId))
+					)
+						issue(
+							'INVALID_VALUE',
+							jsonPath,
+							'Overload membership role and callable owner are incoherent with its Signature.'
+						);
+					appendGrouped(membershipsByOverloadSet, relation.overloadSetId, relation);
 				}
-				if (
-					!roleMatches ||
-					(overloadSet !== undefined && !callableOwnerSymbolIds.has(overloadSet.callableSymbolId))
-				)
-					issue(
-						'INVALID_VALUE',
-						jsonPath,
-						'Overload membership role and callable owner are incoherent with its Signature.'
-					);
-				appendGrouped(membershipsByOverloadSet, relation.overloadSetId, relation);
-				break;
+				checkInvalidValueOfTypeRelationOverloadMembership2();
+			}
+			switch (relation.kind) {
+				case 'TYPE_OF': {
+					checkTypeRelationTypeOf(relation);
+					break;
+				}
+				case 'TYPE_ALIAS':
+					checkTypeRelationTypeAlias(relation);
+					break;
+				case 'UNION_CONSTITUENT':
+				case 'INTERSECTION_CONSTITUENT': {
+					checkTypeRelationIntersectionConstituent(relation);
+					break;
+				}
+				case 'GENERIC_INSTANTIATION':
+					checkTypeRelationGenericInstantiation(relation);
+					break;
+				case 'PARAMETER_CONSTRAINT': {
+					checkTypeRelationParameterConstraint(relation);
+					break;
+				}
+				case 'TYPE_EXTENSION':
+				case 'TYPE_IMPLEMENTATION':
+					checkTypeRelationTypeImplementation(relation);
+					break;
+				case 'ASSIGNABILITY': {
+					checkTypeRelationAssignability(relation);
+					break;
+				}
+				case 'OVERLOAD_MEMBERSHIP': {
+					checkTypeRelationOverloadMembership(relation);
+					break;
+				}
 			}
 		}
+		checkIdentityMismatchOfTypeRelationsEntry();
 	}
-
-	for (const parameter of snapshot.typeParameters) {
+	function validateTypeRelationsEntry2(
+		parameter: StaticSemanticSnapshot['typeParameters'][number]
+	): void {
 		const relations = constraintRelationsByParameter.get(parameter.id) ?? [];
 		if (relations.length !== 1)
 			issue(
@@ -5778,7 +6453,9 @@ function validateStaticSemanticSnapshotUnsafe(
 				`Type parameter ${parameter.id} must have exactly one matching constraint relation.`
 			);
 	}
-	for (const overloadSet of snapshot.overloadSets) {
+	function validateTypeRelationsEntry3(
+		overloadSet: StaticSemanticSnapshot['overloadSets'][number]
+	): void {
 		const memberships = membershipsByOverloadSet.get(overloadSet.id) ?? [];
 		const ordinals = memberships.map((membership) => membership.ordinal).sort((a, b) => a - b);
 		if (
@@ -5830,14 +6507,16 @@ function validateStaticSemanticSnapshotUnsafe(
 				);
 		}
 	}
+	function validateTypeRelations(): void {
+		for (const [index, relation] of snapshot.typeRelations.entries())
+			validateTypeRelationsEntry(index, relation);
+
+		for (const parameter of snapshot.typeParameters) validateTypeRelationsEntry2(parameter);
+		for (const overloadSet of snapshot.overloadSets) validateTypeRelationsEntry3(overloadSet);
+	}
+	validateTypeRelations();
 	const overloadMembershipsBySignature = new Map<string, number>();
-	for (const memberships of membershipsByOverloadSet.values())
-		for (const membership of memberships)
-			overloadMembershipsBySignature.set(
-				membership.signatureId,
-				(overloadMembershipsBySignature.get(membership.signatureId) ?? 0) + 1
-			);
-	for (const signature of snapshot.signatures) {
+	function checkTypeRelationsEntry2(signature: StaticSemanticSnapshot['signatures'][number]): void {
 		const count = overloadMembershipsBySignature.get(signature.id) ?? 0;
 		if (
 			(signature.semanticKind === 'OVERLOAD_SIGNATURE' ||
@@ -5862,20 +6541,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				`Signature ${signature.id} may not be duplicated across overload memberships.`
 			);
 	}
-	for (const [key, constituents] of constituentRelationsByComposite) {
-		const ordinals = constituents.map((constituent) => constituent.ordinal).sort((a, b) => a - b);
-		if (
-			constituents.length < 2 ||
-			new Set(ordinals).size !== ordinals.length ||
-			!ordinals.every((ordinal, index) => ordinal === index)
-		)
-			issue(
-				'POPULATION_MISMATCH',
-				'$.typeRelations',
-				`Composite ${key} must have at least two unique, contiguous constituent relations.`
-			);
-	}
-	for (const type of snapshot.types)
+	function checkTypeRelationsEntry4(type: StaticSemanticSnapshot['types'][number]): void {
 		if (
 			(type.category === 'UNION' || type.category === 'INTERSECTION') &&
 			!constituentRelationsByComposite.has(
@@ -5887,7 +6553,8 @@ function validateStaticSemanticSnapshotUnsafe(
 				'$.typeRelations',
 				`Composite type ${type.id} lacks its constituent relation closure.`
 			);
-	for (const signature of snapshot.signatures) {
+	}
+	function checkTypeRelationsEntry5(signature: StaticSemanticSnapshot['signatures'][number]): void {
 		const ordinaryOrdinals = snapshot.signatureParameters
 			.filter(
 				(parameter) => parameter.signatureId === signature.id && parameter.role === 'PARAMETER'
@@ -5901,22 +6568,43 @@ function validateStaticSemanticSnapshotUnsafe(
 				`Signature ${signature.id} ordinary parameter ordinals must be contiguous from zero.`
 			);
 	}
+	function checkTypeRelations(): void {
+		for (const memberships of membershipsByOverloadSet.values())
+			for (const membership of memberships)
+				overloadMembershipsBySignature.set(
+					membership.signatureId,
+					(overloadMembershipsBySignature.get(membership.signatureId) ?? 0) + 1
+				);
+		for (const signature of snapshot.signatures) checkTypeRelationsEntry2(signature);
+		for (const [key, constituents] of constituentRelationsByComposite) {
+			const ordinals = constituents.map((constituent) => constituent.ordinal).sort((a, b) => a - b);
+			if (
+				constituents.length < 2 ||
+				new Set(ordinals).size !== ordinals.length ||
+				!ordinals.every((ordinal, index) => ordinal === index)
+			)
+				issue(
+					'POPULATION_MISMATCH',
+					'$.typeRelations',
+					`Composite ${key} must have at least two unique, contiguous constituent relations.`
+				);
+		}
+		for (const type of snapshot.types) checkTypeRelationsEntry4(type);
+		for (const signature of snapshot.signatures) checkTypeRelationsEntry5(signature);
+	}
+	checkTypeRelations();
 	const typeParametersByOwner = new Map<
 		string,
 		StaticSemanticSnapshot['typeParameters'][number][]
 	>();
-	for (const parameter of snapshot.typeParameters)
+	function validateTypeParameters2Entry(
+		parameter: StaticSemanticSnapshot['typeParameters'][number]
+	): void {
 		appendGrouped(typeParametersByOwner, canonicalSemanticJson(parameter.owner), parameter);
-	for (const [owner, parameters] of typeParametersByOwner) {
-		const ordinals = parameters.map((parameter) => parameter.ordinal).sort((a, b) => a - b);
-		if (!ordinals.every((ordinal, index) => ordinal === index))
-			issue(
-				'INVALID_VALUE',
-				'$.typeParameters',
-				`Type-parameter owner ${owner} ordinals must be contiguous from zero.`
-			);
 	}
-	for (const program of snapshot.programs)
+	function validateTypeParameters2Entry3(
+		program: StaticSemanticSnapshot['programs'][number]
+	): void {
 		for (const request of snapshot.assignabilityRequests) {
 			const relations =
 				assignabilityRelationsByProgramRequest.get(`${program.id}\0${request.requestId}`) ?? [];
@@ -5927,119 +6615,128 @@ function validateStaticSemanticSnapshotUnsafe(
 					`Assignability request ${request.requestId} must have exactly one judgment per requested Program.`
 				);
 		}
-	if (
-		assignabilityRelationsByProgramRequest.size !==
-		(typeRequested ? snapshot.programs.length * snapshot.assignabilityRequests.length : 0)
-	)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.typeRelations',
-			'Assignability relations must equal the exact requested Program-by-request judgment matrix.'
-		);
-
-	for (const [index, diagnostic] of snapshot.diagnostics.entries()) {
-		path(diagnostic.path, `$.diagnostics[${index}].path`);
-		if (!projectById.has(diagnostic.projectId))
-			issue(
-				'DANGLING_REFERENCE',
-				`$.diagnostics[${index}].projectId`,
-				'Diagnostic project is absent.'
-			);
-		if (
-			diagnostic.sourceId !== null &&
-			sourceById.get(diagnostic.sourceId)?.projectId !== diagnostic.projectId
-		)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.diagnostics[${index}].sourceId`,
-				'Diagnostic source belongs elsewhere or is absent.'
-			);
-		const diagnosticSource =
-			diagnostic.sourceId === null ? undefined : sourceById.get(diagnostic.sourceId);
-		if (
-			(diagnostic.start === null) !== (diagnostic.end === null) ||
-			(diagnostic.start !== null &&
-				diagnostic.end !== null &&
-				(diagnostic.start > diagnostic.end ||
-					(diagnosticSource !== undefined && diagnostic.end > diagnosticSource.textLength)))
-		)
-			issue('INVALID_VALUE', `$.diagnostics[${index}]`, 'Diagnostic UTF-16 span is invalid.');
-		if (
-			(diagnostic.locationKind === 'NONE' &&
-				(diagnostic.sourceId !== null ||
-					diagnostic.path !== null ||
-					diagnostic.start !== null ||
-					diagnostic.end !== null)) ||
-			(diagnostic.locationKind === 'PATH' &&
-				(diagnostic.sourceId !== null || diagnostic.path === null)) ||
-			(diagnostic.locationKind === 'SOURCE' &&
-				(diagnostic.sourceId === null || diagnostic.path === null))
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.diagnostics[${index}].locationKind`,
-				'Diagnostic location discriminator must exactly govern source, path, and span fields.'
-			);
-		if (diagnostic.locationKind === 'SOURCE' && diagnostic.path !== diagnosticSource?.logicalPath)
-			issue(
-				'CROSS_PROJECT_REFERENCE',
-				`$.diagnostics[${index}].path`,
-				'Source-bound diagnostic source and logical path disagree.'
-			);
-		if (!/^TS[1-9]\d*$/u.test(diagnostic.code))
-			issue(
-				'INVALID_VALUE',
-				`$.diagnostics[${index}].code`,
-				'Diagnostic code must be exactly TS followed by a positive decimal TypeScript code.'
-			);
-		diagnosticMessage(diagnostic.message, `$.diagnostics[${index}].message`);
-		for (const [relatedIndex, related] of diagnostic.related.entries()) {
-			path(related.path, `$.diagnostics[${index}].related[${relatedIndex}].path`);
-			if (!/^TS[1-9]\d*$/u.test(related.code))
+	}
+	function validateTypeParameters2Entry4(
+		index: number,
+		diagnostic: StaticSemanticSnapshot['diagnostics'][number]
+	): void {
+		function checkDanglingReferenceOfTypeParameters2Entry4(): void {
+			path(diagnostic.path, `$.diagnostics[${index}].path`);
+			if (!projectById.has(diagnostic.projectId))
 				issue(
-					'INVALID_VALUE',
-					`$.diagnostics[${index}].related[${relatedIndex}].code`,
-					'Related diagnostic code must be exactly TS followed by a positive decimal TypeScript code.'
-				);
-			diagnosticMessage(
-				related.message,
-				`$.diagnostics[${index}].related[${relatedIndex}].message`
-			);
-			const relatedSource =
-				related.path === null || !referenceCheck()
-					? undefined
-					: sourceByProjectPath.get(`${diagnostic.projectId}\0${related.path}`);
-			if (related.path === null && related.start !== null)
-				issue(
-					'INVALID_VALUE',
-					`$.diagnostics[${index}].related[${relatedIndex}]`,
-					'A related diagnostic span requires a logical path.'
+					'DANGLING_REFERENCE',
+					`$.diagnostics[${index}].projectId`,
+					'Diagnostic project is absent.'
 				);
 			if (
-				(related.start === null) !== (related.end === null) ||
-				(related.start !== null &&
-					related.end !== null &&
-					(related.start > related.end ||
-						(relatedSource !== undefined && related.end > relatedSource.textLength)))
+				diagnostic.sourceId !== null &&
+				sourceById.get(diagnostic.sourceId)?.projectId !== diagnostic.projectId
+			)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`$.diagnostics[${index}].sourceId`,
+					'Diagnostic source belongs elsewhere or is absent.'
+				);
+		}
+		checkDanglingReferenceOfTypeParameters2Entry4();
+		const diagnosticSource =
+			diagnostic.sourceId === null ? undefined : sourceById.get(diagnostic.sourceId);
+		function checkInvalidValueOfInvalidValueOfTypeParameters2Entry(): void {
+			if (
+				(diagnostic.start === null) !== (diagnostic.end === null) ||
+				(diagnostic.start !== null &&
+					diagnostic.end !== null &&
+					(diagnostic.start > diagnostic.end ||
+						(diagnosticSource !== undefined && diagnostic.end > diagnosticSource.textLength)))
+			)
+				issue('INVALID_VALUE', `$.diagnostics[${index}]`, 'Diagnostic UTF-16 span is invalid.');
+			if (
+				(diagnostic.locationKind === 'NONE' &&
+					(diagnostic.sourceId !== null ||
+						diagnostic.path !== null ||
+						diagnostic.start !== null ||
+						diagnostic.end !== null)) ||
+				(diagnostic.locationKind === 'PATH' &&
+					(diagnostic.sourceId !== null || diagnostic.path === null)) ||
+				(diagnostic.locationKind === 'SOURCE' &&
+					(diagnostic.sourceId === null || diagnostic.path === null))
 			)
 				issue(
 					'INVALID_VALUE',
-					`$.diagnostics[${index}].related[${relatedIndex}]`,
-					'Related diagnostic span is invalid or outside its project source.'
+					`$.diagnostics[${index}].locationKind`,
+					'Diagnostic location discriminator must exactly govern source, path, and span fields.'
+				);
+			if (diagnostic.locationKind === 'SOURCE' && diagnostic.path !== diagnosticSource?.logicalPath)
+				issue(
+					'CROSS_PROJECT_REFERENCE',
+					`$.diagnostics[${index}].path`,
+					'Source-bound diagnostic source and logical path disagree.'
 				);
 		}
-		if (!Number.isSafeInteger(diagnostic.multiplicity) || diagnostic.multiplicity < 1)
-			issue(
-				'INVALID_VALUE',
-				`$.diagnostics[${index}].multiplicity`,
-				'Diagnostic multiplicity must be a positive safe integer.'
-			);
-		if (!isCanonicalMultiset(diagnostic.related.map((related) => canonicalSemanticJson(related))))
-			issue(
-				'NONCANONICAL_ORDER',
-				`$.diagnostics[${index}].related`,
-				'Related diagnostic payloads must form a canonical sorted multiset; duplicates are retained.'
-			);
+		function checkInvalidValueOfInvalidValueOfTypeParameters2Entry2(): void {
+			if (!/^TS[1-9]\d*$/u.test(diagnostic.code))
+				issue(
+					'INVALID_VALUE',
+					`$.diagnostics[${index}].code`,
+					'Diagnostic code must be exactly TS followed by a positive decimal TypeScript code.'
+				);
+			diagnosticMessage(diagnostic.message, `$.diagnostics[${index}].message`);
+			for (const [relatedIndex, related] of diagnostic.related.entries()) {
+				path(related.path, `$.diagnostics[${index}].related[${relatedIndex}].path`);
+				if (!/^TS[1-9]\d*$/u.test(related.code))
+					issue(
+						'INVALID_VALUE',
+						`$.diagnostics[${index}].related[${relatedIndex}].code`,
+						'Related diagnostic code must be exactly TS followed by a positive decimal TypeScript code.'
+					);
+				diagnosticMessage(
+					related.message,
+					`$.diagnostics[${index}].related[${relatedIndex}].message`
+				);
+				const relatedSource =
+					related.path === null || !referenceCheck()
+						? undefined
+						: sourceByProjectPath.get(`${diagnostic.projectId}\0${related.path}`);
+				if (related.path === null && related.start !== null)
+					issue(
+						'INVALID_VALUE',
+						`$.diagnostics[${index}].related[${relatedIndex}]`,
+						'A related diagnostic span requires a logical path.'
+					);
+				if (
+					(related.start === null) !== (related.end === null) ||
+					(related.start !== null &&
+						related.end !== null &&
+						(related.start > related.end ||
+							(relatedSource !== undefined && related.end > relatedSource.textLength)))
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.diagnostics[${index}].related[${relatedIndex}]`,
+						'Related diagnostic span is invalid or outside its project source.'
+					);
+			}
+		}
+		function checkInvalidValueOfInvalidValueOfTypeParameters2Entry3(): void {
+			if (!Number.isSafeInteger(diagnostic.multiplicity) || diagnostic.multiplicity < 1)
+				issue(
+					'INVALID_VALUE',
+					`$.diagnostics[${index}].multiplicity`,
+					'Diagnostic multiplicity must be a positive safe integer.'
+				);
+			if (!isCanonicalMultiset(diagnostic.related.map((related) => canonicalSemanticJson(related))))
+				issue(
+					'NONCANONICAL_ORDER',
+					`$.diagnostics[${index}].related`,
+					'Related diagnostic payloads must form a canonical sorted multiset; duplicates are retained.'
+				);
+		}
+		function checkInvalidValueOfTypeParameters2Entry4(): void {
+			checkInvalidValueOfInvalidValueOfTypeParameters2Entry();
+			checkInvalidValueOfInvalidValueOfTypeParameters2Entry2();
+			checkInvalidValueOfInvalidValueOfTypeParameters2Entry3();
+		}
+		checkInvalidValueOfTypeParameters2Entry4();
 		const expected = semanticDiagnosticId({
 			category: diagnostic.category,
 			code: diagnostic.code,
@@ -6053,133 +6750,200 @@ function validateStaticSemanticSnapshotUnsafe(
 			sourceId: diagnostic.sourceId,
 			start: diagnostic.start
 		});
-		if (diagnostic.id !== expected)
-			issue('IDENTITY_MISMATCH', `$.diagnostics[${index}].id`, 'Diagnostic identity mismatch.');
-		provenance(
-			diagnostic.provenanceId,
-			diagnostic.projectId,
-			'TS_PROJECT',
-			`$.diagnostics[${index}].provenanceId`,
-			diagnostic.locationKind === 'SOURCE' && diagnostic.start !== null
-				? (diagnostic.sourceId ?? undefined)
-				: undefined
-		);
+		function checkIdentityMismatchOfTypeParameters2Entry4(): void {
+			if (diagnostic.id !== expected)
+				issue('IDENTITY_MISMATCH', `$.diagnostics[${index}].id`, 'Diagnostic identity mismatch.');
+			provenance(
+				diagnostic.provenanceId,
+				diagnostic.projectId,
+				'TS_PROJECT',
+				`$.diagnostics[${index}].provenanceId`,
+				diagnostic.locationKind === 'SOURCE' && diagnostic.start !== null
+					? (diagnostic.sourceId ?? undefined)
+					: undefined
+			);
+		}
+		checkIdentityMismatchOfTypeParameters2Entry4();
 	}
-
-	const compilerQueryKeys = new Set<string>();
-	for (const [index, observation] of snapshot.compilerInputs.entries()) {
-		path(observation.logicalPath, `$.compilerInputs[${index}].logicalPath`);
-		if (!Number.isSafeInteger(observation.invocationCount) || observation.invocationCount < 1)
-			issue(
-				'INVALID_VALUE',
-				`$.compilerInputs[${index}].invocationCount`,
-				'Compiler input invocation count must be a positive safe integer.'
-			);
-		if (!SHA256.test(observation.resultDigest))
-			issue(
-				'INVALID_VALUE',
-				`$.compilerInputs[${index}].resultDigest`,
-				'Compiler input result digest is invalid.'
-			);
+	function validateTypeParameters2(): void {
+		for (const parameter of snapshot.typeParameters) validateTypeParameters2Entry(parameter);
+		for (const [owner, parameters] of typeParametersByOwner) {
+			const ordinals = parameters.map((parameter) => parameter.ordinal).sort((a, b) => a - b);
+			if (!ordinals.every((ordinal, index) => ordinal === index))
+				issue(
+					'INVALID_VALUE',
+					'$.typeParameters',
+					`Type-parameter owner ${owner} ordinals must be contiguous from zero.`
+				);
+		}
+		for (const program of snapshot.programs) validateTypeParameters2Entry3(program);
 		if (
-			observation.operation === 'READ_FILE' &&
-			observation.result === 'PRESENT' &&
-			(!SHA256.test(observation.contentSha256) || observation.contentBytes < 0)
+			assignabilityRelationsByProgramRequest.size !==
+			(typeRequested ? snapshot.programs.length * snapshot.assignabilityRequests.length : 0)
 		)
 			issue(
-				'INVALID_VALUE',
-				`$.compilerInputs[${index}]`,
-				'Present READ_FILE result requires bounded content metadata.'
+				'POPULATION_MISMATCH',
+				'$.typeRelations',
+				'Assignability relations must equal the exact requested Program-by-request judgment matrix.'
 			);
-		if (observation.operation === 'GET_DIRECTORIES' || observation.operation === 'READ_DIRECTORY') {
-			for (const entry of observation.resultEntries)
-				path(entry, `$.compilerInputs[${index}].resultEntries`);
+
+		for (const [index, diagnostic] of snapshot.diagnostics.entries())
+			validateTypeParameters2Entry4(index, diagnostic);
+	}
+	validateTypeParameters2();
+
+	const compilerQueryKeys = new Set<string>();
+	function validateCompilerInputs2Entry(
+		index: number,
+		observation: StaticSemanticSnapshot['compilerInputs'][number]
+	): void {
+		function checkInvalidValueOfInvalidValueOfCompilerInputs2Entry(): void {
+			path(observation.logicalPath, `$.compilerInputs[${index}].logicalPath`);
+			if (!Number.isSafeInteger(observation.invocationCount) || observation.invocationCount < 1)
+				issue(
+					'INVALID_VALUE',
+					`$.compilerInputs[${index}].invocationCount`,
+					'Compiler input invocation count must be a positive safe integer.'
+				);
+			if (!SHA256.test(observation.resultDigest))
+				issue(
+					'INVALID_VALUE',
+					`$.compilerInputs[${index}].resultDigest`,
+					'Compiler input result digest is invalid.'
+				);
+		}
+		function checkInvalidValueOfInvalidValueOfInvalidValueOfCompilerInputs2Entry(): void {
 			if (
-				!isCanonicalSet(observation.resultEntries) ||
-				(observation.result === 'NOT_DIRECTORY' && observation.resultEntries.length > 0)
+				observation.operation === 'READ_FILE' &&
+				observation.result === 'PRESENT' &&
+				(!SHA256.test(observation.contentSha256) || observation.contentBytes < 0)
 			)
 				issue(
 					'INVALID_VALUE',
-					`$.compilerInputs[${index}].resultEntries`,
-					'Directory observations require canonical results and empty missing-directory results.'
+					`$.compilerInputs[${index}]`,
+					'Present READ_FILE result requires bounded content metadata.'
 				);
-			if (observation.resultEntries.length > observation.scannedEntries)
-				issue(
-					'INVALID_VALUE',
-					`$.compilerInputs[${index}].scannedEntries`,
-					'Directory observation cannot retain more results than it scanned.'
-				);
-			if (observation.result === 'NOT_DIRECTORY' && observation.scannedEntries !== 0)
-				issue(
-					'INVALID_VALUE',
-					`$.compilerInputs[${index}].scannedEntries`,
-					'A missing directory must report zero scanned entries.'
-				);
-		}
-		if (observation.operation === 'READ_DIRECTORY')
-			for (const values of [observation.excludes, observation.extensions, observation.includes]) {
-				if (!isCanonicalSet(values))
-					issue(
-						'NONCANONICAL_ORDER',
-						`$.compilerInputs[${index}]`,
-						'READ_DIRECTORY parameters must be canonical sets.'
-					);
-				if (values.some((entry) => entry.length > snapshot.budgets.maxPathCharacters))
+			if (
+				observation.operation === 'GET_DIRECTORIES' ||
+				observation.operation === 'READ_DIRECTORY'
+			) {
+				for (const entry of observation.resultEntries)
+					path(entry, `$.compilerInputs[${index}].resultEntries`);
+				if (
+					!isCanonicalSet(observation.resultEntries) ||
+					(observation.result === 'NOT_DIRECTORY' && observation.resultEntries.length > 0)
+				)
 					issue(
 						'INVALID_VALUE',
-						`$.compilerInputs[${index}]`,
-						'READ_DIRECTORY path-like query parameters exceed the producing path-character budget.'
+						`$.compilerInputs[${index}].resultEntries`,
+						'Directory observations require canonical results and empty missing-directory results.'
+					);
+				if (observation.resultEntries.length > observation.scannedEntries)
+					issue(
+						'INVALID_VALUE',
+						`$.compilerInputs[${index}].scannedEntries`,
+						'Directory observation cannot retain more results than it scanned.'
+					);
+				if (observation.result === 'NOT_DIRECTORY' && observation.scannedEntries !== 0)
+					issue(
+						'INVALID_VALUE',
+						`$.compilerInputs[${index}].scannedEntries`,
+						'A missing directory must report zero scanned entries.'
 					);
 			}
-		if (
-			(observation.operation === 'REALPATH' || observation.operation === 'CURRENT_DIRECTORY') &&
-			observation.result === 'RESOLVED'
-		)
-			path(observation.resolvedLogicalPath, `$.compilerInputs[${index}].resolvedLogicalPath`);
-		if (
-			observation.operation === 'CURRENT_DIRECTORY' &&
-			(observation.logicalPath !== '.' || observation.resolvedLogicalPath !== '.')
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.compilerInputs[${index}]`,
-				'CURRENT_DIRECTORY is fixed to the logical repository root.'
-			);
-		if (
-			observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
-			observation.logicalPath !== '.'
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.compilerInputs[${index}].logicalPath`,
-				'Case-sensitivity observation is rooted at the logical repository root.'
-			);
+		}
+		function checkNoncanonicalOrderOfInvalidValueOfInvalidValueOfCompilerInputs2Entry(): void {
+			if (observation.operation === 'READ_DIRECTORY')
+				for (const values of [observation.excludes, observation.extensions, observation.includes]) {
+					if (!isCanonicalSet(values))
+						issue(
+							'NONCANONICAL_ORDER',
+							`$.compilerInputs[${index}]`,
+							'READ_DIRECTORY parameters must be canonical sets.'
+						);
+					if (values.some((entry) => entry.length > snapshot.budgets.maxPathCharacters))
+						issue(
+							'INVALID_VALUE',
+							`$.compilerInputs[${index}]`,
+							'READ_DIRECTORY path-like query parameters exceed the producing path-character budget.'
+						);
+				}
+		}
+		function checkInvalidValueOfInvalidValueOfCompilerInputs2Entry2(): void {
+			checkInvalidValueOfInvalidValueOfInvalidValueOfCompilerInputs2Entry();
+			checkNoncanonicalOrderOfInvalidValueOfInvalidValueOfCompilerInputs2Entry();
+		}
+		function checkInvalidValueOfInvalidValueOfCompilerInputs2Entry3(): void {
+			if (
+				(observation.operation === 'REALPATH' || observation.operation === 'CURRENT_DIRECTORY') &&
+				observation.result === 'RESOLVED'
+			)
+				path(observation.resolvedLogicalPath, `$.compilerInputs[${index}].resolvedLogicalPath`);
+			if (
+				observation.operation === 'CURRENT_DIRECTORY' &&
+				(observation.logicalPath !== '.' || observation.resolvedLogicalPath !== '.')
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.compilerInputs[${index}]`,
+					'CURRENT_DIRECTORY is fixed to the logical repository root.'
+				);
+			if (
+				observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
+				observation.logicalPath !== '.'
+			)
+				issue(
+					'INVALID_VALUE',
+					`$.compilerInputs[${index}].logicalPath`,
+					'Case-sensitivity observation is rooted at the logical repository root.'
+				);
+		}
+		function checkInvalidValueOfCompilerInputs2Entry(): void {
+			checkInvalidValueOfInvalidValueOfCompilerInputs2Entry();
+			checkInvalidValueOfInvalidValueOfCompilerInputs2Entry2();
+			checkInvalidValueOfInvalidValueOfCompilerInputs2Entry3();
+		}
+		checkInvalidValueOfCompilerInputs2Entry();
 		const { id: _resultId, resultDigest: _resultDigest, ...resultFields } = observation;
-		if (observation.resultDigest !== compilerInputResultDigest(resultFields))
-			issue(
-				'IDENTITY_MISMATCH',
-				`$.compilerInputs[${index}].resultDigest`,
-				'Compiler input result digest does not bind its exact observed result.'
-			);
+		function checkIdentityMismatchOfCompilerInputs2Entry(): void {
+			if (observation.resultDigest !== compilerInputResultDigest(resultFields))
+				issue(
+					'IDENTITY_MISMATCH',
+					`$.compilerInputs[${index}].resultDigest`,
+					'Compiler input result digest does not bind its exact observed result.'
+				);
+		}
+		checkIdentityMismatchOfCompilerInputs2Entry();
 		const { id: _id, ...identityFields } = observation;
-		if (
-			observation.id !==
-			semanticContextInputId({ ...identityFields, subjectId: snapshot.subjectId })
-		)
-			issue(
-				'IDENTITY_MISMATCH',
-				`$.compilerInputs[${index}].id`,
-				'Compiler input identity mismatch.'
-			);
+		function checkIdentityMismatchOfCompilerInputs2Entry2(): void {
+			if (
+				observation.id !==
+				semanticContextInputId({ ...identityFields, subjectId: snapshot.subjectId })
+			)
+				issue(
+					'IDENTITY_MISMATCH',
+					`$.compilerInputs[${index}].id`,
+					'Compiler input identity mismatch.'
+				);
+		}
+		checkIdentityMismatchOfCompilerInputs2Entry2();
 		const queryKey = compilerInputQueryKey(observation);
-		if (compilerQueryKeys.has(queryKey))
-			issue(
-				'INVALID_VALUE',
-				`$.compilerInputs[${index}]`,
-				'A compiler query may have exactly one deterministic captured result.'
-			);
-		compilerQueryKeys.add(queryKey);
+		function checkInvalidValueOfCompilerInputs2Entry2(): void {
+			if (compilerQueryKeys.has(queryKey))
+				issue(
+					'INVALID_VALUE',
+					`$.compilerInputs[${index}]`,
+					'A compiler query may have exactly one deterministic captured result.'
+				);
+			compilerQueryKeys.add(queryKey);
+		}
+		checkInvalidValueOfCompilerInputs2Entry2();
 	}
+	function validateCompilerInputs2(): void {
+		for (const [index, observation] of snapshot.compilerInputs.entries())
+			validateCompilerInputs2Entry(index, observation);
+	}
+	validateCompilerInputs2();
 	const filesystemClaims = new Map<
 		string,
 		{
@@ -6191,53 +6955,59 @@ function validateStaticSemanticSnapshotUnsafe(
 			realpathResolved: boolean;
 		}
 	>();
-	for (const observation of snapshot.compilerInputs) {
-		const claims = filesystemClaims.get(observation.logicalPath) ?? {
-			directoryAbsent: false,
-			directoryPresent: false,
-			fileAbsent: false,
-			filePresent: false,
-			realpathAbsent: false,
-			realpathResolved: false
-		};
-		if (observation.operation === 'READ_FILE' || observation.operation === 'FILE_EXISTS') {
-			claims.filePresent ||= observation.result === 'PRESENT';
-			claims.fileAbsent ||= observation.result === 'ABSENT';
+	function validateCompilerInputs3(): void {
+		for (const observation of snapshot.compilerInputs) {
+			const claims = filesystemClaims.get(observation.logicalPath) ?? {
+				directoryAbsent: false,
+				directoryPresent: false,
+				fileAbsent: false,
+				filePresent: false,
+				realpathAbsent: false,
+				realpathResolved: false
+			};
+			if (observation.operation === 'READ_FILE' || observation.operation === 'FILE_EXISTS') {
+				claims.filePresent ||= observation.result === 'PRESENT';
+				claims.fileAbsent ||= observation.result === 'ABSENT';
+			}
+			if (
+				observation.operation === 'DIRECTORY_EXISTS' ||
+				observation.operation === 'GET_DIRECTORIES' ||
+				observation.operation === 'READ_DIRECTORY'
+			) {
+				claims.directoryPresent ||= observation.result === 'DIRECTORY';
+				claims.directoryAbsent ||= observation.result === 'NOT_DIRECTORY';
+			}
+			if (observation.operation === 'REALPATH') {
+				claims.realpathAbsent ||= observation.result === 'ABSENT';
+				claims.realpathResolved ||= observation.result === 'RESOLVED';
+			}
+			filesystemClaims.set(observation.logicalPath, claims);
 		}
-		if (
-			observation.operation === 'DIRECTORY_EXISTS' ||
-			observation.operation === 'GET_DIRECTORIES' ||
-			observation.operation === 'READ_DIRECTORY'
-		) {
-			claims.directoryPresent ||= observation.result === 'DIRECTORY';
-			claims.directoryAbsent ||= observation.result === 'NOT_DIRECTORY';
+		for (const [logicalPath, claims] of filesystemClaims) {
+			if (
+				(claims.filePresent && claims.fileAbsent) ||
+				(claims.directoryPresent && claims.directoryAbsent) ||
+				(claims.filePresent && claims.directoryPresent) ||
+				(claims.realpathAbsent && (claims.realpathResolved || claims.filePresent))
+			)
+				issue(
+					'INVALID_VALUE',
+					'$.compilerInputs',
+					`Compiler filesystem observations disagree on the stable path kind or existence for ${logicalPath}.`
+				);
 		}
-		if (observation.operation === 'REALPATH') {
-			claims.realpathAbsent ||= observation.result === 'ABSENT';
-			claims.realpathResolved ||= observation.result === 'RESOLVED';
-		}
-		filesystemClaims.set(observation.logicalPath, claims);
 	}
-	for (const [logicalPath, claims] of filesystemClaims) {
-		if (
-			(claims.filePresent && claims.fileAbsent) ||
-			(claims.directoryPresent && claims.directoryAbsent) ||
-			(claims.filePresent && claims.directoryPresent) ||
-			(claims.realpathAbsent && (claims.realpathResolved || claims.filePresent))
-		)
+	validateCompilerInputs3();
+	const claimedContextIds = snapshot.projects.flatMap((project) => project.contextInputIds);
+	function checkCompilerInputs(): void {
+		if (!sameMembers(claimedContextIds, contextIds))
 			issue(
-				'INVALID_VALUE',
+				'DANGLING_REFERENCE',
 				'$.compilerInputs',
-				`Compiler filesystem observations disagree on the stable path kind or existence for ${logicalPath}.`
+				'Compiler-input closure must equal the exact union claimed by projects.'
 			);
 	}
-	const claimedContextIds = snapshot.projects.flatMap((project) => project.contextInputIds);
-	if (!sameMembers(claimedContextIds, contextIds))
-		issue(
-			'DANGLING_REFERENCE',
-			'$.compilerInputs',
-			'Compiler-input closure must equal the exact union claimed by projects.'
-		);
+	checkCompilerInputs();
 
 	function nodeReference(nodeId: string, sourceId: string, jsonPath: string): void {
 		if (!referenceCheck()) return;
@@ -6247,8 +7017,14 @@ function validateStaticSemanticSnapshotUnsafe(
 			issue('CROSS_PROJECT_REFERENCE', jsonPath, 'Referenced node belongs elsewhere.');
 	}
 
-	for (const [index, literal] of snapshot.literals.entries()) {
-		nodeReference(literal.nodeId, literal.sourceId, `$.literals[${index}].nodeId`);
+	function validateLiteralsEntry(
+		index: number,
+		literal: StaticSemanticSnapshot['literals'][number]
+	): void {
+		function checkLiteralsEntryPart(): void {
+			nodeReference(literal.nodeId, literal.sourceId, `$.literals[${index}].nodeId`);
+		}
+		checkLiteralsEntryPart();
 		const literalNode = nodeById.get(literal.nodeId);
 		const literalDescriptor =
 			literalNode === undefined ? null : semanticLiteralDescriptor(literalNode.kind);
@@ -6257,74 +7033,80 @@ function validateStaticSemanticSnapshotUnsafe(
 			(literal.valueEncoding === 'UTF16_CODE_UNITS_LE'
 				? isUtf16CodeUnitLiteralKind(literalNode.kind)
 				: literalDescriptor?.valueEncoding === literal.valueEncoding);
-		if (
-			literalNode !== undefined &&
-			(literalDescriptor?.valueType !== literal.valueType ||
-				!encodingMatchesNode ||
-				(literal.valueState === 'EXACT' &&
-					!literalValueMatchesNodeKind(
-						literalNode.kind,
-						literal.valueType,
-						literal.valueEncoding,
-						literal.value
-					)))
-		)
-			issue(
-				'INVALID_VALUE',
-				`$.literals[${index}]`,
-				'Literal type, encoding, and fixed value must agree with the retained literal AST node kind.'
-			);
-		if (!SHA256.test(literal.valueSha256) || !SHA256.test(literal.lexemeSha256))
-			issue(
-				'INVALID_VALUE',
-				`$.literals[${index}]`,
-				'Literal value and lexeme digests must be lowercase SHA-256.'
-			);
-		if (literalNode !== undefined && literal.lexemeLength !== literalNode.end - literalNode.start)
-			issue(
-				'INVALID_VALUE',
-				`$.literals[${index}].lexemeLength`,
-				'Literal lexeme length must bind the retained source span exactly.'
-			);
-		if (literal.valueState === 'EXACT') {
-			const expectedLength = literalValueLength(literal.value);
+		function checkInvalidValueOfLiteralsEntry(): void {
 			if (
-				!exactLiteralValueType(literal.valueType, literal.value) ||
-				literal.valueLength !== expectedLength ||
-				literal.valueSha256 !==
-					literalValueDigest(literal.valueEncoding, literal.valueType, literal.value) ||
-				literal.valueLength > snapshot.budgets.maxLiteralCharacters
+				literalNode !== undefined &&
+				(literalDescriptor?.valueType !== literal.valueType ||
+					!encodingMatchesNode ||
+					(literal.valueState === 'EXACT' &&
+						!literalValueMatchesNodeKind(
+							literalNode.kind,
+							literal.valueType,
+							literal.valueEncoding,
+							literal.value
+						)))
 			)
 				issue(
 					'INVALID_VALUE',
 					`$.literals[${index}]`,
-					'Exact literal type, encoding, length, digest, or budget is incoherent.'
+					'Literal type, encoding, and fixed value must agree with the retained literal AST node kind.'
 				);
-		} else if (literal.valueEncoding === 'UTF16_CODE_UNITS_LE') {
-			if (
+			if (!SHA256.test(literal.valueSha256) || !SHA256.test(literal.lexemeSha256))
+				issue(
+					'INVALID_VALUE',
+					`$.literals[${index}]`,
+					'Literal value and lexeme digests must be lowercase SHA-256.'
+				);
+			if (literalNode !== undefined && literal.lexemeLength !== literalNode.end - literalNode.start)
+				issue(
+					'INVALID_VALUE',
+					`$.literals[${index}].lexemeLength`,
+					'Literal lexeme length must bind the retained source span exactly.'
+				);
+			if (literal.valueState === 'EXACT') {
+				const expectedLength = literalValueLength(literal.value);
+				if (
+					!exactLiteralValueType(literal.valueType, literal.value) ||
+					literal.valueLength !== expectedLength ||
+					literal.valueSha256 !==
+						literalValueDigest(literal.valueEncoding, literal.valueType, literal.value) ||
+					literal.valueLength > snapshot.budgets.maxLiteralCharacters
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.literals[${index}]`,
+						'Exact literal type, encoding, length, digest, or budget is incoherent.'
+					);
+			} else if (literal.valueEncoding === 'UTF16_CODE_UNITS_LE') {
+				if (
+					literal.value !== null ||
+					literal.valueLength < 1 ||
+					literalNode === undefined ||
+					!isUtf16CodeUnitLiteralKind(literalNode.kind)
+				)
+					issue(
+						'INVALID_VALUE',
+						`$.literals[${index}]`,
+						'UTF-16-code-unit literals must redact a non-scalar cooked string and retain its original code-unit length and digest.'
+					);
+			} else if (
 				literal.value !== null ||
-				literal.valueLength < 1 ||
-				literalNode === undefined ||
-				!isUtf16CodeUnitLiteralKind(literalNode.kind)
-			)
+				literal.valueLength <= snapshot.budgets.maxLiteralCharacters ||
+				['NULL', 'BOOLEAN'].includes(literal.valueType)
+			) {
 				issue(
 					'INVALID_VALUE',
 					`$.literals[${index}]`,
-					'UTF-16-code-unit literals must redact a non-scalar cooked string and retain its original code-unit length and digest.'
+					'Ordinary digest-only literals must redact an over-limit textual value.'
 				);
-		} else if (
-			literal.value !== null ||
-			literal.valueLength <= snapshot.budgets.maxLiteralCharacters ||
-			['NULL', 'BOOLEAN'].includes(literal.valueType)
-		) {
-			issue(
-				'INVALID_VALUE',
-				`$.literals[${index}]`,
-				'Ordinary digest-only literals must redact an over-limit textual value.'
-			);
+			}
 		}
+		checkInvalidValueOfLiteralsEntry();
 	}
-	for (const [index, invocation] of snapshot.invocations.entries()) {
+	function validateLiteralsEntry2(
+		index: number,
+		invocation: StaticSemanticSnapshot['invocations'][number]
+	): void {
 		nodeReference(invocation.nodeId, invocation.sourceId, `$.invocations[${index}].nodeId`);
 		nodeReference(
 			invocation.calleeNodeId,
@@ -6394,7 +7176,10 @@ function validateStaticSemanticSnapshotUnsafe(
 				'Invocation projection must reproduce its exact call, new, or tagged-template variant and absolute child order.'
 			);
 	}
-	for (const [index, assignment] of snapshot.assignments.entries()) {
+	function validateLiteralsEntry3(
+		index: number,
+		assignment: StaticSemanticSnapshot['assignments'][number]
+	): void {
 		nodeReference(assignment.nodeId, assignment.sourceId, `$.assignments[${index}].nodeId`);
 		nodeReference(
 			assignment.targetNodeId,
@@ -6442,6 +7227,15 @@ function validateStaticSemanticSnapshotUnsafe(
 				'Assignment projection must reproduce its retained kind, operator, target, and value children.'
 			);
 	}
+	function validateLiterals(): void {
+		for (const [index, literal] of snapshot.literals.entries())
+			validateLiteralsEntry(index, literal);
+		for (const [index, invocation] of snapshot.invocations.entries())
+			validateLiteralsEntry2(index, invocation);
+		for (const [index, assignment] of snapshot.assignments.entries())
+			validateLiteralsEntry3(index, assignment);
+	}
+	validateLiterals();
 	const candidateNameParentIds = new Set(
 		snapshot.astNodes
 			.filter(
@@ -6472,95 +7266,101 @@ function validateStaticSemanticSnapshotUnsafe(
 	const expectedAssignments = snapshot.astNodes
 		.filter((node) => semanticAssignmentKind(node) !== null)
 		.map((node) => node.id);
-	if (
-		!sameMembers(
-			snapshot.declarationCandidates.map((record) => record.nodeId),
-			expectedDeclarationCandidates
-		)
-	)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.declarationCandidates',
-			'Declaration-candidate projection must be total over the exact bounded retained-AST taxonomy.'
-		);
-	if (
-		!sameMembers(
-			snapshot.literals.map((record) => record.nodeId),
-			expectedLiterals
-		)
-	)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.literals',
-			'Literal projection must be total over the retained AST.'
-		);
-	if (
-		!sameMembers(
-			snapshot.invocations.map((record) => record.nodeId),
-			expectedInvocations
-		)
-	)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.invocations',
-			'Invocation projection must be total over call, new, and tagged-template nodes in the retained AST.'
-		);
-	if (
-		!sameMembers(
-			snapshot.assignments.map((record) => record.nodeId),
-			expectedAssignments
-		)
-	)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.assignments',
-			'Assignment projection must be total over the retained AST.'
-		);
-	for (const [index, assignment] of snapshot.assignments.entries()) {
-		const node = nodeById.get(assignment.nodeId);
-		if (node !== undefined && semanticAssignmentKind(node) !== assignment.assignmentKind)
-			issue(
-				'INVALID_VALUE',
-				`$.assignments[${index}].assignmentKind`,
-				'Assignment kind must be derived from its AST node.'
-			);
-	}
-
-	const populationsByKind = new Map(snapshot.populations.map((record) => [record.kind, record]));
-	const populationKinds = snapshot.populations.map((record) => record.kind);
-	if (
-		!sameMembers(populationKinds, POPULATIONS) ||
-		new Set(populationKinds).size !== POPULATIONS.length ||
-		!populationKinds.every((kind, index) => kind === POPULATIONS[index])
-	)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.populations',
-			'Every semantic population kind must be reconciled exactly once in registered order.'
-		);
-	for (const [index, population] of snapshot.populations.entries()) {
-		for (const [partition, values] of Object.entries(population.members))
-			if (!isCanonicalSet(values))
-				issue(
-					'NONCANONICAL_ORDER',
-					`$.populations[${index}].members.${partition}`,
-					'Population witness manifests must be canonical sets.'
-				);
-		const recomputed = semanticPopulation(
-			population.kind,
-			population.members,
-			population.expectedZero
-		);
+	function checkDeclarationCandidates(): void {
 		if (
-			canonicalSemanticJson(population) !== canonicalSemanticJson(recomputed) ||
-			!population.reconciles
+			!sameMembers(
+				snapshot.declarationCandidates.map((record) => record.nodeId),
+				expectedDeclarationCandidates
+			)
 		)
 			issue(
 				'POPULATION_MISMATCH',
-				`$.populations[${index}]`,
-				'Population counts and digests must be recomputed from retained partition witnesses.'
+				'$.declarationCandidates',
+				'Declaration-candidate projection must be total over the exact bounded retained-AST taxonomy.'
 			);
+		if (
+			!sameMembers(
+				snapshot.literals.map((record) => record.nodeId),
+				expectedLiterals
+			)
+		)
+			issue(
+				'POPULATION_MISMATCH',
+				'$.literals',
+				'Literal projection must be total over the retained AST.'
+			);
+		if (
+			!sameMembers(
+				snapshot.invocations.map((record) => record.nodeId),
+				expectedInvocations
+			)
+		)
+			issue(
+				'POPULATION_MISMATCH',
+				'$.invocations',
+				'Invocation projection must be total over call, new, and tagged-template nodes in the retained AST.'
+			);
+		if (
+			!sameMembers(
+				snapshot.assignments.map((record) => record.nodeId),
+				expectedAssignments
+			)
+		)
+			issue(
+				'POPULATION_MISMATCH',
+				'$.assignments',
+				'Assignment projection must be total over the retained AST.'
+			);
+		for (const [index, assignment] of snapshot.assignments.entries()) {
+			const node = nodeById.get(assignment.nodeId);
+			if (node !== undefined && semanticAssignmentKind(node) !== assignment.assignmentKind)
+				issue(
+					'INVALID_VALUE',
+					`$.assignments[${index}].assignmentKind`,
+					'Assignment kind must be derived from its AST node.'
+				);
+		}
 	}
+	checkDeclarationCandidates();
+
+	const populationsByKind = new Map(snapshot.populations.map((record) => [record.kind, record]));
+	const populationKinds = snapshot.populations.map((record) => record.kind);
+	function checkPopulations(): void {
+		if (
+			!sameMembers(populationKinds, POPULATIONS) ||
+			new Set(populationKinds).size !== POPULATIONS.length ||
+			!populationKinds.every((kind, index) => kind === POPULATIONS[index])
+		)
+			issue(
+				'POPULATION_MISMATCH',
+				'$.populations',
+				'Every semantic population kind must be reconciled exactly once in registered order.'
+			);
+		for (const [index, population] of snapshot.populations.entries()) {
+			for (const [partition, values] of Object.entries(population.members))
+				if (!isCanonicalSet(values))
+					issue(
+						'NONCANONICAL_ORDER',
+						`$.populations[${index}].members.${partition}`,
+						'Population witness manifests must be canonical sets.'
+					);
+			const recomputed = semanticPopulation(
+				population.kind,
+				population.members,
+				population.expectedZero
+			);
+			if (
+				canonicalSemanticJson(population) !== canonicalSemanticJson(recomputed) ||
+				!population.reconciles
+			)
+				issue(
+					'POPULATION_MISMATCH',
+					`$.populations[${index}]`,
+					'Population counts and digests must be recomputed from retained partition witnesses.'
+				);
+		}
+	}
+	checkPopulations();
 
 	function emitted(
 		kind: SemanticPopulationKind,
@@ -6585,172 +7385,184 @@ function validateStaticSemanticSnapshotUnsafe(
 		}
 	}
 
-	emitted('PROJECT', projectIds);
-	emitted('PROGRAM', programIds);
-	emitted(
-		'SOURCE',
-		snapshot.sources
-			.filter((source) => source.analysisDisposition === 'DEEP_INDEXED')
-			.map((source) => source.id),
-		snapshot.sources
-			.filter((source) => source.analysisDisposition === 'CONTEXT_ONLY')
-			.map((source) => source.id)
-	);
-	emitted(
-		'SCOPE',
-		snapshot.scopes
-			.filter(
-				(scope) =>
-					scope.sourceId === null ||
-					sourceById.get(scope.sourceId)?.analysisDisposition === 'DEEP_INDEXED'
-			)
-			.map((scope) => scope.id),
-		snapshot.scopes
-			.filter(
-				(scope) =>
-					scope.sourceId !== null &&
-					sourceById.get(scope.sourceId)?.analysisDisposition === 'CONTEXT_ONLY'
-			)
-			.map((scope) => scope.id)
-	);
-	emitted('AST_NODE', nodeIds);
-	emitted('DECLARATION_CANDIDATE', declarationCandidateIds);
-	emitted(
-		'DECLARATION',
-		snapshot.declarations.map((record) => record.id),
-		[],
-		snapshot.declarations
-			.filter(
-				(record) =>
-					record.scopeLinkState === 'UNSUPPORTED' || record.symbolBindingState === 'UNSUPPORTED'
-			)
-			.map((record) => record.id)
-	);
-	emitted('SYMBOL', symbolIds);
-	emitted(
-		'ALIAS',
-		aliasIds,
-		[],
-		snapshot.aliases.filter((record) => record.state === 'UNSUPPORTED').map((record) => record.id),
-		snapshot.aliases
-			.filter((record) => record.state === 'UNRESOLVED' || record.state === 'CIRCULAR')
-			.map((record) => record.id)
-	);
-	emitted(
-		'REFERENCE',
-		snapshot.references.map((record) => record.id),
-		[],
-		snapshot.references
-			.filter(
-				(record) =>
-					record.scopeLinkState === 'UNSUPPORTED' || record.resolutionState === 'UNSUPPORTED'
-			)
-			.map((record) => record.id),
-		snapshot.references
-			.filter(
-				(record) =>
-					record.resolutionState === 'UNRESOLVED' && record.scopeLinkState !== 'UNSUPPORTED'
-			)
-			.map((record) => record.id)
-	);
-	emitted(
-		'MODULE_RESOLUTION',
-		moduleResolutionIds,
-		[],
-		snapshot.moduleResolutions
-			.filter((record) => record.resolutionState === 'UNSUPPORTED')
-			.map((record) => record.id),
-		snapshot.moduleResolutions
-			.filter((record) => record.resolutionState === 'UNRESOLVED')
-			.map((record) => record.id)
-	);
-	emitted(
-		'MODULE_EXPORT',
-		moduleExportIds,
-		[],
-		[],
-		snapshot.moduleExports
-			.filter((record) => record.state === 'UNRESOLVED')
-			.map((record) => record.id)
-	);
-	emitted(
-		'TYPE',
-		typeIds,
-		[],
-		snapshot.types
-			.filter((record) => record.structureState === 'BOUNDED')
-			.map((record) => record.id)
-	);
-	emitted(
-		'TYPE_PARAMETER',
-		typeParameterIds,
-		[],
-		snapshot.typeParameters
-			.filter(
-				(record) =>
-					record.constraintState === 'UNSUPPORTED' || record.defaultState === 'UNSUPPORTED'
-			)
-			.map((record) => record.id),
-		snapshot.typeParameters
-			.filter(
-				(record) => record.constraintState === 'UNRESOLVED' || record.defaultState === 'UNRESOLVED'
-			)
-			.map((record) => record.id)
-	);
-	emitted('SIGNATURE', signatureIds);
-	emitted('SIGNATURE_PARAMETER', signatureParameterIds);
-	emitted('OVERLOAD_SET', overloadSetIds);
-	emitted(
-		'TYPE_RELATION',
-		typeRelationIds,
-		[],
-		snapshot.typeRelations
-			.filter((record) => record.state === 'UNSUPPORTED')
-			.map((record) => record.id),
-		snapshot.typeRelations
-			.filter((record) => record.state === 'UNRESOLVED')
-			.map((record) => record.id)
-	);
-	emitted(
-		'LITERAL',
-		snapshot.literals.map((record) => record.nodeId)
-	);
-	emitted('INVOCATION_SITE', invocationIds);
-	emitted(
-		'ASSIGNMENT',
-		snapshot.assignments.map((record) => record.nodeId)
-	);
-	emitted('DIAGNOSTIC', diagnosticIds);
-	emitted('PROVENANCE', provenanceIds);
+	function emitPresenceLedger(): void {
+		emitted('PROJECT', projectIds);
+		emitted('PROGRAM', programIds);
+		emitted(
+			'SOURCE',
+			snapshot.sources
+				.filter((source) => source.analysisDisposition === 'DEEP_INDEXED')
+				.map((source) => source.id),
+			snapshot.sources
+				.filter((source) => source.analysisDisposition === 'CONTEXT_ONLY')
+				.map((source) => source.id)
+		);
+		emitted(
+			'SCOPE',
+			snapshot.scopes
+				.filter(
+					(scope) =>
+						scope.sourceId === null ||
+						sourceById.get(scope.sourceId)?.analysisDisposition === 'DEEP_INDEXED'
+				)
+				.map((scope) => scope.id),
+			snapshot.scopes
+				.filter(
+					(scope) =>
+						scope.sourceId !== null &&
+						sourceById.get(scope.sourceId)?.analysisDisposition === 'CONTEXT_ONLY'
+				)
+				.map((scope) => scope.id)
+		);
+		emitted('AST_NODE', nodeIds);
+		emitted('DECLARATION_CANDIDATE', declarationCandidateIds);
+		emitted(
+			'DECLARATION',
+			snapshot.declarations.map((record) => record.id),
+			[],
+			snapshot.declarations
+				.filter(
+					(record) =>
+						record.scopeLinkState === 'UNSUPPORTED' || record.symbolBindingState === 'UNSUPPORTED'
+				)
+				.map((record) => record.id)
+		);
+		emitted('SYMBOL', symbolIds);
+		emitted(
+			'ALIAS',
+			aliasIds,
+			[],
+			snapshot.aliases
+				.filter((record) => record.state === 'UNSUPPORTED')
+				.map((record) => record.id),
+			snapshot.aliases
+				.filter((record) => record.state === 'UNRESOLVED' || record.state === 'CIRCULAR')
+				.map((record) => record.id)
+		);
+		emitted(
+			'REFERENCE',
+			snapshot.references.map((record) => record.id),
+			[],
+			snapshot.references
+				.filter(
+					(record) =>
+						record.scopeLinkState === 'UNSUPPORTED' || record.resolutionState === 'UNSUPPORTED'
+				)
+				.map((record) => record.id),
+			snapshot.references
+				.filter(
+					(record) =>
+						record.resolutionState === 'UNRESOLVED' && record.scopeLinkState !== 'UNSUPPORTED'
+				)
+				.map((record) => record.id)
+		);
+		emitted(
+			'MODULE_RESOLUTION',
+			moduleResolutionIds,
+			[],
+			snapshot.moduleResolutions
+				.filter((record) => record.resolutionState === 'UNSUPPORTED')
+				.map((record) => record.id),
+			snapshot.moduleResolutions
+				.filter((record) => record.resolutionState === 'UNRESOLVED')
+				.map((record) => record.id)
+		);
+		emitted(
+			'MODULE_EXPORT',
+			moduleExportIds,
+			[],
+			[],
+			snapshot.moduleExports
+				.filter((record) => record.state === 'UNRESOLVED')
+				.map((record) => record.id)
+		);
+		emitted(
+			'TYPE',
+			typeIds,
+			[],
+			snapshot.types
+				.filter((record) => record.structureState === 'BOUNDED')
+				.map((record) => record.id)
+		);
+		emitted(
+			'TYPE_PARAMETER',
+			typeParameterIds,
+			[],
+			snapshot.typeParameters
+				.filter(
+					(record) =>
+						record.constraintState === 'UNSUPPORTED' || record.defaultState === 'UNSUPPORTED'
+				)
+				.map((record) => record.id),
+			snapshot.typeParameters
+				.filter(
+					(record) =>
+						record.constraintState === 'UNRESOLVED' || record.defaultState === 'UNRESOLVED'
+				)
+				.map((record) => record.id)
+		);
+		emitted('SIGNATURE', signatureIds);
+		emitted('SIGNATURE_PARAMETER', signatureParameterIds);
+		emitted('OVERLOAD_SET', overloadSetIds);
+		emitted(
+			'TYPE_RELATION',
+			typeRelationIds,
+			[],
+			snapshot.typeRelations
+				.filter((record) => record.state === 'UNSUPPORTED')
+				.map((record) => record.id),
+			snapshot.typeRelations
+				.filter((record) => record.state === 'UNRESOLVED')
+				.map((record) => record.id)
+		);
+		emitted(
+			'LITERAL',
+			snapshot.literals.map((record) => record.nodeId)
+		);
+		emitted('INVOCATION_SITE', invocationIds);
+		emitted(
+			'ASSIGNMENT',
+			snapshot.assignments.map((record) => record.nodeId)
+		);
+		emitted('DIAGNOSTIC', diagnosticIds);
+		emitted('PROVENANCE', provenanceIds);
+	}
+	emitPresenceLedger();
 	const frameworkMembers = snapshot.projects.flatMap((project) =>
 		project.frameworkCandidates.map((candidate) => `${project.id}\0${candidate}`)
 	);
-	emitted('FRAMEWORK_CANDIDATE', frameworkMembers, [], frameworkMembers);
-	emitted('CONTEXT_INPUT', [], contextIds);
-	for (const values of [
-		snapshot.literals.map((record) => record.nodeId),
-		snapshot.assignments.map((record) => record.nodeId)
-	]) {
-		if (!isCanonicalSet(values))
+	function emitPresenceLedger2(): void {
+		emitted('FRAMEWORK_CANDIDATE', frameworkMembers, [], frameworkMembers);
+		emitted('CONTEXT_INPUT', [], contextIds);
+		for (const values of [
+			snapshot.literals.map((record) => record.nodeId),
+			snapshot.assignments.map((record) => record.nodeId)
+		]) {
+			if (!isCanonicalSet(values))
+				issue(
+					'NONCANONICAL_ORDER',
+					'$',
+					'Node-backed syntax projections must be unique canonical sets.'
+				);
+		}
+	}
+	emitPresenceLedger2();
+	const invocationNodeIds = snapshot.invocations.map((record) => record.nodeId);
+	function checkInvocations(): void {
+		if (new Set(invocationNodeIds).size !== invocationNodeIds.length)
 			issue(
-				'NONCANONICAL_ORDER',
-				'$',
-				'Node-backed syntax projections must be unique canonical sets.'
+				'DUPLICATE_ID',
+				'$.invocations',
+				'Invocation records must reference unique invocation nodes; record order is governed only by invocation identity.'
+			);
+		if (!sameMembers([...referencedProvenanceIds], provenanceIds))
+			issue(
+				'DANGLING_REFERENCE',
+				'$.provenances',
+				'Provenance table must equal the transitive closure of fact provenance references.'
 			);
 	}
-	const invocationNodeIds = snapshot.invocations.map((record) => record.nodeId);
-	if (new Set(invocationNodeIds).size !== invocationNodeIds.length)
-		issue(
-			'DUPLICATE_ID',
-			'$.invocations',
-			'Invocation records must reference unique invocation nodes; record order is governed only by invocation identity.'
-		);
-	if (!sameMembers([...referencedProvenanceIds], provenanceIds))
-		issue(
-			'DANGLING_REFERENCE',
-			'$.provenances',
-			'Provenance table must equal the transitive closure of fact provenance references.'
-		);
+	checkInvocations();
 	const factProvenanceByCapability: Readonly<
 		Record<SemanticCapability, readonly SemanticFactProvenanceRecord[]>
 	> = {
@@ -6864,40 +7676,46 @@ function validateStaticSemanticSnapshotUnsafe(
 	const implementedCapabilities = typeRequested
 		? (['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX', 'TS_TYPE'] as const)
 		: (['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'] as const);
-	for (const capability of implementedCapabilities) {
-		const expectedState = capabilityIsPartial(capability) ? 'PARTIAL' : 'SUPPORTED';
-		if (implementedCapabilityStates.get(capability) !== expectedState)
-			issue(
-				'INVALID_VALUE',
-				'$.capabilities',
-				`${capability} state must exactly roll up its capability-specific facts and closure losses.`
-			);
+	function checkCapabilities2(): void {
+		for (const capability of implementedCapabilities) {
+			const expectedState = capabilityIsPartial(capability) ? 'PARTIAL' : 'SUPPORTED';
+			if (implementedCapabilityStates.get(capability) !== expectedState)
+				issue(
+					'INVALID_VALUE',
+					'$.capabilities',
+					`${capability} state must exactly roll up its capability-specific facts and closure losses.`
+				);
+		}
 	}
+	checkCapabilities2();
 	const partialSignal =
 		capabilityIsPartial('TS_PROJECT') ||
 		capabilityIsPartial('TS_SYMBOL') ||
 		capabilityIsPartial('TS_SYNTAX') ||
 		(typeRequested && capabilityIsPartial('TS_TYPE'));
-	if ((snapshot.health === 'PARTIAL') !== partialSignal)
-		issue(
-			'INVALID_VALUE',
-			'$.health',
-			'Snapshot health must exactly roll up implemented capability partiality.'
-		);
-	if (!snapshot.expectedEmpty && snapshot.projects.length === 0)
-		issue(
-			'POPULATION_MISMATCH',
-			'$.projects',
-			'An unexpectedly empty all-project snapshot cannot be complete.'
-		);
-
-	for (const declarationCandidateId of declarationCandidateIds)
-		if (!declarationCandidateById.has(declarationCandidateId as never))
+	function checkHealth(): void {
+		if ((snapshot.health === 'PARTIAL') !== partialSignal)
 			issue(
-				'DANGLING_REFERENCE',
-				'$.declarationCandidates',
-				'Declaration-candidate index mismatch.'
+				'INVALID_VALUE',
+				'$.health',
+				'Snapshot health must exactly roll up implemented capability partiality.'
 			);
+		if (!snapshot.expectedEmpty && snapshot.projects.length === 0)
+			issue(
+				'POPULATION_MISMATCH',
+				'$.projects',
+				'An unexpectedly empty all-project snapshot cannot be complete.'
+			);
+
+		for (const declarationCandidateId of declarationCandidateIds)
+			if (!declarationCandidateById.has(declarationCandidateId as never))
+				issue(
+					'DANGLING_REFERENCE',
+					'$.declarationCandidates',
+					'Declaration-candidate index mismatch.'
+				);
+	}
+	checkHealth();
 	if (budgetExhausted) {
 		issue('VALIDATION_BUDGET_EXHAUSTED', '$', 'Semantic validation budget was exhausted.');
 		return { issues, state: 'BUDGET_EXHAUSTED' };
