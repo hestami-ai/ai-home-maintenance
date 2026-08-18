@@ -167,128 +167,192 @@ function preflightLimits(value: unknown): {
 	};
 }
 
+type PlainDataWork =
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+interface PlainDataLimits {
+	readonly maxInputRecords: number;
+	readonly maxInputStringCharacters: number;
+}
+
+interface PlainDataCounters {
+	records: number;
+	stringCharacters: number;
+}
+
+function chargeInputRecord(counters: PlainDataCounters, limits: PlainDataLimits): void {
+	counters.records += 1;
+	if (counters.records > limits.maxInputRecords)
+		throw new ProjectContextFailure(
+			'BUDGET_EXCEEDED',
+			`Input plain-data record budget exceeded: ${counters.records} > ${limits.maxInputRecords}.`,
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+}
+
+function requireInputRecordCapacity(
+	projected: number,
+	limits: PlainDataLimits,
+	message: string
+): void {
+	if (projected > limits.maxInputRecords)
+		throw new ProjectContextFailure(
+			'BUDGET_EXCEEDED',
+			message,
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+}
+
+function chargeInputStringCharacters(
+	counters: PlainDataCounters,
+	length: number,
+	limits: PlainDataLimits
+): void {
+	counters.stringCharacters += length;
+	if (counters.stringCharacters > limits.maxInputStringCharacters)
+		throw new ProjectContextFailure(
+			'BUDGET_EXCEEDED',
+			`Input string-character budget exceeded: ${counters.stringCharacters} > ${limits.maxInputStringCharacters}.`,
+			'REQUEST',
+			'$.request.budgets.maxInputStringCharacters'
+		);
+}
+
+function chargeInputString(
+	text: string,
+	counters: PlainDataCounters,
+	limits: PlainDataLimits
+): void {
+	if (!isUnicodeScalarString(text))
+		throw new TypeError('Input strings must contain Unicode scalar text.');
+	chargeInputStringCharacters(counters, text.length, limits);
+}
+
+function isInertPlainDataScalar(value: unknown): boolean {
+	return (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	);
+}
+
+function chargeInputArrayIndexKeys(
+	ownKeys: readonly string[],
+	counters: PlainDataCounters,
+	limits: PlainDataLimits
+): void {
+	for (const key of ownKeys) {
+		if (key === 'length') continue;
+		chargeInputStringCharacters(counters, key.length, limits);
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input array keys must contain Unicode scalar text.');
+	}
+}
+
+function requireDenseInputArrayKeys(ownKeys: readonly string[], count: number): void {
+	if (
+		ownKeys.length !== count + 1 ||
+		ownKeys.some((key) => key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
+	)
+		throw new TypeError('Input arrays must be dense exact data arrays.');
+}
+
+function expandInputArray(
+	value: readonly unknown[],
+	pending: PlainDataWork[],
+	counters: PlainDataCounters,
+	limits: PlainDataLimits
+): void {
+	if (Reflect.getPrototypeOf(value) !== Array.prototype)
+		throw new TypeError('Input arrays must use Array.prototype.');
+	const count = value.length;
+	const ownKeys = Reflect.ownKeys(value);
+	if (ownKeys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input arrays may not contain symbol keys.');
+	chargeInputArrayIndexKeys(ownKeys as string[], counters, limits);
+	requireDenseInputArrayKeys(ownKeys as string[], count);
+	requireInputRecordCapacity(
+		counters.records + count,
+		limits,
+		'Input array population exceeds the plain-data record budget.'
+	);
+	for (let index = count - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input arrays must contain enumerable data elements.');
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+}
+
+function expandInputRecord(
+	value: object,
+	pending: PlainDataWork[],
+	counters: PlainDataCounters,
+	limits: PlainDataLimits
+): void {
+	const prototype = Reflect.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Input records must use a plain prototype.');
+	const ownKeys = Reflect.ownKeys(value);
+	if (ownKeys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input records may not contain symbol keys.');
+	requireInputRecordCapacity(
+		counters.records + ownKeys.length,
+		limits,
+		'Input property population exceeds the plain-data record budget.'
+	);
+	for (const key of [...(ownKeys as string[])].reverse()) {
+		chargeInputStringCharacters(counters, key.length, limits);
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input record keys must contain Unicode scalar text.');
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input records must contain enumerable data properties.');
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+}
+
+function visitPlainDataValue(
+	value: unknown,
+	pending: PlainDataWork[],
+	active: WeakSet<object>,
+	counters: PlainDataCounters,
+	limits: PlainDataLimits
+): void {
+	if (typeof value === 'string') {
+		chargeInputString(value, counters, limits);
+		return;
+	}
+	if (isInertPlainDataScalar(value)) return;
+	if (typeof value !== 'object' || value === null || isProxy(value))
+		throw new TypeError('Input must contain only inert JSON-compatible plain data.');
+	if (active.has(value)) throw new TypeError('Input plain data may not contain cycles.');
+	active.add(value);
+	pending.push({ kind: 'LEAVE', value });
+	if (Array.isArray(value)) expandInputArray(value, pending, counters, limits);
+	else expandInputRecord(value, pending, counters, limits);
+}
+
 function preflightPlainData(
 	value: unknown,
 	limits: { readonly maxInputRecords: number; readonly maxInputStringCharacters: number }
 ): PlainDataUsage {
-	type Work =
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Work[] = [{ kind: 'VISIT', value }];
+	const pending: PlainDataWork[] = [{ kind: 'VISIT', value }];
 	const active = new WeakSet<object>();
-	let records = 0;
-	let stringCharacters = 0;
+	const counters: PlainDataCounters = { records: 0, stringCharacters: 0 };
 	while (pending.length > 0) {
 		const work = pending.pop()!;
 		if (work.kind === 'LEAVE') {
 			active.delete(work.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxInputRecords)
-			throw new ProjectContextFailure(
-				'BUDGET_EXCEEDED',
-				`Input plain-data record budget exceeded: ${records} > ${limits.maxInputRecords}.`,
-				'REQUEST',
-				'$.request.budgets.maxInputRecords'
-			);
-		if (typeof work.value === 'string') {
-			if (!isUnicodeScalarString(work.value))
-				throw new TypeError('Input strings must contain Unicode scalar text.');
-			stringCharacters += work.value.length;
-			if (stringCharacters > limits.maxInputStringCharacters)
-				throw new ProjectContextFailure(
-					'BUDGET_EXCEEDED',
-					`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-					'REQUEST',
-					'$.request.budgets.maxInputStringCharacters'
-				);
-			continue;
-		}
-		if (
-			work.value === null ||
-			typeof work.value === 'boolean' ||
-			(typeof work.value === 'number' &&
-				Number.isSafeInteger(work.value) &&
-				!Object.is(work.value, -0))
-		)
-			continue;
-		if (typeof work.value !== 'object' || isProxy(work.value))
-			throw new TypeError('Input must contain only inert JSON-compatible plain data.');
-		if (active.has(work.value)) throw new TypeError('Input plain data may not contain cycles.');
-		active.add(work.value);
-		pending.push({ kind: 'LEAVE', value: work.value });
-		if (Array.isArray(work.value)) {
-			if (Reflect.getPrototypeOf(work.value) !== Array.prototype)
-				throw new TypeError('Input arrays must use Array.prototype.');
-			const count = work.value.length;
-			const ownKeys = Reflect.ownKeys(work.value);
-			if (ownKeys.some((key) => typeof key !== 'string'))
-				throw new TypeError('Input arrays may not contain symbol keys.');
-			for (const key of ownKeys as string[]) {
-				if (key === 'length') continue;
-				stringCharacters += key.length;
-				if (stringCharacters > limits.maxInputStringCharacters)
-					throw new ProjectContextFailure(
-						'BUDGET_EXCEEDED',
-						`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-						'REQUEST',
-						'$.request.budgets.maxInputStringCharacters'
-					);
-				if (!isUnicodeScalarString(key))
-					throw new TypeError('Input array keys must contain Unicode scalar text.');
-			}
-			if (
-				ownKeys.length !== count + 1 ||
-				(ownKeys as string[]).some((key) => key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-			)
-				throw new TypeError('Input arrays must be dense exact data arrays.');
-			if (records + count > limits.maxInputRecords)
-				throw new ProjectContextFailure(
-					'BUDGET_EXCEEDED',
-					'Input array population exceeds the plain-data record budget.',
-					'REQUEST',
-					'$.request.budgets.maxInputRecords'
-				);
-			for (let index = count - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(work.value, String(index));
-				if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-					throw new TypeError('Input arrays must contain enumerable data elements.');
-				pending.push({ kind: 'VISIT', value: descriptor.value });
-			}
-			continue;
-		}
-		const prototype = Reflect.getPrototypeOf(work.value);
-		if (prototype !== Object.prototype && prototype !== null)
-			throw new TypeError('Input records must use a plain prototype.');
-		const ownKeys = Reflect.ownKeys(work.value);
-		if (ownKeys.some((key) => typeof key !== 'string'))
-			throw new TypeError('Input records may not contain symbol keys.');
-		if (records + ownKeys.length > limits.maxInputRecords)
-			throw new ProjectContextFailure(
-				'BUDGET_EXCEEDED',
-				'Input property population exceeds the plain-data record budget.',
-				'REQUEST',
-				'$.request.budgets.maxInputRecords'
-			);
-		for (const key of [...(ownKeys as string[])].reverse()) {
-			stringCharacters += key.length;
-			if (stringCharacters > limits.maxInputStringCharacters)
-				throw new ProjectContextFailure(
-					'BUDGET_EXCEEDED',
-					`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-					'REQUEST',
-					'$.request.budgets.maxInputStringCharacters'
-				);
-			if (!isUnicodeScalarString(key))
-				throw new TypeError('Input record keys must contain Unicode scalar text.');
-			const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Input records must contain enumerable data properties.');
-			pending.push({ kind: 'VISIT', value: descriptor.value });
-		}
+		chargeInputRecord(counters, limits);
+		visitPlainDataValue(work.value, pending, active, counters, limits);
 	}
-	return { records, stringCharacters };
+	return { records: counters.records, stringCharacters: counters.stringCharacters };
 }
 
 function exactJson(value: unknown, expected: unknown, path: string): void {
@@ -296,10 +360,7 @@ function exactJson(value: unknown, expected: unknown, path: string): void {
 		throw new TypeError(`${path} does not match the exact supported value.`);
 }
 
-function materializeInputs(value: unknown): ProjectContextGraphBuildInputs {
-	const inputs = exactPlainRecord(value, INPUT_KEYS, '$inputs');
-	const request = exactPlainRecord(inputs.request, REQUEST_KEYS, '$inputs.request');
-	const budgets = exactPlainRecord(request.budgets, BUDGET_KEYS, '$inputs.request.budgets');
+function requireExactBudgetPopulation(budgets: Record<string, unknown>): void {
 	for (const key of BUDGET_KEYS) {
 		const budget = budgets[key];
 		const minimum = ZERO_CAPACITY_BUDGET_KEYS.has(key) ? 0 : 1;
@@ -312,6 +373,9 @@ function materializeInputs(value: unknown): ProjectContextGraphBuildInputs {
 		throw new TypeError(
 			'$inputs.request.budgets.maxDiagnostics must be positive and no greater than 100000.'
 		);
+}
+
+function requireSupportedRequestIdentity(request: Record<string, unknown>): void {
 	for (const key of [
 		'operationVersion',
 		'schemaVersion',
@@ -324,6 +388,25 @@ function materializeInputs(value: unknown): ProjectContextGraphBuildInputs {
 		throw new TypeError('Unsupported project-context graph request schema version.');
 	if (request.operationVersion !== PROJECT_CONTEXT_GRAPH_OPERATION_VERSION)
 		throw new TypeError('Unsupported project-context graph operation version.');
+}
+
+function requireOrdinaryPopulationArrays(
+	subject: Record<string, unknown>,
+	snapshot: Record<string, unknown>
+): void {
+	for (const [path, record, keys] of [
+		['$inputs.frozenSubject', subject, ['artifacts', 'projects', 'workspaces']],
+		['$inputs.semanticSnapshot', snapshot, ['programs', 'projects', 'sources']]
+	] as const)
+		for (const key of keys) assertOrdinaryArray(record[key], `${path}.${key}`);
+}
+
+function materializeInputs(value: unknown): ProjectContextGraphBuildInputs {
+	const inputs = exactPlainRecord(value, INPUT_KEYS, '$inputs');
+	const request = exactPlainRecord(inputs.request, REQUEST_KEYS, '$inputs.request');
+	const budgets = exactPlainRecord(request.budgets, BUDGET_KEYS, '$inputs.request.budgets');
+	requireExactBudgetPopulation(budgets);
+	requireSupportedRequestIdentity(request);
 	const selection = exactPlainRecord(
 		request.selection,
 		SELECTION_KEYS,
@@ -336,11 +419,7 @@ function materializeInputs(value: unknown): ProjectContextGraphBuildInputs {
 	exactJson(selection, PROJECT_CONTEXT_GRAPH_SELECTION, '$inputs.request.selection');
 	const subject = shallowPlainRecord(inputs.frozenSubject, '$inputs.frozenSubject');
 	const snapshot = shallowPlainRecord(inputs.semanticSnapshot, '$inputs.semanticSnapshot');
-	for (const [path, record, keys] of [
-		['$inputs.frozenSubject', subject, ['artifacts', 'projects', 'workspaces']],
-		['$inputs.semanticSnapshot', snapshot, ['programs', 'projects', 'sources']]
-	] as const)
-		for (const key of keys) assertOrdinaryArray(record[key], `${path}.${key}`);
+	requireOrdinaryPopulationArrays(subject, snapshot);
 	return {
 		frozenSubject: inputs.frozenSubject as ProjectContextGraphBuildInputs['frozenSubject'],
 		request: {
@@ -667,6 +746,40 @@ function projectRecords(
 	return { programs, projectIdBySemanticId, projects, sourceIdBySemanticId, sources };
 }
 
+function membershipEndpoints(membership: ProjectContextMembership): readonly string[] {
+	return membership.kind === 'PROJECT_HAS_PROGRAM'
+		? [membership.projectId, membership.programId]
+		: [membership.programId, membership.sourceId];
+}
+
+function requireValidSemanticSnapshot(
+	validation: ReturnType<typeof validateStaticSemanticSnapshot>
+): void {
+	if (validation.state === 'VALID') return;
+	throw new ProjectContextFailure(
+		validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'SEMANTIC_SNAPSHOT_INVALID',
+		validation.state === 'BUDGET_EXHAUSTED'
+			? 'Independent semantic snapshot validation exhausted a request budget.'
+			: 'The semantic snapshot is not valid against the exact FrozenSubject.',
+		'VALIDATE',
+		validation.issues[0]?.path ?? null
+	);
+}
+
+function requireValidConstructedGraph(
+	validation: ReturnType<typeof validateConstructedProjectContextGraph>
+): void {
+	if (validation.state === 'VALID') return;
+	throw new ProjectContextFailure(
+		validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'GRAPH_VALIDATION_FAILED',
+		validation.state === 'BUDGET_EXHAUSTED'
+			? 'Independent project-context graph validation exhausted a construction budget.'
+			: 'The constructed project-context graph failed independent validation.',
+		'VALIDATE',
+		validation.issues[0]?.path ?? null
+	);
+}
+
 export function buildProjectContextGraph(
 	inputsValue: unknown,
 	options?: BuildProjectContextGraphOptions
@@ -724,17 +837,7 @@ export function buildProjectContextGraph(
 			},
 			{ frozenSubject: inputs.frozenSubject }
 		);
-		if (semanticValidation.state !== 'VALID')
-			throw new ProjectContextFailure(
-				semanticValidation.state === 'BUDGET_EXHAUSTED'
-					? 'BUDGET_EXCEEDED'
-					: 'SEMANTIC_SNAPSHOT_INVALID',
-				semanticValidation.state === 'BUDGET_EXHAUSTED'
-					? 'Independent semantic snapshot validation exhausted a request budget.'
-					: 'The semantic snapshot is not valid against the exact FrozenSubject.',
-				'VALIDATE',
-				semanticValidation.issues[0]?.path ?? null
-			);
+		requireValidSemanticSnapshot(semanticValidation);
 		const frozenSubjectWitness = canonicalSemanticJsonWitness(inputs.frozenSubject);
 		const semanticSnapshotWitness = canonicalSemanticJsonWitness(inputs.semanticSnapshot);
 		progress.complete({ validationIssues: 0 });
@@ -799,17 +902,12 @@ export function buildProjectContextGraph(
 				programId: source.programId,
 				sourceId: source.id
 			}))
-		].sort((left, right) => {
-			const leftEndpoints =
-				left.kind === 'PROJECT_HAS_PROGRAM'
-					? [left.projectId, left.programId]
-					: [left.programId, left.sourceId];
-			const rightEndpoints =
-				right.kind === 'PROJECT_HAS_PROGRAM'
-					? [right.projectId, right.programId]
-					: [right.programId, right.sourceId];
-			return compareTuple([left.kind, ...leftEndpoints], [right.kind, ...rightEndpoints]);
-		});
+		].sort((left, right) =>
+			compareTuple(
+				[left.kind, ...membershipEndpoints(left)],
+				[right.kind, ...membershipEndpoints(right)]
+			)
+		);
 		const orderedMemberships = memberships.map((membership, ordinal) => ({
 			...membership,
 			ordinal
@@ -919,15 +1017,7 @@ export function buildProjectContextGraph(
 			maxRecords: validationRecords,
 			maxStringCharacters: validationStrings
 		});
-		if (validation.state !== 'VALID')
-			throw new ProjectContextFailure(
-				validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'GRAPH_VALIDATION_FAILED',
-				validation.state === 'BUDGET_EXHAUSTED'
-					? 'Independent project-context graph validation exhausted a construction budget.'
-					: 'The constructed project-context graph failed independent validation.',
-				'VALIDATE',
-				validation.issues[0]?.path ?? null
-			);
+		requireValidConstructedGraph(validation);
 		progress.complete({ validationIssues: 0 });
 		return progress.finish({ diagnostics: [], graph, outcome: 'partial' });
 	} catch (error) {

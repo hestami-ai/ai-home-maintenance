@@ -89,6 +89,11 @@ const LIMIT_KEYS = Object.freeze([
 	'maxVlqDigits'
 ] as const);
 const MAX_SOURCE_MAP_VLQ_DIGITS = 7;
+// S7749 ("invalid group length in numeric value") IS REFUSED, AND THE REGROUPED SPELLING WAS TRIED
+// AND REVERTED. `0x1_00_00_00_00` evaluates identically, so the rule buys nothing here — but it makes
+// this bound the sole outlier against `MAX_VLQ_UNSIGNED` in semantic/validate-source-origin-
+// correlation.ts, which is the SAME 2^32 VLQ ceiling spelled `0x1_0000_0000`. Two decoders that must
+// agree on a boundary should read alike. If the rule is ever satisfied, change BOTH in one commit.
 const MAX_SOURCE_MAP_VLQ_UNSIGNED = 0x1_0000_0000;
 const PROGRESS_CADENCE = 256;
 

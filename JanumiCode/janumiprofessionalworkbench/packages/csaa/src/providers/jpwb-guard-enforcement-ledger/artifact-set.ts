@@ -289,6 +289,54 @@ function hasNonDeclarationLedgerReference(
 	return found;
 }
 
+/**
+ * A ledger entry either REFUSES the whole population or contributes at most one enforcement-site path. `refuse`
+ * is not derivable from a null `path`: a row without an `enforcingSite` is legal and contributes nothing.
+ */
+interface LedgerEntrySite {
+	readonly path: string | null;
+	readonly refuse: boolean;
+}
+
+const REFUSED_LEDGER_ENTRY: LedgerEntrySite = { path: null, refuse: true };
+
+function ledgerRowStringFields(
+	initializer: ts.ObjectLiteralExpression
+): Map<string, ts.Expression> | null {
+	const row = new Map<string, ts.Expression>();
+	for (const rowProperty of initializer.properties) {
+		if (!ts.isPropertyAssignment(rowProperty)) return null;
+		const field = directPropertyName(rowProperty.name);
+		if (field === null || !LEDGER_ROW_FIELDS.has(field) || row.has(field)) return null;
+		if (!ts.isStringLiteralLike(rowProperty.initializer)) return null;
+		row.set(field, rowProperty.initializer);
+	}
+	return row;
+}
+
+function ledgerEntrySite(
+	ledgerProperty: ts.ObjectLiteralElementLike,
+	guardTexts: Set<string>
+): LedgerEntrySite {
+	if (!ts.isPropertyAssignment(ledgerProperty)) return REFUSED_LEDGER_ENTRY;
+	const guardText = directGuardText(ledgerProperty.name);
+	if (guardText === null || guardText.length === 0 || guardTexts.has(guardText))
+		return REFUSED_LEDGER_ENTRY;
+	guardTexts.add(guardText);
+	if (!ts.isObjectLiteralExpression(ledgerProperty.initializer)) return REFUSED_LEDGER_ENTRY;
+
+	const row = ledgerRowStringFields(ledgerProperty.initializer);
+	if (row === null || !row.has('disposition') || !row.has('evidence')) return REFUSED_LEDGER_ENTRY;
+
+	const site = row.get('enforcingSite');
+	if (site === undefined) return { path: null, refuse: false };
+	const match = /^(packages\/rph-application\/src\/handlers\/[^/:]+\.ts):[1-9]\d*$/u.exec(
+		(site as ts.StringLiteralLike).text
+	);
+	if (match === null) return REFUSED_LEDGER_ENTRY;
+	return { path: assertCanonicalRelativePath(match[1]!), refuse: false };
+}
+
 function enforcementSitePathsFromLedger(file: ts.SourceFile): ReadonlySet<string> | null {
 	const declaration = exportedConstLedgerDeclaration(file);
 	if (
@@ -303,29 +351,9 @@ function enforcementSitePathsFromLedger(file: ts.SourceFile): ReadonlySet<string
 	const guardTexts = new Set<string>();
 	const paths = new Set<string>();
 	for (const ledgerProperty of declaration.initializer.properties) {
-		if (!ts.isPropertyAssignment(ledgerProperty)) return null;
-		const guardText = directGuardText(ledgerProperty.name);
-		if (guardText === null || guardText.length === 0 || guardTexts.has(guardText)) return null;
-		guardTexts.add(guardText);
-		if (!ts.isObjectLiteralExpression(ledgerProperty.initializer)) return null;
-
-		const row = new Map<string, ts.Expression>();
-		for (const rowProperty of ledgerProperty.initializer.properties) {
-			if (!ts.isPropertyAssignment(rowProperty)) return null;
-			const field = directPropertyName(rowProperty.name);
-			if (field === null || !LEDGER_ROW_FIELDS.has(field) || row.has(field)) return null;
-			if (!ts.isStringLiteralLike(rowProperty.initializer)) return null;
-			row.set(field, rowProperty.initializer);
-		}
-		if (!row.has('disposition') || !row.has('evidence')) return null;
-
-		const site = row.get('enforcingSite');
-		if (site === undefined) continue;
-		const match = /^(packages\/rph-application\/src\/handlers\/[^/:]+\.ts):[1-9][0-9]*$/u.exec(
-			(site as ts.StringLiteralLike).text
-		);
-		if (match === null) return null;
-		paths.add(assertCanonicalRelativePath(match[1]!));
+		const entry = ledgerEntrySite(ledgerProperty, guardTexts);
+		if (entry.refuse) return null;
+		if (entry.path !== null) paths.add(entry.path);
 	}
 	return paths;
 }
@@ -414,14 +442,18 @@ function analyzerClosure(subject: FrozenSubject): {
 	});
 	return {
 		// A specifier the closure cannot resolve was SILENT before this existed, and that silence was the defect.
-		diagnostics: closure.findings.map((f) =>
-			diagnostic(
+		diagnostics: closure.findings.map((f) => {
+			const specifierPart = f.specifier === null ? '' : ` for '${f.specifier}'`;
+			const importerPart = f.importerPath === null ? '' : ` in ${f.importerPath}`;
+			const resolvedPart =
+				f.resolvedCandidate === null ? '' : ` (resolved to ${f.resolvedCandidate})`;
+			return diagnostic(
 				'POPULATION_RECONCILIATION_FAILED',
-				`Retained analyzer import closure is undecidable: ${f.code}${f.specifier === null ? '' : ` for '${f.specifier}'`}${f.importerPath === null ? '' : ` in ${f.importerPath}`}${f.resolvedCandidate === null ? '' : ` (resolved to ${f.resolvedCandidate})`}.`,
+				`Retained analyzer import closure is undecidable: ${f.code}${specifierPart}${importerPart}${resolvedPart}.`,
 				f.path,
 				'RECONCILE'
-			)
-		),
+			);
+		}),
 		paths: new Set(closure.dependencies)
 	};
 }
@@ -503,20 +535,30 @@ interface DerivedPopulation {
 	readonly diagnostics: readonly GuardEnforcementLedgerArtifactSetDiagnostic[];
 }
 
-function derivePopulation(subject: FrozenSubject): DerivedPopulation {
-	const siteSelection = extractEnforcementSitePaths(subject);
-	const closureSelection = analyzerClosure(subject);
-	const diagnostics = [...siteSelection.diagnostics, ...closureSelection.diagnostics];
+function eligibleRowsByPath(
+	subject: FrozenSubject,
+	enforcementSitePaths: ReadonlySet<string>,
+	analyzerDependencyPaths: ReadonlySet<string>
+): Map<string, CapturedArtifactRecord[]> {
 	const rowsByPath = new Map<string, CapturedArtifactRecord[]>();
 	for (const artifact of subject.artifacts) {
-		const uses = usesForPath(artifact.path, siteSelection.paths, closureSelection.paths);
+		const uses = usesForPath(artifact.path, enforcementSitePaths, analyzerDependencyPaths);
 		if (uses.length === 0) continue;
 		const rows = rowsByPath.get(artifact.path) ?? [];
 		rows.push(artifact);
 		rowsByPath.set(artifact.path, rows);
 	}
+	return rowsByPath;
+}
+
+function excludedEligibleDiagnostics(
+	subject: FrozenSubject,
+	enforcementSitePaths: ReadonlySet<string>,
+	analyzerDependencyPaths: ReadonlySet<string>
+): readonly GuardEnforcementLedgerArtifactSetDiagnostic[] {
+	const diagnostics: GuardEnforcementLedgerArtifactSetDiagnostic[] = [];
 	for (const excluded of subject.excludedArtifacts) {
-		const uses = usesForPath(excluded.path, siteSelection.paths, closureSelection.paths);
+		const uses = usesForPath(excluded.path, enforcementSitePaths, analyzerDependencyPaths);
 		if (uses.length === 0 || OPTIONAL_ENVIRONMENT_PATHS.has(excluded.path)) continue;
 		diagnostics.push(
 			diagnostic(
@@ -527,9 +569,18 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 			)
 		);
 	}
-	// A derived closure member absent from the subject is exactly as fatal as a missing REQUIRED_PATH: the capsule
-	// would be written without it and the analyzer's dynamic import would fail inside the worker.
-	for (const path of [...REQUIRED_PATHS, ...siteSelection.paths, ...closureSelection.paths])
+	return diagnostics;
+}
+
+// A derived closure member absent from the subject is exactly as fatal as a missing REQUIRED_PATH: the capsule
+// would be written without it and the analyzer's dynamic import would fail inside the worker.
+function missingRequiredArtifactDiagnostics(
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>,
+	enforcementSitePaths: ReadonlySet<string>,
+	analyzerDependencyPaths: ReadonlySet<string>
+): readonly GuardEnforcementLedgerArtifactSetDiagnostic[] {
+	const diagnostics: GuardEnforcementLedgerArtifactSetDiagnostic[] = [];
+	for (const path of [...REQUIRED_PATHS, ...enforcementSitePaths, ...analyzerDependencyPaths])
 		if ((rowsByPath.get(path)?.length ?? 0) === 0)
 			diagnostics.push(
 				diagnostic(
@@ -539,6 +590,13 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 					'BIND'
 				)
 			);
+	return diagnostics;
+}
+
+function duplicateManifestRowDiagnostics(
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>
+): readonly GuardEnforcementLedgerArtifactSetDiagnostic[] {
+	const diagnostics: GuardEnforcementLedgerArtifactSetDiagnostic[] = [];
 	for (const [path, rows] of rowsByPath)
 		if (rows.length !== 1)
 			diagnostics.push(
@@ -549,6 +607,12 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 					'RECONCILE'
 				)
 			);
+	return diagnostics;
+}
+
+function canonicalPathCollisionDiagnostics(
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>
+): readonly GuardEnforcementLedgerArtifactSetDiagnostic[] {
 	const pathsByKey = new Map<string, string[]>();
 	for (const path of rowsByPath.keys()) {
 		const key = canonicalPathKey(path);
@@ -556,28 +620,61 @@ function derivePopulation(subject: FrozenSubject): DerivedPopulation {
 		paths.push(path);
 		pathsByKey.set(key, paths);
 	}
+	const diagnostics: GuardEnforcementLedgerArtifactSetDiagnostic[] = [];
 	for (const paths of pathsByKey.values())
-		if (paths.length > 1)
+		if (paths.length > 1) {
+			// Sorted in place, exactly as the collided message and its reported path were pinned: the reported
+			// path is the FIRST path in sorted order, not in insertion order.
+			paths.sort(compareText);
 			diagnostics.push(
 				diagnostic(
 					'POPULATION_RECONCILIATION_FAILED',
-					`Eligible paths collide under canonical comparison: ${paths.sort(compareText).join(', ')}.`,
+					`Eligible paths collide under canonical comparison: ${paths.join(', ')}.`,
 					paths[0] ?? null,
 					'RECONCILE'
 				)
 			);
+		}
+	return diagnostics;
+}
+
+function bindEligibleArtifacts(
+	subject: FrozenSubject,
+	rowsByPath: ReadonlyMap<string, readonly CapturedArtifactRecord[]>,
+	enforcementSitePaths: ReadonlySet<string>,
+	analyzerDependencyPaths: ReadonlySet<string>
+): DerivedPopulation {
 	const artifacts: GuardEnforcementLedgerArtifactBinding[] = [];
+	const diagnostics: GuardEnforcementLedgerArtifactSetDiagnostic[] = [];
 	for (const [path, rows] of [...rowsByPath].sort(([left], [right]) => compareText(left, right))) {
 		if (rows.length !== 1) continue;
 		const result = bindArtifact(
 			subject,
 			rows[0]!,
-			usesForPath(path, siteSelection.paths, closureSelection.paths)
+			usesForPath(path, enforcementSitePaths, analyzerDependencyPaths)
 		);
 		if (result.diagnostic !== undefined) diagnostics.push(result.diagnostic);
 		else artifacts.push(result.binding);
 	}
 	return { artifacts, diagnostics };
+}
+
+function derivePopulation(subject: FrozenSubject): DerivedPopulation {
+	const siteSelection = extractEnforcementSitePaths(subject);
+	const closureSelection = analyzerClosure(subject);
+	const sitePaths = siteSelection.paths;
+	const closurePaths = closureSelection.paths;
+	const diagnostics = [...siteSelection.diagnostics, ...closureSelection.diagnostics];
+	const rowsByPath = eligibleRowsByPath(subject, sitePaths, closurePaths);
+	diagnostics.push(
+		...excludedEligibleDiagnostics(subject, sitePaths, closurePaths),
+		...missingRequiredArtifactDiagnostics(rowsByPath, sitePaths, closurePaths),
+		...duplicateManifestRowDiagnostics(rowsByPath),
+		...canonicalPathCollisionDiagnostics(rowsByPath)
+	);
+	const bound = bindEligibleArtifacts(subject, rowsByPath, sitePaths, closurePaths);
+	diagnostics.push(...bound.diagnostics);
+	return { artifacts: bound.artifacts, diagnostics };
 }
 
 function coverageFor(
@@ -748,7 +845,7 @@ function denseArray(value: unknown, knownLength?: number): value is readonly unk
 	if (keys.length !== length + 1) return false;
 	for (const key of keys) {
 		if (key === 'length') continue;
-		if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)) return false;
+		if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) return false;
 		const index = Number(key);
 		if (index >= length) return false;
 		const descriptor = Reflect.getOwnPropertyDescriptor(value as object, key);
@@ -766,45 +863,12 @@ function arrayValue(value: readonly unknown[], index: number): unknown {
 	return Reflect.getOwnPropertyDescriptor(value, String(index))?.value;
 }
 
-function shapeIssue(
-	value: unknown,
-	maxRecords: number,
-	maxStringCharacters: number
-): GuardEnforcementLedgerValidationIssue | null {
-	if (
-		!exactPlainRecord(value, [
-			'artifacts',
-			'canonicalProfile',
-			'contentDigest',
-			'coverage',
-			'id',
-			'method',
-			'operationVersion',
-			'schemaVersion',
-			'subjectId'
-		])
-	)
-		return { code: 'SHAPE_INVALID', message: 'Expected the exact artifact-set record.', path: '$' };
-	const artifacts = data(value, 'artifacts');
-	const artifactCount = arrayHeaderLength(artifacts);
-	if (artifactCount === null)
-		return {
-			code: 'SHAPE_INVALID',
-			message: 'artifacts must be a dense array.',
-			path: '$.artifacts'
-		};
-	if (artifactCount > maxRecords)
-		return {
-			code: 'BUDGET_EXHAUSTED',
-			message: 'Artifact population exceeds maxRecords.',
-			path: '$.artifacts'
-		};
-	if (artifactCount === 0)
-		return {
-			code: 'SHAPE_INVALID',
-			message: 'Artifact population must be nonempty.',
-			path: '$.artifacts'
-		};
+interface MeasuredShapeIssue {
+	readonly characters: number;
+	readonly issue: GuardEnforcementLedgerValidationIssue | null;
+}
+
+function artifactSetHeaderStringIssue(value: PlainRecord): MeasuredShapeIssue {
 	let stringCharacters = 0;
 	for (const key of [
 		'canonicalProfile',
@@ -818,109 +882,132 @@ function shapeIssue(
 		const field = data(value, key);
 		if (typeof field !== 'string')
 			return {
-				code: 'SHAPE_INVALID',
-				message: `${key} must be text.`,
-				path: `$.${key}`
+				characters: stringCharacters,
+				issue: {
+					code: 'SHAPE_INVALID',
+					message: `${key} must be text.`,
+					path: `$.${key}`
+				}
 			};
 		stringCharacters += field.length;
 	}
-	if (stringCharacters > maxStringCharacters)
-		return {
-			code: 'BUDGET_EXHAUSTED',
-			message: 'Artifact-set strings exceed maxStringCharacters.',
-			path: '$'
-		};
-	if (!denseArray(artifacts, artifactCount))
-		return {
-			code: 'SHAPE_INVALID',
-			message: 'artifacts must be a dense array.',
-			path: '$.artifacts'
-		};
-	for (let index = 0; index < artifactCount; index += 1) {
-		const item = arrayValue(artifacts, index);
-		const itemKeys = [
-			'bytes',
-			'canonicalPathKey',
-			'path',
-			'primaryClass',
-			'semanticRoles',
-			'sha256',
-			'uses'
-		] as const;
-		if (!exactPlainRecord(item, itemKeys))
+	return { characters: stringCharacters, issue: null };
+}
+
+function bindingStringIssue(
+	item: PlainRecord,
+	index: number,
+	semanticRoles: readonly unknown[],
+	uses: readonly unknown[]
+): MeasuredShapeIssue {
+	let characters = 0;
+	for (const key of ['canonicalPathKey', 'path', 'primaryClass', 'sha256'] as const) {
+		const field = data(item, key);
+		if (typeof field !== 'string')
 			return {
-				code: 'SHAPE_INVALID',
-				message: 'Artifact binding shape is not exact.',
-				path: `$.artifacts[${index}]`
-			};
-		const semanticRoles = data(item, 'semanticRoles');
-		const uses = data(item, 'uses');
-		const semanticRoleCount = arrayHeaderLength(semanticRoles);
-		const useCount = arrayHeaderLength(uses);
-		if (semanticRoleCount === null || useCount === null)
-			return {
-				code: 'SHAPE_INVALID',
-				message: 'Artifact binding shape is not exact.',
-				path: `$.artifacts[${index}]`
-			};
-		if (semanticRoleCount > maxRecords || useCount > maxRecords)
-			return {
-				code: 'BUDGET_EXHAUSTED',
-				message: 'Nested artifact population exceeds maxRecords.',
-				path: `$.artifacts[${index}]`
-			};
-		if (semanticRoleCount > SEMANTIC_ROLES.size || useCount > ARTIFACT_USES.size)
-			return {
-				code: 'SHAPE_INVALID',
-				message: 'Nested artifact population exceeds its closed vocabulary.',
-				path: `$.artifacts[${index}]`
-			};
-		if (!denseArray(semanticRoles, semanticRoleCount) || !denseArray(uses, useCount))
-			return {
-				code: 'SHAPE_INVALID',
-				message: 'Artifact binding shape is not exact.',
-				path: `$.artifacts[${index}]`
-			};
-		const bytes = data(item, 'bytes');
-		if (!Number.isSafeInteger(bytes) || (bytes as number) < 0)
-			return {
-				code: 'SHAPE_INVALID',
-				message: 'Artifact bytes must be a nonnegative safe integer.',
-				path: `$.artifacts[${index}].bytes`
-			};
-		for (const key of ['canonicalPathKey', 'path', 'primaryClass', 'sha256'] as const) {
-			const field = data(item, key);
-			if (typeof field !== 'string')
-				return {
+				characters,
+				issue: {
 					code: 'SHAPE_INVALID',
 					message: `${key} must be text.`,
 					path: `$.artifacts[${index}].${key}`
-				};
-			stringCharacters += field.length;
-		}
-		for (const [key, population] of [
-			['semanticRoles', semanticRoles],
-			['uses', uses]
-		] as const) {
-			for (let childIndex = 0; childIndex < arrayLength(population); childIndex += 1) {
-				const field = arrayValue(population, childIndex);
-				if (typeof field !== 'string')
-					return {
+				}
+			};
+		characters += field.length;
+	}
+	for (const [key, population] of [
+		['semanticRoles', semanticRoles],
+		['uses', uses]
+	] as const) {
+		for (let childIndex = 0; childIndex < arrayLength(population); childIndex += 1) {
+			const field = arrayValue(population, childIndex);
+			if (typeof field !== 'string')
+				return {
+					characters,
+					issue: {
 						code: 'SHAPE_INVALID',
 						message: `${key} members must be text.`,
 						path: `$.artifacts[${index}].${key}[${childIndex}]`
-					};
-				stringCharacters += field.length;
-			}
+					}
+				};
+			characters += field.length;
 		}
-		if (stringCharacters > maxStringCharacters)
-			return {
-				code: 'BUDGET_EXHAUSTED',
-				message: 'Artifact-set strings exceed maxStringCharacters.',
-				path: '$'
-			};
 	}
-	const coverage = data(value, 'coverage');
+	return { characters, issue: null };
+}
+
+function bindingShapeIssue(item: unknown, index: number, maxRecords: number): MeasuredShapeIssue {
+	const itemKeys = [
+		'bytes',
+		'canonicalPathKey',
+		'path',
+		'primaryClass',
+		'semanticRoles',
+		'sha256',
+		'uses'
+	] as const;
+	if (!exactPlainRecord(item, itemKeys))
+		return {
+			characters: 0,
+			issue: {
+				code: 'SHAPE_INVALID',
+				message: 'Artifact binding shape is not exact.',
+				path: `$.artifacts[${index}]`
+			}
+		};
+	const semanticRoles = data(item, 'semanticRoles');
+	const uses = data(item, 'uses');
+	const semanticRoleCount = arrayHeaderLength(semanticRoles);
+	const useCount = arrayHeaderLength(uses);
+	if (semanticRoleCount === null || useCount === null)
+		return {
+			characters: 0,
+			issue: {
+				code: 'SHAPE_INVALID',
+				message: 'Artifact binding shape is not exact.',
+				path: `$.artifacts[${index}]`
+			}
+		};
+	if (semanticRoleCount > maxRecords || useCount > maxRecords)
+		return {
+			characters: 0,
+			issue: {
+				code: 'BUDGET_EXHAUSTED',
+				message: 'Nested artifact population exceeds maxRecords.',
+				path: `$.artifacts[${index}]`
+			}
+		};
+	if (semanticRoleCount > SEMANTIC_ROLES.size || useCount > ARTIFACT_USES.size)
+		return {
+			characters: 0,
+			issue: {
+				code: 'SHAPE_INVALID',
+				message: 'Nested artifact population exceeds its closed vocabulary.',
+				path: `$.artifacts[${index}]`
+			}
+		};
+	if (!denseArray(semanticRoles, semanticRoleCount) || !denseArray(uses, useCount))
+		return {
+			characters: 0,
+			issue: {
+				code: 'SHAPE_INVALID',
+				message: 'Artifact binding shape is not exact.',
+				path: `$.artifacts[${index}]`
+			}
+		};
+	const bytes = data(item, 'bytes');
+	if (!Number.isSafeInteger(bytes) || (bytes as number) < 0)
+		return {
+			characters: 0,
+			issue: {
+				code: 'SHAPE_INVALID',
+				message: 'Artifact bytes must be a nonnegative safe integer.',
+				path: `$.artifacts[${index}].bytes`
+			}
+		};
+	return bindingStringIssue(item, index, semanticRoles, uses);
+}
+
+function coverageShapeIssue(coverage: unknown): GuardEnforcementLedgerValidationIssue | null {
 	if (
 		!exactPlainRecord(coverage, [
 			'analyzerArtifacts',
@@ -964,59 +1051,398 @@ function shapeIssue(
 	return null;
 }
 
+function shapeIssue(
+	value: unknown,
+	maxRecords: number,
+	maxStringCharacters: number
+): GuardEnforcementLedgerValidationIssue | null {
+	if (
+		!exactPlainRecord(value, [
+			'artifacts',
+			'canonicalProfile',
+			'contentDigest',
+			'coverage',
+			'id',
+			'method',
+			'operationVersion',
+			'schemaVersion',
+			'subjectId'
+		])
+	)
+		return { code: 'SHAPE_INVALID', message: 'Expected the exact artifact-set record.', path: '$' };
+	const artifacts = data(value, 'artifacts');
+	const artifactCount = arrayHeaderLength(artifacts);
+	if (artifactCount === null)
+		return {
+			code: 'SHAPE_INVALID',
+			message: 'artifacts must be a dense array.',
+			path: '$.artifacts'
+		};
+	if (artifactCount > maxRecords)
+		return {
+			code: 'BUDGET_EXHAUSTED',
+			message: 'Artifact population exceeds maxRecords.',
+			path: '$.artifacts'
+		};
+	if (artifactCount === 0)
+		return {
+			code: 'SHAPE_INVALID',
+			message: 'Artifact population must be nonempty.',
+			path: '$.artifacts'
+		};
+	const header = artifactSetHeaderStringIssue(value);
+	if (header.issue !== null) return header.issue;
+	let stringCharacters = header.characters;
+	if (stringCharacters > maxStringCharacters)
+		return {
+			code: 'BUDGET_EXHAUSTED',
+			message: 'Artifact-set strings exceed maxStringCharacters.',
+			path: '$'
+		};
+	if (!denseArray(artifacts, artifactCount))
+		return {
+			code: 'SHAPE_INVALID',
+			message: 'artifacts must be a dense array.',
+			path: '$.artifacts'
+		};
+	for (let index = 0; index < artifactCount; index += 1) {
+		const measured = bindingShapeIssue(arrayValue(artifacts, index), index, maxRecords);
+		if (measured.issue !== null) return measured.issue;
+		stringCharacters += measured.characters;
+		if (stringCharacters > maxStringCharacters)
+			return {
+				code: 'BUDGET_EXHAUSTED',
+				message: 'Artifact-set strings exceed maxStringCharacters.',
+				path: '$'
+			};
+	}
+	return coverageShapeIssue(data(value, 'coverage'));
+}
+
+type ArtifactSetBinding =
+	import('../../contracts/guard-enforcement-ledger.js').GuardEnforcementLedgerArtifactSetBinding;
+
+interface ArtifactSetValidationLimits {
+	readonly maxIssues: number;
+	readonly maxRecords: number;
+	readonly maxStringCharacters: number;
+}
+
+type ValidationLimitsOutcome =
+	| { readonly limits: ArtifactSetValidationLimits; readonly result: null }
+	| { readonly limits: null; readonly result: GuardEnforcementLedgerValidationResult };
+
+function invalidOptionsResult(
+	message: string,
+	path: string
+): GuardEnforcementLedgerValidationResult {
+	return { issues: [{ code: 'INVALID_VALUE', message, path }], state: 'INVALID' };
+}
+
+type RecordLimitsOutcome =
+	| { readonly invalidKey: 'maxRecords' | 'maxStringCharacters'; readonly limits: null }
+	| {
+			readonly invalidKey: null;
+			readonly limits: { readonly maxRecords: number; readonly maxStringCharacters: number };
+	  };
+
+/**
+ * Validates AND resolves the two record limits together, because splitting them loses the narrowing.
+ *
+ * ⚠ `validationOptionsRecord` narrows `options` to a PlainRecord, so `options.maxRecords` is `unknown`
+ * at the call site and `unknown ?? number` is `{}`, not `number`. The only thing that makes the value
+ * a `number` is `positiveSafeInteger`, a type predicate — so the resolution has to happen HERE, in the
+ * same branch as the guard, exactly as the pre-refactor loop did. A helper that returns only "which
+ * key was invalid" type-checks on its own and breaks its caller.
+ */
+function recordLimits(options: GuardEnforcementLedgerValidationOptions): RecordLimitsOutcome {
+	let maxRecords = Number.MAX_SAFE_INTEGER;
+	let maxStringCharacters = Number.MAX_SAFE_INTEGER;
+	for (const key of ['maxRecords', 'maxStringCharacters'] as const) {
+		const value = options[key];
+		if (value === undefined) continue;
+		if (!positiveSafeInteger(value)) return { invalidKey: key, limits: null };
+		if (key === 'maxRecords') maxRecords = value;
+		else maxStringCharacters = value;
+	}
+	return { invalidKey: null, limits: { maxRecords, maxStringCharacters } };
+}
+
+function validationLimits(
+	options: GuardEnforcementLedgerValidationOptions | undefined
+): ValidationLimitsOutcome {
+	if (options === undefined)
+		return {
+			limits: {
+				maxIssues: 100,
+				maxRecords: Number.MAX_SAFE_INTEGER,
+				maxStringCharacters: Number.MAX_SAFE_INTEGER
+			},
+			result: null
+		};
+	if (!validationOptionsRecord(options))
+		return {
+			limits: null,
+			result: invalidOptionsResult('Validation options shape is invalid.', '$options')
+		};
+	if (options.maxIssues !== undefined && !positiveSafeInteger(options.maxIssues))
+		return {
+			limits: null,
+			result: invalidOptionsResult('maxIssues must be positive.', '$options.maxIssues')
+		};
+	const resolved = recordLimits(options);
+	if (resolved.invalidKey !== null)
+		return {
+			limits: null,
+			result: invalidOptionsResult(
+				`${resolved.invalidKey} must be positive.`,
+				`$options.${resolved.invalidKey}`
+			)
+		};
+	return {
+		limits: {
+			maxIssues: options.maxIssues ?? 100,
+			maxRecords: resolved.limits.maxRecords,
+			maxStringCharacters: resolved.limits.maxStringCharacters
+		},
+		result: null
+	};
+}
+
+function artifactSetIdentityIssues(
+	artifactSet: ArtifactSetBinding,
+	subject: FrozenSubject | undefined
+): readonly GuardEnforcementLedgerValidationIssue[] {
+	const pending: GuardEnforcementLedgerValidationIssue[] = [];
+	if (artifactSet.schemaVersion !== GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_SCHEMA_VERSION)
+		pending.push({
+			code: 'IDENTITY_MISMATCH',
+			message: 'Unsupported artifact-set schema version.',
+			path: '$.schemaVersion'
+		});
+	if (artifactSet.operationVersion !== GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_OPERATION_VERSION)
+		pending.push({
+			code: 'IDENTITY_MISMATCH',
+			message: 'Unsupported artifact-set operation version.',
+			path: '$.operationVersion'
+		});
+	if (artifactSet.method !== GUARD_ENFORCEMENT_LEDGER_METHOD)
+		pending.push({
+			code: 'IDENTITY_MISMATCH',
+			message: 'Artifact-set method is unsupported.',
+			path: '$.method'
+		});
+	if (artifactSet.canonicalProfile !== GUARD_ENFORCEMENT_LEDGER_CANONICAL_PROFILE)
+		pending.push({
+			code: 'IDENTITY_MISMATCH',
+			message: 'Canonical profile is unsupported.',
+			path: '$.canonicalProfile'
+		});
+	if (typeof artifactSet.subjectId !== 'string' || artifactSet.subjectId.length === 0)
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'subjectId must be nonempty text.',
+			path: '$.subjectId'
+		});
+	if (subject !== undefined && artifactSet.subjectId !== subject.descriptor.subjectId)
+		pending.push({
+			code: 'SUBJECT_MISMATCH',
+			message: 'Artifact set identifies a different FrozenSubject.',
+			path: '$.subjectId'
+		});
+	return pending;
+}
+
+function artifactPathIdentityIssues(
+	current: GuardEnforcementLedgerArtifactBinding,
+	index: number
+): readonly GuardEnforcementLedgerValidationIssue[] {
+	if (typeof current.path !== 'string' || typeof current.canonicalPathKey !== 'string')
+		return [
+			{
+				code: 'INVALID_VALUE',
+				message: 'Artifact path identity must be text.',
+				path: `$.artifacts[${index}].path`
+			}
+		];
+	try {
+		if (canonicalPathKey(current.path) !== current.canonicalPathKey)
+			return [
+				{
+					code: 'IDENTITY_MISMATCH',
+					message: 'Canonical path key does not reproduce.',
+					path: `$.artifacts[${index}].canonicalPathKey`
+				}
+			];
+	} catch {
+		return [
+			{
+				code: 'INVALID_VALUE',
+				message: 'Artifact path is noncanonical.',
+				path: `$.artifacts[${index}].path`
+			}
+		];
+	}
+	return [];
+}
+
+function artifactBindingIssues(
+	artifacts: readonly GuardEnforcementLedgerArtifactBinding[],
+	index: number
+): readonly GuardEnforcementLedgerValidationIssue[] {
+	const current = artifacts[index]!;
+	const pending: GuardEnforcementLedgerValidationIssue[] = [];
+	if (index > 0 && compareText(artifacts[index - 1]!.path, current.path) >= 0)
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'Artifact paths must be strictly ordered.',
+			path: `$.artifacts[${index}].path`
+		});
+	if (!Number.isSafeInteger(current.bytes) || current.bytes < 0)
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'bytes must be a nonnegative safe integer.',
+			path: `$.artifacts[${index}].bytes`
+		});
+	pending.push(...artifactPathIdentityIssues(current, index));
+	if (!PRIMARY_CLASSES.has(current.primaryClass))
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'Primary class is unsupported.',
+			path: `$.artifacts[${index}].primaryClass`
+		});
+	if (!SHA256.test(current.sha256))
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'Artifact digest is invalid.',
+			path: `$.artifacts[${index}].sha256`
+		});
+	if (
+		new Set(current.uses).size !== current.uses.length ||
+		!sameStrings([...current.uses].sort(compareText), current.uses) ||
+		current.uses.some((use) => !ARTIFACT_USES.has(use))
+	)
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'Artifact uses are invalid or noncanonical.',
+			path: `$.artifacts[${index}].uses`
+		});
+	if (
+		current.semanticRoles.some((role) => !SEMANTIC_ROLES.has(role)) ||
+		new Set(current.semanticRoles).size !== current.semanticRoles.length ||
+		!sameStrings([...current.semanticRoles].sort(compareText), current.semanticRoles)
+	)
+		pending.push({
+			code: 'INVALID_VALUE',
+			message: 'Semantic roles are invalid or noncanonical.',
+			path: `$.artifacts[${index}].semanticRoles`
+		});
+	return pending;
+}
+
+function artifactSetReconciliationIssues(
+	artifactSet: ArtifactSetBinding,
+	derivedArtifacts: readonly GuardEnforcementLedgerArtifactBinding[]
+): readonly GuardEnforcementLedgerValidationIssue[] {
+	const pending: GuardEnforcementLedgerValidationIssue[] = [];
+	if (canonicalJson(artifactSet.artifacts) !== canonicalJson(derivedArtifacts))
+		pending.push({
+			code: 'POPULATION_MISMATCH',
+			message: 'Artifact population differs from the exact FrozenSubject selection.',
+			path: '$.artifacts'
+		});
+	const expectedCoverage = coverageFor(derivedArtifacts);
+	if (canonicalJson(artifactSet.coverage) !== canonicalJson(expectedCoverage))
+		pending.push({
+			code: 'POPULATION_MISMATCH',
+			message: 'Coverage does not reproduce the selected population.',
+			path: '$.coverage'
+		});
+	const expectedId = guardEnforcementLedgerArtifactSetId({
+		artifactContentDigest: canonicalSemanticJsonWitness(artifactSet.artifacts).sha256,
+		method: artifactSet.method,
+		operationVersion: artifactSet.operationVersion,
+		schemaVersion: artifactSet.schemaVersion,
+		subjectId: artifactSet.subjectId
+	});
+	if (artifactSet.id !== expectedId)
+		pending.push({
+			code: 'IDENTITY_MISMATCH',
+			message: 'Artifact-set identity does not reproduce.',
+			path: '$.id'
+		});
+	if (artifactSet.contentDigest !== guardEnforcementLedgerArtifactSetContentDigest(artifactSet))
+		pending.push({
+			code: 'CONTENT_DIGEST_MISMATCH',
+			message: 'Artifact-set content digest does not reproduce.',
+			path: '$.contentDigest'
+		});
+	return pending;
+}
+
+function finalValidationResult(
+	issues: readonly GuardEnforcementLedgerValidationIssue[],
+	maxIssues: number,
+	issueLimitExceeded: boolean
+): GuardEnforcementLedgerValidationResult {
+	if (issues.length === 0) return { issues: [], state: 'VALID' };
+	return {
+		issues: issues.slice(0, maxIssues),
+		state:
+			issueLimitExceeded || issues.some((issue) => issue.code === 'BUDGET_EXHAUSTED')
+				? 'BUDGET_EXHAUSTED'
+				: 'INVALID'
+	};
+}
+
+function validateWellShapedArtifactSet(
+	artifactSet: ArtifactSetBinding,
+	subject: FrozenSubject | undefined,
+	maxIssues: number
+): GuardEnforcementLedgerValidationResult {
+	const issues: GuardEnforcementLedgerValidationIssue[] = [];
+	let issueLimitExceeded = false;
+	const add = (
+		code: GuardEnforcementLedgerValidationIssue['code'],
+		path: string,
+		message: string
+	) => {
+		if (issues.length < maxIssues) issues.push({ code, message, path });
+		else issueLimitExceeded = true;
+	};
+	const addAll = (pending: readonly GuardEnforcementLedgerValidationIssue[]): void => {
+		for (const issue of pending) add(issue.code, issue.path, issue.message);
+	};
+	addAll(artifactSetIdentityIssues(artifactSet, subject));
+	for (let index = 0; index < artifactSet.artifacts.length; index += 1) {
+		addAll(artifactBindingIssues(artifactSet.artifacts, index));
+		if (issueLimitExceeded) return { issues, state: 'BUDGET_EXHAUSTED' };
+	}
+	const derived =
+		subject === undefined
+			? { artifacts: artifactSet.artifacts, diagnostics: [] }
+			: derivePopulation(subject);
+	for (const cause of derived.diagnostics) {
+		add('POPULATION_MISMATCH', '$subject', cause.message);
+		if (issueLimitExceeded) return { issues, state: 'BUDGET_EXHAUSTED' };
+	}
+	addAll(artifactSetReconciliationIssues(artifactSet, derived.artifacts));
+	return finalValidationResult(issues, maxIssues, issueLimitExceeded);
+}
+
 export function validateGuardEnforcementLedgerArtifactSet(
 	value: unknown,
 	subject?: FrozenSubject,
 	options?: GuardEnforcementLedgerValidationOptions
 ): GuardEnforcementLedgerValidationResult {
 	try {
-		let maxIssues = 100;
-		let maxRecords = Number.MAX_SAFE_INTEGER;
-		let maxStringCharacters = Number.MAX_SAFE_INTEGER;
-		if (options !== undefined) {
-			if (!validationOptionsRecord(options))
-				return {
-					issues: [
-						{
-							code: 'INVALID_VALUE',
-							message: 'Validation options shape is invalid.',
-							path: '$options'
-						}
-					],
-					state: 'INVALID'
-				};
-			if (options.maxIssues !== undefined) {
-				if (!positiveSafeInteger(options.maxIssues))
-					return {
-						issues: [
-							{
-								code: 'INVALID_VALUE',
-								message: 'maxIssues must be positive.',
-								path: '$options.maxIssues'
-							}
-						],
-						state: 'INVALID'
-					};
-				maxIssues = options.maxIssues;
-			}
-			for (const key of ['maxRecords', 'maxStringCharacters'] as const)
-				if (options[key] !== undefined && !positiveSafeInteger(options[key]))
-					return {
-						issues: [
-							{
-								code: 'INVALID_VALUE',
-								message: `${key} must be positive.`,
-								path: `$options.${key}`
-							}
-						],
-						state: 'INVALID'
-					};
-				else if (options[key] !== undefined) {
-					if (key === 'maxRecords') maxRecords = options[key];
-					else maxStringCharacters = options[key];
-				}
-		}
-		const malformed = shapeIssue(value, maxRecords, maxStringCharacters);
+		const resolved = validationLimits(options);
+		if (resolved.limits === null) return resolved.result;
+		const malformed = shapeIssue(
+			value,
+			resolved.limits.maxRecords,
+			resolved.limits.maxStringCharacters
+		);
 		if (malformed !== null)
 			return {
 				issues: [malformed],
@@ -1033,128 +1459,11 @@ export function validateGuardEnforcementLedgerArtifactSet(
 				],
 				state: 'INVALID'
 			};
-		const artifactSet =
-			value as import('../../contracts/guard-enforcement-ledger.js').GuardEnforcementLedgerArtifactSetBinding;
-		const issues: GuardEnforcementLedgerValidationIssue[] = [];
-		let issueLimitExceeded = false;
-		const add = (
-			code: GuardEnforcementLedgerValidationIssue['code'],
-			path: string,
-			message: string
-		) => {
-			if (issues.length < maxIssues) issues.push({ code, message, path });
-			else issueLimitExceeded = true;
-		};
-		if (artifactSet.schemaVersion !== GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_SCHEMA_VERSION)
-			add('IDENTITY_MISMATCH', '$.schemaVersion', 'Unsupported artifact-set schema version.');
-		if (artifactSet.operationVersion !== GUARD_ENFORCEMENT_LEDGER_ARTIFACT_SET_OPERATION_VERSION)
-			add('IDENTITY_MISMATCH', '$.operationVersion', 'Unsupported artifact-set operation version.');
-		if (artifactSet.method !== GUARD_ENFORCEMENT_LEDGER_METHOD)
-			add('IDENTITY_MISMATCH', '$.method', 'Artifact-set method is unsupported.');
-		if (artifactSet.canonicalProfile !== GUARD_ENFORCEMENT_LEDGER_CANONICAL_PROFILE)
-			add('IDENTITY_MISMATCH', '$.canonicalProfile', 'Canonical profile is unsupported.');
-		if (typeof artifactSet.subjectId !== 'string' || artifactSet.subjectId.length === 0)
-			add('INVALID_VALUE', '$.subjectId', 'subjectId must be nonempty text.');
-		if (subject !== undefined && artifactSet.subjectId !== subject.descriptor.subjectId)
-			add('SUBJECT_MISMATCH', '$.subjectId', 'Artifact set identifies a different FrozenSubject.');
-		for (let index = 0; index < artifactSet.artifacts.length; index += 1) {
-			const current = artifactSet.artifacts[index]!;
-			if (index > 0 && compareText(artifactSet.artifacts[index - 1]!.path, current.path) >= 0)
-				add(
-					'INVALID_VALUE',
-					`$.artifacts[${index}].path`,
-					'Artifact paths must be strictly ordered.'
-				);
-			if (!Number.isSafeInteger(current.bytes) || current.bytes < 0)
-				add(
-					'INVALID_VALUE',
-					`$.artifacts[${index}].bytes`,
-					'bytes must be a nonnegative safe integer.'
-				);
-			if (typeof current.path !== 'string' || typeof current.canonicalPathKey !== 'string')
-				add('INVALID_VALUE', `$.artifacts[${index}].path`, 'Artifact path identity must be text.');
-			else {
-				try {
-					if (canonicalPathKey(current.path) !== current.canonicalPathKey)
-						add(
-							'IDENTITY_MISMATCH',
-							`$.artifacts[${index}].canonicalPathKey`,
-							'Canonical path key does not reproduce.'
-						);
-				} catch {
-					add('INVALID_VALUE', `$.artifacts[${index}].path`, 'Artifact path is noncanonical.');
-				}
-			}
-			if (!PRIMARY_CLASSES.has(current.primaryClass))
-				add('INVALID_VALUE', `$.artifacts[${index}].primaryClass`, 'Primary class is unsupported.');
-			if (!SHA256.test(current.sha256))
-				add('INVALID_VALUE', `$.artifacts[${index}].sha256`, 'Artifact digest is invalid.');
-			if (
-				new Set(current.uses).size !== current.uses.length ||
-				!sameStrings([...current.uses].sort(compareText), current.uses) ||
-				current.uses.some((use) => !ARTIFACT_USES.has(use))
-			)
-				add(
-					'INVALID_VALUE',
-					`$.artifacts[${index}].uses`,
-					'Artifact uses are invalid or noncanonical.'
-				);
-			if (
-				current.semanticRoles.some((role) => !SEMANTIC_ROLES.has(role)) ||
-				new Set(current.semanticRoles).size !== current.semanticRoles.length ||
-				!sameStrings([...current.semanticRoles].sort(compareText), current.semanticRoles)
-			)
-				add(
-					'INVALID_VALUE',
-					`$.artifacts[${index}].semanticRoles`,
-					'Semantic roles are invalid or noncanonical.'
-				);
-			if (issueLimitExceeded) return { issues, state: 'BUDGET_EXHAUSTED' };
-		}
-		const derived =
-			subject === undefined
-				? { artifacts: artifactSet.artifacts, diagnostics: [] }
-				: derivePopulation(subject);
-		for (const cause of derived.diagnostics) {
-			add('POPULATION_MISMATCH', '$subject', cause.message);
-			if (issueLimitExceeded) return { issues, state: 'BUDGET_EXHAUSTED' };
-		}
-		if (canonicalJson(artifactSet.artifacts) !== canonicalJson(derived.artifacts))
-			add(
-				'POPULATION_MISMATCH',
-				'$.artifacts',
-				'Artifact population differs from the exact FrozenSubject selection.'
-			);
-		const expectedCoverage = coverageFor(derived.artifacts);
-		if (canonicalJson(artifactSet.coverage) !== canonicalJson(expectedCoverage))
-			add(
-				'POPULATION_MISMATCH',
-				'$.coverage',
-				'Coverage does not reproduce the selected population.'
-			);
-		const expectedId = guardEnforcementLedgerArtifactSetId({
-			artifactContentDigest: canonicalSemanticJsonWitness(artifactSet.artifacts).sha256,
-			method: artifactSet.method,
-			operationVersion: artifactSet.operationVersion,
-			schemaVersion: artifactSet.schemaVersion,
-			subjectId: artifactSet.subjectId
-		});
-		if (artifactSet.id !== expectedId)
-			add('IDENTITY_MISMATCH', '$.id', 'Artifact-set identity does not reproduce.');
-		if (artifactSet.contentDigest !== guardEnforcementLedgerArtifactSetContentDigest(artifactSet))
-			add(
-				'CONTENT_DIGEST_MISMATCH',
-				'$.contentDigest',
-				'Artifact-set content digest does not reproduce.'
-			);
-		if (issues.length === 0) return { issues: [], state: 'VALID' };
-		return {
-			issues: issues.slice(0, maxIssues),
-			state:
-				issueLimitExceeded || issues.some((issue) => issue.code === 'BUDGET_EXHAUSTED')
-					? 'BUDGET_EXHAUSTED'
-					: 'INVALID'
-		};
+		return validateWellShapedArtifactSet(
+			value as ArtifactSetBinding,
+			subject,
+			resolved.limits.maxIssues
+		);
 	} catch {
 		return {
 			issues: [

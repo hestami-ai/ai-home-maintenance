@@ -315,7 +315,8 @@ class IssueCollector {
 type JsonRecord = Record<string, unknown>;
 
 function compareText(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	return left > right ? 1 : 0;
 }
 
 function same(left: unknown, right: unknown): boolean {
@@ -375,9 +376,7 @@ function wireArray(value: unknown, path: string, issues: IssueCollector): value 
 	}
 	if (
 		own.length !== value.length + 1 ||
-		own.some(
-			(key) => typeof key !== 'string' || (key !== 'length' && !/^(0|[1-9][0-9]*)$/u.test(key))
-		)
+		own.some((key) => typeof key !== 'string' || (key !== 'length' && !/^(0|[1-9]\d*)$/u.test(key)))
 	)
 		valid = false;
 	if (!valid)
@@ -531,19 +530,29 @@ function shapeIndex(value: unknown, path: string, issues: IssueCollector): boole
 	return valid;
 }
 
+/**
+ * ⚠ TAKES THE RECORD, NOT `value.kind`, AND READS THE PROPERTY THREE TIMES ON PURPOSE.
+ *
+ * The ternary chain this replaced read `value.kind` once per arm, and `plainRecord` deliberately
+ * ADMITS ACCESSOR PROPERTIES — it rejects only null, arrays, Proxies and foreign prototypes. So a
+ * node whose `kind` is a non-idempotent getter is reachable from the public `graph: unknown`
+ * parameter, and hoisting the read to a single call changes WHICH key set is selected and therefore
+ * which INVALID_SHAPE path and message this validator emits. Reading once is arguably the better
+ * design, but it is a DIFFERENT behaviour, and this is a refactor.
+ */
+function nodeKeysForKind(value: JsonRecord): readonly string[] | null {
+	if (value.kind === 'MACHINE') return MACHINE_NODE_KEYS;
+	if (value.kind === 'STATE') return STATE_NODE_KEYS;
+	if (value.kind === 'CROSS_AXIS_FRONTIER') return CROSS_AXIS_NODE_KEYS;
+	return null;
+}
+
 function shapeNode(value: unknown, path: string, issues: IssueCollector): boolean {
 	if (!plainRecord(value)) {
 		issues.add('INVALID_SHAPE', path, 'Expected a graph-node record.');
 		return false;
 	}
-	const keys =
-		value.kind === 'MACHINE'
-			? MACHINE_NODE_KEYS
-			: value.kind === 'STATE'
-				? STATE_NODE_KEYS
-				: value.kind === 'CROSS_AXIS_FRONTIER'
-					? CROSS_AXIS_NODE_KEYS
-					: null;
+	const keys = nodeKeysForKind(value);
 	if (keys === null) {
 		issues.add('INVALID_SHAPE', `${path}.kind`, 'Unknown state-machine node kind.');
 		return false;
@@ -727,9 +736,13 @@ function indexes(
 		const nodeId = direction === 'FORWARD' ? edge.source.nodeId : edge.target.nodeId;
 		byNode.get(nodeId)?.push(edge.id);
 	}
-	return [...byNode.entries()]
-		.map(([nodeId, edgeIds]) => ({ edgeIds: edgeIds.sort(compareText), nodeId }))
-		.sort((left, right) => compareText(left.nodeId, right.nodeId));
+	const entries: StateMachineGraphIndexEntry[] = [];
+	for (const [nodeId, edgeIds] of byNode.entries()) {
+		edgeIds.sort(compareText);
+		entries.push({ edgeIds, nodeId });
+	}
+	entries.sort((left, right) => compareText(left.nodeId, right.nodeId));
+	return entries;
 }
 
 function coverage(observation: StateMachineTopologyObservation): StateMachineGraphCoverage {
@@ -1102,7 +1115,10 @@ function expectedProjection(
 	};
 }
 
-function validateSemantics(
+type SemanticSourceRecordOf = StaticSemanticSnapshot['sources'][number];
+type SemanticProvenanceRecordOf = StaticSemanticSnapshot['provenances'][number];
+
+function checkIdentityBindings(
 	graph: StateMachineGraphSnapshot,
 	request: BuildStateMachineGraphRequest,
 	snapshot: StaticSemanticSnapshot,
@@ -1131,6 +1147,13 @@ function validateSemantics(
 			'$.subjectId',
 			'Request, observation, graph, and semantic snapshot subjects differ.'
 		);
+}
+
+function checkRequestBindings(
+	graph: StateMachineGraphSnapshot,
+	request: BuildStateMachineGraphRequest,
+	issues: IssueCollector
+): void {
 	if (!same(graph.source, request.source))
 		issues.add(
 			'SOURCE_BINDING_MISMATCH',
@@ -1165,18 +1188,16 @@ function validateSemantics(
 			'$',
 			'Graph must retain exact partial epistemic state, generated-runtime scope, and open closure.'
 		);
-	const selected = snapshot.sources.filter(
-		(source) => source.id === request.source.semanticSourceId
-	);
-	if (selected.length !== 1) {
-		issues.add(
-			'SOURCE_BINDING_MISMATCH',
-			'$request.source.semanticSourceId',
-			'Selected semantic source must occur exactly once.'
-		);
-		return;
-	}
-	const source = selected[0]!;
+}
+
+function checkSourceBinding(
+	graph: StateMachineGraphSnapshot,
+	request: BuildStateMachineGraphRequest,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation,
+	source: SemanticSourceRecordOf,
+	issues: IssueCollector
+): void {
 	if (
 		source.logicalPath !== request.source.logicalPath ||
 		source.programId !== request.source.programId ||
@@ -1206,48 +1227,68 @@ function validateSemantics(
 				`${capability} must occur exactly once and be available.`
 			);
 	}
-	const provenanceIds = [source.provenanceId, source.syntaxProvenanceId]
-		.filter((id): id is SemanticProvenanceId => id !== null)
-		.sort(compareText);
+}
+
+function provenanceRecordBinds(
+	record: SemanticProvenanceRecordOf | undefined,
+	snapshot: StaticSemanticSnapshot,
+	source: SemanticSourceRecordOf
+): boolean {
+	if (record === undefined) return false;
+	return (
+		record.snapshotId === snapshot.id &&
+		record.subjectId === snapshot.subjectId &&
+		record.sourceId === source.id &&
+		record.projectId === source.projectId &&
+		record.extractionVersion === snapshot.extractionVersion &&
+		same(record.provider, snapshot.provider)
+	);
+}
+
+function checkProvenanceBindings(
+	provenanceIds: readonly SemanticProvenanceId[],
+	snapshot: StaticSemanticSnapshot,
+	source: SemanticSourceRecordOf,
+	issues: IssueCollector
+): void {
 	for (const provenanceId of provenanceIds) {
 		const records = snapshot.provenances.filter((record) => record.id === provenanceId);
-		const record = records[0];
-		if (
-			records.length !== 1 ||
-			record === undefined ||
-			record.snapshotId !== snapshot.id ||
-			record.subjectId !== snapshot.subjectId ||
-			record.sourceId !== source.id ||
-			record.projectId !== source.projectId ||
-			record.extractionVersion !== snapshot.extractionVersion ||
-			!same(record.provider, snapshot.provider)
-		)
+		if (records.length !== 1 || !provenanceRecordBinds(records[0], snapshot, source))
 			issues.add(
 				'SOURCE_BINDING_MISMATCH',
 				'$semanticSnapshot.provenances',
 				`Selected provenance ${provenanceId} is absent or not owned by the selected source.`
 			);
 	}
-	let inputDigest: string;
+}
+
+function resolveGraphInputDigest(
+	request: BuildStateMachineGraphRequest,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation,
+	issues: IssueCollector
+): string | undefined {
 	try {
-		inputDigest = stateMachineGraphInputDigest(request, snapshot, observation);
+		return stateMachineGraphInputDigest(request, snapshot, observation);
 	} catch (error) {
 		issues.add(
 			'GRAPH_INPUT_MISMATCH',
 			'$.graphInputDigest',
 			error instanceof Error ? error.message : 'Graph-input digest failed closed.'
 		);
-		return;
+		return undefined;
 	}
-	if (graph.graphInputDigest !== inputDigest)
-		issues.add(
-			'GRAPH_INPUT_MISMATCH',
-			'$.graphInputDigest',
-			'Graph input digest does not bind the request, snapshot, observation, source, and provenance identities.'
-		);
-	let expected: Omit<StateMachineGraphSnapshot, 'contentDigest'>;
+}
+
+function resolveExpectedProjection(
+	request: BuildStateMachineGraphRequest,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation,
+	graphInputDigest: string,
+	issues: IssueCollector
+): Omit<StateMachineGraphSnapshot, 'contentDigest'> | undefined {
 	try {
-		expected = expectedProjection(request, snapshot, observation, inputDigest);
+		return expectedProjection(request, snapshot, observation, graphInputDigest);
 	} catch (error) {
 		issues.add(
 			'OBSERVATION_INVALID',
@@ -1256,8 +1297,15 @@ function validateSemantics(
 				? `Observation cannot project canonically: ${error.message}`
 				: 'Observation cannot project canonically.'
 		);
-		return;
+		return undefined;
 	}
+}
+
+function checkProjectionEquality(
+	graph: StateMachineGraphSnapshot,
+	expected: Omit<StateMachineGraphSnapshot, 'contentDigest'>,
+	issues: IssueCollector
+): void {
 	if (graph.id !== expected.id)
 		issues.add(
 			'IDENTITY_MISMATCH',
@@ -1306,6 +1354,9 @@ function validateSemantics(
 			'$.reverseIndex',
 			'Reverse index does not exactly reconcile all nodes and incoming edges.'
 		);
+}
+
+function checkConformanceClaims(graph: StateMachineGraphSnapshot, issues: IssueCollector): void {
 	if (
 		graph.fullJanCsaa007Conformance !== FULL_JAN_CSAA_007_CONFORMANCE ||
 		graph.fullJanCsaa008Conformance !== FULL_JAN_CSAA_008_CONFORMANCE ||
@@ -1319,52 +1370,79 @@ function validateSemantics(
 			'$',
 			'Implementation-local state-machine projection must remain PARTIAL, unregistered, delegated, and NOT_CLAIMED for full conformance.'
 		);
+}
+
+function checkIdentityUniqueness(graph: StateMachineGraphSnapshot, issues: IssueCollector): void {
 	const nodeIds = graph.nodes.map((node) => node.id);
 	const edgeIds = graph.edges.map((edge) => edge.id);
 	sortedUnique(nodeIds, '$.nodes', issues);
 	sortedUnique(edgeIds, '$.edges', issues);
 	if (new Set(nodeIds).size !== nodeIds.length || new Set(edgeIds).size !== edgeIds.length)
 		issues.add('DUPLICATE_ID', '$', 'Graph populations contain duplicate identities.');
+}
+
+function checkEdgeBinding(
+	edge: StateMachineGraphEdge,
+	index: number,
+	nodeById: ReadonlyMap<StateMachineGraphNode['id'], StateMachineGraphNode>,
+	graphId: StateMachineGraphSnapshot['id'],
+	provenanceIds: readonly SemanticProvenanceId[],
+	issues: IssueCollector
+): void {
+	const sourceNode = nodeById.get(edge.source.nodeId);
+	const targetNode = nodeById.get(edge.target.nodeId);
+	if (sourceNode === undefined || targetNode === undefined)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`$.edges[${index}]`,
+			'Edge endpoint references an absent node.'
+		);
+	else if (sourceNode.kind !== edge.source.kind || targetNode.kind !== edge.target.kind)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`$.edges[${index}]`,
+			'Edge endpoint kind differs from its referenced node.'
+		);
+	if (edge.relationCode !== RELATION_CODES[edge.relationKind])
+		issues.add(
+			'INVALID_VALUE',
+			`$.edges[${index}].relationCode`,
+			'Relation code does not match the relation kind.'
+		);
+	if (
+		edge.id !==
+		stateMachineGraphEdgeId({
+			graph: graphId,
+			observationRecordId: edge.observationRecordId,
+			relationKind: edge.relationKind,
+			source: edge.source,
+			target: edge.target
+		})
+	)
+		issues.add('IDENTITY_MISMATCH', `$.edges[${index}].id`, 'Edge identity mismatch.');
+	if (!same(edge.provenanceIds, provenanceIds))
+		issues.add(
+			'SOURCE_BINDING_MISMATCH',
+			`$.edges[${index}].provenanceIds`,
+			'Edge provenance does not equal selected source provenance.'
+		);
+}
+
+function checkEdgeBindings(
+	graph: StateMachineGraphSnapshot,
+	provenanceIds: readonly SemanticProvenanceId[],
+	issues: IssueCollector
+): void {
 	const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-	for (const [index, edge] of graph.edges.entries()) {
-		const sourceNode = nodeById.get(edge.source.nodeId);
-		const targetNode = nodeById.get(edge.target.nodeId);
-		if (sourceNode === undefined || targetNode === undefined)
-			issues.add(
-				'DANGLING_REFERENCE',
-				`$.edges[${index}]`,
-				'Edge endpoint references an absent node.'
-			);
-		else if (sourceNode.kind !== edge.source.kind || targetNode.kind !== edge.target.kind)
-			issues.add(
-				'DANGLING_REFERENCE',
-				`$.edges[${index}]`,
-				'Edge endpoint kind differs from its referenced node.'
-			);
-		if (edge.relationCode !== RELATION_CODES[edge.relationKind])
-			issues.add(
-				'INVALID_VALUE',
-				`$.edges[${index}].relationCode`,
-				'Relation code does not match the relation kind.'
-			);
-		if (
-			edge.id !==
-			stateMachineGraphEdgeId({
-				graph: graph.id,
-				observationRecordId: edge.observationRecordId,
-				relationKind: edge.relationKind,
-				source: edge.source,
-				target: edge.target
-			})
-		)
-			issues.add('IDENTITY_MISMATCH', `$.edges[${index}].id`, 'Edge identity mismatch.');
-		if (!same(edge.provenanceIds, provenanceIds))
-			issues.add(
-				'SOURCE_BINDING_MISMATCH',
-				`$.edges[${index}].provenanceIds`,
-				'Edge provenance does not equal selected source provenance.'
-			);
-	}
+	for (const [index, edge] of graph.edges.entries())
+		checkEdgeBinding(edge, index, nodeById, graph.id, provenanceIds, issues);
+}
+
+function checkNodeProvenance(
+	graph: StateMachineGraphSnapshot,
+	provenanceIds: readonly SemanticProvenanceId[],
+	issues: IssueCollector
+): void {
 	for (const [index, node] of graph.nodes.entries()) {
 		if (!same(node.provenanceIds, provenanceIds))
 			issues.add(
@@ -1373,6 +1451,9 @@ function validateSemantics(
 				'Node provenance does not equal selected source provenance.'
 			);
 	}
+}
+
+function checkContentDigest(graph: StateMachineGraphSnapshot, issues: IssueCollector): void {
 	try {
 		if (graph.contentDigest !== stateMachineGraphContentDigest(graph))
 			issues.add(
@@ -1387,6 +1468,50 @@ function validateSemantics(
 			error instanceof Error ? error.message : 'Graph content digest failed closed.'
 		);
 	}
+}
+
+function validateSemantics(
+	graph: StateMachineGraphSnapshot,
+	request: BuildStateMachineGraphRequest,
+	snapshot: StaticSemanticSnapshot,
+	observation: StateMachineTopologyObservation,
+	issues: IssueCollector
+): void {
+	checkIdentityBindings(graph, request, snapshot, observation, issues);
+	checkRequestBindings(graph, request, issues);
+	const selected = snapshot.sources.filter(
+		(source) => source.id === request.source.semanticSourceId
+	);
+	if (selected.length !== 1) {
+		issues.add(
+			'SOURCE_BINDING_MISMATCH',
+			'$request.source.semanticSourceId',
+			'Selected semantic source must occur exactly once.'
+		);
+		return;
+	}
+	const source = selected[0]!;
+	checkSourceBinding(graph, request, snapshot, observation, source, issues);
+	const provenanceIds = [source.provenanceId, source.syntaxProvenanceId]
+		.filter((id): id is SemanticProvenanceId => id !== null)
+		.sort(compareText);
+	checkProvenanceBindings(provenanceIds, snapshot, source, issues);
+	const inputDigest = resolveGraphInputDigest(request, snapshot, observation, issues);
+	if (inputDigest === undefined) return;
+	if (graph.graphInputDigest !== inputDigest)
+		issues.add(
+			'GRAPH_INPUT_MISMATCH',
+			'$.graphInputDigest',
+			'Graph input digest does not bind the request, snapshot, observation, source, and provenance identities.'
+		);
+	const expected = resolveExpectedProjection(request, snapshot, observation, inputDigest, issues);
+	if (expected === undefined) return;
+	checkProjectionEquality(graph, expected, issues);
+	checkConformanceClaims(graph, issues);
+	checkIdentityUniqueness(graph, issues);
+	checkEdgeBindings(graph, provenanceIds, issues);
+	checkNodeProvenance(graph, provenanceIds, issues);
+	checkContentDigest(graph, issues);
 }
 
 function validate(

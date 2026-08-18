@@ -405,7 +405,8 @@ function diagnostic(
 }
 
 function compare(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	return left > right ? 1 : 0;
 }
 
 function canonicalDiagnostics(
@@ -514,7 +515,7 @@ function inertArray(value: unknown, label: string, maximumLength: number): reado
 		if (
 			keys.length !== length + 1 ||
 			keys.some(
-				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
 			)
 		)
 			throw new StaticSemanticRequestError(
@@ -1155,6 +1156,57 @@ function rawProjectionDigest(raw: RawStaticSemanticProjectExtraction): RawProjec
 	};
 }
 
+function changedProjectionComponents(
+	captured: RawProjectionDigest,
+	reproduced: RawProjectionDigest
+): string[] {
+	const componentNames = [
+		...new Set([...Object.keys(captured.components), ...Object.keys(reproduced.components)])
+	].sort(compare);
+	return componentNames.filter(
+		(component) => captured.components[component] !== reproduced.components[component]
+	);
+}
+
+function symbolNameMismatchSamples(
+	captured: RawProjectionDigest,
+	reproduced: RawProjectionDigest
+): string[] {
+	return captured.symbolNames
+		.flatMap((name, index): string[] => {
+			if (name === reproduced.symbolNames[index]) return [];
+			const observed = JSON.stringify((reproduced.symbolNames[index] ?? '<missing>').slice(0, 80));
+			return [`${String(index)}:${JSON.stringify(name.slice(0, 80))}->${observed}`];
+		})
+		.slice(0, 3);
+}
+
+function assignabilityContextMismatchSamples(
+	captured: RawProjectionDigest,
+	reproduced: RawProjectionDigest
+): string[] {
+	return captured.assignabilityContexts
+		.flatMap((value, index): string[] => {
+			if (value === reproduced.assignabilityContexts[index]) return [];
+			const observed = reproduced.assignabilityContexts[index] ?? '<missing>';
+			return [`${String(index)}:${value}->${observed}`];
+		})
+		.slice(0, 3);
+}
+
+function projectionMismatchEntry(
+	captured: RawProjectionDigest,
+	changed: readonly string[],
+	nameSamples: readonly string[],
+	assignabilitySamples: readonly string[]
+): string {
+	const components = changed.join(', ') || 'unknown-component';
+	const nameDetail = nameSamples.length === 0 ? '' : ` {${nameSamples.join(', ')}}`;
+	const assignabilityDetail =
+		assignabilitySamples.length === 0 ? '' : ` {assignability:${assignabilitySamples.join(', ')}}`;
+	return `${captured.projectKey} [${components}]${nameDetail}${assignabilityDetail}`;
+}
+
 function rawProjectionMismatchSummary(
 	capture: readonly RawProjectionDigest[],
 	replay: readonly RawProjectionDigest[]
@@ -1168,37 +1220,14 @@ function rawProjectionMismatchSummary(
 			continue;
 		}
 		if (captured.sha256 === reproduced.sha256) continue;
-		const componentNames = [
-			...new Set([...Object.keys(captured.components), ...Object.keys(reproduced.components)])
-		].sort(compare);
-		const changed = componentNames.filter(
-			(component) => captured.components[component] !== reproduced.components[component]
-		);
+		const changed = changedProjectionComponents(captured, reproduced);
 		const nameSamples = changed.includes('symbols.name')
-			? captured.symbolNames
-					.flatMap((name, index) =>
-						name === reproduced.symbolNames[index]
-							? []
-							: [
-									`${String(index)}:${JSON.stringify(name.slice(0, 80))}->${JSON.stringify((reproduced.symbolNames[index] ?? '<missing>').slice(0, 80))}`
-								]
-					)
-					.slice(0, 3)
+			? symbolNameMismatchSamples(captured, reproduced)
 			: [];
 		const assignabilitySamples = changed.includes('typeRelations')
-			? captured.assignabilityContexts
-					.flatMap((value, index) =>
-						value === reproduced.assignabilityContexts[index]
-							? []
-							: [
-									`${String(index)}:${value}->${reproduced.assignabilityContexts[index] ?? '<missing>'}`
-								]
-					)
-					.slice(0, 3)
+			? assignabilityContextMismatchSamples(captured, reproduced)
 			: [];
-		mismatches.push(
-			`${captured.projectKey} [${changed.join(', ') || 'unknown-component'}]${nameSamples.length === 0 ? '' : ` {${nameSamples.join(', ')}}`}${assignabilitySamples.length === 0 ? '' : ` {assignability:${assignabilitySamples.join(', ')}}`}`
-		);
+		mismatches.push(projectionMismatchEntry(captured, changed, nameSamples, assignabilitySamples));
 	}
 	const captureProjects = new Set(capture.map((entry) => entry.projectKey));
 	for (const reproduced of replay) {
@@ -1208,46 +1237,56 @@ function rawProjectionMismatchSummary(
 	return mismatches.slice(0, 5).join('; ');
 }
 
+interface StaticRawExtractionPassInput<T> {
+	readonly assertWithinDeadline: () => void;
+	readonly assignabilityRequests: readonly SemanticAssignabilityRequest[];
+	readonly budgetPhase: 'CAPTURE' | 'EXTRACT';
+	readonly budgets: SemanticBudgets;
+	readonly clock: SemanticOperationClock;
+	readonly deadlineMs: number;
+	readonly environment: CompilerEnvironment;
+	readonly evidenceForProject: (projectKey: string) => ProjectSourceEvidence;
+	readonly includeTypes: boolean;
+	readonly progress: StaticSemanticSnapshotProgressRecorder;
+	readonly progressCountsState: MutableStaticSemanticSnapshotProgressCounts;
+	readonly progressPhase: 'CAPTURE_PROJECT' | 'REPLAY_PROJECT';
+	readonly projectResult: (raw: RawStaticSemanticProjectExtraction) => T;
+	readonly projects: readonly MaterializedProject[];
+	readonly providerBinding: StaticSemanticOperationBudgetProviderBinding;
+	readonly subject: FrozenSubject;
+}
+
 function extractProjectResult<T>(
-	environment: CompilerEnvironment,
+	pass: StaticRawExtractionPassInput<T>,
 	entry: MaterializedProject,
-	subject: FrozenSubject,
-	budgets: SemanticBudgets,
-	assignabilityRequests: readonly SemanticAssignabilityRequest[],
-	includeTypes: boolean,
-	budgetLedger: ReturnType<typeof createStaticRawExtractionBudgetLedger>,
-	deadlineMs: number,
-	clock: SemanticOperationClock,
-	assertWithinDeadline: () => void,
-	evidenceForProject: (projectKey: string) => ProjectSourceEvidence,
-	projectResult: (raw: RawStaticSemanticProjectExtraction) => T
+	budgetLedger: ReturnType<typeof createStaticRawExtractionBudgetLedger>
 ): T {
-	const constructed = constructProject(environment, entry, assertWithinDeadline);
-	const evidence = evidenceForProject(entry.project.configPath);
+	const constructed = constructProject(pass.environment, entry, pass.assertWithinDeadline);
+	const evidence = pass.evidenceForProject(entry.project.configPath);
 	if (evidence.attribution.projectKey !== entry.project.configPath)
 		throw new CompilerInputCaptureError(
 			'INVALID_CAPTURE',
 			`Compiler evidence lacks project attribution ${entry.project.configPath}.`
 		);
 	const result = extractStaticRaw({
-		assignabilityRequests,
-		assertWithinDeadline,
+		assignabilityRequests: pass.assignabilityRequests,
+		assertWithinDeadline: pass.assertWithinDeadline,
 		budgetLedger,
-		budgets,
+		budgets: pass.budgets,
 		checker: constructed.checker,
-		clock,
-		deadlineMs,
+		clock: pass.clock,
+		deadlineMs: pass.deadlineMs,
 		diagnosticFamilies: constructed.diagnosticFamilies,
 		evidenceState: evidence.verificationState,
-		includeTypes,
+		includeTypes: pass.includeTypes,
 		program: constructed.program,
 		programRecipe: constructed.project.programRecipe,
 		project: constructed.project,
 		projectKey: constructed.project.configPath,
 		resolveCheckerContextDigest: () =>
-			compilerInputClosureDigest(evidenceForProject(entry.project.configPath).observations),
+			compilerInputClosureDigest(pass.evidenceForProject(entry.project.configPath).observations),
 		resolveCompilerSource: compilerSourceResolver(
-			subject,
+			pass.subject,
 			evidence,
 			evidence.attribution,
 			evidence.verificationState
@@ -1255,8 +1294,8 @@ function extractProjectResult<T>(
 		toLogicalPath: (path) => constructed.host.toLogicalPath(path)
 	});
 	evidence.assertConsumed?.();
-	assertWithinDeadline();
-	return projectResult(result);
+	pass.assertWithinDeadline();
+	return pass.projectResult(result);
 }
 
 interface StaticRawExtractionPass<T> {
@@ -1264,54 +1303,27 @@ interface StaticRawExtractionPass<T> {
 	readonly results: T[];
 }
 
-function extractPass<T>(
-	environment: CompilerEnvironment,
-	projects: readonly MaterializedProject[],
-	subject: FrozenSubject,
-	budgets: SemanticBudgets,
-	assignabilityRequests: readonly SemanticAssignabilityRequest[],
-	includeTypes: boolean,
-	budgetPhase: 'CAPTURE' | 'EXTRACT',
-	providerBinding: StaticSemanticOperationBudgetProviderBinding,
-	deadlineMs: number,
-	clock: SemanticOperationClock,
-	assertWithinDeadline: () => void,
-	evidenceForProject: (projectKey: string) => ProjectSourceEvidence,
-	projectResult: (raw: RawStaticSemanticProjectExtraction) => T,
-	progress: StaticSemanticSnapshotProgressRecorder,
-	progressCountsState: MutableStaticSemanticSnapshotProgressCounts,
-	progressPhase: 'CAPTURE_PROJECT' | 'REPLAY_PROJECT'
-): StaticRawExtractionPass<T> {
-	const budgetLedger = createStaticRawExtractionBudgetLedger(budgets, budgetPhase, providerBinding);
+function extractPass<T>(pass: StaticRawExtractionPassInput<T>): StaticRawExtractionPass<T> {
+	const budgetLedger = createStaticRawExtractionBudgetLedger(
+		pass.budgets,
+		pass.budgetPhase,
+		pass.providerBinding
+	);
 	const results: T[] = [];
-	if (projects.length === 0) progress.skip(progressPhase, 'NO_PROJECTS');
-	for (const [index, entry] of projects.entries()) {
-		progress.start(progressPhase, {
+	if (pass.projects.length === 0) pass.progress.skip(pass.progressPhase, 'NO_PROJECTS');
+	for (const [index, entry] of pass.projects.entries()) {
+		pass.progress.start(pass.progressPhase, {
 			index: index + 1,
 			projectKey: entry.project.configPath,
-			total: projects.length
+			total: pass.projects.length
 		});
-		assertWithinDeadline();
-		results.push(
-			extractProjectResult(
-				environment,
-				entry,
-				subject,
-				budgets,
-				assignabilityRequests,
-				includeTypes,
-				budgetLedger,
-				deadlineMs,
-				clock,
-				assertWithinDeadline,
-				evidenceForProject,
-				projectResult
-			)
-		);
-		assertWithinDeadline();
-		if (progressPhase === 'CAPTURE_PROJECT') progressCountsState.captureProjectsCompleted += 1;
-		else progressCountsState.replayProjectsCompleted += 1;
-		progress.complete();
+		pass.assertWithinDeadline();
+		results.push(extractProjectResult(pass, entry, budgetLedger));
+		pass.assertWithinDeadline();
+		if (pass.progressPhase === 'CAPTURE_PROJECT')
+			pass.progressCountsState.captureProjectsCompleted += 1;
+		else pass.progressCountsState.replayProjectsCompleted += 1;
+		pass.progress.complete();
 	}
 	return {
 		budgetLedger,
@@ -1342,20 +1354,24 @@ function validationOptions(budgets: SemanticBudgets): SemanticValidationOptions 
 	};
 }
 
+function enqueueFreezeChildren(current: object, pending: unknown[]): void {
+	if (Array.isArray(current)) {
+		for (const entry of current) pending.push(entry);
+		return;
+	}
+	for (const key of Reflect.ownKeys(current)) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+		if (descriptor !== undefined && 'value' in descriptor) pending.push(descriptor.value);
+	}
+}
+
 function deepFreeze<T>(value: T): T {
 	const pending: unknown[] = [value];
 	while (pending.length > 0) {
 		const current = pending.pop();
 		if (current === null || typeof current !== 'object' || Object.isFrozen(current)) continue;
 		Object.freeze(current);
-		if (Array.isArray(current)) {
-			for (let index = 0; index < current.length; index += 1) pending.push(current[index]);
-		} else {
-			for (const key of Reflect.ownKeys(current)) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
-				if (descriptor !== undefined && 'value' in descriptor) pending.push(descriptor.value);
-			}
-		}
+		enqueueFreezeChildren(current, pending);
 	}
 	return value;
 }
@@ -1363,21 +1379,116 @@ function deepFreeze<T>(value: T): T {
 function partialDiagnostics(snapshot: StaticSemanticSnapshot): SemanticBuildDiagnostic[] {
 	return canonicalDiagnostics(
 		snapshot.projects.flatMap((project) =>
-			project.partialityReasons.map((reason) =>
-				diagnostic(
-					reason.code === 'CONTEXT_FRESHNESS_UNKNOWN'
-						? 'COMPILER_CONTEXT_UNAVAILABLE'
-						: reason.code === 'FRAMEWORK_CANDIDATES_UNSUPPORTED'
-							? 'CAPABILITY_UNSUPPORTED'
-							: reason.code,
-					reason.message,
-					'EXTRACT',
-					reason.path,
-					'WARNING'
-				)
-			)
+			project.partialityReasons.map((reason) => {
+				let code: SemanticBuildDiagnosticCode;
+				if (reason.code === 'CONTEXT_FRESHNESS_UNKNOWN') code = 'COMPILER_CONTEXT_UNAVAILABLE';
+				else if (reason.code === 'FRAMEWORK_CANDIDATES_UNSUPPORTED')
+					code = 'CAPABILITY_UNSUPPORTED';
+				else code = reason.code;
+				return diagnostic(code, reason.message, 'EXTRACT', reason.path, 'WARNING');
+			})
 		)
 	);
+}
+
+function requestFailure(
+	error: StaticSemanticRequestError,
+	message: string
+): StaticSemanticBuildFailure {
+	let code: SemanticBuildDiagnosticCode;
+	if (error.code === 'CAPABILITY_UNSUPPORTED') code = 'CAPABILITY_UNSUPPORTED';
+	else if (error.code === 'UNSUPPORTED_VERSION') code = 'COMPILER_VERSION_MISMATCH';
+	else code = 'SEMANTIC_VALIDATION_FAILED';
+	return new StaticSemanticBuildFailure('incompatible', [diagnostic(code, message, 'REQUEST')]);
+}
+
+function recipeFailure(
+	error: ProgramRecipeMaterializationError,
+	message: string,
+	phase: SemanticBuildDiagnostic['phase']
+): StaticSemanticBuildFailure {
+	let code: SemanticBuildDiagnosticCode;
+	if (error.code === 'VERSION_MISMATCH') code = 'COMPILER_VERSION_MISMATCH';
+	else if (error.code === 'PATH_ESCAPE') code = 'COMPILER_CONTEXT_FORBIDDEN';
+	else code = 'PROGRAM_RECIPE_MISMATCH';
+	const outcome =
+		error.code === 'VERSION_MISMATCH' || error.code === 'INVALID_RECIPE'
+			? 'incompatible'
+			: 'unavailable';
+	return new StaticSemanticBuildFailure(outcome, [diagnostic(code, message, phase)]);
+}
+
+function captureFailure(
+	error: CompilerInputCaptureError,
+	message: string,
+	phase: SemanticBuildDiagnostic['phase']
+): StaticSemanticBuildFailure {
+	let code: SemanticBuildDiagnosticCode;
+	if (error.code === 'BUDGET_EXCEEDED') code = 'SEMANTIC_BUDGET_EXCEEDED';
+	else if (
+		error.code === 'CONTEXT_CHANGED' ||
+		error.code === 'UNCONSUMED_QUERY' ||
+		error.code === 'UNRECORDED_QUERY'
+	)
+		code = 'COMPILER_CONTEXT_CHANGED';
+	else if (error.code === 'CONTEXT_UNAVAILABLE') code = 'COMPILER_CONTEXT_UNAVAILABLE';
+	else if (error.code === 'FROZEN_BYTES_UNAVAILABLE') code = 'FROZEN_BYTES_UNAVAILABLE';
+	else if (error.code === 'INVALID_QUERY') code = 'PROGRAM_RECIPE_MISMATCH';
+	else code = 'SEMANTIC_VALIDATION_FAILED';
+	return new StaticSemanticBuildFailure(
+		error.code === 'INVALID_QUERY' ? 'incompatible' : 'unavailable',
+		[diagnostic(code, message, phase)]
+	);
+}
+
+function operationBudgetFailure(
+	error: StaticSemanticOperationBudgetSessionError | SemanticOperationBudgetError,
+	message: string,
+	phase: SemanticBuildDiagnostic['phase']
+): StaticSemanticBuildFailure {
+	const budgetExceeded =
+		error.code === 'BUDGET_EXCEEDED' ||
+		(error instanceof SemanticOperationBudgetError && error.limitKey !== null);
+	return new StaticSemanticBuildFailure('unavailable', [
+		diagnostic(
+			budgetExceeded ? 'SEMANTIC_BUDGET_EXCEEDED' : 'SEMANTIC_VALIDATION_FAILED',
+			message,
+			error.phase ?? phase
+		)
+	]);
+}
+
+function rawExtractionFailure(
+	error: StaticRawExtractionError,
+	message: string
+): StaticSemanticBuildFailure {
+	let code: SemanticBuildDiagnosticCode;
+	if (error.code === 'BUDGET_EXCEEDED' || error.code === 'DEADLINE_EXCEEDED')
+		code = 'SEMANTIC_BUDGET_EXCEEDED';
+	else if (error.code === 'IDENTITY_MISMATCH') code = 'PROGRAM_RECIPE_MISMATCH';
+	else if (error.code === 'SOURCE_EVIDENCE_MISSING') code = 'FROZEN_BYTES_UNAVAILABLE';
+	else if (error.code === 'PATH_MAPPING_FAILED' || error.code === 'SOURCE_POLICY_MISMATCH')
+		code = 'COMPILER_CONTEXT_FORBIDDEN';
+	else code = 'SEMANTIC_VALIDATION_FAILED';
+	return new StaticSemanticBuildFailure(
+		error.code === 'IDENTITY_MISMATCH' || error.code === 'INVALID_INPUT'
+			? 'incompatible'
+			: 'unavailable',
+		[diagnostic(code, message, 'EXTRACT', error.path)]
+	);
+}
+
+function normalizationFailure(
+	error: SemanticNormalizationError,
+	message: string
+): StaticSemanticBuildFailure {
+	return new StaticSemanticBuildFailure('unavailable', [
+		diagnostic(
+			error.code === 'BUDGET_EXCEEDED' ? 'SEMANTIC_BUDGET_EXCEEDED' : 'SEMANTIC_VALIDATION_FAILED',
+			message,
+			'VALIDATE'
+		)
+	]);
 }
 
 function mapFailure(
@@ -1387,93 +1498,17 @@ function mapFailure(
 ): StaticSemanticBuildFailure {
 	if (error instanceof StaticSemanticBuildFailure) return error;
 	const message = safeMessage(error, rootLocator);
-	if (error instanceof StaticSemanticRequestError) {
-		const code: SemanticBuildDiagnosticCode =
-			error.code === 'CAPABILITY_UNSUPPORTED'
-				? 'CAPABILITY_UNSUPPORTED'
-				: error.code === 'UNSUPPORTED_VERSION'
-					? 'COMPILER_VERSION_MISMATCH'
-					: 'SEMANTIC_VALIDATION_FAILED';
-		return new StaticSemanticBuildFailure('incompatible', [diagnostic(code, message, 'REQUEST')]);
-	}
-	if (error instanceof ProgramRecipeMaterializationError) {
-		const code: SemanticBuildDiagnosticCode =
-			error.code === 'VERSION_MISMATCH'
-				? 'COMPILER_VERSION_MISMATCH'
-				: error.code === 'PATH_ESCAPE'
-					? 'COMPILER_CONTEXT_FORBIDDEN'
-					: 'PROGRAM_RECIPE_MISMATCH';
-		return new StaticSemanticBuildFailure(
-			error.code === 'VERSION_MISMATCH' || error.code === 'INVALID_RECIPE'
-				? 'incompatible'
-				: 'unavailable',
-			[diagnostic(code, message, phase)]
-		);
-	}
-	if (error instanceof CompilerInputCaptureError) {
-		const code: SemanticBuildDiagnosticCode =
-			error.code === 'BUDGET_EXCEEDED'
-				? 'SEMANTIC_BUDGET_EXCEEDED'
-				: error.code === 'CONTEXT_CHANGED' ||
-					  error.code === 'UNCONSUMED_QUERY' ||
-					  error.code === 'UNRECORDED_QUERY'
-					? 'COMPILER_CONTEXT_CHANGED'
-					: error.code === 'CONTEXT_UNAVAILABLE'
-						? 'COMPILER_CONTEXT_UNAVAILABLE'
-						: error.code === 'FROZEN_BYTES_UNAVAILABLE'
-							? 'FROZEN_BYTES_UNAVAILABLE'
-							: error.code === 'INVALID_QUERY'
-								? 'PROGRAM_RECIPE_MISMATCH'
-								: 'SEMANTIC_VALIDATION_FAILED';
-		return new StaticSemanticBuildFailure(
-			error.code === 'INVALID_QUERY' ? 'incompatible' : 'unavailable',
-			[diagnostic(code, message, phase)]
-		);
-	}
+	if (error instanceof StaticSemanticRequestError) return requestFailure(error, message);
+	if (error instanceof ProgramRecipeMaterializationError)
+		return recipeFailure(error, message, phase);
+	if (error instanceof CompilerInputCaptureError) return captureFailure(error, message, phase);
 	if (
 		error instanceof StaticSemanticOperationBudgetSessionError ||
 		error instanceof SemanticOperationBudgetError
-	) {
-		return new StaticSemanticBuildFailure('unavailable', [
-			diagnostic(
-				error.code === 'BUDGET_EXCEEDED' ||
-					(error instanceof SemanticOperationBudgetError && error.limitKey !== null)
-					? 'SEMANTIC_BUDGET_EXCEEDED'
-					: 'SEMANTIC_VALIDATION_FAILED',
-				message,
-				error.phase ?? phase
-			)
-		]);
-	}
-	if (error instanceof StaticRawExtractionError) {
-		const code: SemanticBuildDiagnosticCode =
-			error.code === 'BUDGET_EXCEEDED' || error.code === 'DEADLINE_EXCEEDED'
-				? 'SEMANTIC_BUDGET_EXCEEDED'
-				: error.code === 'IDENTITY_MISMATCH'
-					? 'PROGRAM_RECIPE_MISMATCH'
-					: error.code === 'SOURCE_EVIDENCE_MISSING'
-						? 'FROZEN_BYTES_UNAVAILABLE'
-						: error.code === 'PATH_MAPPING_FAILED' || error.code === 'SOURCE_POLICY_MISMATCH'
-							? 'COMPILER_CONTEXT_FORBIDDEN'
-							: 'SEMANTIC_VALIDATION_FAILED';
-		return new StaticSemanticBuildFailure(
-			error.code === 'IDENTITY_MISMATCH' || error.code === 'INVALID_INPUT'
-				? 'incompatible'
-				: 'unavailable',
-			[diagnostic(code, message, 'EXTRACT', error.path)]
-		);
-	}
-	if (error instanceof SemanticNormalizationError) {
-		return new StaticSemanticBuildFailure('unavailable', [
-			diagnostic(
-				error.code === 'BUDGET_EXCEEDED'
-					? 'SEMANTIC_BUDGET_EXCEEDED'
-					: 'SEMANTIC_VALIDATION_FAILED',
-				message,
-				'VALIDATE'
-			)
-		]);
-	}
+	)
+		return operationBudgetFailure(error, message, phase);
+	if (error instanceof StaticRawExtractionError) return rawExtractionFailure(error, message);
+	if (error instanceof SemanticNormalizationError) return normalizationFailure(error, message);
 	return new StaticSemanticBuildFailure('unavailable', [
 		diagnostic(
 			phase === 'PROGRAM' ? 'PROGRAM_CREATION_FAILED' : 'SEMANTIC_VALIDATION_FAILED',
@@ -1588,27 +1623,27 @@ export function buildStaticSemanticSnapshot(
 		);
 		progress.complete();
 		phase = 'PROGRAM';
-		const capturePass = extractPass(
-			captureEnvironment,
-			materializedProjects,
-			subject,
-			request.budgets,
-			request.assignabilityRequests,
-			request.capabilities.includes('TS_TYPE'),
-			'CAPTURE',
-			operationBudgetProviderBinding,
-			deadlineMs,
-			operationClock.now,
+		const capturePass = extractPass({
 			assertWithinDeadline,
-			(projectKey) => ({
+			assignabilityRequests: request.assignabilityRequests,
+			budgetPhase: 'CAPTURE',
+			budgets: request.budgets,
+			clock: operationClock.now,
+			deadlineMs,
+			environment: captureEnvironment,
+			evidenceForProject: (projectKey) => ({
 				...captureEnvironment.currentProjectEvidence(projectKey),
 				verificationState: 'CAPTURED_COMPILER_INPUT'
 			}),
-			(raw) => raw,
+			includeTypes: request.capabilities.includes('TS_TYPE'),
 			progress,
 			progressCountsState,
-			'CAPTURE_PROJECT'
-		);
+			progressPhase: 'CAPTURE_PROJECT',
+			projectResult: (raw) => raw,
+			projects: materializedProjects,
+			providerBinding: operationBudgetProviderBinding,
+			subject
+		});
 		phase = 'CAPTURE';
 		progress.start('CAPTURE_FINALIZATION');
 		const captureProjectionDigests = capturePass.results.map((raw) => {
@@ -1653,19 +1688,15 @@ export function buildStaticSemanticSnapshot(
 		);
 		progress.complete();
 		phase = 'PROGRAM';
-		const replayPass = extractPass(
-			replayEnvironment,
-			materializedProjects,
-			subject,
-			request.budgets,
-			request.assignabilityRequests,
-			request.capabilities.includes('TS_TYPE'),
-			'EXTRACT',
-			operationBudgetProviderBinding,
-			deadlineMs,
-			operationClock.now,
+		const replayPass = extractPass({
 			assertWithinDeadline,
-			(projectKey) => {
+			assignabilityRequests: request.assignabilityRequests,
+			budgetPhase: 'EXTRACT',
+			budgets: request.budgets,
+			clock: operationClock.now,
+			deadlineMs,
+			environment: replayEnvironment,
+			evidenceForProject: (projectKey) => {
 				const attribution = verifiedCapture.projectAttributions.find(
 					(candidate) => candidate.projectKey === projectKey
 				);
@@ -1684,11 +1715,15 @@ export function buildStaticSemanticSnapshot(
 					verificationState: 'VERIFIED_COMPILER_INPUT'
 				};
 			},
-			(raw) => raw,
+			includeTypes: request.capabilities.includes('TS_TYPE'),
 			progress,
 			progressCountsState,
-			'REPLAY_PROJECT'
-		);
+			progressPhase: 'REPLAY_PROJECT',
+			projectResult: (raw) => raw,
+			projects: materializedProjects,
+			providerBinding: operationBudgetProviderBinding,
+			subject
+		});
 		const replayRaw = replayPass.results;
 		phase = 'RECHECK';
 		progress.start('REPLAY_FINALIZATION');

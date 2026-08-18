@@ -28,6 +28,7 @@ import {
 	type DeclarationContextAnalysisBuildInputs,
 	type DeclarationContextAnalysisBuildOutcome,
 	type DeclarationContextAnalysisDiagnostic,
+	type DeclarationContextAnalysisId,
 	type DeclarationContextAnalysisProgressEvent,
 	type DeclarationContextAnalysisProgressPhase,
 	type DeclarationContextAnalysisSnapshot,
@@ -42,6 +43,7 @@ import {
 	type DeclarationContextRelationRecord,
 	type DeclarationContextRelationRecordWithoutId,
 	type DeclarationContextSymbolFlagsBinding,
+	type DeclarationContextTerminalSymbolId,
 	type DeclarationContextTerminalSymbolRecord
 } from '../contracts/declaration-context-analysis.js';
 import {
@@ -224,50 +226,216 @@ function preflightLimits(value: unknown): {
 	};
 }
 
-function preflightPlainData(
-	value: unknown,
-	limits: { readonly maxInputRecords: number; readonly maxInputStringCharacters: number },
-	onProgress?: () => void
-): PlainDataUsage {
-	type Work =
-		| {
-				readonly index: number;
-				readonly kind: 'ARRAY';
-				readonly length: number;
-				readonly value: readonly unknown[];
-		  }
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| {
-				readonly index: number;
-				readonly keys: readonly string[];
-				readonly kind: 'OBJECT';
-				readonly value: object;
-		  }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Work[] = [{ kind: 'VISIT', value }];
-	const active = new WeakSet<object>();
-	let records = 0;
-	let stringCharacters = 0;
+type PreflightWork =
+	| {
+			readonly index: number;
+			readonly kind: 'ARRAY';
+			readonly length: number;
+			readonly value: readonly unknown[];
+	  }
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| {
+			readonly index: number;
+			readonly keys: readonly string[];
+			readonly kind: 'OBJECT';
+			readonly value: object;
+	  }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+interface PreflightState {
+	readonly active: WeakSet<object>;
+	readonly addStringCharacters: (amount: number) => void;
+	readonly maxInputRecords: number;
+	readonly pending: PreflightWork[];
+	records: number;
+	readonly step: () => void;
+}
+
+function createCheckpointStep(onProgress?: () => void): () => void {
 	let workSinceProgress = 0;
-	const step = (): void => {
+	return (): void => {
 		if (onProgress === undefined) return;
 		workSinceProgress += 1;
 		if (workSinceProgress < RESOURCE_CHECKPOINT_CADENCE) return;
 		workSinceProgress = 0;
 		onProgress();
 	};
-	const assertUnicodeScalarText = (text: string, message: string): void => {
-		for (let index = 0; index < text.length; index += 1) {
+}
+
+function assertUnicodeScalarText(text: string, message: string, step: () => void): void {
+	for (let index = 0; index < text.length; index += 1) {
+		step();
+		const code = text.charCodeAt(index);
+		if (code >= 0xd800 && code <= 0xdbff) {
+			const next = text.charCodeAt(index + 1);
+			if (!Number.isInteger(next) || next < 0xdc00 || next > 0xdfff) throw new TypeError(message);
+			index += 1;
 			step();
-			const code = text.charCodeAt(index);
-			if (code >= 0xd800 && code <= 0xdbff) {
-				const next = text.charCodeAt(index + 1);
-				if (!Number.isInteger(next) || next < 0xdc00 || next > 0xdfff) throw new TypeError(message);
-				index += 1;
-				step();
-			} else if (code >= 0xdc00 && code <= 0xdfff) throw new TypeError(message);
-		}
-	};
+		} else if (code >= 0xdc00 && code <= 0xdfff) throw new TypeError(message);
+	}
+}
+
+function preflightArrayElement(
+	work: Extract<PreflightWork, { kind: 'ARRAY' }>,
+	pending: PreflightWork[],
+	addStringCharacters: (amount: number) => void
+): void {
+	if (work.index >= work.length) return;
+	const key = String(work.index);
+	addStringCharacters(key.length);
+	const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		throw new TypeError('Input arrays must contain enumerable data elements.');
+	pending.push(
+		{
+			index: work.index + 1,
+			kind: 'ARRAY',
+			length: work.length,
+			value: work.value
+		},
+		{ kind: 'VISIT', value: descriptor.value }
+	);
+}
+
+function preflightObjectProperty(
+	work: Extract<PreflightWork, { kind: 'OBJECT' }>,
+	pending: PreflightWork[],
+	addStringCharacters: (amount: number) => void,
+	step: () => void
+): void {
+	if (work.index >= work.keys.length) return;
+	const key = work.keys[work.index]!;
+	addStringCharacters(key.length);
+	assertUnicodeScalarText(key, 'Input keys must contain Unicode scalar text.', step);
+	const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		throw new TypeError('Input records must contain enumerable data properties.');
+	pending.push(
+		{
+			index: work.index + 1,
+			keys: work.keys,
+			kind: 'OBJECT',
+			value: work.value
+		},
+		{ kind: 'VISIT', value: descriptor.value }
+	);
+}
+
+function preflightArrayValue(
+	value: readonly unknown[],
+	pending: PreflightWork[],
+	records: number,
+	maxInputRecords: number,
+	step: () => void
+): void {
+	if (Reflect.getPrototypeOf(value) !== Array.prototype)
+		throw new TypeError('Input arrays must use Array.prototype.');
+	const count = value.length;
+	if (count > maxInputRecords - records)
+		throw new DeclarationContextAnalysisFailure(
+			'BUDGET_EXCEEDED',
+			'Input array population exhausted the plain-data record budget.',
+			'REQUEST_BIND',
+			'$.request.budgets.maxInputRecords'
+		);
+	const ownKeys = Reflect.ownKeys(value);
+	let exactArrayKeys = ownKeys.length === count + 1;
+	for (const key of ownKeys) {
+		step();
+		if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key)))
+			exactArrayKeys = false;
+	}
+	if (!exactArrayKeys) throw new TypeError('Input arrays must be dense exact data arrays.');
+	if (count > 0) pending.push({ index: 0, kind: 'ARRAY', length: count, value });
+}
+
+function preflightRecordValue(
+	value: object,
+	pending: PreflightWork[],
+	records: number,
+	maxInputRecords: number,
+	step: () => void
+): void {
+	const prototype = Reflect.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Input records must use a plain prototype.');
+	const ownKeys = Reflect.ownKeys(value);
+	for (const key of ownKeys) {
+		step();
+		if (typeof key !== 'string') throw new TypeError('Input records may not contain symbol keys.');
+	}
+	if (records + ownKeys.length > maxInputRecords)
+		throw new DeclarationContextAnalysisFailure(
+			'BUDGET_EXCEEDED',
+			'Input property population exhausted the plain-data record budget.',
+			'REQUEST_BIND',
+			'$.request.budgets.maxInputRecords'
+		);
+	if (ownKeys.length > 0)
+		pending.push({
+			index: 0,
+			keys: ownKeys as string[],
+			kind: 'OBJECT',
+			value
+		});
+}
+
+function preflightVisitValue(
+	work: Extract<PreflightWork, { kind: 'VISIT' }>,
+	state: PreflightState
+): void {
+	state.records += 1;
+	if (state.records > state.maxInputRecords)
+		throw new DeclarationContextAnalysisFailure(
+			'BUDGET_EXCEEDED',
+			'Input plain-data record budget was exhausted.',
+			'REQUEST_BIND',
+			'$.request.budgets.maxInputRecords'
+		);
+	if (typeof work.value === 'string') {
+		state.addStringCharacters(work.value.length);
+		assertUnicodeScalarText(
+			work.value,
+			'Input strings must contain Unicode scalar text.',
+			state.step
+		);
+		return;
+	}
+	if (
+		work.value === null ||
+		typeof work.value === 'boolean' ||
+		(typeof work.value === 'number' &&
+			Number.isSafeInteger(work.value) &&
+			!Object.is(work.value, -0))
+	)
+		return;
+	if (typeof work.value !== 'object' || isProxy(work.value))
+		throw new TypeError('Inputs must contain only inert JSON-compatible plain data.');
+	if (state.active.has(work.value)) throw new TypeError('Input plain data may not contain cycles.');
+	state.active.add(work.value);
+	state.pending.push({ kind: 'LEAVE', value: work.value });
+	if (Array.isArray(work.value)) {
+		preflightArrayValue(
+			work.value,
+			state.pending,
+			state.records,
+			state.maxInputRecords,
+			state.step
+		);
+		return;
+	}
+	preflightRecordValue(work.value, state.pending, state.records, state.maxInputRecords, state.step);
+}
+
+function preflightPlainData(
+	value: unknown,
+	limits: { readonly maxInputRecords: number; readonly maxInputStringCharacters: number },
+	onProgress?: () => void
+): PlainDataUsage {
+	const pending: PreflightWork[] = [{ kind: 'VISIT', value }];
+	const active = new WeakSet<object>();
+	let stringCharacters = 0;
+	const step = createCheckpointStep(onProgress);
 	const addStringCharacters = (amount: number): void => {
 		stringCharacters += amount;
 		if (
@@ -281,6 +449,14 @@ function preflightPlainData(
 				'$.request.budgets.maxInputStringCharacters'
 			);
 	};
+	const state: PreflightState = {
+		active,
+		addStringCharacters,
+		maxInputRecords: limits.maxInputRecords,
+		pending,
+		records: 0,
+		step
+	};
 	onProgress?.();
 	while (pending.length > 0) {
 		step();
@@ -290,136 +466,45 @@ function preflightPlainData(
 			continue;
 		}
 		if (work.kind === 'ARRAY') {
-			if (work.index >= work.length) continue;
-			const key = String(work.index);
-			addStringCharacters(key.length);
-			const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Input arrays must contain enumerable data elements.');
-			pending.push({
-				index: work.index + 1,
-				kind: 'ARRAY',
-				length: work.length,
-				value: work.value
-			});
-			pending.push({ kind: 'VISIT', value: descriptor.value });
+			preflightArrayElement(work, pending, addStringCharacters);
 			continue;
 		}
 		if (work.kind === 'OBJECT') {
-			if (work.index >= work.keys.length) continue;
-			const key = work.keys[work.index]!;
-			addStringCharacters(key.length);
-			assertUnicodeScalarText(key, 'Input keys must contain Unicode scalar text.');
-			const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Input records must contain enumerable data properties.');
-			pending.push({
-				index: work.index + 1,
-				keys: work.keys,
-				kind: 'OBJECT',
-				value: work.value
-			});
-			pending.push({ kind: 'VISIT', value: descriptor.value });
+			preflightObjectProperty(work, pending, addStringCharacters, step);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxInputRecords)
-			throw new DeclarationContextAnalysisFailure(
-				'BUDGET_EXCEEDED',
-				'Input plain-data record budget was exhausted.',
-				'REQUEST_BIND',
-				'$.request.budgets.maxInputRecords'
-			);
-		if (typeof work.value === 'string') {
-			addStringCharacters(work.value.length);
-			assertUnicodeScalarText(work.value, 'Input strings must contain Unicode scalar text.');
-			continue;
-		}
-		if (
-			work.value === null ||
-			typeof work.value === 'boolean' ||
-			(typeof work.value === 'number' &&
-				Number.isSafeInteger(work.value) &&
-				!Object.is(work.value, -0))
-		)
-			continue;
-		if (typeof work.value !== 'object' || isProxy(work.value))
-			throw new TypeError('Inputs must contain only inert JSON-compatible plain data.');
-		if (active.has(work.value)) throw new TypeError('Input plain data may not contain cycles.');
-		active.add(work.value);
-		pending.push({ kind: 'LEAVE', value: work.value });
-		if (Array.isArray(work.value)) {
-			if (Reflect.getPrototypeOf(work.value) !== Array.prototype)
-				throw new TypeError('Input arrays must use Array.prototype.');
-			const count = work.value.length;
-			if (count > limits.maxInputRecords - records)
-				throw new DeclarationContextAnalysisFailure(
-					'BUDGET_EXCEEDED',
-					'Input array population exhausted the plain-data record budget.',
-					'REQUEST_BIND',
-					'$.request.budgets.maxInputRecords'
-				);
-			const ownKeys = Reflect.ownKeys(work.value);
-			let exactArrayKeys = ownKeys.length === count + 1;
-			for (const key of ownKeys) {
-				step();
-				if (typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))
-					exactArrayKeys = false;
-			}
-			if (!exactArrayKeys) throw new TypeError('Input arrays must be dense exact data arrays.');
-			if (count > 0) pending.push({ index: 0, kind: 'ARRAY', length: count, value: work.value });
-			continue;
-		}
-		const prototype = Reflect.getPrototypeOf(work.value);
-		if (prototype !== Object.prototype && prototype !== null)
-			throw new TypeError('Input records must use a plain prototype.');
-		const ownKeys = Reflect.ownKeys(work.value);
-		for (const key of ownKeys) {
-			step();
-			if (typeof key !== 'string')
-				throw new TypeError('Input records may not contain symbol keys.');
-		}
-		if (records + ownKeys.length > limits.maxInputRecords)
-			throw new DeclarationContextAnalysisFailure(
-				'BUDGET_EXCEEDED',
-				'Input property population exhausted the plain-data record budget.',
-				'REQUEST_BIND',
-				'$.request.budgets.maxInputRecords'
-			);
-		if (ownKeys.length > 0)
-			pending.push({
-				index: 0,
-				keys: ownKeys as string[],
-				kind: 'OBJECT',
-				value: work.value
-			});
+		preflightVisitValue(work, state);
 	}
 	onProgress?.();
-	return { records, stringCharacters };
+	return { records: state.records, stringCharacters };
 }
 
-function sameSelectionValue(actual: unknown, expected: unknown, onProgress: () => void): boolean {
-	onProgress();
-	if (typeof expected === 'string')
-		return typeof actual === 'string' && sameTextWithProgress(actual, expected, onProgress);
-	if (expected === null || typeof expected !== 'object') return Object.is(actual, expected);
-	if (Array.isArray(expected)) {
-		if (!Array.isArray(actual) || actual.length !== expected.length) return false;
-		for (let index = 0; index < expected.length; index += 1) {
-			onProgress();
-			const descriptor = Object.getOwnPropertyDescriptor(actual, String(index));
-			if (
-				descriptor === undefined ||
-				!descriptor.enumerable ||
-				!('value' in descriptor) ||
-				!sameSelectionValue(descriptor.value, expected[index], onProgress)
-			)
-				return false;
-		}
-		return true;
+function sameSelectionArray(
+	actual: unknown,
+	expected: readonly unknown[],
+	onProgress: () => void
+): boolean {
+	if (!Array.isArray(actual) || actual.length !== expected.length) return false;
+	for (let index = 0; index < expected.length; index += 1) {
+		onProgress();
+		const descriptor = Object.getOwnPropertyDescriptor(actual, String(index));
+		if (
+			descriptor === undefined ||
+			!descriptor.enumerable ||
+			!('value' in descriptor) ||
+			!sameSelectionValue(descriptor.value, expected[index], onProgress)
+		)
+			return false;
 	}
+	return true;
+}
+
+function sameSelectionRecord(
+	actual: unknown,
+	expectedRecord: Readonly<Record<string, unknown>>,
+	onProgress: () => void
+): boolean {
 	if (actual === null || typeof actual !== 'object' || Array.isArray(actual)) return false;
-	const expectedRecord = expected as Readonly<Record<string, unknown>>;
 	const expectedKeys = Object.keys(expectedRecord);
 	const actualKeys = Reflect.ownKeys(actual);
 	onProgress();
@@ -440,6 +525,15 @@ function sameSelectionValue(actual: unknown, expected: unknown, onProgress: () =
 			return false;
 	}
 	return true;
+}
+
+function sameSelectionValue(actual: unknown, expected: unknown, onProgress: () => void): boolean {
+	onProgress();
+	if (typeof expected === 'string')
+		return typeof actual === 'string' && sameTextWithProgress(actual, expected, onProgress);
+	if (expected === null || typeof expected !== 'object') return Object.is(actual, expected);
+	if (Array.isArray(expected)) return sameSelectionArray(actual, expected, onProgress);
+	return sameSelectionRecord(actual, expected as Readonly<Record<string, unknown>>, onProgress);
 }
 
 function sameSelection(
@@ -616,6 +710,18 @@ function clonePlainData<Value>(
 	return result as Value;
 }
 
+function deepFreezeMember(
+	container: object,
+	key: string,
+	seen: WeakSet<object>,
+	onProgress?: () => void
+): void {
+	onProgress?.();
+	const descriptor = Reflect.getOwnPropertyDescriptor(container, key);
+	if (descriptor !== undefined && 'value' in descriptor)
+		deepFreeze(descriptor.value, seen, onProgress);
+}
+
 function deepFreeze<Value>(
 	value: Value,
 	seen = new WeakSet<object>(),
@@ -627,19 +733,10 @@ function deepFreeze<Value>(
 	if (seen.has(object)) return value;
 	seen.add(object);
 	if (Array.isArray(value)) {
-		for (let index = 0; index < value.length; index += 1) {
-			onProgress?.();
-			const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
-			if (descriptor !== undefined && 'value' in descriptor)
-				deepFreeze(descriptor.value, seen, onProgress);
-		}
+		for (let index = 0; index < value.length; index += 1)
+			deepFreezeMember(object, String(index), seen, onProgress);
 	} else {
-		for (const key of Object.keys(object)) {
-			onProgress?.();
-			const descriptor = Reflect.getOwnPropertyDescriptor(object, key);
-			if (descriptor !== undefined && 'value' in descriptor)
-				deepFreeze(descriptor.value, seen, onProgress);
-		}
+		for (const key of Object.keys(object)) deepFreezeMember(object, key, seen, onProgress);
 	}
 	return Object.freeze(value);
 }
@@ -667,6 +764,11 @@ function saturatedAdd(...values: readonly number[]): number {
 	return total;
 }
 
+interface ResourceProgressHandle {
+	readonly finish: () => void;
+	readonly step: () => void;
+}
+
 function resourceProgress(onProgress: () => void): {
 	readonly finish: () => void;
 	readonly step: () => void;
@@ -686,7 +788,8 @@ function resourceProgress(onProgress: () => void): {
 
 function boundedCounts(counts: Readonly<Record<string, number>>): Readonly<Record<string, number>> {
 	const result: Record<string, number> = {};
-	for (const key of Object.keys(counts).sort().slice(0, 16)) {
+	const orderedKeys = Object.keys(counts).sort((left, right) => compareText(left, right));
+	for (const key of orderedKeys.slice(0, 16)) {
 		const value = counts[key];
 		if (Number.isSafeInteger(value) && value! >= 0) result[key] = value!;
 	}
@@ -779,12 +882,12 @@ function compilerCapabilityFailure(
 	error: CompilerProjectProgramCapabilityError,
 	phase: DeclarationContextAnalysisProgressPhase
 ): DeclarationContextAnalysisFailure {
+	let code: DeclarationContextAnalysisDiagnostic['code'];
+	if (error.code === 'BUDGET_EXCEEDED') code = 'BUDGET_EXCEEDED';
+	else if (error.code === 'CAPTURE_UNAVAILABLE') code = 'CAPTURE_INVALID';
+	else code = 'PROGRAM_CONSTRUCTION_UNAVAILABLE';
 	return new DeclarationContextAnalysisFailure(
-		error.code === 'BUDGET_EXCEEDED'
-			? 'BUDGET_EXCEEDED'
-			: error.code === 'CAPTURE_UNAVAILABLE'
-				? 'CAPTURE_INVALID'
-				: 'PROGRAM_CONSTRUCTION_UNAVAILABLE',
+		code,
 		'Fresh captured TypeScript Program operation failed closed.',
 		phase
 	);
@@ -1114,14 +1217,20 @@ interface ParsedArtifactDraft {
 }
 
 function compareText(left: string, right: string, onProgress?: () => void): number {
-	if (onProgress === undefined) return left < right ? -1 : left > right ? 1 : 0;
+	if (onProgress === undefined) {
+		if (left < right) return -1;
+		if (left > right) return 1;
+		return 0;
+	}
 	const length = Math.min(left.length, right.length);
 	for (let index = 0; index < length; index += 1) {
 		onProgress();
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
 }
 
 function isUnicodeScalarTextWithProgress(text: string, onProgress: () => void): boolean {
@@ -1173,6 +1282,78 @@ function oneExactWhere<Value>(
 	if (matches !== 1 || match === undefined)
 		throw new DeclarationContextAnalysisFailure('INPUT_POPULATION_MISMATCH', message, phase);
 	return match;
+}
+
+function collectProgramSemanticSources(
+	inputs: DeclarationContextAnalysisBuildInputs,
+	programRecord: DeclarationContextAnalysisBuildInputs['semanticSnapshot']['programs'][number],
+	deadline: ResourceProgressHandle
+): {
+	readonly sourceById: ReadonlyMap<string, SemanticSourceRecord>;
+	readonly sourceByLogicalPath: ReadonlyMap<string, SemanticSourceRecord>;
+	readonly sources: readonly SemanticSourceRecord[];
+} {
+	const sources: SemanticSourceRecord[] = [];
+	for (const source of inputs.semanticSnapshot.sources) {
+		deadline.step();
+		if (source.programId === programRecord.id) sources.push(source);
+	}
+	const sourceById = new Map<string, SemanticSourceRecord>();
+	const sourceByLogicalPath = new Map<string, SemanticSourceRecord>();
+	let duplicateSourceId = false;
+	for (const source of sources) {
+		deadline.step();
+		if (sourceById.has(source.id)) duplicateSourceId = true;
+		if (sourceByLogicalPath.has(source.logicalPath))
+			throw new DeclarationContextAnalysisFailure(
+				'INPUT_POPULATION_MISMATCH',
+				'The selected semantic Program repeats a logical source path.',
+				'PROGRAM_SOURCE_ACCOUNT'
+			);
+		sourceById.set(source.id, source);
+		sourceByLogicalPath.set(source.logicalPath, source);
+	}
+	let sourceIdsReconcile = !duplicateSourceId && sources.length === programRecord.sourceIds.length;
+	for (const id of programRecord.sourceIds) {
+		deadline.step();
+		if (!sourceById.has(id)) sourceIdsReconcile = false;
+	}
+	if (!sourceIdsReconcile)
+		throw new DeclarationContextAnalysisFailure(
+			'INPUT_POPULATION_MISMATCH',
+			'The semantic Program source population does not reproduce its source IDs.',
+			'PROGRAM_SOURCE_ACCOUNT'
+		);
+	return { sourceById, sourceByLogicalPath, sources };
+}
+
+function resolveTargetSemanticSource(
+	sourceById: ReadonlyMap<string, SemanticSourceRecord>,
+	target: DeclarationContextAnalysisBuildInputs['moduleResolutionTrace']['targetWitness']
+): SemanticSourceRecord {
+	const targetSource = sourceById.get(target.semanticSourceId);
+	if (targetSource === undefined)
+		throw new DeclarationContextAnalysisFailure(
+			'INPUT_POPULATION_MISMATCH',
+			'The CAP-011 declaration target source is not uniquely present in its Program.',
+			'PROGRAM_SOURCE_ACCOUNT'
+		);
+	if (
+		targetSource.logicalPath !== target.logicalPath ||
+		targetSource.projectId !== target.semanticProjectId ||
+		targetSource.bytes !== target.bytes ||
+		targetSource.contentSha256 !== target.contentSha256 ||
+		targetSource.analysisDisposition !== 'CONTEXT_ONLY' ||
+		targetSource.artifactClass !== 'CONTEXT_ONLY' ||
+		targetSource.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
+		targetSource.declarationFile !== true
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'INPUT_POPULATION_MISMATCH',
+			'The CAP-011 target does not reproduce one exact context-only semantic source.',
+			'PROGRAM_SOURCE_ACCOUNT'
+		);
+	return targetSource;
 }
 
 function bindProgramContext(
@@ -1244,59 +1425,12 @@ function bindProgramContext(
 			'The CAP-011 importer and CAP-010 target Program context do not bind exactly.',
 			'PROGRAM_CONSTRUCT'
 		);
-	const sources: SemanticSourceRecord[] = [];
-	for (const source of inputs.semanticSnapshot.sources) {
-		deadline.step();
-		if (source.programId === programRecord.id) sources.push(source);
-	}
-	const sourceById = new Map<string, SemanticSourceRecord>();
-	const sourceByLogicalPath = new Map<string, SemanticSourceRecord>();
-	let duplicateSourceId = false;
-	for (const source of sources) {
-		deadline.step();
-		if (sourceById.has(source.id)) duplicateSourceId = true;
-		if (sourceByLogicalPath.has(source.logicalPath))
-			throw new DeclarationContextAnalysisFailure(
-				'INPUT_POPULATION_MISMATCH',
-				'The selected semantic Program repeats a logical source path.',
-				'PROGRAM_SOURCE_ACCOUNT'
-			);
-		sourceById.set(source.id, source);
-		sourceByLogicalPath.set(source.logicalPath, source);
-	}
-	let sourceIdsReconcile = !duplicateSourceId && sources.length === programRecord.sourceIds.length;
-	for (const id of programRecord.sourceIds) {
-		deadline.step();
-		if (!sourceById.has(id)) sourceIdsReconcile = false;
-	}
-	if (!sourceIdsReconcile)
-		throw new DeclarationContextAnalysisFailure(
-			'INPUT_POPULATION_MISMATCH',
-			'The semantic Program source population does not reproduce its source IDs.',
-			'PROGRAM_SOURCE_ACCOUNT'
-		);
-	const targetSource = sourceById.get(target.semanticSourceId);
-	if (targetSource === undefined)
-		throw new DeclarationContextAnalysisFailure(
-			'INPUT_POPULATION_MISMATCH',
-			'The CAP-011 declaration target source is not uniquely present in its Program.',
-			'PROGRAM_SOURCE_ACCOUNT'
-		);
-	if (
-		targetSource.logicalPath !== target.logicalPath ||
-		targetSource.projectId !== target.semanticProjectId ||
-		targetSource.bytes !== target.bytes ||
-		targetSource.contentSha256 !== target.contentSha256 ||
-		targetSource.analysisDisposition !== 'CONTEXT_ONLY' ||
-		targetSource.artifactClass !== 'CONTEXT_ONLY' ||
-		targetSource.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
-		targetSource.declarationFile !== true
-	)
-		throw new DeclarationContextAnalysisFailure(
-			'INPUT_POPULATION_MISMATCH',
-			'The CAP-011 target does not reproduce one exact context-only semantic source.',
-			'PROGRAM_SOURCE_ACCOUNT'
-		);
+	const { sourceById, sourceByLogicalPath, sources } = collectProgramSemanticSources(
+		inputs,
+		programRecord,
+		deadline
+	);
+	const targetSource = resolveTargetSemanticSource(sourceById, target);
 	const sourcePopulation = sources.map((source) => {
 		deadline.step();
 		return {
@@ -1406,59 +1540,82 @@ function symbolFlagsBinding(symbol: ts.Symbol): DeclarationContextSymbolFlagsBin
 	return { compilerVersion: TYPESCRIPT_PROVIDER_VERSION, nativeMask: mask, nativeNames };
 }
 
-function supportedDeclaration(
-	declaration: ts.Declaration,
-	logicalPath: string,
-	onProgress: () => void,
-	assertWithinDeadline: () => void
-): DeclarationDraft {
-	const topLevel = ts.isVariableDeclaration(declaration)
-		? ts.isVariableDeclarationList(declaration.parent) &&
+function isTopLevelDeclarationPlacement(declaration: ts.Declaration): boolean {
+	if (ts.isVariableDeclaration(declaration))
+		return (
+			ts.isVariableDeclarationList(declaration.parent) &&
 			ts.isVariableStatement(declaration.parent.parent) &&
 			ts.isSourceFile(declaration.parent.parent.parent)
-		: ts.isSourceFile(declaration.parent);
-	if (!topLevel)
-		throw new DeclarationContextAnalysisFailure(
-			'UNSUPPORTED_REQUEST',
-			'Terminal declarations must have top-level SourceFile placement in the v1 slice.',
-			'TERMINAL_DECLARATION_BIND'
 		);
-	let kind: DeclarationContextDeclarationKind;
-	let nameNode: ts.Identifier | undefined;
-	if (ts.isClassDeclaration(declaration)) {
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.ClassDeclaration;
-		nameNode = declaration.name;
-	} else if (ts.isEnumDeclaration(declaration)) {
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.EnumDeclaration;
-		nameNode = declaration.name;
-	} else if (ts.isFunctionDeclaration(declaration)) {
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.FunctionDeclaration;
-		nameNode = declaration.name;
-	} else if (ts.isInterfaceDeclaration(declaration)) {
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.InterfaceDeclaration;
-		nameNode = declaration.name;
-	} else if (ts.isModuleDeclaration(declaration) && ts.isIdentifier(declaration.name)) {
+	return ts.isSourceFile(declaration.parent);
+}
+
+function terminalDeclarationKindBinding(declaration: ts.Declaration): {
+	readonly kind: DeclarationContextDeclarationKind;
+	readonly nameNode: ts.Identifier | undefined;
+} {
+	if (ts.isClassDeclaration(declaration))
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.ClassDeclaration,
+			nameNode: declaration.name
+		};
+	if (ts.isEnumDeclaration(declaration))
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.EnumDeclaration,
+			nameNode: declaration.name
+		};
+	if (ts.isFunctionDeclaration(declaration))
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.FunctionDeclaration,
+			nameNode: declaration.name
+		};
+	if (ts.isInterfaceDeclaration(declaration))
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.InterfaceDeclaration,
+			nameNode: declaration.name
+		};
+	if (ts.isModuleDeclaration(declaration) && ts.isIdentifier(declaration.name)) {
 		if ((declaration.flags & ts.NodeFlags.GlobalAugmentation) !== 0)
 			throw new DeclarationContextAnalysisFailure(
 				'UNSUPPORTED_REQUEST',
 				'Global augmentation is unsupported by the v1 declaration-context slice.',
 				'TERMINAL_DECLARATION_BIND'
 			);
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.ModuleDeclarationIdentifierName;
-		nameNode = declaration.name;
-	} else if (ts.isTypeAliasDeclaration(declaration)) {
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.TypeAliasDeclaration;
-		nameNode = declaration.name;
-	} else if (ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name)) {
-		kind = DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.VariableDeclaration;
-		nameNode = declaration.name;
-	} else {
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.ModuleDeclarationIdentifierName,
+			nameNode: declaration.name
+		};
+	}
+	if (ts.isTypeAliasDeclaration(declaration))
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.TypeAliasDeclaration,
+			nameNode: declaration.name
+		};
+	if (ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name))
+		return {
+			kind: DECLARATION_CONTEXT_ANALYSIS_DECLARATION_KIND_PROFILE.VariableDeclaration,
+			nameNode: declaration.name
+		};
+	throw new DeclarationContextAnalysisFailure(
+		'UNSUPPORTED_REQUEST',
+		'The selected terminal symbol has an unsupported declaration kind.',
+		'TERMINAL_DECLARATION_BIND'
+	);
+}
+
+function supportedDeclaration(
+	declaration: ts.Declaration,
+	logicalPath: string,
+	onProgress: () => void,
+	assertWithinDeadline: () => void
+): DeclarationDraft {
+	if (!isTopLevelDeclarationPlacement(declaration))
 		throw new DeclarationContextAnalysisFailure(
 			'UNSUPPORTED_REQUEST',
-			'The selected terminal symbol has an unsupported declaration kind.',
+			'Terminal declarations must have top-level SourceFile placement in the v1 slice.',
 			'TERMINAL_DECLARATION_BIND'
 		);
-	}
+	const { kind, nameNode } = terminalDeclarationKindBinding(declaration);
 	if (nameNode === undefined || !isUnicodeScalarTextWithProgress(nameNode.text, onProgress))
 		throw new DeclarationContextAnalysisFailure(
 			'UNSUPPORTED_REQUEST',
@@ -1531,6 +1688,63 @@ function sameDeclarationDraft(
 	);
 }
 
+function unsupportedTopLevelBindingName(
+	node: ts.Node,
+	sourceFile: ts.SourceFile,
+	onProgress: () => void
+): ts.Identifier | undefined {
+	if (ts.isImportEqualsDeclaration(node) && node.parent === sourceFile) return node.name;
+	if (ts.isImportClause(node) && node.parent.parent === sourceFile) return node.name;
+	if (ts.isNamespaceImport(node) && node.parent.parent.parent === sourceFile) return node.name;
+	if (ts.isImportSpecifier(node) && node.parent.parent.parent.parent === sourceFile)
+		return node.name;
+	if (!ts.isBindingElement(node) || !ts.isIdentifier(node.name)) return undefined;
+	const bindingName = node.name;
+	let container: ts.Node = node;
+	while (
+		ts.isBindingElement(container.parent) ||
+		ts.isArrayBindingPattern(container.parent) ||
+		ts.isObjectBindingPattern(container.parent)
+	) {
+		onProgress();
+		container = container.parent;
+	}
+	const declaration = container.parent;
+	if (
+		ts.isVariableDeclaration(declaration) &&
+		ts.isVariableDeclarationList(declaration.parent) &&
+		ts.isVariableStatement(declaration.parent.parent) &&
+		declaration.parent.parent.parent === sourceFile
+	)
+		return bindingName;
+	return undefined;
+}
+
+function isTopLevelVariableDeclarationWithIdentifierName(
+	node: ts.Node,
+	sourceFile: ts.SourceFile
+): node is ts.VariableDeclaration & { readonly name: ts.Identifier } {
+	return (
+		ts.isVariableDeclaration(node) &&
+		ts.isIdentifier(node.name) &&
+		ts.isVariableDeclarationList(node.parent) &&
+		ts.isVariableStatement(node.parent.parent) &&
+		node.parent.parent.parent === sourceFile
+	);
+}
+
+function isSupportedTerminalDeclarationNode(node: ts.Node, variable: boolean): boolean {
+	return (
+		ts.isClassDeclaration(node) ||
+		ts.isEnumDeclaration(node) ||
+		ts.isFunctionDeclaration(node) ||
+		ts.isInterfaceDeclaration(node) ||
+		(ts.isModuleDeclaration(node) && ts.isIdentifier(node.name)) ||
+		ts.isTypeAliasDeclaration(node) ||
+		variable
+	);
+}
+
 function censusTopLevelTerminalDeclaration(
 	node: ts.Node,
 	sourceFile: ts.SourceFile,
@@ -1539,34 +1753,7 @@ function censusTopLevelTerminalDeclaration(
 	onProgress: () => void,
 	assertWithinDeadline: () => void
 ): DeclarationDraft | null {
-	let unsupportedBindingName: ts.Identifier | undefined;
-	if (ts.isImportEqualsDeclaration(node) && node.parent === sourceFile)
-		unsupportedBindingName = node.name;
-	else if (ts.isImportClause(node) && node.parent.parent === sourceFile)
-		unsupportedBindingName = node.name;
-	else if (ts.isNamespaceImport(node) && node.parent.parent.parent === sourceFile)
-		unsupportedBindingName = node.name;
-	else if (ts.isImportSpecifier(node) && node.parent.parent.parent.parent === sourceFile)
-		unsupportedBindingName = node.name;
-	else if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
-		let container: ts.Node = node;
-		while (
-			ts.isBindingElement(container.parent) ||
-			ts.isArrayBindingPattern(container.parent) ||
-			ts.isObjectBindingPattern(container.parent)
-		) {
-			onProgress();
-			container = container.parent;
-		}
-		const declaration = container.parent;
-		if (
-			ts.isVariableDeclaration(declaration) &&
-			ts.isVariableDeclarationList(declaration.parent) &&
-			ts.isVariableStatement(declaration.parent.parent) &&
-			declaration.parent.parent.parent === sourceFile
-		)
-			unsupportedBindingName = node.name;
-	}
+	const unsupportedBindingName = unsupportedTopLevelBindingName(node, sourceFile, onProgress);
 	if (
 		unsupportedBindingName !== undefined &&
 		sameTextWithProgress(unsupportedBindingName.text, terminalName, onProgress)
@@ -1576,29 +1763,15 @@ function censusTopLevelTerminalDeclaration(
 			'An independently parsed unsupported top-level binding collides with the terminal symbol name.',
 			'ARTIFACT_PARSE_ACCOUNT'
 		);
-	const variable =
-		ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) &&
-		ts.isVariableDeclarationList(node.parent) &&
-		ts.isVariableStatement(node.parent.parent) &&
-		node.parent.parent.parent === sourceFile;
+	const variable = isTopLevelVariableDeclarationWithIdentifierName(node, sourceFile);
 	const direct = node.parent === sourceFile;
 	const namedNode = node as ts.NamedDeclaration;
-	const name = variable
-		? node.name
-		: direct && namedNode.name !== undefined && ts.isIdentifier(namedNode.name)
-			? namedNode.name
-			: undefined;
+	let name: ts.Identifier | undefined;
+	if (variable) name = node.name;
+	else if (direct && namedNode.name !== undefined && ts.isIdentifier(namedNode.name))
+		name = namedNode.name;
 	if (name === undefined || !sameTextWithProgress(name.text, terminalName, onProgress)) return null;
-	const supported =
-		ts.isClassDeclaration(node) ||
-		ts.isEnumDeclaration(node) ||
-		ts.isFunctionDeclaration(node) ||
-		ts.isInterfaceDeclaration(node) ||
-		(ts.isModuleDeclaration(node) && ts.isIdentifier(node.name)) ||
-		ts.isTypeAliasDeclaration(node) ||
-		variable;
-	if (!supported)
+	if (!isSupportedTerminalDeclarationNode(node, variable))
 		throw new DeclarationContextAnalysisFailure(
 			'UNSUPPORTED_REQUEST',
 			'An independently parsed top-level terminal-name binding has an unsupported declaration kind.',
@@ -1677,29 +1850,51 @@ interface CompilerDerivation {
 	readonly terminalName: string;
 }
 
-function deriveCompilerEvidence(
+type CompilerProjectProgramSession = ReturnType<typeof createCompilerProjectProgramSession>;
+
+type DeclarationContextBudgets = DeclarationContextAnalysisBuildInputs['request']['budgets'];
+
+interface TraversalLedger {
+	readonly charge: (amount: number, phase: DeclarationContextAnalysisProgressPhase) => void;
+	readonly total: () => number;
+}
+
+interface ProgramSourceBinding {
+	readonly logicalPath: string;
+	readonly sourceFile: ts.SourceFile;
+}
+
+function createTraversalLedger(maxTraversalSteps: number): TraversalLedger {
+	let progressiveTraversalSteps = 0;
+	return {
+		charge(amount: number, phase: DeclarationContextAnalysisProgressPhase): void {
+			if (amount > maxTraversalSteps - progressiveTraversalSteps)
+				throw new DeclarationContextAnalysisFailure(
+					'BUDGET_EXCEEDED',
+					'Declaration-context traversal exhausted maxTraversalSteps.',
+					phase,
+					'$.request.budgets.maxTraversalSteps'
+				);
+			progressiveTraversalSteps += amount;
+		},
+		total(): number {
+			return progressiveTraversalSteps;
+		}
+	};
+}
+
+function openCompilerProgramSession(
 	inputs: DeclarationContextAnalysisBuildInputs,
 	bound: BoundProgramContext,
 	remainingDurationMs: number,
-	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void,
-	progress: TelemetryRecorder
-): CompilerDerivation {
+	traversal: TraversalLedger,
+	progress: TelemetryRecorder,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): {
+	readonly freshProgramSourceFiles: readonly ts.SourceFile[];
+	readonly session: CompilerProjectProgramSession;
+} {
 	const budgets = inputs.request.budgets;
-	let progressiveTraversalSteps = 0;
-	const chargeTraversal = (
-		amount: number,
-		phase: DeclarationContextAnalysisProgressPhase
-	): void => {
-		if (amount > budgets.maxTraversalSteps - progressiveTraversalSteps)
-			throw new DeclarationContextAnalysisFailure(
-				'BUDGET_EXCEEDED',
-				'Declaration-context traversal exhausted maxTraversalSteps.',
-				phase,
-				'$.request.budgets.maxTraversalSteps'
-			);
-		progressiveTraversalSteps += amount;
-	};
-	progress.start('PROGRAM_CONSTRUCT');
 	const session =
 		declarationContextAnalysisCompilerProgramCapability.createCompilerProjectProgramSession(
 			inputs.semanticSnapshot,
@@ -1716,7 +1911,7 @@ function deriveCompilerEvidence(
 				onInput(stage) {
 					if (stage === 'DECLARATION_ARTIFACT_PARSE') return;
 					try {
-						chargeTraversal(1, progress.activePhase() ?? 'PROGRAM_CONSTRUCT');
+						traversal.charge(1, progress.activePhase() ?? 'PROGRAM_CONSTRUCT');
 					} catch (error) {
 						if (error instanceof DeclarationContextAnalysisFailure)
 							throw new CompilerProjectProgramCapabilityError('BUDGET_EXCEEDED', error.message);
@@ -1735,9 +1930,17 @@ function deriveCompilerEvidence(
 			'PROGRAM_CONSTRUCT',
 			'$.request.budgets.maxProgramSourceFiles'
 		);
-	progress.complete({ programSourceFiles: freshProgramSourceFiles.length });
+	return { freshProgramSourceFiles, session };
+}
 
-	progress.start('PROGRAM_SOURCE_ACCOUNT');
+function reconcileFreshProgramSources(
+	freshProgramSourceFiles: readonly ts.SourceFile[],
+	bound: BoundProgramContext,
+	budgets: DeclarationContextBudgets,
+	traversal: TraversalLedger,
+	session: CompilerProjectProgramSession,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): { readonly programAstNodes: number; readonly programSources: ProgramSourceBinding[] } {
 	const programSourceProgress = resourceProgress(() =>
 		assertWithinDeadline('PROGRAM_SOURCE_ACCOUNT')
 	);
@@ -1772,12 +1975,16 @@ function deriveCompilerEvidence(
 			'The fresh Program source population does not reconcile with CAP-001.',
 			'PROGRAM_SOURCE_ACCOUNT'
 		);
-	chargeTraversal(programSources.length, 'PROGRAM_SOURCE_ACCOUNT');
+	traversal.charge(programSources.length, 'PROGRAM_SOURCE_ACCOUNT');
 	let programAstNodes = 0;
 	for (const { logicalPath, sourceFile } of programSources) {
 		programSourceProgress.step();
 		const source = bound.sourceByLogicalPath.get(logicalPath);
 		if (
+			// S6582 REFUSED — the explicit limb keeps this guard TOTAL. Under the optional chain the
+			// missing-record case depends on `sourceFile.text` being non-nullish to still refuse, which
+			// swaps a recorded INPUT_POPULATION_MISMATCH for a raw TypeError. Same idiom as the sibling
+			// fail-closed guards across this package.
 			source === undefined ||
 			source.textLength !== sourceFile.text.length ||
 			source.declarationFile !== sourceFile.isDeclarationFile
@@ -1793,13 +2000,20 @@ function deriveCompilerEvidence(
 			budgets.maxProgramAstNodes,
 			() => assertWithinDeadline('PROGRAM_SOURCE_ACCOUNT'),
 			'PROGRAM_SOURCE_ACCOUNT',
-			() => chargeTraversal(1, 'PROGRAM_SOURCE_ACCOUNT')
+			() => traversal.charge(1, 'PROGRAM_SOURCE_ACCOUNT')
 		);
 	}
 	programSourceProgress.finish();
-	const contextSourceProgress = resourceProgress(() =>
-		assertWithinDeadline('PROGRAM_SOURCE_ACCOUNT')
-	);
+	return { programAstNodes, programSources };
+}
+
+function reconcileContextProgramSources(
+	inputs: DeclarationContextAnalysisBuildInputs,
+	bound: BoundProgramContext,
+	programSourceCount: number,
+	budgets: DeclarationContextBudgets,
+	contextSourceProgress: ResourceProgressHandle
+): void {
 	if (bound.projectContextProgram.sourceIds.length > budgets.maxProgramSourceFiles)
 		throw new DeclarationContextAnalysisFailure(
 			'BUDGET_EXCEEDED',
@@ -1807,7 +2021,7 @@ function deriveCompilerEvidence(
 			'PROGRAM_SOURCE_ACCOUNT',
 			'$.request.budgets.maxProgramSourceFiles'
 		);
-	if (bound.projectContextProgram.sourceIds.length !== programSources.length)
+	if (bound.projectContextProgram.sourceIds.length !== programSourceCount)
 		throw new DeclarationContextAnalysisFailure(
 			'INPUT_POPULATION_MISMATCH',
 			'The fresh Program and selected project-context Program source populations differ.',
@@ -1860,8 +2074,14 @@ function deriveCompilerEvidence(
 			'The fresh Program source population does not reconcile exactly with CAP-010.',
 			'PROGRAM_SOURCE_ACCOUNT'
 		);
-	progress.complete({ programAstNodes, programSourceFiles: programSources.length });
+}
 
+function resolveRootExternalModuleSource(
+	programSources: readonly ProgramSourceBinding[],
+	bound: BoundProgramContext,
+	contextSourceProgress: ResourceProgressHandle,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): ts.SourceFile {
 	const rootProgramSource = programSources.find((source) => {
 		contextSourceProgress.step();
 		return source.logicalPath === bound.targetSource.logicalPath;
@@ -1879,50 +2099,64 @@ function deriveCompilerEvidence(
 			'The CAP-011 selected declaration target is not one external-module Program source.',
 			'ROOT_EXPORT_ENUMERATE'
 		);
+	return rootProgramSource;
+}
 
-	const artifactByPath = new Map<string, ArtifactDraft>();
-	const bindArtifact = (
-		sourceFile: ts.SourceFile,
-		role: DeclarationContextArtifactRole
-	): ArtifactDraft => {
-		const logicalPath = session.toLogicalPath(sourceFile.fileName);
-		const source = bound.sourceByLogicalPath.get(logicalPath);
-		if (
-			source === undefined ||
-			source.analysisDisposition !== 'CONTEXT_ONLY' ||
-			source.artifactClass !== 'CONTEXT_ONLY' ||
-			source.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
-			source.declarationFile !== true ||
-			source.projectId !== bound.projectRecord.id ||
-			source.programId !== bound.programRecord.id ||
-			source.textLength !== sourceFile.text.length ||
-			sourceFile.isDeclarationFile !== true
-		)
-			throw new DeclarationContextAnalysisFailure(
-				'UNSUPPORTED_REQUEST',
-				'Every consumed declaration artifact must be one context-only workspace build declaration.',
-				'ARTIFACT_BIND'
-			);
-		sourceExtension(logicalPath);
-		const prior = artifactByPath.get(logicalPath);
-		if (prior !== undefined) {
-			prior.roles.add(role);
-			return prior;
-		}
-		if (artifactByPath.size >= budgets.maxArtifacts)
-			throw new DeclarationContextAnalysisFailure(
-				'BUDGET_EXCEEDED',
-				'The consumed declaration-artifact population exceeds maxArtifacts.',
-				'ARTIFACT_BIND'
-			);
-		const artifact: ArtifactDraft = { logicalPath, roles: new Set([role]), source, sourceFile };
-		artifactByPath.set(logicalPath, artifact);
-		return artifact;
-	};
-	bindArtifact(rootProgramSource, 'CAP011_SELECTED_DECLARATION_TARGET');
-	bindArtifact(rootProgramSource, 'SELECTED_EXPORT_BINDING_CARRIER');
+function bindDeclarationArtifact(
+	artifactByPath: Map<string, ArtifactDraft>,
+	bound: BoundProgramContext,
+	maxArtifacts: number,
+	session: CompilerProjectProgramSession,
+	sourceFile: ts.SourceFile,
+	role: DeclarationContextArtifactRole
+): ArtifactDraft {
+	const logicalPath = session.toLogicalPath(sourceFile.fileName);
+	const source = bound.sourceByLogicalPath.get(logicalPath);
+	if (
+		source === undefined ||
+		source.analysisDisposition !== 'CONTEXT_ONLY' ||
+		source.artifactClass !== 'CONTEXT_ONLY' ||
+		source.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
+		source.declarationFile !== true ||
+		source.projectId !== bound.projectRecord.id ||
+		source.programId !== bound.programRecord.id ||
+		source.textLength !== sourceFile.text.length ||
+		sourceFile.isDeclarationFile !== true
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'UNSUPPORTED_REQUEST',
+			'Every consumed declaration artifact must be one context-only workspace build declaration.',
+			'ARTIFACT_BIND'
+		);
+	sourceExtension(logicalPath);
+	const prior = artifactByPath.get(logicalPath);
+	if (prior !== undefined) {
+		prior.roles.add(role);
+		return prior;
+	}
+	if (artifactByPath.size >= maxArtifacts)
+		throw new DeclarationContextAnalysisFailure(
+			'BUDGET_EXCEEDED',
+			'The consumed declaration-artifact population exceeds maxArtifacts.',
+			'ARTIFACT_BIND'
+		);
+	const artifact: ArtifactDraft = { logicalPath, roles: new Set([role]), source, sourceFile };
+	artifactByPath.set(logicalPath, artifact);
+	return artifact;
+}
 
-	progress.start('ROOT_EXPORT_ENUMERATE');
+function enumerateSelectedRootExport(
+	session: CompilerProjectProgramSession,
+	rootProgramSource: ts.SourceFile,
+	exportName: string,
+	maxExportSymbols: number,
+	traversal: TraversalLedger,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): {
+	readonly exports: readonly ts.Symbol[];
+	readonly rootExportSymbolFlags: DeclarationContextSymbolFlagsBinding;
+	readonly selectedExport: ts.Symbol;
+} {
 	const exportProgress = resourceProgress(() => assertWithinDeadline('ROOT_EXPORT_ENUMERATE'));
 	const rootModuleSymbol = declarationContextAnalysisTypeScriptPublicApi.getSymbolAtLocation(
 		session.checker,
@@ -1940,13 +2174,13 @@ function deriveCompilerEvidence(
 		rootModuleSymbol
 	);
 	assertWithinDeadline('ROOT_EXPORT_ENUMERATE');
-	if (exports.length > budgets.maxExportSymbols)
+	if (exports.length > maxExportSymbols)
 		throw new DeclarationContextAnalysisFailure(
 			'BUDGET_EXCEEDED',
 			'The package-root export population exceeds maxExportSymbols.',
 			'ROOT_EXPORT_ENUMERATE'
 		);
-	chargeTraversal(exports.length, 'ROOT_EXPORT_ENUMERATE');
+	traversal.charge(exports.length, 'ROOT_EXPORT_ENUMERATE');
 	const matches: ts.Symbol[] = [];
 	for (const symbol of exports) {
 		exportProgress.step();
@@ -1958,8 +2192,7 @@ function deriveCompilerEvidence(
 				'TypeScript returned a non-Unicode-scalar package-root export name.',
 				'ROOT_EXPORT_ENUMERATE'
 			);
-		if (sameTextWithProgress(name, inputs.request.exportName, exportProgress.step))
-			matches.push(symbol);
+		if (sameTextWithProgress(name, exportName, exportProgress.step)) matches.push(symbol);
 	}
 	const selectedExport = oneExact(
 		matches,
@@ -1969,9 +2202,80 @@ function deriveCompilerEvidence(
 	);
 	const rootExportSymbolFlags = symbolFlagsBinding(selectedExport);
 	exportProgress.finish();
-	progress.complete({ exportSymbolsExamined: exports.length, selectedExports: 1 });
+	return { exports, rootExportSymbolFlags, selectedExport };
+}
 
-	progress.start('ALIAS_RESOLVE');
+function assertAliasHopAdmissible(aliasHopCount: number, maxAliasHops: number): void {
+	if (aliasHopCount > 0)
+		throw new DeclarationContextAnalysisFailure(
+			'UNSUPPORTED_REQUEST',
+			'Multi-hop or cross-binding explicit alias chains are unsupported by the v1 slice.',
+			'ALIAS_RESOLVE'
+		);
+	if (aliasHopCount >= maxAliasHops)
+		throw new DeclarationContextAnalysisFailure(
+			'BUDGET_EXCEEDED',
+			'The selected export alias chain exhausted maxAliasHops.',
+			'ALIAS_RESOLVE'
+		);
+}
+
+function bindRootAliasExportSpecifier(
+	declaration: ts.Declaration,
+	session: CompilerProjectProgramSession,
+	checkerRootExportSpecifiers: ExportSpecifierCensusRecord[],
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): string {
+	if (!ts.isExportSpecifier(declaration))
+		throw new DeclarationContextAnalysisFailure(
+			'UNSUPPORTED_REQUEST',
+			'The selected root alias must be represented by one exact ExportSpecifier.',
+			'ALIAS_RESOLVE'
+		);
+	const exportDeclaration = declaration.parent.parent;
+	if (
+		!ts.isNamedExports(declaration.parent) ||
+		!ts.isExportDeclaration(exportDeclaration) ||
+		exportDeclaration.moduleSpecifier !== undefined
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'UNSUPPORTED_REQUEST',
+			'The selected root ExportSpecifier must be one local same-artifact export without a module specifier.',
+			'ALIAS_RESOLVE'
+		);
+	if (declaration.propertyName === undefined || !ts.isIdentifier(declaration.propertyName))
+		throw new DeclarationContextAnalysisFailure(
+			'UNSUPPORTED_REQUEST',
+			'The selected root alias must name its terminal binding with an identifier propertyName.',
+			'ALIAS_RESOLVE'
+		);
+	const rootAliasPropertyName = declaration.propertyName.text;
+	const sourceFile = declaration.getSourceFile();
+	assertWithinDeadline('ALIAS_RESOLVE');
+	checkerRootExportSpecifiers.push(
+		exportSpecifierCensusRecord(
+			declaration,
+			sourceFile,
+			session.toLogicalPath(sourceFile.fileName),
+			() => assertWithinDeadline('ALIAS_RESOLVE')
+		)
+	);
+	return rootAliasPropertyName;
+}
+
+function resolveAliasChain(
+	selectedExport: ts.Symbol,
+	session: CompilerProjectProgramSession,
+	maxAliasHops: number,
+	traversal: TraversalLedger,
+	bindArtifact: (sourceFile: ts.SourceFile, role: DeclarationContextArtifactRole) => ArtifactDraft,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): {
+	readonly aliasHops: AliasHopDraft[];
+	readonly checkerRootExportSpecifiers: ExportSpecifierCensusRecord[];
+	readonly rootAliasPropertyName: string | null;
+	readonly terminalSymbol: ts.Symbol;
+} {
 	const aliasProgress = resourceProgress(() => assertWithinDeadline('ALIAS_RESOLVE'));
 	const visited = new Set<ts.Symbol>([selectedExport]);
 	const aliasHops: AliasHopDraft[] = [];
@@ -1980,19 +2284,8 @@ function deriveCompilerEvidence(
 	let terminalSymbol = selectedExport;
 	while ((terminalSymbol.flags & ts.SymbolFlags.Alias) !== 0) {
 		aliasProgress.step();
-		if (aliasHops.length > 0)
-			throw new DeclarationContextAnalysisFailure(
-				'UNSUPPORTED_REQUEST',
-				'Multi-hop or cross-binding explicit alias chains are unsupported by the v1 slice.',
-				'ALIAS_RESOLVE'
-			);
-		if (aliasHops.length >= budgets.maxAliasHops)
-			throw new DeclarationContextAnalysisFailure(
-				'BUDGET_EXCEEDED',
-				'The selected export alias chain exhausted maxAliasHops.',
-				'ALIAS_RESOLVE'
-			);
-		chargeTraversal(1, 'ALIAS_RESOLVE');
+		assertAliasHopAdmissible(aliasHops.length, maxAliasHops);
+		traversal.charge(1, 'ALIAS_RESOLVE');
 		const aliasDeclarations =
 			declarationContextAnalysisTypeScriptPublicApi.getDeclarations(terminalSymbol) ?? [];
 		assertWithinDeadline('ALIAS_RESOLVE');
@@ -2002,43 +2295,13 @@ function deriveCompilerEvidence(
 				'Every traversed public alias symbol must have exactly one declaration.',
 				'ALIAS_RESOLVE'
 			);
-		if (terminalSymbol === selectedExport) {
-			const declaration = aliasDeclarations[0]!;
-			if (!ts.isExportSpecifier(declaration))
-				throw new DeclarationContextAnalysisFailure(
-					'UNSUPPORTED_REQUEST',
-					'The selected root alias must be represented by one exact ExportSpecifier.',
-					'ALIAS_RESOLVE'
-				);
-			const exportDeclaration = declaration.parent.parent;
-			if (
-				!ts.isNamedExports(declaration.parent) ||
-				!ts.isExportDeclaration(exportDeclaration) ||
-				exportDeclaration.moduleSpecifier !== undefined
-			)
-				throw new DeclarationContextAnalysisFailure(
-					'UNSUPPORTED_REQUEST',
-					'The selected root ExportSpecifier must be one local same-artifact export without a module specifier.',
-					'ALIAS_RESOLVE'
-				);
-			if (declaration.propertyName === undefined || !ts.isIdentifier(declaration.propertyName))
-				throw new DeclarationContextAnalysisFailure(
-					'UNSUPPORTED_REQUEST',
-					'The selected root alias must name its terminal binding with an identifier propertyName.',
-					'ALIAS_RESOLVE'
-				);
-			rootAliasPropertyName = declaration.propertyName.text;
-			const sourceFile = declaration.getSourceFile();
-			assertWithinDeadline('ALIAS_RESOLVE');
-			checkerRootExportSpecifiers.push(
-				exportSpecifierCensusRecord(
-					declaration,
-					sourceFile,
-					session.toLogicalPath(sourceFile.fileName),
-					() => assertWithinDeadline('ALIAS_RESOLVE')
-				)
+		if (terminalSymbol === selectedExport)
+			rootAliasPropertyName = bindRootAliasExportSpecifier(
+				aliasDeclarations[0]!,
+				session,
+				checkerRootExportSpecifiers,
+				assertWithinDeadline
 			);
-		}
 		const aliasArtifactPaths = new Set<string>();
 		for (const declaration of aliasDeclarations) {
 			aliasProgress.step();
@@ -2084,12 +2347,14 @@ function deriveCompilerEvidence(
 		terminalSymbol = target;
 	}
 	aliasProgress.finish();
-	progress.complete({ aliasHops: aliasHops.length });
+	return { aliasHops, checkerRootExportSpecifiers, rootAliasPropertyName, terminalSymbol };
+}
 
-	progress.start('TERMINAL_DECLARATION_BIND');
-	const declarationProgress = resourceProgress(() =>
-		assertWithinDeadline('TERMINAL_DECLARATION_BIND')
-	);
+function resolveTerminalSymbolName(
+	terminalSymbol: ts.Symbol,
+	declarationProgress: ResourceProgressHandle,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): string {
 	const terminalName = declarationContextAnalysisTypeScriptPublicApi.getName(terminalSymbol);
 	assertWithinDeadline('TERMINAL_DECLARATION_BIND');
 	if (
@@ -2101,16 +2366,21 @@ function deriveCompilerEvidence(
 			'The terminal checker symbol lacks a supported public name.',
 			'TERMINAL_DECLARATION_BIND'
 		);
-	const terminalDeclarations =
-		declarationContextAnalysisTypeScriptPublicApi.getDeclarations(terminalSymbol) ?? [];
-	assertWithinDeadline('TERMINAL_DECLARATION_BIND');
+	return terminalName;
+}
+
+function assertTerminalDeclarationPopulation(
+	terminalDeclarations: readonly ts.Declaration[],
+	maxDeclarations: number,
+	declarationProgress: ResourceProgressHandle
+): void {
 	if (terminalDeclarations.length === 0)
 		throw new DeclarationContextAnalysisFailure(
 			'TARGET_UNAVAILABLE',
 			'The terminal checker symbol has no public declaration population.',
 			'TERMINAL_DECLARATION_BIND'
 		);
-	if (terminalDeclarations.length > budgets.maxDeclarations)
+	if (terminalDeclarations.length > maxDeclarations)
 		throw new DeclarationContextAnalysisFailure(
 			'BUDGET_EXCEEDED',
 			'The terminal declaration population exceeds maxDeclarations.',
@@ -2129,18 +2399,16 @@ function deriveCompilerEvidence(
 			'The terminal checker declaration population repeats a reference identity.',
 			'TERMINAL_DECLARATION_BIND'
 		);
-	chargeTraversal(terminalDeclarations.length, 'TERMINAL_DECLARATION_BIND');
-	const terminalPaths = new Set<string>();
-	const declarations = terminalDeclarations.map((declaration) => {
-		declarationProgress.step();
-		const sourceFile = declaration.getSourceFile();
-		assertWithinDeadline('TERMINAL_DECLARATION_BIND');
-		const artifact = bindArtifact(sourceFile, 'TERMINAL_DECLARATION_CONTAINER');
-		terminalPaths.add(artifact.logicalPath);
-		return supportedDeclaration(declaration, artifact.logicalPath, declarationProgress.step, () =>
-			assertWithinDeadline('TERMINAL_DECLARATION_BIND')
-		);
-	});
+}
+
+function assertTerminalArtifactBinding(
+	terminalPaths: ReadonlySet<string>,
+	bound: BoundProgramContext,
+	aliasHops: readonly AliasHopDraft[],
+	rootAliasPropertyName: string | null,
+	terminalName: string,
+	declarationProgress: ResourceProgressHandle
+): void {
 	if (terminalPaths.size !== 1)
 		throw new DeclarationContextAnalysisFailure(
 			'UNSUPPORTED_REQUEST',
@@ -2166,49 +2434,34 @@ function deriveCompilerEvidence(
 			'The v1 explicit alias must bind one root ExportSpecifier propertyName directly to a same-root terminal symbol.',
 			'TERMINAL_DECLARATION_BIND'
 		);
-	declarations.sort((left, right) => {
-		declarationProgress.step();
-		return compareDeclarationDraft(left, right, declarationProgress.step);
-	});
-	if (
-		declarations.some((declaration) => {
-			declarationProgress.step();
-			return !sameTextWithProgress(declaration.name, terminalName, declarationProgress.step);
-		})
-	)
-		throw new DeclarationContextAnalysisFailure(
-			'TARGET_UNAVAILABLE',
-			'Terminal declaration names do not reproduce the checker symbol name.',
-			'TERMINAL_DECLARATION_BIND'
-		);
-	declarationProgress.finish();
-	progress.complete({ declarations: declarations.length });
+}
 
-	progress.start('ARTIFACT_BIND');
-	const artifactProgress = resourceProgress(() => assertWithinDeadline('ARTIFACT_BIND'));
-	const artifacts = [...artifactByPath.values()].sort((left, right) => {
-		artifactProgress.step();
-		return (
-			compareText(left.logicalPath, right.logicalPath, artifactProgress.step) ||
-			compareText(left.source.id, right.source.id, artifactProgress.step)
-		);
-	});
-	artifactProgress.finish();
-	progress.complete({ artifacts: artifacts.length });
+interface ParsedArtifactCensus {
+	readonly assertWithinDeadline: () => void;
+	readonly checkerRootExportSpecifierCount: number;
+	readonly declarationCount: number;
+	readonly exportName: string;
+	readonly independentRootExportSpecifiers: ExportSpecifierCensusRecord[];
+	readonly independentTerminalDeclarations: DeclarationDraft[];
+	readonly step: () => void;
+	readonly targetLogicalPath: string;
+	readonly terminalLogicalPath: string;
+	readonly terminalName: string;
+}
 
-	progress.start('ARTIFACT_PARSE_ACCOUNT');
-	const parseProgress = resourceProgress(() => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT'));
-	let selectedAstNodes = 0;
+function assertArtifactsHaveNoSyntacticDiagnostics(
+	artifacts: readonly ArtifactDraft[],
+	session: CompilerProjectProgramSession,
+	maxDiagnostics: number,
+	parseProgress: ResourceProgressHandle,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): void {
 	let artifactDiagnostics = 0;
-	const independentTerminalDeclarations: DeclarationDraft[] = [];
-	const independentRootExportSpecifiers: ExportSpecifierCensusRecord[] = [];
-	const terminalLogicalPath = declarations[0]!.logicalPath;
-	const parsedArtifacts: ParsedArtifactDraft[] = [];
 	for (const artifact of artifacts) {
 		parseProgress.step();
 		const syntacticDiagnostics = session.program.getSyntacticDiagnostics(artifact.sourceFile);
 		assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT');
-		if (syntacticDiagnostics.length > budgets.maxDiagnostics - artifactDiagnostics)
+		if (syntacticDiagnostics.length > maxDiagnostics - artifactDiagnostics)
 			throw new DeclarationContextAnalysisFailure(
 				'BUDGET_EXCEEDED',
 				'Artifact Program diagnostics cumulatively exceed maxDiagnostics.',
@@ -2222,37 +2475,116 @@ function deriveCompilerEvidence(
 				'ARTIFACT_PARSE_ACCOUNT'
 			);
 	}
+}
+
+function assertParsedArtifactReconciles(
+	parsed: CompilerProjectParsedSource,
+	artifact: ArtifactDraft,
+	parseProgress: ResourceProgressHandle
+): void {
+	if (
+		parsed.logicalPath !== artifact.logicalPath ||
+		parsed.contentBytes !== artifact.source.bytes ||
+		parsed.contentSha256 !== artifact.source.contentSha256 ||
+		parsed.textLength !== artifact.source.textLength ||
+		!sameTextWithProgress(parsed.sourceFile.text, artifact.sourceFile.text, parseProgress.step) ||
+		parsed.sourceFile.isDeclarationFile !== true
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'CAPTURE_INVALID',
+			'An independently parsed artifact does not reconcile with Program and CAP-001 evidence.',
+			'ARTIFACT_PARSE_ACCOUNT'
+		);
+	if (
+		parsed.sourceFile.referencedFiles.length !== 0 ||
+		parsed.sourceFile.typeReferenceDirectives.length !== 0 ||
+		parsed.sourceFile.libReferenceDirectives.length !== 0 ||
+		parsed.sourceFile.amdDependencies.length !== 0 ||
+		parsed.sourceFile.moduleName !== undefined ||
+		parsed.sourceFile.hasNoDefaultLib
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'UNSUPPORTED_REQUEST',
+			'Triple-slash path, types, lib, no-default-lib, AMD module, and AMD dependency effects are unsupported by the v1 slice.',
+			'ARTIFACT_PARSE_ACCOUNT'
+		);
+}
+
+function censusParsedArtifactNode(
+	node: ts.Node,
+	artifact: ArtifactDraft,
+	parsed: CompilerProjectParsedSource,
+	census: ParsedArtifactCensus
+): void {
+	refuseAmbientEffectNode(node);
+	if (artifact.logicalPath === census.terminalLogicalPath) {
+		const declaration = censusTopLevelTerminalDeclaration(
+			node,
+			parsed.sourceFile,
+			artifact.logicalPath,
+			census.terminalName,
+			census.step,
+			census.assertWithinDeadline
+		);
+		if (declaration !== null) {
+			if (census.independentTerminalDeclarations.length >= census.declarationCount)
+				throw new DeclarationContextAnalysisFailure(
+					'TARGET_UNAVAILABLE',
+					'The independently parsed terminal declaration census exceeds the checker declaration population.',
+					'ARTIFACT_PARSE_ACCOUNT'
+				);
+			census.independentTerminalDeclarations.push(declaration);
+		}
+	}
+	if (
+		artifact.logicalPath === census.targetLogicalPath &&
+		ts.isExportSpecifier(node) &&
+		sameTextWithProgress(node.name.text, census.exportName, census.step) &&
+		ts.isNamedExports(node.parent) &&
+		ts.isExportDeclaration(node.parent.parent) &&
+		node.parent.parent.parent === parsed.sourceFile
+	) {
+		if (census.independentRootExportSpecifiers.length >= census.checkerRootExportSpecifierCount)
+			throw new DeclarationContextAnalysisFailure(
+				'TARGET_UNAVAILABLE',
+				'The independently parsed selected-name root ExportSpecifier census exceeds the checker alias declaration population.',
+				'ARTIFACT_PARSE_ACCOUNT'
+			);
+		census.independentRootExportSpecifiers.push(
+			exportSpecifierCensusRecord(
+				node,
+				parsed.sourceFile,
+				artifact.logicalPath,
+				census.assertWithinDeadline
+			)
+		);
+	}
+}
+
+function accountArtifactParses(
+	artifacts: readonly ArtifactDraft[],
+	session: CompilerProjectProgramSession,
+	budgets: DeclarationContextBudgets,
+	traversal: TraversalLedger,
+	census: ParsedArtifactCensus,
+	parseProgress: ResourceProgressHandle,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void
+): { readonly parsedArtifacts: ParsedArtifactDraft[]; readonly selectedAstNodes: number } {
+	let selectedAstNodes = 0;
+	const parsedArtifacts: ParsedArtifactDraft[] = [];
+	assertArtifactsHaveNoSyntacticDiagnostics(
+		artifacts,
+		session,
+		budgets.maxDiagnostics,
+		parseProgress,
+		assertWithinDeadline
+	);
 	for (const artifact of artifacts) {
 		parseProgress.step();
-		chargeTraversal(1, 'ARTIFACT_PARSE_ACCOUNT');
+		traversal.charge(1, 'ARTIFACT_PARSE_ACCOUNT');
 		const parsed = session.parseCapturedSourceFile(artifact.logicalPath);
 		assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT');
-		if (
-			parsed.logicalPath !== artifact.logicalPath ||
-			parsed.contentBytes !== artifact.source.bytes ||
-			parsed.contentSha256 !== artifact.source.contentSha256 ||
-			parsed.textLength !== artifact.source.textLength ||
-			!sameTextWithProgress(parsed.sourceFile.text, artifact.sourceFile.text, parseProgress.step) ||
-			parsed.sourceFile.isDeclarationFile !== true
-		)
-			throw new DeclarationContextAnalysisFailure(
-				'CAPTURE_INVALID',
-				'An independently parsed artifact does not reconcile with Program and CAP-001 evidence.',
-				'ARTIFACT_PARSE_ACCOUNT'
-			);
-		if (
-			parsed.sourceFile.referencedFiles.length !== 0 ||
-			parsed.sourceFile.typeReferenceDirectives.length !== 0 ||
-			parsed.sourceFile.libReferenceDirectives.length !== 0 ||
-			parsed.sourceFile.amdDependencies.length !== 0 ||
-			parsed.sourceFile.moduleName !== undefined ||
-			parsed.sourceFile.hasNoDefaultLib
-		)
-			throw new DeclarationContextAnalysisFailure(
-				'UNSUPPORTED_REQUEST',
-				'Triple-slash path, types, lib, no-default-lib, AMD module, and AMD dependency effects are unsupported by the v1 slice.',
-				'ARTIFACT_PARSE_ACCOUNT'
-			);
+		assertParsedArtifactReconciles(parsed, artifact, parseProgress);
 		const priorAstNodes = selectedAstNodes;
 		selectedAstNodes = countAstNodes(
 			parsed.sourceFile,
@@ -2261,47 +2593,8 @@ function deriveCompilerEvidence(
 			() => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT'),
 			'ARTIFACT_PARSE_ACCOUNT',
 			(node) => {
-				chargeTraversal(1, 'ARTIFACT_PARSE_ACCOUNT');
-				refuseAmbientEffectNode(node);
-				if (artifact.logicalPath === terminalLogicalPath) {
-					const declaration = censusTopLevelTerminalDeclaration(
-						node,
-						parsed.sourceFile,
-						artifact.logicalPath,
-						terminalName,
-						parseProgress.step,
-						() => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT')
-					);
-					if (declaration !== null) {
-						if (independentTerminalDeclarations.length >= declarations.length)
-							throw new DeclarationContextAnalysisFailure(
-								'TARGET_UNAVAILABLE',
-								'The independently parsed terminal declaration census exceeds the checker declaration population.',
-								'ARTIFACT_PARSE_ACCOUNT'
-							);
-						independentTerminalDeclarations.push(declaration);
-					}
-				}
-				if (
-					artifact.logicalPath === bound.targetSource.logicalPath &&
-					ts.isExportSpecifier(node) &&
-					sameTextWithProgress(node.name.text, inputs.request.exportName, parseProgress.step) &&
-					ts.isNamedExports(node.parent) &&
-					ts.isExportDeclaration(node.parent.parent) &&
-					node.parent.parent.parent === parsed.sourceFile
-				) {
-					if (independentRootExportSpecifiers.length >= checkerRootExportSpecifiers.length)
-						throw new DeclarationContextAnalysisFailure(
-							'TARGET_UNAVAILABLE',
-							'The independently parsed selected-name root ExportSpecifier census exceeds the checker alias declaration population.',
-							'ARTIFACT_PARSE_ACCOUNT'
-						);
-					independentRootExportSpecifiers.push(
-						exportSpecifierCensusRecord(node, parsed.sourceFile, artifact.logicalPath, () =>
-							assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT')
-						)
-					);
-				}
+				traversal.charge(1, 'ARTIFACT_PARSE_ACCOUNT');
+				censusParsedArtifactNode(node, artifact, parsed, census);
 			}
 		);
 		const parsedIsExternalModule = declarationContextAnalysisTypeScriptPublicApi.isExternalModule(
@@ -2321,6 +2614,14 @@ function deriveCompilerEvidence(
 			statements: parsed.sourceFile.statements.length
 		});
 	}
+	return { parsedArtifacts, selectedAstNodes };
+}
+
+function assertTerminalDeclarationCensus(
+	independentTerminalDeclarations: DeclarationDraft[],
+	declarations: readonly DeclarationDraft[],
+	parseProgress: ResourceProgressHandle
+): void {
 	independentTerminalDeclarations.sort((left, right) => {
 		parseProgress.step();
 		return compareDeclarationDraft(left, right, parseProgress.step);
@@ -2337,6 +2638,13 @@ function deriveCompilerEvidence(
 			'The independently parsed terminal declaration census does not reproduce the complete checker declaration multiset.',
 			'ARTIFACT_PARSE_ACCOUNT'
 		);
+}
+
+function assertRootExportSpecifierCensus(
+	independentRootExportSpecifiers: ExportSpecifierCensusRecord[],
+	checkerRootExportSpecifiers: ExportSpecifierCensusRecord[],
+	parseProgress: ResourceProgressHandle
+): void {
 	checkerRootExportSpecifiers.sort((left, right) => {
 		parseProgress.step();
 		return compareExportSpecifierCensus(left, right, parseProgress.step);
@@ -2363,33 +2671,20 @@ function deriveCompilerEvidence(
 			'The independently parsed selected-name root ExportSpecifier census does not reproduce the checker alias declaration.',
 			'ARTIFACT_PARSE_ACCOUNT'
 		);
-	parseProgress.finish();
-	progress.complete({ artifacts: artifacts.length, selectedAstNodes });
-	const compilerOptions = session.program.getCompilerOptions();
-	assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT');
-	const compilerOptionsDigest = canonicalSemanticJsonWitnessWithProgress(compilerOptions, () =>
-		assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT')
-	).sha256;
-	if (
-		compilerOptionsDigest !== inputs.moduleResolutionTrace.resolverEnvironment.compilerOptionsDigest
-	)
-		throw new DeclarationContextAnalysisFailure(
-			'CAPTURE_INVALID',
-			'Fresh Program compiler options do not reproduce the CAP-011 options digest.',
-			'ARTIFACT_PARSE_ACCOUNT'
-		);
-	const languageVersionCode = compilerOptions.target ?? ts.ScriptTarget.Latest;
-	const languageVersionName = ts.ScriptTarget[languageVersionCode];
-	if (typeof languageVersionName !== 'string')
-		throw new DeclarationContextAnalysisFailure(
-			'PROGRAM_CONSTRUCTION_UNAVAILABLE',
-			'The Program language-version code lacks a public reverse-enum name.',
-			'ARTIFACT_PARSE_ACCOUNT'
-		);
+}
 
-	const evidence = session.finalize();
-	assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT');
-	const evidenceProgress = resourceProgress(() => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT'));
+function assertEvidenceReconciles(
+	evidence: CompilerProjectProgramEvidence,
+	inputs: DeclarationContextAnalysisBuildInputs,
+	bound: BoundProgramContext,
+	counts: {
+		readonly artifactCount: number;
+		readonly maxCompilerInputAttempts: number;
+		readonly maxProgramReadBytes: number;
+		readonly programSourceCount: number;
+	},
+	evidenceProgress: ResourceProgressHandle
+): void {
 	let contextInputIdsReconcile =
 		evidence.contextInputIds.length ===
 		inputs.moduleResolutionTrace.captureWitness.inputRecordIds.length;
@@ -2418,10 +2713,10 @@ function deriveCompilerEvidence(
 		evidence.projectResolutionDigest !==
 			inputs.moduleResolutionTrace.captureWitness.projectResolutionDigest ||
 		!contextInputIdsReconcile ||
-		evidence.programSourceFiles !== programSources.length ||
-		evidence.attributedInputRecords > budgets.maxCompilerInputAttempts ||
-		evidence.attributedReadBytes > budgets.maxProgramReadBytes ||
-		evidence.artifactParseInputRecords !== artifacts.length ||
+		evidence.programSourceFiles !== counts.programSourceCount ||
+		evidence.attributedInputRecords > counts.maxCompilerInputAttempts ||
+		evidence.attributedReadBytes > counts.maxProgramReadBytes ||
+		evidence.artifactParseInputRecords !== counts.artifactCount ||
 		evidence.compilerHostCallbacks !==
 			checkedAdd(evidence.programCompilerHostCallbacks, evidence.artifactParseInputRecords) ||
 		evidence.compilerHostReadBytes !==
@@ -2432,10 +2727,13 @@ function deriveCompilerEvidence(
 			'Fresh Program evidence does not reconcile with the exact predecessor capture.',
 			'ARTIFACT_PARSE_ACCOUNT'
 		);
-	evidenceProgress.finish();
-	const capturedReadProgress = resourceProgress(() =>
-		assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT')
-	);
+}
+
+function assertCapturedReadEvidence(
+	evidence: CompilerProjectProgramEvidence,
+	bound: BoundProgramContext,
+	capturedReadProgress: ResourceProgressHandle
+): void {
 	const capturedReadsByLogicalPath = new Map<string, Set<string>>();
 	let artifactSuffixStarted = false;
 	for (const record of evidence.inputRecords) {
@@ -2470,6 +2768,229 @@ function deriveCompilerEvidence(
 				'ARTIFACT_PARSE_ACCOUNT'
 			);
 	}
+}
+
+function deriveCompilerEvidence(
+	inputs: DeclarationContextAnalysisBuildInputs,
+	bound: BoundProgramContext,
+	remainingDurationMs: number,
+	assertWithinDeadline: (phase: DeclarationContextAnalysisProgressPhase) => void,
+	progress: TelemetryRecorder
+): CompilerDerivation {
+	const budgets = inputs.request.budgets;
+	const traversal = createTraversalLedger(budgets.maxTraversalSteps);
+	progress.start('PROGRAM_CONSTRUCT');
+	const { freshProgramSourceFiles, session } = openCompilerProgramSession(
+		inputs,
+		bound,
+		remainingDurationMs,
+		traversal,
+		progress,
+		assertWithinDeadline
+	);
+	progress.complete({ programSourceFiles: freshProgramSourceFiles.length });
+
+	progress.start('PROGRAM_SOURCE_ACCOUNT');
+	const { programAstNodes, programSources } = reconcileFreshProgramSources(
+		freshProgramSourceFiles,
+		bound,
+		budgets,
+		traversal,
+		session,
+		assertWithinDeadline
+	);
+	const contextSourceProgress = resourceProgress(() =>
+		assertWithinDeadline('PROGRAM_SOURCE_ACCOUNT')
+	);
+	reconcileContextProgramSources(
+		inputs,
+		bound,
+		programSources.length,
+		budgets,
+		contextSourceProgress
+	);
+	progress.complete({ programAstNodes, programSourceFiles: programSources.length });
+
+	const rootProgramSource = resolveRootExternalModuleSource(
+		programSources,
+		bound,
+		contextSourceProgress,
+		assertWithinDeadline
+	);
+
+	const artifactByPath = new Map<string, ArtifactDraft>();
+	const bindArtifact = (
+		sourceFile: ts.SourceFile,
+		role: DeclarationContextArtifactRole
+	): ArtifactDraft =>
+		bindDeclarationArtifact(artifactByPath, bound, budgets.maxArtifacts, session, sourceFile, role);
+	bindArtifact(rootProgramSource, 'CAP011_SELECTED_DECLARATION_TARGET');
+	bindArtifact(rootProgramSource, 'SELECTED_EXPORT_BINDING_CARRIER');
+
+	progress.start('ROOT_EXPORT_ENUMERATE');
+	const { exports, rootExportSymbolFlags, selectedExport } = enumerateSelectedRootExport(
+		session,
+		rootProgramSource,
+		inputs.request.exportName,
+		budgets.maxExportSymbols,
+		traversal,
+		assertWithinDeadline
+	);
+	progress.complete({ exportSymbolsExamined: exports.length, selectedExports: 1 });
+
+	progress.start('ALIAS_RESOLVE');
+	const { aliasHops, checkerRootExportSpecifiers, rootAliasPropertyName, terminalSymbol } =
+		resolveAliasChain(
+			selectedExport,
+			session,
+			budgets.maxAliasHops,
+			traversal,
+			bindArtifact,
+			assertWithinDeadline
+		);
+	progress.complete({ aliasHops: aliasHops.length });
+
+	progress.start('TERMINAL_DECLARATION_BIND');
+	const declarationProgress = resourceProgress(() =>
+		assertWithinDeadline('TERMINAL_DECLARATION_BIND')
+	);
+	const terminalName = resolveTerminalSymbolName(
+		terminalSymbol,
+		declarationProgress,
+		assertWithinDeadline
+	);
+	const terminalDeclarations =
+		declarationContextAnalysisTypeScriptPublicApi.getDeclarations(terminalSymbol) ?? [];
+	assertWithinDeadline('TERMINAL_DECLARATION_BIND');
+	assertTerminalDeclarationPopulation(
+		terminalDeclarations,
+		budgets.maxDeclarations,
+		declarationProgress
+	);
+	traversal.charge(terminalDeclarations.length, 'TERMINAL_DECLARATION_BIND');
+	const terminalPaths = new Set<string>();
+	const declarations = terminalDeclarations.map((declaration) => {
+		declarationProgress.step();
+		const sourceFile = declaration.getSourceFile();
+		assertWithinDeadline('TERMINAL_DECLARATION_BIND');
+		const artifact = bindArtifact(sourceFile, 'TERMINAL_DECLARATION_CONTAINER');
+		terminalPaths.add(artifact.logicalPath);
+		return supportedDeclaration(declaration, artifact.logicalPath, declarationProgress.step, () =>
+			assertWithinDeadline('TERMINAL_DECLARATION_BIND')
+		);
+	});
+	assertTerminalArtifactBinding(
+		terminalPaths,
+		bound,
+		aliasHops,
+		rootAliasPropertyName,
+		terminalName,
+		declarationProgress
+	);
+	declarations.sort((left, right) => {
+		declarationProgress.step();
+		return compareDeclarationDraft(left, right, declarationProgress.step);
+	});
+	if (
+		declarations.some((declaration) => {
+			declarationProgress.step();
+			return !sameTextWithProgress(declaration.name, terminalName, declarationProgress.step);
+		})
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'TARGET_UNAVAILABLE',
+			'Terminal declaration names do not reproduce the checker symbol name.',
+			'TERMINAL_DECLARATION_BIND'
+		);
+	declarationProgress.finish();
+	progress.complete({ declarations: declarations.length });
+
+	progress.start('ARTIFACT_BIND');
+	const artifactProgress = resourceProgress(() => assertWithinDeadline('ARTIFACT_BIND'));
+	const artifacts = [...artifactByPath.values()].sort((left, right) => {
+		artifactProgress.step();
+		return (
+			compareText(left.logicalPath, right.logicalPath, artifactProgress.step) ||
+			compareText(left.source.id, right.source.id, artifactProgress.step)
+		);
+	});
+	artifactProgress.finish();
+	progress.complete({ artifacts: artifacts.length });
+
+	progress.start('ARTIFACT_PARSE_ACCOUNT');
+	const parseProgress = resourceProgress(() => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT'));
+	const independentTerminalDeclarations: DeclarationDraft[] = [];
+	const independentRootExportSpecifiers: ExportSpecifierCensusRecord[] = [];
+	const { parsedArtifacts, selectedAstNodes } = accountArtifactParses(
+		artifacts,
+		session,
+		budgets,
+		traversal,
+		{
+			assertWithinDeadline: () => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT'),
+			checkerRootExportSpecifierCount: checkerRootExportSpecifiers.length,
+			declarationCount: declarations.length,
+			exportName: inputs.request.exportName,
+			independentRootExportSpecifiers,
+			independentTerminalDeclarations,
+			step: parseProgress.step,
+			targetLogicalPath: bound.targetSource.logicalPath,
+			terminalLogicalPath: declarations[0]!.logicalPath,
+			terminalName
+		},
+		parseProgress,
+		assertWithinDeadline
+	);
+	assertTerminalDeclarationCensus(independentTerminalDeclarations, declarations, parseProgress);
+	assertRootExportSpecifierCensus(
+		independentRootExportSpecifiers,
+		checkerRootExportSpecifiers,
+		parseProgress
+	);
+	parseProgress.finish();
+	progress.complete({ artifacts: artifacts.length, selectedAstNodes });
+	const compilerOptions = session.program.getCompilerOptions();
+	assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT');
+	const compilerOptionsDigest = canonicalSemanticJsonWitnessWithProgress(compilerOptions, () =>
+		assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT')
+	).sha256;
+	if (
+		compilerOptionsDigest !== inputs.moduleResolutionTrace.resolverEnvironment.compilerOptionsDigest
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'CAPTURE_INVALID',
+			'Fresh Program compiler options do not reproduce the CAP-011 options digest.',
+			'ARTIFACT_PARSE_ACCOUNT'
+		);
+	const languageVersionCode = compilerOptions.target ?? ts.ScriptTarget.Latest;
+	const languageVersionName = ts.ScriptTarget[languageVersionCode];
+	if (typeof languageVersionName !== 'string')
+		throw new DeclarationContextAnalysisFailure(
+			'PROGRAM_CONSTRUCTION_UNAVAILABLE',
+			'The Program language-version code lacks a public reverse-enum name.',
+			'ARTIFACT_PARSE_ACCOUNT'
+		);
+
+	const evidence = session.finalize();
+	assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT');
+	const evidenceProgress = resourceProgress(() => assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT'));
+	assertEvidenceReconciles(
+		evidence,
+		inputs,
+		bound,
+		{
+			artifactCount: artifacts.length,
+			maxCompilerInputAttempts: budgets.maxCompilerInputAttempts,
+			maxProgramReadBytes: budgets.maxProgramReadBytes,
+			programSourceCount: programSources.length
+		},
+		evidenceProgress
+	);
+	evidenceProgress.finish();
+	const capturedReadProgress = resourceProgress(() =>
+		assertWithinDeadline('ARTIFACT_PARSE_ACCOUNT')
+	);
+	assertCapturedReadEvidence(evidence, bound, capturedReadProgress);
 	capturedReadProgress.finish();
 	return {
 		aliasHops,
@@ -2481,7 +3002,7 @@ function deriveCompilerEvidence(
 		languageVersionCode,
 		languageVersionName,
 		parsedArtifacts,
-		preMaterializationTraversalSteps: progressiveTraversalSteps,
+		preMaterializationTraversalSteps: traversal.total(),
 		programAstNodes,
 		programSourceFiles: programSources.length,
 		rootExportSymbolFlags,
@@ -2506,14 +3027,19 @@ function compareStringTuples(left: readonly string[], right: readonly string[]):
 	return 0;
 }
 
-function materializeAnalysis(
+interface MaterializationPopulationBounds {
+	readonly inputRecords: number;
+	readonly mergeRecords: number;
+	readonly outputRecords: number;
+	readonly readBytes: number;
+	readonly relationRecords: number;
+	readonly traversalSteps: number;
+}
+
+function prospectiveMaterializationBounds(
 	inputs: DeclarationContextAnalysisBuildInputs,
-	semanticValidationWitness: DeclarationContextAnalysisSnapshot['semanticValidationWitness'],
-	bound: BoundProgramContext,
-	derived: CompilerDerivation,
-	onProgress: () => void
-): DeclarationContextAnalysisSnapshot {
-	const deadline = resourceProgress(onProgress);
+	derived: CompilerDerivation
+): MaterializationPopulationBounds {
 	const prospectiveMergeRecords = derived.declarations.length > 1 ? 1 : 0;
 	const prospectiveRelationRecords = checkedAdd(
 		derived.declarations.length,
@@ -2574,19 +3100,41 @@ function materializeAnalysis(
 			'Prospective declaration-context populations exceed one requested materialization budget.',
 			'MATERIALIZE'
 		);
+	return {
+		inputRecords: prospectiveInputRecords,
+		mergeRecords: prospectiveMergeRecords,
+		outputRecords: prospectiveOutputRecords,
+		readBytes: prospectiveReadBytes,
+		relationRecords: prospectiveRelationRecords,
+		traversalSteps: prospectiveTraversalSteps
+	};
+}
 
-	const inputDigest = declarationContextAnalysisInputDigest(inputs, onProgress);
-	const analysisId = declarationContextAnalysisId(
-		{
-			conditionalExportResolutionId: inputs.conditionalExportResolution.id,
-			inputDigest,
-			moduleResolutionTraceId: inputs.moduleResolutionTrace.id,
-			semanticSnapshotId: inputs.semanticSnapshot.id,
-			subjectId: inputs.request.subjectId
-		},
-		onProgress
-	);
+function assertMaterializedPopulations(
+	actual: MaterializationPopulationBounds,
+	prospective: MaterializationPopulationBounds
+): void {
+	if (
+		actual.mergeRecords !== prospective.mergeRecords ||
+		actual.relationRecords !== prospective.relationRecords ||
+		actual.inputRecords !== prospective.inputRecords ||
+		actual.readBytes !== prospective.readBytes ||
+		actual.traversalSteps !== prospective.traversalSteps ||
+		actual.outputRecords !== prospective.outputRecords
+	)
+		throw new DeclarationContextAnalysisFailure(
+			'INPUT_POPULATION_MISMATCH',
+			'Materialized declaration-context populations do not reproduce their prospective bounds.',
+			'MATERIALIZE'
+		);
+}
 
+function materializeProgramInputAttempts(
+	derived: CompilerDerivation,
+	analysisId: DeclarationContextAnalysisId,
+	deadline: ResourceProgressHandle,
+	onProgress: () => void
+): DeclarationContextProgramInputAttemptRecord[] {
 	const programInputAttempts: DeclarationContextProgramInputAttemptRecord[] = [];
 	for (const inputRecord of derived.evidence.inputRecords) {
 		deadline.step();
@@ -2621,7 +3169,18 @@ function materializeAnalysis(
 			'Program input-attempt output does not reproduce compiler-host accounting.',
 			'MATERIALIZE'
 		);
+	return programInputAttempts;
+}
 
+function materializeParseWitnesses(
+	derived: CompilerDerivation,
+	analysisId: DeclarationContextAnalysisId,
+	deadline: ResourceProgressHandle,
+	onProgress: () => void
+): {
+	readonly parseWitnessByPath: ReadonlyMap<string, DeclarationContextParseWitnessRecord>;
+	readonly parseWitnesses: DeclarationContextParseWitnessRecord[];
+} {
 	const parseWitnesses: DeclarationContextParseWitnessRecord[] = [];
 	const parseWitnessByPath = new Map<string, DeclarationContextParseWitnessRecord>();
 	for (const parsedArtifact of derived.parsedArtifacts) {
@@ -2681,41 +3240,223 @@ function materializeAnalysis(
 		parseWitnesses.push(record);
 		parseWitnessByPath.set(record.logicalPath, record);
 	}
+	return { parseWitnessByPath, parseWitnesses };
+}
 
-	const artifacts: DeclarationContextArtifactRecord[] = derived.artifacts.map(
-		(artifact, ordinal) => {
-			deadline.step();
-			const parseWitness = parseWitnessByPath.get(artifact.logicalPath);
-			if (parseWitness === undefined)
-				throw new DeclarationContextAnalysisFailure(
-					'INPUT_POPULATION_MISMATCH',
-					'One declaration artifact lacks its parse witness.',
-					'MATERIALIZE'
-				);
-			const roles = DECLARATION_CONTEXT_ANALYSIS_ARTIFACT_ROLE_ORDER.filter((role) =>
-				artifact.roles.has(role)
+function materializeArtifactRecords(
+	derived: CompilerDerivation,
+	parseWitnessByPath: ReadonlyMap<string, DeclarationContextParseWitnessRecord>,
+	analysisId: DeclarationContextAnalysisId,
+	deadline: ResourceProgressHandle,
+	onProgress: () => void
+): DeclarationContextArtifactRecord[] {
+	return derived.artifacts.map((artifact, ordinal) => {
+		deadline.step();
+		const parseWitness = parseWitnessByPath.get(artifact.logicalPath);
+		if (parseWitness === undefined)
+			throw new DeclarationContextAnalysisFailure(
+				'INPUT_POPULATION_MISMATCH',
+				'One declaration artifact lacks its parse witness.',
+				'MATERIALIZE'
 			);
-			const recordWithoutId: Omit<DeclarationContextArtifactRecord, 'id'> = {
-				artifactClass: 'CONTEXT_ONLY',
-				bytes: artifact.source.bytes,
-				contentSha256: artifact.source.contentSha256,
-				declarationFile: true,
-				declarationRole: 'EMITTED_DECLARATION',
-				extension: sourceExtension(artifact.logicalPath),
-				logicalPath: artifact.logicalPath,
-				ordinal,
-				origin: 'WORKSPACE_BUILD_DECLARATION',
-				parseWitnessId: parseWitness.id,
-				roles,
-				semanticProgramId: artifact.source.programId,
-				semanticProjectId: artifact.source.projectId,
-				semanticSourceId: artifact.source.id
-			};
-			return {
-				...recordWithoutId,
-				id: declarationContextArtifactId(analysisId, recordWithoutId, onProgress)
-			};
-		}
+		const roles = DECLARATION_CONTEXT_ANALYSIS_ARTIFACT_ROLE_ORDER.filter((role) =>
+			artifact.roles.has(role)
+		);
+		const recordWithoutId: Omit<DeclarationContextArtifactRecord, 'id'> = {
+			artifactClass: 'CONTEXT_ONLY',
+			bytes: artifact.source.bytes,
+			contentSha256: artifact.source.contentSha256,
+			declarationFile: true,
+			declarationRole: 'EMITTED_DECLARATION',
+			extension: sourceExtension(artifact.logicalPath),
+			logicalPath: artifact.logicalPath,
+			ordinal,
+			origin: 'WORKSPACE_BUILD_DECLARATION',
+			parseWitnessId: parseWitness.id,
+			roles,
+			semanticProgramId: artifact.source.programId,
+			semanticProjectId: artifact.source.projectId,
+			semanticSourceId: artifact.source.id
+		};
+		return {
+			...recordWithoutId,
+			id: declarationContextArtifactId(analysisId, recordWithoutId, onProgress)
+		};
+	});
+}
+
+function materializeDeclarationRecords(
+	derived: CompilerDerivation,
+	artifactByPath: ReadonlyMap<string, DeclarationContextArtifactRecord>,
+	parseWitnessByPath: ReadonlyMap<string, DeclarationContextParseWitnessRecord>,
+	analysisId: DeclarationContextAnalysisId,
+	deadline: ResourceProgressHandle,
+	onProgress: () => void
+): DeclarationContextDeclarationRecord[] {
+	return derived.declarations.map((declaration, ordinal) => {
+		deadline.step();
+		const artifact = artifactByPath.get(declaration.logicalPath);
+		const parseWitness = parseWitnessByPath.get(declaration.logicalPath);
+		if (artifact === undefined || parseWitness === undefined)
+			throw new DeclarationContextAnalysisFailure(
+				'INPUT_POPULATION_MISMATCH',
+				'One terminal declaration lacks artifact and parse identities.',
+				'MATERIALIZE'
+			);
+		const recordWithoutId: Omit<DeclarationContextDeclarationRecord, 'id'> = {
+			ambientContext: 'DECLARATION_FILE',
+			artifactId: artifact.id,
+			end: declaration.end,
+			kind: declaration.kind,
+			name: declaration.name,
+			nameEnd: declaration.nameEnd,
+			nameStart: declaration.nameStart,
+			nativeKind: clonePlainData(declaration.nativeKind, new WeakMap(), deadline.step),
+			ordinal,
+			parseWitnessId: parseWitness.id,
+			role: 'SELECTED_TERMINAL_SYMBOL_DECLARATION',
+			start: declaration.start
+		};
+		return {
+			...recordWithoutId,
+			id: declarationContextDeclarationId(analysisId, recordWithoutId, onProgress)
+		};
+	});
+}
+
+function materializeAliasHopWitnesses(
+	derived: CompilerDerivation,
+	artifactByPath: ReadonlyMap<string, DeclarationContextArtifactRecord>,
+	deadline: ResourceProgressHandle
+): DeclarationContextAliasHopWitness[] {
+	const aliasHops: DeclarationContextAliasHopWitness[] = derived.aliasHops.map((hop, ordinal) => {
+		deadline.step();
+		const aliasArtifacts = hop.aliasArtifactPaths
+			.map((path) => {
+				deadline.step();
+				return artifactByPath.get(path);
+			})
+			.filter((artifact): artifact is DeclarationContextArtifactRecord => {
+				deadline.step();
+				return artifact !== undefined;
+			})
+			.sort((left, right) => {
+				deadline.step();
+				return left.ordinal - right.ordinal;
+			});
+		return {
+			aliasDeclarationArtifactIds: aliasArtifacts.map((artifact) => {
+				deadline.step();
+				return artifact.id;
+			}),
+			aliasName: hop.aliasName,
+			aliasSymbolFlags: clonePlainData(hop.aliasSymbolFlags, new WeakMap(), deadline.step),
+			ordinal,
+			resolutionApi: 'TYPESCRIPT_PUBLIC_TYPE_CHECKER_GET_ALIASED_SYMBOL',
+			targetName: hop.targetName
+		};
+	});
+	if (aliasHops.some((hop) => hop.aliasDeclarationArtifactIds.length === 0))
+		throw new DeclarationContextAnalysisFailure(
+			'INPUT_POPULATION_MISMATCH',
+			'One alias hop lost all declaration-artifact identities.',
+			'MATERIALIZE'
+		);
+	return aliasHops;
+}
+
+function buildRelationDrafts(
+	declarations: readonly DeclarationContextDeclarationRecord[],
+	terminalSymbolId: DeclarationContextTerminalSymbolId,
+	merge: DeclarationContextMergeRecord | undefined,
+	deadline: ResourceProgressHandle
+): DeclarationContextRelationRecordWithoutId[] {
+	const relationDrafts: DeclarationContextRelationRecordWithoutId[] = [];
+	for (const declaration of declarations) {
+		deadline.step();
+		relationDrafts.push(
+			{
+				artifactId: declaration.artifactId,
+				declarationId: declaration.id,
+				kind: 'DECLARES',
+				ordinal: 0
+			},
+			{
+				declarationId: declaration.id,
+				kind: 'CONTRIBUTES_TO',
+				ordinal: 0,
+				terminalSymbolId
+			}
+		);
+		if (merge !== undefined)
+			relationDrafts.push({
+				declarationId: declaration.id,
+				kind: 'MERGES_WITH',
+				mergeId: merge.id,
+				ordinal: 0,
+				terminalSymbolId
+			});
+	}
+	relationDrafts.sort((left, right) => {
+		deadline.step();
+		return compareStringTuples(relationSortKey(left), relationSortKey(right));
+	});
+	return relationDrafts;
+}
+
+function countProgramPresentReadFileAttempts(
+	programInputAttempts: readonly DeclarationContextProgramInputAttemptRecord[],
+	deadline: ResourceProgressHandle
+): number {
+	let programPresentReadFileAttempts = 0;
+	for (const attempt of programInputAttempts) {
+		deadline.step();
+		if (attempt.observation.operation === 'READ_FILE' && attempt.observation.result === 'PRESENT')
+			programPresentReadFileAttempts += 1;
+	}
+	return programPresentReadFileAttempts;
+}
+
+function materializeAnalysis(
+	inputs: DeclarationContextAnalysisBuildInputs,
+	semanticValidationWitness: DeclarationContextAnalysisSnapshot['semanticValidationWitness'],
+	bound: BoundProgramContext,
+	derived: CompilerDerivation,
+	onProgress: () => void
+): DeclarationContextAnalysisSnapshot {
+	const deadline = resourceProgress(onProgress);
+	const prospective = prospectiveMaterializationBounds(inputs, derived);
+
+	const inputDigest = declarationContextAnalysisInputDigest(inputs, onProgress);
+	const analysisId = declarationContextAnalysisId(
+		{
+			conditionalExportResolutionId: inputs.conditionalExportResolution.id,
+			inputDigest,
+			moduleResolutionTraceId: inputs.moduleResolutionTrace.id,
+			semanticSnapshotId: inputs.semanticSnapshot.id,
+			subjectId: inputs.request.subjectId
+		},
+		onProgress
+	);
+
+	const programInputAttempts = materializeProgramInputAttempts(
+		derived,
+		analysisId,
+		deadline,
+		onProgress
+	);
+	const { parseWitnessByPath, parseWitnesses } = materializeParseWitnesses(
+		derived,
+		analysisId,
+		deadline,
+		onProgress
+	);
+	const artifacts = materializeArtifactRecords(
+		derived,
+		parseWitnessByPath,
+		analysisId,
+		deadline,
+		onProgress
 	);
 	const artifactByPath = new Map(
 		artifacts.map((artifact) => {
@@ -2723,37 +3464,13 @@ function materializeAnalysis(
 			return [artifact.logicalPath, artifact];
 		})
 	);
-
-	const declarations: DeclarationContextDeclarationRecord[] = derived.declarations.map(
-		(declaration, ordinal) => {
-			deadline.step();
-			const artifact = artifactByPath.get(declaration.logicalPath);
-			const parseWitness = parseWitnessByPath.get(declaration.logicalPath);
-			if (artifact === undefined || parseWitness === undefined)
-				throw new DeclarationContextAnalysisFailure(
-					'INPUT_POPULATION_MISMATCH',
-					'One terminal declaration lacks artifact and parse identities.',
-					'MATERIALIZE'
-				);
-			const recordWithoutId: Omit<DeclarationContextDeclarationRecord, 'id'> = {
-				ambientContext: 'DECLARATION_FILE',
-				artifactId: artifact.id,
-				end: declaration.end,
-				kind: declaration.kind,
-				name: declaration.name,
-				nameEnd: declaration.nameEnd,
-				nameStart: declaration.nameStart,
-				nativeKind: clonePlainData(declaration.nativeKind, new WeakMap(), deadline.step),
-				ordinal,
-				parseWitnessId: parseWitness.id,
-				role: 'SELECTED_TERMINAL_SYMBOL_DECLARATION',
-				start: declaration.start
-			};
-			return {
-				...recordWithoutId,
-				id: declarationContextDeclarationId(analysisId, recordWithoutId, onProgress)
-			};
-		}
+	const declarations = materializeDeclarationRecords(
+		derived,
+		artifactByPath,
+		parseWitnessByPath,
+		analysisId,
+		deadline,
+		onProgress
 	);
 	const terminalArtifact = artifactByPath.get(derived.declarations[0]!.logicalPath);
 	if (terminalArtifact === undefined)
@@ -2800,39 +3517,7 @@ function materializeAnalysis(
 		});
 	}
 
-	const aliasHops: DeclarationContextAliasHopWitness[] = derived.aliasHops.map((hop, ordinal) => {
-		deadline.step();
-		const aliasArtifacts = hop.aliasArtifactPaths
-			.map((path) => {
-				deadline.step();
-				return artifactByPath.get(path);
-			})
-			.filter((artifact): artifact is DeclarationContextArtifactRecord => {
-				deadline.step();
-				return artifact !== undefined;
-			})
-			.sort((left, right) => {
-				deadline.step();
-				return left.ordinal - right.ordinal;
-			});
-		return {
-			aliasDeclarationArtifactIds: aliasArtifacts.map((artifact) => {
-				deadline.step();
-				return artifact.id;
-			}),
-			aliasName: hop.aliasName,
-			aliasSymbolFlags: clonePlainData(hop.aliasSymbolFlags, new WeakMap(), deadline.step),
-			ordinal,
-			resolutionApi: 'TYPESCRIPT_PUBLIC_TYPE_CHECKER_GET_ALIASED_SYMBOL',
-			targetName: hop.targetName
-		};
-	});
-	if (aliasHops.some((hop) => hop.aliasDeclarationArtifactIds.length === 0))
-		throw new DeclarationContextAnalysisFailure(
-			'INPUT_POPULATION_MISMATCH',
-			'One alias hop lost all declaration-artifact identities.',
-			'MATERIALIZE'
-		);
+	const aliasHops = materializeAliasHopWitnesses(derived, artifactByPath, deadline);
 	const rootArtifact = artifactByPath.get(inputs.moduleResolutionTrace.targetWitness.logicalPath);
 	if (rootArtifact === undefined)
 		throw new DeclarationContextAnalysisFailure(
@@ -2863,34 +3548,7 @@ function materializeAnalysis(
 		id: declarationContextExportBindingId(analysisId, exportBindingWithoutId, onProgress)
 	};
 
-	const relationDrafts: DeclarationContextRelationRecordWithoutId[] = [];
-	for (const declaration of declarations) {
-		deadline.step();
-		relationDrafts.push({
-			artifactId: declaration.artifactId,
-			declarationId: declaration.id,
-			kind: 'DECLARES',
-			ordinal: 0
-		});
-		relationDrafts.push({
-			declarationId: declaration.id,
-			kind: 'CONTRIBUTES_TO',
-			ordinal: 0,
-			terminalSymbolId: terminalSymbol.id
-		});
-		if (merges[0] !== undefined)
-			relationDrafts.push({
-				declarationId: declaration.id,
-				kind: 'MERGES_WITH',
-				mergeId: merges[0].id,
-				ordinal: 0,
-				terminalSymbolId: terminalSymbol.id
-			});
-	}
-	relationDrafts.sort((left, right) => {
-		deadline.step();
-		return compareStringTuples(relationSortKey(left), relationSortKey(right));
-	});
+	const relationDrafts = buildRelationDrafts(declarations, terminalSymbol.id, merges[0], deadline);
 	const relations: DeclarationContextRelationRecord[] = relationDrafts.map((relation, ordinal) => {
 		deadline.step();
 		const recordWithoutId = { ...relation, ordinal } as DeclarationContextRelationRecordWithoutId;
@@ -2900,12 +3558,10 @@ function materializeAnalysis(
 		} as DeclarationContextRelationRecord;
 	});
 
-	let programPresentReadFileAttempts = 0;
-	for (const attempt of programInputAttempts) {
-		deadline.step();
-		if (attempt.observation.operation === 'READ_FILE' && attempt.observation.result === 'PRESENT')
-			programPresentReadFileAttempts += 1;
-	}
+	const programPresentReadFileAttempts = countProgramPresentReadFileAttempts(
+		programInputAttempts,
+		deadline
+	);
 	const mergeRecords = merges.length as 0 | 1;
 	const relationRecords = relations.length;
 	const inputRecords = checkedAdd(programInputAttempts.length, parseWitnesses.length);
@@ -2935,19 +3591,17 @@ function materializeAnalysis(
 		merges.length,
 		relations.length
 	);
-	if (
-		mergeRecords !== prospectiveMergeRecords ||
-		relationRecords !== prospectiveRelationRecords ||
-		inputRecords !== prospectiveInputRecords ||
-		readBytes !== prospectiveReadBytes ||
-		chargedTraversalSteps !== prospectiveTraversalSteps ||
-		outputRecords !== prospectiveOutputRecords
-	)
-		throw new DeclarationContextAnalysisFailure(
-			'INPUT_POPULATION_MISMATCH',
-			'Materialized declaration-context populations do not reproduce their prospective bounds.',
-			'MATERIALIZE'
-		);
+	assertMaterializedPopulations(
+		{
+			inputRecords,
+			mergeRecords,
+			outputRecords,
+			readBytes,
+			relationRecords,
+			traversalSteps: chargedTraversalSteps
+		},
+		prospective
+	);
 	const coverage: DeclarationContextAnalysisSnapshot['coverage'] = {
 		aliasHops: aliasHops.length,
 		ambientEffectRecords: 0,

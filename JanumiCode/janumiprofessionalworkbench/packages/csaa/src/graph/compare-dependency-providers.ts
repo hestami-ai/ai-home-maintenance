@@ -808,20 +808,22 @@ function buildLimitations(
 				"The current compiler graph does not reproduce dependency-cruiser's element-level type-only partition, so comparison uses a coarser key."
 		}
 	];
-	limitations.push({
-		affectedRecordCount: records.filter(
-			(record) => record.disposition === 'INCOMPARABLE_RESOLUTION_CONTEXT'
-		).length,
-		kind: 'RESOLUTION_CONTEXT_NOT_PROVEN_EQUIVALENT',
-		rationale: request.resolutionContext.rationale
-	});
-	limitations.push({
-		affectedRecordCount: records.filter(
-			(record) => record.compiler.occurrenceCount === 0 || record.dependencyCruiser.rowCount === 0
-		).length,
-		kind: 'NEGATIVE_COVERAGE_NOT_CLOSED',
-		rationale: request.negativeCoverage.rationale
-	});
+	limitations.push(
+		{
+			affectedRecordCount: records.filter(
+				(record) => record.disposition === 'INCOMPARABLE_RESOLUTION_CONTEXT'
+			).length,
+			kind: 'RESOLUTION_CONTEXT_NOT_PROVEN_EQUIVALENT',
+			rationale: request.resolutionContext.rationale
+		},
+		{
+			affectedRecordCount: records.filter(
+				(record) => record.compiler.occurrenceCount === 0 || record.dependencyCruiser.rowCount === 0
+			).length,
+			kind: 'NEGATIVE_COVERAGE_NOT_CLOSED',
+			rationale: request.negativeCoverage.rationale
+		}
+	);
 	const providerDomainCount = records.filter(
 		(record) => record.disposition === 'INCOMPARABLE_PROVIDER_DOMAIN'
 	).length;

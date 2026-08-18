@@ -84,7 +84,7 @@ const DEFAULT_OPTIONS: ClosedOptions = Object.freeze({
 const SHA256 = /^[0-9a-f]{64}$/u;
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const MAX_VLQ_DIGITS = 7;
-const MAX_VLQ_UNSIGNED = 0x1_0000_0000;
+const MAX_VLQ_UNSIGNED = 0x1_00_00_00_00;
 const BYTE_HASH_CHUNK_SIZE = 64 * 1024;
 const TEXT_HASH_CHUNK_SIZE = 4_096;
 const HARD_MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
@@ -452,226 +452,395 @@ interface PlainTreeStats {
 	readonly stringCharacters: number;
 }
 
+interface PlainTreeInvalid {
+	readonly problem: SourceOriginCorrelationValidationIssue;
+	readonly state: 'INVALID';
+}
+
 type PlainTreeResult =
-	| { readonly problem: SourceOriginCorrelationValidationIssue; readonly state: 'INVALID' }
-	| { readonly state: 'VALID'; readonly stats: PlainTreeStats };
+	PlainTreeInvalid | { readonly state: 'VALID'; readonly stats: PlainTreeStats };
+
+interface PlainTreeLimits {
+	readonly maxDepth: number;
+	readonly maxRecords: number;
+	readonly maxStringCharacters: number;
+}
+
+type PlainTreePath =
+	| { readonly root: string; readonly state: 'ROOT' }
+	| {
+			readonly array: boolean;
+			readonly key: string;
+			readonly parent: PlainTreePath;
+			readonly state: 'CHILD';
+	  };
+
+type PlainTreeFrame =
+	| {
+			readonly depth: number;
+			readonly path: PlainTreePath;
+			readonly state: 'VISIT';
+			readonly value: unknown;
+	  }
+	| {
+			readonly array: boolean;
+			readonly depth: number;
+			readonly index: number;
+			readonly keys: readonly PropertyKey[];
+			readonly path: PlainTreePath;
+			readonly state: 'CHILDREN';
+			readonly value: object;
+	  };
+
+interface PlainTreeCensus {
+	records: number;
+	stringCharacters: number;
+}
+
+interface PlainTreeContext {
+	readonly census: PlainTreeCensus;
+	readonly checkpoint: DeadlineCheckpoint;
+	readonly limits: PlainTreeLimits;
+	readonly malformedCode: 'INPUT_INVALID' | 'SHAPE_INVALID';
+}
+
+/** Renders a traversal path back to its `$root.a[0].b` text form. */
+function plainTreePathText(path: PlainTreePath, checkpoint: DeadlineCheckpoint): string {
+	const children: Array<Extract<PlainTreePath, { readonly state: 'CHILD' }>> = [];
+	let current = path;
+	while (current.state === 'CHILD') {
+		checkpoint();
+		children.push(current);
+		current = current.parent;
+	}
+	let rendered = current.root;
+	for (let index = children.length - 1; index >= 0; index -= 1) {
+		checkpoint();
+		const child = children[index]!;
+		rendered += child.array ? `[${child.key}]` : `.${child.key}`;
+	}
+	return rendered;
+}
+
+function plainTreeProblem(
+	code: SourceOriginCorrelationValidationIssue['code'],
+	message: string,
+	path: PlainTreePath,
+	checkpoint: DeadlineCheckpoint
+): PlainTreeInvalid {
+	return { problem: issue(code, message, plainTreePathText(path, checkpoint)), state: 'INVALID' };
+}
+
+/** Decides whether a property key is a canonical dense array index below `length`. */
+function denseArrayIndexKey(key: string, length: number): boolean {
+	if (!/^(?:0|[1-9]\d*)$/u.test(key)) return false;
+	const index = Number(key);
+	return Number.isSafeInteger(index) && index >= 0 && index < length && String(index) === key;
+}
+
+/** Decides whether `key` names an own enumerable data property of `input`. */
+function enumerableDataProperty(input: object, key: string): boolean {
+	const descriptor = Reflect.getOwnPropertyDescriptor(input, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) return false;
+	return true;
+}
+
+/** Decides whether a container carries the ordinary Array or Object prototype. */
+function ordinaryContainerPrototype(input: object, array: boolean): boolean {
+	const prototype = Reflect.getPrototypeOf(input);
+	if (array) return prototype === Array.prototype;
+	return prototype === Object.prototype || prototype === null;
+}
+
+/**
+ * Decides whether a value is an inert JSON scalar that ends the traversal of this branch.
+ *
+ * ⚠ THE `input is null | boolean | number` PREDICATE IS LOAD-BEARING, NOT DECORATION. This test was
+ * inline before it was extracted, so TypeScript narrowed `input` past it and the later
+ * `typeof input !== 'object'` guard was enough to reach `object`. A plain `boolean` return narrows
+ * nothing, `null` survives (`typeof null === 'object'`), and every downstream `object` parameter stops
+ * compiling. Extracting a guard out of a control-flow position REMOVES ITS NARROWING unless the
+ * signature carries it.
+ */
+function isInertPlainScalar(input: unknown): input is null | boolean | number {
+	return (
+		input === null ||
+		typeof input === 'boolean' ||
+		(typeof input === 'number' &&
+			Number.isFinite(input) &&
+			(!Number.isInteger(input) || Number.isSafeInteger(input)) &&
+			!Object.is(input, -0))
+	);
+}
+
+/** Charges one string against the descriptor string-character budget. */
+function chargePlainTreeString(
+	input: string,
+	path: PlainTreePath,
+	context: PlainTreeContext
+): PlainTreeInvalid | null {
+	const { census, checkpoint, limits, malformedCode } = context;
+	if (!isUnicodeScalarString(input, checkpoint))
+		return plainTreeProblem(
+			malformedCode,
+			'Strings must contain Unicode scalar text.',
+			path,
+			checkpoint
+		);
+	if (input.length > limits.maxStringCharacters - census.stringCharacters)
+		return plainTreeProblem(
+			'BUDGET_EXHAUSTED',
+			'The descriptor string-character budget was exhausted.',
+			path,
+			checkpoint
+		);
+	census.stringCharacters += input.length;
+	return null;
+}
+
+/** Decides whether one own key of a container is an admissible, budget-fitting data property. */
+function plainTreeKeyIssue(
+	input: object,
+	key: PropertyKey,
+	path: PlainTreePath,
+	array: boolean,
+	length: number,
+	context: PlainTreeContext
+): PlainTreeInvalid | null {
+	const { census, checkpoint, limits, malformedCode } = context;
+	if (typeof key !== 'string')
+		return plainTreeProblem(malformedCode, 'Symbol keys are not accepted.', path, checkpoint);
+	if (array && key === 'length') return null;
+	if (key.length > limits.maxStringCharacters - census.stringCharacters)
+		return plainTreeProblem(
+			'BUDGET_EXHAUSTED',
+			'The descriptor string-character budget was exhausted by a property key.',
+			path,
+			checkpoint
+		);
+	census.stringCharacters += key.length;
+	if (!isUnicodeScalarString(key, checkpoint))
+		return plainTreeProblem(
+			malformedCode,
+			'Property keys must contain Unicode scalar text.',
+			path,
+			checkpoint
+		);
+	if (array && !denseArrayIndexKey(key, length))
+		return plainTreeProblem(
+			malformedCode,
+			'Arrays must be dense without extra properties.',
+			path,
+			checkpoint
+		);
+	if (!enumerableDataProperty(input, key))
+		return plainTreeProblem(
+			malformedCode,
+			'Properties must be enumerable data properties.',
+			{ array, key, parent: path, state: 'CHILD' },
+			checkpoint
+		);
+	return null;
+}
+
+/** Walks every own key of a container in its own enumeration order. */
+function plainTreeKeysIssue(
+	input: object,
+	path: PlainTreePath,
+	keys: readonly PropertyKey[],
+	array: boolean,
+	length: number,
+	context: PlainTreeContext
+): PlainTreeInvalid | null {
+	for (const key of keys) {
+		context.checkpoint();
+		const problem = plainTreeKeyIssue(input, key, path, array, length, context);
+		if (problem !== null) return problem;
+	}
+	return null;
+}
+
+/** Admits one container and schedules its children, charging its population against the budget. */
+function expandPlainTreeContainer(
+	input: object,
+	frame: Extract<PlainTreeFrame, { readonly state: 'VISIT' }>,
+	pending: PlainTreeFrame[],
+	active: WeakSet<object>,
+	context: PlainTreeContext
+): PlainTreeInvalid | null {
+	const { census, checkpoint, limits, malformedCode } = context;
+	const array = Array.isArray(input);
+	if (!ordinaryContainerPrototype(input, array))
+		return plainTreeProblem(
+			malformedCode,
+			'Containers must have ordinary prototypes.',
+			frame.path,
+			checkpoint
+		);
+	let length = 0;
+	if (array) {
+		const lengthDescriptor = Reflect.getOwnPropertyDescriptor(input, 'length');
+		if (
+			lengthDescriptor === undefined ||
+			!('value' in lengthDescriptor) ||
+			!safeNonnegative(lengthDescriptor.value)
+		)
+			return plainTreeProblem(
+				malformedCode,
+				'Arrays must have a valid ordinary length.',
+				frame.path,
+				checkpoint
+			);
+		length = lengthDescriptor.value;
+		if (length > limits.maxRecords - census.records)
+			return plainTreeProblem(
+				'BUDGET_EXHAUSTED',
+				'The descriptor record budget was exhausted by an array population.',
+				frame.path,
+				checkpoint
+			);
+	}
+	const keys = Reflect.ownKeys(input);
+	if (!array && keys.length > limits.maxRecords - census.records)
+		return plainTreeProblem(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by an object population.',
+			frame.path,
+			checkpoint
+		);
+	if (array && keys.length !== length + 1)
+		return plainTreeProblem(
+			malformedCode,
+			'Arrays must be dense without extra properties.',
+			frame.path,
+			checkpoint
+		);
+	const keysProblem = plainTreeKeysIssue(input, frame.path, keys, array, length, context);
+	if (keysProblem !== null) return keysProblem;
+	active.add(input);
+	pending.push({
+		array,
+		depth: frame.depth,
+		index: 0,
+		keys,
+		path: frame.path,
+		state: 'CHILDREN',
+		value: input
+	});
+	return null;
+}
+
+/** Charges one visited value against the record/depth budgets and classifies it. */
+function visitPlainTreeValue(
+	frame: Extract<PlainTreeFrame, { readonly state: 'VISIT' }>,
+	pending: PlainTreeFrame[],
+	active: WeakSet<object>,
+	context: PlainTreeContext
+): PlainTreeInvalid | null {
+	const { census, checkpoint, limits, malformedCode } = context;
+	census.records += 1;
+	if (census.records > limits.maxRecords)
+		return plainTreeProblem(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted.',
+			frame.path,
+			checkpoint
+		);
+	if (frame.depth > limits.maxDepth)
+		return plainTreeProblem(
+			'BUDGET_EXHAUSTED',
+			'The descriptor depth budget was exhausted.',
+			frame.path,
+			checkpoint
+		);
+	const input = frame.value;
+	if (typeof input === 'string') return chargePlainTreeString(input, frame.path, context);
+	if (isInertPlainScalar(input)) return null;
+	if (typeof input !== 'object')
+		return plainTreeProblem(
+			malformedCode,
+			'Only JSON-compatible data values are accepted.',
+			frame.path,
+			checkpoint
+		);
+	if (isProxyValue(input))
+		return plainTreeProblem(
+			malformedCode,
+			'Proxy values are not accepted.',
+			frame.path,
+			checkpoint
+		);
+	if (active.has(input))
+		return plainTreeProblem(malformedCode, 'Cyclic data is not accepted.', frame.path, checkpoint);
+	return expandPlainTreeContainer(input, frame, pending, active, context);
+}
+
+/** Resumes an open container frame at its next unvisited own key. */
+function stepChildrenFrame(
+	frame: Extract<PlainTreeFrame, { readonly state: 'CHILDREN' }>,
+	pending: PlainTreeFrame[],
+	active: WeakSet<object>,
+	malformedCode: 'INPUT_INVALID' | 'SHAPE_INVALID',
+	checkpoint: DeadlineCheckpoint
+): PlainTreeInvalid | null {
+	let index = frame.index;
+	let scheduledChild = false;
+	while (index < frame.keys.length) {
+		checkpoint();
+		const key = frame.keys[index]!;
+		index += 1;
+		if (typeof key !== 'string' || (frame.array && key === 'length')) continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			return plainTreeProblem(
+				malformedCode,
+				'Properties must remain enumerable data properties during traversal.',
+				{ array: frame.array, key, parent: frame.path, state: 'CHILD' },
+				checkpoint
+			);
+		pending.push(
+			{ ...frame, index },
+			{
+				depth: frame.depth + 1,
+				path: { array: frame.array, key, parent: frame.path, state: 'CHILD' },
+				state: 'VISIT',
+				value: descriptor.value
+			}
+		);
+		scheduledChild = true;
+		break;
+	}
+	if (!scheduledChild) active.delete(frame.value);
+	return null;
+}
 
 /** Descriptor-only bounded traversal: no accessor, iterator, callback, or toJSON is invoked. */
 function inspectPlainTree(
 	value: unknown,
-	limits: {
-		readonly maxDepth: number;
-		readonly maxRecords: number;
-		readonly maxStringCharacters: number;
-	},
+	limits: PlainTreeLimits,
 	rootPath: string,
 	malformedCode: 'INPUT_INVALID' | 'SHAPE_INVALID',
 	checkpoint: DeadlineCheckpoint
 ): PlainTreeResult {
-	type Path =
-		| { readonly root: string; readonly state: 'ROOT' }
-		| {
-				readonly array: boolean;
-				readonly key: string;
-				readonly parent: Path;
-				readonly state: 'CHILD';
-		  };
-	type Frame =
-		| {
-				readonly depth: number;
-				readonly path: Path;
-				readonly state: 'VISIT';
-				readonly value: unknown;
-		  }
-		| {
-				readonly array: boolean;
-				readonly depth: number;
-				readonly index: number;
-				readonly keys: readonly PropertyKey[];
-				readonly path: Path;
-				readonly state: 'CHILDREN';
-				readonly value: object;
-		  };
-	const pending: Frame[] = [
+	const pending: PlainTreeFrame[] = [
 		{ depth: 0, path: { root: rootPath, state: 'ROOT' }, state: 'VISIT', value }
 	];
 	const active = new WeakSet<object>();
-	let records = 0;
-	let stringCharacters = 0;
-	const pathText = (path: Path): string => {
-		const children: Array<Extract<Path, { readonly state: 'CHILD' }>> = [];
-		let current = path;
-		while (current.state === 'CHILD') {
-			checkpoint();
-			children.push(current);
-			current = current.parent;
-		}
-		let rendered = current.root;
-		for (let index = children.length - 1; index >= 0; index -= 1) {
-			checkpoint();
-			const child = children[index]!;
-			rendered += child.array ? `[${child.key}]` : `.${child.key}`;
-		}
-		return rendered;
-	};
-	const problem = (
-		code: SourceOriginCorrelationValidationIssue['code'],
-		message: string,
-		path: Path
-	) => ({ problem: issue(code, message, pathText(path)), state: 'INVALID' }) as const;
+	const census: PlainTreeCensus = { records: 0, stringCharacters: 0 };
+	const context: PlainTreeContext = { census, checkpoint, limits, malformedCode };
 	while (pending.length > 0) {
 		checkpoint();
 		const frame = pending.pop()!;
-		if (frame.state === 'CHILDREN') {
-			let index = frame.index;
-			let scheduledChild = false;
-			while (index < frame.keys.length) {
-				checkpoint();
-				const key = frame.keys[index]!;
-				index += 1;
-				if (typeof key !== 'string' || (frame.array && key === 'length')) continue;
-				const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key);
-				if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-					return problem(
-						malformedCode,
-						'Properties must remain enumerable data properties during traversal.',
-						{ array: frame.array, key, parent: frame.path, state: 'CHILD' }
-					);
-				pending.push({ ...frame, index });
-				pending.push({
-					depth: frame.depth + 1,
-					path: { array: frame.array, key, parent: frame.path, state: 'CHILD' },
-					state: 'VISIT',
-					value: descriptor.value
-				});
-				scheduledChild = true;
-				break;
-			}
-			if (!scheduledChild) active.delete(frame.value);
-			continue;
-		}
-		records += 1;
-		if (records > limits.maxRecords)
-			return problem('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
-		if (frame.depth > limits.maxDepth)
-			return problem('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
-		const input = frame.value;
-		if (typeof input === 'string') {
-			if (!isUnicodeScalarString(input, checkpoint))
-				return problem(malformedCode, 'Strings must contain Unicode scalar text.', frame.path);
-			if (input.length > limits.maxStringCharacters - stringCharacters)
-				return problem(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted.',
-					frame.path
-				);
-			stringCharacters += input.length;
-			continue;
-		}
-		if (
-			input === null ||
-			typeof input === 'boolean' ||
-			(typeof input === 'number' &&
-				Number.isFinite(input) &&
-				(!Number.isInteger(input) || Number.isSafeInteger(input)) &&
-				!Object.is(input, -0))
-		)
-			continue;
-		if (typeof input !== 'object')
-			return problem(malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
-		if (isProxyValue(input))
-			return problem(malformedCode, 'Proxy values are not accepted.', frame.path);
-		if (active.has(input))
-			return problem(malformedCode, 'Cyclic data is not accepted.', frame.path);
-		const array = Array.isArray(input);
-		const prototype = Reflect.getPrototypeOf(input);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return problem(malformedCode, 'Containers must have ordinary prototypes.', frame.path);
-		let length = 0;
-		if (array) {
-			const lengthDescriptor = Reflect.getOwnPropertyDescriptor(input, 'length');
-			if (
-				lengthDescriptor === undefined ||
-				!('value' in lengthDescriptor) ||
-				!safeNonnegative(lengthDescriptor.value)
-			)
-				return problem(malformedCode, 'Arrays must have a valid ordinary length.', frame.path);
-			length = lengthDescriptor.value;
-			if (length > limits.maxRecords - records)
-				return problem(
-					'BUDGET_EXHAUSTED',
-					'The descriptor record budget was exhausted by an array population.',
-					frame.path
-				);
-		}
-		const keys = Reflect.ownKeys(input);
-		if (!array && keys.length > limits.maxRecords - records)
-			return problem(
-				'BUDGET_EXHAUSTED',
-				'The descriptor record budget was exhausted by an object population.',
-				frame.path
-			);
-		if (array) {
-			if (keys.length !== length + 1)
-				return problem(malformedCode, 'Arrays must be dense without extra properties.', frame.path);
-		}
-		for (const key of keys) {
-			checkpoint();
-			if (typeof key !== 'string')
-				return problem(malformedCode, 'Symbol keys are not accepted.', frame.path);
-			if (array && key === 'length') continue;
-			if (key.length > limits.maxStringCharacters - stringCharacters)
-				return problem(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted by a property key.',
-					frame.path
-				);
-			stringCharacters += key.length;
-			if (!isUnicodeScalarString(key, checkpoint))
-				return problem(
-					malformedCode,
-					'Property keys must contain Unicode scalar text.',
-					frame.path
-				);
-			if (array) {
-				if (!/^(?:0|[1-9][0-9]*)$/u.test(key))
-					return problem(
-						malformedCode,
-						'Arrays must be dense without extra properties.',
-						frame.path
-					);
-				const index = Number(key);
-				if (!Number.isSafeInteger(index) || index < 0 || index >= length || String(index) !== key)
-					return problem(
-						malformedCode,
-						'Arrays must be dense without extra properties.',
-						frame.path
-					);
-			}
-			const descriptor = Reflect.getOwnPropertyDescriptor(input, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				return problem(malformedCode, 'Properties must be enumerable data properties.', {
-					array,
-					key,
-					parent: frame.path,
-					state: 'CHILD'
-				});
-		}
-		active.add(input);
-		pending.push({
-			array,
-			depth: frame.depth,
-			index: 0,
-			keys,
-			path: frame.path,
-			state: 'CHILDREN',
-			value: input
-		});
+		const problem =
+			frame.state === 'CHILDREN'
+				? stepChildrenFrame(frame, pending, active, malformedCode, checkpoint)
+				: visitPlainTreeValue(frame, pending, active, context);
+		if (problem !== null) return problem;
 	}
-	return { state: 'VALID', stats: Object.freeze({ records, stringCharacters }) };
+	return {
+		state: 'VALID',
+		stats: Object.freeze({ records: census.records, stringCharacters: census.stringCharacters })
+	};
 }
 
 type CanonicalFrame =
@@ -696,7 +865,22 @@ function compareUtf16(left: string, right: string, checkpoint: DeadlineCheckpoin
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
+}
+
+/** Maps one non-surrogate UTF-16 code unit to its canonical JSON escape or literal text. */
+function canonicalJsonEscape(value: string, index: number, code: number): string {
+	if (code === 0x22) return String.raw`\"`;
+	if (code === 0x5c) return String.raw`\\`;
+	if (code === 0x08) return String.raw`\b`;
+	if (code === 0x09) return String.raw`\t`;
+	if (code === 0x0a) return String.raw`\n`;
+	if (code === 0x0c) return String.raw`\f`;
+	if (code === 0x0d) return String.raw`\r`;
+	if (code < 0x20) return String.raw`\u${code.toString(16).padStart(4, '0')}`;
+	return value[index]!;
 }
 
 function* jsonStringChunks(
@@ -717,14 +901,7 @@ function* jsonStringChunks(
 			index += 1;
 		} else if (code >= 0xdc00 && code <= 0xdfff)
 			throw new TypeError('Canonical JSON rejects lone UTF-16 surrogates.');
-		else if (code === 0x22) encoded = '\\"';
-		else if (code === 0x5c) encoded = '\\\\';
-		else if (code === 0x08) encoded = '\\b';
-		else if (code === 0x09) encoded = '\\t';
-		else if (code === 0x0a) encoded = '\\n';
-		else if (code === 0x0c) encoded = '\\f';
-		else if (code === 0x0d) encoded = '\\r';
-		else encoded = code < 0x20 ? `\\u${code.toString(16).padStart(4, '0')}` : value[index]!;
+		else encoded = canonicalJsonEscape(value, index, code);
 		if (buffered.length + encoded.length > 1_024) {
 			yield buffered;
 			buffered = '';
@@ -735,6 +912,83 @@ function* jsonStringChunks(
 	yield '"';
 }
 
+/** Emits the next element separator or terminator of an open canonical array frame. */
+function* canonicalArrayChunks(
+	frame: Extract<CanonicalFrame, { readonly state: 'ARRAY' }>,
+	pending: CanonicalFrame[]
+): Generator<string, void, undefined> {
+	if (frame.index === frame.length) {
+		yield ']';
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	pending.push(
+		{ ...frame, index: frame.index + 1 },
+		{
+			state: 'VALUE',
+			value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
+		}
+	);
+}
+
+/** Emits the next member name, separator, or terminator of an open canonical object frame. */
+function* canonicalObjectChunks(
+	frame: Extract<CanonicalFrame, { readonly state: 'OBJECT' }>,
+	pending: CanonicalFrame[],
+	checkpoint: DeadlineCheckpoint
+): Generator<string, void, undefined> {
+	if (frame.index === frame.keys.length) {
+		yield '}';
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	const key = frame.keys[frame.index]!;
+	yield* jsonStringChunks(key, checkpoint);
+	yield ':';
+	pending.push(
+		{ ...frame, index: frame.index + 1 },
+		{ state: 'VALUE', value: Reflect.getOwnPropertyDescriptor(frame.object, key)!.value }
+	);
+}
+
+/** Emits one canonical JSON value, opening a container frame when the value is one. */
+function* canonicalValueChunks(
+	input: unknown,
+	pending: CanonicalFrame[],
+	checkpoint: DeadlineCheckpoint
+): Generator<string, void, undefined> {
+	if (input === null) {
+		yield 'null';
+		return;
+	}
+	if (typeof input === 'string') {
+		yield* jsonStringChunks(input, checkpoint);
+		return;
+	}
+	if (typeof input === 'boolean') {
+		yield input ? 'true' : 'false';
+		return;
+	}
+	if (typeof input === 'number') {
+		if (!Number.isFinite(input) || (Number.isInteger(input) && !Number.isSafeInteger(input)))
+			throw new TypeError('Canonical JSON requires finite safe numbers.');
+		yield JSON.stringify(input);
+		return;
+	}
+	if (typeof input !== 'object' || input === null)
+		throw new TypeError('Canonical JSON received a non-data value.');
+	if (Array.isArray(input)) {
+		const length = Reflect.getOwnPropertyDescriptor(input, 'length')!.value as number;
+		yield '[';
+		pending.push({ index: 0, length, state: 'ARRAY', value: input });
+		return;
+	}
+	const keys = Reflect.ownKeys(input) as string[];
+	keys.sort((left, right) => compareUtf16(left, right, checkpoint));
+	yield '{';
+	pending.push({ index: 0, keys, object: input, state: 'OBJECT' });
+}
+
 function* canonicalChunks(
 	value: unknown,
 	checkpoint: DeadlineCheckpoint
@@ -743,66 +997,9 @@ function* canonicalChunks(
 	while (pending.length > 0) {
 		checkpoint();
 		const frame = pending.pop()!;
-		if (frame.state === 'ARRAY') {
-			if (frame.index === frame.length) {
-				yield ']';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
-			});
-			continue;
-		}
-		if (frame.state === 'OBJECT') {
-			if (frame.index === frame.keys.length) {
-				yield '}';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			const key = frame.keys[frame.index]!;
-			yield* jsonStringChunks(key, checkpoint);
-			yield ':';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.object, key)!.value
-			});
-			continue;
-		}
-		const input = frame.value;
-		if (input === null) {
-			yield 'null';
-			continue;
-		}
-		if (typeof input === 'string') {
-			yield* jsonStringChunks(input, checkpoint);
-			continue;
-		}
-		if (typeof input === 'boolean') {
-			yield input ? 'true' : 'false';
-			continue;
-		}
-		if (typeof input === 'number') {
-			if (!Number.isFinite(input) || (Number.isInteger(input) && !Number.isSafeInteger(input)))
-				throw new TypeError('Canonical JSON requires finite safe numbers.');
-			yield JSON.stringify(input);
-			continue;
-		}
-		if (typeof input !== 'object' || input === null)
-			throw new TypeError('Canonical JSON received a non-data value.');
-		if (Array.isArray(input)) {
-			const length = Reflect.getOwnPropertyDescriptor(input, 'length')!.value as number;
-			yield '[';
-			pending.push({ index: 0, length, state: 'ARRAY', value: input });
-			continue;
-		}
-		const keys = Reflect.ownKeys(input) as string[];
-		keys.sort((left, right) => compareUtf16(left, right, checkpoint));
-		yield '{';
-		pending.push({ index: 0, keys, object: input, state: 'OBJECT' });
+		if (frame.state === 'ARRAY') yield* canonicalArrayChunks(frame, pending);
+		else if (frame.state === 'OBJECT') yield* canonicalObjectChunks(frame, pending, checkpoint);
+		else yield* canonicalValueChunks(frame.value, pending, checkpoint);
 	}
 }
 
@@ -956,26 +1153,10 @@ function utf8TextEvidence(
 	return Object.freeze({ bytes, contentSha256: hash.digest('hex') });
 }
 
-function requestIssue(
-	inputs: SourceOriginCorrelationBuildInputs,
-	checkpoint: DeadlineCheckpoint
+/** Decides whether every declared request budget is a positive integer the fixed v1 population fits. */
+function requestBudgetIssue(
+	request: SourceOriginCorrelationBuildInputs['request']
 ): SourceOriginCorrelationValidationIssue | null {
-	const request = inputs.request;
-	if (
-		!plainRecord(request) ||
-		!exactKeys(request, REQUEST_KEYS) ||
-		!plainRecord(request.budgets) ||
-		!exactKeys(request.budgets, BUDGET_KEYS) ||
-		!plainRecord(request.targetDeclaration) ||
-		!exactKeys(request.targetDeclaration, CAPTURE_DESCRIPTOR_KEYS) ||
-		!plainRecord(request.declarationMap) ||
-		!exactKeys(request.declarationMap, CAPTURE_DESCRIPTOR_KEYS)
-	)
-		return issue(
-			'INPUT_INVALID',
-			'The source-origin request shell must be exact plain data.',
-			'$inputs.request'
-		);
 	for (const key of BUDGET_KEYS)
 		if (!safePositive(request.budgets[key]))
 			return issue(
@@ -997,18 +1178,14 @@ function requestIssue(
 			'Request budgets cannot support the fixed v1 population.',
 			'$inputs.request.budgets'
 		);
-	if (
-		request.schemaVersion !== SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION ||
-		request.operationVersion !== SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION ||
-		!canonicalEqual(request.selection, SOURCE_ORIGIN_CORRELATION_SELECTION, checkpoint)
-	)
-		return issue('INPUT_INVALID', 'Request constants or selection are invalid.', '$inputs.request');
-	if (typeof request.subjectId !== 'string' || !SHA256.test(request.subjectId))
-		return issue(
-			'INPUT_INVALID',
-			'Request subjectId must be lowercase SHA-256.',
-			'$inputs.request.subjectId'
-		);
+	return null;
+}
+
+/** Decides whether each requested semantic identity is bounded Unicode-scalar text. */
+function requestSemanticIdentityIssue(
+	request: SourceOriginCorrelationBuildInputs['request'],
+	checkpoint: DeadlineCheckpoint
+): SourceOriginCorrelationValidationIssue | null {
 	for (const key of [
 		'semanticSnapshotId',
 		'semanticProjectId',
@@ -1028,6 +1205,14 @@ function requestIssue(
 				`$inputs.request.${key}`
 			);
 	}
+	return null;
+}
+
+/** Decides whether both caller capture descriptors carry a valid length, digest, and path. */
+function requestCaptureDescriptorIssue(
+	request: SourceOriginCorrelationBuildInputs['request'],
+	checkpoint: DeadlineCheckpoint
+): SourceOriginCorrelationValidationIssue | null {
 	for (const [name, descriptor] of [
 		['targetDeclaration', request.targetDeclaration],
 		['declarationMap', request.declarationMap]
@@ -1045,6 +1230,47 @@ function requestIssue(
 				`$inputs.request.${name}.logicalPath`
 			);
 	}
+	return null;
+}
+
+function requestIssue(
+	inputs: SourceOriginCorrelationBuildInputs,
+	checkpoint: DeadlineCheckpoint
+): SourceOriginCorrelationValidationIssue | null {
+	const request = inputs.request;
+	if (
+		!plainRecord(request) ||
+		!exactKeys(request, REQUEST_KEYS) ||
+		!plainRecord(request.budgets) ||
+		!exactKeys(request.budgets, BUDGET_KEYS) ||
+		!plainRecord(request.targetDeclaration) ||
+		!exactKeys(request.targetDeclaration, CAPTURE_DESCRIPTOR_KEYS) ||
+		!plainRecord(request.declarationMap) ||
+		!exactKeys(request.declarationMap, CAPTURE_DESCRIPTOR_KEYS)
+	)
+		return issue(
+			'INPUT_INVALID',
+			'The source-origin request shell must be exact plain data.',
+			'$inputs.request'
+		);
+	const budgetProblem = requestBudgetIssue(request);
+	if (budgetProblem !== null) return budgetProblem;
+	if (
+		request.schemaVersion !== SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION ||
+		request.operationVersion !== SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION ||
+		!canonicalEqual(request.selection, SOURCE_ORIGIN_CORRELATION_SELECTION, checkpoint)
+	)
+		return issue('INPUT_INVALID', 'Request constants or selection are invalid.', '$inputs.request');
+	if (typeof request.subjectId !== 'string' || !SHA256.test(request.subjectId))
+		return issue(
+			'INPUT_INVALID',
+			'Request subjectId must be lowercase SHA-256.',
+			'$inputs.request.subjectId'
+		);
+	const identityProblem = requestSemanticIdentityIssue(request, checkpoint);
+	if (identityProblem !== null) return identityProblem;
+	const descriptorProblem = requestCaptureDescriptorIssue(request, checkpoint);
+	if (descriptorProblem !== null) return descriptorProblem;
 	if (
 		!request.targetDeclaration.logicalPath.endsWith('.d.ts') ||
 		request.declarationMap.logicalPath !== `${request.targetDeclaration.logicalPath}.map`
@@ -1077,7 +1303,7 @@ function validLogicalPath(
 		return false;
 	for (let index = 0; index < value.length; index += 1) {
 		checkpoint();
-		const code = value.charCodeAt(index);
+		const code = value.codePointAt(index)!;
 		if (code <= 0x1f || code === 0x7f) return false;
 	}
 	const normalized = posix.normalize(value);
@@ -1229,7 +1455,7 @@ function decodeUtf8(
 			`${label} exceeds its code-unit budget.`,
 			'$inputs.request.budgets'
 		);
-	if (text.charCodeAt(0) === 0xfeff)
+	if (text.codePointAt(0) === 0xfeff)
 		failDerivation('INPUT_INVALID', `${label} must not contain a byte-order mark.`, '$inputs');
 	if (!isUnicodeScalarString(text, checkpoint))
 		failDerivation('INPUT_INVALID', `${label} must contain Unicode scalar text.`, '$inputs');
@@ -1254,56 +1480,92 @@ interface ParsedSourceMap {
 	readonly generatedLines: number;
 }
 
+interface TopLevelKeyScan {
+	braceDepth: number;
+	bracketDepth: number;
+	escaped: boolean;
+	inString: boolean;
+	readonly keys: string[];
+	stringStart: number;
+}
+
+/** Decides whether the string literal ending at `index` is followed by a member colon. */
+function topLevelKeyFollowedByColon(
+	text: string,
+	index: number,
+	checkpoint: DeadlineCheckpoint
+): boolean {
+	let cursor = index + 1;
+	while (cursor < text.length && /[\t\n\r ]/u.test(text[cursor]!)) {
+		checkpoint();
+		cursor += 1;
+	}
+	return text[cursor] === ':';
+}
+
+/** Re-reads one raw top-level key through JSON.parse, refusing anything that is not a string. */
+function parseTopLevelKey(text: string, stringStart: number, index: number): string {
+	let key: unknown;
+	try {
+		key = JSON.parse(text.slice(stringStart, index + 1));
+	} catch {
+		failDerivation('INPUT_INVALID', 'Declaration map contains an invalid top-level key.');
+	}
+	if (typeof key !== 'string')
+		failDerivation('INPUT_INVALID', 'Declaration map top-level keys must be strings.');
+	return key;
+}
+
+/** Advances the in-string scanner one character, recording a completed top-level key. */
+function stepTopLevelKeyString(
+	scan: TopLevelKeyScan,
+	text: string,
+	index: number,
+	checkpoint: DeadlineCheckpoint
+): void {
+	if (scan.escaped) {
+		scan.escaped = false;
+		return;
+	}
+	const character = text[index]!;
+	if (character === '\\') {
+		scan.escaped = true;
+		return;
+	}
+	if (character !== '"') return;
+	scan.inString = false;
+	if (scan.braceDepth !== 1 || scan.bracketDepth !== 0) return;
+	if (!topLevelKeyFollowedByColon(text, index, checkpoint)) return;
+	scan.keys.push(parseTopLevelKey(text, scan.stringStart, index));
+	if (scan.keys.length > SOURCE_MAP_JSON_KEYS.length)
+		failDerivation('INPUT_INVALID', 'Declaration map contains more than six top-level keys.');
+}
+
 function sourceMapTopLevelKeys(text: string, checkpoint: DeadlineCheckpoint): readonly string[] {
-	const keys: string[] = [];
-	let braceDepth = 0;
-	let bracketDepth = 0;
-	let escaped = false;
-	let inString = false;
-	let stringStart = -1;
+	const scan: TopLevelKeyScan = {
+		braceDepth: 0,
+		bracketDepth: 0,
+		escaped: false,
+		inString: false,
+		keys: [],
+		stringStart: -1
+	};
 	for (let index = 0; index < text.length; index += 1) {
 		checkpoint();
-		const character = text[index]!;
-		if (inString) {
-			if (escaped) {
-				escaped = false;
-				continue;
-			}
-			if (character === '\\') {
-				escaped = true;
-				continue;
-			}
-			if (character !== '"') continue;
-			inString = false;
-			if (braceDepth !== 1 || bracketDepth !== 0) continue;
-			let cursor = index + 1;
-			while (cursor < text.length && /[\t\n\r ]/u.test(text[cursor]!)) {
-				checkpoint();
-				cursor += 1;
-			}
-			if (text[cursor] !== ':') continue;
-			let key: unknown;
-			try {
-				key = JSON.parse(text.slice(stringStart, index + 1));
-			} catch {
-				failDerivation('INPUT_INVALID', 'Declaration map contains an invalid top-level key.');
-			}
-			if (typeof key !== 'string')
-				failDerivation('INPUT_INVALID', 'Declaration map top-level keys must be strings.');
-			keys.push(key);
-			if (keys.length > SOURCE_MAP_JSON_KEYS.length)
-				failDerivation('INPUT_INVALID', 'Declaration map contains more than six top-level keys.');
+		if (scan.inString) {
+			stepTopLevelKeyString(scan, text, index, checkpoint);
 			continue;
 		}
+		const character = text[index]!;
 		if (character === '"') {
-			inString = true;
-			stringStart = index;
-		} else if (character === '{') braceDepth += 1;
-		else if (character === '}') braceDepth -= 1;
-		else if (character === '[') bracketDepth += 1;
-		else if (character === ']') bracketDepth -= 1;
+			scan.inString = true;
+			scan.stringStart = index;
+		} else if (character === '{') scan.braceDepth += 1;
+		else if (character === '}') scan.braceDepth -= 1;
+		else if (character === '[') scan.bracketDepth += 1;
+		else if (character === ']') scan.bracketDepth -= 1;
 	}
-	return keys;
+	return scan.keys;
 }
 
 function encodeSignedVlq(value: number): string {
@@ -1318,6 +1580,26 @@ function encodeSignedVlq(value: number): string {
 	return encoded;
 }
 
+/** Reads one base64 VLQ digit, refusing an unterminated, non-base64, or over-long encoding. */
+function nextVlqDigit(mappings: string, index: number, digits: number): number {
+	if (index >= mappings.length || mappings[index] === ',' || mappings[index] === ';')
+		failDerivation('INPUT_INVALID', 'Declaration map contains an unterminated VLQ.');
+	const digit = BASE64_ALPHABET.indexOf(mappings[index]!);
+	if (digit < 0)
+		failDerivation('INPUT_INVALID', 'Declaration map contains a non-base64 VLQ digit.');
+	if (digits > MAX_VLQ_DIGITS)
+		failDerivation('INPUT_INVALID', 'Declaration map VLQ exceeds the v1 digit ceiling.');
+	return digit;
+}
+
+/** Folds one VLQ digit into the accumulated unsigned magnitude within safe-integer range. */
+function accumulateVlqDigit(unsigned: number, digit: number, factor: number): number {
+	const contribution = (digit & 31) * factor;
+	if (!Number.isSafeInteger(contribution) || !Number.isSafeInteger(unsigned + contribution))
+		failDerivation('INPUT_INVALID', 'Declaration map VLQ exceeds safe-integer representation.');
+	return unsigned + contribution;
+}
+
 function decodeVlq(
 	mappings: string,
 	start: number,
@@ -1329,18 +1611,9 @@ function decodeVlq(
 	let digits = 0;
 	for (;;) {
 		checkpoint();
-		if (index >= mappings.length || mappings[index] === ',' || mappings[index] === ';')
-			failDerivation('INPUT_INVALID', 'Declaration map contains an unterminated VLQ.');
-		const digit = BASE64_ALPHABET.indexOf(mappings[index]!);
-		if (digit < 0)
-			failDerivation('INPUT_INVALID', 'Declaration map contains a non-base64 VLQ digit.');
 		digits += 1;
-		if (digits > MAX_VLQ_DIGITS)
-			failDerivation('INPUT_INVALID', 'Declaration map VLQ exceeds the v1 digit ceiling.');
-		const contribution = (digit & 31) * factor;
-		if (!Number.isSafeInteger(contribution) || !Number.isSafeInteger(unsigned + contribution))
-			failDerivation('INPUT_INVALID', 'Declaration map VLQ exceeds safe-integer representation.');
-		unsigned += contribution;
+		const digit = nextVlqDigit(mappings, index, digits);
+		unsigned = accumulateVlqDigit(unsigned, digit, factor);
 		index += 1;
 		if ((digit & 32) === 0) break;
 		factor *= 32;
@@ -1378,201 +1651,426 @@ type JsonLexicalContainer =
  * exactly like the later descriptor census (object member names are not values) and retains only
  * the active container stack, so hostile width cannot allocate a pre-parse token population.
  */
+type JsonArrayContainer = Extract<JsonLexicalContainer, { kind: 'ARRAY' }>;
+type JsonObjectContainer = Extract<JsonLexicalContainer, { kind: 'OBJECT' }>;
+
+interface JsonLexicalCursor {
+	readonly checkpoint: DeadlineCheckpoint;
+	readonly containers: JsonLexicalContainer[];
+	index: number;
+	readonly maxDepth: number;
+	readonly maxRecords: number;
+	records: number;
+	rootState: 'END' | 'VALUE';
+	readonly text: string;
+}
+
+function invalidJsonDocument(): never {
+	failDerivation(
+		'INPUT_INVALID',
+		'Declaration map is not valid JSON.',
+		'$inputs.declarationMapBytes'
+	);
+}
+
+/** Steps over JSON insignificant whitespace. */
+function skipJsonWhitespace(cursor: JsonLexicalCursor): void {
+	while (cursor.index < cursor.text.length) {
+		cursor.checkpoint();
+		const code = cursor.text.codePointAt(cursor.index);
+		if (code !== 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) break;
+		cursor.index += 1;
+	}
+}
+
+/** Steps over one backslash escape inside a JSON string literal. */
+function scanJsonStringEscape(cursor: JsonLexicalCursor): void {
+	const text = cursor.text;
+	cursor.index += 1;
+	if (cursor.index >= text.length) invalidJsonDocument();
+	const escape = text[cursor.index]!;
+	if (String.raw`"\/bfnrt`.includes(escape)) {
+		cursor.index += 1;
+		return;
+	}
+	if (escape !== 'u' || cursor.index + 4 >= text.length) invalidJsonDocument();
+	for (let digit = 1; digit <= 4; digit += 1) {
+		cursor.checkpoint();
+		if (!/[0-9A-Fa-f]/u.test(text[cursor.index + digit]!)) invalidJsonDocument();
+	}
+	cursor.index += 5;
+}
+
+/** Steps over one complete JSON string literal, including its opening and closing quotes. */
+function scanJsonString(cursor: JsonLexicalCursor): void {
+	const text = cursor.text;
+	if (text.codePointAt(cursor.index) !== 0x22) invalidJsonDocument();
+	cursor.index += 1;
+	while (cursor.index < text.length) {
+		cursor.checkpoint();
+		const code = text.codePointAt(cursor.index)!;
+		if (code === 0x22) {
+			cursor.index += 1;
+			return;
+		}
+		if (code <= 0x1f) invalidJsonDocument();
+		if (code === 0x5c) scanJsonStringEscape(cursor);
+		else cursor.index += 1;
+	}
+	invalidJsonDocument();
+}
+
+/** Steps over a run of decimal digits. */
+function scanJsonDigits(cursor: JsonLexicalCursor): void {
+	while (
+		cursor.index < cursor.text.length &&
+		cursor.text[cursor.index]! >= '0' &&
+		cursor.text[cursor.index]! <= '9'
+	) {
+		cursor.checkpoint();
+		cursor.index += 1;
+	}
+}
+
+/** Refuses unless the cursor rests on a decimal digit. */
+function requireJsonDigit(cursor: JsonLexicalCursor): void {
+	if (
+		cursor.index >= cursor.text.length ||
+		cursor.text[cursor.index]! < '0' ||
+		cursor.text[cursor.index]! > '9'
+	)
+		invalidJsonDocument();
+}
+
+/** Steps over the optional fractional part of a JSON number. */
+function scanJsonFraction(cursor: JsonLexicalCursor): void {
+	if (cursor.text[cursor.index] !== '.') return;
+	cursor.index += 1;
+	requireJsonDigit(cursor);
+	scanJsonDigits(cursor);
+}
+
+/** Steps over the optional exponent part of a JSON number. */
+function scanJsonExponent(cursor: JsonLexicalCursor): void {
+	const text = cursor.text;
+	if (text[cursor.index] !== 'e' && text[cursor.index] !== 'E') return;
+	cursor.index += 1;
+	if (text[cursor.index] === '+' || text[cursor.index] === '-') cursor.index += 1;
+	requireJsonDigit(cursor);
+	scanJsonDigits(cursor);
+}
+
+/** Steps over one complete JSON number literal. */
+function scanJsonNumber(cursor: JsonLexicalCursor): void {
+	const text = cursor.text;
+	if (text[cursor.index] === '-') cursor.index += 1;
+	if (text[cursor.index] === '0') cursor.index += 1;
+	else {
+		if (cursor.index >= text.length || text[cursor.index]! < '1' || text[cursor.index]! > '9')
+			invalidJsonDocument();
+		scanJsonDigits(cursor);
+	}
+	scanJsonFraction(cursor);
+	scanJsonExponent(cursor);
+}
+
+/** Charges one JSON value against the pre-parse census and steps over its opening token. */
+function acceptJsonValue(cursor: JsonLexicalCursor): void {
+	const depth = cursor.containers.length;
+	if (depth > cursor.maxDepth)
+		failDerivation('BUDGET_EXHAUSTED', 'Declaration map JSON exceeds the pre-parse depth ceiling.');
+	cursor.records += 1;
+	if (cursor.records > cursor.maxRecords)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Declaration map JSON exceeds the pre-parse record ceiling.'
+		);
+	if (cursor.containers.length === 0) cursor.rootState = 'END';
+	else cursor.containers.at(-1)!.state = 'COMMA_OR_END';
+	const token = cursor.text[cursor.index];
+	if (token === '{') {
+		cursor.index += 1;
+		cursor.containers.push({ kind: 'OBJECT', state: 'KEY_OR_END' });
+		return;
+	}
+	if (token === '[') {
+		cursor.index += 1;
+		cursor.containers.push({ kind: 'ARRAY', state: 'VALUE_OR_END' });
+		return;
+	}
+	if (token === '"') {
+		scanJsonString(cursor);
+		return;
+	}
+	if (token === '-' || (token !== undefined && token >= '0' && token <= '9')) {
+		scanJsonNumber(cursor);
+		return;
+	}
+	for (const literal of ['true', 'false', 'null'] as const) {
+		if (cursor.text.startsWith(literal, cursor.index)) {
+			cursor.index += literal.length;
+			return;
+		}
+	}
+	invalidJsonDocument();
+}
+
+/** Decides how an object that has just closed a member continues: another member, or the end. */
+function stepJsonObjectAfterMember(cursor: JsonLexicalCursor, current: JsonObjectContainer): void {
+	if (cursor.text[cursor.index] === ',') {
+		cursor.index += 1;
+		current.state = 'KEY';
+		return;
+	}
+	if (cursor.text[cursor.index] === '}') {
+		cursor.index += 1;
+		cursor.containers.pop();
+		return;
+	}
+	invalidJsonDocument();
+}
+
+/** Advances one lexical step inside an open JSON object. */
+function stepJsonObject(cursor: JsonLexicalCursor, current: JsonObjectContainer): void {
+	const text = cursor.text;
+	if (current.state === 'COMMA_OR_END') {
+		stepJsonObjectAfterMember(cursor, current);
+		return;
+	}
+	if (current.state === 'KEY_OR_END' && text[cursor.index] === '}') {
+		cursor.index += 1;
+		cursor.containers.pop();
+		return;
+	}
+	if (current.state === 'KEY_OR_END' || current.state === 'KEY') {
+		if (text[cursor.index] !== '"') invalidJsonDocument();
+		scanJsonString(cursor);
+		current.state = 'COLON';
+		return;
+	}
+	if (current.state === 'COLON') {
+		if (text[cursor.index] !== ':') invalidJsonDocument();
+		cursor.index += 1;
+		current.state = 'VALUE';
+		return;
+	}
+	if (cursor.index >= text.length) invalidJsonDocument();
+	acceptJsonValue(cursor);
+}
+
+/** Advances one lexical step inside an open JSON array. */
+function stepJsonArray(cursor: JsonLexicalCursor, current: JsonArrayContainer): void {
+	const text = cursor.text;
+	if (current.state === 'VALUE_OR_END' && text[cursor.index] === ']') {
+		cursor.index += 1;
+		cursor.containers.pop();
+		return;
+	}
+	if (current.state === 'VALUE_OR_END' || current.state === 'VALUE') {
+		if (cursor.index >= text.length) invalidJsonDocument();
+		acceptJsonValue(cursor);
+		return;
+	}
+	if (text[cursor.index] === ',') {
+		cursor.index += 1;
+		current.state = 'VALUE';
+		return;
+	}
+	if (text[cursor.index] === ']') {
+		cursor.index += 1;
+		cursor.containers.pop();
+		return;
+	}
+	invalidJsonDocument();
+}
+
+/**
+ * Advances the cursor while no container is open. Returns true once the document is complete.
+ *
+ * `cursor.text` is the same string `preflightJsonStructure` was given, so the two length tests are
+ * the reads they always were; only their location moved.
+ */
+function stepJsonRoot(cursor: JsonLexicalCursor): boolean {
+	if (cursor.rootState === 'VALUE') {
+		if (cursor.index >= cursor.text.length) invalidJsonDocument();
+		acceptJsonValue(cursor);
+		return false;
+	}
+	if (cursor.index !== cursor.text.length) invalidJsonDocument();
+	return true;
+}
+
 function preflightJsonStructure(
 	text: string,
 	maxDepth: number,
 	maxRecords: number,
 	checkpoint: DeadlineCheckpoint
 ): void {
-	const containers: JsonLexicalContainer[] = [];
-	let index = 0;
-	let records = 0;
-	let rootState: 'END' | 'VALUE' = 'VALUE';
-	const invalidJson = (): never =>
-		failDerivation(
-			'INPUT_INVALID',
-			'Declaration map is not valid JSON.',
-			'$inputs.declarationMapBytes'
-		);
-	const skipWhitespace = (): void => {
-		while (index < text.length) {
-			checkpoint();
-			const code = text.charCodeAt(index);
-			if (code !== 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) break;
-			index += 1;
-		}
-	};
-	const scanString = (): void => {
-		if (text.charCodeAt(index) !== 0x22) invalidJson();
-		index += 1;
-		while (index < text.length) {
-			checkpoint();
-			const code = text.charCodeAt(index);
-			if (code === 0x22) {
-				index += 1;
-				return;
-			}
-			if (code <= 0x1f) invalidJson();
-			if (code !== 0x5c) {
-				index += 1;
-				continue;
-			}
-			index += 1;
-			if (index >= text.length) invalidJson();
-			const escape = text[index]!;
-			if ('"\\/bfnrt'.includes(escape)) {
-				index += 1;
-				continue;
-			}
-			if (escape !== 'u' || index + 4 >= text.length) invalidJson();
-			for (let digit = 1; digit <= 4; digit += 1) {
-				checkpoint();
-				if (!/[0-9A-Fa-f]/u.test(text[index + digit]!)) invalidJson();
-			}
-			index += 5;
-		}
-		invalidJson();
-	};
-	const scanNumber = (): void => {
-		if (text[index] === '-') index += 1;
-		if (text[index] === '0') index += 1;
-		else {
-			if (index >= text.length || text[index]! < '1' || text[index]! > '9') invalidJson();
-			while (index < text.length && text[index]! >= '0' && text[index]! <= '9') {
-				checkpoint();
-				index += 1;
-			}
-		}
-		if (text[index] === '.') {
-			index += 1;
-			if (index >= text.length || text[index]! < '0' || text[index]! > '9') invalidJson();
-			while (index < text.length && text[index]! >= '0' && text[index]! <= '9') {
-				checkpoint();
-				index += 1;
-			}
-		}
-		if (text[index] === 'e' || text[index] === 'E') {
-			index += 1;
-			if (text[index] === '+' || text[index] === '-') index += 1;
-			if (index >= text.length || text[index]! < '0' || text[index]! > '9') invalidJson();
-			while (index < text.length && text[index]! >= '0' && text[index]! <= '9') {
-				checkpoint();
-				index += 1;
-			}
-		}
-	};
-	const acceptValue = (): void => {
-		const depth = containers.length;
-		if (depth > maxDepth)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Declaration map JSON exceeds the pre-parse depth ceiling.'
-			);
-		records += 1;
-		if (records > maxRecords)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Declaration map JSON exceeds the pre-parse record ceiling.'
-			);
-		if (containers.length === 0) rootState = 'END';
-		else containers[containers.length - 1]!.state = 'COMMA_OR_END';
-		const token = text[index];
-		if (token === '{') {
-			index += 1;
-			containers.push({ kind: 'OBJECT', state: 'KEY_OR_END' });
-			return;
-		}
-		if (token === '[') {
-			index += 1;
-			containers.push({ kind: 'ARRAY', state: 'VALUE_OR_END' });
-			return;
-		}
-		if (token === '"') {
-			scanString();
-			return;
-		}
-		if (token === '-' || (token !== undefined && token >= '0' && token <= '9')) {
-			scanNumber();
-			return;
-		}
-		for (const literal of ['true', 'false', 'null'] as const) {
-			if (text.startsWith(literal, index)) {
-				index += literal.length;
-				return;
-			}
-		}
-		invalidJson();
+	const cursor: JsonLexicalCursor = {
+		checkpoint,
+		containers: [],
+		index: 0,
+		maxDepth,
+		maxRecords,
+		records: 0,
+		rootState: 'VALUE',
+		text
 	};
 	for (;;) {
 		checkpoint();
-		skipWhitespace();
-		const current = containers[containers.length - 1];
+		skipJsonWhitespace(cursor);
+		const current = cursor.containers.at(-1);
 		if (current === undefined) {
-			if (rootState === 'VALUE') {
-				if (index >= text.length) invalidJson();
-				acceptValue();
-				continue;
-			}
-			if (index !== text.length) invalidJson();
-			return;
-		}
-		if (current.kind === 'OBJECT') {
-			if (current.state === 'KEY_OR_END' && text[index] === '}') {
-				index += 1;
-				containers.pop();
-				continue;
-			}
-			if (current.state === 'KEY_OR_END' || current.state === 'KEY') {
-				if (text[index] !== '"') invalidJson();
-				scanString();
-				current.state = 'COLON';
-				continue;
-			}
-			if (current.state === 'COLON') {
-				if (text[index] !== ':') invalidJson();
-				index += 1;
-				current.state = 'VALUE';
-				continue;
-			}
-			if (current.state === 'VALUE') {
-				if (index >= text.length) invalidJson();
-				acceptValue();
-				continue;
-			}
-			if (text[index] === ',') {
-				index += 1;
-				current.state = 'KEY';
-				continue;
-			}
-			if (text[index] === '}') {
-				index += 1;
-				containers.pop();
-				continue;
-			}
-			invalidJson();
-		}
-		if (current.state === 'VALUE_OR_END' && text[index] === ']') {
-			index += 1;
-			containers.pop();
+			if (stepJsonRoot(cursor)) return;
 			continue;
 		}
-		if (current.state === 'VALUE_OR_END' || current.state === 'VALUE') {
-			if (index >= text.length) invalidJson();
-			acceptValue();
-			continue;
-		}
-		if (text[index] === ',') {
-			index += 1;
-			current.state = 'VALUE';
-			continue;
-		}
-		if (text[index] === ']') {
-			index += 1;
-			containers.pop();
-			continue;
-		}
-		invalidJson();
+		if (current.kind === 'OBJECT') stepJsonObject(cursor, current);
+		else stepJsonArray(cursor, current);
 	}
+}
+
+interface SourceMapDocument {
+	readonly file: string;
+	readonly mappings: string;
+	readonly rawSource: string;
+}
+
+interface MappingCoordinates {
+	readonly generatedColumn: number;
+	readonly originalColumn: number;
+	readonly originalLine: number;
+	readonly sourceIndex: number;
+}
+
+/** Applies one segment's four VLQ deltas, refusing any coordinate outside the selected domain. */
+function nextSegmentCoordinates(
+	current: MappingCoordinates,
+	fields: readonly number[],
+	lineSegmentOrdinal: number
+): MappingCoordinates {
+	const generatedColumn = boundedCoordinate(
+		current.generatedColumn,
+		fields[0]!,
+		'Declaration-map generated column'
+	);
+	if (lineSegmentOrdinal > 0 && generatedColumn <= current.generatedColumn)
+		failDerivation('INPUT_INVALID', 'Generated columns must be strictly increasing within a line.');
+	const sourceIndex = boundedCoordinate(
+		current.sourceIndex,
+		fields[1]!,
+		'Declaration-map source index'
+	);
+	if (sourceIndex !== 0)
+		failDerivation('INPUT_INVALID', 'Every declaration-map segment must select sources[0].');
+	const originalLine = boundedCoordinate(
+		current.originalLine,
+		fields[2]!,
+		'Declaration-map original line'
+	);
+	const originalColumn = boundedCoordinate(
+		current.originalColumn,
+		fields[3]!,
+		'Declaration-map original column'
+	);
+	return { generatedColumn, originalColumn, originalLine, sourceIndex };
+}
+
+/** Reads exactly the four VLQ fields of one segment and reports where the segment ends. */
+function decodeSegmentFields(
+	mappings: string,
+	start: number,
+	checkpoint: DeadlineCheckpoint
+): { readonly fields: readonly number[]; readonly next: number } {
+	const fields: number[] = [];
+	let index = start;
+	while (index < mappings.length && mappings[index] !== ',' && mappings[index] !== ';') {
+		if (fields.length >= 4)
+			failDerivation(
+				'INPUT_INVALID',
+				'Every declaration-map segment must have exactly four fields.'
+			);
+		const decoded = decodeVlq(mappings, index, checkpoint);
+		fields.push(decoded.value);
+		index = decoded.next;
+	}
+	if (fields.length !== 4)
+		failDerivation('INPUT_INVALID', 'Every declaration-map segment must have exactly four fields.');
+	return { fields, next: index };
+}
+
+/** Steps over a segment separator, refusing the empty segment an adjacent separator would imply. */
+function advancePastSegmentComma(mappings: string, index: number): number {
+	if (mappings[index] !== ',') return index;
+	const next = index + 1;
+	if (next >= mappings.length || mappings[next] === ',' || mappings[next] === ';')
+		failDerivation('INPUT_INVALID', 'Declaration map contains an empty segment.');
+	return next;
+}
+
+/** Opens the next generated line, refusing once the decoded-line budget cannot admit it. */
+function nextGeneratedLine(
+	generatedLine: number,
+	budgets: SourceOriginCorrelationBuildInputs['request']['budgets']
+): number {
+	const line = generatedLine + 1;
+	if (line + 1 > budgets.maxDecodedMapLines || line + 1 > HARD_MAX_DECODED_LINES)
+		failDerivation('BUDGET_EXHAUSTED', 'Declaration map exceeds the generated-line budget.');
+	return line;
+}
+
+/** Decodes the whole base64-VLQ mappings string into the strict flat v1 segment population. */
+function decodeMappings(
+	mappings: string,
+	budgets: SourceOriginCorrelationBuildInputs['request']['budgets'],
+	checkpoint: DeadlineCheckpoint
+): { readonly generatedLines: number; readonly segments: readonly DecodedSegment[] } {
+	const segments: DecodedSegment[] = [];
+	let generatedLine = 0;
+	let coordinates: MappingCoordinates = {
+		generatedColumn: 0,
+		originalColumn: 0,
+		originalLine: 0,
+		sourceIndex: 0
+	};
+	let lineSegmentOrdinal = 0;
+	let index = 0;
+	if (budgets.maxDecodedMapLines < 1)
+		failDerivation('BUDGET_EXHAUSTED', 'Declaration map line budget cannot admit one line.');
+	while (index < mappings.length) {
+		checkpoint();
+		if (mappings[index] === ';') {
+			generatedLine = nextGeneratedLine(generatedLine, budgets);
+			coordinates = { ...coordinates, generatedColumn: 0 };
+			lineSegmentOrdinal = 0;
+			index += 1;
+			continue;
+		}
+		if (mappings[index] === ',')
+			failDerivation('INPUT_INVALID', 'Declaration map contains an empty segment.');
+		if (
+			segments.length >= budgets.maxDecodedMapSegments ||
+			segments.length >= HARD_MAX_DECODED_SEGMENTS
+		)
+			failDerivation('BUDGET_EXHAUSTED', 'Declaration map exceeds the decoded-segment budget.');
+		const decoded = decodeSegmentFields(mappings, index, checkpoint);
+		index = decoded.next;
+		coordinates = nextSegmentCoordinates(coordinates, decoded.fields, lineSegmentOrdinal);
+		segments.push({
+			generatedColumn: coordinates.generatedColumn,
+			generatedLine,
+			lineSegmentOrdinal,
+			ordinal: segments.length,
+			originalColumn: coordinates.originalColumn,
+			originalLine: coordinates.originalLine,
+			sourceIndex: 0
+		});
+		lineSegmentOrdinal += 1;
+		if (index >= mappings.length) break;
+		index = advancePastSegmentComma(mappings, index);
+	}
+	if (segments.length === 0)
+		failDerivation('INPUT_INVALID', 'Declaration map must contain at least one mapped segment.');
+	return { generatedLines: generatedLine + 1, segments };
 }
 
 function parseSourceMap(
@@ -1580,6 +2078,23 @@ function parseSourceMap(
 	budgets: SourceOriginCorrelationBuildInputs['request']['budgets'],
 	checkpoint: DeadlineCheckpoint
 ): ParsedSourceMap {
+	const document = parseSourceMapDocument(text, budgets, checkpoint);
+	const decoded = decodeMappings(document.mappings, budgets, checkpoint);
+	return {
+		file: document.file,
+		generatedLines: decoded.generatedLines,
+		mappings: document.mappings,
+		rawSource: document.rawSource,
+		segments: decoded.segments
+	};
+}
+
+/** Decides whether the declaration-map text is one exact strict flat Source Map v3 document. */
+function parseSourceMapDocument(
+	text: string,
+	budgets: SourceOriginCorrelationBuildInputs['request']['budgets'],
+	checkpoint: DeadlineCheckpoint
+): SourceMapDocument {
 	if (text.length > budgets.maxInputStringCharacters)
 		failDerivation('BUDGET_EXHAUSTED', 'Declaration map text exceeds maxInputStringCharacters.');
 	preflightJsonStructure(
@@ -1674,100 +2189,7 @@ function parseSourceMap(
 			'INPUT_INVALID',
 			'Declaration map file/source paths are outside the selected path profile.'
 		);
-	const mappings = object.mappings;
-	const segments: DecodedSegment[] = [];
-	let generatedLine = 0;
-	let generatedColumn = 0;
-	let originalLine = 0;
-	let originalColumn = 0;
-	let sourceIndex = 0;
-	let lineSegmentOrdinal = 0;
-	let index = 0;
-	if (budgets.maxDecodedMapLines < 1)
-		failDerivation('BUDGET_EXHAUSTED', 'Declaration map line budget cannot admit one line.');
-	while (index < mappings.length) {
-		checkpoint();
-		if (mappings[index] === ';') {
-			generatedLine += 1;
-			if (
-				generatedLine + 1 > budgets.maxDecodedMapLines ||
-				generatedLine + 1 > HARD_MAX_DECODED_LINES
-			)
-				failDerivation('BUDGET_EXHAUSTED', 'Declaration map exceeds the generated-line budget.');
-			generatedColumn = 0;
-			lineSegmentOrdinal = 0;
-			index += 1;
-			continue;
-		}
-		if (mappings[index] === ',')
-			failDerivation('INPUT_INVALID', 'Declaration map contains an empty segment.');
-		if (
-			segments.length >= budgets.maxDecodedMapSegments ||
-			segments.length >= HARD_MAX_DECODED_SEGMENTS
-		)
-			failDerivation('BUDGET_EXHAUSTED', 'Declaration map exceeds the decoded-segment budget.');
-		const fields: number[] = [];
-		while (index < mappings.length && mappings[index] !== ',' && mappings[index] !== ';') {
-			if (fields.length >= 4)
-				failDerivation(
-					'INPUT_INVALID',
-					'Every declaration-map segment must have exactly four fields.'
-				);
-			const decoded = decodeVlq(mappings, index, checkpoint);
-			fields.push(decoded.value);
-			index = decoded.next;
-		}
-		if (fields.length !== 4)
-			failDerivation(
-				'INPUT_INVALID',
-				'Every declaration-map segment must have exactly four fields.'
-			);
-		const nextGeneratedColumn = boundedCoordinate(
-			generatedColumn,
-			fields[0]!,
-			'Declaration-map generated column'
-		);
-		if (lineSegmentOrdinal > 0 && nextGeneratedColumn <= generatedColumn)
-			failDerivation(
-				'INPUT_INVALID',
-				'Generated columns must be strictly increasing within a line.'
-			);
-		generatedColumn = nextGeneratedColumn;
-		sourceIndex = boundedCoordinate(sourceIndex, fields[1]!, 'Declaration-map source index');
-		if (sourceIndex !== 0)
-			failDerivation('INPUT_INVALID', 'Every declaration-map segment must select sources[0].');
-		originalLine = boundedCoordinate(originalLine, fields[2]!, 'Declaration-map original line');
-		originalColumn = boundedCoordinate(
-			originalColumn,
-			fields[3]!,
-			'Declaration-map original column'
-		);
-		segments.push({
-			generatedColumn,
-			generatedLine,
-			lineSegmentOrdinal,
-			ordinal: segments.length,
-			originalColumn,
-			originalLine,
-			sourceIndex: 0
-		});
-		lineSegmentOrdinal += 1;
-		if (index >= mappings.length) break;
-		if (mappings[index] === ',') {
-			index += 1;
-			if (index >= mappings.length || mappings[index] === ',' || mappings[index] === ';')
-				failDerivation('INPUT_INVALID', 'Declaration map contains an empty segment.');
-		}
-	}
-	if (segments.length === 0)
-		failDerivation('INPUT_INVALID', 'Declaration map must contain at least one mapped segment.');
-	return {
-		file: object.file,
-		generatedLines: generatedLine + 1,
-		mappings,
-		rawSource: object.sources[0],
-		segments
-	};
+	return { file: object.file, mappings: object.mappings, rawSource: object.sources[0] };
 }
 
 interface TextLine {
@@ -2352,7 +2774,7 @@ function denseArray(value: unknown, expectedLength: number): value is unknown[] 
 	return keys.every(
 		(key) =>
 			typeof key === 'string' &&
-			(key === 'length' || (/^(?:0|[1-9][0-9]*)$/u.test(key) && Number(key) < expectedLength))
+			(key === 'length' || (/^(?:0|[1-9]\d*)$/u.test(key) && Number(key) < expectedLength))
 	);
 }
 
@@ -2387,10 +2809,40 @@ function validateProviderEmission(
 		inputs.request.budgets.maxEmitStringCharacters,
 		HARD_MAX_EMIT_STRING_CHARACTERS
 	);
+	validateProviderOutputBudget(outputs, maximumOutputCharacters, checkpoint);
+	validateProviderOutputIdentities(outputs, inputs, bound, checkpoint);
+	validateMaterializedSource(sourceValue, inputs, bound, checkpoint);
+	const selection = selectionValue as unknown as CompilerProjectDeclarationEmission['selection'];
+	if (
+		selection.logicalPath !== bound.source.logicalPath ||
+		selection.semanticProgramId !== bound.program.id ||
+		selection.semanticProjectId !== bound.project.id ||
+		selection.semanticSourceId !== bound.source.id
+	)
+		failDerivation('INPUT_INVALID', 'Fresh declaration provider selection does not reconcile.');
+	const witness = witnessValue as unknown as CompilerProjectDeclarationEmission['emissionWitness'];
+	validateEmissionWitnessScalars(witness);
+	validateWitnessOutputAliases(witnessValue, outputs, checkpoint);
+	validateWitnessIdentity(witness, inputs, bound, programSources);
+	const expectedSourceDigest = domainDigest(
+		'JAN-CSAA-SOURCE-ORIGIN-PROGRAM-SOURCE-POPULATION',
+		programSources,
+		checkpoint
+	);
+	if (witness.programSourcePopulationDigest !== expectedSourceDigest)
+		failDerivation('INPUT_INVALID', 'Fresh emission Program source digest does not reconcile.');
+	return value as unknown as CompilerProjectDeclarationEmission;
+}
+
+/** Decides whether each emitted output carries valid, budget-fitting text evidence. */
+function validateProviderOutputBudget(
+	outputs: CompilerProjectDeclarationEmission['outputs'],
+	maximumOutputCharacters: number,
+	checkpoint: DeadlineCheckpoint
+): void {
 	let outputCharacters = 0;
-	for (let index = 0; index < outputs.length; index += 1) {
+	for (const output of outputs) {
 		checkpoint();
-		const output = outputs[index];
 		if (!providerRecord(output, PROVIDER_OUTPUT_KEYS))
 			failDerivation(
 				'INPUT_INVALID',
@@ -2411,9 +2863,17 @@ function validateProviderEmission(
 				'Fresh declaration provider output text exceeds the cumulative character ceiling.'
 			);
 	}
-	for (let index = 0; index < outputs.length; index += 1) {
+}
+
+/** Decides whether each emitted output names the bound source through the selected path profile. */
+function validateProviderOutputIdentities(
+	outputs: CompilerProjectDeclarationEmission['outputs'],
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundInputs,
+	checkpoint: DeadlineCheckpoint
+): void {
+	for (const output of outputs) {
 		checkpoint();
-		const output = outputs[index]!;
 		if (
 			typeof output.contentSha256 !== 'string' ||
 			!SHA256.test(output.contentSha256) ||
@@ -2426,6 +2886,15 @@ function validateProviderEmission(
 		)
 			failDerivation('INPUT_INVALID', 'Fresh declaration provider output evidence is invalid.');
 	}
+}
+
+/** Decides whether the provider's materialized source is byte-identical to the authored source. */
+function validateMaterializedSource(
+	sourceValue: unknown,
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundInputs,
+	checkpoint: DeadlineCheckpoint
+): void {
 	const source = sourceValue as unknown as CompilerProjectDeclarationEmission['materializedSource'];
 	const maximumSourceCharacters = Math.min(
 		inputs.request.budgets.maxSourceTextCodeUnits,
@@ -2461,15 +2930,12 @@ function validateProviderEmission(
 			'INPUT_INVALID',
 			'Fresh declaration provider source text bytes do not reconcile with the authored source.'
 		);
-	const selection = selectionValue as unknown as CompilerProjectDeclarationEmission['selection'];
-	if (
-		selection.logicalPath !== bound.source.logicalPath ||
-		selection.semanticProgramId !== bound.program.id ||
-		selection.semanticProjectId !== bound.project.id ||
-		selection.semanticSourceId !== bound.source.id
-	)
-		failDerivation('INPUT_INVALID', 'Fresh declaration provider selection does not reconcile.');
-	const witness = witnessValue as unknown as CompilerProjectDeclarationEmission['emissionWitness'];
+}
+
+/** Decides whether every counted and digested emission-witness scalar is well formed. */
+function validateEmissionWitnessScalars(
+	witness: CompilerProjectDeclarationEmission['emissionWitness']
+): void {
 	for (const key of [
 		'attributedCompilerInputAttempts',
 		'attributedProgramReadBytes',
@@ -2495,6 +2961,14 @@ function validateProviderEmission(
 		if (typeof digest !== 'string' || !SHA256.test(digest))
 			failDerivation('INPUT_INVALID', `Fresh emission witness ${key} must be lowercase SHA-256.`);
 	}
+}
+
+/** Decides whether the witness output aliases are field-for-field the emitted output records. */
+function validateWitnessOutputAliases(
+	witnessValue: unknown,
+	outputs: CompilerProjectDeclarationEmission['outputs'],
+	checkpoint: DeadlineCheckpoint
+): void {
 	const witnessOutputsValue = ownDataValue(witnessValue, 'outputs');
 	if (!denseArray(witnessOutputsValue, outputs.length))
 		failDerivation('INPUT_INVALID', 'Fresh emission witness output aliases are malformed.');
@@ -2504,17 +2978,35 @@ function validateProviderEmission(
 		const output = outputs[index]!;
 		if (!providerRecord(witnessOutput, PROVIDER_OUTPUT_KEYS))
 			failDerivation('INPUT_INVALID', 'Fresh emission witness output alias is malformed.');
-		for (const key of PROVIDER_OUTPUT_KEYS) {
-			const aliasValue = ownDataValue(witnessOutput, key);
+		compareWitnessOutputAlias(witnessOutput, output, checkpoint);
+	}
+}
+
+/** Refuses unless every declared output field is present and equal on the witness alias. */
+function compareWitnessOutputAlias(
+	witnessOutput: Record<string, unknown>,
+	output: CompilerProjectDeclarationEmission['outputs'][number],
+	checkpoint: DeadlineCheckpoint
+): void {
+	for (const key of PROVIDER_OUTPUT_KEYS) {
+		const aliasValue = ownDataValue(witnessOutput, key);
+		checkpoint();
+		const reconciles = aliasValue === output[key];
+		checkpoint();
+		if (!reconciles) {
 			checkpoint();
-			const reconciles = aliasValue === output[key];
-			checkpoint();
-			if (!reconciles) {
-				checkpoint();
-				failDerivation('INPUT_INVALID', 'Fresh emission witness output aliases do not reconcile.');
-			}
+			failDerivation('INPUT_INVALID', 'Fresh emission witness output aliases do not reconcile.');
 		}
 	}
+}
+
+/** Decides whether the emission witness identity and population reconcile with the request. */
+function validateWitnessIdentity(
+	witness: CompilerProjectDeclarationEmission['emissionWitness'],
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundInputs,
+	programSources: readonly SourceOriginProgramSourceIdentity[]
+): void {
 	if (
 		typeof witness.compilerVersion !== 'string' ||
 		witness.compilerVersion.length === 0 ||
@@ -2554,14 +3046,182 @@ function validateProviderEmission(
 		witness.programReadBytes > inputs.request.budgets.maxProgramReadBytes
 	)
 		failDerivation('BUDGET_EXHAUSTED', 'Fresh emission exceeds Program input/read budgets.');
-	const expectedSourceDigest = domainDigest(
-		'JAN-CSAA-SOURCE-ORIGIN-PROGRAM-SOURCE-POPULATION',
-		programSources,
-		checkpoint
-	);
-	if (witness.programSourcePopulationDigest !== expectedSourceDigest)
-		failDerivation('INPUT_INVALID', 'Fresh emission Program source digest does not reconcile.');
-	return value as unknown as CompilerProjectDeclarationEmission;
+}
+
+/** Collects the distinct authored line ordinals a sparse line scan must retain. */
+function authoredLineOrdinalsOf(
+	segments: readonly DecodedSegment[],
+	decodedSegments: number,
+	checkpoint: DeadlineCheckpoint
+): ReadonlySet<number> {
+	const authoredLineOrdinals = new Set<number>();
+	for (const decoded of segments) {
+		checkpoint();
+		if (
+			!authoredLineOrdinals.has(decoded.originalLine) &&
+			authoredLineOrdinals.size >= decodedSegments
+		)
+			failDerivation(
+				'BUDGET_EXHAUSTED',
+				'Sparse authored-line population exceeds the decoded-segment preflight.'
+			);
+		authoredLineOrdinals.add(decoded.originalLine);
+	}
+	return authoredLineOrdinals;
+}
+
+interface CorrelationBuildContext {
+	readonly analysisId: SourceOriginCorrelationId;
+	readonly authoredArtifactId: SourceOriginArtifactId;
+	readonly authoredLines: SparseTextLineBounds;
+	readonly checkpoint: DeadlineCheckpoint;
+	readonly generatedLineMapped: Uint8Array;
+	readonly mappingHealthId: SourceOriginMappingHealthId;
+	readonly segments: readonly DecodedSegment[];
+	readonly sourceMapId: SourceOriginSourceMapId;
+	readonly targetArtifactId: SourceOriginArtifactId;
+	readonly targetLines: readonly TextLine[];
+}
+
+interface CorrelationPopulation {
+	readonly correlationRecords: Array<SourceOriginCorrelationSnapshot['correlations'][number]>;
+	readonly locationRecords: Array<SourceOriginCorrelationSnapshot['locations'][number]>;
+	readonly segmentRecords: Array<SourceOriginCorrelationSnapshot['segments'][number]>;
+}
+
+/** Emits one segment, two endpoint locations, and one correlation per decoded map segment. */
+function buildCorrelationPopulation(context: CorrelationBuildContext): CorrelationPopulation {
+	const {
+		analysisId,
+		authoredArtifactId,
+		authoredLines,
+		checkpoint,
+		generatedLineMapped,
+		mappingHealthId,
+		sourceMapId,
+		targetArtifactId,
+		targetLines
+	} = context;
+	const generatedCoordinates = new Set<string>();
+	const authoredCoordinates = new Set<string>();
+	const segmentRecords: Array<SourceOriginCorrelationSnapshot['segments'][number]> = [];
+	const locationRecords: Array<SourceOriginCorrelationSnapshot['locations'][number]> = [];
+	const correlationRecords: Array<SourceOriginCorrelationSnapshot['correlations'][number]> = [];
+	for (const decoded of context.segments) {
+		checkpoint();
+		const generatedOffset = coordinateOffset(
+			targetLines,
+			decoded.generatedLine,
+			decoded.generatedColumn,
+			'Generated coordinate'
+		);
+		const authoredOffset = sparseCoordinateOffset(
+			authoredLines,
+			decoded.originalLine,
+			decoded.originalColumn,
+			'Authored coordinate'
+		);
+		const generatedKey = `${decoded.generatedLine}:${decoded.generatedColumn}`;
+		const authoredKey = `${decoded.originalLine}:${decoded.originalColumn}`;
+		if (generatedCoordinates.has(generatedKey) || authoredCoordinates.has(authoredKey))
+			failDerivation('INPUT_INVALID', 'Mapped endpoint coordinates must be globally unique.');
+		generatedCoordinates.add(generatedKey);
+		authoredCoordinates.add(authoredKey);
+		generatedLineMapped[decoded.generatedLine] = 1;
+		const segmentWithoutId = {
+			decodedFieldCount: 4 as const,
+			generatedColumn: decoded.generatedColumn,
+			generatedLine: decoded.generatedLine,
+			lineSegmentOrdinal: decoded.lineSegmentOrdinal,
+			mapId: sourceMapId,
+			nameIndex: null,
+			ordinal: decoded.ordinal,
+			originalColumn: decoded.originalColumn,
+			originalLine: decoded.originalLine,
+			sourceArtifactId: authoredArtifactId,
+			sourceIndex: 0 as const,
+			state: 'MAPPED' as const,
+			targetArtifactId
+		};
+		const segmentId = segmentIdentity(analysisId, segmentWithoutId, checkpoint);
+		segmentRecords.push({ ...segmentWithoutId, id: segmentId });
+		const generatedLocationWithoutId = {
+			artifactId: targetArtifactId,
+			column: decoded.generatedColumn,
+			coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
+			line: decoded.generatedLine,
+			offset: generatedOffset,
+			ordinal: decoded.ordinal * 2,
+			role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[0],
+			segmentId,
+			width: 0 as const
+		};
+		const generatedLocationId = locationIdentity(
+			analysisId,
+			generatedLocationWithoutId,
+			checkpoint
+		);
+		const authoredLocationWithoutId = {
+			artifactId: authoredArtifactId,
+			column: decoded.originalColumn,
+			coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
+			line: decoded.originalLine,
+			offset: authoredOffset,
+			ordinal: decoded.ordinal * 2 + 1,
+			role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[1],
+			segmentId,
+			width: 0 as const
+		};
+		const authoredLocationId = locationIdentity(analysisId, authoredLocationWithoutId, checkpoint);
+		locationRecords.push(
+			{ ...generatedLocationWithoutId, id: generatedLocationId },
+			{ ...authoredLocationWithoutId, id: authoredLocationId }
+		);
+		const correlationWithoutId = {
+			authoredLocationId,
+			directionality: 'BIDIRECTIONAL_EXACT_ONE_TO_ONE' as const,
+			generatedLocationId,
+			kind: 'GENERATED_TO_AUTHORED_SOURCE_MAP_SEGMENT' as const,
+			mapId: sourceMapId,
+			mappingHealthId,
+			ordinal: decoded.ordinal,
+			segmentId,
+			state: 'EXACT' as const
+		};
+		correlationRecords.push({
+			...correlationWithoutId,
+			id: exactCorrelationIdentity(analysisId, correlationWithoutId, checkpoint)
+		});
+	}
+	return { correlationRecords, locationRecords, segmentRecords };
+}
+
+/** Refuses unless every decoded generated line carried at least one mapped segment. */
+function assertEveryGeneratedLineMapped(
+	generatedLineMapped: Uint8Array,
+	checkpoint: DeadlineCheckpoint
+): void {
+	for (const mapped of generatedLineMapped) {
+		checkpoint();
+		if (mapped === 0)
+			failDerivation('INPUT_INVALID', 'Only the required final trailer line may be unmapped.');
+	}
+}
+
+/** Projects the segment identities the source-map record carries, under its own child budget. */
+function segmentIdentityList(
+	segmentRecords: ReadonlyArray<SourceOriginCorrelationSnapshot['segments'][number]>,
+	maxDecodedMapSegments: number,
+	checkpoint: DeadlineCheckpoint
+): Array<SourceOriginCorrelationSnapshot['segments'][number]['id']> {
+	const segmentIds: Array<SourceOriginCorrelationSnapshot['segments'][number]['id']> = [];
+	for (const record of segmentRecords) {
+		checkpoint();
+		if (segmentIds.length >= maxDecodedMapSegments)
+			failDerivation('BUDGET_EXHAUSTED', 'Source-map child identity budget was exhausted.');
+		segmentIds.push(record.id);
+	}
+	return segmentIds;
 }
 
 interface DeriveParameters {
@@ -2579,6 +3239,283 @@ type DeriveResult =
 	| { readonly analysis: SourceOriginCorrelationSnapshot; readonly state: 'VALID' }
 	| { readonly problem: SourceOriginCorrelationValidationIssue; readonly state: 'INVALID' };
 
+interface ReconciledCaptures {
+	readonly callerCaptureBytes: number;
+	readonly callerCaptureCharacters: number;
+	readonly mapSha256: string;
+	readonly mapText: string;
+	readonly targetSha256: string;
+	readonly targetText: string;
+}
+
+/** Decides whether the caller's two byte captures reconcile with the request capture descriptors. */
+function reconcileCallerCaptures(
+	inputs: SourceOriginCorrelationBuildInputs,
+	targetBytes: Readonly<Uint8Array>,
+	mapBytes: Readonly<Uint8Array>,
+	checkpoint: DeadlineCheckpoint
+): ReconciledCaptures {
+	const budgets = inputs.request.budgets;
+	const callerCaptureBytes = checkedAdd(targetBytes.byteLength, mapBytes.byteLength);
+	if (
+		callerCaptureBytes > budgets.maxCallerCaptureBytes ||
+		callerCaptureBytes > budgets.maxReadBytes ||
+		callerCaptureBytes > HARD_MAX_CAPTURE_BYTES
+	)
+		failDerivation('BUDGET_EXHAUSTED', 'Caller captures exceed request read/capture budgets.');
+	const targetSha256 = bytesSha256(targetBytes, checkpoint);
+	const mapSha256 = bytesSha256(mapBytes, checkpoint);
+	if (
+		targetBytes.byteLength !== inputs.request.targetDeclaration.contentBytes ||
+		targetSha256 !== inputs.request.targetDeclaration.contentSha256 ||
+		mapBytes.byteLength !== inputs.request.declarationMap.contentBytes ||
+		mapSha256 !== inputs.request.declarationMap.contentSha256
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'Caller capture bytes do not reconcile with request descriptors.'
+		);
+	const targetText = decodeUtf8(
+		targetBytes,
+		'Target declaration capture',
+		budgets.maxEmitStringCharacters,
+		checkpoint
+	);
+	const mapText = decodeUtf8(
+		mapBytes,
+		'Declaration-map capture',
+		budgets.maxEmitStringCharacters,
+		checkpoint
+	);
+	const callerCaptureCharacters = checkedAdd(targetText.length, mapText.length);
+	if (callerCaptureCharacters > budgets.maxEmitStringCharacters)
+		failDerivation('BUDGET_EXHAUSTED', 'Caller capture texts exceed maxEmitStringCharacters.');
+	return {
+		callerCaptureBytes,
+		callerCaptureCharacters,
+		mapSha256,
+		mapText,
+		targetSha256,
+		targetText
+	};
+}
+
+interface DerivedPopulationPlan {
+	readonly outputRecords: number;
+	readonly plannedCorrelations: number;
+	readonly plannedLocations: number;
+	readonly plannedUnmappedGeneratedLines: number;
+}
+
+/** Decides whether the fixed v1 derived populations fit every preallocation ceiling. */
+function planDerivedPopulations(
+	budgets: SourceOriginCorrelationBuildInputs['request']['budgets'],
+	bound: BoundInputs,
+	decodedSegments: number
+): DerivedPopulationPlan {
+	if (
+		bound.source.textLength >
+		Math.min(budgets.maxSourceTextCodeUnits, HARD_MAX_SOURCE_TEXT_CODE_UNITS)
+	)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Selected authored source text exceeds the pre-emission materialization ceiling.'
+		);
+	const plannedLocations = checkedMultiply(decodedSegments, 2);
+	const plannedCorrelations = decodedSegments;
+	const plannedUnmappedGeneratedLines = 1;
+	const outputRecords = checkedAdd(
+		7,
+		checkedMultiply(decodedSegments, 4),
+		plannedUnmappedGeneratedLines
+	);
+	if (
+		decodedSegments > budgets.maxDecodedMapSegments ||
+		plannedLocations > budgets.maxLocations ||
+		plannedCorrelations > budgets.maxCorrelations ||
+		plannedUnmappedGeneratedLines > budgets.maxUnmappedGeneratedLines ||
+		outputRecords > budgets.maxOutputRecords
+	)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Derived correlation populations exceed preallocation ceilings.'
+		);
+	return {
+		outputRecords,
+		plannedCorrelations,
+		plannedLocations,
+		plannedUnmappedGeneratedLines
+	};
+}
+
+interface ProviderEmissionBudgets {
+	readonly providerInputRecords: number;
+	readonly providerOutputBytes: number;
+	readonly providerOutputStringCharacters: number;
+	readonly providerReadBytes: number;
+	readonly residualReadBytes: number;
+}
+
+/** Decides the residual emission budget left to the provider once caller captures are charged. */
+function planProviderEmissionBudgets(
+	budgets: SourceOriginCorrelationBuildInputs['request']['budgets'],
+	callerCaptureBytes: number,
+	callerCaptureCharacters: number
+): ProviderEmissionBudgets {
+	if (budgets.maxInputRecords <= 2 || budgets.maxReadBytes <= callerCaptureBytes)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Caller aggregate input/read budgets leave no positive Program residual.'
+		);
+	const residualInputRecords = budgets.maxInputRecords - 2;
+	const residualReadBytes = budgets.maxReadBytes - callerCaptureBytes;
+	const providerInputRecords = Math.min(
+		budgets.maxCompilerInputAttempts,
+		HARD_MAX_COMPILER_INPUT_ATTEMPTS,
+		residualInputRecords
+	);
+	const providerReadBytes = Math.min(budgets.maxProgramReadBytes, residualReadBytes);
+	const providerOutputBytes = Math.min(
+		budgets.maxEmitBytes,
+		HARD_MAX_EMIT_BYTES,
+		callerCaptureBytes
+	);
+	const providerOutputStringCharacters = Math.min(
+		budgets.maxEmitStringCharacters,
+		HARD_MAX_EMIT_STRING_CHARACTERS,
+		callerCaptureCharacters
+	);
+	if (
+		providerOutputBytes !== callerCaptureBytes ||
+		providerOutputStringCharacters !== callerCaptureCharacters
+	)
+		failDerivation(
+			'BUDGET_EXHAUSTED',
+			'Exact caller-captured outputs cannot fit the residual declaration-emission budget.'
+		);
+	return {
+		providerInputRecords,
+		providerOutputBytes,
+		providerOutputStringCharacters,
+		providerReadBytes,
+		residualReadBytes
+	};
+}
+
+/** Runs the fresh declaration emission and translates every provider failure into a refusal. */
+function emitFreshDeclaration(
+	provider: Readonly<ValidationProvider>,
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundInputs,
+	providerBudgets: ProviderEmissionBudgets,
+	providerDuration: number,
+	checkpoint: DeadlineCheckpoint
+): unknown {
+	const budgets = inputs.request.budgets;
+	try {
+		return provider.emitDeclaration(
+			{
+				compilerProgramLimits: {
+					maxDurationMs: providerDuration,
+					maxProgramInputRecords: providerBudgets.providerInputRecords,
+					maxProgramReadBytes: providerBudgets.providerReadBytes,
+					maxProgramSourceFiles: budgets.maxProgramSourceFiles,
+					maxTotalInputRecords: providerBudgets.providerInputRecords,
+					maxTotalReadBytes: providerBudgets.residualReadBytes
+				},
+				frozenSubject: inputs.frozenSubject,
+				logicalPath: bound.source.logicalPath,
+				semanticProgramId: bound.program.id,
+				semanticProjectId: bound.project.id,
+				semanticSnapshot: inputs.semanticSnapshot,
+				semanticSourceId: bound.source.id
+			},
+			{
+				maxDurationMs: providerDuration,
+				maxInputRecords: providerBudgets.providerInputRecords,
+				maxOutputBytes: providerBudgets.providerOutputBytes,
+				maxOutputFiles: budgets.maxEmitOutputs,
+				maxOutputStringCharacters: providerBudgets.providerOutputStringCharacters,
+				maxPathCharacters: budgets.maxPathCharacters,
+				maxProgramSourceFiles: budgets.maxProgramSourceFiles,
+				maxReadBytes: providerBudgets.providerReadBytes,
+				maxTraversalSteps: budgets.maxTraversalSteps
+			},
+			Object.freeze({ checkpoint })
+		);
+	} catch (error) {
+		checkpoint();
+		if (error instanceof CompilerProjectDeclarationEmissionError)
+			failDerivation(
+				error.code === 'BUDGET_EXCEEDED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
+				'Fresh public declaration emission failed closed.'
+			);
+		failDerivation('INPUT_INVALID', 'Fresh public declaration provider failed closed.');
+	}
+}
+
+interface EmittedOutputs {
+	readonly mapOutput: CompilerProjectDeclarationEmission['outputs'][number];
+	readonly targetOutput: CompilerProjectDeclarationEmission['outputs'][number];
+}
+
+/** Decides whether the fresh emission is byte-equal to the two caller captures. */
+function reconcileEmittedOutputs(
+	emission: CompilerProjectDeclarationEmission,
+	inputs: SourceOriginCorrelationBuildInputs,
+	captures: ReconciledCaptures,
+	targetBytes: Readonly<Uint8Array>,
+	mapBytes: Readonly<Uint8Array>,
+	checkpoint: DeadlineCheckpoint
+): EmittedOutputs {
+	const targetOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION');
+	const mapOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION_MAP');
+	if (targetOutputs.length !== 1 || mapOutputs.length !== 1)
+		failDerivation('INPUT_INVALID', 'Fresh emission output kinds do not reconcile.');
+	const targetOutput = targetOutputs[0]!;
+	const mapOutput = mapOutputs[0]!;
+	checkpoint();
+	const targetContentReconciles = targetOutput.content === captures.targetText;
+	checkpoint();
+	const mapContentReconciles = mapOutput.content === captures.mapText;
+	checkpoint();
+	if (
+		targetOutput.logicalPath !== inputs.request.targetDeclaration.logicalPath ||
+		targetOutput.bytes !== targetBytes.byteLength ||
+		targetOutput.contentSha256 !== captures.targetSha256 ||
+		!targetContentReconciles ||
+		mapOutput.logicalPath !== inputs.request.declarationMap.logicalPath ||
+		mapOutput.bytes !== mapBytes.byteLength ||
+		mapOutput.contentSha256 !== captures.mapSha256 ||
+		!mapContentReconciles
+	) {
+		checkpoint();
+		failDerivation('DERIVATION_MISMATCH', 'Fresh emission is not byte-equal to caller captures.');
+	}
+	return { mapOutput, targetOutput };
+}
+
+/** Decides whether the declaration map's own file/source paths name the bound target and source. */
+function reconcileDeclarationMapPaths(
+	inputs: SourceOriginCorrelationBuildInputs,
+	parsedMap: ParsedSourceMap,
+	bound: BoundInputs,
+	checkpoint: DeadlineCheckpoint
+): void {
+	const resolvedSourcePath = posix.normalize(
+		posix.join(posix.dirname(inputs.request.declarationMap.logicalPath), parsedMap.rawSource)
+	);
+	if (
+		parsedMap.file !== posix.basename(inputs.request.targetDeclaration.logicalPath) ||
+		!validLogicalPath(resolvedSourcePath, inputs.request.budgets.maxPathCharacters, checkpoint) ||
+		resolvedSourcePath !== bound.source.logicalPath
+	)
+		failDerivation(
+			'INPUT_INVALID',
+			'Declaration-map target/source path identities do not reconcile.'
+		);
+}
+
 function derive(parameters: DeriveParameters): DeriveResult {
 	const {
 		checkpoint,
@@ -2592,161 +3529,41 @@ function derive(parameters: DeriveParameters): DeriveResult {
 	} = parameters;
 	try {
 		const budgets = inputs.request.budgets;
-		const callerCaptureBytes = checkedAdd(targetBytes.byteLength, mapBytes.byteLength);
-		if (
-			callerCaptureBytes > budgets.maxCallerCaptureBytes ||
-			callerCaptureBytes > budgets.maxReadBytes ||
-			callerCaptureBytes > HARD_MAX_CAPTURE_BYTES
-		)
-			failDerivation('BUDGET_EXHAUSTED', 'Caller captures exceed request read/capture budgets.');
-		const targetSha256 = bytesSha256(targetBytes, checkpoint);
-		const mapSha256 = bytesSha256(mapBytes, checkpoint);
-		if (
-			targetBytes.byteLength !== inputs.request.targetDeclaration.contentBytes ||
-			targetSha256 !== inputs.request.targetDeclaration.contentSha256 ||
-			mapBytes.byteLength !== inputs.request.declarationMap.contentBytes ||
-			mapSha256 !== inputs.request.declarationMap.contentSha256
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'Caller capture bytes do not reconcile with request descriptors.'
-			);
-		const targetText = decodeUtf8(
-			targetBytes,
-			'Target declaration capture',
-			budgets.maxEmitStringCharacters,
-			checkpoint
-		);
-		const mapText = decodeUtf8(
-			mapBytes,
-			'Declaration-map capture',
-			budgets.maxEmitStringCharacters,
-			checkpoint
-		);
-		const callerCaptureCharacters = checkedAdd(targetText.length, mapText.length);
-		if (callerCaptureCharacters > budgets.maxEmitStringCharacters)
-			failDerivation('BUDGET_EXHAUSTED', 'Caller capture texts exceed maxEmitStringCharacters.');
+		const captures = reconcileCallerCaptures(inputs, targetBytes, mapBytes, checkpoint);
+		const {
+			callerCaptureBytes,
+			callerCaptureCharacters,
+			mapSha256,
+			mapText,
+			targetSha256,
+			targetText
+		} = captures;
 		const parsedMap = parseSourceMap(mapText, budgets, checkpoint);
 		const bound = bindInputs(inputs, checkpoint);
-		if (
-			bound.source.textLength >
-			Math.min(budgets.maxSourceTextCodeUnits, HARD_MAX_SOURCE_TEXT_CODE_UNITS)
-		)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Selected authored source text exceeds the pre-emission materialization ceiling.'
-			);
 		const decodedSegments = parsedMap.segments.length;
-		const plannedLocations = checkedMultiply(decodedSegments, 2);
-		const plannedCorrelations = decodedSegments;
-		const plannedUnmappedGeneratedLines = 1;
-		const outputRecords = checkedAdd(
-			7,
-			checkedMultiply(decodedSegments, 4),
-			plannedUnmappedGeneratedLines
-		);
-		if (
-			decodedSegments > budgets.maxDecodedMapSegments ||
-			plannedLocations > budgets.maxLocations ||
-			plannedCorrelations > budgets.maxCorrelations ||
-			plannedUnmappedGeneratedLines > budgets.maxUnmappedGeneratedLines ||
-			outputRecords > budgets.maxOutputRecords
-		)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Derived correlation populations exceed preallocation ceilings.'
-			);
-		const resolvedSourcePath = posix.normalize(
-			posix.join(posix.dirname(inputs.request.declarationMap.logicalPath), parsedMap.rawSource)
-		);
-		if (
-			parsedMap.file !== posix.basename(inputs.request.targetDeclaration.logicalPath) ||
-			!validLogicalPath(resolvedSourcePath, budgets.maxPathCharacters, checkpoint) ||
-			resolvedSourcePath !== bound.source.logicalPath
-		)
-			failDerivation(
-				'INPUT_INVALID',
-				'Declaration-map target/source path identities do not reconcile.'
-			);
+		const { outputRecords, plannedCorrelations, plannedLocations, plannedUnmappedGeneratedLines } =
+			planDerivedPopulations(budgets, bound, decodedSegments);
+		reconcileDeclarationMapPaths(inputs, parsedMap, bound, checkpoint);
 		const programSources = programSourcePopulation(inputs, bound, checkpoint);
 		const inputDigest =
 			knownInputDigest ?? captureInputDigest(inputs, targetBytes, mapBytes, checkpoint);
 		const analysisId = analysisIdentity(inputs, inputDigest, checkpoint);
-		if (budgets.maxInputRecords <= 2 || budgets.maxReadBytes <= callerCaptureBytes)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Caller aggregate input/read budgets leave no positive Program residual.'
-			);
-		const residualInputRecords = budgets.maxInputRecords - 2;
-		const residualReadBytes = budgets.maxReadBytes - callerCaptureBytes;
-		const providerInputRecords = Math.min(
-			budgets.maxCompilerInputAttempts,
-			HARD_MAX_COMPILER_INPUT_ATTEMPTS,
-			residualInputRecords
-		);
-		const providerReadBytes = Math.min(budgets.maxProgramReadBytes, residualReadBytes);
-		const providerOutputBytes = Math.min(
-			budgets.maxEmitBytes,
-			HARD_MAX_EMIT_BYTES,
-			callerCaptureBytes
-		);
-		const providerOutputStringCharacters = Math.min(
-			budgets.maxEmitStringCharacters,
-			HARD_MAX_EMIT_STRING_CHARACTERS,
+		const providerBudgets = planProviderEmissionBudgets(
+			budgets,
+			callerCaptureBytes,
 			callerCaptureCharacters
 		);
-		if (
-			providerOutputBytes !== callerCaptureBytes ||
-			providerOutputStringCharacters !== callerCaptureCharacters
-		)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'Exact caller-captured outputs cannot fit the residual declaration-emission budget.'
-			);
 
 		const providerDuration = remainingDurationMs();
 		checkpoint();
-		let rawEmission: unknown;
-		try {
-			rawEmission = provider.emitDeclaration(
-				{
-					compilerProgramLimits: {
-						maxDurationMs: providerDuration,
-						maxProgramInputRecords: providerInputRecords,
-						maxProgramReadBytes: providerReadBytes,
-						maxProgramSourceFiles: budgets.maxProgramSourceFiles,
-						maxTotalInputRecords: providerInputRecords,
-						maxTotalReadBytes: residualReadBytes
-					},
-					frozenSubject: inputs.frozenSubject,
-					logicalPath: bound.source.logicalPath,
-					semanticProgramId: bound.program.id,
-					semanticProjectId: bound.project.id,
-					semanticSnapshot: inputs.semanticSnapshot,
-					semanticSourceId: bound.source.id
-				},
-				{
-					maxDurationMs: providerDuration,
-					maxInputRecords: providerInputRecords,
-					maxOutputBytes: providerOutputBytes,
-					maxOutputFiles: budgets.maxEmitOutputs,
-					maxOutputStringCharacters: providerOutputStringCharacters,
-					maxPathCharacters: budgets.maxPathCharacters,
-					maxProgramSourceFiles: budgets.maxProgramSourceFiles,
-					maxReadBytes: providerReadBytes,
-					maxTraversalSteps: budgets.maxTraversalSteps
-				},
-				Object.freeze({ checkpoint })
-			);
-		} catch (error) {
-			checkpoint();
-			if (error instanceof CompilerProjectDeclarationEmissionError)
-				failDerivation(
-					error.code === 'BUDGET_EXCEEDED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
-					'Fresh public declaration emission failed closed.'
-				);
-			failDerivation('INPUT_INVALID', 'Fresh public declaration provider failed closed.');
-		}
+		const rawEmission = emitFreshDeclaration(
+			provider,
+			inputs,
+			bound,
+			providerBudgets,
+			providerDuration,
+			checkpoint
+		);
 		checkpoint();
 		const emission = validateProviderEmission(
 			rawEmission,
@@ -2756,30 +3573,14 @@ function derive(parameters: DeriveParameters): DeriveResult {
 			checkpoint
 		);
 		checkpoint();
-		const targetOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION');
-		const mapOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION_MAP');
-		if (targetOutputs.length !== 1 || mapOutputs.length !== 1)
-			failDerivation('INPUT_INVALID', 'Fresh emission output kinds do not reconcile.');
-		const targetOutput = targetOutputs[0]!;
-		const mapOutput = mapOutputs[0]!;
-		checkpoint();
-		const targetContentReconciles = targetOutput.content === targetText;
-		checkpoint();
-		const mapContentReconciles = mapOutput.content === mapText;
-		checkpoint();
-		if (
-			targetOutput.logicalPath !== inputs.request.targetDeclaration.logicalPath ||
-			targetOutput.bytes !== targetBytes.byteLength ||
-			targetOutput.contentSha256 !== targetSha256 ||
-			!targetContentReconciles ||
-			mapOutput.logicalPath !== inputs.request.declarationMap.logicalPath ||
-			mapOutput.bytes !== mapBytes.byteLength ||
-			mapOutput.contentSha256 !== mapSha256 ||
-			!mapContentReconciles
-		) {
-			checkpoint();
-			failDerivation('DERIVATION_MISMATCH', 'Fresh emission is not byte-equal to caller captures.');
-		}
+		const { mapOutput, targetOutput } = reconcileEmittedOutputs(
+			emission,
+			inputs,
+			captures,
+			targetBytes,
+			mapBytes,
+			checkpoint
+		);
 
 		const targetArtifactWithoutId = {
 			artifactClass: 'GENERATED_DECLARATION' as const,
@@ -2941,19 +3742,11 @@ function derive(parameters: DeriveParameters): DeriveResult {
 			checkedAdd(Math.min(budgets.maxDecodedMapLines, HARD_MAX_DECODED_LINES), 1),
 			checkpoint
 		);
-		const authoredLineOrdinals = new Set<number>();
-		for (const decoded of parsedMap.segments) {
-			checkpoint();
-			if (
-				!authoredLineOrdinals.has(decoded.originalLine) &&
-				authoredLineOrdinals.size >= decodedSegments
-			)
-				failDerivation(
-					'BUDGET_EXHAUSTED',
-					'Sparse authored-line population exceeds the decoded-segment preflight.'
-				);
-			authoredLineOrdinals.add(decoded.originalLine);
-		}
+		const authoredLineOrdinals = authoredLineOrdinalsOf(
+			parsedMap.segments,
+			decodedSegments,
+			checkpoint
+		);
 		const authoredLines = sparseTextLineBounds(
 			emission.materializedSource.text,
 			authoredLineOrdinals,
@@ -2969,107 +3762,20 @@ function derive(parameters: DeriveParameters): DeriveResult {
 		checkpoint();
 		if (generatedLineMapped.length !== parsedMap.generatedLines)
 			failDerivation('BUDGET_EXHAUSTED', 'Generated-line tracking allocation failed closed.');
-		const generatedCoordinates = new Set<string>();
-		const authoredCoordinates = new Set<string>();
-		const segmentRecords: Array<SourceOriginCorrelationSnapshot['segments'][number]> = [];
-		const locationRecords: Array<SourceOriginCorrelationSnapshot['locations'][number]> = [];
-		const correlationRecords: Array<SourceOriginCorrelationSnapshot['correlations'][number]> = [];
-		for (const decoded of parsedMap.segments) {
-			checkpoint();
-			const generatedOffset = coordinateOffset(
-				targetLines,
-				decoded.generatedLine,
-				decoded.generatedColumn,
-				'Generated coordinate'
-			);
-			const authoredOffset = sparseCoordinateOffset(
-				authoredLines,
-				decoded.originalLine,
-				decoded.originalColumn,
-				'Authored coordinate'
-			);
-			const generatedKey = `${decoded.generatedLine}:${decoded.generatedColumn}`;
-			const authoredKey = `${decoded.originalLine}:${decoded.originalColumn}`;
-			if (generatedCoordinates.has(generatedKey) || authoredCoordinates.has(authoredKey))
-				failDerivation('INPUT_INVALID', 'Mapped endpoint coordinates must be globally unique.');
-			generatedCoordinates.add(generatedKey);
-			authoredCoordinates.add(authoredKey);
-			generatedLineMapped[decoded.generatedLine] = 1;
-			const segmentWithoutId = {
-				decodedFieldCount: 4 as const,
-				generatedColumn: decoded.generatedColumn,
-				generatedLine: decoded.generatedLine,
-				lineSegmentOrdinal: decoded.lineSegmentOrdinal,
-				mapId: sourceMapId,
-				nameIndex: null,
-				ordinal: decoded.ordinal,
-				originalColumn: decoded.originalColumn,
-				originalLine: decoded.originalLine,
-				sourceArtifactId: authoredArtifactId,
-				sourceIndex: 0 as const,
-				state: 'MAPPED' as const,
-				targetArtifactId
-			};
-			const segmentId = segmentIdentity(analysisId, segmentWithoutId, checkpoint);
-			segmentRecords.push({ ...segmentWithoutId, id: segmentId });
-			const generatedLocationWithoutId = {
-				artifactId: targetArtifactId,
-				column: decoded.generatedColumn,
-				coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
-				line: decoded.generatedLine,
-				offset: generatedOffset,
-				ordinal: decoded.ordinal * 2,
-				role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[0],
-				segmentId,
-				width: 0 as const
-			};
-			const generatedLocationId = locationIdentity(
-				analysisId,
-				generatedLocationWithoutId,
-				checkpoint
-			);
-			const authoredLocationWithoutId = {
-				artifactId: authoredArtifactId,
-				column: decoded.originalColumn,
-				coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
-				line: decoded.originalLine,
-				offset: authoredOffset,
-				ordinal: decoded.ordinal * 2 + 1,
-				role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[1],
-				segmentId,
-				width: 0 as const
-			};
-			const authoredLocationId = locationIdentity(
-				analysisId,
-				authoredLocationWithoutId,
-				checkpoint
-			);
-			locationRecords.push(
-				{ ...generatedLocationWithoutId, id: generatedLocationId },
-				{ ...authoredLocationWithoutId, id: authoredLocationId }
-			);
-			const correlationWithoutId = {
-				authoredLocationId,
-				directionality: 'BIDIRECTIONAL_EXACT_ONE_TO_ONE' as const,
-				generatedLocationId,
-				kind: 'GENERATED_TO_AUTHORED_SOURCE_MAP_SEGMENT' as const,
-				mapId: sourceMapId,
-				mappingHealthId,
-				ordinal: decoded.ordinal,
-				segmentId,
-				state: 'EXACT' as const
-			};
-			correlationRecords.push({
-				...correlationWithoutId,
-				id: exactCorrelationIdentity(analysisId, correlationWithoutId, checkpoint)
-			});
-		}
-		for (let line = 0; line < generatedLineMapped.length; line += 1) {
-			checkpoint();
-			if (generatedLineMapped[line] === 0)
-				failDerivation('INPUT_INVALID', 'Only the required final trailer line may be unmapped.');
-		}
-		const trailerLine = targetLines[targetLines.length - 1]!;
+		const { correlationRecords, locationRecords, segmentRecords } = buildCorrelationPopulation({
+			analysisId,
+			authoredArtifactId,
+			authoredLines,
+			checkpoint,
+			generatedLineMapped,
+			mappingHealthId,
+			segments: parsedMap.segments,
+			sourceMapId,
+			targetArtifactId,
+			targetLines
+		});
+		assertEveryGeneratedLineMapped(generatedLineMapped, checkpoint);
+		const trailerLine = targetLines.at(-1)!;
 		const expectedTrailer = `//# sourceMappingURL=${posix.basename(inputs.request.declarationMap.logicalPath)}`;
 		const trailerContent = targetText.slice(trailerLine.startOffset, trailerLine.endOffset);
 		if (trailerContent !== expectedTrailer)
@@ -3097,13 +3803,11 @@ function derive(parameters: DeriveParameters): DeriveResult {
 			id: unmappedLineIdentity(analysisId, unmappedWithoutId, checkpoint)
 		};
 		const unmappedRecords = [unmappedRecord] as const;
-		const segmentIds: Array<SourceOriginCorrelationSnapshot['segments'][number]['id']> = [];
-		for (const record of segmentRecords) {
-			checkpoint();
-			if (segmentIds.length >= budgets.maxDecodedMapSegments)
-				failDerivation('BUDGET_EXHAUSTED', 'Source-map child identity budget was exhausted.');
-			segmentIds.push(record.id);
-		}
+		const segmentIds = segmentIdentityList(
+			segmentRecords,
+			budgets.maxDecodedMapSegments,
+			checkpoint
+		);
 		const sourceMapRecord = {
 			...sourceMapWithoutChildren,
 			id: sourceMapId,
@@ -3261,6 +3965,228 @@ function derive(parameters: DeriveParameters): DeriveResult {
 	}
 }
 
+interface DurationClock {
+	activeDurationMs: number;
+	lastObservedAt: number;
+	readonly provider: Readonly<ValidationProvider>;
+	readonly startedAt: number;
+}
+
+/** Advances the monotonic duration ledger by one observation and returns the positive residual. */
+function remainingDurationOf(clock: DurationClock): number {
+	let observed: number;
+	try {
+		observed = clock.provider.monotonicNow();
+	} catch {
+		throw new ValidationAbort(
+			issue('INPUT_INVALID', 'The validation monotonic clock failed closed.')
+		);
+	}
+	if (!Number.isFinite(observed) || observed < clock.startedAt || observed < clock.lastObservedAt)
+		throw new ValidationAbort(
+			issue('INPUT_INVALID', 'The validation monotonic clock failed closed.')
+		);
+	clock.lastObservedAt = observed;
+	const elapsed = Math.floor(observed - clock.startedAt);
+	if (!safeNonnegative(elapsed))
+		throw new ValidationAbort(
+			issue('INPUT_INVALID', 'The validation monotonic elapsed time is invalid.')
+		);
+	const remaining = clock.activeDurationMs - elapsed;
+	if (!safePositive(remaining))
+		throw new ValidationAbort(
+			issue('BUDGET_EXHAUSTED', 'The validation duration budget was exhausted.')
+		);
+	return remaining;
+}
+
+/** Decides whether the StaticSemanticSnapshot still owes public validation, and whether it passes. */
+function semanticSnapshotIssue(
+	inputs: SourceOriginCorrelationBuildInputs,
+	options: ClosedOptions,
+	alreadyValidated: boolean,
+	checkpoint: DeadlineCheckpoint
+): SourceOriginCorrelationValidationIssue | null {
+	if (alreadyValidated) return null;
+	checkpoint();
+	const semanticRecords = Math.min(
+		options.maxInputRecords,
+		inputs.request.budgets.maxInputRecords,
+		HARD_MAX_INPUT_RECORDS
+	);
+	const semanticStrings = Math.min(
+		options.maxInputStringCharacters,
+		inputs.request.budgets.maxInputStringCharacters,
+		HARD_MAX_INPUT_STRING_CHARACTERS
+	);
+	const semanticIssues = Math.min(options.maxIssues, inputs.request.budgets.maxDiagnostics);
+	const semantic = validateStaticSemanticSnapshot(
+		inputs.semanticSnapshot,
+		{
+			maxDepth: options.maxDepth,
+			maxDiagnostics: semanticIssues,
+			maxIssues: semanticIssues,
+			maxRecords: semanticRecords,
+			maxReferenceChecks: semanticRecords,
+			maxStringCharacters: semanticStrings
+		},
+		{ frozenSubject: inputs.frozenSubject }
+	);
+	checkpoint();
+	if (semantic.state !== 'VALID')
+		return issue(
+			semantic.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
+			'The StaticSemanticSnapshot is not valid for the exact FrozenSubject.',
+			'$inputs.semanticSnapshot'
+		);
+	return null;
+}
+
+interface ValidationRun {
+	readonly checkpoint: DeadlineCheckpoint;
+	readonly clock: DurationClock;
+	readonly inputsValue: unknown;
+	readonly knownInputDigest?: string;
+	readonly options: ClosedOptions;
+	readonly provider: Readonly<ValidationProvider>;
+	readonly remainingDuration: () => number;
+	readonly semanticAlreadyValidated: boolean;
+	readonly value: unknown;
+}
+
+function validateClosedCandidate(run: ValidationRun): SourceOriginCorrelationValidationResult {
+	const { checkpoint, clock, inputsValue, options, provider, value } = run;
+	checkpoint();
+	if (!plainRecord(value) || !exactKeys(value, SNAPSHOT_KEYS))
+		return invalid(
+			issue('SHAPE_INVALID', 'The source-origin candidate snapshot shell must be exact.')
+		);
+	const shellProblem = inputShellIssue(inputsValue);
+	if (shellProblem !== null) return invalid(shellProblem);
+	const inputs = inputsValue as SourceOriginCorrelationBuildInputs;
+	const initialRequestTree = inspectPlainTree(
+		inputs.request,
+		{
+			maxDepth: options.maxDepth,
+			maxRecords: Math.min(options.maxInputRecords, HARD_MAX_INPUT_RECORDS),
+			maxStringCharacters: Math.min(
+				options.maxInputStringCharacters,
+				HARD_MAX_INPUT_STRING_CHARACTERS
+			)
+		},
+		'$inputs.request',
+		'INPUT_INVALID',
+		checkpoint
+	);
+	if (initialRequestTree.state === 'INVALID') return invalid(initialRequestTree.problem);
+	const requestProblem = requestIssue(inputs, checkpoint);
+	if (requestProblem !== null) return invalid(requestProblem);
+	clock.activeDurationMs = Math.min(
+		options.maxDurationMs,
+		inputs.request.budgets.maxDurationMs,
+		HARD_MAX_DURATION_MS
+	);
+	checkpoint();
+	const inputStats = inspectInputPlainData(inputs, options, checkpoint);
+	checkpoint();
+	const populationProblem = candidatePopulationIssue(value, inputs.request.budgets);
+	if (populationProblem !== null) return invalid(populationProblem);
+	const candidateTree = inspectPlainTree(
+		value,
+		{
+			maxDepth: options.maxDepth,
+			maxRecords: options.maxRecords,
+			maxStringCharacters: options.maxStringCharacters
+		},
+		'$',
+		'SHAPE_INVALID',
+		checkpoint
+	);
+	if (candidateTree.state === 'INVALID') return invalid(candidateTree.problem);
+	const targetCaptureBytes = captureByteLength(
+		inputs.targetDeclarationBytes,
+		'$inputs.targetDeclarationBytes'
+	);
+	const mapCaptureBytes = captureByteLength(
+		inputs.declarationMapBytes,
+		'$inputs.declarationMapBytes'
+	);
+	const callerCaptureBytes = checkedAdd(targetCaptureBytes, mapCaptureBytes);
+	const maximumCallerCaptureBytes = Math.min(
+		inputs.request.budgets.maxCallerCaptureBytes,
+		inputs.request.budgets.maxReadBytes,
+		HARD_MAX_CAPTURE_BYTES
+	);
+	if (callerCaptureBytes > maximumCallerCaptureBytes)
+		return invalid(
+			issue(
+				'BUDGET_EXHAUSTED',
+				'Caller capture byte population exceeds request budgets.',
+				'$inputs'
+			)
+		);
+	const targetBytes = copyCapture(
+		inputs.targetDeclarationBytes,
+		targetCaptureBytes,
+		'$inputs.targetDeclarationBytes',
+		checkpoint
+	);
+	const mapBytes = copyCapture(
+		inputs.declarationMapBytes,
+		mapCaptureBytes,
+		'$inputs.declarationMapBytes',
+		checkpoint
+	);
+	const semanticProblem = semanticSnapshotIssue(
+		inputs,
+		options,
+		run.semanticAlreadyValidated,
+		checkpoint
+	);
+	if (semanticProblem !== null) return invalid(semanticProblem);
+	checkpoint();
+	const expected = derive({
+		checkpoint,
+		inputStats,
+		inputs,
+		knownInputDigest: run.knownInputDigest,
+		mapBytes,
+		provider,
+		remainingDurationMs: run.remainingDuration,
+		targetBytes
+	});
+	if (expected.state === 'INVALID') return invalid(expected.problem);
+	checkpoint();
+	const candidate = value as unknown as SourceOriginCorrelationSnapshot;
+	if (
+		candidate.inputDigest !== expected.analysis.inputDigest ||
+		candidate.id !== expected.analysis.id
+	)
+		return invalid(
+			issue(
+				'IDENTITY_MISMATCH',
+				'The candidate source-origin identities do not reproduce from the exact inputs.'
+			)
+		);
+	if (candidate.contentDigest !== expected.analysis.contentDigest)
+		return invalid(
+			issue(
+				'CONTENT_DIGEST_MISMATCH',
+				'The candidate source-origin content digest does not reproduce.',
+				'$.contentDigest'
+			)
+		);
+	if (!canonicalEqual(candidate, expected.analysis, checkpoint))
+		return invalid(
+			issue(
+				'DERIVATION_MISMATCH',
+				'The candidate differs from the independently replayed source-origin correlation.'
+			)
+		);
+	checkpoint();
+	return { issues: [], state: 'VALID' };
+}
+
 function validateInternal(
 	value: unknown,
 	inputsValue: unknown,
@@ -3277,202 +4203,35 @@ function validateInternal(
 	}
 	if (!Number.isFinite(startedAt) || startedAt < 0)
 		return invalid(issue('INPUT_INVALID', 'The validation operation clock is unavailable.'));
-	let lastObservedAt = startedAt;
 	const options = closeOptions(optionsValue);
 	if (options === null)
 		return invalid(issue('SHAPE_INVALID', 'Validation options are invalid.', '$options'));
-	let activeDurationMs = Math.min(
-		options.maxDurationMs,
-		earlyRequestDuration(inputsValue) ?? options.maxDurationMs,
-		HARD_MAX_DURATION_MS
-	);
-	const remainingDuration = (): number => {
-		let observed: number;
-		try {
-			observed = provider.monotonicNow();
-		} catch {
-			throw new ValidationAbort(
-				issue('INPUT_INVALID', 'The validation monotonic clock failed closed.')
-			);
-		}
-		if (!Number.isFinite(observed) || observed < startedAt || observed < lastObservedAt)
-			throw new ValidationAbort(
-				issue('INPUT_INVALID', 'The validation monotonic clock failed closed.')
-			);
-		lastObservedAt = observed;
-		const elapsed = Math.floor(observed - startedAt);
-		if (!safeNonnegative(elapsed))
-			throw new ValidationAbort(
-				issue('INPUT_INVALID', 'The validation monotonic elapsed time is invalid.')
-			);
-		const remaining = activeDurationMs - elapsed;
-		if (!safePositive(remaining))
-			throw new ValidationAbort(
-				issue('BUDGET_EXHAUSTED', 'The validation duration budget was exhausted.')
-			);
-		return remaining;
+	const clock: DurationClock = {
+		activeDurationMs: Math.min(
+			options.maxDurationMs,
+			earlyRequestDuration(inputsValue) ?? options.maxDurationMs,
+			HARD_MAX_DURATION_MS
+		),
+		lastObservedAt: startedAt,
+		provider,
+		startedAt
 	};
+	const remainingDuration = (): number => remainingDurationOf(clock);
 	const checkpoint = (): void => {
 		remainingDuration();
 	};
 	try {
-		checkpoint();
-		if (!plainRecord(value) || !exactKeys(value, SNAPSHOT_KEYS))
-			return invalid(
-				issue('SHAPE_INVALID', 'The source-origin candidate snapshot shell must be exact.')
-			);
-		const shellProblem = inputShellIssue(inputsValue);
-		if (shellProblem !== null) return invalid(shellProblem);
-		const inputs = inputsValue as SourceOriginCorrelationBuildInputs;
-		const initialRequestTree = inspectPlainTree(
-			inputs.request,
-			{
-				maxDepth: options.maxDepth,
-				maxRecords: Math.min(options.maxInputRecords, HARD_MAX_INPUT_RECORDS),
-				maxStringCharacters: Math.min(
-					options.maxInputStringCharacters,
-					HARD_MAX_INPUT_STRING_CHARACTERS
-				)
-			},
-			'$inputs.request',
-			'INPUT_INVALID',
-			checkpoint
-		);
-		if (initialRequestTree.state === 'INVALID') return invalid(initialRequestTree.problem);
-		const requestProblem = requestIssue(inputs, checkpoint);
-		if (requestProblem !== null) return invalid(requestProblem);
-		activeDurationMs = Math.min(
-			options.maxDurationMs,
-			inputs.request.budgets.maxDurationMs,
-			HARD_MAX_DURATION_MS
-		);
-		checkpoint();
-		const inputStats = inspectInputPlainData(inputs, options, checkpoint);
-		checkpoint();
-		const populationProblem = candidatePopulationIssue(value, inputs.request.budgets);
-		if (populationProblem !== null) return invalid(populationProblem);
-		const candidateTree = inspectPlainTree(
-			value,
-			{
-				maxDepth: options.maxDepth,
-				maxRecords: options.maxRecords,
-				maxStringCharacters: options.maxStringCharacters
-			},
-			'$',
-			'SHAPE_INVALID',
-			checkpoint
-		);
-		if (candidateTree.state === 'INVALID') return invalid(candidateTree.problem);
-		const targetCaptureBytes = captureByteLength(
-			inputs.targetDeclarationBytes,
-			'$inputs.targetDeclarationBytes'
-		);
-		const mapCaptureBytes = captureByteLength(
-			inputs.declarationMapBytes,
-			'$inputs.declarationMapBytes'
-		);
-		const callerCaptureBytes = checkedAdd(targetCaptureBytes, mapCaptureBytes);
-		const maximumCallerCaptureBytes = Math.min(
-			inputs.request.budgets.maxCallerCaptureBytes,
-			inputs.request.budgets.maxReadBytes,
-			HARD_MAX_CAPTURE_BYTES
-		);
-		if (callerCaptureBytes > maximumCallerCaptureBytes)
-			return invalid(
-				issue(
-					'BUDGET_EXHAUSTED',
-					'Caller capture byte population exceeds request budgets.',
-					'$inputs'
-				)
-			);
-		const targetBytes = copyCapture(
-			inputs.targetDeclarationBytes,
-			targetCaptureBytes,
-			'$inputs.targetDeclarationBytes',
-			checkpoint
-		);
-		const mapBytes = copyCapture(
-			inputs.declarationMapBytes,
-			mapCaptureBytes,
-			'$inputs.declarationMapBytes',
-			checkpoint
-		);
-		if (!semanticAlreadyValidated) {
-			checkpoint();
-			const semanticRecords = Math.min(
-				options.maxInputRecords,
-				inputs.request.budgets.maxInputRecords,
-				HARD_MAX_INPUT_RECORDS
-			);
-			const semanticStrings = Math.min(
-				options.maxInputStringCharacters,
-				inputs.request.budgets.maxInputStringCharacters,
-				HARD_MAX_INPUT_STRING_CHARACTERS
-			);
-			const semanticIssues = Math.min(options.maxIssues, inputs.request.budgets.maxDiagnostics);
-			const semantic = validateStaticSemanticSnapshot(
-				inputs.semanticSnapshot,
-				{
-					maxDepth: options.maxDepth,
-					maxDiagnostics: semanticIssues,
-					maxIssues: semanticIssues,
-					maxRecords: semanticRecords,
-					maxReferenceChecks: semanticRecords,
-					maxStringCharacters: semanticStrings
-				},
-				{ frozenSubject: inputs.frozenSubject }
-			);
-			checkpoint();
-			if (semantic.state !== 'VALID')
-				return invalid(
-					issue(
-						semantic.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
-						'The StaticSemanticSnapshot is not valid for the exact FrozenSubject.',
-						'$inputs.semanticSnapshot'
-					)
-				);
-		}
-		checkpoint();
-		const expected = derive({
+		return validateClosedCandidate({
 			checkpoint,
-			inputStats,
-			inputs,
+			clock,
+			inputsValue,
 			knownInputDigest,
-			mapBytes,
+			options,
 			provider,
-			remainingDurationMs: remainingDuration,
-			targetBytes
+			remainingDuration,
+			semanticAlreadyValidated,
+			value
 		});
-		if (expected.state === 'INVALID') return invalid(expected.problem);
-		checkpoint();
-		const candidate = value as unknown as SourceOriginCorrelationSnapshot;
-		if (
-			candidate.inputDigest !== expected.analysis.inputDigest ||
-			candidate.id !== expected.analysis.id
-		)
-			return invalid(
-				issue(
-					'IDENTITY_MISMATCH',
-					'The candidate source-origin identities do not reproduce from the exact inputs.'
-				)
-			);
-		if (candidate.contentDigest !== expected.analysis.contentDigest)
-			return invalid(
-				issue(
-					'CONTENT_DIGEST_MISMATCH',
-					'The candidate source-origin content digest does not reproduce.',
-					'$.contentDigest'
-				)
-			);
-		if (!canonicalEqual(candidate, expected.analysis, checkpoint))
-			return invalid(
-				issue(
-					'DERIVATION_MISMATCH',
-					'The candidate differs from the independently replayed source-origin correlation.'
-				)
-			);
-		checkpoint();
-		return { issues: [], state: 'VALID' };
 	} catch (error) {
 		if (error instanceof ValidationAbort) return invalid(error.problem);
 		if (error instanceof DerivationFailure) return invalid(error.problem);

@@ -148,14 +148,169 @@ function preflightLimits(value: unknown): {
 	};
 }
 
+interface PreflightLimits {
+	readonly maxInputRecords: number;
+	readonly maxInputStringCharacters: number;
+}
+
+type PreflightWork =
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+function chargedPlainDataRecords(records: number, limits: PreflightLimits): number {
+	const charged = records + 1;
+	if (charged > limits.maxInputRecords)
+		throw new CompositionFailure(
+			'BUDGET_EXCEEDED',
+			`Input plain-data record budget exceeded: ${charged} > ${limits.maxInputRecords}.`,
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+	return charged;
+}
+
+function chargedStringCharacters(
+	stringCharacters: number,
+	addition: number,
+	limits: PreflightLimits
+): number {
+	const charged = stringCharacters + addition;
+	if (charged > limits.maxInputStringCharacters)
+		throw new CompositionFailure(
+			'BUDGET_EXCEEDED',
+			`Input string-character budget exceeded: ${charged} > ${limits.maxInputStringCharacters}.`,
+			'REQUEST',
+			'$.request.budgets.maxInputStringCharacters'
+		);
+	return charged;
+}
+
+function assertPlainDataPopulationBudget(
+	population: number,
+	limits: PreflightLimits,
+	message: string
+): void {
+	if (population > limits.maxInputRecords)
+		throw new CompositionFailure(
+			'BUDGET_EXCEEDED',
+			message,
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+}
+
+function chargedScalarString(
+	text: string,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	if (!isUnicodeScalarString(text))
+		throw new TypeError('Input strings must contain Unicode scalar text.');
+	return chargedStringCharacters(stringCharacters, text.length, limits);
+}
+
+function isInertPlainScalar(value: unknown): boolean {
+	return (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	);
+}
+
+function visitablePlainContainer(value: unknown, active: WeakSet<object>): object {
+	if (typeof value !== 'object' || isProxy(value))
+		throw new TypeError('Input must contain only inert JSON-compatible plain data.');
+	if (active.has(value as object)) throw new TypeError('Input plain data may not contain cycles.');
+	return value as object;
+}
+
+function assertDenseExactDataArray(keys: readonly string[], count: number): void {
+	if (
+		keys.length !== count + 1 ||
+		keys.some((key) => key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
+	)
+		throw new TypeError('Input arrays must be dense exact data arrays.');
+}
+
+function pushArrayElementWork(
+	array: readonly unknown[],
+	count: number,
+	pending: PreflightWork[]
+): void {
+	for (let index = count - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(array, String(index));
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input arrays must contain enumerable data elements.');
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+}
+
+function expandArrayWork(
+	array: readonly unknown[],
+	pending: PreflightWork[],
+	records: number,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	if (Reflect.getPrototypeOf(array) !== Array.prototype)
+		throw new TypeError('Input arrays must use Array.prototype.');
+	const count = array.length;
+	const keys = Reflect.ownKeys(array);
+	if (keys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input arrays may not contain symbol keys.');
+	let charged = stringCharacters;
+	for (const key of keys as string[]) {
+		if (key === 'length') continue;
+		charged = chargedStringCharacters(charged, key.length, limits);
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input array keys must contain Unicode scalar text.');
+	}
+	assertDenseExactDataArray(keys as string[], count);
+	assertPlainDataPopulationBudget(
+		records + count,
+		limits,
+		'Input array population exceeds the plain-data record budget.'
+	);
+	pushArrayElementWork(array, count, pending);
+	return charged;
+}
+
+function expandRecordWork(
+	record: object,
+	pending: PreflightWork[],
+	records: number,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	const prototype = Reflect.getPrototypeOf(record);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Input records must use a plain prototype.');
+	const keys = Reflect.ownKeys(record);
+	if (keys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input records may not contain symbol keys.');
+	assertPlainDataPopulationBudget(
+		records + keys.length,
+		limits,
+		'Input property population exceeds the plain-data record budget.'
+	);
+	let charged = stringCharacters;
+	for (const key of [...(keys as string[])].reverse()) {
+		charged = chargedStringCharacters(charged, key.length, limits);
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input record keys must contain Unicode scalar text.');
+		const descriptor = Reflect.getOwnPropertyDescriptor(record, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input records must contain enumerable data properties.');
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+	return charged;
+}
+
 function preflightPlainData(
 	value: unknown,
 	limits: { readonly maxInputRecords: number; readonly maxInputStringCharacters: number }
 ): PlainDataUsage {
-	type Work =
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Work[] = [{ kind: 'VISIT', value }];
+	const pending: PreflightWork[] = [{ kind: 'VISIT', value }];
 	const active = new WeakSet<object>();
 	let records = 0;
 	let stringCharacters = 0;
@@ -165,109 +320,20 @@ function preflightPlainData(
 			active.delete(work.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxInputRecords)
-			throw new CompositionFailure(
-				'BUDGET_EXCEEDED',
-				`Input plain-data record budget exceeded: ${records} > ${limits.maxInputRecords}.`,
-				'REQUEST',
-				'$.request.budgets.maxInputRecords'
-			);
+		records = chargedPlainDataRecords(records, limits);
 		if (typeof work.value === 'string') {
-			if (!isUnicodeScalarString(work.value))
-				throw new TypeError('Input strings must contain Unicode scalar text.');
-			stringCharacters += work.value.length;
-			if (stringCharacters > limits.maxInputStringCharacters)
-				throw new CompositionFailure(
-					'BUDGET_EXCEEDED',
-					`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-					'REQUEST',
-					'$.request.budgets.maxInputStringCharacters'
-				);
+			stringCharacters = chargedScalarString(work.value, stringCharacters, limits);
 			continue;
 		}
-		if (
-			work.value === null ||
-			typeof work.value === 'boolean' ||
-			(typeof work.value === 'number' &&
-				Number.isSafeInteger(work.value) &&
-				!Object.is(work.value, -0))
-		)
-			continue;
-		if (typeof work.value !== 'object' || isProxy(work.value))
-			throw new TypeError('Input must contain only inert JSON-compatible plain data.');
-		if (active.has(work.value)) throw new TypeError('Input plain data may not contain cycles.');
-		active.add(work.value);
-		pending.push({ kind: 'LEAVE', value: work.value });
-		if (Array.isArray(work.value)) {
-			if (Reflect.getPrototypeOf(work.value) !== Array.prototype)
-				throw new TypeError('Input arrays must use Array.prototype.');
-			const count = work.value.length;
-			const keys = Reflect.ownKeys(work.value);
-			if (keys.some((key) => typeof key !== 'string'))
-				throw new TypeError('Input arrays may not contain symbol keys.');
-			for (const key of keys as string[]) {
-				if (key === 'length') continue;
-				stringCharacters += key.length;
-				if (stringCharacters > limits.maxInputStringCharacters)
-					throw new CompositionFailure(
-						'BUDGET_EXCEEDED',
-						`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-						'REQUEST',
-						'$.request.budgets.maxInputStringCharacters'
-					);
-				if (!isUnicodeScalarString(key))
-					throw new TypeError('Input array keys must contain Unicode scalar text.');
-			}
-			if (
-				keys.length !== count + 1 ||
-				(keys as string[]).some((key) => key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-			)
-				throw new TypeError('Input arrays must be dense exact data arrays.');
-			if (records + count > limits.maxInputRecords)
-				throw new CompositionFailure(
-					'BUDGET_EXCEEDED',
-					'Input array population exceeds the plain-data record budget.',
-					'REQUEST',
-					'$.request.budgets.maxInputRecords'
-				);
-			for (let index = count - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(work.value, String(index));
-				if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-					throw new TypeError('Input arrays must contain enumerable data elements.');
-				pending.push({ kind: 'VISIT', value: descriptor.value });
-			}
+		if (isInertPlainScalar(work.value)) continue;
+		const container = visitablePlainContainer(work.value, active);
+		active.add(container);
+		pending.push({ kind: 'LEAVE', value: container });
+		if (Array.isArray(container)) {
+			stringCharacters = expandArrayWork(container, pending, records, stringCharacters, limits);
 			continue;
 		}
-		const prototype = Reflect.getPrototypeOf(work.value);
-		if (prototype !== Object.prototype && prototype !== null)
-			throw new TypeError('Input records must use a plain prototype.');
-		const keys = Reflect.ownKeys(work.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			throw new TypeError('Input records may not contain symbol keys.');
-		if (records + keys.length > limits.maxInputRecords)
-			throw new CompositionFailure(
-				'BUDGET_EXCEEDED',
-				'Input property population exceeds the plain-data record budget.',
-				'REQUEST',
-				'$.request.budgets.maxInputRecords'
-			);
-		for (const key of [...(keys as string[])].reverse()) {
-			stringCharacters += key.length;
-			if (stringCharacters > limits.maxInputStringCharacters)
-				throw new CompositionFailure(
-					'BUDGET_EXCEEDED',
-					`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-					'REQUEST',
-					'$.request.budgets.maxInputStringCharacters'
-				);
-			if (!isUnicodeScalarString(key))
-				throw new TypeError('Input record keys must contain Unicode scalar text.');
-			const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Input records must contain enumerable data properties.');
-			pending.push({ kind: 'VISIT', value: descriptor.value });
-		}
+		stringCharacters = expandRecordWork(container, pending, records, stringCharacters, limits);
 	}
 	return { records, stringCharacters };
 }
@@ -312,10 +378,7 @@ function exactJson(value: unknown, expected: unknown, path: string): void {
 		throw new TypeError(`${path} does not match the exact supported value.`);
 }
 
-function materializeInputs(value: unknown): LogicalGraphCompositionInputs {
-	const input = exactPlainRecord(value, INPUT_KEYS, '$inputs');
-	const requestRecord = exactPlainRecord(input.request, REQUEST_KEYS, '$inputs.request');
-	const budgets = exactPlainRecord(requestRecord.budgets, BUDGET_KEYS, '$inputs.request.budgets');
+function assertExactRequestBudgets(budgets: Record<string, unknown>): void {
 	for (const key of BUDGET_KEYS)
 		if (!Number.isSafeInteger(budgets[key]) || (budgets[key] as number) < 0)
 			throw new TypeError(`$inputs.request.budgets.${key} must be a nonnegative safe integer.`);
@@ -327,6 +390,9 @@ function materializeInputs(value: unknown): LogicalGraphCompositionInputs {
 		throw new TypeError(
 			'$inputs.request frontier budgets must remain zero for the exact refuse-incompatible-input method.'
 		);
+}
+
+function assertExactRequestIdentity(requestRecord: Record<string, unknown>): void {
 	for (const key of [
 		'operationVersion',
 		'schemaVersion',
@@ -339,6 +405,37 @@ function materializeInputs(value: unknown): LogicalGraphCompositionInputs {
 		throw new TypeError('Unsupported logical composition request schema version.');
 	if (requestRecord.operationVersion !== LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION)
 		throw new TypeError('Unsupported logical composition operation version.');
+}
+
+function assertExactSourceLayerRoles(
+	moduleLayer: Record<string, unknown>,
+	callLayer: Record<string, unknown>
+): void {
+	if (moduleLayer.role !== 'MODULE_DEPENDENCY' || moduleLayer.ordinal !== 0)
+		throw new TypeError('$inputs.request.sourceLayers[0] has an invalid role or ordinal.');
+	if (callLayer.role !== 'CALL' || callLayer.ordinal !== 1)
+		throw new TypeError('$inputs.request.sourceLayers[1] has an invalid role or ordinal.');
+}
+
+function assertExactGraphArrayShapes(
+	snapshot: Record<string, unknown>,
+	moduleGraph: Record<string, unknown>,
+	callGraph: Record<string, unknown>
+): void {
+	for (const [path, record, keys] of [
+		['$inputs.semanticSnapshot', snapshot, ['sources']],
+		['$inputs.moduleDependencyGraph', moduleGraph, ['nodes', 'edges', 'limitations', 'layers']],
+		['$inputs.callGraph', callGraph, ['nodes', 'edges', 'limitations', 'layers']]
+	] as const)
+		for (const key of keys) assertOrdinaryArray(record[key], `${path}.${key}`);
+}
+
+function materializeInputs(value: unknown): LogicalGraphCompositionInputs {
+	const input = exactPlainRecord(value, INPUT_KEYS, '$inputs');
+	const requestRecord = exactPlainRecord(input.request, REQUEST_KEYS, '$inputs.request');
+	const budgets = exactPlainRecord(requestRecord.budgets, BUDGET_KEYS, '$inputs.request.budgets');
+	assertExactRequestBudgets(budgets);
+	assertExactRequestIdentity(requestRecord);
 	const selection = exactPlainRecord(
 		requestRecord.selection,
 		SELECTION_KEYS,
@@ -360,22 +457,14 @@ function materializeInputs(value: unknown): LogicalGraphCompositionInputs {
 		CALL_LAYER_REFERENCE_KEYS,
 		'$inputs.request.sourceLayers[1]'
 	);
-	if (moduleLayer.role !== 'MODULE_DEPENDENCY' || moduleLayer.ordinal !== 0)
-		throw new TypeError('$inputs.request.sourceLayers[0] has an invalid role or ordinal.');
-	if (callLayer.role !== 'CALL' || callLayer.ordinal !== 1)
-		throw new TypeError('$inputs.request.sourceLayers[1] has an invalid role or ordinal.');
+	assertExactSourceLayerRoles(moduleLayer, callLayer);
 	const snapshot = shallowPlainRecord(input.semanticSnapshot, '$inputs.semanticSnapshot');
 	const moduleGraph = shallowPlainRecord(
 		input.moduleDependencyGraph,
 		'$inputs.moduleDependencyGraph'
 	);
 	const callGraph = shallowPlainRecord(input.callGraph, '$inputs.callGraph');
-	for (const [path, record, keys] of [
-		['$inputs.semanticSnapshot', snapshot, ['sources']],
-		['$inputs.moduleDependencyGraph', moduleGraph, ['nodes', 'edges', 'limitations', 'layers']],
-		['$inputs.callGraph', callGraph, ['nodes', 'edges', 'limitations', 'layers']]
-	] as const)
-		for (const key of keys) assertOrdinaryArray(record[key], `${path}.${key}`);
+	assertExactGraphArrayShapes(snapshot, moduleGraph, callGraph);
 	return {
 		callGraph: input.callGraph as LogicalGraphCompositionInputs['callGraph'],
 		moduleDependencyGraph:
@@ -600,6 +689,89 @@ function validationSummary(
 		.join(', ');
 }
 
+function failureMessage(error: unknown, fallback: string): string {
+	return error instanceof Error ? error.message : fallback;
+}
+
+function requestBindDiagnosticCode(error: unknown): LogicalGraphCompositionDiagnostic['code'] {
+	if (error instanceof CompositionFailure && error.code === 'BUDGET_EXCEEDED')
+		return 'BUDGET_EXCEEDED';
+	return 'REQUEST_INVALID';
+}
+
+function compositionFailurePath(error: unknown): string | null {
+	return error instanceof CompositionFailure ? error.path : null;
+}
+
+function asCompositionFailure(error: unknown): CompositionFailure {
+	if (error instanceof CompositionFailure) return error;
+	return new CompositionFailure(
+		'INPUT_POPULATION_MISMATCH',
+		failureMessage(error, 'Logical graph composition failed closed.'),
+		'JOIN'
+	);
+}
+
+function assertBudgetNotExceeded(
+	path: string,
+	actual: number,
+	maximum: number,
+	phase: LogicalGraphCompositionDiagnostic['phase']
+): void {
+	if (actual > maximum)
+		throw new CompositionFailure(
+			'BUDGET_EXCEEDED',
+			`${path} exceeded: ${actual} > ${maximum}.`,
+			phase,
+			`$.request.budgets.${path}`
+		);
+}
+
+function assertReconciledInputIdentities(inputs: LogicalGraphCompositionInputs): void {
+	const { callGraph, moduleDependencyGraph, request, semanticSnapshot } = inputs;
+	if (
+		request.subjectId !== semanticSnapshot.subjectId ||
+		request.subjectId !== moduleDependencyGraph.subjectId ||
+		request.subjectId !== callGraph.subjectId ||
+		request.semanticSnapshotId !== semanticSnapshot.id ||
+		request.semanticSnapshotId !== moduleDependencyGraph.semanticSnapshotId ||
+		request.semanticSnapshotId !== callGraph.semanticSnapshotId
+	)
+		throw new CompositionFailure(
+			'INPUT_IDENTITY_MISMATCH',
+			'Request, snapshot, and both predecessor graphs must share exact subject and snapshot identities.',
+			'BIND'
+		);
+	const expectedLayers = exactLayerReferences(inputs);
+	if (canonicalSemanticJson(request.sourceLayers) !== canonicalSemanticJson(expectedLayers))
+		throw new CompositionFailure(
+			'LAYER_BINDING_INVALID',
+			'Request sourceLayers do not exactly bind the supplied predecessor graph layers.',
+			'BIND',
+			'$.request.sourceLayers'
+		);
+	if (
+		moduleDependencyGraph.semanticExtractionVersion !== semanticSnapshot.extractionVersion ||
+		callGraph.semanticExtractionVersion !== semanticSnapshot.extractionVersion ||
+		moduleDependencyGraph.semanticSchemaVersion !== semanticSnapshot.schemaVersion ||
+		callGraph.semanticSchemaVersion !== semanticSnapshot.schemaVersion
+	)
+		throw new CompositionFailure(
+			'INPUT_IDENTITY_MISMATCH',
+			'Predecessor schema or extraction identities differ from the exact semantic snapshot.',
+			'BIND'
+		);
+}
+
+function composedLayerClosure(
+	moduleClosure: LogicalGraphCompositionInputs['moduleDependencyGraph']['coverage']['closure'],
+	callClosure: LogicalGraphCompositionInputs['callGraph']['coverage']['closure']
+): 'CLOSED_WITHIN_SELECTED_CONTRIBUTING_LAYER_METHODS' | 'OPEN' {
+	if (moduleClosure === 'CLOSED' && callClosure === 'CLOSED_WITHIN_DECLARED_METHOD')
+		return 'CLOSED_WITHIN_SELECTED_CONTRIBUTING_LAYER_METHODS';
+	return 'OPEN';
+}
+
 /** Compose the exact validated module-dependency and call layers by source occurrence only. */
 export function buildLogicalGraphComposition(
 	inputsValue: unknown,
@@ -617,55 +789,21 @@ export function buildLogicalGraphComposition(
 			inputPreflightStringCharacters: usage.stringCharacters
 		});
 	} catch (error) {
-		const code =
-			error instanceof CompositionFailure && error.code === 'BUDGET_EXCEEDED'
-				? 'BUDGET_EXCEEDED'
-				: 'REQUEST_INVALID';
+		const code = requestBindDiagnosticCode(error);
 		progress.fail({ diagnostics: 1 }, code);
 		return progress.finish(
 			unavailable(
 				code,
-				error instanceof Error ? error.message : 'Logical graph composition request is invalid.',
+				failureMessage(error, 'Logical graph composition request is invalid.'),
 				'REQUEST',
-				error instanceof CompositionFailure ? error.path : null
+				compositionFailurePath(error)
 			)
 		);
 	}
 	const { callGraph, moduleDependencyGraph, request, semanticSnapshot } = inputs;
 	try {
 		progress.start('INPUT_IDENTITY_RECONCILE');
-		if (
-			request.subjectId !== semanticSnapshot.subjectId ||
-			request.subjectId !== moduleDependencyGraph.subjectId ||
-			request.subjectId !== callGraph.subjectId ||
-			request.semanticSnapshotId !== semanticSnapshot.id ||
-			request.semanticSnapshotId !== moduleDependencyGraph.semanticSnapshotId ||
-			request.semanticSnapshotId !== callGraph.semanticSnapshotId
-		)
-			throw new CompositionFailure(
-				'INPUT_IDENTITY_MISMATCH',
-				'Request, snapshot, and both predecessor graphs must share exact subject and snapshot identities.',
-				'BIND'
-			);
-		const expectedLayers = exactLayerReferences(inputs);
-		if (canonicalSemanticJson(request.sourceLayers) !== canonicalSemanticJson(expectedLayers))
-			throw new CompositionFailure(
-				'LAYER_BINDING_INVALID',
-				'Request sourceLayers do not exactly bind the supplied predecessor graph layers.',
-				'BIND',
-				'$.request.sourceLayers'
-			);
-		if (
-			moduleDependencyGraph.semanticExtractionVersion !== semanticSnapshot.extractionVersion ||
-			callGraph.semanticExtractionVersion !== semanticSnapshot.extractionVersion ||
-			moduleDependencyGraph.semanticSchemaVersion !== semanticSnapshot.schemaVersion ||
-			callGraph.semanticSchemaVersion !== semanticSnapshot.schemaVersion
-		)
-			throw new CompositionFailure(
-				'INPUT_IDENTITY_MISMATCH',
-				'Predecessor schema or extraction identities differ from the exact semantic snapshot.',
-				'BIND'
-			);
+		assertReconciledInputIdentities(inputs);
 		progress.complete({ identities: 3, reconciledGraphs: 2, sourceLayers: 2 });
 
 		progress.start('INPUT_BUDGET');
@@ -689,13 +827,7 @@ export function buildLogicalGraphComposition(
 			['maxCallEdges', callGraph.edges.length, request.budgets.maxCallEdges],
 			['maxInputRecords', inputRecords, request.budgets.maxInputRecords]
 		] as const)
-			if (actual > maximum)
-				throw new CompositionFailure(
-					'BUDGET_EXCEEDED',
-					`${path} exceeded: ${actual} > ${maximum}.`,
-					'BIND',
-					`$.request.budgets.${path}`
-				);
+			assertBudgetNotExceeded(path, actual, maximum, 'BIND');
 		progress.complete({ inputRecords });
 
 		progress.start('MODULE_DEPENDENCY_GRAPH_VALIDATE');
@@ -732,21 +864,19 @@ export function buildLogicalGraphComposition(
 			(node): node is CallGraphSourceRegionNode => node.kind === 'SOURCE_REGION'
 		);
 		const eligible = moduleSources.length + callSources.length;
-		if (eligible > request.budgets.maxEligibleSourceNodes)
-			throw new CompositionFailure(
-				'BUDGET_EXCEEDED',
-				`maxEligibleSourceNodes exceeded: ${eligible} > ${request.budgets.maxEligibleSourceNodes}.`,
-				'JOIN',
-				'$.request.budgets.maxEligibleSourceNodes'
-			);
+		assertBudgetNotExceeded(
+			'maxEligibleSourceNodes',
+			eligible,
+			request.budgets.maxEligibleSourceNodes,
+			'JOIN'
+		);
 		const traversalSteps = inputRecords + eligible;
-		if (traversalSteps > request.budgets.maxTraversalSteps)
-			throw new CompositionFailure(
-				'BUDGET_EXCEEDED',
-				`maxTraversalSteps exceeded: ${traversalSteps} > ${request.budgets.maxTraversalSteps}.`,
-				'JOIN',
-				'$.request.budgets.maxTraversalSteps'
-			);
+		assertBudgetNotExceeded(
+			'maxTraversalSteps',
+			traversalSteps,
+			request.budgets.maxTraversalSteps,
+			'JOIN'
+		);
 		const moduleBySource = uniqueBySourceId(moduleSources);
 		const callBySource = uniqueBySourceId(callSources);
 		const snapshotSources = new Map(
@@ -761,13 +891,7 @@ export function buildLogicalGraphComposition(
 			subjectId: semanticSnapshot.subjectId
 		});
 		const sourceIds = [...snapshotSources.keys()].sort(compareText);
-		if (sourceIds.length > request.budgets.maxLinks)
-			throw new CompositionFailure(
-				'BUDGET_EXCEEDED',
-				`maxLinks exceeded: ${sourceIds.length} > ${request.budgets.maxLinks}.`,
-				'JOIN',
-				'$.request.budgets.maxLinks'
-			);
+		assertBudgetNotExceeded('maxLinks', sourceIds.length, request.budgets.maxLinks, 'JOIN');
 		const crossLinks = sourceIds.map(
 			(semanticSourceId, ordinal): LogicalGraphCompositionCrossLink => {
 				const moduleNode = moduleBySource.get(semanticSourceId)!;
@@ -867,13 +991,12 @@ export function buildLogicalGraphComposition(
 			}))
 		];
 		const outputRecords = 1 + 2 + inheritedLimitations.length + crossLinks.length;
-		if (outputRecords > request.budgets.maxOutputRecords)
-			throw new CompositionFailure(
-				'BUDGET_EXCEEDED',
-				`maxOutputRecords exceeded: ${outputRecords} > ${request.budgets.maxOutputRecords}.`,
-				'MATERIALIZE',
-				'$.request.budgets.maxOutputRecords'
-			);
+		assertBudgetNotExceeded(
+			'maxOutputRecords',
+			outputRecords,
+			request.budgets.maxOutputRecords,
+			'MATERIALIZE'
+		);
 		progress.complete({ inheritedLimitations: inheritedLimitations.length, outputRecords });
 
 		progress.start('SERIALIZE');
@@ -883,11 +1006,10 @@ export function buildLogicalGraphComposition(
 			canonicalProfile: LOGICAL_GRAPH_COMPOSITION_CANONICAL_PROFILE,
 			capability: LOGICAL_GRAPH_COMPOSITION_CAPABILITY,
 			capabilityStatus: LOGICAL_GRAPH_COMPOSITION_CAPABILITY_STATUS,
-			closure:
-				moduleDependencyGraph.coverage.closure === 'CLOSED' &&
-				callGraph.coverage.closure === 'CLOSED_WITHIN_DECLARED_METHOD'
-					? ('CLOSED_WITHIN_SELECTED_CONTRIBUTING_LAYER_METHODS' as const)
-					: ('OPEN' as const),
+			closure: composedLayerClosure(
+				moduleDependencyGraph.coverage.closure,
+				callGraph.coverage.closure
+			),
 			compositionClosure: 'EXACT_FOR_SELECTED_VALIDATED_LAYERS_AND_MAPPING_RULE' as const,
 			conflicts: [] as const,
 			coverage,
@@ -944,14 +1066,7 @@ export function buildLogicalGraphComposition(
 		progress.complete({ issues: 0 });
 		return progress.finish({ composition, diagnostics: [], outcome: 'partial' });
 	} catch (error) {
-		const failure =
-			error instanceof CompositionFailure
-				? error
-				: new CompositionFailure(
-						'INPUT_POPULATION_MISMATCH',
-						error instanceof Error ? error.message : 'Logical graph composition failed closed.',
-						'JOIN'
-					);
+		const failure = asCompositionFailure(error);
 		progress.fail({ diagnostics: 1 }, failure.code);
 		return progress.finish(unavailable(failure.code, failure.message, failure.phase, failure.path));
 	}

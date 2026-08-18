@@ -189,7 +189,9 @@ function invalid(
 }
 
 function compareText(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function plainRecord(value: unknown): value is Record<string, unknown> {
@@ -242,6 +244,203 @@ function closeOptions(
 	return result as unknown as ClosedOptions;
 }
 
+interface PlainTreeVisitFrame {
+	readonly depth: number;
+	readonly path: string;
+	readonly state: 'VISIT';
+	readonly value: unknown;
+}
+
+type PlainTreeFrame = PlainTreeVisitFrame | { readonly state: 'LEAVE'; readonly value: object };
+
+interface PlainTreeWalk {
+	readonly active: WeakSet<object>;
+	readonly limits: Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>;
+	readonly malformedCode: ModuleResolutionTraceValidationIssue['code'];
+	readonly pending: PlainTreeFrame[];
+	characters: number;
+	records: number;
+}
+
+function plainDataNumber(value: unknown): boolean {
+	return (
+		typeof value === 'number' &&
+		Number.isFinite(value) &&
+		(!Number.isInteger(value) || Number.isSafeInteger(value)) &&
+		!Object.is(value, -0)
+	);
+}
+
+function invalidDenseArrayKey(key: string, arrayLength: number): boolean {
+	if (key === 'length') return false;
+	if (!/^(0|[1-9]\d*)$/u.test(key)) return true;
+	const index = Number(key);
+	return !Number.isSafeInteger(index) || index >= arrayLength || String(index) !== key;
+}
+
+function plainTreeStringIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	text: string
+): ModuleResolutionTraceValidationIssue | null {
+	if (!isUnicodeScalarString(text))
+		return issue(walk.malformedCode, 'Strings must contain Unicode scalar text.', frame.path);
+	walk.characters += text.length;
+	if (walk.characters > walk.limits.maxStringCharacters)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The descriptor string-character budget was exhausted.',
+			frame.path
+		);
+	return null;
+}
+
+function plainTreePrototypeIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	container: object,
+	array: boolean
+): ModuleResolutionTraceValidationIssue | null {
+	const prototype = Reflect.getPrototypeOf(container);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return issue(walk.malformedCode, 'Containers must have ordinary prototypes.', frame.path);
+	return null;
+}
+
+function plainTreeKeyCharacterIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	stringKeys: readonly string[],
+	array: boolean
+): ModuleResolutionTraceValidationIssue | null {
+	for (const key of stringKeys) {
+		if (array && key === 'length') continue;
+		walk.characters += key.length;
+		if (walk.characters > walk.limits.maxStringCharacters)
+			return issue(
+				'BUDGET_EXHAUSTED',
+				'The descriptor string-character budget was exhausted by a property key.',
+				frame.path
+			);
+		if (!isUnicodeScalarString(key))
+			return issue(
+				walk.malformedCode,
+				'Property keys must contain Unicode scalar text.',
+				frame.path
+			);
+	}
+	return null;
+}
+
+function plainTreeArrayShapeIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	container: object,
+	keyCount: number,
+	stringKeys: readonly string[]
+): ModuleResolutionTraceValidationIssue | null {
+	const arrayLength = Reflect.getOwnPropertyDescriptor(container, 'length')!.value as number;
+	if (arrayLength > walk.limits.maxRecords - walk.records)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by an array population.',
+			frame.path
+		);
+	if (keyCount !== arrayLength + 1)
+		return issue(walk.malformedCode, 'Arrays must be dense ordinary arrays.', frame.path);
+	if (stringKeys.some((key) => invalidDenseArrayKey(key, arrayLength)))
+		return issue(walk.malformedCode, 'Arrays must be dense without extra properties.', frame.path);
+	return null;
+}
+
+function plainTreePropertyPopulationIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	keyCount: number
+): ModuleResolutionTraceValidationIssue | null {
+	if (keyCount > walk.limits.maxRecords - walk.records)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by a property population.',
+			frame.path
+		);
+	return null;
+}
+
+function plainTreeChildIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	container: object,
+	stringKeys: readonly string[],
+	array: boolean
+): ModuleResolutionTraceValidationIssue | null {
+	for (let index = stringKeys.length - 1; index >= 0; index -= 1) {
+		const key = stringKeys[index]!;
+		if (array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(container, key)!;
+		if (!descriptor.enumerable || !('value' in descriptor))
+			return issue(
+				walk.malformedCode,
+				'Properties must be enumerable data properties.',
+				`${frame.path}.${key}`
+			);
+		walk.pending.push({
+			depth: frame.depth + 1,
+			path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
+			state: 'VISIT',
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function plainTreeContainerIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame,
+	container: object
+): ModuleResolutionTraceValidationIssue | null {
+	const array = Array.isArray(container);
+	const prototypeProblem = plainTreePrototypeIssue(walk, frame, container, array);
+	if (prototypeProblem !== null) return prototypeProblem;
+	const keys = Reflect.ownKeys(container);
+	if (keys.some((key) => typeof key !== 'string'))
+		return issue(walk.malformedCode, 'Symbol keys are not accepted.', frame.path);
+	const stringKeys = keys as string[];
+	const keyProblem = plainTreeKeyCharacterIssue(walk, frame, stringKeys, array);
+	if (keyProblem !== null) return keyProblem;
+	const populationProblem = array
+		? plainTreeArrayShapeIssue(walk, frame, container, keys.length, stringKeys)
+		: plainTreePropertyPopulationIssue(walk, frame, keys.length);
+	if (populationProblem !== null) return populationProblem;
+	walk.active.add(container);
+	walk.pending.push({ state: 'LEAVE', value: container });
+	return plainTreeChildIssue(walk, frame, container, stringKeys, array);
+}
+
+function plainTreeVisitIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame
+): ModuleResolutionTraceValidationIssue | null {
+	walk.records += 1;
+	if (walk.records > walk.limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
+	if (frame.depth > walk.limits.maxDepth)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
+	if (typeof frame.value === 'string') return plainTreeStringIssue(walk, frame, frame.value);
+	if (frame.value === null || typeof frame.value === 'boolean' || plainDataNumber(frame.value))
+		return null;
+	if (typeof frame.value !== 'object')
+		return issue(walk.malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
+	if (isProxyValue(frame.value))
+		return issue(walk.malformedCode, 'Proxy values are not accepted.', frame.path);
+	if (walk.active.has(frame.value))
+		return issue(walk.malformedCode, 'Cyclic data is not accepted.', frame.path);
+	return plainTreeContainerIssue(walk, frame, frame.value);
+}
+
 /** Descriptor-only traversal: accessors, iterators, callbacks, and toJSON are never invoked. */
 function plainTreeIssue(
 	value: unknown,
@@ -249,126 +448,22 @@ function plainTreeIssue(
 	rootPath: string,
 	input = false
 ): ModuleResolutionTraceValidationIssue | null {
-	type Frame =
-		| {
-				readonly depth: number;
-				readonly path: string;
-				readonly state: 'VISIT';
-				readonly value: unknown;
-		  }
-		| { readonly state: 'LEAVE'; readonly value: object };
-	const pending: Frame[] = [{ depth: 0, path: rootPath, state: 'VISIT', value }];
-	const active = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
-	const malformedCode = input ? 'INPUT_INVALID' : 'SHAPE_INVALID';
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
+	const walk: PlainTreeWalk = {
+		active: new WeakSet<object>(),
+		characters: 0,
+		limits,
+		malformedCode: input ? 'INPUT_INVALID' : 'SHAPE_INVALID',
+		pending: [{ depth: 0, path: rootPath, state: 'VISIT', value }],
+		records: 0
+	};
+	while (walk.pending.length > 0) {
+		const frame = walk.pending.pop()!;
 		if (frame.state === 'LEAVE') {
-			active.delete(frame.value);
+			walk.active.delete(frame.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxRecords)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
-		if (frame.depth > limits.maxDepth)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
-		if (typeof frame.value === 'string') {
-			if (!isUnicodeScalarString(frame.value))
-				return issue(malformedCode, 'Strings must contain Unicode scalar text.', frame.path);
-			characters += frame.value.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted.',
-					frame.path
-				);
-			continue;
-		}
-		if (
-			frame.value === null ||
-			typeof frame.value === 'boolean' ||
-			(typeof frame.value === 'number' &&
-				Number.isFinite(frame.value) &&
-				(!Number.isInteger(frame.value) || Number.isSafeInteger(frame.value)) &&
-				!Object.is(frame.value, -0))
-		)
-			continue;
-		if (typeof frame.value !== 'object')
-			return issue(malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
-		if (isProxyValue(frame.value))
-			return issue(malformedCode, 'Proxy values are not accepted.', frame.path);
-		if (active.has(frame.value))
-			return issue(malformedCode, 'Cyclic data is not accepted.', frame.path);
-		const array = Array.isArray(frame.value);
-		const prototype = Reflect.getPrototypeOf(frame.value);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return issue(malformedCode, 'Containers must have ordinary prototypes.', frame.path);
-		const keys = Reflect.ownKeys(frame.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			return issue(malformedCode, 'Symbol keys are not accepted.', frame.path);
-		const stringKeys = keys as string[];
-		for (const key of stringKeys) {
-			if (array && key === 'length') continue;
-			characters += key.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted by a property key.',
-					frame.path
-				);
-			if (!isUnicodeScalarString(key))
-				return issue(malformedCode, 'Property keys must contain Unicode scalar text.', frame.path);
-		}
-		let arrayLength: number | null = null;
-		if (array) {
-			arrayLength = Reflect.getOwnPropertyDescriptor(frame.value, 'length')!.value as number;
-			if (arrayLength > limits.maxRecords - records)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor record budget was exhausted by an array population.',
-					frame.path
-				);
-			if (keys.length !== arrayLength + 1)
-				return issue(malformedCode, 'Arrays must be dense ordinary arrays.', frame.path);
-			if (
-				stringKeys.some((key) => {
-					if (key === 'length') return false;
-					if (!/^(0|[1-9][0-9]*)$/u.test(key)) return true;
-					const index = Number(key);
-					return !Number.isSafeInteger(index) || index >= arrayLength! || String(index) !== key;
-				})
-			)
-				return issue(malformedCode, 'Arrays must be dense without extra properties.', frame.path);
-		} else if (keys.length > limits.maxRecords - records) {
-			return issue(
-				'BUDGET_EXHAUSTED',
-				'The descriptor record budget was exhausted by a property population.',
-				frame.path
-			);
-		}
-		active.add(frame.value);
-		pending.push({ state: 'LEAVE', value: frame.value });
-		for (let index = stringKeys.length - 1; index >= 0; index -= 1) {
-			const key = stringKeys[index]!;
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key)!;
-			if (!descriptor.enumerable || !('value' in descriptor))
-				return issue(
-					malformedCode,
-					'Properties must be enumerable data properties.',
-					`${frame.path}.${key}`
-				);
-			pending.push({
-				depth: frame.depth + 1,
-				path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
-				state: 'VISIT',
-				value: descriptor.value
-			});
-		}
+		const problem = plainTreeVisitIssue(walk, frame);
+		if (problem !== null) return problem;
 	}
 	return null;
 }
@@ -387,52 +482,56 @@ type CanonicalFrame =
 	  }
 	| { readonly state: 'VALUE'; readonly value: unknown };
 
+function canonicalClosingToken(frame: CanonicalFrame): ']' | '}' | null {
+	if (frame.state === 'ARRAY') return frame.index === frame.length ? ']' : null;
+	if (frame.state === 'OBJECT') return frame.index === frame.entries.length ? '}' : null;
+	return null;
+}
+
+function canonicalSeparatorNeeded(frame: CanonicalFrame): boolean {
+	return frame.state !== 'VALUE' && frame.index !== 0;
+}
+
+function canonicalScalarToken(value: unknown): string | null {
+	if (value === null) return 'null';
+	if (typeof value === 'string') return JSON.stringify(value);
+	if (typeof value === 'boolean') return value ? 'true' : 'false';
+	if (typeof value === 'number') return JSON.stringify(value);
+	return null;
+}
+
 /** Validator-private canonical token stream over values already accepted by plainTreeIssue. */
 function* canonicalChunks(value: unknown): Generator<string, void, undefined> {
 	const pending: CanonicalFrame[] = [{ state: 'VALUE', value }];
 	while (pending.length > 0) {
 		const frame = pending.pop()!;
+		const closing = canonicalClosingToken(frame);
+		if (closing !== null) {
+			yield closing;
+			continue;
+		}
+		if (canonicalSeparatorNeeded(frame)) yield ',';
 		if (frame.state === 'ARRAY') {
-			if (frame.index === frame.length) {
-				yield ']';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
-			});
+			pending.push(
+				{ ...frame, index: frame.index + 1 },
+				{
+					state: 'VALUE',
+					value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
+				}
+			);
 			continue;
 		}
 		if (frame.state === 'OBJECT') {
-			if (frame.index === frame.entries.length) {
-				yield '}';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
 			const [key, child] = frame.entries[frame.index]!;
 			yield JSON.stringify(key);
 			yield ':';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({ state: 'VALUE', value: child });
+			pending.push({ ...frame, index: frame.index + 1 }, { state: 'VALUE', value: child });
 			continue;
 		}
 		const input = frame.value;
-		if (input === null) {
-			yield 'null';
-			continue;
-		}
-		if (typeof input === 'string') {
-			yield JSON.stringify(input);
-			continue;
-		}
-		if (typeof input === 'boolean') {
-			yield input ? 'true' : 'false';
-			continue;
-		}
-		if (typeof input === 'number') {
-			yield JSON.stringify(input);
+		const scalar = canonicalScalarToken(input);
+		if (scalar !== null) {
+			yield scalar;
 			continue;
 		}
 		const objectInput = input as object;
@@ -791,11 +890,11 @@ function presentRead(
 	path: string
 ): PresentReadEntry {
 	if (
-		entry === undefined ||
-		entry.query.operation !== 'READ_FILE' ||
+		entry?.query.operation !== 'READ_FILE' ||
 		entry.query.logicalPath !== logicalPath ||
 		entry.observation.operation !== 'READ_FILE' ||
 		entry.observation.result !== 'PRESENT' ||
+		// S6582 REFUSED: the explicit `=== undefined` limb is what keeps rawSha256 off a missing buffer.
 		entry.bytes === undefined ||
 		entry.bytes.byteLength !== entry.observation.contentBytes ||
 		rawSha256(entry.bytes) !== entry.observation.contentSha256
@@ -863,22 +962,18 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 	const importerSource = semanticSources[0]!;
 	const semanticProgram = semanticPrograms[0]!;
 	const importerNode = importerNodes[0]!;
-	const semanticProjects = semanticSnapshot.projects.filter(
+	const semanticProject = semanticSnapshot.projects.filter(
 		(record) => record.id === importerSource.projectId
-	);
-	const semanticProject = semanticProjects[0]!;
-	const contextSources = projectContextGraph.sources.filter(
+	)[0]!;
+	const contextSource = projectContextGraph.sources.filter(
 		(record) => record.id === request.importer.projectContextSourceId
-	);
-	const contextPrograms = projectContextGraph.programs.filter(
+	)[0]!;
+	const contextProgram = projectContextGraph.programs.filter(
 		(record) => record.id === request.importer.projectContextProgramId
-	);
-	const contextSource = contextSources[0]!;
-	const contextProgram = contextPrograms[0]!;
-	const contextProjects = projectContextGraph.projects.filter(
+	)[0]!;
+	const contextProject = projectContextGraph.projects.filter(
 		(record) => record.id === contextSource.projectId
-	);
-	const contextProject = contextProjects[0]!;
+	)[0]!;
 	if (
 		semanticModuleResolution.nodeId !== request.importer.specifierNodeId ||
 		semanticModuleResolution.sourceId !== importerSource.id ||
@@ -911,9 +1006,9 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			'The selected importer semantic and project-context identities do not reconcile.',
 			'$inputs.request.importer'
 		);
-	const literals = semanticSnapshot.literals.filter(
+	const literalRecord = semanticSnapshot.literals.filter(
 		(record) => record.nodeId === importerNode.id && record.sourceId === importerSource.id
-	);
+	)[0]!;
 	const sameOccurrences = semanticSnapshot.moduleResolutions.filter(
 		(record) =>
 			record.sourceId === importerSource.id &&
@@ -928,18 +1023,17 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			'The selected importer must contain one exact supported import occurrence.',
 			'$inputs.semanticSnapshot.moduleResolutions'
 		);
-	const targetSources = semanticSnapshot.sources.filter(
+	const targetSource = semanticSnapshot.sources.filter(
 		(record) => record.id === semanticModuleResolution.targetSourceId
-	);
-	const targetSource = targetSources[0]!;
+	)[0]!;
 	if (
 		targetSource.artifactClass !== 'CONTEXT_ONLY' ||
 		targetSource.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
 		!targetSource.declarationFile ||
 		!(
-			/\.d\.ts$/u.test(targetSource.logicalPath) ||
-			/\.d\.mts$/u.test(targetSource.logicalPath) ||
-			/\.d\.cts$/u.test(targetSource.logicalPath)
+			targetSource.logicalPath.endsWith('.d.ts') ||
+			targetSource.logicalPath.endsWith('.d.mts') ||
+			targetSource.logicalPath.endsWith('.d.cts')
 		)
 	)
 		failDerivation(
@@ -947,10 +1041,9 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			'The semantic target must be one workspace build declaration.',
 			'$inputs.semanticSnapshot.sources'
 		);
-	const workspaces = frozenSubject.workspaces.filter(
-		(workspace) => workspace.name === request.packageName
-	);
-	const workspace = workspaces[0]!;
+	const workspace = frozenSubject.workspaces.filter(
+		(candidate) => candidate.name === request.packageName
+	)[0]!;
 	const packageExportTarget = conditionalExportResolution.decision.target as string;
 	const expectedTargetPath =
 		workspace.path === '.'
@@ -966,7 +1059,7 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 		semanticSnapshot,
 		semanticProject.configPath
 	);
-	if (lookup === undefined || lookup.subjectId !== request.subjectId)
+	if (lookup?.subjectId !== request.subjectId)
 		failDerivation(
 			'INPUT_INVALID',
 			'The exact semantic snapshot does not retain its verified project-scoped compiler capture.',
@@ -1046,7 +1139,7 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			specifierNodeId: importerNode.id,
 			typeOnly: false
 		},
-		literalRecord: literals[0]!,
+		literalRecord,
 		lookup,
 		materialized,
 		semanticModuleResolution,
@@ -1179,6 +1272,7 @@ function createCaptureOnlyResolutionHost(
 		state.candidates = nextCandidates;
 		if (entry.observation.operation === 'READ_FILE' && entry.observation.result === 'PRESENT') {
 			if (
+				// S6582 REFUSED — see above: rawSha256 must never be reached with a missing buffer.
 				entry.bytes === undefined ||
 				entry.bytes.byteLength !== entry.observation.contentBytes ||
 				rawSha256(entry.bytes) !== entry.observation.contentSha256
@@ -1285,6 +1379,70 @@ interface ReplayResult {
 	readonly useCaseSensitiveFileNames: boolean;
 }
 
+function unsupportedResolverProgram(
+	inputs: ModuleResolutionTraceBuildInputs,
+	options: ts.CompilerOptions
+): boolean {
+	return (
+		ts.version !== inputs.semanticSnapshot.provider.version ||
+		options.module !== ts.ModuleKind.NodeNext ||
+		options.moduleResolution !== ts.ModuleResolutionKind.NodeNext ||
+		(options.customConditions !== undefined &&
+			(!Array.isArray(options.customConditions) || options.customConditions.length !== 0))
+	);
+}
+
+function isSelectedImporterLiteral(
+	node: ts.Node,
+	sourceFile: ts.SourceFile,
+	binding: StaticBinding,
+	specifier: string
+): node is ts.StringLiteral {
+	return (
+		ts.isStringLiteral(node) &&
+		node.getStart(sourceFile, false) === binding.importerNodeRecord.start &&
+		node.getEnd() === binding.importerNodeRecord.end &&
+		node.text === specifier &&
+		ts.isImportDeclaration(node.parent) &&
+		node.parent.moduleSpecifier === node &&
+		node.parent.importClause?.phaseModifier !== ts.SyntaxKind.TypeKeyword
+	);
+}
+
+function collectImporterLiteralMatches(
+	inputs: ModuleResolutionTraceBuildInputs,
+	binding: StaticBinding,
+	sourceFile: ts.SourceFile,
+	state: ReplayState
+): ts.StringLiteral[] {
+	const matched: ts.StringLiteral[] = [];
+	const pending: ts.Node[] = [sourceFile];
+	while (pending.length > 0) {
+		const node = pending.pop()!;
+		state.astNodes += 1;
+		if (
+			state.astNodes > inputs.request.budgets.maxAstNodes ||
+			state.astNodes + state.attempts.length + state.candidates >
+				inputs.request.budgets.maxTraversalSteps
+		)
+			failDerivation(
+				'BUDGET_EXHAUSTED',
+				'The selected importer AST-node budget was exhausted.',
+				'$inputs.request.budgets.maxAstNodes'
+			);
+		if (isSelectedImporterLiteral(node, sourceFile, binding, inputs.request.specifier))
+			matched.push(node);
+		ts.forEachChild(node, (child) => {
+			pending.push(child);
+		});
+	}
+	return matched;
+}
+
+function unstableCaseSensitivity(values: readonly boolean[]): boolean {
+	return values.length === 0 || values.some((value) => value !== values[0]);
+}
+
 function replayResolution(
 	inputs: ModuleResolutionTraceBuildInputs,
 	binding: StaticBinding
@@ -1314,13 +1472,7 @@ function replayResolution(
 		stage: 'IMPLIED_NODE_FORMAT'
 	};
 	const host = createCaptureOnlyResolutionHost(inputs, binding, state);
-	if (
-		ts.version !== inputs.semanticSnapshot.provider.version ||
-		options.module !== ts.ModuleKind.NodeNext ||
-		options.moduleResolution !== ts.ModuleResolutionKind.NodeNext ||
-		(options.customConditions !== undefined &&
-			(!Array.isArray(options.customConditions) || options.customConditions.length !== 0))
-	)
+	if (unsupportedResolverProgram(inputs, options))
 		failDerivation(
 			'INPUT_INVALID',
 			'The selected Program must use NodeNext without custom compiler conditions.',
@@ -1350,35 +1502,7 @@ function replayResolution(
 			? undefined
 			: (binding.importerScriptKind as ts.ScriptKind)
 	);
-	const matchedImporterNodes: ts.StringLiteral[] = [];
-	const pending: ts.Node[] = [sourceFile];
-	while (pending.length > 0) {
-		const node = pending.pop()!;
-		state.astNodes += 1;
-		if (
-			state.astNodes > inputs.request.budgets.maxAstNodes ||
-			state.astNodes + state.attempts.length + state.candidates >
-				inputs.request.budgets.maxTraversalSteps
-		)
-			failDerivation(
-				'BUDGET_EXHAUSTED',
-				'The selected importer AST-node budget was exhausted.',
-				'$inputs.request.budgets.maxAstNodes'
-			);
-		if (
-			ts.isStringLiteral(node) &&
-			node.getStart(sourceFile, false) === binding.importerNodeRecord.start &&
-			node.getEnd() === binding.importerNodeRecord.end &&
-			node.text === inputs.request.specifier &&
-			ts.isImportDeclaration(node.parent) &&
-			node.parent.moduleSpecifier === node &&
-			node.parent.importClause?.isTypeOnly !== true
-		)
-			matchedImporterNodes.push(node);
-		ts.forEachChild(node, (child) => {
-			pending.push(child);
-		});
-	}
+	const matchedImporterNodes = collectImporterLiteralMatches(inputs, binding, sourceFile, state);
 	if (
 		matchedImporterNodes.length !== 1 ||
 		sourceFile.isDeclarationFile !== binding.importerWitnessBase.declarationFile
@@ -1412,10 +1536,7 @@ function replayResolution(
 			'The public TypeScript resolver did not produce a supported resolved module.',
 			'$inputs.request.specifier'
 		);
-	if (
-		state.caseSensitivityValues.length === 0 ||
-		state.caseSensitivityValues.some((value) => value !== state.caseSensitivityValues[0])
-	)
+	if (unstableCaseSensitivity(state.caseSensitivityValues))
 		failDerivation(
 			'INPUT_INVALID',
 			'The replayed case-sensitivity callbacks do not establish one stable environment.',
@@ -1564,6 +1685,17 @@ function targetExtension(logicalPath: string): '.d.ts' | '.d.mts' | '.d.cts' {
 	return '.d.ts';
 }
 
+function candidateExclusionReason(
+	selected: boolean,
+	purpose: ModuleResolutionCandidateRecord['purpose'],
+	observationResult: ModuleResolutionCandidateRecord['observationResult']
+): ModuleResolutionCandidateRecord['exclusionReason'] {
+	if (selected) return null;
+	if (purpose === 'PACKAGE_METADATA') return 'PACKAGE_METADATA_NOT_A_MODULE_TARGET';
+	if (observationResult === 'ABSENT') return 'FILE_ABSENT';
+	return 'PRESENT_NOT_SELECTED';
+}
+
 type DeriveResult =
 	| { readonly graph: ModuleResolutionTraceSnapshot; readonly state: 'VALID' }
 	| { readonly problem: ModuleResolutionTraceValidationIssue; readonly state: 'INVALID' };
@@ -1630,12 +1762,12 @@ function derive(inputs: ModuleResolutionTraceBuildInputs, knownInputDigest?: str
 				'The selected target READ_FILE witness does not reproduce the semantic build declaration.',
 				'$inputs.semanticSnapshot.sources'
 			);
-		const targetPrograms = inputs.semanticSnapshot.programs.filter(
+		const targetProgram = inputs.semanticSnapshot.programs.filter(
 			(program) => program.id === binding.targetSource.programId
-		);
-		const targetProjects = inputs.semanticSnapshot.projects.filter(
+		)[0]!;
+		const targetProject = inputs.semanticSnapshot.projects.filter(
 			(project) => project.id === binding.targetSource.projectId
-		);
+		)[0]!;
 		const readBytes = replay.readBytesBeforeTarget + targetReadEntry.observation.contentBytes;
 		if (!Number.isSafeInteger(readBytes) || readBytes > inputs.request.budgets.maxReadBytes)
 			failDerivation(
@@ -1679,8 +1811,8 @@ function derive(inputs: ModuleResolutionTraceBuildInputs, knownInputDigest?: str
 			packageExportTarget: inputs.conditionalExportResolution.decision.target as string,
 			packageName: inputs.request.packageName,
 			packageWorkspacePath: binding.workspace.path,
-			semanticProgramId: targetPrograms[0]!.id,
-			semanticProjectId: targetProjects[0]!.id,
+			semanticProgramId: targetProgram.id,
+			semanticProjectId: targetProject.id,
 			semanticSourceId: binding.targetSource.id,
 			targetRead: {
 				observation: cloneObservation(
@@ -1726,13 +1858,7 @@ function derive(inputs: ModuleResolutionTraceBuildInputs, knownInputDigest?: str
 				return {
 					attemptId: attempt.id,
 					disposition: selected ? 'SELECTED' : 'EXCLUDED',
-					exclusionReason: selected
-						? null
-						: purpose === 'PACKAGE_METADATA'
-							? 'PACKAGE_METADATA_NOT_A_MODULE_TARGET'
-							: observation.result === 'ABSENT'
-								? 'FILE_ABSENT'
-								: 'PRESENT_NOT_SELECTED',
+					exclusionReason: candidateExclusionReason(selected, purpose, observation.result),
 					logicalPath: attempt.query.logicalPath,
 					observationResult: observation.result,
 					ordinal,

@@ -17,7 +17,7 @@ import {
 	type SourceOrigin
 } from '../../contracts/semantic.js';
 import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
-import { sha256 } from '../../inventory/canonical.js';
+import { compareText, sha256 } from '../../inventory/canonical.js';
 import {
 	canonicalSemanticJson,
 	canonicalSemanticJsonWitnessWithProgress
@@ -324,8 +324,8 @@ function exactKeys(
 	errorCode: CompilerInputCaptureError['code'],
 	onProgress?: () => void
 ): void {
-	const actual = Object.keys(record).sort();
-	const sortedExpected = [...expected].sort();
+	const actual = Object.keys(record).sort(compareText);
+	const sortedExpected = [...expected].sort(compareText);
 	if (actual.length !== sortedExpected.length)
 		fail(errorCode, `${field} has unknown or missing fields.`);
 	for (let index = 0; index < actual.length; index += 1) {
@@ -365,7 +365,7 @@ function inertDenseArray(
 		);
 		if (
 			keys.some(
-				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
 			) ||
 			indexKeys.length !== length ||
 			indexKeys.some((key) => Number(key) >= length)
@@ -402,62 +402,112 @@ function compareUtf16Strings(left: string, right: string, onProgress?: () => voi
 		if (leftUnit !== rightUnit) return leftUnit < rightUnit ? -1 : 1;
 	}
 	onProgress?.();
-	return left.length === right.length ? 0 : left.length < right.length ? -1 : 1;
+	if (left.length === right.length) return 0;
+	return left.length < right.length ? -1 : 1;
 }
 
 function visitUtf16String(value: string, onProgress: () => void): void {
 	for (let index = 0; index < value.length; index += 1) onProgress();
 }
 
+interface StringArrayLimits {
+	readonly clock?: SemanticOperationClock;
+	readonly deadlineMs?: number;
+	readonly maxCharacters?: number;
+	readonly maxLength?: number;
+	readonly onProgress?: () => void;
+	readonly work?: QueryParameterWork;
+}
+
+function inertStringArrayLength(
+	value: unknown,
+	field: string,
+	errorCode: CompilerInputCaptureError['code'],
+	maxLength: number,
+	work: QueryParameterWork | undefined
+): number {
+	if (value === null || typeof value !== 'object' || isProxy(value) || !Array.isArray(value))
+		fail(errorCode, `${field} must be a dense inert string array.`);
+	if (Object.getPrototypeOf(value) !== Array.prototype)
+		fail(errorCode, `${field} must use the intrinsic Array prototype.`);
+	const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+	if (
+		lengthDescriptor === undefined ||
+		!('value' in lengthDescriptor) ||
+		typeof lengthDescriptor.value !== 'number' ||
+		!Number.isSafeInteger(lengthDescriptor.value) ||
+		lengthDescriptor.value < 0 ||
+		lengthDescriptor.value > maxLength ||
+		(work !== undefined && work.entries + lengthDescriptor.value > work.maxEntries)
+	)
+		fail('BUDGET_EXCEEDED', `${field} exceeds its cumulative array bound.`);
+	return lengthDescriptor.value;
+}
+
+function assertDenseStringIndexKeys(
+	keys: readonly (string | symbol)[],
+	field: string,
+	errorCode: CompilerInputCaptureError['code'],
+	length: number,
+	onProgress?: () => void
+): void {
+	let indexKeyCount = 0;
+	let invalidKey = false;
+	for (const key of keys) {
+		onProgress?.();
+		if (typeof key !== 'string') {
+			invalidKey = true;
+			continue;
+		}
+		if (key === 'length') continue;
+		indexKeyCount += 1;
+		if (!/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= length) invalidKey = true;
+	}
+	if (invalidKey || indexKeyCount !== length)
+		fail(errorCode, `${field} must not contain holes, symbols, or expando properties.`);
+}
+
+function chargeQueryParameterWork(
+	work: QueryParameterWork,
+	entryValue: string,
+	index: number,
+	onProgress?: () => void
+): void {
+	const addition =
+		canonicalSemanticJsonWitnessWithProgress(entryValue, onProgress).bytes + (index === 0 ? 0 : 1);
+	if (
+		!Number.isSafeInteger(work.metadataBytes + addition) ||
+		work.metadataBytes + addition > work.maxMetadataBytes
+	)
+		fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its cumulative metadata-byte budget.');
+	work.metadataBytes += addition;
+	work.entries += 1;
+}
+
 function inertStringArray(
 	value: unknown,
 	field: string,
 	errorCode: CompilerInputCaptureError['code'],
-	maxCharacters = MAX_QUERY_CHARACTERS,
-	maxLength = Number.MAX_SAFE_INTEGER,
-	deadlineMs = Number.MAX_SAFE_INTEGER,
-	work?: QueryParameterWork,
-	clock: SemanticOperationClock = Date.now,
-	onProgress?: () => void
+	limits: StringArrayLimits = {}
 ): readonly string[] {
+	const {
+		clock = Date.now,
+		deadlineMs = Number.MAX_SAFE_INTEGER,
+		maxCharacters = MAX_QUERY_CHARACTERS,
+		maxLength = Number.MAX_SAFE_INTEGER,
+		onProgress,
+		work
+	} = limits;
 	try {
 		onProgress?.();
-		if (value === null || typeof value !== 'object' || isProxy(value) || !Array.isArray(value))
-			fail(errorCode, `${field} must be a dense inert string array.`);
-		if (Object.getPrototypeOf(value) !== Array.prototype)
-			fail(errorCode, `${field} must use the intrinsic Array prototype.`);
-		const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
-		if (
-			lengthDescriptor === undefined ||
-			!('value' in lengthDescriptor) ||
-			typeof lengthDescriptor.value !== 'number' ||
-			!Number.isSafeInteger(lengthDescriptor.value) ||
-			lengthDescriptor.value < 0 ||
-			lengthDescriptor.value > maxLength ||
-			(work !== undefined && work.entries + lengthDescriptor.value > work.maxEntries)
-		)
-			fail('BUDGET_EXCEEDED', `${field} exceeds its cumulative array bound.`);
-		const length = lengthDescriptor.value;
-		const keys = Reflect.ownKeys(value);
-		let indexKeyCount = 0;
-		let invalidKey = false;
-		for (const key of keys) {
-			onProgress?.();
-			if (typeof key !== 'string') {
-				invalidKey = true;
-				continue;
-			}
-			if (key === 'length') continue;
-			indexKeyCount += 1;
-			if (!/^(?:0|[1-9][0-9]*)$/u.test(key) || Number(key) >= length) invalidKey = true;
-		}
-		if (invalidKey || indexKeyCount !== length)
-			fail(errorCode, `${field} must not contain holes, symbols, or expando properties.`);
+		const length = inertStringArrayLength(value, field, errorCode, maxLength, work);
+		const container = value as object;
+		assertDenseStringIndexKeys(Reflect.ownKeys(container), field, errorCode, length, onProgress);
 		const result: string[] = [];
 		for (let index = 0; index < length; index += 1) {
 			onProgress?.();
 			checkDeadline({ clock, deadlineMs });
-			const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+			const descriptor = Object.getOwnPropertyDescriptor(container, String(index));
 			if (
 				descriptor === undefined ||
 				!descriptor.enumerable ||
@@ -467,21 +517,7 @@ function inertStringArray(
 				fail(errorCode, `${field}[${index}] must be an enumerable string data property.`);
 			if (descriptor.value.length > maxCharacters)
 				fail('BUDGET_EXCEEDED', `${field}[${index}] exceeds the string bound.`);
-			if (work !== undefined) {
-				const addition =
-					canonicalSemanticJsonWitnessWithProgress(descriptor.value, onProgress).bytes +
-					(index === 0 ? 0 : 1);
-				if (
-					!Number.isSafeInteger(work.metadataBytes + addition) ||
-					work.metadataBytes + addition > work.maxMetadataBytes
-				)
-					fail(
-						'BUDGET_EXCEEDED',
-						'Compiler input query exceeds its cumulative metadata-byte budget.'
-					);
-				work.metadataBytes += addition;
-				work.entries += 1;
-			}
+			if (work !== undefined) chargeQueryParameterWork(work, descriptor.value, index, onProgress);
 			result.push(descriptor.value);
 		}
 		return result;
@@ -495,25 +531,11 @@ function inertStringArray(
 function canonicalStringSet(
 	value: unknown,
 	field: string,
-	maxCharacters: number,
-	maxLength: number,
-	deadlineMs: number,
 	errorCode: CompilerInputCaptureError['code'],
-	work?: QueryParameterWork,
-	clock: SemanticOperationClock = Date.now,
-	onProgress?: () => void
+	limits: StringArrayLimits = {}
 ): readonly string[] {
-	const result = inertStringArray(
-		value,
-		field,
-		errorCode,
-		maxCharacters,
-		maxLength,
-		deadlineMs,
-		work,
-		clock,
-		onProgress
-	);
+	const { clock = Date.now, deadlineMs = Number.MAX_SAFE_INTEGER, onProgress } = limits;
+	const result = inertStringArray(value, field, errorCode, limits);
 	for (let index = 1; index < result.length; index += 1) {
 		onProgress?.();
 		checkDeadline({ clock, deadlineMs });
@@ -569,18 +591,129 @@ function compilerProjectIdentity(
 	}
 }
 
+function attributionBindsRecipeIdentity(
+	expected: CompilerProjectAttribution,
+	identity: {
+		readonly materializedRecipeDigest: string;
+		readonly projectResolutionDigest: string;
+	}
+): boolean {
+	return (
+		expected.projectResolutionDigest === identity.projectResolutionDigest &&
+		expected.materializedRecipeDigest === identity.materializedRecipeDigest
+	);
+}
+
+type NormalizeQueryLimits = Pick<
+	CompilerInputReadLimits,
+	| 'clock'
+	| 'deadlineMs'
+	| 'maxDirectoryEntries'
+	| 'maxPathCharacters'
+	| 'maxQueryMetadataBytes'
+	| 'onProgress'
+>;
+
+function normalizedQueryLogicalPath(
+	record: Readonly<Record<string, unknown>>,
+	maxPathCharacters: number,
+	errorCode: CompilerInputCaptureError['code']
+): string {
+	if (typeof record.logicalPath !== 'string')
+		fail(errorCode, 'CompilerInputQuery.logicalPath must be a string.');
+	if (record.logicalPath.length > maxPathCharacters)
+		fail('BUDGET_EXCEEDED', 'CompilerInputQuery.logicalPath exceeds its path-character budget.');
+	return record.logicalPath;
+}
+
+function rootCompilerInputQuery(
+	operation: 'CURRENT_DIRECTORY' | 'USE_CASE_SENSITIVE_FILE_NAMES',
+	recordedLogicalPath: string,
+	logicalPath: string,
+	maxQueryMetadataBytes: number,
+	errorCode: CompilerInputCaptureError['code'],
+	checkpoint: () => void
+): CompilerInputQuery {
+	if (recordedLogicalPath !== '.' || logicalPath !== '.')
+		fail(errorCode, `${operation} is fixed to the logical repository root.`);
+	const query = Object.freeze({ logicalPath: '.' as const, operation });
+	if (canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes > maxQueryMetadataBytes)
+		fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
+	return query;
+}
+
+function readDirectoryCompilerInputQuery(
+	record: Readonly<Record<string, unknown>>,
+	logicalPath: string,
+	limits: NormalizeQueryLimits,
+	errorCode: CompilerInputCaptureError['code'],
+	checkpoint: () => void
+): CompilerInputQuery {
+	if (
+		record.depth !== null &&
+		(typeof record.depth !== 'number' || !Number.isSafeInteger(record.depth) || record.depth < 0)
+	)
+		fail(errorCode, 'READ_DIRECTORY.depth must be null or a non-negative safe integer.');
+	const emptyQuery = {
+		depth: record.depth as number | null,
+		excludes: Object.freeze([]),
+		extensions: Object.freeze([]),
+		includes: Object.freeze([]),
+		logicalPath,
+		operation: 'READ_DIRECTORY' as const
+	};
+	const work: QueryParameterWork = {
+		entries: 0,
+		maxEntries: limits.maxDirectoryEntries,
+		maxMetadataBytes: limits.maxQueryMetadataBytes,
+		metadataBytes: canonicalSemanticJsonWitnessWithProgress(emptyQuery, checkpoint).bytes
+	};
+	if (work.metadataBytes > work.maxMetadataBytes)
+		fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
+	const setLimits: StringArrayLimits = {
+		clock: limits.clock,
+		deadlineMs: limits.deadlineMs,
+		maxCharacters: limits.maxPathCharacters,
+		maxLength: limits.maxDirectoryEntries,
+		onProgress: checkpoint,
+		work
+	};
+	const excludes = canonicalStringSet(
+		record.excludes,
+		'CompilerInputQuery.excludes',
+		errorCode,
+		setLimits
+	);
+	const extensions = canonicalStringSet(
+		record.extensions,
+		'CompilerInputQuery.extensions',
+		errorCode,
+		setLimits
+	);
+	const includes = canonicalStringSet(
+		record.includes,
+		'CompilerInputQuery.includes',
+		errorCode,
+		setLimits
+	);
+	const query = Object.freeze({
+		depth: record.depth as number | null,
+		excludes,
+		extensions,
+		includes,
+		logicalPath,
+		operation: 'READ_DIRECTORY' as const
+	});
+	checkpoint();
+	if (canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes !== work.metadataBytes)
+		fail('INVALID_QUERY', 'Compiler input query metadata accounting failed to reconcile.');
+	return query;
+}
+
 function normalizeCompilerInputQuery(
 	value: unknown,
 	paths: FrozenCompilerPathResolver,
-	limits: Pick<
-		CompilerInputReadLimits,
-		| 'clock'
-		| 'deadlineMs'
-		| 'maxDirectoryEntries'
-		| 'maxPathCharacters'
-		| 'maxQueryMetadataBytes'
-		| 'onProgress'
-	> = DEFAULT_READ_LIMITS,
+	limits: NormalizeQueryLimits = DEFAULT_READ_LIMITS,
 	errorCode: CompilerInputCaptureError['code'] = 'INVALID_QUERY'
 ): CompilerInputQuery {
 	const resourceProgress = guardedProgress(limits.onProgress);
@@ -599,95 +732,26 @@ function normalizeCompilerInputQuery(
 				? ['depth', 'excludes', 'extensions', 'includes', 'logicalPath', 'operation']
 				: ['logicalPath', 'operation'];
 		exactKeys(record, 'CompilerInputQuery', expected, errorCode, checkpoint);
-		if (typeof record.logicalPath !== 'string')
-			fail(errorCode, 'CompilerInputQuery.logicalPath must be a string.');
-		if (record.logicalPath.length > limits.maxPathCharacters)
-			fail('BUDGET_EXCEEDED', 'CompilerInputQuery.logicalPath exceeds its path-character budget.');
-		visitUtf16String(record.logicalPath, checkpoint);
+		const recordedLogicalPath = normalizedQueryLogicalPath(
+			record,
+			limits.maxPathCharacters,
+			errorCode
+		);
+		visitUtf16String(recordedLogicalPath, checkpoint);
 		checkpoint();
-		const logicalPath = paths.canonicalRecordedLogical(record.logicalPath);
+		const logicalPath = paths.canonicalRecordedLogical(recordedLogicalPath);
 		checkpoint();
-		if (operation === 'CURRENT_DIRECTORY' || operation === 'USE_CASE_SENSITIVE_FILE_NAMES') {
-			if (record.logicalPath !== '.' || logicalPath !== '.')
-				fail(errorCode, `${operation} is fixed to the logical repository root.`);
-			const query = Object.freeze({ logicalPath: '.' as const, operation });
-			if (
-				canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes >
-				limits.maxQueryMetadataBytes
-			)
-				fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
-			return query;
-		}
-		if (operation === 'READ_DIRECTORY') {
-			if (
-				record.depth !== null &&
-				(typeof record.depth !== 'number' ||
-					!Number.isSafeInteger(record.depth) ||
-					record.depth < 0)
-			)
-				fail(errorCode, 'READ_DIRECTORY.depth must be null or a non-negative safe integer.');
-			const emptyQuery = {
-				depth: record.depth as number | null,
-				excludes: Object.freeze([]),
-				extensions: Object.freeze([]),
-				includes: Object.freeze([]),
+		if (operation === 'CURRENT_DIRECTORY' || operation === 'USE_CASE_SENSITIVE_FILE_NAMES')
+			return rootCompilerInputQuery(
+				operation,
+				recordedLogicalPath,
 				logicalPath,
-				operation: 'READ_DIRECTORY' as const
-			};
-			const work: QueryParameterWork = {
-				entries: 0,
-				maxEntries: limits.maxDirectoryEntries,
-				maxMetadataBytes: limits.maxQueryMetadataBytes,
-				metadataBytes: canonicalSemanticJsonWitnessWithProgress(emptyQuery, checkpoint).bytes
-			};
-			if (work.metadataBytes > work.maxMetadataBytes)
-				fail('BUDGET_EXCEEDED', 'Compiler input query exceeds its metadata-byte budget.');
-			const excludes = canonicalStringSet(
-				record.excludes,
-				'CompilerInputQuery.excludes',
-				limits.maxPathCharacters,
-				limits.maxDirectoryEntries,
-				limits.deadlineMs,
+				limits.maxQueryMetadataBytes,
 				errorCode,
-				work,
-				limits.clock,
 				checkpoint
 			);
-			const extensions = canonicalStringSet(
-				record.extensions,
-				'CompilerInputQuery.extensions',
-				limits.maxPathCharacters,
-				limits.maxDirectoryEntries,
-				limits.deadlineMs,
-				errorCode,
-				work,
-				limits.clock,
-				checkpoint
-			);
-			const includes = canonicalStringSet(
-				record.includes,
-				'CompilerInputQuery.includes',
-				limits.maxPathCharacters,
-				limits.maxDirectoryEntries,
-				limits.deadlineMs,
-				errorCode,
-				work,
-				limits.clock,
-				checkpoint
-			);
-			const query = Object.freeze({
-				depth: record.depth as number | null,
-				excludes,
-				extensions,
-				includes,
-				logicalPath,
-				operation: 'READ_DIRECTORY' as const
-			});
-			checkpoint();
-			if (canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes !== work.metadataBytes)
-				fail('INVALID_QUERY', 'Compiler input query metadata accounting failed to reconcile.');
-			return query;
-		}
+		if (operation === 'READ_DIRECTORY')
+			return readDirectoryCompilerInputQuery(record, logicalPath, limits, errorCode, checkpoint);
 		const query = Object.freeze({ logicalPath, operation }) as CompilerInputQuery;
 		if (
 			canonicalSemanticJsonWitnessWithProgress(query, checkpoint).bytes >
@@ -898,10 +962,15 @@ function checkDeadline(limits: Pick<CompilerInputReadLimits, 'clock' | 'deadline
 		fail('BUDGET_EXCEEDED', 'Semantic extraction duration exceeded its producing budget.');
 }
 
-function statKind(absolutePath: string): 'ABSENT' | 'DIRECTORY' | 'FILE' {
+/** What a path resolves to on disk. Aliased because three sites return it. */
+type StatKind = 'ABSENT' | 'DIRECTORY' | 'FILE';
+
+function statKind(absolutePath: string): StatKind {
 	try {
 		const stat = statSync(absolutePath);
-		return stat.isDirectory() ? 'DIRECTORY' : stat.isFile() ? 'FILE' : 'ABSENT';
+		if (stat.isDirectory()) return 'DIRECTORY';
+		if (stat.isFile()) return 'FILE';
+		return 'ABSENT';
 	} catch (error) {
 		if (absent(error)) return 'ABSENT';
 		fail('CONTEXT_UNAVAILABLE', 'Compiler context metadata could not be read.');
@@ -1004,7 +1073,7 @@ function readStableAuthorizedFile(
 }
 
 function uniqueSorted(values: readonly string[]): string[] {
-	return [...new Set(values)].sort();
+	return [...new Set(values)].sort(compareText);
 }
 
 const RESERVED_CHARACTER_PATTERN = /[^\w\s/]/gu;
@@ -1036,7 +1105,7 @@ function wildcardFragments(usage: WildcardUsage): {
 	if (usage === 'files')
 		return {
 			double: `(?:/${IMPLICIT_EXCLUDE}[^/.][^/]*)*?`,
-			single: '(?:[^./]|(?:\\.(?!min\\.js$))?)*'
+			single: String.raw`(?:[^./]|(?:\.(?!min\.js$))?)*`
 		};
 	if (usage === 'directories')
 		return { double: `(?:/${IMPLICIT_EXCLUDE}[^/.][^/]*)*?`, single: '[^/]*' };
@@ -1044,13 +1113,67 @@ function wildcardFragments(usage: WildcardUsage): {
 }
 
 function wildcardReplacement(match: string, single: string): string {
-	return match === '*'
-		? single
-		: match === '?'
-			? '[^/]'
-			: REGEXP_SYNTAX_CHARACTERS.has(match)
-				? `\\${match}`
-				: match;
+	if (match === '*') return single;
+	if (match === '?') return '[^/]';
+	if (REGEXP_SYNTAX_CHARACTERS.has(match)) return `\\${match}`;
+	return match;
+}
+
+interface WildcardFragments {
+	readonly double: string;
+	readonly single: string;
+}
+
+function wildcardComponentPattern(
+	component: string,
+	usage: WildcardUsage,
+	fragments: WildcardFragments
+): string {
+	if (usage === 'exclude')
+		return component.replace(RESERVED_CHARACTER_PATTERN, (match) =>
+			wildcardReplacement(match, fragments.single)
+		);
+	let remainder = component;
+	let componentPattern = '';
+	if (remainder.startsWith('*')) {
+		componentPattern += `(?:[^./]${fragments.single})?`;
+		remainder = remainder.slice(1);
+	} else if (remainder.startsWith('?')) {
+		componentPattern += '[^./]';
+		remainder = remainder.slice(1);
+	}
+	componentPattern += remainder.replace(RESERVED_CHARACTER_PATTERN, (match) =>
+		wildcardReplacement(match, fragments.single)
+	);
+	if (componentPattern === remainder) return componentPattern;
+	return IMPLICIT_EXCLUDE + componentPattern;
+}
+
+function wildcardComponentsPattern(
+	components: readonly string[],
+	usage: WildcardUsage,
+	fragments: WildcardFragments
+): string {
+	let subpattern = '';
+	let written = false;
+	let optional = 0;
+	for (const component of components) {
+		if (component === '**') subpattern += fragments.double;
+		else {
+			if (usage === 'directories') {
+				subpattern += '(?:';
+				optional += 1;
+			}
+			if (written) subpattern += '/';
+			subpattern += wildcardComponentPattern(component, usage, fragments);
+		}
+		written = true;
+	}
+	while (optional > 0) {
+		subpattern += ')?';
+		optional -= 1;
+	}
+	return subpattern;
 }
 
 function wildcardSubpattern(
@@ -1061,51 +1184,16 @@ function wildcardSubpattern(
 	if (spec.length === 0) return undefined;
 	const normalized = posix.normalize(`${MATCH_ROOT}/${spec}`);
 	const components = normalized.split('/');
-	let last = components.at(-1)!;
+	const last = components.at(-1)!;
 	if (usage !== 'exclude' && last === '**') return undefined;
-	if (appendImplicit && !/[.*?]/u.test(last)) {
-		components.push('**', '*');
-		last = '*';
-	}
-	void last;
-	const fragments = wildcardFragments(usage);
-	let subpattern = '';
-	let written = false;
-	let optional = 0;
-	for (let component of components) {
-		if (component === '**') subpattern += fragments.double;
-		else {
-			if (usage === 'directories') {
-				subpattern += '(?:';
-				optional += 1;
-			}
-			if (written) subpattern += '/';
-			if (usage !== 'exclude') {
-				let componentPattern = '';
-				if (component.startsWith('*')) {
-					componentPattern += `(?:[^./]${fragments.single})?`;
-					component = component.slice(1);
-				} else if (component.startsWith('?')) {
-					componentPattern += '[^./]';
-					component = component.slice(1);
-				}
-				componentPattern += component.replace(RESERVED_CHARACTER_PATTERN, (match) =>
-					wildcardReplacement(match, fragments.single)
-				);
-				if (componentPattern !== component) subpattern += IMPLICIT_EXCLUDE;
-				subpattern += componentPattern;
-			} else
-				subpattern += component.replace(RESERVED_CHARACTER_PATTERN, (match) =>
-					wildcardReplacement(match, fragments.single)
-				);
-		}
-		written = true;
-	}
-	while (optional > 0) {
-		subpattern += ')?';
-		optional -= 1;
-	}
-	return subpattern;
+	if (appendImplicit && !/[.*?]/u.test(last)) components.push('**', '*');
+	return wildcardComponentsPattern(components, usage, wildcardFragments(usage));
+}
+
+function stripTrailingSlashes(value: string): string {
+	let end = value.length;
+	while (end > 0 && value.charAt(end - 1) === '/') end -= 1;
+	return value.slice(0, end);
 }
 
 function normalizeWildcardSpec(
@@ -1124,7 +1212,16 @@ function normalizeWildcardSpec(
 	const normalized = posix.normalize(spec.replaceAll('\\', '/').replace(/^\.\//u, ''));
 	if (normalized === '..' || normalized.startsWith('../') || normalized.startsWith('/'))
 		fail('INVALID_QUERY', 'READ_DIRECTORY wildcard escaped its query root.');
-	return normalized === '.' ? '.' : normalized.replace(/\/+$/u, '');
+	return normalized === '.' ? '.' : stripTrailingSlashes(normalized);
+}
+
+function alternationGroup(patterns: readonly string[]): string {
+	return patterns.map((pattern) => `(?:${pattern})`).join('|');
+}
+
+function includeDirectoryRegex(includeDirectories: readonly string[], flags: string): RegExp {
+	if (includeDirectories.length === 0) return new RegExp('(?!)', flags);
+	return new RegExp(`^(?:${alternationGroup(includeDirectories)})$`, flags);
 }
 
 class TypeScriptDirectoryMatcher {
@@ -1174,25 +1271,15 @@ class TypeScriptDirectoryMatcher {
 						return new RegExp(`^${pattern}$`, flags);
 					});
 		this.includeDirectoryRegex =
-			query.includes.length === 0
-				? undefined
-				: includeDirectories.length === 0
-					? new RegExp('(?!)', flags)
-					: new RegExp(
-							`^(?:${includeDirectories.map((pattern) => `(?:${pattern})`).join('|')})$`,
-							flags
-						);
+			query.includes.length === 0 ? undefined : includeDirectoryRegex(includeDirectories, flags);
 		this.excludeRegex =
 			excludes.length === 0
 				? undefined
-				: new RegExp(`^(?:${excludes.map((pattern) => `(?:${pattern})`).join('|')})(?:$|/)`, flags);
+				: new RegExp(`^(?:${alternationGroup(excludes)})(?:$|/)`, flags);
 		this.excludeDirectoryRootRegex =
 			excludeDirectoryRoots.length === 0
 				? undefined
-				: new RegExp(
-						`^(?:${excludeDirectoryRoots.map((pattern) => `(?:${pattern})`).join('|')})(?:$|/)`,
-						flags
-					);
+				: new RegExp(`^(?:${alternationGroup(excludeDirectoryRoots)})(?:$|/)`, flags);
 		this.extensions = query.extensions;
 		checkDeadline(limits);
 	}
@@ -1333,6 +1420,61 @@ function scanVirtualDirectories(
 	return { entries: uniqueSorted(children), scannedEntries };
 }
 
+interface DirectoryFrame {
+	readonly depth: number;
+	readonly logicalPath: string;
+}
+
+interface VirtualScanContext {
+	readonly limits: CompilerInputReadLimits;
+	readonly matcher: TypeScriptDirectoryMatcher;
+	readonly paths: FrozenCompilerPathResolver;
+	readonly query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>;
+	readonly resultBudget: DirectoryResultBudget;
+	readonly results: string[];
+}
+
+function mayDescendIntoDirectory(
+	query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>,
+	currentDepth: number,
+	matcher: TypeScriptDirectoryMatcher,
+	relative: string
+): boolean {
+	return (
+		(query.depth === null || query.depth === 0 || currentDepth + 1 < query.depth) &&
+		matcher.directory(relative)
+	);
+}
+
+function collectVirtualScanChildren(
+	context: VirtualScanContext,
+	current: DirectoryFrame,
+	scannedEntries: number
+): { readonly childDirectories: DirectoryFrame[]; readonly scannedEntries: number } {
+	const { limits, matcher, query, resultBudget, results } = context;
+	const childDirectories: DirectoryFrame[] = [];
+	let scanned = scannedEntries;
+	for (const child of context.paths.virtualChildren(current.logicalPath)) {
+		checkDeadline(limits);
+		resultBudget.assertPath(child.logicalPath);
+		resultBudget.noteScannedEntry();
+		scanned += 1;
+		if (scanned > limits.maxDirectoryEntries)
+			fail(
+				'BUDGET_EXCEEDED',
+				'Compiler virtual directory query exceeded its scanned-entry budget.'
+			);
+		const relative = relativeFrom(query.logicalPath, child.logicalPath);
+		if (relative === undefined) continue;
+		if (child.kind === 'DIRECTORY') {
+			if (mayDescendIntoDirectory(query, current.depth, matcher, relative))
+				childDirectories.push({ depth: current.depth + 1, logicalPath: child.logicalPath });
+		} else if (matcher.file(relative) && resultBudget.retain(child.logicalPath))
+			results.push(child.logicalPath);
+	}
+	return { childDirectories, scannedEntries: scanned };
+}
+
 function scanVirtualFiles(
 	query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>,
 	paths: FrozenCompilerPathResolver,
@@ -1341,36 +1483,16 @@ function scanVirtualFiles(
 ): DirectoryScan {
 	const matcher = new TypeScriptDirectoryMatcher(query, paths, limits);
 	const results: string[] = [];
-	const stack: { readonly depth: number; readonly logicalPath: string }[] = [
-		{ depth: 0, logicalPath: query.logicalPath }
-	];
+	const context: VirtualScanContext = { limits, matcher, paths, query, resultBudget, results };
+	const stack: DirectoryFrame[] = [{ depth: 0, logicalPath: query.logicalPath }];
 	let scannedEntries = 0;
 	while (stack.length > 0) {
 		checkDeadline(limits);
 		const current = stack.pop()!;
-		const childDirectories: { readonly depth: number; readonly logicalPath: string }[] = [];
-		for (const child of paths.virtualChildren(current.logicalPath)) {
-			checkDeadline(limits);
-			resultBudget.assertPath(child.logicalPath);
-			resultBudget.noteScannedEntry();
-			scannedEntries += 1;
-			if (scannedEntries > limits.maxDirectoryEntries)
-				fail(
-					'BUDGET_EXCEEDED',
-					'Compiler virtual directory query exceeded its scanned-entry budget.'
-				);
-			const relative = relativeFrom(query.logicalPath, child.logicalPath);
-			if (relative === undefined) continue;
-			if (child.kind === 'DIRECTORY') {
-				const mayDescend =
-					(query.depth === null || query.depth === 0 || current.depth + 1 < query.depth) &&
-					matcher.directory(relative);
-				if (mayDescend)
-					childDirectories.push({ depth: current.depth + 1, logicalPath: child.logicalPath });
-			} else if (matcher.file(relative) && resultBudget.retain(child.logicalPath))
-				results.push(child.logicalPath);
-		}
-		for (const child of childDirectories.reverse()) stack.push(child);
+		const collected = collectVirtualScanChildren(context, current, scannedEntries);
+		scannedEntries = collected.scannedEntries;
+		collected.childDirectories.reverse();
+		for (const child of collected.childDirectories) stack.push(child);
 	}
 	return { entries: uniqueSorted(results), scannedEntries };
 }
@@ -1389,6 +1511,64 @@ function syntacticallyForbiddenFile(
 	return posix.basename(logicalPath).includes('.') && !paths.isLiveFilePermitted(logicalPath);
 }
 
+interface DirectoryEntryKindProbe {
+	isDirectory(): boolean;
+	isFile(): boolean;
+	isSymbolicLink(): boolean;
+}
+
+function openAuthorizedDirectory(
+	absolutePath: string,
+	logicalPath: string
+): ReturnType<typeof opendirSync> {
+	try {
+		return opendirSync(absolutePath);
+	} catch (error) {
+		if (absent(error))
+			fail(
+				'CONTEXT_CHANGED',
+				`Compiler directory disappeared during its bounded scan: ${logicalPath}.`
+			);
+		return fail(
+			'CONTEXT_UNAVAILABLE',
+			`Compiler directory could not be opened during its bounded scan: ${logicalPath}.`
+		);
+	}
+}
+
+function closeDirectoryQuietly(directory: ReturnType<typeof opendirSync>): void {
+	try {
+		directory.closeSync();
+	} catch {
+		/* the iterator can close itself */
+	}
+}
+
+function excludedFileForPurpose(
+	logicalPath: string,
+	purpose: 'DIRECTORIES' | 'FILES',
+	paths: FrozenCompilerPathResolver
+): boolean {
+	return purpose === 'DIRECTORIES' || !paths.isLiveFilePermitted(logicalPath);
+}
+
+function unusableDirectoryEntry(
+	entry: DirectoryEntryKindProbe,
+	logicalPath: string,
+	purpose: 'DIRECTORIES' | 'FILES',
+	paths: FrozenCompilerPathResolver
+): boolean {
+	if (entry.isFile() && excludedFileForPurpose(logicalPath, purpose, paths)) return true;
+	if (entry.isSymbolicLink() && syntacticallyForbiddenFile(logicalPath, paths)) return true;
+	return !entry.isDirectory() && !entry.isFile() && !entry.isSymbolicLink();
+}
+
+function enumeratedChildKind(entry: DirectoryEntryKindProbe, absolutePath: string): StatKind {
+	if (entry.isDirectory()) return 'DIRECTORY';
+	if (entry.isFile()) return 'FILE';
+	return statKind(absolutePath);
+}
+
 function readAuthorizedChildren(
 	logicalPath: string,
 	paths: FrozenCompilerPathResolver,
@@ -1402,32 +1582,12 @@ function readAuthorizedChildren(
 	const absolutePath = paths.toAbsolute(logicalPath);
 	const children: LiveDirectoryChild[] = [];
 	let scannedEntries = 0;
-	let directory: ReturnType<typeof opendirSync>;
-	try {
-		directory = opendirSync(absolutePath);
-	} catch (error) {
-		if (absent(error))
-			fail(
-				'CONTEXT_CHANGED',
-				`Compiler directory disappeared during its bounded scan: ${logicalPath}.`
-			);
-		fail(
-			'CONTEXT_UNAVAILABLE',
-			`Compiler directory could not be opened during its bounded scan: ${logicalPath}.`
-		);
-	}
+	const directory = openAuthorizedDirectory(absolutePath, logicalPath);
 	try {
 		for (let entry = directory.readSync(); entry !== null; entry = directory.readSync()) {
 			checkDeadline(limits);
 			const identity = paths.enumeratedChildIdentity(logicalPath, entry.name);
-			if (
-				entry.isFile() &&
-				(purpose === 'DIRECTORIES' || !paths.isLiveFilePermitted(identity.logicalPath))
-			)
-				continue;
-			if (entry.isSymbolicLink() && syntacticallyForbiddenFile(identity.logicalPath, paths))
-				continue;
-			if (!entry.isDirectory() && !entry.isFile() && !entry.isSymbolicLink()) continue;
+			if (unusableDirectoryEntry(entry, identity.logicalPath, purpose, paths)) continue;
 			resultBudget.assertPath(identity.logicalPath);
 			if (scannedEntries >= limits.maxDirectoryEntries)
 				fail('BUDGET_EXCEEDED', 'Compiler directory query exceeded its scanned-entry budget.');
@@ -1438,21 +1598,13 @@ function readAuthorizedChildren(
 				continue;
 			}
 			const authorized = paths.authorizeEnumeratedChild(logicalPath, entry.name);
-			const kind = entry.isDirectory()
-				? 'DIRECTORY'
-				: entry.isFile()
-					? 'FILE'
-					: statKind(authorized.absolutePath);
+			const kind = enumeratedChildKind(entry, authorized.absolutePath);
 			if (kind === 'ABSENT')
 				fail(
 					'CONTEXT_CHANGED',
 					`Compiler directory child disappeared during its bounded scan: ${identity.logicalPath}.`
 				);
-			if (
-				kind === 'FILE' &&
-				(purpose === 'DIRECTORIES' || !paths.isLiveFilePermitted(identity.logicalPath))
-			)
-				continue;
+			if (kind === 'FILE' && excludedFileForPurpose(identity.logicalPath, purpose, paths)) continue;
 			resultBudget.noteScannedEntry();
 			scannedEntries += 1;
 			if (scannedEntries > limits.maxDirectoryEntries)
@@ -1460,15 +1612,9 @@ function readAuthorizedChildren(
 			children.push(Object.freeze({ ...authorized, kind }));
 		}
 	} finally {
-		try {
-			directory.closeSync();
-		} catch {
-			/* the iterator can close itself */
-		}
+		closeDirectoryQuietly(directory);
 	}
-	children.sort((left, right) =>
-		left.logicalPath < right.logicalPath ? -1 : left.logicalPath > right.logicalPath ? 1 : 0
-	);
+	children.sort((left, right) => compareText(left.logicalPath, right.logicalPath));
 	return { children, scannedEntries };
 }
 
@@ -1485,6 +1631,43 @@ function scanLiveDirectories(
 	return { entries: uniqueSorted(results), scannedEntries: scanned.scannedEntries };
 }
 
+function resolvePhysicalDirectory(logicalPath: string, absolutePath: string): string {
+	try {
+		return realpathSync.native(absolutePath);
+	} catch (error) {
+		if (absent(error))
+			fail(
+				'CONTEXT_CHANGED',
+				`Compiler directory disappeared during its bounded scan: ${logicalPath}.`
+			);
+		throw error;
+	}
+}
+
+function collectLiveScanChildren(
+	children: readonly LiveDirectoryChild[],
+	query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>,
+	current: DirectoryFrame,
+	matcher: TypeScriptDirectoryMatcher,
+	resultBudget: DirectoryResultBudget,
+	results: string[]
+): DirectoryFrame[] {
+	const childDirectories: DirectoryFrame[] = [];
+	for (const child of children) {
+		const relative = relativeFrom(query.logicalPath, child.logicalPath);
+		const observedRelative = relativeFrom(query.logicalPath, child.observedLogicalPath);
+		if (relative === undefined || observedRelative === undefined) continue;
+		if (child.kind === 'DIRECTORY') {
+			if (mayDescendIntoDirectory(query, current.depth, matcher, observedRelative))
+				childDirectories.push({ depth: current.depth + 1, logicalPath: child.logicalPath });
+			continue;
+		}
+		if (!matcher.file(observedRelative)) continue;
+		if (resultBudget.retain(child.logicalPath)) results.push(child.logicalPath);
+	}
+	return childDirectories;
+}
+
 function scanLiveFiles(
 	query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>,
 	paths: FrozenCompilerPathResolver,
@@ -1493,26 +1676,14 @@ function scanLiveFiles(
 ): DirectoryScan {
 	const matcher = new TypeScriptDirectoryMatcher(query, paths, limits);
 	const results: string[] = [];
-	const stack: { readonly depth: number; readonly logicalPath: string }[] = [
-		{ depth: 0, logicalPath: query.logicalPath }
-	];
+	const stack: DirectoryFrame[] = [{ depth: 0, logicalPath: query.logicalPath }];
 	const visited = new Set<string>();
 	let scannedEntries = 0;
 	while (stack.length > 0) {
 		checkDeadline(limits);
 		const current = stack.pop()!;
 		const currentAbsolute = paths.toAbsolute(current.logicalPath);
-		let physical: string;
-		try {
-			physical = realpathSync.native(currentAbsolute);
-		} catch (error) {
-			if (absent(error))
-				fail(
-					'CONTEXT_CHANGED',
-					`Compiler directory disappeared during its bounded scan: ${current.logicalPath}.`
-				);
-			throw error;
-		}
+		const physical = resolvePhysicalDirectory(current.logicalPath, currentAbsolute);
 		if (visited.has(physical)) continue;
 		visited.add(physical);
 		const scanned = readAuthorizedChildren(
@@ -1527,23 +1698,16 @@ function scanLiveFiles(
 			}
 		);
 		scannedEntries += scanned.scannedEntries;
-		const childDirectories: { readonly depth: number; readonly logicalPath: string }[] = [];
-		for (const child of scanned.children) {
-			const relative = relativeFrom(query.logicalPath, child.logicalPath);
-			const observedRelative = relativeFrom(query.logicalPath, child.observedLogicalPath);
-			if (relative === undefined || observedRelative === undefined) continue;
-			if (child.kind === 'DIRECTORY') {
-				const mayDescend =
-					(query.depth === null || query.depth === 0 || current.depth + 1 < query.depth) &&
-					matcher.directory(observedRelative);
-				if (mayDescend)
-					childDirectories.push({ depth: current.depth + 1, logicalPath: child.logicalPath });
-				continue;
-			}
-			if (!matcher.file(observedRelative)) continue;
-			if (resultBudget.retain(child.logicalPath)) results.push(child.logicalPath);
-		}
-		for (const child of childDirectories.reverse()) stack.push(child);
+		const childDirectories = collectLiveScanChildren(
+			scanned.children,
+			query,
+			current,
+			matcher,
+			resultBudget,
+			results
+		);
+		childDirectories.reverse();
+		for (const child of childDirectories) stack.push(child);
 	}
 	return { entries: uniqueSorted(results), scannedEntries };
 }
@@ -1552,6 +1716,82 @@ function mergeScans(scans: readonly DirectoryScan[]): DirectoryScan {
 	return {
 		entries: uniqueSorted(scans.flatMap((scan) => scan.entries)),
 		scannedEntries: scans.reduce((total, scan) => total + scan.scannedEntries, 0)
+	};
+}
+
+interface CompilerObservationBase {
+	readonly invocationCount: 1;
+	readonly logicalPath: string;
+	readonly origin: SourceOrigin;
+}
+
+interface ObservationContext {
+	readonly base: CompilerObservationBase;
+	readonly emit: (payload: CompilerObservationPayload) => CompilerInputObservation;
+	readonly limits: CompilerInputReadLimits;
+	readonly liveRegion: boolean;
+	readonly liveScanRegion: boolean;
+	readonly subjectId: string;
+	readonly virtualDirectory: boolean;
+}
+
+function boundaryObservation(
+	query: CompilerInputQuery,
+	base: CompilerObservationBase,
+	emit: (payload: CompilerObservationPayload) => CompilerInputObservation
+): CapturedCompilerInput {
+	switch (query.operation) {
+		case 'READ_FILE':
+		case 'FILE_EXISTS':
+		case 'REALPATH':
+			return Object.freeze({
+				observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
+				query
+			});
+		case 'DIRECTORY_EXISTS':
+			return Object.freeze({
+				observation: emit({ ...base, operation: query.operation, result: 'NOT_DIRECTORY' }),
+				query
+			});
+		case 'GET_DIRECTORIES':
+			return Object.freeze({
+				observation: emit({
+					...base,
+					operation: query.operation,
+					result: 'NOT_DIRECTORY',
+					resultEntries: Object.freeze([]),
+					scannedEntries: 0
+				}),
+				query
+			});
+		case 'READ_DIRECTORY':
+			return Object.freeze({
+				observation: emit({
+					...base,
+					...query,
+					result: 'NOT_DIRECTORY',
+					resultEntries: Object.freeze([]),
+					scannedEntries: 0
+				}),
+				query
+			});
+		case 'CURRENT_DIRECTORY':
+		case 'USE_CASE_SENSITIVE_FILE_NAMES':
+			return fail(
+				'INVALID_QUERY',
+				'Repository-root queries cannot use an outside-boundary identity.'
+			);
+	}
+}
+
+function remainingDirectoryEntries(
+	limits: CompilerInputReadLimits,
+	scans: readonly DirectoryScan[]
+): CompilerInputReadLimits {
+	return {
+		...limits,
+		maxDirectoryEntries:
+			limits.maxDirectoryEntries - scans.reduce((total, scan) => total + scan.scannedEntries, 0)
 	};
 }
 
@@ -1585,304 +1825,30 @@ export class LiveCompilerInputReader {
 				this.caseSensitive,
 				limits.maxQueryMetadataBytes
 			);
-			if (this.paths.isBoundaryPath(query.logicalPath)) {
-				switch (query.operation) {
-					case 'READ_FILE':
-					case 'FILE_EXISTS':
-						return Object.freeze({
-							observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
-							query
-						});
-					case 'DIRECTORY_EXISTS':
-						return Object.freeze({
-							observation: emit({ ...base, operation: query.operation, result: 'NOT_DIRECTORY' }),
-							query
-						});
-					case 'GET_DIRECTORIES':
-						return Object.freeze({
-							observation: emit({
-								...base,
-								operation: query.operation,
-								result: 'NOT_DIRECTORY',
-								resultEntries: Object.freeze([]),
-								scannedEntries: 0
-							}),
-							query
-						});
-					case 'READ_DIRECTORY':
-						return Object.freeze({
-							observation: emit({
-								...base,
-								...query,
-								result: 'NOT_DIRECTORY',
-								resultEntries: Object.freeze([]),
-								scannedEntries: 0
-							}),
-							query
-						});
-					case 'REALPATH':
-						return Object.freeze({
-							observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
-							query
-						});
-					case 'CURRENT_DIRECTORY':
-					case 'USE_CASE_SENSITIVE_FILE_NAMES':
-						fail(
-							'INVALID_QUERY',
-							'Repository-root queries cannot use an outside-boundary identity.'
-						);
-				}
-			}
-			const liveRegion = this.paths.isLiveDirectoryPermitted(query.logicalPath);
-			const liveScanRegion = this.paths.isLiveScanPermitted(query.logicalPath);
-			const virtualDirectory = this.paths.isVirtualDirectory(query.logicalPath);
+			if (this.paths.isBoundaryPath(query.logicalPath))
+				return boundaryObservation(query, base, emit);
+			const context: ObservationContext = {
+				base,
+				emit,
+				limits,
+				liveRegion: this.paths.isLiveDirectoryPermitted(query.logicalPath),
+				liveScanRegion: this.paths.isLiveScanPermitted(query.logicalPath),
+				subjectId,
+				virtualDirectory: this.paths.isVirtualDirectory(query.logicalPath)
+			};
 			switch (query.operation) {
-				case 'READ_FILE': {
-					const artifact = this.paths.frozenArtifact(query.logicalPath);
-					let bytes: Uint8Array | undefined;
-					let byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT' | undefined;
-					if (artifact !== undefined) {
-						bytes = readFrozenSubjectArtifact(this.subject, artifact.path);
-						if (
-							bytes === undefined ||
-							bytes.byteLength !== artifact.bytes ||
-							sha256(bytes) !== artifact.sha256
-						)
-							fail(
-								'FROZEN_BYTES_UNAVAILABLE',
-								`Frozen bytes do not reproduce the captured identity for ${artifact.path}.`
-							);
-						byteBudgetClass = 'FROZEN_SUBJECT';
-					} else if (liveRegion && this.paths.isLiveFilePermitted(query.logicalPath)) {
-						const absolutePath = this.paths.toAbsolute(query.logicalPath);
-						const kind = statKind(absolutePath);
-						if (kind === 'DIRECTORY')
-							return Object.freeze({
-								observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
-								query
-							});
-						if (kind === 'FILE') {
-							this.paths.assertLiveFilePermitted(query.logicalPath);
-							if (!limits.allowPresentRead)
-								fail(
-									'BUDGET_EXCEEDED',
-									'Compiler input closure exceeded its live-context file budget.'
-								);
-							bytes = readStableAuthorizedFile(absolutePath, query.logicalPath, this.paths, limits);
-							const expectedDigest = this.paths.explicitContextDigest(query.logicalPath);
-							if (expectedDigest !== undefined && sha256(bytes) !== expectedDigest)
-								fail(
-									'CONTEXT_CHANGED',
-									`Explicit generated compiler context no longer reproduces its frozen digest: ${query.logicalPath}.`
-								);
-							byteBudgetClass = 'LIVE_COMPILER_CONTEXT';
-						}
-					}
-					checkDeadline(limits);
-					if (bytes === undefined || byteBudgetClass === undefined)
-						return Object.freeze({
-							observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
-							query
-						});
-					return Object.freeze({
-						bytes: bytes.slice(),
-						observation: emit({
-							...base,
-							byteBudgetClass,
-							contentBytes: bytes.byteLength,
-							contentSha256: sha256(bytes),
-							operation: query.operation,
-							result: 'PRESENT'
-						}),
-						query
-					});
-				}
-				case 'FILE_EXISTS': {
-					const artifact = this.paths.frozenArtifact(query.logicalPath);
-					const permittedLiveFile = liveRegion && this.paths.isLiveFilePermitted(query.logicalPath);
-					const kind =
-						artifact !== undefined
-							? 'FILE'
-							: permittedLiveFile
-								? statKind(this.paths.toAbsolute(query.logicalPath))
-								: 'ABSENT';
-					if (artifact === undefined && kind === 'FILE')
-						this.paths.assertLiveFilePermitted(query.logicalPath);
-					return Object.freeze({
-						observation: emit({
-							...base,
-							operation: query.operation,
-							result: kind === 'FILE' ? 'PRESENT' : 'ABSENT'
-						}),
-						query
-					});
-				}
-				case 'DIRECTORY_EXISTS': {
-					const exists =
-						virtualDirectory ||
-						(liveRegion && statKind(this.paths.toAbsolute(query.logicalPath)) === 'DIRECTORY');
-					return Object.freeze({
-						observation: emit({
-							...base,
-							operation: query.operation,
-							result: exists ? 'DIRECTORY' : 'NOT_DIRECTORY'
-						}),
-						query
-					});
-				}
-				case 'GET_DIRECTORIES': {
-					const resultBudget = new DirectoryResultBudget(
-						subjectId,
-						{
-							...base,
-							operation: query.operation,
-							result: 'DIRECTORY',
-							resultEntries: Object.freeze([]),
-							scannedEntries: 0
-						},
-						limits
-					);
-					const liveDirectory =
-						liveScanRegion && statKind(this.paths.toAbsolute(query.logicalPath)) === 'DIRECTORY';
-					if (!virtualDirectory && !liveDirectory)
-						return Object.freeze({
-							observation: emit({
-								...base,
-								operation: query.operation,
-								result: 'NOT_DIRECTORY',
-								resultEntries: Object.freeze([]),
-								scannedEntries: 0
-							}),
-							query
-						});
-					const scans: DirectoryScan[] = [];
-					if (virtualDirectory)
-						scans.push(scanVirtualDirectories(query.logicalPath, this.paths, limits, resultBudget));
-					if (liveDirectory)
-						scans.push(
-							scanLiveDirectories(
-								query.logicalPath,
-								this.paths,
-								{
-									...limits,
-									maxDirectoryEntries:
-										limits.maxDirectoryEntries -
-										scans.reduce((total, scan) => total + scan.scannedEntries, 0)
-								},
-								resultBudget
-							)
-						);
-					const scan = mergeScans(scans);
-					return Object.freeze({
-						observation: emit({
-							...base,
-							operation: query.operation,
-							result: 'DIRECTORY',
-							resultEntries: Object.freeze([...scan.entries]),
-							scannedEntries: scan.scannedEntries
-						}),
-						query
-					});
-				}
-				case 'READ_DIRECTORY': {
-					const resultBudget = new DirectoryResultBudget(
-						subjectId,
-						{
-							...base,
-							...query,
-							result: 'DIRECTORY',
-							resultEntries: Object.freeze([]),
-							scannedEntries: 0
-						},
-						limits
-					);
-					const liveDirectory =
-						liveScanRegion && statKind(this.paths.toAbsolute(query.logicalPath)) === 'DIRECTORY';
-					if (!virtualDirectory && !liveDirectory)
-						return Object.freeze({
-							observation: emit({
-								...base,
-								...query,
-								result: 'NOT_DIRECTORY',
-								resultEntries: Object.freeze([]),
-								scannedEntries: 0
-							}),
-							query
-						});
-					const scans: DirectoryScan[] = [];
-					if (virtualDirectory)
-						scans.push(scanVirtualFiles(query, this.paths, limits, resultBudget));
-					if (liveDirectory)
-						scans.push(
-							scanLiveFiles(
-								query,
-								this.paths,
-								{
-									...limits,
-									maxDirectoryEntries:
-										limits.maxDirectoryEntries -
-										scans.reduce((total, scan) => total + scan.scannedEntries, 0)
-								},
-								resultBudget
-							)
-						);
-					const scan = mergeScans(scans);
-					return Object.freeze({
-						observation: emit({
-							...base,
-							...query,
-							result: 'DIRECTORY',
-							resultEntries: Object.freeze([...scan.entries]),
-							scannedEntries: scan.scannedEntries
-						}),
-						query
-					});
-				}
-				case 'REALPATH': {
-					const resolvedFrozenLogical = this.paths.resolvedFrozenLogical(query.logicalPath);
-					if (resolvedFrozenLogical !== undefined) {
-						if (resolvedFrozenLogical.length > limits.maxPathCharacters)
-							fail(
-								'BUDGET_EXCEEDED',
-								'Compiler REALPATH produced a path beyond its path-character budget.'
-							);
-						return Object.freeze({
-							observation: emit({
-								...base,
-								operation: query.operation,
-								resolvedLogicalPath: resolvedFrozenLogical,
-								result: 'RESOLVED'
-							}),
-							query
-						});
-					}
-					if (!liveRegion || !this.paths.isLiveRealpathPermitted(query.logicalPath))
-						return Object.freeze({
-							observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
-							query
-						});
-					const absolutePath = this.paths.toAbsolute(query.logicalPath);
-					if (statKind(absolutePath) === 'ABSENT')
-						return Object.freeze({
-							observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
-							query
-						});
-					const resolvedLogicalPath = this.paths.toLogical(realpathSync.native(absolutePath));
-					if (resolvedLogicalPath.length > limits.maxPathCharacters)
-						fail(
-							'BUDGET_EXCEEDED',
-							'Compiler REALPATH produced a path beyond its path-character budget.'
-						);
-					return Object.freeze({
-						observation: emit({
-							...base,
-							operation: query.operation,
-							resolvedLogicalPath,
-							result: 'RESOLVED'
-						}),
-						query
-					});
-				}
+				case 'READ_FILE':
+					return this.observeReadFile(query, context);
+				case 'FILE_EXISTS':
+					return this.observeFileExists(query, context);
+				case 'DIRECTORY_EXISTS':
+					return this.observeDirectoryExists(query, context);
+				case 'GET_DIRECTORIES':
+					return this.observeGetDirectories(query, context);
+				case 'READ_DIRECTORY':
+					return this.observeReadDirectory(query, context);
+				case 'REALPATH':
+					return this.observeRealpath(query, context);
 				case 'CURRENT_DIRECTORY':
 					return Object.freeze({
 						observation: emit({
@@ -1914,6 +1880,279 @@ export class LiveCompilerInputReader {
 			);
 		}
 	}
+
+	private frozenArtifactBytes(artifact: {
+		readonly bytes: number;
+		readonly path: string;
+		readonly sha256: string;
+	}): Uint8Array {
+		const bytes = readFrozenSubjectArtifact(this.subject, artifact.path);
+		if (bytes === undefined || !bytesReproduceArtifact(bytes, artifact))
+			fail(
+				'FROZEN_BYTES_UNAVAILABLE',
+				`Frozen bytes do not reproduce the captured identity for ${artifact.path}.`
+			);
+		return bytes;
+	}
+
+	private readLivePresentBytes(
+		logicalPath: string,
+		absolutePath: string,
+		limits: CompilerInputReadLimits
+	): Uint8Array {
+		this.paths.assertLiveFilePermitted(logicalPath);
+		if (!limits.allowPresentRead)
+			fail('BUDGET_EXCEEDED', 'Compiler input closure exceeded its live-context file budget.');
+		const bytes = readStableAuthorizedFile(absolutePath, logicalPath, this.paths, limits);
+		const expectedDigest = this.paths.explicitContextDigest(logicalPath);
+		if (expectedDigest !== undefined && sha256(bytes) !== expectedDigest)
+			fail(
+				'CONTEXT_CHANGED',
+				`Explicit generated compiler context no longer reproduces its frozen digest: ${logicalPath}.`
+			);
+		return bytes;
+	}
+
+	private observeReadFile(
+		query: CompilerInputQuery,
+		context: ObservationContext
+	): CapturedCompilerInput {
+		const { base, emit, limits } = context;
+		const absentRead = (): CapturedCompilerInput =>
+			Object.freeze({
+				observation: emit({ ...base, operation: 'READ_FILE', result: 'ABSENT' }),
+				query
+			});
+		const artifact = this.paths.frozenArtifact(query.logicalPath);
+		let bytes: Uint8Array | undefined;
+		let byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT' | undefined;
+		if (artifact !== undefined) {
+			bytes = this.frozenArtifactBytes(artifact);
+			byteBudgetClass = 'FROZEN_SUBJECT';
+		} else if (context.liveRegion && this.paths.isLiveFilePermitted(query.logicalPath)) {
+			const absolutePath = this.paths.toAbsolute(query.logicalPath);
+			const kind = statKind(absolutePath);
+			if (kind === 'DIRECTORY') return absentRead();
+			if (kind === 'FILE') {
+				bytes = this.readLivePresentBytes(query.logicalPath, absolutePath, limits);
+				byteBudgetClass = 'LIVE_COMPILER_CONTEXT';
+			}
+		}
+		checkDeadline(limits);
+		if (bytes === undefined || byteBudgetClass === undefined) return absentRead();
+		return Object.freeze({
+			bytes: bytes.slice(),
+			observation: emit({
+				...base,
+				byteBudgetClass,
+				contentBytes: bytes.byteLength,
+				contentSha256: sha256(bytes),
+				operation: 'READ_FILE',
+				result: 'PRESENT'
+			}),
+			query
+		});
+	}
+
+	private fileExistsKind(
+		logicalPath: string,
+		frozen: boolean,
+		permittedLiveFile: boolean
+	): StatKind {
+		if (frozen) return 'FILE';
+		if (permittedLiveFile) return statKind(this.paths.toAbsolute(logicalPath));
+		return 'ABSENT';
+	}
+
+	private observeFileExists(
+		query: CompilerInputQuery,
+		context: ObservationContext
+	): CapturedCompilerInput {
+		const { base, emit } = context;
+		const artifact = this.paths.frozenArtifact(query.logicalPath);
+		const permittedLiveFile =
+			context.liveRegion && this.paths.isLiveFilePermitted(query.logicalPath);
+		const kind = this.fileExistsKind(query.logicalPath, artifact !== undefined, permittedLiveFile);
+		if (artifact === undefined && kind === 'FILE')
+			this.paths.assertLiveFilePermitted(query.logicalPath);
+		return Object.freeze({
+			observation: emit({
+				...base,
+				operation: 'FILE_EXISTS',
+				result: kind === 'FILE' ? 'PRESENT' : 'ABSENT'
+			}),
+			query
+		});
+	}
+
+	private observeDirectoryExists(
+		query: CompilerInputQuery,
+		context: ObservationContext
+	): CapturedCompilerInput {
+		const { base, emit } = context;
+		const exists =
+			context.virtualDirectory ||
+			(context.liveRegion && statKind(this.paths.toAbsolute(query.logicalPath)) === 'DIRECTORY');
+		return Object.freeze({
+			observation: emit({
+				...base,
+				operation: 'DIRECTORY_EXISTS',
+				result: exists ? 'DIRECTORY' : 'NOT_DIRECTORY'
+			}),
+			query
+		});
+	}
+
+	private observeGetDirectories(
+		query: CompilerInputQuery,
+		context: ObservationContext
+	): CapturedCompilerInput {
+		const { base, emit, limits } = context;
+		const resultBudget = new DirectoryResultBudget(
+			context.subjectId,
+			{
+				...base,
+				operation: 'GET_DIRECTORIES',
+				result: 'DIRECTORY',
+				resultEntries: Object.freeze([]),
+				scannedEntries: 0
+			},
+			limits
+		);
+		const liveDirectory =
+			context.liveScanRegion && statKind(this.paths.toAbsolute(query.logicalPath)) === 'DIRECTORY';
+		if (!context.virtualDirectory && !liveDirectory)
+			return Object.freeze({
+				observation: emit({
+					...base,
+					operation: 'GET_DIRECTORIES',
+					result: 'NOT_DIRECTORY',
+					resultEntries: Object.freeze([]),
+					scannedEntries: 0
+				}),
+				query
+			});
+		const scans: DirectoryScan[] = [];
+		if (context.virtualDirectory)
+			scans.push(scanVirtualDirectories(query.logicalPath, this.paths, limits, resultBudget));
+		if (liveDirectory)
+			scans.push(
+				scanLiveDirectories(
+					query.logicalPath,
+					this.paths,
+					remainingDirectoryEntries(limits, scans),
+					resultBudget
+				)
+			);
+		const scan = mergeScans(scans);
+		return Object.freeze({
+			observation: emit({
+				...base,
+				operation: 'GET_DIRECTORIES',
+				result: 'DIRECTORY',
+				resultEntries: Object.freeze([...scan.entries]),
+				scannedEntries: scan.scannedEntries
+			}),
+			query
+		});
+	}
+
+	private observeReadDirectory(
+		query: Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>,
+		context: ObservationContext
+	): CapturedCompilerInput {
+		const { base, emit, limits } = context;
+		const resultBudget = new DirectoryResultBudget(
+			context.subjectId,
+			{
+				...base,
+				...query,
+				result: 'DIRECTORY',
+				resultEntries: Object.freeze([]),
+				scannedEntries: 0
+			},
+			limits
+		);
+		const liveDirectory =
+			context.liveScanRegion && statKind(this.paths.toAbsolute(query.logicalPath)) === 'DIRECTORY';
+		if (!context.virtualDirectory && !liveDirectory)
+			return Object.freeze({
+				observation: emit({
+					...base,
+					...query,
+					result: 'NOT_DIRECTORY',
+					resultEntries: Object.freeze([]),
+					scannedEntries: 0
+				}),
+				query
+			});
+		const scans: DirectoryScan[] = [];
+		if (context.virtualDirectory)
+			scans.push(scanVirtualFiles(query, this.paths, limits, resultBudget));
+		if (liveDirectory)
+			scans.push(
+				scanLiveFiles(query, this.paths, remainingDirectoryEntries(limits, scans), resultBudget)
+			);
+		const scan = mergeScans(scans);
+		return Object.freeze({
+			observation: emit({
+				...base,
+				...query,
+				result: 'DIRECTORY',
+				resultEntries: Object.freeze([...scan.entries]),
+				scannedEntries: scan.scannedEntries
+			}),
+			query
+		});
+	}
+
+	private observeRealpath(
+		query: CompilerInputQuery,
+		context: ObservationContext
+	): CapturedCompilerInput {
+		const { base, emit, limits } = context;
+		const absentRealpath = (): CapturedCompilerInput =>
+			Object.freeze({
+				observation: emit({ ...base, operation: 'REALPATH', result: 'ABSENT' }),
+				query
+			});
+		const resolvedFrozenLogical = this.paths.resolvedFrozenLogical(query.logicalPath);
+		if (resolvedFrozenLogical !== undefined) {
+			if (resolvedFrozenLogical.length > limits.maxPathCharacters)
+				fail(
+					'BUDGET_EXCEEDED',
+					'Compiler REALPATH produced a path beyond its path-character budget.'
+				);
+			return Object.freeze({
+				observation: emit({
+					...base,
+					operation: 'REALPATH',
+					resolvedLogicalPath: resolvedFrozenLogical,
+					result: 'RESOLVED'
+				}),
+				query
+			});
+		}
+		if (!context.liveRegion || !this.paths.isLiveRealpathPermitted(query.logicalPath))
+			return absentRealpath();
+		const absolutePath = this.paths.toAbsolute(query.logicalPath);
+		if (statKind(absolutePath) === 'ABSENT') return absentRealpath();
+		const resolvedLogicalPath = this.paths.toLogical(realpathSync.native(absolutePath));
+		if (resolvedLogicalPath.length > limits.maxPathCharacters)
+			fail(
+				'BUDGET_EXCEEDED',
+				'Compiler REALPATH produced a path beyond its path-character budget.'
+			);
+		return Object.freeze({
+			observation: emit({
+				...base,
+				operation: 'REALPATH',
+				resolvedLogicalPath,
+				result: 'RESOLVED'
+			}),
+			query
+		});
+	}
 }
 
 function freezeWire<T>(value: T): T {
@@ -1940,6 +2179,19 @@ function observationBytes(observation: CompilerInputObservation): number {
 
 function compilerInputsMetadataBytes(observationByteSum: number, observationCount: number): number {
 	return 2 + observationByteSum + Math.max(0, observationCount - 1);
+}
+
+function assertCapturedResultWithinPathBudget(
+	observation: CompilerInputObservation,
+	maxPathCharacters: number
+): void {
+	if (
+		('resultEntries' in observation &&
+			observation.resultEntries.some((entry) => entry.length > maxPathCharacters)) ||
+		('resolvedLogicalPath' in observation &&
+			observation.resolvedLogicalPath.length > maxPathCharacters)
+	)
+		fail('BUDGET_EXCEEDED', 'Compiler input result exceeded its path-character budget.');
 }
 
 class ProjectAttributionTracker {
@@ -1989,7 +2241,7 @@ class ProjectAttributionTracker {
 			fail('INVALID_QUERY', `Compiler project attribution is not registered: ${projectKey}.`);
 		const contextInputIds = new Set<SemanticContextInputId>();
 		const queryInvocations = [...queries.entries()]
-			.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+			.sort(([left], [right]) => compareText(left, right))
 			.map(([key, value]) => {
 				const global = globalEntries.get(key);
 				if (global === undefined)
@@ -2004,7 +2256,7 @@ class ProjectAttributionTracker {
 				});
 			});
 		return Object.freeze({
-			contextInputIds: Object.freeze([...contextInputIds].sort()),
+			contextInputIds: Object.freeze([...contextInputIds].sort(compareText)),
 			...identity,
 			projectKey,
 			queryInvocations: Object.freeze(queryInvocations)
@@ -2016,7 +2268,7 @@ class ProjectAttributionTracker {
 	): readonly CompilerProjectAttribution[] {
 		const totals = new Map<string, number>();
 		const result = [...this.byProject.keys()]
-			.sort()
+			.sort(compareText)
 			.map((projectKey) => this.entry(projectKey, globalEntries));
 		for (const attribution of result)
 			for (const value of attribution.queryInvocations) {
@@ -2131,7 +2383,7 @@ export class CompilerInputJournal {
 		const observations = [...this.entriesByQuery.values()]
 			.map((entry) => entry.observation)
 			.filter((observation) => ids.has(observation.id))
-			.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+			.sort((left, right) => compareText(left.id, right.id))
 			.map((observation) => freezeWire(structuredClone(observation)));
 		if (observations.length !== ids.size)
 			fail(
@@ -2140,6 +2392,74 @@ export class CompilerInputJournal {
 			);
 		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
 		return Object.freeze({ attribution, observations: Object.freeze(observations) });
+	}
+
+	private captureRepeatInvocation(
+		key: string,
+		existing: CapturedCompilerInput,
+		query: CompilerInputQuery,
+		projectKey: string
+	): CapturedCompilerInput {
+		const updated = withInvocationCount(
+			this.reader.paths.subject.descriptor.subjectId,
+			existing,
+			existing.observation.invocationCount + 1
+		);
+		const nextByteSum =
+			this.observationByteSum -
+			observationBytes(existing.observation) +
+			observationBytes(updated.observation);
+		if (
+			compilerInputsMetadataBytes(nextByteSum, this.entriesByQuery.size) >
+			this.budgets.maxCompilerInputMetadataBytes
+		)
+			fail(
+				'BUDGET_EXCEEDED',
+				'Compiler input journal exceeded its exact emitted metadata-byte budget.'
+			);
+		this.entriesByQuery.set(key, updated);
+		this.observationByteSum = nextByteSum;
+		this.queryInvocations += 1;
+		this.attributions.record(projectKey, query);
+		const result = cloneCaptured(updated);
+		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
+		return result;
+	}
+
+	private assertScannedEntryBudget(scannedEntries: number): void {
+		if (
+			!Number.isSafeInteger(this.directoryEntries + scannedEntries) ||
+			this.directoryEntries + scannedEntries > this.budgets.maxDirectoryEntries
+		)
+			fail(
+				'BUDGET_EXCEEDED',
+				'Compiler input journal exceeded its scanned-directory-entry budget.'
+			);
+	}
+
+	private nextLiveContextTotals(observation: CompilerInputObservation): {
+		readonly contextBytes: number;
+		readonly contextFiles: number;
+	} {
+		if (
+			observation.operation !== 'READ_FILE' ||
+			observation.result !== 'PRESENT' ||
+			observation.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT'
+		)
+			return { contextBytes: this.contextBytes, contextFiles: this.contextFiles };
+		const contextFiles = this.contextFiles + 1;
+		const contextBytes = this.contextBytes + observation.contentBytes;
+		if (
+			observation.contentBytes > this.budgets.maxContextFileBytes ||
+			contextFiles > this.budgets.maxContextFiles ||
+			!Number.isSafeInteger(contextBytes) ||
+			contextBytes > this.budgets.maxContextBytes
+		)
+			fail(
+				'BUDGET_EXCEEDED',
+				'Compiler input closure exceeded its live-context file or byte budget.'
+			);
+		return { contextBytes, contextFiles };
 	}
 
 	private captureActive(queryValue: CompilerInputQuery, projectKey: string): CapturedCompilerInput {
@@ -2160,32 +2480,8 @@ export class CompilerInputJournal {
 		const existing = this.entriesByQuery.get(key);
 		if (this.queryInvocations >= this.budgets.maxCompilerQueryInvocations)
 			fail('BUDGET_EXCEEDED', 'Compiler input journal exceeded its query-invocation budget.');
-		if (existing !== undefined) {
-			const updated = withInvocationCount(
-				this.reader.paths.subject.descriptor.subjectId,
-				existing,
-				existing.observation.invocationCount + 1
-			);
-			const nextByteSum =
-				this.observationByteSum -
-				observationBytes(existing.observation) +
-				observationBytes(updated.observation);
-			if (
-				compilerInputsMetadataBytes(nextByteSum, this.entriesByQuery.size) >
-				this.budgets.maxCompilerInputMetadataBytes
-			)
-				fail(
-					'BUDGET_EXCEEDED',
-					'Compiler input journal exceeded its exact emitted metadata-byte budget.'
-				);
-			this.entriesByQuery.set(key, updated);
-			this.observationByteSum = nextByteSum;
-			this.queryInvocations += 1;
-			this.attributions.record(projectKey, query);
-			const result = cloneCaptured(updated);
-			checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
-			return result;
-		}
+		if (existing !== undefined)
+			return this.captureRepeatInvocation(key, existing, query, projectKey);
 		if (this.entriesByQuery.size >= this.budgets.maxCompilerQueries)
 			fail('BUDGET_EXCEEDED', 'Compiler input journal exceeded its distinct-query budget.');
 		const frozenRead =
@@ -2206,45 +2502,10 @@ export class CompilerInputJournal {
 			)
 		});
 		checkDeadline({ clock: this.clock, deadlineMs: this.deadlineMs });
-		if (
-			('resultEntries' in captured.observation &&
-				captured.observation.resultEntries.some(
-					(entry) => entry.length > this.budgets.maxPathCharacters
-				)) ||
-			('resolvedLogicalPath' in captured.observation &&
-				captured.observation.resolvedLogicalPath.length > this.budgets.maxPathCharacters)
-		)
-			fail('BUDGET_EXCEEDED', 'Compiler input result exceeded its path-character budget.');
-		const scannedEntries =
-			'scannedEntries' in captured.observation ? captured.observation.scannedEntries : 0;
-		if (
-			!Number.isSafeInteger(this.directoryEntries + scannedEntries) ||
-			this.directoryEntries + scannedEntries > this.budgets.maxDirectoryEntries
-		)
-			fail(
-				'BUDGET_EXCEEDED',
-				'Compiler input journal exceeded its scanned-directory-entry budget.'
-			);
-		let nextContextFiles = this.contextFiles;
-		let nextContextBytes = this.contextBytes;
-		if (
-			captured.observation.operation === 'READ_FILE' &&
-			captured.observation.result === 'PRESENT' &&
-			captured.observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT'
-		) {
-			nextContextFiles += 1;
-			nextContextBytes += captured.observation.contentBytes;
-			if (
-				captured.observation.contentBytes > this.budgets.maxContextFileBytes ||
-				nextContextFiles > this.budgets.maxContextFiles ||
-				!Number.isSafeInteger(nextContextBytes) ||
-				nextContextBytes > this.budgets.maxContextBytes
-			)
-				fail(
-					'BUDGET_EXCEEDED',
-					'Compiler input closure exceeded its live-context file or byte budget.'
-				);
-		}
+		assertCapturedResultWithinPathBudget(captured.observation, this.budgets.maxPathCharacters);
+		const scannedEntries = observationScannedEntries(captured.observation);
+		this.assertScannedEntryBudget(scannedEntries);
+		const nextContextTotals = this.nextLiveContextTotals(captured.observation);
 		const nextByteSum = this.observationByteSum + observationBytes(captured.observation);
 		if (
 			compilerInputsMetadataBytes(nextByteSum, this.entriesByQuery.size + 1) >
@@ -2256,8 +2517,8 @@ export class CompilerInputJournal {
 			);
 		const stored = cloneCaptured(captured);
 		this.entriesByQuery.set(key, stored);
-		this.contextFiles = nextContextFiles;
-		this.contextBytes = nextContextBytes;
+		this.contextFiles = nextContextTotals.contextFiles;
+		this.contextBytes = nextContextTotals.contextBytes;
 		this.directoryEntries += scannedEntries;
 		this.observationByteSum = nextByteSum;
 		this.queryInvocations += 1;
@@ -2270,13 +2531,7 @@ export class CompilerInputJournal {
 	private entries(): readonly CapturedCompilerInput[] {
 		return Object.freeze(
 			[...this.entriesByQuery.values()]
-				.sort((left, right) =>
-					left.observation.id < right.observation.id
-						? -1
-						: left.observation.id > right.observation.id
-							? 1
-							: 0
-				)
+				.sort((left, right) => compareText(left.observation.id, right.observation.id))
 				.map(cloneCaptured)
 		);
 	}
@@ -2358,7 +2613,7 @@ function inertBytes(value: unknown, field: string): Uint8Array {
 			fail('INVALID_CAPTURE', `${field} must be an inert Uint8Array.`);
 		if (
 			Reflect.ownKeys(value).some(
-				(key) => typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)
+				(key) => typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)
 			)
 		)
 			fail('INVALID_CAPTURE', `${field} must not contain symbol or expando properties.`);
@@ -2367,6 +2622,236 @@ function inertBytes(value: unknown, field: string): Uint8Array {
 		if (error instanceof CompilerInputCaptureError) throw error;
 		fail('INVALID_CAPTURE', `${field} could not be inspected as inert bytes.`);
 	}
+}
+
+function bytesReproduceArtifact(
+	bytes: Uint8Array,
+	artifact: { readonly bytes: number; readonly sha256: string }
+): boolean {
+	return bytes.byteLength === artifact.bytes && sha256(bytes) === artifact.sha256;
+}
+
+function assertCapturedEntryFields(entry: Readonly<Record<string, unknown>>): void {
+	if (
+		!Object.keys(entry).every((key) => ['bytes', 'observation', 'query'].includes(key)) ||
+		!Object.hasOwn(entry, 'observation') ||
+		!Object.hasOwn(entry, 'query')
+	)
+		fail('INVALID_CAPTURE', 'CapturedCompilerInput has unknown or missing fields.');
+}
+
+function assertCapturedObservationBinding(
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	paths: FrozenCompilerPathResolver
+): void {
+	const expectedOrigin =
+		query.operation === 'CURRENT_DIRECTORY' || query.operation === 'USE_CASE_SENSITIVE_FILE_NAMES'
+			? 'CONFIGURATION'
+			: paths.recordedOrigin(query.logicalPath);
+	if (
+		observation.operation !== query.operation ||
+		observation.logicalPath !== query.logicalPath ||
+		typeof observation.origin !== 'string' ||
+		!ORIGINS.has(observation.origin as SourceOrigin) ||
+		observation.origin !== expectedOrigin
+	)
+		fail(
+			'INVALID_CAPTURE',
+			'Captured observation does not bind its canonical query and derived origin.'
+		);
+	if (
+		typeof observation.invocationCount !== 'number' ||
+		!Number.isSafeInteger(observation.invocationCount) ||
+		observation.invocationCount < 1
+	)
+		fail('INVALID_CAPTURE', 'Captured observation invocation count is invalid.');
+}
+
+function capturedResultIsValidForOperation(operation: string, result: string): boolean {
+	if (operation === 'READ_FILE' || operation === 'FILE_EXISTS')
+		return ['PRESENT', 'ABSENT'].includes(result);
+	if (
+		operation === 'DIRECTORY_EXISTS' ||
+		operation === 'GET_DIRECTORIES' ||
+		operation === 'READ_DIRECTORY'
+	)
+		return ['DIRECTORY', 'NOT_DIRECTORY'].includes(result);
+	if (operation === 'REALPATH') return ['RESOLVED', 'ABSENT'].includes(result);
+	if (operation === 'CURRENT_DIRECTORY') return result === 'RESOLVED';
+	return (
+		operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
+		['CASE_SENSITIVE', 'CASE_INSENSITIVE'].includes(result)
+	);
+}
+
+function assertCapturedReadDirectoryParameters(
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery
+): void {
+	const readQuery = query as Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>;
+	for (const key of ['depth', 'excludes', 'extensions', 'includes'] as const)
+		if (canonicalSemanticJson(observation[key]) !== canonicalSemanticJson(readQuery[key]))
+			fail('INVALID_CAPTURE', 'Captured READ_DIRECTORY parameters do not reproduce the query.');
+}
+
+function assertCapturedDirectoryResult(
+	observation: Readonly<Record<string, unknown>>,
+	result: string,
+	paths: FrozenCompilerPathResolver,
+	budgets: SemanticBudgets,
+	deadlineMs: number,
+	clock: SemanticOperationClock
+): void {
+	const entries = inertStringArray(
+		observation.resultEntries,
+		'CapturedCompilerInput.observation.resultEntries',
+		'INVALID_CAPTURE',
+		{
+			clock,
+			deadlineMs,
+			maxCharacters: budgets.maxPathCharacters,
+			maxLength: budgets.maxDirectoryEntries
+		}
+	);
+	if (
+		entries.some(
+			(item, index) =>
+				paths.canonicalRecordedLogical(item) !== item || (index > 0 && entries[index - 1]! >= item)
+		) ||
+		(result === 'NOT_DIRECTORY' && entries.length > 0)
+	)
+		fail('INVALID_CAPTURE', 'Captured directory result entries are not a canonical set.');
+	if (
+		typeof observation.scannedEntries !== 'number' ||
+		!Number.isSafeInteger(observation.scannedEntries) ||
+		observation.scannedEntries < entries.length ||
+		(result === 'NOT_DIRECTORY' && observation.scannedEntries !== 0)
+	)
+		fail('INVALID_CAPTURE', 'Captured scanned-entry evidence is invalid.');
+}
+
+function assertCapturedPresentFileMetadata(
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	paths: FrozenCompilerPathResolver
+): void {
+	const expectedBudgetClass =
+		paths.frozenArtifact(query.logicalPath) === undefined
+			? 'LIVE_COMPILER_CONTEXT'
+			: 'FROZEN_SUBJECT';
+	if (
+		observation.byteBudgetClass !== expectedBudgetClass ||
+		typeof observation.contentBytes !== 'number' ||
+		!Number.isSafeInteger(observation.contentBytes) ||
+		observation.contentBytes < 0 ||
+		typeof observation.contentSha256 !== 'string' ||
+		!SHA256.test(observation.contentSha256)
+	)
+		fail('INVALID_CAPTURE', 'Captured present file metadata or byte-budget class is invalid.');
+}
+
+function assertCapturedOperationEvidence(
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	result: string,
+	paths: FrozenCompilerPathResolver,
+	budgets: SemanticBudgets,
+	deadlineMs: number,
+	clock: SemanticOperationClock
+): void {
+	if (observation.operation === 'READ_DIRECTORY')
+		assertCapturedReadDirectoryParameters(observation, query);
+	if (observation.operation === 'GET_DIRECTORIES' || observation.operation === 'READ_DIRECTORY')
+		assertCapturedDirectoryResult(observation, result, paths, budgets, deadlineMs, clock);
+	if (observation.operation === 'READ_FILE' && result === 'PRESENT')
+		assertCapturedPresentFileMetadata(observation, query, paths);
+}
+
+function assertCapturedResolvedPaths(
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	result: string,
+	paths: FrozenCompilerPathResolver
+): void {
+	if (
+		(observation.operation === 'REALPATH' || observation.operation === 'CURRENT_DIRECTORY') &&
+		result === 'RESOLVED' &&
+		(typeof observation.resolvedLogicalPath !== 'string' ||
+			paths.canonicalRecordedLogical(observation.resolvedLogicalPath) !==
+				observation.resolvedLogicalPath)
+	)
+		fail('INVALID_CAPTURE', 'Captured resolved logical path is not canonical.');
+	if (
+		observation.operation === 'CURRENT_DIRECTORY' &&
+		(query.logicalPath !== '.' || observation.resolvedLogicalPath !== '.')
+	)
+		fail('INVALID_CAPTURE', 'Captured current directory is not the repository root.');
+	if (
+		observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
+		result !== (paths.caseSensitive ? 'CASE_SENSITIVE' : 'CASE_INSENSITIVE')
+	)
+		fail('INVALID_CAPTURE', 'Captured case-sensitivity result does not match the path authority.');
+}
+
+function assertCapturedObservationIdentity(
+	observation: Readonly<Record<string, unknown>>,
+	paths: FrozenCompilerPathResolver
+): void {
+	if (
+		typeof observation.id !== 'string' ||
+		typeof observation.resultDigest !== 'string' ||
+		!SHA256.test(observation.resultDigest)
+	)
+		fail('INVALID_CAPTURE', 'Captured observation identity fields are invalid.');
+	const { id: _id, resultDigest: _resultDigest, ...payload } = observation;
+	const expected = finalizeObservation(
+		paths.subject.descriptor.subjectId,
+		payload as CompilerObservationPayload
+	);
+	if (canonicalSemanticJson(expected) !== canonicalSemanticJson(observation))
+		fail('INVALID_CAPTURE', 'Captured observation identity does not bind its exact result.');
+}
+
+function assertCapturedFrozenBytes(
+	bytes: Uint8Array,
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	paths: FrozenCompilerPathResolver
+): void {
+	const artifact = paths.frozenArtifact(query.logicalPath);
+	const authoritative =
+		artifact === undefined ? undefined : readFrozenSubjectArtifact(paths.subject, artifact.path);
+	if (
+		artifact === undefined ||
+		authoritative === undefined ||
+		!bytesReproduceArtifact(authoritative, artifact)
+	)
+		fail('FROZEN_BYTES_UNAVAILABLE', `Frozen bytes are unavailable for ${query.logicalPath}.`);
+	if (
+		observation.contentBytes !== artifact.bytes ||
+		observation.contentSha256 !== artifact.sha256 ||
+		bytes.byteLength !== authoritative.byteLength ||
+		bytes.some((byte, index) => byte !== authoritative[index])
+	)
+		fail(
+			'INVALID_CAPTURE',
+			`Captured frozen bytes do not reproduce the authoritative artifact: ${query.logicalPath}.`
+		);
+}
+
+function validateCapturedPresentBytes(
+	entry: Readonly<Record<string, unknown>>,
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	paths: FrozenCompilerPathResolver
+): Uint8Array {
+	const bytes = inertBytes(entry.bytes, 'CapturedCompilerInput.bytes');
+	if (bytes.byteLength !== observation.contentBytes || sha256(bytes) !== observation.contentSha256)
+		fail('INVALID_CAPTURE', 'Captured bytes do not reproduce the present file observation.');
+	if (observation.byteBudgetClass === 'FROZEN_SUBJECT')
+		assertCapturedFrozenBytes(bytes, observation, query, paths);
+	return bytes;
 }
 
 function validateCapturedEntry(
@@ -2378,12 +2863,7 @@ function validateCapturedEntry(
 ): CapturedCompilerInput {
 	try {
 		const entry = inertRecord(value, 'CapturedCompilerInput', 'INVALID_CAPTURE');
-		if (
-			!Object.keys(entry).every((key) => ['bytes', 'observation', 'query'].includes(key)) ||
-			!Object.hasOwn(entry, 'observation') ||
-			!Object.hasOwn(entry, 'query')
-		)
-			fail('INVALID_CAPTURE', 'CapturedCompilerInput has unknown or missing fields.');
+		assertCapturedEntryFields(entry);
 		const query = normalizeCompilerInputQuery(
 			entry.query,
 			paths,
@@ -2409,130 +2889,13 @@ function validateCapturedEntry(
 			observationAllowedKeys(observation.operation, observation.result),
 			'INVALID_CAPTURE'
 		);
-		const expectedOrigin =
-			query.operation === 'CURRENT_DIRECTORY' || query.operation === 'USE_CASE_SENSITIVE_FILE_NAMES'
-				? 'CONFIGURATION'
-				: paths.recordedOrigin(query.logicalPath);
-		if (
-			observation.operation !== query.operation ||
-			observation.logicalPath !== query.logicalPath ||
-			typeof observation.origin !== 'string' ||
-			!ORIGINS.has(observation.origin as SourceOrigin) ||
-			observation.origin !== expectedOrigin
-		)
-			fail(
-				'INVALID_CAPTURE',
-				'Captured observation does not bind its canonical query and derived origin.'
-			);
-		if (
-			typeof observation.invocationCount !== 'number' ||
-			!Number.isSafeInteger(observation.invocationCount) ||
-			observation.invocationCount < 1
-		)
-			fail('INVALID_CAPTURE', 'Captured observation invocation count is invalid.');
+		assertCapturedObservationBinding(observation, query, paths);
 		const result = observation.result;
-		const validResult =
-			observation.operation === 'READ_FILE' || observation.operation === 'FILE_EXISTS'
-				? ['PRESENT', 'ABSENT'].includes(result)
-				: observation.operation === 'DIRECTORY_EXISTS'
-					? ['DIRECTORY', 'NOT_DIRECTORY'].includes(result)
-					: observation.operation === 'GET_DIRECTORIES' ||
-						  observation.operation === 'READ_DIRECTORY'
-						? ['DIRECTORY', 'NOT_DIRECTORY'].includes(result)
-						: observation.operation === 'REALPATH'
-							? ['RESOLVED', 'ABSENT'].includes(result)
-							: observation.operation === 'CURRENT_DIRECTORY'
-								? result === 'RESOLVED'
-								: observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
-									['CASE_SENSITIVE', 'CASE_INSENSITIVE'].includes(result);
-		if (!validResult)
+		if (!capturedResultIsValidForOperation(observation.operation, result))
 			fail('INVALID_CAPTURE', 'Captured observation result is invalid for its operation.');
-		if (observation.operation === 'READ_DIRECTORY') {
-			const readQuery = query as Extract<CompilerInputQuery, { operation: 'READ_DIRECTORY' }>;
-			for (const key of ['depth', 'excludes', 'extensions', 'includes'] as const)
-				if (canonicalSemanticJson(observation[key]) !== canonicalSemanticJson(readQuery[key]))
-					fail('INVALID_CAPTURE', 'Captured READ_DIRECTORY parameters do not reproduce the query.');
-		}
-		if (observation.operation === 'GET_DIRECTORIES' || observation.operation === 'READ_DIRECTORY') {
-			const entries = inertStringArray(
-				observation.resultEntries,
-				'CapturedCompilerInput.observation.resultEntries',
-				'INVALID_CAPTURE',
-				budgets.maxPathCharacters,
-				budgets.maxDirectoryEntries,
-				deadlineMs,
-				undefined,
-				clock
-			);
-			if (
-				entries.some(
-					(item, index) =>
-						paths.canonicalRecordedLogical(item) !== item ||
-						(index > 0 && entries[index - 1]! >= item)
-				) ||
-				(result === 'NOT_DIRECTORY' && entries.length > 0)
-			)
-				fail('INVALID_CAPTURE', 'Captured directory result entries are not a canonical set.');
-			if (
-				typeof observation.scannedEntries !== 'number' ||
-				!Number.isSafeInteger(observation.scannedEntries) ||
-				observation.scannedEntries < entries.length ||
-				(result === 'NOT_DIRECTORY' && observation.scannedEntries !== 0)
-			)
-				fail('INVALID_CAPTURE', 'Captured scanned-entry evidence is invalid.');
-		}
-		if (observation.operation === 'READ_FILE' && result === 'PRESENT') {
-			const expectedBudgetClass =
-				paths.frozenArtifact(query.logicalPath) === undefined
-					? 'LIVE_COMPILER_CONTEXT'
-					: 'FROZEN_SUBJECT';
-			if (
-				observation.byteBudgetClass !== expectedBudgetClass ||
-				typeof observation.contentBytes !== 'number' ||
-				!Number.isSafeInteger(observation.contentBytes) ||
-				observation.contentBytes < 0 ||
-				typeof observation.contentSha256 !== 'string' ||
-				!SHA256.test(observation.contentSha256)
-			)
-				fail('INVALID_CAPTURE', 'Captured present file metadata or byte-budget class is invalid.');
-		}
-		if (
-			(observation.operation === 'REALPATH' || observation.operation === 'CURRENT_DIRECTORY') &&
-			result === 'RESOLVED'
-		) {
-			if (
-				typeof observation.resolvedLogicalPath !== 'string' ||
-				paths.canonicalRecordedLogical(observation.resolvedLogicalPath) !==
-					observation.resolvedLogicalPath
-			)
-				fail('INVALID_CAPTURE', 'Captured resolved logical path is not canonical.');
-		}
-		if (
-			observation.operation === 'CURRENT_DIRECTORY' &&
-			(query.logicalPath !== '.' || observation.resolvedLogicalPath !== '.')
-		)
-			fail('INVALID_CAPTURE', 'Captured current directory is not the repository root.');
-		if (
-			observation.operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
-			result !== (paths.caseSensitive ? 'CASE_SENSITIVE' : 'CASE_INSENSITIVE')
-		)
-			fail(
-				'INVALID_CAPTURE',
-				'Captured case-sensitivity result does not match the path authority.'
-			);
-		if (
-			typeof observation.id !== 'string' ||
-			typeof observation.resultDigest !== 'string' ||
-			!SHA256.test(observation.resultDigest)
-		)
-			fail('INVALID_CAPTURE', 'Captured observation identity fields are invalid.');
-		const { id: _id, resultDigest: _resultDigest, ...payload } = observation;
-		const expected = finalizeObservation(
-			paths.subject.descriptor.subjectId,
-			payload as CompilerObservationPayload
-		);
-		if (canonicalSemanticJson(expected) !== canonicalSemanticJson(observation))
-			fail('INVALID_CAPTURE', 'Captured observation identity does not bind its exact result.');
+		assertCapturedOperationEvidence(observation, query, result, paths, budgets, deadlineMs, clock);
+		assertCapturedResolvedPaths(observation, query, result, paths);
+		assertCapturedObservationIdentity(observation, paths);
 		const presentRead = observation.operation === 'READ_FILE' && result === 'PRESENT';
 		exactKeys(
 			entry,
@@ -2540,47 +2903,13 @@ function validateCapturedEntry(
 			presentRead ? ['bytes', 'observation', 'query'] : ['observation', 'query'],
 			'INVALID_CAPTURE'
 		);
-		if (presentRead) {
-			const bytes = inertBytes(entry.bytes, 'CapturedCompilerInput.bytes');
-			if (
-				bytes.byteLength !== observation.contentBytes ||
-				sha256(bytes) !== observation.contentSha256
-			)
-				fail('INVALID_CAPTURE', 'Captured bytes do not reproduce the present file observation.');
-			if (observation.byteBudgetClass === 'FROZEN_SUBJECT') {
-				const artifact = paths.frozenArtifact(query.logicalPath);
-				const authoritative =
-					artifact === undefined
-						? undefined
-						: readFrozenSubjectArtifact(paths.subject, artifact.path);
-				if (
-					artifact === undefined ||
-					authoritative === undefined ||
-					authoritative.byteLength !== artifact.bytes ||
-					sha256(authoritative) !== artifact.sha256
-				)
-					fail(
-						'FROZEN_BYTES_UNAVAILABLE',
-						`Frozen bytes are unavailable for ${query.logicalPath}.`
-					);
-				if (
-					observation.contentBytes !== artifact.bytes ||
-					observation.contentSha256 !== artifact.sha256 ||
-					bytes.byteLength !== authoritative.byteLength ||
-					bytes.some((byte, index) => byte !== authoritative[index])
-				)
-					fail(
-						'INVALID_CAPTURE',
-						`Captured frozen bytes do not reproduce the authoritative artifact: ${query.logicalPath}.`
-					);
-			}
+		if (!presentRead)
 			return cloneCaptured({
-				bytes,
 				observation: observation as unknown as CompilerInputObservation,
 				query
 			});
-		}
 		return cloneCaptured({
+			bytes: validateCapturedPresentBytes(entry, observation, query, paths),
 			observation: observation as unknown as CompilerInputObservation,
 			query
 		});
@@ -2593,6 +2922,55 @@ function validateCapturedEntry(
 
 interface ValidatedJournal {
 	readonly entries: readonly CapturedCompilerInput[];
+}
+
+interface JournalEntryTotals {
+	invocationCount: number;
+	scannedEntries: number;
+}
+
+type LiveContextReadObservation = Extract<
+	CompilerInputObservation,
+	{ operation: 'READ_FILE'; result: 'PRESENT' }
+>;
+
+function observationScannedEntries(observation: CompilerInputObservation): number {
+	return 'scannedEntries' in observation ? observation.scannedEntries : 0;
+}
+
+function accumulateJournalEntryTotals(
+	entry: CapturedCompilerInput,
+	totals: JournalEntryTotals,
+	budgets: SemanticBudgets
+): void {
+	totals.invocationCount += entry.observation.invocationCount;
+	if (
+		!Number.isSafeInteger(totals.invocationCount) ||
+		totals.invocationCount > budgets.maxCompilerQueryInvocations
+	)
+		fail('BUDGET_EXCEEDED', 'Compiler input journal exceeds its query-invocation budget.');
+	totals.scannedEntries += observationScannedEntries(entry.observation);
+	if (
+		!Number.isSafeInteger(totals.scannedEntries) ||
+		totals.scannedEntries > budgets.maxDirectoryEntries
+	)
+		fail('BUDGET_EXCEEDED', 'Compiler input journal exceeds its scanned-directory-entry budget.');
+}
+
+function noteJournalLiveContextRead(
+	entry: CapturedCompilerInput,
+	liveReads: Map<string, LiveContextReadObservation>,
+	budgets: SemanticBudgets
+): void {
+	if (
+		entry.observation.operation !== 'READ_FILE' ||
+		entry.observation.result !== 'PRESENT' ||
+		entry.observation.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT'
+	)
+		return;
+	if (entry.observation.contentBytes > budgets.maxContextFileBytes)
+		fail('BUDGET_EXCEEDED', 'Compiler input journal contains an oversized live-context file.');
+	liveReads.set(entry.observation.logicalPath, entry.observation);
 }
 
 function validateJournalEntries(
@@ -2612,12 +2990,8 @@ function validateJournalEntries(
 	);
 	const entries: CapturedCompilerInput[] = [];
 	const queryKeys = new Set<string>();
-	const liveReads = new Map<
-		string,
-		Extract<CompilerInputObservation, { operation: 'READ_FILE'; result: 'PRESENT' }>
-	>();
-	let invocationCount = 0;
-	let scannedEntries = 0;
+	const liveReads = new Map<string, LiveContextReadObservation>();
+	const totals: JournalEntryTotals = { invocationCount: 0, scannedEntries: 0 };
 	for (const value of values) {
 		checkDeadline({ clock, deadlineMs });
 		const entry = validateCapturedEntry(value, paths, budgets, deadlineMs, clock);
@@ -2628,24 +3002,8 @@ function validateJournalEntries(
 				`Compiler input journal contains duplicate query ${entry.query.operation} ${entry.query.logicalPath}.`
 			);
 		queryKeys.add(key);
-		invocationCount += entry.observation.invocationCount;
-		if (
-			!Number.isSafeInteger(invocationCount) ||
-			invocationCount > budgets.maxCompilerQueryInvocations
-		)
-			fail('BUDGET_EXCEEDED', 'Compiler input journal exceeds its query-invocation budget.');
-		scannedEntries += 'scannedEntries' in entry.observation ? entry.observation.scannedEntries : 0;
-		if (!Number.isSafeInteger(scannedEntries) || scannedEntries > budgets.maxDirectoryEntries)
-			fail('BUDGET_EXCEEDED', 'Compiler input journal exceeds its scanned-directory-entry budget.');
-		if (
-			entry.observation.operation === 'READ_FILE' &&
-			entry.observation.result === 'PRESENT' &&
-			entry.observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT'
-		) {
-			if (entry.observation.contentBytes > budgets.maxContextFileBytes)
-				fail('BUDGET_EXCEEDED', 'Compiler input journal contains an oversized live-context file.');
-			liveReads.set(entry.observation.logicalPath, entry.observation);
-		}
+		accumulateJournalEntryTotals(entry, totals, budgets);
+		noteJournalLiveContextRead(entry, liveReads, budgets);
 		entries.push(entry);
 		checkDeadline({ clock, deadlineMs });
 	}
@@ -2659,7 +3017,7 @@ function validateJournalEntries(
 		fail('BUDGET_EXCEEDED', 'Compiler input journal exceeds its live-context byte budget.');
 	const observations = entries
 		.map((entry) => entry.observation)
-		.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+		.sort((left, right) => compareText(left.id, right.id));
 	if (
 		Buffer.byteLength(canonicalSemanticJson(observations), 'utf8') >
 		budgets.maxCompilerInputMetadataBytes
@@ -2831,6 +3189,107 @@ function borrowedVerifiedProjectInputEntry(
 	});
 }
 
+interface AttributedCompilerEntry {
+	readonly entry: CapturedCompilerInput;
+	readonly invocationCount: number;
+	readonly query: CompilerInputQuery;
+}
+
+function indexVerifiedCaptureEntryBuckets(
+	entries: readonly CapturedCompilerInput[]
+): Map<string, CapturedCompilerInput[]> {
+	const entriesByQueryBucket = new Map<string, CapturedCompilerInput[]>();
+	for (const entry of entries) {
+		const bucketKey = verifiedCompilerInputQueryBucketKey(entry.query);
+		const bucket = entriesByQueryBucket.get(bucketKey) ?? [];
+		if (exactVerifiedCompilerInputQueryBucketEntry(bucket, entry.query) !== undefined)
+			fail('INVALID_CAPTURE', 'Verified compiler capture repeats an exact compiler query.');
+		bucket.push(entry);
+		entriesByQueryBucket.set(bucketKey, bucket);
+	}
+	return entriesByQueryBucket;
+}
+
+function verifiedProjectAttributionBinds(
+	attribution: CompilerProjectAttribution,
+	projectBinding: VerifiedCompilerProjectInputProjectionBinding
+): boolean {
+	return (
+		attribution.materializedRecipeDigest === projectBinding.materializedRecipeDigest &&
+		attribution.projectResolutionDigest === projectBinding.projectResolutionDigest &&
+		canonicalSemanticJson(attribution.contextInputIds) ===
+			canonicalSemanticJson(projectBinding.contextInputIds)
+	);
+}
+
+function requireVerifiedProjectAttribution(
+	attributionsByProject: ReadonlyMap<string, CompilerProjectAttribution>,
+	projectBinding: VerifiedCompilerProjectInputProjectionBinding
+): CompilerProjectAttribution {
+	const attribution = attributionsByProject.get(projectBinding.configPath);
+	if (attribution !== undefined && verifiedProjectAttributionBinds(attribution, projectBinding))
+		return attribution;
+	return fail(
+		'INVALID_CAPTURE',
+		`Verified compiler capture does not reproduce project attribution ${projectBinding.configPath}.`
+	);
+}
+
+function assertVerifiedProjectProgramContext(
+	contextIds: ReadonlySet<SemanticContextInputId>,
+	observationsById: ReadonlyMap<SemanticContextInputId, CompilerInputObservation>,
+	projectBinding: VerifiedCompilerProjectInputProjectionBinding
+): void {
+	const projectObservations: CompilerInputObservation[] = [];
+	for (const id of contextIds) {
+		const observation = observationsById.get(id);
+		if (observation !== undefined) projectObservations.push(observation);
+	}
+	if (
+		projectObservations.length !== contextIds.size ||
+		compilerInputClosureDigest(projectObservations) !== projectBinding.programContextDigest
+	)
+		fail(
+			'INVALID_CAPTURE',
+			`Verified compiler capture does not reproduce program context ${projectBinding.configPath}.`
+		);
+}
+
+function indexAttributedEntryBuckets(
+	attribution: CompilerProjectAttribution,
+	entriesByQueryBucket: ReadonlyMap<string, CapturedCompilerInput[]>,
+	configPath: string
+): Map<string, AttributedCompilerEntry[]> {
+	const attributedEntryBuckets = new Map<string, AttributedCompilerEntry[]>();
+	for (const queryAttribution of attribution.queryInvocations) {
+		const bucketKey = verifiedCompilerInputQueryBucketKey(queryAttribution.query);
+		const entry = exactVerifiedCompilerInputQueryBucketEntry(
+			entriesByQueryBucket.get(bucketKey),
+			queryAttribution.query
+		);
+		if (entry === undefined)
+			fail(
+				'INVALID_CAPTURE',
+				`Verified project attribution references an absent compiler query ${configPath}.`
+			);
+		const bucket = attributedEntryBuckets.get(bucketKey) ?? [];
+		if (exactVerifiedCompilerInputQueryBucketEntry(bucket, queryAttribution.query) !== undefined)
+			fail(
+				'INVALID_CAPTURE',
+				`Verified project attribution repeats a compiler query ${configPath}.`
+			);
+		bucket.push(
+			Object.freeze({
+				entry,
+				invocationCount: queryAttribution.invocationCount,
+				query: entry.query
+			})
+		);
+		attributedEntryBuckets.set(bucketKey, bucket);
+	}
+	return attributedEntryBuckets;
+}
+
 /**
  * @internal Opens project-scoped, non-consuming views after proving the shared capture/snapshot
  * closure once. Global observations and queries are indexed once; each project then traverses only
@@ -2849,15 +3308,7 @@ export function createVerifiedCompilerProjectInputLookupSet(
 	const observationsById = new Map(
 		state.observations.map((observation) => [observation.id, observation] as const)
 	);
-	const entriesByQueryBucket = new Map<string, CapturedCompilerInput[]>();
-	for (const entry of state.entries) {
-		const bucketKey = verifiedCompilerInputQueryBucketKey(entry.query);
-		const bucket = entriesByQueryBucket.get(bucketKey) ?? [];
-		if (exactVerifiedCompilerInputQueryBucketEntry(bucket, entry.query) !== undefined)
-			fail('INVALID_CAPTURE', 'Verified compiler capture repeats an exact compiler query.');
-		bucket.push(entry);
-		entriesByQueryBucket.set(bucketKey, bucket);
-	}
+	const entriesByQueryBucket = indexVerifiedCaptureEntryBuckets(state.entries);
 	const lookupLimits = Object.freeze({
 		deadlineMs: Number.MAX_SAFE_INTEGER,
 		maxDirectoryEntries: state.budgets.maxDirectoryEntries,
@@ -2873,77 +3324,21 @@ export function createVerifiedCompilerProjectInputLookupSet(
 				`Verified compiler lookup binding repeats project ${projectBinding.configPath}.`
 			);
 		opened.add(projectBinding.configPath);
-		const attribution = attributionsByProject.get(projectBinding.configPath);
-		if (
-			attribution === undefined ||
-			attribution.materializedRecipeDigest !== projectBinding.materializedRecipeDigest ||
-			attribution.projectResolutionDigest !== projectBinding.projectResolutionDigest ||
-			canonicalSemanticJson(attribution.contextInputIds) !==
-				canonicalSemanticJson(projectBinding.contextInputIds)
-		)
-			fail(
-				'INVALID_CAPTURE',
-				`Verified compiler capture does not reproduce project attribution ${projectBinding.configPath}.`
-			);
-		const contextIds = new Set(attribution.contextInputIds);
-		const projectObservations: CompilerInputObservation[] = [];
-		for (const id of contextIds) {
-			const observation = observationsById.get(id);
-			if (observation !== undefined) projectObservations.push(observation);
-		}
-		if (
-			projectObservations.length !== contextIds.size ||
-			compilerInputClosureDigest(projectObservations) !== projectBinding.programContextDigest
-		)
-			fail(
-				'INVALID_CAPTURE',
-				`Verified compiler capture does not reproduce program context ${projectBinding.configPath}.`
-			);
-
-		const attributedEntryBuckets = new Map<
-			string,
-			Array<{
-				readonly entry: CapturedCompilerInput;
-				readonly invocationCount: number;
-				readonly query: CompilerInputQuery;
-			}>
-		>();
-		for (const queryAttribution of attribution.queryInvocations) {
-			const bucketKey = verifiedCompilerInputQueryBucketKey(queryAttribution.query);
-			const entry = exactVerifiedCompilerInputQueryBucketEntry(
-				entriesByQueryBucket.get(bucketKey),
-				queryAttribution.query
-			);
-			if (entry === undefined)
-				fail(
-					'INVALID_CAPTURE',
-					`Verified project attribution references an absent compiler query ${projectBinding.configPath}.`
-				);
-			const bucket = attributedEntryBuckets.get(bucketKey) ?? [];
-			if (exactVerifiedCompilerInputQueryBucketEntry(bucket, queryAttribution.query) !== undefined)
-				fail(
-					'INVALID_CAPTURE',
-					`Verified project attribution repeats a compiler query ${projectBinding.configPath}.`
-				);
-			bucket.push(
-				Object.freeze({
-					entry,
-					invocationCount: queryAttribution.invocationCount,
-					query: entry.query
-				})
-			);
-			attributedEntryBuckets.set(bucketKey, bucket);
-		}
+		const attribution = requireVerifiedProjectAttribution(attributionsByProject, projectBinding);
+		assertVerifiedProjectProgramContext(
+			new Set(attribution.contextInputIds),
+			observationsById,
+			projectBinding
+		);
+		const attributedEntryBuckets = indexAttributedEntryBuckets(
+			attribution,
+			entriesByQueryBucket,
+			projectBinding.configPath
+		);
 		const locateAttributed = (
 			queryValue: CompilerInputQuery,
 			onProgress?: () => void
-		):
-			| {
-					readonly entry: CapturedCompilerInput;
-					readonly invocationCount: number;
-					readonly query: CompilerInputQuery;
-			  }
-			| undefined => {
+		): AttributedCompilerEntry | undefined => {
 			onProgress?.();
 			const query = normalizeCompilerInputQuery(queryValue, state.paths, {
 				...lookupLimits,
@@ -3049,8 +3444,12 @@ function compilerInputOperationBudgetEvidence(
 	phase: 'CAPTURE' | 'RECHECK',
 	queryAttributions: readonly CompilerProjectAttribution[]
 ): CompilerInputOperationBudgetEvidence {
-	const projects = state.projectAttributions.map((attribution) => attribution.projectKey).sort();
-	const compilerInputs = state.entries.map((entry) => compilerInputQueryKey(entry.query)).sort();
+	const projects = state.projectAttributions
+		.map((attribution) => attribution.projectKey)
+		.sort(compareText);
+	const compilerInputs = state.entries
+		.map((entry) => compilerInputQueryKey(entry.query))
+		.sort(compareText);
 	const liveContext = state.observations
 		.filter(
 			(
@@ -3063,14 +3462,14 @@ function compilerInputOperationBudgetEvidence(
 				observation.result === 'PRESENT' &&
 				observation.byteBudgetClass === 'LIVE_COMPILER_CONTEXT'
 		)
-		.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+		.sort((left, right) => compareText(left.id, right.id));
 	const directoryContributions = state.observations
 		.flatMap((observation) =>
 			'scannedEntries' in observation && observation.scannedEntries > 0
 				? [{ amount: observation.scannedEntries, key: observation.id }]
 				: []
 		)
-		.sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0));
+		.sort((left, right) => compareText(left.key, right.key));
 	const populationClaims: readonly SemanticOperationPopulationClaimInput[] = [
 		{ members: projects, mode: 'COUNT', phase, population: 'PROJECTS' },
 		{ members: compilerInputs, mode: 'COUNT', phase, population: 'COMPILER_INPUTS' },
@@ -3118,8 +3517,7 @@ function compilerInputOperationBudgetEvidence(
 		)
 		.sort(
 			(left, right) =>
-				(left.projectKey < right.projectKey ? -1 : left.projectKey > right.projectKey ? 1 : 0) ||
-				(left.queryKey < right.queryKey ? -1 : left.queryKey > right.queryKey ? 1 : 0)
+				compareText(left.projectKey, right.projectKey) || compareText(left.queryKey, right.queryKey)
 		);
 	return freezeWire(
 		structuredClone({ phase, populationClaims, queryCharges })
@@ -3213,7 +3611,7 @@ function validateFinalizedState(
 	checkDeadline({ clock: state.clock, deadlineMs });
 	const observations = entries
 		.map((entry) => entry.observation)
-		.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+		.sort((left, right) => compareText(left.id, right.id));
 	if (
 		canonicalSemanticJson(observations) !== canonicalSemanticJson(state.observations) ||
 		state.closureDigest !== compilerInputClosureDigest(observations)
@@ -3253,7 +3651,7 @@ function validateFinalizedState(
 			expectedIds.add(entry.observation.id);
 			totals.set(key, (totals.get(key) ?? 0) + record.invocationCount);
 		}
-		const expectedContextInputIds = [...expectedIds].sort();
+		const expectedContextInputIds = [...expectedIds].sort(compareText);
 		if (
 			canonicalSemanticJson(expectedContextInputIds) !==
 			canonicalSemanticJson(attribution.contextInputIds)
@@ -3454,11 +3852,7 @@ export class ReplayCompilerInputJournal {
 		const expected = this.expectedAttributions.find(
 			(attribution) => attribution.projectKey === projectKey
 		);
-		if (
-			expected === undefined ||
-			expected.projectResolutionDigest !== identity.projectResolutionDigest ||
-			expected.materializedRecipeDigest !== identity.materializedRecipeDigest
-		)
+		if (expected === undefined || !attributionBindsRecipeIdentity(expected, identity))
 			fail(
 				'INVALID_CAPTURE',
 				`Replay compiler recipe identity does not reproduce capture for ${projectKey}.`

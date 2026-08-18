@@ -180,7 +180,8 @@ function independentCanonicalJson(value: unknown): string {
 			}
 			const keys = Reflect.ownKeys(container) as string[];
 			const members: string[] = [];
-			for (const key of keys.sort(compareText))
+			keys.sort(compareText);
+			for (const key of keys)
 				members.push(
 					`${JSON.stringify(key)}:${encode(Reflect.getOwnPropertyDescriptor(container, key)!.value)}`
 				);
@@ -379,143 +380,222 @@ function closeOptions(
 	return result as unknown as ClosedOptions;
 }
 
+type TreeLimits = Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>;
+
+interface TreeWalkCounters {
+	characters: number;
+	records: number;
+}
+
+type TreeVisitFrame = {
+	readonly depth: number;
+	readonly path: string;
+	readonly state: 'VISIT';
+	readonly value: unknown;
+};
+
+type TreeFrame = TreeVisitFrame | { readonly state: 'LEAVE'; readonly value: object };
+
+/** Decides whether a string leaf is admissible, charging it to the character budget. */
+function treeStringIssue(
+	text: string,
+	path: string,
+	limits: TreeLimits,
+	counters: TreeWalkCounters
+): LogicalGraphCompositionValidationIssue | null {
+	if (!isUnicodeScalarString(text))
+		return issue('SHAPE_INVALID', 'Strings must contain Unicode scalar text.', path);
+	counters.characters += text.length;
+	if (counters.characters > limits.maxStringCharacters)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor string-character budget was exhausted.', path);
+	return null;
+}
+
+/** Decides whether a non-null value is a directly acceptable scalar leaf. */
+function isImmediateTreeScalar(value: unknown): boolean {
+	return (
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	);
+}
+
+/** Decides whether a container may be traversed at all. */
+function treeContainerIssue(
+	container: object,
+	path: string,
+	active: WeakSet<object>
+): LogicalGraphCompositionValidationIssue | null {
+	if (isProxyValue(container))
+		return issue('SHAPE_INVALID', 'Proxy values are not accepted.', path);
+	if (active.has(container)) return issue('SHAPE_INVALID', 'Cyclic data is not accepted.', path);
+	const array = Array.isArray(container);
+	const prototype = Reflect.getPrototypeOf(container);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return issue('SHAPE_INVALID', 'Containers must have ordinary prototypes.', path);
+	return null;
+}
+
+/** Charges every own property key of a container to the character budget. */
+function treeKeyCharacterIssue(
+	keys: readonly PropertyKey[],
+	array: boolean,
+	path: string,
+	limits: TreeLimits,
+	counters: TreeWalkCounters
+): LogicalGraphCompositionValidationIssue | null {
+	for (const key of keys) {
+		if (typeof key !== 'string' || (array && key === 'length')) continue;
+		counters.characters += key.length;
+		if (counters.characters > limits.maxStringCharacters)
+			return issue(
+				'BUDGET_EXHAUSTED',
+				'The descriptor string-character budget was exhausted by a property key.',
+				path
+			);
+	}
+	return null;
+}
+
+/** Decides whether an array carries exactly its dense index keys and nothing else. */
+function denseArrayIssue(
+	keys: readonly PropertyKey[],
+	length: number,
+	path: string
+): LogicalGraphCompositionValidationIssue | null {
+	if (keys.length !== length + 1)
+		return issue('SHAPE_INVALID', 'Arrays must be dense ordinary arrays.', path);
+	if (
+		keys.some((key) => {
+			if (typeof key !== 'string') return true;
+			if (key === 'length') return false;
+			if (!/^(0|[1-9]\d*)$/u.test(key)) return true;
+			const numericIndex = Number(key);
+			return (
+				!Number.isSafeInteger(numericIndex) ||
+				numericIndex < 0 ||
+				numericIndex >= length ||
+				String(numericIndex) !== key
+			);
+		})
+	)
+		return issue('SHAPE_INVALID', 'Arrays must be dense without extra properties.', path);
+	return null;
+}
+
+/** Enqueues one VISIT frame per child in reverse key order so children are popped in key order. */
+function pushChildFramesIssue(
+	frame: TreeVisitFrame,
+	container: object,
+	keys: readonly PropertyKey[],
+	array: boolean,
+	pending: TreeFrame[]
+): LogicalGraphCompositionValidationIssue | null {
+	for (let index = keys.length - 1; index >= 0; index -= 1) {
+		const key = keys[index] as string;
+		if (!isUnicodeScalarString(key))
+			return issue('SHAPE_INVALID', 'Property keys must contain Unicode scalar text.', frame.path);
+		if (array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(container, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			return issue(
+				'SHAPE_INVALID',
+				'Properties must be enumerable data properties.',
+				`${frame.path}.${key}`
+			);
+		pending.push({
+			depth: frame.depth + 1,
+			path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
+			state: 'VISIT',
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+/** Charges a container's population, marks it active, and enqueues its children. */
+function traverseContainerIssue(
+	frame: TreeVisitFrame,
+	container: object,
+	limits: TreeLimits,
+	counters: TreeWalkCounters,
+	active: WeakSet<object>,
+	pending: TreeFrame[]
+): LogicalGraphCompositionValidationIssue | null {
+	const array = Array.isArray(container);
+	let arrayLength: number | null = null;
+	let keys: readonly PropertyKey[];
+	if (array) {
+		arrayLength = Reflect.getOwnPropertyDescriptor(container, 'length')!.value as number;
+		if (arrayLength > limits.maxRecords - counters.records)
+			return issue(
+				'BUDGET_EXHAUSTED',
+				'The descriptor record budget was exhausted by an array population.',
+				frame.path
+			);
+		keys = Reflect.ownKeys(container);
+	} else keys = Reflect.ownKeys(container);
+	if (keys.some((key) => typeof key !== 'string'))
+		return issue('SHAPE_INVALID', 'Symbol keys are not accepted.', frame.path);
+	const keyCharacterIssue = treeKeyCharacterIssue(keys, array, frame.path, limits, counters);
+	if (keyCharacterIssue !== null) return keyCharacterIssue;
+	if (array) {
+		const arrayIssue = denseArrayIssue(keys, arrayLength!, frame.path);
+		if (arrayIssue !== null) return arrayIssue;
+	}
+	if (!array && keys.length > limits.maxRecords - counters.records)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by a property population.',
+			frame.path
+		);
+	active.add(container);
+	pending.push({ state: 'LEAVE', value: container });
+	return pushChildFramesIssue(frame, container, keys, array, pending);
+}
+
+/** Decides one pending VISIT frame, charging budgets and enqueueing any children. */
+function visitFrameIssue(
+	frame: TreeVisitFrame,
+	limits: TreeLimits,
+	counters: TreeWalkCounters,
+	active: WeakSet<object>,
+	pending: TreeFrame[]
+): LogicalGraphCompositionValidationIssue | null {
+	counters.records += 1;
+	if (counters.records > limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
+	if (frame.depth > limits.maxDepth)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
+	if (typeof frame.value === 'string')
+		return treeStringIssue(frame.value, frame.path, limits, counters);
+	if (frame.value === null || isImmediateTreeScalar(frame.value)) return null;
+	if (typeof frame.value !== 'object')
+		return issue('SHAPE_INVALID', 'Only JSON-compatible data values are accepted.', frame.path);
+	const containerIssue = treeContainerIssue(frame.value, frame.path, active);
+	if (containerIssue !== null) return containerIssue;
+	return traverseContainerIssue(frame, frame.value, limits, counters, active, pending);
+}
+
 /** Descriptor-only traversal: no getter, iterator, toJSON, or user callback can run. */
 function plainTreeIssue(
 	value: unknown,
-	limits: Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>,
+	limits: TreeLimits,
 	rootPath: string
 ): LogicalGraphCompositionValidationIssue | null {
-	type Frame =
-		| {
-				readonly depth: number;
-				readonly path: string;
-				readonly state: 'VISIT';
-				readonly value: unknown;
-		  }
-		| { readonly state: 'LEAVE'; readonly value: object };
-	const pending: Frame[] = [{ depth: 0, path: rootPath, state: 'VISIT', value }];
+	const pending: TreeFrame[] = [{ depth: 0, path: rootPath, state: 'VISIT', value }];
 	const active = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
+	const counters: TreeWalkCounters = { characters: 0, records: 0 };
 	while (pending.length > 0) {
 		const frame = pending.pop()!;
 		if (frame.state === 'LEAVE') {
 			active.delete(frame.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxRecords)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
-		if (frame.depth > limits.maxDepth)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
-		if (typeof frame.value === 'string') {
-			if (!isUnicodeScalarString(frame.value))
-				return issue('SHAPE_INVALID', 'Strings must contain Unicode scalar text.', frame.path);
-			characters += frame.value.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted.',
-					frame.path
-				);
-			continue;
-		}
-		if (
-			frame.value === null ||
-			typeof frame.value === 'boolean' ||
-			(typeof frame.value === 'number' &&
-				Number.isSafeInteger(frame.value) &&
-				!Object.is(frame.value, -0))
-		)
-			continue;
-		if (typeof frame.value !== 'object')
-			return issue('SHAPE_INVALID', 'Only JSON-compatible data values are accepted.', frame.path);
-		if (isProxyValue(frame.value))
-			return issue('SHAPE_INVALID', 'Proxy values are not accepted.', frame.path);
-		if (active.has(frame.value))
-			return issue('SHAPE_INVALID', 'Cyclic data is not accepted.', frame.path);
-		const array = Array.isArray(frame.value);
-		const prototype = Reflect.getPrototypeOf(frame.value);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return issue('SHAPE_INVALID', 'Containers must have ordinary prototypes.', frame.path);
-		let arrayLength: number | null = null;
-		let keys: readonly PropertyKey[];
-		if (array) {
-			arrayLength = Reflect.getOwnPropertyDescriptor(frame.value, 'length')!.value as number;
-			if (arrayLength > limits.maxRecords - records)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor record budget was exhausted by an array population.',
-					frame.path
-				);
-			keys = Reflect.ownKeys(frame.value);
-		} else keys = Reflect.ownKeys(frame.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			return issue('SHAPE_INVALID', 'Symbol keys are not accepted.', frame.path);
-		for (const key of keys) {
-			if (typeof key !== 'string' || (array && key === 'length')) continue;
-			characters += key.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted by a property key.',
-					frame.path
-				);
-		}
-		if (array) {
-			const length = arrayLength!;
-			if (keys.length !== length + 1)
-				return issue('SHAPE_INVALID', 'Arrays must be dense ordinary arrays.', frame.path);
-			if (
-				keys.some((key) => {
-					if (typeof key !== 'string') return true;
-					if (key === 'length') return false;
-					if (!/^(0|[1-9][0-9]*)$/u.test(key)) return true;
-					const numericIndex = Number(key);
-					return (
-						!Number.isSafeInteger(numericIndex) ||
-						numericIndex < 0 ||
-						numericIndex >= length ||
-						String(numericIndex) !== key
-					);
-				})
-			)
-				return issue('SHAPE_INVALID', 'Arrays must be dense without extra properties.', frame.path);
-		}
-		if (!array && keys.length > limits.maxRecords - records)
-			return issue(
-				'BUDGET_EXHAUSTED',
-				'The descriptor record budget was exhausted by a property population.',
-				frame.path
-			);
-		active.add(frame.value);
-		pending.push({ state: 'LEAVE', value: frame.value });
-		for (let index = keys.length - 1; index >= 0; index -= 1) {
-			const key = keys[index] as string;
-			if (!isUnicodeScalarString(key))
-				return issue(
-					'SHAPE_INVALID',
-					'Property keys must contain Unicode scalar text.',
-					frame.path
-				);
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				return issue(
-					'SHAPE_INVALID',
-					'Properties must be enumerable data properties.',
-					`${frame.path}.${key}`
-				);
-			pending.push({
-				depth: frame.depth + 1,
-				path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
-				state: 'VISIT',
-				value: descriptor.value
-			});
-		}
+		const frameIssue = visitFrameIssue(frame, limits, counters, active, pending);
+		if (frameIssue !== null) return frameIssue;
 	}
 	return null;
 }
@@ -972,6 +1052,67 @@ function deriveComposition(
 	};
 }
 
+/** Re-codes an input-wrapper tree issue as an input issue unless it is a budget exhaustion. */
+function inputWrapperTreeIssue(
+	inputsValue: unknown,
+	limits: TreeLimits
+): LogicalGraphCompositionValidationIssue | null {
+	const treeIssue = plainTreeIssue(inputsValue, limits, '$inputs');
+	if (treeIssue === null) return null;
+	return treeIssue.code === 'BUDGET_EXHAUSTED'
+		? treeIssue
+		: { ...treeIssue, code: 'INPUT_INVALID' };
+}
+
+/** Decides whether both predecessor graphs are independently valid, module-dependency first. */
+function predecessorValidationIssue(
+	inputs: LogicalGraphCompositionInputs,
+	maxIssues: number
+): LogicalGraphCompositionValidationIssue | null {
+	const moduleValidation = validateModuleDependencyGraph(
+		inputs.moduleDependencyGraph,
+		inputs.semanticSnapshot,
+		{ maxIssues }
+	);
+	if (moduleValidation.state !== 'VALID')
+		return issue(
+			'INPUT_INVALID',
+			'The module-dependency predecessor is not independently valid.',
+			'$inputs.moduleDependencyGraph'
+		);
+	const callValidation = validateCallGraph(inputs.callGraph, inputs.semanticSnapshot, {
+		maxIssues
+	});
+	if (callValidation.state !== 'VALID')
+		return issue(
+			'INPUT_INVALID',
+			'The call predecessor is not independently valid.',
+			'$inputs.callGraph'
+		);
+	return null;
+}
+
+/** Decides whether the candidate reproduces the independently derived composition exactly. */
+function candidateAgreementIssue(
+	candidate: LogicalGraphCompositionSnapshot,
+	expected: LogicalGraphCompositionSnapshot
+): LogicalGraphCompositionValidationIssue | null {
+	if (candidate.inputDigest !== expected.inputDigest || candidate.id !== expected.id)
+		return issue('IDENTITY_MISMATCH', 'The composition identity does not reproduce.', '$.id');
+	if (candidate.contentDigest !== independentContentDigest(candidate))
+		return issue(
+			'CONTENT_DIGEST_MISMATCH',
+			'The composition content digest is invalid.',
+			'$.contentDigest'
+		);
+	if (independentCanonicalJson(candidate) !== independentCanonicalJson(expected))
+		return issue(
+			'POPULATION_MISMATCH',
+			'The candidate differs from the independently derived logical graph composition.'
+		);
+	return null;
+}
+
 function validateInternal(
 	value: unknown,
 	inputsValue: unknown,
@@ -991,21 +1132,12 @@ function validateInternal(
 	if (shellIssue !== null) return invalid(shellIssue);
 
 	// Inspect the entire wrapper under caller limits before reading even the nested request budgets.
-	const broadInputTreeIssue = plainTreeIssue(
-		inputsValue,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: limits.maxInputRecords,
-			maxStringCharacters: limits.maxInputStringCharacters
-		},
-		'$inputs'
-	);
-	if (broadInputTreeIssue !== null)
-		return invalid(
-			broadInputTreeIssue.code === 'BUDGET_EXHAUSTED'
-				? broadInputTreeIssue
-				: { ...broadInputTreeIssue, code: 'INPUT_INVALID' }
-		);
+	const broadInputTreeIssue = inputWrapperTreeIssue(inputsValue, {
+		maxDepth: limits.maxDepth,
+		maxRecords: limits.maxInputRecords,
+		maxStringCharacters: limits.maxInputStringCharacters
+	});
+	if (broadInputTreeIssue !== null) return invalid(broadInputTreeIssue);
 	const inputs = inputsValue as LogicalGraphCompositionInputs;
 	const closedRequestIssue = requestIssue(inputs);
 	if (closedRequestIssue !== null) return invalid(closedRequestIssue);
@@ -1020,68 +1152,21 @@ function validateInternal(
 			inputs.request.budgets.maxInputStringCharacters
 		)
 	};
-	const inputTreeIssue = plainTreeIssue(inputsValue, inputLimits, '$inputs');
-	if (inputTreeIssue !== null)
-		return invalid(
-			inputTreeIssue.code === 'BUDGET_EXHAUSTED'
-				? inputTreeIssue
-				: { ...inputTreeIssue, code: 'INPUT_INVALID' }
-		);
+	const inputTreeIssue = inputWrapperTreeIssue(inputsValue, inputLimits);
+	if (inputTreeIssue !== null) return invalid(inputTreeIssue);
 	const budgetIssue = operationBudgetIssue(inputs);
 	if (budgetIssue !== null) return invalid(budgetIssue);
 	const bindingIssue = inputBindingIssue(inputs);
 	if (bindingIssue !== null) return invalid(bindingIssue);
 	const maxIssues = Math.min(limits.maxIssues, inputs.request.budgets.maxDiagnostics, 100_000);
-	const moduleValidation = validateModuleDependencyGraph(
-		inputs.moduleDependencyGraph,
-		inputs.semanticSnapshot,
-		{ maxIssues }
-	);
-	if (moduleValidation.state !== 'VALID')
-		return invalid(
-			issue(
-				'INPUT_INVALID',
-				'The module-dependency predecessor is not independently valid.',
-				'$inputs.moduleDependencyGraph'
-			)
-		);
-	const callValidation = validateCallGraph(inputs.callGraph, inputs.semanticSnapshot, {
-		maxIssues
-	});
-	if (callValidation.state !== 'VALID')
-		return invalid(
-			issue(
-				'INPUT_INVALID',
-				'The call predecessor is not independently valid.',
-				'$inputs.callGraph'
-			)
-		);
+	const predecessorIssue = predecessorValidationIssue(inputs, maxIssues);
+	if (predecessorIssue !== null) return invalid(predecessorIssue);
 	const expected = deriveComposition(inputs, knownInputDigest);
 	if (expected.state === 'INVALID')
 		return invalid(issue('INPUT_INVALID', expected.message, expected.path));
 	const candidate = value as unknown as LogicalGraphCompositionSnapshot;
-	if (
-		candidate.inputDigest !== expected.composition.inputDigest ||
-		candidate.id !== expected.composition.id
-	)
-		return invalid(
-			issue('IDENTITY_MISMATCH', 'The composition identity does not reproduce.', '$.id')
-		);
-	if (candidate.contentDigest !== independentContentDigest(candidate))
-		return invalid(
-			issue(
-				'CONTENT_DIGEST_MISMATCH',
-				'The composition content digest is invalid.',
-				'$.contentDigest'
-			)
-		);
-	if (independentCanonicalJson(candidate) !== independentCanonicalJson(expected.composition))
-		return invalid(
-			issue(
-				'POPULATION_MISMATCH',
-				'The candidate differs from the independently derived logical graph composition.'
-			)
-		);
+	const agreementIssue = candidateAgreementIssue(candidate, expected.composition);
+	if (agreementIssue !== null) return invalid(agreementIssue);
 	return { issues: [], state: 'VALID' };
 }
 

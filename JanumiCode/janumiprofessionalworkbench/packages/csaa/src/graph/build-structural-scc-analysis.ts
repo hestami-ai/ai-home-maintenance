@@ -200,21 +200,15 @@ function dataObject(value: unknown): value is Record<PropertyKey, unknown> {
 	);
 }
 
-function adjacencyProjection(inputs: StructuralSccAnalysisInputs): AdjacencyProjectionResult {
-	const nodeLength = arrayLength(inputs.graph.nodes);
-	const edgeLength = arrayLength(inputs.graph.edges);
-	if (nodeLength === null || edgeLength === null) return { state: 'INVALID' };
-	if (
-		nodeLength > inputs.request.budgets.maxNodes ||
-		edgeLength > inputs.request.budgets.maxEdges ||
-		nodeLength + edgeLength > inputs.request.budgets.maxTraversalSteps
-	)
-		return { state: 'BUDGET_EXCEEDED' };
+function projectedNodeIds(
+	graphNodes: StructuralSccAnalysisInputs['graph']['nodes'],
+	nodeLength: number
+): StructuralSccAnalysisInputs['graph']['nodes'][number]['id'][] | null {
 	const nodeIds: StructuralSccAnalysisInputs['graph']['nodes'][number]['id'][] = [];
 	for (let index = 0; index < nodeLength; index += 1) {
-		const descriptor = Reflect.getOwnPropertyDescriptor(inputs.graph.nodes, String(index));
+		const descriptor = Reflect.getOwnPropertyDescriptor(graphNodes, String(index));
 		if (descriptor === undefined || !('value' in descriptor) || !dataObject(descriptor.value))
-			return { state: 'INVALID' };
+			return null;
 		const node =
 			descriptor.value as unknown as StructuralSccAnalysisInputs['graph']['nodes'][number];
 		const idDescriptor = Reflect.getOwnPropertyDescriptor(node, 'id');
@@ -223,14 +217,21 @@ function adjacencyProjection(inputs: StructuralSccAnalysisInputs): AdjacencyProj
 			!('value' in idDescriptor) ||
 			typeof idDescriptor.value !== 'string'
 		)
-			return { state: 'INVALID' };
+			return null;
 		nodeIds.push(idDescriptor.value as (typeof nodeIds)[number]);
 	}
+	return nodeIds;
+}
+
+function projectedEdges(
+	graphEdges: StructuralSccAnalysisInputs['graph']['edges'],
+	edgeLength: number
+): AdjacencyProjection['edges'][number][] | null {
 	const edges: AdjacencyProjection['edges'][number][] = [];
 	for (let index = 0; index < edgeLength; index += 1) {
-		const descriptor = Reflect.getOwnPropertyDescriptor(inputs.graph.edges, String(index));
+		const descriptor = Reflect.getOwnPropertyDescriptor(graphEdges, String(index));
 		if (descriptor === undefined || !('value' in descriptor) || !dataObject(descriptor.value))
-			return { state: 'INVALID' };
+			return null;
 		const edge =
 			descriptor.value as unknown as StructuralSccAnalysisInputs['graph']['edges'][number];
 		const idDescriptor = Reflect.getOwnPropertyDescriptor(edge, 'id');
@@ -247,7 +248,7 @@ function adjacencyProjection(inputs: StructuralSccAnalysisInputs): AdjacencyProj
 			!('value' in targetDescriptor) ||
 			!dataObject(targetDescriptor.value)
 		)
-			return { state: 'INVALID' };
+			return null;
 		const sourceId = Reflect.getOwnPropertyDescriptor(sourceDescriptor.value as object, 'nodeId');
 		const targetId = Reflect.getOwnPropertyDescriptor(targetDescriptor.value as object, 'nodeId');
 		if (
@@ -258,32 +259,57 @@ function adjacencyProjection(inputs: StructuralSccAnalysisInputs): AdjacencyProj
 			!('value' in targetId) ||
 			typeof targetId.value !== 'string'
 		)
-			return { state: 'INVALID' };
+			return null;
 		edges.push({
 			id: idDescriptor.value as AdjacencyProjection['edges'][number]['id'],
 			source: sourceId.value as AdjacencyProjection['edges'][number]['source'],
 			target: targetId.value as AdjacencyProjection['edges'][number]['target']
 		});
 	}
-	const coverageDescriptor = Reflect.getOwnPropertyDescriptor(inputs.graph, 'coverage');
+	return edges;
+}
+
+function projectedUpstreamClosure(
+	graph: StructuralSccAnalysisInputs['graph']
+): AdjacencyProjection['upstreamClosure'] | null {
+	const coverageDescriptor = Reflect.getOwnPropertyDescriptor(graph, 'coverage');
 	if (
 		coverageDescriptor === undefined ||
 		!('value' in coverageDescriptor) ||
 		!dataObject(coverageDescriptor.value)
 	)
-		return { state: 'INVALID' };
+		return null;
 	const closureDescriptor = Reflect.getOwnPropertyDescriptor(coverageDescriptor.value, 'closure');
 	if (
 		closureDescriptor === undefined ||
 		!('value' in closureDescriptor) ||
 		(closureDescriptor.value !== 'CLOSED' && closureDescriptor.value !== 'OPEN')
 	)
-		return { state: 'INVALID' };
+		return null;
+	return closureDescriptor.value;
+}
+
+function adjacencyProjection(inputs: StructuralSccAnalysisInputs): AdjacencyProjectionResult {
+	const nodeLength = arrayLength(inputs.graph.nodes);
+	const edgeLength = arrayLength(inputs.graph.edges);
+	if (nodeLength === null || edgeLength === null) return { state: 'INVALID' };
+	if (
+		nodeLength > inputs.request.budgets.maxNodes ||
+		edgeLength > inputs.request.budgets.maxEdges ||
+		nodeLength + edgeLength > inputs.request.budgets.maxTraversalSteps
+	)
+		return { state: 'BUDGET_EXCEEDED' };
+	const nodeIds = projectedNodeIds(inputs.graph.nodes, nodeLength);
+	if (nodeIds === null) return { state: 'INVALID' };
+	const edges = projectedEdges(inputs.graph.edges, edgeLength);
+	if (edges === null) return { state: 'INVALID' };
+	const upstreamClosure = projectedUpstreamClosure(inputs.graph);
+	if (upstreamClosure === null) return { state: 'INVALID' };
 	return {
 		projection: {
 			edges: edges.map((edge) => Object.freeze({ ...edge })),
 			nodeIds: [...nodeIds].sort(compareText),
-			upstreamClosure: closureDescriptor.value
+			upstreamClosure
 		},
 		state: 'VALID'
 	};
@@ -350,6 +376,89 @@ const CONSUMED_SEMANTIC_KEYS = [
 	'subjectId'
 ] as const;
 
+type ConsumedItem =
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+type ConsumedExpansion = 'BUDGET_EXCEEDED' | 'INVALID' | 'VALID';
+
+type ConsumedVisit =
+	| { readonly characters: number; readonly state: 'VALID' }
+	| { readonly state: 'BUDGET_EXCEEDED' | 'INVALID' };
+
+function expandConsumedArray(
+	value: readonly unknown[],
+	records: number,
+	maxInputRecords: number,
+	pending: ConsumedItem[]
+): ConsumedExpansion {
+	if (Object.getPrototypeOf(value) !== Array.prototype) return 'INVALID';
+	const length = arrayLength(value);
+	if (length === null) return 'INVALID';
+	if (records + length > maxInputRecords) return 'BUDGET_EXCEEDED';
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== length + 1) return 'INVALID';
+	if (keys.some((key) => typeof key === 'symbol')) return 'INVALID';
+	for (let index = length - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return 'INVALID';
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+	return 'VALID';
+}
+
+function expandConsumedObject(
+	value: object,
+	records: number,
+	maxInputRecords: number,
+	pending: ConsumedItem[]
+): ConsumedExpansion {
+	if (Object.getPrototypeOf(value) !== Object.prototype) return 'INVALID';
+	const keys = Reflect.ownKeys(value);
+	if (keys.some((key) => typeof key !== 'string')) return 'INVALID';
+	if (records + keys.length > maxInputRecords) return 'BUDGET_EXCEEDED';
+	for (const key of keys) {
+		if (typeof key !== 'string') return 'INVALID';
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return 'INVALID';
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+	return 'VALID';
+}
+
+function visitConsumedValue(
+	value: unknown,
+	records: number,
+	characters: number,
+	budgets: StructuralSccAnalysisBudgets,
+	active: WeakSet<object>,
+	pending: ConsumedItem[]
+): ConsumedVisit {
+	if (typeof value === 'string') {
+		if (!isUnicodeScalarString(value)) return { state: 'INVALID' };
+		const total = characters + value.length;
+		if (total > budgets.maxInputStringCharacters) return { state: 'BUDGET_EXCEEDED' };
+		return { characters: total, state: 'VALID' };
+	}
+	if (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	)
+		return { characters, state: 'VALID' };
+	if (typeof value !== 'object' || isProxy(value)) return { state: 'INVALID' };
+	if (active.has(value)) return { state: 'INVALID' };
+	active.add(value);
+	pending.push({ kind: 'LEAVE', value });
+	const expansion = Array.isArray(value)
+		? expandConsumedArray(value, records, budgets.maxInputRecords, pending)
+		: expandConsumedObject(value, records, budgets.maxInputRecords, pending);
+	if (expansion !== 'VALID') return { state: expansion };
+	return { characters, state: 'VALID' };
+}
+
 function consumedInputBudgetState(
 	inputs: StructuralSccAnalysisInputs,
 	request: StructuralSccAnalysisRequest
@@ -361,10 +470,7 @@ function consumedInputBudgetState(
 			return 'INVALID';
 		semanticProjection[key] = descriptor.value;
 	}
-	type Item =
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Item[] = [
+	const pending: ConsumedItem[] = [
 		{
 			kind: 'VISIT',
 			value: { graph: inputs.graph, request, semanticSnapshot: semanticProjection }
@@ -381,113 +487,131 @@ function consumedInputBudgetState(
 		}
 		records += 1;
 		if (records > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
-		if (typeof item.value === 'string') {
-			if (!isUnicodeScalarString(item.value)) return 'INVALID';
-			characters += item.value.length;
-			if (characters > request.budgets.maxInputStringCharacters) return 'BUDGET_EXCEEDED';
-			continue;
-		}
-		if (
-			item.value === null ||
-			typeof item.value === 'boolean' ||
-			(typeof item.value === 'number' &&
-				Number.isSafeInteger(item.value) &&
-				!Object.is(item.value, -0))
-		)
-			continue;
-		if (typeof item.value !== 'object' || isProxy(item.value)) return 'INVALID';
-		if (active.has(item.value)) return 'INVALID';
-		active.add(item.value);
-		pending.push({ kind: 'LEAVE', value: item.value });
-		if (Array.isArray(item.value)) {
-			if (Object.getPrototypeOf(item.value) !== Array.prototype) return 'INVALID';
-			const length = arrayLength(item.value);
-			if (length === null) return 'INVALID';
-			if (records + length > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
-			const keys = Reflect.ownKeys(item.value);
-			if (keys.length !== length + 1 || keys.some((key) => typeof key === 'symbol'))
-				return 'INVALID';
-			for (let index = length - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(item.value, String(index));
-				if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-					return 'INVALID';
-				pending.push({ kind: 'VISIT', value: descriptor.value });
-			}
-			continue;
-		}
-		if (Object.getPrototypeOf(item.value) !== Object.prototype) return 'INVALID';
-		const keys = Reflect.ownKeys(item.value);
-		if (keys.some((key) => typeof key !== 'string')) return 'INVALID';
-		if (records + keys.length > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
-		for (const key of keys) {
-			if (typeof key !== 'string') return 'INVALID';
-			const descriptor = Reflect.getOwnPropertyDescriptor(item.value, key);
-			if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-				return 'INVALID';
-			pending.push({ kind: 'VISIT', value: descriptor.value });
-		}
+		const visit = visitConsumedValue(
+			item.value,
+			records,
+			characters,
+			request.budgets,
+			active,
+			pending
+		);
+		if (visit.state !== 'VALID') return visit.state;
+		characters = visit.characters;
 	}
 	return 'VALID';
 }
 
-function tarjan(projection: AdjacencyProjection): readonly (readonly string[])[] {
+interface TarjanFrame {
+	nodeId: string;
+	nextNeighbor: number;
+	parent: string | null;
+}
+
+interface TarjanTraversal {
+	readonly active: string[];
+	readonly adjacency: ReadonlyMap<string, string[]>;
+	readonly indexByNode: Map<string, number>;
+	readonly lowByNode: Map<string, number>;
+	readonly onActive: Set<string>;
+}
+
+function tarjanAdjacency(projection: AdjacencyProjection): Map<string, string[]> {
 	const adjacency = new Map<string, string[]>(
 		projection.nodeIds.map((nodeId) => [nodeId, [] as string[]])
 	);
 	for (const edge of projection.edges) adjacency.get(edge.source)?.push(edge.target);
 	for (const neighbors of adjacency.values()) neighbors.sort(compareText);
-	const indexByNode = new Map<string, number>();
-	const lowByNode = new Map<string, number>();
-	const active: string[] = [];
-	const onActive = new Set<string>();
+	return adjacency;
+}
+
+function enterTarjanNode(nodeId: string, nextIndex: number, traversal: TarjanTraversal): number {
+	if (traversal.indexByNode.has(nodeId)) return nextIndex;
+	traversal.indexByNode.set(nodeId, nextIndex);
+	traversal.lowByNode.set(nodeId, nextIndex);
+	traversal.active.push(nodeId);
+	traversal.onActive.add(nodeId);
+	return nextIndex + 1;
+}
+
+function advanceTarjanNeighbor(
+	frame: TarjanFrame,
+	neighbors: readonly string[],
+	frames: TarjanFrame[],
+	traversal: TarjanTraversal
+): void {
+	const neighbor = neighbors[frame.nextNeighbor++]!;
+	if (!traversal.indexByNode.has(neighbor)) {
+		frames.push({ nodeId: neighbor, nextNeighbor: 0, parent: frame.nodeId });
+		return;
+	}
+	if (traversal.onActive.has(neighbor))
+		traversal.lowByNode.set(
+			frame.nodeId,
+			Math.min(traversal.lowByNode.get(frame.nodeId)!, traversal.indexByNode.get(neighbor)!)
+		);
+}
+
+function popTarjanComponent(rootNodeId: string, traversal: TarjanTraversal): string[] {
+	const component: string[] = [];
+	while (traversal.active.length > 0) {
+		const member = traversal.active.pop()!;
+		traversal.onActive.delete(member);
+		component.push(member);
+		if (member === rootNodeId) break;
+	}
+	component.sort(compareText);
+	return component;
+}
+
+function finishTarjanFrame(
+	frame: TarjanFrame,
+	frames: TarjanFrame[],
+	components: string[][],
+	traversal: TarjanTraversal
+): void {
+	frames.pop();
+	if (frame.parent !== null)
+		traversal.lowByNode.set(
+			frame.parent,
+			Math.min(traversal.lowByNode.get(frame.parent)!, traversal.lowByNode.get(frame.nodeId)!)
+		);
+	if (traversal.lowByNode.get(frame.nodeId) === traversal.indexByNode.get(frame.nodeId))
+		components.push(popTarjanComponent(frame.nodeId, traversal));
+}
+
+function tarjan(projection: AdjacencyProjection): readonly (readonly string[])[] {
+	const traversal: TarjanTraversal = {
+		active: [],
+		adjacency: tarjanAdjacency(projection),
+		indexByNode: new Map<string, number>(),
+		lowByNode: new Map<string, number>(),
+		onActive: new Set<string>()
+	};
 	const components: string[][] = [];
 	let nextIndex = 0;
-	type Frame = { nodeId: string; nextNeighbor: number; parent: string | null };
 	for (const root of projection.nodeIds) {
-		if (indexByNode.has(root)) continue;
-		const frames: Frame[] = [{ nodeId: root, nextNeighbor: 0, parent: null }];
+		if (traversal.indexByNode.has(root)) continue;
+		const frames: TarjanFrame[] = [{ nodeId: root, nextNeighbor: 0, parent: null }];
 		while (frames.length > 0) {
-			const frame = frames[frames.length - 1]!;
-			if (!indexByNode.has(frame.nodeId)) {
-				indexByNode.set(frame.nodeId, nextIndex);
-				lowByNode.set(frame.nodeId, nextIndex);
-				nextIndex += 1;
-				active.push(frame.nodeId);
-				onActive.add(frame.nodeId);
-			}
-			const neighbors = adjacency.get(frame.nodeId)!;
-			if (frame.nextNeighbor < neighbors.length) {
-				const neighbor = neighbors[frame.nextNeighbor++]!;
-				if (!indexByNode.has(neighbor)) {
-					frames.push({ nodeId: neighbor, nextNeighbor: 0, parent: frame.nodeId });
-					continue;
-				}
-				if (onActive.has(neighbor))
-					lowByNode.set(
-						frame.nodeId,
-						Math.min(lowByNode.get(frame.nodeId)!, indexByNode.get(neighbor)!)
-					);
-				continue;
-			}
-			frames.pop();
-			if (frame.parent !== null)
-				lowByNode.set(
-					frame.parent,
-					Math.min(lowByNode.get(frame.parent)!, lowByNode.get(frame.nodeId)!)
-				);
-			if (lowByNode.get(frame.nodeId) === indexByNode.get(frame.nodeId)) {
-				const component: string[] = [];
-				while (active.length > 0) {
-					const member = active.pop()!;
-					onActive.delete(member);
-					component.push(member);
-					if (member === frame.nodeId) break;
-				}
-				components.push(component.sort(compareText));
-			}
+			const frame = frames.at(-1)!;
+			nextIndex = enterTarjanNode(frame.nodeId, nextIndex, traversal);
+			const neighbors = traversal.adjacency.get(frame.nodeId)!;
+			if (frame.nextNeighbor < neighbors.length)
+				advanceTarjanNeighbor(frame, neighbors, frames, traversal);
+			else finishTarjanFrame(frame, frames, components, traversal);
 		}
 	}
 	return components.sort((left, right) => compareText(left.join('\0'), right.join('\0')));
+}
+
+function componentCycleKind(
+	nodeIds: readonly string[],
+	id: StructuralSccComponent['id'],
+	selfLoopComponents: ReadonlySet<StructuralSccComponent['id']>
+): StructuralSccComponent['cycleKind'] {
+	if (nodeIds.length > 1) return 'MULTI_NODE';
+	if (selfLoopComponents.has(id)) return 'SELF_LOOP_SINGLETON';
+	return 'ACYCLIC_SINGLETON';
 }
 
 function materialize(
@@ -529,12 +653,7 @@ function materialize(
 		const id = componentIds[ordinal]!;
 		const internalEdgeIds = internalEdgeIdsByComponent.get(id)!.sort(compareText);
 		return {
-			cycleKind:
-				nodeIds.length > 1
-					? 'MULTI_NODE'
-					: selfLoopComponents.has(id)
-						? 'SELF_LOOP_SINGLETON'
-						: 'ACYCLIC_SINGLETON',
+			cycleKind: componentCycleKind(nodeIds, id, selfLoopComponents),
 			id,
 			internalEdgeIds,
 			nodeIds: nodeIds as StructuralSccComponent['nodeIds'],
@@ -614,6 +733,73 @@ function materialize(
 	};
 }
 
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function boundIdentitiesAgree(
+	closedInputs: StructuralSccAnalysisInputs,
+	request: StructuralSccAnalysisRequest
+): boolean {
+	return (
+		closedInputs.graph.id === request.sourceGraph.graphId &&
+		closedInputs.graph.contentDigest === request.sourceGraph.contentDigest &&
+		closedInputs.graph.graphInputDigest === request.sourceGraph.graphInputDigest &&
+		closedInputs.graph.subjectId === request.subjectId &&
+		closedInputs.graph.semanticSnapshotId === request.semanticSnapshotId &&
+		closedInputs.semanticSnapshot.id === request.semanticSnapshotId &&
+		closedInputs.semanticSnapshot.subjectId === request.subjectId
+	);
+}
+
+function consumedInputUnavailable(
+	state: 'BUDGET_EXCEEDED' | 'INVALID'
+): StructuralSccAnalysisOutcome {
+	if (state === 'BUDGET_EXCEEDED')
+		return unavailable(
+			'BUDGET_EXCEEDED',
+			'The consumed predecessor projection exceeds an input budget.',
+			'BIND'
+		);
+	return unavailable(
+		'SOURCE_GRAPH_INVALID',
+		'The consumed predecessor projection is not safe plain data.',
+		'BIND'
+	);
+}
+
+function adjacencyProjectionUnavailable(
+	state: 'BUDGET_EXCEEDED' | 'INVALID'
+): StructuralSccAnalysisOutcome {
+	if (state === 'BUDGET_EXCEEDED')
+		return unavailable(
+			'BUDGET_EXCEEDED',
+			'The graph population exceeds a node, edge, or traversal budget.',
+			'BIND'
+		);
+	return unavailable(
+		'SOURCE_GRAPH_INVALID',
+		'The source graph does not expose a valid node and edge projection.',
+		'BIND'
+	);
+}
+
+function analysisValidationUnavailable(
+	state: 'BUDGET_EXHAUSTED' | 'INVALID'
+): StructuralSccAnalysisOutcome {
+	if (state === 'BUDGET_EXHAUSTED')
+		return unavailable(
+			'BUDGET_EXCEEDED',
+			'Independent validation exhausted a construction budget.',
+			'BIND'
+		);
+	return unavailable(
+		'ANALYSIS_VALIDATION_FAILED',
+		'The constructed SCC analysis failed independent validation.',
+		'VALIDATE'
+	);
+}
+
 function buildStructuralSccAnalysisInternal(
 	inputs: StructuralSccAnalysisInputs
 ): StructuralSccAnalysisOutcome {
@@ -628,21 +814,9 @@ function buildStructuralSccAnalysisInternal(
 	try {
 		request = materializeRequest(closedInputs.request);
 	} catch (error) {
-		return unavailable(
-			'REQUEST_INVALID',
-			error instanceof Error ? error.message : String(error),
-			'REQUEST'
-		);
+		return unavailable('REQUEST_INVALID', errorMessage(error), 'REQUEST');
 	}
-	if (
-		closedInputs.graph.id !== request.sourceGraph.graphId ||
-		closedInputs.graph.contentDigest !== request.sourceGraph.contentDigest ||
-		closedInputs.graph.graphInputDigest !== request.sourceGraph.graphInputDigest ||
-		closedInputs.graph.subjectId !== request.subjectId ||
-		closedInputs.graph.semanticSnapshotId !== request.semanticSnapshotId ||
-		closedInputs.semanticSnapshot.id !== request.semanticSnapshotId ||
-		closedInputs.semanticSnapshot.subjectId !== request.subjectId
-	)
+	if (!boundIdentitiesAgree(closedInputs, request))
 		return unavailable(
 			'INPUT_IDENTITY_MISMATCH',
 			'The request, graph, and semantic snapshot identities differ.',
@@ -650,23 +824,10 @@ function buildStructuralSccAnalysisInternal(
 		);
 	const boundInputs = { ...closedInputs, request };
 	const inputBudgetState = consumedInputBudgetState(boundInputs, request);
-	if (inputBudgetState !== 'VALID')
-		return unavailable(
-			inputBudgetState === 'BUDGET_EXCEEDED' ? 'BUDGET_EXCEEDED' : 'SOURCE_GRAPH_INVALID',
-			inputBudgetState === 'BUDGET_EXCEEDED'
-				? 'The consumed predecessor projection exceeds an input budget.'
-				: 'The consumed predecessor projection is not safe plain data.',
-			'BIND'
-		);
+	if (inputBudgetState !== 'VALID') return consumedInputUnavailable(inputBudgetState);
 	const projectionResult = adjacencyProjection(boundInputs);
 	if (projectionResult.state !== 'VALID')
-		return unavailable(
-			projectionResult.state === 'BUDGET_EXCEEDED' ? 'BUDGET_EXCEEDED' : 'SOURCE_GRAPH_INVALID',
-			projectionResult.state === 'BUDGET_EXCEEDED'
-				? 'The graph population exceeds a node, edge, or traversal budget.'
-				: 'The source graph does not expose a valid node and edge projection.',
-			'BIND'
-		);
+		return adjacencyProjectionUnavailable(projectionResult.state);
 	const projection = projectionResult.projection;
 	const requiredSteps = projection.nodeIds.length + projection.edges.length;
 	let graphValidation: ReturnType<typeof validateModuleDependencyGraph>;
@@ -704,14 +865,7 @@ function buildStructuralSccAnalysisInternal(
 		maxRecords: Math.max(128, requiredSteps * 32 + analysis.components.length * 8),
 		maxStringCharacters: Math.max(4_096, requiredSteps * 4_096)
 	});
-	if (validation.state !== 'VALID')
-		return unavailable(
-			validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'ANALYSIS_VALIDATION_FAILED',
-			validation.state === 'BUDGET_EXHAUSTED'
-				? 'Independent validation exhausted a construction budget.'
-				: 'The constructed SCC analysis failed independent validation.',
-			validation.state === 'BUDGET_EXHAUSTED' ? 'BIND' : 'VALIDATE'
-		);
+	if (validation.state !== 'VALID') return analysisValidationUnavailable(validation.state);
 	return deepFreeze({ analysis, diagnostics: [], outcome: 'partial' });
 }
 

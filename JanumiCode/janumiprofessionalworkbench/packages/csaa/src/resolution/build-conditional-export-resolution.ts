@@ -200,14 +200,174 @@ function preflightLimits(value: unknown): {
 	};
 }
 
+type PreflightWork =
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+interface PreflightLimits {
+	readonly maxInputRecords: number;
+	readonly maxInputStringCharacters: number;
+}
+
+function chargePreflightRecord(records: number, limits: PreflightLimits): number {
+	const total = records + 1;
+	if (total > limits.maxInputRecords)
+		throw new ConditionalExportFailure(
+			'BUDGET_EXCEEDED',
+			`Input plain-data record budget exceeded: ${total} > ${limits.maxInputRecords}.`,
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+	return total;
+}
+
+function chargePreflightString(
+	text: string,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	if (!isUnicodeScalarString(text))
+		throw new TypeError('Input strings must contain Unicode scalar text.');
+	const total = stringCharacters + text.length;
+	if (total > limits.maxInputStringCharacters)
+		throw new ConditionalExportFailure(
+			'BUDGET_EXCEEDED',
+			`Input string-character budget exceeded: ${total} > ${limits.maxInputStringCharacters}.`,
+			'REQUEST',
+			'$.request.budgets.maxInputStringCharacters'
+		);
+	return total;
+}
+
+function isInertPreflightScalar(value: unknown): boolean {
+	return (
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	);
+}
+
+function chargePreflightArrayKeys(
+	ownKeys: readonly string[],
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	let total = stringCharacters;
+	for (const key of ownKeys) {
+		if (key === 'length') continue;
+		total += key.length;
+		if (total > limits.maxInputStringCharacters)
+			throw new ConditionalExportFailure(
+				'BUDGET_EXCEEDED',
+				'Input string-character budget exceeded by an array key.',
+				'REQUEST',
+				'$.request.budgets.maxInputStringCharacters'
+			);
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input array keys must contain Unicode scalar text.');
+	}
+	return total;
+}
+
+function pushPreflightArrayElements(
+	array: readonly unknown[],
+	count: number,
+	pending: PreflightWork[]
+): void {
+	for (let index = count - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(array, String(index));
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input arrays must contain enumerable data elements.');
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+}
+
+function expandArrayPreflightWork(
+	array: readonly unknown[],
+	pending: PreflightWork[],
+	records: number,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	if (Reflect.getPrototypeOf(array) !== Array.prototype)
+		throw new TypeError('Input arrays must use Array.prototype.');
+	const count = array.length;
+	const ownKeys = Reflect.ownKeys(array);
+	if (ownKeys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input arrays may not contain symbol keys.');
+	const total = chargePreflightArrayKeys(ownKeys as string[], stringCharacters, limits);
+	if (
+		ownKeys.length !== count + 1 ||
+		(ownKeys as string[]).some((key) => key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
+	)
+		throw new TypeError('Input arrays must be dense exact data arrays.');
+	if (records + count > limits.maxInputRecords)
+		throw new ConditionalExportFailure(
+			'BUDGET_EXCEEDED',
+			'Input array population exceeds the plain-data record budget.',
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+	pushPreflightArrayElements(array, count, pending);
+	return total;
+}
+
+function expandRecordPreflightWork(
+	record: object,
+	pending: PreflightWork[],
+	records: number,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	const prototype = Reflect.getPrototypeOf(record);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError('Input records must use a plain prototype.');
+	const ownKeys = Reflect.ownKeys(record);
+	if (ownKeys.some((key) => typeof key !== 'string'))
+		throw new TypeError('Input records may not contain symbol keys.');
+	if (records + ownKeys.length > limits.maxInputRecords)
+		throw new ConditionalExportFailure(
+			'BUDGET_EXCEEDED',
+			'Input property population exceeds the plain-data record budget.',
+			'REQUEST',
+			'$.request.budgets.maxInputRecords'
+		);
+	let total = stringCharacters;
+	for (const key of [...(ownKeys as string[])].reverse()) {
+		total += key.length;
+		if (total > limits.maxInputStringCharacters)
+			throw new ConditionalExportFailure(
+				'BUDGET_EXCEEDED',
+				'Input string-character budget exceeded by a record key.',
+				'REQUEST',
+				'$.request.budgets.maxInputStringCharacters'
+			);
+		if (!isUnicodeScalarString(key))
+			throw new TypeError('Input record keys must contain Unicode scalar text.');
+		const descriptor = Reflect.getOwnPropertyDescriptor(record, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError('Input records must contain enumerable data properties.');
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+	return total;
+}
+
+function expandContainerPreflightWork(
+	container: object,
+	pending: PreflightWork[],
+	records: number,
+	stringCharacters: number,
+	limits: PreflightLimits
+): number {
+	return Array.isArray(container)
+		? expandArrayPreflightWork(container, pending, records, stringCharacters, limits)
+		: expandRecordPreflightWork(container, pending, records, stringCharacters, limits);
+}
+
 function preflightPlainData(
 	value: unknown,
 	limits: { readonly maxInputRecords: number; readonly maxInputStringCharacters: number }
 ): PlainDataUsage {
-	type Work =
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Work[] = [{ kind: 'VISIT', value }];
+	const pending: PreflightWork[] = [{ kind: 'VISIT', value }];
 	const active = new WeakSet<object>();
 	let records = 0;
 	let stringCharacters = 0;
@@ -217,109 +377,24 @@ function preflightPlainData(
 			active.delete(work.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxInputRecords)
-			throw new ConditionalExportFailure(
-				'BUDGET_EXCEEDED',
-				`Input plain-data record budget exceeded: ${records} > ${limits.maxInputRecords}.`,
-				'REQUEST',
-				'$.request.budgets.maxInputRecords'
-			);
+		records = chargePreflightRecord(records, limits);
 		if (typeof work.value === 'string') {
-			if (!isUnicodeScalarString(work.value))
-				throw new TypeError('Input strings must contain Unicode scalar text.');
-			stringCharacters += work.value.length;
-			if (stringCharacters > limits.maxInputStringCharacters)
-				throw new ConditionalExportFailure(
-					'BUDGET_EXCEEDED',
-					`Input string-character budget exceeded: ${stringCharacters} > ${limits.maxInputStringCharacters}.`,
-					'REQUEST',
-					'$.request.budgets.maxInputStringCharacters'
-				);
+			stringCharacters = chargePreflightString(work.value, stringCharacters, limits);
 			continue;
 		}
-		if (
-			work.value === null ||
-			typeof work.value === 'boolean' ||
-			(typeof work.value === 'number' &&
-				Number.isSafeInteger(work.value) &&
-				!Object.is(work.value, -0))
-		)
-			continue;
+		if (work.value === null || isInertPreflightScalar(work.value)) continue;
 		if (typeof work.value !== 'object' || isProxy(work.value))
 			throw new TypeError('Input must contain only inert JSON-compatible plain data.');
 		if (active.has(work.value)) throw new TypeError('Input plain data may not contain cycles.');
 		active.add(work.value);
 		pending.push({ kind: 'LEAVE', value: work.value });
-		if (Array.isArray(work.value)) {
-			if (Reflect.getPrototypeOf(work.value) !== Array.prototype)
-				throw new TypeError('Input arrays must use Array.prototype.');
-			const count = work.value.length;
-			const ownKeys = Reflect.ownKeys(work.value);
-			if (ownKeys.some((key) => typeof key !== 'string'))
-				throw new TypeError('Input arrays may not contain symbol keys.');
-			for (const key of ownKeys as string[]) {
-				if (key === 'length') continue;
-				stringCharacters += key.length;
-				if (stringCharacters > limits.maxInputStringCharacters)
-					throw new ConditionalExportFailure(
-						'BUDGET_EXCEEDED',
-						'Input string-character budget exceeded by an array key.',
-						'REQUEST',
-						'$.request.budgets.maxInputStringCharacters'
-					);
-				if (!isUnicodeScalarString(key))
-					throw new TypeError('Input array keys must contain Unicode scalar text.');
-			}
-			if (
-				ownKeys.length !== count + 1 ||
-				(ownKeys as string[]).some((key) => key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
-			)
-				throw new TypeError('Input arrays must be dense exact data arrays.');
-			if (records + count > limits.maxInputRecords)
-				throw new ConditionalExportFailure(
-					'BUDGET_EXCEEDED',
-					'Input array population exceeds the plain-data record budget.',
-					'REQUEST',
-					'$.request.budgets.maxInputRecords'
-				);
-			for (let index = count - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(work.value, String(index));
-				if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-					throw new TypeError('Input arrays must contain enumerable data elements.');
-				pending.push({ kind: 'VISIT', value: descriptor.value });
-			}
-			continue;
-		}
-		const prototype = Reflect.getPrototypeOf(work.value);
-		if (prototype !== Object.prototype && prototype !== null)
-			throw new TypeError('Input records must use a plain prototype.');
-		const ownKeys = Reflect.ownKeys(work.value);
-		if (ownKeys.some((key) => typeof key !== 'string'))
-			throw new TypeError('Input records may not contain symbol keys.');
-		if (records + ownKeys.length > limits.maxInputRecords)
-			throw new ConditionalExportFailure(
-				'BUDGET_EXCEEDED',
-				'Input property population exceeds the plain-data record budget.',
-				'REQUEST',
-				'$.request.budgets.maxInputRecords'
-			);
-		for (const key of [...(ownKeys as string[])].reverse()) {
-			stringCharacters += key.length;
-			if (stringCharacters > limits.maxInputStringCharacters)
-				throw new ConditionalExportFailure(
-					'BUDGET_EXCEEDED',
-					'Input string-character budget exceeded by a record key.',
-					'REQUEST',
-					'$.request.budgets.maxInputStringCharacters'
-				);
-			if (!isUnicodeScalarString(key))
-				throw new TypeError('Input record keys must contain Unicode scalar text.');
-			const descriptor = Reflect.getOwnPropertyDescriptor(work.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				throw new TypeError('Input records must contain enumerable data properties.');
-			pending.push({ kind: 'VISIT', value: descriptor.value });
-		}
+		stringCharacters = expandContainerPreflightWork(
+			work.value,
+			pending,
+			records,
+			stringCharacters,
+			limits
+		);
 	}
 	return { records, stringCharacters };
 }
@@ -353,10 +428,7 @@ function isNumericConditionPropertyName(value: string): boolean {
 	return String(numeric) === value && numeric >= 0 && numeric < 4_294_967_295;
 }
 
-function materializeInputs(value: unknown): ConditionalExportResolutionBuildInputs {
-	const inputs = exactPlainRecord(value, INPUT_KEYS, '$inputs');
-	const request = exactPlainRecord(inputs.request, REQUEST_KEYS, '$inputs.request');
-	const budgets = exactPlainRecord(request.budgets, BUDGET_KEYS, '$inputs.request.budgets');
+function assertRequestBudgets(budgets: Record<string, unknown>): void {
 	for (const key of BUDGET_KEYS) {
 		const minimum = ZERO_CAPACITY_BUDGET_KEYS.has(key) ? 0 : 1;
 		const budget = budgets[key];
@@ -367,6 +439,9 @@ function materializeInputs(value: unknown): ConditionalExportResolutionBuildInpu
 	}
 	if ((budgets.maxDiagnostics as number) > 100_000)
 		throw new TypeError('$inputs.request.budgets.maxDiagnostics may not exceed 100000.');
+}
+
+function assertRequestScalars(request: Record<string, unknown>): void {
 	for (const key of [
 		'exportSubpath',
 		'manifestPath',
@@ -397,8 +472,9 @@ function materializeInputs(value: unknown): ConditionalExportResolutionBuildInpu
 		throw new TypeError('$inputs.request.manifestPath must be a canonical relative path.');
 	if (!/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/iu.test(request.packageName as string))
 		throw new TypeError('$inputs.request.packageName is invalid.');
-	const conditions = request.conditions;
-	assertOrdinaryArray(conditions, '$inputs.request.conditions');
+}
+
+function assertExplicitConditions(conditions: readonly unknown[]): void {
 	const conditionSet = new Set<string>();
 	for (let index = 0; index < conditions.length; index += 1) {
 		const condition = conditions[index];
@@ -409,26 +485,17 @@ function materializeInputs(value: unknown): ConditionalExportResolutionBuildInpu
 			throw new TypeError('Explicit conditions must be unique and may not use reserved names.');
 		conditionSet.add(condition);
 	}
-	const consumer = exactPlainRecord(request.consumer, CONSUMER_KEYS, '$inputs.request.consumer');
-	for (const key of CONSUMER_KEYS)
-		nonemptyScalarText(consumer[key], `$inputs.request.consumer.${key}`);
-	const contextReference = exactPlainRecord(
-		request.projectContextGraph,
-		PROJECT_CONTEXT_REFERENCE_KEYS,
-		'$inputs.request.projectContextGraph'
-	);
+}
+
+function assertContextReferenceDigests(contextReference: Record<string, unknown>): void {
 	for (const key of PROJECT_CONTEXT_REFERENCE_KEYS)
 		nonemptyScalarText(contextReference[key], `$inputs.request.projectContextGraph.${key}`);
 	for (const key of ['contentDigest', 'inputDigest'] as const)
 		if (!SHA256.test(contextReference[key] as string))
 			throw new TypeError(`$inputs.request.projectContextGraph.${key} must be lowercase SHA-256.`);
-	const selection = exactPlainRecord(
-		request.selection,
-		SELECTION_KEYS,
-		'$inputs.request.selection'
-	);
-	assertOrdinaryArray(selection.leafKinds, '$inputs.request.selection.leafKinds');
-	exactJson(selection, CONDITIONAL_EXPORT_RESOLUTION_SELECTION, '$inputs.request.selection');
+}
+
+function assertInputCollections(inputs: Record<string, unknown>): void {
 	const frozenSubject = shallowPlainRecord(inputs.frozenSubject, '$inputs.frozenSubject');
 	const semanticSnapshot = shallowPlainRecord(inputs.semanticSnapshot, '$inputs.semanticSnapshot');
 	const projectContextGraph = shallowPlainRecord(
@@ -441,6 +508,34 @@ function materializeInputs(value: unknown): ConditionalExportResolutionBuildInpu
 		['$inputs.projectContextGraph', projectContextGraph, ['programs', 'projects', 'sources']]
 	] as const)
 		for (const key of keys) assertOrdinaryArray(record[key], `${path}.${key}`);
+}
+
+function materializeInputs(value: unknown): ConditionalExportResolutionBuildInputs {
+	const inputs = exactPlainRecord(value, INPUT_KEYS, '$inputs');
+	const request = exactPlainRecord(inputs.request, REQUEST_KEYS, '$inputs.request');
+	const budgets = exactPlainRecord(request.budgets, BUDGET_KEYS, '$inputs.request.budgets');
+	assertRequestBudgets(budgets);
+	assertRequestScalars(request);
+	const conditions = request.conditions;
+	assertOrdinaryArray(conditions, '$inputs.request.conditions');
+	assertExplicitConditions(conditions);
+	const consumer = exactPlainRecord(request.consumer, CONSUMER_KEYS, '$inputs.request.consumer');
+	for (const key of CONSUMER_KEYS)
+		nonemptyScalarText(consumer[key], `$inputs.request.consumer.${key}`);
+	const contextReference = exactPlainRecord(
+		request.projectContextGraph,
+		PROJECT_CONTEXT_REFERENCE_KEYS,
+		'$inputs.request.projectContextGraph'
+	);
+	assertContextReferenceDigests(contextReference);
+	const selection = exactPlainRecord(
+		request.selection,
+		SELECTION_KEYS,
+		'$inputs.request.selection'
+	);
+	assertOrdinaryArray(selection.leafKinds, '$inputs.request.selection.leafKinds');
+	exactJson(selection, CONDITIONAL_EXPORT_RESOLUTION_SELECTION, '$inputs.request.selection');
+	assertInputCollections(inputs);
 	return {
 		frozenSubject: inputs.frozenSubject as ConditionalExportResolutionBuildInputs['frozenSubject'],
 		projectContextGraph:
@@ -667,26 +762,12 @@ function decodedExportString(literal: ts.StringLiteral, sourceFile: ts.JsonSourc
 	return literal.text;
 }
 
-function parseManifest(
-	text: string,
-	manifestPath: string,
-	manifestBytes: Uint8Array,
-	workspace: ConditionalExportResolutionBuildInputs['frozenSubject']['workspaces'][number],
-	maxAstNodes: number
-): ParsedManifest {
-	const sourceFile = ts.parseJsonText(manifestPath, text);
-	const parseDiagnostics = (
-		sourceFile as ts.JsonSourceFile & {
-			readonly parseDiagnostics?: readonly ts.Diagnostic[];
-		}
-	).parseDiagnostics;
-	if (parseDiagnostics !== undefined && parseDiagnostics.length > 0)
-		throw new ConditionalExportFailure(
-			'MANIFEST_INVALID',
-			'The exact frozen package manifest has JSON parse diagnostics.',
-			'MANIFEST',
-			'$manifest'
-		);
+interface ManifestNodeScan {
+	readonly declarationOrdinals: Map<ts.PropertyAssignment, number>;
+	readonly nodes: ts.Node[];
+}
+
+function scanManifestNodes(sourceFile: ts.JsonSourceFile, maxAstNodes: number): ManifestNodeScan {
 	const pending: ts.Node[] = [sourceFile];
 	const nodes: ts.Node[] = [];
 	const declarationOrdinals = new Map<ts.PropertyAssignment, number>();
@@ -708,6 +789,10 @@ function parseManifest(
 		});
 		for (let index = children.length - 1; index >= 0; index -= 1) pending.push(children[index]!);
 	}
+	return { declarationOrdinals, nodes };
+}
+
+function manifestRootObject(sourceFile: ts.JsonSourceFile): ts.ObjectLiteralExpression {
 	if (
 		sourceFile.statements.length !== 1 ||
 		!ts.isExpressionStatement(sourceFile.statements[0]!) ||
@@ -719,7 +804,10 @@ function parseManifest(
 			'MANIFEST',
 			'$manifest'
 		);
-	const root = sourceFile.statements[0].expression;
+	return sourceFile.statements[0].expression;
+}
+
+function assertUniqueManifestKeys(nodes: readonly ts.Node[], sourceFile: ts.JsonSourceFile): void {
 	for (const node of nodes) {
 		if (!ts.isObjectLiteralExpression(node)) continue;
 		const names = new Set<string>();
@@ -735,9 +823,22 @@ function parseManifest(
 			names.add(name);
 		}
 	}
+}
+
+function manifestRootProperties(
+	root: ts.ObjectLiteralExpression,
+	sourceFile: ts.JsonSourceFile
+): Map<string, ts.PropertyAssignment> {
 	const byName = new Map<string, ts.PropertyAssignment>();
 	for (const property of root.properties)
 		byName.set(decodedPropertyName(property, sourceFile), property as ts.PropertyAssignment);
+	return byName;
+}
+
+function assertManifestPackageName(
+	byName: ReadonlyMap<string, ts.PropertyAssignment>,
+	workspaceName: string
+): void {
 	const nameProperty = byName.get('name');
 	if (nameProperty === undefined || !ts.isStringLiteral(nameProperty.initializer))
 		throw new ConditionalExportFailure(
@@ -746,13 +847,40 @@ function parseManifest(
 			'MANIFEST',
 			'$manifest.name'
 		);
-	if (nameProperty.initializer.text !== workspace.name)
+	if (nameProperty.initializer.text !== workspaceName)
 		throw new ConditionalExportFailure(
 			'INPUT_POPULATION_MISMATCH',
 			'Raw manifest and FrozenSubject workspace package names differ.',
 			'MANIFEST',
 			'$manifest.name'
 		);
+}
+
+function parseManifest(
+	text: string,
+	manifestPath: string,
+	manifestBytes: Uint8Array,
+	workspace: ConditionalExportResolutionBuildInputs['frozenSubject']['workspaces'][number],
+	maxAstNodes: number
+): ParsedManifest {
+	const sourceFile = ts.parseJsonText(manifestPath, text);
+	const parseDiagnostics = (
+		sourceFile as ts.JsonSourceFile & {
+			readonly parseDiagnostics?: readonly ts.Diagnostic[];
+		}
+	).parseDiagnostics;
+	if (parseDiagnostics !== undefined && parseDiagnostics.length > 0)
+		throw new ConditionalExportFailure(
+			'MANIFEST_INVALID',
+			'The exact frozen package manifest has JSON parse diagnostics.',
+			'MANIFEST',
+			'$manifest'
+		);
+	const { declarationOrdinals, nodes } = scanManifestNodes(sourceFile, maxAstNodes);
+	const root = manifestRootObject(sourceFile);
+	assertUniqueManifestKeys(nodes, sourceFile);
+	const byName = manifestRootProperties(root, sourceFile);
+	assertManifestPackageName(byName, workspace.name);
 	const exportsProperty = byName.get('exports') ?? null;
 	const importsProperty = byName.get('imports') ?? null;
 	const exportsValueSpan =
@@ -869,136 +997,240 @@ function compareFrontierSeed(left: FrontierSeed, right: FrontierSeed): number {
 			);
 }
 
+interface PendingConditionProperty {
+	readonly ancestorsActive: boolean;
+	readonly conditionPath: readonly string[];
+	readonly parentIndex: number | null;
+	readonly property: ts.PropertyAssignment;
+}
+
+interface ConditionTreeWalkState {
+	readonly branches: BranchSeed[];
+	decisionLeafSeedIndex: number | null;
+	decisionState: ConditionTreeResult['state'] | null;
+	decisionTarget: string | null;
+	readonly frontiers: FrontierSeed[];
+	readonly pending: PendingConditionProperty[];
+	terminated: boolean;
+}
+
+interface ConditionLeafContext {
+	readonly conditionPath: readonly string[];
+	readonly declarationPath: readonly string[];
+	readonly initializer: ts.Expression;
+	readonly pathActive: boolean;
+	readonly seedIndex: number;
+	readonly target: string | null;
+	readonly valueKind: ConditionalExportBranchRecord['valueKind'];
+}
+
+function frontierImpact(pathActive: boolean): ConditionalExportFrontierRecord['impact'] {
+	return pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION';
+}
+
+function unsupportedValueKindReason(initializer: ts.Node): ConditionalExportFrontierReason {
+	return ts.isArrayLiteralExpression(initializer)
+		? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
+		: 'UNSUPPORTED_EXPORT_VALUE_KIND';
+}
+
+function conditionValueKind(
+	initializer: ts.Expression
+): ConditionalExportBranchRecord['valueKind'] | null {
+	if (ts.isObjectLiteralExpression(initializer)) return 'CONDITION_OBJECT';
+	if (ts.isStringLiteral(initializer)) return 'STRING';
+	if (initializer.kind === ts.SyntaxKind.NullKeyword) return 'NULL';
+	return null;
+}
+
+function branchExclusionReason(
+	priorTerminated: boolean,
+	ancestorsActive: boolean,
+	active: boolean
+): ConditionalExportBranchRecord['exclusionReason'] {
+	if (priorTerminated) return 'PRIOR_BRANCH_TERMINATED_EVALUATION';
+	if (!ancestorsActive) return 'ANCESTOR_CONDITION_INACTIVE';
+	if (!active) return 'CONDITION_INACTIVE';
+	return null;
+}
+
+function assertNonNumericConditionName(
+	condition: string,
+	parsed: ParsedManifest,
+	property: ts.PropertyAssignment
+): void {
+	if (isNumericConditionPropertyName(condition))
+		throw new ConditionalExportFailure(
+			'MANIFEST_INVALID',
+			'Selected exact-key condition names must not be canonical numeric property names.',
+			'MANIFEST',
+			`$manifest@${property.name.getStart(parsed.sourceFile)}`
+		);
+}
+
+function recordUnsupportedConditionValue(
+	state: ConditionTreeWalkState,
+	parsed: ParsedManifest,
+	property: ts.PropertyAssignment,
+	declarationPath: readonly string[],
+	initializer: ts.Expression,
+	pathActive: boolean
+): void {
+	state.frontiers.push(
+		frontierSeed(
+			parsed,
+			property,
+			declarationPath,
+			frontierImpact(pathActive),
+			unsupportedValueKindReason(initializer),
+			initializer
+		)
+	);
+	if (!pathActive) return;
+	state.terminated = true;
+	state.decisionState = 'UNSUPPORTED';
+}
+
+function applyStringConditionLeaf(
+	state: ConditionTreeWalkState,
+	parsed: ParsedManifest,
+	property: ts.PropertyAssignment,
+	leaf: ConditionLeafContext
+): void {
+	const safe = safeSlashPath(leaf.target!, false);
+	if (!safe)
+		state.frontiers.push(
+			frontierSeed(
+				parsed,
+				property,
+				leaf.declarationPath,
+				frontierImpact(leaf.pathActive),
+				'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
+				leaf.initializer
+			)
+		);
+	if (!leaf.pathActive) return;
+	state.terminated = true;
+	if (safe) {
+		state.decisionLeafSeedIndex = leaf.seedIndex;
+		state.decisionState = 'SELECTED_TARGET';
+		state.decisionTarget = leaf.target;
+	} else state.decisionState = 'UNSUPPORTED';
+}
+
+function pushConditionChildren(
+	state: ConditionTreeWalkState,
+	initializer: ts.ObjectLiteralExpression,
+	leaf: ConditionLeafContext
+): void {
+	for (let index = initializer.properties.length - 1; index >= 0; index -= 1)
+		state.pending.push({
+			ancestorsActive: leaf.pathActive,
+			conditionPath: leaf.conditionPath,
+			parentIndex: leaf.seedIndex,
+			property: initializer.properties[index] as ts.PropertyAssignment
+		});
+}
+
+function applyConditionValueKind(
+	state: ConditionTreeWalkState,
+	parsed: ParsedManifest,
+	property: ts.PropertyAssignment,
+	leaf: ConditionLeafContext
+): void {
+	if (leaf.valueKind === 'STRING') {
+		applyStringConditionLeaf(state, parsed, property, leaf);
+		return;
+	}
+	if (leaf.valueKind === 'NULL') {
+		if (leaf.pathActive) {
+			state.terminated = true;
+			state.decisionLeafSeedIndex = leaf.seedIndex;
+			state.decisionState = 'BLOCKED_BY_NULL';
+		}
+		return;
+	}
+	if (ts.isObjectLiteralExpression(leaf.initializer))
+		pushConditionChildren(state, leaf.initializer, leaf);
+}
+
 function evaluateConditionTree(
 	parsed: ParsedManifest,
 	root: ts.ObjectLiteralExpression,
 	request: ConditionalExportResolutionRequest
 ): ConditionTreeResult {
-	interface PendingProperty {
-		readonly ancestorsActive: boolean;
-		readonly conditionPath: readonly string[];
-		readonly parentIndex: number | null;
-		readonly property: ts.PropertyAssignment;
-	}
-	const branches: BranchSeed[] = [];
-	const frontiers: FrontierSeed[] = [];
-	const pending: PendingProperty[] = [];
+	const state: ConditionTreeWalkState = {
+		branches: [],
+		decisionLeafSeedIndex: null,
+		decisionState: null,
+		decisionTarget: null,
+		frontiers: [],
+		pending: [],
+		terminated: false
+	};
 	for (let index = root.properties.length - 1; index >= 0; index -= 1)
-		pending.push({
+		state.pending.push({
 			ancestorsActive: true,
 			conditionPath: [],
 			parentIndex: null,
 			property: root.properties[index] as ts.PropertyAssignment
 		});
-	let decisionLeafSeedIndex: number | null = null;
-	let decisionState: ConditionTreeResult['state'] | null = null;
-	let decisionTarget: string | null = null;
-	let terminated = false;
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
+	while (state.pending.length > 0) {
+		const frame = state.pending.pop()!;
 		const condition = decodedPropertyName(frame.property, parsed.sourceFile);
-		if (isNumericConditionPropertyName(condition))
-			throw new ConditionalExportFailure(
-				'MANIFEST_INVALID',
-				'Selected exact-key condition names must not be canonical numeric property names.',
-				'MANIFEST',
-				`$manifest@${frame.property.name.getStart(parsed.sourceFile)}`
-			);
+		assertNonNumericConditionName(condition, parsed, frame.property);
 		const path = [...frame.conditionPath, condition];
 		const match = conditionMatch(condition, request);
 		const active = match !== 'INACTIVE';
-		const priorTerminated = terminated;
+		const priorTerminated = state.terminated;
 		const pathActive = !priorTerminated && frame.ancestorsActive && active;
 		const initializer = frame.property.initializer;
-		let valueKind: ConditionalExportBranchRecord['valueKind'] | null = null;
-		let target: string | null = null;
-		if (ts.isObjectLiteralExpression(initializer)) valueKind = 'CONDITION_OBJECT';
-		else if (ts.isStringLiteral(initializer)) {
-			valueKind = 'STRING';
-			target = decodedExportString(initializer, parsed.sourceFile);
-		} else if (initializer.kind === ts.SyntaxKind.NullKeyword) valueKind = 'NULL';
-		else {
-			frontiers.push(
-				frontierSeed(
-					parsed,
-					frame.property,
-					['exports', request.exportSubpath, ...path],
-					pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION',
-					ts.isArrayLiteralExpression(initializer)
-						? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
-						: 'UNSUPPORTED_EXPORT_VALUE_KIND',
-					initializer
-				)
+		const declarationPath = ['exports', request.exportSubpath, ...path];
+		const valueKind = conditionValueKind(initializer);
+		if (valueKind === null) {
+			recordUnsupportedConditionValue(
+				state,
+				parsed,
+				frame.property,
+				declarationPath,
+				initializer,
+				pathActive
 			);
-			if (pathActive) {
-				terminated = true;
-				decisionState = 'UNSUPPORTED';
-			}
 			continue;
 		}
-		const seedIndex = branches.length;
-		branches.push({
+		const target = ts.isStringLiteral(initializer)
+			? decodedExportString(initializer, parsed.sourceFile)
+			: null;
+		const seedIndex = state.branches.length;
+		state.branches.push({
 			condition,
 			conditionMatch: match,
 			conditionPath: path,
 			declarationOrdinal: declarationOrdinal(parsed, frame.property),
 			depth: path.length - 1,
-			exclusionReason: priorTerminated
-				? 'PRIOR_BRANCH_TERMINATED_EVALUATION'
-				: !frame.ancestorsActive
-					? 'ANCESTOR_CONDITION_INACTIVE'
-					: !active
-						? 'CONDITION_INACTIVE'
-						: null,
+			exclusionReason: branchExclusionReason(priorTerminated, frame.ancestorsActive, active),
 			keySpan: span(parsed.sourceFile, frame.property.name),
 			parentIndex: frame.parentIndex,
 			target,
 			valueKind,
 			valueSpan: span(parsed.sourceFile, initializer)
 		});
-		if (valueKind === 'STRING') {
-			const safe = safeSlashPath(target!, false);
-			if (!safe)
-				frontiers.push(
-					frontierSeed(
-						parsed,
-						frame.property,
-						['exports', request.exportSubpath, ...path],
-						pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION',
-						'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
-						initializer
-					)
-				);
-			if (pathActive) {
-				terminated = true;
-				if (safe) {
-					decisionLeafSeedIndex = seedIndex;
-					decisionState = 'SELECTED_TARGET';
-					decisionTarget = target;
-				} else decisionState = 'UNSUPPORTED';
-			}
-		} else if (valueKind === 'NULL') {
-			if (pathActive) {
-				terminated = true;
-				decisionLeafSeedIndex = seedIndex;
-				decisionState = 'BLOCKED_BY_NULL';
-			}
-		} else if (ts.isObjectLiteralExpression(initializer)) {
-			for (let index = initializer.properties.length - 1; index >= 0; index -= 1)
-				pending.push({
-					ancestorsActive: pathActive,
-					conditionPath: path,
-					parentIndex: seedIndex,
-					property: initializer.properties[index] as ts.PropertyAssignment
-				});
-		}
+		applyConditionValueKind(state, parsed, frame.property, {
+			conditionPath: path,
+			declarationPath,
+			initializer,
+			pathActive,
+			seedIndex,
+			target,
+			valueKind
+		});
 	}
 	return {
-		branches,
-		decisionLeafSeedIndex,
-		frontiers,
-		state: decisionState ?? 'NO_MATCHING_CONDITION',
-		target: decisionTarget
+		branches: state.branches,
+		decisionLeafSeedIndex: state.decisionLeafSeedIndex,
+		frontiers: state.frontiers,
+		state: state.decisionState ?? 'NO_MATCHING_CONDITION',
+		target: state.decisionTarget
 	};
 }
 
@@ -1012,132 +1244,108 @@ interface EvaluatedSurface {
 	readonly frontiers: readonly FrontierSeed[];
 }
 
-function evaluateSurface(
-	parsed: ParsedManifest,
-	request: ConditionalExportResolutionRequest
-): EvaluatedSurface {
-	const { exportsProperty, importsProperty, sourceFile } = parsed;
-	const frontiers: FrontierSeed[] = [];
-	if (importsProperty !== null)
-		frontiers.push(
-			frontierSeed(
-				parsed,
-				importsProperty,
-				['imports'],
-				'OUTSIDE_SELECTED_DECISION',
-				'PACKAGE_IMPORTS_MAP_UNSUPPORTED',
-				importsProperty
-			)
+function assertExportsKeyShape(exportsValue: ts.Expression, sourceFile: ts.JsonSourceFile): void {
+	if (!ts.isObjectLiteralExpression(exportsValue)) return;
+	const keys = exportsValue.properties.map((property) => decodedPropertyName(property, sourceFile));
+	if (keys.some((key) => key.startsWith('.')) && keys.some((key) => !key.startsWith('.')))
+		throw new ConditionalExportFailure(
+			'MANIFEST_INVALID',
+			'The manifest exports object must not mix subpath and condition keys.',
+			'MANIFEST',
+			'$manifest.exports'
 		);
-	if (exportsProperty === null)
-		return {
-			branches: [],
-			decisionLeafSeedIndex: null,
-			decisionState: 'NO_EXACT_EXPORT_KEY',
-			decisionTarget: null,
-			exactKeyComparisons: 0,
-			exactKeyOutcome: { exportSubpath: request.exportSubpath, state: 'ABSENT' },
-			frontiers
-		};
-	const exportsValue = exportsProperty.initializer;
-	const exportsOrdinal = declarationOrdinal(parsed, exportsProperty);
-	const rootKeyOutcome = (): ConditionalExportExactKeyOutcome =>
-		request.exportSubpath === '.'
-			? {
-					declarationOrdinal: exportsOrdinal,
-					exportSubpath: request.exportSubpath,
-					keySpan: span(sourceFile, exportsProperty.name),
-					matchKind: 'ROOT_DOT_SUGAR',
-					state: 'MATCHED',
-					valueSpan: span(sourceFile, exportsValue)
-				}
-			: { exportSubpath: request.exportSubpath, state: 'ABSENT' };
+}
 
-	if (ts.isObjectLiteralExpression(exportsValue)) {
-		const keys = exportsValue.properties.map((property) =>
-			decodedPropertyName(property, sourceFile)
-		);
-		if (keys.some((key) => key.startsWith('.')) && keys.some((key) => !key.startsWith('.')))
-			throw new ConditionalExportFailure(
-				'MANIFEST_INVALID',
-				'The manifest exports object must not mix subpath and condition keys.',
-				'MANIFEST',
-				'$manifest.exports'
+function rootStringExportDecisionState(
+	request: ConditionalExportResolutionRequest,
+	safe: boolean
+): EvaluatedSurface['decisionState'] {
+	if (request.exportSubpath !== '.') return 'NO_EXACT_EXPORT_KEY';
+	if (safe) return 'SELECTED_TARGET';
+	return 'UNSUPPORTED';
+}
+
+function rootExportsValueFrontierReason(
+	exportsValue: ts.Expression
+): ConditionalExportFrontierReason {
+	if (ts.isArrayLiteralExpression(exportsValue)) return 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED';
+	if (ts.isObjectLiteralExpression(exportsValue)) return 'EXPORTS_ROOT_CONDITION_MAP_UNSUPPORTED';
+	return 'UNSUPPORTED_EXPORT_VALUE_KIND';
+}
+
+function evaluateNonSubpathExports(
+	parsed: ParsedManifest,
+	request: ConditionalExportResolutionRequest,
+	exportsProperty: ts.PropertyAssignment,
+	frontiers: FrontierSeed[],
+	rootKeyOutcome: () => ConditionalExportExactKeyOutcome
+): EvaluatedSurface {
+	const sourceFile = parsed.sourceFile;
+	const exportsValue = exportsProperty.initializer;
+	const impact =
+		request.exportSubpath === '.' ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION';
+	if (ts.isStringLiteral(exportsValue)) {
+		const target = decodedExportString(exportsValue, sourceFile);
+		const safe = safeSlashPath(target, false);
+		if (!safe)
+			frontiers.push(
+				frontierSeed(
+					parsed,
+					exportsProperty,
+					['exports'],
+					impact,
+					'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
+					exportsValue
+				)
 			);
-	}
-	const explicitSubpathMap =
-		ts.isObjectLiteralExpression(exportsValue) &&
-		exportsValue.properties.every((property) =>
-			decodedPropertyName(property, sourceFile).startsWith('.')
-		);
-	if (!explicitSubpathMap) {
-		const impact =
-			request.exportSubpath === '.' ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION';
-		if (ts.isStringLiteral(exportsValue)) {
-			const target = decodedExportString(exportsValue, sourceFile);
-			const safe = safeSlashPath(target, false);
-			if (!safe)
-				frontiers.push(
-					frontierSeed(
-						parsed,
-						exportsProperty,
-						['exports'],
-						impact,
-						'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
-						exportsValue
-					)
-				);
-			return {
-				branches: [],
-				decisionLeafSeedIndex: null,
-				decisionState:
-					request.exportSubpath !== '.'
-						? 'NO_EXACT_EXPORT_KEY'
-						: safe
-							? 'SELECTED_TARGET'
-							: 'UNSUPPORTED',
-				decisionTarget: request.exportSubpath === '.' && safe ? target : null,
-				exactKeyComparisons: 1,
-				exactKeyOutcome: rootKeyOutcome(),
-				frontiers
-			};
-		}
-		if (exportsValue.kind === ts.SyntaxKind.NullKeyword)
-			return {
-				branches: [],
-				decisionLeafSeedIndex: null,
-				decisionState: request.exportSubpath === '.' ? 'BLOCKED_BY_NULL' : 'NO_EXACT_EXPORT_KEY',
-				decisionTarget: null,
-				exactKeyComparisons: 1,
-				exactKeyOutcome: rootKeyOutcome(),
-				frontiers
-			};
-		frontiers.push(
-			frontierSeed(
-				parsed,
-				exportsProperty,
-				['exports'],
-				impact,
-				ts.isArrayLiteralExpression(exportsValue)
-					? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
-					: ts.isObjectLiteralExpression(exportsValue)
-						? 'EXPORTS_ROOT_CONDITION_MAP_UNSUPPORTED'
-						: 'UNSUPPORTED_EXPORT_VALUE_KIND',
-				exportsValue
-			)
-		);
 		return {
 			branches: [],
 			decisionLeafSeedIndex: null,
-			decisionState: request.exportSubpath === '.' ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
-			decisionTarget: null,
+			decisionState: rootStringExportDecisionState(request, safe),
+			decisionTarget: request.exportSubpath === '.' && safe ? target : null,
 			exactKeyComparisons: 1,
 			exactKeyOutcome: rootKeyOutcome(),
 			frontiers
 		};
 	}
+	if (exportsValue.kind === ts.SyntaxKind.NullKeyword)
+		return {
+			branches: [],
+			decisionLeafSeedIndex: null,
+			decisionState: request.exportSubpath === '.' ? 'BLOCKED_BY_NULL' : 'NO_EXACT_EXPORT_KEY',
+			decisionTarget: null,
+			exactKeyComparisons: 1,
+			exactKeyOutcome: rootKeyOutcome(),
+			frontiers
+		};
+	frontiers.push(
+		frontierSeed(
+			parsed,
+			exportsProperty,
+			['exports'],
+			impact,
+			rootExportsValueFrontierReason(exportsValue),
+			exportsValue
+		)
+	);
+	return {
+		branches: [],
+		decisionLeafSeedIndex: null,
+		decisionState: request.exportSubpath === '.' ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
+		decisionTarget: null,
+		exactKeyComparisons: 1,
+		exactKeyOutcome: rootKeyOutcome(),
+		frontiers
+	};
+}
 
-	const assignments = exportsValue.properties as ts.NodeArray<ts.PropertyAssignment>;
+function selectExactSubpathProperty(
+	parsed: ParsedManifest,
+	request: ConditionalExportResolutionRequest,
+	assignments: readonly ts.PropertyAssignment[],
+	frontiers: FrontierSeed[]
+): ts.PropertyAssignment | null {
+	const sourceFile = parsed.sourceFile;
 	let exactProperty: ts.PropertyAssignment | null = null;
 	for (const property of assignments) {
 		const name = decodedPropertyName(property, sourceFile);
@@ -1154,31 +1362,40 @@ function evaluateSurface(
 			);
 		else if (name === request.exportSubpath) exactProperty = property;
 	}
-	if (exactProperty === null) {
-		const adjusted = frontiers.map((frontier) =>
-			frontier.reason === 'EXPORT_PATTERN_KEY_UNSUPPORTED'
-				? { ...frontier, impact: 'BLOCKS_SELECTED_DECISION' as const }
-				: frontier
-		);
-		const blocked = adjusted.some((frontier) => frontier.impact === 'BLOCKS_SELECTED_DECISION');
-		return {
-			branches: [],
-			decisionLeafSeedIndex: null,
-			decisionState: blocked ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
-			decisionTarget: null,
-			exactKeyComparisons: assignments.length,
-			exactKeyOutcome: { exportSubpath: request.exportSubpath, state: 'ABSENT' },
-			frontiers: adjusted
-		};
-	}
-	const exactKeyOutcome: ConditionalExportExactKeyOutcome = {
-		declarationOrdinal: declarationOrdinal(parsed, exactProperty),
-		exportSubpath: request.exportSubpath,
-		keySpan: span(sourceFile, exactProperty.name),
-		matchKind: 'EXPLICIT_SUBPATH_KEY',
-		state: 'MATCHED',
-		valueSpan: span(sourceFile, exactProperty.initializer)
+	return exactProperty;
+}
+
+function evaluateMissingExactSubpath(
+	request: ConditionalExportResolutionRequest,
+	assignments: readonly ts.PropertyAssignment[],
+	frontiers: readonly FrontierSeed[]
+): EvaluatedSurface {
+	const adjusted = frontiers.map((frontier) =>
+		frontier.reason === 'EXPORT_PATTERN_KEY_UNSUPPORTED'
+			? { ...frontier, impact: 'BLOCKS_SELECTED_DECISION' as const }
+			: frontier
+	);
+	const blocked = adjusted.some((frontier) => frontier.impact === 'BLOCKS_SELECTED_DECISION');
+	return {
+		branches: [],
+		decisionLeafSeedIndex: null,
+		decisionState: blocked ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
+		decisionTarget: null,
+		exactKeyComparisons: assignments.length,
+		exactKeyOutcome: { exportSubpath: request.exportSubpath, state: 'ABSENT' },
+		frontiers: adjusted
 	};
+}
+
+function evaluateExactSubpathValue(
+	parsed: ParsedManifest,
+	request: ConditionalExportResolutionRequest,
+	exactProperty: ts.PropertyAssignment,
+	exactKeyOutcome: ConditionalExportExactKeyOutcome,
+	assignments: readonly ts.PropertyAssignment[],
+	frontiers: FrontierSeed[]
+): EvaluatedSurface {
+	const sourceFile = parsed.sourceFile;
 	const exactValue = exactProperty.initializer;
 	if (ts.isStringLiteral(exactValue)) {
 		const target = decodedExportString(exactValue, sourceFile);
@@ -1232,9 +1449,7 @@ function evaluateSurface(
 			exactProperty,
 			['exports', request.exportSubpath],
 			'BLOCKS_SELECTED_DECISION',
-			ts.isArrayLiteralExpression(exactValue)
-				? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
-				: 'UNSUPPORTED_EXPORT_VALUE_KIND',
+			unsupportedValueKindReason(exactValue),
 			exactValue
 		)
 	);
@@ -1247,6 +1462,77 @@ function evaluateSurface(
 		exactKeyOutcome,
 		frontiers
 	};
+}
+
+function evaluateSurface(
+	parsed: ParsedManifest,
+	request: ConditionalExportResolutionRequest
+): EvaluatedSurface {
+	const { exportsProperty, importsProperty, sourceFile } = parsed;
+	const frontiers: FrontierSeed[] = [];
+	if (importsProperty !== null)
+		frontiers.push(
+			frontierSeed(
+				parsed,
+				importsProperty,
+				['imports'],
+				'OUTSIDE_SELECTED_DECISION',
+				'PACKAGE_IMPORTS_MAP_UNSUPPORTED',
+				importsProperty
+			)
+		);
+	if (exportsProperty === null)
+		return {
+			branches: [],
+			decisionLeafSeedIndex: null,
+			decisionState: 'NO_EXACT_EXPORT_KEY',
+			decisionTarget: null,
+			exactKeyComparisons: 0,
+			exactKeyOutcome: { exportSubpath: request.exportSubpath, state: 'ABSENT' },
+			frontiers
+		};
+	const exportsValue = exportsProperty.initializer;
+	const exportsOrdinal = declarationOrdinal(parsed, exportsProperty);
+	const rootKeyOutcome = (): ConditionalExportExactKeyOutcome =>
+		request.exportSubpath === '.'
+			? {
+					declarationOrdinal: exportsOrdinal,
+					exportSubpath: request.exportSubpath,
+					keySpan: span(sourceFile, exportsProperty.name),
+					matchKind: 'ROOT_DOT_SUGAR',
+					state: 'MATCHED',
+					valueSpan: span(sourceFile, exportsValue)
+				}
+			: { exportSubpath: request.exportSubpath, state: 'ABSENT' };
+
+	assertExportsKeyShape(exportsValue, sourceFile);
+	const explicitSubpathMap =
+		ts.isObjectLiteralExpression(exportsValue) &&
+		exportsValue.properties.every((property) =>
+			decodedPropertyName(property, sourceFile).startsWith('.')
+		);
+	if (!explicitSubpathMap)
+		return evaluateNonSubpathExports(parsed, request, exportsProperty, frontiers, rootKeyOutcome);
+
+	const assignments = exportsValue.properties as ts.NodeArray<ts.PropertyAssignment>;
+	const exactProperty = selectExactSubpathProperty(parsed, request, assignments, frontiers);
+	if (exactProperty === null) return evaluateMissingExactSubpath(request, assignments, frontiers);
+	const exactKeyOutcome: ConditionalExportExactKeyOutcome = {
+		declarationOrdinal: declarationOrdinal(parsed, exactProperty),
+		exportSubpath: request.exportSubpath,
+		keySpan: span(sourceFile, exactProperty.name),
+		matchKind: 'EXPLICIT_SUBPATH_KEY',
+		state: 'MATCHED',
+		valueSpan: span(sourceFile, exactProperty.initializer)
+	};
+	return evaluateExactSubpathValue(
+		parsed,
+		request,
+		exactProperty,
+		exactKeyOutcome,
+		assignments,
+		frontiers
+	);
 }
 
 interface BoundConsumerAndManifest {
@@ -1393,6 +1679,67 @@ function enforceOperationBudgets(
 			);
 }
 
+function selectedBranchSeedIndexes(evaluated: EvaluatedSurface): Set<number> {
+	const selectedSeedIndexes = new Set<number>();
+	if (evaluated.decisionLeafSeedIndex === null) return selectedSeedIndexes;
+	let current: number | null = evaluated.decisionLeafSeedIndex;
+	while (current !== null) {
+		selectedSeedIndexes.add(current);
+		current = evaluated.branches[current]!.parentIndex;
+	}
+	return selectedSeedIndexes;
+}
+
+function branchEvaluation(
+	seed: BranchSeed,
+	ordinal: number,
+	selectedSeedIndexes: ReadonlySet<number>
+): ConditionalExportBranchRecord['evaluation'] {
+	if (seed.exclusionReason !== null) return 'EXCLUDED';
+	if (selectedSeedIndexes.has(ordinal)) return 'SELECTED';
+	return 'CANDIDATE';
+}
+
+function resolutionCoverage(
+	parsed: ParsedManifest,
+	evaluated: EvaluatedSurface,
+	branches: readonly ConditionalExportBranchRecord[],
+	decision: ConditionalExportDecisionRecord,
+	frontierRecords: number,
+	chargedTraversalSteps: number,
+	outputRecords: number
+): ConditionalExportResolutionCoverage {
+	const branchRecords = branches.length;
+	return {
+		astNodes: parsed.astNodes,
+		blockedByNullDecisions: decision.state === 'BLOCKED_BY_NULL' ? 1 : 0,
+		branchPopulationReconciles: true,
+		branchRecords,
+		candidateBranches: branches.filter((branch) => branch.evaluation === 'CANDIDATE').length,
+		chargedTraversalSteps,
+		conditionChecks: branchRecords,
+		decisionPopulationReconciles: true,
+		decisionRecords: 1,
+		exactExportKeyComparisons: evaluated.exactKeyComparisons,
+		exactExportKeyMatches: evaluated.exactKeyOutcome.state === 'MATCHED' ? 1 : 0,
+		exactExportKeyMisses: evaluated.exactKeyOutcome.state === 'ABSENT' ? 1 : 0,
+		excludedBranches: branches.filter((branch) => branch.evaluation === 'EXCLUDED').length,
+		frontierPopulationReconciles: true,
+		frontierRecords,
+		manifestBytes: parsed.manifestWitness.manifestBytes,
+		noExactExportKeyDecisions: decision.state === 'NO_EXACT_EXPORT_KEY' ? 1 : 0,
+		noMatchingConditionDecisions: decision.state === 'NO_MATCHING_CONDITION' ? 1 : 0,
+		outputRecords,
+		selectedBranches: branches.filter((branch) => branch.evaluation === 'SELECTED').length,
+		selectedConsumerPrograms: 1,
+		selectedConsumerSources: 1,
+		selectedManifests: 1,
+		selectedTargetDecisions: decision.state === 'SELECTED_TARGET' ? 1 : 0,
+		selectedWorkspacePackages: 1,
+		unsupportedDecisions: decision.state === 'UNSUPPORTED' ? 1 : 0
+	};
+}
+
 function materializeResolution(
 	inputs: ConditionalExportResolutionBuildInputs,
 	consumerEnvironment: ConditionalExportConsumerEnvironment,
@@ -1405,26 +1752,14 @@ function materializeResolution(
 		semanticSnapshotId: inputs.semanticSnapshot.id,
 		subjectId: inputs.frozenSubject.descriptor.subjectId
 	});
-	const selectedSeedIndexes = new Set<number>();
-	if (evaluated.decisionLeafSeedIndex !== null) {
-		let current: number | null = evaluated.decisionLeafSeedIndex;
-		while (current !== null) {
-			selectedSeedIndexes.add(current);
-			current = evaluated.branches[current]!.parentIndex;
-		}
-	}
+	const selectedSeedIndexes = selectedBranchSeedIndexes(evaluated);
 	const branches = evaluated.branches.map((seed, ordinal): ConditionalExportBranchRecord => ({
 		condition: seed.condition,
 		conditionMatch: seed.conditionMatch,
 		conditionPath: [...seed.conditionPath],
 		declarationOrdinal: seed.declarationOrdinal,
 		depth: seed.depth,
-		evaluation:
-			seed.exclusionReason !== null
-				? 'EXCLUDED'
-				: selectedSeedIndexes.has(ordinal)
-					? 'SELECTED'
-					: 'CANDIDATE',
+		evaluation: branchEvaluation(seed, ordinal, selectedSeedIndexes),
 		exclusionReason: seed.exclusionReason,
 		id: conditionalExportBranchId(resolutionId, {
 			conditionPath: seed.conditionPath,
@@ -1504,34 +1839,15 @@ function materializeResolution(
 		outputRecords,
 		traversalSteps: chargedTraversalSteps
 	});
-	const coverage: ConditionalExportResolutionCoverage = {
-		astNodes: parsed.astNodes,
-		blockedByNullDecisions: decision.state === 'BLOCKED_BY_NULL' ? 1 : 0,
-		branchPopulationReconciles: true,
-		branchRecords,
-		candidateBranches: branches.filter((branch) => branch.evaluation === 'CANDIDATE').length,
-		chargedTraversalSteps,
-		conditionChecks: branchRecords,
-		decisionPopulationReconciles: true,
-		decisionRecords: 1,
-		exactExportKeyComparisons: evaluated.exactKeyComparisons,
-		exactExportKeyMatches: evaluated.exactKeyOutcome.state === 'MATCHED' ? 1 : 0,
-		exactExportKeyMisses: evaluated.exactKeyOutcome.state === 'ABSENT' ? 1 : 0,
-		excludedBranches: branches.filter((branch) => branch.evaluation === 'EXCLUDED').length,
-		frontierPopulationReconciles: true,
+	const coverage: ConditionalExportResolutionCoverage = resolutionCoverage(
+		parsed,
+		evaluated,
+		branches,
+		decision,
 		frontierRecords,
-		manifestBytes: parsed.manifestWitness.manifestBytes,
-		noExactExportKeyDecisions: decision.state === 'NO_EXACT_EXPORT_KEY' ? 1 : 0,
-		noMatchingConditionDecisions: decision.state === 'NO_MATCHING_CONDITION' ? 1 : 0,
-		outputRecords,
-		selectedBranches: branches.filter((branch) => branch.evaluation === 'SELECTED').length,
-		selectedConsumerPrograms: 1,
-		selectedConsumerSources: 1,
-		selectedManifests: 1,
-		selectedTargetDecisions: decision.state === 'SELECTED_TARGET' ? 1 : 0,
-		selectedWorkspacePackages: 1,
-		unsupportedDecisions: decision.state === 'UNSUPPORTED' ? 1 : 0
-	};
+		chargedTraversalSteps,
+		outputRecords
+	);
 	const open = decision.state === 'UNSUPPORTED';
 	const content: ConditionalExportResolutionContent = {
 		authorityTransfer: CONDITIONAL_EXPORT_RESOLUTION_AUTHORITY_TRANSFER,

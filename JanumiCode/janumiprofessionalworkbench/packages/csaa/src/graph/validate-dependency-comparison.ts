@@ -1,6 +1,7 @@
 import type {
 	CompareDependencyProvidersRequest,
 	DependencyProviderComparisonAssessment,
+	DependencyProviderComparisonDiagnostic,
 	DependencyProviderComparisonLimitationKind,
 	DependencyProviderComparisonSnapshot
 } from '../contracts/dependency-comparison.js';
@@ -261,6 +262,269 @@ function expectedRecordId(contextDigest: string, key: JsonRecord): string {
 	return `dependency-comparison-record:${sha256(canonicalSemanticJson({ contextDigest, key }))}`;
 }
 
+interface RecordPopulationContext {
+	readonly contextDigest: string;
+	readonly graphEdgeMaximum: number;
+	readonly maxRationaleCharacters: number;
+	readonly providerDependencyMaximum: number;
+	readonly providerDependencyTypeMaximum: number;
+}
+
+interface RecordDescriptors {
+	readonly assessment: DependencyProviderComparisonAssessment | null;
+	readonly disposition: string | null;
+}
+
+function subRecord(value: unknown): JsonRecord | null {
+	return isRecord(value) ? value : null;
+}
+
+function reportRecordSectionShapes(
+	path: string,
+	compiler: JsonRecord | null,
+	provider: JsonRecord | null,
+	key: JsonRecord | null,
+	issues: ValidationIssues
+): void {
+	if (compiler === null || !hasExactKeys(compiler, COMPILER_EVIDENCE_FIELDS))
+		issues.add('INVALID_SHAPE', `${path}.compiler`, 'Compiler evidence fields are invalid.');
+	if (provider === null || !hasExactKeys(provider, PROVIDER_EVIDENCE_FIELDS))
+		issues.add(
+			'INVALID_SHAPE',
+			`${path}.dependencyCruiser`,
+			'Dependency-cruiser evidence fields are invalid.'
+		);
+	if (key === null || !hasExactKeys(key, KEY_FIELDS))
+		issues.add('INVALID_SHAPE', `${path}.key`, 'Comparison key fields are invalid.');
+}
+
+function canonicalEvidenceIds(
+	evidence: JsonRecord | null,
+	member: string,
+	path: string,
+	maximum: number,
+	issues: ValidationIssues
+): readonly string[] | null {
+	if (evidence === null) return null;
+	return canonicalStrings(evidence[member], path, issues, maximum, 'DUPLICATE_ID');
+}
+
+function validateCompilerEvidence(
+	compiler: JsonRecord,
+	path: string,
+	edgeIds: readonly string[] | null,
+	context: RecordPopulationContext,
+	issues: ValidationIssues
+): void {
+	const memberMaximum = edgeIds?.length ?? context.graphEdgeMaximum;
+	canonicalStrings(compiler.relationKinds, `${path}.compiler.relationKinds`, issues, memberMaximum);
+	canonicalStrings(
+		compiler.resolutionStates,
+		`${path}.compiler.resolutionStates`,
+		issues,
+		memberMaximum
+	);
+	canonicalStrings(
+		compiler.targetLogicalPaths,
+		`${path}.compiler.targetLogicalPaths`,
+		issues,
+		memberMaximum
+	);
+	canonicalStrings(compiler.targetNodeIds, `${path}.compiler.targetNodeIds`, issues, memberMaximum);
+	if (!safeNonnegativeInteger(compiler.occurrenceCount))
+		issues.add(
+			'INVALID_SHAPE',
+			`${path}.compiler.occurrenceCount`,
+			'Compiler occurrence count must be a nonnegative safe integer.'
+		);
+	else if (edgeIds !== null && compiler.occurrenceCount !== edgeIds.length)
+		issues.add(
+			'POPULATION_MISMATCH',
+			`${path}.compiler.occurrenceCount`,
+			'Compiler occurrence count does not match its edge identities.'
+		);
+}
+
+function validateProviderEvidence(
+	provider: JsonRecord,
+	path: string,
+	dependencyIds: readonly string[] | null,
+	context: RecordPopulationContext,
+	issues: ValidationIssues
+): void {
+	const memberMaximum = dependencyIds?.length ?? context.providerDependencyMaximum;
+	canonicalStrings(
+		provider.dependencyTypes,
+		`${path}.dependencyCruiser.dependencyTypes`,
+		issues,
+		context.providerDependencyTypeMaximum
+	);
+	canonicalStrings(
+		provider.targetKinds,
+		`${path}.dependencyCruiser.targetKinds`,
+		issues,
+		memberMaximum
+	);
+	canonicalStrings(
+		provider.targetLogicalPaths,
+		`${path}.dependencyCruiser.targetLogicalPaths`,
+		issues,
+		memberMaximum
+	);
+	if (!safeNonnegativeInteger(provider.rowCount))
+		issues.add(
+			'INVALID_SHAPE',
+			`${path}.dependencyCruiser.rowCount`,
+			'Provider row count must be a nonnegative safe integer.'
+		);
+	else if (dependencyIds !== null && provider.rowCount !== dependencyIds.length)
+		issues.add(
+			'POPULATION_MISMATCH',
+			`${path}.dependencyCruiser.rowCount`,
+			'Provider row count does not match its dependency identities.'
+		);
+}
+
+function validateRecordDescriptors(
+	value: JsonRecord,
+	path: string,
+	maxRationaleCharacters: number,
+	issues: ValidationIssues
+): RecordDescriptors {
+	const assessment =
+		typeof value.assessment === 'string' && ASSESSMENTS.has(value.assessment as never)
+			? (value.assessment as DependencyProviderComparisonAssessment)
+			: null;
+	if (assessment === null)
+		issues.add('INVALID_SHAPE', `${path}.assessment`, 'Comparison assessment is invalid.');
+	const disposition = typeof value.disposition === 'string' ? value.disposition : null;
+	if (disposition === null)
+		issues.add('INVALID_SHAPE', `${path}.disposition`, 'Comparison disposition is invalid.');
+	if (
+		typeof value.rationale !== 'string' ||
+		value.rationale.length === 0 ||
+		value.rationale.length > maxRationaleCharacters
+	)
+		issues.add(
+			'INVALID_SHAPE',
+			`${path}.rationale`,
+			'Record rationale must be non-empty and within the request budget.'
+		);
+	return { assessment, disposition };
+}
+
+function serializeRecordKey(
+	key: JsonRecord | null,
+	path: string,
+	issues: ValidationIssues
+): string | null {
+	if (key === null) return null;
+	try {
+		return canonicalSemanticJson(key);
+	} catch {
+		issues.add('INVALID_SHAPE', `${path}.key`, 'Comparison key is not canonically serializable.');
+		return null;
+	}
+}
+
+function reportKeyOrder(
+	previousKeyText: string | null,
+	serializedKey: string | null,
+	path: string,
+	issues: ValidationIssues
+): void {
+	if (serializedKey === null || previousKeyText === null) return;
+	const order = compareText(previousKeyText, serializedKey);
+	if (order === 0)
+		issues.add('POPULATION_MISMATCH', `${path}.key`, 'Comparison keys must be unique.');
+	else if (order > 0)
+		issues.add(
+			'NONCANONICAL_ORDER',
+			'$.records',
+			'Comparison records are not in canonical key order.'
+		);
+}
+
+function validateRecordIdentity(
+	value: JsonRecord,
+	key: JsonRecord | null,
+	path: string,
+	context: RecordPopulationContext,
+	recordIds: Set<string>,
+	issues: ValidationIssues
+): void {
+	if (typeof value.id !== 'string') {
+		issues.add('INVALID_SHAPE', `${path}.id`, 'Comparison record identity must be a string.');
+		return;
+	}
+	if (recordIds.has(value.id))
+		issues.add('DUPLICATE_ID', `${path}.id`, 'Comparison record identities must be unique.');
+	recordIds.add(value.id);
+	if (key !== null && value.id !== expectedRecordId(context.contextDigest, key))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Comparison record identity mismatch.');
+}
+
+function validateRecordEntry(
+	value: unknown,
+	path: string,
+	previousKeyText: string | null,
+	context: RecordPopulationContext,
+	recordIds: Set<string>,
+	issues: ValidationIssues
+): RecordView {
+	if (!isRecord(value) || !hasExactKeys(value, RECORD_FIELDS)) {
+		issues.add('INVALID_SHAPE', path, 'Comparison record fields do not match the contract.');
+		return {
+			assessment: null,
+			compilerEdgeIds: [],
+			dependencyIds: [],
+			disposition: null,
+			keyText: null
+		};
+	}
+
+	const compiler = subRecord(value.compiler);
+	const provider = subRecord(value.dependencyCruiser);
+	const key = subRecord(value.key);
+	reportRecordSectionShapes(path, compiler, provider, key, issues);
+
+	const edgeIds = canonicalEvidenceIds(
+		compiler,
+		'edgeIds',
+		`${path}.compiler.edgeIds`,
+		context.graphEdgeMaximum,
+		issues
+	);
+	const dependencyIds = canonicalEvidenceIds(
+		provider,
+		'dependencyIds',
+		`${path}.dependencyCruiser.dependencyIds`,
+		context.providerDependencyMaximum,
+		issues
+	);
+
+	if (compiler !== null) validateCompilerEvidence(compiler, path, edgeIds, context, issues);
+	if (provider !== null) validateProviderEvidence(provider, path, dependencyIds, context, issues);
+
+	const { assessment, disposition } = validateRecordDescriptors(
+		value,
+		path,
+		context.maxRationaleCharacters,
+		issues
+	);
+	const serializedKey = serializeRecordKey(key, path, issues);
+	reportKeyOrder(previousKeyText, serializedKey, path, issues);
+	validateRecordIdentity(value, key, path, context, recordIds, issues);
+
+	return {
+		assessment,
+		compilerEdgeIds: edgeIds ?? [],
+		dependencyIds: dependencyIds ?? [],
+		disposition,
+		keyText: serializedKey
+	};
+}
+
 function validateRecordPopulation(
 	records: readonly unknown[],
 	contextDigest: string,
@@ -270,206 +534,44 @@ function validateRecordPopulation(
 	maxRationaleCharacters: number,
 	issues: ValidationIssues
 ): readonly RecordView[] {
+	const context: RecordPopulationContext = {
+		contextDigest,
+		graphEdgeMaximum,
+		maxRationaleCharacters,
+		providerDependencyMaximum,
+		providerDependencyTypeMaximum
+	};
 	const views: RecordView[] = [];
 	const recordIds = new Set<string>();
 	let previousKeyText: string | null = null;
 
 	for (const [index, value] of records.entries()) {
-		const path = `$.records[${index}]`;
-		if (!isRecord(value) || !hasExactKeys(value, RECORD_FIELDS)) {
-			issues.add('INVALID_SHAPE', path, 'Comparison record fields do not match the contract.');
-			views.push({
-				assessment: null,
-				compilerEdgeIds: [],
-				dependencyIds: [],
-				disposition: null,
-				keyText: null
-			});
-			continue;
-		}
-
-		const compiler = isRecord(value.compiler) ? value.compiler : null;
-		const provider = isRecord(value.dependencyCruiser) ? value.dependencyCruiser : null;
-		const key = isRecord(value.key) ? value.key : null;
-		if (compiler === null || !hasExactKeys(compiler, COMPILER_EVIDENCE_FIELDS))
-			issues.add('INVALID_SHAPE', `${path}.compiler`, 'Compiler evidence fields are invalid.');
-		if (provider === null || !hasExactKeys(provider, PROVIDER_EVIDENCE_FIELDS))
-			issues.add(
-				'INVALID_SHAPE',
-				`${path}.dependencyCruiser`,
-				'Dependency-cruiser evidence fields are invalid.'
-			);
-		if (key === null || !hasExactKeys(key, KEY_FIELDS))
-			issues.add('INVALID_SHAPE', `${path}.key`, 'Comparison key fields are invalid.');
-
-		const edgeIds =
-			compiler === null
-				? null
-				: canonicalStrings(
-						compiler.edgeIds,
-						`${path}.compiler.edgeIds`,
-						issues,
-						graphEdgeMaximum,
-						'DUPLICATE_ID'
-					);
-		const dependencyIds =
-			provider === null
-				? null
-				: canonicalStrings(
-						provider.dependencyIds,
-						`${path}.dependencyCruiser.dependencyIds`,
-						issues,
-						providerDependencyMaximum,
-						'DUPLICATE_ID'
-					);
-
-		if (compiler !== null) {
-			canonicalStrings(
-				compiler.relationKinds,
-				`${path}.compiler.relationKinds`,
-				issues,
-				edgeIds?.length ?? graphEdgeMaximum
-			);
-			canonicalStrings(
-				compiler.resolutionStates,
-				`${path}.compiler.resolutionStates`,
-				issues,
-				edgeIds?.length ?? graphEdgeMaximum
-			);
-			canonicalStrings(
-				compiler.targetLogicalPaths,
-				`${path}.compiler.targetLogicalPaths`,
-				issues,
-				edgeIds?.length ?? graphEdgeMaximum
-			);
-			canonicalStrings(
-				compiler.targetNodeIds,
-				`${path}.compiler.targetNodeIds`,
-				issues,
-				edgeIds?.length ?? graphEdgeMaximum
-			);
-			if (!safeNonnegativeInteger(compiler.occurrenceCount))
-				issues.add(
-					'INVALID_SHAPE',
-					`${path}.compiler.occurrenceCount`,
-					'Compiler occurrence count must be a nonnegative safe integer.'
-				);
-			else if (edgeIds !== null && compiler.occurrenceCount !== edgeIds.length)
-				issues.add(
-					'POPULATION_MISMATCH',
-					`${path}.compiler.occurrenceCount`,
-					'Compiler occurrence count does not match its edge identities.'
-				);
-		}
-
-		if (provider !== null) {
-			canonicalStrings(
-				provider.dependencyTypes,
-				`${path}.dependencyCruiser.dependencyTypes`,
-				issues,
-				providerDependencyTypeMaximum
-			);
-			canonicalStrings(
-				provider.targetKinds,
-				`${path}.dependencyCruiser.targetKinds`,
-				issues,
-				dependencyIds?.length ?? providerDependencyMaximum
-			);
-			canonicalStrings(
-				provider.targetLogicalPaths,
-				`${path}.dependencyCruiser.targetLogicalPaths`,
-				issues,
-				dependencyIds?.length ?? providerDependencyMaximum
-			);
-			if (!safeNonnegativeInteger(provider.rowCount))
-				issues.add(
-					'INVALID_SHAPE',
-					`${path}.dependencyCruiser.rowCount`,
-					'Provider row count must be a nonnegative safe integer.'
-				);
-			else if (dependencyIds !== null && provider.rowCount !== dependencyIds.length)
-				issues.add(
-					'POPULATION_MISMATCH',
-					`${path}.dependencyCruiser.rowCount`,
-					'Provider row count does not match its dependency identities.'
-				);
-		}
-
-		const assessment =
-			typeof value.assessment === 'string' && ASSESSMENTS.has(value.assessment as never)
-				? (value.assessment as DependencyProviderComparisonAssessment)
-				: null;
-		if (assessment === null)
-			issues.add('INVALID_SHAPE', `${path}.assessment`, 'Comparison assessment is invalid.');
-		const disposition = typeof value.disposition === 'string' ? value.disposition : null;
-		if (disposition === null)
-			issues.add('INVALID_SHAPE', `${path}.disposition`, 'Comparison disposition is invalid.');
-		if (
-			typeof value.rationale !== 'string' ||
-			value.rationale.length === 0 ||
-			value.rationale.length > maxRationaleCharacters
-		)
-			issues.add(
-				'INVALID_SHAPE',
-				`${path}.rationale`,
-				'Record rationale must be non-empty and within the request budget.'
-			);
-
-		let serializedKey: string | null = null;
-		if (key !== null)
-			try {
-				serializedKey = canonicalSemanticJson(key);
-			} catch {
-				issues.add(
-					'INVALID_SHAPE',
-					`${path}.key`,
-					'Comparison key is not canonically serializable.'
-				);
-			}
-		if (serializedKey !== null) {
-			if (previousKeyText !== null) {
-				const order = compareText(previousKeyText, serializedKey);
-				if (order === 0)
-					issues.add('POPULATION_MISMATCH', `${path}.key`, 'Comparison keys must be unique.');
-				else if (order > 0)
-					issues.add(
-						'NONCANONICAL_ORDER',
-						'$.records',
-						'Comparison records are not in canonical key order.'
-					);
-			}
-			previousKeyText = serializedKey;
-		}
-
-		if (typeof value.id !== 'string')
-			issues.add('INVALID_SHAPE', `${path}.id`, 'Comparison record identity must be a string.');
-		else {
-			if (recordIds.has(value.id))
-				issues.add('DUPLICATE_ID', `${path}.id`, 'Comparison record identities must be unique.');
-			recordIds.add(value.id);
-			if (key !== null && value.id !== expectedRecordId(contextDigest, key))
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Comparison record identity mismatch.');
-		}
-
-		views.push({
-			assessment,
-			compilerEdgeIds: edgeIds ?? [],
-			dependencyIds: dependencyIds ?? [],
-			disposition,
-			keyText: serializedKey
-		});
+		const view = validateRecordEntry(
+			value,
+			`$.records[${index}]`,
+			previousKeyText,
+			context,
+			recordIds,
+			issues
+		);
+		previousKeyText = view.keyText ?? previousKeyText;
+		views.push(view);
 	}
 	return views;
+}
+
+interface CoverageExpectations {
+	readonly compilerPartition: boolean;
+	readonly graphEdgeTotal: number;
+	readonly providerDependencyTotal: number;
+	readonly providerPartition: boolean;
 }
 
 function validateCoverage(
 	value: unknown,
 	records: readonly unknown[],
 	views: readonly RecordView[],
-	graphEdgeTotal: number,
-	providerDependencyTotal: number,
-	compilerPartition: boolean,
-	providerPartition: boolean,
+	totals: CoverageExpectations,
 	issues: ValidationIssues
 ): void {
 	if (!isRecord(value) || !hasExactKeys(value, COVERAGE_FIELDS)) {
@@ -489,13 +591,13 @@ function validateCoverage(
 	const expected: JsonRecord = {
 		agreementRecords: count('AGREEMENT'),
 		compilerEdgesRepresented,
-		compilerEdgesTotal: graphEdgeTotal,
+		compilerEdgesTotal: totals.graphEdgeTotal,
 		corroborationRecords: count('CORROBORATION'),
 		dependencyCruiserDependenciesRepresented,
-		dependencyCruiserDependenciesTotal: providerDependencyTotal,
+		dependencyCruiserDependenciesTotal: totals.providerDependencyTotal,
 		incomparableRecords: count('INCOMPARABLE'),
 		observedDifferenceRecords: count('OBSERVED_DIFFERENCE'),
-		reconciles: compilerPartition && providerPartition,
+		reconciles: totals.compilerPartition && totals.providerPartition,
 		recordCount: records.length
 	};
 	for (const field of COVERAGE_FIELDS)
@@ -541,6 +643,67 @@ function expectedLimitationCounts(
 	return expected;
 }
 
+function validateLimitationEntry(
+	entry: unknown,
+	path: string,
+	previousKind: string | null,
+	maxRationaleCharacters: number,
+	actual: Map<string, number>,
+	issues: ValidationIssues
+): string | null {
+	if (!isRecord(entry) || !hasExactKeys(entry, LIMITATION_FIELDS)) {
+		issues.add('INVALID_SHAPE', path, 'Limitation fields do not match the contract.');
+		return previousKind;
+	}
+	if (typeof entry.kind !== 'string') {
+		issues.add('INVALID_SHAPE', `${path}.kind`, 'Limitation kind must be a string.');
+		return previousKind;
+	}
+	if (actual.has(entry.kind))
+		issues.add('DUPLICATE_ID', `${path}.kind`, 'Limitation kinds must be unique.');
+	if (previousKind !== null && compareText(previousKind, entry.kind) >= 0)
+		issues.add(
+			'NONCANONICAL_ORDER',
+			'$.limitations',
+			'Limitations are not in unique canonical kind order.'
+		);
+	if (!safeNonnegativeInteger(entry.affectedRecordCount))
+		issues.add(
+			'INVALID_SHAPE',
+			`${path}.affectedRecordCount`,
+			'Limitation count must be a nonnegative safe integer.'
+		);
+	else actual.set(entry.kind, entry.affectedRecordCount);
+	if (
+		typeof entry.rationale !== 'string' ||
+		entry.rationale.length === 0 ||
+		entry.rationale.length > maxRationaleCharacters
+	)
+		issues.add(
+			'INVALID_SHAPE',
+			`${path}.rationale`,
+			'Limitation rationale must be non-empty and within the request budget.'
+		);
+	return entry.kind;
+}
+
+function reportLimitationReconciliation(
+	expected: ReadonlyMap<DependencyProviderComparisonLimitationKind, number>,
+	actual: ReadonlyMap<string, number>,
+	issues: ValidationIssues
+): void {
+	for (const [kind, count] of expected)
+		if (actual.get(kind) !== count)
+			issues.add(
+				'POPULATION_MISMATCH',
+				'$.limitations',
+				`Limitation ${kind} does not carry its derived affected-record count.`
+			);
+	for (const kind of actual.keys())
+		if (!expected.has(kind as DependencyProviderComparisonLimitationKind))
+			issues.add('POPULATION_MISMATCH', '$.limitations', `Unexpected limitation kind ${kind}.`);
+}
+
 function validateLimitations(
 	value: unknown,
 	views: readonly RecordView[],
@@ -554,64 +717,22 @@ function validateLimitations(
 	const expected = expectedLimitationCounts(views);
 	const actual = new Map<string, number>();
 	let previousKind: string | null = null;
-	for (const [index, entry] of value.entries()) {
-		const path = `$.limitations[${index}]`;
-		if (!isRecord(entry) || !hasExactKeys(entry, LIMITATION_FIELDS)) {
-			issues.add('INVALID_SHAPE', path, 'Limitation fields do not match the contract.');
-			continue;
-		}
-		if (typeof entry.kind !== 'string') {
-			issues.add('INVALID_SHAPE', `${path}.kind`, 'Limitation kind must be a string.');
-			continue;
-		}
-		if (actual.has(entry.kind))
-			issues.add('DUPLICATE_ID', `${path}.kind`, 'Limitation kinds must be unique.');
-		if (previousKind !== null && compareText(previousKind, entry.kind) >= 0)
-			issues.add(
-				'NONCANONICAL_ORDER',
-				'$.limitations',
-				'Limitations are not in unique canonical kind order.'
-			);
-		previousKind = entry.kind;
-		if (!safeNonnegativeInteger(entry.affectedRecordCount))
-			issues.add(
-				'INVALID_SHAPE',
-				`${path}.affectedRecordCount`,
-				'Limitation count must be a nonnegative safe integer.'
-			);
-		else actual.set(entry.kind, entry.affectedRecordCount);
-		if (
-			typeof entry.rationale !== 'string' ||
-			entry.rationale.length === 0 ||
-			entry.rationale.length > maxRationaleCharacters
-		)
-			issues.add(
-				'INVALID_SHAPE',
-				`${path}.rationale`,
-				'Limitation rationale must be non-empty and within the request budget.'
-			);
-	}
+	for (const [index, entry] of value.entries())
+		previousKind = validateLimitationEntry(
+			entry,
+			`$.limitations[${index}]`,
+			previousKind,
+			maxRationaleCharacters,
+			actual,
+			issues
+		);
 
-	for (const [kind, count] of expected)
-		if (actual.get(kind) !== count)
-			issues.add(
-				'POPULATION_MISMATCH',
-				'$.limitations',
-				`Limitation ${kind} does not carry its derived affected-record count.`
-			);
-	for (const kind of actual.keys())
-		if (!expected.has(kind as DependencyProviderComparisonLimitationKind))
-			issues.add('POPULATION_MISMATCH', '$.limitations', `Unexpected limitation kind ${kind}.`);
+	reportLimitationReconciliation(expected, actual, issues);
 }
 
-function validateInternal(
-	value: unknown,
-	request: CompareDependencyProvidersRequest,
-	semanticSnapshot: StaticSemanticSnapshot,
-	graph: ModuleDependencyGraphSnapshot,
-	observation: DependencyCruiserObservation,
+function resolveMaxIssues(
 	options: DependencyProviderComparisonValidationOptions
-): DependencyProviderComparisonValidationResult {
+): DependencyProviderComparisonValidationResult | number {
 	if (!isRecord(options))
 		return invalidResult(
 			'INVALID_INPUTS',
@@ -631,41 +752,86 @@ function validateInternal(
 			'$validationOptions.maxIssues',
 			'maxIssues must be a positive safe integer no greater than 100000.'
 		);
+	return maxIssues;
+}
 
-	const rebuilt = compareDependencyProviders(request, semanticSnapshot, graph, observation);
-	if (rebuilt.outcome === 'unavailable')
-		return {
-			issues: rebuilt.diagnostics.slice(0, maxIssues).map((diagnostic) => ({
-				code: 'INVALID_INPUTS' as const,
-				message: diagnostic.message,
-				path: diagnostic.path ?? '$'
-			})),
-			state: rebuilt.diagnostics.length > maxIssues ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
+function unavailableResult(
+	diagnostics: readonly DependencyProviderComparisonDiagnostic[],
+	maxIssues: number
+): DependencyProviderComparisonValidationResult {
+	return {
+		issues: diagnostics.slice(0, maxIssues).map((diagnostic) => ({
+			code: 'INVALID_INPUTS' as const,
+			message: diagnostic.message,
+			path: diagnostic.path ?? '$'
+		})),
+		state: diagnostics.length > maxIssues ? 'BUDGET_EXHAUSTED' : 'INVALID'
+	};
+}
 
-	const issues = new ValidationIssues(maxIssues);
+function reportRootShape(
+	value: unknown,
+	issues: ValidationIssues
+): value is JsonRecord & { readonly records: readonly unknown[] } {
 	if (!isRecord(value) || !hasExactKeys(value, ROOT_FIELDS)) {
 		issues.add('INVALID_SHAPE', '$', 'Comparison root fields do not match the contract.');
-		return issues.result();
+		return false;
 	}
 	if (!Array.isArray(value.records)) {
 		issues.add('INVALID_SHAPE', '$.records', 'Comparison records must be an array.');
-		return issues.result();
+		return false;
 	}
-	if (
-		!isRecord(request) ||
-		!isRecord(request.budgets) ||
-		!Number.isSafeInteger(request.budgets.maxComparisonRecords) ||
-		!Number.isSafeInteger(request.budgets.maxRationaleCharacters)
-	)
-		return invalidResult('INVALID_INPUTS', '$request.budgets', 'Comparison budgets are invalid.');
-	if (value.records.length > request.budgets.maxComparisonRecords)
-		return invalidResult(
-			'POPULATION_BUDGET_EXCEEDED',
-			'$.records',
-			`Comparison contains ${value.records.length} records, exceeding maxComparisonRecords ${request.budgets.maxComparisonRecords}.`
-		);
+	return true;
+}
 
+function providerTypeCeiling(observationRecord: JsonRecord | null): number {
+	if (!Array.isArray(observationRecord?.dependencies)) return 0;
+	return observationRecord.dependencies.reduce<number>(
+		(total, dependency) =>
+			total +
+			(isRecord(dependency) && Array.isArray(dependency.dependencyTypes)
+				? dependency.dependencyTypes.length
+				: 0),
+		0
+	);
+}
+
+function reportContentMatch(
+	value: JsonRecord,
+	rebuiltComparison: DependencyProviderComparisonSnapshot,
+	issues: ValidationIssues
+): DependencyProviderComparisonValidationResult {
+	let contentIssue: DependencyProviderComparisonValidationIssue | null = null;
+	try {
+		if (
+			canonicalSemanticJson(value as unknown as DependencyProviderComparisonSnapshot) !==
+			canonicalSemanticJson(rebuiltComparison)
+		)
+			contentIssue = {
+				code: 'CONTENT_MISMATCH',
+				message:
+					'Comparison bytes do not match the deterministic result rebuilt from the bound inputs.',
+				path: '$'
+			};
+	} catch {
+		contentIssue = {
+			code: 'INVALID_SHAPE',
+			message: 'Comparison canonicalization failed closed.',
+			path: '$'
+		};
+	}
+	if (contentIssue !== null) return { issues: [contentIssue], state: 'INVALID' };
+	return issues.result();
+}
+
+function validateComparisonBody(
+	value: JsonRecord & { readonly records: readonly unknown[] },
+	request: CompareDependencyProvidersRequest,
+	graph: ModuleDependencyGraphSnapshot,
+	observation: DependencyCruiserObservation,
+	rebuiltComparison: DependencyProviderComparisonSnapshot,
+	issues: ValidationIssues
+): DependencyProviderComparisonValidationResult {
 	const graphRecord = isRecord(graph) ? graph : null;
 	const observationRecord = isRecord(observation) ? observation : null;
 	const edgeIds = inputIds(graphRecord?.edges, '$graph.edges', issues);
@@ -675,16 +841,7 @@ function validateInternal(
 		issues
 	);
 	if (edgeIds === null || dependencyIds === null) return issues.result();
-	const providerTypeMaximum = Array.isArray(observationRecord?.dependencies)
-		? observationRecord.dependencies.reduce(
-				(total, dependency) =>
-					total +
-					(isRecord(dependency) && Array.isArray(dependency.dependencyTypes)
-						? dependency.dependencyTypes.length
-						: 0),
-				0
-			)
-		: 0;
+	const providerTypeMaximum = providerTypeCeiling(observationRecord);
 	if (
 		typeof value.comparisonContextDigest !== 'string' ||
 		!SHA256.test(value.comparisonContextDigest)
@@ -722,39 +879,50 @@ function validateInternal(
 		'Dependency-cruiser dependency',
 		issues
 	);
-	validateCoverage(
-		value.coverage,
-		value.records,
-		views,
-		edgeIds.length,
-		dependencyIds.length,
+	const totals: CoverageExpectations = {
 		compilerPartition,
-		providerPartition,
-		issues
-	);
+		graphEdgeTotal: edgeIds.length,
+		providerDependencyTotal: dependencyIds.length,
+		providerPartition
+	};
+	validateCoverage(value.coverage, value.records, views, totals, issues);
 	validateLimitations(value.limitations, views, request.budgets.maxRationaleCharacters, issues);
 
-	let contentIssue: DependencyProviderComparisonValidationIssue | null = null;
-	try {
-		if (
-			canonicalSemanticJson(value as unknown as DependencyProviderComparisonSnapshot) !==
-			canonicalSemanticJson(rebuilt.comparison)
-		)
-			contentIssue = {
-				code: 'CONTENT_MISMATCH',
-				message:
-					'Comparison bytes do not match the deterministic result rebuilt from the bound inputs.',
-				path: '$'
-			};
-	} catch {
-		contentIssue = {
-			code: 'INVALID_SHAPE',
-			message: 'Comparison canonicalization failed closed.',
-			path: '$'
-		};
-	}
-	if (contentIssue !== null) return { issues: [contentIssue], state: 'INVALID' };
-	return issues.result();
+	return reportContentMatch(value, rebuiltComparison, issues);
+}
+
+function validateInternal(
+	value: unknown,
+	request: CompareDependencyProvidersRequest,
+	semanticSnapshot: StaticSemanticSnapshot,
+	graph: ModuleDependencyGraphSnapshot,
+	observation: DependencyCruiserObservation,
+	options: DependencyProviderComparisonValidationOptions
+): DependencyProviderComparisonValidationResult {
+	const resolvedMaxIssues = resolveMaxIssues(options);
+	if (typeof resolvedMaxIssues !== 'number') return resolvedMaxIssues;
+
+	const rebuilt = compareDependencyProviders(request, semanticSnapshot, graph, observation);
+	if (rebuilt.outcome === 'unavailable')
+		return unavailableResult(rebuilt.diagnostics, resolvedMaxIssues);
+
+	const issues = new ValidationIssues(resolvedMaxIssues);
+	if (!reportRootShape(value, issues)) return issues.result();
+	if (
+		!isRecord(request) ||
+		!isRecord(request.budgets) ||
+		!Number.isSafeInteger(request.budgets.maxComparisonRecords) ||
+		!Number.isSafeInteger(request.budgets.maxRationaleCharacters)
+	)
+		return invalidResult('INVALID_INPUTS', '$request.budgets', 'Comparison budgets are invalid.');
+	if (value.records.length > request.budgets.maxComparisonRecords)
+		return invalidResult(
+			'POPULATION_BUDGET_EXCEEDED',
+			'$.records',
+			`Comparison contains ${value.records.length} records, exceeding maxComparisonRecords ${request.budgets.maxComparisonRecords}.`
+		);
+
+	return validateComparisonBody(value, request, graph, observation, rebuilt.comparison, issues);
 }
 
 /**

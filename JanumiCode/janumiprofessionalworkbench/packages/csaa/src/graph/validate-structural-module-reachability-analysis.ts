@@ -173,20 +173,178 @@ function closeOptions(
 	return closed as unknown as ClosedOptions;
 }
 
+interface PlainTreeVisit {
+	readonly depth: number;
+	readonly kind: 'VISIT';
+	readonly path: string;
+	readonly value: unknown;
+}
+
+type PlainTreeItem = PlainTreeVisit | { readonly kind: 'LEAVE'; readonly value: object };
+
+type PlainLeafOutcome =
+	| { readonly characters: number; readonly kind: 'CONTINUE' }
+	| { readonly issue: StructuralModuleReachabilityValidationIssue; readonly kind: 'ISSUE' }
+	| { readonly kind: 'DESCEND'; readonly value: object };
+
+// Decides whether visiting this item has already exhausted a traversal budget.
+function plainVisitBudgetIssue(
+	item: PlainTreeVisit,
+	records: number,
+	limits: ClosedOptions
+): StructuralModuleReachabilityValidationIssue | null {
+	if (records > limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The record budget was exhausted.', item.path);
+	if (item.depth > limits.maxDepth)
+		return issue('BUDGET_EXHAUSTED', 'The validation depth budget was exhausted.', item.path);
+	return null;
+}
+
+// Decides whether this item is an accepted scalar leaf (carrying the running
+// character count forward), a refusal, or an object that must be descended into.
+function plainLeafOutcome(
+	item: PlainTreeVisit,
+	characters: number,
+	limits: ClosedOptions
+): PlainLeafOutcome {
+	if (typeof item.value === 'string') {
+		if (!isUnicodeScalarString(item.value))
+			return {
+				issue: issue('SHAPE_INVALID', 'Strings must contain Unicode scalar text.', item.path),
+				kind: 'ISSUE'
+			};
+		const accumulated = characters + item.value.length;
+		if (accumulated > limits.maxStringCharacters)
+			return {
+				issue: issue('BUDGET_EXHAUSTED', 'The string-character budget was exhausted.', item.path),
+				kind: 'ISSUE'
+			};
+		return { characters: accumulated, kind: 'CONTINUE' };
+	}
+	if (
+		item.value === null ||
+		typeof item.value === 'boolean' ||
+		(typeof item.value === 'number' && safeInteger(item.value))
+	)
+		return { characters, kind: 'CONTINUE' };
+	const descendant: object | null = typeof item.value === 'object' ? item.value : null;
+	if (descendant === null)
+		return {
+			issue: issue(
+				'SHAPE_INVALID',
+				'Only JSON-compatible data properties are accepted.',
+				item.path
+			),
+			kind: 'ISSUE'
+		};
+	return { kind: 'DESCEND', value: descendant };
+}
+
+// Decides whether the object being entered is an accepted, unaliased, acyclic node.
+function plainObjectEntryIssue(
+	item: PlainTreeVisit,
+	target: object,
+	active: WeakSet<object>,
+	seen: WeakSet<object>,
+	allowSharedAliases: boolean
+): StructuralModuleReachabilityValidationIssue | null {
+	if (isProxyValue(target))
+		return issue('SHAPE_INVALID', 'Proxy values are not accepted.', item.path);
+	if (active.has(target)) return issue('SHAPE_INVALID', 'Cycles are not accepted.', item.path);
+	if (!allowSharedAliases && seen.has(target))
+		return issue('SHAPE_INVALID', 'Shared object aliases are not accepted.', item.path);
+	return null;
+}
+
+function plainArrayItemsIssue(
+	item: PlainTreeVisit,
+	target: readonly unknown[],
+	records: number,
+	limits: ClosedOptions,
+	pending: PlainTreeItem[]
+): StructuralModuleReachabilityValidationIssue | null {
+	if (Object.getPrototypeOf(target) !== Array.prototype)
+		return issue('SHAPE_INVALID', 'Arrays must use Array.prototype.', item.path);
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(target, 'length');
+	const lengthValue =
+		lengthDescriptor !== undefined && 'value' in lengthDescriptor
+			? lengthDescriptor.value
+			: undefined;
+	if (!safeNonnegative(lengthValue))
+		return issue('SHAPE_INVALID', 'Array length is invalid.', item.path);
+	const length = lengthValue;
+	if (records + length > limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The array population exceeds the record budget.', item.path);
+	const keys = Reflect.ownKeys(target);
+	if (keys.length !== length + 1 || keys.some((key) => typeof key === 'symbol'))
+		return issue('SHAPE_INVALID', 'Arrays must be dense exact data arrays.', item.path);
+	for (let index = length - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(target, String(index));
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return issue('SHAPE_INVALID', 'Arrays must contain enumerable data elements.', item.path);
+		pending.push({
+			depth: item.depth + 1,
+			kind: 'VISIT',
+			path: `${item.path}[${index}]`,
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function plainRecordEntriesIssue(
+	item: PlainTreeVisit,
+	target: object,
+	records: number,
+	limits: ClosedOptions,
+	pending: PlainTreeItem[]
+): StructuralModuleReachabilityValidationIssue | null {
+	if (Object.getPrototypeOf(target) !== Object.prototype)
+		return issue('SHAPE_INVALID', 'Records must use Object.prototype.', item.path);
+	const keys = Reflect.ownKeys(target);
+	if (keys.some((key) => typeof key !== 'string'))
+		return issue('SHAPE_INVALID', 'Symbol record keys are not accepted.', item.path);
+	if (records + keys.length > limits.maxRecords)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The property population exceeds the record budget.',
+			item.path
+		);
+	keys.reverse();
+	for (const key of keys) {
+		if (typeof key !== 'string' || !isUnicodeScalarString(key))
+			return issue('SHAPE_INVALID', 'Record keys must contain Unicode scalar text.', item.path);
+		const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return issue('SHAPE_INVALID', 'Records must contain enumerable data properties.', item.path);
+		pending.push({
+			depth: item.depth + 1,
+			kind: 'VISIT',
+			path: `${item.path}.${key}`,
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+// Enqueues the children of an entered object, refusing any non-plain shape.
+function plainChildrenIssue(
+	item: PlainTreeVisit,
+	target: object,
+	records: number,
+	limits: ClosedOptions,
+	pending: PlainTreeItem[]
+): StructuralModuleReachabilityValidationIssue | null {
+	if (Array.isArray(target)) return plainArrayItemsIssue(item, target, records, limits, pending);
+	return plainRecordEntriesIssue(item, target, records, limits, pending);
+}
+
 function plainTreeIssue(
 	value: unknown,
 	limits: ClosedOptions,
 	allowSharedAliases = false
 ): StructuralModuleReachabilityValidationIssue | null {
-	type Item =
-		| {
-				readonly depth: number;
-				readonly kind: 'VISIT';
-				readonly path: string;
-				readonly value: unknown;
-		  }
-		| { readonly kind: 'LEAVE'; readonly value: object };
-	const pending: Item[] = [{ depth: 0, kind: 'VISIT', path: '$', value }];
+	const pending: PlainTreeItem[] = [{ depth: 0, kind: 'VISIT', path: '$', value }];
 	const active = new WeakSet<object>();
 	const seen = new WeakSet<object>();
 	let records = 0;
@@ -198,100 +356,22 @@ function plainTreeIssue(
 			continue;
 		}
 		records += 1;
-		if (records > limits.maxRecords)
-			return issue('BUDGET_EXHAUSTED', 'The record budget was exhausted.', item.path);
-		if (item.depth > limits.maxDepth)
-			return issue('BUDGET_EXHAUSTED', 'The validation depth budget was exhausted.', item.path);
-		if (typeof item.value === 'string') {
-			if (!isUnicodeScalarString(item.value))
-				return issue('SHAPE_INVALID', 'Strings must contain Unicode scalar text.', item.path);
-			characters += item.value.length;
-			if (characters > limits.maxStringCharacters)
-				return issue('BUDGET_EXHAUSTED', 'The string-character budget was exhausted.', item.path);
+		const budgetIssue = plainVisitBudgetIssue(item, records, limits);
+		if (budgetIssue !== null) return budgetIssue;
+		const leaf = plainLeafOutcome(item, characters, limits);
+		if (leaf.kind === 'ISSUE') return leaf.issue;
+		if (leaf.kind === 'CONTINUE') {
+			characters = leaf.characters;
 			continue;
 		}
-		if (
-			item.value === null ||
-			typeof item.value === 'boolean' ||
-			(typeof item.value === 'number' && safeInteger(item.value))
-		)
-			continue;
-		if (typeof item.value !== 'object')
-			return issue(
-				'SHAPE_INVALID',
-				'Only JSON-compatible data properties are accepted.',
-				item.path
-			);
-		if (isProxyValue(item.value))
-			return issue('SHAPE_INVALID', 'Proxy values are not accepted.', item.path);
-		if (active.has(item.value))
-			return issue('SHAPE_INVALID', 'Cycles are not accepted.', item.path);
-		if (!allowSharedAliases && seen.has(item.value))
-			return issue('SHAPE_INVALID', 'Shared object aliases are not accepted.', item.path);
-		seen.add(item.value);
-		active.add(item.value);
-		pending.push({ kind: 'LEAVE', value: item.value });
-		if (Array.isArray(item.value)) {
-			if (Object.getPrototypeOf(item.value) !== Array.prototype)
-				return issue('SHAPE_INVALID', 'Arrays must use Array.prototype.', item.path);
-			const lengthDescriptor = Reflect.getOwnPropertyDescriptor(item.value, 'length');
-			const lengthValue =
-				lengthDescriptor !== undefined && 'value' in lengthDescriptor
-					? lengthDescriptor.value
-					: undefined;
-			if (!safeNonnegative(lengthValue))
-				return issue('SHAPE_INVALID', 'Array length is invalid.', item.path);
-			const length = lengthValue;
-			if (records + length > limits.maxRecords)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The array population exceeds the record budget.',
-					item.path
-				);
-			const keys = Reflect.ownKeys(item.value);
-			if (keys.length !== length + 1 || keys.some((key) => typeof key === 'symbol'))
-				return issue('SHAPE_INVALID', 'Arrays must be dense exact data arrays.', item.path);
-			for (let index = length - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(item.value, String(index));
-				if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-					return issue('SHAPE_INVALID', 'Arrays must contain enumerable data elements.', item.path);
-				pending.push({
-					depth: item.depth + 1,
-					kind: 'VISIT',
-					path: `${item.path}[${index}]`,
-					value: descriptor.value
-				});
-			}
-			continue;
-		}
-		if (Object.getPrototypeOf(item.value) !== Object.prototype)
-			return issue('SHAPE_INVALID', 'Records must use Object.prototype.', item.path);
-		const keys = Reflect.ownKeys(item.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			return issue('SHAPE_INVALID', 'Symbol record keys are not accepted.', item.path);
-		if (records + keys.length > limits.maxRecords)
-			return issue(
-				'BUDGET_EXHAUSTED',
-				'The property population exceeds the record budget.',
-				item.path
-			);
-		for (const key of keys.reverse()) {
-			if (typeof key !== 'string' || !isUnicodeScalarString(key))
-				return issue('SHAPE_INVALID', 'Record keys must contain Unicode scalar text.', item.path);
-			const descriptor = Reflect.getOwnPropertyDescriptor(item.value, key);
-			if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-				return issue(
-					'SHAPE_INVALID',
-					'Records must contain enumerable data properties.',
-					item.path
-				);
-			pending.push({
-				depth: item.depth + 1,
-				kind: 'VISIT',
-				path: `${item.path}.${key}`,
-				value: descriptor.value
-			});
-		}
+		const target = leaf.value;
+		const entryIssue = plainObjectEntryIssue(item, target, active, seen, allowSharedAliases);
+		if (entryIssue !== null) return entryIssue;
+		seen.add(target);
+		active.add(target);
+		pending.push({ kind: 'LEAVE', value: target });
+		const childrenIssue = plainChildrenIssue(item, target, records, limits, pending);
+		if (childrenIssue !== null) return childrenIssue;
 	}
 	return null;
 }
@@ -467,6 +547,235 @@ interface DerivationSuccess {
 
 type DerivationResult = DerivationBudgetFailure | DerivationSuccess;
 
+type TraversalBudgets = StructuralModuleReachabilityAnalysisInputs['request']['budgets'];
+
+type ReachabilityGraphNode = StructuralModuleReachabilityAnalysisInputs['graph']['nodes'][number];
+
+type ReachabilityAnalysisId = ReturnType<typeof structuralModuleReachabilityAnalysisId>;
+
+type ArcRelaxation =
+	| { readonly discovered: boolean; readonly kind: 'RELAX' }
+	| { readonly kind: 'BUDGET'; readonly path: string }
+	| { readonly kind: 'SKIP' };
+
+interface ArcSweep {
+	readonly discovered: TraversalNodeId[];
+	readonly examinedEdges: number;
+	readonly failurePath: string | null;
+}
+
+interface DistanceComputation {
+	readonly distanceByNode: Map<TraversalNodeId, number>;
+	readonly examinedEdges: number;
+	readonly state: 'COMPUTED';
+}
+
+interface LayerWitness {
+	readonly arc: TraversalArc;
+	readonly nodeId: TraversalNodeId;
+}
+
+interface WitnessSelection {
+	readonly maxDistance: number;
+	readonly predecessorByNode: Map<TraversalNodeId, TraversalNodeId>;
+	readonly witnessByNode: Map<TraversalNodeId, TraversalArc['edgeId']>;
+}
+
+// Decides, for a single arc, whether relaxing it is skipped, refused for a
+// budget, or admitted (and whether it discovers a previously unreached node).
+function arcRelaxation(
+	arc: TraversalArc,
+	candidateDistance: number,
+	distanceByNode: Map<TraversalNodeId, number>,
+	budgets: TraversalBudgets
+): ArcRelaxation {
+	const priorDistance = distanceByNode.get(arc.to);
+	if (priorDistance !== undefined && priorDistance <= candidateDistance) return { kind: 'SKIP' };
+	if (distanceByNode.size >= budgets.maxReachableNodes)
+		return { kind: 'BUDGET', path: '$inputs.request.budgets.maxReachableNodes' };
+	if (distanceByNode.size - 1 >= budgets.maxWitnessEdges)
+		return { kind: 'BUDGET', path: '$inputs.request.budgets.maxWitnessEdges' };
+	return { discovered: priorDistance === undefined, kind: 'RELAX' };
+}
+
+// Relaxes every outgoing arc of one node, mutating the distance map in place and
+// reporting the nodes newly discovered so the caller can enqueue them in order.
+function sweepOutgoingArcs(
+	arcs: readonly TraversalArc[],
+	currentDistance: number,
+	cursor: number,
+	examinedEdges: number,
+	distanceByNode: Map<TraversalNodeId, number>,
+	budgets: TraversalBudgets
+): ArcSweep {
+	const discovered: TraversalNodeId[] = [];
+	let sweptEdges = examinedEdges;
+	for (const arc of arcs) {
+		sweptEdges += 1;
+		if (cursor + sweptEdges > budgets.maxTraversalSteps)
+			return {
+				discovered,
+				examinedEdges: sweptEdges,
+				failurePath: '$inputs.request.budgets.maxTraversalSteps'
+			};
+		const candidateDistance = currentDistance + 1;
+		const relaxation = arcRelaxation(arc, candidateDistance, distanceByNode, budgets);
+		if (relaxation.kind === 'BUDGET')
+			return { discovered, examinedEdges: sweptEdges, failurePath: relaxation.path };
+		if (relaxation.kind === 'SKIP') continue;
+		distanceByNode.set(arc.to, candidateDistance);
+		if (relaxation.discovered) discovered.push(arc.to);
+	}
+	return { discovered, examinedEdges: sweptEdges, failurePath: null };
+}
+
+function shortestDistances(
+	criterionNodeId: TraversalNodeId,
+	outgoing: Map<TraversalNodeId, TraversalArc[]>,
+	budgets: TraversalBudgets
+): DerivationBudgetFailure | DistanceComputation {
+	const distanceByNode = new Map<TraversalNodeId, number>([[criterionNodeId, 0]]);
+	const pending: TraversalNodeId[] = [criterionNodeId];
+	let cursor = 0;
+	let examinedEdges = 0;
+	while (cursor < pending.length) {
+		const current = pending[cursor++]!;
+		if (cursor + examinedEdges > budgets.maxTraversalSteps)
+			return {
+				path: '$inputs.request.budgets.maxTraversalSteps',
+				state: 'BUDGET_EXHAUSTED'
+			};
+		const currentDistance = distanceByNode.get(current)!;
+		const sweep = sweepOutgoingArcs(
+			outgoing.get(current)!,
+			currentDistance,
+			cursor,
+			examinedEdges,
+			distanceByNode,
+			budgets
+		);
+		examinedEdges = sweep.examinedEdges;
+		if (sweep.failurePath !== null) return { path: sweep.failurePath, state: 'BUDGET_EXHAUSTED' };
+		for (const nodeId of sweep.discovered) pending.push(nodeId);
+	}
+	return { distanceByNode, examinedEdges, state: 'COMPUTED' };
+}
+
+// Picks the canonical witness arc for every node at one distance layer, in the
+// canonical emission order of that layer.
+function canonicalLayerWitnesses(
+	layerNodeIds: readonly TraversalNodeId[],
+	distance: number,
+	distanceByNode: Map<TraversalNodeId, number>,
+	incoming: Map<TraversalNodeId, TraversalArc[]>,
+	discoveryRank: Map<TraversalNodeId, number>
+): LayerWitness[] {
+	return layerNodeIds
+		.map((nodeId) => {
+			const candidates = incoming
+				.get(nodeId)!
+				.filter((arc) => distanceByNode.get(arc.from) === distance - 1)
+				.sort((left, right) => {
+					const rankOrder = discoveryRank.get(left.from)! - discoveryRank.get(right.from)!;
+					return rankOrder !== 0 ? rankOrder : compareText(left.edgeId, right.edgeId);
+				});
+			return { arc: candidates[0]!, nodeId };
+		})
+		.sort((left, right) => {
+			const rankOrder = discoveryRank.get(left.arc.from)! - discoveryRank.get(right.arc.from)!;
+			if (rankOrder !== 0) return rankOrder;
+			const nodeOrder = compareText(left.nodeId, right.nodeId);
+			return nodeOrder !== 0 ? nodeOrder : compareText(left.arc.edgeId, right.arc.edgeId);
+		});
+}
+
+function canonicalWitnessSelection(
+	criterionNodeId: TraversalNodeId,
+	distanceByNode: Map<TraversalNodeId, number>,
+	incoming: Map<TraversalNodeId, TraversalArc[]>
+): WitnessSelection {
+	let maxDistance = 0;
+	for (const distance of distanceByNode.values()) maxDistance = Math.max(maxDistance, distance);
+	const nodesByDistance: TraversalNodeId[][] = Array.from({ length: maxDistance + 1 }, () => []);
+	for (const [nodeId, distance] of distanceByNode) nodesByDistance[distance]!.push(nodeId);
+	const discoveryRank = new Map<TraversalNodeId, number>([[criterionNodeId, 0]]);
+	const predecessorByNode = new Map<TraversalNodeId, TraversalNodeId>();
+	const witnessByNode = new Map<TraversalNodeId, TraversalArc['edgeId']>();
+	let nextRank = 1;
+	for (let distance = 1; distance <= maxDistance; distance += 1) {
+		const selected = canonicalLayerWitnesses(
+			nodesByDistance[distance]!,
+			distance,
+			distanceByNode,
+			incoming,
+			discoveryRank
+		);
+		for (const { arc, nodeId } of selected) {
+			discoveryRank.set(nodeId, nextRank++);
+			predecessorByNode.set(nodeId, arc.from);
+			witnessByNode.set(nodeId, arc.edgeId);
+		}
+	}
+	return { maxDistance, predecessorByNode, witnessByNode };
+}
+
+function orderedReachedNodeIds(distanceByNode: Map<TraversalNodeId, number>): TraversalNodeId[] {
+	return [...distanceByNode.entries()]
+		.sort((left, right) => {
+			const distanceOrder = left[1] - right[1];
+			return distanceOrder !== 0 ? distanceOrder : compareText(left[0], right[0]);
+		})
+		.map(([nodeId]) => nodeId);
+}
+
+function reachabilityMembers(
+	analysisId: ReachabilityAnalysisId,
+	criterionNodeId: TraversalNodeId,
+	orderedReachedNodes: readonly TraversalNodeId[],
+	nodeById: Map<TraversalNodeId, ReachabilityGraphNode>,
+	distanceByNode: Map<TraversalNodeId, number>,
+	selection: WitnessSelection
+): StructuralModuleReachabilityMember[] {
+	return orderedReachedNodes.map((nodeId, ordinal) => {
+		const node = nodeById.get(nodeId)!;
+		const criterion = nodeId === criterionNodeId;
+		return {
+			criterion,
+			distance: distanceByNode.get(nodeId)!,
+			id: structuralModuleReachabilityMemberId(analysisId, nodeId),
+			nodeId: node.id,
+			nodeKind: node.kind,
+			ordinal,
+			predecessorNodeId: criterion
+				? null
+				: (selection.predecessorByNode.get(nodeId)! as typeof node.id),
+			witnessEdgeId: criterion ? null : selection.witnessByNode.get(nodeId)!
+		};
+	});
+}
+
+function encounteredFrontierRecords(
+	analysisId: ReachabilityAnalysisId,
+	nodeById: Map<TraversalNodeId, ReachabilityGraphNode>,
+	terminalMembers: readonly StructuralModuleReachabilityMember[]
+): StructuralModuleReachabilityEncounteredFrontier[] {
+	return terminalMembers.map((member, ordinal) => {
+		const node = nodeById.get(member.nodeId)!;
+		if (node.kind !== 'RESOLUTION_TARGET')
+			throw new Error('The validated node-kind projection became inconsistent.');
+		return {
+			id: structuralModuleReachabilityFrontierId(analysisId, member.nodeId),
+			memberId: member.id,
+			moduleResolutionId: node.moduleResolutionId,
+			nodeId: member.nodeId,
+			ordinal,
+			reason: STRUCTURAL_MODULE_REACHABILITY_TERMINAL_FRONTIER_REASON,
+			resolutionState: node.resolutionState,
+			witnessEdgeId: member.witnessEdgeId
+		};
+	});
+}
+
 function independentAnalysis(inputs: StructuralModuleReachabilityAnalysisInputs): DerivationResult {
 	const request = inputs.request;
 	const nodeById = new Map(inputs.graph.nodes.map((node) => [node.id, node]));
@@ -484,42 +793,10 @@ function independentAnalysis(inputs: StructuralModuleReachabilityAnalysisInputs)
 
 	// Compute only shortest distances here. Witness selection is deliberately a
 	// separate canonical reconstruction below rather than an artifact of queue order.
-	const distanceByNode = new Map<TraversalNodeId, number>([[request.criterion.nodeId, 0]]);
-	const pending: TraversalNodeId[] = [request.criterion.nodeId];
-	let cursor = 0;
-	let examinedEdges = 0;
-	while (cursor < pending.length) {
-		const current = pending[cursor++]!;
-		if (cursor + examinedEdges > request.budgets.maxTraversalSteps)
-			return {
-				path: '$inputs.request.budgets.maxTraversalSteps',
-				state: 'BUDGET_EXHAUSTED'
-			};
-		const currentDistance = distanceByNode.get(current)!;
-		for (const arc of outgoing.get(current)!) {
-			examinedEdges += 1;
-			if (cursor + examinedEdges > request.budgets.maxTraversalSteps)
-				return {
-					path: '$inputs.request.budgets.maxTraversalSteps',
-					state: 'BUDGET_EXHAUSTED'
-				};
-			const candidateDistance = currentDistance + 1;
-			const priorDistance = distanceByNode.get(arc.to);
-			if (priorDistance !== undefined && priorDistance <= candidateDistance) continue;
-			if (distanceByNode.size >= request.budgets.maxReachableNodes)
-				return {
-					path: '$inputs.request.budgets.maxReachableNodes',
-					state: 'BUDGET_EXHAUSTED'
-				};
-			if (distanceByNode.size - 1 >= request.budgets.maxWitnessEdges)
-				return {
-					path: '$inputs.request.budgets.maxWitnessEdges',
-					state: 'BUDGET_EXHAUSTED'
-				};
-			distanceByNode.set(arc.to, candidateDistance);
-			if (priorDistance === undefined) pending.push(arc.to);
-		}
-	}
+	const computed = shortestDistances(request.criterion.nodeId, outgoing, request.budgets);
+	if (computed.state === 'BUDGET_EXHAUSTED') return computed;
+	const distanceByNode = computed.distanceByNode;
+	const examinedEdges = computed.examinedEdges;
 	const reachedNodes = distanceByNode.size;
 	const witnessEdges = Math.max(0, reachedNodes - 1);
 	const chargedTraversalSteps = reachedNodes + examinedEdges;
@@ -539,36 +816,8 @@ function independentAnalysis(inputs: StructuralModuleReachabilityAnalysisInputs)
 			state: 'BUDGET_EXHAUSTED'
 		};
 
-	let maxDistance = 0;
-	for (const distance of distanceByNode.values()) maxDistance = Math.max(maxDistance, distance);
-	const nodesByDistance: TraversalNodeId[][] = Array.from({ length: maxDistance + 1 }, () => []);
-	for (const [nodeId, distance] of distanceByNode) nodesByDistance[distance]!.push(nodeId);
-	const discoveryRank = new Map<TraversalNodeId, number>([[request.criterion.nodeId, 0]]);
-	const predecessorByNode = new Map<TraversalNodeId, TraversalNodeId>();
-	const witnessByNode = new Map<TraversalNodeId, TraversalArc['edgeId']>();
-	let nextRank = 1;
-	for (let distance = 1; distance <= maxDistance; distance += 1) {
-		const selected = nodesByDistance[distance]!.map((nodeId) => {
-			const candidates = incoming
-				.get(nodeId)!
-				.filter((arc) => distanceByNode.get(arc.from) === distance - 1)
-				.sort((left, right) => {
-					const rankOrder = discoveryRank.get(left.from)! - discoveryRank.get(right.from)!;
-					return rankOrder !== 0 ? rankOrder : compareText(left.edgeId, right.edgeId);
-				});
-			return { arc: candidates[0]!, nodeId };
-		}).sort((left, right) => {
-			const rankOrder = discoveryRank.get(left.arc.from)! - discoveryRank.get(right.arc.from)!;
-			if (rankOrder !== 0) return rankOrder;
-			const nodeOrder = compareText(left.nodeId, right.nodeId);
-			return nodeOrder !== 0 ? nodeOrder : compareText(left.arc.edgeId, right.arc.edgeId);
-		});
-		for (const { arc, nodeId } of selected) {
-			discoveryRank.set(nodeId, nextRank++);
-			predecessorByNode.set(nodeId, arc.from);
-			witnessByNode.set(nodeId, arc.edgeId);
-		}
-	}
+	const selection = canonicalWitnessSelection(request.criterion.nodeId, distanceByNode, incoming);
+	const maxDistance = selection.maxDistance;
 
 	const inputDigest = structuralModuleReachabilityAnalysisInputDigest(inputs);
 	const analysisId = structuralModuleReachabilityAnalysisId({
@@ -576,27 +825,14 @@ function independentAnalysis(inputs: StructuralModuleReachabilityAnalysisInputs)
 		semanticSnapshotId: request.semanticSnapshotId,
 		subjectId: request.subjectId
 	});
-	const orderedReachedNodes = [...distanceByNode.entries()]
-		.sort((left, right) => {
-			const distanceOrder = left[1] - right[1];
-			return distanceOrder !== 0 ? distanceOrder : compareText(left[0], right[0]);
-		})
-		.map(([nodeId]) => nodeId);
-	const members: StructuralModuleReachabilityMember[] = orderedReachedNodes.map(
-		(nodeId, ordinal) => {
-			const node = nodeById.get(nodeId)!;
-			const criterion = nodeId === request.criterion.nodeId;
-			return {
-				criterion,
-				distance: distanceByNode.get(nodeId)!,
-				id: structuralModuleReachabilityMemberId(analysisId, nodeId),
-				nodeId: node.id,
-				nodeKind: node.kind,
-				ordinal,
-				predecessorNodeId: criterion ? null : (predecessorByNode.get(nodeId)! as typeof node.id),
-				witnessEdgeId: criterion ? null : witnessByNode.get(nodeId)!
-			};
-		}
+	const orderedReachedNodes = orderedReachedNodeIds(distanceByNode);
+	const members: StructuralModuleReachabilityMember[] = reachabilityMembers(
+		analysisId,
+		request.criterion.nodeId,
+		orderedReachedNodes,
+		nodeById,
+		distanceByNode,
+		selection
 	);
 	const terminalMembers = members.filter((member) => member.nodeKind === 'RESOLUTION_TARGET');
 	if (terminalMembers.length > request.budgets.maxFrontierRecords)
@@ -605,21 +841,7 @@ function independentAnalysis(inputs: StructuralModuleReachabilityAnalysisInputs)
 			state: 'BUDGET_EXHAUSTED'
 		};
 	const encounteredFrontiers: StructuralModuleReachabilityEncounteredFrontier[] =
-		terminalMembers.map((member, ordinal) => {
-			const node = nodeById.get(member.nodeId)!;
-			if (node.kind !== 'RESOLUTION_TARGET')
-				throw new Error('The validated node-kind projection became inconsistent.');
-			return {
-				id: structuralModuleReachabilityFrontierId(analysisId, member.nodeId),
-				memberId: member.id,
-				moduleResolutionId: node.moduleResolutionId,
-				nodeId: member.nodeId,
-				ordinal,
-				reason: STRUCTURAL_MODULE_REACHABILITY_TERMINAL_FRONTIER_REASON,
-				resolutionState: node.resolutionState,
-				witnessEdgeId: member.witnessEdgeId
-			};
-		});
+		encounteredFrontierRecords(analysisId, nodeById, terminalMembers);
 	const sourceMembers = members.filter((member) => member.nodeKind === 'SOURCE').length;
 	const resolutionTargetMembers = members.length - sourceMembers;
 	const withoutDigest = {
@@ -697,6 +919,34 @@ function independentAnalysis(inputs: StructuralModuleReachabilityAnalysisInputs)
 	};
 }
 
+function issueResult(
+	found: StructuralModuleReachabilityValidationIssue
+): StructuralModuleReachabilityValidationResult {
+	return {
+		issues: [found],
+		state: found.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
+	};
+}
+
+function boundedInputShellIssue(
+	inputs: StructuralModuleReachabilityAnalysisInputs,
+	limits: ClosedOptions
+): StructuralModuleReachabilityValidationIssue | null {
+	if (
+		inputs.request.budgets.maxInputRecords < limits.maxInputRecords ||
+		inputs.request.budgets.maxInputStringCharacters < limits.maxInputStringCharacters
+	)
+		return inputShellIssue(inputs, {
+			...limits,
+			maxInputRecords: Math.min(limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
+			maxInputStringCharacters: Math.min(
+				limits.maxInputStringCharacters,
+				inputs.request.budgets.maxInputStringCharacters
+			)
+		});
+	return null;
+}
+
 function validateInternal(
 	value: unknown,
 	inputs: StructuralModuleReachabilityAnalysisInputs,
@@ -709,11 +959,7 @@ function validateInternal(
 			state: 'INVALID'
 		};
 	const candidateTreeIssue = plainTreeIssue(value, limits);
-	if (candidateTreeIssue !== null)
-		return {
-			issues: [candidateTreeIssue],
-			state: candidateTreeIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
+	if (candidateTreeIssue !== null) return issueResult(candidateTreeIssue);
 	if (!plainRecord(value) || !exactKeys(value, SNAPSHOT_KEYS))
 		return {
 			issues: [
@@ -725,35 +971,11 @@ function validateInternal(
 			state: 'INVALID'
 		};
 	const shellIssue = inputShellIssue(inputs, limits);
-	if (shellIssue !== null)
-		return {
-			issues: [shellIssue],
-			state: shellIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
+	if (shellIssue !== null) return issueResult(shellIssue);
 	const closedRequestIssue = requestIssue(inputs);
-	if (closedRequestIssue !== null)
-		return {
-			issues: [closedRequestIssue],
-			state: closedRequestIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
-	if (
-		inputs.request.budgets.maxInputRecords < limits.maxInputRecords ||
-		inputs.request.budgets.maxInputStringCharacters < limits.maxInputStringCharacters
-	) {
-		const boundedInputIssue = inputShellIssue(inputs, {
-			...limits,
-			maxInputRecords: Math.min(limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
-			maxInputStringCharacters: Math.min(
-				limits.maxInputStringCharacters,
-				inputs.request.budgets.maxInputStringCharacters
-			)
-		});
-		if (boundedInputIssue !== null)
-			return {
-				issues: [boundedInputIssue],
-				state: boundedInputIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-			};
-	}
+	if (closedRequestIssue !== null) return issueResult(closedRequestIssue);
+	const boundedInputIssue = boundedInputShellIssue(inputs, limits);
+	if (boundedInputIssue !== null) return issueResult(boundedInputIssue);
 	const graphValidation = validateModuleDependencyGraph(inputs.graph, inputs.semanticSnapshot, {
 		maxIssues: Math.min(limits.maxIssues, inputs.request.budgets.maxDiagnostics)
 	});

@@ -85,7 +85,7 @@ import { validateStateMachineGraph } from './validate-state-machine-graph.js';
 const STATE_SOURCE_PATH = 'packages/rph-domain/src/transitions.data.ts';
 const MACHINE_EXCLUSIONS_PATH = 'packages/rph-domain/src/machine-exclusions.ts';
 const APPLICATION_PROJECT_PATH = 'packages/rph-application/tsconfig.json';
-const ENFORCING_SITE = /^(packages\/rph-application\/src\/handlers\/[^/:]+\.ts):[1-9][0-9]*$/u;
+const ENFORCING_SITE = /^(packages\/rph-application\/src\/handlers\/[^/:]+\.ts):[1-9]\d*$/u;
 
 const CALLABLE_KINDS = new Set<number>([
 	ts.SyntaxKind.FunctionDeclaration,
@@ -267,148 +267,253 @@ function materializeOptions(
 	return result;
 }
 
+interface InspectionBudget {
+	readonly maxDepth: number;
+	readonly maxRecords: number;
+	readonly maxStringCharacters: number;
+}
+
+interface InspectionFrame {
+	readonly depth: number;
+	readonly exit: boolean;
+	readonly path: string;
+	readonly value: unknown;
+}
+
+interface InspectionCounters {
+	records: number;
+	stringCharacters: number;
+}
+
+function inspectFrameBudget(
+	frame: InspectionFrame,
+	limits: InspectionBudget,
+	counters: InspectionCounters
+): InspectionFailure | null {
+	if (frame.depth > limits.maxDepth)
+		return {
+			budget: true,
+			message: `Structural depth budget exceeded: ${frame.depth} > ${limits.maxDepth}.`,
+			path: frame.path
+		};
+	counters.records += 1;
+	if (counters.records > limits.maxRecords)
+		return {
+			budget: true,
+			message: `Structural record budget exceeded: ${counters.records} > ${limits.maxRecords}.`,
+			path: frame.path
+		};
+	return null;
+}
+
+function inspectStringCharacters(
+	text: string,
+	path: string,
+	limits: InspectionBudget,
+	counters: InspectionCounters
+): InspectionFailure | null {
+	counters.stringCharacters += text.length;
+	if (counters.stringCharacters > limits.maxStringCharacters)
+		return {
+			budget: true,
+			message: `String-character budget exceeded: ${counters.stringCharacters} > ${limits.maxStringCharacters}.`,
+			path
+		};
+	return null;
+}
+
+/** Booleans and finite non-negative-zero numbers; `null` is admitted by the container dispatch. */
+function isCanonicalScalar(value: unknown): boolean {
+	return (
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isFinite(value) && !Object.is(value, -0))
+	);
+}
+
+function inspectContainerPrototype(
+	current: object,
+	path: string,
+	array: boolean
+): InspectionFailure | null {
+	const prototype = Reflect.getPrototypeOf(current);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return { budget: false, message: 'Containers must have plain prototypes.', path };
+	return null;
+}
+
+/** The declared array length, or the refusal owed by its descriptor or the record budget. */
+function traversedArrayLength(
+	current: object,
+	path: string,
+	limits: InspectionBudget,
+	records: number
+): InspectionFailure | number {
+	const descriptor = Reflect.getOwnPropertyDescriptor(current, 'length');
+	if (
+		descriptor === undefined ||
+		!('value' in descriptor) ||
+		!Number.isSafeInteger(descriptor.value) ||
+		(descriptor.value as number) < 0
+	)
+		return { budget: false, message: 'Array length descriptor is invalid.', path };
+	const arrayLength = descriptor.value as number;
+	if (arrayLength > limits.maxRecords - records)
+		return {
+			budget: true,
+			message: 'Structural record budget cannot admit the array population.',
+			path
+		};
+	return arrayLength;
+}
+
+function denseArrayKey(key: PropertyKey, arrayLength: number): boolean {
+	if (key === 'length') return true;
+	if (typeof key !== 'string') return false;
+	const index = Number(key);
+	return Number.isSafeInteger(index) && index >= 0 && index < arrayLength && String(index) === key;
+}
+
+function inspectContainerKeys(
+	keys: readonly PropertyKey[],
+	path: string,
+	array: boolean,
+	arrayLength: number,
+	limits: InspectionBudget,
+	records: number
+): InspectionFailure | null {
+	if (keys.length > limits.maxRecords - records)
+		return {
+			budget: true,
+			message: 'Structural record budget cannot admit the container properties.',
+			path
+		};
+	if (keys.some((key) => typeof key !== 'string'))
+		return { budget: false, message: 'Containers may not have symbol keys.', path };
+	if (
+		array &&
+		(keys.length !== arrayLength + 1 || keys.some((key) => !denseArrayKey(key, arrayLength)))
+	)
+		return {
+			budget: false,
+			message: 'Arrays must be dense and may not carry extra properties.',
+			path
+		};
+	return null;
+}
+
+function pushContainerChildren(
+	current: object,
+	frame: InspectionFrame,
+	keys: readonly PropertyKey[],
+	limits: InspectionBudget,
+	counters: InspectionCounters,
+	pending: InspectionFrame[]
+): InspectionFailure | null {
+	const array = Array.isArray(current);
+	for (const key of keys) {
+		if (array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			return {
+				budget: false,
+				message: 'Properties must be enumerable data properties.',
+				path: `${frame.path}.${String(key)}`
+			};
+		counters.stringCharacters += String(key).length;
+		if (counters.stringCharacters > limits.maxStringCharacters)
+			return {
+				budget: true,
+				message: 'String-character budget exceeded while inspecting keys.',
+				path: frame.path
+			};
+		pending.push({
+			depth: frame.depth + 1,
+			exit: false,
+			path: array ? `${frame.path}[${String(key)}]` : `${frame.path}.${String(key)}`,
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function inspectContainerFrame(
+	current: object,
+	frame: InspectionFrame,
+	limits: InspectionBudget,
+	counters: InspectionCounters,
+	active: WeakSet<object>,
+	pending: InspectionFrame[]
+): InspectionFailure | null {
+	if (isProxy(current))
+		return { budget: false, message: 'Value contains a Proxy.', path: frame.path };
+	if (active.has(current))
+		return { budget: false, message: 'Value contains a cyclic container.', path: frame.path };
+	const array = Array.isArray(current);
+	const prototypeFailure = inspectContainerPrototype(current, frame.path, array);
+	if (prototypeFailure !== null) return prototypeFailure;
+	const arrayLength = array
+		? traversedArrayLength(current, frame.path, limits, counters.records)
+		: 0;
+	if (typeof arrayLength !== 'number') return arrayLength;
+	const keys = Reflect.ownKeys(current);
+	const keysFailure = inspectContainerKeys(
+		keys,
+		frame.path,
+		array,
+		arrayLength,
+		limits,
+		counters.records
+	);
+	if (keysFailure !== null) return keysFailure;
+	active.add(current);
+	pending.push({ ...frame, exit: true });
+	return pushContainerChildren(current, frame, keys, limits, counters, pending);
+}
+
+function inspectFrame(
+	frame: InspectionFrame,
+	limits: InspectionBudget,
+	counters: InspectionCounters,
+	active: WeakSet<object>,
+	pending: InspectionFrame[]
+): InspectionFailure | null {
+	const budgetFailure = inspectFrameBudget(frame, limits, counters);
+	if (budgetFailure !== null) return budgetFailure;
+	const current = frame.value;
+	if (typeof current === 'string')
+		return inspectStringCharacters(current, frame.path, limits, counters);
+	if (isCanonicalScalar(current)) return null;
+	if (typeof current !== 'object')
+		return {
+			budget: false,
+			message: 'Value contains a non-canonical JSON member.',
+			path: frame.path
+		};
+	if (current === null) return null;
+	return inspectContainerFrame(current, frame, limits, counters, active, pending);
+}
+
 /** Descriptor-only hostile-shape inspection performed before canonicalizers or predecessor validators. */
 function inspectPlainData(
 	roots: readonly { readonly path: string; readonly value: unknown }[],
-	limits: {
-		readonly maxDepth: number;
-		readonly maxRecords: number;
-		readonly maxStringCharacters: number;
-	}
+	limits: InspectionBudget
 ): InspectionFailure | null {
-	type Frame = {
-		readonly depth: number;
-		readonly exit: boolean;
-		readonly path: string;
-		readonly value: unknown;
-	};
-	const pending: Frame[] = roots
+	const pending: InspectionFrame[] = roots
 		.map((root) => ({ depth: 0, exit: false, path: root.path, value: root.value }))
 		.reverse();
 	const active = new WeakSet<object>();
-	let records = 0;
-	let stringCharacters = 0;
+	const counters: InspectionCounters = { records: 0, stringCharacters: 0 };
 	while (pending.length > 0) {
 		const frame = pending.pop()!;
-		const current = frame.value;
 		if (frame.exit) {
-			active.delete(current as object);
+			active.delete(frame.value as object);
 			continue;
 		}
-		if (frame.depth > limits.maxDepth)
-			return {
-				budget: true,
-				message: `Structural depth budget exceeded: ${frame.depth} > ${limits.maxDepth}.`,
-				path: frame.path
-			};
-		records += 1;
-		if (records > limits.maxRecords)
-			return {
-				budget: true,
-				message: `Structural record budget exceeded: ${records} > ${limits.maxRecords}.`,
-				path: frame.path
-			};
-		if (typeof current === 'string') {
-			stringCharacters += current.length;
-			if (stringCharacters > limits.maxStringCharacters)
-				return {
-					budget: true,
-					message: `String-character budget exceeded: ${stringCharacters} > ${limits.maxStringCharacters}.`,
-					path: frame.path
-				};
-			continue;
-		}
-		if (
-			current === null ||
-			typeof current === 'boolean' ||
-			(typeof current === 'number' && Number.isFinite(current) && !Object.is(current, -0))
-		)
-			continue;
-		if (typeof current !== 'object')
-			return {
-				budget: false,
-				message: 'Value contains a non-canonical JSON member.',
-				path: frame.path
-			};
-		if (isProxy(current))
-			return { budget: false, message: 'Value contains a Proxy.', path: frame.path };
-		if (active.has(current))
-			return { budget: false, message: 'Value contains a cyclic container.', path: frame.path };
-		const array = Array.isArray(current);
-		const prototype = Reflect.getPrototypeOf(current);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return { budget: false, message: 'Containers must have plain prototypes.', path: frame.path };
-		let arrayLength = 0;
-		if (array) {
-			const descriptor = Reflect.getOwnPropertyDescriptor(current, 'length');
-			if (
-				descriptor === undefined ||
-				!('value' in descriptor) ||
-				!Number.isSafeInteger(descriptor.value) ||
-				(descriptor.value as number) < 0
-			)
-				return { budget: false, message: 'Array length descriptor is invalid.', path: frame.path };
-			arrayLength = descriptor.value as number;
-			if (arrayLength > limits.maxRecords - records)
-				return {
-					budget: true,
-					message: 'Structural record budget cannot admit the array population.',
-					path: frame.path
-				};
-		}
-		const keys = Reflect.ownKeys(current);
-		if (keys.length > limits.maxRecords - records)
-			return {
-				budget: true,
-				message: 'Structural record budget cannot admit the container properties.',
-				path: frame.path
-			};
-		if (keys.some((key) => typeof key !== 'string'))
-			return { budget: false, message: 'Containers may not have symbol keys.', path: frame.path };
-		if (array) {
-			const dense = (key: PropertyKey): boolean => {
-				if (key === 'length') return true;
-				if (typeof key !== 'string') return false;
-				const index = Number(key);
-				return (
-					Number.isSafeInteger(index) && index >= 0 && index < arrayLength && String(index) === key
-				);
-			};
-			if (keys.length !== arrayLength + 1 || keys.some((key) => !dense(key)))
-				return {
-					budget: false,
-					message: 'Arrays must be dense and may not carry extra properties.',
-					path: frame.path
-				};
-		}
-		active.add(current);
-		pending.push({ ...frame, exit: true });
-		for (const key of keys) {
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				return {
-					budget: false,
-					message: 'Properties must be enumerable data properties.',
-					path: `${frame.path}.${String(key)}`
-				};
-			stringCharacters += String(key).length;
-			if (stringCharacters > limits.maxStringCharacters)
-				return {
-					budget: true,
-					message: 'String-character budget exceeded while inspecting keys.',
-					path: frame.path
-				};
-			pending.push({
-				depth: frame.depth + 1,
-				exit: false,
-				path: array ? `${frame.path}[${String(key)}]` : `${frame.path}.${String(key)}`,
-				value: descriptor.value
-			});
-		}
+		const failure = inspectFrame(frame, limits, counters, active, pending);
+		if (failure !== null) return failure;
 	}
 	return null;
 }
@@ -490,21 +595,37 @@ function grouped<Key, Value>(map: Map<Key, Value[]>, key: Key, value: Value): vo
 	else values.push(value);
 }
 
-function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticModel {
-	const snapshot = inputs.semanticSnapshot;
+/** Logical paths cited by an ENFORCED guard site, in retained guard order. */
+function enforcementPathsFrom(inputs: GuardClassificationOverlayBuildInputs): Set<string> {
 	const enforcementPaths = new Set<string>();
 	for (const guard of inputs.guardObservation.guards) {
 		const match = guard.enforcingSite === null ? null : ENFORCING_SITE.exec(guard.enforcingSite);
 		if (match !== null) enforcementPaths.add(match[1]!);
 	}
-	const factoryTargetNodeIds = new Set(
+	return enforcementPaths;
+}
+
+function factoryTargetNodeIdsFrom(
+	inputs: GuardClassificationOverlayBuildInputs
+): Set<SemanticAstNodeRecord['id']> {
+	return new Set(
 		inputs.commandHandlerGraph.nodes.flatMap((node) =>
 			node.kind === 'HANDLER_TARGET' && node.bodyKind === 'FACTORY_CALL_RESULT_CANDIDATE'
 				? [node.nodeId]
 				: []
 		)
 	);
+}
 
+/** Deep-indexed application sources that own an enforcement anchor, with exact ownership checks. */
+function anchorSourceIndex(
+	snapshot: StaticSemanticSnapshot,
+	enforcementPaths: ReadonlySet<string>
+): {
+	readonly anchorSourceIds: Set<string>;
+	readonly anchorSourcesByPath: Map<string, SemanticSourceRecord[]>;
+	readonly sourceById: Map<string, SemanticSourceRecord>;
+} {
 	const projectConfigById = new Map<string, string>();
 	const projectProgramById = new Map<string, string>();
 	for (const project of snapshot.projects) {
@@ -532,7 +653,16 @@ function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticM
 		anchorSourceIds.add(source.id);
 		grouped(anchorSourcesByPath, source.logicalPath, source);
 	}
+	return { anchorSourceIds, anchorSourcesByPath, sourceById };
+}
 
+function invocationIndex(
+	snapshot: StaticSemanticSnapshot,
+	factoryTargetNodeIds: ReadonlySet<SemanticAstNodeRecord['id']>
+): {
+	readonly calleeNodeIds: Set<string>;
+	readonly invocationByNode: Map<string, StaticSemanticSnapshot['invocations'][number]>;
+} {
 	const invocationByNode = new Map<string, StaticSemanticSnapshot['invocations'][number]>();
 	const calleeNodeIds = new Set<string>();
 	for (const invocation of snapshot.invocations) {
@@ -540,6 +670,16 @@ function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticM
 		invocationByNode.set(invocation.nodeId, invocation);
 		calleeNodeIds.add(invocation.calleeNodeId);
 	}
+	return { calleeNodeIds, invocationByNode };
+}
+
+function referenceIndex(
+	snapshot: StaticSemanticSnapshot,
+	calleeNodeIds: ReadonlySet<string>
+): {
+	readonly referencesByNode: Map<string, StaticSemanticSnapshot['references'][number][]>;
+	readonly symbolIds: Set<string>;
+} {
 	const referencesByNode = new Map<string, StaticSemanticSnapshot['references'][number][]>();
 	const symbolIds = new Set<string>();
 	for (const reference of snapshot.references) {
@@ -547,6 +687,16 @@ function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticM
 		grouped(referencesByNode, reference.nodeId, reference);
 		if (reference.resolvedSymbolId !== null) symbolIds.add(reference.resolvedSymbolId);
 	}
+	return { referencesByNode, symbolIds };
+}
+
+function symbolIndex(
+	snapshot: StaticSemanticSnapshot,
+	symbolIds: ReadonlySet<string>
+): {
+	readonly declarationIds: Set<string>;
+	readonly symbolById: Map<string, StaticSemanticSnapshot['symbols'][number]>;
+} {
 	const symbolById = new Map<string, StaticSemanticSnapshot['symbols'][number]>();
 	const declarationIds = new Set<string>();
 	for (const symbol of snapshot.symbols) {
@@ -554,6 +704,16 @@ function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticM
 		symbolById.set(symbol.id, symbol);
 		for (const declarationId of symbol.declarationIds) declarationIds.add(declarationId);
 	}
+	return { declarationIds, symbolById };
+}
+
+function declarationIndex(
+	snapshot: StaticSemanticSnapshot,
+	declarationIds: ReadonlySet<string>
+): {
+	readonly declarationById: Map<string, SemanticDeclarationRecord>;
+	readonly declarationNodeIds: Set<string>;
+} {
 	const declarationById = new Map<string, SemanticDeclarationRecord>();
 	const declarationNodeIds = new Set<string>();
 	for (const declaration of snapshot.declarations) {
@@ -561,6 +721,16 @@ function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticM
 		declarationById.set(declaration.id, declaration);
 		if (declaration.nodeId !== null) declarationNodeIds.add(declaration.nodeId);
 	}
+	return { declarationById, declarationNodeIds };
+}
+
+function assignmentIndex(
+	snapshot: StaticSemanticSnapshot,
+	declarationNodeIds: ReadonlySet<string>
+): {
+	readonly assignmentsByNode: Map<string, StaticSemanticSnapshot['assignments'][number][]>;
+	readonly explicitNodeIds: Set<string>;
+} {
 	const assignmentsByNode = new Map<string, StaticSemanticSnapshot['assignments'][number][]>();
 	const explicitNodeIds = new Set<string>(declarationNodeIds);
 	for (const assignment of snapshot.assignments) {
@@ -568,23 +738,60 @@ function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticM
 		grouped(assignmentsByNode, assignment.targetNodeId, assignment);
 		if (assignment.valueNodeId !== null) explicitNodeIds.add(assignment.valueNodeId);
 	}
+	return { assignmentsByNode, explicitNodeIds };
+}
+
+function invalidSourceSpan(node: SemanticAstNodeRecord, source: SemanticSourceRecord): boolean {
+	return (
+		!Number.isSafeInteger(node.start) ||
+		!Number.isSafeInteger(node.end) ||
+		node.start < 0 ||
+		node.end < node.start ||
+		node.end > source.textLength
+	);
+}
+
+function astNodeIndex(
+	snapshot: StaticSemanticSnapshot,
+	anchorSourceIds: ReadonlySet<string>,
+	explicitNodeIds: ReadonlySet<string>,
+	sourceById: ReadonlyMap<string, SemanticSourceRecord>
+): {
+	readonly nodeById: Map<string, SemanticAstNodeRecord>;
+	readonly nodesBySource: Map<string, SemanticAstNodeRecord[]>;
+} {
 	const nodeById = new Map<string, SemanticAstNodeRecord>();
 	const nodesBySource = new Map<string, SemanticAstNodeRecord[]>();
 	for (const node of snapshot.astNodes) {
 		if (!anchorSourceIds.has(node.sourceId) && !explicitNodeIds.has(node.id)) continue;
 		const source = sourceById.get(node.sourceId);
-		if (
-			source !== undefined &&
-			(!Number.isSafeInteger(node.start) ||
-				!Number.isSafeInteger(node.end) ||
-				node.start < 0 ||
-				node.end < node.start ||
-				node.end > source.textLength)
-		)
+		if (source !== undefined && invalidSourceSpan(node, source))
 			throw new Error(`Semantic AST node ${node.id} has an invalid source span.`);
 		nodeById.set(node.id, node);
 		if (source !== undefined) grouped(nodesBySource, node.sourceId, node);
 	}
+	return { nodeById, nodesBySource };
+}
+
+function semanticModel(inputs: GuardClassificationOverlayBuildInputs): SemanticModel {
+	const snapshot = inputs.semanticSnapshot;
+	const enforcementPaths = enforcementPathsFrom(inputs);
+	const factoryTargetNodeIds = factoryTargetNodeIdsFrom(inputs);
+	const { anchorSourceIds, anchorSourcesByPath, sourceById } = anchorSourceIndex(
+		snapshot,
+		enforcementPaths
+	);
+	const { calleeNodeIds, invocationByNode } = invocationIndex(snapshot, factoryTargetNodeIds);
+	const { referencesByNode, symbolIds } = referenceIndex(snapshot, calleeNodeIds);
+	const { declarationIds, symbolById } = symbolIndex(snapshot, symbolIds);
+	const { declarationById, declarationNodeIds } = declarationIndex(snapshot, declarationIds);
+	const { assignmentsByNode, explicitNodeIds } = assignmentIndex(snapshot, declarationNodeIds);
+	const { nodeById, nodesBySource } = astNodeIndex(
+		snapshot,
+		anchorSourceIds,
+		explicitNodeIds,
+		sourceById
+	);
 	return {
 		anchorSourcesByPath,
 		assignmentsByNode,
@@ -656,7 +863,7 @@ function decodeCompilerText(bytes: Uint8Array): string {
 
 function lineAt(text: string, position: number): number {
 	let line = 1;
-	for (let index = 0; index < position; index += 1) if (text.charCodeAt(index) === 10) line += 1;
+	for (let index = 0; index < position; index += 1) if (text.codePointAt(index) === 10) line += 1;
 	return line;
 }
 
@@ -728,14 +935,15 @@ function assertFrozenBinding(
 	const bytes = readFrozenSubjectArtifact(inputs.subject, path);
 	const digest = bytes === undefined ? null : sha256(bytes);
 	const expectedDigest = expected.contentSha256 ?? expected.sha256;
+	const identityRefusal = `Frozen artifact ${path} does not match its exact recorded identity.`;
+	if (bytes === undefined) throw new Error(identityRefusal);
 	if (
-		bytes === undefined ||
 		bytes.byteLength !== expected.bytes ||
 		bytes.byteLength !== artifacts[0]!.bytes ||
 		digest !== expectedDigest ||
 		digest !== artifacts[0]!.sha256
 	)
-		throw new Error(`Frozen artifact ${path} does not match its exact recorded identity.`);
+		throw new Error(identityRefusal);
 	return bytes;
 }
 
@@ -803,7 +1011,7 @@ function anchorFact(
 		throw new Error(`Expected exactly one deep-indexed application semantic source for ${path}.`);
 	const source = sources[0]!;
 	const start = text.indexOf(anchorText);
-	if (start < 0 || text.indexOf(anchorText, start + 1) >= 0)
+	if (start < 0 || text.includes(anchorText, start + 1))
 		throw new Error(`Enforcement anchor in ${path} is absent or non-unique.`);
 	const end = start + anchorText.length;
 	const containing = (model.nodesBySource.get(source.id) ?? [])
@@ -997,30 +1205,54 @@ function indexOrder(
 	);
 }
 
-function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): ExpectedDerivation {
-	const semantic = semanticModel(inputs);
-	const command = commandModel(inputs);
-	const state = stateModel(inputs);
-	const inputDigest = guardClassificationOverlayInputDigest(inputs);
-	const overlayId = guardClassificationOverlayId({
-		inputDigest,
-		semanticSnapshotId: inputs.semanticSnapshot.id,
-		subjectId: inputs.request.subjectId
-	});
-	const classificationIdByGuard = new Map(
-		inputs.guardObservation.guards.map((guard) => [
-			guard.id,
-			guardClassificationRecordId(overlayId, guard.id)
-		])
-	);
-	if (classificationIdByGuard.size !== inputs.guardObservation.guards.length)
-		throw new Error('Guard ledger guard identities are duplicated.');
+type GuardLedgerRecord =
+	GuardClassificationOverlayBuildInputs['guardObservation']['guards'][number];
 
+type ClassificationIdIndex = ReadonlyMap<string, GuardClassificationOverlayClassificationId>;
+
+type OccurrencesByClassification = ReadonlyMap<
+	GuardClassificationOverlayClassificationId,
+	GuardClassificationOverlayOccurrenceRecord[]
+>;
+
+interface FactoryTargetMatch {
+	readonly callable: SemanticAstNodeRecord;
+	readonly target: HandlerTargetNode;
+}
+
+interface OverlayDerivationContext {
+	readonly classificationIdByGuard: ClassificationIdIndex;
+	readonly command: CommandModel;
+	readonly inputs: GuardClassificationOverlayBuildInputs;
+	readonly overlayId: GuardClassificationOverlayId;
+	readonly semantic: SemanticModel;
+	readonly state: StateModel;
+}
+
+interface AnchorAttribution {
+	readonly anchorByKey: Map<string, AnchorFact>;
+	readonly anchorClassifications: Map<string, GuardClassificationOverlayClassificationId[]>;
+}
+
+interface AnchorLinkSink {
+	readonly anchorFrontierIds: GuardClassificationOverlayFrontier['id'][];
+	readonly frontiers: GuardClassificationOverlayFrontier[];
+	readonly handlerLinks: GuardClassificationOverlayHandlerLink[];
+}
+
+/** Occurrence drafts and their exact command evidence, in retained guarded-arrow order. */
+function deriveGuardedArrowRecords(
+	context: OverlayDerivationContext,
+	frontiers: GuardClassificationOverlayFrontier[]
+): {
+	readonly commandEvidenceLinks: GuardClassificationOverlayCommandEvidenceLink[];
+	readonly occurrenceDrafts: GuardClassificationOverlayOccurrenceRecord[];
+} {
+	const { command, inputs, overlayId, state } = context;
 	const commandEvidenceLinks: GuardClassificationOverlayCommandEvidenceLink[] = [];
 	const occurrenceDrafts: GuardClassificationOverlayOccurrenceRecord[] = [];
-	const frontiers: GuardClassificationOverlayFrontier[] = [];
 	for (const arrow of inputs.guardObservation.guardedArrows) {
-		const classificationId = classificationIdByGuard.get(arrow.guardId);
+		const classificationId = context.classificationIdByGuard.get(arrow.guardId);
 		if (classificationId === undefined)
 			throw new Error(`Guarded arrow ${arrow.id} references an absent guard record.`);
 		const occurrenceId = guardOccurrenceRecordId(overlayId, arrow.id);
@@ -1075,18 +1307,14 @@ function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): Expected
 			to: arrow.to
 		});
 	}
-	commandEvidenceLinks.sort((left, right) => compareText(left.id, right.id));
-	occurrenceDrafts.sort((left, right) => compareText(left.id, right.id));
+	return { commandEvidenceLinks, occurrenceDrafts };
+}
 
-	const occurrencesByClassification = new Map<
-		GuardClassificationOverlayClassificationId,
-		GuardClassificationOverlayOccurrenceRecord[]
-	>();
-	for (const occurrence of occurrenceDrafts)
-		grouped(occurrencesByClassification, occurrence.classificationId, occurrence);
+/** Deduplicated enforcement anchors and the classifications that cite each of them. */
+function deriveAnchorAttribution(context: OverlayDerivationContext): AnchorAttribution {
 	const anchorByKey = new Map<string, AnchorFact>();
 	const anchorClassifications = new Map<string, GuardClassificationOverlayClassificationId[]>();
-	for (const guard of inputs.guardObservation.guards) {
+	for (const guard of context.inputs.guardObservation.guards) {
 		if (guard.enforcingAnchor === null && guard.enforcingSite === null) continue;
 		if (guard.enforcingSite === null || guard.enforcingAnchor === null)
 			throw new Error(`Guard citation ${guard.id} lacks an exact site or anchor.`);
@@ -1097,195 +1325,289 @@ function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): Expected
 		const key = `${path}\0${guard.enforcingAnchor}`;
 		let fact = anchorByKey.get(key);
 		if (fact === undefined) {
-			fact = anchorFact(overlayId, path, guard.enforcingAnchor, inputs, semantic);
+			fact = anchorFact(
+				context.overlayId,
+				path,
+				guard.enforcingAnchor,
+				context.inputs,
+				context.semantic
+			);
 			anchorByKey.set(key, fact);
 		}
-		grouped(anchorClassifications, fact.id, classificationIdByGuard.get(guard.id)!);
+		grouped(anchorClassifications, fact.id, context.classificationIdByGuard.get(guard.id)!);
 	}
-	const anchorByClassification = new Map<string, AnchorFact>();
-	for (const [anchorId, ids] of anchorClassifications) {
-		const fact = [...anchorByKey.values()].find((item) => item.id === anchorId)!;
-		for (const id of ids) anchorByClassification.set(id, fact);
+	return { anchorByKey, anchorClassifications };
+}
+
+/** Records the explicit frontier owed by a stale or unclassified retained ledger row. */
+function pushLedgerStateFrontier(
+	guard: GuardLedgerRecord,
+	classificationId: GuardClassificationOverlayClassificationId,
+	overlayId: GuardClassificationOverlayId,
+	frontiers: GuardClassificationOverlayFrontier[]
+): void {
+	if (guard.ledgerState !== 'STALE' && guard.ledgerState !== 'UNCLASSIFIED') return;
+	const stale = guard.ledgerState === 'STALE';
+	const frontierKind = stale ? 'STALE_LEDGER_ROW' : 'UNCLASSIFIED_GUARD_TEXT';
+	frontiers.push({
+		anchorSiteId: null,
+		classificationId,
+		frontierKind,
+		id: guardClassificationFrontierId({
+			anchorSiteId: null,
+			classificationId,
+			frontierKind,
+			occurrenceId: null,
+			overlayId
+		}),
+		occurrenceId: null,
+		reason: stale
+			? 'The retained guard-classification row is stale and is not promoted by this overlay.'
+			: 'The retained guard text has no classification and remains an explicit frontier.'
+	});
+}
+
+function deriveClassifications(
+	context: OverlayDerivationContext,
+	anchorByClassification: ReadonlyMap<string, AnchorFact>,
+	occurrencesByClassification: OccurrencesByClassification,
+	frontiers: GuardClassificationOverlayFrontier[]
+): GuardClassificationOverlayClassificationRecord[] {
+	return context.inputs.guardObservation.guards
+		.map((guard): GuardClassificationOverlayClassificationRecord => {
+			const id = context.classificationIdByGuard.get(guard.id)!;
+			const anchor = anchorByClassification.get(id);
+			pushLedgerStateFrontier(guard, id, context.overlayId, frontiers);
+			return {
+				anchorSiteId: anchor?.id ?? null,
+				disposition: guard.disposition,
+				enforcingAnchor: guard.enforcingAnchor,
+				enforcingSite: guard.enforcingSite,
+				evidence: guard.evidence,
+				guardId: guard.id,
+				guardText: guard.guardText,
+				id,
+				ledgerState: guard.ledgerState,
+				occurrenceIds: sortedUnique(
+					(occurrencesByClassification.get(id) ?? []).map((occurrence) => occurrence.id)
+				)
+			};
+		})
+		.sort((left, right) => compareText(left.id, right.id));
+}
+
+/** Registered direct-function targets whose callable exactly contains the anchor. */
+function exactHandlerTargets(
+	links: readonly GuardClassificationOverlayCommandEvidenceLink[],
+	containingCallableIds: ReadonlySet<SemanticAstNodeRecord['id']>,
+	command: CommandModel
+): Map<HandlerTargetNode['id'], HandlerTargetNode> {
+	const exactTargets = new Map<HandlerTargetNode['id'], HandlerTargetNode>();
+	for (const link of links)
+		for (const targetId of link.handlerTargetNodeIds) {
+			const target = command.targetById.get(targetId);
+			if (target?.bodyKind === 'DIRECT_FUNCTION' && containingCallableIds.has(target.nodeId))
+				exactTargets.set(target.id, target);
+		}
+	return exactTargets;
+}
+
+/** Registered factory-result targets whose resolved factory callable contains the anchor. */
+function factoryHandlerTargets(
+	links: readonly GuardClassificationOverlayCommandEvidenceLink[],
+	containingCallableIds: ReadonlySet<SemanticAstNodeRecord['id']>,
+	command: CommandModel,
+	semantic: SemanticModel
+): Map<HandlerTargetNode['id'], FactoryTargetMatch> {
+	const factoryTargets = new Map<HandlerTargetNode['id'], FactoryTargetMatch>();
+	for (const link of links)
+		for (const targetId of link.handlerTargetNodeIds) {
+			const target = command.targetById.get(targetId);
+			if (target === undefined) continue;
+			const factoryCallable = factoryCallableForTarget(target, semantic);
+			if (factoryCallable !== null && containingCallableIds.has(factoryCallable.id))
+				factoryTargets.set(target.id, { callable: factoryCallable, target });
+		}
+	return factoryTargets;
+}
+
+function exactHandlerLink(
+	context: OverlayDerivationContext,
+	fact: AnchorFact,
+	links: readonly GuardClassificationOverlayCommandEvidenceLink[],
+	target: HandlerTargetNode
+): GuardClassificationOverlayHandlerLink {
+	const targetNodeIds = [target.id] as const;
+	return {
+		anchorSiteId: fact.id,
+		attribution: 'EXACT',
+		commandHandlerGraphId: context.inputs.commandHandlerGraph.id,
+		id: guardEnforcementHandlerLinkId({
+			anchorSiteId: fact.id,
+			attribution: 'EXACT',
+			overlayId: context.overlayId,
+			targetNodeIds
+		}),
+		kind: 'EXACT_HANDLER_TARGET',
+		supportingEdgeIds: sortedUnique(
+			links
+				.filter((link) => link.handlerTargetNodeIds.includes(target.id))
+				.flatMap((link) => link.supportingEdgeIds)
+		),
+		targetNodeIds
+	};
+}
+
+function factoryHandlerLink(
+	context: OverlayDerivationContext,
+	fact: AnchorFact,
+	links: readonly GuardClassificationOverlayCommandEvidenceLink[],
+	factoryTargets: ReadonlyMap<HandlerTargetNode['id'], FactoryTargetMatch>,
+	factoryCallableNodeId: SemanticAstNodeRecord['id']
+): GuardClassificationOverlayHandlerLink {
+	const targetNodeIds = sortedUnique(factoryTargets.keys());
+	return {
+		anchorSiteId: fact.id,
+		attribution: 'CANDIDATE',
+		commandHandlerGraphId: context.inputs.commandHandlerGraph.id,
+		factoryCallableNodeId,
+		id: guardEnforcementHandlerLinkId({
+			anchorSiteId: fact.id,
+			attribution: 'CANDIDATE',
+			factoryCallableNodeId,
+			overlayId: context.overlayId,
+			targetNodeIds
+		}),
+		kind: 'FACTORY_SHARED_CANDIDATE',
+		supportingEdgeIds: sortedUnique(
+			links
+				.filter((link) =>
+					link.handlerTargetNodeIds.some((targetId) => factoryTargets.has(targetId))
+				)
+				.flatMap((link) => link.supportingEdgeIds)
+		),
+		targetNodeIds
+	};
+}
+
+/** One anchor/classification pair: an exact handler link, or a candidate link plus its frontier. */
+function deriveAnchorClassificationLinks(
+	context: OverlayDerivationContext,
+	fact: AnchorFact,
+	containingCallableIds: ReadonlySet<SemanticAstNodeRecord['id']>,
+	classificationId: GuardClassificationOverlayClassificationId,
+	links: readonly GuardClassificationOverlayCommandEvidenceLink[],
+	sink: AnchorLinkSink
+): void {
+	const exactTargets = exactHandlerTargets(links, containingCallableIds, context.command);
+	if (exactTargets.size === 1) {
+		sink.handlerLinks.push(exactHandlerLink(context, fact, links, [...exactTargets.values()][0]!));
+		return;
 	}
+	const factoryTargets = factoryHandlerTargets(
+		links,
+		containingCallableIds,
+		context.command,
+		context.semantic
+	);
+	const factoryCallableIds = sortedUnique(
+		[...factoryTargets.values()].map((match) => match.callable.id)
+	);
+	const attributed = factoryTargets.size > 0 && factoryCallableIds.length === 1;
+	const frontierKind = attributed
+		? 'FACTORY_HANDLER_ATTRIBUTION_CANDIDATE'
+		: 'HELPER_CALL_FLOW_UNRESOLVED';
+	if (attributed)
+		sink.handlerLinks.push(
+			factoryHandlerLink(context, fact, links, factoryTargets, factoryCallableIds[0]!)
+		);
+	const frontier: GuardClassificationOverlayFrontier = {
+		anchorSiteId: fact.id,
+		classificationId,
+		frontierKind,
+		id: guardClassificationFrontierId({
+			anchorSiteId: fact.id,
+			classificationId,
+			frontierKind,
+			occurrenceId: null,
+			overlayId: context.overlayId
+		}),
+		occurrenceId: null,
+		reason:
+			frontierKind === 'FACTORY_HANDLER_ATTRIBUTION_CANDIDATE'
+				? 'The anchor is contained by a shared factory callable; registered factory-result targets remain candidates.'
+				: 'The anchor callable is not an exact registered handler target or a resolved shared factory callable; helper call flow is not modeled.'
+	};
+	sink.frontiers.push(frontier);
+	sink.anchorFrontierIds.push(frontier.id);
+}
 
-	const classifications: GuardClassificationOverlayClassificationRecord[] =
-		inputs.guardObservation.guards
-			.map((guard): GuardClassificationOverlayClassificationRecord => {
-				const id = classificationIdByGuard.get(guard.id)!;
-				const anchor = anchorByClassification.get(id);
-				if (guard.ledgerState === 'STALE' || guard.ledgerState === 'UNCLASSIFIED') {
-					const frontierKind =
-						guard.ledgerState === 'STALE' ? 'STALE_LEDGER_ROW' : 'UNCLASSIFIED_GUARD_TEXT';
-					frontiers.push({
-						anchorSiteId: null,
-						classificationId: id,
-						frontierKind,
-						id: guardClassificationFrontierId({
-							anchorSiteId: null,
-							classificationId: id,
-							frontierKind,
-							occurrenceId: null,
-							overlayId
-						}),
-						occurrenceId: null,
-						reason:
-							guard.ledgerState === 'STALE'
-								? 'The retained guard-classification row is stale and is not promoted by this overlay.'
-								: 'The retained guard text has no classification and remains an explicit frontier.'
-					});
-				}
-				return {
-					anchorSiteId: anchor?.id ?? null,
-					disposition: guard.disposition,
-					enforcingAnchor: guard.enforcingAnchor,
-					enforcingSite: guard.enforcingSite,
-					evidence: guard.evidence,
-					guardId: guard.id,
-					guardText: guard.guardText,
-					id,
-					ledgerState: guard.ledgerState,
-					occurrenceIds: sortedUnique(
-						(occurrencesByClassification.get(id) ?? []).map((occurrence) => occurrence.id)
-					)
-				};
-			})
-			.sort((left, right) => compareText(left.id, right.id));
+function anchorSiteRecord(
+	fact: AnchorFact,
+	classificationIds: readonly GuardClassificationOverlayClassificationId[],
+	anchorFrontierIds: readonly GuardClassificationOverlayFrontier['id'][],
+	handlerLinks: readonly GuardClassificationOverlayHandlerLink[]
+): GuardClassificationOverlayAnchorSite {
+	const localHandlerLinks = handlerLinks.filter((link) => link.anchorSiteId === fact.id);
+	return {
+		anchorText: fact.anchorText,
+		callableNodeId: fact.callable.id,
+		classificationIds,
+		currentLine: fact.currentLine,
+		end: fact.end,
+		frontierIds: sortedUnique(anchorFrontierIds),
+		handlerLinkIds: sortedUnique(localHandlerLinks.map((link) => link.id)),
+		id: fact.id,
+		path: fact.path,
+		programId: fact.programId,
+		projectId: fact.projectId,
+		sourceId: fact.sourceId,
+		start: fact.start
+	};
+}
 
+function deriveAnchorSites(
+	context: OverlayDerivationContext,
+	anchors: AnchorAttribution,
+	occurrencesByClassification: OccurrencesByClassification,
+	commandEvidenceLinks: readonly GuardClassificationOverlayCommandEvidenceLink[],
+	frontiers: GuardClassificationOverlayFrontier[]
+): {
+	readonly anchorSites: GuardClassificationOverlayAnchorSite[];
+	readonly handlerLinks: GuardClassificationOverlayHandlerLink[];
+} {
 	const handlerLinks: GuardClassificationOverlayHandlerLink[] = [];
 	const anchorSites: GuardClassificationOverlayAnchorSite[] = [];
-	for (const fact of [...anchorByKey.values()].sort((left, right) =>
+	for (const fact of [...anchors.anchorByKey.values()].sort((left, right) =>
 		compareText(left.id, right.id)
 	)) {
 		const containingCallableIds = new Set(fact.callableAncestors.map((callable) => callable.id));
-		const classificationIds = sortedUnique(anchorClassifications.get(fact.id) ?? []);
+		const classificationIds = sortedUnique(anchors.anchorClassifications.get(fact.id) ?? []);
 		const anchorFrontierIds: GuardClassificationOverlayFrontier['id'][] = [];
+		const sink: AnchorLinkSink = { anchorFrontierIds, frontiers, handlerLinks };
 		for (const classificationId of classificationIds) {
-			const occurrenceIds = (occurrencesByClassification.get(classificationId) ?? []).map(
-				(occurrence) => occurrence.id
-			);
-			const links = commandEvidenceLinks.filter((link) =>
-				occurrenceIds.includes(link.occurrenceId)
-			);
-			const exactTargets = new Map<HandlerTargetNode['id'], HandlerTargetNode>();
-			for (const link of links)
-				for (const targetId of link.handlerTargetNodeIds) {
-					const target = command.targetById.get(targetId);
-					if (target?.bodyKind === 'DIRECT_FUNCTION' && containingCallableIds.has(target.nodeId))
-						exactTargets.set(target.id, target);
-				}
-			if (exactTargets.size === 1) {
-				const target = [...exactTargets.values()][0]!;
-				const targetNodeIds = [target.id] as const;
-				handlerLinks.push({
-					anchorSiteId: fact.id,
-					attribution: 'EXACT',
-					commandHandlerGraphId: inputs.commandHandlerGraph.id,
-					id: guardEnforcementHandlerLinkId({
-						anchorSiteId: fact.id,
-						attribution: 'EXACT',
-						overlayId,
-						targetNodeIds
-					}),
-					kind: 'EXACT_HANDLER_TARGET',
-					supportingEdgeIds: sortedUnique(
-						links
-							.filter((link) => link.handlerTargetNodeIds.includes(target.id))
-							.flatMap((link) => link.supportingEdgeIds)
-					),
-					targetNodeIds
-				});
-				continue;
-			}
-			const factoryTargets = new Map<
-				HandlerTargetNode['id'],
-				{ readonly callable: SemanticAstNodeRecord; readonly target: HandlerTargetNode }
-			>();
-			for (const link of links)
-				for (const targetId of link.handlerTargetNodeIds) {
-					const target = command.targetById.get(targetId);
-					if (target === undefined) continue;
-					const factoryCallable = factoryCallableForTarget(target, semantic);
-					if (factoryCallable !== null && containingCallableIds.has(factoryCallable.id))
-						factoryTargets.set(target.id, { callable: factoryCallable, target });
-				}
-			const factoryCallableIds = sortedUnique(
-				[...factoryTargets.values()].map((match) => match.callable.id)
-			);
-			const frontierKind =
-				factoryTargets.size > 0 && factoryCallableIds.length === 1
-					? 'FACTORY_HANDLER_ATTRIBUTION_CANDIDATE'
-					: 'HELPER_CALL_FLOW_UNRESOLVED';
-			if (factoryTargets.size > 0 && factoryCallableIds.length === 1) {
-				const factoryCallableNodeId = factoryCallableIds[0]!;
-				const targetNodeIds = sortedUnique(factoryTargets.keys());
-				handlerLinks.push({
-					anchorSiteId: fact.id,
-					attribution: 'CANDIDATE',
-					commandHandlerGraphId: inputs.commandHandlerGraph.id,
-					factoryCallableNodeId,
-					id: guardEnforcementHandlerLinkId({
-						anchorSiteId: fact.id,
-						attribution: 'CANDIDATE',
-						factoryCallableNodeId,
-						overlayId,
-						targetNodeIds
-					}),
-					kind: 'FACTORY_SHARED_CANDIDATE',
-					supportingEdgeIds: sortedUnique(
-						links
-							.filter((link) =>
-								link.handlerTargetNodeIds.some((targetId) => factoryTargets.has(targetId))
-							)
-							.flatMap((link) => link.supportingEdgeIds)
-					),
-					targetNodeIds
-				});
-			}
-			const frontier: GuardClassificationOverlayFrontier = {
-				anchorSiteId: fact.id,
+			const classificationOccurrences = occurrencesByClassification.get(classificationId) ?? [];
+			const occurrenceIds = new Set(classificationOccurrences.map((occurrence) => occurrence.id));
+			const links = commandEvidenceLinks.filter((link) => occurrenceIds.has(link.occurrenceId));
+			deriveAnchorClassificationLinks(
+				context,
+				fact,
+				containingCallableIds,
 				classificationId,
-				frontierKind,
-				id: guardClassificationFrontierId({
-					anchorSiteId: fact.id,
-					classificationId,
-					frontierKind,
-					occurrenceId: null,
-					overlayId
-				}),
-				occurrenceId: null,
-				reason:
-					frontierKind === 'FACTORY_HANDLER_ATTRIBUTION_CANDIDATE'
-						? 'The anchor is contained by a shared factory callable; registered factory-result targets remain candidates.'
-						: 'The anchor callable is not an exact registered handler target or a resolved shared factory callable; helper call flow is not modeled.'
-			};
-			frontiers.push(frontier);
-			anchorFrontierIds.push(frontier.id);
+				links,
+				sink
+			);
 		}
-		const localHandlerLinks = handlerLinks.filter((link) => link.anchorSiteId === fact.id);
-		anchorSites.push({
-			anchorText: fact.anchorText,
-			callableNodeId: fact.callable.id,
-			classificationIds,
-			currentLine: fact.currentLine,
-			end: fact.end,
-			frontierIds: sortedUnique(anchorFrontierIds),
-			handlerLinkIds: sortedUnique(localHandlerLinks.map((link) => link.id)),
-			id: fact.id,
-			path: fact.path,
-			programId: fact.programId,
-			projectId: fact.projectId,
-			sourceId: fact.sourceId,
-			start: fact.start
-		});
+		anchorSites.push(anchorSiteRecord(fact, classificationIds, anchorFrontierIds, handlerLinks));
 	}
-	const deduplicatedHandlerLinks = [
-		...new Map(handlerLinks.map((link) => [link.id, link])).values()
-	];
-	handlerLinks.splice(0, handlerLinks.length, ...deduplicatedHandlerLinks);
-	handlerLinks.sort((left, right) => compareText(left.id, right.id));
-	frontiers.sort((left, right) => compareText(left.id, right.id));
-	anchorSites.sort((left, right) => compareText(left.id, right.id));
-	const occurrences = occurrenceDrafts
+	return { anchorSites, handlerLinks };
+}
+
+function resolveOccurrenceFrontiers(
+	occurrenceDrafts: readonly GuardClassificationOverlayOccurrenceRecord[],
+	frontiers: readonly GuardClassificationOverlayFrontier[]
+): GuardClassificationOverlayOccurrenceRecord[] {
+	return occurrenceDrafts
 		.map((occurrence): GuardClassificationOverlayOccurrenceRecord => ({
 			...occurrence,
 			frontierIds: sortedUnique(
@@ -1299,23 +1621,27 @@ function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): Expected
 			)
 		}))
 		.sort((left, right) => compareText(left.id, right.id));
+}
 
-	const occurrenceById = new Map(occurrences.map((occurrence) => [occurrence.id, occurrence]));
-	const classificationById = new Map(
-		classifications.map((classification) => [classification.id, classification])
+function frontierIdsForClassification(
+	frontiers: readonly GuardClassificationOverlayFrontier[],
+	classificationId: string
+): GuardClassificationOverlayFrontier['id'][] {
+	return sortedUnique(
+		frontiers
+			.filter((frontier) => frontier.classificationId === classificationId)
+			.map((frontier) => frontier.id)
 	);
-	const anchorSiteById = new Map(anchorSites.map((anchor) => [anchor.id, anchor]));
-	const handlerLinksByAnchor = new Map<string, GuardClassificationOverlayHandlerLink[]>();
-	for (const link of handlerLinks) grouped(handlerLinksByAnchor, link.anchorSiteId, link);
-	const frontiersForClassification = (
-		classificationId: string
-	): GuardClassificationOverlayFrontier['id'][] =>
-		sortedUnique(
-			frontiers
-				.filter((frontier) => frontier.classificationId === classificationId)
-				.map((frontier) => frontier.id)
-		);
-	const forwardIndex = classifications
+}
+
+function forwardIndexEntries(
+	classifications: readonly GuardClassificationOverlayClassificationRecord[],
+	occurrenceById: ReadonlyMap<string, GuardClassificationOverlayOccurrenceRecord>,
+	anchorSiteById: ReadonlyMap<string, GuardClassificationOverlayAnchorSite>,
+	handlerLinksByAnchor: ReadonlyMap<string, GuardClassificationOverlayHandlerLink[]>,
+	frontiers: readonly GuardClassificationOverlayFrontier[]
+): GuardClassificationOverlayIndexEntry[] {
+	return classifications
 		.map((classification): GuardClassificationOverlayIndexEntry => {
 			const occurrences = classification.occurrenceIds.map((id) => occurrenceById.get(id)!);
 			const anchor =
@@ -1328,7 +1654,7 @@ function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): Expected
 				commandEvidenceLinkIds: sortedUnique(
 					occurrences.flatMap((occurrence) => occurrence.commandEvidenceLinkIds)
 				),
-				frontierIds: frontiersForClassification(classification.id),
+				frontierIds: frontierIdsForClassification(frontiers, classification.id),
 				handlerLinkIds: sortedUnique(
 					(handlerLinksByAnchor.get(anchor?.id ?? '') ?? []).map((link) => link.id)
 				),
@@ -1337,7 +1663,15 @@ function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): Expected
 			};
 		})
 		.sort(indexOrder);
-	const reverseIndex = occurrences
+}
+
+function reverseIndexEntries(
+	occurrences: readonly GuardClassificationOverlayOccurrenceRecord[],
+	classificationById: ReadonlyMap<string, GuardClassificationOverlayClassificationRecord>,
+	anchorSiteById: ReadonlyMap<string, GuardClassificationOverlayAnchorSite>,
+	handlerLinksByAnchor: ReadonlyMap<string, GuardClassificationOverlayHandlerLink[]>
+): GuardClassificationOverlayIndexEntry[] {
+	return occurrences
 		.map((occurrence): GuardClassificationOverlayIndexEntry => {
 			const classification = classificationById.get(occurrence.classificationId)!;
 			const anchor =
@@ -1357,11 +1691,110 @@ function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): Expected
 			};
 		})
 		.sort(indexOrder);
+}
+
+/** Null dispositions order first; the rest keep UTF-16 code-unit order. */
+function compareDisposition(
+	left: GuardClassificationOverlayClassificationRecord['disposition'],
+	right: GuardClassificationOverlayClassificationRecord['disposition']
+): number {
+	if (left === null && right === null) return 0;
+	if (left === null) return -1;
+	if (right === null) return 1;
+	return compareText(left, right);
+}
+
+function deriveExpected(inputs: GuardClassificationOverlayBuildInputs): ExpectedDerivation {
+	const semantic = semanticModel(inputs);
+	const command = commandModel(inputs);
+	const state = stateModel(inputs);
+	const inputDigest = guardClassificationOverlayInputDigest(inputs);
+	const overlayId = guardClassificationOverlayId({
+		inputDigest,
+		semanticSnapshotId: inputs.semanticSnapshot.id,
+		subjectId: inputs.request.subjectId
+	});
+	const classificationIdByGuard = new Map(
+		inputs.guardObservation.guards.map((guard) => [
+			guard.id,
+			guardClassificationRecordId(overlayId, guard.id)
+		])
+	);
+	if (classificationIdByGuard.size !== inputs.guardObservation.guards.length)
+		throw new Error('Guard ledger guard identities are duplicated.');
+	const context: OverlayDerivationContext = {
+		classificationIdByGuard,
+		command,
+		inputs,
+		overlayId,
+		semantic,
+		state
+	};
+
+	const frontiers: GuardClassificationOverlayFrontier[] = [];
+	const { commandEvidenceLinks, occurrenceDrafts } = deriveGuardedArrowRecords(context, frontiers);
+	commandEvidenceLinks.sort((left, right) => compareText(left.id, right.id));
+	occurrenceDrafts.sort((left, right) => compareText(left.id, right.id));
+
+	const occurrencesByClassification = new Map<
+		GuardClassificationOverlayClassificationId,
+		GuardClassificationOverlayOccurrenceRecord[]
+	>();
+	for (const occurrence of occurrenceDrafts)
+		grouped(occurrencesByClassification, occurrence.classificationId, occurrence);
+	const anchors = deriveAnchorAttribution(context);
+	const anchorByClassification = new Map<string, AnchorFact>();
+	for (const [anchorId, ids] of anchors.anchorClassifications) {
+		const fact = [...anchors.anchorByKey.values()].find((item) => item.id === anchorId)!;
+		for (const id of ids) anchorByClassification.set(id, fact);
+	}
+
+	const classifications = deriveClassifications(
+		context,
+		anchorByClassification,
+		occurrencesByClassification,
+		frontiers
+	);
+
+	const { anchorSites, handlerLinks } = deriveAnchorSites(
+		context,
+		anchors,
+		occurrencesByClassification,
+		commandEvidenceLinks,
+		frontiers
+	);
+	const deduplicatedHandlerLinks = [
+		...new Map(handlerLinks.map((link) => [link.id, link])).values()
+	];
+	handlerLinks.splice(0, handlerLinks.length, ...deduplicatedHandlerLinks);
+	handlerLinks.sort((left, right) => compareText(left.id, right.id));
+	frontiers.sort((left, right) => compareText(left.id, right.id));
+	anchorSites.sort((left, right) => compareText(left.id, right.id));
+	const occurrences = resolveOccurrenceFrontiers(occurrenceDrafts, frontiers);
+
+	const occurrenceById = new Map(occurrences.map((occurrence) => [occurrence.id, occurrence]));
+	const classificationById = new Map(
+		classifications.map((classification) => [classification.id, classification])
+	);
+	const anchorSiteById = new Map(anchorSites.map((anchor) => [anchor.id, anchor]));
+	const handlerLinksByAnchor = new Map<string, GuardClassificationOverlayHandlerLink[]>();
+	for (const link of handlerLinks) grouped(handlerLinksByAnchor, link.anchorSiteId, link);
+	const forwardIndex = forwardIndexEntries(
+		classifications,
+		occurrenceById,
+		anchorSiteById,
+		handlerLinksByAnchor,
+		frontiers
+	);
+	const reverseIndex = reverseIndexEntries(
+		occurrences,
+		classificationById,
+		anchorSiteById,
+		handlerLinksByAnchor
+	);
 
 	const dispositionCounts = [...new Set(classifications.map((item) => item.disposition))]
-		.sort((left, right) =>
-			left === null ? (right === null ? 0 : -1) : right === null ? 1 : compareText(left, right)
-		)
+		.sort(compareDisposition)
 		.map((disposition) => ({
 			count: classifications.filter((item) => item.disposition === disposition).length,
 			disposition
@@ -1630,37 +2063,64 @@ function predecessorIssue(
 	return null;
 }
 
-/**
- * Independently validates the bounded guard-classification overlay from explicit predecessor
- * requests and products. No candidate-derived request or candidate population is trusted.
- */
-export function validateGuardClassificationOverlay(
+/** Refusal text for a caught error, preserving the exact recorded wording. */
+function caughtErrorMessage(error: unknown, prefix: string, fallback: string): string {
+	return error instanceof Error ? `${prefix}${error.message}` : fallback;
+}
+
+function inspectionFailureResult(
+	failure: InspectionFailure
+): GuardClassificationOverlayValidationResult {
+	return invalidResult(
+		failure.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
+		failure.path,
+		failure.message,
+		failure.budget
+	);
+}
+
+/** Descriptor-only array-shell inspection of every retained semantic population, in order. */
+function inspectSemanticPopulations(
+	snapshot: StaticSemanticSnapshot,
+	maxInputRecords: number
+): InspectionFailure | null {
+	let remainingSemanticRecords = maxInputRecords;
+	for (const name of [
+		'capabilities',
+		'projects',
+		'programs',
+		'sources',
+		'astNodes',
+		'assignments',
+		'references',
+		'invocations',
+		'declarations',
+		'symbols'
+	] as const) {
+		const population = snapshot[name];
+		const shell = inspectArrayShell(
+			population,
+			`$inputs.semanticSnapshot.${name}`,
+			remainingSemanticRecords
+		);
+		if (shell !== null) return shell;
+		remainingSemanticRecords -= population.length;
+	}
+	return null;
+}
+
+/** Hostile-shape gate applied before any canonicalizer or predecessor validator is reached. */
+function inspectOverlayShape(
 	value: unknown,
 	inputs: GuardClassificationOverlayBuildInputs,
-	options?: GuardClassificationOverlayValidationOptions
-): GuardClassificationOverlayValidationResult {
-	let limits: ValidationLimits;
-	try {
-		limits = materializeOptions(options);
-	} catch (error) {
-		return invalidResult(
-			'SHAPE_INVALID',
-			'$options',
-			error instanceof Error ? error.message : 'Validation options are invalid.'
-		);
-	}
+	limits: ValidationLimits
+): GuardClassificationOverlayValidationResult | null {
 	const candidateInspection = inspectPlainData([{ path: '$', value }], {
 		maxDepth: limits.maxDepth,
 		maxRecords: limits.maxRecords,
 		maxStringCharacters: limits.maxStringCharacters
 	});
-	if (candidateInspection !== null)
-		return invalidResult(
-			candidateInspection.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
-			candidateInspection.path,
-			candidateInspection.message,
-			candidateInspection.budget
-		);
+	if (candidateInspection !== null) return inspectionFailureResult(candidateInspection);
 	const inputShell = inspectRecordShell(inputs, '$inputs');
 	if (inputShell !== null)
 		return invalidResult('SHAPE_INVALID', inputShell.path, inputShell.message);
@@ -1687,44 +2147,87 @@ export function validateGuardClassificationOverlay(
 			maxStringCharacters: limits.maxInputStringCharacters
 		}
 	);
-	if (inputInspection !== null)
-		return invalidResult(
-			inputInspection.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
-			inputInspection.path,
-			inputInspection.message,
-			inputInspection.budget
-		);
+	if (inputInspection !== null) return inspectionFailureResult(inputInspection);
 	const semanticShell = inspectRecordShell(inputs.semanticSnapshot, '$inputs.semanticSnapshot');
 	if (semanticShell !== null)
 		return invalidResult('SHAPE_INVALID', semanticShell.path, semanticShell.message);
-	let remainingSemanticRecords = limits.maxInputRecords;
-	for (const name of [
-		'capabilities',
-		'projects',
-		'programs',
-		'sources',
-		'astNodes',
-		'assignments',
-		'references',
-		'invocations',
-		'declarations',
-		'symbols'
-	] as const) {
-		const population = inputs.semanticSnapshot[name];
-		const shell = inspectArrayShell(
-			population,
-			`$inputs.semanticSnapshot.${name}`,
-			remainingSemanticRecords
+	const populationShell = inspectSemanticPopulations(
+		inputs.semanticSnapshot,
+		limits.maxInputRecords
+	);
+	if (populationShell !== null) return inspectionFailureResult(populationShell);
+	return null;
+}
+
+function requiredSemanticCapabilities(inputs: GuardClassificationOverlayBuildInputs): boolean {
+	const requiredCapabilities = ['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const;
+	return requiredCapabilities.every((required) =>
+		inputs.semanticSnapshot.capabilities.some(
+			(capability) => capability.capability === required && capability.state !== 'UNSUPPORTED'
+		)
+	);
+}
+
+/** Caller operation guards, refused in the exact declared population order. */
+function exceededOperationBudget(
+	inputs: GuardClassificationOverlayBuildInputs,
+	expected: GuardClassificationOverlaySnapshot,
+	sourceBytes: number
+): GuardClassificationOverlayValidationResult | null {
+	const populations = [
+		['maxAnchorSites', expected.anchorSites.length, inputs.request.budgets.maxAnchorSites],
+		['maxAstNodes', inputs.semanticSnapshot.astNodes.length, inputs.request.budgets.maxAstNodes],
+		[
+			'maxCommandEvidenceLinks',
+			expected.commandEvidenceLinks.length,
+			inputs.request.budgets.maxCommandEvidenceLinks
+		],
+		['maxFrontiers', expected.frontiers.length, inputs.request.budgets.maxFrontiers],
+		[
+			'maxGuardOccurrences',
+			expected.occurrences.length,
+			inputs.request.budgets.maxGuardOccurrences
+		],
+		['maxGuardRecords', expected.classifications.length, inputs.request.budgets.maxGuardRecords],
+		['maxHandlerLinks', expected.handlerLinks.length, inputs.request.budgets.maxHandlerLinks],
+		['maxSourceBytes', sourceBytes, inputs.request.budgets.maxSourceBytes],
+		[
+			'maxStateEvidenceRefs',
+			expected.coverage.stateEvidenceRefs,
+			inputs.request.budgets.maxStateEvidenceRefs
+		]
+	] as const;
+	const exceeded = populations.find(([, actual, maximum]) => actual > maximum);
+	if (exceeded === undefined) return null;
+	return invalidResult(
+		'BUDGET_EXHAUSTED',
+		`$inputs.request.budgets.${exceeded[0]}`,
+		`Caller operation guard exceeded: ${exceeded[1]} > ${exceeded[2]}.`,
+		true
+	);
+}
+
+/**
+ * Independently validates the bounded guard-classification overlay from explicit predecessor
+ * requests and products. No candidate-derived request or candidate population is trusted.
+ */
+export function validateGuardClassificationOverlay(
+	value: unknown,
+	inputs: GuardClassificationOverlayBuildInputs,
+	options?: GuardClassificationOverlayValidationOptions
+): GuardClassificationOverlayValidationResult {
+	let limits: ValidationLimits;
+	try {
+		limits = materializeOptions(options);
+	} catch (error) {
+		return invalidResult(
+			'SHAPE_INVALID',
+			'$options',
+			caughtErrorMessage(error, '', 'Validation options are invalid.')
 		);
-		if (shell !== null)
-			return invalidResult(
-				shell.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
-				shell.path,
-				shell.message,
-				shell.budget
-			);
-		remainingSemanticRecords -= population.length;
 	}
+	const shape = inspectOverlayShape(value, inputs, limits);
+	if (shape !== null) return shape;
 	try {
 		if (!requestValid(inputs))
 			return invalidResult(
@@ -1738,14 +2241,7 @@ export function validateGuardClassificationOverlay(
 				'$inputs',
 				'Explicit requests and predecessor products do not share exact identities.'
 			);
-		const requiredCapabilities = ['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const;
-		if (
-			!requiredCapabilities.every((required) =>
-				inputs.semanticSnapshot.capabilities.some(
-					(capability) => capability.capability === required && capability.state !== 'UNSUPPORTED'
-				)
-			)
-		)
+		if (!requiredSemanticCapabilities(inputs))
 			return invalidResult(
 				'INPUT_INVALID',
 				'$inputs.semanticSnapshot.capabilities',
@@ -1755,37 +2251,8 @@ export function validateGuardClassificationOverlay(
 		if (upstream !== null) return invalidResult('INPUT_INVALID', '$inputs', upstream);
 		assertSharedArtifacts(inputs);
 		const { expected, sourceBytes } = deriveExpected(inputs);
-		const populations = [
-			['maxAnchorSites', expected.anchorSites.length, inputs.request.budgets.maxAnchorSites],
-			['maxAstNodes', inputs.semanticSnapshot.astNodes.length, inputs.request.budgets.maxAstNodes],
-			[
-				'maxCommandEvidenceLinks',
-				expected.commandEvidenceLinks.length,
-				inputs.request.budgets.maxCommandEvidenceLinks
-			],
-			['maxFrontiers', expected.frontiers.length, inputs.request.budgets.maxFrontiers],
-			[
-				'maxGuardOccurrences',
-				expected.occurrences.length,
-				inputs.request.budgets.maxGuardOccurrences
-			],
-			['maxGuardRecords', expected.classifications.length, inputs.request.budgets.maxGuardRecords],
-			['maxHandlerLinks', expected.handlerLinks.length, inputs.request.budgets.maxHandlerLinks],
-			['maxSourceBytes', sourceBytes, inputs.request.budgets.maxSourceBytes],
-			[
-				'maxStateEvidenceRefs',
-				expected.coverage.stateEvidenceRefs,
-				inputs.request.budgets.maxStateEvidenceRefs
-			]
-		] as const;
-		const exceeded = populations.find(([, actual, maximum]) => actual > maximum);
-		if (exceeded !== undefined)
-			return invalidResult(
-				'BUDGET_EXHAUSTED',
-				`$inputs.request.budgets.${exceeded[0]}`,
-				`Caller operation guard exceeded: ${exceeded[1]} > ${exceeded[2]}.`,
-				true
-			);
+		const exceeded = exceededOperationBudget(inputs, expected, sourceBytes);
+		if (exceeded !== null) return exceeded;
 		if (!same(value, expected))
 			return invalidResult(
 				'POPULATION_MISMATCH',
@@ -1797,9 +2264,11 @@ export function validateGuardClassificationOverlay(
 		return invalidResult(
 			'POPULATION_MISMATCH',
 			'$',
-			error instanceof Error
-				? `Independent overlay derivation failed closed: ${error.message}`
-				: 'Independent overlay derivation failed closed.'
+			caughtErrorMessage(
+				error,
+				'Independent overlay derivation failed closed: ',
+				'Independent overlay derivation failed closed.'
+			)
 		);
 	}
 }

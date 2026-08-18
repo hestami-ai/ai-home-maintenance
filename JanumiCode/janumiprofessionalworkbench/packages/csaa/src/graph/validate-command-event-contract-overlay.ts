@@ -300,148 +300,250 @@ function materializeOptions(
 	return result;
 }
 
+interface InspectionBudgets {
+	readonly maxDepth: number;
+	readonly maxRecords: number;
+	readonly maxStringCharacters: number;
+}
+
+interface InspectionFrame {
+	readonly depth: number;
+	readonly exit: boolean;
+	readonly path: string;
+	readonly value: unknown;
+}
+
+interface InspectionState {
+	readonly active: WeakSet<object>;
+	readonly pending: InspectionFrame[];
+	records: number;
+	stringCharacters: number;
+}
+
+/** Canonical-scalar admission: the new string-character total when the frame is a leaf, else null. */
+function inspectScalarMember(
+	current: unknown,
+	path: string,
+	stringCharacters: number,
+	maxStringCharacters: number
+): InspectionFailure | number | null {
+	if (typeof current === 'string') {
+		const total = stringCharacters + current.length;
+		if (total > maxStringCharacters)
+			return {
+				budget: true,
+				message: `String-character budget exceeded: ${total} > ${maxStringCharacters}.`,
+				path
+			};
+		return total;
+	}
+	if (
+		current === null ||
+		typeof current === 'boolean' ||
+		(typeof current === 'number' && Number.isFinite(current) && !Object.is(current, -0))
+	)
+		return stringCharacters;
+	if (typeof current !== 'object')
+		return { budget: false, message: 'Value contains a non-canonical JSON member.', path };
+	return null;
+}
+
+function inspectContainerIdentity(
+	current: object,
+	path: string,
+	active: WeakSet<object>
+): InspectionFailure | null {
+	if (isProxy(current)) return { budget: false, message: 'Value contains a Proxy.', path };
+	if (active.has(current))
+		return { budget: false, message: 'Value contains a cyclic container.', path };
+	const array = Array.isArray(current);
+	const prototype = Reflect.getPrototypeOf(current);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return { budget: false, message: 'Containers must have plain prototypes.', path };
+	return null;
+}
+
+/** The admitted array length, or the refusal its length descriptor or the record budget produced. */
+function inspectArrayPopulation(
+	current: object,
+	path: string,
+	remainingRecords: number
+): InspectionFailure | number {
+	const descriptor = Reflect.getOwnPropertyDescriptor(current, 'length');
+	if (
+		descriptor === undefined ||
+		!('value' in descriptor) ||
+		!Number.isSafeInteger(descriptor.value) ||
+		(descriptor.value as number) < 0
+	)
+		return { budget: false, message: 'Array length descriptor is invalid.', path };
+	const arrayLength = descriptor.value as number;
+	if (arrayLength > remainingRecords)
+		return {
+			budget: true,
+			message: 'Structural record budget cannot admit the array population.',
+			path
+		};
+	return arrayLength;
+}
+
+function denseArrayKey(key: PropertyKey, arrayLength: number): boolean {
+	if (key === 'length') return true;
+	if (typeof key !== 'string') return false;
+	const index = Number(key);
+	return Number.isSafeInteger(index) && index >= 0 && index < arrayLength && String(index) === key;
+}
+
+function inspectContainerKeys(
+	path: string,
+	keys: readonly (string | symbol)[],
+	arrayLength: number | null,
+	remainingRecords: number
+): InspectionFailure | null {
+	if (keys.length > remainingRecords)
+		return {
+			budget: true,
+			message: 'Structural record budget cannot admit the container properties.',
+			path
+		};
+	if (keys.some((key) => typeof key !== 'string'))
+		return { budget: false, message: 'Containers may not have symbol keys.', path };
+	if (arrayLength === null) return null;
+	if (keys.length !== arrayLength + 1 || keys.some((key) => !denseArrayKey(key, arrayLength)))
+		return {
+			budget: false,
+			message: 'Arrays must be dense and may not carry extra properties.',
+			path
+		};
+	return null;
+}
+
+/** Pushes the admitted child frames; returns the new string-character total, or the refusal. */
+function pushInspectionChildren(
+	pending: InspectionFrame[],
+	frame: InspectionFrame,
+	current: object,
+	keys: readonly (string | symbol)[],
+	maxStringCharacters: number,
+	stringCharacters: number
+): InspectionFailure | number {
+	const array = Array.isArray(current);
+	let total = stringCharacters;
+	for (const key of keys) {
+		if (array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			return {
+				budget: false,
+				message: 'Properties must be enumerable data properties.',
+				path: `${frame.path}.${String(key)}`
+			};
+		total += String(key).length;
+		if (total > maxStringCharacters)
+			return {
+				budget: true,
+				message: 'String-character budget exceeded while inspecting keys.',
+				path: frame.path
+			};
+		pending.push({
+			depth: frame.depth + 1,
+			exit: false,
+			path: array ? `${frame.path}[${String(key)}]` : `${frame.path}.${String(key)}`,
+			value: descriptor.value
+		});
+	}
+	return total;
+}
+
+function inspectContainerFrame(
+	state: InspectionState,
+	frame: InspectionFrame,
+	current: object,
+	limits: InspectionBudgets
+): InspectionFailure | null {
+	const identity = inspectContainerIdentity(current, frame.path, state.active);
+	if (identity !== null) return identity;
+	const remainingRecords = limits.maxRecords - state.records;
+	let arrayLength: number | null = null;
+	if (Array.isArray(current)) {
+		const population = inspectArrayPopulation(current, frame.path, remainingRecords);
+		if (typeof population !== 'number') return population;
+		arrayLength = population;
+	}
+	const keys = Reflect.ownKeys(current);
+	const keyFailure = inspectContainerKeys(frame.path, keys, arrayLength, remainingRecords);
+	if (keyFailure !== null) return keyFailure;
+	state.active.add(current);
+	state.pending.push({ ...frame, exit: true });
+	const total = pushInspectionChildren(
+		state.pending,
+		frame,
+		current,
+		keys,
+		limits.maxStringCharacters,
+		state.stringCharacters
+	);
+	if (typeof total !== 'number') return total;
+	state.stringCharacters = total;
+	return null;
+}
+
+function inspectFrame(
+	state: InspectionState,
+	frame: InspectionFrame,
+	limits: InspectionBudgets
+): InspectionFailure | null {
+	const current = frame.value;
+	if (frame.exit) {
+		state.active.delete(current as object);
+		return null;
+	}
+	if (frame.depth > limits.maxDepth)
+		return {
+			budget: true,
+			message: `Structural depth budget exceeded: ${frame.depth} > ${limits.maxDepth}.`,
+			path: frame.path
+		};
+	state.records += 1;
+	if (state.records > limits.maxRecords)
+		return {
+			budget: true,
+			message: `Structural record budget exceeded: ${state.records} > ${limits.maxRecords}.`,
+			path: frame.path
+		};
+	const scalar = inspectScalarMember(
+		current,
+		frame.path,
+		state.stringCharacters,
+		limits.maxStringCharacters
+	);
+	if (typeof scalar === 'number') {
+		state.stringCharacters = scalar;
+		return null;
+	}
+	if (scalar !== null) return scalar;
+	return inspectContainerFrame(state, frame, current as object, limits);
+}
+
 /** Descriptor-only hostile-shape inspection performed before canonicalizers or predecessor validators. */
 function inspectPlainData(
 	roots: readonly { readonly path: string; readonly value: unknown }[],
-	limits: {
-		readonly maxDepth: number;
-		readonly maxRecords: number;
-		readonly maxStringCharacters: number;
-	}
+	limits: InspectionBudgets
 ): InspectionFailure | null {
-	type Frame = {
-		readonly depth: number;
-		readonly exit: boolean;
-		readonly path: string;
-		readonly value: unknown;
+	const state: InspectionState = {
+		active: new WeakSet<object>(),
+		pending: roots
+			.map((root) => ({ depth: 0, exit: false, path: root.path, value: root.value }))
+			.reverse(),
+		records: 0,
+		stringCharacters: 0
 	};
-	const pending: Frame[] = roots
-		.map((root) => ({ depth: 0, exit: false, path: root.path, value: root.value }))
-		.reverse();
-	const active = new WeakSet<object>();
-	let records = 0;
-	let stringCharacters = 0;
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
-		const current = frame.value;
-		if (frame.exit) {
-			active.delete(current as object);
-			continue;
-		}
-		if (frame.depth > limits.maxDepth)
-			return {
-				budget: true,
-				message: `Structural depth budget exceeded: ${frame.depth} > ${limits.maxDepth}.`,
-				path: frame.path
-			};
-		records += 1;
-		if (records > limits.maxRecords)
-			return {
-				budget: true,
-				message: `Structural record budget exceeded: ${records} > ${limits.maxRecords}.`,
-				path: frame.path
-			};
-		if (typeof current === 'string') {
-			stringCharacters += current.length;
-			if (stringCharacters > limits.maxStringCharacters)
-				return {
-					budget: true,
-					message: `String-character budget exceeded: ${stringCharacters} > ${limits.maxStringCharacters}.`,
-					path: frame.path
-				};
-			continue;
-		}
-		if (
-			current === null ||
-			typeof current === 'boolean' ||
-			(typeof current === 'number' && Number.isFinite(current) && !Object.is(current, -0))
-		)
-			continue;
-		if (typeof current !== 'object')
-			return {
-				budget: false,
-				message: 'Value contains a non-canonical JSON member.',
-				path: frame.path
-			};
-		if (isProxy(current))
-			return { budget: false, message: 'Value contains a Proxy.', path: frame.path };
-		if (active.has(current))
-			return { budget: false, message: 'Value contains a cyclic container.', path: frame.path };
-		const array = Array.isArray(current);
-		const prototype = Reflect.getPrototypeOf(current);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return { budget: false, message: 'Containers must have plain prototypes.', path: frame.path };
-		let arrayLength = 0;
-		if (array) {
-			const descriptor = Reflect.getOwnPropertyDescriptor(current, 'length');
-			if (
-				descriptor === undefined ||
-				!('value' in descriptor) ||
-				!Number.isSafeInteger(descriptor.value) ||
-				(descriptor.value as number) < 0
-			)
-				return { budget: false, message: 'Array length descriptor is invalid.', path: frame.path };
-			arrayLength = descriptor.value as number;
-			if (arrayLength > limits.maxRecords - records)
-				return {
-					budget: true,
-					message: 'Structural record budget cannot admit the array population.',
-					path: frame.path
-				};
-		}
-		const keys = Reflect.ownKeys(current);
-		if (keys.length > limits.maxRecords - records)
-			return {
-				budget: true,
-				message: 'Structural record budget cannot admit the container properties.',
-				path: frame.path
-			};
-		if (keys.some((key) => typeof key !== 'string'))
-			return { budget: false, message: 'Containers may not have symbol keys.', path: frame.path };
-		if (array) {
-			const dense = (key: PropertyKey): boolean => {
-				if (key === 'length') return true;
-				if (typeof key !== 'string') return false;
-				const index = Number(key);
-				return (
-					Number.isSafeInteger(index) && index >= 0 && index < arrayLength && String(index) === key
-				);
-			};
-			if (keys.length !== arrayLength + 1 || keys.some((key) => !dense(key)))
-				return {
-					budget: false,
-					message: 'Arrays must be dense and may not carry extra properties.',
-					path: frame.path
-				};
-		}
-		active.add(current);
-		pending.push({ ...frame, exit: true });
-		for (const key of keys) {
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				return {
-					budget: false,
-					message: 'Properties must be enumerable data properties.',
-					path: `${frame.path}.${String(key)}`
-				};
-			stringCharacters += String(key).length;
-			if (stringCharacters > limits.maxStringCharacters)
-				return {
-					budget: true,
-					message: 'String-character budget exceeded while inspecting keys.',
-					path: frame.path
-				};
-			pending.push({
-				depth: frame.depth + 1,
-				exit: false,
-				path: array ? `${frame.path}[${String(key)}]` : `${frame.path}.${String(key)}`,
-				value: descriptor.value
-			});
-		}
+	while (state.pending.length > 0) {
+		const failure = inspectFrame(state, state.pending.pop()!, limits);
+		if (failure !== null) return failure;
 	}
 	return null;
 }
@@ -511,6 +613,57 @@ function addGrouped<Key, Value>(map: Map<Key, Value[]>, key: Key, value: Value):
 	else values.push(value);
 }
 
+function selectedSemanticSymbolIds(
+	declarations: readonly SemanticDeclarationRecord[],
+	references: readonly SemanticReferenceRecord[]
+): Set<string> {
+	const symbolIds = new Set<string>();
+	for (const declaration of declarations)
+		if (declaration.symbolId !== null) symbolIds.add(declaration.symbolId);
+	for (const reference of references)
+		if (reference.resolvedSymbolId !== null) symbolIds.add(reference.resolvedSymbolId);
+	return symbolIds;
+}
+
+function groupSemanticNodesBySpan(
+	nodes: readonly SemanticAstNodeRecord[],
+	nodeById: ReadonlyMap<string, SemanticAstNodeRecord>
+): Map<string, SemanticAstNodeRecord[]> {
+	const nodesBySpan = new Map<string, SemanticAstNodeRecord[]>();
+	for (const node of nodes) {
+		if (node.parentId !== null && !nodeById.has(node.parentId))
+			throw new Error(`Selected semantic node ${node.id} has no selected parent.`);
+		addGrouped(nodesBySpan, `${node.kind}\0${node.start}\0${node.end}`, node);
+	}
+	return nodesBySpan;
+}
+
+function groupSemanticReferencesByNode(
+	references: readonly SemanticReferenceRecord[],
+	nodeById: ReadonlyMap<string, SemanticAstNodeRecord>,
+	symbolById: ReadonlyMap<string, SemanticSymbolRecord>
+): Map<string, SemanticReferenceRecord[]> {
+	const referenceByNode = new Map<string, SemanticReferenceRecord[]>();
+	for (const reference of references) {
+		if (!nodeById.has(reference.nodeId))
+			throw new Error(`Selected semantic reference ${reference.id} has no selected node.`);
+		if (reference.resolvedSymbolId !== null && !symbolById.has(reference.resolvedSymbolId))
+			throw new Error(`Selected semantic reference ${reference.id} has no selected symbol.`);
+		addGrouped(referenceByNode, reference.nodeId, reference);
+	}
+	return referenceByNode;
+}
+
+function assertSemanticDeclarationNodes(
+	declarations: readonly SemanticDeclarationRecord[],
+	nodeById: ReadonlyMap<string, SemanticAstNodeRecord>
+): void {
+	for (const declaration of declarations) {
+		if (declaration.nodeId !== null && !nodeById.has(declaration.nodeId))
+			throw new Error(`Selected semantic declaration ${declaration.id} has no selected node.`);
+	}
+}
+
 function semanticModel(
 	snapshot: StaticSemanticSnapshot,
 	source: SemanticSourceRecord
@@ -526,34 +679,15 @@ function semanticModel(
 		'Selected semantic declaration'
 	);
 	const references = snapshot.references.filter((reference) => reference.sourceId === source.id);
-	const symbolIds = new Set<string>();
-	for (const declaration of declarations)
-		if (declaration.symbolId !== null) symbolIds.add(declaration.symbolId);
-	for (const reference of references)
-		if (reference.resolvedSymbolId !== null) symbolIds.add(reference.resolvedSymbolId);
+	const symbolIds = selectedSemanticSymbolIds(declarations, references);
 	const symbolById = uniqueMap(
 		snapshot.symbols.filter((symbol) => symbolIds.has(symbol.id)),
 		(symbol) => symbol.id,
 		'Selected semantic symbol'
 	);
-	const nodesBySpan = new Map<string, SemanticAstNodeRecord[]>();
-	for (const node of nodes) {
-		if (node.parentId !== null && !nodeById.has(node.parentId))
-			throw new Error(`Selected semantic node ${node.id} has no selected parent.`);
-		addGrouped(nodesBySpan, `${node.kind}\0${node.start}\0${node.end}`, node);
-	}
-	const referenceByNode = new Map<string, SemanticReferenceRecord[]>();
-	for (const reference of references) {
-		if (!nodeById.has(reference.nodeId))
-			throw new Error(`Selected semantic reference ${reference.id} has no selected node.`);
-		if (reference.resolvedSymbolId !== null && !symbolById.has(reference.resolvedSymbolId))
-			throw new Error(`Selected semantic reference ${reference.id} has no selected symbol.`);
-		addGrouped(referenceByNode, reference.nodeId, reference);
-	}
-	for (const declaration of declarations) {
-		if (declaration.nodeId !== null && !nodeById.has(declaration.nodeId))
-			throw new Error(`Selected semantic declaration ${declaration.id} has no selected node.`);
-	}
+	const nodesBySpan = groupSemanticNodesBySpan(nodes, nodeById);
+	const referenceByNode = groupSemanticReferencesByNode(references, nodeById, symbolById);
+	assertSemanticDeclarationNodes(declarations, nodeById);
 	return { declarationById, nodesBySpan, referenceByNode, symbolById };
 }
 
@@ -621,6 +755,14 @@ function semanticNode(
 	return exactOne(model.nodesBySpan.get(key) ?? [], `${description} semantic node`);
 }
 
+function frozenBytesReproduceArtifact(
+	bytes: Uint8Array | undefined,
+	artifact: CapturedArtifactRecord
+): bytes is Uint8Array {
+	if (bytes === undefined) return false;
+	return bytes.byteLength === artifact.bytes && sha256(bytes) === artifact.sha256;
+}
+
 function frozenArtifact(
 	subject: FrozenSubject,
 	path: string
@@ -633,11 +775,7 @@ function frozenArtifact(
 		`Frozen ${path} artifact`
 	);
 	const bytes = readFrozenSubjectArtifact(subject, path);
-	if (
-		bytes === undefined ||
-		bytes.byteLength !== artifact.bytes ||
-		sha256(bytes) !== artifact.sha256
-	)
+	if (!frozenBytesReproduceArtifact(bytes, artifact))
 		throw new Error(`Frozen ${path} bytes do not reproduce their exact artifact identity.`);
 	return { artifact, bytes };
 }
@@ -850,9 +988,7 @@ function parseEventContracts(
 			.map((id) => model.declarationById.get(id))
 			.filter(
 				(declaration): declaration is SemanticDeclarationRecord =>
-					declaration !== undefined &&
-					declaration.sourceId === source.id &&
-					declaration.name === expectedName
+					declaration?.sourceId === source.id && declaration?.name === expectedName
 			);
 		const payloadDeclaration = exactOne(
 			payloadDeclarations,
@@ -1544,6 +1680,17 @@ function makeFrontier(
 	};
 }
 
+function parsedCommandMatchesVocab(
+	actual: ParsedCommandDeclaration,
+	expected: VocabCommand
+): boolean {
+	return (
+		actual.primary.eventName === expected.primaryEvent &&
+		actual.additional.length === expected.additionalEvents.length &&
+		actual.additional.every((item, index) => item.eventName === expected.additionalEvents[index])
+	);
+}
+
 function assertGeneratedVocabParity(
 	commands: readonly ParsedCommandDeclaration[],
 	events: readonly ParsedEventContract[],
@@ -1554,12 +1701,7 @@ function assertGeneratedVocabParity(
 		throw new Error('Generated COMMANDS and vocab command populations differ.');
 	for (const expected of vocab.commands) {
 		const actual = generatedByName.get(expected.commandName);
-		if (
-			actual === undefined ||
-			actual.primary.eventName !== expected.primaryEvent ||
-			actual.additional.length !== expected.additionalEvents.length ||
-			actual.additional.some((item, index) => item.eventName !== expected.additionalEvents[index])
-		)
+		if (actual === undefined || !parsedCommandMatchesVocab(actual, expected))
 			throw new Error(`Generated COMMANDS.${expected.commandName} differs from vocab.`);
 	}
 	const generatedEvents = new Set(events.map((event) => event.eventName));
@@ -1666,6 +1808,109 @@ function buildExpectedIndexes(input: {
 	return { forwardIndex, reverseIndex };
 }
 
+function pushCommandDeclarationFrontiers(
+	frontiers: CommandEventContractFrontier[],
+	overlayId: CommandEventContractOverlayId,
+	generated: GeneratedPopulation,
+	transitionCommands: ReadonlySet<string>
+): void {
+	for (const command of generated.commands)
+		if (!transitionCommands.has(command.commandName))
+			frontiers.push(
+				makeFrontier(overlayId, 'COMMAND_WITHOUT_TRANSITION_BINDING', command.id, null, null)
+			);
+	for (const missing of generated.missing)
+		frontiers.push(
+			makeFrontier(
+				overlayId,
+				'GENERATED_EVENT_SCHEMA_UNRESOLVED',
+				missing.commandId,
+				null,
+				missing.eventName
+			)
+		);
+}
+
+function pushDeclaredEventFrontiers(
+	frontiers: CommandEventContractFrontier[],
+	overlayId: CommandEventContractOverlayId,
+	generated: GeneratedPopulation,
+	boundNames: ReadonlySet<string>,
+	pinnedNames: ReadonlySet<string>
+): void {
+	for (const event of generated.eventContracts)
+		if (!boundNames.has(event.eventName) && !pinnedNames.has(event.eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'DECLARED_NEITHER_BOUND_NOR_PINNED_EMITTED',
+					null,
+					event.id,
+					event.eventName
+				)
+			);
+}
+
+function pushBoundSetMismatchFrontiers(
+	frontiers: CommandEventContractFrontier[],
+	overlayId: CommandEventContractOverlayId,
+	eventByName: ReadonlyMap<string, CommandEventContractEventRecord>,
+	declaredNames: ReadonlySet<string>,
+	boundNames: ReadonlySet<string>
+): void {
+	for (const eventName of sortedUnique([...declaredNames, ...boundNames]))
+		if (declaredNames.has(eventName) !== boundNames.has(eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'GENERATED_RETAINED_BOUND_SET_MISMATCH',
+					null,
+					eventByName.get(eventName)?.id ?? null,
+					eventName
+				)
+			);
+}
+
+function pushPinnedNotBoundFrontiers(
+	frontiers: CommandEventContractFrontier[],
+	overlayId: CommandEventContractOverlayId,
+	eventByName: ReadonlyMap<string, CommandEventContractEventRecord>,
+	boundNames: ReadonlySet<string>,
+	pinnedNames: ReadonlySet<string>
+): void {
+	for (const eventName of sortedUnique(pinnedNames))
+		if (!boundNames.has(eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'PINNED_EMITTED_NOT_RETAINED_BOUND',
+					null,
+					eventByName.get(eventName)?.id ?? null,
+					eventName
+				)
+			);
+}
+
+function pushBoundNotPinnedFrontiers(
+	frontiers: CommandEventContractFrontier[],
+	overlayId: CommandEventContractOverlayId,
+	eventByName: ReadonlyMap<string, CommandEventContractEventRecord>,
+	boundNames: ReadonlySet<string>,
+	pinnedNames: ReadonlySet<string>
+): void {
+	for (const eventName of sortedUnique(boundNames))
+		if (!pinnedNames.has(eventName))
+			frontiers.push(
+				makeFrontier(
+					overlayId,
+					'RETAINED_BOUND_NOT_PINNED_EMITTED',
+					null,
+					eventByName.get(eventName)?.id ?? null,
+					eventName
+				)
+			);
+}
+
 function expectedOverlay(inputs: CommandEventContractOverlayBuildInputs): {
 	readonly overlay: CommandEventContractOverlaySnapshot;
 	readonly sourceBytes: number;
@@ -1722,65 +1967,11 @@ function expectedOverlay(inputs: CommandEventContractOverlayBuildInputs): {
 	const pinnedNames = new Set(pinnedEmissions.map((item) => item.eventName));
 	const transitionCommands = new Set(vocab.bindings.map((binding) => binding.commandName));
 	const frontiers: CommandEventContractFrontier[] = [];
-	for (const command of generated.commands)
-		if (!transitionCommands.has(command.commandName))
-			frontiers.push(
-				makeFrontier(overlayId, 'COMMAND_WITHOUT_TRANSITION_BINDING', command.id, null, null)
-			);
-	for (const missing of generated.missing)
-		frontiers.push(
-			makeFrontier(
-				overlayId,
-				'GENERATED_EVENT_SCHEMA_UNRESOLVED',
-				missing.commandId,
-				null,
-				missing.eventName
-			)
-		);
-	for (const event of generated.eventContracts)
-		if (!boundNames.has(event.eventName) && !pinnedNames.has(event.eventName))
-			frontiers.push(
-				makeFrontier(
-					overlayId,
-					'DECLARED_NEITHER_BOUND_NOR_PINNED_EMITTED',
-					null,
-					event.id,
-					event.eventName
-				)
-			);
-	for (const eventName of sortedUnique([...declaredNames, ...boundNames]))
-		if (declaredNames.has(eventName) !== boundNames.has(eventName))
-			frontiers.push(
-				makeFrontier(
-					overlayId,
-					'GENERATED_RETAINED_BOUND_SET_MISMATCH',
-					null,
-					eventByName.get(eventName)?.id ?? null,
-					eventName
-				)
-			);
-	for (const eventName of sortedUnique(pinnedNames))
-		if (!boundNames.has(eventName))
-			frontiers.push(
-				makeFrontier(
-					overlayId,
-					'PINNED_EMITTED_NOT_RETAINED_BOUND',
-					null,
-					eventByName.get(eventName)?.id ?? null,
-					eventName
-				)
-			);
-	for (const eventName of sortedUnique(boundNames))
-		if (!pinnedNames.has(eventName))
-			frontiers.push(
-				makeFrontier(
-					overlayId,
-					'RETAINED_BOUND_NOT_PINNED_EMITTED',
-					null,
-					eventByName.get(eventName)?.id ?? null,
-					eventName
-				)
-			);
+	pushCommandDeclarationFrontiers(frontiers, overlayId, generated, transitionCommands);
+	pushDeclaredEventFrontiers(frontiers, overlayId, generated, boundNames, pinnedNames);
+	pushBoundSetMismatchFrontiers(frontiers, overlayId, eventByName, declaredNames, boundNames);
+	pushPinnedNotBoundFrontiers(frontiers, overlayId, eventByName, boundNames, pinnedNames);
+	pushBoundNotPinnedFrontiers(frontiers, overlayId, eventByName, boundNames, pinnedNames);
 	frontiers.sort((left, right) => compareText(left.id, right.id));
 	const coverage: CommandEventContractOverlayCoverage = {
 		additionalDeclaredLinks: generated.declaredLinks.filter((link) => link.role === 'ADDITIONAL')
@@ -2009,33 +2200,53 @@ function predecessorIssue(
 	return null;
 }
 
-function validateOverlay(
+function inspectionFailureResult(
+	failure: InspectionFailure
+): CommandEventContractOverlayValidationResult {
+	return invalidResult(
+		failure.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
+		failure.path,
+		failure.message,
+		failure.budget
+	);
+}
+
+/** Sequential array-shell admission of the semantic populations under one shared record budget. */
+function semanticPopulationFailure(
+	inputs: CommandEventContractOverlayBuildInputs,
+	maxInputRecords: number
+): CommandEventContractOverlayValidationResult | null {
+	let remaining = maxInputRecords;
+	for (const name of [
+		'capabilities',
+		'projects',
+		'programs',
+		'sources',
+		'astNodes',
+		'references',
+		'declarations',
+		'symbols'
+	] as const) {
+		const population = inputs.semanticSnapshot[name];
+		const shell = inspectArrayShell(population, `$inputs.semanticSnapshot.${name}`, remaining);
+		if (shell !== null) return inspectionFailureResult(shell);
+		remaining -= population.length;
+	}
+	return null;
+}
+
+/** Descriptor-only candidate and input shell refusal performed before any independent derivation. */
+function overlayShapeFailure(
 	value: unknown,
 	inputs: CommandEventContractOverlayBuildInputs,
-	options?: CommandEventContractOverlayValidationOptions
-): CommandEventContractOverlayValidationResult {
-	let limits: ValidationLimits;
-	try {
-		limits = materializeOptions(options);
-	} catch (error) {
-		return invalidResult(
-			'SHAPE_INVALID',
-			'$options',
-			error instanceof Error ? error.message : 'Validation options are invalid.'
-		);
-	}
+	limits: ValidationLimits
+): CommandEventContractOverlayValidationResult | null {
 	const candidateInspection = inspectPlainData([{ path: '$', value }], {
 		maxDepth: limits.maxDepth,
 		maxRecords: limits.maxRecords,
 		maxStringCharacters: limits.maxStringCharacters
 	});
-	if (candidateInspection !== null)
-		return invalidResult(
-			candidateInspection.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
-			candidateInspection.path,
-			candidateInspection.message,
-			candidateInspection.budget
-		);
+	if (candidateInspection !== null) return inspectionFailureResult(candidateInspection);
 	if (!plainObject(value) || !exactKeys(value, SNAPSHOT_KEYS))
 		return invalidResult('SHAPE_INVALID', '$', 'Overlay top-level field population is invalid.');
 	const inputShell = inspectRecordShell(inputs, '$inputs', INPUT_KEYS);
@@ -2060,116 +2271,118 @@ function validateOverlay(
 			maxStringCharacters: limits.maxInputStringCharacters
 		}
 	);
-	if (inputInspection !== null)
-		return invalidResult(
-			inputInspection.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
-			inputInspection.path,
-			inputInspection.message,
-			inputInspection.budget
-		);
+	if (inputInspection !== null) return inspectionFailureResult(inputInspection);
 	const semanticShell = inspectRecordShell(inputs.semanticSnapshot, '$inputs.semanticSnapshot');
 	if (semanticShell !== null)
 		return invalidResult('SHAPE_INVALID', semanticShell.path, semanticShell.message);
-	let remaining = limits.maxInputRecords;
-	for (const name of [
-		'capabilities',
-		'projects',
-		'programs',
-		'sources',
-		'astNodes',
-		'references',
-		'declarations',
-		'symbols'
-	] as const) {
-		const population = inputs.semanticSnapshot[name];
-		const shell = inspectArrayShell(population, `$inputs.semanticSnapshot.${name}`, remaining);
-		if (shell !== null)
-			return invalidResult(
-				shell.budget ? 'BUDGET_EXHAUSTED' : 'SHAPE_INVALID',
-				shell.path,
-				shell.message,
-				shell.budget
-			);
-		remaining -= population.length;
-	}
-	try {
-		if (!requestValid(inputs))
-			return invalidResult(
-				'INPUT_INVALID',
-				'$inputs.request',
-				'Build inputs or request do not have the exact supported shape and constants.'
-			);
-		if (!inputIdentityValid(inputs))
-			return invalidResult(
-				'INPUT_INVALID',
-				'$inputs',
-				'Explicit requests and predecessor products do not share exact identities.'
-			);
-		if (
-			!(['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const).every((required) =>
-				inputs.semanticSnapshot.capabilities.some(
-					(capability) => capability.capability === required && capability.state !== 'UNSUPPORTED'
-				)
-			)
+	return semanticPopulationFailure(inputs, limits.maxInputRecords);
+}
+
+function requiredSemanticCapabilitiesPresent(
+	inputs: CommandEventContractOverlayBuildInputs
+): boolean {
+	return (['TS_PROJECT', 'TS_SYNTAX', 'TS_SYMBOL'] as const).every((required) =>
+		inputs.semanticSnapshot.capabilities.some(
+			(capability) => capability.capability === required && capability.state !== 'UNSUPPORTED'
 		)
-			return invalidResult(
-				'INPUT_INVALID',
-				'$inputs.semanticSnapshot.capabilities',
-				'TS_PROJECT, TS_SYNTAX, and TS_SYMBOL are required.'
-			);
-		if (inputs.semanticSnapshot.astNodes.length > inputs.request.budgets.maxAstNodes)
-			return invalidResult(
-				'BUDGET_EXHAUSTED',
-				'$inputs.request.budgets.maxAstNodes',
-				'Caller operation guard maxAstNodes is exceeded.',
-				true
-			);
-		const upstream = predecessorIssue(inputs, limits);
-		if (upstream !== null) return invalidResult('INPUT_INVALID', '$inputs', upstream);
-		const { overlay: expected, sourceBytes } = expectedOverlay(inputs);
-		const populations = [
-			[
-				'maxBoundContributions',
-				expected.boundContributions.length,
-				inputs.request.budgets.maxBoundContributions
-			],
-			['maxCommands', expected.commands.length, inputs.request.budgets.maxCommands],
-			['maxDeclaredLinks', expected.declaredLinks.length, inputs.request.budgets.maxDeclaredLinks],
-			[
-				'maxEventContracts',
-				expected.eventContracts.length,
-				inputs.request.budgets.maxEventContracts
-			],
-			['maxFrontiers', expected.frontiers.length, inputs.request.budgets.maxFrontiers],
-			[
-				'maxPinnedEmissions',
-				expected.pinnedEmissions.length,
-				inputs.request.budgets.maxPinnedEmissions
-			],
-			['maxSourceBytes', sourceBytes, inputs.request.budgets.maxSourceBytes]
-		] as const;
-		const exceeded = populations.find(([, actual, maximum]) => actual > maximum);
-		if (exceeded !== undefined)
-			return invalidResult(
-				'BUDGET_EXHAUSTED',
-				`$inputs.request.budgets.${exceeded[0]}`,
-				`Caller operation guard exceeded: ${exceeded[1]} > ${exceeded[2]}.`,
-				true
-			);
-		const candidate = value as unknown as CommandEventContractOverlaySnapshot;
-		if (candidate.contentDigest !== commandEventContractOverlayContentDigest(candidate))
-			return invalidResult(
-				'CONTENT_DIGEST_MISMATCH',
-				'$.contentDigest',
-				'Overlay content digest does not reproduce canonical content.'
-			);
-		if (!same(candidate, expected))
-			return invalidResult(
-				'POPULATION_MISMATCH',
-				'$',
-				'Overlay does not exactly reproduce the independently derived canonical population.'
-			);
-		return { issues: [], state: 'VALID' };
+	);
+}
+
+function populationBudgetFailure(
+	expected: CommandEventContractOverlaySnapshot,
+	sourceBytes: number,
+	budgets: CommandEventContractOverlayBuildInputs['request']['budgets']
+): CommandEventContractOverlayValidationResult | null {
+	const populations = [
+		['maxBoundContributions', expected.boundContributions.length, budgets.maxBoundContributions],
+		['maxCommands', expected.commands.length, budgets.maxCommands],
+		['maxDeclaredLinks', expected.declaredLinks.length, budgets.maxDeclaredLinks],
+		['maxEventContracts', expected.eventContracts.length, budgets.maxEventContracts],
+		['maxFrontiers', expected.frontiers.length, budgets.maxFrontiers],
+		['maxPinnedEmissions', expected.pinnedEmissions.length, budgets.maxPinnedEmissions],
+		['maxSourceBytes', sourceBytes, budgets.maxSourceBytes]
+	] as const;
+	const exceeded = populations.find(([, actual, maximum]) => actual > maximum);
+	if (exceeded === undefined) return null;
+	return invalidResult(
+		'BUDGET_EXHAUSTED',
+		`$inputs.request.budgets.${exceeded[0]}`,
+		`Caller operation guard exceeded: ${exceeded[1]} > ${exceeded[2]}.`,
+		true
+	);
+}
+
+/** Independent derivation and exact reproduction; refusals throw for the caller's fail-closed arm. */
+function overlayDerivationResult(
+	value: unknown,
+	inputs: CommandEventContractOverlayBuildInputs,
+	limits: ValidationLimits
+): CommandEventContractOverlayValidationResult {
+	if (!requestValid(inputs))
+		return invalidResult(
+			'INPUT_INVALID',
+			'$inputs.request',
+			'Build inputs or request do not have the exact supported shape and constants.'
+		);
+	if (!inputIdentityValid(inputs))
+		return invalidResult(
+			'INPUT_INVALID',
+			'$inputs',
+			'Explicit requests and predecessor products do not share exact identities.'
+		);
+	if (!requiredSemanticCapabilitiesPresent(inputs))
+		return invalidResult(
+			'INPUT_INVALID',
+			'$inputs.semanticSnapshot.capabilities',
+			'TS_PROJECT, TS_SYNTAX, and TS_SYMBOL are required.'
+		);
+	if (inputs.semanticSnapshot.astNodes.length > inputs.request.budgets.maxAstNodes)
+		return invalidResult(
+			'BUDGET_EXHAUSTED',
+			'$inputs.request.budgets.maxAstNodes',
+			'Caller operation guard maxAstNodes is exceeded.',
+			true
+		);
+	const upstream = predecessorIssue(inputs, limits);
+	if (upstream !== null) return invalidResult('INPUT_INVALID', '$inputs', upstream);
+	const { overlay: expected, sourceBytes } = expectedOverlay(inputs);
+	const budgetFailure = populationBudgetFailure(expected, sourceBytes, inputs.request.budgets);
+	if (budgetFailure !== null) return budgetFailure;
+	const candidate = value as unknown as CommandEventContractOverlaySnapshot;
+	if (candidate.contentDigest !== commandEventContractOverlayContentDigest(candidate))
+		return invalidResult(
+			'CONTENT_DIGEST_MISMATCH',
+			'$.contentDigest',
+			'Overlay content digest does not reproduce canonical content.'
+		);
+	if (!same(candidate, expected))
+		return invalidResult(
+			'POPULATION_MISMATCH',
+			'$',
+			'Overlay does not exactly reproduce the independently derived canonical population.'
+		);
+	return { issues: [], state: 'VALID' };
+}
+
+function validateOverlay(
+	value: unknown,
+	inputs: CommandEventContractOverlayBuildInputs,
+	options?: CommandEventContractOverlayValidationOptions
+): CommandEventContractOverlayValidationResult {
+	let limits: ValidationLimits;
+	try {
+		limits = materializeOptions(options);
+	} catch (error) {
+		return invalidResult(
+			'SHAPE_INVALID',
+			'$options',
+			error instanceof Error ? error.message : 'Validation options are invalid.'
+		);
+	}
+	const shapeFailure = overlayShapeFailure(value, inputs, limits);
+	if (shapeFailure !== null) return shapeFailure;
+	try {
+		return overlayDerivationResult(value, inputs, limits);
 	} catch (error) {
 		return invalidResult(
 			'POPULATION_MISMATCH',

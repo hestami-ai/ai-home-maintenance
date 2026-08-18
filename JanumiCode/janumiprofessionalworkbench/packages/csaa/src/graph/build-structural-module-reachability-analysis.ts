@@ -273,21 +273,105 @@ function essentialInputShell(value: unknown): StructuralModuleReachabilityAnalys
 	};
 }
 
+type ConsumedInputItem =
+	| { readonly kind: 'LEAVE'; readonly value: object }
+	| { readonly kind: 'VISIT'; readonly value: unknown };
+
+function projectConsumedSemanticKeys(
+	semanticSnapshot: StructuralModuleReachabilityAnalysisInputs['semanticSnapshot']
+): Record<string, unknown> | null {
+	const semanticProjection: Record<string, unknown> = {};
+	for (const key of CONSUMED_SEMANTIC_KEYS) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(semanticSnapshot, key);
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable) return null;
+		semanticProjection[key] = descriptor.value;
+	}
+	return semanticProjection;
+}
+
+/** Outcome of one consumed-input admission step. Aliased because five helpers return it. */
+type ConsumedInputState = 'BUDGET_EXCEEDED' | 'INVALID' | 'VALID';
+
+function consumedStringState(
+	value: string,
+	characters: number,
+	maxInputStringCharacters: number
+): ConsumedInputState {
+	if (!isUnicodeScalarString(value)) return 'INVALID';
+	if (characters + value.length > maxInputStringCharacters) return 'BUDGET_EXCEEDED';
+	return 'VALID';
+}
+
+function expandConsumedArray(
+	value: unknown[],
+	pending: ConsumedInputItem[],
+	records: number,
+	maxInputRecords: number
+): ConsumedInputState {
+	if (Object.getPrototypeOf(value) !== Array.prototype) return 'INVALID';
+	const length = arrayLength(value);
+	if (length === null) return 'INVALID';
+	if (records + length > maxInputRecords) return 'BUDGET_EXCEEDED';
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== length + 1) return 'INVALID';
+	if (keys.some((key) => typeof key === 'symbol')) return 'INVALID';
+	for (let index = length - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return 'INVALID';
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+	return 'VALID';
+}
+
+function expandConsumedObject(
+	value: object,
+	pending: ConsumedInputItem[],
+	records: number,
+	maxInputRecords: number
+): ConsumedInputState {
+	if (Object.getPrototypeOf(value) !== Object.prototype) return 'INVALID';
+	const keys = Reflect.ownKeys(value);
+	if (keys.some((key) => typeof key !== 'string')) return 'INVALID';
+	if (records + keys.length > maxInputRecords) return 'BUDGET_EXCEEDED';
+	for (const key of keys) {
+		if (typeof key !== 'string') return 'INVALID';
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return 'INVALID';
+		pending.push({ kind: 'VISIT', value: descriptor.value });
+	}
+	return 'VALID';
+}
+
+function visitConsumedComposite(
+	value: unknown,
+	pending: ConsumedInputItem[],
+	active: WeakSet<object>,
+	records: number,
+	maxInputRecords: number
+): ConsumedInputState {
+	if (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0))
+	)
+		return 'VALID';
+	if (typeof value !== 'object' || isProxyValue(value)) return 'INVALID';
+	if (active.has(value)) return 'INVALID';
+	active.add(value);
+	pending.push({ kind: 'LEAVE', value });
+	if (Array.isArray(value)) return expandConsumedArray(value, pending, records, maxInputRecords);
+	return expandConsumedObject(value, pending, records, maxInputRecords);
+}
+
 function consumedInputBudgetState(
 	inputs: StructuralModuleReachabilityAnalysisInputs,
 	request: StructuralModuleReachabilityAnalysisRequest
-): 'BUDGET_EXCEEDED' | 'INVALID' | 'VALID' {
-	const semanticProjection: Record<string, unknown> = {};
-	for (const key of CONSUMED_SEMANTIC_KEYS) {
-		const descriptor = Reflect.getOwnPropertyDescriptor(inputs.semanticSnapshot, key);
-		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-			return 'INVALID';
-		semanticProjection[key] = descriptor.value;
-	}
-	type Item =
-		| { readonly kind: 'LEAVE'; readonly value: object }
-		| { readonly kind: 'VISIT'; readonly value: unknown };
-	const pending: Item[] = [
+): ConsumedInputState {
+	const semanticProjection = projectConsumedSemanticKeys(inputs.semanticSnapshot);
+	if (semanticProjection === null) return 'INVALID';
+	const pending: ConsumedInputItem[] = [
 		{
 			kind: 'VISIT',
 			value: { graph: inputs.graph, request, semanticSnapshot: semanticProjection }
@@ -305,50 +389,23 @@ function consumedInputBudgetState(
 		records += 1;
 		if (records > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
 		if (typeof item.value === 'string') {
-			if (!isUnicodeScalarString(item.value)) return 'INVALID';
+			const stringState = consumedStringState(
+				item.value,
+				characters,
+				request.budgets.maxInputStringCharacters
+			);
+			if (stringState !== 'VALID') return stringState;
 			characters += item.value.length;
-			if (characters > request.budgets.maxInputStringCharacters) return 'BUDGET_EXCEEDED';
 			continue;
 		}
-		if (
-			item.value === null ||
-			typeof item.value === 'boolean' ||
-			(typeof item.value === 'number' &&
-				Number.isSafeInteger(item.value) &&
-				!Object.is(item.value, -0))
-		)
-			continue;
-		if (typeof item.value !== 'object' || isProxyValue(item.value)) return 'INVALID';
-		if (active.has(item.value)) return 'INVALID';
-		active.add(item.value);
-		pending.push({ kind: 'LEAVE', value: item.value });
-		if (Array.isArray(item.value)) {
-			if (Object.getPrototypeOf(item.value) !== Array.prototype) return 'INVALID';
-			const length = arrayLength(item.value);
-			if (length === null) return 'INVALID';
-			if (records + length > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
-			const keys = Reflect.ownKeys(item.value);
-			if (keys.length !== length + 1 || keys.some((key) => typeof key === 'symbol'))
-				return 'INVALID';
-			for (let index = length - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(item.value, String(index));
-				if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-					return 'INVALID';
-				pending.push({ kind: 'VISIT', value: descriptor.value });
-			}
-			continue;
-		}
-		if (Object.getPrototypeOf(item.value) !== Object.prototype) return 'INVALID';
-		const keys = Reflect.ownKeys(item.value);
-		if (keys.some((key) => typeof key !== 'string')) return 'INVALID';
-		if (records + keys.length > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
-		for (const key of keys) {
-			if (typeof key !== 'string') return 'INVALID';
-			const descriptor = Reflect.getOwnPropertyDescriptor(item.value, key);
-			if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-				return 'INVALID';
-			pending.push({ kind: 'VISIT', value: descriptor.value });
-		}
+		const compositeState = visitConsumedComposite(
+			item.value,
+			pending,
+			active,
+			records,
+			request.budgets.maxInputRecords
+		);
+		if (compositeState !== 'VALID') return compositeState;
 	}
 	return 'VALID';
 }
@@ -379,6 +436,147 @@ function dataDescriptor(value: object, key: PropertyKey): PropertyDescriptor | n
 	return descriptor !== undefined && 'value' in descriptor ? descriptor : null;
 }
 
+interface ProjectedResolutionFacets {
+	readonly moduleResolutionId: ProjectedNode['moduleResolutionId'];
+	readonly resolutionState: ProjectedNode['resolutionState'];
+}
+
+interface OrientedArcEndpoints {
+	readonly currentNodeId: ProjectedNode['id'];
+	readonly neighborNodeId: ProjectedNode['id'];
+}
+
+function projectResolutionFacets(
+	record: Record<PropertyKey, unknown>
+): ProjectedResolutionFacets | null {
+	const moduleResolution = dataDescriptor(record, 'moduleResolutionId')?.value;
+	const state = dataDescriptor(record, 'resolutionState')?.value;
+	if (
+		typeof moduleResolution !== 'string' ||
+		(state !== 'RESOLVED_AMBIENT' &&
+			state !== 'RESOLVED_EXTERNAL' &&
+			state !== 'UNRESOLVED' &&
+			state !== 'UNSUPPORTED')
+	)
+		return null;
+	return {
+		moduleResolutionId: moduleResolution as ProjectedNode['moduleResolutionId'],
+		resolutionState: state
+	};
+}
+
+function collectProjectedNodes(
+	nodeRecords: object,
+	nodeLength: number,
+	nodes: ProjectedNode[],
+	adjacency: Map<ProjectedNode['id'], ProjectedArc[]>
+): boolean {
+	for (let index = 0; index < nodeLength; index += 1) {
+		const record = dataDescriptor(nodeRecords, String(index))?.value;
+		if (!exactDataShell(record, ['id', 'kind'])) return false;
+		const id = dataDescriptor(record, 'id')?.value;
+		const kind = dataDescriptor(record, 'kind')?.value;
+		if (typeof id !== 'string') return false;
+		if (kind !== 'SOURCE' && kind !== 'RESOLUTION_TARGET') return false;
+		let moduleResolutionId: ProjectedNode['moduleResolutionId'] = null;
+		let resolutionState: ProjectedNode['resolutionState'] = null;
+		if (kind === 'RESOLUTION_TARGET') {
+			const facets = projectResolutionFacets(record);
+			if (facets === null) return false;
+			moduleResolutionId = facets.moduleResolutionId;
+			resolutionState = facets.resolutionState;
+		}
+		nodes.push({
+			id: id as ProjectedNode['id'],
+			kind,
+			moduleResolutionId,
+			resolutionState
+		});
+		adjacency.set(id as ProjectedNode['id'], []);
+	}
+	return true;
+}
+
+function orientedArcEndpoints(
+	direction: StructuralModuleReachabilityAnalysisRequest['direction'],
+	sourceNodeId: string,
+	targetNodeId: string
+): OrientedArcEndpoints {
+	if (direction === 'FORWARD')
+		return {
+			currentNodeId: sourceNodeId as ProjectedNode['id'],
+			neighborNodeId: targetNodeId as ProjectedNode['id']
+		};
+	return {
+		currentNodeId: targetNodeId as ProjectedNode['id'],
+		neighborNodeId: sourceNodeId as ProjectedNode['id']
+	};
+}
+
+function collectProjectedArcs(
+	edgeRecords: object,
+	edgeLength: number,
+	adjacency: Map<ProjectedNode['id'], ProjectedArc[]>,
+	direction: StructuralModuleReachabilityAnalysisRequest['direction']
+): boolean {
+	for (let index = 0; index < edgeLength; index += 1) {
+		const record = dataDescriptor(edgeRecords, String(index))?.value;
+		if (!exactDataShell(record, ['id', 'source', 'target'])) return false;
+		const edgeId = dataDescriptor(record, 'id')?.value;
+		const source = dataDescriptor(record, 'source')?.value;
+		const target = dataDescriptor(record, 'target')?.value;
+		if (
+			typeof edgeId !== 'string' ||
+			!exactDataShell(source, ['nodeId']) ||
+			!exactDataShell(target, ['nodeId'])
+		)
+			return false;
+		const sourceNodeId = dataDescriptor(source, 'nodeId')?.value;
+		const targetNodeId = dataDescriptor(target, 'nodeId')?.value;
+		if (typeof sourceNodeId !== 'string' || typeof targetNodeId !== 'string') return false;
+		const { currentNodeId, neighborNodeId } = orientedArcEndpoints(
+			direction,
+			sourceNodeId,
+			targetNodeId
+		);
+		const arcs = adjacency.get(currentNodeId);
+		if (arcs === undefined || !adjacency.has(neighborNodeId)) return false;
+		arcs.push({
+			edgeId: edgeId as ProjectedArc['edgeId'],
+			neighborNodeId: neighborNodeId as ProjectedArc['neighborNodeId']
+		});
+	}
+	return true;
+}
+
+function collectUpstreamLimitations(
+	limitationRecords: object,
+	limitationLength: number
+): ModuleDependencyGraphLimitationClone[] | null {
+	const upstreamLimitations: ModuleDependencyGraphLimitationClone[] = [];
+	for (let index = 0; index < limitationLength; index += 1) {
+		const limitation = dataDescriptor(limitationRecords, String(index))?.value;
+		if (
+			!exactDataShell(limitation, [
+				'closureEffect',
+				'kind',
+				'moduleResolutionId',
+				'reason',
+				'sourceId'
+			])
+		)
+			return null;
+		upstreamLimitations.push({
+			closureEffect: dataDescriptor(limitation, 'closureEffect')!.value,
+			kind: dataDescriptor(limitation, 'kind')!.value,
+			moduleResolutionId: dataDescriptor(limitation, 'moduleResolutionId')!.value,
+			reason: dataDescriptor(limitation, 'reason')!.value,
+			sourceId: dataDescriptor(limitation, 'sourceId')!.value
+		} as ModuleDependencyGraphLimitationClone);
+	}
+	return upstreamLimitations;
+}
+
 function projectGraph(
 	inputs: StructuralModuleReachabilityAnalysisInputs,
 	request: StructuralModuleReachabilityAnalysisRequest
@@ -390,65 +588,9 @@ function projectGraph(
 		return 'BUDGET_EXCEEDED';
 	const nodes: ProjectedNode[] = [];
 	const adjacency = new Map<ProjectedNode['id'], ProjectedArc[]>();
-	for (let index = 0; index < nodeLength; index += 1) {
-		const record = dataDescriptor(inputs.graph.nodes, String(index))?.value;
-		if (!exactDataShell(record, ['id', 'kind'])) return 'INVALID';
-		const id = dataDescriptor(record, 'id')?.value;
-		const kind = dataDescriptor(record, 'kind')?.value;
-		if (typeof id !== 'string' || (kind !== 'SOURCE' && kind !== 'RESOLUTION_TARGET'))
-			return 'INVALID';
-		let moduleResolutionId: ProjectedNode['moduleResolutionId'] = null;
-		let resolutionState: ProjectedNode['resolutionState'] = null;
-		if (kind === 'RESOLUTION_TARGET') {
-			const moduleResolution = dataDescriptor(record, 'moduleResolutionId')?.value;
-			const state = dataDescriptor(record, 'resolutionState')?.value;
-			if (
-				typeof moduleResolution !== 'string' ||
-				(state !== 'RESOLVED_AMBIENT' &&
-					state !== 'RESOLVED_EXTERNAL' &&
-					state !== 'UNRESOLVED' &&
-					state !== 'UNSUPPORTED')
-			)
-				return 'INVALID';
-			moduleResolutionId = moduleResolution as ProjectedNode['moduleResolutionId'];
-			resolutionState = state;
-		}
-		nodes.push({
-			id: id as ProjectedNode['id'],
-			kind,
-			moduleResolutionId,
-			resolutionState
-		});
-		adjacency.set(id as ProjectedNode['id'], []);
-	}
-	for (let index = 0; index < edgeLength; index += 1) {
-		const record = dataDescriptor(inputs.graph.edges, String(index))?.value;
-		if (!exactDataShell(record, ['id', 'source', 'target'])) return 'INVALID';
-		const edgeId = dataDescriptor(record, 'id')?.value;
-		const source = dataDescriptor(record, 'source')?.value;
-		const target = dataDescriptor(record, 'target')?.value;
-		if (
-			typeof edgeId !== 'string' ||
-			!exactDataShell(source, ['nodeId']) ||
-			!exactDataShell(target, ['nodeId'])
-		)
-			return 'INVALID';
-		const sourceNodeId = dataDescriptor(source, 'nodeId')?.value;
-		const targetNodeId = dataDescriptor(target, 'nodeId')?.value;
-		if (typeof sourceNodeId !== 'string' || typeof targetNodeId !== 'string') return 'INVALID';
-		const currentNodeId = (
-			request.direction === 'FORWARD' ? sourceNodeId : targetNodeId
-		) as ProjectedNode['id'];
-		const neighborNodeId = (
-			request.direction === 'FORWARD' ? targetNodeId : sourceNodeId
-		) as ProjectedNode['id'];
-		const arcs = adjacency.get(currentNodeId);
-		if (arcs === undefined || !adjacency.has(neighborNodeId)) return 'INVALID';
-		arcs.push({
-			edgeId: edgeId as ProjectedArc['edgeId'],
-			neighborNodeId: neighborNodeId as ProjectedArc['neighborNodeId']
-		});
-	}
+	if (!collectProjectedNodes(inputs.graph.nodes, nodeLength, nodes, adjacency)) return 'INVALID';
+	if (!collectProjectedArcs(inputs.graph.edges, edgeLength, adjacency, request.direction))
+		return 'INVALID';
 	for (const arcs of adjacency.values())
 		arcs.sort(
 			(left, right) =>
@@ -461,28 +603,9 @@ function projectGraph(
 	if (closure !== 'CLOSED' && closure !== 'OPEN') return 'INVALID';
 	const limitationLength = arrayLength(inputs.graph.limitations);
 	if (limitationLength === null) return 'INVALID';
-	const upstreamLimitations: ModuleDependencyGraphLimitationClone[] = [];
-	for (let index = 0; index < limitationLength; index += 1) {
-		const limitation = dataDescriptor(inputs.graph.limitations, String(index))?.value;
-		if (
-			!exactDataShell(limitation, [
-				'closureEffect',
-				'kind',
-				'moduleResolutionId',
-				'reason',
-				'sourceId'
-			])
-		)
-			return 'INVALID';
-		upstreamLimitations.push({
-			closureEffect: dataDescriptor(limitation, 'closureEffect')!.value,
-			kind: dataDescriptor(limitation, 'kind')!.value,
-			moduleResolutionId: dataDescriptor(limitation, 'moduleResolutionId')!.value,
-			reason: dataDescriptor(limitation, 'reason')!.value,
-			sourceId: dataDescriptor(limitation, 'sourceId')!.value
-		} as ModuleDependencyGraphLimitationClone);
-	}
-	return { adjacency, nodes, upstreamClosure: closure, upstreamLimitations };
+	const limitations = collectUpstreamLimitations(inputs.graph.limitations, limitationLength);
+	if (limitations === null) return 'INVALID';
+	return { adjacency, nodes, upstreamClosure: closure, upstreamLimitations: limitations };
 }
 
 type ModuleDependencyGraphLimitationClone =
@@ -499,6 +622,41 @@ interface Traversal {
 
 class FrontierBudgetExceeded extends Error {}
 
+interface TraversalPredecessor {
+	readonly edgeId: ProjectedArc['edgeId'];
+	readonly nodeId: ProjectedNode['id'];
+}
+
+interface TraversalState {
+	chargedTraversalSteps: number;
+	readonly distanceByNode: Map<ProjectedNode['id'], number>;
+	examinedEdges: number;
+	readonly predecessorByNode: Map<ProjectedNode['id'], TraversalPredecessor>;
+	readonly queue: ProjectedNode['id'][];
+}
+
+function expandTraversalNode(
+	nodeId: ProjectedNode['id'],
+	projection: GraphProjection,
+	request: StructuralModuleReachabilityAnalysisRequest,
+	state: TraversalState
+): void {
+	for (const arc of projection.adjacency.get(nodeId)!) {
+		state.examinedEdges += 1;
+		state.chargedTraversalSteps += 1;
+		if (state.chargedTraversalSteps > request.budgets.maxTraversalSteps)
+			throw new RangeError('maxTraversalSteps exceeded.');
+		if (state.distanceByNode.has(arc.neighborNodeId)) continue;
+		if (state.distanceByNode.size >= request.budgets.maxReachableNodes)
+			throw new RangeError('maxReachableNodes exceeded.');
+		if (state.predecessorByNode.size >= request.budgets.maxWitnessEdges)
+			throw new RangeError('maxWitnessEdges exceeded.');
+		state.distanceByNode.set(arc.neighborNodeId, state.distanceByNode.get(nodeId)! + 1);
+		state.predecessorByNode.set(arc.neighborNodeId, { edgeId: arc.edgeId, nodeId });
+		state.queue.push(arc.neighborNodeId);
+	}
+}
+
 function traverse(
 	projection: GraphProjection,
 	request: StructuralModuleReachabilityAnalysisRequest
@@ -507,35 +665,24 @@ function traverse(
 	if (!projection.adjacency.has(seed)) return null;
 	if (request.budgets.maxReachableNodes < 1 || request.budgets.maxTraversalSteps < 1)
 		throw new RangeError('A structural reachability traversal budget was exceeded.');
-	const queue: ProjectedNode['id'][] = [seed];
-	const distanceByNode = new Map<ProjectedNode['id'], number>([[seed, 0]]);
-	const predecessorByNode = new Map<
-		ProjectedNode['id'],
-		{ readonly edgeId: ProjectedArc['edgeId']; readonly nodeId: ProjectedNode['id'] }
-	>();
-	let examinedEdges = 0;
-	let chargedTraversalSteps = 0;
-	for (let cursor = 0; cursor < queue.length; cursor += 1) {
-		const nodeId = queue[cursor]!;
-		chargedTraversalSteps += 1;
-		if (chargedTraversalSteps > request.budgets.maxTraversalSteps)
+	const state: TraversalState = {
+		chargedTraversalSteps: 0,
+		distanceByNode: new Map<ProjectedNode['id'], number>([[seed, 0]]),
+		examinedEdges: 0,
+		predecessorByNode: new Map<ProjectedNode['id'], TraversalPredecessor>(),
+		queue: [seed]
+	};
+	for (const nodeId of state.queue) {
+		state.chargedTraversalSteps += 1;
+		if (state.chargedTraversalSteps > request.budgets.maxTraversalSteps)
 			throw new RangeError('maxTraversalSteps exceeded.');
-		for (const arc of projection.adjacency.get(nodeId)!) {
-			examinedEdges += 1;
-			chargedTraversalSteps += 1;
-			if (chargedTraversalSteps > request.budgets.maxTraversalSteps)
-				throw new RangeError('maxTraversalSteps exceeded.');
-			if (distanceByNode.has(arc.neighborNodeId)) continue;
-			if (distanceByNode.size >= request.budgets.maxReachableNodes)
-				throw new RangeError('maxReachableNodes exceeded.');
-			if (predecessorByNode.size >= request.budgets.maxWitnessEdges)
-				throw new RangeError('maxWitnessEdges exceeded.');
-			distanceByNode.set(arc.neighborNodeId, distanceByNode.get(nodeId)! + 1);
-			predecessorByNode.set(arc.neighborNodeId, { edgeId: arc.edgeId, nodeId });
-			queue.push(arc.neighborNodeId);
-		}
+		expandTraversalNode(nodeId, projection, request, state);
 	}
-	return { distanceByNode, examinedEdges, predecessorByNode };
+	return {
+		distanceByNode: state.distanceByNode,
+		examinedEdges: state.examinedEdges,
+		predecessorByNode: state.predecessorByNode
+	};
 }
 
 function materialize(
@@ -671,50 +818,53 @@ function materialize(
 	};
 }
 
-function buildInternal(
-	inputs: StructuralModuleReachabilityAnalysisInputs
+function refusalMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function inputIdentitiesReconcile(
+	inputs: StructuralModuleReachabilityAnalysisInputs,
+	request: StructuralModuleReachabilityAnalysisRequest
+): boolean {
+	return (
+		inputs.graph.id === request.sourceGraph.graphId &&
+		inputs.graph.contentDigest === request.sourceGraph.contentDigest &&
+		inputs.graph.graphInputDigest === request.sourceGraph.graphInputDigest &&
+		inputs.graph.subjectId === request.subjectId &&
+		inputs.graph.semanticSnapshotId === request.semanticSnapshotId &&
+		inputs.semanticSnapshot.id === request.semanticSnapshotId &&
+		inputs.semanticSnapshot.subjectId === request.subjectId
+	);
+}
+
+function consumedInputUnavailable(
+	state: 'BUDGET_EXCEEDED' | 'INVALID'
 ): StructuralModuleReachabilityAnalysisBuildOutcome {
-	const closedInputs = essentialInputShell(inputs);
-	if (closedInputs === null)
+	if (state === 'BUDGET_EXCEEDED')
 		return unavailable(
-			'REQUEST_INVALID',
-			'The structural module reachability input shell must contain exact data properties.',
-			'REQUEST'
+			'BUDGET_EXCEEDED',
+			'The consumed predecessor projection exceeds an input budget.',
+			'BIND'
 		);
-	let request: StructuralModuleReachabilityAnalysisRequest;
-	try {
-		request = materializeRequest(closedInputs.request);
-	} catch (error) {
-		return unavailable(
-			'REQUEST_INVALID',
-			error instanceof Error ? error.message : String(error),
-			'REQUEST'
-		);
-	}
-	if (
-		closedInputs.graph.id !== request.sourceGraph.graphId ||
-		closedInputs.graph.contentDigest !== request.sourceGraph.contentDigest ||
-		closedInputs.graph.graphInputDigest !== request.sourceGraph.graphInputDigest ||
-		closedInputs.graph.subjectId !== request.subjectId ||
-		closedInputs.graph.semanticSnapshotId !== request.semanticSnapshotId ||
-		closedInputs.semanticSnapshot.id !== request.semanticSnapshotId ||
-		closedInputs.semanticSnapshot.subjectId !== request.subjectId
-	)
+	return unavailable(
+		'SOURCE_GRAPH_INVALID',
+		'The consumed predecessor projection is not safe plain data.',
+		'BIND'
+	);
+}
+
+function bindPreconditionFailure(
+	boundInputs: StructuralModuleReachabilityAnalysisInputs,
+	request: StructuralModuleReachabilityAnalysisRequest
+): StructuralModuleReachabilityAnalysisBuildOutcome | null {
+	if (!inputIdentitiesReconcile(boundInputs, request))
 		return unavailable(
 			'INPUT_IDENTITY_MISMATCH',
 			'The request, graph, and semantic snapshot identities differ.',
 			'BIND'
 		);
-	const boundInputs = { ...closedInputs, request };
 	const inputBudgetState = consumedInputBudgetState(boundInputs, request);
-	if (inputBudgetState !== 'VALID')
-		return unavailable(
-			inputBudgetState === 'BUDGET_EXCEEDED' ? 'BUDGET_EXCEEDED' : 'SOURCE_GRAPH_INVALID',
-			inputBudgetState === 'BUDGET_EXCEEDED'
-				? 'The consumed predecessor projection exceeds an input budget.'
-				: 'The consumed predecessor projection is not safe plain data.',
-			'BIND'
-		);
+	if (inputBudgetState !== 'VALID') return consumedInputUnavailable(inputBudgetState);
 	const inputNodeCount = arrayLength(boundInputs.graph.nodes);
 	const inputEdgeCount = arrayLength(boundInputs.graph.edges);
 	if (inputNodeCount === null || inputEdgeCount === null)
@@ -729,6 +879,13 @@ function buildInternal(
 			'The graph population exceeds a node or edge budget.',
 			'BIND'
 		);
+	return null;
+}
+
+function sourceGraphValidationFailure(
+	boundInputs: StructuralModuleReachabilityAnalysisInputs,
+	request: StructuralModuleReachabilityAnalysisRequest
+): StructuralModuleReachabilityAnalysisBuildOutcome | null {
 	let graphValidation: ReturnType<typeof validateModuleDependencyGraph>;
 	try {
 		graphValidation = validateModuleDependencyGraph(
@@ -749,19 +906,107 @@ function buildInternal(
 			'The source graph is not independently valid.',
 			'BIND'
 		);
-	const projection = projectGraph(boundInputs, request);
+	return null;
+}
+
+function projectionUnavailable(
+	projection: 'BUDGET_EXCEEDED' | 'INVALID'
+): StructuralModuleReachabilityAnalysisBuildOutcome {
 	if (projection === 'INVALID')
 		return unavailable(
 			'SOURCE_GRAPH_INVALID',
 			'The source graph does not expose a safe structural reachability projection.',
 			'BIND'
 		);
-	if (projection === 'BUDGET_EXCEEDED')
+	return unavailable(
+		'BUDGET_EXCEEDED',
+		'The graph population exceeds a node or edge budget.',
+		'BIND'
+	);
+}
+
+function materializationUnavailable(
+	error: unknown
+): StructuralModuleReachabilityAnalysisBuildOutcome {
+	if (!(error instanceof FrontierBudgetExceeded))
+		return unavailable(
+			'ANALYSIS_VALIDATION_FAILED',
+			'The structural module reachability result could not be materialized safely.',
+			'VALIDATE'
+		);
+	return unavailable(
+		'BUDGET_EXCEEDED',
+		'The structural module reachability result exceeds a frontier-record budget.',
+		'TRAVERSE'
+	);
+}
+
+function constructionValidationOptions(
+	analysis: StructuralModuleReachabilityAnalysisSnapshot,
+	request: StructuralModuleReachabilityAnalysisRequest
+): NonNullable<Parameters<typeof validateConstructedStructuralModuleReachabilityAnalysis>[2]> {
+	const requiredSteps = analysis.coverage.chargedTraversalSteps;
+	return {
+		maxDepth: 64,
+		maxInputRecords: request.budgets.maxInputRecords,
+		maxInputStringCharacters: request.budgets.maxInputStringCharacters,
+		maxIssues: request.budgets.maxDiagnostics,
+		maxRecords: Math.max(
+			512,
+			requiredSteps * 64 +
+				analysis.members.length * 16 +
+				analysis.encounteredFrontiers.length * 16 +
+				analysis.upstreamLimitations.length * 16
+		),
+		maxStringCharacters: Math.max(
+			16_384,
+			Math.min(
+				Number.MAX_SAFE_INTEGER,
+				request.budgets.maxInputStringCharacters + requiredSteps * 4_096
+			)
+		)
+	};
+}
+
+function constructionValidationUnavailable(
+	state: 'BUDGET_EXHAUSTED' | 'INVALID'
+): StructuralModuleReachabilityAnalysisBuildOutcome {
+	if (state === 'BUDGET_EXHAUSTED')
 		return unavailable(
 			'BUDGET_EXCEEDED',
-			'The graph population exceeds a node or edge budget.',
+			'Independent validation exhausted a construction budget.',
 			'BIND'
 		);
+	return unavailable(
+		'ANALYSIS_VALIDATION_FAILED',
+		'The constructed structural module reachability analysis failed independent validation.',
+		'VALIDATE'
+	);
+}
+
+function buildInternal(
+	inputs: StructuralModuleReachabilityAnalysisInputs
+): StructuralModuleReachabilityAnalysisBuildOutcome {
+	const closedInputs = essentialInputShell(inputs);
+	if (closedInputs === null)
+		return unavailable(
+			'REQUEST_INVALID',
+			'The structural module reachability input shell must contain exact data properties.',
+			'REQUEST'
+		);
+	let request: StructuralModuleReachabilityAnalysisRequest;
+	try {
+		request = materializeRequest(closedInputs.request);
+	} catch (error) {
+		return unavailable('REQUEST_INVALID', refusalMessage(error), 'REQUEST');
+	}
+	const boundInputs = { ...closedInputs, request };
+	const bindFailure = bindPreconditionFailure(boundInputs, request);
+	if (bindFailure !== null) return bindFailure;
+	const graphFailure = sourceGraphValidationFailure(boundInputs, request);
+	if (graphFailure !== null) return graphFailure;
+	const projection = projectGraph(boundInputs, request);
+	if (typeof projection === 'string') return projectionUnavailable(projection);
 	let traversal: Traversal | null;
 	try {
 		traversal = traverse(projection, request);
@@ -783,51 +1028,14 @@ function buildInternal(
 	try {
 		analysis = materialize(boundInputs, request, projection, traversal);
 	} catch (error) {
-		if (!(error instanceof FrontierBudgetExceeded))
-			return unavailable(
-				'ANALYSIS_VALIDATION_FAILED',
-				'The structural module reachability result could not be materialized safely.',
-				'VALIDATE'
-			);
-		return unavailable(
-			'BUDGET_EXCEEDED',
-			'The structural module reachability result exceeds a frontier-record budget.',
-			'TRAVERSE'
-		);
+		return materializationUnavailable(error);
 	}
-	const requiredSteps = analysis.coverage.chargedTraversalSteps;
 	const validation = validateConstructedStructuralModuleReachabilityAnalysis(
 		analysis,
 		boundInputs,
-		{
-			maxDepth: 64,
-			maxInputRecords: request.budgets.maxInputRecords,
-			maxInputStringCharacters: request.budgets.maxInputStringCharacters,
-			maxIssues: request.budgets.maxDiagnostics,
-			maxRecords: Math.max(
-				512,
-				requiredSteps * 64 +
-					analysis.members.length * 16 +
-					analysis.encounteredFrontiers.length * 16 +
-					analysis.upstreamLimitations.length * 16
-			),
-			maxStringCharacters: Math.max(
-				16_384,
-				Math.min(
-					Number.MAX_SAFE_INTEGER,
-					request.budgets.maxInputStringCharacters + requiredSteps * 4_096
-				)
-			)
-		}
+		constructionValidationOptions(analysis, request)
 	);
-	if (validation.state !== 'VALID')
-		return unavailable(
-			validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'ANALYSIS_VALIDATION_FAILED',
-			validation.state === 'BUDGET_EXHAUSTED'
-				? 'Independent validation exhausted a construction budget.'
-				: 'The constructed structural module reachability analysis failed independent validation.',
-			validation.state === 'BUDGET_EXHAUSTED' ? 'BIND' : 'VALIDATE'
-		);
+	if (validation.state !== 'VALID') return constructionValidationUnavailable(validation.state);
 	return deepFreeze({ analysis, diagnostics: [], outcome: 'partial' });
 }
 

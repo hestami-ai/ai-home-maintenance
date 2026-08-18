@@ -196,139 +196,231 @@ function closeOptions(
 	return result as unknown as ClosedOptions;
 }
 
-/** Descriptor-only traversal: getters, iterators, callbacks, and toJSON are never invoked. */
-function plainTreeIssue(
-	value: unknown,
-	limits: Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>,
-	rootPath: string,
-	input = false
+type PlainTreeLimits = Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>;
+
+type PlainTreeFrame =
+	| {
+			readonly depth: number;
+			readonly path: string;
+			readonly state: 'VISIT';
+			readonly value: unknown;
+	  }
+	| { readonly state: 'LEAVE'; readonly value: object };
+
+type PlainTreeVisitFrame = Extract<PlainTreeFrame, { readonly state: 'VISIT' }>;
+
+interface PlainTreeWalk {
+	readonly active: WeakSet<object>;
+	characters: number;
+	readonly limits: PlainTreeLimits;
+	readonly malformedCode: ProjectContextGraphValidationIssue['code'];
+	records: number;
+}
+
+function plainTreeVisitBudgetIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame
 ): ProjectContextGraphValidationIssue | null {
-	type Frame =
-		| {
-				readonly depth: number;
-				readonly path: string;
-				readonly state: 'VISIT';
-				readonly value: unknown;
-		  }
-		| { readonly state: 'LEAVE'; readonly value: object };
-	const pending: Frame[] = [{ depth: 0, path: rootPath, state: 'VISIT', value }];
-	const active = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
-	const malformedCode = input ? 'INPUT_INVALID' : 'SHAPE_INVALID';
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
-		if (frame.state === 'LEAVE') {
-			active.delete(frame.value);
-			continue;
-		}
-		records += 1;
-		if (records > limits.maxRecords)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
-		if (frame.depth > limits.maxDepth)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
-		if (typeof frame.value === 'string') {
-			if (!isUnicodeScalarString(frame.value))
-				return issue(malformedCode, 'Strings must contain Unicode scalar text.', frame.path);
-			characters += frame.value.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted.',
-					frame.path
-				);
-			continue;
-		}
-		if (
-			frame.value === null ||
-			typeof frame.value === 'boolean' ||
-			(typeof frame.value === 'number' &&
-				Number.isFinite(frame.value) &&
-				(!Number.isInteger(frame.value) || Number.isSafeInteger(frame.value)) &&
-				!Object.is(frame.value, -0))
-		)
-			continue;
-		if (typeof frame.value !== 'object')
-			return issue(malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
-		if (isProxyValue(frame.value))
-			return issue(malformedCode, 'Proxy values are not accepted.', frame.path);
-		if (active.has(frame.value))
-			return issue(malformedCode, 'Cyclic data is not accepted.', frame.path);
-		const array = Array.isArray(frame.value);
-		const prototype = Reflect.getPrototypeOf(frame.value);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return issue(malformedCode, 'Containers must have ordinary prototypes.', frame.path);
-		const keys = Reflect.ownKeys(frame.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			return issue(malformedCode, 'Symbol keys are not accepted.', frame.path);
-		let arrayLength: number | null = null;
-		if (array) {
-			const lengthDescriptor = Reflect.getOwnPropertyDescriptor(frame.value, 'length');
-			arrayLength =
-				lengthDescriptor !== undefined && 'value' in lengthDescriptor
-					? (lengthDescriptor.value as number)
-					: null;
-			if (!Number.isSafeInteger(arrayLength) || arrayLength! < 0)
-				return issue(malformedCode, 'Arrays must have a valid length.', frame.path);
-			if (arrayLength! > limits.maxRecords - records)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor record budget was exhausted by an array population.',
-					frame.path
-				);
-			if (keys.length !== arrayLength! + 1)
-				return issue(malformedCode, 'Arrays must be dense ordinary arrays.', frame.path);
-			if (
-				keys.some((key) => {
-					if (typeof key !== 'string') return true;
-					if (key === 'length') return false;
-					if (!/^(0|[1-9][0-9]*)$/u.test(key)) return true;
-					const index = Number(key);
-					return !Number.isSafeInteger(index) || index >= arrayLength! || String(index) !== key;
-				})
-			)
-				return issue(malformedCode, 'Arrays must be dense without extra properties.', frame.path);
-		} else if (keys.length > limits.maxRecords - records) {
+	walk.records += 1;
+	if (walk.records > walk.limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
+	if (frame.depth > walk.limits.maxDepth)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
+	return null;
+}
+
+function plainTreeStringIssue(
+	walk: PlainTreeWalk,
+	text: string,
+	path: string
+): ProjectContextGraphValidationIssue | null {
+	if (!isUnicodeScalarString(text))
+		return issue(walk.malformedCode, 'Strings must contain Unicode scalar text.', path);
+	walk.characters += text.length;
+	if (walk.characters > walk.limits.maxStringCharacters)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor string-character budget was exhausted.', path);
+	return null;
+}
+
+/** Booleans and JSON-safe numbers are accepted leaves; null is decided by the caller. */
+function isPlainTreeScalarLeaf(value: unknown): boolean {
+	return (
+		typeof value === 'boolean' ||
+		(typeof value === 'number' &&
+			Number.isFinite(value) &&
+			(!Number.isInteger(value) || Number.isSafeInteger(value)) &&
+			!Object.is(value, -0))
+	);
+}
+
+function plainTreeContainerShapeIssue(
+	walk: PlainTreeWalk,
+	container: object,
+	path: string
+): ProjectContextGraphValidationIssue | null {
+	if (isProxyValue(container))
+		return issue(walk.malformedCode, 'Proxy values are not accepted.', path);
+	if (walk.active.has(container))
+		return issue(walk.malformedCode, 'Cyclic data is not accepted.', path);
+	const array = Array.isArray(container);
+	const prototype = Reflect.getPrototypeOf(container);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return issue(walk.malformedCode, 'Containers must have ordinary prototypes.', path);
+	return null;
+}
+
+function isPlainTreeArrayIndexKey(key: string | symbol, arrayLength: number): boolean {
+	if (typeof key !== 'string') return false;
+	if (key === 'length') return true;
+	if (!/^(0|[1-9]\d*)$/u.test(key)) return false;
+	const index = Number(key);
+	return Number.isSafeInteger(index) && index < arrayLength && String(index) === key;
+}
+
+function plainTreePopulationIssue(
+	walk: PlainTreeWalk,
+	container: object,
+	keys: readonly (string | symbol)[],
+	path: string
+): ProjectContextGraphValidationIssue | null {
+	if (!Array.isArray(container)) {
+		if (keys.length > walk.limits.maxRecords - walk.records)
 			return issue(
 				'BUDGET_EXHAUSTED',
 				'The descriptor record budget was exhausted by a property population.',
-				frame.path
+				path
 			);
-		}
-		for (const key of keys) {
-			if (typeof key !== 'string' || (array && key === 'length')) continue;
-			if (!isUnicodeScalarString(key))
-				return issue(malformedCode, 'Property keys must contain Unicode scalar text.', frame.path);
-			characters += key.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted by a property key.',
-					frame.path
-				);
-		}
-		active.add(frame.value);
-		pending.push({ state: 'LEAVE', value: frame.value });
-		for (let index = keys.length - 1; index >= 0; index -= 1) {
-			const key = keys[index] as string;
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-				return issue(
-					malformedCode,
-					'Properties must be enumerable data properties.',
-					`${frame.path}.${key}`
-				);
-			pending.push({
-				depth: frame.depth + 1,
-				path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
-				state: 'VISIT',
-				value: descriptor.value
-			});
-		}
+		return null;
+	}
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(container, 'length');
+	const arrayLength: number | null =
+		lengthDescriptor !== undefined && 'value' in lengthDescriptor
+			? (lengthDescriptor.value as number)
+			: null;
+	if (!Number.isSafeInteger(arrayLength) || arrayLength! < 0)
+		return issue(walk.malformedCode, 'Arrays must have a valid length.', path);
+	if (arrayLength! > walk.limits.maxRecords - walk.records)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by an array population.',
+			path
+		);
+	if (keys.length !== arrayLength! + 1)
+		return issue(walk.malformedCode, 'Arrays must be dense ordinary arrays.', path);
+	if (keys.some((key) => !isPlainTreeArrayIndexKey(key, arrayLength!)))
+		return issue(walk.malformedCode, 'Arrays must be dense without extra properties.', path);
+	return null;
+}
+
+function plainTreeKeyIssue(
+	walk: PlainTreeWalk,
+	keys: readonly (string | symbol)[],
+	array: boolean,
+	path: string
+): ProjectContextGraphValidationIssue | null {
+	for (const key of keys) {
+		if (typeof key !== 'string' || (array && key === 'length')) continue;
+		if (!isUnicodeScalarString(key))
+			return issue(walk.malformedCode, 'Property keys must contain Unicode scalar text.', path);
+		walk.characters += key.length;
+		if (walk.characters > walk.limits.maxStringCharacters)
+			return issue(
+				'BUDGET_EXHAUSTED',
+				'The descriptor string-character budget was exhausted by a property key.',
+				path
+			);
+	}
+	return null;
+}
+
+function plainTreeChildIssue(
+	walk: PlainTreeWalk,
+	pending: PlainTreeFrame[],
+	container: object,
+	frame: PlainTreeVisitFrame,
+	keys: readonly (string | symbol)[]
+): ProjectContextGraphValidationIssue | null {
+	const array = Array.isArray(container);
+	walk.active.add(container);
+	pending.push({ state: 'LEAVE', value: container });
+	for (let index = keys.length - 1; index >= 0; index -= 1) {
+		const key = keys[index] as string;
+		if (array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(container, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			return issue(
+				walk.malformedCode,
+				'Properties must be enumerable data properties.',
+				`${frame.path}.${key}`
+			);
+		pending.push({
+			depth: frame.depth + 1,
+			path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
+			state: 'VISIT',
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function plainTreeContainerIssue(
+	walk: PlainTreeWalk,
+	pending: PlainTreeFrame[],
+	container: object,
+	frame: PlainTreeVisitFrame
+): ProjectContextGraphValidationIssue | null {
+	const shapeIssue = plainTreeContainerShapeIssue(walk, container, frame.path);
+	if (shapeIssue !== null) return shapeIssue;
+	const keys = Reflect.ownKeys(container);
+	if (keys.some((key) => typeof key !== 'string'))
+		return issue(walk.malformedCode, 'Symbol keys are not accepted.', frame.path);
+	const populationIssue = plainTreePopulationIssue(walk, container, keys, frame.path);
+	if (populationIssue !== null) return populationIssue;
+	const keyIssue = plainTreeKeyIssue(walk, keys, Array.isArray(container), frame.path);
+	if (keyIssue !== null) return keyIssue;
+	return plainTreeChildIssue(walk, pending, container, frame, keys);
+}
+
+function plainTreeFrameIssue(
+	walk: PlainTreeWalk,
+	pending: PlainTreeFrame[],
+	frame: PlainTreeFrame
+): ProjectContextGraphValidationIssue | null {
+	if (frame.state === 'LEAVE') {
+		walk.active.delete(frame.value);
+		return null;
+	}
+	const budgetIssue = plainTreeVisitBudgetIssue(walk, frame);
+	if (budgetIssue !== null) return budgetIssue;
+	const current = frame.value;
+	if (typeof current === 'string') return plainTreeStringIssue(walk, current, frame.path);
+	if (current === null || isPlainTreeScalarLeaf(current)) return null;
+	if (typeof current !== 'object')
+		return issue(walk.malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
+	return plainTreeContainerIssue(walk, pending, current, frame);
+}
+
+/** Descriptor-only traversal: getters, iterators, callbacks, and toJSON are never invoked. */
+function plainTreeIssue(
+	value: unknown,
+	limits: PlainTreeLimits,
+	rootPath: string,
+	input = false
+): ProjectContextGraphValidationIssue | null {
+	const pending: PlainTreeFrame[] = [{ depth: 0, path: rootPath, state: 'VISIT', value }];
+	const walk: PlainTreeWalk = {
+		active: new WeakSet<object>(),
+		characters: 0,
+		limits,
+		malformedCode: input ? 'INPUT_INVALID' : 'SHAPE_INVALID',
+		records: 0
+	};
+	while (pending.length > 0) {
+		const frameIssue = plainTreeFrameIssue(walk, pending, pending.pop()!);
+		if (frameIssue !== null) return frameIssue;
 	}
 	return null;
 }
@@ -348,6 +440,93 @@ type IndependentCanonicalFrame =
 	  }
 	| { readonly state: 'VALUE'; readonly value: unknown };
 
+type IndependentCanonicalArrayFrame = Extract<
+	IndependentCanonicalFrame,
+	{ readonly state: 'ARRAY' }
+>;
+type IndependentCanonicalObjectFrame = Extract<
+	IndependentCanonicalFrame,
+	{ readonly state: 'OBJECT' }
+>;
+
+function* independentCanonicalArrayChunks(
+	pending: IndependentCanonicalFrame[],
+	active: WeakSet<object>,
+	frame: IndependentCanonicalArrayFrame
+): Generator<string, void, undefined> {
+	if (frame.index === frame.length) {
+		yield ']';
+		active.delete(frame.value);
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	pending.push(
+		{ ...frame, index: frame.index + 1 },
+		{
+			state: 'VALUE',
+			value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
+		}
+	);
+}
+
+function* independentCanonicalObjectChunks(
+	pending: IndependentCanonicalFrame[],
+	active: WeakSet<object>,
+	frame: IndependentCanonicalObjectFrame
+): Generator<string, void, undefined> {
+	if (frame.index === frame.entries.length) {
+		yield '}';
+		active.delete(frame.value);
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	const [key, child] = frame.entries[frame.index]!;
+	yield JSON.stringify(key);
+	yield ':';
+	pending.push({ ...frame, index: frame.index + 1 }, { state: 'VALUE', value: child });
+}
+
+function* independentCanonicalValueChunks(
+	pending: IndependentCanonicalFrame[],
+	active: WeakSet<object>,
+	input: unknown
+): Generator<string, void, undefined> {
+	if (input === null) {
+		yield 'null';
+		return;
+	}
+	if (typeof input === 'string') {
+		yield JSON.stringify(input);
+		return;
+	}
+	if (typeof input === 'boolean') {
+		yield input ? 'true' : 'false';
+		return;
+	}
+	if (typeof input === 'number') {
+		yield JSON.stringify(input);
+		return;
+	}
+	if (typeof input !== 'object') throw new TypeError('Canonical input must be JSON data.');
+	if (isProxyValue(input) || active.has(input))
+		throw new TypeError('Canonical input must be plain and acyclic.');
+	active.add(input);
+	if (Array.isArray(input)) {
+		const length = Reflect.getOwnPropertyDescriptor(input, 'length')!.value as number;
+		yield '[';
+		pending.push({ index: 0, length, state: 'ARRAY', value: input });
+		return;
+	}
+	const entries = (Reflect.ownKeys(input) as string[])
+		.sort(compareText)
+		.map(
+			(key) =>
+				[key, Reflect.getOwnPropertyDescriptor(input, key)!.value] as readonly [string, unknown]
+		);
+	yield '{';
+	pending.push({ entries, index: 0, state: 'OBJECT', value: input });
+}
+
 /** Separate iterative canonical token stream used only by this validator. */
 function* independentCanonicalChunks(value: unknown): Generator<string, void, undefined> {
 	const active = new WeakSet<object>();
@@ -355,69 +534,14 @@ function* independentCanonicalChunks(value: unknown): Generator<string, void, un
 	while (pending.length > 0) {
 		const frame = pending.pop()!;
 		if (frame.state === 'ARRAY') {
-			if (frame.index === frame.length) {
-				yield ']';
-				active.delete(frame.value);
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
-			});
+			yield* independentCanonicalArrayChunks(pending, active, frame);
 			continue;
 		}
 		if (frame.state === 'OBJECT') {
-			if (frame.index === frame.entries.length) {
-				yield '}';
-				active.delete(frame.value);
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			const [key, child] = frame.entries[frame.index]!;
-			yield JSON.stringify(key);
-			yield ':';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({ state: 'VALUE', value: child });
+			yield* independentCanonicalObjectChunks(pending, active, frame);
 			continue;
 		}
-
-		const input = frame.value;
-		if (input === null) {
-			yield 'null';
-			continue;
-		}
-		if (typeof input === 'string') {
-			yield JSON.stringify(input);
-			continue;
-		}
-		if (typeof input === 'boolean') {
-			yield input ? 'true' : 'false';
-			continue;
-		}
-		if (typeof input === 'number') {
-			yield JSON.stringify(input);
-			continue;
-		}
-		if (typeof input !== 'object') throw new TypeError('Canonical input must be JSON data.');
-		if (isProxyValue(input) || active.has(input))
-			throw new TypeError('Canonical input must be plain and acyclic.');
-		active.add(input);
-		if (Array.isArray(input)) {
-			const length = Reflect.getOwnPropertyDescriptor(input, 'length')!.value as number;
-			yield '[';
-			pending.push({ index: 0, length, state: 'ARRAY', value: input });
-			continue;
-		}
-		const entries = (Reflect.ownKeys(input) as string[])
-			.sort(compareText)
-			.map(
-				(key) =>
-					[key, Reflect.getOwnPropertyDescriptor(input, key)!.value] as readonly [string, unknown]
-			);
-		yield '{';
-		pending.push({ entries, index: 0, state: 'OBJECT', value: input });
+		yield* independentCanonicalValueChunks(pending, active, frame.value);
 	}
 }
 
@@ -711,6 +835,239 @@ type Derivation =
 	| { readonly graph: ProjectContextGraphSnapshot; readonly state: 'VALID' }
 	| { readonly message: string; readonly path: string; readonly state: 'INVALID' };
 
+type DerivationFailure = Extract<Derivation, { readonly state: 'INVALID' }>;
+
+type SemanticProjectInput = ProjectContextGraphBuildInputs['semanticSnapshot']['projects'][number];
+type SemanticProgramInput = ProjectContextGraphBuildInputs['semanticSnapshot']['programs'][number];
+type SemanticSourceInput = ProjectContextGraphBuildInputs['semanticSnapshot']['sources'][number];
+type FrozenProjectInput = ProjectContextGraphBuildInputs['frozenSubject']['projects'][number];
+type ProjectIdLookup = (semanticId: string) => ProjectContextProjectId | undefined;
+type ProgramIdLookup = (semanticId: string) => ProjectContextProgramId | undefined;
+type SourceIdLookup = (semanticId: string) => ProjectContextSourceId | undefined;
+
+type WithoutOrdinal<T> = T extends unknown ? Omit<T, 'ordinal'> : never;
+type MembershipSeed = {
+	readonly fromId: string;
+	readonly membership: WithoutOrdinal<ProjectContextMembership>;
+	readonly toId: string;
+};
+type ProjectReferenceRecord = ProjectContextGraphSnapshot['projectReferences'][number];
+type ReferenceSeed = Omit<ProjectReferenceRecord, 'ordinal'>;
+
+function deriveProjectRecords(
+	orderedSemanticProjects: readonly SemanticProjectInput[],
+	frozenByConfigPath: ReadonlyMap<string, FrozenProjectInput>,
+	requireProjectId: ProjectIdLookup,
+	requireProgramId: ProgramIdLookup,
+	requireSourceId: SourceIdLookup
+): ProjectContextProjectRecord[] | DerivationFailure {
+	const projects: ProjectContextProjectRecord[] = [];
+	for (let ordinal = 0; ordinal < orderedSemanticProjects.length; ordinal += 1) {
+		const project = orderedSemanticProjects[ordinal]!;
+		const frozenProject = frozenByConfigPath.get(project.configPath);
+		const id = requireProjectId(project.id);
+		const programId = requireProgramId(project.programId);
+		const mappedSourceIds = project.sourceIds.map((sourceId) => requireSourceId(sourceId));
+		// S7765 REFUSED at all three of these sites, and `.includes(undefined)` WAS TRIED AND REVERTED.
+		// `Array#includes` reads array HOLES as `undefined`; `Array#some` SKIPS them (it tests HasProperty
+		// first). `.map` preserves holes, so a sparse `sourceIds` would be newly refused under `includes`.
+		// That input is unreachable today only because a density check in a DIFFERENT function rejects
+		// sparse arrays first — a distant invariant, not a local one. Keeping `some` makes the guard total.
+		if (
+			frozenProject === undefined ||
+			id === undefined ||
+			programId === undefined ||
+			mappedSourceIds.some((sourceId) => sourceId === undefined)
+		)
+			return {
+				message:
+					'The project population does not reconcile to frozen project, program, and source identities.',
+				path: '$inputs.semanticSnapshot.projects',
+				state: 'INVALID'
+			};
+		projects.push({
+			configurationClosure: frozenProject.configClosure,
+			configPath: project.configPath,
+			health: project.health,
+			id,
+			kind: project.kind,
+			ordinal,
+			partialityReasons: project.partialityReasons,
+			programId,
+			programRecipe: frozenProject.programRecipe,
+			rootDisposition: project.rootDisposition,
+			rootNames: project.rootNames,
+			semanticProgramId: project.programId,
+			semanticProjectId: project.id,
+			sourceIds: mappedSourceIds as ProjectContextSourceId[]
+		});
+	}
+	return projects;
+}
+
+function deriveProgramRecords(
+	semanticPrograms: readonly SemanticProgramInput[],
+	requireProjectId: ProjectIdLookup,
+	requireProgramId: ProgramIdLookup,
+	requireSourceId: SourceIdLookup
+): ProjectContextProgramRecord[] | DerivationFailure {
+	const orderedSemanticPrograms = [...semanticPrograms].sort((left, right) =>
+		compareText(left.id, right.id)
+	);
+	const programs: ProjectContextProgramRecord[] = [];
+	for (let ordinal = 0; ordinal < orderedSemanticPrograms.length; ordinal += 1) {
+		const program = orderedSemanticPrograms[ordinal]!;
+		const id = requireProgramId(program.id);
+		const projectId = requireProjectId(program.projectId);
+		const mappedSources = program.sourceIds.map((sourceId) => requireSourceId(sourceId));
+		const mappedRoots = program.rootSourceIds.map((sourceId) => requireSourceId(sourceId));
+		if (
+			id === undefined ||
+			projectId === undefined ||
+			mappedSources.some((sourceId) => sourceId === undefined) ||
+			mappedRoots.some((sourceId) => sourceId === undefined)
+		)
+			return {
+				message: 'The program population does not reconcile to project and source identities.',
+				path: '$inputs.semanticSnapshot.programs',
+				state: 'INVALID'
+			};
+		programs.push({
+			checkerState: program.checkerState,
+			contextDigest: program.contextDigest,
+			id,
+			ordinal,
+			projectId,
+			rootSourceIds: mappedRoots as ProjectContextSourceId[],
+			semanticProgramId: program.id,
+			semanticProjectId: program.projectId,
+			sourceIds: mappedSources as ProjectContextSourceId[]
+		});
+	}
+	return programs;
+}
+
+function deriveSourceRecords(
+	semanticSources: readonly SemanticSourceInput[],
+	requireProjectId: ProjectIdLookup,
+	requireProgramId: ProgramIdLookup,
+	requireSourceId: SourceIdLookup
+): ProjectContextSourceRecord[] | DerivationFailure {
+	const orderedSemanticSources = [...semanticSources].sort((left, right) => {
+		const programOrder = compareText(left.programId, right.programId);
+		if (programOrder !== 0) return programOrder;
+		const pathOrder = compareText(left.logicalPath, right.logicalPath);
+		return pathOrder !== 0 ? pathOrder : compareText(left.id, right.id);
+	});
+	const sources: ProjectContextSourceRecord[] = [];
+	for (let ordinal = 0; ordinal < orderedSemanticSources.length; ordinal += 1) {
+		const source = orderedSemanticSources[ordinal]!;
+		const id = requireSourceId(source.id);
+		const programId = requireProgramId(source.programId);
+		const projectId = requireProjectId(source.projectId);
+		if (id === undefined || programId === undefined || projectId === undefined)
+			return {
+				message: 'The source population does not reconcile to project and program identities.',
+				path: '$inputs.semanticSnapshot.sources',
+				state: 'INVALID'
+			};
+		sources.push({
+			analysisDisposition: source.analysisDisposition,
+			declarationFile: source.declarationFile,
+			id,
+			logicalPath: source.logicalPath,
+			ordinal,
+			origin: source.origin,
+			programId,
+			projectId,
+			rootFile: source.rootFile,
+			semanticProgramId: source.programId,
+			semanticProjectId: source.projectId,
+			semanticSourceId: source.id
+		});
+	}
+	return sources;
+}
+
+function deriveMemberships(
+	graphId: ProjectContextGraphId,
+	programs: readonly ProjectContextProgramRecord[],
+	sources: readonly ProjectContextSourceRecord[]
+): ProjectContextMembership[] {
+	const membershipSeeds: MembershipSeed[] = [];
+	for (const program of programs)
+		membershipSeeds.push({
+			fromId: program.projectId,
+			membership: {
+				id: independentMembershipId(graphId, 'PROJECT_HAS_PROGRAM', program.projectId, program.id),
+				kind: 'PROJECT_HAS_PROGRAM',
+				programId: program.id,
+				projectId: program.projectId
+			},
+			toId: program.id
+		});
+	for (const source of sources)
+		membershipSeeds.push({
+			fromId: source.programId,
+			membership: {
+				id: independentMembershipId(graphId, 'PROGRAM_HAS_SOURCE', source.programId, source.id),
+				kind: 'PROGRAM_HAS_SOURCE',
+				programId: source.programId,
+				sourceId: source.id
+			},
+			toId: source.id
+		});
+	membershipSeeds.sort((left, right) => {
+		const kindOrder = compareText(left.membership.kind, right.membership.kind);
+		if (kindOrder !== 0) return kindOrder;
+		const fromOrder = compareText(left.fromId, right.fromId);
+		return fromOrder !== 0 ? fromOrder : compareText(left.toId, right.toId);
+	});
+	return membershipSeeds.map((seed, ordinal) => ({
+		...seed.membership,
+		ordinal
+	})) as ProjectContextMembership[];
+}
+
+function deriveProjectReferences(
+	graphId: ProjectContextGraphId,
+	orderedSemanticProjects: readonly SemanticProjectInput[],
+	semanticProjectByConfigPath: ReadonlyMap<string, SemanticProjectInput>,
+	requireProjectId: ProjectIdLookup
+): ProjectReferenceRecord[] | DerivationFailure {
+	const referenceSeeds: (ReferenceSeed & { readonly fromConfigPath: string })[] = [];
+	for (const project of orderedSemanticProjects) {
+		const fromProjectId = requireProjectId(project.id)!;
+		for (const declaredTargetConfigPath of project.projectReferences) {
+			const targetProject = semanticProjectByConfigPath.get(declaredTargetConfigPath);
+			const targetProjectId =
+				targetProject === undefined ? undefined : requireProjectId(targetProject.id);
+			if (targetProjectId === undefined)
+				return {
+					message:
+						'Every declared project reference must resolve inside the validated selected project population.',
+					path: '$inputs.semanticSnapshot.projects',
+					state: 'INVALID'
+				};
+			referenceSeeds.push({
+				declaredTargetConfigPath,
+				fromConfigPath: project.configPath,
+				fromProjectId,
+				id: independentReferenceId(graphId, fromProjectId, declaredTargetConfigPath),
+				resolution: 'RESOLVED_SELECTED_PROJECT',
+				targetProjectId
+			});
+		}
+	}
+	referenceSeeds.sort((left, right) => {
+		const fromOrder = compareText(left.fromConfigPath, right.fromConfigPath);
+		return fromOrder !== 0
+			? fromOrder
+			: compareText(left.declaredTargetConfigPath, right.declaredTargetConfigPath);
+	});
+	return referenceSeeds.map((reference, ordinal) => ({ ...reference, ordinal }));
+}
+
 function derive(inputs: ProjectContextGraphBuildInputs, knownInputDigest?: string): Derivation {
 	const { frozenSubject, request, semanticSnapshot } = inputs;
 	const inputDigest = independentInputDigest(inputs);
@@ -752,183 +1109,40 @@ function derive(inputs: ProjectContextGraphBuildInputs, knownInputDigest?: strin
 	const orderedSemanticProjects = [...semanticSnapshot.projects].sort((left, right) =>
 		compareText(left.configPath, right.configPath)
 	);
-	const projects: ProjectContextProjectRecord[] = [];
-	for (let ordinal = 0; ordinal < orderedSemanticProjects.length; ordinal += 1) {
-		const project = orderedSemanticProjects[ordinal]!;
-		const frozenProject = frozenByConfigPath.get(project.configPath);
-		const id = requireProjectId(project.id);
-		const programId = requireProgramId(project.programId);
-		const mappedSourceIds = project.sourceIds.map((sourceId) => requireSourceId(sourceId));
-		if (
-			frozenProject === undefined ||
-			id === undefined ||
-			programId === undefined ||
-			mappedSourceIds.some((sourceId) => sourceId === undefined)
-		)
-			return {
-				message:
-					'The project population does not reconcile to frozen project, program, and source identities.',
-				path: '$inputs.semanticSnapshot.projects',
-				state: 'INVALID'
-			};
-		projects.push({
-			configurationClosure: frozenProject.configClosure,
-			configPath: project.configPath,
-			health: project.health,
-			id,
-			kind: project.kind,
-			ordinal,
-			partialityReasons: project.partialityReasons,
-			programId,
-			programRecipe: frozenProject.programRecipe,
-			rootDisposition: project.rootDisposition,
-			rootNames: project.rootNames,
-			semanticProgramId: project.programId,
-			semanticProjectId: project.id,
-			sourceIds: mappedSourceIds as ProjectContextSourceId[]
-		});
-	}
-
-	const orderedSemanticPrograms = [...semanticSnapshot.programs].sort((left, right) =>
-		compareText(left.id, right.id)
+	const projects = deriveProjectRecords(
+		orderedSemanticProjects,
+		frozenByConfigPath,
+		requireProjectId,
+		requireProgramId,
+		requireSourceId
 	);
-	const programs: ProjectContextProgramRecord[] = [];
-	for (let ordinal = 0; ordinal < orderedSemanticPrograms.length; ordinal += 1) {
-		const program = orderedSemanticPrograms[ordinal]!;
-		const id = requireProgramId(program.id);
-		const projectId = requireProjectId(program.projectId);
-		const mappedSources = program.sourceIds.map((sourceId) => requireSourceId(sourceId));
-		const mappedRoots = program.rootSourceIds.map((sourceId) => requireSourceId(sourceId));
-		if (
-			id === undefined ||
-			projectId === undefined ||
-			mappedSources.some((sourceId) => sourceId === undefined) ||
-			mappedRoots.some((sourceId) => sourceId === undefined)
-		)
-			return {
-				message: 'The program population does not reconcile to project and source identities.',
-				path: '$inputs.semanticSnapshot.programs',
-				state: 'INVALID'
-			};
-		programs.push({
-			checkerState: program.checkerState,
-			contextDigest: program.contextDigest,
-			id,
-			ordinal,
-			projectId,
-			rootSourceIds: mappedRoots as ProjectContextSourceId[],
-			semanticProgramId: program.id,
-			semanticProjectId: program.projectId,
-			sourceIds: mappedSources as ProjectContextSourceId[]
-		});
-	}
+	if (!Array.isArray(projects)) return projects;
 
-	const orderedSemanticSources = [...semanticSnapshot.sources].sort((left, right) => {
-		const programOrder = compareText(left.programId, right.programId);
-		if (programOrder !== 0) return programOrder;
-		const pathOrder = compareText(left.logicalPath, right.logicalPath);
-		return pathOrder !== 0 ? pathOrder : compareText(left.id, right.id);
-	});
-	const sources: ProjectContextSourceRecord[] = [];
-	for (let ordinal = 0; ordinal < orderedSemanticSources.length; ordinal += 1) {
-		const source = orderedSemanticSources[ordinal]!;
-		const id = requireSourceId(source.id);
-		const programId = requireProgramId(source.programId);
-		const projectId = requireProjectId(source.projectId);
-		if (id === undefined || programId === undefined || projectId === undefined)
-			return {
-				message: 'The source population does not reconcile to project and program identities.',
-				path: '$inputs.semanticSnapshot.sources',
-				state: 'INVALID'
-			};
-		sources.push({
-			analysisDisposition: source.analysisDisposition,
-			declarationFile: source.declarationFile,
-			id,
-			logicalPath: source.logicalPath,
-			ordinal,
-			origin: source.origin,
-			programId,
-			projectId,
-			rootFile: source.rootFile,
-			semanticProgramId: source.programId,
-			semanticProjectId: source.projectId,
-			semanticSourceId: source.id
-		});
-	}
+	const programs = deriveProgramRecords(
+		semanticSnapshot.programs,
+		requireProjectId,
+		requireProgramId,
+		requireSourceId
+	);
+	if (!Array.isArray(programs)) return programs;
 
-	type WithoutOrdinal<T> = T extends unknown ? Omit<T, 'ordinal'> : never;
-	type MembershipSeed = {
-		readonly fromId: string;
-		readonly membership: WithoutOrdinal<ProjectContextMembership>;
-		readonly toId: string;
-	};
-	const membershipSeeds: MembershipSeed[] = [];
-	for (const program of programs)
-		membershipSeeds.push({
-			fromId: program.projectId,
-			membership: {
-				id: independentMembershipId(graphId, 'PROJECT_HAS_PROGRAM', program.projectId, program.id),
-				kind: 'PROJECT_HAS_PROGRAM',
-				programId: program.id,
-				projectId: program.projectId
-			},
-			toId: program.id
-		});
-	for (const source of sources)
-		membershipSeeds.push({
-			fromId: source.programId,
-			membership: {
-				id: independentMembershipId(graphId, 'PROGRAM_HAS_SOURCE', source.programId, source.id),
-				kind: 'PROGRAM_HAS_SOURCE',
-				programId: source.programId,
-				sourceId: source.id
-			},
-			toId: source.id
-		});
-	membershipSeeds.sort((left, right) => {
-		const kindOrder = compareText(left.membership.kind, right.membership.kind);
-		if (kindOrder !== 0) return kindOrder;
-		const fromOrder = compareText(left.fromId, right.fromId);
-		return fromOrder !== 0 ? fromOrder : compareText(left.toId, right.toId);
-	});
-	const memberships = membershipSeeds.map((seed, ordinal) => ({
-		...seed.membership,
-		ordinal
-	})) as ProjectContextMembership[];
+	const sources = deriveSourceRecords(
+		semanticSnapshot.sources,
+		requireProjectId,
+		requireProgramId,
+		requireSourceId
+	);
+	if (!Array.isArray(sources)) return sources;
 
-	type ReferenceSeed = Omit<ProjectContextGraphSnapshot['projectReferences'][number], 'ordinal'>;
-	const referenceSeeds: (ReferenceSeed & { readonly fromConfigPath: string })[] = [];
-	for (const project of orderedSemanticProjects) {
-		const fromProjectId = requireProjectId(project.id)!;
-		for (const declaredTargetConfigPath of project.projectReferences) {
-			const targetProject = semanticProjectByConfigPath.get(declaredTargetConfigPath);
-			const targetProjectId =
-				targetProject === undefined ? undefined : requireProjectId(targetProject.id);
-			if (targetProjectId === undefined)
-				return {
-					message:
-						'Every declared project reference must resolve inside the validated selected project population.',
-					path: '$inputs.semanticSnapshot.projects',
-					state: 'INVALID'
-				};
-			referenceSeeds.push({
-				declaredTargetConfigPath,
-				fromConfigPath: project.configPath,
-				fromProjectId,
-				id: independentReferenceId(graphId, fromProjectId, declaredTargetConfigPath),
-				resolution: 'RESOLVED_SELECTED_PROJECT',
-				targetProjectId
-			});
-		}
-	}
-	referenceSeeds.sort((left, right) => {
-		const fromOrder = compareText(left.fromConfigPath, right.fromConfigPath);
-		return fromOrder !== 0
-			? fromOrder
-			: compareText(left.declaredTargetConfigPath, right.declaredTargetConfigPath);
-	});
-	const projectReferences = referenceSeeds.map((reference, ordinal) => ({ ...reference, ordinal }));
+	const memberships = deriveMemberships(graphId, programs, sources);
+
+	const projectReferences = deriveProjectReferences(
+		graphId,
+		orderedSemanticProjects,
+		semanticProjectByConfigPath,
+		requireProjectId
+	);
+	if (!Array.isArray(projectReferences)) return projectReferences;
 	const configurationClosureRecords = frozenSubject.projects.reduce(
 		(count, project) => count + project.configClosure.length,
 		0
@@ -1009,6 +1223,72 @@ function derive(inputs: ProjectContextGraphBuildInputs, knownInputDigest?: strin
 	};
 }
 
+function predecessorSemanticIssue(
+	inputs: ProjectContextGraphBuildInputs
+): ProjectContextGraphValidationIssue | null {
+	const semanticValidation = validateStaticSemanticSnapshot(
+		inputs.semanticSnapshot,
+		{
+			maxDepth: 4_096,
+			maxDiagnostics: inputs.request.budgets.maxDiagnostics,
+			maxIssues: inputs.request.budgets.maxDiagnostics,
+			maxRecords: inputs.request.budgets.maxInputRecords,
+			maxReferenceChecks: inputs.request.budgets.maxInputRecords,
+			maxStringCharacters: inputs.request.budgets.maxInputStringCharacters
+		},
+		{
+			frozenSubject: inputs.frozenSubject
+		}
+	);
+	if (semanticValidation.state !== 'VALID')
+		return issue(
+			semanticValidation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
+			'The static semantic snapshot is not independently valid for the exact frozen subject.',
+			'$inputs.semanticSnapshot'
+		);
+	return null;
+}
+
+/** Shell, descriptor-tree, request, binding, and budget admission in their fixed order. */
+function validatedInputsIssue(
+	inputsValue: unknown,
+	limits: ClosedOptions
+): ProjectContextGraphValidationIssue | null {
+	const shellIssue = inputShellIssue(inputsValue);
+	if (shellIssue !== null) return shellIssue;
+	const broadInputIssue = plainTreeIssue(
+		inputsValue,
+		{
+			maxDepth: limits.maxDepth,
+			maxRecords: limits.maxInputRecords,
+			maxStringCharacters: limits.maxInputStringCharacters
+		},
+		'$inputs',
+		true
+	);
+	if (broadInputIssue !== null) return broadInputIssue;
+	const inputs = inputsValue as ProjectContextGraphBuildInputs;
+	const closedRequestIssue = requestIssue(inputs);
+	if (closedRequestIssue !== null) return closedRequestIssue;
+	const requestInputIssue = plainTreeIssue(
+		inputsValue,
+		{
+			maxDepth: limits.maxDepth,
+			maxRecords: Math.min(limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
+			maxStringCharacters: Math.min(
+				limits.maxInputStringCharacters,
+				inputs.request.budgets.maxInputStringCharacters
+			)
+		},
+		'$inputs',
+		true
+	);
+	if (requestInputIssue !== null) return requestInputIssue;
+	const bindingIssue = inputBindingIssue(inputs);
+	if (bindingIssue !== null) return bindingIssue;
+	return operationBudgetIssue(inputs);
+}
+
 function validateInternal(
 	value: unknown,
 	inputsValue: unknown,
@@ -1033,63 +1313,12 @@ function validateInternal(
 		return invalid(
 			issue('SHAPE_INVALID', 'The project-context graph snapshot shell must be exact.')
 		);
-	const shellIssue = inputShellIssue(inputsValue);
-	if (shellIssue !== null) return invalid(shellIssue);
-	const broadInputIssue = plainTreeIssue(
-		inputsValue,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: limits.maxInputRecords,
-			maxStringCharacters: limits.maxInputStringCharacters
-		},
-		'$inputs',
-		true
-	);
-	if (broadInputIssue !== null) return invalid(broadInputIssue);
+	const inputsIssue = validatedInputsIssue(inputsValue, limits);
+	if (inputsIssue !== null) return invalid(inputsIssue);
 	const inputs = inputsValue as ProjectContextGraphBuildInputs;
-	const closedRequestIssue = requestIssue(inputs);
-	if (closedRequestIssue !== null) return invalid(closedRequestIssue);
-	const requestInputIssue = plainTreeIssue(
-		inputsValue,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: Math.min(limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
-			maxStringCharacters: Math.min(
-				limits.maxInputStringCharacters,
-				inputs.request.budgets.maxInputStringCharacters
-			)
-		},
-		'$inputs',
-		true
-	);
-	if (requestInputIssue !== null) return invalid(requestInputIssue);
-	const bindingIssue = inputBindingIssue(inputs);
-	if (bindingIssue !== null) return invalid(bindingIssue);
-	const budgetIssue = operationBudgetIssue(inputs);
-	if (budgetIssue !== null) return invalid(budgetIssue);
 	if (!predecessorValidated) {
-		const semanticValidation = validateStaticSemanticSnapshot(
-			inputs.semanticSnapshot,
-			{
-				maxDepth: 4_096,
-				maxDiagnostics: inputs.request.budgets.maxDiagnostics,
-				maxIssues: inputs.request.budgets.maxDiagnostics,
-				maxRecords: inputs.request.budgets.maxInputRecords,
-				maxReferenceChecks: inputs.request.budgets.maxInputRecords,
-				maxStringCharacters: inputs.request.budgets.maxInputStringCharacters
-			},
-			{
-				frozenSubject: inputs.frozenSubject
-			}
-		);
-		if (semanticValidation.state !== 'VALID')
-			return invalid(
-				issue(
-					semanticValidation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INPUT_INVALID',
-					'The static semantic snapshot is not independently valid for the exact frozen subject.',
-					'$inputs.semanticSnapshot'
-				)
-			);
+		const semanticIssue = predecessorSemanticIssue(inputs);
+		if (semanticIssue !== null) return invalid(semanticIssue);
 	}
 	const expected = derive(inputs, knownInputDigest);
 	if (expected.state === 'INVALID')

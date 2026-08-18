@@ -524,54 +524,68 @@ function positiveBudgets(value: unknown): SourceOriginCorrelationBudgets {
 	return result as unknown as SourceOriginCorrelationBudgets;
 }
 
-function sameSelectionValue(actual: unknown, expected: unknown, deadline: Deadline): boolean {
-	deadline.check('REQUEST_BIND');
-	if (typeof expected === 'string') {
-		if (typeof actual !== 'string' || actual.length !== expected.length) return false;
-		for (let index = 0; index < expected.length; index += 1) {
-			checkpointLoop(index, deadline, 'REQUEST_BIND');
-			if (actual.charCodeAt(index) !== expected.charCodeAt(index)) return false;
-		}
-		return true;
+/** Exact UTF-16 code-unit equality for one selection string. */
+function sameSelectionText(actual: unknown, expected: string, deadline: Deadline): boolean {
+	if (typeof actual !== 'string' || actual.length !== expected.length) return false;
+	for (let index = 0; index < expected.length; index += 1) {
+		checkpointLoop(index, deadline, 'REQUEST_BIND');
+		if (actual.charCodeAt(index) !== expected.charCodeAt(index)) return false;
 	}
-	if (Array.isArray(expected)) {
+	return true;
+}
+
+/** Whether an own-key population is exactly `length` dense canonical index keys plus `length`. */
+function denseSelectionIndexKeys(
+	ownKeys: readonly PropertyKey[],
+	length: number,
+	deadline: Deadline
+): boolean {
+	for (let keyIndex = 0; keyIndex < ownKeys.length; keyIndex += 1) {
+		checkpointLoop(keyIndex, deadline, 'REQUEST_BIND');
+		const key = ownKeys[keyIndex]!;
+		if (key === 'length') continue;
+		if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= length)
+			return false;
+	}
+	return true;
+}
+
+function sameSelectionArray(
+	actual: unknown,
+	expected: readonly unknown[],
+	deadline: Deadline
+): boolean {
+	if (
+		!Array.isArray(actual) ||
+		isProxy(actual) ||
+		Reflect.getPrototypeOf(actual) !== Array.prototype ||
+		actual.length !== expected.length
+	)
+		return false;
+	deadline.check('REQUEST_BIND');
+	const ownKeys = Reflect.ownKeys(actual);
+	deadline.check('REQUEST_BIND');
+	if (ownKeys.length !== expected.length + 1) return false;
+	if (!denseSelectionIndexKeys(ownKeys, expected.length, deadline)) return false;
+	for (let index = 0; index < expected.length; index += 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(actual, String(index));
 		if (
-			!Array.isArray(actual) ||
-			isProxy(actual) ||
-			Reflect.getPrototypeOf(actual) !== Array.prototype ||
-			actual.length !== expected.length
+			descriptor === undefined ||
+			!descriptor.enumerable ||
+			!('value' in descriptor) ||
+			!sameSelectionValue(descriptor.value, expected[index], deadline)
 		)
 			return false;
-		deadline.check('REQUEST_BIND');
-		const ownKeys = Reflect.ownKeys(actual);
-		deadline.check('REQUEST_BIND');
-		if (ownKeys.length !== expected.length + 1) return false;
-		for (let keyIndex = 0; keyIndex < ownKeys.length; keyIndex += 1) {
-			checkpointLoop(keyIndex, deadline, 'REQUEST_BIND');
-			const key = ownKeys[keyIndex]!;
-			if (key === 'length') continue;
-			if (
-				typeof key !== 'string' ||
-				!/^(?:0|[1-9][0-9]*)$/u.test(key) ||
-				Number(key) >= expected.length
-			)
-				return false;
-		}
-		for (let index = 0; index < expected.length; index += 1) {
-			const descriptor = Reflect.getOwnPropertyDescriptor(actual, String(index));
-			if (
-				descriptor === undefined ||
-				!descriptor.enumerable ||
-				!('value' in descriptor) ||
-				!sameSelectionValue(descriptor.value, expected[index], deadline)
-			)
-				return false;
-		}
-		return true;
 	}
-	if (expected === null || typeof expected !== 'object') return Object.is(actual, expected);
-	const expectedRecord = expected as Readonly<Record<string, unknown>>;
-	const keys = Object.keys(expectedRecord);
+	return true;
+}
+
+function sameSelectionRecord(
+	actual: unknown,
+	expected: Readonly<Record<string, unknown>>,
+	deadline: Deadline
+): boolean {
+	const keys = Object.keys(expected);
 	let actualRecord: Readonly<Record<string, unknown>>;
 	try {
 		actualRecord = exactPlainRecord(actual, keys, '$inputs.request.selection');
@@ -581,9 +595,17 @@ function sameSelectionValue(actual: unknown, expected: unknown, deadline: Deadli
 	for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
 		checkpointLoop(keyIndex, deadline, 'REQUEST_BIND');
 		const key = keys[keyIndex]!;
-		if (!sameSelectionValue(actualRecord[key], expectedRecord[key], deadline)) return false;
+		if (!sameSelectionValue(actualRecord[key], expected[key], deadline)) return false;
 	}
 	return true;
+}
+
+function sameSelectionValue(actual: unknown, expected: unknown, deadline: Deadline): boolean {
+	deadline.check('REQUEST_BIND');
+	if (typeof expected === 'string') return sameSelectionText(actual, expected, deadline);
+	if (Array.isArray(expected)) return sameSelectionArray(actual, expected, deadline);
+	if (expected === null || typeof expected !== 'object') return Object.is(actual, expected);
+	return sameSelectionRecord(actual, expected as Readonly<Record<string, unknown>>, deadline);
 }
 
 function materializeRequest(value: unknown, deadline: Deadline): SourceOriginCorrelationRequest {
@@ -767,6 +789,251 @@ function checkpointedUnicodeScalarString(
 	return true;
 }
 
+interface CensusFrame {
+	depth: number;
+	entered: boolean;
+	index: number;
+	keys: readonly PropertyKey[];
+	value: unknown;
+}
+
+interface CensusTotals {
+	readonly records: number;
+	readonly stringCharacters: number;
+}
+
+/** Whether a value is an inert JSON scalar that ends a census branch without descent. */
+function isInertCensusScalar(value: unknown): boolean {
+	return (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' &&
+			Number.isFinite(value) &&
+			(!Number.isInteger(value) || Number.isSafeInteger(value)) &&
+			!Object.is(value, -0))
+	);
+}
+
+/** Refuses anything that is not an ordinary, acyclic, ordinary-prototype census container. */
+function assertInertCensusContainer(value: unknown, active: WeakSet<object>): object {
+	if (value === null || typeof value !== 'object' || isProxy(value))
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Inputs must be inert JSON-compatible plain data.',
+			'INPUT_BUDGET'
+		);
+	if (active.has(value))
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Cyclic input data is unsupported.',
+			'INPUT_BUDGET'
+		);
+	const array = Array.isArray(value);
+	const prototype = Reflect.getPrototypeOf(value);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Input containers must have ordinary prototypes.',
+			'INPUT_BUDGET'
+		);
+	return value;
+}
+
+/** The declared length of one census array, refusing exotic or over-budget length properties. */
+function censusArrayLength(value: object, remainingRecords: number, deadline: Deadline): number {
+	deadline.check('INPUT_BUDGET');
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
+	deadline.check('INPUT_BUDGET');
+	if (
+		lengthDescriptor === undefined ||
+		lengthDescriptor.enumerable ||
+		!('value' in lengthDescriptor) ||
+		typeof lengthDescriptor.value !== 'number' ||
+		!Number.isSafeInteger(lengthDescriptor.value) ||
+		lengthDescriptor.value < 0
+	)
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Input arrays must have an ordinary length data property.',
+			'INPUT_BUDGET'
+		);
+	const arrayLength = lengthDescriptor.value as number;
+	if (arrayLength > remainingRecords)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Input array population exceeds the remaining record budget.',
+			'INPUT_BUDGET'
+		);
+	return arrayLength;
+}
+
+/** The own-key population of one census container, refused when it cannot fit the budget. */
+function censusContainerKeys(
+	value: object,
+	remainingRecords: number,
+	deadline: Deadline
+): readonly PropertyKey[] {
+	const array = Array.isArray(value);
+	const arrayLength = array ? censusArrayLength(value, remainingRecords, deadline) : null;
+	deadline.check('INPUT_BUDGET');
+	const keys = Reflect.ownKeys(value);
+	deadline.check('INPUT_BUDGET');
+	if (!array && keys.length > remainingRecords)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Input container population exceeds the remaining record budget.',
+			'INPUT_BUDGET'
+		);
+	if (array && keys.length !== arrayLength! + 1)
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Input arrays must be dense.',
+			'INPUT_BUDGET'
+		);
+	return keys;
+}
+
+/** Charges one census string and returns the new running string-character total. */
+function censusStringValue(
+	value: string,
+	stringCharacters: number,
+	maximumStringCharacters: number,
+	deadline: Deadline
+): number {
+	const charged = checkedAdd(stringCharacters, value.length);
+	if (charged > maximumStringCharacters)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Input string-character budget was exhausted.',
+			'INPUT_BUDGET'
+		);
+	if (!checkpointedUnicodeScalarString(value, deadline, 'INPUT_BUDGET'))
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Input strings must contain Unicode scalar text.',
+			'INPUT_BUDGET'
+		);
+	return charged;
+}
+
+/**
+ * Advances one entered frame by exactly one own key — popping it when exhausted, pushing the
+ * descended child otherwise — and returns the new running string-character total.
+ */
+function censusDescend(
+	frame: CensusFrame,
+	pending: CensusFrame[],
+	active: WeakSet<object>,
+	stringCharacters: number,
+	maximumStringCharacters: number
+): number {
+	if (frame.index >= frame.keys.length) {
+		active.delete(frame.value as object);
+		pending.pop();
+		return stringCharacters;
+	}
+	const key = frame.keys[frame.index++]!;
+	const array = Array.isArray(frame.value);
+	if (typeof key !== 'string')
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Symbol input keys are unsupported.',
+			'INPUT_BUDGET'
+		);
+	if (array && key === 'length') return stringCharacters;
+	if (array && (!/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= (frame.value as unknown[]).length))
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Input arrays must be dense.',
+			'INPUT_BUDGET'
+		);
+	const descriptor = Reflect.getOwnPropertyDescriptor(frame.value as object, key);
+	if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+		throw new SourceOriginCorrelationFailure(
+			'REQUEST_INVALID',
+			'Input properties must be enumerable data properties.',
+			'INPUT_BUDGET'
+		);
+	const charged = checkedAdd(stringCharacters, key.length);
+	if (charged > maximumStringCharacters)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Input string-character budget was exhausted.',
+			'INPUT_BUDGET'
+		);
+	pending.push({
+		depth: frame.depth + 1,
+		entered: false,
+		index: 0,
+		keys: [],
+		value: descriptor.value
+	});
+	return charged;
+}
+
+/** Walks exactly one census root and returns the totals carried forward from it. */
+function censusRoot(
+	root: unknown,
+	totals: CensusTotals,
+	maximumRecords: number,
+	maximumStringCharacters: number,
+	deadline: Deadline
+): CensusTotals {
+	let records = totals.records;
+	let stringCharacters = totals.stringCharacters;
+	const pending: CensusFrame[] = [{ depth: 0, entered: false, index: 0, keys: [], value: root }];
+	const active = new WeakSet<object>();
+	while (pending.length > 0) {
+		deadline.check('INPUT_BUDGET');
+		const frame = pending.at(-1)!;
+		if (frame.entered) {
+			stringCharacters = censusDescend(
+				frame,
+				pending,
+				active,
+				stringCharacters,
+				maximumStringCharacters
+			);
+			continue;
+		}
+		if (++records > maximumRecords)
+			throw new SourceOriginCorrelationFailure(
+				'BUDGET_EXCEEDED',
+				'Input record budget was exhausted.',
+				'INPUT_BUDGET'
+			);
+		if (frame.depth > HARD_INPUT_DEPTH)
+			throw new SourceOriginCorrelationFailure(
+				'BUDGET_EXCEEDED',
+				'Input depth ceiling was exceeded.',
+				'INPUT_BUDGET'
+			);
+		const value = frame.value;
+		if (typeof value === 'string') {
+			stringCharacters = censusStringValue(
+				value,
+				stringCharacters,
+				maximumStringCharacters,
+				deadline
+			);
+			pending.pop();
+			continue;
+		}
+		if (isInertCensusScalar(value)) {
+			pending.pop();
+			continue;
+		}
+		const container = assertInertCensusContainer(value, active);
+		frame.keys = censusContainerKeys(container, maximumRecords - records, deadline);
+		active.add(container);
+		frame.entered = true;
+	}
+	return { records, stringCharacters };
+}
+
 /** The census has exactly three roots: request, FrozenSubject, and semanticSnapshot. */
 function inputCensus(inputs: SourceOriginCorrelationBuildInputs, deadline: Deadline): InputCensus {
 	const limits = inputs.request.budgets;
@@ -775,182 +1042,10 @@ function inputCensus(inputs: SourceOriginCorrelationBuildInputs, deadline: Deadl
 		limits.maxInputStringCharacters,
 		HARD_LIMITS.maxInputStringCharacters
 	);
-	let records = 0;
-	let stringCharacters = 0;
-	for (const root of [inputs.request, inputs.frozenSubject, inputs.semanticSnapshot]) {
-		type Frame = {
-			depth: number;
-			entered: boolean;
-			index: number;
-			keys: readonly PropertyKey[];
-			value: unknown;
-		};
-		const pending: Frame[] = [{ depth: 0, entered: false, index: 0, keys: [], value: root }];
-		const active = new WeakSet<object>();
-		while (pending.length > 0) {
-			deadline.check('INPUT_BUDGET');
-			const frame = pending[pending.length - 1]!;
-			if (frame.entered) {
-				if (frame.index >= frame.keys.length) {
-					active.delete(frame.value as object);
-					pending.pop();
-					continue;
-				}
-				const key = frame.keys[frame.index++]!;
-				const array = Array.isArray(frame.value);
-				if (typeof key !== 'string')
-					throw new SourceOriginCorrelationFailure(
-						'REQUEST_INVALID',
-						'Symbol input keys are unsupported.',
-						'INPUT_BUDGET'
-					);
-				if (array && key === 'length') continue;
-				if (
-					array &&
-					(!/^(?:0|[1-9][0-9]*)$/u.test(key) || Number(key) >= (frame.value as unknown[]).length)
-				)
-					throw new SourceOriginCorrelationFailure(
-						'REQUEST_INVALID',
-						'Input arrays must be dense.',
-						'INPUT_BUDGET'
-					);
-				const descriptor = Reflect.getOwnPropertyDescriptor(frame.value as object, key);
-				if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
-					throw new SourceOriginCorrelationFailure(
-						'REQUEST_INVALID',
-						'Input properties must be enumerable data properties.',
-						'INPUT_BUDGET'
-					);
-				stringCharacters = checkedAdd(stringCharacters, key.length);
-				if (stringCharacters > maximumStringCharacters)
-					throw new SourceOriginCorrelationFailure(
-						'BUDGET_EXCEEDED',
-						'Input string-character budget was exhausted.',
-						'INPUT_BUDGET'
-					);
-				pending.push({
-					depth: frame.depth + 1,
-					entered: false,
-					index: 0,
-					keys: [],
-					value: descriptor.value
-				});
-				continue;
-			}
-			if (++records > maximumRecords)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Input record budget was exhausted.',
-					'INPUT_BUDGET'
-				);
-			if (frame.depth > HARD_INPUT_DEPTH)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Input depth ceiling was exceeded.',
-					'INPUT_BUDGET'
-				);
-			const value = frame.value;
-			if (typeof value === 'string') {
-				stringCharacters = checkedAdd(stringCharacters, value.length);
-				if (stringCharacters > maximumStringCharacters)
-					throw new SourceOriginCorrelationFailure(
-						'BUDGET_EXCEEDED',
-						'Input string-character budget was exhausted.',
-						'INPUT_BUDGET'
-					);
-				if (!checkpointedUnicodeScalarString(value, deadline, 'INPUT_BUDGET'))
-					throw new SourceOriginCorrelationFailure(
-						'REQUEST_INVALID',
-						'Input strings must contain Unicode scalar text.',
-						'INPUT_BUDGET'
-					);
-				pending.pop();
-				continue;
-			}
-			if (
-				value === null ||
-				typeof value === 'boolean' ||
-				(typeof value === 'number' &&
-					Number.isFinite(value) &&
-					(!Number.isInteger(value) || Number.isSafeInteger(value)) &&
-					!Object.is(value, -0))
-			) {
-				pending.pop();
-				continue;
-			}
-			if (typeof value !== 'object' || isProxy(value))
-				throw new SourceOriginCorrelationFailure(
-					'REQUEST_INVALID',
-					'Inputs must be inert JSON-compatible plain data.',
-					'INPUT_BUDGET'
-				);
-			if (active.has(value))
-				throw new SourceOriginCorrelationFailure(
-					'REQUEST_INVALID',
-					'Cyclic input data is unsupported.',
-					'INPUT_BUDGET'
-				);
-			const array = Array.isArray(value);
-			const prototype = Reflect.getPrototypeOf(value);
-			if (
-				(array && prototype !== Array.prototype) ||
-				(!array && prototype !== Object.prototype && prototype !== null)
-			)
-				throw new SourceOriginCorrelationFailure(
-					'REQUEST_INVALID',
-					'Input containers must have ordinary prototypes.',
-					'INPUT_BUDGET'
-				);
-			const remainingRecords = maximumRecords - records;
-			let arrayLength: number | null = null;
-			if (array) {
-				deadline.check('INPUT_BUDGET');
-				const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
-				deadline.check('INPUT_BUDGET');
-				if (
-					lengthDescriptor === undefined ||
-					lengthDescriptor.enumerable ||
-					!('value' in lengthDescriptor) ||
-					typeof lengthDescriptor.value !== 'number' ||
-					!Number.isSafeInteger(lengthDescriptor.value) ||
-					lengthDescriptor.value < 0
-				)
-					throw new SourceOriginCorrelationFailure(
-						'REQUEST_INVALID',
-						'Input arrays must have an ordinary length data property.',
-						'INPUT_BUDGET'
-					);
-				arrayLength = lengthDescriptor.value;
-				if (arrayLength > remainingRecords)
-					throw new SourceOriginCorrelationFailure(
-						'BUDGET_EXCEEDED',
-						'Input array population exceeds the remaining record budget.',
-						'INPUT_BUDGET'
-					);
-			}
-			deadline.check('INPUT_BUDGET');
-			const keys = Reflect.ownKeys(value);
-			deadline.check('INPUT_BUDGET');
-			if (!array && keys.length > remainingRecords)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Input container population exceeds the remaining record budget.',
-					'INPUT_BUDGET'
-				);
-			if (array) {
-				if (keys.length !== arrayLength! + 1)
-					throw new SourceOriginCorrelationFailure(
-						'REQUEST_INVALID',
-						'Input arrays must be dense.',
-						'INPUT_BUDGET'
-					);
-			}
-			active.add(value);
-			frame.entered = true;
-			frame.keys = keys;
-		}
-	}
-	return Object.freeze({ records, stringCharacters });
+	let totals: CensusTotals = { records: 0, stringCharacters: 0 };
+	for (const root of [inputs.request, inputs.frozenSubject, inputs.semanticSnapshot])
+		totals = censusRoot(root, totals, maximumRecords, maximumStringCharacters, deadline);
+	return Object.freeze({ records: totals.records, stringCharacters: totals.stringCharacters });
 }
 
 function captureLength(value: unknown, path: string): number {
@@ -962,11 +1057,14 @@ function captureLength(value: unknown, path: string): number {
 			path
 		);
 	try {
-		if (Reflect.getPrototypeOf(value) !== UINT8_ARRAY_PROTOTYPE) throw new TypeError();
+		if (Reflect.getPrototypeOf(value) !== UINT8_ARRAY_PROTOTYPE)
+			throw new TypeError('Caller capture is not an ordinary Uint8Array.');
 		const buffer = REFLECT_APPLY(TYPED_ARRAY_BUFFER_GETTER, value, []) as ArrayBuffer;
-		if (Reflect.getPrototypeOf(buffer) !== ARRAY_BUFFER_PROTOTYPE) throw new TypeError();
+		if (Reflect.getPrototypeOf(buffer) !== ARRAY_BUFFER_PROTOTYPE)
+			throw new TypeError('Caller capture buffer is not an ordinary ArrayBuffer.');
 		const length = REFLECT_APPLY(TYPED_ARRAY_BYTE_LENGTH_GETTER, value, []) as number;
-		if (!Number.isSafeInteger(length) || length < 0) throw new TypeError();
+		if (!Number.isSafeInteger(length) || length < 0)
+			throw new TypeError('Caller capture byte length is not a bounded safe integer.');
 		return length;
 	} catch {
 		throw new SourceOriginCorrelationFailure(
@@ -1042,7 +1140,8 @@ function textIdentity(
 ): { readonly bytes: number; readonly sha256: string } {
 	const hash = createHash('sha256');
 	let bytes = 0;
-	for (let offset = 0; offset < text.length; offset += TEXT_CHUNK_SIZE) {
+	let offset = 0;
+	while (offset < text.length) {
 		deadline.check(phase);
 		let end = Math.min(text.length, offset + TEXT_CHUNK_SIZE);
 		if (
@@ -1055,7 +1154,7 @@ function textIdentity(
 		const chunk = text.slice(offset, end);
 		bytes = checkedAdd(bytes, Buffer.byteLength(chunk, 'utf8'));
 		hash.update(chunk, 'utf8');
-		offset = end - TEXT_CHUNK_SIZE;
+		offset = end;
 	}
 	deadline.check(phase);
 	return Object.freeze({ bytes, sha256: hash.digest('hex') });
@@ -1064,7 +1163,8 @@ function textIdentity(
 function textEqualsBytes(text: string, bytes: Uint8Array, deadline: Deadline): boolean {
 	let byteOffset = 0;
 	const encoder = new TextEncoder();
-	for (let offset = 0; offset < text.length; offset += TEXT_CHUNK_SIZE) {
+	let offset = 0;
+	while (offset < text.length) {
 		deadline.check('EMISSION_RECONCILE');
 		let end = Math.min(text.length, offset + TEXT_CHUNK_SIZE);
 		if (
@@ -1088,7 +1188,7 @@ function textEqualsBytes(text: string, bytes: Uint8Array, deadline: Deadline): b
 			}
 		}
 		byteOffset += chunk.byteLength;
-		offset = end - TEXT_CHUNK_SIZE;
+		offset = end;
 	}
 	deadline.check('EMISSION_RECONCILE');
 	return byteOffset === bytes.byteLength;
@@ -1115,7 +1215,7 @@ function decodeUtf8(bytes: Uint8Array, maximum: number, label: string, deadline:
 			'CAPTURE_BIND'
 		);
 	if (
-		text.charCodeAt(0) === 0xfeff ||
+		text.codePointAt(0) === 0xfeff ||
 		!checkpointedUnicodeScalarString(text, deadline, 'CAPTURE_BIND')
 	)
 		throw new SourceOriginCorrelationFailure(
@@ -1126,63 +1226,109 @@ function decodeUtf8(bytes: Uint8Array, maximum: number, label: string, deadline:
 	return text;
 }
 
+interface JsonLexicalState {
+	depth: number;
+	escaped: boolean;
+	inString: boolean;
+	records: number;
+}
+
+/** Charges exactly one lexical JSON record against the record budget. */
+function chargeJsonRecord(state: JsonLexicalState, maximumRecords: number): void {
+	state.records += 1;
+	if (state.records > maximumRecords)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Source-map JSON record budget was exhausted.',
+			'SOURCE_MAP_PARSE'
+		);
+}
+
+/** Whether a closing quote ends a value rather than an object member name. */
+function closedJsonStringIsValue(text: string, index: number, deadline: Deadline): boolean {
+	let cursor = index + 1;
+	while (cursor < text.length && /[\t\n\r ]/u.test(text[cursor]!)) {
+		checkpointLoop(cursor, deadline, 'SOURCE_MAP_PARSE');
+		cursor += 1;
+	}
+	return text[cursor] !== ':';
+}
+
+/** Whether the character at `index` opens a bare JSON scalar token. */
+function opensJsonScalar(text: string, index: number): boolean {
+	const character = text[index]!;
+	if (character !== '-' && !/[0-9tfn]/u.test(character)) return false;
+	return index === 0 || /[\s[{,:]/u.test(text[index - 1]!);
+}
+
+/** Advances the lexer by one character while inside a JSON string literal. */
+function scanJsonStringCharacter(
+	state: JsonLexicalState,
+	text: string,
+	index: number,
+	maximumRecords: number,
+	deadline: Deadline
+): void {
+	const character = text[index]!;
+	if (state.escaped) {
+		state.escaped = false;
+		return;
+	}
+	if (character === '\\') {
+		state.escaped = true;
+		return;
+	}
+	if (character !== '"') return;
+	state.inString = false;
+	if (closedJsonStringIsValue(text, index, deadline)) chargeJsonRecord(state, maximumRecords);
+}
+
+/** Advances the lexer by one character while outside any JSON string literal. */
+function scanJsonStructuralCharacter(
+	state: JsonLexicalState,
+	text: string,
+	index: number,
+	maximumDepth: number,
+	maximumRecords: number
+): void {
+	const character = text[index]!;
+	if (character === '"') {
+		state.inString = true;
+		return;
+	}
+	if (character === '{' || character === '[') {
+		chargeJsonRecord(state, maximumRecords);
+		state.depth += 1;
+		if (state.depth > maximumDepth)
+			throw new SourceOriginCorrelationFailure(
+				'BUDGET_EXCEEDED',
+				'Source-map JSON depth budget was exhausted.',
+				'SOURCE_MAP_PARSE'
+			);
+		return;
+	}
+	if (character === '}' || character === ']') {
+		state.depth -= 1;
+		return;
+	}
+	if (opensJsonScalar(text, index)) chargeJsonRecord(state, maximumRecords);
+}
+
 function jsonLexicalPreflight(
 	text: string,
 	budgets: SourceOriginCorrelationBudgets,
 	deadline: Deadline
 ): void {
-	let depth = 0;
-	let records = 0;
-	let inString = false;
-	let escaped = false;
+	const state: JsonLexicalState = { depth: 0, escaped: false, inString: false, records: 0 };
 	const maximumDepth = Math.min(budgets.maxSourceMapJsonDepth, HARD_LIMITS.maxSourceMapJsonDepth);
 	const maximumRecords = Math.min(
 		budgets.maxSourceMapJsonRecords,
 		HARD_LIMITS.maxSourceMapJsonRecords
 	);
-	const charge = (): void => {
-		records += 1;
-		if (records > maximumRecords)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Source-map JSON record budget was exhausted.',
-				'SOURCE_MAP_PARSE'
-			);
-	};
 	for (let index = 0; index < text.length; index += 1) {
 		checkpointLoop(index, deadline, 'SOURCE_MAP_PARSE');
-		const character = text[index]!;
-		if (inString) {
-			if (escaped) escaped = false;
-			else if (character === '\\') escaped = true;
-			else if (character === '"') {
-				inString = false;
-				let cursor = index + 1;
-				while (cursor < text.length && /[\t\n\r ]/u.test(text[cursor]!)) {
-					checkpointLoop(cursor, deadline, 'SOURCE_MAP_PARSE');
-					cursor += 1;
-				}
-				if (text[cursor] !== ':') charge();
-			}
-			continue;
-		}
-		if (character === '"') {
-			inString = true;
-		} else if (character === '{' || character === '[') {
-			charge();
-			depth += 1;
-			if (depth > maximumDepth)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Source-map JSON depth budget was exhausted.',
-					'SOURCE_MAP_PARSE'
-				);
-		} else if (character === '}' || character === ']') depth -= 1;
-		else if (
-			(character === '-' || /[0-9tfn]/u.test(character)) &&
-			(index === 0 || /[\s[{,:]/u.test(text[index - 1]!))
-		)
-			charge();
+		if (state.inString) scanJsonStringCharacter(state, text, index, maximumRecords, deadline);
+		else scanJsonStructuralCharacter(state, text, index, maximumDepth, maximumRecords);
 	}
 	deadline.check('SOURCE_MAP_PARSE');
 }
@@ -1202,15 +1348,15 @@ function validLogicalPath(
 		const length = end - segmentStart;
 		return (
 			length === 0 ||
-			(length === 1 && value.charCodeAt(segmentStart) === 0x2e) ||
+			(length === 1 && value.codePointAt(segmentStart) === 0x2e) ||
 			(length === 2 &&
-				value.charCodeAt(segmentStart) === 0x2e &&
-				value.charCodeAt(segmentStart + 1) === 0x2e)
+				value.codePointAt(segmentStart) === 0x2e &&
+				value.codePointAt(segmentStart + 1) === 0x2e)
 		);
 	};
 	for (let index = 0; index < value.length; index += 1) {
 		checkpointLoop(index, deadline, phase);
-		const code = value.charCodeAt(index);
+		const code = value.codePointAt(index)!;
 		if (code <= 0x1f || code === 0x7f || code === 0x5c || code === 0x3f || code === 0x23)
 			return false;
 		if (code === 0x2f) {
@@ -1344,7 +1490,9 @@ function compareUtf16(left: string, right: string, deadline?: Deadline): number 
 		const difference = left.charCodeAt(index) - right.charCodeAt(index);
 		if (difference !== 0) return difference < 0 ? -1 : 1;
 	}
-	return left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+	if (left.length < right.length) return -1;
+	if (left.length > right.length) return 1;
+	return 0;
 }
 
 function programSources(
@@ -1586,6 +1734,282 @@ function denseDataValues(
 	return result;
 }
 
+type ProviderDeclarationOutput = CompilerProjectDeclarationEmission['outputs'][number];
+
+/** Reads one provider output entry, refusing anything outside the exact declared output profile. */
+function providerOutputRecord(
+	entry: unknown,
+	ordinal: number,
+	path: string,
+	maximumOutputCharacters: number,
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundSelection,
+	deadline: Deadline
+): Readonly<Record<string, unknown>> {
+	deadline.check('EMISSION_RECONCILE');
+	const record = exactPlainRecord(entry, PROVIDER_OUTPUT_KEYS, `${path}[${ordinal}]`);
+	if (
+		!Number.isSafeInteger(record.bytes) ||
+		(record.bytes as number) < 0 ||
+		!Number.isSafeInteger(record.textLength) ||
+		(record.textLength as number) < 0 ||
+		typeof record.content !== 'string' ||
+		record.content.length !== record.textLength ||
+		record.content.length > maximumOutputCharacters ||
+		typeof record.contentSha256 !== 'string' ||
+		!SHA256.test(record.contentSha256) ||
+		typeof record.logicalPath !== 'string' ||
+		!validLogicalPath(
+			record.logicalPath,
+			inputs.request.budgets.maxPathCharacters,
+			deadline,
+			'EMISSION_RECONCILE'
+		) ||
+		record.sourceLogicalPath !== bound.source.logicalPath ||
+		record.writeByteOrderMark !== false ||
+		(record.kind !== 'DECLARATION' && record.kind !== 'DECLARATION_MAP')
+	)
+		throw new TypeError('invalid output');
+	return record;
+}
+
+/** Copies one verified provider output into inert evidence after its text passes scalar checks. */
+function providerMaterializedOutput(
+	record: Readonly<Record<string, unknown>>,
+	deadline: Deadline
+): ProviderDeclarationOutput {
+	if (!checkpointedUnicodeScalarString(record.content as string, deadline, 'EMISSION_RECONCILE'))
+		throw new TypeError('invalid output');
+	return {
+		bytes: record.bytes,
+		content: record.content,
+		contentSha256: record.contentSha256,
+		kind: record.kind,
+		logicalPath: record.logicalPath,
+		sourceLogicalPath: record.sourceLogicalPath,
+		textLength: record.textLength,
+		writeByteOrderMark: false
+	} as ProviderDeclarationOutput;
+}
+
+/** The exact two-output provider population, refused when its strings exceed the emit budget. */
+function providerPrimaryOutputs(
+	population: unknown,
+	path: string,
+	maximumOutputCharacters: number,
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundSelection,
+	deadline: Deadline
+): readonly [ProviderDeclarationOutput, ProviderDeclarationOutput] {
+	const values = denseDataValues(population, 2, path, deadline);
+	const records = [
+		providerOutputRecord(values[0], 0, path, maximumOutputCharacters, inputs, bound, deadline),
+		providerOutputRecord(values[1], 1, path, maximumOutputCharacters, inputs, bound, deadline)
+	] as const;
+	if (
+		(records[0].content as string).length + (records[1].content as string).length >
+		maximumOutputCharacters
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Fresh declaration output strings exceed maxEmitStringCharacters.',
+			'EMISSION_RECONCILE',
+			path
+		);
+	deadline.check('EMISSION_RECONCILE');
+	return [
+		providerMaterializedOutput(records[0], deadline),
+		providerMaterializedOutput(records[1], deadline)
+	] as const;
+}
+
+function assertProviderMaterializedSource(
+	sourceRecord: Readonly<Record<string, unknown>>,
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): void {
+	if (
+		!Number.isSafeInteger(sourceRecord.contentBytes) ||
+		(sourceRecord.contentBytes as number) < 0 ||
+		!Number.isSafeInteger(sourceRecord.textLength) ||
+		(sourceRecord.textLength as number) < 0 ||
+		typeof sourceRecord.contentSha256 !== 'string' ||
+		!SHA256.test(sourceRecord.contentSha256) ||
+		typeof sourceRecord.logicalPath !== 'string' ||
+		!validLogicalPath(
+			sourceRecord.logicalPath,
+			inputs.request.budgets.maxPathCharacters,
+			deadline,
+			'EMISSION_RECONCILE'
+		) ||
+		typeof sourceRecord.text !== 'string' ||
+		sourceRecord.text.length !== sourceRecord.textLength ||
+		sourceRecord.text.length >
+			Math.min(inputs.request.budgets.maxSourceTextCodeUnits, HARD_LIMITS.maxSourceTextCodeUnits) ||
+		!checkpointedUnicodeScalarString(sourceRecord.text, deadline, 'EMISSION_RECONCILE')
+	)
+		throw new TypeError('invalid source');
+	for (const key of ['semanticProgramId', 'semanticProjectId', 'semanticSourceId'] as const) {
+		const entry = sourceRecord[key];
+		if (
+			typeof entry !== 'string' ||
+			entry.length > HARD_LIMITS.maxPathCharacters ||
+			!checkpointedUnicodeScalarString(entry, deadline, 'EMISSION_RECONCILE')
+		)
+			throw new TypeError('invalid source identity');
+	}
+}
+
+function assertProviderSelection(
+	selectionRecord: Readonly<Record<string, unknown>>,
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): void {
+	for (const key of PROVIDER_SELECTION_KEYS) {
+		const entry = selectionRecord[key];
+		if (
+			typeof entry !== 'string' ||
+			entry.length > HARD_LIMITS.maxPathCharacters ||
+			!checkpointedUnicodeScalarString(entry, deadline, 'EMISSION_RECONCILE')
+		)
+			throw new TypeError('invalid selection');
+	}
+	if (
+		!validLogicalPath(
+			selectionRecord.logicalPath as string,
+			inputs.request.budgets.maxPathCharacters,
+			deadline,
+			'EMISSION_RECONCILE'
+		)
+	)
+		throw new TypeError('invalid selection path');
+}
+
+/** Refuses witness counts that are not bounded safe integers and digests that are not SHA-256. */
+function assertProviderWitnessScalars(witnessRecord: Readonly<Record<string, unknown>>): void {
+	for (const key of [
+		'attributedCompilerInputAttempts',
+		'attributedProgramReadBytes',
+		'attributedUniqueQueries',
+		'declarationEmitCompilerInputAttempts',
+		'declarationEmitReadBytes',
+		'programCompilerInputAttempts',
+		'programPresentReadFileAttempts',
+		'programReadBytes',
+		'programSourceFiles'
+	] as const)
+		if (!Number.isSafeInteger(witnessRecord[key]) || (witnessRecord[key] as number) < 0)
+			throw new TypeError('invalid witness count');
+	for (const key of [
+		'captureContextDigest',
+		'compilerOptionsDigest',
+		'materializedRecipeDigest',
+		'programInputAttemptPopulationDigest',
+		'programSourcePopulationDigest',
+		'projectResolutionDigest'
+	] as const)
+		if (typeof witnessRecord[key] !== 'string' || !SHA256.test(witnessRecord[key] as string))
+			throw new TypeError('invalid witness digest');
+}
+
+/** Refuses witness identity strings and repository-relative witness paths that are not exact. */
+function assertProviderWitnessPaths(
+	witnessRecord: Readonly<Record<string, unknown>>,
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): void {
+	for (const key of [
+		'compilerVersion',
+		'configPath',
+		'selectedSourceLogicalPath',
+		'semanticProgramId',
+		'semanticProjectId',
+		'semanticSourceId'
+	] as const) {
+		const entry = witnessRecord[key];
+		if (
+			typeof entry !== 'string' ||
+			entry.length > HARD_LIMITS.maxPathCharacters ||
+			!checkpointedUnicodeScalarString(entry, deadline, 'EMISSION_RECONCILE')
+		)
+			throw new TypeError('invalid witness string');
+	}
+	for (const key of ['configPath', 'selectedSourceLogicalPath'] as const)
+		if (
+			!validLogicalPath(
+				witnessRecord[key] as string,
+				inputs.request.budgets.maxPathCharacters,
+				deadline,
+				'EMISSION_RECONCILE'
+			)
+		)
+			throw new TypeError('invalid witness path');
+}
+
+/** Refuses any witness output that is not field-for-field identical to the emitted output. */
+function assertProviderWitnessOutputs(
+	witnessRecord: Readonly<Record<string, unknown>>,
+	outputs: readonly ProviderDeclarationOutput[],
+	deadline: Deadline
+): void {
+	const witnessOutputValues = denseDataValues(
+		witnessRecord.outputs,
+		2,
+		'$emission.emissionWitness.outputs',
+		deadline
+	);
+	for (let index = 0; index < 2; index += 1) {
+		const left = outputs[index]!;
+		const right = exactPlainRecord(
+			witnessOutputValues[index],
+			PROVIDER_OUTPUT_KEYS,
+			`$emission.emissionWitness.outputs[${index}]`
+		);
+		if (
+			typeof right.bytes !== 'number' ||
+			typeof right.content !== 'string' ||
+			typeof right.contentSha256 !== 'string' ||
+			typeof right.kind !== 'string' ||
+			typeof right.logicalPath !== 'string' ||
+			typeof right.sourceLogicalPath !== 'string' ||
+			typeof right.textLength !== 'number' ||
+			typeof right.writeByteOrderMark !== 'boolean'
+		)
+			throw new TypeError('witness output primitives are invalid');
+		for (const key of PROVIDER_OUTPUT_KEYS) {
+			deadline.check('EMISSION_RECONCILE');
+			const equal = left[key] === right[key];
+			deadline.check('EMISSION_RECONCILE');
+			if (!equal) throw new TypeError('witness outputs differ');
+		}
+	}
+}
+
+/** Refuses any witness constant that is not the exact fresh-emission state this operation admits. */
+function assertProviderWitnessConstants(
+	witnessRecord: Readonly<Record<string, unknown>>,
+	deadline: Deadline
+): void {
+	if (
+		denseDataValues(
+			witnessRecord.emitDiagnostics,
+			0,
+			'$emission.emissionWitness.emitDiagnostics',
+			deadline
+		).length !== 0 ||
+		witnessRecord.declarationEmitCallbacksUseOnlyAttributedQueries !== true ||
+		witnessRecord.emitApi !== 'TYPESCRIPT_PUBLIC_PROGRAM_EMIT' ||
+		witnessRecord.emitOnlyDtsFiles !== true ||
+		witnessRecord.emitSkipped !== false ||
+		witnessRecord.programCallbacksWithinAttributedInvocationBounds !== true ||
+		witnessRecord.programInputAttemptPopulationReconciles !== true ||
+		witnessRecord.programSourceFilePopulationReconciles !== true ||
+		witnessRecord.state !==
+			'FRESH_PUBLIC_TYPESCRIPT_DECLARATION_EMISSION_OVER_VERIFIED_PROJECT_SCOPED_CAPTURE'
+	)
+		throw new TypeError('invalid witness constants');
+}
+
 function materializeProviderEmission(
 	value: unknown,
 	inputs: SourceOriginCorrelationBuildInputs,
@@ -1602,104 +2026,20 @@ function materializeProviderEmission(
 			inputs.request.budgets.maxEmitStringCharacters,
 			HARD_LIMITS.maxEmitStringCharacters
 		);
-		const readOutput = (entry: unknown, ordinal: number, path: string) => {
-			deadline.check('EMISSION_RECONCILE');
-			const record = exactPlainRecord(entry, PROVIDER_OUTPUT_KEYS, `${path}[${ordinal}]`);
-			if (
-				!Number.isSafeInteger(record.bytes) ||
-				(record.bytes as number) < 0 ||
-				!Number.isSafeInteger(record.textLength) ||
-				(record.textLength as number) < 0 ||
-				typeof record.content !== 'string' ||
-				record.content.length !== record.textLength ||
-				record.content.length > maximumOutputCharacters ||
-				typeof record.contentSha256 !== 'string' ||
-				!SHA256.test(record.contentSha256) ||
-				typeof record.logicalPath !== 'string' ||
-				!validLogicalPath(
-					record.logicalPath,
-					inputs.request.budgets.maxPathCharacters,
-					deadline,
-					'EMISSION_RECONCILE'
-				) ||
-				record.sourceLogicalPath !== bound.source.logicalPath ||
-				record.writeByteOrderMark !== false ||
-				(record.kind !== 'DECLARATION' && record.kind !== 'DECLARATION_MAP')
-			)
-				throw new TypeError('invalid output');
-			return record;
-		};
-		const materializeOutput = (record: Readonly<Record<string, unknown>>) => {
-			if (
-				!checkpointedUnicodeScalarString(record.content as string, deadline, 'EMISSION_RECONCILE')
-			)
-				throw new TypeError('invalid output');
-			return {
-				bytes: record.bytes,
-				content: record.content,
-				contentSha256: record.contentSha256,
-				kind: record.kind,
-				logicalPath: record.logicalPath,
-				sourceLogicalPath: record.sourceLogicalPath,
-				textLength: record.textLength,
-				writeByteOrderMark: false
-			} as CompilerProjectDeclarationEmission['outputs'][number];
-		};
-		const materializePrimaryOutputPopulation = (population: unknown, path: string) => {
-			const values = denseDataValues(population, 2, path, deadline);
-			const records = [readOutput(values[0], 0, path), readOutput(values[1], 1, path)] as const;
-			if (
-				(records[0].content as string).length + (records[1].content as string).length >
-				maximumOutputCharacters
-			)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Fresh declaration output strings exceed maxEmitStringCharacters.',
-					'EMISSION_RECONCILE',
-					path
-				);
-			deadline.check('EMISSION_RECONCILE');
-			return [materializeOutput(records[0]), materializeOutput(records[1])] as const;
-		};
-		const outputs = materializePrimaryOutputPopulation(shell.outputs, '$emission.outputs');
+		const outputs = providerPrimaryOutputs(
+			shell.outputs,
+			'$emission.outputs',
+			maximumOutputCharacters,
+			inputs,
+			bound,
+			deadline
+		);
 		const sourceRecord = exactPlainRecord(
 			shell.materializedSource,
 			PROVIDER_SOURCE_KEYS,
 			'$emission.materializedSource'
 		);
-		if (
-			!Number.isSafeInteger(sourceRecord.contentBytes) ||
-			(sourceRecord.contentBytes as number) < 0 ||
-			!Number.isSafeInteger(sourceRecord.textLength) ||
-			(sourceRecord.textLength as number) < 0 ||
-			typeof sourceRecord.contentSha256 !== 'string' ||
-			!SHA256.test(sourceRecord.contentSha256) ||
-			typeof sourceRecord.logicalPath !== 'string' ||
-			!validLogicalPath(
-				sourceRecord.logicalPath,
-				inputs.request.budgets.maxPathCharacters,
-				deadline,
-				'EMISSION_RECONCILE'
-			) ||
-			typeof sourceRecord.text !== 'string' ||
-			sourceRecord.text.length !== sourceRecord.textLength ||
-			sourceRecord.text.length >
-				Math.min(
-					inputs.request.budgets.maxSourceTextCodeUnits,
-					HARD_LIMITS.maxSourceTextCodeUnits
-				) ||
-			!checkpointedUnicodeScalarString(sourceRecord.text, deadline, 'EMISSION_RECONCILE')
-		)
-			throw new TypeError('invalid source');
-		for (const key of ['semanticProgramId', 'semanticProjectId', 'semanticSourceId'] as const) {
-			const entry = sourceRecord[key];
-			if (
-				typeof entry !== 'string' ||
-				entry.length > HARD_LIMITS.maxPathCharacters ||
-				!checkpointedUnicodeScalarString(entry, deadline, 'EMISSION_RECONCILE')
-			)
-				throw new TypeError('invalid source identity');
-		}
+		assertProviderMaterializedSource(sourceRecord, inputs, deadline);
 		const materializedSource = {
 			contentBytes: sourceRecord.contentBytes,
 			contentSha256: sourceRecord.contentSha256,
@@ -1715,24 +2055,7 @@ function materializeProviderEmission(
 			PROVIDER_SELECTION_KEYS,
 			'$emission.selection'
 		);
-		for (const key of PROVIDER_SELECTION_KEYS) {
-			const entry = selectionRecord[key];
-			if (
-				typeof entry !== 'string' ||
-				entry.length > HARD_LIMITS.maxPathCharacters ||
-				!checkpointedUnicodeScalarString(entry, deadline, 'EMISSION_RECONCILE')
-			)
-				throw new TypeError('invalid selection');
-		}
-		if (
-			!validLogicalPath(
-				selectionRecord.logicalPath as string,
-				inputs.request.budgets.maxPathCharacters,
-				deadline,
-				'EMISSION_RECONCILE'
-			)
-		)
-			throw new TypeError('invalid selection path');
+		assertProviderSelection(selectionRecord, inputs, deadline);
 		const selection = {
 			logicalPath: selectionRecord.logicalPath,
 			semanticProgramId: selectionRecord.semanticProgramId,
@@ -1744,104 +2067,10 @@ function materializeProviderEmission(
 			PROVIDER_WITNESS_KEYS,
 			'$emission.emissionWitness'
 		);
-		for (const key of [
-			'attributedCompilerInputAttempts',
-			'attributedProgramReadBytes',
-			'attributedUniqueQueries',
-			'declarationEmitCompilerInputAttempts',
-			'declarationEmitReadBytes',
-			'programCompilerInputAttempts',
-			'programPresentReadFileAttempts',
-			'programReadBytes',
-			'programSourceFiles'
-		] as const)
-			if (!Number.isSafeInteger(witnessRecord[key]) || (witnessRecord[key] as number) < 0)
-				throw new TypeError('invalid witness count');
-		for (const key of [
-			'captureContextDigest',
-			'compilerOptionsDigest',
-			'materializedRecipeDigest',
-			'programInputAttemptPopulationDigest',
-			'programSourcePopulationDigest',
-			'projectResolutionDigest'
-		] as const)
-			if (typeof witnessRecord[key] !== 'string' || !SHA256.test(witnessRecord[key] as string))
-				throw new TypeError('invalid witness digest');
-		for (const key of [
-			'compilerVersion',
-			'configPath',
-			'selectedSourceLogicalPath',
-			'semanticProgramId',
-			'semanticProjectId',
-			'semanticSourceId'
-		] as const) {
-			const entry = witnessRecord[key];
-			if (
-				typeof entry !== 'string' ||
-				entry.length > HARD_LIMITS.maxPathCharacters ||
-				!checkpointedUnicodeScalarString(entry, deadline, 'EMISSION_RECONCILE')
-			)
-				throw new TypeError('invalid witness string');
-		}
-		for (const key of ['configPath', 'selectedSourceLogicalPath'] as const)
-			if (
-				!validLogicalPath(
-					witnessRecord[key] as string,
-					inputs.request.budgets.maxPathCharacters,
-					deadline,
-					'EMISSION_RECONCILE'
-				)
-			)
-				throw new TypeError('invalid witness path');
-		const witnessOutputValues = denseDataValues(
-			witnessRecord.outputs,
-			2,
-			'$emission.emissionWitness.outputs',
-			deadline
-		);
-		for (let index = 0; index < 2; index += 1) {
-			const left = outputs[index]!;
-			const right = exactPlainRecord(
-				witnessOutputValues[index],
-				PROVIDER_OUTPUT_KEYS,
-				`$emission.emissionWitness.outputs[${index}]`
-			);
-			if (
-				typeof right.bytes !== 'number' ||
-				typeof right.content !== 'string' ||
-				typeof right.contentSha256 !== 'string' ||
-				typeof right.kind !== 'string' ||
-				typeof right.logicalPath !== 'string' ||
-				typeof right.sourceLogicalPath !== 'string' ||
-				typeof right.textLength !== 'number' ||
-				typeof right.writeByteOrderMark !== 'boolean'
-			)
-				throw new TypeError('witness output primitives are invalid');
-			for (const key of PROVIDER_OUTPUT_KEYS) {
-				deadline.check('EMISSION_RECONCILE');
-				const equal = left[key] === right[key];
-				deadline.check('EMISSION_RECONCILE');
-				if (!equal) throw new TypeError('witness outputs differ');
-			}
-		}
-		if (
-			denseDataValues(
-				witnessRecord.emitDiagnostics,
-				0,
-				'$emission.emissionWitness.emitDiagnostics',
-				deadline
-			).length !== 0 ||
-			witnessRecord.declarationEmitCallbacksUseOnlyAttributedQueries !== true ||
-			witnessRecord.emitApi !== 'TYPESCRIPT_PUBLIC_PROGRAM_EMIT' ||
-			witnessRecord.emitOnlyDtsFiles !== true ||
-			witnessRecord.emitSkipped !== false ||
-			witnessRecord.programCallbacksWithinAttributedInvocationBounds !== true ||
-			witnessRecord.programInputAttemptPopulationReconciles !== true ||
-			witnessRecord.programSourceFilePopulationReconciles !== true ||
-			witnessRecord.state !==
-				'FRESH_PUBLIC_TYPESCRIPT_DECLARATION_EMISSION_OVER_VERIFIED_PROJECT_SCOPED_CAPTURE'
-		)
-			throw new TypeError('invalid witness constants');
+		assertProviderWitnessScalars(witnessRecord);
+		assertProviderWitnessPaths(witnessRecord, inputs, deadline);
+		assertProviderWitnessOutputs(witnessRecord, outputs, deadline);
+		assertProviderWitnessConstants(witnessRecord, deadline);
 		const emissionWitness = {
 			...witnessRecord,
 			emitDiagnostics: [] as const,
@@ -1889,7 +2118,7 @@ function deepFreeze<Value>(value: Value, deadline: Deadline): Value {
 	}
 	while (pending.length > 0) {
 		deadline.check('MATERIALIZE');
-		const frame = pending[pending.length - 1]!;
+		const frame = pending.at(-1)!;
 		const length = frame.state === 'ARRAY' ? frame.length : frame.keys.length;
 		if (frame.index >= length) {
 			Object.freeze(frame.value);
@@ -1911,6 +2140,825 @@ function deepFreeze<Value>(value: Value, deadline: Deadline): Value {
 		pending.push(frameFor(descriptor.value));
 	}
 	return value;
+}
+
+type CorrelationAnalysisId = ReturnType<typeof sourceOriginCorrelationId>;
+type CorrelationArtifactId = ReturnType<typeof sourceOriginArtifactId>;
+type CorrelationSourceMapId = ReturnType<typeof sourceOriginSourceMapId>;
+type CorrelationMappingHealthId = ReturnType<typeof sourceOriginMappingHealthId>;
+
+interface CapturedDeclarationBytes {
+	readonly callerCaptureBytes: number;
+	readonly callerCaptureStringCharacters: number;
+	readonly capturedInputs: SourceOriginCorrelationBuildInputs;
+	readonly mapBytes: Uint8Array;
+	readonly mapLength: number;
+	readonly mapSha256: string;
+	readonly mapText: string;
+	readonly targetBytes: Uint8Array;
+	readonly targetLength: number;
+	readonly targetSha256: string;
+	readonly targetText: string;
+}
+
+interface ProspectivePopulations {
+	readonly locations: number;
+	readonly outputRecords: number;
+	readonly segments: number;
+}
+
+interface CorrelationRecordIdentities {
+	readonly authoredArtifactId: CorrelationArtifactId;
+	readonly mapId: CorrelationSourceMapId;
+	readonly mappingHealthId: CorrelationMappingHealthId;
+	readonly targetArtifactId: CorrelationArtifactId;
+}
+
+interface MappedCorrelationRecords {
+	readonly correlations: SourceOriginCorrelationSnapshot['correlations'][number][];
+	readonly locations: SourceOriginCorrelationSnapshot['locations'][number][];
+	readonly segments: SourceOriginCorrelationSnapshot['segments'][number][];
+}
+
+/** Refuses inputs whose subject and semantic capabilities are not exact frozen inert values. */
+function assertFrozenSemanticCapabilities(inputs: SourceOriginCorrelationBuildInputs): void {
+	if (
+		!isFrozenSubjectCapability(inputs.frozenSubject) ||
+		isProxy(inputs.frozenSubject) ||
+		!Object.isFrozen(inputs.frozenSubject) ||
+		inputs.semanticSnapshot === null ||
+		typeof inputs.semanticSnapshot !== 'object' ||
+		isProxy(inputs.semanticSnapshot) ||
+		!Object.isFrozen(inputs.semanticSnapshot)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'CAPTURE_INVALID',
+			'Source-origin correlation requires exact frozen subject and semantic capabilities.',
+			'REQUEST_BIND'
+		);
+}
+
+/** Copies, hashes, and decodes both caller captures, refusing any that misses its descriptor. */
+function bindCallerCaptures(
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): CapturedDeclarationBytes {
+	const targetLength = captureLength(
+		inputs.targetDeclarationBytes,
+		'$inputs.targetDeclarationBytes'
+	);
+	const mapLength = captureLength(inputs.declarationMapBytes, '$inputs.declarationMapBytes');
+	const callerCaptureBytes = checkedAdd(targetLength, mapLength);
+	if (
+		callerCaptureBytes >
+			Math.min(inputs.request.budgets.maxCallerCaptureBytes, HARD_LIMITS.maxCallerCaptureBytes) ||
+		callerCaptureBytes > inputs.request.budgets.maxReadBytes
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Caller capture bytes exceed request or implementation ceilings.',
+			'CAPTURE_BIND'
+		);
+	const targetBytes = copyCapture(
+		inputs.targetDeclarationBytes as Uint8Array,
+		targetLength,
+		'$inputs.targetDeclarationBytes',
+		deadline
+	);
+	const mapBytes = copyCapture(
+		inputs.declarationMapBytes as Uint8Array,
+		mapLength,
+		'$inputs.declarationMapBytes',
+		deadline
+	);
+	const targetSha256 = bytesSha256(targetBytes, deadline, 'CAPTURE_BIND');
+	const mapSha256 = bytesSha256(mapBytes, deadline, 'CAPTURE_BIND');
+	if (
+		targetLength !== inputs.request.targetDeclaration.contentBytes ||
+		targetSha256 !== inputs.request.targetDeclaration.contentSha256 ||
+		mapLength !== inputs.request.declarationMap.contentBytes ||
+		mapSha256 !== inputs.request.declarationMap.contentSha256
+	)
+		throw new SourceOriginCorrelationFailure(
+			'INPUT_IDENTITY_MISMATCH',
+			'Caller captures do not reconcile with declared length and SHA-256.',
+			'CAPTURE_BIND'
+		);
+	const targetText = decodeUtf8(
+		targetBytes,
+		Math.min(inputs.request.budgets.maxEmitStringCharacters, HARD_LIMITS.maxEmitStringCharacters),
+		'Target declaration capture',
+		deadline
+	);
+	const mapText = decodeUtf8(
+		mapBytes,
+		Math.min(inputs.request.budgets.maxEmitStringCharacters, HARD_LIMITS.maxEmitStringCharacters),
+		'Declaration-map capture',
+		deadline
+	);
+	const callerCaptureStringCharacters = checkedAdd(targetText.length, mapText.length);
+	if (
+		callerCaptureStringCharacters >
+		Math.min(inputs.request.budgets.maxEmitStringCharacters, HARD_LIMITS.maxEmitStringCharacters)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Caller capture strings exceed maxEmitStringCharacters.',
+			'CAPTURE_BIND'
+		);
+	const capturedInputs: SourceOriginCorrelationBuildInputs = {
+		...inputs,
+		declarationMapBytes: mapBytes,
+		targetDeclarationBytes: targetBytes
+	};
+	return {
+		callerCaptureBytes,
+		callerCaptureStringCharacters,
+		capturedInputs,
+		mapBytes,
+		mapLength,
+		mapSha256,
+		mapText,
+		targetBytes,
+		targetLength,
+		targetSha256,
+		targetText
+	};
+}
+
+/** Independently validates the semantic snapshot and returns both canonical JSON witnesses. */
+function validateSemanticInputs(
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): {
+	readonly frozenSubjectWitness: ReturnType<typeof canonicalSemanticJsonWitnessWithProgress>;
+	readonly semanticSnapshotWitness: ReturnType<typeof canonicalSemanticJsonWitnessWithProgress>;
+} {
+	deadline.check('SEMANTIC_SNAPSHOT_VALIDATE');
+	let semanticValidation: ReturnType<typeof validateStaticSemanticSnapshot>;
+	try {
+		semanticValidation = validateStaticSemanticSnapshot(
+			inputs.semanticSnapshot,
+			{
+				maxDepth: HARD_INPUT_DEPTH,
+				maxDiagnostics: Math.min(inputs.request.budgets.maxDiagnostics, HARD_LIMITS.maxDiagnostics),
+				maxIssues: Math.min(inputs.request.budgets.maxDiagnostics, HARD_LIMITS.maxDiagnostics),
+				maxRecords: Math.min(inputs.request.budgets.maxInputRecords, HARD_LIMITS.maxInputRecords),
+				maxReferenceChecks: Math.min(
+					inputs.request.budgets.maxInputRecords,
+					HARD_LIMITS.maxInputRecords
+				),
+				maxStringCharacters: Math.min(
+					inputs.request.budgets.maxInputStringCharacters,
+					HARD_LIMITS.maxInputStringCharacters
+				)
+			},
+			{ frozenSubject: inputs.frozenSubject }
+		);
+	} catch (error) {
+		deadline.check('SEMANTIC_SNAPSHOT_VALIDATE');
+		throw error;
+	}
+	deadline.check('SEMANTIC_SNAPSHOT_VALIDATE');
+	if (semanticValidation.state !== 'VALID')
+		throw new SourceOriginCorrelationFailure(
+			semanticValidation.state === 'BUDGET_EXHAUSTED'
+				? 'BUDGET_EXCEEDED'
+				: 'SEMANTIC_SNAPSHOT_INVALID',
+			'Static semantic snapshot is not independently valid for the FrozenSubject.',
+			'SEMANTIC_SNAPSHOT_VALIDATE',
+			semanticValidation.issues[0]?.path ?? null
+		);
+	const frozenSubjectWitness = canonicalSemanticJsonWitnessWithProgress(inputs.frozenSubject, () =>
+		deadline.check('SEMANTIC_SNAPSHOT_VALIDATE')
+	);
+	const semanticSnapshotWitness = canonicalSemanticJsonWitnessWithProgress(
+		inputs.semanticSnapshot,
+		() => deadline.check('SEMANTIC_SNAPSHOT_VALIDATE')
+	);
+	return { frozenSubjectWitness, semanticSnapshotWitness };
+}
+
+function assertBoundSourceTextCeiling(
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundSelection
+): void {
+	if (
+		bound.source.textLength >
+		Math.min(inputs.request.budgets.maxSourceTextCodeUnits, HARD_LIMITS.maxSourceTextCodeUnits)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Selected authored source exceeds the pre-emission text ceiling.',
+			'PROGRAM_BIND',
+			'$.semanticSnapshot.sources'
+		);
+}
+
+function preflightDeclarationMapJson(
+	mapText: string,
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): void {
+	if (
+		mapText.length >
+		Math.min(
+			inputs.request.budgets.maxInputStringCharacters,
+			SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxInputCharacters
+		)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Source-map input characters exceed budget.',
+			'SOURCE_MAP_PARSE'
+		);
+	jsonLexicalPreflight(mapText, inputs.request.budgets, deadline);
+}
+
+/** The correlation diagnostic code that one strict Source Map v3 decode failure maps onto. */
+function sourceMapDecodeFailureCode(
+	error: SourceMapV3DecodeError
+): SourceOriginCorrelationDiagnostic['code'] {
+	if (error.code === 'BUDGET_EXCEEDED') return 'BUDGET_EXCEEDED';
+	if (error.code === 'SHAPE_INVALID') return 'SOURCE_MAP_UNSUPPORTED';
+	return 'SOURCE_MAP_INVALID';
+}
+
+function decodeDeclarationMapCapture(
+	mapText: string,
+	inputs: SourceOriginCorrelationBuildInputs,
+	deadline: Deadline
+): DecodedSourceMapV3 {
+	try {
+		return decodeSourceMapV3(
+			mapText,
+			{
+				maxCoordinate: Number.MAX_SAFE_INTEGER,
+				maxGeneratedLines: Math.min(
+					inputs.request.budgets.maxDecodedMapLines,
+					SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxGeneratedLines
+				),
+				maxInputCharacters: Math.min(
+					inputs.request.budgets.maxInputStringCharacters,
+					SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxInputCharacters
+				),
+				maxMappingsCharacters: Math.min(
+					inputs.request.budgets.maxMappingsCharacters,
+					SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxMappingsCharacters
+				),
+				maxPathCharacters: Math.min(
+					inputs.request.budgets.maxPathCharacters,
+					SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxPathCharacters
+				),
+				maxSegments: Math.min(
+					inputs.request.budgets.maxDecodedMapSegments,
+					SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxSegments
+				),
+				maxVlqDigits: 7
+			},
+			{ onProgress: () => deadline.check('SOURCE_MAP_DECODE') }
+		);
+	} catch (error) {
+		deadline.check('SOURCE_MAP_DECODE');
+		if (error instanceof SourceMapV3DecodeError)
+			throw new SourceOriginCorrelationFailure(
+				sourceMapDecodeFailureCode(error),
+				'Declaration map failed strict Source Map v3 decoding.',
+				'SOURCE_MAP_DECODE'
+			);
+		throw error;
+	}
+}
+
+/** The fixed derived populations one decoded map implies, refused when they cannot fit budgets. */
+function computeProspectivePopulations(
+	decodedMap: DecodedSourceMapV3,
+	inputs: SourceOriginCorrelationBuildInputs
+): ProspectivePopulations {
+	const prospectiveSegments = decodedMap.segmentCount;
+	const prospectiveLocations = checkedMultiply(prospectiveSegments, 2);
+	const prospectiveOutputRecords = checkedAdd(8, checkedMultiply(prospectiveSegments, 4));
+	if (
+		prospectiveSegments >
+			Math.min(inputs.request.budgets.maxDecodedMapSegments, HARD_LIMITS.maxDecodedMapSegments) ||
+		prospectiveSegments >
+			Math.min(inputs.request.budgets.maxCorrelations, HARD_LIMITS.maxCorrelations) ||
+		prospectiveLocations >
+			Math.min(inputs.request.budgets.maxLocations, HARD_LIMITS.maxLocations) ||
+		prospectiveOutputRecords >
+			Math.min(inputs.request.budgets.maxOutputRecords, HARD_LIMITS.maxOutputRecords)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Decoded map populations cannot fit output budgets.',
+			'SOURCE_MAP_DECODE'
+		);
+	return {
+		locations: prospectiveLocations,
+		outputRecords: prospectiveOutputRecords,
+		segments: prospectiveSegments
+	};
+}
+
+function assertResolvedSourcePath(
+	inputs: SourceOriginCorrelationBuildInputs,
+	decodedMap: DecodedSourceMapV3,
+	bound: BoundSelection,
+	deadline: Deadline
+): void {
+	deadline.check('SOURCE_PATH_RESOLVE');
+	const resolvedSourcePath = posix.normalize(
+		posix.join(posix.dirname(inputs.request.declarationMap.logicalPath), decodedMap.source)
+	);
+	deadline.check('SOURCE_PATH_RESOLVE');
+	if (
+		decodedMap.file !== posix.basename(inputs.request.targetDeclaration.logicalPath) ||
+		!validLogicalPath(
+			resolvedSourcePath,
+			inputs.request.budgets.maxPathCharacters,
+			deadline,
+			'SOURCE_PATH_RESOLVE'
+		) ||
+		resolvedSourcePath !== bound.source.logicalPath
+	)
+		throw new SourceOriginCorrelationFailure(
+			'SOURCE_ORIGIN_UNAVAILABLE',
+			'Source-map target/source paths do not resolve exactly.',
+			'SOURCE_PATH_RESOLVE'
+		);
+}
+
+/** Refuses fresh emission evidence that is not exactly byte-equal to the caller captures. */
+function reconcileFreshEmission(
+	emission: CompilerProjectDeclarationEmission,
+	inputs: SourceOriginCorrelationBuildInputs,
+	bound: BoundSelection,
+	captured: CapturedDeclarationBytes,
+	sourcePopulation: readonly SourceOriginProgramSourceIdentity[],
+	expectedSourcePopulationDigest: string,
+	deadline: Deadline
+): {
+	readonly mapOutput: ProviderDeclarationOutput;
+	readonly targetOutput: ProviderDeclarationOutput;
+} {
+	const witness = emission.emissionWitness;
+	const targetOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION');
+	const mapOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION_MAP');
+	if (
+		emission.version !== COMPILER_PROJECT_DECLARATION_EMISSION_VERSION ||
+		targetOutputs.length !== 1 ||
+		mapOutputs.length !== 1
+	)
+		throw new SourceOriginCorrelationFailure(
+			'EMISSION_FAILED',
+			'Fresh declaration provider returned an unsupported output population.',
+			'EMISSION_RECONCILE'
+		);
+	const targetOutput = targetOutputs[0]!;
+	const mapOutput = mapOutputs[0]!;
+	const materializedTextIdentity = textIdentity(
+		emission.materializedSource.text,
+		deadline,
+		'EMISSION_RECONCILE'
+	);
+	if (
+		emission.selection.logicalPath !== bound.source.logicalPath ||
+		emission.selection.semanticProgramId !== bound.program.id ||
+		emission.selection.semanticProjectId !== bound.project.id ||
+		emission.selection.semanticSourceId !== bound.source.id ||
+		emission.materializedSource.logicalPath !== bound.source.logicalPath ||
+		emission.materializedSource.semanticProgramId !== bound.program.id ||
+		emission.materializedSource.semanticProjectId !== bound.project.id ||
+		emission.materializedSource.semanticSourceId !== bound.source.id ||
+		emission.materializedSource.contentBytes !== bound.source.bytes ||
+		emission.materializedSource.contentSha256 !== bound.source.contentSha256 ||
+		emission.materializedSource.textLength !== bound.source.textLength ||
+		emission.materializedSource.text.length !== emission.materializedSource.textLength ||
+		emission.materializedSource.text.length >
+			Math.min(inputs.request.budgets.maxSourceTextCodeUnits, HARD_LIMITS.maxSourceTextCodeUnits) ||
+		materializedTextIdentity.bytes !== bound.source.bytes ||
+		materializedTextIdentity.sha256 !== bound.source.contentSha256
+	)
+		throw new SourceOriginCorrelationFailure(
+			'EMISSION_FAILED',
+			'Fresh emission source/selection evidence does not reconcile.',
+			'EMISSION_RECONCILE'
+		);
+	if (
+		targetOutput.logicalPath !== inputs.request.targetDeclaration.logicalPath ||
+		targetOutput.bytes !== captured.targetLength ||
+		targetOutput.contentSha256 !== captured.targetSha256 ||
+		targetOutput.textLength !== targetOutput.content.length ||
+		!textEqualsBytes(targetOutput.content, captured.targetBytes, deadline) ||
+		mapOutput.logicalPath !== inputs.request.declarationMap.logicalPath ||
+		mapOutput.bytes !== captured.mapLength ||
+		mapOutput.contentSha256 !== captured.mapSha256 ||
+		mapOutput.textLength !== mapOutput.content.length ||
+		!textEqualsBytes(mapOutput.content, captured.mapBytes, deadline)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'EMISSION_OUTPUT_MISMATCH',
+			'Fresh declaration outputs are not exactly byte-equal to caller captures.',
+			'EMISSION_RECONCILE'
+		);
+	if (
+		witness.semanticProgramId !== bound.program.id ||
+		witness.semanticProjectId !== bound.project.id ||
+		witness.semanticSourceId !== bound.source.id ||
+		witness.selectedSourceLogicalPath !== bound.source.logicalPath ||
+		witness.configPath !== bound.project.configPath ||
+		witness.compilerVersion !== inputs.semanticSnapshot.provider.version ||
+		witness.programSourceFiles !== sourcePopulation.length ||
+		witness.programSourcePopulationDigest !== expectedSourcePopulationDigest ||
+		witness.programCompilerInputAttempts >
+			Math.min(
+				inputs.request.budgets.maxCompilerInputAttempts,
+				HARD_LIMITS.maxCompilerInputAttempts
+			) ||
+		witness.programReadBytes >
+			Math.min(inputs.request.budgets.maxProgramReadBytes, HARD_LIMITS.maxProgramReadBytes) ||
+		witness.declarationEmitCallbacksUseOnlyAttributedQueries !== true ||
+		witness.programCallbacksWithinAttributedInvocationBounds !== true ||
+		witness.programInputAttemptPopulationReconciles !== true ||
+		witness.programSourceFilePopulationReconciles !== true ||
+		witness.emitApi !== 'TYPESCRIPT_PUBLIC_PROGRAM_EMIT' ||
+		witness.emitOnlyDtsFiles !== true ||
+		witness.emitSkipped !== false ||
+		witness.emitDiagnostics.length !== 0
+	)
+		throw new SourceOriginCorrelationFailure(
+			'EMISSION_FAILED',
+			'Fresh emission witness does not reconcile.',
+			'EMISSION_RECONCILE'
+		);
+	return { mapOutput, targetOutput };
+}
+
+/** The distinct authored line numbers the decoded segment population references. */
+function referencedAuthoredLineNumbers(
+	decodedMap: DecodedSourceMapV3,
+	maximumLines: number,
+	deadline: Deadline
+): ReadonlySet<number> {
+	const referencedAuthoredLines = new Set<number>();
+	for (let index = 0; index < decodedMap.segments.length; index += 1) {
+		checkpointLoop(index, deadline, 'LOCATION_BIND');
+		const originalLine = decodedMap.segments[index]!.originalLine;
+		if (referencedAuthoredLines.has(originalLine)) continue;
+		if (referencedAuthoredLines.size >= maximumLines)
+			throw new SourceOriginCorrelationFailure(
+				'BUDGET_EXCEEDED',
+				'Authored source-map line population exceeds its segment bound.',
+				'LOCATION_BIND'
+			);
+		referencedAuthoredLines.add(originalLine);
+	}
+	return referencedAuthoredLines;
+}
+
+function assertTrailingGeneratedLine(
+	targetLines: readonly TextLine[],
+	decodedMap: DecodedSourceMapV3
+): void {
+	if (targetLines.length !== decodedMap.generatedLines + 1)
+		throw new SourceOriginCorrelationFailure(
+			'SOURCE_MAP_INVALID',
+			'Target must have exactly one final line beyond mapped lines.',
+			'LOCATION_BIND'
+		);
+}
+
+function assertUniqueMappedCoordinates(
+	generatedCoordinates: ReadonlySet<string>,
+	authoredCoordinates: ReadonlySet<string>,
+	generatedKey: string,
+	authoredKey: string
+): void {
+	if (generatedCoordinates.has(generatedKey) || authoredCoordinates.has(authoredKey))
+		throw new SourceOriginCorrelationFailure(
+			'SOURCE_MAP_INVALID',
+			'Mapped endpoint coordinates must be globally unique.',
+			'LOCATION_BIND'
+		);
+}
+
+function assertDerivedCorrelationBounds(
+	sizes: {
+		readonly authoredCoordinates: number;
+		readonly correlations: number;
+		readonly generatedCoordinates: number;
+		readonly locations: number;
+		readonly segments: number;
+	},
+	prospective: ProspectivePopulations
+): void {
+	if (
+		sizes.generatedCoordinates >= prospective.segments ||
+		sizes.authoredCoordinates >= prospective.segments ||
+		sizes.segments >= prospective.segments ||
+		sizes.locations > prospective.locations - 2 ||
+		sizes.correlations >= prospective.segments
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Derived correlation population exceeded its preflight bound.',
+			'LOCATION_BIND'
+		);
+}
+
+function assertEveryGeneratedLineMapped(generatedMapped: Uint8Array, deadline: Deadline): void {
+	for (let index = 0; index < generatedMapped.length; index += 1) {
+		checkpointLoop(index, deadline, 'LOCATION_BIND');
+		if (generatedMapped[index] !== 1)
+			throw new SourceOriginCorrelationFailure(
+				'SOURCE_MAP_INVALID',
+				'Every generated line before the trailer must contain a mapping.',
+				'LOCATION_BIND'
+			);
+	}
+}
+
+/** Materializes one segment, its two endpoint locations, and its exact correlation per mapping. */
+function bindMappedCorrelations(
+	analysisId: CorrelationAnalysisId,
+	decodedMap: DecodedSourceMapV3,
+	targetLines: readonly TextLine[],
+	authoredLines: ReadonlyMap<number, TextLineBounds>,
+	identities: CorrelationRecordIdentities,
+	prospective: ProspectivePopulations,
+	deadline: Deadline
+): MappedCorrelationRecords {
+	const generatedMapped = new Uint8Array(decodedMap.generatedLines);
+	deadline.check('LOCATION_BIND');
+	const generatedCoordinates = new Set<string>();
+	const authoredCoordinates = new Set<string>();
+	const segmentRecords: SourceOriginCorrelationSnapshot['segments'][number][] = [];
+	const locationRecords: SourceOriginCorrelationSnapshot['locations'][number][] = [];
+	const correlationRecords: SourceOriginCorrelationSnapshot['correlations'][number][] = [];
+	let priorLine = -1;
+	let lineSegmentOrdinal = 0;
+	for (const decoded of decodedMap.segments) {
+		deadline.check('LOCATION_BIND');
+		if (decoded.generatedLine !== priorLine) {
+			priorLine = decoded.generatedLine;
+			lineSegmentOrdinal = 0;
+		}
+		const generatedOffset = coordinateOffset(
+			targetLines[decoded.generatedLine],
+			decoded.generatedColumn
+		);
+		const authoredOffset = coordinateOffset(
+			authoredLines.get(decoded.originalLine),
+			decoded.originalColumn
+		);
+		const generatedKey = `${decoded.generatedLine}:${decoded.generatedColumn}`;
+		const authoredKey = `${decoded.originalLine}:${decoded.originalColumn}`;
+		assertUniqueMappedCoordinates(
+			generatedCoordinates,
+			authoredCoordinates,
+			generatedKey,
+			authoredKey
+		);
+		assertDerivedCorrelationBounds(
+			{
+				authoredCoordinates: authoredCoordinates.size,
+				correlations: correlationRecords.length,
+				generatedCoordinates: generatedCoordinates.size,
+				locations: locationRecords.length,
+				segments: segmentRecords.length
+			},
+			prospective
+		);
+		generatedCoordinates.add(generatedKey);
+		authoredCoordinates.add(authoredKey);
+		generatedMapped[decoded.generatedLine] = 1;
+		const segmentWithoutId = {
+			decodedFieldCount: 4 as const,
+			generatedColumn: decoded.generatedColumn,
+			generatedLine: decoded.generatedLine,
+			lineSegmentOrdinal,
+			mapId: identities.mapId,
+			nameIndex: null,
+			ordinal: decoded.ordinal,
+			originalColumn: decoded.originalColumn,
+			originalLine: decoded.originalLine,
+			sourceArtifactId: identities.authoredArtifactId,
+			sourceIndex: 0 as const,
+			state: 'MAPPED' as const,
+			targetArtifactId: identities.targetArtifactId
+		};
+		lineSegmentOrdinal += 1;
+		const segmentId = sourceOriginMapSegmentId(analysisId, segmentWithoutId, () =>
+			deadline.check('LOCATION_BIND')
+		);
+		segmentRecords.push({ ...segmentWithoutId, id: segmentId });
+		const generatedLocationWithoutId = {
+			artifactId: identities.targetArtifactId,
+			column: decoded.generatedColumn,
+			coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
+			line: decoded.generatedLine,
+			offset: generatedOffset,
+			ordinal: decoded.ordinal * 2,
+			role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[0],
+			segmentId,
+			width: 0 as const
+		};
+		const authoredLocationWithoutId = {
+			artifactId: identities.authoredArtifactId,
+			column: decoded.originalColumn,
+			coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
+			line: decoded.originalLine,
+			offset: authoredOffset,
+			ordinal: decoded.ordinal * 2 + 1,
+			role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[1],
+			segmentId,
+			width: 0 as const
+		};
+		const generatedLocationId = sourceOriginLocationId(analysisId, generatedLocationWithoutId, () =>
+			deadline.check('LOCATION_BIND')
+		);
+		const authoredLocationId = sourceOriginLocationId(analysisId, authoredLocationWithoutId, () =>
+			deadline.check('LOCATION_BIND')
+		);
+		locationRecords.push(
+			{ ...generatedLocationWithoutId, id: generatedLocationId },
+			{ ...authoredLocationWithoutId, id: authoredLocationId }
+		);
+		const correlationWithoutId = {
+			authoredLocationId,
+			directionality: 'BIDIRECTIONAL_EXACT_ONE_TO_ONE' as const,
+			generatedLocationId,
+			kind: 'GENERATED_TO_AUTHORED_SOURCE_MAP_SEGMENT' as const,
+			mapId: identities.mapId,
+			mappingHealthId: identities.mappingHealthId,
+			ordinal: decoded.ordinal,
+			segmentId,
+			state: 'EXACT' as const
+		};
+		correlationRecords.push({
+			...correlationWithoutId,
+			id: sourceOriginExactCorrelationId(analysisId, correlationWithoutId, () =>
+				deadline.check('LOCATION_BIND')
+			)
+		});
+	}
+	assertEveryGeneratedLineMapped(generatedMapped, deadline);
+	return {
+		correlations: correlationRecords,
+		locations: locationRecords,
+		segments: segmentRecords
+	};
+}
+
+function assertCorrelationPopulationsReconcile(
+	segments: number,
+	locations: number,
+	correlations: number
+): void {
+	if (segments !== correlations || locations !== checkedMultiply(segments, 2))
+		throw new SourceOriginCorrelationFailure(
+			'INPUT_POPULATION_MISMATCH',
+			'Segment/location/correlation populations do not reconcile.',
+			'CORRELATION_BIND'
+		);
+}
+
+function assertSourceMappingUrlTrailer(
+	trailerLine: TextLine,
+	inputs: SourceOriginCorrelationBuildInputs
+): void {
+	const expectedTrailer = `//# sourceMappingURL=${posix.basename(inputs.request.declarationMap.logicalPath)}`;
+	if (
+		trailerLine.content !== expectedTrailer ||
+		inputs.request.budgets.maxUnmappedGeneratedLines < 1
+	)
+		throw new SourceOriginCorrelationFailure(
+			inputs.request.budgets.maxUnmappedGeneratedLines < 1
+				? 'BUDGET_EXCEEDED'
+				: 'SOURCE_MAP_INVALID',
+			'Target lacks the exact final unmapped sourceMappingURL trailer.',
+			'UNMAPPED_LINE_BIND'
+		);
+}
+
+function collectSegmentIds(
+	segments: readonly SourceOriginCorrelationSnapshot['segments'][number][],
+	maximumSegments: number,
+	deadline: Deadline
+): SourceOriginCorrelationSnapshot['sourceMap']['segmentIds'][number][] {
+	const segmentIds: SourceOriginCorrelationSnapshot['sourceMap']['segmentIds'][number][] = [];
+	for (let index = 0; index < segments.length; index += 1) {
+		checkpointLoop(index, deadline, 'UNMAPPED_LINE_BIND');
+		if (segmentIds.length >= maximumSegments)
+			throw new SourceOriginCorrelationFailure(
+				'BUDGET_EXCEEDED',
+				'Segment ID population exceeded its preflight bound.',
+				'UNMAPPED_LINE_BIND'
+			);
+		segmentIds.push(segments[index]!.id);
+	}
+	return segmentIds;
+}
+
+function assertDerivedPopulationBudgets(
+	budgets: SourceOriginCorrelationBudgets,
+	populations: {
+		readonly chargedInputRecords: number;
+		readonly chargedTraversalSteps: number;
+		readonly correlations: number;
+		readonly decodedSegments: number;
+		readonly emitBytes: number;
+		readonly locations: number;
+		readonly outputRecords: number;
+		readonly readBytes: number;
+	}
+): void {
+	if (
+		populations.decodedSegments > budgets.maxDecodedMapSegments ||
+		populations.locations > budgets.maxLocations ||
+		populations.correlations > budgets.maxCorrelations ||
+		populations.outputRecords > Math.min(budgets.maxOutputRecords, HARD_LIMITS.maxOutputRecords) ||
+		populations.chargedInputRecords > budgets.maxInputRecords ||
+		populations.emitBytes > budgets.maxEmitBytes ||
+		populations.readBytes > budgets.maxReadBytes ||
+		populations.chargedTraversalSteps >
+			Math.min(budgets.maxTraversalSteps, HARD_LIMITS.maxTraversalSteps)
+	)
+		throw new SourceOriginCorrelationFailure(
+			'BUDGET_EXCEEDED',
+			'Derived populations exceed request budgets.',
+			'MATERIALIZE'
+		);
+}
+
+function runConstructedAnalysisValidation(
+	analysis: SourceOriginCorrelationSnapshot,
+	capturedInputs: SourceOriginCorrelationBuildInputs,
+	inputDigest: string,
+	inputStats: InputCensus,
+	outputRecords: number,
+	deadline: Deadline
+): void {
+	deadline.check('ANALYSIS_VALIDATE');
+	const budgets = capturedInputs.request.budgets;
+	let validation: ReturnType<typeof validateConstructedSourceOriginCorrelation>;
+	try {
+		validation = validateConstructedSourceOriginCorrelation(analysis, capturedInputs, inputDigest, {
+			maxDepth: HARD_INPUT_DEPTH,
+			maxDurationMs: deadline.remaining('ANALYSIS_VALIDATE'),
+			maxInputRecords: Math.min(budgets.maxInputRecords, HARD_LIMITS.maxInputRecords),
+			maxInputStringCharacters: Math.min(
+				budgets.maxInputStringCharacters,
+				HARD_LIMITS.maxInputStringCharacters
+			),
+			maxIssues: Math.min(budgets.maxDiagnostics, HARD_LIMITS.maxDiagnostics),
+			maxRecords: Math.min(
+				Number.MAX_SAFE_INTEGER,
+				checkedAdd(inputStats.records, outputRecords, 1024)
+			),
+			maxStringCharacters: Math.min(
+				Number.MAX_SAFE_INTEGER,
+				checkedAdd(inputStats.stringCharacters, budgets.maxEmitStringCharacters, 65_536)
+			)
+		});
+	} catch (error) {
+		deadline.check('ANALYSIS_VALIDATE');
+		throw error;
+	}
+	deadline.check('ANALYSIS_VALIDATE');
+	if (validation.state !== 'VALID')
+		throw new SourceOriginCorrelationFailure(
+			validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'VALIDATION_FAILED',
+			`Constructed source-origin correlation failed independent validation: ${validation.issues[0]?.message ?? 'unknown issue'}`,
+			'ANALYSIS_VALIDATE',
+			validation.issues[0]?.path ?? null
+		);
+}
+
+/** Closes the active phase and returns the one frozen unavailable outcome a failure produces. */
+function correlationFailureOutcome(
+	error: unknown,
+	progress: TelemetryRecorder
+): SourceOriginCorrelationBuildOutcome {
+	if (error instanceof CompilerProjectDeclarationEmissionError) {
+		const code = error.code === 'BUDGET_EXCEEDED' ? 'BUDGET_EXCEEDED' : 'EMISSION_FAILED';
+		progress.fail({}, code);
+		return progress.finish(
+			unavailable(code, 'Fresh declaration emission failed closed.', 'DECLARATION_EMIT')
+		);
+	}
+	if (error instanceof SourceOriginCorrelationFailure) {
+		progress.fail({}, error.code);
+		return progress.finish(unavailable(error.code, error.message, error.phase, error.path));
+	}
+	progress.fail({}, 'REQUEST_INVALID');
+	return progress.finish(
+		unavailable(
+			'REQUEST_INVALID',
+			'Source-origin input inspection or derivation failed closed.',
+			progress.activePhase() ?? 'REQUEST_BIND'
+		)
+	);
 }
 
 /**
@@ -1939,20 +2987,7 @@ export function buildSourceOriginCorrelation(
 		const deadline = operationDeadline(clock, preflight.maxDurationMs);
 		deadline.check('REQUEST_BIND');
 		const inputs = materializeInputs(inputsValue, deadline);
-		if (
-			!isFrozenSubjectCapability(inputs.frozenSubject) ||
-			isProxy(inputs.frozenSubject) ||
-			!Object.isFrozen(inputs.frozenSubject) ||
-			inputs.semanticSnapshot === null ||
-			typeof inputs.semanticSnapshot !== 'object' ||
-			isProxy(inputs.semanticSnapshot) ||
-			!Object.isFrozen(inputs.semanticSnapshot)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'CAPTURE_INVALID',
-				'Source-origin correlation requires exact frozen subject and semantic capabilities.',
-				'REQUEST_BIND'
-			);
+		assertFrozenSemanticCapabilities(inputs);
 		progress.complete();
 
 		progress.start('INPUT_BUDGET');
@@ -1964,137 +2999,30 @@ export function buildSourceOriginCorrelation(
 		});
 
 		progress.start('CAPTURE_BIND');
-		const targetLength = captureLength(
-			inputs.targetDeclarationBytes,
-			'$inputs.targetDeclarationBytes'
-		);
-		const mapLength = captureLength(inputs.declarationMapBytes, '$inputs.declarationMapBytes');
-		const callerCaptureBytes = checkedAdd(targetLength, mapLength);
-		if (
-			callerCaptureBytes >
-				Math.min(inputs.request.budgets.maxCallerCaptureBytes, HARD_LIMITS.maxCallerCaptureBytes) ||
-			callerCaptureBytes > inputs.request.budgets.maxReadBytes
-		)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Caller capture bytes exceed request or implementation ceilings.',
-				'CAPTURE_BIND'
-			);
-		const targetBytes = copyCapture(
-			inputs.targetDeclarationBytes as Uint8Array,
-			targetLength,
-			'$inputs.targetDeclarationBytes',
-			deadline
-		);
-		const mapBytes = copyCapture(
-			inputs.declarationMapBytes as Uint8Array,
+		const captured = bindCallerCaptures(inputs, deadline);
+		const {
+			callerCaptureBytes,
+			callerCaptureStringCharacters,
+			capturedInputs,
 			mapLength,
-			'$inputs.declarationMapBytes',
-			deadline
-		);
-		const targetSha256 = bytesSha256(targetBytes, deadline, 'CAPTURE_BIND');
-		const mapSha256 = bytesSha256(mapBytes, deadline, 'CAPTURE_BIND');
-		if (
-			targetLength !== inputs.request.targetDeclaration.contentBytes ||
-			targetSha256 !== inputs.request.targetDeclaration.contentSha256 ||
-			mapLength !== inputs.request.declarationMap.contentBytes ||
-			mapSha256 !== inputs.request.declarationMap.contentSha256
-		)
-			throw new SourceOriginCorrelationFailure(
-				'INPUT_IDENTITY_MISMATCH',
-				'Caller captures do not reconcile with declared length and SHA-256.',
-				'CAPTURE_BIND'
-			);
-		const targetText = decodeUtf8(
-			targetBytes,
-			Math.min(inputs.request.budgets.maxEmitStringCharacters, HARD_LIMITS.maxEmitStringCharacters),
-			'Target declaration capture',
-			deadline
-		);
-		const mapText = decodeUtf8(
-			mapBytes,
-			Math.min(inputs.request.budgets.maxEmitStringCharacters, HARD_LIMITS.maxEmitStringCharacters),
-			'Declaration-map capture',
-			deadline
-		);
-		const callerCaptureStringCharacters = checkedAdd(targetText.length, mapText.length);
-		if (
-			callerCaptureStringCharacters >
-			Math.min(inputs.request.budgets.maxEmitStringCharacters, HARD_LIMITS.maxEmitStringCharacters)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Caller capture strings exceed maxEmitStringCharacters.',
-				'CAPTURE_BIND'
-			);
-		const capturedInputs: SourceOriginCorrelationBuildInputs = {
-			...inputs,
-			declarationMapBytes: mapBytes,
-			targetDeclarationBytes: targetBytes
-		};
+			mapSha256,
+			mapText,
+			targetLength,
+			targetSha256,
+			targetText
+		} = captured;
 		progress.complete({ callerCaptureBytes });
 
 		progress.start('SEMANTIC_SNAPSHOT_VALIDATE');
-		deadline.check('SEMANTIC_SNAPSHOT_VALIDATE');
-		let semanticValidation: ReturnType<typeof validateStaticSemanticSnapshot>;
-		try {
-			semanticValidation = validateStaticSemanticSnapshot(
-				inputs.semanticSnapshot,
-				{
-					maxDepth: HARD_INPUT_DEPTH,
-					maxDiagnostics: Math.min(
-						inputs.request.budgets.maxDiagnostics,
-						HARD_LIMITS.maxDiagnostics
-					),
-					maxIssues: Math.min(inputs.request.budgets.maxDiagnostics, HARD_LIMITS.maxDiagnostics),
-					maxRecords: Math.min(inputs.request.budgets.maxInputRecords, HARD_LIMITS.maxInputRecords),
-					maxReferenceChecks: Math.min(
-						inputs.request.budgets.maxInputRecords,
-						HARD_LIMITS.maxInputRecords
-					),
-					maxStringCharacters: Math.min(
-						inputs.request.budgets.maxInputStringCharacters,
-						HARD_LIMITS.maxInputStringCharacters
-					)
-				},
-				{ frozenSubject: inputs.frozenSubject }
-			);
-		} catch (error) {
-			deadline.check('SEMANTIC_SNAPSHOT_VALIDATE');
-			throw error;
-		}
-		deadline.check('SEMANTIC_SNAPSHOT_VALIDATE');
-		if (semanticValidation.state !== 'VALID')
-			throw new SourceOriginCorrelationFailure(
-				semanticValidation.state === 'BUDGET_EXHAUSTED'
-					? 'BUDGET_EXCEEDED'
-					: 'SEMANTIC_SNAPSHOT_INVALID',
-				'Static semantic snapshot is not independently valid for the FrozenSubject.',
-				'SEMANTIC_SNAPSHOT_VALIDATE',
-				semanticValidation.issues[0]?.path ?? null
-			);
-		const frozenSubjectWitness = canonicalSemanticJsonWitnessWithProgress(
-			inputs.frozenSubject,
-			() => deadline.check('SEMANTIC_SNAPSHOT_VALIDATE')
-		);
-		const semanticSnapshotWitness = canonicalSemanticJsonWitnessWithProgress(
-			inputs.semanticSnapshot,
-			() => deadline.check('SEMANTIC_SNAPSHOT_VALIDATE')
+		const { frozenSubjectWitness, semanticSnapshotWitness } = validateSemanticInputs(
+			inputs,
+			deadline
 		);
 		progress.complete({ validationIssues: 0 });
 
 		progress.start('PROGRAM_BIND');
 		const bound = bindSelection(inputs, deadline);
-		if (
-			bound.source.textLength >
-			Math.min(inputs.request.budgets.maxSourceTextCodeUnits, HARD_LIMITS.maxSourceTextCodeUnits)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Selected authored source exceeds the pre-emission text ceiling.',
-				'PROGRAM_BIND',
-				'$.semanticSnapshot.sources'
-			);
+		assertBoundSourceTextCeiling(inputs, bound);
 		progress.complete({ selectedSources: 1 });
 
 		progress.start('PROGRAM_SOURCE_ACCOUNT');
@@ -2106,110 +3034,19 @@ export function buildSourceOriginCorrelation(
 		progress.complete({ programSourceFiles: sourcePopulation.length });
 
 		progress.start('SOURCE_MAP_PARSE');
-		if (
-			mapText.length >
-			Math.min(
-				inputs.request.budgets.maxInputStringCharacters,
-				SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxInputCharacters
-			)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Source-map input characters exceed budget.',
-				'SOURCE_MAP_PARSE'
-			);
-		jsonLexicalPreflight(mapText, inputs.request.budgets, deadline);
+		preflightDeclarationMapJson(mapText, inputs, deadline);
 		progress.complete({ mapCharacters: mapText.length });
 
 		progress.start('SOURCE_MAP_DECODE');
-		let decodedMap: DecodedSourceMapV3;
-		try {
-			decodedMap = decodeSourceMapV3(
-				mapText,
-				{
-					maxCoordinate: Number.MAX_SAFE_INTEGER,
-					maxGeneratedLines: Math.min(
-						inputs.request.budgets.maxDecodedMapLines,
-						SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxGeneratedLines
-					),
-					maxInputCharacters: Math.min(
-						inputs.request.budgets.maxInputStringCharacters,
-						SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxInputCharacters
-					),
-					maxMappingsCharacters: Math.min(
-						inputs.request.budgets.maxMappingsCharacters,
-						SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxMappingsCharacters
-					),
-					maxPathCharacters: Math.min(
-						inputs.request.budgets.maxPathCharacters,
-						SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxPathCharacters
-					),
-					maxSegments: Math.min(
-						inputs.request.budgets.maxDecodedMapSegments,
-						SOURCE_MAP_V3_DECODER_IMPLEMENTATION_LIMITS.maxSegments
-					),
-					maxVlqDigits: 7
-				},
-				{ onProgress: () => deadline.check('SOURCE_MAP_DECODE') }
-			);
-		} catch (error) {
-			deadline.check('SOURCE_MAP_DECODE');
-			if (error instanceof SourceMapV3DecodeError)
-				throw new SourceOriginCorrelationFailure(
-					error.code === 'BUDGET_EXCEEDED'
-						? 'BUDGET_EXCEEDED'
-						: error.code === 'SHAPE_INVALID'
-							? 'SOURCE_MAP_UNSUPPORTED'
-							: 'SOURCE_MAP_INVALID',
-					'Declaration map failed strict Source Map v3 decoding.',
-					'SOURCE_MAP_DECODE'
-				);
-			throw error;
-		}
-		const prospectiveSegments = decodedMap.segmentCount;
-		const prospectiveLocations = checkedMultiply(prospectiveSegments, 2);
-		const prospectiveOutputRecords = checkedAdd(8, checkedMultiply(prospectiveSegments, 4));
-		if (
-			prospectiveSegments >
-				Math.min(inputs.request.budgets.maxDecodedMapSegments, HARD_LIMITS.maxDecodedMapSegments) ||
-			prospectiveSegments >
-				Math.min(inputs.request.budgets.maxCorrelations, HARD_LIMITS.maxCorrelations) ||
-			prospectiveLocations >
-				Math.min(inputs.request.budgets.maxLocations, HARD_LIMITS.maxLocations) ||
-			prospectiveOutputRecords >
-				Math.min(inputs.request.budgets.maxOutputRecords, HARD_LIMITS.maxOutputRecords)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Decoded map populations cannot fit output budgets.',
-				'SOURCE_MAP_DECODE'
-			);
+		const decodedMap = decodeDeclarationMapCapture(mapText, inputs, deadline);
+		const prospective = computeProspectivePopulations(decodedMap, inputs);
 		progress.complete({
 			decodedLines: decodedMap.generatedLines,
 			decodedSegments: decodedMap.segmentCount
 		});
 
 		progress.start('SOURCE_PATH_RESOLVE');
-		deadline.check('SOURCE_PATH_RESOLVE');
-		const resolvedSourcePath = posix.normalize(
-			posix.join(posix.dirname(inputs.request.declarationMap.logicalPath), decodedMap.source)
-		);
-		deadline.check('SOURCE_PATH_RESOLVE');
-		if (
-			decodedMap.file !== posix.basename(inputs.request.targetDeclaration.logicalPath) ||
-			!validLogicalPath(
-				resolvedSourcePath,
-				inputs.request.budgets.maxPathCharacters,
-				deadline,
-				'SOURCE_PATH_RESOLVE'
-			) ||
-			resolvedSourcePath !== bound.source.logicalPath
-		)
-			throw new SourceOriginCorrelationFailure(
-				'SOURCE_ORIGIN_UNAVAILABLE',
-				'Source-map target/source paths do not resolve exactly.',
-				'SOURCE_PATH_RESOLVE'
-			);
+		assertResolvedSourcePath(inputs, decodedMap, bound, deadline);
 		progress.complete({ resolvedSources: 1 });
 
 		const inputDigest = sourceOriginCorrelationInputDigest(capturedInputs, () =>
@@ -2341,98 +3178,15 @@ export function buildSourceOriginCorrelation(
 		progress.start('EMISSION_RECONCILE');
 		const emission = materializeProviderEmission(emissionValue, inputs, bound, deadline);
 		const witness = emission.emissionWitness;
-		const targetOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION');
-		const mapOutputs = emission.outputs.filter((output) => output.kind === 'DECLARATION_MAP');
-		if (
-			emission.version !== COMPILER_PROJECT_DECLARATION_EMISSION_VERSION ||
-			targetOutputs.length !== 1 ||
-			mapOutputs.length !== 1
-		)
-			throw new SourceOriginCorrelationFailure(
-				'EMISSION_FAILED',
-				'Fresh declaration provider returned an unsupported output population.',
-				'EMISSION_RECONCILE'
-			);
-		const targetOutput = targetOutputs[0]!;
-		const mapOutput = mapOutputs[0]!;
-		const materializedTextIdentity = textIdentity(
-			emission.materializedSource.text,
-			deadline,
-			'EMISSION_RECONCILE'
+		const { mapOutput, targetOutput } = reconcileFreshEmission(
+			emission,
+			inputs,
+			bound,
+			captured,
+			sourcePopulation,
+			expectedSourcePopulationDigest,
+			deadline
 		);
-		if (
-			emission.selection.logicalPath !== bound.source.logicalPath ||
-			emission.selection.semanticProgramId !== bound.program.id ||
-			emission.selection.semanticProjectId !== bound.project.id ||
-			emission.selection.semanticSourceId !== bound.source.id ||
-			emission.materializedSource.logicalPath !== bound.source.logicalPath ||
-			emission.materializedSource.semanticProgramId !== bound.program.id ||
-			emission.materializedSource.semanticProjectId !== bound.project.id ||
-			emission.materializedSource.semanticSourceId !== bound.source.id ||
-			emission.materializedSource.contentBytes !== bound.source.bytes ||
-			emission.materializedSource.contentSha256 !== bound.source.contentSha256 ||
-			emission.materializedSource.textLength !== bound.source.textLength ||
-			emission.materializedSource.text.length !== emission.materializedSource.textLength ||
-			emission.materializedSource.text.length >
-				Math.min(
-					inputs.request.budgets.maxSourceTextCodeUnits,
-					HARD_LIMITS.maxSourceTextCodeUnits
-				) ||
-			materializedTextIdentity.bytes !== bound.source.bytes ||
-			materializedTextIdentity.sha256 !== bound.source.contentSha256
-		)
-			throw new SourceOriginCorrelationFailure(
-				'EMISSION_FAILED',
-				'Fresh emission source/selection evidence does not reconcile.',
-				'EMISSION_RECONCILE'
-			);
-		if (
-			targetOutput.logicalPath !== inputs.request.targetDeclaration.logicalPath ||
-			targetOutput.bytes !== targetLength ||
-			targetOutput.contentSha256 !== targetSha256 ||
-			targetOutput.textLength !== targetOutput.content.length ||
-			!textEqualsBytes(targetOutput.content, targetBytes, deadline) ||
-			mapOutput.logicalPath !== inputs.request.declarationMap.logicalPath ||
-			mapOutput.bytes !== mapLength ||
-			mapOutput.contentSha256 !== mapSha256 ||
-			mapOutput.textLength !== mapOutput.content.length ||
-			!textEqualsBytes(mapOutput.content, mapBytes, deadline)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'EMISSION_OUTPUT_MISMATCH',
-				'Fresh declaration outputs are not exactly byte-equal to caller captures.',
-				'EMISSION_RECONCILE'
-			);
-		if (
-			witness.semanticProgramId !== bound.program.id ||
-			witness.semanticProjectId !== bound.project.id ||
-			witness.semanticSourceId !== bound.source.id ||
-			witness.selectedSourceLogicalPath !== bound.source.logicalPath ||
-			witness.configPath !== bound.project.configPath ||
-			witness.compilerVersion !== inputs.semanticSnapshot.provider.version ||
-			witness.programSourceFiles !== sourcePopulation.length ||
-			witness.programSourcePopulationDigest !== expectedSourcePopulationDigest ||
-			witness.programCompilerInputAttempts >
-				Math.min(
-					inputs.request.budgets.maxCompilerInputAttempts,
-					HARD_LIMITS.maxCompilerInputAttempts
-				) ||
-			witness.programReadBytes >
-				Math.min(inputs.request.budgets.maxProgramReadBytes, HARD_LIMITS.maxProgramReadBytes) ||
-			witness.declarationEmitCallbacksUseOnlyAttributedQueries !== true ||
-			witness.programCallbacksWithinAttributedInvocationBounds !== true ||
-			witness.programInputAttemptPopulationReconciles !== true ||
-			witness.programSourceFilePopulationReconciles !== true ||
-			witness.emitApi !== 'TYPESCRIPT_PUBLIC_PROGRAM_EMIT' ||
-			witness.emitOnlyDtsFiles !== true ||
-			witness.emitSkipped !== false ||
-			witness.emitDiagnostics.length !== 0
-		)
-			throw new SourceOriginCorrelationFailure(
-				'EMISSION_FAILED',
-				'Fresh emission witness does not reconcile.',
-				'EMISSION_RECONCILE'
-			);
 		progress.complete({ reconciledOutputs: 2 });
 
 		progress.start('MATERIALIZE');
@@ -2606,186 +3360,44 @@ export function buildSourceOriginCorrelation(
 			Math.min(inputs.request.budgets.maxDecodedMapLines + 1, HARD_LIMITS.maxDecodedMapLines + 1),
 			deadline
 		);
-		const referencedAuthoredLines = new Set<number>();
-		for (let index = 0; index < decodedMap.segments.length; index += 1) {
-			checkpointLoop(index, deadline, 'LOCATION_BIND');
-			const originalLine = decodedMap.segments[index]!.originalLine;
-			if (referencedAuthoredLines.has(originalLine)) continue;
-			if (referencedAuthoredLines.size >= prospectiveSegments)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Authored source-map line population exceeds its segment bound.',
-					'LOCATION_BIND'
-				);
-			referencedAuthoredLines.add(originalLine);
-		}
+		const referencedAuthoredLines = referencedAuthoredLineNumbers(
+			decodedMap,
+			prospective.segments,
+			deadline
+		);
 		const authoredLines = referencedTextLineBounds(
 			emission.materializedSource.text,
 			referencedAuthoredLines,
-			prospectiveSegments,
+			prospective.segments,
 			deadline
 		);
-		if (targetLines.length !== decodedMap.generatedLines + 1)
-			throw new SourceOriginCorrelationFailure(
-				'SOURCE_MAP_INVALID',
-				'Target must have exactly one final line beyond mapped lines.',
-				'LOCATION_BIND'
-			);
-		const generatedMapped = new Uint8Array(decodedMap.generatedLines);
-		deadline.check('LOCATION_BIND');
-		const generatedCoordinates = new Set<string>();
-		const authoredCoordinates = new Set<string>();
-		const segmentRecords: SourceOriginCorrelationSnapshot['segments'][number][] = [];
-		const locationRecords: SourceOriginCorrelationSnapshot['locations'][number][] = [];
-		const correlationRecords: SourceOriginCorrelationSnapshot['correlations'][number][] = [];
-		let priorLine = -1;
-		let lineSegmentOrdinal = 0;
-		for (const decoded of decodedMap.segments) {
-			deadline.check('LOCATION_BIND');
-			if (decoded.generatedLine !== priorLine) {
-				priorLine = decoded.generatedLine;
-				lineSegmentOrdinal = 0;
-			}
-			const generatedOffset = coordinateOffset(
-				targetLines[decoded.generatedLine],
-				decoded.generatedColumn
-			);
-			const authoredOffset = coordinateOffset(
-				authoredLines.get(decoded.originalLine),
-				decoded.originalColumn
-			);
-			const generatedKey = `${decoded.generatedLine}:${decoded.generatedColumn}`;
-			const authoredKey = `${decoded.originalLine}:${decoded.originalColumn}`;
-			if (generatedCoordinates.has(generatedKey) || authoredCoordinates.has(authoredKey))
-				throw new SourceOriginCorrelationFailure(
-					'SOURCE_MAP_INVALID',
-					'Mapped endpoint coordinates must be globally unique.',
-					'LOCATION_BIND'
-				);
-			if (
-				generatedCoordinates.size >= prospectiveSegments ||
-				authoredCoordinates.size >= prospectiveSegments ||
-				segmentRecords.length >= prospectiveSegments ||
-				locationRecords.length > prospectiveLocations - 2 ||
-				correlationRecords.length >= prospectiveSegments
-			)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Derived correlation population exceeded its preflight bound.',
-					'LOCATION_BIND'
-				);
-			generatedCoordinates.add(generatedKey);
-			authoredCoordinates.add(authoredKey);
-			generatedMapped[decoded.generatedLine] = 1;
-			const segmentWithoutId = {
-				decodedFieldCount: 4 as const,
-				generatedColumn: decoded.generatedColumn,
-				generatedLine: decoded.generatedLine,
-				lineSegmentOrdinal,
-				mapId: sourceMapId,
-				nameIndex: null,
-				ordinal: decoded.ordinal,
-				originalColumn: decoded.originalColumn,
-				originalLine: decoded.originalLine,
-				sourceArtifactId: authoredArtifactId,
-				sourceIndex: 0 as const,
-				state: 'MAPPED' as const,
-				targetArtifactId
-			};
-			lineSegmentOrdinal += 1;
-			const segmentId = sourceOriginMapSegmentId(analysisId, segmentWithoutId, () =>
-				deadline.check('LOCATION_BIND')
-			);
-			segmentRecords.push({ ...segmentWithoutId, id: segmentId });
-			const generatedLocationWithoutId = {
-				artifactId: targetArtifactId,
-				column: decoded.generatedColumn,
-				coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
-				line: decoded.generatedLine,
-				offset: generatedOffset,
-				ordinal: decoded.ordinal * 2,
-				role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[0],
-				segmentId,
-				width: 0 as const
-			};
-			const authoredLocationWithoutId = {
-				artifactId: authoredArtifactId,
-				column: decoded.originalColumn,
-				coordinateEncoding: 'ZERO_BASED_UTF16_CODE_UNIT' as const,
-				line: decoded.originalLine,
-				offset: authoredOffset,
-				ordinal: decoded.ordinal * 2 + 1,
-				role: SOURCE_ORIGIN_CORRELATION_LOCATION_ROLE_ORDER[1],
-				segmentId,
-				width: 0 as const
-			};
-			const generatedLocationId = sourceOriginLocationId(
-				analysisId,
-				generatedLocationWithoutId,
-				() => deadline.check('LOCATION_BIND')
-			);
-			const authoredLocationId = sourceOriginLocationId(analysisId, authoredLocationWithoutId, () =>
-				deadline.check('LOCATION_BIND')
-			);
-			locationRecords.push(
-				{ ...generatedLocationWithoutId, id: generatedLocationId },
-				{ ...authoredLocationWithoutId, id: authoredLocationId }
-			);
-			const correlationWithoutId = {
-				authoredLocationId,
-				directionality: 'BIDIRECTIONAL_EXACT_ONE_TO_ONE' as const,
-				generatedLocationId,
-				kind: 'GENERATED_TO_AUTHORED_SOURCE_MAP_SEGMENT' as const,
-				mapId: sourceMapId,
-				mappingHealthId,
-				ordinal: decoded.ordinal,
-				segmentId,
-				state: 'EXACT' as const
-			};
-			correlationRecords.push({
-				...correlationWithoutId,
-				id: sourceOriginExactCorrelationId(analysisId, correlationWithoutId, () =>
-					deadline.check('LOCATION_BIND')
-				)
-			});
-		}
-		for (let index = 0; index < generatedMapped.length; index += 1) {
-			checkpointLoop(index, deadline, 'LOCATION_BIND');
-			if (generatedMapped[index] !== 1)
-				throw new SourceOriginCorrelationFailure(
-					'SOURCE_MAP_INVALID',
-					'Every generated line before the trailer must contain a mapping.',
-					'LOCATION_BIND'
-				);
-		}
+		assertTrailingGeneratedLine(targetLines, decodedMap);
+		const {
+			correlations: correlationRecords,
+			locations: locationRecords,
+			segments: segmentRecords
+		} = bindMappedCorrelations(
+			analysisId,
+			decodedMap,
+			targetLines,
+			authoredLines,
+			{ authoredArtifactId, mapId: sourceMapId, mappingHealthId, targetArtifactId },
+			prospective,
+			deadline
+		);
 		progress.complete({ locations: locationRecords.length });
 
 		progress.start('CORRELATION_BIND');
-		if (
-			segmentRecords.length !== correlationRecords.length ||
-			locationRecords.length !== checkedMultiply(segmentRecords.length, 2)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'INPUT_POPULATION_MISMATCH',
-				'Segment/location/correlation populations do not reconcile.',
-				'CORRELATION_BIND'
-			);
+		assertCorrelationPopulationsReconcile(
+			segmentRecords.length,
+			locationRecords.length,
+			correlationRecords.length
+		);
 		progress.complete({ correlations: correlationRecords.length });
 
 		progress.start('UNMAPPED_LINE_BIND');
-		const trailerLine = targetLines[targetLines.length - 1]!;
-		const expectedTrailer = `//# sourceMappingURL=${posix.basename(inputs.request.declarationMap.logicalPath)}`;
-		if (
-			trailerLine.content !== expectedTrailer ||
-			inputs.request.budgets.maxUnmappedGeneratedLines < 1
-		)
-			throw new SourceOriginCorrelationFailure(
-				inputs.request.budgets.maxUnmappedGeneratedLines < 1
-					? 'BUDGET_EXCEEDED'
-					: 'SOURCE_MAP_INVALID',
-				'Target lacks the exact final unmapped sourceMappingURL trailer.',
-				'UNMAPPED_LINE_BIND'
-			);
+		const trailerLine = targetLines.at(-1)!;
+		assertSourceMappingUrlTrailer(trailerLine, inputs);
 		const unmappedWithoutId = {
 			classification: 'SOURCE_MAPPING_URL_TRAILER' as const,
 			contentSha256: textSha256(trailerLine.content, deadline, 'UNMAPPED_LINE_BIND'),
@@ -2809,17 +3421,7 @@ export function buildSourceOriginCorrelation(
 				)
 			}
 		] as const;
-		const segmentIds: SourceOriginCorrelationSnapshot['sourceMap']['segmentIds'][number][] = [];
-		for (let index = 0; index < segmentRecords.length; index += 1) {
-			checkpointLoop(index, deadline, 'UNMAPPED_LINE_BIND');
-			if (segmentIds.length >= prospectiveSegments)
-				throw new SourceOriginCorrelationFailure(
-					'BUDGET_EXCEEDED',
-					'Segment ID population exceeded its preflight bound.',
-					'UNMAPPED_LINE_BIND'
-				);
-			segmentIds.push(segmentRecords[index]!.id);
-		}
+		const segmentIds = collectSegmentIds(segmentRecords, prospective.segments, deadline);
 		const sourceMapRecord = {
 			...sourceMapWithoutChildren,
 			id: sourceMapId,
@@ -2851,23 +3453,16 @@ export function buildSourceOriginCorrelation(
 			decodedSegments,
 			outputRecords
 		);
-		if (
-			decodedSegments > inputs.request.budgets.maxDecodedMapSegments ||
-			locationRecords.length > inputs.request.budgets.maxLocations ||
-			correlationRecords.length > inputs.request.budgets.maxCorrelations ||
-			outputRecords >
-				Math.min(inputs.request.budgets.maxOutputRecords, HARD_LIMITS.maxOutputRecords) ||
-			chargedInputRecords > inputs.request.budgets.maxInputRecords ||
-			emitBytes > inputs.request.budgets.maxEmitBytes ||
-			readBytes > inputs.request.budgets.maxReadBytes ||
-			chargedTraversalSteps >
-				Math.min(inputs.request.budgets.maxTraversalSteps, HARD_LIMITS.maxTraversalSteps)
-		)
-			throw new SourceOriginCorrelationFailure(
-				'BUDGET_EXCEEDED',
-				'Derived populations exceed request budgets.',
-				'MATERIALIZE'
-			);
+		assertDerivedPopulationBudgets(inputs.request.budgets, {
+			chargedInputRecords,
+			chargedTraversalSteps,
+			correlations: correlationRecords.length,
+			decodedSegments,
+			emitBytes,
+			locations: locationRecords.length,
+			outputRecords,
+			readBytes
+		});
 		const coverage = {
 			ambiguousMappings: 0 as const,
 			artifacts: 3 as const,
@@ -2978,72 +3573,17 @@ export function buildSourceOriginCorrelation(
 		progress.complete({ outputRecords });
 
 		progress.start('ANALYSIS_VALIDATE');
-		deadline.check('ANALYSIS_VALIDATE');
-		let validation: ReturnType<typeof validateConstructedSourceOriginCorrelation>;
-		try {
-			validation = validateConstructedSourceOriginCorrelation(
-				analysis,
-				capturedInputs,
-				inputDigest,
-				{
-					maxDepth: HARD_INPUT_DEPTH,
-					maxDurationMs: deadline.remaining('ANALYSIS_VALIDATE'),
-					maxInputRecords: Math.min(
-						inputs.request.budgets.maxInputRecords,
-						HARD_LIMITS.maxInputRecords
-					),
-					maxInputStringCharacters: Math.min(
-						inputs.request.budgets.maxInputStringCharacters,
-						HARD_LIMITS.maxInputStringCharacters
-					),
-					maxIssues: Math.min(inputs.request.budgets.maxDiagnostics, HARD_LIMITS.maxDiagnostics),
-					maxRecords: Math.min(
-						Number.MAX_SAFE_INTEGER,
-						checkedAdd(inputStats.records, outputRecords, 1024)
-					),
-					maxStringCharacters: Math.min(
-						Number.MAX_SAFE_INTEGER,
-						checkedAdd(
-							inputStats.stringCharacters,
-							inputs.request.budgets.maxEmitStringCharacters,
-							65_536
-						)
-					)
-				}
-			);
-		} catch (error) {
-			deadline.check('ANALYSIS_VALIDATE');
-			throw error;
-		}
-		deadline.check('ANALYSIS_VALIDATE');
-		if (validation.state !== 'VALID')
-			throw new SourceOriginCorrelationFailure(
-				validation.state === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXCEEDED' : 'VALIDATION_FAILED',
-				`Constructed source-origin correlation failed independent validation: ${validation.issues[0]?.message ?? 'unknown issue'}`,
-				'ANALYSIS_VALIDATE',
-				validation.issues[0]?.path ?? null
-			);
+		runConstructedAnalysisValidation(
+			analysis,
+			capturedInputs,
+			inputDigest,
+			inputStats,
+			outputRecords,
+			deadline
+		);
 		progress.complete({ validationIssues: 0 });
 		return progress.finish({ analysis, diagnostics: Object.freeze([]), outcome: 'partial' });
 	} catch (error) {
-		if (error instanceof CompilerProjectDeclarationEmissionError) {
-			const code = error.code === 'BUDGET_EXCEEDED' ? 'BUDGET_EXCEEDED' : 'EMISSION_FAILED';
-			progress.fail({}, code);
-			return progress.finish(
-				unavailable(code, 'Fresh declaration emission failed closed.', 'DECLARATION_EMIT')
-			);
-		}
-		if (error instanceof SourceOriginCorrelationFailure) {
-			progress.fail({}, error.code);
-			return progress.finish(unavailable(error.code, error.message, error.phase, error.path));
-		}
-		progress.fail({}, 'REQUEST_INVALID');
-		return progress.finish(
-			unavailable(
-				'REQUEST_INVALID',
-				'Source-origin input inspection or derivation failed closed.',
-				progress.activePhase() ?? 'REQUEST_BIND'
-			)
-		);
+		return correlationFailureOutcome(error, progress);
 	}
 }

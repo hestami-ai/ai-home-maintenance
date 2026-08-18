@@ -1060,42 +1060,73 @@ const COMPILER_INPUT_BASE_KEYS = [
 	'resultDigest'
 ] as const;
 
+function isPresenceResult(result: unknown): boolean {
+	return result === 'PRESENT' || result === 'ABSENT';
+}
+
+function isDirectoryResult(result: unknown): boolean {
+	return result === 'DIRECTORY' || result === 'NOT_DIRECTORY';
+}
+
+function isCaseSensitivityResult(result: unknown): boolean {
+	return result === 'CASE_SENSITIVE' || result === 'CASE_INSENSITIVE';
+}
+
+function compilerInputReadFileKeys(result: unknown): readonly string[] | undefined {
+	if (result === 'PRESENT')
+		return [...COMPILER_INPUT_BASE_KEYS, 'byteBudgetClass', 'contentBytes', 'contentSha256'];
+	if (result === 'ABSENT') return COMPILER_INPUT_BASE_KEYS;
+	return undefined;
+}
+
+function compilerInputReadDirectoryKeys(result: unknown): readonly string[] | undefined {
+	if (!isDirectoryResult(result)) return undefined;
+	return [
+		...COMPILER_INPUT_BASE_KEYS,
+		'depth',
+		'excludes',
+		'extensions',
+		'includes',
+		'resultEntries',
+		'scannedEntries'
+	];
+}
+
+function compilerInputRealpathKeys(result: unknown): readonly string[] | undefined {
+	if (result === 'ABSENT') return COMPILER_INPUT_BASE_KEYS;
+	if (result === 'RESOLVED') return [...COMPILER_INPUT_BASE_KEYS, 'resolvedLogicalPath'];
+	return undefined;
+}
+
 function compilerInputKeys(
 	record: Readonly<Record<string, unknown>>
 ): readonly string[] | undefined {
 	const operation = record.operation;
 	const result = record.result;
-	if (operation === 'READ_FILE')
-		return result === 'PRESENT'
-			? [...COMPILER_INPUT_BASE_KEYS, 'byteBudgetClass', 'contentBytes', 'contentSha256']
-			: result === 'ABSENT'
-				? COMPILER_INPUT_BASE_KEYS
+	switch (operation) {
+		case 'READ_FILE':
+			return compilerInputReadFileKeys(result);
+		case 'FILE_EXISTS':
+			return isPresenceResult(result) ? COMPILER_INPUT_BASE_KEYS : undefined;
+		case 'DIRECTORY_EXISTS':
+			return isDirectoryResult(result) ? COMPILER_INPUT_BASE_KEYS : undefined;
+		case 'GET_DIRECTORIES':
+			return isDirectoryResult(result)
+				? [...COMPILER_INPUT_BASE_KEYS, 'resultEntries', 'scannedEntries']
 				: undefined;
-	if (operation === 'FILE_EXISTS' && (result === 'PRESENT' || result === 'ABSENT'))
-		return COMPILER_INPUT_BASE_KEYS;
-	if (operation === 'DIRECTORY_EXISTS' && (result === 'DIRECTORY' || result === 'NOT_DIRECTORY'))
-		return COMPILER_INPUT_BASE_KEYS;
-	if (operation === 'GET_DIRECTORIES' && (result === 'DIRECTORY' || result === 'NOT_DIRECTORY'))
-		return [...COMPILER_INPUT_BASE_KEYS, 'resultEntries', 'scannedEntries'];
-	if (operation === 'READ_DIRECTORY' && (result === 'DIRECTORY' || result === 'NOT_DIRECTORY'))
-		return [
-			...COMPILER_INPUT_BASE_KEYS,
-			'depth',
-			'excludes',
-			'extensions',
-			'includes',
-			'resultEntries',
-			'scannedEntries'
-		];
-	if (operation === 'REALPATH' && result === 'ABSENT') return COMPILER_INPUT_BASE_KEYS;
-	if ((operation === 'REALPATH' || operation === 'CURRENT_DIRECTORY') && result === 'RESOLVED')
-		return [...COMPILER_INPUT_BASE_KEYS, 'resolvedLogicalPath'];
-	if (
-		operation === 'USE_CASE_SENSITIVE_FILE_NAMES' &&
-		(result === 'CASE_SENSITIVE' || result === 'CASE_INSENSITIVE')
-	)
-		return COMPILER_INPUT_BASE_KEYS;
-	return undefined;
+		case 'READ_DIRECTORY':
+			return compilerInputReadDirectoryKeys(result);
+		case 'REALPATH':
+			return compilerInputRealpathKeys(result);
+		case 'CURRENT_DIRECTORY':
+			return result === 'RESOLVED'
+				? [...COMPILER_INPUT_BASE_KEYS, 'resolvedLogicalPath']
+				: undefined;
+		case 'USE_CASE_SENSITIVE_FILE_NAMES':
+			return isCaseSensitivityResult(result) ? COMPILER_INPUT_BASE_KEYS : undefined;
+		default:
+			return undefined;
+	}
 }
 
 function typeAcquisitionAnchorKeys(
@@ -1186,6 +1217,59 @@ function validScalar(field: string, value: unknown): boolean {
 	return typeof value === 'string';
 }
 
+function isScalarContext(context: string): boolean {
+	return context === 'scalar' || context === 'path-scalar' || context === 'literal-value';
+}
+
+function nullableContextInner(context: string): string | undefined {
+	if (context.startsWith('list-or-null:')) return `list:${context.slice(13)}`;
+	if (context === 'span-or-null') return 'span';
+	return undefined;
+}
+
+function isJsonScalar(input: unknown): boolean {
+	return (
+		input === null ||
+		typeof input === 'string' ||
+		typeof input === 'boolean' ||
+		typeof input === 'number'
+	);
+}
+
+function expectedObjectMessage(context: string): string {
+	return context === 'json'
+		? 'Expected a JSON-compatible value.'
+		: `Expected a closed ${context} object.`;
+}
+
+function closedContextKeys(
+	context: string,
+	record: Readonly<Record<string, unknown>>
+): readonly string[] | undefined {
+	if (context === 'compiler-input') return compilerInputKeys(record);
+	if (context === 'type-acquisition-anchor') return typeAcquisitionAnchorKeys(record);
+	if (context === 'type-relation') return typeRelationKeys(record);
+	return KEYS[context];
+}
+
+function childContextFor(context: string, key: string): string {
+	const field = `${context}.${key}`;
+	if (context === 'literal' && key === 'value') return 'literal-value';
+	const arrayItem = ARRAY_CHILD[field];
+	if (arrayItem === 'scalar' && PATH_ARRAY_FIELDS.has(field)) return 'list:path-scalar';
+	if (arrayItem !== undefined) return `list:${arrayItem}`;
+	return OBJECT_CHILD[field] ?? `field:${field}`;
+}
+
+function canonicalStringBytes(text: string): number {
+	for (let index = 0; index < text.length; index += 1) {
+		const code = text.codePointAt(index)!;
+		if (code < 0x20 || code === 0x22 || code === 0x5c || code > 0x7f)
+			return Buffer.byteLength(JSON.stringify(text), 'utf8');
+	}
+	return text.length + 2;
+}
+
 export interface SemanticWireMaterializationResult {
 	readonly canonicalBytes?: number;
 	readonly issues: readonly SemanticWireInspectionIssue[];
@@ -1225,15 +1309,6 @@ export function materializeSemanticSnapshotWire(
 			return;
 		}
 		canonicalBytes += addition;
-	}
-
-	function canonicalStringBytes(text: string): number {
-		for (let index = 0; index < text.length; index += 1) {
-			const code = text.charCodeAt(index);
-			if (code < 0x20 || code === 0x22 || code === 0x5c || code > 0x7f)
-				return Buffer.byteLength(JSON.stringify(text), 'utf8');
-		}
-		return text.length + 2;
 	}
 
 	function accountCanonicalScalar(input: unknown, path: string): void {
@@ -1324,7 +1399,7 @@ export function materializeSemanticSnapshotWire(
 		if (
 			ownKeys.length !== length + 1 ||
 			ownKeys.some(
-				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key))
+				(key) => typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9]\d*)$/u.test(key))
 			)
 		) {
 			issue(false, path, 'Arrays must be dense and contain only canonical index properties.');
@@ -1341,16 +1416,19 @@ export function materializeSemanticSnapshotWire(
 		return input as readonly unknown[];
 	}
 
-	function visit(input: unknown, context: string, depth: number, path: string): unknown {
-		visited += 1;
+	function visitBudgetExceeded(depth: number, path: string): boolean {
 		if (visited > options.maxRecords) {
 			issue(true, path, `Wire value count exceeds ${options.maxRecords}.`);
-			return null;
+			return true;
 		}
 		if (depth > options.maxDepth) {
 			issue(true, path, `Wire depth exceeds ${options.maxDepth}.`);
-			return null;
+			return true;
 		}
+		return false;
+	}
+
+	function accountVisitedScalar(input: unknown, path: string): void {
 		if (typeof input === 'string') accountString(input, path);
 		if (
 			typeof input === 'number' &&
@@ -1358,67 +1436,101 @@ export function materializeSemanticSnapshotWire(
 		)
 			issue(false, path, 'Wire numbers must be finite and integer values must be safe.');
 		if (input === null || typeof input !== 'object') accountCanonicalScalar(input, path);
+	}
 
-		if (context === 'scalar' || context === 'path-scalar' || context === 'literal-value') {
-			const valid =
-				context === 'literal-value'
-					? input === null || ['string', 'boolean'].includes(typeof input)
-					: typeof input === 'string';
-			if (!valid) issue(false, path, 'Expected a valid scalar.');
-			if (context === 'path-scalar' && typeof input === 'string' && looksAbsolute(input))
-				issue(false, path, 'Absolute paths are not permitted in semantic path fields.');
+	function checkScalarContext(input: unknown, context: string, path: string): void {
+		const valid =
+			context === 'literal-value'
+				? input === null || ['string', 'boolean'].includes(typeof input)
+				: typeof input === 'string';
+		if (!valid) issue(false, path, 'Expected a valid scalar.');
+		if (context === 'path-scalar' && typeof input === 'string' && looksAbsolute(input))
+			issue(false, path, 'Absolute paths are not permitted in semantic path fields.');
+	}
+
+	function checkFieldContext(input: unknown, field: string, path: string): void {
+		if (!validScalar(field, input)) issue(false, path, `Invalid scalar for ${field}.`);
+		if (PATH_SCALAR_FIELDS.has(field) && typeof input === 'string' && looksAbsolute(input))
+			issue(false, path, 'Absolute paths are not permitted in semantic path fields.');
+	}
+
+	function visitList(input: unknown, itemContext: string, depth: number, path: string): unknown {
+		if (input === null || typeof input !== 'object') {
+			issue(false, path, 'Expected an array.');
+			return null;
+		}
+		const array = inertArray(input, path);
+		if (array === null) return null;
+		if (ancestors.has(input)) {
+			issue(false, path, 'Cyclic values are not permitted in the semantic wire.');
+			return null;
+		}
+		ancestors.add(input);
+		try {
+			for (let index = 0; index < array.length; index += 1)
+				visit(array[index], itemContext, depth + 1, `${path}[${index}]`);
+			return input;
+		} finally {
+			ancestors.delete(input);
+		}
+	}
+
+	function visitJsonMembers(
+		record: Readonly<Record<string, unknown>>,
+		depth: number,
+		path: string
+	): void {
+		for (const [key, child] of Object.entries(record))
+			visit(child, 'json', depth + 1, `${path}.${key}`);
+	}
+
+	function visitClosedRecord(
+		record: Readonly<Record<string, unknown>>,
+		context: string,
+		depth: number,
+		path: string
+	): unknown {
+		const allowed = closedContextKeys(context, record);
+		if (allowed === undefined) {
+			issue(false, path, `Invalid closed ${context} discriminator.`);
+			return null;
+		}
+		for (const key of Object.keys(record))
+			if (!allowed.includes(key)) issue(false, `${path}.${key}`, `Unknown field ${key}.`);
+		for (const key of allowed) {
+			if (!Object.hasOwn(record, key)) {
+				issue(false, `${path}.${key}`, `Missing required field ${key}.`);
+				continue;
+			}
+			visit(record[key], childContextFor(context, key), depth + 1, `${path}.${key}`);
+		}
+		return record;
+	}
+
+	function visit(input: unknown, context: string, depth: number, path: string): unknown {
+		visited += 1;
+		if (visitBudgetExceeded(depth, path)) return null;
+		accountVisitedScalar(input, path);
+
+		if (isScalarContext(context)) {
+			checkScalarContext(input, context, path);
 			return input;
 		}
 		if (context.startsWith('field:')) {
-			const field = context.slice(6);
-			if (!validScalar(field, input)) issue(false, path, `Invalid scalar for ${field}.`);
-			if (PATH_SCALAR_FIELDS.has(field) && typeof input === 'string' && looksAbsolute(input))
-				issue(false, path, 'Absolute paths are not permitted in semantic path fields.');
+			checkFieldContext(input, context.slice(6), path);
 			return input;
 		}
-		if (context.startsWith('list-or-null:'))
-			return input === null ? null : visit(input, `list:${context.slice(13)}`, depth, path);
-		if (context === 'span-or-null')
-			return input === null ? null : visit(input, 'span', depth, path);
+		const nullableInner = nullableContextInner(context);
+		if (nullableInner !== undefined)
+			return input === null ? null : visit(input, nullableInner, depth, path);
+		if (context.startsWith('list:')) return visitList(input, context.slice(5), depth, path);
+		return visitObject(input, context, depth, path);
+	}
 
-		if (context.startsWith('list:')) {
-			if (input === null || typeof input !== 'object') {
-				issue(false, path, 'Expected an array.');
-				return null;
-			}
-			const array = inertArray(input, path);
-			if (array === null) return null;
-			if (ancestors.has(input)) {
-				issue(false, path, 'Cyclic values are not permitted in the semantic wire.');
-				return null;
-			}
-			ancestors.add(input);
-			try {
-				const itemContext = context.slice(5);
-				for (let index = 0; index < array.length; index += 1)
-					visit(array[index], itemContext, depth + 1, `${path}[${index}]`);
-				return input;
-			} finally {
-				ancestors.delete(input);
-			}
-		}
-
-		if (
-			context === 'json' &&
-			(input === null ||
-				typeof input === 'string' ||
-				typeof input === 'boolean' ||
-				typeof input === 'number')
-		)
-			return input;
+	function visitObject(input: unknown, context: string, depth: number, path: string): unknown {
+		if (context === 'json' && isJsonScalar(input)) return input;
 		if (input === null || typeof input !== 'object') {
-			issue(
-				false,
-				path,
-				context === 'json'
-					? 'Expected a JSON-compatible value.'
-					: `Expected a closed ${context} object.`
-			);
+			issue(false, path, expectedObjectMessage(context));
 			return null;
 		}
 		if (isProxy(input)) {
@@ -1439,38 +1551,10 @@ export function materializeSemanticSnapshotWire(
 		ancestors.add(input);
 		try {
 			if (context === 'json') {
-				for (const [key, child] of Object.entries(record))
-					visit(child, 'json', depth + 1, `${path}.${key}`);
+				visitJsonMembers(record, depth, path);
 				return input;
 			}
-			const allowed =
-				context === 'compiler-input'
-					? compilerInputKeys(record)
-					: context === 'type-acquisition-anchor'
-						? typeAcquisitionAnchorKeys(record)
-						: context === 'type-relation'
-							? typeRelationKeys(record)
-							: KEYS[context];
-			if (allowed === undefined) {
-				issue(false, path, `Invalid closed ${context} discriminator.`);
-				return null;
-			}
-			for (const key of Object.keys(record))
-				if (!allowed.includes(key)) issue(false, `${path}.${key}`, `Unknown field ${key}.`);
-			for (const key of allowed) {
-				if (!Object.hasOwn(record, key)) {
-					issue(false, `${path}.${key}`, `Missing required field ${key}.`);
-					continue;
-				}
-				let childContext = OBJECT_CHILD[`${context}.${key}`] ?? `field:${context}.${key}`;
-				const arrayItem = ARRAY_CHILD[`${context}.${key}`];
-				if (arrayItem !== undefined) childContext = `list:${arrayItem}`;
-				if (arrayItem === 'scalar' && PATH_ARRAY_FIELDS.has(`${context}.${key}`))
-					childContext = 'list:path-scalar';
-				if (context === 'literal' && key === 'value') childContext = 'literal-value';
-				visit(record[key], childContext, depth + 1, `${path}.${key}`);
-			}
-			return input;
+			return visitClosedRecord(record, context, depth, path);
 		} finally {
 			ancestors.delete(input);
 		}

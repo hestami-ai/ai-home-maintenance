@@ -154,10 +154,10 @@ function inputShellIssue(
 ): StructuralSccValidationIssue | null {
 	if (!plainRecord(value)) return issue('INPUT_INVALID', 'The input shell is invalid.', '$inputs');
 	const keys = Reflect.ownKeys(value);
-	const expected = ['graph', 'request', 'semanticSnapshot'];
+	const expected = new Set(['graph', 'request', 'semanticSnapshot']);
 	if (
-		keys.length !== expected.length ||
-		keys.some((key) => typeof key !== 'string' || !expected.includes(key))
+		keys.length !== expected.size ||
+		keys.some((key) => typeof key !== 'string' || !expected.has(key))
 	)
 		return issue('INPUT_INVALID', 'The input shell must be exact.', '$inputs');
 	for (const key of expected) {
@@ -215,127 +215,168 @@ function issue(
 	return { code, message, path };
 }
 
+interface TreeVisit {
+	readonly depth: number;
+	readonly kind: 'VISIT';
+	readonly path: string;
+	readonly value: unknown;
+}
+
+type TreePending = TreeVisit | { readonly kind: 'LEAVE'; readonly value: object };
+
+interface TreeWalk {
+	readonly active: WeakSet<object>;
+	characters: number;
+	readonly pending: TreePending[];
+	records: number;
+	readonly seen: WeakSet<object>;
+}
+
+function isAcceptedTreeScalar(value: unknown): boolean {
+	if (typeof value === 'boolean') return true;
+	return typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0);
+}
+
+function treeStringIssue(
+	value: string,
+	path: string,
+	limits: ClosedOptions,
+	walk: TreeWalk
+): StructuralSccValidationIssue | null {
+	if (!isUnicodeScalarString(value))
+		return issue('SHAPE_INVALID', 'Strings must contain Unicode scalar text.', path);
+	walk.characters += value.length;
+	if (walk.characters > limits.maxStringCharacters)
+		return issue('BUDGET_EXHAUSTED', 'The string-character budget was exhausted.', path);
+	return null;
+}
+
+function treeAliasIssue(
+	target: object,
+	path: string,
+	allowSharedAliases: boolean,
+	walk: TreeWalk
+): StructuralSccValidationIssue | null {
+	if (isProxy(target)) return issue('SHAPE_INVALID', 'Proxy values are not accepted.', path);
+	if (walk.active.has(target)) return issue('SHAPE_INVALID', 'Cycles are not accepted.', path);
+	if (!allowSharedAliases && walk.seen.has(target))
+		return issue('SHAPE_INVALID', 'Shared object aliases are not accepted.', path);
+	return null;
+}
+
+function treeArrayIssue(
+	target: object,
+	depth: number,
+	path: string,
+	limits: ClosedOptions,
+	walk: TreeWalk
+): StructuralSccValidationIssue | null {
+	if (Object.getPrototypeOf(target) !== Array.prototype)
+		return issue('SHAPE_INVALID', 'Arrays must use Array.prototype.', path);
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(target, 'length');
+	const lengthValue =
+		lengthDescriptor !== undefined && 'value' in lengthDescriptor
+			? lengthDescriptor.value
+			: undefined;
+	if (!Number.isSafeInteger(lengthValue) || (lengthValue as number) < 0)
+		return issue('SHAPE_INVALID', 'Array length is invalid.', path);
+	const length = lengthValue as number;
+	if (walk.records + length > limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The array population exceeds the record budget.', path);
+	const keys = Reflect.ownKeys(target);
+	if (keys.length !== length + 1 || keys.some((key) => typeof key === 'symbol'))
+		return issue('SHAPE_INVALID', 'Arrays must be dense exact data arrays.', path);
+	for (let index = length - 1; index >= 0; index -= 1) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(target, String(index));
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return issue('SHAPE_INVALID', 'Arrays must contain enumerable data elements.', path);
+		walk.pending.push({
+			depth: depth + 1,
+			kind: 'VISIT',
+			path: `${path}[${index}]`,
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function treeRecordIssue(
+	target: object,
+	depth: number,
+	path: string,
+	limits: ClosedOptions,
+	walk: TreeWalk
+): StructuralSccValidationIssue | null {
+	if (Object.getPrototypeOf(target) !== Object.prototype)
+		return issue('SHAPE_INVALID', 'Records must use Object.prototype.', path);
+	const keys = Reflect.ownKeys(target);
+	if (keys.some((key) => typeof key !== 'string'))
+		return issue('SHAPE_INVALID', 'Symbol record keys are not accepted.', path);
+	if (walk.records + keys.length > limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The property population exceeds the record budget.', path);
+	keys.reverse();
+	for (const key of keys) {
+		if (typeof key !== 'string')
+			return issue('SHAPE_INVALID', 'Symbol record keys are not accepted.', path);
+		const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			return issue('SHAPE_INVALID', 'Records must contain enumerable data properties.', path);
+		walk.pending.push({
+			depth: depth + 1,
+			kind: 'VISIT',
+			path: `${path}.${key}`,
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function treeVisitIssue(
+	item: TreeVisit,
+	limits: ClosedOptions,
+	allowSharedAliases: boolean,
+	walk: TreeWalk
+): StructuralSccValidationIssue | null {
+	if (walk.records > limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The record budget was exhausted.', item.path);
+	if (item.depth > limits.maxDepth)
+		return issue('BUDGET_EXHAUSTED', 'The validation depth budget was exhausted.', item.path);
+	if (typeof item.value === 'string') return treeStringIssue(item.value, item.path, limits, walk);
+	if (item.value === null || isAcceptedTreeScalar(item.value)) return null;
+	if (typeof item.value !== 'object')
+		return issue('SHAPE_INVALID', 'Only JSON-compatible data properties are accepted.', item.path);
+	const aliasIssue = treeAliasIssue(item.value, item.path, allowSharedAliases, walk);
+	if (aliasIssue !== null) return aliasIssue;
+	walk.seen.add(item.value);
+	walk.active.add(item.value);
+	walk.pending.push({ kind: 'LEAVE', value: item.value });
+	if (Array.isArray(item.value))
+		return treeArrayIssue(item.value, item.depth, item.path, limits, walk);
+	return treeRecordIssue(item.value, item.depth, item.path, limits, walk);
+}
+
 function plainTreeIssue(
 	value: unknown,
 	limits: ClosedOptions,
 	allowSharedAliases = false
 ): StructuralSccValidationIssue | null {
-	type Item =
-		| {
-				readonly depth: number;
-				readonly kind: 'VISIT';
-				readonly path: string;
-				readonly value: unknown;
-		  }
-		| { readonly kind: 'LEAVE'; readonly value: object };
-	const pending: Item[] = [{ depth: 0, kind: 'VISIT', path: '$', value }];
-	const active = new WeakSet<object>();
-	const seen = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
+	const pending: TreePending[] = [{ depth: 0, kind: 'VISIT', path: '$', value }];
+	const walk: TreeWalk = {
+		active: new WeakSet<object>(),
+		characters: 0,
+		pending,
+		records: 0,
+		seen: new WeakSet<object>()
+	};
 	while (pending.length > 0) {
 		const item = pending.pop()!;
 		if (item.kind === 'LEAVE') {
-			active.delete(item.value);
+			walk.active.delete(item.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxRecords)
-			return issue('BUDGET_EXHAUSTED', 'The record budget was exhausted.', item.path);
-		if (item.depth > limits.maxDepth)
-			return issue('BUDGET_EXHAUSTED', 'The validation depth budget was exhausted.', item.path);
-		if (typeof item.value === 'string') {
-			if (!isUnicodeScalarString(item.value))
-				return issue('SHAPE_INVALID', 'Strings must contain Unicode scalar text.', item.path);
-			characters += item.value.length;
-			if (characters > limits.maxStringCharacters)
-				return issue('BUDGET_EXHAUSTED', 'The string-character budget was exhausted.', item.path);
-			continue;
-		}
-		if (
-			item.value === null ||
-			typeof item.value === 'boolean' ||
-			(typeof item.value === 'number' &&
-				Number.isSafeInteger(item.value) &&
-				!Object.is(item.value, -0))
-		)
-			continue;
-		if (typeof item.value !== 'object')
-			return issue(
-				'SHAPE_INVALID',
-				'Only JSON-compatible data properties are accepted.',
-				item.path
-			);
-		if (isProxy(item.value))
-			return issue('SHAPE_INVALID', 'Proxy values are not accepted.', item.path);
-		if (active.has(item.value))
-			return issue('SHAPE_INVALID', 'Cycles are not accepted.', item.path);
-		if (!allowSharedAliases && seen.has(item.value))
-			return issue('SHAPE_INVALID', 'Shared object aliases are not accepted.', item.path);
-		seen.add(item.value);
-		active.add(item.value);
-		pending.push({ kind: 'LEAVE', value: item.value });
-		if (Array.isArray(item.value)) {
-			if (Object.getPrototypeOf(item.value) !== Array.prototype)
-				return issue('SHAPE_INVALID', 'Arrays must use Array.prototype.', item.path);
-			const lengthDescriptor = Reflect.getOwnPropertyDescriptor(item.value, 'length');
-			const lengthValue =
-				lengthDescriptor !== undefined && 'value' in lengthDescriptor
-					? lengthDescriptor.value
-					: undefined;
-			if (!Number.isSafeInteger(lengthValue) || (lengthValue as number) < 0)
-				return issue('SHAPE_INVALID', 'Array length is invalid.', item.path);
-			const length = lengthValue as number;
-			if (records + length > limits.maxRecords)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The array population exceeds the record budget.',
-					item.path
-				);
-			const keys = Reflect.ownKeys(item.value);
-			if (keys.length !== length + 1 || keys.some((key) => typeof key === 'symbol'))
-				return issue('SHAPE_INVALID', 'Arrays must be dense exact data arrays.', item.path);
-			for (let index = length - 1; index >= 0; index -= 1) {
-				const descriptor = Reflect.getOwnPropertyDescriptor(item.value, String(index));
-				if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-					return issue('SHAPE_INVALID', 'Arrays must contain enumerable data elements.', item.path);
-				pending.push({
-					depth: item.depth + 1,
-					kind: 'VISIT',
-					path: `${item.path}[${index}]`,
-					value: descriptor.value
-				});
-			}
-			continue;
-		}
-		if (Object.getPrototypeOf(item.value) !== Object.prototype)
-			return issue('SHAPE_INVALID', 'Records must use Object.prototype.', item.path);
-		const keys = Reflect.ownKeys(item.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			return issue('SHAPE_INVALID', 'Symbol record keys are not accepted.', item.path);
-		if (records + keys.length > limits.maxRecords)
-			return issue(
-				'BUDGET_EXHAUSTED',
-				'The property population exceeds the record budget.',
-				item.path
-			);
-		for (const key of keys.reverse()) {
-			if (typeof key !== 'string')
-				return issue('SHAPE_INVALID', 'Symbol record keys are not accepted.', item.path);
-			const descriptor = Reflect.getOwnPropertyDescriptor(item.value, key);
-			if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
-				return issue(
-					'SHAPE_INVALID',
-					'Records must contain enumerable data properties.',
-					item.path
-				);
-			pending.push({
-				depth: item.depth + 1,
-				kind: 'VISIT',
-				path: `${item.path}.${key}`,
-				value: descriptor.value
-			});
-		}
+		walk.records += 1;
+		const visitIssue = treeVisitIssue(item, limits, allowSharedAliases, walk);
+		if (visitIssue !== null) return visitIssue;
 	}
 	return null;
 }
@@ -453,6 +494,51 @@ function projection(inputs: StructuralSccAnalysisInputs): Projection {
 	};
 }
 
+function sccVisitForward(
+	root: string,
+	forward: ReadonlyMap<string, string[]>,
+	visited: Set<string>,
+	finish: string[]
+): void {
+	const stack: { nodeId: string; next: number }[] = [{ nodeId: root, next: 0 }];
+	visited.add(root);
+	while (stack.length > 0) {
+		const frame = stack.at(-1)!;
+		const neighbors = forward.get(frame.nodeId)!;
+		if (frame.next < neighbors.length) {
+			const next = neighbors[frame.next++]!;
+			if (!visited.has(next)) {
+				visited.add(next);
+				stack.push({ nodeId: next, next: 0 });
+			}
+		} else {
+			finish.push(frame.nodeId);
+			stack.pop();
+		}
+	}
+}
+
+function sccComponentFrom(
+	root: string,
+	reverse: ReadonlyMap<string, string[]>,
+	assigned: Set<string>
+): string[] {
+	const component: string[] = [];
+	const stack = [root];
+	assigned.add(root);
+	while (stack.length > 0) {
+		const nodeId = stack.pop()!;
+		component.push(nodeId);
+		for (const next of reverse.get(nodeId)!)
+			if (!assigned.has(next)) {
+				assigned.add(next);
+				stack.push(next);
+			}
+	}
+	component.sort(compareText);
+	return component;
+}
+
 function kosaraju(projected: Projection): readonly (readonly string[])[] {
 	const forward = new Map<string, string[]>(
 		projected.nodeIds.map((nodeId) => [nodeId, [] as string[]])
@@ -469,43 +555,25 @@ function kosaraju(projected: Projection): readonly (readonly string[])[] {
 	const finish: string[] = [];
 	for (const root of projected.nodeIds) {
 		if (visited.has(root)) continue;
-		const stack: { nodeId: string; next: number }[] = [{ nodeId: root, next: 0 }];
-		visited.add(root);
-		while (stack.length > 0) {
-			const frame = stack[stack.length - 1]!;
-			const neighbors = forward.get(frame.nodeId)!;
-			if (frame.next < neighbors.length) {
-				const next = neighbors[frame.next++]!;
-				if (!visited.has(next)) {
-					visited.add(next);
-					stack.push({ nodeId: next, next: 0 });
-				}
-			} else {
-				finish.push(frame.nodeId);
-				stack.pop();
-			}
-		}
+		sccVisitForward(root, forward, visited, finish);
 	}
 	const assigned = new Set<string>();
 	const components: string[][] = [];
 	for (let index = finish.length - 1; index >= 0; index -= 1) {
 		const root = finish[index]!;
 		if (assigned.has(root)) continue;
-		const component: string[] = [];
-		const stack = [root];
-		assigned.add(root);
-		while (stack.length > 0) {
-			const nodeId = stack.pop()!;
-			component.push(nodeId);
-			for (const next of reverse.get(nodeId)!)
-				if (!assigned.has(next)) {
-					assigned.add(next);
-					stack.push(next);
-				}
-		}
-		components.push(component.sort(compareText));
+		components.push(sccComponentFrom(root, reverse, assigned));
 	}
 	return components.sort((left, right) => compareText(left.join('\0'), right.join('\0')));
+}
+
+function componentCycleKind(
+	nodeCount: number,
+	isSelfLoopSingleton: boolean
+): StructuralSccComponent['cycleKind'] {
+	if (nodeCount > 1) return 'MULTI_NODE';
+	if (isSelfLoopSingleton) return 'SELF_LOOP_SINGLETON';
+	return 'ACYCLIC_SINGLETON';
 }
 
 function expectedAnalysis(
@@ -543,12 +611,7 @@ function expectedAnalysis(
 		const componentId = componentIds[ordinal]!;
 		const internalEdgeIds = internalEdgeIdsByComponent.get(componentId)!.sort(compareText);
 		return {
-			cycleKind:
-				nodeIds.length > 1
-					? 'MULTI_NODE'
-					: selfLoopComponents.has(componentId)
-						? 'SELF_LOOP_SINGLETON'
-						: 'ACYCLIC_SINGLETON',
+			cycleKind: componentCycleKind(nodeIds.length, selfLoopComponents.has(componentId)),
 			id: componentId,
 			internalEdgeIds,
 			nodeIds: nodeIds as StructuralSccComponent['nodeIds'],
@@ -621,6 +684,33 @@ function expectedAnalysis(
 	return { ...withoutDigest, contentDigest: structuralSccAnalysisContentDigest(withoutDigest) };
 }
 
+function issueResult(reported: StructuralSccValidationIssue): StructuralSccValidationResult {
+	return {
+		issues: [reported],
+		state: reported.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
+	};
+}
+
+function requestBudgetShellIssue(
+	inputs: StructuralSccAnalysisInputs,
+	closedOptions: ClosedOptions
+): StructuralSccValidationIssue | null {
+	const budgets = inputs.request.budgets;
+	if (
+		budgets.maxInputRecords >= closedOptions.maxInputRecords &&
+		budgets.maxInputStringCharacters >= closedOptions.maxInputStringCharacters
+	)
+		return null;
+	return inputShellIssue(inputs, {
+		...closedOptions,
+		maxInputRecords: Math.min(closedOptions.maxInputRecords, budgets.maxInputRecords),
+		maxInputStringCharacters: Math.min(
+			closedOptions.maxInputStringCharacters,
+			budgets.maxInputStringCharacters
+		)
+	});
+}
+
 function validateStructuralSccAnalysisInternal(
 	value: unknown,
 	inputs: StructuralSccAnalysisInputs,
@@ -633,49 +723,18 @@ function validateStructuralSccAnalysisInternal(
 			state: 'INVALID'
 		};
 	const shapeIssue = plainTreeIssue(value, closedOptions);
-	if (shapeIssue !== null)
-		return {
-			issues: [shapeIssue],
-			state: shapeIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
+	if (shapeIssue !== null) return issueResult(shapeIssue);
 	if (!plainRecord(value) || !exactKeys(value, SNAPSHOT_KEYS))
 		return {
 			issues: [issue('SHAPE_INVALID', 'The SCC analysis snapshot shell must be exact.')],
 			state: 'INVALID'
 		};
 	const shellIssue = inputShellIssue(inputs, closedOptions);
-	if (shellIssue !== null)
-		return {
-			issues: [shellIssue],
-			state: shellIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
+	if (shellIssue !== null) return issueResult(shellIssue);
 	const inputIssue = requestIssue(inputs);
-	if (inputIssue !== null)
-		return {
-			issues: [inputIssue],
-			state: inputIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-		};
-	if (
-		inputs.request.budgets.maxInputRecords < closedOptions.maxInputRecords ||
-		inputs.request.budgets.maxInputStringCharacters < closedOptions.maxInputStringCharacters
-	) {
-		const requestBudgetIssue = inputShellIssue(inputs, {
-			...closedOptions,
-			maxInputRecords: Math.min(
-				closedOptions.maxInputRecords,
-				inputs.request.budgets.maxInputRecords
-			),
-			maxInputStringCharacters: Math.min(
-				closedOptions.maxInputStringCharacters,
-				inputs.request.budgets.maxInputStringCharacters
-			)
-		});
-		if (requestBudgetIssue !== null)
-			return {
-				issues: [requestBudgetIssue],
-				state: requestBudgetIssue.code === 'BUDGET_EXHAUSTED' ? 'BUDGET_EXHAUSTED' : 'INVALID'
-			};
-	}
+	if (inputIssue !== null) return issueResult(inputIssue);
+	const budgetShellIssue = requestBudgetShellIssue(inputs, closedOptions);
+	if (budgetShellIssue !== null) return issueResult(budgetShellIssue);
 	const graphValidation = validateModuleDependencyGraph(inputs.graph, inputs.semanticSnapshot, {
 		maxIssues: Math.min(closedOptions.maxIssues, inputs.request.budgets.maxDiagnostics)
 	});

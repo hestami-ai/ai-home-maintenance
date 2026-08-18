@@ -751,28 +751,32 @@ function propertyName(name: ts.PropertyName | undefined): string | undefined {
 	return undefined;
 }
 
+function arrayLiteralValue(node: ts.ArrayLiteralExpression): unknown {
+	const values = node.elements.map((element) =>
+		ts.isSpreadElement(element) ? undefined : literalValue(element as ts.Expression)
+	);
+	return values.includes(undefined) ? undefined : values;
+}
+
+function objectLiteralValue(node: ts.ObjectLiteralExpression): unknown {
+	const value: Record<string, unknown> = {};
+	for (const child of node.properties) {
+		if (!ts.isPropertyAssignment(child)) return undefined;
+		const key = propertyName(child.name);
+		const literal = literalValue(child.initializer);
+		if (key === undefined || literal === undefined) return undefined;
+		value[key] = literal;
+	}
+	return value;
+}
+
 function literalValue(node: ts.Expression): unknown {
 	if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
 	if (ts.isNumericLiteral(node)) return Number(node.text);
 	if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
 	if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
-	if (ts.isArrayLiteralExpression(node)) {
-		const values = node.elements.map((element) =>
-			ts.isSpreadElement(element) ? undefined : literalValue(element as ts.Expression)
-		);
-		return values.some((value) => value === undefined) ? undefined : values;
-	}
-	if (ts.isObjectLiteralExpression(node)) {
-		const value: Record<string, unknown> = {};
-		for (const child of node.properties) {
-			if (!ts.isPropertyAssignment(child)) return undefined;
-			const key = propertyName(child.name);
-			const literal = literalValue(child.initializer);
-			if (key === undefined || literal === undefined) return undefined;
-			value[key] = literal;
-		}
-		return value;
-	}
+	if (ts.isArrayLiteralExpression(node)) return arrayLiteralValue(node);
+	if (ts.isObjectLiteralExpression(node)) return objectLiteralValue(node);
 	return undefined;
 }
 
@@ -927,15 +931,16 @@ function dependencyBoundary(
 	};
 	visit(sourceFile);
 	const commandTokens = boundaryCommand?.trim().split(/\s+/) ?? [];
-	const executableIndex = commandTokens.findIndex((token) => token === 'depcruise');
+	const executableIndex = commandTokens.indexOf('depcruise');
 	const optionIndex = commandTokens.findIndex(
 		(token, index) => index > executableIndex && token.startsWith('-')
 	);
+	const perimeterEnd = optionIndex < 0 ? commandTokens.length : optionIndex;
 	const analyzedPerimeter =
 		executableIndex < 0
 			? []
 			: commandTokens
-					.slice(executableIndex + 1, optionIndex < 0 ? commandTokens.length : optionIndex)
+					.slice(executableIndex + 1, perimeterEnd)
 					.filter((token) => !token.startsWith('-'))
 					.sort(compareText);
 	return {
@@ -984,6 +989,51 @@ function gateReachableScriptNames(rootScripts: ReadonlyMap<string, string>): Set
 	return reachable;
 }
 
+function providerConfigurationPaths(
+	files: readonly SelectedFileRecord[]
+): Record<(typeof PROVIDERS)[number][0], readonly string[]> {
+	return {
+		'@playwright/test': files
+			.filter((file) => file.path.endsWith('playwright.config.ts'))
+			.map((file) => file.path),
+		'@vitest/coverage-v8': files.some((file) => file.path === 'vitest.config.ts')
+			? ['vitest.config.ts']
+			: [],
+		'dependency-cruiser': files.some((file) => file.path === '.dependency-cruiser.cjs')
+			? ['.dependency-cruiser.cjs']
+			: [],
+		eslint: files.some((file) => file.path === 'eslint.config.mjs') ? ['eslint.config.mjs'] : [],
+		sonar: files.some((file) => file.path === 'sonar-project.properties')
+			? ['sonar-project.properties']
+			: [],
+		typescript: files
+			.filter((file) => /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file.path))
+			.map((file) => file.path),
+		vitest: files
+			.filter((file) => /^vitest(?:\.[^.]+)?\.(?:config|projects)\.ts$/.test(file.path))
+			.map((file) => file.path)
+	};
+}
+
+function providerGateEvidence(
+	gateReachable: ReadonlySet<string>
+): Record<(typeof PROVIDERS)[number][0], readonly string[]> {
+	return {
+		'@playwright/test': gateReachable.has('e2e') ? ['package.json#/scripts/gate:fast'] : [],
+		'@vitest/coverage-v8': gateReachable.has('test:coverage')
+			? ['package.json#/scripts/test:coverage']
+			: [],
+		'dependency-cruiser': gateReachable.has('boundary') ? ['package.json#/scripts/boundary'] : [],
+		eslint: gateReachable.has('lint') ? ['package.json#/scripts/lint'] : [],
+		sonar: gateReachable.has('sonar') ? ['package.json#/scripts/sonar'] : [],
+		typescript: gateReachable.has('check-types') ? ['package.json#/scripts/check-types'] : [],
+		vitest:
+			gateReachable.has('test:src') || gateReachable.has('test')
+				? ['package.json#/scripts/test']
+				: []
+	};
+}
+
 function providerInventory(
 	subject: FrozenSubject,
 	files: readonly SelectedFileRecord[],
@@ -998,44 +1048,11 @@ function providerInventory(
 	);
 	const gateReachable = gateReachableScriptNames(rootScripts);
 	return PROVIDERS.map(([name, potentialCapabilities]) => {
-		const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		const version =
-			new RegExp(`^\\s*"${escaped}": \\["${escaped}@([^"\\s]+)"`, 'm').exec(text)?.[1] ?? null;
-		const configurationPaths: Record<(typeof PROVIDERS)[number][0], readonly string[]> = {
-			'@playwright/test': files
-				.filter((file) => /playwright\.config\.ts$/.test(file.path))
-				.map((file) => file.path),
-			'@vitest/coverage-v8': files.some((file) => file.path === 'vitest.config.ts')
-				? ['vitest.config.ts']
-				: [],
-			'dependency-cruiser': files.some((file) => file.path === '.dependency-cruiser.cjs')
-				? ['.dependency-cruiser.cjs']
-				: [],
-			eslint: files.some((file) => file.path === 'eslint.config.mjs') ? ['eslint.config.mjs'] : [],
-			sonar: files.some((file) => file.path === 'sonar-project.properties')
-				? ['sonar-project.properties']
-				: [],
-			typescript: files
-				.filter((file) => /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file.path))
-				.map((file) => file.path),
-			vitest: files
-				.filter((file) => /^vitest(?:\.[^.]+)?\.(?:config|projects)\.ts$/.test(file.path))
-				.map((file) => file.path)
-		};
-		const gateEvidence: Record<(typeof PROVIDERS)[number][0], readonly string[]> = {
-			'@playwright/test': gateReachable.has('e2e') ? ['package.json#/scripts/gate:fast'] : [],
-			'@vitest/coverage-v8': gateReachable.has('test:coverage')
-				? ['package.json#/scripts/test:coverage']
-				: [],
-			'dependency-cruiser': gateReachable.has('boundary') ? ['package.json#/scripts/boundary'] : [],
-			eslint: gateReachable.has('lint') ? ['package.json#/scripts/lint'] : [],
-			sonar: gateReachable.has('sonar') ? ['package.json#/scripts/sonar'] : [],
-			typescript: gateReachable.has('check-types') ? ['package.json#/scripts/check-types'] : [],
-			vitest:
-				gateReachable.has('test:src') || gateReachable.has('test')
-					? ['package.json#/scripts/test']
-					: []
-		};
+		const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+		const versionPattern = new RegExp(String.raw`^\s*"${escaped}": \["${escaped}@([^"\s]+)"`, 'm');
+		const version = versionPattern.exec(text)?.[1] ?? null;
+		const configurationPaths = providerConfigurationPaths(files);
+		const gateEvidence = providerGateEvidence(gateReachable);
 		const configured = configurationPaths[name].length > 0;
 		const gateWired = gateEvidence[name].length > 0;
 		const inventoryIntegrated = name === 'typescript';
@@ -1079,6 +1096,81 @@ function providerInventory(
 	});
 }
 
+function verificationAssetRole(
+	path: string,
+	projectsText: string,
+	isTest: boolean,
+	isData: boolean
+): VerificationAssetInventory['role'] {
+	if (isTest) return 'TEST';
+	if (isData) return 'SUPPORT_DATA';
+	if (/(?:guard|refusal)/.test(basename(path)) && projectsText.includes(basename(path)))
+		return 'RUNTIME_GUARD';
+	if (path.startsWith('scripts/')) return 'SCRIPT';
+	return 'ANALYZER';
+}
+
+function verificationAssetExtractionMethod(
+	text: string,
+	isTest: boolean,
+	isData: boolean
+): VerificationAssetInventory['extractionMethod'] {
+	if (/from ['"]typescript['"]|require\(['"]typescript['"]\)/.exec(text)) return 'TYPESCRIPT_AST';
+	if (isTest) return 'VITEST_EXECUTABLE_ASSERTION';
+	if (isData) return 'DECLARED_STATIC_DATA';
+	if (/\b(?:readFileSync|readdirSync|globSync|readFile)\b/.test(text)) return 'FILESYSTEM_OR_TEXT';
+	return 'IMPORTED_EXECUTABLE_LOGIC';
+}
+
+function verificationAssetAssertedPopulation(
+	path: string,
+	isTest: boolean,
+	extractionMethod: VerificationAssetInventory['extractionMethod']
+): string {
+	if (isTest) return `Executable assertions and imported surfaces declared by ${path}.`;
+	if (extractionMethod === 'TYPESCRIPT_AST')
+		return `Repository syntax and declarations selected by ${path} at execution time.`;
+	return `Repository files, exports, or runtime events selected by ${path} at execution time.`;
+}
+
+function verificationAssetDisposition(
+	path: string,
+	role: VerificationAssetInventory['role']
+): VerificationAssetInventory['disposition'] {
+	if (path === 'verif/arrow-command-census.ts') return ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY;
+	if (role === 'ANALYZER') return 'WRAP';
+	return 'RETAIN_DELEGATED';
+}
+
+function verificationAssetCarriers(
+	path: string,
+	stem: string,
+	isTest: boolean,
+	testSources: ReadonlyMap<string, string>,
+	projectsText: string,
+	configuredCommands: readonly CommandInventory[]
+): string[] {
+	const carriers = isTest
+		? ['bun run test:src -> verif', path]
+		: [...testSources.entries()]
+				.filter(
+					([, source]) =>
+						source.includes(`./${stem}`) ||
+						source.includes(basename(path)) ||
+						source.includes(path.replace(/\.ts$/, ''))
+				)
+				.map(([testPath]) => testPath);
+	for (const command of configuredCommands) {
+		if (command.command.includes(path) || command.command.includes(basename(path))) {
+			carriers.push(...command.provenance);
+		}
+	}
+	if (!isTest && projectsText.includes(basename(path)))
+		carriers.push('vitest.projects.ts#setupFiles');
+	if (carriers.length === 0) carriers.push('UNMAPPED');
+	return carriers;
+}
+
 function verificationAssets(
 	subject: FrozenSubject,
 	files: readonly SelectedFileRecord[],
@@ -1104,18 +1196,7 @@ function verificationAssets(
 		const stem = basename(path).replace(/\.test\.ts$|\.data\.ts$|\.ts$/, '');
 		const isTest = path.endsWith('.test.ts');
 		const isData = path.endsWith('.data.ts');
-		const isGuard =
-			!isTest && /(?:guard|refusal)/.test(basename(path)) && projectsText.includes(basename(path));
-		const isScript = path.startsWith('scripts/');
-		const role = isTest
-			? 'TEST'
-			: isData
-				? 'SUPPORT_DATA'
-				: isGuard
-					? 'RUNTIME_GUARD'
-					: isScript
-						? 'SCRIPT'
-						: 'ANALYZER';
+		const role = verificationAssetRole(path, projectsText, isTest, isData);
 		const associatedBaselines = baselines
 			.filter(
 				(baseline) =>
@@ -1124,47 +1205,20 @@ function verificationAssets(
 					text.includes(basename(baseline.path))
 			)
 			.map((baseline) => baseline.path);
-		const carriers = isTest
-			? ['bun run test:src -> verif', path]
-			: [...testSources.entries()]
-					.filter(
-						([, source]) =>
-							source.includes(`./${stem}`) ||
-							source.includes(basename(path)) ||
-							source.includes(path.replace(/\.ts$/, ''))
-					)
-					.map(([testPath]) => testPath);
-		for (const command of configuredCommands) {
-			if (command.command.includes(path) || command.command.includes(basename(path))) {
-				carriers.push(...command.provenance);
-			}
-		}
-		if (!isTest && projectsText.includes(basename(path)))
-			carriers.push('vitest.projects.ts#setupFiles');
-		if (carriers.length === 0) carriers.push('UNMAPPED');
-		const extractionMethod = text.match(/from ['"]typescript['"]|require\(['"]typescript['"]\)/)
-			? 'TYPESCRIPT_AST'
-			: isTest
-				? 'VITEST_EXECUTABLE_ASSERTION'
-				: isData
-					? 'DECLARED_STATIC_DATA'
-					: /\b(?:readFileSync|readdirSync|globSync|readFile)\b/.test(text)
-						? 'FILESYSTEM_OR_TEXT'
-						: 'IMPORTED_EXECUTABLE_LOGIC';
+		const carriers = verificationAssetCarriers(
+			path,
+			stem,
+			isTest,
+			testSources,
+			projectsText,
+			configuredCommands
+		);
+		const extractionMethod = verificationAssetExtractionMethod(text, isTest, isData);
 		return {
 			associatedBaselines,
-			assertedPopulation: isTest
-				? `Executable assertions and imported surfaces declared by ${path}.`
-				: extractionMethod === 'TYPESCRIPT_AST'
-					? `Repository syntax and declarations selected by ${path} at execution time.`
-					: `Repository files, exports, or runtime events selected by ${path} at execution time.`,
+			assertedPopulation: verificationAssetAssertedPopulation(path, isTest, extractionMethod),
 			contentSha256: selectedFile.sha256,
-			disposition:
-				path === 'verif/arrow-command-census.ts'
-					? ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY
-					: role === 'ANALYZER'
-						? 'WRAP'
-						: 'RETAIN_DELEGATED',
+			disposition: verificationAssetDisposition(path, role),
 			extractionMethod,
 			gateCarriers: [...new Set(carriers)].sort(compareText),
 			path,
@@ -1542,12 +1596,11 @@ function projectExclusionRecords(subject: FrozenSubject): ExclusionRecord[] {
 		.sort((left, right) => compareText(left.id, right.id));
 }
 
-function assertJpwbNonVacuity(
+function assertJpwbCorePopulations(
 	rootManifest: JsonObject,
 	workspaces: readonly WorkspaceInventory[],
 	files: readonly SelectedFileRecord[],
-	assets: readonly VerificationAssetInventory[],
-	configuredCommands: readonly CommandInventory[]
+	assets: readonly VerificationAssetInventory[]
 ): void {
 	if (rootManifest.name !== 'janumi-professional-workbench') {
 		throw new Error('JPWB inventory root manifest identity is absent or incompatible');
@@ -1559,6 +1612,9 @@ function assertJpwbNonVacuity(
 	if (!files.some((file) => file.path.startsWith('scripts/') && file.path.endsWith('.ts'))) {
 		throw new Error('JPWB scripts TypeScript population is empty');
 	}
+}
+
+function assertJpwbRequiredRootCommands(configuredCommands: readonly CommandInventory[]): void {
 	const rootNames = new Set(
 		configuredCommands.filter((entry) => entry.owner === '.').map((entry) => entry.name)
 	);
@@ -1584,222 +1640,173 @@ function assertJpwbNonVacuity(
 		if (!rootNames.has(required))
 			throw new Error(`Required JPWB assurance command is absent: ${required}`);
 	}
-	const conditionalExportResolutionSmokeCommand = configuredCommands.find(
-		(entry) =>
-			entry.owner === '.' && entry.name === 'csaa:semantic:smoke:conditional-export-resolution'
-	);
-	if (
-		conditionalExportResolutionSmokeCommand?.command !==
+}
+
+function assertJpwbAssuranceCommandExact(
+	configuredCommands: readonly CommandInventory[],
+	name: string,
+	expected: string
+): void {
+	const configured = configuredCommands.find((entry) => entry.owner === '.' && entry.name === name);
+	if (configured?.command !== expected) {
+		throw new Error(`Required JPWB assurance command is incompatible: ${name}`);
+	}
+}
+
+function assertRequiredSelectedPaths(
+	selectedPaths: ReadonlySet<string>,
+	required: readonly string[],
+	description: string
+): void {
+	for (const path of required) {
+		if (!selectedPaths.has(path)) throw new Error(`${description} is absent: ${path}`);
+	}
+}
+
+function assertJpwbNonVacuity(
+	rootManifest: JsonObject,
+	workspaces: readonly WorkspaceInventory[],
+	files: readonly SelectedFileRecord[],
+	assets: readonly VerificationAssetInventory[],
+	configuredCommands: readonly CommandInventory[]
+): void {
+	assertJpwbCorePopulations(rootManifest, workspaces, files, assets);
+	assertJpwbRequiredRootCommands(configuredCommands);
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:conditional-export-resolution',
 		JPWB_CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND
-	) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:conditional-export-resolution'
-		);
-	}
-	const declarationContextAnalysisSmokeCommand = configuredCommands.find(
-		(entry) =>
-			entry.owner === '.' && entry.name === 'csaa:semantic:smoke:declaration-context-analysis'
 	);
-	if (
-		declarationContextAnalysisSmokeCommand?.command !==
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:declaration-context-analysis',
 		JPWB_DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND
-	) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:declaration-context-analysis'
-		);
-	}
-	const sourceOriginCorrelationSmokeCommand = configuredCommands.find(
-		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:source-origin-correlation'
 	);
-	if (
-		sourceOriginCorrelationSmokeCommand?.command !==
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:source-origin-correlation',
 		JPWB_SOURCE_ORIGIN_CORRELATION_ONLY_SMOKE_COMMAND
-	) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:source-origin-correlation'
-		);
-	}
-	const moduleResolutionTraceSmokeCommand = configuredCommands.find(
-		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:module-resolution-trace'
 	);
-	if (
-		moduleResolutionTraceSmokeCommand?.command !== JPWB_MODULE_RESOLUTION_TRACE_ONLY_SMOKE_COMMAND
-	) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:module-resolution-trace'
-		);
-	}
-	const logicalGraphCompositionSmokeCommand = configuredCommands.find(
-		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:logical-graph-composition'
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:module-resolution-trace',
+		JPWB_MODULE_RESOLUTION_TRACE_ONLY_SMOKE_COMMAND
 	);
-	if (
-		logicalGraphCompositionSmokeCommand?.command !==
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:logical-graph-composition',
 		JPWB_LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND
-	) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:logical-graph-composition'
-		);
-	}
-	const projectContextGraphSmokeCommand = configuredCommands.find(
-		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:project-context-graph'
 	);
-	if (projectContextGraphSmokeCommand?.command !== JPWB_PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:project-context-graph'
-		);
-	}
-	const structuralSccSmokeCommand = configuredCommands.find(
-		(entry) => entry.owner === '.' && entry.name === 'csaa:semantic:smoke:structural-scc'
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:project-context-graph',
+		JPWB_PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND
 	);
-	if (structuralSccSmokeCommand?.command !== JPWB_STRUCTURAL_SCC_ONLY_SMOKE_COMMAND) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:structural-scc'
-		);
-	}
-	const structuralModuleReachabilitySmokeCommand = configuredCommands.find(
-		(entry) =>
-			entry.owner === '.' && entry.name === 'csaa:semantic:smoke:structural-module-reachability'
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:structural-scc',
+		JPWB_STRUCTURAL_SCC_ONLY_SMOKE_COMMAND
 	);
-	if (
-		structuralModuleReachabilitySmokeCommand?.command !==
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:semantic:smoke:structural-module-reachability',
 		JPWB_STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND
-	) {
-		throw new Error(
-			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:structural-module-reachability'
-		);
-	}
+	);
 	const selectedPaths = new Set(files.map((file) => file.path));
-	for (const required of TYPESCRIPT_SEMANTIC_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB TypeScript semantic implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB TypeScript read/write access graph implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB command-handler static projection implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of [
-		...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
-		...JPWB_COMMAND_DISPATCH_RETAINED_CENSUS_REFERENCE
-	]) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB command-dispatch static topology implementation or retained reference is absent: ${required}`
-			);
-		}
-	}
-	for (const required of [
-		...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE,
-		...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE
-	]) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB arrow-command census implementation or retained-authority artifact is absent: ${required}`
-			);
-		}
-	}
-	for (const required of [
-		...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
-		...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE
-	]) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB guard-enforcement-ledger implementation or retained-authority artifact is absent: ${required}`
-			);
-		}
-	}
-	for (const required of JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB guard-classification static overlay implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of [
-		...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
-		...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE
-	]) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB command-event-contract static overlay implementation or exact input is absent: ${required}`
-			);
-		}
-	}
-	for (const required of JPWB_STATE_MACHINE_GRAPH_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB state-machine graph implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB structural SCC analysis implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB structural module reachability analysis implementation source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB logical graph composition implementation or verification source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB project context graph implementation or verification source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB conditional export resolution implementation or verification source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB module resolution trace implementation or verification source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB declaration context analysis implementation or verification source is absent: ${required}`
-			);
-		}
-	}
-	for (const required of TYPESCRIPT_SOURCE_ORIGIN_CORRELATION_PROVENANCE) {
-		if (!selectedPaths.has(required)) {
-			throw new Error(
-				`Required JPWB source origin correlation implementation or verification source is absent: ${required}`
-			);
-		}
-	}
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_SEMANTIC_PROVENANCE,
+		'Required JPWB TypeScript semantic implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+		'Required JPWB TypeScript read/write access graph implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+		'Required JPWB command-handler static projection implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		[
+			...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+			...JPWB_COMMAND_DISPATCH_RETAINED_CENSUS_REFERENCE
+		],
+		'Required JPWB command-dispatch static topology implementation or retained reference'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		[...JPWB_ARROW_COMMAND_CENSUS_PROVENANCE, ...JPWB_ARROW_COMMAND_CENSUS_RETAINED_PROVENANCE],
+		'Required JPWB arrow-command census implementation or retained-authority artifact'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		[
+			...JPWB_GUARD_ENFORCEMENT_LEDGER_PROVENANCE,
+			...JPWB_GUARD_ENFORCEMENT_LEDGER_RETAINED_PROVENANCE
+		],
+		'Required JPWB guard-enforcement-ledger implementation or retained-authority artifact'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
+		'Required JPWB guard-classification static overlay implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		[
+			...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+			...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE
+		],
+		'Required JPWB command-event-contract static overlay implementation or exact input'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
+		'Required JPWB state-machine graph implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+		'Required JPWB structural SCC analysis implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
+		'Required JPWB structural module reachability analysis implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+		'Required JPWB logical graph composition implementation or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
+		'Required JPWB project context graph implementation or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
+		'Required JPWB conditional export resolution implementation or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE,
+		'Required JPWB module resolution trace implementation or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+		'Required JPWB declaration context analysis implementation or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_SOURCE_ORIGIN_CORRELATION_PROVENANCE,
+		'Required JPWB source origin correlation implementation or verification source'
+	);
 }
 
 export function collectInventory(options: CollectInventoryOptions): InventoryDocument {

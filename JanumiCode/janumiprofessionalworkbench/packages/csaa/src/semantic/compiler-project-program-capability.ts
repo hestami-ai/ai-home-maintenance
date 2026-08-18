@@ -935,7 +935,7 @@ export function createCompilerProjectProgramSession(
 				assertWithinDeadline();
 				if (text === undefined)
 					fail('CAPTURE_UNAVAILABLE', 'Explicit compiler source parse lacks captured bytes.');
-				const inputRecord = inputRecords[inputRecords.length - 1];
+				const inputRecord = inputRecords.at(-1);
 				if (
 					inputRecord?.stage !== 'DECLARATION_ARTIFACT_PARSE' ||
 					inputRecord.query.operation !== 'READ_FILE' ||

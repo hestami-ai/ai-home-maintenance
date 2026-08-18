@@ -5624,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "65fd2c57a3c2166aeec5ffc0eb411c5154efc99965204cad5d0b75224f92948b",
+    "fileManifestDigest": "acf780fed112af85003ee94dc5e2c7f64c0a3be0b1078cf9e5db086a9b774811",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -7084,9 +7084,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 37062,
+        "bytes": 39488,
         "path": "packages/csaa/src/graph/build-logical-graph-composition.ts",
-        "sha256": "6aa44ba29a4a1d805b51707e76da6bd026e7c69f6b37482c28ca9592f20b272f",
+        "sha256": "6a619348460bca00cebcdeeab178fd970a30b51f18d7788eeb5af464601240e3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7112,9 +7112,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 35614,
+        "bytes": 37435,
         "path": "packages/csaa/src/graph/build-project-context-graph.ts",
-        "sha256": "a992de842c72f2f2816e69613f7b646979f95b88e19319681554027e6837f407",
+        "sha256": "b5acaf7fcb7388d994ca5c7abd69d43e61e5ffb628ff0a045fa774bee264939b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7154,9 +7154,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 32893,
+        "bytes": 38603,
         "path": "packages/csaa/src/graph/build-structural-module-reachability-analysis.ts",
-        "sha256": "640038e5835289d28a1ae63c98279b032d7aac9f8ed423be7c9a02bd2b5c36f7",
+        "sha256": "bc2ff6db83c953c018ec5540e1e3652757ba8c3f914e52c3a4b21b3b91f540ec",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7168,9 +7168,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 27020,
+        "bytes": 30975,
         "path": "packages/csaa/src/graph/build-structural-scc-analysis.ts",
-        "sha256": "1fe124977254a69fa45b407e6e676d0953cbdab65a71c9d66a989d40fac810f2",
+        "sha256": "9a4ad02ccdeb67b8e18f53d920fbd0b1d67791bd087f396eabaa7b564c9656e2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7247,7 +7247,7 @@
         "artifactClass": "SOURCE",
         "bytes": 36460,
         "path": "packages/csaa/src/graph/compare-dependency-providers.ts",
-        "sha256": "e278dbcf70cbe37d4e3745b1417614ad10074e8523daff33bee19bd46f9e7cce",
+        "sha256": "182ce78425ddf0a08db3cad8622fdc393badaf355c29defa046bf41c67d71dab",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7427,9 +7427,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 82426,
+        "bytes": 89542,
         "path": "packages/csaa/src/graph/validate-command-event-contract-overlay.ts",
-        "sha256": "c38d9a5728c2ccf9f17a928f829ac9b8da9e068f17a177c4e6f51a7c9ab73d31",
+        "sha256": "e091281ef5ea3c6739aa64729ed3cb30e2f7ba4df9d30b0d719550135d487016",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7455,9 +7455,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 24348,
+        "bytes": 29139,
         "path": "packages/csaa/src/graph/validate-dependency-comparison.ts",
-        "sha256": "f2ede469180fbde6f76c6dd78301fadf7e166d3ad42ab487c57e808d42e3a367",
+        "sha256": "98b5f586a523952c42aee282357e927f8c258741022af565b9d6bf250905596d",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7490,23 +7490,23 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 68477,
+        "bytes": 83768,
         "path": "packages/csaa/src/graph/validate-guard-classification-overlay.ts",
-        "sha256": "f145856258b06c3b076788f2399019400c506f88a4a75e774af5320958f8c5a1",
+        "sha256": "69701be72974a851969c133bc638a74d15d22249cb0f8d02d4d9a672a53ebb41",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 40608,
+        "bytes": 44289,
         "path": "packages/csaa/src/graph/validate-logical-graph-composition.ts",
-        "sha256": "c6649ae1e25d68125c4835d4064b5d2365d106f3b6bbbe7c50f6644cd891f6f3",
+        "sha256": "4ef11281356a495dbe1d302bba83801b05dc9d1d148540a5524b488197aeb3e9",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 40335,
+        "bytes": 47800,
         "path": "packages/csaa/src/graph/validate-project-context-graph.ts",
-        "sha256": "46edeb8f3d06ee6ca80193eb082bfc766c13422d1c5575b428e3e0f3962c1005",
+        "sha256": "7583b810cd8a9450de8cdb7928669bd6955759efb725244fce25dc6e353e6d45",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7525,23 +7525,23 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 48654,
+        "bytes": 52966,
         "path": "packages/csaa/src/graph/validate-state-machine-graph.ts",
-        "sha256": "0293ee101c80a8f19fac0766db2a6c699f50f066e16c89d491de7bdd9222367a",
+        "sha256": "beecce7f74b8a1cf5035d76ac715ce8504413c30bb12a873ad1e70e25e3d256d",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 30295,
+        "bytes": 37800,
         "path": "packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts",
-        "sha256": "7b520eea09121eb13251e5063bd7ecb9ca14bec61faec7c77ce4c3cd3a89955e",
+        "sha256": "dfe57bb40e5671c66a7f8ce20de9a2a24bf7fe1fb55003c01777c29019baa702",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 25615,
+        "bytes": 27406,
         "path": "packages/csaa/src/graph/validate-structural-scc-analysis.ts",
-        "sha256": "f4d0f64cce363c71c73984400b135bd41372b934606c48eec8655f658735a288",
+        "sha256": "d412971e98d6c35f5ac530a364c7c0074cd619e3f4aae1323116026f1614776b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7581,9 +7581,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 120199,
+        "bytes": 119693,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "104878287b3d7daebf2cd6daa283f2b3ac555ddde6b1942e5e690c2494e91187",
+        "sha256": "4b3e7d2afb0f576915f64ce23ac5dfb551f781efcdca21d0d672f6b20467d16d",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7756,9 +7756,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 40931,
+        "bytes": 50276,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts",
-        "sha256": "1f69460531206e0de9e13d416d58adb87010040d3137198e9bb349497e8293c5",
+        "sha256": "cb4423dd04d4824f8a1ff7241c75ea512329ed7e9739a3ae9fb32ed058c78e38",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7889,9 +7889,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 21074,
+        "bytes": 21575,
         "path": "packages/csaa/src/providers/source-map/decode-source-map-v3.ts",
-        "sha256": "4f46c7c2de8f1c6e5a4278735f8411e2d7188627c7882c8af4210f2bd7054cd1",
+        "sha256": "92c1dcde03f060735dab6b2289872aa70408dc0487f8a179fb4edebdb2a6d71e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7903,9 +7903,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 124061,
+        "bytes": 135750,
         "path": "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
-        "sha256": "1b0b1da9f2f28fd1a6b63332856aaf7a599cddbbe6227a1b322c0b1df9758abd",
+        "sha256": "9abba8d2aa6cf236d6ddf6c90ebefba9509d93e8f1408e86c944dc48425ff176",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8001,9 +8001,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 62503,
+        "bytes": 71100,
         "path": "packages/csaa/src/resolution/build-conditional-export-resolution.ts",
-        "sha256": "0194a1be212cfc0076851248626e8fc6b0b8749a731f42c9a4b52910495c65c6",
+        "sha256": "54ce10e833ff03adb3a7af67ce5f47e8e172dff90f843be6f1ed25ad362c1538",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8064,16 +8064,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 65579,
+        "bytes": 74504,
         "path": "packages/csaa/src/resolution/validate-conditional-export-resolution.ts",
-        "sha256": "321f0e4e280f4138225b46f86c6847b2b493d05bbeba61d11bbf78d5c6eef6a0",
+        "sha256": "7465078bb4998da116a397fbc88ab58c020ccfc3729d2aa8c1bf6a96537f1a4c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 72069,
+        "bytes": 76112,
         "path": "packages/csaa/src/resolution/validate-module-resolution-trace.ts",
-        "sha256": "e8f70be6a860b6a625235849a89553a13868d98aca54d30b23d06cc55b9b411f",
+        "sha256": "8efc9252be020da574f48662add422c2130e26badbcd73d8cce8cd26665dd1c0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8085,9 +8085,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 120351,
+        "bytes": 138255,
         "path": "packages/csaa/src/semantic/build-declaration-context-analysis.ts",
-        "sha256": "7418e4ecdf9847dab963a60ec52ff6a0da67febcfa2ee81de60158fbe64f025c",
+        "sha256": "b257c6d2218c7655463ff0655e7768473161a9670c00317eeb510ce17e3508da",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8099,9 +8099,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 104185,
+        "bytes": 119860,
         "path": "packages/csaa/src/semantic/build-source-origin-correlation.ts",
-        "sha256": "4b4c8aaf886869e8a53c38ce5233d68657e5b3415b79aeefd239374447bca376",
+        "sha256": "ac832ebb274c6f7d7991addb5cec610ca50c9ae3ed98ff949f8b6ec68615d6a3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8113,9 +8113,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 61367,
+        "bytes": 63887,
         "path": "packages/csaa/src/semantic/build-static-semantic-snapshot.ts",
-        "sha256": "13b53e3fb1fcbbdf6ce69b412e193e8dce9997ec89040dbc4c743ecf80ed852e",
+        "sha256": "96f065c5063af19aa86974726b42f9feda066f70b782e00d204f6d1c097bf5ca",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8141,9 +8141,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 35383,
+        "bytes": 35365,
         "path": "packages/csaa/src/semantic/compiler-project-program-capability.ts",
-        "sha256": "05e513997cfcfd235bdb89af99a8cd1da0ff28b0ddfa9c2005e6a386c6490bf8",
+        "sha256": "5c2f5754f62a713890df96f51be75f5f5be62bb794dd540d73318314c32f936c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8372,9 +8372,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 119287,
+        "bytes": 143983,
         "path": "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
-        "sha256": "9f8f5760a532898287a0f8fbaa6b7c6dc3e374a33c89af8e0e6d14f1224ac589",
+        "sha256": "f6ac6b5fa376ecb6fe8455674bcf2ef1b3424626b9bb168c37777681ec160f61",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8386,9 +8386,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 40781,
+        "bytes": 43140,
         "path": "packages/csaa/src/semantic/validate-wire-shape.ts",
-        "sha256": "00758e87658a126f46f7cea2fd124cdeca549fedd0b94d27c976af6520d26c6f",
+        "sha256": "431dc08bd72c265481246a9cec82406c6e1412431b39f5df60a9b41c4b28643c",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12326,7 +12326,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "4255de4fcfe3557fe10c2a66fade60f4ac1ec1a207721f0e75c47c77e407a8fe",
+    "subjectId": "8deb3a2b9894346d3508495c9e842e31be828929775bea1900baa18468524a1d",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [

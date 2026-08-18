@@ -169,7 +169,9 @@ function invalid(
 }
 
 function compareText(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function plainRecord(value: unknown): value is Record<string, unknown> {
@@ -228,6 +230,191 @@ function closeOptions(
 	return result as unknown as ClosedOptions;
 }
 
+interface PlainTreeVisitFrame {
+	readonly depth: number;
+	readonly path: string;
+	readonly state: 'VISIT';
+	readonly value: unknown;
+}
+
+type PlainTreeFrame = PlainTreeVisitFrame | { readonly state: 'LEAVE'; readonly value: object };
+
+interface PlainTreeWalk {
+	readonly active: WeakSet<object>;
+	characters: number;
+	readonly limits: Pick<ClosedOptions, 'maxDepth' | 'maxRecords' | 'maxStringCharacters'>;
+	readonly malformedCode: ConditionalExportResolutionValidationIssue['code'];
+	readonly pending: PlainTreeFrame[];
+	records: number;
+}
+
+/** JSON-compatible leaves that carry no descriptor population of their own. */
+function jsonScalarLeaf(value: unknown): boolean {
+	return (
+		value === null ||
+		typeof value === 'boolean' ||
+		(typeof value === 'number' &&
+			Number.isFinite(value) &&
+			(!Number.isInteger(value) || Number.isSafeInteger(value)) &&
+			!Object.is(value, -0))
+	);
+}
+
+function stringLeafIssue(
+	text: string,
+	walk: PlainTreeWalk,
+	path: string
+): ConditionalExportResolutionValidationIssue | null {
+	if (!isUnicodeScalarString(text))
+		return issue(walk.malformedCode, 'Strings must contain Unicode scalar text.', path);
+	walk.characters += text.length;
+	if (walk.characters > walk.limits.maxStringCharacters)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor string-character budget was exhausted.', path);
+	return null;
+}
+
+function containerShapeIssue(
+	container: object,
+	walk: PlainTreeWalk,
+	path: string
+): ConditionalExportResolutionValidationIssue | null {
+	if (isProxyValue(container))
+		return issue(walk.malformedCode, 'Proxy values are not accepted.', path);
+	if (walk.active.has(container))
+		return issue(walk.malformedCode, 'Cyclic data is not accepted.', path);
+	const array = Array.isArray(container);
+	const prototype = Reflect.getPrototypeOf(container);
+	if (
+		(array && prototype !== Array.prototype) ||
+		(!array && prototype !== Object.prototype && prototype !== null)
+	)
+		return issue(walk.malformedCode, 'Containers must have ordinary prototypes.', path);
+	return null;
+}
+
+function propertyKeyIssue(
+	stringKeys: readonly string[],
+	array: boolean,
+	walk: PlainTreeWalk,
+	path: string
+): ConditionalExportResolutionValidationIssue | null {
+	for (const key of stringKeys) {
+		if (array && key === 'length') continue;
+		walk.characters += key.length;
+		if (walk.characters > walk.limits.maxStringCharacters)
+			return issue(
+				'BUDGET_EXHAUSTED',
+				'The descriptor string-character budget was exhausted by a property key.',
+				path
+			);
+		if (!isUnicodeScalarString(key))
+			return issue(walk.malformedCode, 'Property keys must contain Unicode scalar text.', path);
+	}
+	return null;
+}
+
+/** A key that is not a canonical in-range array index of a dense ordinary array. */
+function denseArrayKeyInvalid(key: string, arrayLength: number): boolean {
+	if (key === 'length') return false;
+	if (!/^(0|[1-9]\d*)$/u.test(key)) return true;
+	const index = Number(key);
+	return !Number.isSafeInteger(index) || index >= arrayLength || String(index) !== key;
+}
+
+function populationIssue(
+	container: object,
+	array: boolean,
+	stringKeys: readonly string[],
+	walk: PlainTreeWalk,
+	path: string
+): ConditionalExportResolutionValidationIssue | null {
+	const remaining = walk.limits.maxRecords - walk.records;
+	if (!array)
+		return stringKeys.length > remaining
+			? issue(
+					'BUDGET_EXHAUSTED',
+					'The descriptor record budget was exhausted by a property population.',
+					path
+				)
+			: null;
+	const arrayLength = Reflect.getOwnPropertyDescriptor(container, 'length')!.value as number;
+	if (arrayLength > remaining)
+		return issue(
+			'BUDGET_EXHAUSTED',
+			'The descriptor record budget was exhausted by an array population.',
+			path
+		);
+	if (stringKeys.length !== arrayLength + 1)
+		return issue(walk.malformedCode, 'Arrays must be dense ordinary arrays.', path);
+	if (stringKeys.some((key) => denseArrayKeyInvalid(key, arrayLength)))
+		return issue(walk.malformedCode, 'Arrays must be dense without extra properties.', path);
+	return null;
+}
+
+function pushChildFrames(
+	container: object,
+	array: boolean,
+	stringKeys: readonly string[],
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame
+): ConditionalExportResolutionValidationIssue | null {
+	for (let index = stringKeys.length - 1; index >= 0; index -= 1) {
+		const key = stringKeys[index]!;
+		if (array && key === 'length') continue;
+		const descriptor = Reflect.getOwnPropertyDescriptor(container, key)!;
+		if (!descriptor.enumerable || !('value' in descriptor))
+			return issue(
+				walk.malformedCode,
+				'Properties must be enumerable data properties.',
+				`${frame.path}.${key}`
+			);
+		walk.pending.push({
+			depth: frame.depth + 1,
+			path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
+			state: 'VISIT',
+			value: descriptor.value
+		});
+	}
+	return null;
+}
+
+function containerFrameIssue(
+	container: object,
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame
+): ConditionalExportResolutionValidationIssue | null {
+	const shapeIssue = containerShapeIssue(container, walk, frame.path);
+	if (shapeIssue !== null) return shapeIssue;
+	const keys = Reflect.ownKeys(container);
+	if (keys.some((key) => typeof key !== 'string'))
+		return issue(walk.malformedCode, 'Symbol keys are not accepted.', frame.path);
+	const stringKeys = keys as string[];
+	const array = Array.isArray(container);
+	const keyIssue = propertyKeyIssue(stringKeys, array, walk, frame.path);
+	if (keyIssue !== null) return keyIssue;
+	const arrayIssue = populationIssue(container, array, stringKeys, walk, frame.path);
+	if (arrayIssue !== null) return arrayIssue;
+	walk.active.add(container);
+	walk.pending.push({ state: 'LEAVE', value: container });
+	return pushChildFrames(container, array, stringKeys, walk, frame);
+}
+
+function visitFrameIssue(
+	walk: PlainTreeWalk,
+	frame: PlainTreeVisitFrame
+): ConditionalExportResolutionValidationIssue | null {
+	walk.records += 1;
+	if (walk.records > walk.limits.maxRecords)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
+	if (frame.depth > walk.limits.maxDepth)
+		return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
+	if (typeof frame.value === 'string') return stringLeafIssue(frame.value, walk, frame.path);
+	if (jsonScalarLeaf(frame.value)) return null;
+	if (typeof frame.value !== 'object')
+		return issue(walk.malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
+	return containerFrameIssue(frame.value!, walk, frame);
+}
+
 /** Descriptor-only traversal: getters, iterators, callbacks, and toJSON are never invoked. */
 function plainTreeIssue(
 	value: unknown,
@@ -235,143 +422,83 @@ function plainTreeIssue(
 	rootPath: string,
 	input = false
 ): ConditionalExportResolutionValidationIssue | null {
-	type Frame =
-		| {
-				readonly depth: number;
-				readonly path: string;
-				readonly state: 'VISIT';
-				readonly value: unknown;
-		  }
-		| { readonly state: 'LEAVE'; readonly value: object };
-	const pending: Frame[] = [{ depth: 0, path: rootPath, state: 'VISIT', value }];
-	const active = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
-	const malformedCode = input ? 'INPUT_INVALID' : 'SHAPE_INVALID';
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
+	const walk: PlainTreeWalk = {
+		active: new WeakSet<object>(),
+		characters: 0,
+		limits,
+		malformedCode: input ? 'INPUT_INVALID' : 'SHAPE_INVALID',
+		pending: [{ depth: 0, path: rootPath, state: 'VISIT', value }],
+		records: 0
+	};
+	while (walk.pending.length > 0) {
+		const frame = walk.pending.pop()!;
 		if (frame.state === 'LEAVE') {
-			active.delete(frame.value);
+			walk.active.delete(frame.value);
 			continue;
 		}
-		records += 1;
-		if (records > limits.maxRecords)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor record budget was exhausted.', frame.path);
-		if (frame.depth > limits.maxDepth)
-			return issue('BUDGET_EXHAUSTED', 'The descriptor depth budget was exhausted.', frame.path);
-		if (typeof frame.value === 'string') {
-			if (!isUnicodeScalarString(frame.value))
-				return issue(malformedCode, 'Strings must contain Unicode scalar text.', frame.path);
-			characters += frame.value.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted.',
-					frame.path
-				);
-			continue;
-		}
-		if (
-			frame.value === null ||
-			typeof frame.value === 'boolean' ||
-			(typeof frame.value === 'number' &&
-				Number.isFinite(frame.value) &&
-				(!Number.isInteger(frame.value) || Number.isSafeInteger(frame.value)) &&
-				!Object.is(frame.value, -0))
-		)
-			continue;
-		if (typeof frame.value !== 'object')
-			return issue(malformedCode, 'Only JSON-compatible data values are accepted.', frame.path);
-		if (isProxyValue(frame.value))
-			return issue(malformedCode, 'Proxy values are not accepted.', frame.path);
-		if (active.has(frame.value))
-			return issue(malformedCode, 'Cyclic data is not accepted.', frame.path);
-		const array = Array.isArray(frame.value);
-		const prototype = Reflect.getPrototypeOf(frame.value);
-		if (
-			(array && prototype !== Array.prototype) ||
-			(!array && prototype !== Object.prototype && prototype !== null)
-		)
-			return issue(malformedCode, 'Containers must have ordinary prototypes.', frame.path);
-		const keys = Reflect.ownKeys(frame.value);
-		if (keys.some((key) => typeof key !== 'string'))
-			return issue(malformedCode, 'Symbol keys are not accepted.', frame.path);
-		const stringKeys = keys as string[];
-		for (const key of stringKeys) {
-			if (array && key === 'length') continue;
-			characters += key.length;
-			if (characters > limits.maxStringCharacters)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor string-character budget was exhausted by a property key.',
-					frame.path
-				);
-			if (!isUnicodeScalarString(key))
-				return issue(malformedCode, 'Property keys must contain Unicode scalar text.', frame.path);
-		}
-		let arrayLength: number | null = null;
-		if (array) {
-			arrayLength = Reflect.getOwnPropertyDescriptor(frame.value, 'length')!.value as number;
-			if (arrayLength! > limits.maxRecords - records)
-				return issue(
-					'BUDGET_EXHAUSTED',
-					'The descriptor record budget was exhausted by an array population.',
-					frame.path
-				);
-			if (keys.length !== arrayLength! + 1)
-				return issue(malformedCode, 'Arrays must be dense ordinary arrays.', frame.path);
-			if (
-				stringKeys.some((key) => {
-					if (key === 'length') return false;
-					if (!/^(0|[1-9][0-9]*)$/u.test(key)) return true;
-					const index = Number(key);
-					return !Number.isSafeInteger(index) || index >= arrayLength! || String(index) !== key;
-				})
-			)
-				return issue(malformedCode, 'Arrays must be dense without extra properties.', frame.path);
-		} else if (keys.length > limits.maxRecords - records) {
-			return issue(
-				'BUDGET_EXHAUSTED',
-				'The descriptor record budget was exhausted by a property population.',
-				frame.path
-			);
-		}
-		active.add(frame.value);
-		pending.push({ state: 'LEAVE', value: frame.value });
-		for (let index = stringKeys.length - 1; index >= 0; index -= 1) {
-			const key = stringKeys[index]!;
-			if (array && key === 'length') continue;
-			const descriptor = Reflect.getOwnPropertyDescriptor(frame.value, key)!;
-			if (!descriptor.enumerable || !('value' in descriptor))
-				return issue(
-					malformedCode,
-					'Properties must be enumerable data properties.',
-					`${frame.path}.${key}`
-				);
-			pending.push({
-				depth: frame.depth + 1,
-				path: array ? `${frame.path}[${key}]` : `${frame.path}.${key}`,
-				state: 'VISIT',
-				value: descriptor.value
-			});
-		}
+		const frameIssue = visitFrameIssue(walk, frame);
+		if (frameIssue !== null) return frameIssue;
 	}
 	return null;
 }
 
+interface CanonicalArrayFrame {
+	readonly index: number;
+	readonly length: number;
+	readonly state: 'ARRAY';
+	readonly value: unknown[];
+}
+
+interface CanonicalObjectFrame {
+	readonly entries: readonly (readonly [string, unknown])[];
+	readonly index: number;
+	readonly state: 'OBJECT';
+}
+
 type CanonicalFrame =
-	| {
-			readonly index: number;
-			readonly length: number;
-			readonly state: 'ARRAY';
-			readonly value: unknown[];
-	  }
-	| {
-			readonly entries: readonly (readonly [string, unknown])[];
-			readonly index: number;
-			readonly state: 'OBJECT';
-	  }
-	| { readonly state: 'VALUE'; readonly value: unknown };
+	CanonicalArrayFrame | CanonicalObjectFrame | { readonly state: 'VALUE'; readonly value: unknown };
+
+/** The canonical token for a JSON scalar; null means the value is a container. */
+function canonicalScalarToken(input: unknown): string | null {
+	if (input === null) return 'null';
+	if (typeof input === 'string') return JSON.stringify(input);
+	if (typeof input === 'boolean') return input ? 'true' : 'false';
+	if (typeof input === 'number') return JSON.stringify(input);
+	return null;
+}
+
+function* canonicalArrayChunks(
+	frame: CanonicalArrayFrame,
+	pending: CanonicalFrame[]
+): Generator<string, void, undefined> {
+	if (frame.index === frame.length) {
+		yield ']';
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	pending.push(
+		{ ...frame, index: frame.index + 1 },
+		{
+			state: 'VALUE',
+			value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
+		}
+	);
+}
+
+function* canonicalObjectChunks(
+	frame: CanonicalObjectFrame,
+	pending: CanonicalFrame[]
+): Generator<string, void, undefined> {
+	if (frame.index === frame.entries.length) {
+		yield '}';
+		return;
+	}
+	if (frame.index !== 0) yield ',';
+	const [key, child] = frame.entries[frame.index]!;
+	yield JSON.stringify(key);
+	yield ':';
+	pending.push({ ...frame, index: frame.index + 1 }, { state: 'VALUE', value: child });
+}
 
 /** Validator-private canonical token stream over values already accepted by plainTreeIssue. */
 function* canonicalChunks(value: unknown): Generator<string, void, undefined> {
@@ -379,47 +506,18 @@ function* canonicalChunks(value: unknown): Generator<string, void, undefined> {
 	while (pending.length > 0) {
 		const frame = pending.pop()!;
 		if (frame.state === 'ARRAY') {
-			if (frame.index === frame.length) {
-				yield ']';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({
-				state: 'VALUE',
-				value: Reflect.getOwnPropertyDescriptor(frame.value, String(frame.index))!.value
-			});
+			yield* canonicalArrayChunks(frame, pending);
 			continue;
 		}
 		if (frame.state === 'OBJECT') {
-			if (frame.index === frame.entries.length) {
-				yield '}';
-				continue;
-			}
-			if (frame.index !== 0) yield ',';
-			const [key, child] = frame.entries[frame.index]!;
-			yield JSON.stringify(key);
-			yield ':';
-			pending.push({ ...frame, index: frame.index + 1 });
-			pending.push({ state: 'VALUE', value: child });
+			yield* canonicalObjectChunks(frame, pending);
 			continue;
 		}
 
 		const input = frame.value;
-		if (input === null) {
-			yield 'null';
-			continue;
-		}
-		if (typeof input === 'string') {
-			yield JSON.stringify(input);
-			continue;
-		}
-		if (typeof input === 'boolean') {
-			yield input ? 'true' : 'false';
-			continue;
-		}
-		if (typeof input === 'number') {
-			yield JSON.stringify(input);
+		const token = canonicalScalarToken(input);
+		if (token !== null) {
+			yield token;
 			continue;
 		}
 		const objectInput = input as object;
@@ -941,6 +1039,88 @@ type ParseResult =
 	| { readonly parsed: ParsedManifest; readonly state: 'VALID' }
 	| { readonly problem: ConditionalExportResolutionValidationIssue; readonly state: 'INVALID' };
 
+interface ManifestAstScan {
+	readonly astNodes: number;
+	readonly declarationOrdinals: ReadonlyMap<ts.PropertyAssignment, number>;
+	readonly objectLiterals: readonly ts.ObjectLiteralExpression[];
+}
+
+/** Explicit-stack AST sweep; null means the request AST-node budget was exhausted. */
+function scanManifestAst(source: ts.JsonSourceFile, maxAstNodes: number): ManifestAstScan | null {
+	const declarationOrdinals = new Map<ts.PropertyAssignment, number>();
+	const objectLiterals: ts.ObjectLiteralExpression[] = [];
+	const pending: ts.Node[] = [source];
+	let astNodes = 0;
+	let declarationOrdinal = 0;
+	while (pending.length > 0) {
+		const node = pending.pop()!;
+		astNodes += 1;
+		if (astNodes > maxAstNodes) return null;
+		if (ts.isPropertyAssignment(node)) {
+			declarationOrdinals.set(node, declarationOrdinal);
+			declarationOrdinal += 1;
+		}
+		if (ts.isObjectLiteralExpression(node)) objectLiterals.push(node);
+		const children: ts.Node[] = [];
+		ts.forEachChild(node, (child) => {
+			children.push(child);
+		});
+		for (let index = children.length - 1; index >= 0; index -= 1) pending.push(children[index]!);
+	}
+	return { astNodes, declarationOrdinals, objectLiterals };
+}
+
+function manifestMemberIssue(
+	objectLiterals: readonly ts.ObjectLiteralExpression[]
+): ConditionalExportResolutionValidationIssue | null {
+	for (const object of objectLiterals) {
+		const names = new Set<string>();
+		for (const property of object.properties) {
+			if (!ts.isPropertyAssignment(property))
+				return issue(
+					'INPUT_INVALID',
+					'The manifest contains an unsupported object member.',
+					'$manifest'
+				);
+			const name = propertyName(property);
+			if (name === null || !isUnicodeScalarString(name) || names.has(name))
+				return issue(
+					'INPUT_INVALID',
+					'The manifest contains a duplicate or non-string object key.',
+					'$manifest'
+				);
+			names.add(name);
+		}
+	}
+	return null;
+}
+
+function manifestRootProperties(root: ts.ObjectLiteralExpression): {
+	readonly exportsProperty: ts.PropertyAssignment | null;
+	readonly importsProperty: ts.PropertyAssignment | null;
+} {
+	let exportsProperty: ts.PropertyAssignment | null = null;
+	let importsProperty: ts.PropertyAssignment | null = null;
+	for (const property of root.properties) {
+		const assignment = property as ts.PropertyAssignment;
+		const name = propertyName(assignment)!;
+		if (name === 'exports') exportsProperty = assignment;
+		if (name === 'imports') importsProperty = assignment;
+	}
+	return { exportsProperty, importsProperty };
+}
+
+function manifestNameBinds(root: ts.ObjectLiteralExpression, workspaceName: string): boolean {
+	const nameProperty = root.properties.find(
+		(property) => propertyName(property as ts.PropertyAssignment) === 'name'
+	) as ts.PropertyAssignment | undefined;
+	return (
+		nameProperty !== undefined &&
+		ts.isStringLiteral(nameProperty.initializer) &&
+		nameProperty.initializer.text === workspaceName
+	);
+}
+
 function parseManifest(
 	inputs: ConditionalExportResolutionBuildInputs,
 	bound: BoundConsumerAndManifest
@@ -971,34 +1151,16 @@ function parseManifest(
 			),
 			state: 'INVALID'
 		};
-	const declarationOrdinals = new Map<ts.PropertyAssignment, number>();
-	const objectLiterals: ts.ObjectLiteralExpression[] = [];
-	const pending: ts.Node[] = [source];
-	let astNodes = 0;
-	let declarationOrdinal = 0;
-	while (pending.length > 0) {
-		const node = pending.pop()!;
-		astNodes += 1;
-		if (astNodes > inputs.request.budgets.maxAstNodes)
-			return {
-				problem: issue(
-					'BUDGET_EXHAUSTED',
-					'The manifest AST-node budget was exhausted.',
-					'$inputs.request.budgets.maxAstNodes'
-				),
-				state: 'INVALID'
-			};
-		if (ts.isPropertyAssignment(node)) {
-			declarationOrdinals.set(node, declarationOrdinal);
-			declarationOrdinal += 1;
-		}
-		if (ts.isObjectLiteralExpression(node)) objectLiterals.push(node);
-		const children: ts.Node[] = [];
-		ts.forEachChild(node, (child) => {
-			children.push(child);
-		});
-		for (let index = children.length - 1; index >= 0; index -= 1) pending.push(children[index]!);
-	}
+	const scan = scanManifestAst(source, inputs.request.budgets.maxAstNodes);
+	if (scan === null)
+		return {
+			problem: issue(
+				'BUDGET_EXHAUSTED',
+				'The manifest AST-node budget was exhausted.',
+				'$inputs.request.budgets.maxAstNodes'
+			),
+			state: 'INVALID'
+		};
 	if (
 		source.statements.length !== 1 ||
 		!ts.isExpressionStatement(source.statements[0]!) ||
@@ -1013,47 +1175,10 @@ function parseManifest(
 			state: 'INVALID'
 		};
 	const root = source.statements[0]!.expression;
-	for (const object of objectLiterals) {
-		const names = new Set<string>();
-		for (const property of object.properties) {
-			if (!ts.isPropertyAssignment(property))
-				return {
-					problem: issue(
-						'INPUT_INVALID',
-						'The manifest contains an unsupported object member.',
-						'$manifest'
-					),
-					state: 'INVALID'
-				};
-			const name = propertyName(property);
-			if (name === null || !isUnicodeScalarString(name) || names.has(name))
-				return {
-					problem: issue(
-						'INPUT_INVALID',
-						'The manifest contains a duplicate or non-string object key.',
-						'$manifest'
-					),
-					state: 'INVALID'
-				};
-			names.add(name);
-		}
-	}
-	let exportsProperty: ts.PropertyAssignment | null = null;
-	let importsProperty: ts.PropertyAssignment | null = null;
-	for (const property of root.properties) {
-		const assignment = property as ts.PropertyAssignment;
-		const name = propertyName(assignment)!;
-		if (name === 'exports') exportsProperty = assignment;
-		if (name === 'imports') importsProperty = assignment;
-	}
-	const nameProperty = root.properties.find(
-		(property) => propertyName(property as ts.PropertyAssignment) === 'name'
-	) as ts.PropertyAssignment | undefined;
-	if (
-		nameProperty === undefined ||
-		!ts.isStringLiteral(nameProperty.initializer) ||
-		nameProperty.initializer.text !== bound.workspace.name
-	)
+	const memberIssue = manifestMemberIssue(scan.objectLiterals);
+	if (memberIssue !== null) return { problem: memberIssue, state: 'INVALID' };
+	const { exportsProperty, importsProperty } = manifestRootProperties(root);
+	if (!manifestNameBinds(root, bound.workspace.name))
 		return {
 			problem: issue(
 				'INPUT_INVALID',
@@ -1075,8 +1200,8 @@ function parseManifest(
 					.digest('hex');
 	return {
 		parsed: {
-			astNodes,
-			declarationOrdinals,
+			astNodes: scan.astNodes,
+			declarationOrdinals: scan.declarationOrdinals,
 			exportsProperty,
 			importsProperty,
 			manifestWitness: {
@@ -1181,6 +1306,153 @@ interface EvaluatedSurface {
 	readonly frontierSeeds: readonly FrontierSeed[];
 }
 
+interface PendingConditionProperty {
+	readonly ancestorsActive: boolean;
+	readonly conditionPath: readonly string[];
+	readonly parentIndex: number | null;
+	readonly property: ts.PropertyAssignment;
+}
+
+interface ConditionTreeWalk {
+	readonly branchSeeds: BranchSeed[];
+	decisionLeafSeedIndex: number | null;
+	decisionState: ConditionalExportDecisionRecord['state'] | null;
+	decisionTarget: string | null;
+	readonly exportSubpath: string;
+	readonly frontierSeeds: FrontierSeed[];
+	readonly inputs: ConditionalExportResolutionBuildInputs;
+	readonly parsed: ParsedManifest;
+	readonly pending: PendingConditionProperty[];
+	terminated: boolean;
+}
+
+function conditionValueKind(
+	initializer: ts.Expression
+): ConditionalExportBranchRecord['valueKind'] | null {
+	if (ts.isObjectLiteralExpression(initializer)) return 'CONDITION_OBJECT';
+	if (ts.isStringLiteral(initializer)) return 'STRING';
+	if (nullLiteral(initializer)) return 'NULL';
+	return null;
+}
+
+function branchExclusionReason(
+	priorTerminated: boolean,
+	ancestorsActive: boolean,
+	active: boolean
+): ConditionalExportBranchRecord['exclusionReason'] {
+	if (priorTerminated) return 'PRIOR_BRANCH_TERMINATED_EVALUATION';
+	if (!ancestorsActive) return 'ANCESTOR_CONDITION_INACTIVE';
+	if (!active) return 'CONDITION_INACTIVE';
+	return null;
+}
+
+/** An unsupported export value kind terminates evaluation only on the active path. */
+function recordUnsupportedConditionValue(
+	walk: ConditionTreeWalk,
+	frame: PendingConditionProperty,
+	path: readonly string[],
+	pathActive: boolean
+): void {
+	const initializer = frame.property.initializer;
+	walk.frontierSeeds.push(
+		frontierSeed(
+			walk.parsed,
+			frame.property,
+			['exports', walk.exportSubpath, ...path],
+			pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION',
+			ts.isArrayLiteralExpression(initializer)
+				? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
+				: 'UNSUPPORTED_EXPORT_VALUE_KIND',
+			initializer
+		)
+	);
+	if (pathActive) {
+		walk.terminated = true;
+		walk.decisionState = 'UNSUPPORTED';
+	}
+}
+
+function applyConditionStringTarget(
+	walk: ConditionTreeWalk,
+	frame: PendingConditionProperty,
+	path: readonly string[],
+	pathActive: boolean,
+	seedIndex: number,
+	target: string
+): void {
+	const safe = safeRelativePackageSyntax(target, false);
+	if (!safe) {
+		walk.frontierSeeds.push(
+			frontierSeed(
+				walk.parsed,
+				frame.property,
+				['exports', walk.exportSubpath, ...path],
+				pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION',
+				'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
+				frame.property.initializer
+			)
+		);
+	}
+	if (pathActive) {
+		walk.terminated = true;
+		if (safe) {
+			walk.decisionLeafSeedIndex = seedIndex;
+			walk.decisionState = 'SELECTED_TARGET';
+			walk.decisionTarget = target;
+		} else walk.decisionState = 'UNSUPPORTED';
+	}
+}
+
+function visitConditionProperty(walk: ConditionTreeWalk, frame: PendingConditionProperty): void {
+	const condition = propertyName(frame.property)!;
+	const path = [...frame.conditionPath, condition];
+	const match = conditionMatch(condition, walk.inputs);
+	const active = match !== 'INACTIVE';
+	const priorTerminated = walk.terminated;
+	const pathActive = !priorTerminated && frame.ancestorsActive && active;
+	const initializer = frame.property.initializer;
+	const valueKind = conditionValueKind(initializer);
+	if (valueKind === null) {
+		recordUnsupportedConditionValue(walk, frame, path, pathActive);
+		return;
+	}
+	const target = ts.isStringLiteral(initializer) ? initializer.text : null;
+	const seedIndex = walk.branchSeeds.length;
+	walk.branchSeeds.push({
+		condition,
+		conditionMatch: match,
+		conditionPath: path,
+		declarationOrdinal: declarationOrdinal(walk.parsed, frame.property),
+		depth: path.length - 1,
+		exclusionReason: branchExclusionReason(priorTerminated, frame.ancestorsActive, active),
+		keySpan: sourceSpan(frame.property.name, walk.parsed.source),
+		parentIndex: frame.parentIndex,
+		target,
+		valueKind,
+		valueSpan: sourceSpan(initializer, walk.parsed.source)
+	});
+	if (valueKind === 'STRING') {
+		applyConditionStringTarget(walk, frame, path, pathActive, seedIndex, target!);
+		return;
+	}
+	if (valueKind === 'NULL') {
+		if (pathActive) {
+			walk.terminated = true;
+			walk.decisionLeafSeedIndex = seedIndex;
+			walk.decisionState = 'BLOCKED_BY_NULL';
+		}
+		return;
+	}
+	if (ts.isObjectLiteralExpression(initializer))
+		for (let index = initializer.properties.length - 1; index >= 0; index -= 1)
+			walk.pending.push({
+				ancestorsActive: pathActive,
+				conditionPath: path,
+				parentIndex: seedIndex,
+				property: initializer.properties[index] as ts.PropertyAssignment
+			});
+}
+
 function evaluateConditionTree(
 	inputs: ConditionalExportResolutionBuildInputs,
 	parsed: ParsedManifest,
@@ -1193,130 +1465,248 @@ function evaluateConditionTree(
 	readonly decisionState: ConditionalExportDecisionRecord['state'];
 	readonly decisionTarget: string | null;
 } {
-	interface PendingProperty {
-		readonly ancestorsActive: boolean;
-		readonly conditionPath: readonly string[];
-		readonly parentIndex: number | null;
-		readonly property: ts.PropertyAssignment;
-	}
-	const pending: PendingProperty[] = [];
+	const walk: ConditionTreeWalk = {
+		branchSeeds: [],
+		decisionLeafSeedIndex: null,
+		decisionState: null,
+		decisionTarget: null,
+		exportSubpath,
+		frontierSeeds,
+		inputs,
+		parsed,
+		pending: [],
+		terminated: false
+	};
 	for (let index = root.properties.length - 1; index >= 0; index -= 1)
-		pending.push({
+		walk.pending.push({
 			ancestorsActive: true,
 			conditionPath: [],
 			parentIndex: null,
 			property: root.properties[index] as ts.PropertyAssignment
 		});
-	const branchSeeds: BranchSeed[] = [];
-	let decisionLeafSeedIndex: number | null = null;
-	let decisionState: ConditionalExportDecisionRecord['state'] | null = null;
-	let decisionTarget: string | null = null;
-	let terminated = false;
-	while (pending.length > 0) {
-		const frame = pending.pop()!;
-		const condition = propertyName(frame.property)!;
-		const path = [...frame.conditionPath, condition];
-		const match = conditionMatch(condition, inputs);
-		const active = match !== 'INACTIVE';
-		const priorTerminated = terminated;
-		const pathActive = !priorTerminated && frame.ancestorsActive && active;
-		const initializer = frame.property.initializer;
-		let valueKind: ConditionalExportBranchRecord['valueKind'] | null = null;
-		let target: string | null = null;
-		if (ts.isObjectLiteralExpression(initializer)) valueKind = 'CONDITION_OBJECT';
-		else if (ts.isStringLiteral(initializer)) {
-			valueKind = 'STRING';
-			target = initializer.text;
-		} else if (nullLiteral(initializer)) valueKind = 'NULL';
-		else {
-			frontierSeeds.push(
-				frontierSeed(
-					parsed,
-					frame.property,
-					['exports', exportSubpath, ...path],
-					pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION',
-					ts.isArrayLiteralExpression(initializer)
-						? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
-						: 'UNSUPPORTED_EXPORT_VALUE_KIND',
-					initializer
-				)
-			);
-			if (pathActive) {
-				terminated = true;
-				decisionState = 'UNSUPPORTED';
-			}
-			continue;
-		}
-		const seedIndex = branchSeeds.length;
-		branchSeeds.push({
-			condition,
-			conditionMatch: match,
-			conditionPath: path,
-			declarationOrdinal: declarationOrdinal(parsed, frame.property),
-			depth: path.length - 1,
-			exclusionReason: priorTerminated
-				? 'PRIOR_BRANCH_TERMINATED_EVALUATION'
-				: !frame.ancestorsActive
-					? 'ANCESTOR_CONDITION_INACTIVE'
-					: !active
-						? 'CONDITION_INACTIVE'
-						: null,
-			keySpan: sourceSpan(frame.property.name, parsed.source),
-			parentIndex: frame.parentIndex,
-			target,
-			valueKind,
-			valueSpan: sourceSpan(initializer, parsed.source)
-		});
-		if (valueKind === 'STRING') {
-			const safe = safeRelativePackageSyntax(target!, false);
-			if (!safe) {
-				frontierSeeds.push(
-					frontierSeed(
-						parsed,
-						frame.property,
-						['exports', exportSubpath, ...path],
-						pathActive ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION',
-						'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
-						initializer
-					)
-				);
-			}
-			if (pathActive) {
-				terminated = true;
-				if (safe) {
-					decisionLeafSeedIndex = seedIndex;
-					decisionState = 'SELECTED_TARGET';
-					decisionTarget = target;
-				} else decisionState = 'UNSUPPORTED';
-			}
-		} else if (valueKind === 'NULL') {
-			if (pathActive) {
-				terminated = true;
-				decisionLeafSeedIndex = seedIndex;
-				decisionState = 'BLOCKED_BY_NULL';
-			}
-		} else if (ts.isObjectLiteralExpression(initializer)) {
-			for (let index = initializer.properties.length - 1; index >= 0; index -= 1)
-				pending.push({
-					ancestorsActive: pathActive,
-					conditionPath: path,
-					parentIndex: seedIndex,
-					property: initializer.properties[index] as ts.PropertyAssignment
-				});
-		}
-	}
-	if (decisionState === null)
+	while (walk.pending.length > 0) visitConditionProperty(walk, walk.pending.pop()!);
+	if (walk.decisionState === null)
 		return {
-			branchSeeds,
+			branchSeeds: walk.branchSeeds,
 			decisionLeafSeedIndex: null,
 			decisionState: 'NO_MATCHING_CONDITION',
 			decisionTarget: null
 		};
 	return {
-		branchSeeds,
-		decisionLeafSeedIndex,
-		decisionState,
-		decisionTarget
+		branchSeeds: walk.branchSeeds,
+		decisionLeafSeedIndex: walk.decisionLeafSeedIndex,
+		decisionState: walk.decisionState,
+		decisionTarget: walk.decisionTarget
+	};
+}
+
+function exportsRootUnsupportedReason(value: ts.Expression): ConditionalExportFrontierReason {
+	if (ts.isArrayLiteralExpression(value)) return 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED';
+	if (ts.isObjectLiteralExpression(value)) return 'EXPORTS_ROOT_CONDITION_MAP_UNSUPPORTED';
+	return 'UNSUPPORTED_EXPORT_VALUE_KIND';
+}
+
+function rootStringDecisionState(
+	rootSubpath: boolean,
+	safeTarget: boolean
+): ConditionalExportDecisionRecord['state'] {
+	if (!rootSubpath) return 'NO_EXACT_EXPORT_KEY';
+	if (safeTarget) return 'SELECTED_TARGET';
+	return 'UNSUPPORTED';
+}
+
+/** The raw exports value is not an explicit subpath map, so only a root '.' request can bind it. */
+function exportsRootValueSurface(
+	inputs: ConditionalExportResolutionBuildInputs,
+	parsed: ParsedManifest,
+	exportsProperty: ts.PropertyAssignment,
+	frontierSeeds: FrontierSeed[],
+	rootKeyOutcome: () => ConditionalExportResolutionSnapshot['exactKeyOutcome']
+): EvaluatedSurface {
+	const exportsValue = exportsProperty.initializer;
+	const rootSubpath = inputs.request.exportSubpath === '.';
+	const impact = rootSubpath ? 'BLOCKS_SELECTED_DECISION' : 'OUTSIDE_SELECTED_DECISION';
+	if (ts.isStringLiteral(exportsValue)) {
+		const safe = safeRelativePackageSyntax(exportsValue.text, false);
+		if (!safe)
+			frontierSeeds.push(
+				frontierSeed(
+					parsed,
+					exportsProperty,
+					['exports'],
+					impact,
+					'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
+					exportsValue
+				)
+			);
+		return {
+			branchSeeds: [],
+			decisionLeafSeedIndex: null,
+			decisionState: rootStringDecisionState(rootSubpath, safe),
+			decisionTarget: rootSubpath && safe ? exportsValue.text : null,
+			exactKeyComparisons: 1,
+			exactKeyOutcome: rootKeyOutcome(),
+			frontierSeeds
+		};
+	}
+	if (nullLiteral(exportsValue))
+		return {
+			branchSeeds: [],
+			decisionLeafSeedIndex: null,
+			decisionState: rootSubpath ? 'BLOCKED_BY_NULL' : 'NO_EXACT_EXPORT_KEY',
+			decisionTarget: null,
+			exactKeyComparisons: 1,
+			exactKeyOutcome: rootKeyOutcome(),
+			frontierSeeds
+		};
+	frontierSeeds.push(
+		frontierSeed(
+			parsed,
+			exportsProperty,
+			['exports'],
+			impact,
+			exportsRootUnsupportedReason(exportsValue),
+			exportsValue
+		)
+	);
+	return {
+		branchSeeds: [],
+		decisionLeafSeedIndex: null,
+		decisionState: rootSubpath ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
+		decisionTarget: null,
+		exactKeyComparisons: 1,
+		exactKeyOutcome: rootKeyOutcome(),
+		frontierSeeds
+	};
+}
+
+/** Records a frontier for every pattern key and returns the last exact subpath key, if any. */
+function selectExactExportProperty(
+	inputs: ConditionalExportResolutionBuildInputs,
+	parsed: ParsedManifest,
+	assignments: ts.NodeArray<ts.PropertyAssignment>,
+	frontierSeeds: FrontierSeed[]
+): ts.PropertyAssignment | null {
+	let exactProperty: ts.PropertyAssignment | null = null;
+	for (const property of assignments) {
+		const name = propertyName(property)!;
+		if (name.includes('*'))
+			frontierSeeds.push(
+				frontierSeed(
+					parsed,
+					property,
+					['exports', name],
+					'OUTSIDE_SELECTED_DECISION',
+					'EXPORT_PATTERN_KEY_UNSUPPORTED',
+					property
+				)
+			);
+		else if (name === inputs.request.exportSubpath) exactProperty = property;
+	}
+	return exactProperty;
+}
+
+function absentExactExportKeySurface(
+	inputs: ConditionalExportResolutionBuildInputs,
+	exactKeyComparisons: number,
+	frontierSeeds: readonly FrontierSeed[]
+): EvaluatedSurface {
+	const adjustedFrontiers = frontierSeeds.map((frontier) =>
+		frontier.reason === 'EXPORT_PATTERN_KEY_UNSUPPORTED'
+			? { ...frontier, impact: 'BLOCKS_SELECTED_DECISION' as const }
+			: frontier
+	);
+	const blocked = adjustedFrontiers.some(
+		(frontier) => frontier.impact === 'BLOCKS_SELECTED_DECISION'
+	);
+	return {
+		branchSeeds: [],
+		decisionLeafSeedIndex: null,
+		decisionState: blocked ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
+		decisionTarget: null,
+		exactKeyComparisons,
+		exactKeyOutcome: { exportSubpath: inputs.request.exportSubpath, state: 'ABSENT' },
+		frontierSeeds: adjustedFrontiers
+	};
+}
+
+function exactExportValueSurface(
+	inputs: ConditionalExportResolutionBuildInputs,
+	parsed: ParsedManifest,
+	exactProperty: ts.PropertyAssignment,
+	exactKeyOutcome: ConditionalExportResolutionSnapshot['exactKeyOutcome'],
+	exactKeyComparisons: number,
+	frontierSeeds: FrontierSeed[]
+): EvaluatedSurface {
+	const exactValue = exactProperty.initializer;
+	if (ts.isStringLiteral(exactValue)) {
+		const safe = safeRelativePackageSyntax(exactValue.text, false);
+		if (!safe)
+			frontierSeeds.push(
+				frontierSeed(
+					parsed,
+					exactProperty,
+					['exports', inputs.request.exportSubpath],
+					'BLOCKS_SELECTED_DECISION',
+					'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
+					exactValue
+				)
+			);
+		return {
+			branchSeeds: [],
+			decisionLeafSeedIndex: null,
+			decisionState: safe ? 'SELECTED_TARGET' : 'UNSUPPORTED',
+			decisionTarget: safe ? exactValue.text : null,
+			exactKeyComparisons,
+			exactKeyOutcome,
+			frontierSeeds
+		};
+	}
+	if (nullLiteral(exactValue))
+		return {
+			branchSeeds: [],
+			decisionLeafSeedIndex: null,
+			decisionState: 'BLOCKED_BY_NULL',
+			decisionTarget: null,
+			exactKeyComparisons,
+			exactKeyOutcome,
+			frontierSeeds
+		};
+	if (ts.isObjectLiteralExpression(exactValue)) {
+		const evaluated = evaluateConditionTree(
+			inputs,
+			parsed,
+			exactValue,
+			inputs.request.exportSubpath,
+			frontierSeeds
+		);
+		return {
+			...evaluated,
+			exactKeyComparisons,
+			exactKeyOutcome,
+			frontierSeeds
+		};
+	}
+	frontierSeeds.push(
+		frontierSeed(
+			parsed,
+			exactProperty,
+			['exports', inputs.request.exportSubpath],
+			'BLOCKS_SELECTED_DECISION',
+			ts.isArrayLiteralExpression(exactValue)
+				? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
+				: 'UNSUPPORTED_EXPORT_VALUE_KIND',
+			exactValue
+		)
+	);
+	return {
+		branchSeeds: [],
+		decisionLeafSeedIndex: null,
+		decisionState: 'UNSUPPORTED',
+		decisionTarget: null,
+		exactKeyComparisons,
+		exactKeyOutcome,
+		frontierSeeds
 	};
 }
 
@@ -1366,114 +1756,13 @@ function evaluateSurface(
 		exportsValue.properties.every((property) =>
 			propertyName(property as ts.PropertyAssignment)!.startsWith('.')
 		);
-	if (!explicitSubpathMap) {
-		const impact =
-			inputs.request.exportSubpath === '.'
-				? 'BLOCKS_SELECTED_DECISION'
-				: 'OUTSIDE_SELECTED_DECISION';
-		if (ts.isStringLiteral(exportsValue)) {
-			if (!safeRelativePackageSyntax(exportsValue.text, false))
-				frontierSeeds.push(
-					frontierSeed(
-						parsed,
-						exportsProperty,
-						['exports'],
-						impact,
-						'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
-						exportsValue
-					)
-				);
-			return {
-				branchSeeds: [],
-				decisionLeafSeedIndex: null,
-				decisionState:
-					inputs.request.exportSubpath !== '.'
-						? 'NO_EXACT_EXPORT_KEY'
-						: safeRelativePackageSyntax(exportsValue.text, false)
-							? 'SELECTED_TARGET'
-							: 'UNSUPPORTED',
-				decisionTarget:
-					inputs.request.exportSubpath === '.' &&
-					safeRelativePackageSyntax(exportsValue.text, false)
-						? exportsValue.text
-						: null,
-				exactKeyComparisons: 1,
-				exactKeyOutcome: rootKeyOutcome(),
-				frontierSeeds
-			};
-		}
-		if (nullLiteral(exportsValue))
-			return {
-				branchSeeds: [],
-				decisionLeafSeedIndex: null,
-				decisionState:
-					inputs.request.exportSubpath === '.' ? 'BLOCKED_BY_NULL' : 'NO_EXACT_EXPORT_KEY',
-				decisionTarget: null,
-				exactKeyComparisons: 1,
-				exactKeyOutcome: rootKeyOutcome(),
-				frontierSeeds
-			};
-		frontierSeeds.push(
-			frontierSeed(
-				parsed,
-				exportsProperty,
-				['exports'],
-				impact,
-				ts.isArrayLiteralExpression(exportsValue)
-					? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
-					: ts.isObjectLiteralExpression(exportsValue)
-						? 'EXPORTS_ROOT_CONDITION_MAP_UNSUPPORTED'
-						: 'UNSUPPORTED_EXPORT_VALUE_KIND',
-				exportsValue
-			)
-		);
-		return {
-			branchSeeds: [],
-			decisionLeafSeedIndex: null,
-			decisionState: inputs.request.exportSubpath === '.' ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
-			decisionTarget: null,
-			exactKeyComparisons: 1,
-			exactKeyOutcome: rootKeyOutcome(),
-			frontierSeeds
-		};
-	}
+	if (!explicitSubpathMap)
+		return exportsRootValueSurface(inputs, parsed, exportsProperty, frontierSeeds, rootKeyOutcome);
 
 	const assignments = exportsValue.properties as ts.NodeArray<ts.PropertyAssignment>;
-	let exactProperty: ts.PropertyAssignment | null = null;
-	for (const property of assignments) {
-		const name = propertyName(property)!;
-		if (name.includes('*'))
-			frontierSeeds.push(
-				frontierSeed(
-					parsed,
-					property,
-					['exports', name],
-					'OUTSIDE_SELECTED_DECISION',
-					'EXPORT_PATTERN_KEY_UNSUPPORTED',
-					property
-				)
-			);
-		else if (name === inputs.request.exportSubpath) exactProperty = property;
-	}
-	if (exactProperty === null) {
-		const adjustedFrontiers = frontierSeeds.map((frontier) =>
-			frontier.reason === 'EXPORT_PATTERN_KEY_UNSUPPORTED'
-				? { ...frontier, impact: 'BLOCKS_SELECTED_DECISION' as const }
-				: frontier
-		);
-		const blocked = adjustedFrontiers.some(
-			(frontier) => frontier.impact === 'BLOCKS_SELECTED_DECISION'
-		);
-		return {
-			branchSeeds: [],
-			decisionLeafSeedIndex: null,
-			decisionState: blocked ? 'UNSUPPORTED' : 'NO_EXACT_EXPORT_KEY',
-			decisionTarget: null,
-			exactKeyComparisons: assignments.length,
-			exactKeyOutcome: { exportSubpath: inputs.request.exportSubpath, state: 'ABSENT' },
-			frontierSeeds: adjustedFrontiers
-		};
-	}
+	const exactProperty = selectExactExportProperty(inputs, parsed, assignments, frontierSeeds);
+	if (exactProperty === null)
+		return absentExactExportKeySurface(inputs, assignments.length, frontierSeeds);
 	const exactKeyOutcome: ConditionalExportResolutionSnapshot['exactKeyOutcome'] = {
 		declarationOrdinal: declarationOrdinal(parsed, exactProperty),
 		exportSubpath: inputs.request.exportSubpath,
@@ -1482,81 +1771,78 @@ function evaluateSurface(
 		state: 'MATCHED',
 		valueSpan: sourceSpan(exactProperty.initializer, source)
 	};
-	const exactValue = exactProperty.initializer;
-	if (ts.isStringLiteral(exactValue)) {
-		const safe = safeRelativePackageSyntax(exactValue.text, false);
-		if (!safe)
-			frontierSeeds.push(
-				frontierSeed(
-					parsed,
-					exactProperty,
-					['exports', inputs.request.exportSubpath],
-					'BLOCKS_SELECTED_DECISION',
-					'UNSUPPORTED_EXPORT_TARGET_SYNTAX',
-					exactValue
-				)
-			);
-		return {
-			branchSeeds: [],
-			decisionLeafSeedIndex: null,
-			decisionState: safe ? 'SELECTED_TARGET' : 'UNSUPPORTED',
-			decisionTarget: safe ? exactValue.text : null,
-			exactKeyComparisons: assignments.length,
-			exactKeyOutcome,
-			frontierSeeds
-		};
-	}
-	if (nullLiteral(exactValue))
-		return {
-			branchSeeds: [],
-			decisionLeafSeedIndex: null,
-			decisionState: 'BLOCKED_BY_NULL',
-			decisionTarget: null,
-			exactKeyComparisons: assignments.length,
-			exactKeyOutcome,
-			frontierSeeds
-		};
-	if (ts.isObjectLiteralExpression(exactValue)) {
-		const evaluated = evaluateConditionTree(
-			inputs,
-			parsed,
-			exactValue,
-			inputs.request.exportSubpath,
-			frontierSeeds
-		);
-		return {
-			...evaluated,
-			exactKeyComparisons: assignments.length,
-			exactKeyOutcome,
-			frontierSeeds
-		};
-	}
-	frontierSeeds.push(
-		frontierSeed(
-			parsed,
-			exactProperty,
-			['exports', inputs.request.exportSubpath],
-			'BLOCKS_SELECTED_DECISION',
-			ts.isArrayLiteralExpression(exactValue)
-				? 'EXPORT_ARRAY_FALLBACK_UNSUPPORTED'
-				: 'UNSUPPORTED_EXPORT_VALUE_KIND',
-			exactValue
-		)
-	);
-	return {
-		branchSeeds: [],
-		decisionLeafSeedIndex: null,
-		decisionState: 'UNSUPPORTED',
-		decisionTarget: null,
-		exactKeyComparisons: assignments.length,
+	return exactExportValueSurface(
+		inputs,
+		parsed,
+		exactProperty,
 		exactKeyOutcome,
+		assignments.length,
 		frontierSeeds
-	};
+	);
 }
 
 type Derivation =
 	| { readonly graph: ConditionalExportResolutionSnapshot; readonly state: 'VALID' }
 	| { readonly problem: ConditionalExportResolutionValidationIssue; readonly state: 'INVALID' };
+
+interface DerivedRecordCounts {
+	readonly branchRecords: number;
+	readonly chargedTraversalSteps: number;
+	readonly frontierRecords: number;
+	readonly outputRecords: number;
+}
+
+/** Coverage tallies are one-or-zero counts of a single reconciled condition. */
+function tally(condition: boolean): 0 | 1 {
+	return condition ? 1 : 0;
+}
+
+function operationBudgetIssue(
+	inputs: ConditionalExportResolutionBuildInputs,
+	counts: DerivedRecordCounts
+): ConditionalExportResolutionValidationIssue | null {
+	const { budgets } = inputs.request;
+	for (const [actual, maximum, path] of [
+		[counts.branchRecords, budgets.maxBranches, '$inputs.request.budgets.maxBranches'],
+		[
+			counts.branchRecords,
+			budgets.maxConditionChecks,
+			'$inputs.request.budgets.maxConditionChecks'
+		],
+		[counts.frontierRecords, budgets.maxFrontiers, '$inputs.request.budgets.maxFrontiers'],
+		[
+			counts.chargedTraversalSteps,
+			budgets.maxTraversalSteps,
+			'$inputs.request.budgets.maxTraversalSteps'
+		],
+		[counts.outputRecords, budgets.maxOutputRecords, '$inputs.request.budgets.maxOutputRecords']
+	] as const) {
+		if (actual > maximum)
+			return issue('BUDGET_EXHAUSTED', `The operation budget at ${path} was exhausted.`, path);
+	}
+	return null;
+}
+
+/** The selected leaf and every ancestor branch seed on its path back to the tree root. */
+function selectedBranchSeedIndexes(evaluated: EvaluatedSurface): Set<number> {
+	const selected = new Set<number>();
+	let current: number | null = evaluated.decisionLeafSeedIndex;
+	while (current !== null) {
+		selected.add(current);
+		current = evaluated.branchSeeds[current]!.parentIndex;
+	}
+	return selected;
+}
+
+function branchEvaluation(
+	seed: BranchSeed,
+	ordinal: number,
+	selected: ReadonlySet<number>
+): ConditionalExportBranchRecord['evaluation'] {
+	if (seed.exclusionReason !== null) return 'EXCLUDED';
+	if (selected.has(ordinal)) return 'SELECTED';
+	return 'CANDIDATE';
+}
 
 function derive(
 	inputs: ConditionalExportResolutionBuildInputs,
@@ -1589,39 +1875,14 @@ function derive(
 	const chargedTraversalSteps =
 		parsed.astNodes + evaluated.exactKeyComparisons + branchRecords + frontierRecords;
 	const outputRecords = 1 + branchRecords + frontierRecords;
-	for (const [actual, maximum, path] of [
-		[branchRecords, inputs.request.budgets.maxBranches, '$inputs.request.budgets.maxBranches'],
-		[
-			branchRecords,
-			inputs.request.budgets.maxConditionChecks,
-			'$inputs.request.budgets.maxConditionChecks'
-		],
-		[frontierRecords, inputs.request.budgets.maxFrontiers, '$inputs.request.budgets.maxFrontiers'],
-		[
-			chargedTraversalSteps,
-			inputs.request.budgets.maxTraversalSteps,
-			'$inputs.request.budgets.maxTraversalSteps'
-		],
-		[
-			outputRecords,
-			inputs.request.budgets.maxOutputRecords,
-			'$inputs.request.budgets.maxOutputRecords'
-		]
-	] as const) {
-		if (actual > maximum)
-			return {
-				problem: issue('BUDGET_EXHAUSTED', `The operation budget at ${path} was exhausted.`, path),
-				state: 'INVALID'
-			};
-	}
-	const selectedSeedIndexes = new Set<number>();
-	if (evaluated.decisionLeafSeedIndex !== null) {
-		let current: number | null = evaluated.decisionLeafSeedIndex;
-		while (current !== null) {
-			selectedSeedIndexes.add(current);
-			current = evaluated.branchSeeds[current]!.parentIndex;
-		}
-	}
+	const budgetIssue = operationBudgetIssue(inputs, {
+		branchRecords,
+		chargedTraversalSteps,
+		frontierRecords,
+		outputRecords
+	});
+	if (budgetIssue !== null) return { problem: budgetIssue, state: 'INVALID' };
+	const selectedSeedIndexes = selectedBranchSeedIndexes(evaluated);
 	const branches = evaluated.branchSeeds.map((seed, ordinal): ConditionalExportBranchRecord => {
 		const identityInput = {
 			conditionPath: seed.conditionPath,
@@ -1637,12 +1898,7 @@ function derive(
 			conditionPath: seed.conditionPath,
 			declarationOrdinal: seed.declarationOrdinal,
 			depth: seed.depth,
-			evaluation:
-				seed.exclusionReason !== null
-					? 'EXCLUDED'
-					: selectedSeedIndexes.has(ordinal)
-						? 'SELECTED'
-						: 'CANDIDATE',
+			evaluation: branchEvaluation(seed, ordinal, selectedSeedIndexes),
 			exclusionReason: seed.exclusionReason,
 			id: independentBranchId(resolutionId, identityInput),
 			keySpan: seed.keySpan,
@@ -1680,7 +1936,7 @@ function derive(
 	} as ConditionalExportDecisionRecord;
 	const coverage = {
 		astNodes: parsed.astNodes,
-		blockedByNullDecisions: decision.state === 'BLOCKED_BY_NULL' ? (1 as const) : (0 as const),
+		blockedByNullDecisions: tally(decision.state === 'BLOCKED_BY_NULL'),
 		branchPopulationReconciles: true as const,
 		branchRecords,
 		candidateBranches: branches.filter((branch) => branch.evaluation === 'CANDIDATE').length,
@@ -1689,26 +1945,22 @@ function derive(
 		decisionPopulationReconciles: true as const,
 		decisionRecords: 1 as const,
 		exactExportKeyComparisons: evaluated.exactKeyComparisons,
-		exactExportKeyMatches:
-			evaluated.exactKeyOutcome.state === 'MATCHED' ? (1 as const) : (0 as const),
-		exactExportKeyMisses:
-			evaluated.exactKeyOutcome.state === 'ABSENT' ? (1 as const) : (0 as const),
+		exactExportKeyMatches: tally(evaluated.exactKeyOutcome.state === 'MATCHED'),
+		exactExportKeyMisses: tally(evaluated.exactKeyOutcome.state === 'ABSENT'),
 		excludedBranches: branches.filter((branch) => branch.evaluation === 'EXCLUDED').length,
 		frontierPopulationReconciles: true as const,
 		frontierRecords,
 		manifestBytes: parsed.manifestWitness.manifestBytes,
-		noExactExportKeyDecisions:
-			decision.state === 'NO_EXACT_EXPORT_KEY' ? (1 as const) : (0 as const),
-		noMatchingConditionDecisions:
-			decision.state === 'NO_MATCHING_CONDITION' ? (1 as const) : (0 as const),
+		noExactExportKeyDecisions: tally(decision.state === 'NO_EXACT_EXPORT_KEY'),
+		noMatchingConditionDecisions: tally(decision.state === 'NO_MATCHING_CONDITION'),
 		outputRecords,
 		selectedBranches: branches.filter((branch) => branch.evaluation === 'SELECTED').length,
 		selectedConsumerPrograms: 1 as const,
 		selectedConsumerSources: 1 as const,
 		selectedManifests: 1 as const,
-		selectedTargetDecisions: decision.state === 'SELECTED_TARGET' ? (1 as const) : (0 as const),
+		selectedTargetDecisions: tally(decision.state === 'SELECTED_TARGET'),
 		selectedWorkspacePackages: 1 as const,
-		unsupportedDecisions: decision.state === 'UNSUPPORTED' ? (1 as const) : (0 as const)
+		unsupportedDecisions: tally(decision.state === 'UNSUPPORTED')
 	};
 	const open = decision.state === 'UNSUPPORTED';
 	const content = {
@@ -1755,43 +2007,21 @@ function derive(
 	};
 }
 
-function manifestStructureIssue(
-	parsed: ParsedManifest,
-	request: ConditionalExportResolutionBuildInputs['request']
+function scalarExportTargetIssue(text: string): ConditionalExportResolutionValidationIssue | null {
+	return isUnicodeScalarString(text)
+		? null
+		: issue(
+				'INPUT_INVALID',
+				'Decoded export target strings must contain Unicode scalar text.',
+				'$manifest.exports'
+			);
+}
+
+/** Walks the selected exact-key condition subtree for numeric keys and non-scalar targets. */
+function conditionSubtreeIssue(
+	root: ts.ObjectLiteralExpression
 ): ConditionalExportResolutionValidationIssue | null {
-	const value = parsed.exportsProperty?.initializer;
-	if (value === undefined) return null;
-	if (ts.isStringLiteral(value))
-		return isUnicodeScalarString(value.text)
-			? null
-			: issue(
-					'INPUT_INVALID',
-					'Decoded export target strings must contain Unicode scalar text.',
-					'$manifest.exports'
-				);
-	if (!ts.isObjectLiteralExpression(value)) return null;
-	const keys = value.properties.map((property) => propertyName(property as ts.PropertyAssignment)!);
-	if (keys.some((key) => key.startsWith('.')) && keys.some((key) => !key.startsWith('.')))
-		return issue(
-			'INPUT_INVALID',
-			'The manifest exports object must not mix subpath and condition keys.',
-			'$manifest.exports'
-		);
-	if (!keys.every((key) => key.startsWith('.'))) return null;
-	const exactProperty = value.properties.find(
-		(property) => propertyName(property as ts.PropertyAssignment) === request.exportSubpath
-	) as ts.PropertyAssignment | undefined;
-	if (exactProperty === undefined) return null;
-	if (ts.isStringLiteral(exactProperty.initializer))
-		return isUnicodeScalarString(exactProperty.initializer.text)
-			? null
-			: issue(
-					'INPUT_INVALID',
-					'Decoded export target strings must contain Unicode scalar text.',
-					'$manifest.exports'
-				);
-	if (!ts.isObjectLiteralExpression(exactProperty.initializer)) return null;
-	const pending: ts.ObjectLiteralExpression[] = [exactProperty.initializer];
+	const pending: ts.ObjectLiteralExpression[] = [root];
 	while (pending.length > 0) {
 		const object = pending.pop()!;
 		for (const property of object.properties) {
@@ -1819,16 +2049,38 @@ function manifestStructureIssue(
 	return null;
 }
 
-function validateInternal(
+function manifestStructureIssue(
+	parsed: ParsedManifest,
+	request: ConditionalExportResolutionBuildInputs['request']
+): ConditionalExportResolutionValidationIssue | null {
+	const value = parsed.exportsProperty?.initializer;
+	if (value === undefined) return null;
+	if (ts.isStringLiteral(value)) return scalarExportTargetIssue(value.text);
+	if (!ts.isObjectLiteralExpression(value)) return null;
+	const keys = value.properties.map((property) => propertyName(property as ts.PropertyAssignment)!);
+	if (keys.some((key) => key.startsWith('.')) && keys.some((key) => !key.startsWith('.')))
+		return issue(
+			'INPUT_INVALID',
+			'The manifest exports object must not mix subpath and condition keys.',
+			'$manifest.exports'
+		);
+	if (!keys.every((key) => key.startsWith('.'))) return null;
+	const exactProperty = value.properties.find(
+		(property) => propertyName(property as ts.PropertyAssignment) === request.exportSubpath
+	) as ts.PropertyAssignment | undefined;
+	if (exactProperty === undefined) return null;
+	if (ts.isStringLiteral(exactProperty.initializer))
+		return scalarExportTargetIssue(exactProperty.initializer.text);
+	if (!ts.isObjectLiteralExpression(exactProperty.initializer)) return null;
+	return conditionSubtreeIssue(exactProperty.initializer);
+}
+
+/** Ordered admission gate: candidate shell, input shell, closed request, and identity binding. */
+function inputAdmissionIssue(
 	value: unknown,
 	inputsValue: unknown,
-	options: ConditionalExportResolutionValidationOptions | undefined,
-	knownInputDigest?: string,
-	predecessorValidated = false
-): ConditionalExportResolutionValidationResult {
-	const limits = closeOptions(options);
-	if (limits === null)
-		return invalid(issue('SHAPE_INVALID', 'Validation options are invalid.', '$options'));
+	limits: ClosedOptions
+): ConditionalExportResolutionValidationIssue | null {
 	const candidateTreeIssue = plainTreeIssue(
 		value,
 		{
@@ -1838,13 +2090,14 @@ function validateInternal(
 		},
 		'$'
 	);
-	if (candidateTreeIssue !== null) return invalid(candidateTreeIssue);
+	if (candidateTreeIssue !== null) return candidateTreeIssue;
 	if (!plainRecord(value) || !exactKeys(value, SNAPSHOT_KEYS))
-		return invalid(
-			issue('SHAPE_INVALID', 'The conditional-export resolution snapshot shell must be exact.')
+		return issue(
+			'SHAPE_INVALID',
+			'The conditional-export resolution snapshot shell must be exact.'
 		);
 	const shellIssue = inputShellIssue(inputsValue);
-	if (shellIssue !== null) return invalid(shellIssue);
+	if (shellIssue !== null) return shellIssue;
 	const broadInputIssue = plainTreeIssue(
 		inputsValue,
 		{
@@ -1855,10 +2108,10 @@ function validateInternal(
 		'$inputs',
 		true
 	);
-	if (broadInputIssue !== null) return invalid(broadInputIssue);
+	if (broadInputIssue !== null) return broadInputIssue;
 	const inputs = inputsValue as ConditionalExportResolutionBuildInputs;
 	const closedRequestIssue = requestIssue(inputs);
-	if (closedRequestIssue !== null) return invalid(closedRequestIssue);
+	if (closedRequestIssue !== null) return closedRequestIssue;
 	const requestInputIssue = plainTreeIssue(
 		inputsValue,
 		{
@@ -1872,9 +2125,23 @@ function validateInternal(
 		'$inputs',
 		true
 	);
-	if (requestInputIssue !== null) return invalid(requestInputIssue);
-	const bindingIssue = inputBindingIssue(inputs);
-	if (bindingIssue !== null) return invalid(bindingIssue);
+	if (requestInputIssue !== null) return requestInputIssue;
+	return inputBindingIssue(inputs);
+}
+
+function validateInternal(
+	value: unknown,
+	inputsValue: unknown,
+	options: ConditionalExportResolutionValidationOptions | undefined,
+	knownInputDigest?: string,
+	predecessorValidated = false
+): ConditionalExportResolutionValidationResult {
+	const limits = closeOptions(options);
+	if (limits === null)
+		return invalid(issue('SHAPE_INVALID', 'Validation options are invalid.', '$options'));
+	const admissionIssue = inputAdmissionIssue(value, inputsValue, limits);
+	if (admissionIssue !== null) return invalid(admissionIssue);
+	const inputs = inputsValue as ConditionalExportResolutionBuildInputs;
 	if (!predecessorValidated) {
 		const predecessorIssue = projectContextValidationIssue(inputs, limits);
 		if (predecessorIssue !== null) return invalid(predecessorIssue);
