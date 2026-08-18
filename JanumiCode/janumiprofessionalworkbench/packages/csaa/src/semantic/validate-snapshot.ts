@@ -3,6 +3,7 @@ import { isProxy } from 'node:util/types';
 import ts from 'typescript';
 import type {
 	CompilerInputObservation,
+	SemanticCapability,
 	SemanticFactProvenanceRecord,
 	SemanticLimitation,
 	SemanticPopulationKind,
@@ -26,7 +27,7 @@ import {
 	SEMANTIC_TYPE_FINGERPRINT_PROFILE,
 	TYPESCRIPT_PROVIDER_VERSION
 } from '../contracts/semantic.js';
-import { sha256 } from '../inventory/canonical.js';
+import { compareText, sha256 } from '../inventory/canonical.js';
 import {
 	canonicalSemanticJson,
 	canonicalSemanticJsonWitness,
@@ -279,7 +280,7 @@ function isLogicalPath(value: string): boolean {
 }
 
 function sortedUnique(values: readonly string[]): string[] {
-	return [...new Set(values)].sort();
+	return [...new Set(values)].sort(compareText);
 }
 
 function diagnosticManifestDigest(
@@ -288,7 +289,7 @@ function diagnosticManifestDigest(
 	return sha256(
 		canonicalSemanticJson(
 			[...records]
-				.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+				.sort((left, right) => compareText(left.id, right.id))
 				.map(({ id, multiplicity }) => ({ id, multiplicity }))
 		)
 	);
@@ -373,9 +374,7 @@ function compilerInputQueryKey(observation: CompilerInputObservation): string {
 	});
 }
 
-function populationCapability(
-	kind: SemanticPopulationKind
-): 'TS_PROJECT' | 'TS_SYMBOL' | 'TS_SYNTAX' | 'TS_TYPE' {
+function populationCapability(kind: SemanticPopulationKind): SemanticCapability {
 	if (
 		[
 			'TYPE',
@@ -424,6 +423,77 @@ function indexBy<Value>(
 	const result = new Map<string, Value>();
 	for (const value of values) result.set(keyOf(value), value);
 	return result;
+}
+
+interface RecomputedScopeLink {
+	readonly scope: StaticSemanticSnapshot['scopes'][number] | undefined;
+	readonly state: 'RESOLVED' | 'UNSUPPORTED';
+}
+
+function expectedSymbolMergeState(
+	declarationCount: number
+): StaticSemanticSnapshot['symbols'][number]['mergeState'] {
+	if (declarationCount === 0) return 'DECLARATIONLESS';
+	if (declarationCount === 1) return 'SINGLE';
+	return 'MERGED';
+}
+
+function aliasStateDisagrees(alias: StaticSemanticSnapshot['aliases'][number]): boolean {
+	if (alias.state === 'RESOLVED')
+		return alias.targetSymbolId === null || alias.terminalSymbolId === null;
+	if (alias.state === 'CIRCULAR') return alias.terminalSymbolId !== null;
+	return alias.targetSymbolId !== null || alias.terminalSymbolId !== null;
+}
+
+function expectedTypeIdentityBasis(
+	type: StaticSemanticSnapshot['types'][number]
+): StaticSemanticSnapshot['types'][number]['identityBasis'] {
+	if (
+		type.symbolId !== null ||
+		type.aliasSymbolId !== null ||
+		type.acquisitionAnchors.some((anchor) => anchor.kind === 'DECLARATION')
+	)
+		return 'DECLARATION_ANCHORED';
+	if (type.acquisitionAnchors.some((anchor) => anchor.kind === 'NODE' || anchor.kind === 'SYMBOL'))
+		return 'QUERY_ANCHORED';
+	return 'STRUCTURAL';
+}
+
+function expectedParameterConstraintRelationState(
+	constraintState: StaticSemanticSnapshot['typeParameters'][number]['constraintState']
+): StaticSemanticSnapshot['typeRelations'][number]['state'] {
+	if (constraintState === 'UNRESOLVED') return 'UNRESOLVED';
+	if (constraintState === 'UNSUPPORTED') return 'UNSUPPORTED';
+	return 'CONFIRMED';
+}
+
+function expectedCandidateExportBinding(
+	candidate: StaticSemanticSnapshot['declarationCandidates'][number],
+	modifierNames: ReadonlySet<string>,
+	carrierModifierNames: ReadonlySet<string>,
+	variableCarrier: StaticSemanticSnapshot['astNodes'][number] | undefined
+): {
+	readonly carrierId: string | null;
+	readonly syntax: StaticSemanticSnapshot['declarationCandidates'][number]['exportSyntax'];
+} {
+	if (candidate.syntaxKind === ts.SyntaxKind.ExportSpecifier)
+		return { carrierId: candidate.nodeId, syntax: 'EXPORT_SPECIFIER' };
+	if (candidate.syntaxKind === ts.SyntaxKind.ExportAssignment)
+		return { carrierId: candidate.nodeId, syntax: 'EXPORT_ASSIGNMENT' };
+	if (
+		candidate.syntaxKind === ts.SyntaxKind.NamespaceExport ||
+		candidate.syntaxKind === ts.SyntaxKind.NamespaceExportDeclaration
+	)
+		return { carrierId: candidate.nodeId, syntax: 'NAMESPACE_EXPORT' };
+	if (modifierNames.has('DefaultKeyword'))
+		return { carrierId: candidate.nodeId, syntax: 'DEFAULT' };
+	if (modifierNames.has('ExportKeyword'))
+		return { carrierId: candidate.nodeId, syntax: 'EXPLICIT' };
+	if (carrierModifierNames.has('DefaultKeyword'))
+		return { carrierId: variableCarrier!.id, syntax: 'DEFAULT' };
+	if (carrierModifierNames.has('ExportKeyword'))
+		return { carrierId: variableCarrier!.id, syntax: 'EXPLICIT' };
+	return { carrierId: null, syntax: 'NONE' };
 }
 
 function validateStaticSemanticSnapshotUnsafe(
@@ -1135,7 +1205,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		operationVersion: snapshot.operationVersion,
 		projectRecipeDigests: snapshot.projects
 			.map((project) => project.programRecipe.projectResolutionDigest)
-			.sort(),
+			.sort(compareText),
 		provider: snapshot.provider,
 		requestedCapabilities: snapshot.requestedCapabilities,
 		schemaVersion: snapshot.schemaVersion,
@@ -1352,7 +1422,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	): boolean {
 		if (!referenceCheck()) return false;
 		const source = sourceById.get(sourceId as never);
-		if (source === undefined || source.programId !== programId || source.projectId !== projectId) {
+		if (source?.programId !== programId || source.projectId !== projectId) {
 			issue(
 				'CROSS_PROJECT_REFERENCE',
 				jsonPath,
@@ -1409,7 +1479,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	): boolean {
 		if (!referenceCheck()) return false;
 		const symbol = symbolById.get(symbolId as never);
-		if (symbol === undefined || symbol.programId !== programId || symbol.projectId !== projectId) {
+		if (symbol?.programId !== programId || symbol.projectId !== projectId) {
 			issue(
 				symbol === undefined ? 'DANGLING_REFERENCE' : 'CROSS_PROJECT_REFERENCE',
 				jsonPath,
@@ -1471,7 +1541,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			'$validationContext.frozenSubject.descriptor.subjectId',
 			'FrozenSubject witness does not bind the semantic snapshot subject.'
 		);
-	if (frozenSubject !== undefined && frozenSubject.descriptor.subjectId === snapshot.subjectId) {
+	if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
 		for (const observation of frozenReads) {
 			const artifactPath = frozenArtifactPath(observation.logicalPath);
 			const matchingArtifacts = frozenSubject.artifacts.filter(
@@ -1538,7 +1608,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	}
 	if (projectByConfigPath.size !== snapshot.projects.length)
 		issue('DUPLICATE_ID', '$.projects', 'Project configuration paths must be unique.');
-	if (frozenSubject !== undefined && frozenSubject.descriptor.subjectId === snapshot.subjectId) {
+	if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
 		const authoritativePaths = frozenSubject.projects.map((project) => project.configPath);
 		if (
 			new Set(authoritativePaths).size !== authoritativePaths.length ||
@@ -1617,6 +1687,46 @@ function validateStaticSemanticSnapshotUnsafe(
 			);
 	}
 
+	function diagnosticMessageScalarText(
+		message: StaticSemanticSnapshot['diagnostics'][number]['message'],
+		jsonPath: string
+	): void {
+		if (
+			!isUnicodeScalarString(message.text) ||
+			message.textLength !== message.text.length ||
+			message.textSha256 !==
+				semanticUtf16CodeUnitsDigest('JAN-CSAA-DIAGNOSTIC-TEXT', ['UNICODE_SCALAR'], message.text)
+		)
+			issue(
+				'INVALID_VALUE',
+				jsonPath,
+				'Scalar diagnostic text encoding, length, or digest is incoherent.'
+			);
+	}
+
+	function diagnosticMessageTextEncoding(
+		message: StaticSemanticSnapshot['diagnostics'][number]['message'],
+		jsonPath: string
+	): void {
+		if (message.textEncoding === 'UNICODE_SCALAR') {
+			diagnosticMessageScalarText(message, jsonPath);
+			return;
+		}
+		const units = parseUtf16CodeUnitsHex(message.text);
+		if (
+			units === null ||
+			!hasLoneUtf16CodeUnit(units) ||
+			message.textLength !== units.length ||
+			message.textSha256 !==
+				semanticUtf16CodeUnitsDigest('JAN-CSAA-DIAGNOSTIC-TEXT', ['UTF16_CODE_UNITS_HEX'], units)
+		)
+			issue(
+				'INVALID_VALUE',
+				jsonPath,
+				'UTF-16 diagnostic text encoding, length, or digest is incoherent.'
+			);
+	}
+
 	function diagnosticMessage(
 		root: StaticSemanticSnapshot['diagnostics'][number]['message'],
 		jsonPath: string
@@ -1638,41 +1748,7 @@ function validateStaticSemanticSnapshotUnsafe(
 					`${current.path}.textSha256`,
 					'Diagnostic message digest must be lowercase SHA-256.'
 				);
-			if (current.message.textEncoding === 'UNICODE_SCALAR') {
-				if (
-					!isUnicodeScalarString(current.message.text) ||
-					current.message.textLength !== current.message.text.length ||
-					current.message.textSha256 !==
-						semanticUtf16CodeUnitsDigest(
-							'JAN-CSAA-DIAGNOSTIC-TEXT',
-							['UNICODE_SCALAR'],
-							current.message.text
-						)
-				)
-					issue(
-						'INVALID_VALUE',
-						current.path,
-						'Scalar diagnostic text encoding, length, or digest is incoherent.'
-					);
-			} else {
-				const units = parseUtf16CodeUnitsHex(current.message.text);
-				if (
-					units === null ||
-					!hasLoneUtf16CodeUnit(units) ||
-					current.message.textLength !== units.length ||
-					current.message.textSha256 !==
-						semanticUtf16CodeUnitsDigest(
-							'JAN-CSAA-DIAGNOSTIC-TEXT',
-							['UTF16_CODE_UNITS_HEX'],
-							units
-						)
-				)
-					issue(
-						'INVALID_VALUE',
-						current.path,
-						'UTF-16 diagnostic text encoding, length, or digest is incoherent.'
-					);
-			}
+			diagnosticMessageTextEncoding(current.message, current.path);
 			for (let index = current.message.next.length - 1; index >= 0; index -= 1)
 				stack.push({
 					message: current.message.next[index]!,
@@ -1683,9 +1759,10 @@ function validateStaticSemanticSnapshotUnsafe(
 
 	const validatedProvenanceIds = new Set<string>();
 	const referencedProvenanceIds = new Set<string>();
-	function validateProvenanceRecord(record: SemanticFactProvenanceRecord, jsonPath: string): void {
-		if (validatedProvenanceIds.has(record.id)) return;
-		validatedProvenanceIds.add(record.id);
+	function validateProvenanceIdentityBinding(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
 		const { id: _id, ...preimage } = record;
 		if (semanticProvenanceId(preimage) !== record.id)
 			issue(
@@ -1721,6 +1798,12 @@ function validateStaticSemanticSnapshotUnsafe(
 				`${jsonPath}.provider`,
 				'Provenance provider does not match snapshot provider.'
 			);
+	}
+
+	function validateProvenanceEpistemicState(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
 		const epistemic = record.epistemic;
 		if (
 			!isRecord(epistemic) ||
@@ -1775,6 +1858,12 @@ function validateStaticSemanticSnapshotUnsafe(
 				`${jsonPath}.epistemic.capabilityCoverage`,
 				'Unknown freshness, unresolved regions, or closure-degrading limitations require partial capability coverage.'
 			);
+	}
+
+	function validateProvenanceLimitationSet(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
 		if (!isCanonicalSet(record.limitations.map(limitationKey)))
 			issue(
 				'NONCANONICAL_ORDER',
@@ -1799,6 +1888,12 @@ function validateStaticSemanticSnapshotUnsafe(
 					'Fatal provenance must not be emitted.'
 				);
 		}
+	}
+
+	function validateProvenanceSymbolBoundaryLimitations(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
 		const provenanceProgramBoundaryLimitations = record.limitations.filter(
 			(limitation) =>
 				limitation.capability === 'TS_SYMBOL' &&
@@ -1824,6 +1919,12 @@ function validateStaticSemanticSnapshotUnsafe(
 				`${jsonPath}.limitations`,
 				'The TS_SYMBOL Program-boundary provenance limitation is forbidden outside TS_SYMBOL provenance in a multi-Program snapshot.'
 			);
+	}
+
+	function validateProvenanceTypeBoundaryLimitations(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
 		const provenanceTypeProgramBoundaryLimitations = record.limitations.filter(
 			(limitation) =>
 				limitation.capability === 'TS_TYPE' &&
@@ -1849,6 +1950,12 @@ function validateStaticSemanticSnapshotUnsafe(
 				`${jsonPath}.limitations`,
 				'The TS_TYPE Program-boundary provenance limitation is forbidden outside TS_TYPE provenance in a multi-Program snapshot.'
 			);
+	}
+
+	function validateProvenanceInvalidationDependencies(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
 		const project = projectById.get(record.projectId);
 		const program = project === undefined ? undefined : programById.get(project.programId);
 		if (project === undefined || program === undefined)
@@ -1884,85 +1991,111 @@ function validateStaticSemanticSnapshotUnsafe(
 					`${jsonPath}.invalidationDependencies`,
 					`Invalidation dependency ${dependency.kind} does not bind the actual input.`
 				);
-		if (record.sourceId === null) {
-			if (record.parentProvenanceId !== null)
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.parentProvenanceId`,
-					'Project provenance must not have a parent.'
-				);
-			const expectedSupportRefs = supportRefsByProject.get(record.projectId);
-			if (
-				expectedSupportRefs === undefined ||
-				!sameMembers(epistemic.supportBasis.sourceRefs, [...expectedSupportRefs])
-			)
-				issue(
-					'DANGLING_REFERENCE',
-					`${jsonPath}.epistemic.supportBasis.sourceRefs`,
-					'Project provenance support must bind exactly the subject, snapshot, project, Program, and attributed compiler inputs.'
-				);
-		} else {
-			const source = sourceById.get(record.sourceId);
-			if (source === undefined || source.projectId !== record.projectId)
-				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`${jsonPath}.sourceId`,
-					'Source provenance must bind a source in the same project.'
-				);
-			const parent =
-				record.parentProvenanceId === null
-					? undefined
-					: provenanceById.get(record.parentProvenanceId);
-			if (
-				parent === undefined ||
-				parent.sourceId !== null ||
-				parent.parentProvenanceId !== null ||
-				parent.projectId !== record.projectId ||
-				parent.capability !== record.capability
-			)
-				issue(
-					'CROSS_PROJECT_REFERENCE',
-					`${jsonPath}.parentProvenanceId`,
-					'Source provenance must have exactly one same-project, same-capability project-provenance parent.'
-				);
-			else {
-				referencedProvenanceIds.add(parent.id);
-				validateProvenanceRecord(
-					parent,
-					`$.provenances[${provenanceIndexById.get(parent.id) ?? -1}]`
-				);
-				const childLimitationKeys = new Set(record.limitations.map(limitationKey));
-				const childUnresolvedRegions = new Set(record.epistemic.unresolvedRegions);
-				if (
-					parent.limitations.some(
-						(limitation) => !childLimitationKeys.has(limitationKey(limitation))
-					) ||
-					parent.epistemic.unresolvedRegions.some((region) => !childUnresolvedRegions.has(region))
-				)
-					issue(
-						'INVALID_VALUE',
-						`${jsonPath}.parentProvenanceId`,
-						'Source provenance must monotonically preserve every parent limitation and unresolved region.'
-					);
-			}
-			if (
-				!sameMembers(epistemic.supportBasis.sourceRefs, [
-					record.parentProvenanceId ?? '',
-					record.sourceId
-				])
-			)
-				issue(
-					'INVALID_VALUE',
-					`${jsonPath}.epistemic.supportBasis.sourceRefs`,
-					'Source provenance support must bind exactly its parent provenance and source.'
-				);
+	}
+
+	function validateProjectProvenanceSupport(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
+		if (record.parentProvenanceId !== null)
+			issue(
+				'INVALID_VALUE',
+				`${jsonPath}.parentProvenanceId`,
+				'Project provenance must not have a parent.'
+			);
+		const expectedSupportRefs = supportRefsByProject.get(record.projectId);
+		if (
+			expectedSupportRefs === undefined ||
+			!sameMembers(record.epistemic.supportBasis.sourceRefs, [...expectedSupportRefs])
+		)
+			issue(
+				'DANGLING_REFERENCE',
+				`${jsonPath}.epistemic.supportBasis.sourceRefs`,
+				'Project provenance support must bind exactly the subject, snapshot, project, Program, and attributed compiler inputs.'
+			);
+	}
+
+	function validateSourceProvenanceParent(
+		record: SemanticFactProvenanceRecord,
+		jsonPath: string
+	): void {
+		const parent =
+			record.parentProvenanceId === null
+				? undefined
+				: provenanceById.get(record.parentProvenanceId);
+		if (
+			parent?.sourceId !== null ||
+			parent.parentProvenanceId !== null ||
+			parent.projectId !== record.projectId ||
+			parent.capability !== record.capability
+		) {
+			issue(
+				'CROSS_PROJECT_REFERENCE',
+				`${jsonPath}.parentProvenanceId`,
+				'Source provenance must have exactly one same-project, same-capability project-provenance parent.'
+			);
+			return;
 		}
+		referencedProvenanceIds.add(parent.id);
+		validateProvenanceRecord(parent, `$.provenances[${provenanceIndexById.get(parent.id) ?? -1}]`);
+		const childLimitationKeys = new Set(record.limitations.map(limitationKey));
+		const childUnresolvedRegions = new Set(record.epistemic.unresolvedRegions);
+		if (
+			parent.limitations.some(
+				(limitation) => !childLimitationKeys.has(limitationKey(limitation))
+			) ||
+			parent.epistemic.unresolvedRegions.some((region) => !childUnresolvedRegions.has(region))
+		)
+			issue(
+				'INVALID_VALUE',
+				`${jsonPath}.parentProvenanceId`,
+				'Source provenance must monotonically preserve every parent limitation and unresolved region.'
+			);
+	}
+
+	function validateSourceProvenanceBinding(
+		record: SemanticFactProvenanceRecord,
+		sourceId: string,
+		jsonPath: string
+	): void {
+		const source = sourceById.get(sourceId);
+		if (source?.projectId !== record.projectId)
+			issue(
+				'CROSS_PROJECT_REFERENCE',
+				`${jsonPath}.sourceId`,
+				'Source provenance must bind a source in the same project.'
+			);
+		validateSourceProvenanceParent(record, jsonPath);
+		if (
+			!sameMembers(record.epistemic.supportBasis.sourceRefs, [
+				record.parentProvenanceId ?? '',
+				sourceId
+			])
+		)
+			issue(
+				'INVALID_VALUE',
+				`${jsonPath}.epistemic.supportBasis.sourceRefs`,
+				'Source provenance support must bind exactly its parent provenance and source.'
+			);
+	}
+
+	function validateProvenanceRecord(record: SemanticFactProvenanceRecord, jsonPath: string): void {
+		if (validatedProvenanceIds.has(record.id)) return;
+		validatedProvenanceIds.add(record.id);
+		validateProvenanceIdentityBinding(record, jsonPath);
+		validateProvenanceEpistemicState(record, jsonPath);
+		validateProvenanceLimitationSet(record, jsonPath);
+		validateProvenanceSymbolBoundaryLimitations(record, jsonPath);
+		validateProvenanceTypeBoundaryLimitations(record, jsonPath);
+		validateProvenanceInvalidationDependencies(record, jsonPath);
+		if (record.sourceId === null) validateProjectProvenanceSupport(record, jsonPath);
+		else validateSourceProvenanceBinding(record, record.sourceId, jsonPath);
 	}
 
 	function provenance(
 		provenanceId: string,
 		projectId: string,
-		capability: 'TS_PROJECT' | 'TS_SYMBOL' | 'TS_SYNTAX' | 'TS_TYPE',
+		capability: SemanticCapability,
 		jsonPath: string,
 		sourceId?: string
 	): SemanticFactProvenanceRecord | undefined {
@@ -2379,7 +2512,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		for (const coverage of program.diagnosticFamilies) {
 			const familyRecords =
 				diagnosticsByProjectFamily.get(`${program.projectId}\0${coverage.family}`) ?? [];
-			const familyIds = familyRecords.map((diagnostic) => diagnostic.id).sort();
+			const familyIds = familyRecords.map((diagnostic) => diagnostic.id).sort(compareText);
 			const occurrenceCount = familyRecords.reduce(
 				(total, diagnostic) => total + diagnostic.multiplicity,
 				0
@@ -2424,7 +2557,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		const rootPaths = programSources
 			.filter((source) => rootSourceSet.has(source.id))
 			.map((source) => source.logicalPath)
-			.sort();
+			.sort(compareText);
 		if (project !== undefined && !sameMembers(rootPaths, project.rootNames))
 			issue(
 				'DANGLING_REFERENCE',
@@ -2511,8 +2644,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			const rootNode = source.rootNodeId === null ? undefined : nodeById.get(source.rootNodeId);
 			if (
 				source.artifactClass === 'CONTEXT_ONLY' ||
-				!rootNode ||
-				rootNode.sourceId !== source.id ||
+				rootNode?.sourceId !== source.id ||
 				rootNode.parentId !== null ||
 				rootNode.kind !== ts.SyntaxKind.SourceFile ||
 				rootNode.structuralRoles.length !== 1 ||
@@ -2608,7 +2740,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	const siblingKeys = new Set<string>();
 	for (const [index, node] of snapshot.astNodes.entries()) {
 		const source = sourceById.get(node.sourceId);
-		if (!source || source.analysisDisposition !== 'DEEP_INDEXED')
+		if (source?.analysisDisposition !== 'DEEP_INDEXED')
 			issue(
 				'CROSS_PROJECT_REFERENCE',
 				`$.astNodes[${index}].sourceId`,
@@ -2771,13 +2903,13 @@ function validateStaticSemanticSnapshotUnsafe(
 					'Parent is from another source or does not contain the child.'
 				);
 			else {
-				const invocationRoles: readonly string[] = [
+				const invocationRoles: ReadonlySet<string> = new Set<string>([
 					AST_STRUCTURAL_ROLES.invocationCallee,
 					AST_STRUCTURAL_ROLES.invocationArgument,
 					AST_STRUCTURAL_ROLES.invocationTemplate
-				];
+				]);
 				if (
-					node.structuralRoles.some((role) => invocationRoles.includes(role)) &&
+					node.structuralRoles.some((role) => invocationRoles.has(role)) &&
 					semanticInvocationKind(parent.kind) === null
 				)
 					issue(
@@ -2879,7 +3011,7 @@ function validateStaticSemanticSnapshotUnsafe(
 					break;
 				}
 				const parent = nodeById.get(cursor.parentId);
-				if (parent === undefined || parent.sourceId !== source.id) {
+				if (parent?.sourceId !== source.id) {
 					validChain = false;
 					break;
 				}
@@ -2998,11 +3130,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			scope.ownerKind === null || source === undefined
 				? null
 				: semanticScopeBoundaryDescriptor(scope.ownerKind, source.moduleKind);
-		if (
-			expectedDescriptor === null ||
-			expectedDescriptor.kind !== scope.kind ||
-			expectedDescriptor.domain !== scope.domain
-		)
+		if (expectedDescriptor?.kind !== scope.kind || expectedDescriptor.domain !== scope.domain)
 			issue(
 				'INVALID_VALUE',
 				`${jsonPath}.kind`,
@@ -3163,7 +3291,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				cursor = cursor.parentId === null ? undefined : nodeById.get(cursor.parentId);
 			}
 		}
-		if (expectedParent === undefined || scope.parentScopeId !== expectedParent.id)
+		if (scope.parentScopeId !== expectedParent?.id)
 			issue(
 				'INVALID_VALUE',
 				`$.scopes[${index}].parentScopeId`,
@@ -3201,23 +3329,30 @@ function validateStaticSemanticSnapshotUnsafe(
 			);
 	}
 
+	function bindingElementVariableDeclaration(
+		node: StaticSemanticSnapshot['astNodes'][number]
+	): StaticSemanticSnapshot['astNodes'][number] | undefined {
+		let cursor = node.parentId === null ? undefined : nodeById.get(node.parentId);
+		while (
+			cursor !== undefined &&
+			[
+				ts.SyntaxKind.ArrayBindingPattern,
+				ts.SyntaxKind.BindingElement,
+				ts.SyntaxKind.ObjectBindingPattern
+			].includes(cursor.kind)
+		)
+			cursor = cursor.parentId === null ? undefined : nodeById.get(cursor.parentId);
+		return cursor?.kind === ts.SyntaxKind.VariableDeclaration ? cursor : undefined;
+	}
+
 	function enclosingVariableStatement(
 		node: StaticSemanticSnapshot['astNodes'][number]
 	): StaticSemanticSnapshot['astNodes'][number] | undefined {
 		let declaration = node;
 		if (node.kind === ts.SyntaxKind.BindingElement) {
-			let cursor = node.parentId === null ? undefined : nodeById.get(node.parentId);
-			while (
-				cursor !== undefined &&
-				[
-					ts.SyntaxKind.ArrayBindingPattern,
-					ts.SyntaxKind.BindingElement,
-					ts.SyntaxKind.ObjectBindingPattern
-				].includes(cursor.kind)
-			)
-				cursor = cursor.parentId === null ? undefined : nodeById.get(cursor.parentId);
-			if (cursor?.kind !== ts.SyntaxKind.VariableDeclaration) return undefined;
-			declaration = cursor;
+			const bindingDeclaration = bindingElementVariableDeclaration(node);
+			if (bindingDeclaration === undefined) return undefined;
+			declaration = bindingDeclaration;
 		} else if (node.kind !== ts.SyntaxKind.VariableDeclaration) {
 			return undefined;
 		}
@@ -3478,7 +3613,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				literal.valueType === 'STRING' &&
 				literal.value === 'use strict' &&
 				literal.lexemeLength === USE_STRICT_LEXEME_LENGTH &&
-				USE_STRICT_LEXEME_DIGESTS.some((digest) => digest === literal.lexemeSha256)
+				USE_STRICT_LEXEME_DIGESTS.includes(literal.lexemeSha256)
 			)
 				return true;
 		}
@@ -3520,6 +3655,23 @@ function validateStaticSemanticSnapshotUnsafe(
 		return parent !== undefined && functionBodyNode(parent)?.id === node.id ? parent : undefined;
 	}
 
+	function functionDeclarationScopeLink(
+		node: StaticSemanticSnapshot['astNodes'][number]
+	): RecomputedScopeLink | undefined {
+		if (node.parentId === null) return undefined;
+		const parent = nodeById.get(node.parentId);
+		if (parent === undefined) return undefined;
+		const functionOwner = isDirectFunctionBody(parent);
+		if (functionOwner !== undefined) return { scope: ownedScope(functionOwner), state: 'RESOLVED' };
+		if (
+			parent.kind !== ts.SyntaxKind.SourceFile &&
+			parent.kind !== ts.SyntaxKind.ModuleBlock &&
+			!isValidationDefinitelyStrict(node)
+		)
+			return { scope: undefined, state: 'UNSUPPORTED' };
+		return undefined;
+	}
+
 	function expectedDeclarationScopeLink(node: StaticSemanticSnapshot['astNodes'][number]): {
 		readonly scope: StaticSemanticSnapshot['scopes'][number] | undefined;
 		readonly state: 'RESOLVED' | 'UNSUPPORTED';
@@ -3535,19 +3687,9 @@ function validateStaticSemanticSnapshotUnsafe(
 			node.kind === ts.SyntaxKind.ClassExpression
 		)
 			return { scope: ownedScope(node), state: 'RESOLVED' };
-		if (node.kind === ts.SyntaxKind.FunctionDeclaration && node.parentId !== null) {
-			const parent = nodeById.get(node.parentId);
-			if (parent !== undefined) {
-				const functionOwner = isDirectFunctionBody(parent);
-				if (functionOwner !== undefined)
-					return { scope: ownedScope(functionOwner), state: 'RESOLVED' };
-				if (
-					parent.kind !== ts.SyntaxKind.SourceFile &&
-					parent.kind !== ts.SyntaxKind.ModuleBlock &&
-					!isValidationDefinitelyStrict(node)
-				)
-					return { scope: undefined, state: 'UNSUPPORTED' };
-			}
+		if (node.kind === ts.SyntaxKind.FunctionDeclaration) {
+			const functionLink = functionDeclarationScopeLink(node);
+			if (functionLink !== undefined) return functionLink;
 		}
 		const declarationList = enclosingVariableDeclarationList(node);
 		if (
@@ -3593,7 +3735,7 @@ function validateStaticSemanticSnapshotUnsafe(
 
 	for (const [index, candidate] of snapshot.declarationCandidates.entries()) {
 		const node = nodeById.get(candidate.nodeId);
-		if (!node || node.sourceId !== candidate.sourceId)
+		if (node?.sourceId !== candidate.sourceId)
 			issue(
 				'CROSS_PROJECT_REFERENCE',
 				`$.declarationCandidates[${index}].nodeId`,
@@ -3679,16 +3821,11 @@ function validateStaticSemanticSnapshotUnsafe(
 				`$.declarationCandidates[${index}].syntacticName`,
 				'Atomic identifier names must reproduce their retained identifier text.'
 			);
-		if (
-			candidate.nameState === 'ATOMIC' &&
-			nameNode !== undefined &&
-			nameNode.syntacticIdentifierText === null
-		) {
+		if (candidate.nameState === 'ATOMIC' && nameNode?.syntacticIdentifierText === null) {
 			const nameLiteral = literalByNodeId.get(nameNode.id);
 			if (
 				candidate.syntacticName === null ||
-				nameLiteral === undefined ||
-				nameLiteral.lexemeLength !== candidate.syntacticName.length ||
+				nameLiteral?.lexemeLength !== candidate.syntacticName.length ||
 				nameLiteral.lexemeSha256 !== sha256(candidate.syntacticName)
 			)
 				issue(
@@ -3756,23 +3893,12 @@ function validateStaticSemanticSnapshotUnsafe(
 				.filter((child) => isTypeScriptModifierKind(child.kind))
 				.map((child) => child.kindName)
 		);
-		const expectedExport =
-			candidate.syntaxKind === ts.SyntaxKind.ExportSpecifier
-				? { carrierId: candidate.nodeId, syntax: 'EXPORT_SPECIFIER' as const }
-				: candidate.syntaxKind === ts.SyntaxKind.ExportAssignment
-					? { carrierId: candidate.nodeId, syntax: 'EXPORT_ASSIGNMENT' as const }
-					: candidate.syntaxKind === ts.SyntaxKind.NamespaceExport ||
-						  candidate.syntaxKind === ts.SyntaxKind.NamespaceExportDeclaration
-						? { carrierId: candidate.nodeId, syntax: 'NAMESPACE_EXPORT' as const }
-						: modifierNames.has('DefaultKeyword')
-							? { carrierId: candidate.nodeId, syntax: 'DEFAULT' as const }
-							: modifierNames.has('ExportKeyword')
-								? { carrierId: candidate.nodeId, syntax: 'EXPLICIT' as const }
-								: carrierModifierNames.has('DefaultKeyword')
-									? { carrierId: variableCarrier!.id, syntax: 'DEFAULT' as const }
-									: carrierModifierNames.has('ExportKeyword')
-										? { carrierId: variableCarrier!.id, syntax: 'EXPLICIT' as const }
-										: { carrierId: null, syntax: 'NONE' as const };
+		const expectedExport = expectedCandidateExportBinding(
+			candidate,
+			modifierNames,
+			carrierModifierNames,
+			variableCarrier
+		);
 		if (
 			candidate.exportSyntax !== expectedExport.syntax ||
 			candidate.exportCarrierNodeId !== expectedExport.carrierId
@@ -3819,8 +3945,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			return undefined;
 		}
 		if (
-			source === undefined ||
-			scope.projectId !== source.projectId ||
+			scope.projectId !== source?.projectId ||
 			scope.programId !== source.programId ||
 			(scope.kind !== 'PROGRAM_GLOBAL' && scope.sourceId !== source.id)
 		)
@@ -4037,12 +4162,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				`${jsonPath}.identityBasis`,
 				'Symbol identity basis must agree with its declaration or fallback-reference set.'
 			);
-		const expectedMergeState =
-			symbol.declarationIds.length === 0
-				? 'DECLARATIONLESS'
-				: symbol.declarationIds.length === 1
-					? 'SINGLE'
-					: 'MERGED';
+		const expectedMergeState = expectedSymbolMergeState(symbol.declarationIds.length);
 		if (symbol.mergeState !== expectedMergeState)
 			issue(
 				'INVALID_VALUE',
@@ -4149,13 +4269,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			if (alias.state !== 'RESOLVED')
 				degradedSymbolProvenance(alias.provenanceId, projectId, `${jsonPath}.provenanceId`);
 		}
-		if (
-			alias.state === 'RESOLVED'
-				? alias.targetSymbolId === null || alias.terminalSymbolId === null
-				: alias.state === 'CIRCULAR'
-					? alias.terminalSymbolId !== null
-					: alias.targetSymbolId !== null || alias.terminalSymbolId !== null
-		)
+		if (aliasStateDisagrees(alias))
 			issue('INVALID_VALUE', `${jsonPath}.state`, 'Alias state and target identities disagree.');
 		const expected = semanticAliasId({
 			aliasSymbolId: alias.aliasSymbolId,
@@ -4497,7 +4611,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	): boolean {
 		if (!referenceCheck()) return false;
 		const type = typeById.get(typeId as never);
-		if (type === undefined || type.programId !== programId || type.projectId !== projectId) {
+		if (type?.programId !== programId || type.projectId !== projectId) {
 			issue(
 				type === undefined ? 'DANGLING_REFERENCE' : 'CROSS_PROJECT_REFERENCE',
 				jsonPath,
@@ -4518,11 +4632,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	): boolean {
 		if (!referenceCheck()) return false;
 		const signature = signatureById.get(signatureId as never);
-		if (
-			signature === undefined ||
-			signature.programId !== programId ||
-			signature.projectId !== projectId
-		) {
+		if (signature?.programId !== programId || signature.projectId !== projectId) {
 			issue(
 				signature === undefined ? 'DANGLING_REFERENCE' : 'CROSS_PROJECT_REFERENCE',
 				jsonPath,
@@ -4543,11 +4653,7 @@ function validateStaticSemanticSnapshotUnsafe(
 	): boolean {
 		if (!referenceCheck()) return false;
 		const parameter = typeParameterById.get(typeParameterId as never);
-		if (
-			parameter === undefined ||
-			parameter.programId !== programId ||
-			parameter.projectId !== projectId
-		) {
+		if (parameter?.programId !== programId || parameter.projectId !== projectId) {
 			issue(
 				parameter === undefined ? 'DANGLING_REFERENCE' : 'CROSS_PROJECT_REFERENCE',
 				jsonPath,
@@ -4629,7 +4735,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				(flags & value) !== 0
 			)
 				names.add(name);
-		return [...names].sort();
+		return [...names].sort(compareText);
 	}
 
 	function expectedTypeCategory(
@@ -4671,7 +4777,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		if ((flags & ts.TypeFlags.StringMapping) !== 0) unsupported.add('STRING_MAPPING');
 		if (objectFlags !== null && (objectFlags & ts.ObjectFlags.Mapped) !== 0)
 			unsupported.add('MAPPED');
-		return [...unsupported].sort();
+		return [...unsupported].sort(compareText);
 	}
 
 	for (const [index, type] of snapshot.types.entries()) {
@@ -4797,16 +4903,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				type.projectId,
 				`${jsonPath}.aliasSymbolId`
 			);
-		const expectedIdentityBasis =
-			type.symbolId !== null ||
-			type.aliasSymbolId !== null ||
-			type.acquisitionAnchors.some((anchor) => anchor.kind === 'DECLARATION')
-				? 'DECLARATION_ANCHORED'
-				: type.acquisitionAnchors.some(
-							(anchor) => anchor.kind === 'NODE' || anchor.kind === 'SYMBOL'
-					  )
-					? 'QUERY_ANCHORED'
-					: 'STRUCTURAL';
+		const expectedIdentityBasis = expectedTypeIdentityBasis(type);
 		if (type.identityBasis !== expectedIdentityBasis)
 			issue(
 				'INVALID_VALUE',
@@ -5068,11 +5165,10 @@ function validateStaticSemanticSnapshotUnsafe(
 			);
 		const expectedParameters = snapshot.signatureParameters
 			.filter((parameter) => parameter.signatureId === signature.id)
-			.sort(
-				(left, right) =>
-					(left.role === right.role ? 0 : left.role === 'THIS' ? -1 : 1) ||
-					left.ordinal - right.ordinal
-			)
+			.sort((left, right) => {
+				if (left.role !== right.role) return left.role === 'THIS' ? -1 : 1;
+				return left.ordinal - right.ordinal;
+			})
 			.map((parameter) => parameter.id);
 		const expectedTypeParameters = snapshot.typeParameters
 			.filter(
@@ -5113,27 +5209,27 @@ function validateStaticSemanticSnapshotUnsafe(
 				signature.projectId,
 				`${jsonPath}.typeParameterIds`
 			);
-		const expectedId =
-			signature.identityBasis === 'DECLARATION_ANCHORED' && signature.declarationId !== null
-				? semanticSignatureId({
-						declarationId: signature.declarationId,
-						identityBasis: 'DECLARATION_ANCHORED',
-						programId: signature.programId,
-						semanticKind: signature.semanticKind,
-						signatureKind: signature.signatureKind
-					})
-				: signature.providerOrdinal === null
-					? null
-					: semanticSignatureId({
-							fingerprintProfile: signature.fingerprintProfile,
-							fingerprintSha256: signature.fingerprintSha256,
-							identityBasis: 'OWNER_ORDINAL',
-							owner: signature.owner,
-							programId: signature.programId,
-							providerOrdinal: signature.providerOrdinal,
-							semanticKind: signature.semanticKind,
-							signatureKind: signature.signatureKind
-						});
+		let expectedId: string | null;
+		if (signature.identityBasis === 'DECLARATION_ANCHORED' && signature.declarationId !== null)
+			expectedId = semanticSignatureId({
+				declarationId: signature.declarationId,
+				identityBasis: 'DECLARATION_ANCHORED',
+				programId: signature.programId,
+				semanticKind: signature.semanticKind,
+				signatureKind: signature.signatureKind
+			});
+		else if (signature.providerOrdinal === null) expectedId = null;
+		else
+			expectedId = semanticSignatureId({
+				fingerprintProfile: signature.fingerprintProfile,
+				fingerprintSha256: signature.fingerprintSha256,
+				identityBasis: 'OWNER_ORDINAL',
+				owner: signature.owner,
+				programId: signature.programId,
+				providerOrdinal: signature.providerOrdinal,
+				semanticKind: signature.semanticKind,
+				signatureKind: signature.signatureKind
+			});
 		if (expectedId === null || signature.id !== expectedId)
 			issue('IDENTITY_MISMATCH', `${jsonPath}.id`, 'Signature identity mismatch.');
 	}
@@ -5266,7 +5362,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		projectId: string
 	): StaticSemanticSnapshot['astNodes'][number]['id'] | null {
 		const source = sourceByProjectPath.get(`${projectId}\0${selector.logicalPath}`);
-		if (source === undefined || source.programId !== programId) return null;
+		if (source?.programId !== programId) return null;
 		return (
 			snapshot.astNodes.find(
 				(node) =>
@@ -5476,12 +5572,7 @@ function validateStaticSemanticSnapshotUnsafe(
 					relation.projectId,
 					`${jsonPath}.typeParameterId`
 				);
-				const expectedState =
-					relation.constraintState === 'UNRESOLVED'
-						? 'UNRESOLVED'
-						: relation.constraintState === 'UNSUPPORTED'
-							? 'UNSUPPORTED'
-							: 'CONFIRMED';
+				const expectedState = expectedParameterConstraintRelationState(relation.constraintState);
 				const parameter = typeParameterById.get(relation.typeParameterId);
 				if (
 					relation.state !== expectedState ||
@@ -5542,8 +5633,7 @@ function validateStaticSemanticSnapshotUnsafe(
 				const program = programById.get(relation.programId);
 				if (
 					request === undefined ||
-					program === undefined ||
-					relation.checkerContextDigest !== program.contextDigest ||
+					relation.checkerContextDigest !== program?.contextDigest ||
 					!SHA256.test(relation.checkerContextDigest)
 				)
 					issue(
@@ -5623,8 +5713,7 @@ function validateStaticSemanticSnapshotUnsafe(
 					);
 				const overloadSet = overloadSetById.get(relation.overloadSetId);
 				if (
-					overloadSet === undefined ||
-					overloadSet.programId !== relation.programId ||
+					overloadSet?.programId !== relation.programId ||
 					overloadSet.projectId !== relation.projectId
 				)
 					issue(
@@ -5639,16 +5728,20 @@ function validateStaticSemanticSnapshotUnsafe(
 					`${jsonPath}.signatureId`
 				);
 				const signature = signatureById.get(relation.signatureId);
-				const roleMatches =
-					relation.role === 'IMPLEMENTATION_SIGNATURE'
-						? signature?.semanticKind === 'IMPLEMENTATION_SIGNATURE'
-						: relation.role === 'OVERLOAD_DECLARATION' || relation.role === 'AMBIENT_OVERLOAD'
-							? signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
-								signature.declarationRole === relation.role
-							: signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
-								signature.declarationRole === relation.role &&
-								signature.signatureKind ===
-									(relation.role === 'CALL_SIGNATURE' ? 'CALL' : 'CONSTRUCT');
+				let roleMatches: boolean;
+				if (relation.role === 'IMPLEMENTATION_SIGNATURE')
+					roleMatches = signature?.semanticKind === 'IMPLEMENTATION_SIGNATURE';
+				else if (relation.role === 'OVERLOAD_DECLARATION' || relation.role === 'AMBIENT_OVERLOAD')
+					roleMatches =
+						signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
+						signature.declarationRole === relation.role;
+				else {
+					const expectedSignatureKind = relation.role === 'CALL_SIGNATURE' ? 'CALL' : 'CONSTRUCT';
+					roleMatches =
+						signature?.semanticKind === 'OVERLOAD_SIGNATURE' &&
+						signature.declarationRole === relation.role &&
+						signature.signatureKind === expectedSignatureKind;
+				}
 				const callableOwnerSymbolIds = new Set<string>();
 				if (signature?.owner.kind === 'SYMBOL') callableOwnerSymbolIds.add(signature.owner.id);
 				else if (signature?.owner.kind === 'DECLARATION') {
@@ -5887,16 +5980,13 @@ function validateStaticSemanticSnapshotUnsafe(
 				`$.diagnostics[${index}].locationKind`,
 				'Diagnostic location discriminator must exactly govern source, path, and span fields.'
 			);
-		if (
-			diagnostic.locationKind === 'SOURCE' &&
-			(diagnosticSource === undefined || diagnostic.path !== diagnosticSource.logicalPath)
-		)
+		if (diagnostic.locationKind === 'SOURCE' && diagnostic.path !== diagnosticSource?.logicalPath)
 			issue(
 				'CROSS_PROJECT_REFERENCE',
 				`$.diagnostics[${index}].path`,
 				'Source-bound diagnostic source and logical path disagree.'
 			);
-		if (!/^TS[1-9][0-9]*$/u.test(diagnostic.code))
+		if (!/^TS[1-9]\d*$/u.test(diagnostic.code))
 			issue(
 				'INVALID_VALUE',
 				`$.diagnostics[${index}].code`,
@@ -5905,7 +5995,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		diagnosticMessage(diagnostic.message, `$.diagnostics[${index}].message`);
 		for (const [relatedIndex, related] of diagnostic.related.entries()) {
 			path(related.path, `$.diagnostics[${index}].related[${relatedIndex}].path`);
-			if (!/^TS[1-9][0-9]*$/u.test(related.code))
+			if (!/^TS[1-9]\d*$/u.test(related.code))
 				issue(
 					'INVALID_VALUE',
 					`$.diagnostics[${index}].related[${relatedIndex}].code`,
@@ -6274,14 +6364,17 @@ function validateStaticSemanticSnapshotUnsafe(
 			invocation.invocationKind === 'CALL' &&
 			invocationNode !== undefined &&
 			(invocationNode.publicFlags & ts.NodeFlags.OptionalChain) !== 0;
-		const variantCoherent =
-			invocation.invocationKind === 'CALL'
-				? invocation.templateNodeId === null && invocation.optional === expectedOptional
-				: invocation.invocationKind === 'NEW'
-					? invocation.templateNodeId === null && invocation.optional === false
-					: invocation.templateNodeId !== null &&
-						invocation.optional === false &&
-						invocation.argumentNodeIds.length === 0;
+		let variantCoherent: boolean;
+		if (invocation.invocationKind === 'CALL')
+			variantCoherent =
+				invocation.templateNodeId === null && invocation.optional === expectedOptional;
+		else if (invocation.invocationKind === 'NEW')
+			variantCoherent = invocation.templateNodeId === null && invocation.optional === false;
+		else
+			variantCoherent =
+				invocation.templateNodeId !== null &&
+				invocation.optional === false &&
+				invocation.argumentNodeIds.length === 0;
 		if (
 			semanticInvocationKind(invocationNode?.kind ?? -1) !== invocation.invocationKind ||
 			!variantCoherent ||
@@ -6659,10 +6752,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			'Provenance table must equal the transitive closure of fact provenance references.'
 		);
 	const factProvenanceByCapability: Readonly<
-		Record<
-			'TS_PROJECT' | 'TS_SYMBOL' | 'TS_SYNTAX' | 'TS_TYPE',
-			readonly SemanticFactProvenanceRecord[]
-		>
+		Record<SemanticCapability, readonly SemanticFactProvenanceRecord[]>
 	> = {
 		TS_PROJECT: snapshot.provenances.filter(
 			(record) => referencedProvenanceIds.has(record.id) && record.capability === 'TS_PROJECT'
@@ -6677,9 +6767,7 @@ function validateStaticSemanticSnapshotUnsafe(
 			(record) => referencedProvenanceIds.has(record.id) && record.capability === 'TS_TYPE'
 		)
 	};
-	const capabilityIsPartial = (
-		capability: 'TS_PROJECT' | 'TS_SYMBOL' | 'TS_SYNTAX' | 'TS_TYPE'
-	): boolean => {
+	const capabilityIsPartial = (capability: SemanticCapability): boolean => {
 		const factPartial = factProvenanceByCapability[capability].some(
 			(record) =>
 				record.epistemic.capabilityCoverage === 'partial' ||
@@ -6947,15 +7035,13 @@ export function validateStaticSemanticSnapshot(
 	if (shapeIssues.length > 0) {
 		const budget = shapeIssues.some((issue) => issue.budget);
 		return {
-			issues: shapeIssues.map((issue) => ({
-				code: issue.budget
-					? 'VALIDATION_BUDGET_EXHAUSTED'
-					: issue.message.startsWith('Absolute')
-						? 'ABSOLUTE_PATH'
-						: 'INVALID_SHAPE',
-				message: issue.message,
-				path: issue.path
-			})),
+			issues: shapeIssues.map((issue) => {
+				let code: SemanticValidationIssueCode;
+				if (issue.budget) code = 'VALIDATION_BUDGET_EXHAUSTED';
+				else if (issue.message.startsWith('Absolute')) code = 'ABSOLUTE_PATH';
+				else code = 'INVALID_SHAPE';
+				return { code, message: issue.message, path: issue.path };
+			}),
 			state: budget ? 'BUDGET_EXHAUSTED' : 'INVALID'
 		};
 	}

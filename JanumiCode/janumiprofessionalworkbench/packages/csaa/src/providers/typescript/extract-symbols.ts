@@ -41,6 +41,7 @@ import {
 	typescriptSyntaxKindName
 } from '../../semantic/syntax-projection.js';
 import { extractTypeScriptTypes } from './extract-types.js';
+import type { ExtractTypeScriptTypesInput, RawTypeScriptTypeProjection } from './extract-types.js';
 
 export interface TypeScriptSymbolExtractionGuard {
 	readonly addFact: () => void;
@@ -164,7 +165,9 @@ interface SymbolGroup {
 }
 
 function compareStrings(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function syntaxKindName(kind: number): string {
@@ -310,7 +313,7 @@ function moduleOccurrence(node: ts.Node): ModuleOccurrence | null {
 		return literalModuleOccurrence(
 			'IMPORT',
 			node.moduleSpecifier,
-			node.importClause?.isTypeOnly === true
+			node.importClause?.phaseModifier === ts.SyntaxKind.TypeKeyword
 		);
 	if (
 		ts.isExportDeclaration(node) &&
@@ -375,187 +378,234 @@ function isReexportDeclaration(declaration: ts.Declaration, sourceFile: ts.Sourc
 	return ts.isNamespaceExport(declaration);
 }
 
-/**
- * Project TypeChecker facts into identity-free records. TypeScript objects are
- * retained only while this function executes; every ordinal is assigned from
- * canonical source/declaration/reference anchors after collection completes.
- */
-export function extractTypeScriptSymbols(
+interface DeclaringScopeLink {
+	readonly key: string | null;
+	readonly state: SemanticScopeLinkState;
+}
+
+interface GroupBuilder {
+	readonly declarations: Map<string, DeclarationAnchor>;
+	readonly fallbackAnchors: Map<string, NodeAnchor>;
+	flags: number;
+	readonly key: string;
+	readonly names: Set<string>;
+	readonly representatives: ts.Symbol[];
+}
+
+interface SymbolInput {
+	readonly declarations: readonly DeclarationAnchor[];
+	readonly fallbackAnchors: readonly NodeAnchor[];
+	readonly flags: number;
+	readonly metadata: SymbolMetadata;
+	readonly name: string;
+	readonly signature: string;
+}
+
+interface PendingDeclaration {
+	readonly declaration: DeclarationAnchor;
+	readonly group: SymbolGroup | null;
+}
+
+interface SymbolExtractionState {
+	readonly candidateByNode: WeakMap<ts.Node, RawSemanticDeclarationCandidate>;
+	readonly conditionalHasInfer: WeakMap<ts.ConditionalTypeNode, boolean>;
+	readonly declarationAnchorCache: WeakMap<ts.Declaration, DeclarationAnchor | null>;
+	readonly directEvalEnvironments: WeakSet<ts.Node>;
+	readonly globalScopeKey: string;
+	readonly guard: TypeScriptSymbolExtractionGuard;
+	readonly input: ExtractTypeScriptSymbolsInput;
+	readonly metadataBySymbol: Map<ts.Symbol, SymbolMetadata>;
+	readonly ordinalByNode: WeakMap<ts.Node, number>;
+	readonly scopeKeyByBoundary: WeakMap<ts.Node, string>;
+	readonly scopesByKey: Map<string, ScopeAnchor>;
+	readonly sourceByFile: Map<ts.SourceFile, TypeScriptSymbolSourceInput>;
+	readonly sourceByOrdinal: Map<number, TypeScriptSymbolSourceInput>;
+}
+
+interface CollectedSymbolFacts {
+	readonly exportsBySource: Map<number, readonly ts.Symbol[]>;
+	readonly moduleSymbols: Map<number, ts.Symbol>;
+	readonly pendingModuleResolutions: PendingModuleResolution[];
+	readonly pendingReferences: PendingReference[];
+}
+
+interface SourceReferenceContext {
+	readonly declarationByNameNode: Map<ts.Node, ts.Declaration>;
+	readonly declarationNameNodes: Set<ts.Node>;
+	readonly sourceInput: TypeScriptSymbolSourceInput;
+}
+
+interface SymbolProjectionContext {
+	readonly aliasByOrdinal: ReadonlyMap<number, RawSemanticAlias>;
+	readonly groupBySymbol: ReadonlyMap<ts.Symbol, SymbolGroup>;
+	readonly scopeOrdinalByKey: ReadonlyMap<string, number>;
+	readonly unsupportedSymbols: ReadonlySet<ts.Symbol>;
+}
+
+interface ModuleExportContext {
+	readonly aliasByOrdinal: ReadonlyMap<number, RawSemanticAlias>;
+	readonly hasStarReexport: boolean;
+	readonly sourceFile: ts.SourceFile;
+	readonly sourceOrdinal: number;
+}
+
+function sourcesByLogicalPath(
 	input: ExtractTypeScriptSymbolsInput
-): RawTypeScriptSymbolProjection {
-	const { checker, guard } = input;
-	guard.check();
-	const sourceByFile = new Map<ts.SourceFile, TypeScriptSymbolSourceInput>();
-	const sourceByOrdinal = new Map<number, TypeScriptSymbolSourceInput>();
-	const ordinalByNode = new WeakMap<ts.Node, number>();
-	const candidateByNode = new WeakMap<ts.Node, RawSemanticDeclarationCandidate>();
-	for (const sourceInput of input.sources) {
+): readonly TypeScriptSymbolSourceInput[] {
+	return [...input.sources].sort((left, right) =>
+		compareStrings(left.source.logicalPath, right.source.logicalPath)
+	);
+}
+
+function isParameterProperty(declaration: ts.Declaration): boolean {
+	return (
+		ts.isParameter(declaration) &&
+		ts.isConstructorDeclaration(declaration.parent) &&
+		ts.isParameterPropertyDeclaration(declaration, declaration.parent)
+	);
+}
+
+function hasUseStrictPrologue(statements: ts.NodeArray<ts.Statement>): boolean {
+	for (const statement of statements) {
+		if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression))
+			return false;
+		const lexeme = statement.expression.getText(statement.getSourceFile());
+		if (lexeme === '"use strict"' || lexeme === "'use strict'") return true;
+	}
+	return false;
+}
+
+function functionBody(node: ts.Node): ts.ConciseBody | undefined {
+	if (
+		ts.isFunctionDeclaration(node) ||
+		ts.isFunctionExpression(node) ||
+		ts.isArrowFunction(node) ||
+		ts.isMethodDeclaration(node) ||
+		ts.isGetAccessorDeclaration(node) ||
+		ts.isSetAccessorDeclaration(node) ||
+		ts.isConstructorDeclaration(node)
+	)
+		return node.body;
+	return undefined;
+}
+
+function transparentEvalCallee(node: ts.Expression): ts.Expression {
+	let cursor = node;
+	for (;;) {
 		if (
-			sourceByFile.has(sourceInput.sourceFile) ||
-			sourceByOrdinal.has(sourceInput.source.sourceOrdinal)
-		)
-			throw new Error('TypeScript symbol extraction received duplicate source identity.');
-		sourceByFile.set(sourceInput.sourceFile, sourceInput);
-		sourceByOrdinal.set(sourceInput.source.sourceOrdinal, sourceInput);
-		if (sourceInput.nodes !== null) {
-			for (let index = 0; index < sourceInput.nodes.length; index += 1)
-				ordinalByNode.set(sourceInput.nodes[index]!, index);
-			for (const candidate of sourceInput.declarationCandidates) {
-				const candidateNode = sourceInput.nodes[candidate.nodeOrdinal];
-				if (candidateNode === undefined)
-					throw new Error('Declaration candidate lacks its transient TypeScript node.');
-				candidateByNode.set(candidateNode, candidate);
-			}
+			ts.isParenthesizedExpression(cursor) ||
+			ts.isNonNullExpression(cursor) ||
+			ts.isAsExpression(cursor) ||
+			ts.isTypeAssertionExpression(cursor) ||
+			ts.isSatisfiesExpression(cursor)
+		) {
+			cursor = cursor.expression;
+			continue;
 		}
+		return cursor;
 	}
+}
 
-	function boundaryDescriptor(node: ts.Node) {
-		const sourceInput = sourceByFile.get(node.getSourceFile());
-		return semanticScopeBoundaryDescriptor(
-			node.kind,
-			sourceInput?.source.moduleKind ??
-				(ts.isExternalModule(node.getSourceFile()) ? 'MODULE' : 'SCRIPT')
-		);
+function variableEnvironment(node: ts.Node): ts.Node | null {
+	let cursor: ts.Node | undefined = node;
+	while (cursor !== undefined) {
+		if (ts.isFunctionLike(cursor) || ts.isSourceFile(cursor)) return cursor;
+		cursor = cursor.parent;
 	}
+	return null;
+}
 
-	function isParameterProperty(declaration: ts.Declaration): boolean {
-		return (
-			ts.isParameter(declaration) &&
-			ts.isConstructorDeclaration(declaration.parent) &&
-			ts.isParameterPropertyDeclaration(declaration, declaration.parent)
-		);
+function variableDeclarationList(declaration: ts.Declaration): ts.VariableDeclarationList | null {
+	let cursor: ts.Node | undefined = declaration;
+	while (cursor !== undefined && !ts.isSourceFile(cursor) && !ts.isFunctionLike(cursor)) {
+		if (ts.isVariableDeclarationList(cursor)) return cursor;
+		cursor = cursor.parent;
 	}
+	return null;
+}
 
-	function hasUseStrictPrologue(statements: ts.NodeArray<ts.Statement>): boolean {
-		for (const statement of statements) {
-			if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression))
-				return false;
-			const lexeme = statement.expression.getText(statement.getSourceFile());
-			if (lexeme === '"use strict"' || lexeme === "'use strict'") return true;
-		}
-		return false;
+function normalizedSymbolName(
+	symbol: ts.Symbol,
+	declarations: readonly DeclarationAnchor[]
+): string {
+	const sourceDeclaration = declarations.find(
+		(declaration) => declaration.kind === ts.SyntaxKind.SourceFile
+	);
+	const compilerName = symbol.getName();
+	const stableCompilerName = compilerName.startsWith('__@')
+		? compilerName.replace(/@\d+$/u, '')
+		: compilerName;
+	let name: string;
+	if (sourceDeclaration === undefined)
+		name = stableCompilerName.length === 0 ? '<anonymous>' : stableCompilerName;
+	else name = `module:${sourceDeclaration.logicalPath}`;
+	return isUnicodeScalarString(name)
+		? name
+		: `utf16-code-units:${encodeSemanticDiagnosticText(name).text}`;
+}
+
+function assertNodeSpan(
+	node: ts.Node,
+	sourceFile: ts.SourceFile,
+	invalidSpanMessage: string
+): { readonly end: number; readonly start: number } {
+	const start = node.getStart(sourceFile, false);
+	const end = node.end;
+	if (
+		!Number.isSafeInteger(start) ||
+		!Number.isSafeInteger(end) ||
+		start < 0 ||
+		start > end ||
+		end > sourceFile.text.length
+	)
+		throw new Error(invalidSpanMessage);
+	return { end, start };
+}
+
+function indexSourceNodes(
+	sourceInput: TypeScriptSymbolSourceInput,
+	ordinalByNode: WeakMap<ts.Node, number>,
+	candidateByNode: WeakMap<ts.Node, RawSemanticDeclarationCandidate>
+): void {
+	if (sourceInput.nodes === null) return;
+	for (let index = 0; index < sourceInput.nodes.length; index += 1)
+		ordinalByNode.set(sourceInput.nodes[index]!, index);
+	for (const candidate of sourceInput.declarationCandidates) {
+		const candidateNode = sourceInput.nodes[candidate.nodeOrdinal];
+		if (candidateNode === undefined)
+			throw new Error('Declaration candidate lacks its transient TypeScript node.');
+		candidateByNode.set(candidateNode, candidate);
 	}
+}
 
-	function functionBody(node: ts.Node): ts.ConciseBody | undefined {
-		if (
-			ts.isFunctionDeclaration(node) ||
-			ts.isFunctionExpression(node) ||
-			ts.isArrowFunction(node) ||
-			ts.isMethodDeclaration(node) ||
-			ts.isGetAccessorDeclaration(node) ||
-			ts.isSetAccessorDeclaration(node) ||
-			ts.isConstructorDeclaration(node)
-		)
-			return node.body;
-		return undefined;
-	}
+function directEvalEnvironment(node: ts.Node): ts.Node | null {
+	if (!ts.isCallExpression(node) || node.questionDotToken !== undefined) return null;
+	const callee = transparentEvalCallee(node.expression);
+	if (!ts.isIdentifier(callee) || callee.text !== 'eval') return null;
+	return variableEnvironment(node);
+}
 
-	function isDefinitelyStrict(node: ts.Node): boolean {
-		if (
-			input.compilerOptions.alwaysStrict === true ||
-			(input.compilerOptions.alwaysStrict !== false && input.compilerOptions.strict === true)
-		)
-			return true;
-		const sourceInput = sourceByFile.get(node.getSourceFile());
-		if (sourceInput?.source.moduleKind === 'MODULE' || ts.isExternalModule(node.getSourceFile()))
-			return true;
-		let cursor: ts.Node | undefined = node.parent;
-		while (cursor !== undefined) {
-			if (ts.isClassDeclaration(cursor) || ts.isClassExpression(cursor)) return true;
-			if (ts.isSourceFile(cursor) && hasUseStrictPrologue(cursor.statements)) return true;
-			const body = functionBody(cursor);
-			if (body !== undefined && ts.isBlock(body) && hasUseStrictPrologue(body.statements))
-				return true;
-			cursor = cursor.parent;
-		}
-		return false;
-	}
-
-	function transparentEvalCallee(node: ts.Expression): ts.Expression {
-		let cursor = node;
-		for (;;) {
-			if (
-				ts.isParenthesizedExpression(cursor) ||
-				ts.isNonNullExpression(cursor) ||
-				ts.isAsExpression(cursor) ||
-				ts.isTypeAssertionExpression(cursor) ||
-				ts.isSatisfiesExpression(cursor)
-			) {
-				cursor = cursor.expression;
-				continue;
-			}
-			return cursor;
-		}
-	}
-
-	const conditionalHasInfer = new WeakMap<ts.ConditionalTypeNode, boolean>();
-	function containsInferBinding(node: ts.ConditionalTypeNode): boolean {
-		const cached = conditionalHasInfer.get(node);
-		if (cached !== undefined) return cached;
-		let found = false;
-		const visit = (child: ts.Node): void => {
-			if (found) return;
-			if (ts.isInferTypeNode(child)) {
-				found = true;
-				return;
-			}
-			ts.forEachChild(child, visit);
-		};
-		ts.forEachChild(node, visit);
-		conditionalHasInfer.set(node, found);
-		return found;
-	}
-
-	function isInsideConditionalInfer(node: ts.Node): boolean {
-		let cursor: ts.Node | undefined = node;
-		while (cursor !== undefined) {
-			if (ts.isConditionalTypeNode(cursor) && containsInferBinding(cursor)) return true;
-			cursor = cursor.parent;
-		}
-		return false;
-	}
-
-	function variableEnvironment(node: ts.Node): ts.Node | null {
-		let cursor: ts.Node | undefined = node;
-		while (cursor !== undefined) {
-			if (ts.isFunctionLike(cursor) || ts.isSourceFile(cursor)) return cursor;
-			cursor = cursor.parent;
-		}
-		return null;
-	}
-
+function collectDirectEvalEnvironments(input: ExtractTypeScriptSymbolsInput): WeakSet<ts.Node> {
 	const directEvalEnvironments = new WeakSet<ts.Node>();
 	for (const sourceInput of input.sources)
-		for (const node of sourceInput.nodes ?? [])
-			if (ts.isCallExpression(node) && node.questionDotToken === undefined) {
-				const callee = transparentEvalCallee(node.expression);
-				if (!ts.isIdentifier(callee) || callee.text !== 'eval') continue;
-				const environment = variableEnvironment(node);
-				if (environment !== null) directEvalEnvironments.add(environment);
-			}
-
-	function isDynamicallyAffectedReference(node: ts.Node): boolean {
-		let cursor: ts.Node | undefined = node;
-		while (cursor !== undefined) {
-			if (ts.isWithStatement(cursor)) return true;
-			cursor = cursor.parent;
+		for (const node of sourceInput.nodes ?? []) {
+			const environment = directEvalEnvironment(node);
+			if (environment !== null) directEvalEnvironments.add(environment);
 		}
-		const environment = variableEnvironment(node);
-		return (
-			isInsideConditionalInfer(node) ||
-			(environment !== null && directEvalEnvironments.has(environment))
-		);
-	}
+	return directEvalEnvironments;
+}
 
-	const scopesByKey = new Map<string, ScopeAnchor>();
-	const scopeKeyByBoundary = new WeakMap<ts.Node, string>();
+function seedProgramGlobalScope(
+	input: ExtractTypeScriptSymbolsInput,
+	scopesByKey: Map<string, ScopeAnchor>
+): string {
 	const globalDescriptor = programGlobalScopeDescriptor();
 	const globalScopeKey = canonicalSemanticJson({
 		domain: globalDescriptor.domain,
 		kind: 'PROGRAM_GLOBAL',
 		projectKey: input.projectKey
 	});
-	guard.addScope();
+	input.guard.addScope();
 	scopesByKey.set(globalScopeKey, {
 		domain: globalDescriptor.domain,
 		end: null,
@@ -568,481 +618,659 @@ export function extractTypeScriptSymbols(
 		sourceOrdinal: null,
 		start: null
 	});
+	return globalScopeKey;
+}
 
-	function ensureContainingScope(node: ts.Node | undefined): string {
-		let cursor = node;
-		while (cursor !== undefined && boundaryDescriptor(cursor) === null) cursor = cursor.parent;
-		return cursor === undefined ? globalScopeKey : ensureBoundaryScope(cursor);
-	}
-
-	function ensureOrdinaryContainingScope(node: ts.Node | undefined): string {
-		let cursor = node;
-		while (cursor !== undefined) {
-			const descriptor = boundaryDescriptor(cursor);
-			if (descriptor !== null && isOrdinaryReferenceScope(descriptor.domain))
-				return ensureBoundaryScope(cursor);
-			cursor = cursor.parent;
-		}
-		return globalScopeKey;
-	}
-
-	function ensureBoundaryScope(node: ts.Node): string {
-		const existing = scopeKeyByBoundary.get(node);
-		if (existing !== undefined) return existing;
-		const descriptor = boundaryDescriptor(node);
-		if (descriptor === null) return ensureContainingScope(node.parent);
-		const { domain, kind } = descriptor;
-		const sourceFile = node.getSourceFile();
-		const sourceInput = sourceByFile.get(sourceFile);
-		if (sourceInput === undefined) return globalScopeKey;
-		const start = node.getStart(sourceFile, false);
-		const end = node.end;
+function createSymbolExtractionState(input: ExtractTypeScriptSymbolsInput): SymbolExtractionState {
+	const sourceByFile = new Map<ts.SourceFile, TypeScriptSymbolSourceInput>();
+	const sourceByOrdinal = new Map<number, TypeScriptSymbolSourceInput>();
+	const ordinalByNode = new WeakMap<ts.Node, number>();
+	const candidateByNode = new WeakMap<ts.Node, RawSemanticDeclarationCandidate>();
+	for (const sourceInput of input.sources) {
 		if (
-			!Number.isSafeInteger(start) ||
-			!Number.isSafeInteger(end) ||
-			start < 0 ||
-			start > end ||
-			end > sourceFile.text.length
+			sourceByFile.has(sourceInput.sourceFile) ||
+			sourceByOrdinal.has(sourceInput.source.sourceOrdinal)
 		)
-			throw new Error('TypeScript returned an invalid scope span.');
-		const parentKey = ts.isSourceFile(node) ? globalScopeKey : ensureContainingScope(node.parent);
-		const key = canonicalSemanticJson({
-			domain,
-			end,
-			kind,
-			logicalPath: sourceInput.source.logicalPath,
-			ownerKind: node.kind,
-			start
-		});
-		const ownerNodeOrdinal = sourceInput.nodes === null ? null : (ordinalByNode.get(node) ?? null);
-		if (sourceInput.nodes !== null && ownerNodeOrdinal === null)
-			throw new Error('A retained scope boundary lacks its public AST node ordinal.');
-		const anchor: ScopeAnchor = {
-			domain,
-			end,
-			key,
-			kind,
-			ownerKind: node.kind,
-			ownerKindName: syntaxKindName(node.kind),
-			ownerNodeOrdinal,
-			parentKey,
-			sourceOrdinal: sourceInput.source.sourceOrdinal,
-			start
-		};
-		const collision = scopesByKey.get(key);
-		if (
-			collision !== undefined &&
-			canonicalSemanticJson(collision) !== canonicalSemanticJson(anchor)
-		)
-			throw new Error('Canonical scope anchor collision.');
-		if (collision === undefined) {
-			guard.addScope();
-			scopesByKey.set(key, anchor);
-		}
-		scopeKeyByBoundary.set(node, key);
-		return key;
+			throw new Error('TypeScript symbol extraction received duplicate source identity.');
+		sourceByFile.set(sourceInput.sourceFile, sourceInput);
+		sourceByOrdinal.set(sourceInput.source.sourceOrdinal, sourceInput);
+		indexSourceNodes(sourceInput, ordinalByNode, candidateByNode);
 	}
+	const directEvalEnvironments = collectDirectEvalEnvironments(input);
+	const scopesByKey = new Map<string, ScopeAnchor>();
+	const globalScopeKey = seedProgramGlobalScope(input, scopesByKey);
+	return {
+		candidateByNode,
+		conditionalHasInfer: new WeakMap(),
+		declarationAnchorCache: new WeakMap(),
+		directEvalEnvironments,
+		globalScopeKey,
+		guard: input.guard,
+		input,
+		metadataBySymbol: new Map(),
+		ordinalByNode,
+		scopeKeyByBoundary: new WeakMap(),
+		scopesByKey,
+		sourceByFile,
+		sourceByOrdinal
+	};
+}
 
-	function variableDeclarationList(declaration: ts.Declaration): ts.VariableDeclarationList | null {
-		let cursor: ts.Node | undefined = declaration;
-		while (cursor !== undefined && !ts.isSourceFile(cursor) && !ts.isFunctionLike(cursor)) {
-			if (ts.isVariableDeclarationList(cursor)) return cursor;
-			cursor = cursor.parent;
-		}
-		return null;
+function boundaryDescriptor(state: SymbolExtractionState, node: ts.Node) {
+	const sourceInput = state.sourceByFile.get(node.getSourceFile());
+	return semanticScopeBoundaryDescriptor(
+		node.kind,
+		sourceInput?.source.moduleKind ??
+			(ts.isExternalModule(node.getSourceFile()) ? 'MODULE' : 'SCRIPT')
+	);
+}
+
+function isStrictScopeBoundary(node: ts.Node): boolean {
+	if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) return true;
+	if (ts.isSourceFile(node) && hasUseStrictPrologue(node.statements)) return true;
+	const body = functionBody(node);
+	return body !== undefined && ts.isBlock(body) && hasUseStrictPrologue(body.statements);
+}
+
+function isDefinitelyStrict(state: SymbolExtractionState, node: ts.Node): boolean {
+	const compilerOptions = state.input.compilerOptions;
+	if (
+		compilerOptions.alwaysStrict === true ||
+		(compilerOptions.alwaysStrict !== false && compilerOptions.strict === true)
+	)
+		return true;
+	const sourceInput = state.sourceByFile.get(node.getSourceFile());
+	if (sourceInput?.source.moduleKind === 'MODULE' || ts.isExternalModule(node.getSourceFile()))
+		return true;
+	let cursor: ts.Node | undefined = node.parent;
+	while (cursor !== undefined) {
+		if (isStrictScopeBoundary(cursor)) return true;
+		cursor = cursor.parent;
 	}
+	return false;
+}
 
-	function nearestVariableEnvironment(node: ts.Node | undefined): string | null {
-		let cursor = node;
-		while (cursor !== undefined) {
-			if (ts.isClassStaticBlockDeclaration(cursor)) return ensureBoundaryScope(cursor);
-			if (ts.isFunctionLike(cursor)) return ensureBoundaryScope(cursor);
-			if (ts.isModuleDeclaration(cursor)) return ensureBoundaryScope(cursor);
-			if (ts.isSourceFile(cursor)) {
-				const sourceScope = ensureBoundaryScope(cursor);
-				return scopesByKey.get(sourceScope)?.kind === 'SOURCE_SCRIPT'
-					? globalScopeKey
-					: sourceScope;
-			}
-			cursor = cursor.parent;
+function containsInferBinding(state: SymbolExtractionState, node: ts.ConditionalTypeNode): boolean {
+	const cached = state.conditionalHasInfer.get(node);
+	if (cached !== undefined) return cached;
+	let found = false;
+	const visit = (child: ts.Node): void => {
+		if (found) return;
+		if (ts.isInferTypeNode(child)) {
+			found = true;
+			return;
 		}
-		return null;
+		ts.forEachChild(child, visit);
+	};
+	ts.forEachChild(node, visit);
+	state.conditionalHasInfer.set(node, found);
+	return found;
+}
+
+function isInsideConditionalInfer(state: SymbolExtractionState, node: ts.Node): boolean {
+	let cursor: ts.Node | undefined = node;
+	while (cursor !== undefined) {
+		if (ts.isConditionalTypeNode(cursor) && containsInferBinding(state, cursor)) return true;
+		cursor = cursor.parent;
 	}
+	return false;
+}
 
-	function declaringScope(declaration: ts.Declaration): {
-		readonly key: string | null;
-		readonly state: SemanticScopeLinkState;
-	} {
-		if (isParameterProperty(declaration)) return { key: null, state: 'UNSUPPORTED' };
-		if (isInsideConditionalInfer(declaration)) return { key: null, state: 'UNSUPPORTED' };
-		if (ts.isSourceFile(declaration))
-			return { key: ensureBoundaryScope(declaration), state: 'RESOLVED' };
-		if (ts.isFunctionExpression(declaration) || ts.isClassExpression(declaration))
-			return { key: ensureBoundaryScope(declaration), state: 'RESOLVED' };
-		if (ts.isFunctionDeclaration(declaration)) {
-			const parent = declaration.parent;
-			if (
-				ts.isBlock(parent) &&
-				parent.parent !== undefined &&
-				ts.isFunctionLike(parent.parent) &&
-				functionBody(parent.parent) === parent
-			)
-				return { key: ensureBoundaryScope(parent.parent), state: 'RESOLVED' };
-			if (!ts.isSourceFile(parent) && !ts.isModuleBlock(parent) && !isDefinitelyStrict(declaration))
-				return { key: null, state: 'UNSUPPORTED' };
-		}
-		const list = variableDeclarationList(declaration);
-		if (list !== null && (list.flags & ts.NodeFlags.BlockScoped) === 0) {
-			const key = nearestVariableEnvironment(declaration.parent);
-			return { key, state: key === null ? 'UNSUPPORTED' : 'RESOLVED' };
-		}
-		let key = ensureContainingScope(declaration.parent);
-		if (scopesByKey.get(key)?.kind === 'SOURCE_SCRIPT') key = globalScopeKey;
-		return { key, state: 'RESOLVED' };
+function isDynamicallyAffectedReference(state: SymbolExtractionState, node: ts.Node): boolean {
+	let cursor: ts.Node | undefined = node;
+	while (cursor !== undefined) {
+		if (ts.isWithStatement(cursor)) return true;
+		cursor = cursor.parent;
 	}
+	const environment = variableEnvironment(node);
+	return (
+		isInsideConditionalInfer(state, node) ||
+		(environment !== null && state.directEvalEnvironments.has(environment))
+	);
+}
 
-	for (const sourceInput of [...input.sources].sort((left, right) =>
-		compareStrings(left.source.logicalPath, right.source.logicalPath)
-	)) {
-		ensureBoundaryScope(sourceInput.sourceFile);
+function ensureContainingScope(state: SymbolExtractionState, node: ts.Node | undefined): string {
+	let cursor = node;
+	while (cursor !== undefined && boundaryDescriptor(state, cursor) === null) cursor = cursor.parent;
+	return cursor === undefined ? state.globalScopeKey : ensureBoundaryScope(state, cursor);
+}
+
+function ensureOrdinaryContainingScope(
+	state: SymbolExtractionState,
+	node: ts.Node | undefined
+): string {
+	let cursor = node;
+	while (cursor !== undefined) {
+		const descriptor = boundaryDescriptor(state, cursor);
+		if (descriptor !== null && isOrdinaryReferenceScope(descriptor.domain))
+			return ensureBoundaryScope(state, cursor);
+		cursor = cursor.parent;
+	}
+	return state.globalScopeKey;
+}
+
+function registerScopeAnchor(state: SymbolExtractionState, key: string, anchor: ScopeAnchor): void {
+	const collision = state.scopesByKey.get(key);
+	if (collision !== undefined && canonicalSemanticJson(collision) !== canonicalSemanticJson(anchor))
+		throw new Error('Canonical scope anchor collision.');
+	if (collision === undefined) {
+		state.guard.addScope();
+		state.scopesByKey.set(key, anchor);
+	}
+}
+
+function ensureBoundaryScope(state: SymbolExtractionState, node: ts.Node): string {
+	const existing = state.scopeKeyByBoundary.get(node);
+	if (existing !== undefined) return existing;
+	const descriptor = boundaryDescriptor(state, node);
+	if (descriptor === null) return ensureContainingScope(state, node.parent);
+	const { domain, kind } = descriptor;
+	const sourceFile = node.getSourceFile();
+	const sourceInput = state.sourceByFile.get(sourceFile);
+	if (sourceInput === undefined) return state.globalScopeKey;
+	const { end, start } = assertNodeSpan(
+		node,
+		sourceFile,
+		'TypeScript returned an invalid scope span.'
+	);
+	const parentKey = ts.isSourceFile(node)
+		? state.globalScopeKey
+		: ensureContainingScope(state, node.parent);
+	const key = canonicalSemanticJson({
+		domain,
+		end,
+		kind,
+		logicalPath: sourceInput.source.logicalPath,
+		ownerKind: node.kind,
+		start
+	});
+	const ownerNodeOrdinal =
+		sourceInput.nodes === null ? null : (state.ordinalByNode.get(node) ?? null);
+	if (sourceInput.nodes !== null && ownerNodeOrdinal === null)
+		throw new Error('A retained scope boundary lacks its public AST node ordinal.');
+	const anchor: ScopeAnchor = {
+		domain,
+		end,
+		key,
+		kind,
+		ownerKind: node.kind,
+		ownerKindName: syntaxKindName(node.kind),
+		ownerNodeOrdinal,
+		parentKey,
+		sourceOrdinal: sourceInput.source.sourceOrdinal,
+		start
+	};
+	registerScopeAnchor(state, key, anchor);
+	state.scopeKeyByBoundary.set(node, key);
+	return key;
+}
+
+function nearestVariableEnvironment(
+	state: SymbolExtractionState,
+	node: ts.Node | undefined
+): string | null {
+	let cursor = node;
+	while (cursor !== undefined) {
+		if (ts.isClassStaticBlockDeclaration(cursor)) return ensureBoundaryScope(state, cursor);
+		if (ts.isFunctionLike(cursor)) return ensureBoundaryScope(state, cursor);
+		if (ts.isModuleDeclaration(cursor)) return ensureBoundaryScope(state, cursor);
+		if (ts.isSourceFile(cursor)) {
+			const sourceScope = ensureBoundaryScope(state, cursor);
+			return state.scopesByKey.get(sourceScope)?.kind === 'SOURCE_SCRIPT'
+				? state.globalScopeKey
+				: sourceScope;
+		}
+		cursor = cursor.parent;
+	}
+	return null;
+}
+
+function functionDeclarationScopeLink(
+	state: SymbolExtractionState,
+	declaration: ts.FunctionDeclaration
+): DeclaringScopeLink | null {
+	const parent = declaration.parent;
+	if (
+		ts.isBlock(parent) &&
+		parent.parent !== undefined &&
+		ts.isFunctionLike(parent.parent) &&
+		functionBody(parent.parent) === parent
+	)
+		return { key: ensureBoundaryScope(state, parent.parent), state: 'RESOLVED' };
+	if (
+		!ts.isSourceFile(parent) &&
+		!ts.isModuleBlock(parent) &&
+		!isDefinitelyStrict(state, declaration)
+	)
+		return { key: null, state: 'UNSUPPORTED' };
+	return null;
+}
+
+function hoistedVariableScopeLink(
+	state: SymbolExtractionState,
+	declaration: ts.Declaration
+): DeclaringScopeLink | null {
+	const list = variableDeclarationList(declaration);
+	if (list === null || (list.flags & ts.NodeFlags.BlockScoped) !== 0) return null;
+	const key = nearestVariableEnvironment(state, declaration.parent);
+	return { key, state: key === null ? 'UNSUPPORTED' : 'RESOLVED' };
+}
+
+function lexicalDeclaringScopeLink(
+	state: SymbolExtractionState,
+	declaration: ts.Declaration
+): DeclaringScopeLink {
+	const key = ensureContainingScope(state, declaration.parent);
+	return {
+		key: state.scopesByKey.get(key)?.kind === 'SOURCE_SCRIPT' ? state.globalScopeKey : key,
+		state: 'RESOLVED'
+	};
+}
+
+function declaringScope(
+	state: SymbolExtractionState,
+	declaration: ts.Declaration
+): DeclaringScopeLink {
+	if (isParameterProperty(declaration)) return { key: null, state: 'UNSUPPORTED' };
+	if (isInsideConditionalInfer(state, declaration)) return { key: null, state: 'UNSUPPORTED' };
+	if (ts.isSourceFile(declaration))
+		return { key: ensureBoundaryScope(state, declaration), state: 'RESOLVED' };
+	if (ts.isFunctionExpression(declaration) || ts.isClassExpression(declaration))
+		return { key: ensureBoundaryScope(state, declaration), state: 'RESOLVED' };
+	if (ts.isFunctionDeclaration(declaration)) {
+		const link = functionDeclarationScopeLink(state, declaration);
+		if (link !== null) return link;
+	}
+	return (
+		hoistedVariableScopeLink(state, declaration) ?? lexicalDeclaringScopeLink(state, declaration)
+	);
+}
+
+function seedBoundaryScopes(state: SymbolExtractionState): void {
+	for (const sourceInput of sourcesByLogicalPath(state.input)) {
+		ensureBoundaryScope(state, sourceInput.sourceFile);
 		for (const node of sourceInput.nodes ?? [])
-			if (boundaryDescriptor(node) !== null) ensureBoundaryScope(node);
+			if (boundaryDescriptor(state, node) !== null) ensureBoundaryScope(state, node);
 	}
+}
 
-	const declarationAnchorCache = new WeakMap<ts.Declaration, DeclarationAnchor | null>();
-	function anchorForDeclaration(declaration: ts.Declaration): DeclarationAnchor | null {
-		const cached = declarationAnchorCache.get(declaration);
-		if (cached !== undefined) return cached;
-		const sourceFile = declaration.getSourceFile();
-		const sourceInput = sourceByFile.get(sourceFile);
-		if (sourceInput === undefined) {
-			declarationAnchorCache.set(declaration, null);
-			return null;
-		}
-		const start = declaration.getStart(sourceFile, false);
-		const end = declaration.end;
-		if (
-			!Number.isSafeInteger(start) ||
-			!Number.isSafeInteger(end) ||
-			start < 0 ||
-			start > end ||
-			end > sourceFile.text.length
-		)
-			throw new Error('TypeScript returned an invalid declaration span.');
-		const candidate = candidateByNode.get(declaration) ?? null;
-		const nodeOrdinal =
-			sourceInput.nodes === null ? null : (ordinalByNode.get(declaration) ?? null);
-		const named = declarationName(ts.getNameOfDeclaration(declaration), sourceFile);
-		const scope = declaringScope(declaration);
-		const key = canonicalSemanticJson({
-			end,
-			kind: declaration.kind,
-			logicalPath: sourceInput.source.logicalPath,
-			name: named.name,
-			nameState: named.nameState,
-			start
-		});
-		const anchor: DeclarationAnchor = {
-			ambient: isAmbientDeclaration(declaration, sourceFile),
-			candidateNodeOrdinal: candidate?.nodeOrdinal ?? null,
-			declaringScopeKey: scope.key,
-			declaration,
-			end,
-			key,
-			kind: declaration.kind,
-			kindName: syntaxKindName(declaration.kind),
-			logicalPath: sourceInput.source.logicalPath,
-			name: named.name,
-			nameState: named.nameState,
+function anchorForDeclaration(
+	state: SymbolExtractionState,
+	declaration: ts.Declaration
+): DeclarationAnchor | null {
+	const cached = state.declarationAnchorCache.get(declaration);
+	if (cached !== undefined) return cached;
+	const sourceFile = declaration.getSourceFile();
+	const sourceInput = state.sourceByFile.get(sourceFile);
+	if (sourceInput === undefined) {
+		state.declarationAnchorCache.set(declaration, null);
+		return null;
+	}
+	const { end, start } = assertNodeSpan(
+		declaration,
+		sourceFile,
+		'TypeScript returned an invalid declaration span.'
+	);
+	const candidate = state.candidateByNode.get(declaration) ?? null;
+	const nodeOrdinal =
+		sourceInput.nodes === null ? null : (state.ordinalByNode.get(declaration) ?? null);
+	const named = declarationName(ts.getNameOfDeclaration(declaration), sourceFile);
+	const scope = declaringScope(state, declaration);
+	const key = canonicalSemanticJson({
+		end,
+		kind: declaration.kind,
+		logicalPath: sourceInput.source.logicalPath,
+		name: named.name,
+		nameState: named.nameState,
+		start
+	});
+	const anchor: DeclarationAnchor = {
+		ambient: isAmbientDeclaration(declaration, sourceFile),
+		candidateNodeOrdinal: candidate?.nodeOrdinal ?? null,
+		declaringScopeKey: scope.key,
+		declaration,
+		end,
+		key,
+		kind: declaration.kind,
+		kindName: syntaxKindName(declaration.kind),
+		logicalPath: sourceInput.source.logicalPath,
+		name: named.name,
+		nameState: named.nameState,
+		nodeOrdinal,
+		sourceOrdinal: sourceInput.source.sourceOrdinal,
+		scopeLinkState: scope.state,
+		symbolBindingState: isParameterProperty(declaration) ? 'UNSUPPORTED' : 'RESOLVED',
+		start
+	};
+	state.declarationAnchorCache.set(declaration, anchor);
+	return anchor;
+}
+
+function symbolDeclarations(
+	state: SymbolExtractionState,
+	symbol: ts.Symbol
+): readonly DeclarationAnchor[] {
+	const byKey = new Map<string, DeclarationAnchor>();
+	for (const declaration of symbol.getDeclarations() ?? []) {
+		const anchor = anchorForDeclaration(state, declaration);
+		if (anchor !== null) byKey.set(anchor.key, anchor);
+	}
+	return [...byKey.values()].sort((left, right) => compareStrings(left.key, right.key));
+}
+
+function firstFallbackAnchor(
+	state: SymbolExtractionState,
+	symbol: ts.Symbol
+): NodeAnchor | undefined {
+	return [...(state.metadataBySymbol.get(symbol)?.fallbackAnchors.values() ?? [])].sort(
+		(left, right) =>
+			left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
+	)[0];
+}
+
+function symbolWorkKey(state: SymbolExtractionState, symbol: ts.Symbol): string {
+	const declarations = symbolDeclarations(state, symbol);
+	const fallbackAnchors = [
+		...(state.metadataBySymbol.get(symbol)?.fallbackAnchors.values() ?? [])
+	].sort(
+		(left, right) =>
+			left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
+	);
+	return canonicalSemanticJson({
+		declarations: declarations.map((entry) => entry.key),
+		fallbackAnchors,
+		flags: symbol.getFlags(),
+		name: normalizedSymbolName(symbol, declarations)
+	});
+}
+
+function addSymbol(
+	state: SymbolExtractionState,
+	symbol: ts.Symbol | undefined,
+	fallback?: NodeAnchor
+): ts.Symbol | null {
+	if (symbol === undefined) return null;
+	let metadata = state.metadataBySymbol.get(symbol);
+	if (metadata === undefined) {
+		metadata = { fallbackAnchors: new Map(), symbol };
+		state.metadataBySymbol.set(symbol, metadata);
+	}
+	if (fallback !== undefined) metadata.fallbackAnchors.set(nodeAnchorKey(fallback), fallback);
+	return symbol;
+}
+
+function symbolQuery<T>(
+	state: SymbolExtractionState,
+	kind: string,
+	discriminator: string,
+	action: () => T
+): T {
+	return state.guard.query(`${state.input.projectKey}\0${kind}\0${discriminator}`, action);
+}
+
+function indexDeclarationNameNodes(context: SourceReferenceContext): void {
+	const nodes = context.sourceInput.nodes;
+	if (nodes === null) return;
+	for (const candidate of context.sourceInput.declarationCandidates) {
+		if (candidate.nameNodeOrdinal === null) continue;
+		const nameNode = nodes[candidate.nameNodeOrdinal]!;
+		context.declarationNameNodes.add(nameNode);
+		context.declarationByNameNode.set(nameNode, nodes[candidate.nodeOrdinal]! as ts.Declaration);
+	}
+}
+
+function referenceScopeLink(
+	state: SymbolExtractionState,
+	node: ts.Node,
+	declaration: ts.Declaration | undefined
+): DeclaringScopeLink {
+	if (isDynamicallyAffectedReference(state, node)) return { key: null, state: 'UNSUPPORTED' };
+	if (declaration === undefined)
+		return { key: ensureOrdinaryContainingScope(state, node.parent), state: 'RESOLVED' };
+	return declaringScope(state, declaration);
+}
+
+function collectNodeReference(
+	state: SymbolExtractionState,
+	collected: CollectedSymbolFacts,
+	context: SourceReferenceContext,
+	node: ts.Node,
+	nodeOrdinal: number
+): void {
+	const role = referenceRole(node, context.declarationNameNodes);
+	if (role === null) return;
+	const declaration =
+		role === 'DECLARATION_NAME' ? context.declarationByNameNode.get(node) : undefined;
+	const scope = referenceScopeLink(state, node, declaration);
+	const symbol = addSymbol(
+		state,
+		symbolQuery(
+			state,
+			'node-symbol',
+			`${context.sourceInput.source.logicalPath}\0${String(nodeOrdinal)}`,
+			() => state.input.checker.getSymbolAtLocation(node)
+		),
+		{
 			nodeOrdinal,
-			sourceOrdinal: sourceInput.source.sourceOrdinal,
-			scopeLinkState: scope.state,
-			symbolBindingState: isParameterProperty(declaration) ? 'UNSUPPORTED' : 'RESOLVED',
-			start
+			sourceOrdinal: context.sourceInput.source.sourceOrdinal
+		}
+	);
+	collected.pendingReferences.push({
+		containingScopeKey: scope.key,
+		nodeOrdinal,
+		role,
+		scopeLinkState: scope.state,
+		sourceOrdinal: context.sourceInput.source.sourceOrdinal,
+		symbol
+	});
+}
+
+function resolveModuleTarget(
+	state: SymbolExtractionState,
+	occurrence: ModuleOccurrence,
+	symbol: ts.Symbol | null
+): {
+	readonly resolutionState: RawSemanticModuleResolution['resolutionState'];
+	readonly targetSourceOrdinal: number | null;
+} {
+	const unresolved: RawSemanticModuleResolution['resolutionState'] =
+		occurrence.specifierState === 'NON_LITERAL' ? 'UNSUPPORTED' : 'UNRESOLVED';
+	if (symbol === null) return { resolutionState: unresolved, targetSourceOrdinal: null };
+	const declarations = symbolDeclarations(state, symbol);
+	const sourceDeclaration = declarations.find(
+		(declaration) => declaration.kind === ts.SyntaxKind.SourceFile
+	);
+	if (sourceDeclaration === undefined)
+		return {
+			resolutionState: declarations.length > 0 ? 'RESOLVED_AMBIENT' : 'UNRESOLVED',
+			targetSourceOrdinal: null
 		};
-		declarationAnchorCache.set(declaration, anchor);
-		return anchor;
-	}
+	const targetSourceOrdinal = sourceDeclaration.sourceOrdinal;
+	const targetSource = state.sourceByOrdinal.get(targetSourceOrdinal)!.source;
+	return {
+		resolutionState: isExternalOrigin(targetSource) ? 'RESOLVED_EXTERNAL' : 'RESOLVED_SOURCE',
+		targetSourceOrdinal
+	};
+}
 
-	function symbolDeclarations(symbol: ts.Symbol): readonly DeclarationAnchor[] {
-		const byKey = new Map<string, DeclarationAnchor>();
-		for (const declaration of symbol.getDeclarations() ?? []) {
-			const anchor = anchorForDeclaration(declaration);
-			if (anchor !== null) byKey.set(anchor.key, anchor);
-		}
-		return [...byKey.values()].sort((left, right) => compareStrings(left.key, right.key));
-	}
-
-	function normalizedSymbolName(
-		symbol: ts.Symbol,
-		declarations: readonly DeclarationAnchor[]
-	): string {
-		const sourceDeclaration = declarations.find(
-			(declaration) => declaration.kind === ts.SyntaxKind.SourceFile
-		);
-		const compilerName = symbol.getName();
-		const stableCompilerName = compilerName.startsWith('__@')
-			? compilerName.replace(/@[0-9]+$/u, '')
-			: compilerName;
-		const name =
-			sourceDeclaration === undefined
-				? stableCompilerName.length === 0
-					? '<anonymous>'
-					: stableCompilerName
-				: `module:${sourceDeclaration.logicalPath}`;
-		return isUnicodeScalarString(name)
-			? name
-			: `utf16-code-units:${encodeSemanticDiagnosticText(name).text}`;
-	}
-
-	const metadataBySymbol = new Map<ts.Symbol, SymbolMetadata>();
-	function symbolWorkKey(symbol: ts.Symbol): string {
-		const declarations = symbolDeclarations(symbol);
-		const fallbackAnchors = [
-			...(metadataBySymbol.get(symbol)?.fallbackAnchors.values() ?? [])
-		].sort(
-			(left, right) =>
-				left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
-		);
-		return canonicalSemanticJson({
-			declarations: declarations.map((entry) => entry.key),
-			fallbackAnchors,
-			flags: symbol.getFlags(),
-			name: normalizedSymbolName(symbol, declarations)
-		});
-	}
-
-	function addSymbol(symbol: ts.Symbol | undefined, fallback?: NodeAnchor): ts.Symbol | null {
-		if (symbol === undefined) return null;
-		let metadata = metadataBySymbol.get(symbol);
-		if (metadata === undefined) {
-			metadata = { fallbackAnchors: new Map(), symbol };
-			metadataBySymbol.set(symbol, metadata);
-		}
-		if (fallback !== undefined) metadata.fallbackAnchors.set(nodeAnchorKey(fallback), fallback);
-		return symbol;
-	}
-
-	function symbolQuery<T>(kind: string, discriminator: string, action: () => T): T {
-		return guard.query(`${input.projectKey}\0${kind}\0${discriminator}`, action);
-	}
-
-	const pendingReferences: PendingReference[] = [];
-	const pendingModuleResolutions: PendingModuleResolution[] = [];
-	const moduleSymbols = new Map<number, ts.Symbol>();
-	const exportsBySource = new Map<number, readonly ts.Symbol[]>();
-
-	for (const sourceInput of [...input.sources].sort((left, right) =>
-		compareStrings(left.source.logicalPath, right.source.logicalPath)
-	)) {
-		guard.check();
-		const rootAnchor =
-			sourceInput.nodes === null
-				? undefined
-				: { nodeOrdinal: 0, sourceOrdinal: sourceInput.source.sourceOrdinal };
-		const moduleSymbol = addSymbol(
-			symbolQuery('source-symbol', sourceInput.source.logicalPath, () =>
-				checker.getSymbolAtLocation(sourceInput.sourceFile)
-			),
-			rootAnchor
-		);
-		if (moduleSymbol !== null) moduleSymbols.set(sourceInput.source.sourceOrdinal, moduleSymbol);
-		if (sourceInput.nodes === null) continue;
-		const declarationNameNodes = new Set<ts.Node>();
-		const declarationByNameNode = new Map<ts.Node, ts.Declaration>();
-		for (const candidate of sourceInput.declarationCandidates) {
-			if (candidate.nameNodeOrdinal !== null) {
-				const nameNode = sourceInput.nodes[candidate.nameNodeOrdinal]!;
-				declarationNameNodes.add(nameNode);
-				declarationByNameNode.set(
-					nameNode,
-					sourceInput.nodes[candidate.nodeOrdinal]! as ts.Declaration
-				);
-			}
-		}
-		for (let nodeOrdinal = 0; nodeOrdinal < sourceInput.nodes.length; nodeOrdinal += 1) {
-			guard.check();
-			const node = sourceInput.nodes[nodeOrdinal]!;
-			const role = referenceRole(node, declarationNameNodes);
-			if (role !== null) {
-				const declaration =
-					role === 'DECLARATION_NAME' ? declarationByNameNode.get(node) : undefined;
-				const scope = isDynamicallyAffectedReference(node)
-					? { key: null, state: 'UNSUPPORTED' as const }
-					: declaration === undefined
-						? {
-								key: ensureOrdinaryContainingScope(node.parent),
-								state: 'RESOLVED' as const
-							}
-						: declaringScope(declaration);
-				const symbol = addSymbol(
+function collectNodeModuleResolution(
+	state: SymbolExtractionState,
+	collected: CollectedSymbolFacts,
+	sourceInput: TypeScriptSymbolSourceInput,
+	node: ts.Node
+): void {
+	const occurrence = moduleOccurrence(node);
+	if (occurrence === null) return;
+	const specifierOrdinal = state.ordinalByNode.get(occurrence.node);
+	if (specifierOrdinal === undefined)
+		throw new Error('Module occurrence specifier is outside the retained AST profile.');
+	const anchor = {
+		nodeOrdinal: specifierOrdinal,
+		sourceOrdinal: sourceInput.source.sourceOrdinal
+	};
+	const symbol =
+		occurrence.specifierState === 'LITERAL'
+			? addSymbol(
+					state,
 					symbolQuery(
-						'node-symbol',
-						`${sourceInput.source.logicalPath}\0${String(nodeOrdinal)}`,
-						() => checker.getSymbolAtLocation(node)
+						state,
+						'module-symbol',
+						`${sourceInput.source.logicalPath}\0${String(specifierOrdinal)}\0${occurrence.kind}`,
+						() => state.input.checker.getSymbolAtLocation(occurrence.node)
 					),
-					{
-						nodeOrdinal,
-						sourceOrdinal: sourceInput.source.sourceOrdinal
-					}
-				);
-				pendingReferences.push({
-					containingScopeKey: scope.key,
-					nodeOrdinal,
-					role,
-					scopeLinkState: scope.state,
-					sourceOrdinal: sourceInput.source.sourceOrdinal,
-					symbol
-				});
-			}
-			const occurrence = moduleOccurrence(node);
-			if (occurrence !== null) {
-				const specifierOrdinal = ordinalByNode.get(occurrence.node);
-				if (specifierOrdinal === undefined)
-					throw new Error('Module occurrence specifier is outside the retained AST profile.');
-				const anchor = {
-					nodeOrdinal: specifierOrdinal,
-					sourceOrdinal: sourceInput.source.sourceOrdinal
-				};
-				const symbol =
-					occurrence.specifierState === 'LITERAL'
-						? addSymbol(
-								symbolQuery(
-									'module-symbol',
-									`${sourceInput.source.logicalPath}\0${String(specifierOrdinal)}\0${occurrence.kind}`,
-									() => checker.getSymbolAtLocation(occurrence.node)
-								),
-								anchor
-							)
-						: null;
-				let resolutionState: RawSemanticModuleResolution['resolutionState'] =
-					occurrence.specifierState === 'NON_LITERAL' ? 'UNSUPPORTED' : 'UNRESOLVED';
-				let targetSourceOrdinal: number | null = null;
-				if (symbol !== null) {
-					const declarations = symbolDeclarations(symbol);
-					const sourceDeclaration = declarations.find(
-						(declaration) => declaration.kind === ts.SyntaxKind.SourceFile
-					);
-					if (sourceDeclaration !== undefined) {
-						targetSourceOrdinal = sourceDeclaration.sourceOrdinal;
-						const targetSource = sourceByOrdinal.get(targetSourceOrdinal)!.source;
-						resolutionState = isExternalOrigin(targetSource)
-							? 'RESOLVED_EXTERNAL'
-							: 'RESOLVED_SOURCE';
-					} else {
-						resolutionState = declarations.length > 0 ? 'RESOLVED_AMBIENT' : 'UNRESOLVED';
-					}
-				}
-				pendingModuleResolutions.push({
-					moduleSymbol: symbol,
-					nodeOrdinal: specifierOrdinal,
-					occurrenceKind: occurrence.kind,
-					resolutionState,
-					sourceOrdinal: sourceInput.source.sourceOrdinal,
-					specifier: occurrence.specifier,
-					specifierState: occurrence.specifierState,
-					targetSourceOrdinal,
-					typeOnly: occurrence.typeOnly
-				});
-			}
+					anchor
+				)
+			: null;
+	const resolved = resolveModuleTarget(state, occurrence, symbol);
+	collected.pendingModuleResolutions.push({
+		moduleSymbol: symbol,
+		nodeOrdinal: specifierOrdinal,
+		occurrenceKind: occurrence.kind,
+		resolutionState: resolved.resolutionState,
+		sourceOrdinal: sourceInput.source.sourceOrdinal,
+		specifier: occurrence.specifier,
+		specifierState: occurrence.specifierState,
+		targetSourceOrdinal: resolved.targetSourceOrdinal,
+		typeOnly: occurrence.typeOnly
+	});
+}
+
+function collectSourceReferences(
+	state: SymbolExtractionState,
+	collected: CollectedSymbolFacts,
+	sourceInput: TypeScriptSymbolSourceInput
+): void {
+	state.guard.check();
+	const rootAnchor =
+		sourceInput.nodes === null
+			? undefined
+			: { nodeOrdinal: 0, sourceOrdinal: sourceInput.source.sourceOrdinal };
+	const moduleSymbol = addSymbol(
+		state,
+		symbolQuery(state, 'source-symbol', sourceInput.source.logicalPath, () =>
+			state.input.checker.getSymbolAtLocation(sourceInput.sourceFile)
+		),
+		rootAnchor
+	);
+	if (moduleSymbol !== null)
+		collected.moduleSymbols.set(sourceInput.source.sourceOrdinal, moduleSymbol);
+	const nodes = sourceInput.nodes;
+	if (nodes === null) return;
+	const context: SourceReferenceContext = {
+		declarationByNameNode: new Map(),
+		declarationNameNodes: new Set(),
+		sourceInput
+	};
+	indexDeclarationNameNodes(context);
+	for (let nodeOrdinal = 0; nodeOrdinal < nodes.length; nodeOrdinal += 1) {
+		state.guard.check();
+		const node = nodes[nodeOrdinal]!;
+		collectNodeReference(state, collected, context, node, nodeOrdinal);
+		collectNodeModuleResolution(state, collected, sourceInput, node);
+	}
+}
+
+function collectSourceExports(
+	state: SymbolExtractionState,
+	collected: CollectedSymbolFacts,
+	sourceInput: TypeScriptSymbolSourceInput
+): void {
+	if (sourceInput.nodes === null) return;
+	const moduleSymbol = collected.moduleSymbols.get(sourceInput.source.sourceOrdinal);
+	if (moduleSymbol === undefined) return;
+	const exported = [
+		...symbolQuery(state, 'module-exports', sourceInput.source.logicalPath, () =>
+			state.input.checker.getExportsOfModule(moduleSymbol)
+		)
+	].sort((left, right) => compareStrings(symbolWorkKey(state, left), symbolWorkKey(state, right)));
+	collected.exportsBySource.set(sourceInput.source.sourceOrdinal, exported);
+	for (const symbol of exported)
+		addSymbol(state, symbol, { nodeOrdinal: 0, sourceOrdinal: sourceInput.source.sourceOrdinal });
+}
+
+function collectSourceFacts(state: SymbolExtractionState): CollectedSymbolFacts {
+	const collected: CollectedSymbolFacts = {
+		exportsBySource: new Map(),
+		moduleSymbols: new Map(),
+		pendingModuleResolutions: [],
+		pendingReferences: []
+	};
+	for (const sourceInput of sourcesByLogicalPath(state.input))
+		collectSourceReferences(state, collected, sourceInput);
+	for (const sourceInput of sourcesByLogicalPath(state.input))
+		collectSourceExports(state, collected, sourceInput);
+	return collected;
+}
+
+function resolveAliasChain(state: SymbolExtractionState, alias: ts.Symbol): AliasResolution {
+	const discriminator = symbolWorkKey(state, alias);
+	const seen = new Set<ts.Symbol>([alias]);
+	let cursor = alias;
+	let target: ts.Symbol | null = null;
+	let terminal: ts.Symbol | null = null;
+	let aliasState: RawSemanticAlias['state'] = 'RESOLVED';
+	for (;;) {
+		state.guard.check();
+		const immediate = symbolQuery(
+			state,
+			'immediate-alias',
+			`${discriminator}\0${symbolWorkKey(state, cursor)}`,
+			() => state.input.checker.getImmediateAliasedSymbol(cursor)
+		);
+		if (immediate === undefined) {
+			aliasState = 'UNRESOLVED';
+			break;
 		}
+		const unknown = symbolQuery(state, 'unknown-symbol', symbolWorkKey(state, immediate), () =>
+			state.input.checker.isUnknownSymbol(immediate!)
+		);
+		if (unknown) {
+			aliasState = 'UNRESOLVED';
+			break;
+		}
+		addSymbol(state, immediate, firstFallbackAnchor(state, alias));
+		target ??= immediate;
+		if (seen.has(immediate)) {
+			aliasState = 'CIRCULAR';
+			break;
+		}
+		seen.add(immediate);
+		if ((immediate.getFlags() & ts.SymbolFlags.Alias) === 0) {
+			terminal = immediate;
+			break;
+		}
+		cursor = immediate;
 	}
+	return {
+		state: aliasState,
+		target: aliasState === 'UNRESOLVED' ? null : target,
+		terminal: aliasState === 'RESOLVED' ? terminal : null
+	};
+}
 
-	for (const sourceInput of [...input.sources].sort((left, right) =>
-		compareStrings(left.source.logicalPath, right.source.logicalPath)
-	)) {
-		if (sourceInput.nodes === null) continue;
-		const moduleSymbol = moduleSymbols.get(sourceInput.source.sourceOrdinal);
-		if (moduleSymbol === undefined) continue;
-		const exported = [
-			...symbolQuery('module-exports', sourceInput.source.logicalPath, () =>
-				checker.getExportsOfModule(moduleSymbol)
-			)
-		].sort((left, right) => compareStrings(symbolWorkKey(left), symbolWorkKey(right)));
-		exportsBySource.set(sourceInput.source.sourceOrdinal, exported);
-		for (const symbol of exported)
-			addSymbol(symbol, { nodeOrdinal: 0, sourceOrdinal: sourceInput.source.sourceOrdinal });
-	}
-
+function resolveAliases(state: SymbolExtractionState): Map<ts.Symbol, AliasResolution> {
 	const aliasBySymbol = new Map<ts.Symbol, AliasResolution>();
 	let aliasesPending = true;
 	while (aliasesPending) {
 		aliasesPending = false;
-		const aliases = [...metadataBySymbol.keys()]
+		const aliases = [...state.metadataBySymbol.keys()]
 			.filter(
 				(symbol) => (symbol.getFlags() & ts.SymbolFlags.Alias) !== 0 && !aliasBySymbol.has(symbol)
 			)
-			.sort((left, right) => compareStrings(symbolWorkKey(left), symbolWorkKey(right)));
+			.sort((left, right) =>
+				compareStrings(symbolWorkKey(state, left), symbolWorkKey(state, right))
+			);
 		for (const alias of aliases) {
 			aliasesPending = true;
-			const discriminator = symbolWorkKey(alias);
-			const seen = new Set<ts.Symbol>([alias]);
-			let cursor = alias;
-			let target: ts.Symbol | null = null;
-			let terminal: ts.Symbol | null = null;
-			let state: RawSemanticAlias['state'] = 'RESOLVED';
-			for (;;) {
-				guard.check();
-				const immediate = symbolQuery(
-					'immediate-alias',
-					`${discriminator}\0${symbolWorkKey(cursor)}`,
-					() => checker.getImmediateAliasedSymbol(cursor)
-				);
-				if (immediate === undefined) {
-					state = 'UNRESOLVED';
-					break;
-				}
-				const unknown = symbolQuery('unknown-symbol', symbolWorkKey(immediate), () =>
-					checker.isUnknownSymbol(immediate!)
-				);
-				if (unknown) {
-					state = 'UNRESOLVED';
-					break;
-				}
-				const fallback = [...(metadataBySymbol.get(alias)?.fallbackAnchors.values() ?? [])].sort(
-					(left, right) =>
-						left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
-				)[0];
-				addSymbol(immediate, fallback);
-				if (target === null) target = immediate;
-				if (seen.has(immediate)) {
-					state = 'CIRCULAR';
-					terminal = null;
-					break;
-				}
-				seen.add(immediate);
-				if ((immediate.getFlags() & ts.SymbolFlags.Alias) === 0) {
-					terminal = immediate;
-					break;
-				}
-				cursor = immediate;
-			}
-			aliasBySymbol.set(alias, {
-				state,
-				target: state === 'UNRESOLVED' ? null : target,
-				terminal: state === 'RESOLVED' ? terminal : null
-			});
+			aliasBySymbol.set(alias, resolveAliasChain(state, alias));
 		}
 	}
+	return aliasBySymbol;
+}
 
-	interface GroupBuilder {
-		readonly declarations: Map<string, DeclarationAnchor>;
-		readonly fallbackAnchors: Map<string, NodeAnchor>;
-		flags: number;
-		readonly key: string;
-		readonly names: Set<string>;
-		readonly representatives: ts.Symbol[];
-	}
-	interface SymbolInput {
-		readonly declarations: readonly DeclarationAnchor[];
-		readonly fallbackAnchors: readonly NodeAnchor[];
-		readonly flags: number;
-		readonly metadata: SymbolMetadata;
-		readonly name: string;
-		readonly signature: string;
-	}
-	const symbolInputs: SymbolInput[] = [...metadataBySymbol.values()].map((metadata) => {
-		const declarations = symbolDeclarations(metadata.symbol);
+function buildSymbolInputs(state: SymbolExtractionState): SymbolInput[] {
+	return [...state.metadataBySymbol.values()].map((metadata) => {
+		const declarations = symbolDeclarations(state, metadata.symbol);
 		const fallbackAnchors =
 			declarations.length === 0
 				? [...metadata.fallbackAnchors.values()].sort(
@@ -1061,6 +1289,11 @@ export function extractTypeScriptSymbols(
 			signature: canonicalSemanticJson({ flags, name })
 		};
 	});
+}
+
+function indexInputsByDeclaration(
+	symbolInputs: readonly SymbolInput[]
+): Map<string, SymbolInput[]> {
 	const inputsByDeclaration = new Map<string, SymbolInput[]>();
 	for (const symbolInput of symbolInputs)
 		for (const declaration of symbolInput.declarations) {
@@ -1068,34 +1301,88 @@ export function extractTypeScriptSymbols(
 			owners.push(symbolInput);
 			inputsByDeclaration.set(declaration.key, owners);
 		}
+	return inputsByDeclaration;
+}
+
+function hasIncompatibleOwners(
+	owners: readonly SymbolInput[],
+	unsupportedSymbols: ReadonlySet<ts.Symbol>
+): boolean {
+	return (
+		owners.some(
+			(owner) =>
+				unsupportedSymbols.has(owner.metadata.symbol) ||
+				owner.declarations.some((declaration) => declaration.symbolBindingState === 'UNSUPPORTED')
+		) || new Set(owners.map((owner) => owner.signature)).size > 1
+	);
+}
+
+function markOwnersUnsupported(
+	owners: readonly SymbolInput[],
+	unsupportedSymbols: Set<ts.Symbol>
+): boolean {
+	let changed = false;
+	for (const owner of owners)
+		if (!unsupportedSymbols.has(owner.metadata.symbol)) {
+			unsupportedSymbols.add(owner.metadata.symbol);
+			changed = true;
+		}
+	return changed;
+}
+
+function unsupportedSymbolSet(symbolInputs: readonly SymbolInput[]): Set<ts.Symbol> {
+	const inputsByDeclaration = indexInputsByDeclaration(symbolInputs);
 	const unsupportedSymbols = new Set<ts.Symbol>();
-	const unsupportedDeclarationsByKey = new Map<string, DeclarationAnchor>();
 	let unsupportedChanged = true;
 	while (unsupportedChanged) {
 		unsupportedChanged = false;
-		for (const owners of inputsByDeclaration.values()) {
-			const incompatible =
-				owners.some(
-					(owner) =>
-						unsupportedSymbols.has(owner.metadata.symbol) ||
-						owner.declarations.some(
-							(declaration) => declaration.symbolBindingState === 'UNSUPPORTED'
-						)
-				) || new Set(owners.map((owner) => owner.signature)).size > 1;
-			if (!incompatible) continue;
-			for (const owner of owners)
-				if (!unsupportedSymbols.has(owner.metadata.symbol)) {
-					unsupportedSymbols.add(owner.metadata.symbol);
-					unsupportedChanged = true;
-				}
-		}
+		for (const owners of inputsByDeclaration.values())
+			if (
+				hasIncompatibleOwners(owners, unsupportedSymbols) &&
+				markOwnersUnsupported(owners, unsupportedSymbols)
+			)
+				unsupportedChanged = true;
 	}
+	return unsupportedSymbols;
+}
+
+function unsupportedDeclarationIndex(
+	symbolInputs: readonly SymbolInput[],
+	unsupportedSymbols: ReadonlySet<ts.Symbol>
+): Map<string, DeclarationAnchor> {
+	const unsupportedDeclarationsByKey = new Map<string, DeclarationAnchor>();
 	for (const owner of symbolInputs.filter((entry) => unsupportedSymbols.has(entry.metadata.symbol)))
 		for (const declaration of owner.declarations)
 			unsupportedDeclarationsByKey.set(declaration.key, {
 				...declaration,
 				symbolBindingState: 'UNSUPPORTED'
 			});
+	return unsupportedDeclarationsByKey;
+}
+
+function ensureGroupBuilder(
+	buildersByKey: Map<string, GroupBuilder>,
+	key: string,
+	flags: number
+): GroupBuilder {
+	const existing = buildersByKey.get(key);
+	if (existing !== undefined) return existing;
+	const builder: GroupBuilder = {
+		declarations: new Map(),
+		fallbackAnchors: new Map(),
+		flags,
+		key,
+		names: new Set(),
+		representatives: []
+	};
+	buildersByKey.set(key, builder);
+	return builder;
+}
+
+function buildPreliminaryBuilders(
+	symbolInputs: readonly SymbolInput[],
+	unsupportedSymbols: ReadonlySet<ts.Symbol>
+): GroupBuilder[] {
 	const buildersByKey = new Map<string, GroupBuilder>();
 	for (const symbolInput of symbolInputs) {
 		const { declarations, fallbackAnchors, flags, metadata, name } = symbolInput;
@@ -1108,18 +1395,7 @@ export function extractTypeScriptSymbols(
 						name
 					})
 				: canonicalSemanticJson({ declarations: [], fallbackAnchors, flags, name });
-		let builder = buildersByKey.get(key);
-		if (builder === undefined) {
-			builder = {
-				declarations: new Map(),
-				fallbackAnchors: new Map(),
-				flags,
-				key,
-				names: new Set(),
-				representatives: []
-			};
-			buildersByKey.set(key, builder);
-		}
+		const builder = ensureGroupBuilder(buildersByKey, key, flags);
 		builder.flags |= flags;
 		builder.names.add(name);
 		builder.representatives.push(metadata.symbol);
@@ -1127,45 +1403,62 @@ export function extractTypeScriptSymbols(
 		for (const anchor of fallbackAnchors)
 			builder.fallbackAnchors.set(nodeAnchorKey(anchor), anchor);
 	}
-	const preliminaryBuilders = [...buildersByKey.values()];
+	return [...buildersByKey.values()];
+}
+
+function findRoot(parents: number[], index: number): number {
+	let root = index;
+	while (parents[root] !== root) root = parents[root]!;
+	let cursor = index;
+	while (parents[cursor] !== cursor) {
+		const parent = parents[cursor]!;
+		parents[cursor] = root;
+		cursor = parent;
+	}
+	return root;
+}
+
+function mergeBuildersByDeclaration(preliminaryBuilders: readonly GroupBuilder[]): number[] {
 	const parents = preliminaryBuilders.map((_, index) => index);
-	const findRoot = (index: number): number => {
-		let root = index;
-		while (parents[root] !== root) root = parents[root]!;
-		while (parents[index] !== index) {
-			const parent = parents[index]!;
-			parents[index] = root;
-			index = parent;
-		}
-		return root;
-	};
 	const declarationOwner = new Map<string, number>();
-	for (let index = 0; index < preliminaryBuilders.length; index += 1) {
+	for (let index = 0; index < preliminaryBuilders.length; index += 1)
 		for (const declarationKey of preliminaryBuilders[index]!.declarations.keys()) {
 			const owner = declarationOwner.get(declarationKey);
 			if (owner === undefined) declarationOwner.set(declarationKey, index);
 			else {
-				const left = findRoot(index);
-				const right = findRoot(owner);
+				const left = findRoot(parents, index);
+				const right = findRoot(parents, owner);
 				if (left !== right) parents[Math.max(left, right)] = Math.min(left, right);
 			}
 		}
-	}
+	return parents;
+}
+
+function ensureMergedBuilder(
+	mergedByRoot: Map<number, Omit<GroupBuilder, 'key'>>,
+	root: number
+): Omit<GroupBuilder, 'key'> {
+	const existing = mergedByRoot.get(root);
+	if (existing !== undefined) return existing;
+	const merged: Omit<GroupBuilder, 'key'> = {
+		declarations: new Map(),
+		fallbackAnchors: new Map(),
+		flags: 0,
+		names: new Set(),
+		representatives: []
+	};
+	mergedByRoot.set(root, merged);
+	return merged;
+}
+
+function mergeGroupBuilders(
+	preliminaryBuilders: readonly GroupBuilder[],
+	parents: number[]
+): Map<number, Omit<GroupBuilder, 'key'>> {
 	const mergedByRoot = new Map<number, Omit<GroupBuilder, 'key'>>();
 	for (let index = 0; index < preliminaryBuilders.length; index += 1) {
 		const builder = preliminaryBuilders[index]!;
-		const root = findRoot(index);
-		let merged = mergedByRoot.get(root);
-		if (merged === undefined) {
-			merged = {
-				declarations: new Map(),
-				fallbackAnchors: new Map(),
-				flags: 0,
-				names: new Set(),
-				representatives: []
-			};
-			mergedByRoot.set(root, merged);
-		}
+		const merged = ensureMergedBuilder(mergedByRoot, findRoot(parents, index));
 		merged.flags |= builder.flags;
 		for (const [key, declaration] of builder.declarations)
 			merged.declarations.set(key, declaration);
@@ -1173,59 +1466,83 @@ export function extractTypeScriptSymbols(
 		for (const name of builder.names) merged.names.add(name);
 		merged.representatives.push(...builder.representatives);
 	}
-	const sortedBuilders: GroupBuilder[] = [...mergedByRoot.values()]
-		.map((builder) => {
-			const declarationKeys = [...builder.declarations.keys()].sort(compareStrings);
-			const fallbackAnchors = [...builder.fallbackAnchors.values()].sort(
-				(left, right) =>
-					left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
-			);
-			const name = [...builder.names].sort(compareStrings)[0] ?? '<anonymous>';
-			const key =
-				declarationKeys.length > 0
-					? canonicalSemanticJson({ declarations: declarationKeys })
-					: canonicalSemanticJson({
-							declarations: [],
-							fallbackAnchors,
-							flags: builder.flags,
-							name
-						});
-			return { ...builder, key };
-		})
+	return mergedByRoot;
+}
+
+function finalizeGroupBuilder(builder: Omit<GroupBuilder, 'key'>): GroupBuilder {
+	const declarationKeys = [...builder.declarations.keys()].sort(compareStrings);
+	const fallbackAnchors = [...builder.fallbackAnchors.values()].sort(
+		(left, right) =>
+			left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
+	);
+	const name = [...builder.names].sort(compareStrings)[0] ?? '<anonymous>';
+	const key =
+		declarationKeys.length > 0
+			? canonicalSemanticJson({ declarations: declarationKeys })
+			: canonicalSemanticJson({
+					declarations: [],
+					fallbackAnchors,
+					flags: builder.flags,
+					name
+				});
+	return { ...builder, key };
+}
+
+function finalizeSymbolGroup(
+	state: SymbolExtractionState,
+	builder: GroupBuilder,
+	symbolOrdinal: number
+): SymbolGroup {
+	const declarations = [...builder.declarations.values()].sort((left, right) =>
+		compareStrings(left.key, right.key)
+	);
+	const sourceDeclaration = declarations.find(
+		(declaration) => declaration.kind === ts.SyntaxKind.SourceFile
+	);
+	const declaredNames = declarations
+		.flatMap((declaration) => (declaration.name === null ? [] : [declaration.name]))
+		.sort(compareStrings);
+	const name =
+		sourceDeclaration !== undefined
+			? `module:${sourceDeclaration.logicalPath}`
+			: (declaredNames[0] ?? [...builder.names].sort(compareStrings)[0] ?? '<anonymous>');
+	return {
+		declarations,
+		fallbackAnchors: [...builder.fallbackAnchors.values()].sort(
+			(left, right) =>
+				left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
+		),
+		flags: builder.flags,
+		key: builder.key,
+		name,
+		representatives: [...builder.representatives].sort((left, right) =>
+			compareStrings(symbolWorkKey(state, left), symbolWorkKey(state, right))
+		),
+		symbolOrdinal
+	};
+}
+
+function buildSymbolGroups(
+	state: SymbolExtractionState,
+	symbolInputs: readonly SymbolInput[],
+	unsupportedSymbols: ReadonlySet<ts.Symbol>
+): SymbolGroup[] {
+	const preliminaryBuilders = buildPreliminaryBuilders(symbolInputs, unsupportedSymbols);
+	const parents = mergeBuildersByDeclaration(preliminaryBuilders);
+	const mergedByRoot = mergeGroupBuilders(preliminaryBuilders, parents);
+	const sortedBuilders = [...mergedByRoot.values()]
+		.map((builder) => finalizeGroupBuilder(builder))
 		.sort((left, right) => compareStrings(left.key, right.key));
-	const groups: SymbolGroup[] = sortedBuilders.map((builder, symbolOrdinal) => {
-		const declarations = [...builder.declarations.values()].sort((left, right) =>
-			compareStrings(left.key, right.key)
-		);
-		const sourceDeclaration = declarations.find(
-			(declaration) => declaration.kind === ts.SyntaxKind.SourceFile
-		);
-		const declaredNames = declarations
-			.flatMap((declaration) => (declaration.name === null ? [] : [declaration.name]))
-			.sort(compareStrings);
-		const name =
-			sourceDeclaration !== undefined
-				? `module:${sourceDeclaration.logicalPath}`
-				: (declaredNames[0] ?? [...builder.names].sort(compareStrings)[0] ?? '<anonymous>');
-		return {
-			declarations,
-			fallbackAnchors: [...builder.fallbackAnchors.values()].sort(
-				(left, right) =>
-					left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
-			),
-			flags: builder.flags,
-			key: builder.key,
-			name,
-			representatives: [...builder.representatives].sort((left, right) =>
-				compareStrings(symbolWorkKey(left), symbolWorkKey(right))
-			),
-			symbolOrdinal
-		};
-	});
-	const groupBySymbol = new Map<ts.Symbol, SymbolGroup>();
-	for (const group of groups)
-		for (const representative of group.representatives) groupBySymbol.set(representative, group);
-	const sortedScopeAnchors = [...scopesByKey.values()].sort((left, right) =>
+	return sortedBuilders.map((builder, symbolOrdinal) =>
+		finalizeSymbolGroup(state, builder, symbolOrdinal)
+	);
+}
+
+function buildScopeProjection(state: SymbolExtractionState): {
+	readonly scopeOrdinalByKey: ReadonlyMap<string, number>;
+	readonly scopes: RawSemanticScope[];
+} {
+	const sortedScopeAnchors = [...state.scopesByKey.values()].sort((left, right) =>
 		compareStrings(left.key, right.key)
 	);
 	const scopeOrdinalByKey = new Map(
@@ -1246,36 +1563,57 @@ export function extractTypeScriptSymbols(
 	}));
 	if (scopes.some((scope) => scope.kind !== 'PROGRAM_GLOBAL' && scope.parentScopeOrdinal === null))
 		throw new Error('A semantic scope lacks its canonical parent.');
+	return { scopeOrdinalByKey, scopes };
+}
+
+function unsupportedCallableAnchor(
+	state: SymbolExtractionState,
+	declaration: ts.Node | undefined,
+	groupedDeclarationKeys: ReadonlySet<string>
+): DeclarationAnchor | null {
+	if (
+		declaration === undefined ||
+		(!ts.isCallSignatureDeclaration(declaration) &&
+			!ts.isConstructSignatureDeclaration(declaration))
+	)
+		return null;
+	const anchor = anchorForDeclaration(state, declaration);
+	return anchor === null || groupedDeclarationKeys.has(anchor.key) ? null : anchor;
+}
+
+function markUnsupportedCallableDeclarations(
+	state: SymbolExtractionState,
+	groups: readonly SymbolGroup[],
+	unsupportedDeclarationsByKey: Map<string, DeclarationAnchor>
+): void {
 	const groupedDeclarationKeys = new Set(
 		groups.flatMap((group) => group.declarations.map((declaration) => declaration.key))
 	);
-	for (const sourceInput of [...input.sources].sort((left, right) =>
-		compareStrings(left.source.logicalPath, right.source.logicalPath)
-	)) {
-		if (sourceInput.nodes === null) continue;
+	for (const sourceInput of sourcesByLogicalPath(state.input)) {
+		const nodes = sourceInput.nodes;
+		if (nodes === null) continue;
 		for (const candidate of [...sourceInput.declarationCandidates].sort(
 			(left, right) => left.nodeOrdinal - right.nodeOrdinal
 		)) {
-			const declaration = sourceInput.nodes[candidate.nodeOrdinal];
-			if (
-				declaration === undefined ||
-				(!ts.isCallSignatureDeclaration(declaration) &&
-					!ts.isConstructSignatureDeclaration(declaration))
-			)
-				continue;
-			const anchor = anchorForDeclaration(declaration);
-			if (anchor === null || groupedDeclarationKeys.has(anchor.key)) continue;
-			unsupportedDeclarationsByKey.set(anchor.key, {
-				...anchor,
-				symbolBindingState: 'UNSUPPORTED'
-			});
+			const anchor = unsupportedCallableAnchor(
+				state,
+				nodes[candidate.nodeOrdinal],
+				groupedDeclarationKeys
+			);
+			if (anchor !== null)
+				unsupportedDeclarationsByKey.set(anchor.key, {
+					...anchor,
+					symbolBindingState: 'UNSUPPORTED'
+				});
 		}
 	}
+}
 
-	const pendingDeclarations: {
-		readonly declaration: DeclarationAnchor;
-		readonly group: SymbolGroup | null;
-	}[] = [
+function buildPendingDeclarations(
+	groups: readonly SymbolGroup[],
+	unsupportedDeclarationsByKey: ReadonlyMap<string, DeclarationAnchor>
+): PendingDeclaration[] {
+	return [
 		...groups.flatMap((group) => group.declarations.map((declaration) => ({ declaration, group }))),
 		...[...unsupportedDeclarationsByKey.values()].map((declaration) => ({
 			declaration,
@@ -1286,52 +1624,75 @@ export function extractTypeScriptSymbols(
 			compareStrings(left.declaration.key, right.declaration.key) ||
 			compareStrings(left.group?.key ?? '', right.group?.key ?? '')
 	);
-	const declarationOrdinalByKey = new Map<string, number>();
-	const declarations: RawSemanticDeclaration[] = pendingDeclarations.map(
-		({ declaration, group }, declarationOrdinal) => {
-			guard.addFact();
-			if (group !== null)
-				declarationOrdinalByKey.set(`${group.key}\0${declaration.key}`, declarationOrdinal);
-			return {
-				ambient: declaration.ambient,
-				candidateNodeOrdinal: declaration.candidateNodeOrdinal,
-				declaringScopeOrdinal:
-					declaration.declaringScopeKey === null
-						? null
-						: (scopeOrdinalByKey.get(declaration.declaringScopeKey) ?? null),
-				declarationOrdinal,
-				end: declaration.end,
-				kind: declaration.kind,
-				kindName: declaration.kindName,
-				name: declaration.name,
-				nameState: declaration.nameState,
-				nodeOrdinal: declaration.nodeOrdinal,
-				sourceOrdinal: declaration.sourceOrdinal,
-				scopeLinkState: declaration.scopeLinkState,
-				start: declaration.start,
-				symbolBindingState: declaration.symbolBindingState,
-				symbolOrdinal: group?.symbolOrdinal ?? null
-			};
-		}
-	);
+}
 
-	const symbols: RawSemanticSymbol[] = groups.map((group) => {
+function buildDeclarationRecords(
+	guard: TypeScriptSymbolExtractionGuard,
+	pendingDeclarations: readonly PendingDeclaration[],
+	scopeOrdinalByKey: ReadonlyMap<string, number>,
+	declarationOrdinalByKey: Map<string, number>
+): RawSemanticDeclaration[] {
+	return pendingDeclarations.map(({ declaration, group }, declarationOrdinal) => {
 		guard.addFact();
+		if (group !== null)
+			declarationOrdinalByKey.set(`${group.key}\0${declaration.key}`, declarationOrdinal);
+		return {
+			ambient: declaration.ambient,
+			candidateNodeOrdinal: declaration.candidateNodeOrdinal,
+			declaringScopeOrdinal:
+				declaration.declaringScopeKey === null
+					? null
+					: (scopeOrdinalByKey.get(declaration.declaringScopeKey) ?? null),
+			declarationOrdinal,
+			end: declaration.end,
+			kind: declaration.kind,
+			kindName: declaration.kindName,
+			name: declaration.name,
+			nameState: declaration.nameState,
+			nodeOrdinal: declaration.nodeOrdinal,
+			sourceOrdinal: declaration.sourceOrdinal,
+			scopeLinkState: declaration.scopeLinkState,
+			start: declaration.start,
+			symbolBindingState: declaration.symbolBindingState,
+			symbolOrdinal: group?.symbolOrdinal ?? null
+		};
+	});
+}
+
+function valueDeclarationOrdinalFor(
+	state: SymbolExtractionState,
+	group: SymbolGroup,
+	declarationOrdinalByKey: ReadonlyMap<string, number>
+): number | null {
+	const valueDeclarationKeys = new Set<string>();
+	for (const representative of group.representatives) {
+		if (representative.valueDeclaration === undefined) continue;
+		const anchor = anchorForDeclaration(state, representative.valueDeclaration);
+		if (anchor !== null) valueDeclarationKeys.add(anchor.key);
+	}
+	return (
+		[...valueDeclarationKeys]
+			.sort(compareStrings)
+			.map((key) => declarationOrdinalByKey.get(`${group.key}\0${key}`))
+			.find((value): value is number => value !== undefined) ?? null
+	);
+}
+
+function buildSymbolRecords(
+	state: SymbolExtractionState,
+	groups: readonly SymbolGroup[],
+	declarationOrdinalByKey: ReadonlyMap<string, number>
+): RawSemanticSymbol[] {
+	return groups.map((group) => {
+		state.guard.addFact();
 		const declarationOrdinals = group.declarations.map((declaration) =>
 			declarationOrdinalByKey.get(`${group.key}\0${declaration.key}`)!
 		);
-		const valueDeclarationKeys = new Set<string>();
-		for (const representative of group.representatives) {
-			if (representative.valueDeclaration !== undefined) {
-				const anchor = anchorForDeclaration(representative.valueDeclaration);
-				if (anchor !== null) valueDeclarationKeys.add(anchor.key);
-			}
-		}
-		const valueDeclarationOrdinal =
-			[...valueDeclarationKeys]
-				.sort(compareStrings)
-				.map((key) => declarationOrdinalByKey.get(`${group.key}\0${key}`))
-				.find((value): value is number => value !== undefined) ?? null;
+		const valueDeclarationOrdinal = valueDeclarationOrdinalFor(
+			state,
+			group,
+			declarationOrdinalByKey
+		);
 		return {
 			declarationOrdinals,
 			fallbackReferenceNodes: group.fallbackAnchors,
@@ -1342,139 +1703,177 @@ export function extractTypeScriptSymbols(
 			valueDeclarationOrdinal
 		};
 	});
-	const typeProjection = input.includeTypes
-		? extractTypeScriptTypes({
-				assignabilityRequests: input.assignabilityRequests,
-				checker,
-				declarations: pendingDeclarations.map(({ declaration }, declarationOrdinal) => ({
-					declaration: declaration.declaration,
-					declarationOrdinal
-				})),
-				guard,
-				nodeAnchorForNode: (node) => {
-					const sourceInput = sourceByFile.get(node.getSourceFile());
-					const nodeOrdinal = ordinalByNode.get(node);
-					return sourceInput === undefined || nodeOrdinal === undefined
-						? null
-						: { nodeOrdinal, sourceOrdinal: sourceInput.source.sourceOrdinal };
-				},
-				projectKey: input.projectKey,
-				resolveCheckerContextDigest: input.resolveCheckerContextDigest,
-				sources: input.sources.map((sourceInput) => ({
-					logicalPath: sourceInput.source.logicalPath,
-					nodes: sourceInput.nodes,
-					sourceFile: sourceInput.sourceFile,
-					sourceOrdinal: sourceInput.source.sourceOrdinal
-				})),
-				symbols: groups.map((group) => ({
-					declarations: group.declarations.map((declaration) => {
-						const declarationOrdinal = declarationOrdinalByKey.get(
-							`${group.key}\0${declaration.key}`
-						);
-						if (declarationOrdinal === undefined)
-							throw new Error('Canonical type bridge lacks a declaration ordinal.');
-						return { declaration: declaration.declaration, declarationOrdinal };
-					}),
-					flags: group.flags,
-					representatives: group.representatives,
-					symbolOrdinal: group.symbolOrdinal
-				}))
-			})
-		: {
-				overloadSets: [],
-				signatureParameters: [],
-				signatures: [],
-				typeParameters: [],
-				typeRelations: [],
-				types: []
-			};
+}
 
+function typeExtractionInput(
+	state: SymbolExtractionState,
+	groups: readonly SymbolGroup[],
+	pendingDeclarations: readonly PendingDeclaration[],
+	declarationOrdinalByKey: ReadonlyMap<string, number>
+): ExtractTypeScriptTypesInput {
+	const input = state.input;
+	return {
+		assignabilityRequests: input.assignabilityRequests,
+		checker: input.checker,
+		declarations: pendingDeclarations.map(({ declaration }, declarationOrdinal) => ({
+			declaration: declaration.declaration,
+			declarationOrdinal
+		})),
+		guard: input.guard,
+		nodeAnchorForNode: (node) => {
+			const sourceInput = state.sourceByFile.get(node.getSourceFile());
+			const nodeOrdinal = state.ordinalByNode.get(node);
+			return sourceInput === undefined || nodeOrdinal === undefined
+				? null
+				: { nodeOrdinal, sourceOrdinal: sourceInput.source.sourceOrdinal };
+		},
+		projectKey: input.projectKey,
+		resolveCheckerContextDigest: input.resolveCheckerContextDigest,
+		sources: input.sources.map((sourceInput) => ({
+			logicalPath: sourceInput.source.logicalPath,
+			nodes: sourceInput.nodes,
+			sourceFile: sourceInput.sourceFile,
+			sourceOrdinal: sourceInput.source.sourceOrdinal
+		})),
+		symbols: groups.map((group) => ({
+			declarations: group.declarations.map((declaration) => {
+				const declarationOrdinal = declarationOrdinalByKey.get(`${group.key}\0${declaration.key}`);
+				if (declarationOrdinal === undefined)
+					throw new Error('Canonical type bridge lacks a declaration ordinal.');
+				return { declaration: declaration.declaration, declarationOrdinal };
+			}),
+			flags: group.flags,
+			representatives: group.representatives,
+			symbolOrdinal: group.symbolOrdinal
+		}))
+	};
+}
+
+function emptyTypeProjection(): RawTypeScriptTypeProjection {
+	return {
+		overloadSets: [],
+		signatureParameters: [],
+		signatures: [],
+		typeParameters: [],
+		typeRelations: [],
+		types: []
+	};
+}
+
+function aliasRecordForGroup(
+	group: SymbolGroup,
+	aliasBySymbol: ReadonlyMap<ts.Symbol, AliasResolution>,
+	groupBySymbol: ReadonlyMap<ts.Symbol, SymbolGroup>,
+	unsupportedSymbols: ReadonlySet<ts.Symbol>
+): RawSemanticAlias {
+	const normalized = new Map<string, RawSemanticAlias>();
+	for (const representative of group.representatives) {
+		const resolution = aliasBySymbol.get(representative) ?? {
+			state: 'UNRESOLVED' as const,
+			target: null,
+			terminal: null
+		};
+		const targetGroup =
+			resolution.target === null ? null : (groupBySymbol.get(resolution.target) ?? null);
+		const terminalGroup =
+			resolution.terminal === null ? null : (groupBySymbol.get(resolution.terminal) ?? null);
+		const unsupportedTarget =
+			(resolution.target !== null && unsupportedSymbols.has(resolution.target)) ||
+			(resolution.terminal !== null && unsupportedSymbols.has(resolution.terminal));
+		const record: RawSemanticAlias = {
+			aliasSymbolOrdinal: group.symbolOrdinal,
+			state: unsupportedTarget ? 'UNSUPPORTED' : resolution.state,
+			targetSymbolOrdinal: unsupportedTarget ? null : (targetGroup?.symbolOrdinal ?? null),
+			terminalSymbolOrdinal: unsupportedTarget ? null : (terminalGroup?.symbolOrdinal ?? null)
+		};
+		normalized.set(canonicalSemanticJson(record), record);
+	}
+	if (normalized.size !== 1)
+		throw new Error('Canonical symbol grouping produced incompatible alias relations.');
+	return [...normalized.values()][0]!;
+}
+
+function buildAliasRecords(
+	state: SymbolExtractionState,
+	groups: readonly SymbolGroup[],
+	aliasBySymbol: ReadonlyMap<ts.Symbol, AliasResolution>,
+	groupBySymbol: ReadonlyMap<ts.Symbol, SymbolGroup>,
+	unsupportedSymbols: ReadonlySet<ts.Symbol>
+): RawSemanticAlias[] {
 	const aliases: RawSemanticAlias[] = [];
 	for (const group of groups.filter(
 		(candidate) => (candidate.flags & ts.SymbolFlags.Alias) !== 0
 	)) {
-		const normalized = new Map<string, RawSemanticAlias>();
-		for (const representative of group.representatives) {
-			const resolution = aliasBySymbol.get(representative) ?? {
-				state: 'UNRESOLVED' as const,
-				target: null,
-				terminal: null
-			};
-			const targetGroup =
-				resolution.target === null ? null : (groupBySymbol.get(resolution.target) ?? null);
-			const terminalGroup =
-				resolution.terminal === null ? null : (groupBySymbol.get(resolution.terminal) ?? null);
-			const unsupportedTarget =
-				(resolution.target !== null && unsupportedSymbols.has(resolution.target)) ||
-				(resolution.terminal !== null && unsupportedSymbols.has(resolution.terminal));
-			const record: RawSemanticAlias = {
-				aliasSymbolOrdinal: group.symbolOrdinal,
-				state: unsupportedTarget ? 'UNSUPPORTED' : resolution.state,
-				targetSymbolOrdinal: unsupportedTarget ? null : (targetGroup?.symbolOrdinal ?? null),
-				terminalSymbolOrdinal: unsupportedTarget ? null : (terminalGroup?.symbolOrdinal ?? null)
-			};
-			normalized.set(canonicalSemanticJson(record), record);
-		}
-		if (normalized.size !== 1)
-			throw new Error('Canonical symbol grouping produced incompatible alias relations.');
-		guard.addFact();
-		aliases.push([...normalized.values()][0]!);
+		const record = aliasRecordForGroup(group, aliasBySymbol, groupBySymbol, unsupportedSymbols);
+		state.guard.addFact();
+		aliases.push(record);
 	}
 	aliases.sort((left, right) => left.aliasSymbolOrdinal - right.aliasSymbolOrdinal);
-	const aliasByOrdinal = new Map(
-		aliases.map((alias) => [alias.aliasSymbolOrdinal, alias] as const)
-	);
+	return aliases;
+}
 
-	const references: RawSemanticReference[] = pendingReferences
+function referenceRecord(
+	reference: PendingReference,
+	context: SymbolProjectionContext
+): RawSemanticReference {
+	const group =
+		reference.symbol === null ? null : (context.groupBySymbol.get(reference.symbol) ?? null);
+	const base = {
+		containingScopeOrdinal:
+			reference.containingScopeKey === null
+				? null
+				: (context.scopeOrdinalByKey.get(reference.containingScopeKey) ?? null),
+		nodeOrdinal: reference.nodeOrdinal,
+		role: reference.role,
+		scopeLinkState: reference.scopeLinkState,
+		sourceOrdinal: reference.sourceOrdinal
+	};
+	if (reference.symbol !== null && context.unsupportedSymbols.has(reference.symbol))
+		return {
+			...base,
+			resolutionState: 'UNSUPPORTED',
+			resolvedSymbolOrdinal: null,
+			symbolOrdinal: null
+		};
+	if (group === null)
+		return {
+			...base,
+			resolutionState: 'UNRESOLVED',
+			resolvedSymbolOrdinal: null,
+			symbolOrdinal: null
+		};
+	const alias = context.aliasByOrdinal.get(group.symbolOrdinal);
+	if (alias === undefined)
+		return {
+			...base,
+			resolutionState: 'RESOLVED_DIRECT',
+			resolvedSymbolOrdinal: group.symbolOrdinal,
+			symbolOrdinal: group.symbolOrdinal
+		};
+	if (alias.state === 'RESOLVED' && alias.terminalSymbolOrdinal !== null)
+		return {
+			...base,
+			resolutionState: 'RESOLVED_ALIAS',
+			resolvedSymbolOrdinal: alias.terminalSymbolOrdinal,
+			symbolOrdinal: group.symbolOrdinal
+		};
+	return {
+		...base,
+		resolutionState: alias.state === 'UNRESOLVED' ? 'UNRESOLVED' : 'UNSUPPORTED',
+		resolvedSymbolOrdinal: null,
+		symbolOrdinal: alias.state === 'UNRESOLVED' ? group.symbolOrdinal : null
+	};
+}
+
+function buildReferenceRecords(
+	state: SymbolExtractionState,
+	pendingReferences: readonly PendingReference[],
+	context: SymbolProjectionContext
+): RawSemanticReference[] {
+	return pendingReferences
 		.map((reference): RawSemanticReference => {
-			guard.addFact();
-			const group =
-				reference.symbol === null ? null : (groupBySymbol.get(reference.symbol) ?? null);
-			const base = {
-				containingScopeOrdinal:
-					reference.containingScopeKey === null
-						? null
-						: (scopeOrdinalByKey.get(reference.containingScopeKey) ?? null),
-				nodeOrdinal: reference.nodeOrdinal,
-				role: reference.role,
-				scopeLinkState: reference.scopeLinkState,
-				sourceOrdinal: reference.sourceOrdinal
-			};
-			if (reference.symbol !== null && unsupportedSymbols.has(reference.symbol))
-				return {
-					...base,
-					resolutionState: 'UNSUPPORTED',
-					resolvedSymbolOrdinal: null,
-					symbolOrdinal: null
-				};
-			if (group === null)
-				return {
-					...base,
-					resolutionState: 'UNRESOLVED',
-					resolvedSymbolOrdinal: null,
-					symbolOrdinal: null
-				};
-			const alias = aliasByOrdinal.get(group.symbolOrdinal);
-			if (alias === undefined)
-				return {
-					...base,
-					resolutionState: 'RESOLVED_DIRECT',
-					resolvedSymbolOrdinal: group.symbolOrdinal,
-					symbolOrdinal: group.symbolOrdinal
-				};
-			if (alias.state === 'RESOLVED' && alias.terminalSymbolOrdinal !== null)
-				return {
-					...base,
-					resolutionState: 'RESOLVED_ALIAS',
-					resolvedSymbolOrdinal: alias.terminalSymbolOrdinal,
-					symbolOrdinal: group.symbolOrdinal
-				};
-			return {
-				...base,
-				resolutionState: alias.state === 'UNRESOLVED' ? 'UNRESOLVED' : 'UNSUPPORTED',
-				resolvedSymbolOrdinal: null,
-				symbolOrdinal: alias.state === 'UNRESOLVED' ? group.symbolOrdinal : null
-			};
+			state.guard.addFact();
+			return referenceRecord(reference, context);
 		})
 		.sort(
 			(left, right) =>
@@ -1482,17 +1881,23 @@ export function extractTypeScriptSymbols(
 				left.nodeOrdinal - right.nodeOrdinal ||
 				compareStrings(left.role, right.role)
 		);
+}
 
-	const moduleResolutions: RawSemanticModuleResolution[] = pendingModuleResolutions
+function buildModuleResolutionRecords(
+	state: SymbolExtractionState,
+	pendingModuleResolutions: readonly PendingModuleResolution[],
+	context: SymbolProjectionContext
+): RawSemanticModuleResolution[] {
+	return pendingModuleResolutions
 		.map((resolution): RawSemanticModuleResolution => {
-			guard.addFact();
+			state.guard.addFact();
 			const unsupportedModuleSymbol =
-				resolution.moduleSymbol !== null && unsupportedSymbols.has(resolution.moduleSymbol);
+				resolution.moduleSymbol !== null && context.unsupportedSymbols.has(resolution.moduleSymbol);
 			return {
 				moduleSymbolOrdinal:
 					resolution.moduleSymbol === null
 						? null
-						: (groupBySymbol.get(resolution.moduleSymbol)?.symbolOrdinal ?? null),
+						: (context.groupBySymbol.get(resolution.moduleSymbol)?.symbolOrdinal ?? null),
 				nodeOrdinal: resolution.nodeOrdinal,
 				occurrenceKind: resolution.occurrenceKind,
 				resolutionState: unsupportedModuleSymbol ? 'UNSUPPORTED' : resolution.resolutionState,
@@ -1511,45 +1916,69 @@ export function extractTypeScriptSymbols(
 				compareStrings(left.specifierState, right.specifierState) ||
 				compareStrings(left.specifier ?? '', right.specifier ?? '')
 		);
+}
 
+function hasStarReexport(sourceFile: ts.SourceFile): boolean {
+	return sourceFile.statements.some(
+		(statement) =>
+			ts.isExportDeclaration(statement) &&
+			statement.moduleSpecifier !== undefined &&
+			statement.exportClause === undefined
+	);
+}
+
+function moduleExportRecord(
+	symbol: ts.Symbol,
+	group: SymbolGroup,
+	context: ModuleExportContext
+): RawSemanticModuleExport {
+	const alias = context.aliasByOrdinal.get(group.symbolOrdinal);
+	const reexport =
+		group.declarations.some((declaration) =>
+			isReexportDeclaration(declaration.declaration, context.sourceFile)
+		) ||
+		(context.hasStarReexport &&
+			group.declarations.every(
+				(declaration) => declaration.declaration.getSourceFile() !== context.sourceFile
+			));
+	let exportState: RawSemanticModuleExport['state'];
+	if (alias !== undefined && alias.state !== 'RESOLVED') exportState = 'UNRESOLVED';
+	else if (reexport) exportState = 'REEXPORT';
+	else if (alias !== undefined) exportState = 'ALIAS';
+	else exportState = 'DIRECT';
+	return {
+		exportName: symbol.getName(),
+		sourceOrdinal: context.sourceOrdinal,
+		state: exportState,
+		symbolOrdinal: group.symbolOrdinal,
+		targetSymbolOrdinal:
+			alias?.targetSymbolOrdinal ?? (exportState === 'REEXPORT' ? group.symbolOrdinal : null)
+	};
+}
+
+function buildModuleExportRecords(
+	state: SymbolExtractionState,
+	collected: CollectedSymbolFacts,
+	context: SymbolProjectionContext
+): RawSemanticModuleExport[] {
 	const moduleExports: RawSemanticModuleExport[] = [];
-	for (const [sourceOrdinal, exported] of exportsBySource) {
-		const sourceInput = sourceByOrdinal.get(sourceOrdinal)!;
-		const hasStarReexport = sourceInput.sourceFile.statements.some(
-			(statement) =>
-				ts.isExportDeclaration(statement) &&
-				statement.moduleSpecifier !== undefined &&
-				statement.exportClause === undefined
-		);
+	for (const [sourceOrdinal, exported] of collected.exportsBySource) {
+		const sourceInput = state.sourceByOrdinal.get(sourceOrdinal)!;
+		const exportContext: ModuleExportContext = {
+			aliasByOrdinal: context.aliasByOrdinal,
+			hasStarReexport: hasStarReexport(sourceInput.sourceFile),
+			sourceFile: sourceInput.sourceFile,
+			sourceOrdinal
+		};
 		for (const symbol of exported) {
-			const group = groupBySymbol.get(symbol);
+			const group = context.groupBySymbol.get(symbol);
 			if (group === undefined) {
-				if (unsupportedSymbols.has(symbol)) continue;
+				if (context.unsupportedSymbols.has(symbol)) continue;
 				throw new Error('Module export symbol was not collected.');
 			}
-			const alias = aliasByOrdinal.get(group.symbolOrdinal);
-			const reexport =
-				group.declarations.some((declaration) =>
-					isReexportDeclaration(declaration.declaration, sourceInput.sourceFile)
-				) ||
-				(hasStarReexport &&
-					group.declarations.every(
-						(declaration) => declaration.declaration.getSourceFile() !== sourceInput.sourceFile
-					));
-			let state: RawSemanticModuleExport['state'];
-			if (alias !== undefined && alias.state !== 'RESOLVED') state = 'UNRESOLVED';
-			else if (reexport) state = 'REEXPORT';
-			else if (alias !== undefined) state = 'ALIAS';
-			else state = 'DIRECT';
-			guard.addFact();
-			moduleExports.push({
-				exportName: symbol.getName(),
-				sourceOrdinal,
-				state,
-				symbolOrdinal: group.symbolOrdinal,
-				targetSymbolOrdinal:
-					alias?.targetSymbolOrdinal ?? (state === 'REEXPORT' ? group.symbolOrdinal : null)
-			});
+			const record = moduleExportRecord(symbol, group, exportContext);
+			state.guard.addFact();
+			moduleExports.push(record);
 		}
 	}
 	moduleExports.sort(
@@ -1558,7 +1987,25 @@ export function extractTypeScriptSymbols(
 			compareStrings(left.exportName, right.exportName) ||
 			left.symbolOrdinal - right.symbolOrdinal
 	);
-	const partialityReasons = [
+	return moduleExports;
+}
+
+function partialityMessage(declaration: DeclarationAnchor): string {
+	if (declaration.symbolBindingState === 'UNSUPPORTED') {
+		if (
+			ts.isCallSignatureDeclaration(declaration.declaration) ||
+			ts.isConstructSignatureDeclaration(declaration.declaration)
+		)
+			return `Declaration ${declaration.kindName} at UTF-16 ${String(declaration.start)}-${String(declaration.end)} has no independent public TypeScript Symbol; callable ownership is represented through its enclosing Type and TS_TYPE overload membership.`;
+		return `Declaration ${declaration.kindName} at UTF-16 ${String(declaration.start)}-${String(declaration.end)} contributes incompatible checker-symbol bindings that the singular declaration contract cannot represent.`;
+	}
+	return `Declaration ${declaration.kindName} at UTF-16 ${String(declaration.start)}-${String(declaration.end)} has scope placement outside the supported closed binding rules.`;
+}
+
+function buildPartialityReasons(
+	pendingDeclarations: readonly PendingDeclaration[]
+): RawSemanticPartialityReason[] {
+	return [
 		...new Map(
 			pendingDeclarations
 				.filter(
@@ -1567,13 +2014,7 @@ export function extractTypeScriptSymbols(
 						entry.declaration.scopeLinkState === 'UNSUPPORTED'
 				)
 				.map(({ declaration }) => {
-					const message =
-						declaration.symbolBindingState === 'UNSUPPORTED'
-							? ts.isCallSignatureDeclaration(declaration.declaration) ||
-								ts.isConstructSignatureDeclaration(declaration.declaration)
-								? `Declaration ${declaration.kindName} at UTF-16 ${String(declaration.start)}-${String(declaration.end)} has no independent public TypeScript Symbol; callable ownership is represented through its enclosing Type and TS_TYPE overload membership.`
-								: `Declaration ${declaration.kindName} at UTF-16 ${String(declaration.start)}-${String(declaration.end)} contributes incompatible checker-symbol bindings that the singular declaration contract cannot represent.`
-							: `Declaration ${declaration.kindName} at UTF-16 ${String(declaration.start)}-${String(declaration.end)} has scope placement outside the supported closed binding rules.`;
+					const message = partialityMessage(declaration);
 					const reason: RawSemanticPartialityReason = {
 						capability: 'TS_SYMBOL',
 						code: 'CAPABILITY_UNSUPPORTED',
@@ -1586,6 +2027,73 @@ export function extractTypeScriptSymbols(
 	].sort((left, right) =>
 		compareStrings(`${left.path ?? ''}\0${left.message}`, `${right.path ?? ''}\0${right.message}`)
 	);
+}
+
+/**
+ * Project TypeChecker facts into identity-free records. TypeScript objects are
+ * retained only while this function executes; every ordinal is assigned from
+ * canonical source/declaration/reference anchors after collection completes.
+ */
+export function extractTypeScriptSymbols(
+	input: ExtractTypeScriptSymbolsInput
+): RawTypeScriptSymbolProjection {
+	const { guard } = input;
+	guard.check();
+	const state = createSymbolExtractionState(input);
+	seedBoundaryScopes(state);
+
+	const collected = collectSourceFacts(state);
+	const aliasBySymbol = resolveAliases(state);
+	const symbolInputs = buildSymbolInputs(state);
+	const unsupportedSymbols = unsupportedSymbolSet(symbolInputs);
+	const unsupportedDeclarationsByKey = unsupportedDeclarationIndex(
+		symbolInputs,
+		unsupportedSymbols
+	);
+	const groups = buildSymbolGroups(state, symbolInputs, unsupportedSymbols);
+	const groupBySymbol = new Map<ts.Symbol, SymbolGroup>();
+	for (const group of groups)
+		for (const representative of group.representatives) groupBySymbol.set(representative, group);
+	const { scopeOrdinalByKey, scopes } = buildScopeProjection(state);
+	markUnsupportedCallableDeclarations(state, groups, unsupportedDeclarationsByKey);
+	const pendingDeclarations = buildPendingDeclarations(groups, unsupportedDeclarationsByKey);
+	const declarationOrdinalByKey = new Map<string, number>();
+	const declarations = buildDeclarationRecords(
+		guard,
+		pendingDeclarations,
+		scopeOrdinalByKey,
+		declarationOrdinalByKey
+	);
+	const symbols = buildSymbolRecords(state, groups, declarationOrdinalByKey);
+	const typeProjection = input.includeTypes
+		? extractTypeScriptTypes(
+				typeExtractionInput(state, groups, pendingDeclarations, declarationOrdinalByKey)
+			)
+		: emptyTypeProjection();
+	const aliases = buildAliasRecords(
+		state,
+		groups,
+		aliasBySymbol,
+		groupBySymbol,
+		unsupportedSymbols
+	);
+	const aliasByOrdinal = new Map(
+		aliases.map((alias) => [alias.aliasSymbolOrdinal, alias] as const)
+	);
+	const projection: SymbolProjectionContext = {
+		aliasByOrdinal,
+		groupBySymbol,
+		scopeOrdinalByKey,
+		unsupportedSymbols
+	};
+	const references = buildReferenceRecords(state, collected.pendingReferences, projection);
+	const moduleResolutions = buildModuleResolutionRecords(
+		state,
+		collected.pendingModuleResolutions,
+		projection
+	);
+	const moduleExports = buildModuleExportRecords(state, collected, projection);
+	const partialityReasons = buildPartialityReasons(pendingDeclarations);
 	guard.check();
 	return {
 		aliases,

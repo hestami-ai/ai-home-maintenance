@@ -5624,7 +5624,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "5388c4310c2f6328c471a407b50672e3bbbc95a1c9b4501726fcd0e361597f6f",
+    "fileManifestDigest": "6400a8e1ee4505cf3e080ea23284b5d6f9440eb979311d72adc0ea4946e689de",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -7399,9 +7399,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 106244,
+        "bytes": 131292,
         "path": "packages/csaa/src/graph/validate-call-graph.ts",
-        "sha256": "2edf41b48376a4d8f1a181283db86cbdafa6bceeeed799abe109a6b2efd46a98",
+        "sha256": "22d7873eafd9b9ce78f208a9b4a9c8468fdcb07fc5cc1a5489ff3d591e39e897",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7511,9 +7511,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 45179,
+        "bytes": 56363,
         "path": "packages/csaa/src/graph/validate-read-write-access-graph.ts",
-        "sha256": "99574d3e56059c1f4890f543d047115de796fd8b0128e5ab6e1f8b63eba95860",
+        "sha256": "29621bf8c2a2b037f8e4124c17fbf6b1f7da175839281d8bae8a030dc6e2487d",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7952,9 +7952,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 56554,
+        "bytes": 70756,
         "path": "packages/csaa/src/providers/typescript/extract-symbols.ts",
-        "sha256": "bb1674206b392ba640343a34ab294ec614645e9a96f196cbb5874e63acbceac7",
+        "sha256": "dbcb2c408f06c8cf9186da92681d4918140f28a68e0c5e9c6273683da40949f7",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8218,9 +8218,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 109746,
+        "bytes": 130800,
         "path": "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
-        "sha256": "e5416dd566b3c5ae607b98970fd4055dd6506529ca12f71650d63b080dd1666b",
+        "sha256": "07d9cfbf54b659a29f6ba8f46102bc48a3a8be1372cabe42d5ee09eb79392f02",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8358,9 +8358,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 241734,
+        "bytes": 244942,
         "path": "packages/csaa/src/semantic/validate-snapshot.ts",
-        "sha256": "a5aa08dad27d024c260d36d0954f303452b613516846cd629fe0252f3fe86943",
+        "sha256": "dda5c99407031c80b3c89dec2557fc45f5c603283a244df99d515b12137caf5b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12326,7 +12326,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "0c14e1feac4b611dd1e0de52ba58f3c70f0763bee7e8d9984b3f733131ff4000",
+    "subjectId": "98f84014e75ed8d66fcb26ea6b7ad4d75b9849a96a9d50b18d0a88a9ace57139",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [

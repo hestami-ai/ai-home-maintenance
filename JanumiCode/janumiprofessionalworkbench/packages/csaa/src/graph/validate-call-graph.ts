@@ -20,6 +20,7 @@ import {
 import {
 	FULL_JAN_CSAA_007_CONFORMANCE,
 	type SemanticProvenanceId,
+	type SemanticSymbolId,
 	type StaticSemanticSnapshot
 } from '../contracts/semantic.js';
 import { canonicalSemanticJson, isUnicodeScalarString } from '../semantic/canonical.js';
@@ -375,7 +376,9 @@ class IssueCollector {
 type JsonRecord = Record<string, unknown>;
 
 function compareText(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
+	if (left < right) return -1;
+	if (left > right) return 1;
+	return 0;
 }
 
 function plainRecord(value: unknown): value is JsonRecord {
@@ -536,21 +539,15 @@ function shapeIndex(value: unknown, path: string, issues: IssueCollector): boole
 	return valid;
 }
 
-function shapeNode(value: unknown, path: string, issues: IssueCollector): boolean {
-	if (!plainRecord(value)) {
-		issues.add('INVALID_SHAPE', path, 'Expected a graph-node object.');
-		return false;
-	}
-	let expected: readonly string[];
-	if (value.kind === 'SOURCE_REGION') expected = SOURCE_REGION_NODE_KEYS;
-	else if (value.kind === 'CALLABLE_TARGET') expected = CALLABLE_TARGET_NODE_KEYS;
-	else if (value.kind === 'CALL_SITE') expected = CALL_SITE_NODE_KEYS;
-	else if (value.kind === 'FRONTIER') expected = FRONTIER_NODE_KEYS;
-	else {
-		issues.add('INVALID_SHAPE', `${path}.kind`, 'Unknown call-graph node kind.');
-		return false;
-	}
-	if (!exactKeys(value, expected, path, issues)) return false;
+function nodeKeysForKind(kind: unknown): readonly string[] | null {
+	if (kind === 'SOURCE_REGION') return SOURCE_REGION_NODE_KEYS;
+	if (kind === 'CALLABLE_TARGET') return CALLABLE_TARGET_NODE_KEYS;
+	if (kind === 'CALL_SITE') return CALL_SITE_NODE_KEYS;
+	if (kind === 'FRONTIER') return FRONTIER_NODE_KEYS;
+	return null;
+}
+
+function shapeNodeBaseFields(value: JsonRecord, path: string, issues: IssueCollector): boolean {
 	let valid =
 		shapeEpistemic(value.epistemic, `${path}.epistemic`, issues) &&
 		scalarString(value.graphId) &&
@@ -565,69 +562,97 @@ function shapeNode(value: unknown, path: string, issues: IssueCollector): boolea
 			valid = shapeLocation(location, `${path}.sourceLocations[${index}]`, issues) && valid;
 			if (issues.exhausted) break;
 		}
-	if (value.kind === 'SOURCE_REGION')
-		valid =
-			oneOf(value.analysisDisposition, ['DEEP_INDEXED', 'CONTEXT_ONLY']) &&
-			scalarString(value.logicalPath) &&
-			scalarString(value.programId) &&
-			scalarString(value.projectId) &&
-			scalarString(value.semanticSourceId) &&
-			valid;
-	else if (value.kind === 'CALLABLE_TARGET')
-		valid =
-			oneOf(value.bodyState, ['BLOCK_BODY', 'EXPRESSION_BODY', 'IMPLICIT', 'STATIC_BLOCK']) &&
-			oneOf(value.callableKind, CALLABLE_KINDS) &&
-			stringArray(value.declarationIds) &&
-			scalarString(value.programId) &&
-			scalarString(value.projectId) &&
-			scalarString(value.semanticNodeId) &&
-			scalarString(value.sourceId) &&
-			stringArray(value.symbolIds) &&
-			valid;
-	else if (value.kind === 'CALL_SITE')
-		valid =
-			scalarString(value.calleeNodeId) &&
-			oneOf(value.dispatchClass, DISPATCH_CLASSES) &&
-			scalarString(value.invocationId) &&
-			oneOf(value.invocationKind, ['CALL', 'NEW', 'TAGGED_TEMPLATE']) &&
-			scalarString(value.invocationNodeId) &&
-			typeof value.optional === 'boolean' &&
-			scalarString(value.ownerNodeId) &&
-			scalarString(value.programId) &&
-			scalarString(value.projectId) &&
-			oneOf(value.reasonCode, REASON_CODES) &&
-			stringArray(value.referenceIds) &&
-			oneOf(value.resolutionClass, [
-				'EXACT',
-				'CANDIDATE_SET',
-				'EXTERNAL_DISPATCH',
-				'UNRESOLVED',
-				'UNSUPPORTED'
-			]) &&
-			stringArray(value.resolvedSymbolIds) &&
-			scalarString(value.sourceId) &&
-			stringArray(value.targetNodeIds) &&
-			valid;
-	else
-		valid =
-			oneOf(value.frontierKind, ['EXTERNAL_DISPATCH', 'UNRESOLVED', 'UNSUPPORTED']) &&
-			scalarString(value.invocationId) &&
-			oneOf(value.reasonCode, REASON_CODES) &&
-			stringArray(value.semanticSymbolIds) &&
-			scalarString(value.sourceId) &&
-			valid;
+	return valid;
+}
+
+function shapeSourceRegionNodeFields(value: JsonRecord): boolean {
+	return (
+		oneOf(value.analysisDisposition, ['DEEP_INDEXED', 'CONTEXT_ONLY']) &&
+		scalarString(value.logicalPath) &&
+		scalarString(value.programId) &&
+		scalarString(value.projectId) &&
+		scalarString(value.semanticSourceId)
+	);
+}
+
+function shapeCallableTargetNodeFields(value: JsonRecord): boolean {
+	return (
+		oneOf(value.bodyState, ['BLOCK_BODY', 'EXPRESSION_BODY', 'IMPLICIT', 'STATIC_BLOCK']) &&
+		oneOf(value.callableKind, CALLABLE_KINDS) &&
+		stringArray(value.declarationIds) &&
+		scalarString(value.programId) &&
+		scalarString(value.projectId) &&
+		scalarString(value.semanticNodeId) &&
+		scalarString(value.sourceId) &&
+		stringArray(value.symbolIds)
+	);
+}
+
+function shapeCallSiteNodeFields(value: JsonRecord): boolean {
+	return (
+		scalarString(value.calleeNodeId) &&
+		oneOf(value.dispatchClass, DISPATCH_CLASSES) &&
+		scalarString(value.invocationId) &&
+		oneOf(value.invocationKind, ['CALL', 'NEW', 'TAGGED_TEMPLATE']) &&
+		scalarString(value.invocationNodeId) &&
+		typeof value.optional === 'boolean' &&
+		scalarString(value.ownerNodeId) &&
+		scalarString(value.programId) &&
+		scalarString(value.projectId) &&
+		oneOf(value.reasonCode, REASON_CODES) &&
+		stringArray(value.referenceIds) &&
+		oneOf(value.resolutionClass, [
+			'EXACT',
+			'CANDIDATE_SET',
+			'EXTERNAL_DISPATCH',
+			'UNRESOLVED',
+			'UNSUPPORTED'
+		]) &&
+		stringArray(value.resolvedSymbolIds) &&
+		scalarString(value.sourceId) &&
+		stringArray(value.targetNodeIds)
+	);
+}
+
+function shapeFrontierNodeFields(value: JsonRecord): boolean {
+	return (
+		oneOf(value.frontierKind, ['EXTERNAL_DISPATCH', 'UNRESOLVED', 'UNSUPPORTED']) &&
+		scalarString(value.invocationId) &&
+		oneOf(value.reasonCode, REASON_CODES) &&
+		stringArray(value.semanticSymbolIds) &&
+		scalarString(value.sourceId)
+	);
+}
+
+function shapeNodeKindFields(value: JsonRecord): boolean {
+	if (value.kind === 'SOURCE_REGION') return shapeSourceRegionNodeFields(value);
+	if (value.kind === 'CALLABLE_TARGET') return shapeCallableTargetNodeFields(value);
+	if (value.kind === 'CALL_SITE') return shapeCallSiteNodeFields(value);
+	return shapeFrontierNodeFields(value);
+}
+
+function shapeNode(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!plainRecord(value)) {
+		issues.add('INVALID_SHAPE', path, 'Expected a graph-node object.');
+		return false;
+	}
+	const expected = nodeKeysForKind(value.kind);
+	if (expected === null) {
+		issues.add('INVALID_SHAPE', `${path}.kind`, 'Unknown call-graph node kind.');
+		return false;
+	}
+	if (!exactKeys(value, expected, path, issues)) return false;
+	let valid = shapeNodeBaseFields(value, path, issues);
+	valid = shapeNodeKindFields(value) && valid;
 	if (!valid) issues.add('INVALID_SHAPE', path, 'Graph-node fields have invalid primitive values.');
 	return valid;
 }
 
-function shapeEdge(value: unknown, path: string, issues: IssueCollector): boolean {
-	if (!plainRecord(value)) {
-		issues.add('INVALID_SHAPE', path, 'Expected a graph-edge object.');
-		return false;
-	}
-	const expected =
-		value.relationKind === 'CANDIDATE_CALL_TARGET' ? CANDIDATE_EDGE_KEYS : EDGE_BASE_KEYS;
-	if (!exactKeys(value, expected, path, issues)) return false;
+function shapeEdgePrimitiveFields(
+	value: JsonRecord,
+	path: string,
+	issues: IssueCollector
+): boolean {
 	let valid = nonnegativeInteger(value.candidateRank) || value.candidateRank === null;
 	valid =
 		shapeEpistemic(value.epistemic, `${path}.epistemic`, issues) &&
@@ -658,30 +683,64 @@ function shapeEdge(value: unknown, path: string, issues: IssueCollector): boolea
 		scalarString(value.subjectId) &&
 		oneOf(value.targetState, ['STRUCTURAL', 'CONFIRMED', 'CANDIDATE', 'UNRESOLVED_DYNAMIC']) &&
 		valid;
-	valid = shapeEndpoint(value.source, `${path}.source`, issues) && valid;
+	return valid;
+}
+
+function shapeEdgeEndpoints(value: JsonRecord, path: string, issues: IssueCollector): boolean {
+	let valid = shapeEndpoint(value.source, `${path}.source`, issues);
 	valid = shapeEndpoint(value.target, `${path}.target`, issues) && valid;
 	if (Array.isArray(value.sourceLocations))
 		for (const [index, location] of value.sourceLocations.entries()) {
 			valid = shapeLocation(location, `${path}.sourceLocations[${index}]`, issues) && valid;
 			if (issues.exhausted) break;
 		}
-	if (value.relationKind === 'CANDIDATE_CALL_TARGET') {
-		if (!exactKeys(value.inferenceBasis, INFERENCE_BASIS_KEYS, `${path}.inferenceBasis`, issues))
-			valid = false;
-		else
-			valid =
-				stringArray(value.inferenceBasis.inputIds) &&
-				stringArray(value.inferenceBasis.limitationKinds) &&
-				value.inferenceBasis.limitationKinds.every((kind) => oneOf(kind, LIMITATION_KINDS)) &&
-				value.inferenceBasis.method === CALL_GRAPH_METHOD &&
-				nonemptyString(value.inferenceBasis.rationale) &&
-				valid;
+	return valid;
+}
+
+function shapeEdgeInferenceBasis(value: JsonRecord, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(value.inferenceBasis, INFERENCE_BASIS_KEYS, `${path}.inferenceBasis`, issues))
+		return false;
+	return (
+		stringArray(value.inferenceBasis.inputIds) &&
+		stringArray(value.inferenceBasis.limitationKinds) &&
+		value.inferenceBasis.limitationKinds.every((kind) => oneOf(kind, LIMITATION_KINDS)) &&
+		value.inferenceBasis.method === CALL_GRAPH_METHOD &&
+		nonemptyString(value.inferenceBasis.rationale)
+	);
+}
+
+function shapeEdge(value: unknown, path: string, issues: IssueCollector): boolean {
+	if (!plainRecord(value)) {
+		issues.add('INVALID_SHAPE', path, 'Expected a graph-edge object.');
+		return false;
 	}
+	const expected =
+		value.relationKind === 'CANDIDATE_CALL_TARGET' ? CANDIDATE_EDGE_KEYS : EDGE_BASE_KEYS;
+	if (!exactKeys(value, expected, path, issues)) return false;
+	let valid = shapeEdgePrimitiveFields(value, path, issues);
+	valid = shapeEdgeEndpoints(value, path, issues) && valid;
+	if (value.relationKind === 'CANDIDATE_CALL_TARGET')
+		valid = shapeEdgeInferenceBasis(value, path, issues) && valid;
 	if (!valid) issues.add('INVALID_SHAPE', path, 'Graph-edge fields have invalid primitive values.');
 	return valid;
 }
 
-function populationBudget(
+interface NestedPopulationMaximums {
+	readonly declarationIds: number;
+	readonly edgeIds: number;
+	readonly inputIds: number;
+	readonly limitationKinds: number;
+	readonly nodeIds: number;
+	readonly provenanceIds: number;
+	readonly referenceIds: number;
+	readonly resolvedSymbolIds: number;
+	readonly semanticSymbolIds: number;
+	readonly sourceLocations: number;
+	readonly symbolIds: number;
+	readonly targetNodeIds: number;
+}
+
+function topLevelPopulationBudget(
 	value: JsonRecord,
 	snapshot: StaticSemanticSnapshot,
 	issues: IssueCollector
@@ -715,7 +774,14 @@ function populationBudget(
 			return false;
 		}
 	}
-	const nestedMaximums = {
+	return true;
+}
+
+function nestedPopulationMaximums(
+	value: JsonRecord,
+	snapshot: StaticSemanticSnapshot
+): NestedPopulationMaximums {
+	return {
 		declarationIds: snapshot.declarations.length,
 		edgeIds: Array.isArray(value.edges) ? value.edges.length : 0,
 		inputIds:
@@ -737,106 +803,236 @@ function populationBudget(
 		semanticSymbolIds: snapshot.symbols.length,
 		sourceLocations: 4,
 		symbolIds: snapshot.symbols.length,
-		targetNodeIds: astNodes + invocations
-	} as const;
-	const within = (
-		population: unknown,
-		field: keyof typeof nestedMaximums,
-		path: string
-	): boolean => {
-		if (!Array.isArray(population)) return true;
-		if (population.length <= nestedMaximums[field]) return true;
-		issues.add(
-			'POPULATION_BUDGET_EXCEEDED',
-			path,
-			`${field} exceeds the population bound derived from the semantic snapshot.`
-		);
-		return false;
+		targetNodeIds: snapshot.astNodes.length + snapshot.invocations.length
 	};
-	if (Array.isArray(value.nodes))
-		for (const [index, node] of value.nodes.entries()) {
-			if (!plainRecord(node)) continue;
-			for (const field of [
-				'declarationIds',
-				'provenanceIds',
-				'referenceIds',
-				'resolvedSymbolIds',
-				'semanticSymbolIds',
-				'sourceLocations',
-				'symbolIds',
-				'targetNodeIds'
-			] as const)
-				if (!within(node[field], field, `$.nodes[${index}].${field}`)) return false;
-		}
-	if (Array.isArray(value.edges))
-		for (const [index, edge] of value.edges.entries()) {
-			if (!plainRecord(edge)) continue;
-			if (!within(edge.provenanceIds, 'provenanceIds', `$.edges[${index}].provenanceIds`))
+}
+
+function withinNestedMaximum(
+	population: unknown,
+	field: keyof NestedPopulationMaximums,
+	maximums: NestedPopulationMaximums,
+	path: string,
+	issues: IssueCollector
+): boolean {
+	if (!Array.isArray(population)) return true;
+	if (population.length <= maximums[field]) return true;
+	issues.add(
+		'POPULATION_BUDGET_EXCEEDED',
+		path,
+		`${field} exceeds the population bound derived from the semantic snapshot.`
+	);
+	return false;
+}
+
+function nodePopulationBudget(
+	nodes: readonly unknown[],
+	maximums: NestedPopulationMaximums,
+	issues: IssueCollector
+): boolean {
+	for (const [index, node] of nodes.entries()) {
+		if (!plainRecord(node)) continue;
+		for (const field of [
+			'declarationIds',
+			'provenanceIds',
+			'referenceIds',
+			'resolvedSymbolIds',
+			'semanticSymbolIds',
+			'sourceLocations',
+			'symbolIds',
+			'targetNodeIds'
+		] as const)
+			if (!withinNestedMaximum(node[field], field, maximums, `$.nodes[${index}].${field}`, issues))
 				return false;
-			if (!within(edge.sourceLocations, 'sourceLocations', `$.edges[${index}].sourceLocations`))
-				return false;
-			if (plainRecord(edge.inferenceBasis)) {
-				if (
-					!within(
-						edge.inferenceBasis.inputIds,
-						'inputIds',
-						`$.edges[${index}].inferenceBasis.inputIds`
-					)
-				)
-					return false;
-				if (
-					!within(
-						edge.inferenceBasis.limitationKinds,
-						'limitationKinds',
-						`$.edges[${index}].inferenceBasis.limitationKinds`
-					)
-				)
-					return false;
-			}
+	}
+	return true;
+}
+
+function edgeRecordWithinBudget(
+	edge: JsonRecord,
+	path: string,
+	maximums: NestedPopulationMaximums,
+	issues: IssueCollector
+): boolean {
+	if (
+		!withinNestedMaximum(
+			edge.provenanceIds,
+			'provenanceIds',
+			maximums,
+			`${path}.provenanceIds`,
+			issues
+		)
+	)
+		return false;
+	if (
+		!withinNestedMaximum(
+			edge.sourceLocations,
+			'sourceLocations',
+			maximums,
+			`${path}.sourceLocations`,
+			issues
+		)
+	)
+		return false;
+	if (!plainRecord(edge.inferenceBasis)) return true;
+	if (
+		!withinNestedMaximum(
+			edge.inferenceBasis.inputIds,
+			'inputIds',
+			maximums,
+			`${path}.inferenceBasis.inputIds`,
+			issues
+		)
+	)
+		return false;
+	return withinNestedMaximum(
+		edge.inferenceBasis.limitationKinds,
+		'limitationKinds',
+		maximums,
+		`${path}.inferenceBasis.limitationKinds`,
+		issues
+	);
+}
+
+function edgePopulationBudget(
+	edges: readonly unknown[],
+	maximums: NestedPopulationMaximums,
+	issues: IssueCollector
+): boolean {
+	for (const [index, edge] of edges.entries())
+		if (plainRecord(edge) && !edgeRecordWithinBudget(edge, `$.edges[${index}]`, maximums, issues))
+			return false;
+	return true;
+}
+
+function layerRecordWithinBudget(
+	layer: JsonRecord,
+	path: string,
+	maximums: NestedPopulationMaximums,
+	limitationMaximum: number,
+	issues: IssueCollector
+): boolean {
+	if (!withinNestedMaximum(layer.edgeIds, 'edgeIds', maximums, `${path}.edgeIds`, issues))
+		return false;
+	if (!withinNestedMaximum(layer.nodeIds, 'nodeIds', maximums, `${path}.nodeIds`, issues))
+		return false;
+	if (
+		!withinNestedMaximum(
+			layer.provenanceIds,
+			'provenanceIds',
+			maximums,
+			`${path}.provenanceIds`,
+			issues
+		)
+	)
+		return false;
+	for (const [field, maximum] of [
+		['entryMechanismCoverage', ENTRY_MECHANISMS.length],
+		['limitations', limitationMaximum],
+		['relationLaneCoverage', RELATION_LANES.length]
+	] as const) {
+		const population = layer[field];
+		if (Array.isArray(population) && population.length > maximum) {
+			issues.add(
+				'POPULATION_BUDGET_EXCEEDED',
+				`${path}.${field}`,
+				`${field} exceeds the bounded layer population.`
+			);
+			return false;
 		}
-	if (Array.isArray(value.layers))
-		for (const [index, layer] of value.layers.entries()) {
-			if (!plainRecord(layer)) continue;
-			if (!within(layer.edgeIds, 'edgeIds', `$.layers[${index}].edgeIds`)) return false;
-			if (!within(layer.nodeIds, 'nodeIds', `$.layers[${index}].nodeIds`)) return false;
-			if (!within(layer.provenanceIds, 'provenanceIds', `$.layers[${index}].provenanceIds`))
-				return false;
-			for (const [field, maximum] of [
-				['entryMechanismCoverage', ENTRY_MECHANISMS.length],
-				['limitations', snapshot.limitations.length + invocations * 4 + 16],
-				['relationLaneCoverage', RELATION_LANES.length]
-			] as const) {
-				const population = layer[field];
-				if (Array.isArray(population) && population.length > maximum) {
-					issues.add(
-						'POPULATION_BUDGET_EXCEEDED',
-						`$.layers[${index}].${field}`,
-						`${field} exceeds the bounded layer population.`
-					);
-					return false;
-				}
-			}
-		}
+	}
+	return true;
+}
+
+function layerPopulationBudget(
+	layers: readonly unknown[],
+	maximums: NestedPopulationMaximums,
+	limitationMaximum: number,
+	issues: IssueCollector
+): boolean {
+	for (const [index, layer] of layers.entries())
+		if (
+			plainRecord(layer) &&
+			!layerRecordWithinBudget(layer, `$.layers[${index}]`, maximums, limitationMaximum, issues)
+		)
+			return false;
+	return true;
+}
+
+function indexPopulationBudget(
+	value: JsonRecord,
+	maximums: NestedPopulationMaximums,
+	issues: IssueCollector
+): boolean {
 	for (const field of ['forwardIndex', 'reverseIndex'] as const) {
 		const index = value[field];
 		if (!Array.isArray(index)) continue;
 		for (const [entryIndex, entry] of index.entries())
 			if (
 				plainRecord(entry) &&
-				!within(entry.edgeIds, 'edgeIds', `$.${field}[${entryIndex}].edgeIds`)
+				!withinNestedMaximum(
+					entry.edgeIds,
+					'edgeIds',
+					maximums,
+					`$.${field}[${entryIndex}].edgeIds`,
+					issues
+				)
 			)
 				return false;
 	}
 	return true;
 }
 
-function shapeGraph(
-	value: unknown,
+function populationBudget(
+	value: JsonRecord,
 	snapshot: StaticSemanticSnapshot,
 	issues: IssueCollector
-): value is CallGraphSnapshot {
-	if (!exactKeys(value, TOP_LEVEL_KEYS, '$', issues)) return false;
-	if (!populationBudget(value, snapshot, issues)) return false;
+): boolean {
+	if (!topLevelPopulationBudget(value, snapshot, issues)) return false;
+	const maximums = nestedPopulationMaximums(value, snapshot);
+	const layerLimitationMaximum = snapshot.limitations.length + snapshot.invocations.length * 4 + 16;
+	if (Array.isArray(value.nodes) && !nodePopulationBudget(value.nodes, maximums, issues))
+		return false;
+	if (Array.isArray(value.edges) && !edgePopulationBudget(value.edges, maximums, issues))
+		return false;
+	if (
+		Array.isArray(value.layers) &&
+		!layerPopulationBudget(value.layers, maximums, layerLimitationMaximum, issues)
+	)
+		return false;
+	return indexPopulationBudget(value, maximums, issues);
+}
+
+type ShapeRecord = (value: unknown, path: string, issues: IssueCollector) => boolean;
+
+function shapeRecordArray(
+	records: unknown,
+	shape: ShapeRecord,
+	pathPrefix: string,
+	issues: IssueCollector
+): boolean {
+	if (!Array.isArray(records)) return true;
+	let valid = true;
+	for (const [index, record] of records.entries()) {
+		valid = shape(record, `${pathPrefix}[${index}]`, issues) && valid;
+		if (issues.exhausted) break;
+	}
+	return valid;
+}
+
+function shapeLayerRecordArray(
+	records: unknown,
+	shape: ShapeRecord,
+	pathPrefix: string,
+	issues: IssueCollector
+): boolean {
+	if (!Array.isArray(records)) return true;
+	let valid = true;
+	for (const [index, record] of records.entries())
+		valid = shape(record, `${pathPrefix}[${index}]`, issues) && valid;
+	return valid;
+}
+
+function shapeGraphTopFields(value: JsonRecord, issues: IssueCollector): boolean {
 	let valid =
 		scalarString(value.canonicalProfile) &&
 		scalarString(value.capability) &&
@@ -865,16 +1061,11 @@ function shapeGraph(
 		scalarString(value.semanticSnapshotId) &&
 		scalarString(value.subjectId);
 	valid = shapeCoverage(value.coverage, '$.coverage', issues) && valid;
-	if (Array.isArray(value.nodes))
-		for (const [index, node] of value.nodes.entries()) {
-			valid = shapeNode(node, `$.nodes[${index}]`, issues) && valid;
-			if (issues.exhausted) break;
-		}
-	if (Array.isArray(value.edges))
-		for (const [index, edge] of value.edges.entries()) {
-			valid = shapeEdge(edge, `$.edges[${index}]`, issues) && valid;
-			if (issues.exhausted) break;
-		}
+	return valid;
+}
+
+function shapeGraphRecordArrays(value: JsonRecord, issues: IssueCollector): boolean {
+	let valid = true;
 	for (const [field, records, shape] of [
 		['limitations', value.limitations, shapeLimitation],
 		['entryMechanismCoverage', value.entryMechanismCoverage, shapeEntryCoverage],
@@ -882,49 +1073,67 @@ function shapeGraph(
 		['forwardIndex', value.forwardIndex, shapeIndex],
 		['reverseIndex', value.reverseIndex, shapeIndex]
 	] as const)
-		if (Array.isArray(records))
-			for (const [index, record] of records.entries()) {
-				valid = shape(record, `$.${field}[${index}]`, issues) && valid;
-				if (issues.exhausted) break;
-			}
-	if (Array.isArray(value.layers))
-		for (const [index, layer] of value.layers.entries()) {
-			const path = `$.layers[${index}]`;
-			if (!exactKeys(layer, LAYER_KEYS, path, issues)) {
-				valid = false;
-				continue;
-			}
-			let layerValid =
-				layer.capability === CALL_GRAPH_CAPABILITY &&
-				layer.capabilityStatus === CALL_GRAPH_CAPABILITY_STATUS &&
-				stringArray(layer.edgeIds) &&
-				Array.isArray(layer.entryMechanismCoverage) &&
-				shapeEpistemic(layer.epistemic, `${path}.epistemic`, issues) &&
-				scalarString(layer.graphId) &&
-				scalarString(layer.id) &&
-				layer.kind === 'TYPESCRIPT_STATIC_CALL' &&
-				Array.isArray(layer.limitations) &&
-				layer.method === CALL_GRAPH_METHOD &&
-				stringArray(layer.nodeIds) &&
-				layer.ordinal === 0 &&
-				shapeProvider(layer.producer, `${path}.producer`, issues) &&
-				stringArray(layer.provenanceIds) &&
-				Array.isArray(layer.relationLaneCoverage) &&
-				scalarString(layer.semanticSnapshotId) &&
-				scalarString(layer.subjectId);
-			layerValid = shapeCoverage(layer.coverage, `${path}.coverage`, issues) && layerValid;
-			for (const [field, records, shape] of [
-				['limitations', layer.limitations, shapeLimitation],
-				['entryMechanismCoverage', layer.entryMechanismCoverage, shapeEntryCoverage],
-				['relationLaneCoverage', layer.relationLaneCoverage, shapeLaneCoverage]
-			] as const)
-				if (Array.isArray(records))
-					for (const [recordIndex, record] of records.entries())
-						layerValid = shape(record, `${path}.${field}[${recordIndex}]`, issues) && layerValid;
-			if (!layerValid)
-				issues.add('INVALID_SHAPE', path, 'Graph-layer fields have invalid primitive values.');
-			valid = layerValid && valid;
-		}
+		valid = shapeRecordArray(records, shape, `$.${field}`, issues) && valid;
+	return valid;
+}
+
+function shapeLayerFields(layer: JsonRecord, path: string, issues: IssueCollector): boolean {
+	let layerValid =
+		layer.capability === CALL_GRAPH_CAPABILITY &&
+		layer.capabilityStatus === CALL_GRAPH_CAPABILITY_STATUS &&
+		stringArray(layer.edgeIds) &&
+		Array.isArray(layer.entryMechanismCoverage) &&
+		shapeEpistemic(layer.epistemic, `${path}.epistemic`, issues) &&
+		scalarString(layer.graphId) &&
+		scalarString(layer.id) &&
+		layer.kind === 'TYPESCRIPT_STATIC_CALL' &&
+		Array.isArray(layer.limitations) &&
+		layer.method === CALL_GRAPH_METHOD &&
+		stringArray(layer.nodeIds) &&
+		layer.ordinal === 0 &&
+		shapeProvider(layer.producer, `${path}.producer`, issues) &&
+		stringArray(layer.provenanceIds) &&
+		Array.isArray(layer.relationLaneCoverage) &&
+		scalarString(layer.semanticSnapshotId) &&
+		scalarString(layer.subjectId);
+	layerValid = shapeCoverage(layer.coverage, `${path}.coverage`, issues) && layerValid;
+	return layerValid;
+}
+
+function shapeLayer(layer: unknown, path: string, issues: IssueCollector): boolean {
+	if (!exactKeys(layer, LAYER_KEYS, path, issues)) return false;
+	let layerValid = shapeLayerFields(layer, path, issues);
+	for (const [field, records, shape] of [
+		['limitations', layer.limitations, shapeLimitation],
+		['entryMechanismCoverage', layer.entryMechanismCoverage, shapeEntryCoverage],
+		['relationLaneCoverage', layer.relationLaneCoverage, shapeLaneCoverage]
+	] as const)
+		layerValid = shapeLayerRecordArray(records, shape, `${path}.${field}`, issues) && layerValid;
+	if (!layerValid)
+		issues.add('INVALID_SHAPE', path, 'Graph-layer fields have invalid primitive values.');
+	return layerValid;
+}
+
+function shapeGraphLayers(layers: unknown, issues: IssueCollector): boolean {
+	if (!Array.isArray(layers)) return true;
+	let valid = true;
+	for (const [index, layer] of layers.entries())
+		valid = shapeLayer(layer, `$.layers[${index}]`, issues) && valid;
+	return valid;
+}
+
+function shapeGraph(
+	value: unknown,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): value is CallGraphSnapshot {
+	if (!exactKeys(value, TOP_LEVEL_KEYS, '$', issues)) return false;
+	if (!populationBudget(value, snapshot, issues)) return false;
+	let valid = shapeGraphTopFields(value, issues);
+	valid = shapeRecordArray(value.nodes, shapeNode, '$.nodes', issues) && valid;
+	valid = shapeRecordArray(value.edges, shapeEdge, '$.edges', issues) && valid;
+	valid = shapeGraphRecordArrays(value, issues) && valid;
+	valid = shapeGraphLayers(value.layers, issues) && valid;
 	if (!valid) issues.add('INVALID_SHAPE', '$', 'Call-graph fields have invalid primitive values.');
 	return valid;
 }
@@ -1096,9 +1305,9 @@ function expectedCallableProvenance(
 	].sort(compareText);
 }
 
-function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel {
-	const sourceById = new Map(snapshot.sources.map((source) => [source.id, source]));
-	const symbolById = new Map(snapshot.symbols.map((symbol) => [symbol.id, symbol]));
+function groupChildrenByParent(
+	snapshot: StaticSemanticSnapshot
+): Map<string, StaticSemanticSnapshot['astNodes'][number][]> {
 	const childrenByParent = new Map<string, StaticSemanticSnapshot['astNodes'][number][]>();
 	for (const node of snapshot.astNodes) {
 		if (node.parentId === null) continue;
@@ -1106,6 +1315,12 @@ function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel 
 		children.push(node);
 		childrenByParent.set(node.parentId, children);
 	}
+	return childrenByParent;
+}
+
+function groupDeclarationsByNode(
+	snapshot: StaticSemanticSnapshot
+): Map<string, StaticSemanticSnapshot['declarations'][number][]> {
 	const declarationsByNode = new Map<string, StaticSemanticSnapshot['declarations'][number][]>();
 	for (const declaration of snapshot.declarations) {
 		if (declaration.nodeId === null) continue;
@@ -1113,6 +1328,12 @@ function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel 
 		declarations.push(declaration);
 		declarationsByNode.set(declaration.nodeId, declarations);
 	}
+	return declarationsByNode;
+}
+
+function groupReferencesByNode(
+	snapshot: StaticSemanticSnapshot
+): Map<string, StaticSemanticSnapshot['references'][number][]> {
 	const referencesByNode = new Map<string, StaticSemanticSnapshot['references'][number][]>();
 	for (const reference of snapshot.references) {
 		const references = referencesByNode.get(reference.nodeId) ?? [];
@@ -1121,31 +1342,36 @@ function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel 
 	}
 	for (const references of referencesByNode.values())
 		references.sort((left, right) => compareText(left.id, right.id));
+	return referencesByNode;
+}
 
+function expectedBodyState(
+	node: StaticSemanticSnapshot['astNodes'][number],
+	children: readonly StaticSemanticSnapshot['astNodes'][number][]
+): ExpectedCallable['bodyState'] | null {
+	if (node.kind === ts.SyntaxKind.ClassStaticBlockDeclaration) return 'STATIC_BLOCK';
+	if (node.kind === ts.SyntaxKind.ArrowFunction)
+		return children.some((child) => child.kind === ts.SyntaxKind.Block)
+			? 'BLOCK_BODY'
+			: 'EXPRESSION_BODY';
+	if (node.kind === ts.SyntaxKind.ClassDeclaration || node.kind === ts.SyntaxKind.ClassExpression)
+		return children.some((child) => child.kind === ts.SyntaxKind.Constructor) ? null : 'IMPLICIT';
+	return children.some((child) => child.kind === ts.SyntaxKind.Block) ? 'BLOCK_BODY' : null;
+}
+
+function collectExpectedCallables(
+	snapshot: StaticSemanticSnapshot,
+	childrenByParent: ReadonlyMap<string, StaticSemanticSnapshot['astNodes'][number][]>,
+	declarationsByNode: ReadonlyMap<string, StaticSemanticSnapshot['declarations'][number][]>
+): Map<string, ExpectedCallable> {
+	const sourceById = new Map(snapshot.sources.map((source) => [source.id, source]));
 	const callablesByNode = new Map<string, ExpectedCallable>();
 	for (const node of snapshot.astNodes) {
 		const source = sourceById.get(node.sourceId);
-		if (source === undefined || source.analysisDisposition !== 'DEEP_INDEXED') continue;
+		if (source?.analysisDisposition !== 'DEEP_INDEXED') continue;
 		const callableKind = callableKindForSyntaxKind(node.kind);
 		if (callableKind === null) continue;
-		const children = childrenByParent.get(node.id) ?? [];
-		let bodyState: ExpectedCallable['bodyState'] | null;
-		if (node.kind === ts.SyntaxKind.ClassStaticBlockDeclaration) bodyState = 'STATIC_BLOCK';
-		else if (node.kind === ts.SyntaxKind.ArrowFunction)
-			bodyState = children.some((child) => child.kind === ts.SyntaxKind.Block)
-				? 'BLOCK_BODY'
-				: 'EXPRESSION_BODY';
-		else if (
-			node.kind === ts.SyntaxKind.ClassDeclaration ||
-			node.kind === ts.SyntaxKind.ClassExpression
-		)
-			bodyState = children.some((child) => child.kind === ts.SyntaxKind.Constructor)
-				? null
-				: 'IMPLICIT';
-		else
-			bodyState = children.some((child) => child.kind === ts.SyntaxKind.Block)
-				? 'BLOCK_BODY'
-				: null;
+		const bodyState = expectedBodyState(node, childrenByParent.get(node.id) ?? []);
 		if (bodyState === null) continue;
 		const declarations = declarationsByNode.get(node.id) ?? [];
 		callablesByNode.set(node.id, {
@@ -1162,7 +1388,25 @@ function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel 
 			)
 		});
 	}
+	return callablesByNode;
+}
 
+function mergeClassDeclarationAssociations(
+	spec: ExpectedCallable,
+	declarations: readonly StaticSemanticSnapshot['declarations'][number][]
+): void {
+	for (const declaration of declarations) {
+		spec.declarationIds.add(declaration.id);
+		if (declaration.symbolId !== null) spec.symbolIds.add(declaration.symbolId);
+	}
+}
+
+function mergeClassCallableAssociations(
+	snapshot: StaticSemanticSnapshot,
+	childrenByParent: ReadonlyMap<string, StaticSemanticSnapshot['astNodes'][number][]>,
+	declarationsByNode: ReadonlyMap<string, StaticSemanticSnapshot['declarations'][number][]>,
+	callablesByNode: ReadonlyMap<string, ExpectedCallable>
+): void {
 	for (const node of snapshot.astNodes) {
 		if (node.kind !== ts.SyntaxKind.ClassDeclaration && node.kind !== ts.SyntaxKind.ClassExpression)
 			continue;
@@ -1171,31 +1415,48 @@ function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel 
 		);
 		const spec = callablesByNode.get(constructor?.id ?? node.id);
 		if (spec === undefined) continue;
-		for (const declaration of declarationsByNode.get(node.id) ?? []) {
-			spec.declarationIds.add(declaration.id);
-			if (declaration.symbolId !== null) spec.symbolIds.add(declaration.symbolId);
-		}
+		mergeClassDeclarationAssociations(spec, declarationsByNode.get(node.id) ?? []);
 	}
+}
 
+function applyAssignmentReference(
+	spec: ExpectedCallable,
+	assignment: StaticSemanticSnapshot['assignments'][number],
+	valueNodeId: NonNullable<StaticSemanticSnapshot['assignments'][number]['valueNodeId']>,
+	reference: StaticSemanticSnapshot['references'][number],
+	symbolById: ReadonlyMap<string, StaticSemanticSnapshot['symbols'][number]>
+): void {
+	if (reference.resolvedSymbolId === null) return;
+	const symbolId = reference.resolvedSymbolId;
+	spec.symbolIds.add(symbolId);
+	const associationInputs = spec.assignmentInputIdsBySymbol.get(symbolId) ?? new Set<string>();
+	associationInputs.add(assignment.nodeId);
+	associationInputs.add(assignment.targetNodeId);
+	associationInputs.add(valueNodeId);
+	spec.assignmentInputIdsBySymbol.set(symbolId, associationInputs);
+	const symbol = symbolById.get(symbolId);
+	if (symbol !== undefined)
+		for (const declarationId of symbol.declarationIds) spec.declarationIds.add(declarationId);
+}
+
+function applyAssignmentAssociations(
+	snapshot: StaticSemanticSnapshot,
+	referencesByNode: ReadonlyMap<string, StaticSemanticSnapshot['references'][number][]>,
+	callablesByNode: ReadonlyMap<string, ExpectedCallable>
+): void {
+	const symbolById = new Map(snapshot.symbols.map((symbol) => [symbol.id, symbol]));
 	for (const assignment of snapshot.assignments) {
 		if (assignment.valueNodeId === null) continue;
 		const spec = callablesByNode.get(assignment.valueNodeId);
 		if (spec === undefined) continue;
-		for (const reference of referencesByNode.get(assignment.targetNodeId) ?? []) {
-			if (reference.resolvedSymbolId === null) continue;
-			const symbolId = reference.resolvedSymbolId;
-			spec.symbolIds.add(symbolId);
-			const associationInputs = spec.assignmentInputIdsBySymbol.get(symbolId) ?? new Set<string>();
-			associationInputs.add(assignment.nodeId);
-			associationInputs.add(assignment.targetNodeId);
-			associationInputs.add(assignment.valueNodeId);
-			spec.assignmentInputIdsBySymbol.set(symbolId, associationInputs);
-			const symbol = symbolById.get(symbolId);
-			if (symbol !== undefined)
-				for (const declarationId of symbol.declarationIds) spec.declarationIds.add(declarationId);
-		}
+		for (const reference of referencesByNode.get(assignment.targetNodeId) ?? [])
+			applyAssignmentReference(spec, assignment, assignment.valueNodeId, reference, symbolById);
 	}
+}
 
+function groupSpecsBySymbol(
+	callablesByNode: ReadonlyMap<string, ExpectedCallable>
+): Map<string, ExpectedCallable[]> {
 	const specsBySymbol = new Map<string, ExpectedCallable[]>();
 	for (const spec of callablesByNode.values())
 		for (const symbolId of spec.symbolIds) {
@@ -1205,7 +1466,22 @@ function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel 
 		}
 	for (const specs of specsBySymbol.values())
 		specs.sort((left, right) => compareText(left.node.id, right.node.id));
-	return { callablesByNode, childrenByParent, referencesByNode, specsBySymbol };
+	return specsBySymbol;
+}
+
+function expectedCallModel(snapshot: StaticSemanticSnapshot): ExpectedCallModel {
+	const childrenByParent = groupChildrenByParent(snapshot);
+	const declarationsByNode = groupDeclarationsByNode(snapshot);
+	const referencesByNode = groupReferencesByNode(snapshot);
+	const callablesByNode = collectExpectedCallables(snapshot, childrenByParent, declarationsByNode);
+	mergeClassCallableAssociations(snapshot, childrenByParent, declarationsByNode, callablesByNode);
+	applyAssignmentAssociations(snapshot, referencesByNode, callablesByNode);
+	return {
+		callablesByNode,
+		childrenByParent,
+		referencesByNode,
+		specsBySymbol: groupSpecsBySymbol(callablesByNode)
+	};
 }
 
 function compatibleExpectedCallable(
@@ -1242,290 +1518,387 @@ function expectedDispatchClass(
 	return 'UNSUPPORTED_EXPRESSION';
 }
 
+interface InvocationClassificationState {
+	readonly callee: StaticSemanticSnapshot['astNodes'][number];
+	dispatchClass: ExpectedCallClassification['dispatchClass'];
+	readonly invocation: StaticSemanticSnapshot['invocations'][number];
+	readonly source: StaticSemanticSnapshot['sources'][number];
+}
+
+interface ClassificationInput {
+	readonly includeReferenceProvenance?: boolean;
+	readonly reasonCode: ExpectedCallClassification['reasonCode'];
+	readonly referenceIds: readonly string[];
+	readonly resolutionClass: CallGraphResolutionClass;
+	readonly resolvedSymbolIds: readonly string[];
+	readonly targetSpecs?: readonly ExpectedCallable[];
+}
+
+function createCallClassificationContext(
+	snapshot: StaticSemanticSnapshot,
+	graphId: CallGraphId,
+	model: ExpectedCallModel
+) {
+	return {
+		declarationById: new Map(
+			snapshot.declarations.map((declaration) => [declaration.id, declaration])
+		),
+		graphId,
+		invocationNodeIds: new Set(snapshot.invocations.map((invocation) => invocation.nodeId)),
+		model,
+		nodeById: new Map(snapshot.astNodes.map((node) => [node.id, node])),
+		referenceById: new Map<string, StaticSemanticSnapshot['references'][number]>(
+			snapshot.references.map((reference) => [reference.id, reference])
+		),
+		sourceById: new Map(snapshot.sources.map((source) => [source.id, source])),
+		symbolById: new Map(snapshot.symbols.map((symbol) => [symbol.id, symbol]))
+	};
+}
+
+type CallClassificationContext = ReturnType<typeof createCallClassificationContext>;
+
+function calleeSubtreeIds(
+	model: ExpectedCallModel,
+	root: StaticSemanticSnapshot['astNodes'][number]
+): Set<StaticSemanticSnapshot['astNodes'][number]['id']> {
+	const result = new Set<StaticSemanticSnapshot['astNodes'][number]['id']>();
+	const pending = [root];
+	while (pending.length > 0) {
+		const current = pending.pop()!;
+		if (result.has(current.id)) continue;
+		result.add(current.id);
+		pending.push(...(model.childrenByParent.get(current.id) ?? []));
+	}
+	return result;
+}
+
+function inlineExpectedSpecs(
+	model: ExpectedCallModel,
+	root: StaticSemanticSnapshot['astNodes'][number],
+	invocationKind: StaticSemanticSnapshot['invocations'][number]['invocationKind']
+): ExpectedCallable[] {
+	const direct = model.callablesByNode.get(root.id);
+	if (direct !== undefined && compatibleExpectedCallable(invocationKind, direct)) return [direct];
+	if (root.kind === ts.SyntaxKind.ClassExpression) {
+		const constructor = (model.childrenByParent.get(root.id) ?? [])
+			.map((child) => model.callablesByNode.get(child.id))
+			.find(
+				(spec): spec is ExpectedCallable =>
+					spec?.callableKind === 'CONSTRUCTOR' && compatibleExpectedCallable(invocationKind, spec)
+			);
+		return constructor === undefined ? [] : [constructor];
+	}
+	if (!TRANSPARENT_CALLEE_KINDS.has(root.kind)) return [];
+	return (model.childrenByParent.get(root.id) ?? []).flatMap((child) =>
+		inlineExpectedSpecs(model, child, invocationKind)
+	);
+}
+
+function buildExpectedClassification(
+	context: CallClassificationContext,
+	state: InvocationClassificationState,
+	input: ClassificationInput
+): ExpectedCallClassification {
+	const { graphId, referenceById } = context;
+	const { includeReferenceProvenance = true, referenceIds, targetSpecs = [] } = input;
+	const sortedSpecs = [...targetSpecs].sort((left, right) =>
+		compareText(
+			callGraphCallableTargetNodeId(graphId, left.node.id),
+			callGraphCallableTargetNodeId(graphId, right.node.id)
+		)
+	);
+	return {
+		dispatchClass: state.dispatchClass,
+		invocation: state.invocation,
+		provenanceIds: [
+			...new Set([
+				state.source.provenanceId,
+				...(state.source.syntaxProvenanceId === null ? [] : [state.source.syntaxProvenanceId]),
+				...(includeReferenceProvenance
+					? referenceIds.flatMap((id) => {
+							const reference = referenceById.get(id);
+							return reference === undefined
+								? []
+								: [reference.resolutionProvenanceId, reference.structuralProvenanceId];
+						})
+					: [])
+			])
+		].sort(compareText),
+		reasonCode: input.reasonCode,
+		referenceIds: [...referenceIds].sort(compareText),
+		resolutionClass: input.resolutionClass,
+		resolvedSymbolIds: [...new Set(input.resolvedSymbolIds)].sort(compareText),
+		source: state.source,
+		targetCallableNodeIds: sortedSpecs.map((spec) =>
+			callGraphCallableTargetNodeId(graphId, spec.node.id)
+		),
+		targetSpecsByNode: new Map(sortedSpecs.map((spec) => [spec.node.id, spec]))
+	};
+}
+
+function classifyDirectCallee(
+	context: CallClassificationContext,
+	state: InvocationClassificationState,
+	inline: readonly ExpectedCallable[]
+): ExpectedCallClassification | null {
+	const { callee } = state;
+	if (
+		callee.kind === ts.SyntaxKind.ImportKeyword ||
+		(callee.kind === ts.SyntaxKind.Identifier && callee.syntacticIdentifierText === 'eval')
+	)
+		return buildExpectedClassification(context, state, {
+			reasonCode:
+				callee.kind === ts.SyntaxKind.ImportKeyword
+					? 'DYNAMIC_IMPORT_CALL'
+					: 'DYNAMIC_CALLEE_EXPRESSION',
+			referenceIds: [],
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: []
+		});
+	if (inline.length === 1)
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
+			referenceIds: [],
+			resolutionClass: 'CANDIDATE_SET',
+			resolvedSymbolIds: [...inline[0]!.symbolIds],
+			targetSpecs: inline
+		});
+	if (inline.length > 1)
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'MULTIPLE_CALLEE_REFERENCE_CANDIDATES',
+			referenceIds: [],
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: []
+		});
+	return null;
+}
+
+function classifyMemberDispatch(
+	context: CallClassificationContext,
+	state: InvocationClassificationState,
+	subtreeReferences: readonly StaticSemanticSnapshot['references'][number][],
+	memberReferences: readonly StaticSemanticSnapshot['references'][number][]
+): ExpectedCallClassification | null {
+	const { callee } = state;
+	if (callee.kind === ts.SyntaxKind.ThisKeyword || callee.kind === ts.SyntaxKind.SuperKeyword)
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'THIS_OR_SUPER_DISPATCH',
+			referenceIds: [],
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: []
+		});
+	if (callee.kind === ts.SyntaxKind.ElementAccessExpression && memberReferences.length === 0)
+		return buildExpectedClassification(context, state, {
+			includeReferenceProvenance: false,
+			reasonCode: 'COMPUTED_ELEMENT_DISPATCH',
+			referenceIds: subtreeReferences.map((reference) => reference.id),
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: [],
+			targetSpecs: []
+		});
+	return null;
+}
+
+function selectedCalleeReferences(
+	model: ExpectedCallModel,
+	callee: StaticSemanticSnapshot['astNodes'][number],
+	subtreeReferences: readonly StaticSemanticSnapshot['references'][number][],
+	memberReferences: readonly StaticSemanticSnapshot['references'][number][]
+): readonly StaticSemanticSnapshot['references'][number][] {
+	if (
+		callee.kind === ts.SyntaxKind.PropertyAccessExpression ||
+		callee.kind === ts.SyntaxKind.ElementAccessExpression ||
+		memberReferences.length > 0
+	)
+		return memberReferences;
+	if (callee.kind === ts.SyntaxKind.Identifier || callee.kind === ts.SyntaxKind.PrivateIdentifier)
+		return model.referencesByNode.get(callee.id) ?? [];
+	if (TRANSPARENT_CALLEE_KINDS.has(callee.kind))
+		return subtreeReferences.filter(
+			(reference) => reference.role === 'SYMBOL_USE' || reference.role === 'MEMBER_NAME'
+		);
+	return [];
+}
+
+function classifyAmbiguousReferences(
+	context: CallClassificationContext,
+	state: InvocationClassificationState,
+	selectedReferences: readonly StaticSemanticSnapshot['references'][number][]
+): ExpectedCallClassification | null {
+	if (selectedReferences.length === 0)
+		return buildExpectedClassification(context, state, {
+			reasonCode:
+				state.dispatchClass === 'UNSUPPORTED_EXPRESSION'
+					? 'DYNAMIC_CALLEE_EXPRESSION'
+					: 'CALLEE_REFERENCE_NOT_RECONCILED',
+			referenceIds: [],
+			resolutionClass:
+				state.dispatchClass === 'UNSUPPORTED_EXPRESSION' ? 'UNSUPPORTED' : 'UNRESOLVED',
+			resolvedSymbolIds: []
+		});
+	if (selectedReferences.length > 1)
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'MULTIPLE_CALLEE_REFERENCE_CANDIDATES',
+			referenceIds: selectedReferences.map((reference) => reference.id),
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: selectedReferences.flatMap((reference) =>
+				reference.resolvedSymbolId === null ? [] : [reference.resolvedSymbolId]
+			)
+		});
+	return null;
+}
+
+function resolvedSymbolReasonCode(
+	context: CallClassificationContext,
+	// Branded, not `string`: `symbolById` is keyed by SemanticSymbolId, and widening the parameter
+	// drops the brand at the call site. Third time this campaign has widened a branded id in an
+	// extracted helper signature.
+	symbolId: SemanticSymbolId
+): ExpectedCallClassification['reasonCode'] {
+	const { declarationById, sourceById, symbolById } = context;
+	const symbol = symbolById.get(symbolId);
+	const declarations =
+		symbol?.declarationIds
+			.map((id) => declarationById.get(id))
+			.filter(
+				(declaration): declaration is NonNullable<typeof declaration> => declaration !== undefined
+			) ?? [];
+	const externalOnly =
+		declarations.length > 0 &&
+		declarations.every((declaration) => {
+			const declarationSource = sourceById.get(declaration.sourceId);
+			return (
+				declaration.ambient ||
+				declarationSource?.analysisDisposition === 'CONTEXT_ONLY' ||
+				declarationSource?.origin === 'EXTERNAL_DECLARATION' ||
+				declarationSource?.origin === 'TOOLCHAIN_LIBRARY' ||
+				declarationSource?.artifactClass === 'EXTERNAL_DEPENDENCY' ||
+				declarationSource?.artifactClass === 'VENDOR'
+			);
+		});
+	return externalOnly
+		? 'RESOLVED_EXTERNAL_OR_CONTEXT_ONLY_SYMBOL'
+		: 'CALLABLE_VALUE_FLOW_NOT_MODELED';
+}
+
+function classifySelectedReferences(
+	context: CallClassificationContext,
+	state: InvocationClassificationState,
+	selectedReferences: readonly StaticSemanticSnapshot['references'][number][]
+): ExpectedCallClassification {
+	const ambiguous = classifyAmbiguousReferences(context, state, selectedReferences);
+	if (ambiguous !== null) return ambiguous;
+	const reference = selectedReferences[0]!;
+	if (reference.resolutionState === 'UNSUPPORTED')
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'REFERENCE_UNSUPPORTED',
+			referenceIds: [reference.id],
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: []
+		});
+	if (reference.resolutionState === 'UNRESOLVED' || reference.resolvedSymbolId === null)
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'REFERENCE_UNRESOLVED',
+			referenceIds: [reference.id],
+			resolutionClass: 'UNRESOLVED',
+			resolvedSymbolIds: []
+		});
+	const symbolId = reference.resolvedSymbolId;
+	const candidates = (context.model.specsBySymbol.get(symbolId) ?? []).filter((spec) =>
+		compatibleExpectedCallable(state.invocation.invocationKind, spec)
+	);
+	if (candidates.length > 0)
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'RESOLVED_LOCAL_CALLABLE_CANDIDATES',
+			referenceIds: [reference.id],
+			resolutionClass: 'CANDIDATE_SET',
+			resolvedSymbolIds: [symbolId],
+			targetSpecs: candidates
+		});
+	return buildExpectedClassification(context, state, {
+		reasonCode: resolvedSymbolReasonCode(context, symbolId),
+		referenceIds: [reference.id],
+		resolutionClass: 'EXTERNAL_DISPATCH',
+		resolvedSymbolIds: [symbolId]
+	});
+}
+
+function classifyInvocation(
+	context: CallClassificationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number]
+): ExpectedCallClassification | null {
+	const { invocationNodeIds, model, nodeById, sourceById } = context;
+	const callee = nodeById.get(invocation.calleeNodeId);
+	const source = sourceById.get(invocation.sourceId);
+	if (callee === undefined || source === undefined) return null;
+	const inline = inlineExpectedSpecs(model, callee, invocation.invocationKind).sort((left, right) =>
+		compareText(left.node.id, right.node.id)
+	);
+	const state: InvocationClassificationState = {
+		callee,
+		dispatchClass: expectedDispatchClass(callee, 0, inline.length),
+		invocation,
+		source
+	};
+	const direct = classifyDirectCallee(context, state, inline);
+	if (direct !== null) return direct;
+
+	const calleeSubtree = calleeSubtreeIds(model, callee);
+	if ([...calleeSubtree].some((nodeId) => invocationNodeIds.has(nodeId))) {
+		state.dispatchClass = 'UNSUPPORTED_EXPRESSION';
+		return buildExpectedClassification(context, state, {
+			reasonCode: 'DYNAMIC_CALLEE_EXPRESSION',
+			referenceIds: [],
+			resolutionClass: 'UNSUPPORTED',
+			resolvedSymbolIds: []
+		});
+	}
+	const subtreeReferences = [...calleeSubtree]
+		.flatMap((nodeId) => model.referencesByNode.get(nodeId) ?? [])
+		.sort((left, right) => compareText(left.id, right.id));
+	const memberReferences = subtreeReferences.filter(
+		(reference) => reference.role === 'MEMBER_NAME'
+	);
+	state.dispatchClass = expectedDispatchClass(callee, memberReferences.length, inline.length);
+	const member = classifyMemberDispatch(context, state, subtreeReferences, memberReferences);
+	if (member !== null) return member;
+	return classifySelectedReferences(
+		context,
+		state,
+		selectedCalleeReferences(model, callee, subtreeReferences, memberReferences)
+	);
+}
+
 function expectedCallClassifications(
 	snapshot: StaticSemanticSnapshot,
 	graphId: CallGraphId,
 	model: ExpectedCallModel
 ): Map<string, ExpectedCallClassification> {
-	const nodeById = new Map(snapshot.astNodes.map((node) => [node.id, node]));
-	const sourceById = new Map(snapshot.sources.map((source) => [source.id, source]));
-	const symbolById = new Map(snapshot.symbols.map((symbol) => [symbol.id, symbol]));
-	const declarationById = new Map(
-		snapshot.declarations.map((declaration) => [declaration.id, declaration])
-	);
-	const referenceById = new Map<string, StaticSemanticSnapshot['references'][number]>(
-		snapshot.references.map((reference) => [reference.id, reference])
-	);
-	const invocationNodeIds = new Set(snapshot.invocations.map((invocation) => invocation.nodeId));
-
-	const subtreeIds = (
-		root: StaticSemanticSnapshot['astNodes'][number]
-	): Set<StaticSemanticSnapshot['astNodes'][number]['id']> => {
-		const result = new Set<StaticSemanticSnapshot['astNodes'][number]['id']>();
-		const pending = [root];
-		while (pending.length > 0) {
-			const current = pending.pop()!;
-			if (result.has(current.id)) continue;
-			result.add(current.id);
-			pending.push(...(model.childrenByParent.get(current.id) ?? []));
-		}
-		return result;
-	};
-	const inlineSpecs = (
-		root: StaticSemanticSnapshot['astNodes'][number],
-		invocationKind: StaticSemanticSnapshot['invocations'][number]['invocationKind']
-	): ExpectedCallable[] => {
-		const direct = model.callablesByNode.get(root.id);
-		if (direct !== undefined && compatibleExpectedCallable(invocationKind, direct)) return [direct];
-		if (root.kind === ts.SyntaxKind.ClassExpression) {
-			const constructor = (model.childrenByParent.get(root.id) ?? [])
-				.map((child) => model.callablesByNode.get(child.id))
-				.find(
-					(spec): spec is ExpectedCallable =>
-						spec !== undefined &&
-						spec.callableKind === 'CONSTRUCTOR' &&
-						compatibleExpectedCallable(invocationKind, spec)
-				);
-			return constructor === undefined ? [] : [constructor];
-		}
-		if (!TRANSPARENT_CALLEE_KINDS.has(root.kind)) return [];
-		return (model.childrenByParent.get(root.id) ?? []).flatMap((child) =>
-			inlineSpecs(child, invocationKind)
-		);
-	};
-
+	const context = createCallClassificationContext(snapshot, graphId, model);
 	const result = new Map<string, ExpectedCallClassification>();
 	for (const invocation of snapshot.invocations) {
-		const callee = nodeById.get(invocation.calleeNodeId);
-		const source = sourceById.get(invocation.sourceId);
-		if (callee === undefined || source === undefined) continue;
-		const inline = inlineSpecs(callee, invocation.invocationKind).sort((left, right) =>
-			compareText(left.node.id, right.node.id)
-		);
-		let dispatchClass = expectedDispatchClass(callee, 0, inline.length);
-		const classification = (
-			reasonCode: ExpectedCallClassification['reasonCode'],
-			referenceIds: readonly string[],
-			resolutionClass: CallGraphResolutionClass,
-			resolvedSymbolIds: readonly string[],
-			targetSpecs: readonly ExpectedCallable[] = [],
-			includeReferenceProvenance = true
-		): ExpectedCallClassification => {
-			const sortedSpecs = [...targetSpecs].sort((left, right) =>
-				compareText(
-					callGraphCallableTargetNodeId(graphId, left.node.id),
-					callGraphCallableTargetNodeId(graphId, right.node.id)
-				)
-			);
-			return {
-				dispatchClass,
-				invocation,
-				provenanceIds: [
-					...new Set([
-						source.provenanceId,
-						...(source.syntaxProvenanceId === null ? [] : [source.syntaxProvenanceId]),
-						...(includeReferenceProvenance
-							? referenceIds.flatMap((id) => {
-									const reference = referenceById.get(id);
-									return reference === undefined
-										? []
-										: [reference.resolutionProvenanceId, reference.structuralProvenanceId];
-								})
-							: [])
-					])
-				].sort(compareText),
-				reasonCode,
-				referenceIds: [...referenceIds].sort(compareText),
-				resolutionClass,
-				resolvedSymbolIds: [...new Set(resolvedSymbolIds)].sort(compareText),
-				source,
-				targetCallableNodeIds: sortedSpecs.map((spec) =>
-					callGraphCallableTargetNodeId(graphId, spec.node.id)
-				),
-				targetSpecsByNode: new Map(sortedSpecs.map((spec) => [spec.node.id, spec]))
-			};
-		};
-
-		if (
-			callee.kind === ts.SyntaxKind.ImportKeyword ||
-			(callee.kind === ts.SyntaxKind.Identifier && callee.syntacticIdentifierText === 'eval')
-		) {
-			result.set(
-				invocation.id,
-				classification(
-					callee.kind === ts.SyntaxKind.ImportKeyword
-						? 'DYNAMIC_IMPORT_CALL'
-						: 'DYNAMIC_CALLEE_EXPRESSION',
-					[],
-					'UNSUPPORTED',
-					[]
-				)
-			);
-			continue;
-		}
-		if (inline.length === 1) {
-			result.set(
-				invocation.id,
-				classification(
-					'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
-					[],
-					'CANDIDATE_SET',
-					[...inline[0]!.symbolIds],
-					inline
-				)
-			);
-			continue;
-		}
-		if (inline.length > 1) {
-			result.set(
-				invocation.id,
-				classification('MULTIPLE_CALLEE_REFERENCE_CANDIDATES', [], 'UNSUPPORTED', [])
-			);
-			continue;
-		}
-
-		const calleeSubtree = subtreeIds(callee);
-		if ([...calleeSubtree].some((nodeId) => invocationNodeIds.has(nodeId))) {
-			dispatchClass = 'UNSUPPORTED_EXPRESSION';
-			result.set(invocation.id, classification('DYNAMIC_CALLEE_EXPRESSION', [], 'UNSUPPORTED', []));
-			continue;
-		}
-		const subtreeReferences = [...calleeSubtree]
-			.flatMap((nodeId) => model.referencesByNode.get(nodeId) ?? [])
-			.sort((left, right) => compareText(left.id, right.id));
-		const memberReferences = subtreeReferences.filter(
-			(reference) => reference.role === 'MEMBER_NAME'
-		);
-		dispatchClass = expectedDispatchClass(callee, memberReferences.length, inline.length);
-		if (callee.kind === ts.SyntaxKind.ThisKeyword || callee.kind === ts.SyntaxKind.SuperKeyword) {
-			result.set(invocation.id, classification('THIS_OR_SUPER_DISPATCH', [], 'UNSUPPORTED', []));
-			continue;
-		}
-		if (callee.kind === ts.SyntaxKind.ElementAccessExpression && memberReferences.length === 0) {
-			result.set(
-				invocation.id,
-				classification(
-					'COMPUTED_ELEMENT_DISPATCH',
-					subtreeReferences.map((reference) => reference.id),
-					'UNSUPPORTED',
-					[],
-					[],
-					false
-				)
-			);
-			continue;
-		}
-		let selectedReferences: StaticSemanticSnapshot['references'][number][];
-		if (
-			callee.kind === ts.SyntaxKind.PropertyAccessExpression ||
-			callee.kind === ts.SyntaxKind.ElementAccessExpression ||
-			memberReferences.length > 0
-		)
-			selectedReferences = memberReferences;
-		else if (
-			callee.kind === ts.SyntaxKind.Identifier ||
-			callee.kind === ts.SyntaxKind.PrivateIdentifier
-		)
-			selectedReferences = model.referencesByNode.get(callee.id) ?? [];
-		else if (TRANSPARENT_CALLEE_KINDS.has(callee.kind))
-			selectedReferences = subtreeReferences.filter(
-				(reference) => reference.role === 'SYMBOL_USE' || reference.role === 'MEMBER_NAME'
-			);
-		else selectedReferences = [];
-
-		if (selectedReferences.length === 0) {
-			result.set(
-				invocation.id,
-				classification(
-					dispatchClass === 'UNSUPPORTED_EXPRESSION'
-						? 'DYNAMIC_CALLEE_EXPRESSION'
-						: 'CALLEE_REFERENCE_NOT_RECONCILED',
-					[],
-					dispatchClass === 'UNSUPPORTED_EXPRESSION' ? 'UNSUPPORTED' : 'UNRESOLVED',
-					[]
-				)
-			);
-			continue;
-		}
-		if (selectedReferences.length > 1) {
-			result.set(
-				invocation.id,
-				classification(
-					'MULTIPLE_CALLEE_REFERENCE_CANDIDATES',
-					selectedReferences.map((reference) => reference.id),
-					'UNSUPPORTED',
-					selectedReferences.flatMap((reference) =>
-						reference.resolvedSymbolId === null ? [] : [reference.resolvedSymbolId]
-					)
-				)
-			);
-			continue;
-		}
-		const reference = selectedReferences[0]!;
-		if (reference.resolutionState === 'UNSUPPORTED') {
-			result.set(
-				invocation.id,
-				classification('REFERENCE_UNSUPPORTED', [reference.id], 'UNSUPPORTED', [])
-			);
-			continue;
-		}
-		if (reference.resolutionState === 'UNRESOLVED' || reference.resolvedSymbolId === null) {
-			result.set(
-				invocation.id,
-				classification('REFERENCE_UNRESOLVED', [reference.id], 'UNRESOLVED', [])
-			);
-			continue;
-		}
-		const symbolId = reference.resolvedSymbolId;
-		const candidates = (model.specsBySymbol.get(symbolId) ?? []).filter((spec) =>
-			compatibleExpectedCallable(invocation.invocationKind, spec)
-		);
-		if (candidates.length > 0) {
-			result.set(
-				invocation.id,
-				classification(
-					'RESOLVED_LOCAL_CALLABLE_CANDIDATES',
-					[reference.id],
-					'CANDIDATE_SET',
-					[symbolId],
-					candidates
-				)
-			);
-			continue;
-		}
-		const symbol = symbolById.get(symbolId);
-		const declarations =
-			symbol?.declarationIds
-				.map((id) => declarationById.get(id))
-				.filter(
-					(declaration): declaration is NonNullable<typeof declaration> => declaration !== undefined
-				) ?? [];
-		const externalOnly =
-			declarations.length > 0 &&
-			declarations.every((declaration) => {
-				const declarationSource = sourceById.get(declaration.sourceId);
-				return (
-					declaration.ambient ||
-					declarationSource?.analysisDisposition === 'CONTEXT_ONLY' ||
-					declarationSource?.origin === 'EXTERNAL_DECLARATION' ||
-					declarationSource?.origin === 'TOOLCHAIN_LIBRARY' ||
-					declarationSource?.artifactClass === 'EXTERNAL_DEPENDENCY' ||
-					declarationSource?.artifactClass === 'VENDOR'
-				);
-			});
-		result.set(
-			invocation.id,
-			classification(
-				externalOnly
-					? 'RESOLVED_EXTERNAL_OR_CONTEXT_ONLY_SYMBOL'
-					: 'CALLABLE_VALUE_FLOW_NOT_MODELED',
-				[reference.id],
-				'EXTERNAL_DISPATCH',
-				[symbolId]
-			)
-		);
+		const classification = classifyInvocation(context, invocation);
+		if (classification !== null) result.set(invocation.id, classification);
 	}
 	return result;
+}
+
+function expectedInferenceState(
+	candidateCount: number,
+	orderedCount: number
+): CallGraphEpistemicState['inferenceState'] {
+	if (candidateCount === 0) return 'UNRESOLVED';
+	if (candidateCount === orderedCount) return 'CANDIDATE';
+	return 'MIXED';
+}
+
+function expectedSupportBasis(
+	candidateCount: number,
+	allUnsupported: boolean
+): CallGraphEpistemicState['supportBasis'] {
+	if (candidateCount > 0) return 'COMPILER_BOUND_STATIC_CANDIDATE';
+	if (allUnsupported) return 'UNSUPPORTED';
+	return 'NO_TARGET_EVIDENCE';
 }
 
 function expectedGlobalEpistemic(
@@ -1548,18 +1921,8 @@ function expectedGlobalEpistemic(
 		conflictState: 'NOT_EVALUATED',
 		executionHealth: 'PARTIAL',
 		freshness: 'SNAPSHOT_BOUND',
-		inferenceState:
-			candidateCount === 0
-				? 'UNRESOLVED'
-				: candidateCount === ordered.length
-					? 'CANDIDATE'
-					: 'MIXED',
-		supportBasis:
-			candidateCount > 0
-				? 'COMPILER_BOUND_STATIC_CANDIDATE'
-				: allUnsupported
-					? 'UNSUPPORTED'
-					: 'NO_TARGET_EVIDENCE'
+		inferenceState: expectedInferenceState(candidateCount, ordered.length),
+		supportBasis: expectedSupportBasis(candidateCount, allUnsupported)
 	};
 }
 
@@ -1630,7 +1993,10 @@ function expectedIndexes(
 		byNode: ReadonlyMap<CallGraphNode['id'], CallGraphEdge['id'][]>
 	): CallGraphIndexEntry[] =>
 		[...byNode.entries()]
-			.map(([nodeId, edgeIds]) => ({ edgeIds: edgeIds.sort(compareText), nodeId }))
+			.map(([nodeId, edgeIds]) => {
+				edgeIds.sort(compareText);
+				return { edgeIds, nodeId };
+			})
 			.sort((left, right) => compareText(left.nodeId, right.nodeId));
 	return { forward: entries(forwardByNode), reverse: entries(reverseByNode) };
 }
@@ -1727,12 +2093,9 @@ function validateCoverageArrays(
 		);
 }
 
-function validateCallGraphSemantics(
-	graph: CallGraphSnapshot,
-	snapshot: StaticSemanticSnapshot,
-	issues: IssueCollector,
-	knownGraphInputDigest?: string
-): void {
+type SemanticValidationContext = ReturnType<typeof createSemanticValidationContext>;
+
+function validateGraphVersionValues(graph: CallGraphSnapshot, issues: IssueCollector): void {
 	if (graph.schemaVersion !== CALL_GRAPH_SCHEMA_VERSION)
 		issues.add('UNSUPPORTED_SCHEMA_VERSION', '$.schemaVersion', graph.schemaVersion);
 	if (graph.operationVersion !== CALL_GRAPH_OPERATION_VERSION)
@@ -1741,6 +2104,9 @@ function validateCallGraphSemantics(
 		issues.add('INVALID_VALUE', '$.canonicalProfile', 'Unsupported call-graph canonical profile.');
 	if (graph.method !== CALL_GRAPH_METHOD)
 		issues.add('INVALID_VALUE', '$.method', 'Unsupported call-graph construction method.');
+}
+
+function validateGraphConformanceClaims(graph: CallGraphSnapshot, issues: IssueCollector): void {
 	if (
 		graph.capability !== CALL_GRAPH_CAPABILITY ||
 		graph.capabilityStatus !== CALL_GRAPH_CAPABILITY_STATUS
@@ -1771,6 +2137,13 @@ function validateCallGraphSemantics(
 			'$.coverage',
 			'This producer cannot claim call-graph closure or whole-program reachability.'
 		);
+}
+
+function validateGraphSemanticBinding(
+	graph: CallGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
 	if (graph.semanticSnapshotId !== snapshot.id)
 		issues.add(
 			'DANGLING_REFERENCE',
@@ -1793,6 +2166,14 @@ function validateCallGraphSemantics(
 			'$.producer',
 			'Graph producer does not match the semantic provider.'
 		);
+}
+
+function validateGraphDigests(
+	graph: CallGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector,
+	knownGraphInputDigest?: string
+): void {
 	if (!SHA256.test(graph.graphInputDigest))
 		issues.add(
 			'INVALID_VALUE',
@@ -1815,7 +2196,9 @@ function validateCallGraphSemantics(
 			error instanceof Error ? error.message : 'Call-graph input projection failed closed.'
 		);
 	}
+}
 
+function validateGraphIdentityPreimage(graph: CallGraphSnapshot, issues: IssueCollector): void {
 	const expectedGraphId = callGraphId({
 		canonicalProfile: graph.canonicalProfile,
 		graphInputDigest: graph.graphInputDigest,
@@ -1828,49 +2211,28 @@ function validateCallGraphSemantics(
 	});
 	if (graph.id !== expectedGraphId)
 		issues.add('IDENTITY_MISMATCH', '$.id', 'Call-graph identity preimage mismatch.');
-	if (graph.layers.length !== 1) {
-		issues.add('POPULATION_MISMATCH', '$.layers', 'Exactly one static-call layer is required.');
-		return;
-	}
-	const layer = graph.layers[0];
+}
+
+function validateLayerIdentity(
+	graph: CallGraphSnapshot,
+	layer: CallGraphSnapshot['layers'][number],
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector
+): void {
 	if (layer.id !== callGraphLayerId(graph.id, layer.kind, layer.ordinal))
 		issues.add('IDENTITY_MISMATCH', '$.layers[0].id', 'Call-graph layer identity mismatch.');
 	graphWideReference(layer, graph, layer.id, '$.layers[0]', issues);
 	if (!same(layer.producer, snapshot.provider))
 		issues.add('INVALID_VALUE', '$.layers[0].producer', 'Layer producer mismatch.');
+}
 
-	const nodeById = validateIdPopulation(graph.nodes, '$.nodes', issues);
-	const edgeById = validateIdPopulation(graph.edges, '$.edges', issues);
-	const sourceById = new Map(snapshot.sources.map((record) => [record.id, record]));
-	const nodeBySemanticId = new Map(snapshot.astNodes.map((record) => [record.id, record]));
-	const invocationById = new Map<string, (typeof snapshot.invocations)[number]>(
-		snapshot.invocations.map((record) => [record.id, record])
-	);
-	const declarationById = new Map(snapshot.declarations.map((record) => [record.id, record]));
-	const symbolById = new Map(snapshot.symbols.map((record) => [record.id, record]));
-	const referenceById = new Map(snapshot.references.map((record) => [record.id, record]));
-	const projectById = new Map(snapshot.projects.map((record) => [record.id, record]));
-	const programById = new Map(snapshot.programs.map((record) => [record.id, record]));
-	const provenanceById = new Map(snapshot.provenances.map((record) => [record.id, record]));
-	const allSemanticIds = new Set<string>();
-	for (const population of [
-		snapshot.astNodes,
-		snapshot.declarations,
-		snapshot.invocations,
-		snapshot.overloadSets,
-		snapshot.references,
-		snapshot.signatures,
-		snapshot.symbols,
-		snapshot.typeRelations,
-		snapshot.provenances,
-		snapshot.sources
-	])
-		for (const record of population) allSemanticIds.add(record.id);
-
-	const sourceRegionBySource = new Map<string, Extract<CallGraphNode, { kind: 'SOURCE_REGION' }>>();
-	const callModel = expectedCallModel(snapshot);
-	const expectedCallables = callModel.callablesByNode;
-	const expectedClassifications = expectedCallClassifications(snapshot, graph.id, callModel);
+function buildExpectedNodeProvenance(
+	graph: CallGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	expectedCallables: ReadonlyMap<string, ExpectedCallable>,
+	expectedClassifications: ReadonlyMap<string, ExpectedCallClassification>,
+	declarationById: ReadonlyMap<string, StaticSemanticSnapshot['declarations'][number]>
+): Map<string, readonly SemanticProvenanceId[]> {
 	const expectedNodeProvenance = new Map<string, readonly SemanticProvenanceId[]>();
 	for (const source of snapshot.sources)
 		expectedNodeProvenance.set(callGraphSourceRegionNodeId(graph.id, source.id), [
@@ -1899,12 +2261,79 @@ function validateCallGraphSemantics(
 				classification.provenanceIds
 			);
 	}
-	const callableBySemanticNode = new Map<
-		string,
-		Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>
-	>();
-	const callSitesByInvocation = new Map<string, Extract<CallGraphNode, { kind: 'CALL_SITE' }>[]>();
-	const frontiersByInvocation = new Map<string, Extract<CallGraphNode, { kind: 'FRONTIER' }>[]>();
+	return expectedNodeProvenance;
+}
+
+function collectSemanticIds(snapshot: StaticSemanticSnapshot): Set<string> {
+	const allSemanticIds = new Set<string>();
+	for (const population of [
+		snapshot.astNodes,
+		snapshot.declarations,
+		snapshot.invocations,
+		snapshot.overloadSets,
+		snapshot.references,
+		snapshot.signatures,
+		snapshot.symbols,
+		snapshot.typeRelations,
+		snapshot.provenances,
+		snapshot.sources
+	])
+		for (const record of population) allSemanticIds.add(record.id);
+	return allSemanticIds;
+}
+
+function createSemanticValidationContext(
+	graph: CallGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	layer: CallGraphSnapshot['layers'][number],
+	issues: IssueCollector
+) {
+	const nodeById = validateIdPopulation(graph.nodes, '$.nodes', issues);
+	const edgeById = validateIdPopulation(graph.edges, '$.edges', issues);
+	const declarationById = new Map(snapshot.declarations.map((record) => [record.id, record]));
+	const allSemanticIds = collectSemanticIds(snapshot);
+	const callModel = expectedCallModel(snapshot);
+	const expectedCallables = callModel.callablesByNode;
+	const expectedClassifications = expectedCallClassifications(snapshot, graph.id, callModel);
+	return {
+		allSemanticIds,
+		callSitesByInvocation: new Map<string, Extract<CallGraphNode, { kind: 'CALL_SITE' }>[]>(),
+		callableBySemanticNode: new Map<string, Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>>(),
+		declarationById,
+		edgeById,
+		expectedCallables,
+		expectedClassifications,
+		expectedNodeProvenance: buildExpectedNodeProvenance(
+			graph,
+			snapshot,
+			expectedCallables,
+			expectedClassifications,
+			declarationById
+		),
+		frontiersByInvocation: new Map<string, Extract<CallGraphNode, { kind: 'FRONTIER' }>[]>(),
+		graph,
+		invocationById: new Map<string, (typeof snapshot.invocations)[number]>(
+			snapshot.invocations.map((record) => [record.id, record])
+		),
+		issues,
+		layer,
+		nodeById,
+		nodeBySemanticId: new Map(snapshot.astNodes.map((record) => [record.id, record])),
+		ownershipByInvocation: new Map<string, CallGraphEdge[]>(),
+		programById: new Map(snapshot.programs.map((record) => [record.id, record])),
+		projectById: new Map(snapshot.projects.map((record) => [record.id, record])),
+		provenanceById: new Map(snapshot.provenances.map((record) => [record.id, record])),
+		referenceById: new Map(snapshot.references.map((record) => [record.id, record])),
+		snapshot,
+		sourceById: new Map(snapshot.sources.map((record) => [record.id, record])),
+		sourceRegionBySource: new Map<string, Extract<CallGraphNode, { kind: 'SOURCE_REGION' }>>(),
+		symbolById: new Map(snapshot.symbols.map((record) => [record.id, record])),
+		targetsByInvocation: new Map<string, CallGraphEdge[]>()
+	};
+}
+
+function validateSemanticProvenanceRecords(context: SemanticValidationContext): boolean {
+	const { issues, projectById, snapshot, sourceById } = context;
 	for (const [index, provenance] of snapshot.provenances.entries()) {
 		const path = `$semanticSnapshot.provenances[${index}]`;
 		if (!projectById.has(provenance.projectId))
@@ -1920,392 +2349,558 @@ function validateCallGraphSemantics(
 					'Provenance source and project identities are inconsistent.'
 				);
 		}
-		if (issues.exhausted) return;
+		if (issues.exhausted) return false;
 	}
-	const expectedOwnerNodeId = (
-		invocationNode: StaticSemanticSnapshot['astNodes'][number]
-	): string | null => {
-		let parentId = invocationNode.parentId;
-		const visited = new Set<string>();
-		while (parentId !== null) {
-			if (visited.has(parentId)) return null;
-			visited.add(parentId);
-			if (expectedCallables.has(parentId)) return callGraphCallableTargetNodeId(graph.id, parentId);
-			const parent = nodeBySemanticId.get(parentId);
-			if (parent === undefined || parent.sourceId !== invocationNode.sourceId) return null;
-			parentId = parent.parentId;
-		}
-		return callGraphSourceRegionNodeId(graph.id, invocationNode.sourceId);
-	};
+	return true;
+}
 
-	for (const [index, node] of graph.nodes.entries()) {
-		const path = `$.nodes[${index}]`;
-		graphWideReference(node, graph, layer.id, path, issues);
-		validateProvenanceIds(
-			node.provenanceIds,
-			provenanceById,
-			snapshot.id,
-			snapshot.subjectId,
-			`${path}.provenanceIds`,
-			issues
+function expectedOwnerNodeId(
+	context: SemanticValidationContext,
+	invocationNode: StaticSemanticSnapshot['astNodes'][number]
+): string | null {
+	const { expectedCallables, graph, nodeBySemanticId } = context;
+	let parentId = invocationNode.parentId;
+	const visited = new Set<string>();
+	while (parentId !== null) {
+		if (visited.has(parentId)) return null;
+		visited.add(parentId);
+		if (expectedCallables.has(parentId)) return callGraphCallableTargetNodeId(graph.id, parentId);
+		const parent = nodeBySemanticId.get(parentId);
+		// S6582 REFUSED: the right operand is a PROPERTY READ, not a literal, so `undefined !==
+		// undefined` is false and the guard stops refusing exactly when both are missing. Safe only
+		// against a literal or enum — this comparand is neither.
+		if (parent === undefined || parent.sourceId !== invocationNode.sourceId) return null;
+		parentId = parent.parentId;
+	}
+	return callGraphSourceRegionNodeId(graph.id, invocationNode.sourceId);
+}
+
+function validateCallGraphSemantics(
+	graph: CallGraphSnapshot,
+	snapshot: StaticSemanticSnapshot,
+	issues: IssueCollector,
+	knownGraphInputDigest?: string
+): void {
+	validateGraphVersionValues(graph, issues);
+	validateGraphConformanceClaims(graph, issues);
+	validateGraphSemanticBinding(graph, snapshot, issues);
+	validateGraphDigests(graph, snapshot, issues, knownGraphInputDigest);
+	validateGraphIdentityPreimage(graph, issues);
+	if (graph.layers.length !== 1) {
+		issues.add('POPULATION_MISMATCH', '$.layers', 'Exactly one static-call layer is required.');
+		return;
+	}
+	const layer = graph.layers[0];
+	validateLayerIdentity(graph, layer, snapshot, issues);
+	const context = createSemanticValidationContext(graph, snapshot, layer, issues);
+	if (!validateSemanticProvenanceRecords(context)) return;
+	if (!validateGraphNodes(context)) return;
+	validateNodePopulations(context);
+	if (!validateGraphEdges(context)) return;
+	if (!validateInvocationReconciliation(context)) return;
+	validateCallSiteInvocationKeys(context);
+	validateLayerManifests(context);
+	validateGraphIndexes(context);
+	validateCoverageTotals(context);
+	validateLimitations(context);
+	validateLayerParity(context);
+	validateLayerProvenance(context);
+	validateContentDigest(context);
+	validateDuplicateIdentities(context);
+}
+
+function validateSourceRegionBinding(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'SOURCE_REGION' }>,
+	source: StaticSemanticSnapshot['sources'][number],
+	path: string
+): void {
+	const { graph, issues } = context;
+	if (
+		node.analysisDisposition !== source.analysisDisposition ||
+		node.logicalPath !== source.logicalPath ||
+		node.programId !== source.programId ||
+		node.projectId !== source.projectId
+	)
+		issues.add('INVALID_VALUE', path, 'Source-region fields differ from the semantic source.');
+	if (node.id !== callGraphSourceRegionNodeId(graph.id, source.id))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Source-region identity mismatch.');
+	if (!same(node.provenanceIds, [source.provenanceId]))
+		issues.add('DANGLING_REFERENCE', `${path}.provenanceIds`, 'Source-region provenance mismatch.');
+	if (!same(node.sourceLocations, exactLocation(source.id, 0, source.textLength)))
+		issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Source-region extent mismatch.');
+	try {
+		assertCanonicalRelativePath(node.logicalPath);
+	} catch {
+		issues.add(
+			'ABSOLUTE_PATH',
+			`${path}.logicalPath`,
+			'Source-region path is not canonical relative.'
 		);
-		canonicalObjectArray(node.sourceLocations, `${path}.sourceLocations`, issues);
-		for (const [locationIndex, location] of node.sourceLocations.entries()) {
-			const source = sourceById.get(location.sourceId);
-			if (source === undefined)
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.sourceLocations[${locationIndex}]`,
-					'Absent source.'
-				);
-			else if (location.end > source.textLength)
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.sourceLocations[${locationIndex}].end`,
-					'Location exceeds its source.'
-				);
-		}
-		if (node.kind === 'SOURCE_REGION') {
-			if (!same(node.epistemic, expectedStructuralEpistemic(snapshot)))
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Source-region epistemic dimensions do not match structural compiler evidence.'
-				);
-			if (sourceRegionBySource.has(node.semanticSourceId))
-				issues.add(
-					'DUPLICATE_ID',
-					`${path}.semanticSourceId`,
-					'Duplicate source-region projection.'
-				);
-			else sourceRegionBySource.set(node.semanticSourceId, node);
-			const source = sourceById.get(node.semanticSourceId);
-			if (source === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.semanticSourceId`, 'Absent semantic source.');
-			else {
-				if (
-					node.analysisDisposition !== source.analysisDisposition ||
-					node.logicalPath !== source.logicalPath ||
-					node.programId !== source.programId ||
-					node.projectId !== source.projectId
-				)
-					issues.add(
-						'INVALID_VALUE',
-						path,
-						'Source-region fields differ from the semantic source.'
-					);
-				if (node.id !== callGraphSourceRegionNodeId(graph.id, source.id))
-					issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Source-region identity mismatch.');
-				if (!same(node.provenanceIds, [source.provenanceId]))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.provenanceIds`,
-						'Source-region provenance mismatch.'
-					);
-				if (!same(node.sourceLocations, exactLocation(source.id, 0, source.textLength)))
-					issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Source-region extent mismatch.');
-				try {
-					assertCanonicalRelativePath(node.logicalPath);
-				} catch {
-					issues.add(
-						'ABSOLUTE_PATH',
-						`${path}.logicalPath`,
-						'Source-region path is not canonical relative.'
-					);
-				}
-			}
-		} else if (node.kind === 'CALLABLE_TARGET') {
-			if (!same(node.epistemic, expectedStructuralEpistemic(snapshot)))
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Callable-target epistemic dimensions do not match structural compiler evidence.'
-				);
-			if (callableBySemanticNode.has(node.semanticNodeId))
-				issues.add(
-					'DUPLICATE_ID',
-					`${path}.semanticNodeId`,
-					'Duplicate callable-target projection.'
-				);
-			else callableBySemanticNode.set(node.semanticNodeId, node);
-			const semanticNode = nodeBySemanticId.get(node.semanticNodeId);
-			const source = sourceById.get(node.sourceId);
-			const expectedCallable = expectedCallables.get(node.semanticNodeId);
-			if (expectedCallable === undefined)
-				issues.add(
-					'POPULATION_MISMATCH',
-					`${path}.semanticNodeId`,
-					'Callable target is outside the derivable deep-indexed runtime callable population.'
-				);
-			else if (
-				node.bodyState !== expectedCallable.bodyState ||
-				node.callableKind !== expectedCallable.callableKind ||
-				node.sourceId !== expectedCallable.source.id ||
-				node.programId !== expectedCallable.source.programId ||
-				node.projectId !== expectedCallable.source.projectId
-			)
-				issues.add(
-					'INVALID_VALUE',
-					path,
-					'Callable kind, body state, source, program, or project differs from semantic AST topology.'
-				);
-			if (semanticNode === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.semanticNodeId`, 'Absent callable AST node.');
-			if (source === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.sourceId`, 'Absent callable source.');
-			else if (node.programId !== source.programId || node.projectId !== source.projectId)
-				issues.add('DANGLING_REFERENCE', path, 'Callable source/program/project binding mismatch.');
-			if (semanticNode !== undefined) {
-				if (semanticNode.sourceId !== node.sourceId)
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.sourceId`,
-						'Callable AST node belongs to another source.'
-					);
-				if (
-					!same(
-						node.sourceLocations,
-						exactLocation(node.sourceId, semanticNode.start, semanticNode.end)
-					)
-				)
-					issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Callable location mismatch.');
-			}
-			if (node.id !== callGraphCallableTargetNodeId(graph.id, node.semanticNodeId))
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Callable-target identity mismatch.');
-			sortedUniqueStrings(node.declarationIds, `${path}.declarationIds`, issues);
-			sortedUniqueStrings(node.symbolIds, `${path}.symbolIds`, issues);
-			if (
-				expectedCallable !== undefined &&
-				(!same(node.declarationIds, [...expectedCallable.declarationIds].sort(compareText)) ||
-					!same(node.symbolIds, [...expectedCallable.symbolIds].sort(compareText)) ||
-					!same(node.provenanceIds, expectedCallableProvenance(expectedCallable, declarationById)))
-			)
-				issues.add(
-					'POPULATION_MISMATCH',
-					path,
-					'Callable declaration, symbol, or provenance associations do not exactly match the semantic snapshot.'
-				);
-			const nodeSymbolIds = new Set(node.symbolIds);
-			for (const [declarationIndex, declarationId] of node.declarationIds.entries()) {
-				const declaration = declarationById.get(declarationId);
-				if (declaration === undefined)
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.declarationIds[${declarationIndex}]`,
-						'Absent declaration.'
-					);
-				else if (declaration.symbolId !== null && !nodeSymbolIds.has(declaration.symbolId))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.declarationIds[${declarationIndex}]`,
-						'Declaration symbol is absent from this callable target.'
-					);
-			}
-			const nodeDeclarationIds = new Set(node.declarationIds);
-			for (const [symbolIndex, symbolId] of node.symbolIds.entries()) {
-				const symbol = symbolById.get(symbolId);
-				if (symbol === undefined)
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.symbolIds[${symbolIndex}]`,
-						'Absent callable symbol.'
-					);
-				else if (!symbol.declarationIds.some((id) => nodeDeclarationIds.has(id)))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.symbolIds[${symbolIndex}]`,
-						'Symbol has no declaration on this callable node.'
-					);
-			}
-		} else if (node.kind === 'CALL_SITE') {
-			const expectedClassification = expectedClassifications.get(node.invocationId);
-			if (
-				expectedClassification !== undefined &&
-				!same(
-					node.epistemic,
-					expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
-				)
-			)
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Call-site epistemic dimensions do not match the independently derived resolution class.'
-				);
-			const grouped = callSitesByInvocation.get(node.invocationId) ?? [];
-			grouped.push(node);
-			callSitesByInvocation.set(node.invocationId, grouped);
-			const invocation = invocationById.get(node.invocationId);
-			const source = sourceById.get(node.sourceId);
-			if (invocation === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Absent semantic invocation.');
-			else if (
-				node.calleeNodeId !== invocation.calleeNodeId ||
-				node.invocationKind !== invocation.invocationKind ||
-				node.invocationNodeId !== invocation.nodeId ||
-				node.optional !== invocation.optional ||
-				node.sourceId !== invocation.sourceId
-			)
-				issues.add('INVALID_VALUE', path, 'Call-site fields differ from the semantic invocation.');
-			if (source === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.sourceId`, 'Absent call-site source.');
-			else if (node.programId !== source.programId || node.projectId !== source.projectId)
-				issues.add(
-					'DANGLING_REFERENCE',
-					path,
-					'Call-site source/program/project binding mismatch.'
-				);
-			const invocationNode = nodeBySemanticId.get(node.invocationNodeId);
-			if (invocationNode === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.invocationNodeId`, 'Absent invocation AST node.');
-			else {
-				if (
-					!same(
-						node.sourceLocations,
-						exactLocation(node.sourceId, invocationNode.start, invocationNode.end)
-					)
-				)
-					issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Call-site location mismatch.');
-				const expectedOwner = expectedOwnerNodeId(invocationNode);
-				if (expectedOwner === null || node.ownerNodeId !== expectedOwner)
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.ownerNodeId`,
-						'Call-site owner is not its nearest runtime callable or source region.'
-					);
-			}
-			if (!nodeBySemanticId.has(node.calleeNodeId))
-				issues.add('DANGLING_REFERENCE', `${path}.calleeNodeId`, 'Absent callee AST node.');
-			if (node.id !== callGraphCallSiteNodeId(graph.id, node.invocationId))
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Call-site identity mismatch.');
-			sortedUniqueStrings(node.referenceIds, `${path}.referenceIds`, issues);
-			sortedUniqueStrings(node.resolvedSymbolIds, `${path}.resolvedSymbolIds`, issues);
-			sortedUniqueStrings(node.targetNodeIds, `${path}.targetNodeIds`, issues);
-			if (expectedClassification === undefined)
-				issues.add(
-					'POPULATION_MISMATCH',
-					`${path}.invocationId`,
-					'Call-site invocation has no independently derivable classification.'
-				);
-			else {
-				const expectedTargetNodeIds =
-					expectedClassification.resolutionClass === 'CANDIDATE_SET'
-						? expectedClassification.targetCallableNodeIds
-						: [
-								callGraphFrontierNodeId(
-									graph.id,
-									node.invocationId,
-									expectedClassification.resolutionClass === 'EXACT'
-										? 'UNSUPPORTED'
-										: expectedClassification.resolutionClass
-								)
-							];
-				if (
-					node.dispatchClass !== expectedClassification.dispatchClass ||
-					node.reasonCode !== expectedClassification.reasonCode ||
-					node.resolutionClass !== expectedClassification.resolutionClass ||
-					!same(node.referenceIds, expectedClassification.referenceIds) ||
-					!same(node.resolvedSymbolIds, expectedClassification.resolvedSymbolIds) ||
-					!same(node.targetNodeIds, expectedTargetNodeIds) ||
-					!same(node.provenanceIds, expectedClassification.provenanceIds)
-				)
-					issues.add(
-						'INVALID_VALUE',
-						path,
-						'Call-site dispatch, reason, references, symbols, resolution, complete target set, or provenance differs from the semantic snapshot.'
-					);
-			}
-			for (const [referenceIndex, referenceId] of node.referenceIds.entries()) {
-				const reference = referenceById.get(referenceId);
-				if (reference === undefined)
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.referenceIds[${referenceIndex}]`,
-						'Absent callee reference.'
-					);
-				else if (reference.sourceId !== node.sourceId)
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.referenceIds[${referenceIndex}]`,
-						'Callee reference belongs to another source.'
-					);
-			}
-			for (const [symbolIndex, symbolId] of node.resolvedSymbolIds.entries())
-				if (!symbolById.has(symbolId))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.resolvedSymbolIds[${symbolIndex}]`,
-						'Absent resolved symbol.'
-					);
-			if (node.resolutionClass === 'EXACT')
-				issues.add(
-					'CONFORMANCE_OVERCLAIM',
-					`${path}.resolutionClass`,
-					'Exact call targets are unavailable in this producer.'
-				);
-		} else {
-			const expectedClassification = expectedClassifications.get(node.invocationId);
-			if (
-				expectedClassification !== undefined &&
-				!same(
-					node.epistemic,
-					expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
-				)
-			)
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Frontier epistemic dimensions do not match the independently derived resolution class.'
-				);
-			const grouped = frontiersByInvocation.get(node.invocationId) ?? [];
-			grouped.push(node);
-			frontiersByInvocation.set(node.invocationId, grouped);
-			const invocation = invocationById.get(node.invocationId);
-			if (invocation === undefined)
-				issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Absent frontier invocation.');
-			else if (invocation.sourceId !== node.sourceId)
-				issues.add(
-					'DANGLING_REFERENCE',
-					`${path}.sourceId`,
-					'Frontier source differs from its invocation.'
-				);
-			const invocationNode =
-				invocation === undefined ? undefined : nodeBySemanticId.get(invocation.nodeId);
-			if (
-				invocationNode !== undefined &&
-				!same(
-					node.sourceLocations,
-					exactLocation(node.sourceId, invocationNode.start, invocationNode.end)
-				)
-			)
-				issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Frontier location mismatch.');
-			if (node.id !== callGraphFrontierNodeId(graph.id, node.invocationId, node.frontierKind))
-				issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Frontier-node identity mismatch.');
-			sortedUniqueStrings(node.semanticSymbolIds, `${path}.semanticSymbolIds`, issues);
-			if (
-				expectedClassification === undefined ||
-				expectedClassification.resolutionClass === 'CANDIDATE_SET' ||
-				expectedClassification.resolutionClass === 'EXACT' ||
-				node.frontierKind !== expectedClassification.resolutionClass ||
-				node.reasonCode !== expectedClassification.reasonCode ||
-				!same(node.semanticSymbolIds, expectedClassification.resolvedSymbolIds) ||
-				!same(node.provenanceIds, expectedClassification.provenanceIds)
-			)
-				issues.add(
-					'INVALID_VALUE',
-					path,
-					'Frontier class, reason, semantic symbols, or provenance differ from the independently derived call-site frontier.'
-				);
-			for (const [symbolIndex, symbolId] of node.semanticSymbolIds.entries())
-				if (!symbolById.has(symbolId))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`${path}.semanticSymbolIds[${symbolIndex}]`,
-						'Absent frontier symbol.'
-					);
-		}
-		if (issues.exhausted) return;
 	}
+}
 
+function validateSourceRegionNode(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'SOURCE_REGION' }>,
+	path: string
+): void {
+	const { issues, snapshot, sourceById, sourceRegionBySource } = context;
+	if (!same(node.epistemic, expectedStructuralEpistemic(snapshot)))
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Source-region epistemic dimensions do not match structural compiler evidence.'
+		);
+	if (sourceRegionBySource.has(node.semanticSourceId))
+		issues.add('DUPLICATE_ID', `${path}.semanticSourceId`, 'Duplicate source-region projection.');
+	else sourceRegionBySource.set(node.semanticSourceId, node);
+	const source = sourceById.get(node.semanticSourceId);
+	if (source === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.semanticSourceId`, 'Absent semantic source.');
+	else validateSourceRegionBinding(context, node, source, path);
+}
+
+function validateCallableTargetExpectation(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>,
+	path: string
+): void {
+	const { expectedCallables, issues } = context;
+	const expectedCallable = expectedCallables.get(node.semanticNodeId);
+	if (expectedCallable === undefined)
+		issues.add(
+			'POPULATION_MISMATCH',
+			`${path}.semanticNodeId`,
+			'Callable target is outside the derivable deep-indexed runtime callable population.'
+		);
+	else if (
+		node.bodyState !== expectedCallable.bodyState ||
+		node.callableKind !== expectedCallable.callableKind ||
+		node.sourceId !== expectedCallable.source.id ||
+		node.programId !== expectedCallable.source.programId ||
+		node.projectId !== expectedCallable.source.projectId
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Callable kind, body state, source, program, or project differs from semantic AST topology.'
+		);
+}
+
+function validateCallableTargetSemantics(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>,
+	path: string
+): void {
+	const { graph, issues, nodeBySemanticId, sourceById } = context;
+	const semanticNode = nodeBySemanticId.get(node.semanticNodeId);
+	const source = sourceById.get(node.sourceId);
+	if (semanticNode === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.semanticNodeId`, 'Absent callable AST node.');
+	if (source === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.sourceId`, 'Absent callable source.');
+	else if (node.programId !== source.programId || node.projectId !== source.projectId)
+		issues.add('DANGLING_REFERENCE', path, 'Callable source/program/project binding mismatch.');
+	if (semanticNode !== undefined) {
+		if (semanticNode.sourceId !== node.sourceId)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.sourceId`,
+				'Callable AST node belongs to another source.'
+			);
+		if (
+			!same(
+				node.sourceLocations,
+				exactLocation(node.sourceId, semanticNode.start, semanticNode.end)
+			)
+		)
+			issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Callable location mismatch.');
+	}
+	if (node.id !== callGraphCallableTargetNodeId(graph.id, node.semanticNodeId))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Callable-target identity mismatch.');
+}
+
+function validateCallableTargetAssociations(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>,
+	path: string
+): void {
+	const { declarationById, expectedCallables, issues } = context;
+	const expectedCallable = expectedCallables.get(node.semanticNodeId);
+	sortedUniqueStrings(node.declarationIds, `${path}.declarationIds`, issues);
+	sortedUniqueStrings(node.symbolIds, `${path}.symbolIds`, issues);
+	if (
+		expectedCallable !== undefined &&
+		(!same(node.declarationIds, [...expectedCallable.declarationIds].sort(compareText)) ||
+			!same(node.symbolIds, [...expectedCallable.symbolIds].sort(compareText)) ||
+			!same(node.provenanceIds, expectedCallableProvenance(expectedCallable, declarationById)))
+	)
+		issues.add(
+			'POPULATION_MISMATCH',
+			path,
+			'Callable declaration, symbol, or provenance associations do not exactly match the semantic snapshot.'
+		);
+}
+
+function validateCallableTargetMembers(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>,
+	path: string
+): void {
+	const { declarationById, issues, symbolById } = context;
+	const nodeSymbolIds = new Set(node.symbolIds);
+	for (const [declarationIndex, declarationId] of node.declarationIds.entries()) {
+		const declaration = declarationById.get(declarationId);
+		if (declaration === undefined)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.declarationIds[${declarationIndex}]`,
+				'Absent declaration.'
+			);
+		else if (declaration.symbolId !== null && !nodeSymbolIds.has(declaration.symbolId))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.declarationIds[${declarationIndex}]`,
+				'Declaration symbol is absent from this callable target.'
+			);
+	}
+	const nodeDeclarationIds = new Set(node.declarationIds);
+	for (const [symbolIndex, symbolId] of node.symbolIds.entries()) {
+		const symbol = symbolById.get(symbolId);
+		if (symbol === undefined)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.symbolIds[${symbolIndex}]`,
+				'Absent callable symbol.'
+			);
+		else if (!symbol.declarationIds.some((id) => nodeDeclarationIds.has(id)))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.symbolIds[${symbolIndex}]`,
+				'Symbol has no declaration on this callable node.'
+			);
+	}
+}
+
+function validateCallableTargetNode(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>,
+	path: string
+): void {
+	const { callableBySemanticNode, issues, snapshot } = context;
+	if (!same(node.epistemic, expectedStructuralEpistemic(snapshot)))
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Callable-target epistemic dimensions do not match structural compiler evidence.'
+		);
+	if (callableBySemanticNode.has(node.semanticNodeId))
+		issues.add('DUPLICATE_ID', `${path}.semanticNodeId`, 'Duplicate callable-target projection.');
+	else callableBySemanticNode.set(node.semanticNodeId, node);
+	validateCallableTargetExpectation(context, node, path);
+	validateCallableTargetSemantics(context, node, path);
+	validateCallableTargetAssociations(context, node, path);
+	validateCallableTargetMembers(context, node, path);
+}
+
+function validateCallSiteLocation(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	invocationNode: StaticSemanticSnapshot['astNodes'][number],
+	path: string
+): void {
+	const { issues } = context;
+	if (
+		!same(
+			node.sourceLocations,
+			exactLocation(node.sourceId, invocationNode.start, invocationNode.end)
+		)
+	)
+		issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Call-site location mismatch.');
+	const expectedOwner = expectedOwnerNodeId(context, invocationNode);
+	if (expectedOwner === null || node.ownerNodeId !== expectedOwner)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.ownerNodeId`,
+			'Call-site owner is not its nearest runtime callable or source region.'
+		);
+}
+
+function validateCallSiteInvocationBinding(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	path: string
+): void {
+	const { graph, invocationById, issues, nodeBySemanticId, sourceById } = context;
+	const invocation = invocationById.get(node.invocationId);
+	const source = sourceById.get(node.sourceId);
+	if (invocation === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Absent semantic invocation.');
+	else if (
+		node.calleeNodeId !== invocation.calleeNodeId ||
+		node.invocationKind !== invocation.invocationKind ||
+		node.invocationNodeId !== invocation.nodeId ||
+		node.optional !== invocation.optional ||
+		node.sourceId !== invocation.sourceId
+	)
+		issues.add('INVALID_VALUE', path, 'Call-site fields differ from the semantic invocation.');
+	if (source === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.sourceId`, 'Absent call-site source.');
+	else if (node.programId !== source.programId || node.projectId !== source.projectId)
+		issues.add('DANGLING_REFERENCE', path, 'Call-site source/program/project binding mismatch.');
+	const invocationNode = nodeBySemanticId.get(node.invocationNodeId);
+	if (invocationNode === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.invocationNodeId`, 'Absent invocation AST node.');
+	else validateCallSiteLocation(context, node, invocationNode, path);
+	if (!nodeBySemanticId.has(node.calleeNodeId))
+		issues.add('DANGLING_REFERENCE', `${path}.calleeNodeId`, 'Absent callee AST node.');
+	if (node.id !== callGraphCallSiteNodeId(graph.id, node.invocationId))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Call-site identity mismatch.');
+}
+
+function validateCallSiteExpectation(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	path: string
+): void {
+	const { expectedClassifications, graph, issues } = context;
+	sortedUniqueStrings(node.referenceIds, `${path}.referenceIds`, issues);
+	sortedUniqueStrings(node.resolvedSymbolIds, `${path}.resolvedSymbolIds`, issues);
+	sortedUniqueStrings(node.targetNodeIds, `${path}.targetNodeIds`, issues);
+	const expectedClassification = expectedClassifications.get(node.invocationId);
+	if (expectedClassification === undefined) {
+		issues.add(
+			'POPULATION_MISMATCH',
+			`${path}.invocationId`,
+			'Call-site invocation has no independently derivable classification.'
+		);
+		return;
+	}
+	const expectedTargetNodeIds =
+		expectedClassification.resolutionClass === 'CANDIDATE_SET'
+			? expectedClassification.targetCallableNodeIds
+			: [
+					callGraphFrontierNodeId(
+						graph.id,
+						node.invocationId,
+						expectedClassification.resolutionClass === 'EXACT'
+							? 'UNSUPPORTED'
+							: expectedClassification.resolutionClass
+					)
+				];
+	if (
+		node.dispatchClass !== expectedClassification.dispatchClass ||
+		node.reasonCode !== expectedClassification.reasonCode ||
+		node.resolutionClass !== expectedClassification.resolutionClass ||
+		!same(node.referenceIds, expectedClassification.referenceIds) ||
+		!same(node.resolvedSymbolIds, expectedClassification.resolvedSymbolIds) ||
+		!same(node.targetNodeIds, expectedTargetNodeIds) ||
+		!same(node.provenanceIds, expectedClassification.provenanceIds)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Call-site dispatch, reason, references, symbols, resolution, complete target set, or provenance differs from the semantic snapshot.'
+		);
+}
+
+function validateCallSiteReferences(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	path: string
+): void {
+	const { issues, referenceById, symbolById } = context;
+	for (const [referenceIndex, referenceId] of node.referenceIds.entries()) {
+		const reference = referenceById.get(referenceId);
+		if (reference === undefined)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.referenceIds[${referenceIndex}]`,
+				'Absent callee reference.'
+			);
+		else if (reference.sourceId !== node.sourceId)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.referenceIds[${referenceIndex}]`,
+				'Callee reference belongs to another source.'
+			);
+	}
+	for (const [symbolIndex, symbolId] of node.resolvedSymbolIds.entries())
+		if (!symbolById.has(symbolId))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.resolvedSymbolIds[${symbolIndex}]`,
+				'Absent resolved symbol.'
+			);
+	if (node.resolutionClass === 'EXACT')
+		issues.add(
+			'CONFORMANCE_OVERCLAIM',
+			`${path}.resolutionClass`,
+			'Exact call targets are unavailable in this producer.'
+		);
+}
+
+function validateCallSiteNode(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	path: string
+): void {
+	const { callSitesByInvocation, expectedClassifications, issues, snapshot } = context;
+	const expectedClassification = expectedClassifications.get(node.invocationId);
+	if (
+		expectedClassification !== undefined &&
+		!same(
+			node.epistemic,
+			expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Call-site epistemic dimensions do not match the independently derived resolution class.'
+		);
+	const grouped = callSitesByInvocation.get(node.invocationId) ?? [];
+	grouped.push(node);
+	callSitesByInvocation.set(node.invocationId, grouped);
+	validateCallSiteInvocationBinding(context, node, path);
+	validateCallSiteExpectation(context, node, path);
+	validateCallSiteReferences(context, node, path);
+}
+
+function validateFrontierNode(
+	context: SemanticValidationContext,
+	node: Extract<CallGraphNode, { kind: 'FRONTIER' }>,
+	path: string
+): void {
+	const {
+		expectedClassifications,
+		frontiersByInvocation,
+		graph,
+		invocationById,
+		issues,
+		nodeBySemanticId,
+		snapshot,
+		symbolById
+	} = context;
+	const expectedClassification = expectedClassifications.get(node.invocationId);
+	if (
+		expectedClassification !== undefined &&
+		!same(
+			node.epistemic,
+			expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Frontier epistemic dimensions do not match the independently derived resolution class.'
+		);
+	const grouped = frontiersByInvocation.get(node.invocationId) ?? [];
+	grouped.push(node);
+	frontiersByInvocation.set(node.invocationId, grouped);
+	const invocation = invocationById.get(node.invocationId);
+	if (invocation === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Absent frontier invocation.');
+	else if (invocation.sourceId !== node.sourceId)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.sourceId`,
+			'Frontier source differs from its invocation.'
+		);
+	const invocationNode =
+		invocation === undefined ? undefined : nodeBySemanticId.get(invocation.nodeId);
+	if (
+		invocationNode !== undefined &&
+		!same(
+			node.sourceLocations,
+			exactLocation(node.sourceId, invocationNode.start, invocationNode.end)
+		)
+	)
+		issues.add('INVALID_VALUE', `${path}.sourceLocations`, 'Frontier location mismatch.');
+	if (node.id !== callGraphFrontierNodeId(graph.id, node.invocationId, node.frontierKind))
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Frontier-node identity mismatch.');
+	sortedUniqueStrings(node.semanticSymbolIds, `${path}.semanticSymbolIds`, issues);
+	if (
+		expectedClassification === undefined ||
+		expectedClassification.resolutionClass === 'CANDIDATE_SET' ||
+		expectedClassification.resolutionClass === 'EXACT' ||
+		node.frontierKind !== expectedClassification.resolutionClass ||
+		node.reasonCode !== expectedClassification.reasonCode ||
+		!same(node.semanticSymbolIds, expectedClassification.resolvedSymbolIds) ||
+		!same(node.provenanceIds, expectedClassification.provenanceIds)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Frontier class, reason, semantic symbols, or provenance differ from the independently derived call-site frontier.'
+		);
+	for (const [symbolIndex, symbolId] of node.semanticSymbolIds.entries())
+		if (!symbolById.has(symbolId))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.semanticSymbolIds[${symbolIndex}]`,
+				'Absent frontier symbol.'
+			);
+}
+
+function validateGraphNode(
+	context: SemanticValidationContext,
+	node: CallGraphNode,
+	path: string
+): void {
+	const { graph, issues, layer, provenanceById, snapshot, sourceById } = context;
+	graphWideReference(node, graph, layer.id, path, issues);
+	validateProvenanceIds(
+		node.provenanceIds,
+		provenanceById,
+		snapshot.id,
+		snapshot.subjectId,
+		`${path}.provenanceIds`,
+		issues
+	);
+	canonicalObjectArray(node.sourceLocations, `${path}.sourceLocations`, issues);
+	for (const [locationIndex, location] of node.sourceLocations.entries()) {
+		const source = sourceById.get(location.sourceId);
+		if (source === undefined)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.sourceLocations[${locationIndex}]`,
+				'Absent source.'
+			);
+		else if (location.end > source.textLength)
+			issues.add(
+				'INVALID_VALUE',
+				`${path}.sourceLocations[${locationIndex}].end`,
+				'Location exceeds its source.'
+			);
+	}
+	if (node.kind === 'SOURCE_REGION') validateSourceRegionNode(context, node, path);
+	else if (node.kind === 'CALLABLE_TARGET') validateCallableTargetNode(context, node, path);
+	else if (node.kind === 'CALL_SITE') validateCallSiteNode(context, node, path);
+	else validateFrontierNode(context, node, path);
+}
+
+function validateGraphNodes(context: SemanticValidationContext): boolean {
+	const { graph, issues } = context;
+	for (const [index, node] of graph.nodes.entries()) {
+		validateGraphNode(context, node, `$.nodes[${index}]`);
+		if (issues.exhausted) return false;
+	}
+	return true;
+}
+
+function validateNodePopulations(context: SemanticValidationContext): void {
+	const {
+		callableBySemanticNode,
+		expectedCallables,
+		graph,
+		issues,
+		programById,
+		projectById,
+		snapshot,
+		sourceRegionBySource
+	} = context;
 	if (
 		sourceRegionBySource.size !== snapshot.sources.length ||
 		graph.nodes.filter((node) => node.kind === 'SOURCE_REGION').length !== snapshot.sources.length
@@ -2339,399 +2934,540 @@ function validateCallGraphSemantics(
 				'Semantic source program/project pair is inconsistent.'
 			);
 	}
+}
 
-	const ownershipByInvocation = new Map<string, CallGraphEdge[]>();
-	const targetsByInvocation = new Map<string, CallGraphEdge[]>();
-	for (const [index, edge] of graph.edges.entries()) {
-		const path = `$.edges[${index}]`;
-		graphWideReference(edge, graph, layer.id, path, issues);
-		validateProvenanceIds(
-			edge.provenanceIds,
-			provenanceById,
-			snapshot.id,
-			snapshot.subjectId,
-			`${path}.provenanceIds`,
-			issues
+function validateEdgeInvocationLocation(
+	context: SemanticValidationContext,
+	edge: CallGraphEdge,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	path: string
+): void {
+	const { issues, nodeBySemanticId } = context;
+	const invocationNode = nodeBySemanticId.get(invocation.nodeId);
+	if (invocationNode === undefined)
+		issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Invocation AST node is absent.');
+	else if (
+		!same(
+			edge.sourceLocations,
+			exactLocation(invocation.sourceId, invocationNode.start, invocationNode.end)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.sourceLocations`,
+			'Edge location does not cite its exact invocation.'
 		);
-		canonicalObjectArray(edge.sourceLocations, `${path}.sourceLocations`, issues);
-		const invocation = invocationById.get(edge.invocationId);
-		if (invocation === undefined) {
-			issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Absent semantic invocation.');
-			continue;
-		}
-		const expectedClassification = expectedClassifications.get(edge.invocationId);
-		const invocationNode = nodeBySemanticId.get(invocation.nodeId);
-		if (invocationNode === undefined)
-			issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Invocation AST node is absent.');
-		else if (
-			!same(
-				edge.sourceLocations,
-				exactLocation(invocation.sourceId, invocationNode.start, invocationNode.end)
-			)
-		)
-			issues.add(
-				'INVALID_VALUE',
-				`${path}.sourceLocations`,
-				'Edge location does not cite its exact invocation.'
-			);
-		const sourceNode = nodeById.get(edge.source.nodeId);
-		const targetNode = nodeById.get(edge.target.nodeId);
-		if (sourceNode === undefined || sourceNode.kind !== edge.source.kind)
-			issues.add(
-				'DANGLING_REFERENCE',
-				`${path}.source`,
-				'Edge source endpoint is absent or has another kind.'
-			);
-		if (targetNode === undefined || targetNode.kind !== edge.target.kind)
-			issues.add(
-				'DANGLING_REFERENCE',
-				`${path}.target`,
-				'Edge target endpoint is absent or has another kind.'
-			);
-		const expectedSourceProvenance = expectedNodeProvenance.get(edge.source.nodeId);
-		const expectedTargetProvenance = expectedNodeProvenance.get(edge.target.nodeId);
-		if (
-			expectedSourceProvenance === undefined ||
-			expectedTargetProvenance === undefined ||
-			!same(
-				edge.provenanceIds,
-				[...new Set([...expectedSourceProvenance, ...expectedTargetProvenance])].sort(compareText)
-			)
-		)
-			issues.add(
-				'INVALID_VALUE',
-				`${path}.provenanceIds`,
-				'Edge provenance must exactly equal the independently derived union of endpoint evidence.'
-			);
-		if (edge.relationKind === 'CALL_SITE_OWNERSHIP') {
-			if (!same(edge.epistemic, expectedStructuralEpistemic(snapshot)))
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.epistemic`,
-					'Ownership-edge epistemic dimensions must remain structural.'
-				);
-			const grouped = ownershipByInvocation.get(edge.invocationId) ?? [];
-			grouped.push(edge);
-			ownershipByInvocation.set(edge.invocationId, grouped);
-			const callSite = callSitesByInvocation.get(edge.invocationId)?.[0];
-			if (
-				edge.candidateRank !== null ||
-				edge.evidenceClass !== 'R-SEM' ||
-				edge.relationCode !== 'STRUCTURAL' ||
-				edge.resolutionClass !== null ||
-				edge.targetState !== 'STRUCTURAL' ||
-				targetNode?.kind !== 'CALL_SITE' ||
-				targetNode.id !== callSite?.id ||
-				sourceNode?.id !== callSite?.ownerNodeId ||
-				(sourceNode?.kind !== 'SOURCE_REGION' && sourceNode?.kind !== 'CALLABLE_TARGET')
-			)
-				issues.add(
-					'INVALID_VALUE',
-					path,
-					'Ownership edge lane, state, rank, or endpoints are incompatible.'
-				);
-		} else {
-			const grouped = targetsByInvocation.get(edge.invocationId) ?? [];
-			grouped.push(edge);
-			targetsByInvocation.set(edge.invocationId, grouped);
-			const callSite = callSitesByInvocation.get(edge.invocationId)?.[0];
-			if (sourceNode?.kind !== 'CALL_SITE' || sourceNode.id !== callSite?.id)
-				issues.add(
-					'INVALID_VALUE',
-					`${path}.source`,
-					'Target edge must originate at its call-site node.'
-				);
-			if (edge.relationKind === 'CONFIRMED_CALL_TARGET')
-				issues.add(
-					'CONFORMANCE_OVERCLAIM',
-					path,
-					'Confirmed call-target edges are unavailable in this producer.'
-				);
-			else if (edge.relationKind === 'CANDIDATE_CALL_TARGET') {
-				if (
-					expectedClassification === undefined ||
-					expectedClassification.resolutionClass !== 'CANDIDATE_SET' ||
-					!same(
-						edge.epistemic,
-						expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
-					)
-				)
-					issues.add(
-						'INVALID_VALUE',
-						`${path}.epistemic`,
-						'Candidate-edge epistemic dimensions do not match independently derived candidate evidence.'
-					);
-				const expectedRank =
-					expectedClassification?.resolutionClass === 'CANDIDATE_SET'
-						? expectedClassification.targetCallableNodeIds.indexOf(edge.target.nodeId) + 1
-						: 0;
-				if (
-					edge.evidenceClass !== 'R-INF' ||
-					edge.relationCode !== 'REL-068' ||
-					edge.resolutionClass !== 'CANDIDATE_SET' ||
-					edge.targetState !== 'CANDIDATE' ||
-					edge.candidateRank !== expectedRank ||
-					expectedRank < 1 ||
-					targetNode?.kind !== 'CALLABLE_TARGET'
-				)
-					issues.add(
-						'INVALID_VALUE',
-						path,
-						'Candidate edge lane, state, rank, or target is incompatible.'
-					);
-				sortedUniqueStrings(
-					edge.inferenceBasis.inputIds,
-					`${path}.inferenceBasis.inputIds`,
-					issues
-				);
-				sortedUniqueStrings(
-					edge.inferenceBasis.limitationKinds,
-					`${path}.inferenceBasis.limitationKinds`,
-					issues
-				);
-				for (const [inputIndex, inputId] of edge.inferenceBasis.inputIds.entries())
-					if (!allSemanticIds.has(inputId))
-						issues.add(
-							'DANGLING_REFERENCE',
-							`${path}.inferenceBasis.inputIds[${inputIndex}]`,
-							'Absent semantic inference input.'
-						);
-				if (
-					expectedClassification !== undefined &&
-					expectedClassification.resolutionClass === 'CANDIDATE_SET' &&
-					targetNode?.kind === 'CALLABLE_TARGET'
-				) {
-					const targetSpec = expectedClassification.targetSpecsByNode.get(
-						targetNode.semanticNodeId
-					);
-					const assignmentInputIds =
-						targetSpec === undefined
-							? []
-							: expectedClassification.resolvedSymbolIds.flatMap((symbolId) => [
-									...(targetSpec.assignmentInputIdsBySymbol.get(symbolId) ?? [])
-								]);
-					const expectedInferenceBasis = {
-						inputIds: [
-							...new Set([
-								invocation.id,
-								...expectedClassification.referenceIds,
-								...expectedClassification.resolvedSymbolIds,
-								...assignmentInputIds,
-								targetNode.semanticNodeId,
-								...(targetSpec === undefined ? [] : [...targetSpec.declarationIds])
-							])
-						].sort(compareText),
-						limitationKinds: [
-							...new Set([
-								'CANDIDATE_SET_OPEN',
-								'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
-								...(expectedClassification.dispatchClass === 'MEMBER_REFERENCE' ||
-								expectedClassification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
-									? ['DYNAMIC_DISPATCH_NOT_CLOSED']
-									: [])
-							])
-						].sort(compareText),
-						method: CALL_GRAPH_METHOD,
-						rationale:
-							'The compiler-bound symbol and retained callable declaration establish a possible target; no exclusivity or dispatch closure is claimed.'
-					};
-					if (targetSpec === undefined || !same(edge.inferenceBasis, expectedInferenceBasis))
-						issues.add(
-							'INVALID_VALUE',
-							`${path}.inferenceBasis`,
-							'Candidate inference basis does not exactly match independently derived invocation, reference, symbol, assignment, declaration, limitation, method, and rationale evidence.'
-						);
-				}
-			} else {
-				const expectedFrontierKind =
-					expectedClassification !== undefined &&
-					expectedClassification.resolutionClass !== 'CANDIDATE_SET' &&
-					expectedClassification.resolutionClass !== 'EXACT'
-						? expectedClassification.resolutionClass
-						: null;
-				if (
-					expectedClassification === undefined ||
-					expectedClassification.resolutionClass === 'CANDIDATE_SET' ||
-					!same(
-						edge.epistemic,
-						expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
-					)
-				)
-					issues.add(
-						'INVALID_VALUE',
-						`${path}.epistemic`,
-						'Frontier-edge epistemic dimensions do not match its resolution class.'
-					);
-				if (
-					edge.evidenceClass !== 'R-INF' ||
-					edge.relationCode !== 'REL-071' ||
-					!oneOf(edge.resolutionClass, ['EXTERNAL_DISPATCH', 'UNRESOLVED', 'UNSUPPORTED']) ||
-					edge.targetState !== 'UNRESOLVED_DYNAMIC' ||
-					edge.candidateRank !== null ||
-					targetNode?.kind !== 'FRONTIER' ||
-					targetNode.frontierKind !== edge.resolutionClass ||
-					expectedFrontierKind === null ||
-					edge.resolutionClass !== expectedFrontierKind ||
-					targetNode.id !==
-						callGraphFrontierNodeId(
-							graph.id,
-							edge.invocationId,
-							expectedFrontierKind ?? 'UNSUPPORTED'
-						)
-				)
-					issues.add(
-						'INVALID_VALUE',
-						path,
-						'Unresolved edge lane, state, rank, or frontier is incompatible.'
-					);
-			}
-		}
-		if (
-			edge.id !==
-			callGraphEdgeId({
-				candidateRank: edge.candidateRank,
-				graph: graph.id,
-				invocationId: edge.invocationId,
-				relationKind: edge.relationKind,
-				source: edge.source,
-				target: edge.target
-			})
-		)
-			issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Call-graph edge identity mismatch.');
-		if (issues.exhausted) return;
-	}
+}
 
-	for (const invocation of snapshot.invocations) {
-		const sites = callSitesByInvocation.get(invocation.id) ?? [];
-		const frontiers = frontiersByInvocation.get(invocation.id) ?? [];
-		const ownership = ownershipByInvocation.get(invocation.id) ?? [];
-		const targets = targetsByInvocation.get(invocation.id) ?? [];
-		const expectedClassification = expectedClassifications.get(invocation.id);
-		if (sites.length !== 1)
+function validateEdgeEndpointBindings(
+	context: SemanticValidationContext,
+	edge: CallGraphEdge,
+	path: string
+): void {
+	const { expectedNodeProvenance, issues, nodeById } = context;
+	const sourceNode = nodeById.get(edge.source.nodeId);
+	const targetNode = nodeById.get(edge.target.nodeId);
+	// S6582 REFUSED — right operand is a property read; see the `parent` guard above.
+	if (sourceNode === undefined || sourceNode.kind !== edge.source.kind)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.source`,
+			'Edge source endpoint is absent or has another kind.'
+		);
+	// S6582 REFUSED — right operand is a property read; see the `parent` guard above.
+	if (targetNode === undefined || targetNode.kind !== edge.target.kind)
+		issues.add(
+			'DANGLING_REFERENCE',
+			`${path}.target`,
+			'Edge target endpoint is absent or has another kind.'
+		);
+	const expectedSourceProvenance = expectedNodeProvenance.get(edge.source.nodeId);
+	const expectedTargetProvenance = expectedNodeProvenance.get(edge.target.nodeId);
+	if (
+		expectedSourceProvenance === undefined ||
+		expectedTargetProvenance === undefined ||
+		!same(
+			edge.provenanceIds,
+			[...new Set([...expectedSourceProvenance, ...expectedTargetProvenance])].sort(compareText)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.provenanceIds`,
+			'Edge provenance must exactly equal the independently derived union of endpoint evidence.'
+		);
+}
+
+function validateOwnershipEdge(
+	context: SemanticValidationContext,
+	edge: CallGraphEdge,
+	path: string
+): void {
+	const { callSitesByInvocation, issues, nodeById, ownershipByInvocation, snapshot } = context;
+	if (!same(edge.epistemic, expectedStructuralEpistemic(snapshot)))
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Ownership-edge epistemic dimensions must remain structural.'
+		);
+	const grouped = ownershipByInvocation.get(edge.invocationId) ?? [];
+	grouped.push(edge);
+	ownershipByInvocation.set(edge.invocationId, grouped);
+	const callSite = callSitesByInvocation.get(edge.invocationId)?.[0];
+	const sourceNode = nodeById.get(edge.source.nodeId);
+	const targetNode = nodeById.get(edge.target.nodeId);
+	if (
+		edge.candidateRank !== null ||
+		edge.evidenceClass !== 'R-SEM' ||
+		edge.relationCode !== 'STRUCTURAL' ||
+		edge.resolutionClass !== null ||
+		edge.targetState !== 'STRUCTURAL' ||
+		targetNode?.kind !== 'CALL_SITE' ||
+		targetNode.id !== callSite?.id ||
+		sourceNode?.id !== callSite?.ownerNodeId ||
+		(sourceNode?.kind !== 'SOURCE_REGION' && sourceNode?.kind !== 'CALLABLE_TARGET')
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Ownership edge lane, state, rank, or endpoints are incompatible.'
+		);
+}
+
+function validateCandidateInferenceBasis(
+	context: SemanticValidationContext,
+	edge: Extract<CallGraphEdge, { relationKind: 'CANDIDATE_CALL_TARGET' }>,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	targetNode: Extract<CallGraphNode, { kind: 'CALLABLE_TARGET' }>,
+	expectedClassification: ExpectedCallClassification,
+	path: string
+): void {
+	const { issues } = context;
+	const targetSpec = expectedClassification.targetSpecsByNode.get(targetNode.semanticNodeId);
+	const assignmentInputIds =
+		targetSpec === undefined
+			? []
+			: expectedClassification.resolvedSymbolIds.flatMap((symbolId) => [
+					...(targetSpec.assignmentInputIdsBySymbol.get(symbolId) ?? [])
+				]);
+	const expectedInferenceBasis = {
+		inputIds: [
+			...new Set([
+				invocation.id,
+				...expectedClassification.referenceIds,
+				...expectedClassification.resolvedSymbolIds,
+				...assignmentInputIds,
+				targetNode.semanticNodeId,
+				...(targetSpec === undefined ? [] : [...targetSpec.declarationIds])
+			])
+		].sort(compareText),
+		limitationKinds: [
+			...new Set([
+				'CANDIDATE_SET_OPEN',
+				'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
+				...(expectedClassification.dispatchClass === 'MEMBER_REFERENCE' ||
+				expectedClassification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
+					? ['DYNAMIC_DISPATCH_NOT_CLOSED']
+					: [])
+			])
+		].sort(compareText),
+		method: CALL_GRAPH_METHOD,
+		rationale:
+			'The compiler-bound symbol and retained callable declaration establish a possible target; no exclusivity or dispatch closure is claimed.'
+	};
+	if (targetSpec === undefined || !same(edge.inferenceBasis, expectedInferenceBasis))
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.inferenceBasis`,
+			'Candidate inference basis does not exactly match independently derived invocation, reference, symbol, assignment, declaration, limitation, method, and rationale evidence.'
+		);
+}
+
+function validateCandidateEdge(
+	context: SemanticValidationContext,
+	edge: Extract<CallGraphEdge, { relationKind: 'CANDIDATE_CALL_TARGET' }>,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	path: string
+): void {
+	const { allSemanticIds, expectedClassifications, issues, nodeById, snapshot } = context;
+	const expectedClassification = expectedClassifications.get(edge.invocationId);
+	const targetNode = nodeById.get(edge.target.nodeId);
+	if (
+		expectedClassification?.resolutionClass !== 'CANDIDATE_SET' ||
+		!same(
+			edge.epistemic,
+			expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Candidate-edge epistemic dimensions do not match independently derived candidate evidence.'
+		);
+	const expectedRank =
+		expectedClassification?.resolutionClass === 'CANDIDATE_SET'
+			? expectedClassification.targetCallableNodeIds.indexOf(edge.target.nodeId) + 1
+			: 0;
+	if (
+		edge.evidenceClass !== 'R-INF' ||
+		edge.relationCode !== 'REL-068' ||
+		edge.resolutionClass !== 'CANDIDATE_SET' ||
+		edge.targetState !== 'CANDIDATE' ||
+		edge.candidateRank !== expectedRank ||
+		expectedRank < 1 ||
+		targetNode?.kind !== 'CALLABLE_TARGET'
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Candidate edge lane, state, rank, or target is incompatible.'
+		);
+	sortedUniqueStrings(edge.inferenceBasis.inputIds, `${path}.inferenceBasis.inputIds`, issues);
+	sortedUniqueStrings(
+		edge.inferenceBasis.limitationKinds,
+		`${path}.inferenceBasis.limitationKinds`,
+		issues
+	);
+	for (const [inputIndex, inputId] of edge.inferenceBasis.inputIds.entries())
+		if (!allSemanticIds.has(inputId))
 			issues.add(
-				'POPULATION_MISMATCH',
-				'$.nodes',
-				`Invocation ${invocation.id} must have exactly one CALL_SITE node.`
+				'DANGLING_REFERENCE',
+				`${path}.inferenceBasis.inputIds[${inputIndex}]`,
+				'Absent semantic inference input.'
 			);
-		if (ownership.length !== 1)
-			issues.add(
-				'POPULATION_MISMATCH',
-				'$.edges',
-				`Invocation ${invocation.id} must have exactly one ownership edge.`
-			);
-		if (targets.length < 1)
-			issues.add(
-				'POPULATION_MISMATCH',
-				'$.edges',
-				`Invocation ${invocation.id} must have at least one target edge.`
-			);
-		const site = sites[0];
-		if (site !== undefined) {
-			const targetIds = targets.map((edge) => edge.target.nodeId).sort(compareText);
-			if (!same(site.targetNodeIds, targetIds))
-				issues.add(
-					'POPULATION_MISMATCH',
-					'$.nodes',
-					`Invocation ${invocation.id} target manifest mismatch.`
-				);
-			if (!nodeById.has(site.ownerNodeId))
-				issues.add('DANGLING_REFERENCE', '$.nodes', `Invocation ${invocation.id} owner is absent.`);
-			if (expectedClassification === undefined)
-				issues.add(
-					'POPULATION_MISMATCH',
-					'$.nodes',
-					`Invocation ${invocation.id} has no independently derivable call classification.`
-				);
-			else {
-				const expectedTargetIds =
-					expectedClassification.resolutionClass === 'CANDIDATE_SET'
-						? [...expectedClassification.targetCallableNodeIds]
-						: [
-								callGraphFrontierNodeId(
-									graph.id,
-									invocation.id,
-									expectedClassification.resolutionClass === 'EXACT'
-										? 'UNSUPPORTED'
-										: expectedClassification.resolutionClass
-								)
-							];
-				if (!same(targetIds, expectedTargetIds))
-					issues.add(
-						'POPULATION_MISMATCH',
-						'$.edges',
-						`Invocation ${invocation.id} target edges do not equal the complete independently derived target set.`
-					);
-				if (expectedClassification.resolutionClass === 'CANDIDATE_SET') {
-					if (
-						frontiers.length !== 0 ||
-						targets.length !== expectedTargetIds.length ||
-						targets.some((edge) => edge.relationKind !== 'CANDIDATE_CALL_TARGET')
-					)
-						issues.add(
-							'POPULATION_MISMATCH',
-							'$.edges',
-							`Invocation ${invocation.id} candidate-edge population differs from independent semantic derivation.`
-						);
-				} else if (
-					expectedClassification.resolutionClass !== 'EXACT' &&
-					(frontiers.length !== 1 ||
-						targets.length !== 1 ||
-						targets[0]?.relationKind !== 'UNRESOLVED_CALL_TARGET')
-				)
-					issues.add(
-						'POPULATION_MISMATCH',
-						'$.edges',
-						`Invocation ${invocation.id} frontier population differs from independent semantic derivation.`
-					);
-			}
-			if (site.resolutionClass === 'CANDIDATE_SET') {
-				if (frontiers.length !== 0)
-					issues.add(
-						'POPULATION_MISMATCH',
-						'$.nodes',
-						`Candidate invocation ${invocation.id} must not have a frontier node.`
-					);
-				if (targets.some((edge) => edge.relationKind !== 'CANDIDATE_CALL_TARGET'))
-					issues.add(
-						'INVALID_VALUE',
-						'$.edges',
-						`Invocation ${invocation.id} mixes candidate and non-candidate targets.`
-					);
-				const ranks = targets
-					.map((edge) => edge.candidateRank)
-					.sort((left, right) => (left ?? -1) - (right ?? -1));
-				const expectedRanks = targets.map((_edge, index) => index + 1);
-				if (!same(ranks, expectedRanks))
-					issues.add(
-						'POPULATION_MISMATCH',
-						'$.edges',
-						`Invocation ${invocation.id} candidate ranks must be contiguous from one.`
-					);
-			} else if (site.resolutionClass !== 'EXACT') {
-				if (frontiers.length !== 1 || frontiers[0]?.frontierKind !== site.resolutionClass)
-					issues.add(
-						'POPULATION_MISMATCH',
-						'$.nodes',
-						`Invocation ${invocation.id} must have exactly one matching frontier node.`
-					);
-				if (targets.length !== 1 || targets[0]?.relationKind !== 'UNRESOLVED_CALL_TARGET')
-					issues.add(
-						'INVALID_VALUE',
-						'$.edges',
-						`Invocation ${invocation.id} must have one explicit frontier target.`
-					);
-				const frontier =
-					targets[0] === undefined ? undefined : nodeById.get(targets[0].target.nodeId);
-				if (frontier?.kind !== 'FRONTIER' || frontier.frontierKind !== site.resolutionClass)
-					issues.add(
-						'INVALID_VALUE',
-						'$.nodes',
-						`Invocation ${invocation.id} frontier class mismatch.`
-					);
-			}
-		}
-		if (issues.exhausted) return;
+	if (
+		expectedClassification?.resolutionClass === 'CANDIDATE_SET' &&
+		targetNode?.kind === 'CALLABLE_TARGET'
+	)
+		validateCandidateInferenceBasis(
+			context,
+			edge,
+			invocation,
+			targetNode,
+			expectedClassification,
+			path
+		);
+}
+
+function validateFrontierEdge(
+	context: SemanticValidationContext,
+	edge: CallGraphEdge,
+	path: string
+): void {
+	const { expectedClassifications, graph, issues, nodeById, snapshot } = context;
+	const expectedClassification = expectedClassifications.get(edge.invocationId);
+	const targetNode = nodeById.get(edge.target.nodeId);
+	const expectedFrontierKind =
+		expectedClassification !== undefined &&
+		expectedClassification.resolutionClass !== 'CANDIDATE_SET' &&
+		expectedClassification.resolutionClass !== 'EXACT'
+			? expectedClassification.resolutionClass
+			: null;
+	if (
+		expectedClassification === undefined ||
+		expectedClassification.resolutionClass === 'CANDIDATE_SET' ||
+		!same(
+			edge.epistemic,
+			expectedResolutionEpistemic(expectedClassification.resolutionClass, snapshot)
+		)
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Frontier-edge epistemic dimensions do not match its resolution class.'
+		);
+	if (
+		edge.evidenceClass !== 'R-INF' ||
+		edge.relationCode !== 'REL-071' ||
+		!oneOf(edge.resolutionClass, ['EXTERNAL_DISPATCH', 'UNRESOLVED', 'UNSUPPORTED']) ||
+		edge.targetState !== 'UNRESOLVED_DYNAMIC' ||
+		edge.candidateRank !== null ||
+		targetNode?.kind !== 'FRONTIER' ||
+		targetNode.frontierKind !== edge.resolutionClass ||
+		expectedFrontierKind === null ||
+		edge.resolutionClass !== expectedFrontierKind ||
+		targetNode.id !==
+			callGraphFrontierNodeId(graph.id, edge.invocationId, expectedFrontierKind ?? 'UNSUPPORTED')
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Unresolved edge lane, state, rank, or frontier is incompatible.'
+		);
+}
+
+function validateTargetEdge(
+	context: SemanticValidationContext,
+	edge: CallGraphEdge,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	path: string
+): void {
+	const { callSitesByInvocation, issues, nodeById, targetsByInvocation } = context;
+	const grouped = targetsByInvocation.get(edge.invocationId) ?? [];
+	grouped.push(edge);
+	targetsByInvocation.set(edge.invocationId, grouped);
+	const callSite = callSitesByInvocation.get(edge.invocationId)?.[0];
+	const sourceNode = nodeById.get(edge.source.nodeId);
+	if (sourceNode?.kind !== 'CALL_SITE' || sourceNode.id !== callSite?.id)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.source`,
+			'Target edge must originate at its call-site node.'
+		);
+	if (edge.relationKind === 'CONFIRMED_CALL_TARGET')
+		issues.add(
+			'CONFORMANCE_OVERCLAIM',
+			path,
+			'Confirmed call-target edges are unavailable in this producer.'
+		);
+	else if (edge.relationKind === 'CANDIDATE_CALL_TARGET')
+		validateCandidateEdge(context, edge, invocation, path);
+	else validateFrontierEdge(context, edge, path);
+}
+
+function validateGraphEdge(
+	context: SemanticValidationContext,
+	edge: CallGraphEdge,
+	path: string
+): boolean {
+	const { graph, invocationById, issues, layer, provenanceById, snapshot } = context;
+	graphWideReference(edge, graph, layer.id, path, issues);
+	validateProvenanceIds(
+		edge.provenanceIds,
+		provenanceById,
+		snapshot.id,
+		snapshot.subjectId,
+		`${path}.provenanceIds`,
+		issues
+	);
+	canonicalObjectArray(edge.sourceLocations, `${path}.sourceLocations`, issues);
+	const invocation = invocationById.get(edge.invocationId);
+	if (invocation === undefined) {
+		issues.add('DANGLING_REFERENCE', `${path}.invocationId`, 'Absent semantic invocation.');
+		return false;
 	}
+	validateEdgeInvocationLocation(context, edge, invocation, path);
+	validateEdgeEndpointBindings(context, edge, path);
+	if (edge.relationKind === 'CALL_SITE_OWNERSHIP') validateOwnershipEdge(context, edge, path);
+	else validateTargetEdge(context, edge, invocation, path);
+	if (
+		edge.id !==
+		callGraphEdgeId({
+			candidateRank: edge.candidateRank,
+			graph: graph.id,
+			invocationId: edge.invocationId,
+			relationKind: edge.relationKind,
+			source: edge.source,
+			target: edge.target
+		})
+	)
+		issues.add('IDENTITY_MISMATCH', `${path}.id`, 'Call-graph edge identity mismatch.');
+	return true;
+}
+
+function validateGraphEdges(context: SemanticValidationContext): boolean {
+	const { graph, issues } = context;
+	for (const [index, edge] of graph.edges.entries()) {
+		if (!validateGraphEdge(context, edge, `$.edges[${index}]`)) continue;
+		if (issues.exhausted) return false;
+	}
+	return true;
+}
+
+function validateInvocationExpectation(
+	context: SemanticValidationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	expectedClassification: ExpectedCallClassification,
+	targetIds: readonly string[],
+	frontiers: readonly Extract<CallGraphNode, { kind: 'FRONTIER' }>[],
+	targets: readonly CallGraphEdge[]
+): void {
+	const { graph, issues } = context;
+	const expectedTargetIds =
+		expectedClassification.resolutionClass === 'CANDIDATE_SET'
+			? [...expectedClassification.targetCallableNodeIds]
+			: [
+					callGraphFrontierNodeId(
+						graph.id,
+						invocation.id,
+						expectedClassification.resolutionClass === 'EXACT'
+							? 'UNSUPPORTED'
+							: expectedClassification.resolutionClass
+					)
+				];
+	if (!same(targetIds, expectedTargetIds))
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.edges',
+			`Invocation ${invocation.id} target edges do not equal the complete independently derived target set.`
+		);
+	if (expectedClassification.resolutionClass === 'CANDIDATE_SET') {
+		if (
+			frontiers.length !== 0 ||
+			targets.length !== expectedTargetIds.length ||
+			targets.some((edge) => edge.relationKind !== 'CANDIDATE_CALL_TARGET')
+		)
+			issues.add(
+				'POPULATION_MISMATCH',
+				'$.edges',
+				`Invocation ${invocation.id} candidate-edge population differs from independent semantic derivation.`
+			);
+	} else if (
+		expectedClassification.resolutionClass !== 'EXACT' &&
+		(frontiers.length !== 1 ||
+			targets.length !== 1 ||
+			targets[0]?.relationKind !== 'UNRESOLVED_CALL_TARGET')
+	)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.edges',
+			`Invocation ${invocation.id} frontier population differs from independent semantic derivation.`
+		);
+}
+
+function validateCandidateInvocationPopulation(
+	context: SemanticValidationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	frontiers: readonly Extract<CallGraphNode, { kind: 'FRONTIER' }>[],
+	targets: readonly CallGraphEdge[]
+): void {
+	const { issues } = context;
+	if (frontiers.length !== 0)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			`Candidate invocation ${invocation.id} must not have a frontier node.`
+		);
+	if (targets.some((edge) => edge.relationKind !== 'CANDIDATE_CALL_TARGET'))
+		issues.add(
+			'INVALID_VALUE',
+			'$.edges',
+			`Invocation ${invocation.id} mixes candidate and non-candidate targets.`
+		);
+	const ranks = targets
+		.map((edge) => edge.candidateRank)
+		.sort((left, right) => (left ?? -1) - (right ?? -1));
+	const expectedRanks = targets.map((_edge, index) => index + 1);
+	if (!same(ranks, expectedRanks))
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.edges',
+			`Invocation ${invocation.id} candidate ranks must be contiguous from one.`
+		);
+}
+
+function validateFrontierInvocationPopulation(
+	context: SemanticValidationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	site: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	frontiers: readonly Extract<CallGraphNode, { kind: 'FRONTIER' }>[],
+	targets: readonly CallGraphEdge[]
+): void {
+	const { issues, nodeById } = context;
+	if (frontiers.length !== 1 || frontiers[0]?.frontierKind !== site.resolutionClass)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			`Invocation ${invocation.id} must have exactly one matching frontier node.`
+		);
+	if (targets.length !== 1 || targets[0]?.relationKind !== 'UNRESOLVED_CALL_TARGET')
+		issues.add(
+			'INVALID_VALUE',
+			'$.edges',
+			`Invocation ${invocation.id} must have one explicit frontier target.`
+		);
+	const frontier = targets[0] === undefined ? undefined : nodeById.get(targets[0].target.nodeId);
+	if (frontier?.kind !== 'FRONTIER' || frontier.frontierKind !== site.resolutionClass)
+		issues.add('INVALID_VALUE', '$.nodes', `Invocation ${invocation.id} frontier class mismatch.`);
+}
+
+function validateInvocationSite(
+	context: SemanticValidationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	site: Extract<CallGraphNode, { kind: 'CALL_SITE' }>,
+	frontiers: readonly Extract<CallGraphNode, { kind: 'FRONTIER' }>[],
+	targets: readonly CallGraphEdge[]
+): void {
+	const { expectedClassifications, issues, nodeById } = context;
+	const targetIds = targets.map((edge) => edge.target.nodeId).sort(compareText);
+	if (!same(site.targetNodeIds, targetIds))
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			`Invocation ${invocation.id} target manifest mismatch.`
+		);
+	if (!nodeById.has(site.ownerNodeId))
+		issues.add('DANGLING_REFERENCE', '$.nodes', `Invocation ${invocation.id} owner is absent.`);
+	const expectedClassification = expectedClassifications.get(invocation.id);
+	if (expectedClassification === undefined)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			`Invocation ${invocation.id} has no independently derivable call classification.`
+		);
+	else
+		validateInvocationExpectation(
+			context,
+			invocation,
+			expectedClassification,
+			targetIds,
+			frontiers,
+			targets
+		);
+	if (site.resolutionClass === 'CANDIDATE_SET')
+		validateCandidateInvocationPopulation(context, invocation, frontiers, targets);
+	else if (site.resolutionClass !== 'EXACT')
+		validateFrontierInvocationPopulation(context, invocation, site, frontiers, targets);
+}
+
+function validateInvocationPopulations(
+	context: SemanticValidationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number]
+): void {
+	const {
+		callSitesByInvocation,
+		frontiersByInvocation,
+		issues,
+		ownershipByInvocation,
+		targetsByInvocation
+	} = context;
+	const sites = callSitesByInvocation.get(invocation.id) ?? [];
+	const frontiers = frontiersByInvocation.get(invocation.id) ?? [];
+	const ownership = ownershipByInvocation.get(invocation.id) ?? [];
+	const targets = targetsByInvocation.get(invocation.id) ?? [];
+	if (sites.length !== 1)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			`Invocation ${invocation.id} must have exactly one CALL_SITE node.`
+		);
+	if (ownership.length !== 1)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.edges',
+			`Invocation ${invocation.id} must have exactly one ownership edge.`
+		);
+	if (targets.length < 1)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.edges',
+			`Invocation ${invocation.id} must have at least one target edge.`
+		);
+	const site = sites[0];
+	if (site !== undefined) validateInvocationSite(context, invocation, site, frontiers, targets);
+}
+
+function validateInvocationReconciliation(context: SemanticValidationContext): boolean {
+	const { issues, snapshot } = context;
+	for (const invocation of snapshot.invocations) {
+		validateInvocationPopulations(context, invocation);
+		if (issues.exhausted) return false;
+	}
+	return true;
+}
+
+function validateCallSiteInvocationKeys(context: SemanticValidationContext): void {
+	const { callSitesByInvocation, invocationById, issues } = context;
 	for (const invocationId of callSitesByInvocation.keys())
 		if (!invocationById.has(invocationId))
 			issues.add(
@@ -2739,7 +3475,10 @@ function validateCallGraphSemantics(
 				'$.nodes',
 				'Call-site population contains an unknown invocation.'
 			);
+}
 
+function validateLayerManifests(context: SemanticValidationContext): void {
+	const { graph, issues, layer } = context;
 	const nodeIds = graph.nodes.map((node) => node.id).sort(compareText);
 	const edgeIds = graph.edges.map((edge) => edge.id).sort(compareText);
 	if (!same(layer.nodeIds, nodeIds))
@@ -2748,7 +3487,28 @@ function validateCallGraphSemantics(
 		issues.add('POPULATION_MISMATCH', '$.layers[0].edgeIds', 'Layer edge manifest mismatch.');
 	sortedUniqueStrings(layer.nodeIds, '$.layers[0].nodeIds', issues);
 	sortedUniqueStrings(layer.edgeIds, '$.layers[0].edgeIds', issues);
+}
 
+function validateIndexEntry(
+	context: SemanticValidationContext,
+	entry: CallGraphIndexEntry,
+	path: string
+): void {
+	const { edgeById, issues, nodeById } = context;
+	if (!nodeById.has(entry.nodeId))
+		issues.add('DANGLING_REFERENCE', `${path}.nodeId`, 'Index references an absent node.');
+	sortedUniqueStrings(entry.edgeIds, `${path}.edgeIds`, issues);
+	for (const [edgeIndex, edgeId] of entry.edgeIds.entries())
+		if (!edgeById.has(edgeId))
+			issues.add(
+				'DANGLING_REFERENCE',
+				`${path}.edgeIds[${edgeIndex}]`,
+				'Index references an absent edge.'
+			);
+}
+
+function validateGraphIndexes(context: SemanticValidationContext): void {
+	const { graph, issues } = context;
 	const expectedGraphIndexes = expectedIndexes(graph.nodes, graph.edges);
 	for (const [name, index, expected] of [
 		['forwardIndex', graph.forwardIndex, expectedGraphIndexes.forward],
@@ -2759,22 +3519,8 @@ function validateCallGraphSemantics(
 			`$.${name}`,
 			issues
 		);
-		for (const [entryIndex, entry] of index.entries()) {
-			if (!nodeById.has(entry.nodeId))
-				issues.add(
-					'DANGLING_REFERENCE',
-					`$.${name}[${entryIndex}].nodeId`,
-					'Index references an absent node.'
-				);
-			sortedUniqueStrings(entry.edgeIds, `$.${name}[${entryIndex}].edgeIds`, issues);
-			for (const [edgeIndex, edgeId] of entry.edgeIds.entries())
-				if (!edgeById.has(edgeId))
-					issues.add(
-						'DANGLING_REFERENCE',
-						`$.${name}[${entryIndex}].edgeIds[${edgeIndex}]`,
-						'Index references an absent edge.'
-					);
-		}
+		for (const [entryIndex, entry] of index.entries())
+			validateIndexEntry(context, entry, `$.${name}[${entryIndex}]`);
 		if (!same(index, expected))
 			issues.add(
 				'POPULATION_MISMATCH',
@@ -2782,7 +3528,10 @@ function validateCallGraphSemantics(
 				`${name} does not exactly reconcile graph navigation.`
 			);
 	}
+}
 
+function validateCoverageTotals(context: SemanticValidationContext): void {
+	const { expectedClassifications, graph, issues, layer, snapshot } = context;
 	const coverage = expectedCoverage(snapshot, expectedClassifications);
 	if (!same(graph.coverage, coverage))
 		issues.add(
@@ -2802,40 +3551,45 @@ function validateCallGraphSemantics(
 			'$.coverage.exactCallSites',
 			'Exact-call count must remain zero in producer 0.1.0.'
 		);
+}
 
-	sortedUniqueStrings(graph.limitations.map(limitationOrderKey), '$.limitations', issues);
-	for (const [index, limitation] of graph.limitations.entries()) {
-		if (limitation.closureEffect !== 'DEGRADES_CLOSURE')
-			issues.add(
-				'LIMITATION_MISMATCH',
-				`$.limitations[${index}].closureEffect`,
-				'Every limitation emitted by producer 0.1.0 degrades closure.'
-			);
-		if (limitation.invocationId !== null && !invocationById.has(limitation.invocationId))
-			issues.add(
-				'DANGLING_REFERENCE',
-				`$.limitations[${index}].invocationId`,
-				'Absent limitation invocation.'
-			);
-		if (limitation.sourceId !== null && !sourceById.has(limitation.sourceId))
-			issues.add(
-				'DANGLING_REFERENCE',
-				`$.limitations[${index}].sourceId`,
-				'Absent limitation source.'
-			);
-		if (limitation.invocationId !== null && limitation.sourceId !== null) {
-			const invocation = invocationById.get(limitation.invocationId);
-			if (invocation !== undefined && invocation.sourceId !== limitation.sourceId)
-				issues.add(
-					'DANGLING_REFERENCE',
-					`$.limitations[${index}]`,
-					'Limitation invocation and source differ.'
-				);
-		}
-	}
-	const globalLimitationKey = (kind: string): string => `${kind}\0\0`;
-	const invocationLimitationKey = (kind: string, invocationId: string, sourceId: string): string =>
-		`${kind}\0${invocationId}\0${sourceId}`;
+function globalLimitationKey(kind: string): string {
+	return `${kind}\0\0`;
+}
+
+function invocationLimitationKey(kind: string, invocationId: string, sourceId: string): string {
+	return `${kind}\0${invocationId}\0${sourceId}`;
+}
+
+function invocationLimitationKeys(
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	classification: ExpectedCallClassification
+): string[] {
+	const { id, sourceId } = invocation;
+	if (classification.resolutionClass === 'CANDIDATE_SET')
+		return [
+			invocationLimitationKey('CANDIDATE_SET_OPEN', id, sourceId),
+			...(classification.dispatchClass === 'MEMBER_REFERENCE' ||
+			classification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
+				? [invocationLimitationKey('DYNAMIC_DISPATCH_NOT_CLOSED', id, sourceId)]
+				: [])
+		];
+	if (classification.resolutionClass === 'EXTERNAL_DISPATCH')
+		return [
+			invocationLimitationKey('EXTERNAL_DISPATCH_FRONTIER', id, sourceId),
+			...(classification.reasonCode === 'CALLABLE_VALUE_FLOW_NOT_MODELED'
+				? [invocationLimitationKey('CALLABLE_VALUE_FLOW_NOT_MODELED', id, sourceId)]
+				: [])
+		];
+	if (classification.resolutionClass === 'UNRESOLVED')
+		return [invocationLimitationKey('UNRESOLVED_TARGET_FRONTIER', id, sourceId)];
+	if (classification.resolutionClass === 'UNSUPPORTED')
+		return [invocationLimitationKey('UNSUPPORTED_TARGET_FRONTIER', id, sourceId)];
+	return [];
+}
+
+function expectedLimitationKeySet(context: SemanticValidationContext): string[] {
+	const { expectedClassifications, snapshot } = context;
 	const expectedLimitationKeys = [
 		globalLimitationKey('CALLER_CONTEXT_COARSENED'),
 		globalLimitationKey('ENTRY_MECHANISM_NOT_ANALYZED'),
@@ -2844,46 +3598,63 @@ function validateCallGraphSemantics(
 	];
 	for (const invocation of snapshot.invocations) {
 		const classification = expectedClassifications.get(invocation.id);
-		if (classification === undefined) continue;
-		if (classification.resolutionClass === 'CANDIDATE_SET') {
-			expectedLimitationKeys.push(
-				invocationLimitationKey('CANDIDATE_SET_OPEN', invocation.id, invocation.sourceId)
-			);
-			if (
-				classification.dispatchClass === 'MEMBER_REFERENCE' ||
-				classification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
-			)
-				expectedLimitationKeys.push(
-					invocationLimitationKey('DYNAMIC_DISPATCH_NOT_CLOSED', invocation.id, invocation.sourceId)
-				);
-		} else if (classification.resolutionClass === 'EXTERNAL_DISPATCH') {
-			expectedLimitationKeys.push(
-				invocationLimitationKey('EXTERNAL_DISPATCH_FRONTIER', invocation.id, invocation.sourceId)
-			);
-			if (classification.reasonCode === 'CALLABLE_VALUE_FLOW_NOT_MODELED')
-				expectedLimitationKeys.push(
-					invocationLimitationKey(
-						'CALLABLE_VALUE_FLOW_NOT_MODELED',
-						invocation.id,
-						invocation.sourceId
-					)
-				);
-		} else if (classification.resolutionClass === 'UNRESOLVED')
-			expectedLimitationKeys.push(
-				invocationLimitationKey('UNRESOLVED_TARGET_FRONTIER', invocation.id, invocation.sourceId)
-			);
-		else if (classification.resolutionClass === 'UNSUPPORTED')
-			expectedLimitationKeys.push(
-				invocationLimitationKey('UNSUPPORTED_TARGET_FRONTIER', invocation.id, invocation.sourceId)
-			);
+		if (classification !== undefined)
+			expectedLimitationKeys.push(...invocationLimitationKeys(invocation, classification));
 	}
 	expectedLimitationKeys.sort(compareText);
-	if (!same(graph.limitations.map(limitationOrderKey), expectedLimitationKeys))
+	return expectedLimitationKeys;
+}
+
+function validateLimitationRecord(
+	context: SemanticValidationContext,
+	limitation: CallGraphSnapshot['limitations'][number],
+	index: number
+): void {
+	const { invocationById, issues, sourceById } = context;
+	if (limitation.closureEffect !== 'DEGRADES_CLOSURE')
+		issues.add(
+			'LIMITATION_MISMATCH',
+			`$.limitations[${index}].closureEffect`,
+			'Every limitation emitted by producer 0.1.0 degrades closure.'
+		);
+	if (limitation.invocationId !== null && !invocationById.has(limitation.invocationId))
+		issues.add(
+			'DANGLING_REFERENCE',
+			`$.limitations[${index}].invocationId`,
+			'Absent limitation invocation.'
+		);
+	if (limitation.sourceId !== null && !sourceById.has(limitation.sourceId))
+		issues.add(
+			'DANGLING_REFERENCE',
+			`$.limitations[${index}].sourceId`,
+			'Absent limitation source.'
+		);
+	if (limitation.invocationId !== null && limitation.sourceId !== null) {
+		const invocation = invocationById.get(limitation.invocationId);
+		if (invocation !== undefined && invocation.sourceId !== limitation.sourceId)
+			issues.add(
+				'DANGLING_REFERENCE',
+				`$.limitations[${index}]`,
+				'Limitation invocation and source differ.'
+			);
+	}
+}
+
+function validateLimitations(context: SemanticValidationContext): void {
+	const { graph, issues } = context;
+	sortedUniqueStrings(graph.limitations.map(limitationOrderKey), '$.limitations', issues);
+	for (const [index, limitation] of graph.limitations.entries())
+		validateLimitationRecord(context, limitation, index);
+	if (!same(graph.limitations.map(limitationOrderKey), expectedLimitationKeySet(context)))
 		issues.add(
 			'LIMITATION_MISMATCH',
 			'$.limitations',
 			'Limitation categories do not exactly reconcile semantic health and every call-site class.'
 		);
+}
+
+function validateLayerParity(context: SemanticValidationContext): void {
+	const { expectedClassifications, graph, issues, layer, snapshot } = context;
 	if (!same(layer.limitations, graph.limitations))
 		issues.add('LIMITATION_MISMATCH', '$.layers[0].limitations', 'Layer limitations differ.');
 	if (!same(layer.entryMechanismCoverage, graph.entryMechanismCoverage))
@@ -2909,7 +3680,10 @@ function validateCallGraphSemantics(
 			'$.epistemic',
 			'Aggregate epistemic dimensions do not match this partial mixed-evidence producer.'
 		);
+}
 
+function validateLayerProvenance(context: SemanticValidationContext): void {
+	const { graph, issues, layer, provenanceById, snapshot } = context;
 	const expectedLayerProvenance = [
 		...new Set(
 			graph.nodes
@@ -2931,7 +3705,10 @@ function validateCallGraphSemantics(
 			'$.layers[0].provenanceIds',
 			'Layer provenance manifest mismatch.'
 		);
+}
 
+function validateContentDigest(context: SemanticValidationContext): void {
+	const { graph, issues } = context;
 	try {
 		if (graph.contentDigest !== callGraphContentDigest(graph))
 			issues.add(
@@ -2946,7 +3723,10 @@ function validateCallGraphSemantics(
 			error instanceof Error ? error.message : 'Call-graph content digest failed closed.'
 		);
 	}
+}
 
+function validateDuplicateIdentities(context: SemanticValidationContext): void {
+	const { edgeById, graph, issues, nodeById } = context;
 	if (nodeById.size !== graph.nodes.length || edgeById.size !== graph.edges.length)
 		issues.add('DUPLICATE_ID', '$', 'Call-graph populations contain duplicate identities.');
 }
