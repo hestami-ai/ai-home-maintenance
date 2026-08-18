@@ -238,6 +238,11 @@ export type StructuralModuleReachabilityAnalysisBuildOutcome =
 			readonly outcome: 'unavailable';
 	  };
 
+// S6564 REFUSED: the alias IS the exported vocabulary, not a redundant restatement of it.
+// `src/index.ts` re-exports this module with `export *`, so removing the alias deletes a public
+// name from @janumipwb/csaa and promotes the longer internal spelling to the API. All three
+// structural contracts declare the same pair the same way; 34 use sites outside these files
+// reach for the short names, so those are the interface and the long ones are the detail.
 export type StructuralModuleReachabilityAnalysisOutcome =
 	StructuralModuleReachabilityAnalysisBuildOutcome;
 export type StructuralModuleReachabilityDiagnostic = StructuralModuleReachabilityAnalysisDiagnostic;
@@ -276,5 +281,10 @@ export type StructuralModuleReachabilityValidationIssue =
 	StructuralModuleReachabilityAnalysisValidationIssue;
 export type StructuralModuleReachabilityValidationOptions =
 	StructuralModuleReachabilityAnalysisValidationOptions;
+// S6564 REFUSED: 7 external use sites take this short name. See the Outcome alias above.
+// `src/index.ts` re-exports this module with `export *`, so removing the alias deletes a public
+// name from @janumipwb/csaa and promotes the longer internal spelling to the API. All three
+// structural contracts declare the same pair the same way; 34 use sites outside these files
+// reach for the short names, so those are the interface and the long ones are the detail.
 export type StructuralModuleReachabilityValidationResult =
 	StructuralModuleReachabilityAnalysisValidationResult;

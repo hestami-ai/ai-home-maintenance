@@ -18,7 +18,7 @@
 		"boundary": "depcruise packages --config .dependency-cruiser.cjs && bun run scripts/csaa-product-boundary.ts",
 		"test:src": "vitest run",
 		"test:dist": "turbo run build && vitest run --config vitest.dist.config.ts",
-		"test:coverage": "vitest run --coverage --testTimeout=30000",
+		"test:coverage": "vitest run --coverage --testTimeout=30000 --maxWorkers=4",
 		"mutants": "bun run scripts/mutants/run.ts",
 		"mutants:preflight": "MUTANTS_PREFLIGHT=1 bun run scripts/mutants/run.ts",
 		"mutants:harvest": "MUTANTS_HARVEST=1 bun run scripts/mutants/run.ts",

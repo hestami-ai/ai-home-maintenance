@@ -962,18 +962,18 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 	const importerSource = semanticSources[0]!;
 	const semanticProgram = semanticPrograms[0]!;
 	const importerNode = importerNodes[0]!;
-	const semanticProject = semanticSnapshot.projects.filter(
+	const semanticProject = semanticSnapshot.projects.find(
 		(record) => record.id === importerSource.projectId
-	)[0]!;
-	const contextSource = projectContextGraph.sources.filter(
+	)!;
+	const contextSource = projectContextGraph.sources.find(
 		(record) => record.id === request.importer.projectContextSourceId
-	)[0]!;
-	const contextProgram = projectContextGraph.programs.filter(
+	)!;
+	const contextProgram = projectContextGraph.programs.find(
 		(record) => record.id === request.importer.projectContextProgramId
-	)[0]!;
-	const contextProject = projectContextGraph.projects.filter(
+	)!;
+	const contextProject = projectContextGraph.projects.find(
 		(record) => record.id === contextSource.projectId
-	)[0]!;
+	)!;
 	if (
 		semanticModuleResolution.nodeId !== request.importer.specifierNodeId ||
 		semanticModuleResolution.sourceId !== importerSource.id ||
@@ -1006,9 +1006,9 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			'The selected importer semantic and project-context identities do not reconcile.',
 			'$inputs.request.importer'
 		);
-	const literalRecord = semanticSnapshot.literals.filter(
+	const literalRecord = semanticSnapshot.literals.find(
 		(record) => record.nodeId === importerNode.id && record.sourceId === importerSource.id
-	)[0]!;
+	)!;
 	const sameOccurrences = semanticSnapshot.moduleResolutions.filter(
 		(record) =>
 			record.sourceId === importerSource.id &&
@@ -1023,9 +1023,9 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			'The selected importer must contain one exact supported import occurrence.',
 			'$inputs.semanticSnapshot.moduleResolutions'
 		);
-	const targetSource = semanticSnapshot.sources.filter(
+	const targetSource = semanticSnapshot.sources.find(
 		(record) => record.id === semanticModuleResolution.targetSourceId
-	)[0]!;
+	)!;
 	if (
 		targetSource.artifactClass !== 'CONTEXT_ONLY' ||
 		targetSource.origin !== 'WORKSPACE_BUILD_DECLARATION' ||
@@ -1041,9 +1041,9 @@ function bindStaticInputs(inputs: ModuleResolutionTraceBuildInputs): StaticBindi
 			'The semantic target must be one workspace build declaration.',
 			'$inputs.semanticSnapshot.sources'
 		);
-	const workspace = frozenSubject.workspaces.filter(
+	const workspace = frozenSubject.workspaces.find(
 		(candidate) => candidate.name === request.packageName
-	)[0]!;
+	)!;
 	const packageExportTarget = conditionalExportResolution.decision.target as string;
 	const expectedTargetPath =
 		workspace.path === '.'
@@ -1762,12 +1762,12 @@ function derive(inputs: ModuleResolutionTraceBuildInputs, knownInputDigest?: str
 				'The selected target READ_FILE witness does not reproduce the semantic build declaration.',
 				'$inputs.semanticSnapshot.sources'
 			);
-		const targetProgram = inputs.semanticSnapshot.programs.filter(
+		const targetProgram = inputs.semanticSnapshot.programs.find(
 			(program) => program.id === binding.targetSource.programId
-		)[0]!;
-		const targetProject = inputs.semanticSnapshot.projects.filter(
+		)!;
+		const targetProject = inputs.semanticSnapshot.projects.find(
 			(project) => project.id === binding.targetSource.projectId
-		)[0]!;
+		)!;
 		const readBytes = replay.readBytesBeforeTarget + targetReadEntry.observation.contentBytes;
 		if (!Number.isSafeInteger(readBytes) || readBytes > inputs.request.budgets.maxReadBytes)
 			failDerivation(

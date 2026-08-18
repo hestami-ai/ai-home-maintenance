@@ -95,9 +95,9 @@ It now also answers a live but more tightly bound question: what exact repositor
 | Subject schema | `jan-csaa-subject/1.1.0` | DWP-002 subject contract |
 | Generator | `jan-csaa-inventory@0.2.0` | Selected generator source is included in the file-manifest digest |
 | Subject kind | `WORKTREE` | Working-tree file bytes; Git cleanliness is not a prerequisite |
-| Subject ID | `0d937cf200dc4abfbf1fee92825d082f496bd871bf8c634dc48aa6ee3d6470c0` | Domain-separated file-manifest, configuration, schema, perimeter, and exclusion-policy identity |
-| File-manifest digest | `83ddd420d782774ad59fea9e589d3bddb89bda3bf9d208124f69ec21034ff888` | `948 selected files` |
-| Configuration digest | `8387f0e615b3b9bdb7b97f2da3fc055f05c0da4d4da73a63292775706aca6246` | Selected files classified as configuration |
+| Subject ID | `c99c4e167f5d837eb1939e0cf7957aa07376d03ba5b23ab75b6cf7f5678fefed` | Domain-separated file-manifest, configuration, schema, perimeter, and exclusion-policy identity |
+| File-manifest digest | `91d397544296b925b0716d6c1f66300236452b2f12d010fb2da22c87442c1ad5` | `948 selected files` |
+| Configuration digest | `b9371209c6c2dd8663c88a7c4f27bfa374591040f26bdc9f30c6aadaf03b1b6b` | Selected files classified as configuration |
 | Repository root | `.` | Machine-independent repository-relative identity |
 | Perimeter | `.dependency-cruiser.cjs`, `.github`, `.gitignore`, `.prettierignore`, `.prettierrc.json`, `apps`, `bun.lock`, `bunfig.toml`, `eslint.config.mjs`, `package.json`, `packages`, `scripts`, `sonar-project.properties`, `tsconfig.json`, `turbo.json`, `verif`, `vitest.config.ts`, `vitest.dist.config.ts`, `vitest.projects.ts` | Root workspace declaration and configured inventory roots |
 | Resolution completeness | `PARTIAL` | Project/configuration diagnostics and generated-context freshness remain explicit |
@@ -210,7 +210,7 @@ Candidate counts combine the resolved compiler-root population with separately c
 | `.` | `mutants:preflight` | `MUTATION` | `CONFIGURED_NOT_RUN` | `MUTANTS_PREFLIGHT=1 bun run scripts/mutants/run.ts` | `package.json#/scripts/mutants:preflight` |
 | `.` | `spec:obligations` | `OTHER` | `CONFIGURED_NOT_RUN` | `bun run scripts/spec-obligations.ts` | `package.json#/scripts/spec:obligations` |
 | `.` | `test` | `TEST` | `CONFIGURED_NOT_RUN` | `turbo run test && bun run test:dist` | `package.json#/scripts/test` |
-| `.` | `test:coverage` | `COVERAGE`, `TEST` | `CONFIGURED_NOT_RUN` | `vitest run --coverage --testTimeout=30000` | `package.json#/scripts/test:coverage` |
+| `.` | `test:coverage` | `COVERAGE`, `TEST` | `CONFIGURED_NOT_RUN` | `vitest run --coverage --testTimeout=30000 --maxWorkers=4` | `package.json#/scripts/test:coverage` |
 | `.` | `test:dist` | `TEST` | `CONFIGURED_NOT_RUN` | `turbo run build && vitest run --config vitest.dist.config.ts` | `package.json#/scripts/test:dist` |
 | `.` | `test:src` | `TEST` | `CONFIGURED_NOT_RUN` | `vitest run` | `package.json#/scripts/test:src` |
 | `apps/rph-demo` | `build` | `BUILD` | `CONFIGURED_NOT_RUN` | `svelte-kit sync && vite build` | `apps/rph-demo/package.json#/scripts/build` |
