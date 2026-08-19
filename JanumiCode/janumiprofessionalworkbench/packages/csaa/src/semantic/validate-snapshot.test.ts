@@ -9500,4 +9500,318 @@ describe('bounded semantic snapshot validation', () => {
 			state: 'INVALID'
 		});
 	});
+
+	// --- Per-validator refusal assertions -------------------------------------------------
+	// A no-op probe stubbed each (): void function in the validator and re-ran the whole csaa
+	// project; these validators could be gutted with every test still green. The cause is that a
+	// single issue CODE is emitted by many functions while the assertions matched the code alone,
+	// so another emitter always satisfied them. Each test below names the MESSAGE, which is the
+	// only per-validator discriminator.
+	it('rejects a type acquisition anchor whose Signature-component reference is absent', () => {
+		const rich = withCallAndConstructOverloadFacts();
+		const type = rich.types[0]!;
+		const absentSignatureId = rich.signatures[0]!.id.replace(
+			/[0-9a-f]{64}$/u,
+			'f'.repeat(64)
+		) as (typeof rich.signatures)[number]['id'];
+		const mutated: StaticSemanticSnapshot = {
+			...rich,
+			types: [
+				{
+					...type,
+					acquisitionAnchors: type.acquisitionAnchors.map((anchor, anchorIndex) =>
+						anchorIndex === 0 && anchor.kind === 'SIGNATURE_COMPONENT'
+							? { ...anchor, signatureId: absentSignatureId }
+							: anchor
+					)
+				}
+			]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Referenced Signature is absent.',
+					path: '$.types[0].acquisitionAnchors[0].signatureId'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a type relation whose provenance reference is absent from the snapshot', () => {
+		const rich = withCallAndConstructOverloadFacts();
+		const absentProvenanceId = rich.provenances[0]!.id.replace(
+			/[0-9a-f]{64}$/u,
+			'f'.repeat(64)
+		) as SemanticProvenanceId;
+		const mutated: StaticSemanticSnapshot = {
+			...rich,
+			typeRelations: rich.typeRelations.map((relation, index) =>
+				index === 0 ? { ...relation, provenanceId: absentProvenanceId } : relation
+			)
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Fact references absent provenance.',
+					path: '$.typeRelations[0].provenanceId'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the refusal for a source whose identity is not a semantic source identity', () => {
+		const snapshot = fixture();
+		const source = snapshot.sources[0]!;
+		const foreignSourceId: StaticSemanticSnapshot = {
+			...snapshot,
+			sources: [{ ...source, id: `semantic:scope-${'f'.repeat(64)}` as never }]
+		};
+		expect(
+			validateSnapshot(foreignSourceId, {}, contextForSnapshot(foreignSourceId))
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Invalid source identity.',
+					path: '$.sources[0].id'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a declaration whose identity is not a semantic declaration identity', () => {
+		const snapshot = withSymbolFacts();
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			declarations: [{ ...snapshot.declarations[0]!, id: 'invalid' as never }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Invalid declaration identity.',
+					path: '$.declarations[0].id'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a reference whose identity is not a semantic reference identity', () => {
+		const snapshot = withSymbolFacts();
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			references: [{ ...snapshot.references[0]!, id: 'invalid' as never }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Invalid reference identity.',
+					path: '$.references[0].id'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects an unreferenced provenance record whose epistemic rationale is empty', () => {
+		const snapshot = fixture();
+		const base = snapshot.provenances.find(
+			(record) => record.capability === 'TS_SYNTAX' && record.sourceId === null
+		)!;
+		const orphan = reidentifyProvenance({
+			...base,
+			epistemic: { ...base.epistemic, rationale: '' }
+		});
+		const provenances = [...snapshot.provenances, orphan].sort((left, right) =>
+			left.id < right.id ? -1 : 1
+		);
+		const orphanIndex = provenances.findIndex((record) => record.id === orphan.id);
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			populations: snapshot.populations.map((population) =>
+				population.kind === 'PROVENANCE'
+					? semanticPopulation('PROVENANCE', members(provenances.map((record) => record.id)))
+					: population
+			),
+			provenances
+		};
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message:
+						'Epistemic support, rationale, and unresolved regions must be explicit non-empty canonical evidence.',
+					path: `$.provenances[${orphanIndex}].epistemic`
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a project config path that is not a canonical logical path', () => {
+		const snapshot = fixture();
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			projects: [{ ...snapshot.projects[0]!, configPath: './tsconfig.json' }]
+		};
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'ABSOLUTE_PATH',
+					message: 'Serialized paths must be canonical logical paths.',
+					path: '$.projects[0].configPath'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the reference inside a conditional type carrying an infer binder that claims a resolved scope link', () => {
+		const base = withSymbolFacts();
+		expect(validateSnapshot(base, {}, contextForSnapshot(base))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		let snapshot = withAstNode(base, {
+			end: 60,
+			kind: ts.SyntaxKind.ConditionalType,
+			kindName: 'ConditionalType',
+			start: 38
+		});
+		const conditionalNode = snapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.ConditionalType
+		)!;
+		snapshot = withAstChild(
+			snapshot,
+			conditionalNode.id,
+			{ end: 50, kind: ts.SyntaxKind.InferType, kindName: 'InferType', start: 44 },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const conditionalReferencePreimage = {
+			nodeId: conditionalNode.id,
+			resolvedSymbolId: null,
+			resolutionState: 'UNRESOLVED' as const,
+			role: 'SYMBOL_USE' as const,
+			symbolId: null
+		};
+		const conditionalReference = {
+			...base.references[0]!,
+			...conditionalReferencePreimage,
+			id: semanticReferenceId(conditionalReferencePreimage)
+		};
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			references: [...snapshot.references, conditionalReference].sort((left, right) =>
+				left.id < right.id ? -1 : 1
+			)
+		};
+		const index = mutated.references.findIndex((entry) => entry.id === conditionalReference.id);
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message:
+						'Scope link must reproduce the independently recomputed supported binding boundary.',
+					path: `$.references[${index}].containingScopeId`
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the symbol whose declaration manifest stops matching the declarations that claim it', () => {
+		const snapshot = withSymbolFacts();
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const declaration = snapshot.declarations[0]!;
+		const claimant = snapshot.symbols.find((symbol) => symbol.id === declaration.symbolId)!;
+		const other = snapshot.symbols.find((symbol) => symbol.id !== claimant.id)!;
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			declarations: [{ ...declaration, symbolId: other.id }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: `Symbol ${claimant.id} declaration manifest is incomplete.`,
+					path: '$.symbols'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the reference whose bound AST node is absent from the snapshot', () => {
+		const snapshot = withSymbolFacts();
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const reference = snapshot.references[0]!;
+		const preimage = {
+			nodeId: `semantic:node-${'f'.repeat(64)}` as never,
+			resolvedSymbolId: reference.resolvedSymbolId,
+			resolutionState: reference.resolutionState,
+			role: reference.role,
+			symbolId: reference.symbolId
+		};
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			references: [{ ...reference, ...preimage, id: semanticReferenceId(preimage) }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Referenced node is absent.',
+					path: '$.references[0].nodeId'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the module resolution whose bound AST node is absent from the snapshot', () => {
+		const snapshot = withSymbolFacts();
+		expect(validateSnapshot(snapshot, {}, contextForSnapshot(snapshot))).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		const resolution = snapshot.moduleResolutions[0]!;
+		const preimage = {
+			moduleSymbolId: resolution.moduleSymbolId,
+			nodeId: `semantic:node-${'f'.repeat(64)}` as never,
+			occurrenceKind: resolution.occurrenceKind,
+			resolutionState: resolution.resolutionState,
+			specifier: resolution.specifier,
+			specifierState: resolution.specifierState,
+			targetSourceId: resolution.targetSourceId,
+			typeOnly: resolution.typeOnly
+		};
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			moduleResolutions: [{ ...resolution, ...preimage, id: semanticModuleResolutionId(preimage) }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Referenced node is absent.',
+					path: '$.moduleResolutions[0].nodeId'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
 });

@@ -3094,4 +3094,128 @@ describe('semantic snapshot normalization', () => {
 			snapshot.populations.find((population) => population.kind === 'SCOPE')?.members.contextOnly
 		).toHaveLength(1);
 	});
+
+	// --- Per-validator refusal assertions -------------------------------------------------
+	// A no-op probe stubbed each (): void function in the validator and re-ran the whole csaa
+	// project; these validators could be gutted with every test still green. The cause is that a
+	// single issue CODE is emitted by many functions while the assertions matched the code alone,
+	// so another emitter always satisfied them. Each test below names the MESSAGE, which is the
+	// only per-validator discriminator.
+	it('names the uniqueness refusal for duplicate assignability request identities', () => {
+		expect(() =>
+			normalizeTypes(
+				typeRaw(),
+				typeRequest([TYPE_ASSIGNABILITY_REQUEST, TYPE_ASSIGNABILITY_REQUEST])
+			)
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				code: 'INVALID_RAW_MODEL',
+				message: 'Semantic assignability request identities must be unique.'
+			})
+		);
+	});
+
+	it('names the ordinal-contiguity refusal for non-contiguous raw signature ordinals', () => {
+		const base = typeRaw();
+		expect(() =>
+			normalizeTypes({
+				...base,
+				signatures: base.signatures.map((signature) =>
+					signature.signatureOrdinal === 1 ? { ...signature, signatureOrdinal: 5 } : signature
+				)
+			})
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				code: 'INVALID_RAW_MODEL',
+				message:
+					'Project tsconfig.json signature ordinals must be contiguous zero-based safe integers.'
+			})
+		);
+	});
+
+	it('names the digest-shape refusal for a raw type display digest that is not lowercase', () => {
+		const base = typeRaw();
+		expect(() =>
+			normalizeTypes({
+				...base,
+				types: base.types.map((type, index) =>
+					index === 0 ? { ...type, displaySha256: sha256(type.display).toUpperCase() } : type
+				)
+			})
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				code: 'INVALID_RAW_MODEL',
+				message: 'Type 0 display digest must be a lowercase SHA-256 digest.'
+			})
+		);
+	});
+
+	it('names the TS_TYPE ordinal-gate refusal for non-contiguous raw type ordinals', () => {
+		const base = typeRaw();
+		expect(() =>
+			normalizeTypes({
+				...base,
+				types: base.types.map((type) =>
+					type.typeOrdinal === 4 ? { ...type, typeOrdinal: 9 } : type
+				)
+			})
+		).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				code: 'INVALID_RAW_MODEL',
+				message: 'Project tsconfig.json type ordinals must be contiguous zero-based safe integers.'
+			})
+		);
+	});
+
+	it('names the refusal when a Signature declaration owner disagrees with its declaration', () => {
+		const base = typeRaw();
+		const incoherentOwner: RawStaticSemanticProjectExtraction = {
+			...base,
+			signatures: base.signatures.map((signature, index) =>
+				index === 0
+					? { ...signature, owner: { declarationOrdinal: 1, kind: 'DECLARATION' as const } }
+					: signature
+			)
+		};
+		expect(() => normalizeTypes(incoherentOwner)).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				message: 'Signature 0 declaration owner is incoherent.'
+			})
+		);
+	});
+
+	it('names the refusal when a declaration-owned type parameter lacks its parameter declaration', () => {
+		const base = typeRaw();
+		const declarationOwned: RawStaticSemanticProjectExtraction = {
+			...base,
+			typeParameters: base.typeParameters.map((parameter, index) =>
+				index === 0
+					? { ...parameter, owner: { declarationOrdinal: 0, kind: 'DECLARATION' as const } }
+					: parameter
+			)
+		};
+		expect(() => normalizeTypes(declarationOwned)).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				message: 'Type parameter 0 lacks its parameter declaration.'
+			})
+		);
+	});
+
+	it('refuses an absent type-parameter type reference during identity assignment', () => {
+		const base = typeRaw();
+		const absentParameterType: RawStaticSemanticProjectExtraction = {
+			...base,
+			typeParameters: base.typeParameters.map((parameter, index) =>
+				index === 0 ? { ...parameter, parameterTypeOrdinal: 99 } : parameter
+			),
+			types: base.types.map((type, index) =>
+				index === 0 ? { ...type, acquisitionAnchors: [] } : type
+			)
+		};
+		expect(() => normalizeTypes(absentParameterType)).toThrowError(
+			expect.objectContaining<Partial<SemanticNormalizationError>>({
+				message: 'Type fact references absent type 99.'
+			})
+		);
+	});
 });

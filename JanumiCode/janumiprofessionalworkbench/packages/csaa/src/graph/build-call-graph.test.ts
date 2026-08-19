@@ -2059,5 +2059,850 @@ void StaticOwner;
 			)
 		});
 		expectIndependentIssue(provenanceMutation, semanticSnapshot, 'provenance differs');
+		expectIndependentIssue(
+			provenanceMutation,
+			semanticSnapshot,
+			'Edge provenance must exactly equal the independently derived union of endpoint evidence.'
+		);
+	});
+
+	// --- Per-validator refusal assertions -------------------------------------------------
+	// A no-op probe stubbed each (): void function in the validator and re-ran the whole csaa
+	// project; these validators could be gutted with every test still green. The cause is that a
+	// single issue CODE is emitted by many functions while the assertions matched the code alone,
+	// so another emitter always satisfied them. Each test below names the MESSAGE, which is the
+	// only per-validator discriminator.
+	it('refuses a callable target whose declaration associations no longer match the semantic snapshot', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const callable = graph.nodes.find(
+			(node) => node.kind === 'CALLABLE_TARGET' && node.declarationIds.length >= 1
+		);
+		expect(callable).toBeDefined();
+		if (callable?.kind !== 'CALLABLE_TARGET') throw new Error('Missing callable-target fixture.');
+		const strippedAssociations = repairedGraph(graph, {
+			nodes: graph.nodes.map((node) =>
+				node.id === callable.id ? { ...callable, declarationIds: [] } : node
+			)
+		});
+		expect(validateCallGraph(strippedAssociations, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message:
+						'Callable declaration, symbol, or provenance associations do not exactly match the semantic snapshot.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('refuses a call site whose extent or owner no longer cites its invocation AST node', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const sites = callSites(graph);
+		const wideSite = sites.find(
+			(site) => site.sourceLocations[0]!.end - site.sourceLocations[0]!.start > 2
+		);
+		expect(wideSite).toBeDefined();
+		if (wideSite === undefined) throw new Error('Missing multi-character call-site extent.');
+		const shrunkExtent = repairedGraph(graph, {
+			nodes: graph.nodes.map((node) =>
+				node.id === wideSite.id
+					? {
+							...wideSite,
+							sourceLocations: [
+								{ ...wideSite.sourceLocations[0]!, end: wideSite.sourceLocations[0]!.end - 1 }
+							]
+						}
+					: node
+			)
+		});
+		expect(validateCallGraph(shrunkExtent, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', message: 'Call-site location mismatch.' })
+			]),
+			state: 'INVALID'
+		});
+
+		const reparentedSite = sites[0]!;
+		const foreignOwner = graph.nodes.find(
+			(node) => node.kind === 'CALLABLE_TARGET' && node.id !== reparentedSite.ownerNodeId
+		);
+		expect(foreignOwner).toBeDefined();
+		if (foreignOwner === undefined) throw new Error('Missing alternate callable owner.');
+		const reparented = repairedGraph(graph, {
+			nodes: graph.nodes.map((node) =>
+				node.id === reparentedSite.id ? { ...reparentedSite, ownerNodeId: foreignOwner.id } : node
+			)
+		});
+		expect(validateCallGraph(reparented, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Call-site owner is not its nearest runtime callable or source region.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('refuses node populations that no longer project every source, callable, program, and project', () => {
+		const zeroSnapshot = snapshot(fixture('ZERO'));
+		const zeroOutcome = buildCallGraph(graphRequest(zeroSnapshot), zeroSnapshot);
+		if (zeroOutcome.outcome === 'unavailable') throw new Error(JSON.stringify(zeroOutcome));
+		const zeroGraph = zeroOutcome.graph;
+		const droppedSourceRegion = repairedGraph(zeroGraph, {
+			nodes: zeroGraph.nodes.filter((node) => node.kind !== 'SOURCE_REGION')
+		});
+		expect(validateCallGraph(droppedSourceRegion, zeroSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: 'Every semantic source must have exactly one SOURCE_REGION node.'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const callable = graph.nodes.find((node) => node.kind === 'CALLABLE_TARGET');
+		expect(callable).toBeDefined();
+		if (callable?.kind !== 'CALLABLE_TARGET') throw new Error('Missing callable-target fixture.');
+		const rebound = repairedGraph(graph, {
+			nodes: graph.nodes.map((node) =>
+				node.id === callable.id
+					? { ...callable, semanticNodeId: semanticSnapshot.invocations[0]!.nodeId }
+					: node
+			)
+		});
+		expect(validateCallGraph(rebound, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message:
+						'Every derivable deep-indexed runtime callable AST node must have exactly one CALLABLE_TARGET node.'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const changed = <T extends string>(value: T): T => `${value}-changed` as T;
+		const renamedProjects = {
+			...semanticSnapshot,
+			projects: semanticSnapshot.projects.map((project) => ({
+				...project,
+				id: changed(project.id)
+			}))
+		} as StaticSemanticSnapshot;
+		expect(validateCallGraph(graph, renamedProjects)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Semantic source has an absent project or program.'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const reparentedPrograms = {
+			...semanticSnapshot,
+			programs: semanticSnapshot.programs.map((program) => ({
+				...program,
+				projectId: changed(program.projectId)
+			}))
+		} as StaticSemanticSnapshot;
+		expect(validateCallGraph(graph, reparentedPrograms)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Semantic source program/project pair is inconsistent.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('refuses an edge whose extent or invocation AST node no longer cites its exact invocation', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const wideEdge = graph.edges.find(
+			(edge) => edge.sourceLocations[0]!.end - edge.sourceLocations[0]!.start > 2
+		);
+		expect(wideEdge).toBeDefined();
+		if (wideEdge === undefined) throw new Error('Missing multi-character edge extent.');
+		const shrunkEdgeExtent = repairedGraph(graph, {
+			edges: graph.edges.map((edge) =>
+				edge.id === wideEdge.id
+					? {
+							...wideEdge,
+							sourceLocations: [
+								{ ...wideEdge.sourceLocations[0]!, end: wideEdge.sourceLocations[0]!.end - 1 }
+							]
+						}
+					: edge
+			)
+		});
+		expect(validateCallGraph(shrunkEdgeExtent, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Edge location does not cite its exact invocation.'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const changed = <T extends string>(value: T): T => `${value}-changed` as T;
+		const renamedAstNodes = {
+			...semanticSnapshot,
+			astNodes: semanticSnapshot.astNodes.map((record) => ({ ...record, id: changed(record.id) }))
+		} as StaticSemanticSnapshot;
+		expect(validateCallGraph(graph, renamedAstNodes)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Invocation AST node is absent.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a frontier node whose class no longer matches its unresolved call site', () => {
+		const semanticSnapshot = snapshot(fixtureFromSource('missingCall();'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const site = callSites(graph)[0]!;
+		expect(site.resolutionClass).toBe('UNRESOLVED');
+		const frontier = graph.nodes.find(
+			(node) => node.kind === 'FRONTIER' && node.invocationId === site.invocationId
+		);
+		if (frontier?.kind !== 'FRONTIER') throw new Error('Missing frontier fixture node.');
+
+		const classMismatch = {
+			...graph,
+			nodes: graph.nodes.map((node) =>
+				node.id === frontier.id ? { ...frontier, frontierKind: 'UNSUPPORTED' as const } : node
+			)
+		} as CallGraphSnapshot;
+
+		expect(validateCallGraph(classMismatch, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: `Invocation ${site.invocationId} must have exactly one matching frontier node.`,
+					path: '$.nodes'
+				}),
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: `Invocation ${site.invocationId} frontier class mismatch.`,
+					path: '$.nodes'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a call-site population keyed by an invocation the semantic snapshot does not carry', () => {
+		const semanticSnapshot = snapshot(fixtureFromSource('function target(): void {}\ntarget();'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const site = callSites(graph)[0]!;
+
+		const unknownInvocation = {
+			...graph,
+			nodes: graph.nodes.map((node) =>
+				node.id === site.id ? { ...site, invocationId: `${site.invocationId}-absent` } : node
+			)
+		} as CallGraphSnapshot;
+
+		expect(validateCallGraph(unknownInvocation, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Call-site population contains an unknown invocation.',
+					path: '$.nodes'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects layer node and edge manifests that no longer list the exact graph populations', () => {
+		const semanticSnapshot = snapshot(fixtureFromSource('missingCall();'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		expect(graph.layers[0].nodeIds.length).toBeGreaterThan(1);
+		expect(graph.layers[0].edgeIds.length).toBeGreaterThan(1);
+
+		const droppedNode = {
+			...graph,
+			layers: [{ ...graph.layers[0], nodeIds: graph.layers[0].nodeIds.slice(1) }]
+		} as CallGraphSnapshot;
+		expect(validateCallGraph(droppedNode, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: 'Layer node manifest mismatch.',
+					path: '$.layers[0].nodeIds'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const droppedEdge = {
+			...graph,
+			layers: [{ ...graph.layers[0], edgeIds: graph.layers[0].edgeIds.slice(1) }]
+		} as CallGraphSnapshot;
+		expect(validateCallGraph(droppedEdge, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: 'Layer edge manifest mismatch.',
+					path: '$.layers[0].edgeIds'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects forward-index entries that reference an absent node or an absent edge', () => {
+		const semanticSnapshot = snapshot(fixtureFromSource('missingCall();'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+
+		const absentNode = {
+			...graph,
+			forwardIndex: graph.forwardIndex.map((entry, index) =>
+				index === 0 ? { ...entry, nodeId: 'graph-node:absent' } : entry
+			)
+		} as CallGraphSnapshot;
+		expect(validateCallGraph(absentNode, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Index references an absent node.',
+					path: '$.forwardIndex[0].nodeId'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const navigable = graph.forwardIndex.findIndex((entry) => entry.edgeIds.length === 1);
+		expect(navigable).toBeGreaterThanOrEqual(0);
+		const absentEdge = {
+			...graph,
+			forwardIndex: graph.forwardIndex.map((entry, index) =>
+				index === navigable ? { ...entry, edgeIds: ['graph-edge:absent'] } : entry
+			)
+		} as CallGraphSnapshot;
+		expect(validateCallGraph(absentEdge, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Index references an absent edge.',
+					path: `$.forwardIndex[${navigable}].edgeIds[0]`
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the duplicated canonical source-location object on node and edge arrays', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const nodeLocation = graph.nodes[0]!.sourceLocations[0]!;
+		const edgeLocation = graph.edges[0]!.sourceLocations[0]!;
+		const cases: readonly {
+			readonly message: string;
+			readonly mutate: (value: CallGraphSnapshot) => unknown;
+			readonly path: string;
+		}[] = [
+			{
+				message: `Duplicate identity ${canonicalSemanticJson(nodeLocation)}.`,
+				mutate: (value) => ({
+					...value,
+					nodes: value.nodes.map((node, index) =>
+						index === 0 ? { ...node, sourceLocations: [nodeLocation, nodeLocation] } : node
+					)
+				}),
+				path: '$.nodes[0].sourceLocations'
+			},
+			{
+				message: `Duplicate identity ${canonicalSemanticJson(edgeLocation)}.`,
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge, index) =>
+						index === 0 ? { ...edge, sourceLocations: [edgeLocation, edgeLocation] } : edge
+					)
+				}),
+				path: '$.edges[0].sourceLocations'
+			}
+		];
+
+		for (const scenario of cases) {
+			const result = validateCallGraph(scenario.mutate(graph), semanticSnapshot, {
+				maxIssues: 200
+			});
+			expect(result.state, scenario.path).toBe('INVALID');
+			expect(result.issues, scenario.path).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: 'DUPLICATE_ID',
+						message: scenario.message,
+						path: scenario.path
+					})
+				])
+			);
+		}
+	});
+
+	it('names every graph-wide reference a layer, node, or edge can misbind', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const cases: readonly {
+			readonly message: string;
+			readonly mutate: (value: CallGraphSnapshot) => unknown;
+			readonly path: string;
+		}[] = [
+			{
+				message: 'Record references another graph.',
+				mutate: (value) => ({
+					...value,
+					layers: [{ ...value.layers[0], graphId: 'call-graph:other' }]
+				}),
+				path: '$.layers[0].graphId'
+			},
+			{
+				message: 'Record references another graph layer.',
+				mutate: (value) => ({
+					...value,
+					nodes: value.nodes.map((node, index) =>
+						index === 0 ? { ...node, layerId: 'call-graph-layer:other' } : node
+					)
+				}),
+				path: '$.nodes[0].layerId'
+			},
+			{
+				message: 'Record references another semantic snapshot.',
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge, index) =>
+						index === 0 ? { ...edge, semanticSnapshotId: 'semantic:snapshot-other' } : edge
+					)
+				}),
+				path: '$.edges[0].semanticSnapshotId'
+			},
+			{
+				message: 'Record references another subject.',
+				mutate: (value) => ({
+					...value,
+					nodes: value.nodes.map((node, index) =>
+						index === 0 ? { ...node, subjectId: 'subject:other' } : node
+					)
+				}),
+				path: '$.nodes[0].subjectId'
+			}
+		];
+
+		for (const scenario of cases) {
+			const result = validateCallGraph(scenario.mutate(graph), semanticSnapshot, {
+				maxIssues: 200
+			});
+			expect(result.state, scenario.message).toBe('INVALID');
+			expect(result.issues, scenario.message).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: 'DANGLING_REFERENCE',
+						message: scenario.message,
+						path: scenario.path
+					})
+				])
+			);
+		}
+	});
+
+	it('names each way a source-region node can stop binding its semantic source', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const sourceRegionIndex = graph.nodes.findIndex((node) => node.kind === 'SOURCE_REGION');
+		const sourceRegion = graph.nodes[sourceRegionIndex];
+		if (sourceRegion?.kind !== 'SOURCE_REGION') throw new Error('Missing source-region node.');
+		const sourceRegionLocation = sourceRegion.sourceLocations[0]!;
+		const unrelatedProvenanceId = semanticSnapshot.provenances.find(
+			(provenance) => !sourceRegion.provenanceIds.includes(provenance.id)
+		)?.id;
+		expect(unrelatedProvenanceId).toBeDefined();
+		if (unrelatedProvenanceId === undefined) throw new Error('Missing unrelated valid provenance.');
+		const nodePath = `$.nodes[${sourceRegionIndex}]`;
+		const cases: readonly {
+			readonly code: string;
+			readonly message: string;
+			readonly patch: Record<string, unknown>;
+			readonly path: string;
+		}[] = [
+			{
+				code: 'INVALID_VALUE',
+				message: 'Source-region fields differ from the semantic source.',
+				patch: { analysisDisposition: 'CONTEXT_ONLY' },
+				path: nodePath
+			},
+			{
+				code: 'IDENTITY_MISMATCH',
+				message: 'Source-region identity mismatch.',
+				patch: { id: `${sourceRegion.id}-other` },
+				path: `${nodePath}.id`
+			},
+			{
+				code: 'DANGLING_REFERENCE',
+				message: 'Source-region provenance mismatch.',
+				patch: { provenanceIds: [unrelatedProvenanceId] },
+				path: `${nodePath}.provenanceIds`
+			},
+			{
+				code: 'INVALID_VALUE',
+				message: 'Source-region extent mismatch.',
+				patch: {
+					sourceLocations: [{ ...sourceRegionLocation, end: sourceRegionLocation.end - 1 }]
+				},
+				path: `${nodePath}.sourceLocations`
+			},
+			{
+				code: 'ABSOLUTE_PATH',
+				message: 'Source-region path is not canonical relative.',
+				patch: { logicalPath: `/${sourceRegion.logicalPath}` },
+				path: `${nodePath}.logicalPath`
+			}
+		];
+
+		for (const scenario of cases) {
+			const result = validateCallGraph(
+				{
+					...graph,
+					nodes: graph.nodes.map((node, index) =>
+						index === sourceRegionIndex ? { ...node, ...scenario.patch } : node
+					)
+				},
+				semanticSnapshot,
+				{ maxIssues: 200 }
+			);
+			expect(result.state, scenario.message).toBe('INVALID');
+			expect(result.issues, scenario.message).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: scenario.code,
+						message: scenario.message,
+						path: scenario.path
+					})
+				])
+			);
+		}
+	});
+
+	it('names the callable-target population and topology expectations it is held to', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const callableIndex = graph.nodes.findIndex((node) => node.kind === 'CALLABLE_TARGET');
+		const callable = graph.nodes[callableIndex];
+		if (callable?.kind !== 'CALLABLE_TARGET') throw new Error('Missing callable-target node.');
+		const nodePath = `$.nodes[${callableIndex}]`;
+		const cases: readonly {
+			readonly code: string;
+			readonly message: string;
+			readonly patch: Record<string, unknown>;
+			readonly path: string;
+		}[] = [
+			{
+				code: 'POPULATION_MISMATCH',
+				message:
+					'Callable target is outside the derivable deep-indexed runtime callable population.',
+				patch: { semanticNodeId: 'semantic:node-other' },
+				path: `${nodePath}.semanticNodeId`
+			},
+			{
+				code: 'INVALID_VALUE',
+				message:
+					'Callable kind, body state, source, program, or project differs from semantic AST topology.',
+				patch: {
+					bodyState: callable.bodyState === 'BLOCK_BODY' ? 'EXPRESSION_BODY' : 'BLOCK_BODY'
+				},
+				path: nodePath
+			}
+		];
+
+		for (const scenario of cases) {
+			const result = validateCallGraph(
+				{
+					...graph,
+					nodes: graph.nodes.map((node, index) =>
+						index === callableIndex ? { ...node, ...scenario.patch } : node
+					)
+				},
+				semanticSnapshot,
+				{ maxIssues: 200 }
+			);
+			expect(result.state, scenario.message).toBe('INVALID');
+			expect(result.issues, scenario.message).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: scenario.code,
+						message: scenario.message,
+						path: scenario.path
+					})
+				])
+			);
+		}
+	});
+
+	it('names the independently derived basis a candidate edge must reproduce', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const candidateEdge = graph.edges.find((edge) => edge.relationKind === 'CANDIDATE_CALL_TARGET');
+		expect(candidateEdge).toBeDefined();
+		if (candidateEdge?.relationKind !== 'CANDIDATE_CALL_TARGET')
+			throw new Error('Missing candidate call-target edge.');
+		const rationaleMutation = repairedGraph(graph, {
+			edges: graph.edges.map((edge) =>
+				edge.id === candidateEdge.id
+					? {
+							...candidateEdge,
+							inferenceBasis: {
+								...candidateEdge.inferenceBasis,
+								rationale: 'A rationale the producer never derived.'
+							}
+						}
+					: edge
+			)
+		});
+		expectIndependentIssue(
+			rationaleMutation,
+			semanticSnapshot,
+			'Candidate inference basis does not exactly match independently derived invocation, reference, symbol, assignment, declaration, limitation, method, and rationale evidence.'
+		);
+	});
+
+	it('names the candidate evidence a candidate edge epistemic state must match', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const candidateEdge = graph.edges.find((edge) => edge.relationKind === 'CANDIDATE_CALL_TARGET');
+		expect(candidateEdge).toBeDefined();
+		if (candidateEdge?.relationKind !== 'CANDIDATE_CALL_TARGET')
+			throw new Error('Missing candidate call-target edge.');
+		const epistemicMutation = repairedGraph(graph, {
+			edges: graph.edges.map((edge) =>
+				edge.id === candidateEdge.id
+					? { ...candidateEdge, epistemic: { ...candidateEdge.epistemic, inferenceState: 'NONE' } }
+					: edge
+			)
+		});
+		expectIndependentIssue(
+			epistemicMutation,
+			semanticSnapshot,
+			'Candidate-edge epistemic dimensions do not match independently derived candidate evidence.'
+		);
+	});
+
+	it('names the resolution class a frontier edge epistemic state must match', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const frontierEdge = graph.edges.find((edge) => edge.relationKind === 'UNRESOLVED_CALL_TARGET');
+		expect(frontierEdge).toBeDefined();
+		if (frontierEdge?.relationKind !== 'UNRESOLVED_CALL_TARGET')
+			throw new Error('Missing unresolved call-target edge.');
+		const epistemicMutation = repairedGraph(graph, {
+			edges: graph.edges.map((edge) =>
+				edge.id === frontierEdge.id
+					? { ...frontierEdge, epistemic: { ...frontierEdge.epistemic, inferenceState: 'NONE' } }
+					: edge
+			)
+		});
+		expectIndependentIssue(
+			epistemicMutation,
+			semanticSnapshot,
+			'Frontier-edge epistemic dimensions do not match its resolution class.'
+		);
+	});
+
+	// A no-op probe turned validateLimitationRecord into `return;` and every csaa test stayed green.
+	// Its four refusals reuse DANGLING_REFERENCE and LIMITATION_MISMATCH, which many other emitters
+	// in this validator also raise, so matching on the code alone proves nothing: one mutated
+	// limitation is dedicated to each branch and every message is named.
+	it('rejects limitation records that stop degrading closure or stop citing their own invocation and source', () => {
+		type LimitationRecord = CallGraphSnapshot['limitations'][number];
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const bound = graph.limitations.filter(
+			(limitation) => limitation.invocationId !== null && limitation.sourceId !== null
+		);
+		expect(bound.length).toBeGreaterThanOrEqual(4);
+		const [degrades, absentInvocation, absentSource, mismatchedSource] = bound;
+		if (mismatchedSource === undefined) throw new Error('Missing invocation-bound limitations.');
+		// A real source that is not the one the bound invocation lives in, so `Absent limitation
+		// source.` stays silent and only the invocation/source disagreement is refused.
+		const otherSource = semanticSnapshot.sources.find(
+			(source) => source.id !== mismatchedSource.sourceId
+		);
+		expect(otherSource).toBeDefined();
+		if (otherSource === undefined) throw new Error('Missing a second semantic source.');
+		const limitations: LimitationRecord[] = graph.limitations.map((limitation) =>
+			limitation === degrades
+				? { ...limitation, closureEffect: 'NONE' as const }
+				: limitation === absentInvocation
+					? {
+							...limitation,
+							invocationId:
+								`semantic:invocation-${'0'.repeat(64)}` as LimitationRecord['invocationId']
+						}
+					: limitation === absentSource
+						? {
+								...limitation,
+								sourceId: `semantic:source-${'0'.repeat(64)}` as LimitationRecord['sourceId']
+							}
+						: limitation === mismatchedSource
+							? { ...limitation, sourceId: otherSource.id }
+							: limitation
+		);
+		const draft = {
+			...graph,
+			layers: [{ ...graph.layers[0], limitations }],
+			limitations
+		} as CallGraphSnapshot;
+		const mutated = { ...draft, contentDigest: callGraphContentDigest(draft) };
+		expect(validateCallGraph(mutated, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'LIMITATION_MISMATCH',
+					message: 'Every limitation emitted by producer 0.1.0 degrades closure.'
+				}),
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Absent limitation invocation.'
+				}),
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Absent limitation source.'
+				}),
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Limitation invocation and source differ.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	// validateLimitations survived the same probe: its LIMITATION_MISMATCH is shared with the layer
+	// parity check and with validateLimitationRecord, so the message is the only discriminator.
+	it('rejects a limitation population that no longer reconciles with semantic health and every call-site class', () => {
+		const semanticSnapshot = snapshot(fixture('ZERO'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		// Dropped from the layer as well, so the surviving refusal is the reconciliation itself and
+		// not the layer-parity check that would otherwise mask it.
+		const limitations = graph.limitations.slice(1);
+		expect(limitations).toHaveLength(graph.limitations.length - 1);
+		const draft = {
+			...graph,
+			layers: [{ ...graph.layers[0], limitations }],
+			limitations
+		} as CallGraphSnapshot;
+		const mutated = { ...draft, contentDigest: callGraphContentDigest(draft) };
+		expect(validateCallGraph(mutated, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'LIMITATION_MISMATCH',
+					message:
+						'Limitation categories do not exactly reconcile semantic health and every call-site class.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	// validateLayerProvenance survived the same probe: POPULATION_MISMATCH is raised by the layer
+	// node, edge, coverage and index checks too, so the message is named here.
+	it('rejects a layer provenance manifest that is not exactly the node and edge provenance union', () => {
+		const semanticSnapshot = snapshot(fixture('ZERO'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const layer = graph.layers[0];
+		if (layer === undefined) throw new Error('Missing the static-call layer.');
+		// A real provenance of the bound snapshot, so the dangling-reference checks stay silent and
+		// only the inflated manifest is refused.
+		const unrelated = semanticSnapshot.provenances.find(
+			(provenance) => !layer.provenanceIds.includes(provenance.id)
+		);
+		expect(unrelated).toBeDefined();
+		if (unrelated === undefined) throw new Error('Missing an unrelated valid provenance.');
+		const provenanceIds = [...layer.provenanceIds, unrelated.id].sort();
+		const draft = { ...graph, layers: [{ ...layer, provenanceIds }] } as CallGraphSnapshot;
+		const mutated = { ...draft, contentDigest: callGraphContentDigest(draft) };
+		expect(validateCallGraph(mutated, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: 'Layer provenance manifest mismatch.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	// validateDuplicateIdentities survived the same probe: the repeated node is already reported by
+	// validateIdPopulation under the same DUPLICATE_ID code, but with the repeated identity itself as
+	// the message, so only naming this message pins the population-size check.
+	it('rejects call-graph populations that repeat a node identity', () => {
+		const semanticSnapshot = snapshot(fixture('ZERO'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		expect(graph.nodes).toHaveLength(1);
+		const sourceRegion = graph.nodes[0];
+		if (sourceRegion === undefined) throw new Error('Missing the projected source-region node.');
+		// Repeated adjacently so the population stays in canonical order and the size check, not the
+		// ordering check, is what refuses it.
+		const draft = { ...graph, nodes: [sourceRegion, sourceRegion] } as CallGraphSnapshot;
+		const mutated = { ...draft, contentDigest: callGraphContentDigest(draft) };
+		expect(validateCallGraph(mutated, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DUPLICATE_ID',
+					message: 'Call-graph populations contain duplicate identities.'
+				})
+			]),
+			state: 'INVALID'
+		});
 	});
 });
