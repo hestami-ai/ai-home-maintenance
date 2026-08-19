@@ -282,8 +282,18 @@ describe('bounded TypeScript read/write access graph', () => {
 			}
 		];
 		(erased as { contentDigest: string }).contentDigest = readWriteAccessGraphContentDigest(erased);
+		// Six distinct validators all emit COVERAGE_MISMATCH, so asserting the code alone stays green
+		// when any single one of them stops firing — which is exactly what a no-op probe demonstrated.
+		// The message is the only per-validator discriminator, so every one is named here.
 		expect(validateReadWriteAccessGraph(erased, semantic)).toMatchObject({
-			issues: expect.arrayContaining([expect.objectContaining({ code: 'COVERAGE_MISMATCH' })]),
+			issues: expect.arrayContaining(
+				[
+					'Candidate semantic references are not projected exactly once.',
+					'Assignment-bound semantic declarations are not projected exactly once.',
+					'Semantic assignments are not represented or frontiered exactly once.',
+					'Coverage counters do not reconcile.'
+				].map((message) => expect.objectContaining({ code: 'COVERAGE_MISMATCH', message }))
+			),
 			state: 'INVALID'
 		});
 		expect(validateReadWriteAccessGraph(first, semantic, { maxRecords: 1 })).toMatchObject({
@@ -309,9 +319,13 @@ describe('bounded TypeScript read/write access graph', () => {
 			(draft as { contentDigest: string }).contentDigest = readWriteAccessGraphContentDigest(draft);
 			return draft;
 		};
-		const expectInvalid = (value: unknown, code: string) =>
+		// `message` is optional but load-bearing where several validators share one code: asserting the
+		// code alone leaves the check green when any single emitter stops firing.
+		const expectInvalid = (value: unknown, code: string, message?: string) =>
 			expect(validateReadWriteAccessGraph(value, semantic)).toMatchObject({
-				issues: expect.arrayContaining([expect.objectContaining({ code })]),
+				issues: expect.arrayContaining([
+					expect.objectContaining(message === undefined ? { code } : { code, message })
+				]),
 				state: 'INVALID'
 			});
 
@@ -490,7 +504,8 @@ describe('bounded TypeScript read/write access graph', () => {
 				(draft as unknown as { edges: ReadWriteAccessGraphSnapshot['edges'] }).edges =
 					draft.edges.slice(1);
 			}),
-			'COVERAGE_MISMATCH'
+			'COVERAGE_MISMATCH',
+			'Access edge relations do not match accessKind.'
 		);
 		expectInvalid(
 			finalized((draft) => {
@@ -503,7 +518,19 @@ describe('bounded TypeScript read/write access graph', () => {
 				if (write?.kind !== 'ACCESS_OCCURRENCE') throw new Error('Expected assignment write.');
 				(write as unknown as { assignmentNodeId: null }).assignmentNodeId = null;
 			}),
-			'COVERAGE_MISMATCH'
+			'COVERAGE_MISMATCH',
+			'Semantic assignments are not represented or frontiered exactly once.'
+		);
+		// validateSymbolProjection is reached by nothing above: it needs the slot population itself to
+		// stop reconciling with the accessed symbols, which no other mutation here disturbs.
+		expectInvalid(
+			finalized((draft) => {
+				const slot = draft.nodes.find((node) => node.kind === 'SYMBOL_SLOT');
+				if (slot?.kind !== 'SYMBOL_SLOT') throw new Error('Expected a symbol slot.');
+				(slot as unknown as { symbolId: string }).symbolId = `semantic:symbol-${'0'.repeat(64)}`;
+			}),
+			'COVERAGE_MISMATCH',
+			'Accessed semantic symbols do not reconcile with symbol slots.'
 		);
 		expectInvalid(
 			finalized((draft) => {
