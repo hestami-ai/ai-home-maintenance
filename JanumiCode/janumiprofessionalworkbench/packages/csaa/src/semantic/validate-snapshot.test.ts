@@ -3617,7 +3617,16 @@ describe('bounded semantic snapshot validation', () => {
 			validateSnapshot(
 				withAstNode(snapshot, { kind: ts.SyntaxKind.SourceFile, kindName: 'SourceFile' }, true)
 			).issues
-		).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'DANGLING_REFERENCE' })]));
+			// This mutation adds a SECOND parentId===null root, which trips TWO DANGLING_REFERENCE
+			// emitters. Matching the code alone therefore stays green when either one stops firing.
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Every AST node must reach its declared source root.'
+				})
+			])
+		);
 	});
 
 	it('requires one contiguous absolute child ordinal independent of structural role', () => {
@@ -8943,5 +8952,552 @@ describe('bounded semantic snapshot validation', () => {
 			},
 			'Type-relation identity mismatch.'
 		);
+	});
+
+	// --- Per-validator refusal assertions -------------------------------------------------
+	// A no-op probe stubbed each (): void function in validate-snapshot.ts and re-ran all 1315
+	// csaa tests; 31 validators could be gutted with nothing going red. The cause is that
+	// INVALID_VALUE is emitted by 116 distinct functions and DANGLING_REFERENCE by 50, while the
+	// assertions matched on the code alone — so another emitter always satisfied them. Each test
+	// below names the MESSAGE, which is the only per-validator discriminator.
+	it('names the Signature identity-derivation refusal when the identity basis contradicts the recorded provider ordinal', () => {
+		const rich = withCallAndConstructOverloadFacts();
+		const context = contextForSnapshot(rich);
+		expect(validateSnapshot(rich, {}, context)).toEqual({ issues: [], state: 'VALID' });
+		const target = rich.signatures[0]!;
+		expect(target.identityBasis).toBe('DECLARATION_ANCHORED');
+		expect(target.providerOrdinal).toBeNull();
+		const mutated = {
+			...rich,
+			signatures: rich.signatures.map((signature) =>
+				signature.id === target.id
+					? { ...signature, identityBasis: 'OWNER_ORDINAL' as const }
+					: signature
+			)
+		};
+		expect(validateSnapshot(mutated, {}, context)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					message: 'Signature identity mismatch.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the compiler-input closure refusal when a project stops claiming an observed compiler input', () => {
+		const snapshot = fixture();
+		expect(validateSnapshot(snapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(snapshot.compilerInputs).toHaveLength(1);
+		const mutated = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({ ...project, contextInputIds: [] }))
+		};
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Compiler-input closure must equal the exact union claimed by projects.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a reference whose recorded identity does not match its resolution preimage', () => {
+		const snapshot = withSymbolFacts();
+		const reference = snapshot.references[0]!;
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			references: [{ ...reference, id: `semantic:reference-${'f'.repeat(64)}` as never }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					message: 'Reference identity mismatch.',
+					path: '$.references[0].id'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the program whose declared project does not resolve', () => {
+		const snapshot = fixture();
+		const program = snapshot.programs[0]!;
+		expect(
+			validateSnapshot({
+				...snapshot,
+				programs: [{ ...program, projectId: `semantic:project-${'f'.repeat(64)}` }]
+			})
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Program project is absent.',
+					path: '$.programs[0].projectId'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the program its own project does not bind back', () => {
+		const snapshot = fixture();
+		const project = snapshot.projects[0]!;
+		expect(
+			validateSnapshot({
+				...snapshot,
+				projects: [{ ...project, programId: `semantic:program-${'f'.repeat(64)}` }]
+			})
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'CROSS_PROJECT_REFERENCE',
+					message: 'Program is not the program bound by its project.',
+					path: '$.programs[0].id'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the program whose root sources stop reproducing the ProgramRecipe roots', () => {
+		const snapshot = fixture();
+		const program = snapshot.programs[0]!;
+		expect(
+			validateSnapshot({ ...snapshot, programs: [{ ...program, rootSourceIds: [] }] })
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Program root sources do not reproduce ProgramRecipe roots.',
+					path: '$.programs[0].rootSourceIds'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the deep-indexed source that declares no SourceFile root node', () => {
+		const snapshot = fixture();
+		const source = snapshot.sources[0]!;
+		expect(
+			validateSnapshot({ ...snapshot, sources: [{ ...source, rootNodeId: null }] })
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message:
+						'Deep-indexed source requires exactly one declared SourceFile root node at absolute ordinal zero.',
+					path: '$.sources[0].rootNodeId'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the refusal for a scope whose project is absent', () => {
+		const snapshot = fixture('src/index.ts', ' '.repeat(64));
+		const sourceScope = snapshot.scopes.find((scope) => scope.sourceId !== null)!;
+		const absentProject = {
+			...snapshot,
+			scopes: snapshot.scopes.map((scope) =>
+				scope.id === sourceScope.id
+					? { ...scope, projectId: `semantic:project-${'f'.repeat(64)}` as never }
+					: scope
+			)
+		};
+		expect(validateSnapshot(absentProject, {}, contextForSnapshot(absentProject))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Scope project or Program is absent.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the refusal when scope project and Program ownership disagree', () => {
+		const snapshot = fixture();
+		const disagreeingOwnership = {
+			...snapshot,
+			projects: snapshot.projects.map((project) => ({
+				...project,
+				programId: `semantic:program-${'f'.repeat(64)}` as never
+			}))
+		};
+		expect(
+			validateSnapshot(disagreeingOwnership, {}, contextForSnapshot(disagreeingOwnership))
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'CROSS_PROJECT_REFERENCE',
+					message: 'Scope project and Program ownership disagree.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('names the refusal when a Program has no Program-global scope', () => {
+		const snapshot = fixture();
+		const withoutGlobalScope = {
+			...snapshot,
+			scopes: snapshot.scopes.filter((scope) => scope.kind !== 'PROGRAM_GLOBAL')
+		};
+		expect(
+			validateSnapshot(withoutGlobalScope, {}, contextForSnapshot(withoutGlobalScope))
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'POPULATION_MISMATCH',
+					message: 'Every Program requires exactly one Program-global scope.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a scope parent relation that closes a cycle', () => {
+		const snapshot = fixture('src/index.ts', ' '.repeat(64));
+		const sourceScope = snapshot.scopes.find((scope) => scope.sourceId !== null)!;
+		const cyclic: StaticSemanticSnapshot = {
+			...snapshot,
+			scopes: snapshot.scopes.map((scope) =>
+				scope.id === sourceScope.id ? { ...scope, parentScopeId: sourceScope.id } : scope
+			)
+		};
+		expect(validateSnapshot(cyclic, {}, contextForSnapshot(cyclic))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Scope parent relation contains a cycle.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a scope whose parent chain never reaches the Program-global scope', () => {
+		const snapshot = fixture('src/index.ts', ' '.repeat(64));
+		const sourceScope = snapshot.scopes.find((scope) => scope.sourceId !== null)!;
+		const absentScopeId = `semantic:scope-${'f'.repeat(64)}` as never;
+		const orphaned: StaticSemanticSnapshot = {
+			...snapshot,
+			scopes: snapshot.scopes.map((scope) =>
+				scope.id === sourceScope.id ? { ...scope, parentScopeId: absentScopeId } : scope
+			)
+		};
+		expect(validateSnapshot(orphaned, {}, contextForSnapshot(orphaned))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message: 'Every scope must reach the one Program-global scope in its Program.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a declaration candidate whose name node is not its declaration-name child', () => {
+		const snapshot = withSymbolFacts();
+		const candidate = snapshot.declarationCandidates[0]!;
+		const foreignName = snapshot.astNodes.find(
+			(node) =>
+				node.kind === ts.SyntaxKind.Identifier &&
+				node.id !== candidate.nameNodeId &&
+				node.parentId === snapshot.sources[0]!.rootNodeId
+		)!;
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			declarationCandidates: [{ ...candidate, nameNodeId: foreignName.id }]
+		};
+		expect(validateSnapshot(mutated, {}, contextForSnapshot(mutated))).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message:
+						'Candidate name must be the retained declaration-name child of the candidate node.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a parameter-property declaration-name reference that claims checker resolution', () => {
+		const base = withSymbolFacts();
+		const source = base.sources[0]!;
+		let snapshot = withAstNode(base, {
+			end: 60,
+			kind: ts.SyntaxKind.Constructor,
+			kindName: 'Constructor',
+			start: 38
+		});
+		const constructorNode = snapshot.astNodes.find(
+			(node) => node.kind === ts.SyntaxKind.Constructor
+		)!;
+		snapshot = withAstChild(
+			snapshot,
+			constructorNode.id,
+			{ end: 58, kind: ts.SyntaxKind.Parameter, kindName: 'Parameter', start: 44 },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		const parameterNode = snapshot.astNodes.find((node) => node.kind === ts.SyntaxKind.Parameter)!;
+		snapshot = withAstChild(
+			snapshot,
+			parameterNode.id,
+			{ end: 51, kind: ts.SyntaxKind.PrivateKeyword, kindName: 'PrivateKeyword', start: 44 },
+			AST_STRUCTURAL_ROLES.genericChild,
+			0
+		);
+		snapshot = withAstChild(
+			snapshot,
+			parameterNode.id,
+			{
+				end: 58,
+				kind: ts.SyntaxKind.Identifier,
+				kindName: 'Identifier',
+				start: 52,
+				syntacticIdentifierText: 'held'
+			},
+			AST_STRUCTURAL_ROLES.declarationName,
+			1
+		);
+		const parameterNameNode = snapshot.astNodes.find(
+			(node) =>
+				node.parentId === parameterNode.id &&
+				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.declarationName)
+		)!;
+		const parameterCandidate = {
+			...base.declarationCandidates[0]!,
+			id: semanticDeclarationCandidateId({
+				candidateRole: 'BINDING',
+				nodeId: parameterNode.id,
+				syntaxKind: parameterNode.kind
+			}),
+			nameNodeId: parameterNameNode.id,
+			nodeId: parameterNode.id,
+			syntacticName: 'held',
+			syntaxKind: parameterNode.kind,
+			syntaxKindName: parameterNode.kindName
+		};
+		const parameterDeclaration = {
+			...base.declarations[0]!,
+			candidateId: parameterCandidate.id,
+			end: parameterNode.end,
+			id: semanticDeclarationId({
+				end: parameterNode.end,
+				kind: parameterNode.kind,
+				nodeId: parameterNode.id,
+				sourceId: source.id,
+				start: parameterNode.start
+			}),
+			kind: parameterNode.kind,
+			kindName: parameterNode.kindName,
+			name: 'held',
+			nodeId: parameterNode.id,
+			start: parameterNode.start
+		};
+		const parameterReferencePreimage = {
+			nodeId: parameterNameNode.id,
+			resolvedSymbolId: null,
+			resolutionState: 'UNRESOLVED' as const,
+			role: 'DECLARATION_NAME' as const,
+			symbolId: null
+		};
+		const parameterReference = {
+			...base.references[0]!,
+			...parameterReferencePreimage,
+			id: semanticReferenceId(parameterReferencePreimage)
+		};
+		const byId = (left: { id: string }, right: { id: string }): number =>
+			left.id < right.id ? -1 : 1;
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			declarationCandidates: [...snapshot.declarationCandidates, parameterCandidate].sort(byId),
+			declarations: [...snapshot.declarations, parameterDeclaration].sort(byId),
+			references: [...snapshot.references, parameterReference].sort(byId)
+		};
+		const result = validateSnapshot(mutated, {}, contextForSnapshot(mutated));
+		expect(result).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'CONFORMANCE_OVERCLAIM',
+					message:
+						'Parameter-property declaration-name references must preserve unsupported checker-symbol resolution.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a requested-capability set that is not the TS_TYPE prerequisite closure', () => {
+		expect(
+			validateSnapshot({ ...fixture(), requestedCapabilities: ['TS_PROJECT', 'TS_SYNTAX'] })
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message:
+						'TS_TYPE may be requested only atop the required TS_PROJECT, TS_SYMBOL, and TS_SYNTAX prerequisite closure.',
+					path: '$.requestedCapabilities'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects two Programs owned by the same project', () => {
+		const snapshot = fixture();
+		expect(
+			validateSnapshot({ ...snapshot, programs: [snapshot.programs[0]!, snapshot.programs[0]!] })
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DUPLICATE_ID',
+					message: 'Each project may own exactly one Program.',
+					path: '$.programs'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects scalar diagnostic text whose recorded length disagrees with its text', () => {
+		const snapshot = withSourceDiagnostics(fixture(), ['2322'], true);
+		const diagnostic = snapshot.diagnostics[0]!;
+		expect(
+			validateSnapshot({
+				...snapshot,
+				diagnostics: [
+					{
+						...diagnostic,
+						message: { ...diagnostic.message, textLength: diagnostic.message.textLength + 1 }
+					}
+				]
+			})
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Scalar diagnostic text encoding, length, or digest is incoherent.',
+					path: '$.diagnostics[0].message'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a UTF-16 diagnostic message whose declared length contradicts its code units', () => {
+		const base = withSourceDiagnostics(fixture(), ['2322'], true);
+		const original = base.diagnostics[0]!;
+		const nonScalarMessage = diagnosticMessage('\ud800');
+		const incoherentMessage = { ...nonScalarMessage, textLength: nonScalarMessage.textLength + 1 };
+		const identity = {
+			category: original.category,
+			code: original.code,
+			end: original.end,
+			family: original.family,
+			locationKind: original.locationKind,
+			message: incoherentMessage,
+			path: original.path,
+			projectId: original.projectId,
+			related: original.related,
+			sourceId: original.sourceId,
+			start: original.start
+		};
+		const mutated = replaceDiagnostics(base, [
+			{ ...original, ...identity, id: semanticDiagnosticId(identity) }
+		]);
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'UTF-16 diagnostic text encoding, length, or digest is incoherent.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a project provenance that declares a parent provenance', () => {
+		const snapshot = fixture();
+		const projectProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_PROJECT' && record.sourceId === null
+		)!;
+		const syntaxProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_SYNTAX' && record.sourceId === null
+		)!;
+		const mutated = reviseProvenance(snapshot, projectProvenance.id, (record) => ({
+			...record,
+			parentProvenanceId: syntaxProvenance.id
+		}));
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					message: 'Project provenance must not have a parent.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a project provenance whose support basis omits a bound reference', () => {
+		const snapshot = fixture();
+		const projectProvenance = snapshot.provenances.find(
+			(record) => record.capability === 'TS_PROJECT' && record.sourceId === null
+		)!;
+		const mutated = reviseProvenance(snapshot, projectProvenance.id, (record) => ({
+			...record,
+			epistemic: {
+				...record.epistemic,
+				supportBasis: {
+					...record.epistemic.supportBasis,
+					sourceRefs: record.epistemic.supportBasis.sourceRefs.slice(1)
+				}
+			}
+		}));
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'DANGLING_REFERENCE',
+					message:
+						'Project provenance support must bind exactly the subject, snapshot, project, Program, and attributed compiler inputs.'
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects a project whose identity no longer binds its config path and resolution digest', () => {
+		const snapshot = fixture();
+		const project = snapshot.projects[0]!;
+		const mutated: StaticSemanticSnapshot = {
+			...snapshot,
+			projects: [
+				{
+					...project,
+					programRecipe: {
+						...project.programRecipe,
+						projectResolutionDigest: sha256('divergent project resolution')
+					}
+				}
+			]
+		};
+		expect(validateSnapshot(mutated)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'IDENTITY_MISMATCH',
+					message: 'Project identity mismatch.'
+				})
+			]),
+			state: 'INVALID'
+		});
 	});
 });
