@@ -10,12 +10,12 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 
 ## Actionable now
 
-- [ ] **REG-F-180 P4 re-audit (REG-E-019, Sonar placement)** — the entry's recorded search
-  (*"`sonarqube|sonarlint|sonar-scanner` … returns nothing"*) was already stale on 2026-08-17
-  (`sonar-project.properties` exists at repo root) and is now doubly so: the 2026-08-19 campaign
-  landed 18 `sonar(...)` commits and modified that file. Re-run the audit, correct the entry in
-  place, and either discharge the precondition or record precisely what still blocks it.
-  Small; high certainty; unblocked.
+- [x] ~~**REG-F-180 P4 re-audit (REG-E-019, Sonar placement)**~~ — **DONE 2026-08-20.** Search was
+  stale (hits now exist) but none was the placement — the properties header itself pointed into the
+  sibling repo, L1186's defect in a second location. **Placement authored: `docs/operations/sonarqube.md`**
+  (scope authority, per-batch gate, the REG-F-100/`f9b8642f` mutation-anchor constraint, L1188/L1220
+  exception discipline). REG-F-180 P4 + REG-E-019 updated in place. **Remaining sponsor act:** retire the
+  Constitution L1186 pointer (ratified canon — not ours to edit).
 - [ ] **REG-F-180 P1/P2 audits (never performed)** — REG-Q-045's survivorship hold (does the seeded
   Product Realization PWA carry RPH-DOC-003/004's hierarchy, catalog, profiles, taxonomies
   losslessly?) and REG-D-008's shape-survivorship audit (an enforced repository reference artifact
