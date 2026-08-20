@@ -27,6 +27,7 @@ export type {
 } from '@janumipwb/rph-contracts';
 import {
 	getObject,
+	getObjectOfType,
 	listAssurancePolicies,
 	listPwuTypes,
 	type AuthedEngineHandle
@@ -251,7 +252,12 @@ export class PwaAuthoringBroker {
 
 	/** The DRAFT PWA under authoring (undefined if the id doesn't resolve). */
 	getPwa(): PwaView | undefined {
-		const s = getObject(this.engine, this.pwaId);
+		// TYPED, and the `?? 'DRAFT'` below is why — REG-F-201. `publicationStatus` exists only on
+		// PWAs, so for any other object the fallback FABRICATED 'DRAFT', and the agent endpoint's
+		// lifecycle guard (routes/pwa/[id]/agent/+server.ts) admits exactly 'DRAFT'. The guard was
+		// therefore EXACTLY INVERTED: it refused the legitimate PUBLISHED PWA and admitted every
+		// non-PWA. Asserting the type here makes that fallback unreachable rather than merely unlucky.
+		const s = getObjectOfType(this.engine, 'PROFESSIONAL_WORK_ARCHITECTURE', this.pwaId);
 		if (!s) return undefined;
 		return {
 			id: this.pwaId,

@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 369,
+      "discovered": 370,
       "excluded": 0,
       "failed": 0,
-      "included": 369,
+      "included": 370,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 369
+      "successfullyInventoried": 370
     },
     {
       "artifactClass": "VERIFICATION",
@@ -195,6 +195,7 @@
         "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
         "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
         "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
+        "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
         "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
         "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
@@ -2509,7 +2510,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "8943699710976536f854120bcc5c3a35811c47e1585fe753c9fd06f82bdf9f91",
+    "configurationDigest": "beae7d798774da2f719ae73f627e445641d8c5be1436858fac80cc03ced0b2f4",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -3020,7 +3021,7 @@
           "configPath": "apps/rph-demo/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "1c01f10c858eca17b0e336d860368f276ec22988c09794857e3588a4d1f0ba20",
+          "projectResolutionDigest": "bc4a2861d1b6137e1ca666d58a436c8ac872ae3956f79dfc453bd9496f7604c6",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3088,6 +3089,7 @@
             "apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
             "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
             "apps/rph-demo/src/lib/server/workbench-id.test.ts",
@@ -5684,7 +5686,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "ab1fa0572bffcd8a572c2d5fdd2201288ff09bf00ed9fdc4cfdf6b28b22176df",
+    "fileManifestDigest": "c365dc226e3efe1c3e4612e9fccc65681bb96cf5577d9752849cc476a7ae8c77",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5747,7 +5749,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 964,
+    "selectedFileCount": 965,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6605,6 +6607,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 3880,
+        "path": "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
+        "sha256": "02ff5fb75899c52bf91a59fc3546b3bedbd2ae49fc4842b684d51ed3a336ba4d",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 3686,
         "path": "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
         "sha256": "c580f7f42b48bff22629b80f9e7002559f68342a2535c7c6986eca834dbf2012",
@@ -6724,9 +6733,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 42138,
+        "bytes": 42577,
         "path": "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
-        "sha256": "f1684c3165765fe17184048bbd45815102df8a30234ab2571e19d6ddaf526e47",
+        "sha256": "c2432a037cda63d883dc42ed560349c34879d82691fe4a4cf82fdf72b8e69cb1",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9608,9 +9617,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 35300,
+        "bytes": 35831,
         "path": "packages/rph-authoring/src/broker.ts",
-        "sha256": "8ef2f98b19057944aa0a49b1d46bcb59497fd2ad195cdcecf3a5dfd919f9a6ae",
+        "sha256": "78e72a3b7db4bbe57ddb757621bd8b019890ad60e46f597b80b2f540db60ea85",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11995,9 +12004,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 269794,
+        "bytes": 272930,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "562abd32c3dd54fd280f790c5ada24c62ccd5269f56e858e38c7424e237f347c",
+        "sha256": "baf4c45d808ddea21bc39ec9a49295005e9e1e80b6d15995ae50c27829722736",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12498,7 +12507,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "70000fe164859373833fbb9e25ff82f36056389c82b06d87078a5750f12f95e7",
+    "subjectId": "2d408d49598cc284dc039d1a7d214513934746b644aa2ce7089a9fb75e2ff02d",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -12629,7 +12638,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 94,
+      "candidateArtifactCount": 95,
       "compilerOptions": {
         "allowJs": true,
         "checkJs": true,
@@ -12770,6 +12779,7 @@
         "apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
         "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
         "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
+        "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
         "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
         "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
@@ -14909,7 +14919,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "562abd32c3dd54fd280f790c5ada24c62ccd5269f56e858e38c7424e237f347c",
+      "contentSha256": "baf4c45d808ddea21bc39ec9a49295005e9e1e80b6d15995ae50c27829722736",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [

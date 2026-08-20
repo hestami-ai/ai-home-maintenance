@@ -3203,5 +3203,33 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/tracker-ingest.test.ts'],
 		why: "PROSE ABOUT A CAPABILITY IS NOT THE CAPABILITY, and this mutant is the day I proved it by accident. A docblock added to queries.ts explaining that getObject 'stands in for four ratified typed queries (getUndertaking, getPwu, getBaseline, getPwaVersion)' flipped all four from ABSENT to DECLARED \u2014 the walk read a sentence ABOUT missing capabilities as evidence they existed. Writing the documentation would have manufactured the implementation. Reverting the strip restores exactly that, and the census leg reddens through its LIVE measure.ts run, which is the second time that live assertion has earned its place. Blast radius when the strip was added, derived over all 118 consumer-walk items: 5 \u2014 the 4 self-inflicted, plus ClaimRejected, which had been scored TESTED since W-3 because its ONLY test mention is a header comment (claim-assessment.test.ts:4) while production emits it (assurance.ts:723).",
 		source: 'REG-F-201'
+	},
+	// ── REG-F-201: the type-blind PWA surfaces, and the permissive default that inverted a guard ───────────────
+	{
+		id: 'F201-pwa-loader-goes-back-to-the-type-blind-read',
+		file: 'apps/rph-demo/src/routes/pwa/[id]/+page.server.ts',
+		find: "const pwa = getObjectOfType(engine, 'PROFESSIONAL_WORK_ARCHITECTURE', params.id);",
+		replace: 'const pwa = getObject(engine, params.id);',
+		expectRed: ['apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts'],
+		why: "REVERTS THE LOADER TO THE LINE THAT SHIPPED IT, verbatim. The consequence is not merely a wrong render: `publicationStatus` exists only on PWAs, so on any other object the loader's own `?? 'DRAFT'` fabricates a draft status, `isDraft` goes true, and the FULL authoring surface unlocks \u2014 more editing surface on a non-PWA than on the genuine seeded PWA, which is PUBLISHED and correctly offers none. Nor is it ULID-gated: `/pwa/floor.reasoning-review`, a module-constant policy id, rendered as a draft PWA named 'Reasoning Review'.",
+		source: 'REG-F-201'
+	},
+	{
+		id: 'F201-broker-fabricates-draft-for-any-object',
+		file: 'packages/rph-authoring/src/broker.ts',
+		find: "const s = getObjectOfType(this.engine, 'PROFESSIONAL_WORK_ARCHITECTURE', this.pwaId);",
+		replace: 'const s = getObject(this.engine, this.pwaId);',
+		expectRed: ['apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts'],
+		why: "THIS ONE INVERTED AN EXPLICIT GUARD, which is why it is filed separately from the loader rather than as the same defect twice. routes/pwa/[id]/agent/+server.ts refuses unless `publicationStatus === 'DRAFT'` \u2014 a real lifecycle check, correct for real PWAs. With a type-blind read, `getPwa`'s `?? 'DRAFT'` synthesizes exactly the value that guard admits, so it REFUSED THE LEGITIMATE PUBLISHED PWA AND ADMITTED EVERY NON-PWA. Past it lies a persistent process-local authoring turn keyed to a non-PWA id, a forked engine, an external model call, and fork-recorded assurance objects asserting objectType PROFESSIONAL_WORK_ARCHITECTURE about something that is not one.",
+		source: 'REG-F-201'
+	},
+	{
+		id: 'F201-broker-asserts-the-wrong-type',
+		file: 'packages/rph-authoring/src/broker.ts',
+		find: "const s = getObjectOfType(this.engine, 'PROFESSIONAL_WORK_ARCHITECTURE', this.pwaId);",
+		replace: "const s = getObjectOfType(this.engine, 'UNDERTAKING', this.pwaId);",
+		expectRed: ['apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts'],
+		why: "THE CONTROL NEEDS ITS OWN MUTANT. A broker that asserted the WRONG type would satisfy both refusal tests above perfectly \u2014 non-PWAs still refused \u2014 while breaking authoring for every real PWA. Only the control ('the broker still returns the real PWA, PUBLISHED and not fabricated') can catch that, and it reddens in the opposite direction from its two siblings. \u26a0 It shares an anchor with F201-broker-fabricates-draft-for-any-object by design: the same one line is the whole guard, and the two mutations of it fail in OPPOSITE directions, which is what distinguishes a real assertion from one that merely refuses a lot.",
+		source: 'REG-F-201'
 	}
 ];

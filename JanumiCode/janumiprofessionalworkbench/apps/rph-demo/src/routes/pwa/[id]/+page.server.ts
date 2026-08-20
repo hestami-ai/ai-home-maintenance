@@ -7,6 +7,7 @@
 import { error, fail } from '@sveltejs/kit';
 import {
 	getObject,
+	getObjectOfType,
 	listAssurancePolicies,
 	listPwuTypes,
 	listUndertakings,
@@ -79,7 +80,11 @@ export const load: PageServerLoad = ({ params }) => {
 	const canonicalEngine = getEngine();
 	const candidate = getPendingAuthoringTurn(params.id);
 	const engine = candidate?.engine ?? canonicalEngine;
-	const pwa = getObject(engine, params.id);
+	// TYPED, not merely existent (REG-F-201). A type-blind read here was WORSE than at the
+	// Undertaking Workbench: publicationStatus exists only on PWAs, so line ~192's ?? 'DRAFT'
+	// FABRICATED a draft status for any other object and unlocked the full authoring surface — more
+	// editing surface on a non-PWA than on the real PWA, which is PUBLISHED and correctly shows none.
+	const pwa = getObjectOfType(engine, 'PROFESSIONAL_WORK_ARCHITECTURE', params.id);
 	if (!pwa) throw error(404, 'PWA not found');
 	// ── THE REVISION FOR PER-4 COMES FROM CANONICAL, AND THE DISPLAY STATE MAY NOT ──────────────────────────
 	// This loader is the only one in the app that can read from a FORK: with an agent candidate staged, `engine`
