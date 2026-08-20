@@ -13,9 +13,12 @@
  *
  * ⚠ THIS SUITE HAS ITS OWN MUTANT: `MU-TRACKER-01-boundary-check-always-passes` in
  * scripts/mutants/ledger.ts collapses the boundary test back to a bare `return true` — the exact
- * `String.includes` behaviour that produced the incident — and expects THIS file plus the census
- * assertion in tracker-ingest.test.ts to redden. A control that has never been seen to fail is the
- * REG-F-196 shape.
+ * `String.includes` behaviour that produced the incident — and names THIS file as its single victim.
+ * Its sibling MU-TRACKER-02 drops only the TRAILING boundary check (admitting exactly the prefix case)
+ * and aims at the census leg instead, so between them they prove both that the decision is wrong and
+ * that the tracker gate can see it. One victim each, deliberately: run.ts invokes vitest once over the
+ * named set, so a second name would mean 'any of these reddens' — a WEAKER claim. A control that has
+ * never been seen to fail is the REG-F-196 shape.
  */
 import { describe, expect, it } from 'vitest';
 

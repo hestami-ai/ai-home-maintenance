@@ -3119,18 +3119,30 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	// because `getPwuTemplate` is spelled that way for its first six characters. That was the SOLE positive
 	// result in the fourteen-name population the walk was commissioned to measure.
 	//
-	// This mutant collapses the boundary test back to the exact behaviour that produced the incident. It is
-	// declared with TWO victims on purpose: the matcher's unit witness (which reddens because the decision is
-	// wrong) AND the census leg (which reddens only because a LIVE `measure.ts` run was added beside the
-	// DB-reading assertion — without it, an instrument regression would leave the committed file, and therefore
-	// the whole census gate, green).
+	// TWO mutants, ONE victim each, and the split is not bookkeeping — it is the whole point. The one-victim
+	// rule (verif/mutant-ledger.test.ts) caught a first draft that named both suites on one mutant: `run.ts`
+	// invokes vitest ONCE over the named set, so a second name means "any of these reddens", which is WEAKER.
+	// Split into two DISTINCT mutations, each aimed at the reader it is meant to prove, the claim gets stronger
+	// AND the second one proves something the first cannot — that the CENSUS leg can see an instrument
+	// regression at all, which is true only because a LIVE `measure.ts` run was added beside the DB-reading
+	// assertion. Without it a broken matcher would leave the committed journal, and so the whole census gate,
+	// green.
 	{
 		id: 'MU-TRACKER-01-boundary-check-always-passes',
 		file: 'scripts/tracker/match.ts',
 		find: 'if (!IDENTIFIER_CHAR.test(before) && !IDENTIFIER_CHAR.test(after)) return true;',
 		replace: 'return true;',
-		expectRed: ['verif/tracker-name-match.test.ts', 'verif/tracker-ingest.test.ts'],
-		why: 'THE INSTRUMENT NEEDS ITS OWN MUTANT. A measurement tool that cannot be shown to fail is a claim about the codebase with no standing — the REG-F-196 shape, applied to the thing that grades everything else. Collapsing the boundary test reproduces the 2026-08-20 substring incident exactly.',
+		expectRed: ['verif/tracker-name-match.test.ts'],
+		why: "THE INSTRUMENT NEEDS ITS OWN MUTANT. A measurement tool that cannot be shown to fail is a claim about the codebase with no standing — the REG-F-196 shape, applied to the thing that grades everything else. Collapsing the boundary test to a bare `return true` IS `String.includes`, the exact behaviour that reported the ratified query `getPwu` as implemented because `getPwuTemplate` starts the same way.",
+		source: 'REG-F-199'
+	},
+	{
+		id: 'MU-TRACKER-02-trailing-boundary-unchecked',
+		file: 'scripts/tracker/match.ts',
+		find: 'if (!IDENTIFIER_CHAR.test(before) && !IDENTIFIER_CHAR.test(after)) return true;',
+		replace: 'if (!IDENTIFIER_CHAR.test(before)) return true;',
+		expectRed: ['verif/tracker-ingest.test.ts'],
+		why: 'SHARPER THAN MU-TRACKER-01 AND AIMED ELSEWHERE. Dropping only the TRAILING check admits exactly one class of false positive — a ratified name that is a PREFIX of a longer identifier — which is the 2026-08-20 incident precisely, and nothing else. Its victim is the CENSUS leg, so what this proves is not that the matcher is wrong but that the tracker gate can SEE the matcher being wrong: it reddens through the live `measure.ts` run, not through the committed journal.',
 		source: 'REG-F-199'
 	}
 ];

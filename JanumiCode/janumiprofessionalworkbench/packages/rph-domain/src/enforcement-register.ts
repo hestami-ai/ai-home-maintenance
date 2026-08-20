@@ -2751,8 +2751,14 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'not a refusal — nothing is rejected when evidence is invalidated; a cascade is computed. UNLIKE THE ' +
 			'REST OF THIS FAMILY IT IS GENUINELY WIRED, and the census is recorded because the same census is what ' +
 			'condemns its neighbours: `classifyEvidenceInvalidation` (rph-domain) has a production caller in ' +
-			'`packages/rph-application/src/handlers/assurance.ts`, and `impactedObjects` has one in ' +
-			'`handlers/decomposition.ts`. Contrast `validateLinkDirectionality` and `TRACE_DIRECTIONALITY` in the ' +
+			'`packages/rph-application/src/handlers/assurance.ts`. ⚠ CORRECTED 2026-08-20 (REG-F-199): this row ' +
+			'previously read "and `impactedObjects` has one in `handlers/decomposition.ts`" — IT DOES NOT, AND THIS ' +
+			'FILE SAID SO 1,200 LINES EARLIER. RPH-INT-006 (above) states "`impactedObjects` has no production ' +
+			'caller and awaits a TraceLink-minting command", and the tree agrees: every identifier-boundary ' +
+			'occurrence is its own definition (traceability.ts:208), its own test, or PROSE — including ' +
+			'decomposition.ts:439, which mentions it inside a REJECTION STRING saying the opposite of what this row ' +
+			'claimed. A delta investigation nearly overturned a correct finding by trusting this sentence. ' +
+			'Contrast `validateLinkDirectionality` and `TRACE_DIRECTIONALITY` in the ' +
 			'same kernel module, whose only reference is their own definition file — correct, unit-tested link ' +
 			'machinery that nothing asks. That dead pair is deliberately NOT filed as this row\'s guard: it ' +
 			'implements link DIRECTIONALITY, which no ratified RPH-TRC rule states, and attaching a dead predicate ' +

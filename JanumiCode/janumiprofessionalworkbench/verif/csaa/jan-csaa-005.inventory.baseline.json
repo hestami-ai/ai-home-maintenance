@@ -38,15 +38,15 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 22,
+      "discovered": 23,
       "excluded": 0,
       "failed": 0,
-      "included": 22,
+      "included": 23,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 22
+      "successfullyInventoried": 23
     },
     {
       "artifactClass": "SOURCE",
@@ -62,27 +62,27 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 364,
+      "discovered": 365,
       "excluded": 0,
       "failed": 0,
-      "included": 364,
+      "included": 365,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 364
+      "successfullyInventoried": 365
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 47,
+      "discovered": 48,
       "excluded": 0,
       "failed": 0,
-      "included": 47,
+      "included": 48,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 47
+      "successfullyInventoried": 48
     }
   ],
   "assuranceSurfaces": {
@@ -366,6 +366,7 @@
         "packages/rph-application/src/handlers/pwa-authoring.test.ts",
         "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
+        "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
         "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
         "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "packages/rph-application/src/handlers/pwu.test.ts",
@@ -528,6 +529,7 @@
         "verif/test-modes.test.ts",
         "verif/tracker-deferrals.test.ts",
         "verif/tracker-ingest.test.ts",
+        "verif/tracker-name-match.test.ts",
         "verif/tracker-substrate.test.ts",
         "verif/transition-provenance-carried.test.ts",
         "verif/trigger-claim-truth.test.ts",
@@ -2503,7 +2505,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "291355314b34b85662e6561ead7c0724eccfafe520f8f2ff362a7923de209501",
+    "configurationDigest": "dcba678d494cd01469ab67d76408a86ad32bf7cba48265beeeb07715047216b7",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -3665,7 +3667,7 @@
           "configPath": "packages/rph-application/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "f2f9be1da1ea74703d9bd0877f0d23ef0a43e13e31dba7da72faf55785c91b9a",
+          "projectResolutionDigest": "ffa274dc6af84375ea4c66e35b2d8f4bca14da8d3e970c2895024576abcd13aa",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3771,6 +3773,7 @@
             "packages/rph-application/src/handlers/pwa-authoring.ts",
             "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
+            "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
             "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
             "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
             "packages/rph-application/src/handlers/pwu.test.ts",
@@ -4837,7 +4840,7 @@
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "716139e497e8f49d4b28b0c6d3548ace61d7403eb39c86c34e6f776659978ee4",
+          "projectResolutionDigest": "22bd0e4ea1e40b350fbf85157848713d30c90a451e40fd248200fb67210a71f1",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4856,6 +4859,7 @@
             "scripts/tracker/check.ts",
             "scripts/tracker/core.ts",
             "scripts/tracker/ingest.ts",
+            "scripts/tracker/match.ts",
             "scripts/tracker/measure.ts",
             "scripts/tracker/query.ts"
           ]
@@ -4929,7 +4933,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "9ef23aadde3cfe6c970290ddff9dbc634c517fba81109de58910c17d53fcf103",
+          "projectResolutionDigest": "b753a5efc8a6120b94b41d9db8c8205bfbc39dc2409727210138843aaebaadde",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4975,6 +4979,7 @@
             "verif/test-modes.test.ts",
             "verif/tracker-deferrals.test.ts",
             "verif/tracker-ingest.test.ts",
+            "verif/tracker-name-match.test.ts",
             "verif/tracker-substrate.test.ts",
             "verif/transition-provenance-carried.test.ts",
             "verif/trigger-claim-truth.test.ts",
@@ -5671,7 +5676,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "7b8f38b2fb123e7d0413a42b11320c80a397b64e222672c24fb3afcd25d33157",
+    "fileManifestDigest": "129a3b2611bb8f8166a738c88239ceec6d3920613705dbe6491252310abb31b1",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5734,7 +5739,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 957,
+    "selectedFileCount": 960,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -9273,6 +9278,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 8346,
+        "path": "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
+        "sha256": "104b08b12c6fdc0ac5f146ff935128ab20391e698666576c5c2c2893ea20c896",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 6168,
         "path": "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
         "sha256": "a00992286e95f8fcb02f7ab084d4360ad40ef5b232b7425aeba3272f17b5367d",
@@ -10743,9 +10755,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 327347,
+        "bytes": 327974,
         "path": "packages/rph-domain/src/enforcement-register.ts",
-        "sha256": "ff5e34ca6aab31e19f417ba9024065111158b5c775fc0dac9f09a0f081a14af3",
+        "sha256": "0a21962447d22e0f1e4cf0ad6dfc42c078151f1ef7e52d4b67e4feb1032034c8",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11947,9 +11959,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 259288,
+        "bytes": 262193,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "1599d58a80777edec7793d3ef9f53d913a6cc48c3275ca4c315e947831934caf",
+        "sha256": "53bf60f915b2935eda219c73630dc529b3d11d1597fe7969c582cd85b612ed70",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12024,9 +12036,16 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 9059,
+        "bytes": 2596,
+        "path": "scripts/tracker/match.ts",
+        "sha256": "09549fd072407a336879b4f4a4de0d90ba240fa6e2c933e2647165c03549ef2a",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
+        "bytes": 9353,
         "path": "scripts/tracker/measure.ts",
-        "sha256": "9e3a16b966c1eca7a6e9a514491f654b09d50fcde9313f30443b8d22d7a68616",
+        "sha256": "65264def139339d1b8e3ce967ca80f9e67f81fcd2fce722b597ef3d9ccc5f7e7",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12353,9 +12372,16 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 16785,
+        "bytes": 22549,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "6ea8f34208716baf4a82cdececbaae3b519f504b68e0c40c10afa52d22709227",
+        "sha256": "59155583940e88399fbb6fa6f452835b12652025be88fce31eb8809306318f96",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 4550,
+        "path": "verif/tracker-name-match.test.ts",
+        "sha256": "5f395c9cbea38b21f4d68744fbd6a3ec2659fb36a701616f1f367f307a3a6e5f",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12436,7 +12462,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "ce198375c45fd2d1e3a56124be6df7667fd866a60fe39eac3971107acbb12224",
+    "subjectId": "47cc334ebcee638dcb4a37cf5bc6d5d1202901a857478ff1d2b6c128bfc1dbef",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -13245,7 +13271,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 125,
+      "candidateArtifactCount": 126,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13372,6 +13398,7 @@
         "packages/rph-application/src/handlers/pwa-authoring.ts",
         "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
+        "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
         "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
         "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "packages/rph-application/src/handlers/pwu.test.ts",
@@ -14299,7 +14326,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 15,
+      "candidateArtifactCount": 16,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14341,6 +14368,7 @@
         "scripts/tracker/check.ts",
         "scripts/tracker/core.ts",
         "scripts/tracker/ingest.ts",
+        "scripts/tracker/match.ts",
         "scripts/tracker/measure.ts",
         "scripts/tracker/query.ts"
       ],
@@ -14380,7 +14408,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 47,
+      "candidateArtifactCount": 48,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14449,6 +14477,7 @@
         "verif/test-modes.test.ts",
         "verif/tracker-deferrals.test.ts",
         "verif/tracker-ingest.test.ts",
+        "verif/tracker-name-match.test.ts",
         "verif/tracker-substrate.test.ts",
         "verif/transition-provenance-carried.test.ts",
         "verif/trigger-claim-truth.test.ts",
@@ -14840,12 +14869,13 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "1599d58a80777edec7793d3ef9f53d913a6cc48c3275ca4c315e947831934caf",
+      "contentSha256": "53bf60f915b2935eda219c73630dc529b3d11d1597fe7969c582cd85b612ed70",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
-        "verif/mutant-ledger.test.ts"
+        "verif/mutant-ledger.test.ts",
+        "verif/tracker-name-match.test.ts"
       ],
       "path": "scripts/mutants/ledger.ts",
       "provenance": [
@@ -14882,6 +14912,7 @@
         "verif/control-verdict.test.ts",
         "verif/mutant-ledger.test.ts",
         "verif/mutant-verdict.test.ts",
+        "verif/tracker-name-match.test.ts",
         "vitest.projects.ts#setupFiles"
       ],
       "path": "scripts/mutants/run.ts",
@@ -15015,13 +15046,30 @@
       "role": "SCRIPT"
     },
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/match.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "09549fd072407a336879b4f4a4de0d90ba240fa6e2c933e2647165c03549ef2a",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "gateCarriers": [
+        "verif/tracker-ingest.test.ts",
+        "verif/tracker-name-match.test.ts"
+      ],
+      "path": "scripts/tracker/match.ts",
+      "provenance": [
+        "scripts/tracker/match.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/measure.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "9e3a16b966c1eca7a6e9a514491f654b09d50fcde9313f30443b8d22d7a68616",
+      "contentSha256": "65264def139339d1b8e3ce967ca80f9e67f81fcd2fce722b597ef3d9ccc5f7e7",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
-        "UNMAPPED"
+        "verif/tracker-ingest.test.ts",
+        "verif/tracker-name-match.test.ts"
       ],
       "path": "scripts/tracker/measure.ts",
       "provenance": [
@@ -15688,7 +15736,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "6ea8f34208716baf4a82cdececbaae3b519f504b68e0c40c10afa52d22709227",
+      "contentSha256": "59155583940e88399fbb6fa6f452835b12652025be88fce31eb8809306318f96",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -15698,6 +15746,22 @@
       "path": "verif/tracker-ingest.test.ts",
       "provenance": [
         "verif/tracker-ingest.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-name-match.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "5f395c9cbea38b21f4d68744fbd6a3ec2659fb36a701616f1f367f307a3a6e5f",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/tracker-name-match.test.ts"
+      ],
+      "path": "verif/tracker-name-match.test.ts",
+      "provenance": [
+        "verif/tracker-name-match.test.ts"
       ],
       "role": "TEST"
     },

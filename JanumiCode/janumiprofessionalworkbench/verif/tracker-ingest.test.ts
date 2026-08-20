@@ -327,6 +327,13 @@ describe('measured verdicts (W-3) — measurements cross-checked, absences contr
 		expect(ratified.filter((n) => !absent.includes(n))).toEqual([]);
 	});
 
+	// ⚠ AN EXPLICIT BUDGET, FOR THE REASON source-is-reviewable.test.ts STATES (REG-F-116): this test's
+	// cost is INHERENT, not waste. It spawns the real `measure.ts`, which walks ~700 files under
+	// packages/+apps and searches every ratified name in each — that IS the instrument, and there is
+	// nothing to remove. `vitest.config.ts` sets no `testTimeout`, so source mode runs on vitest's 5000ms
+	// DEFAULT; this test was measured at 9261ms under contention with the file's other spawns and FAILED
+	// there once, which read as a flake until the default was found. A test whose cost exceeds the default
+	// must declare a budget that fits it rather than fail intermittently in the gate.
 	it('the LIVE instrument still reproduces the roster absence, not just the committed file', () => {
 		// WHY THIS IS SEPARATE FROM THE TEST ABOVE. That one reads the DB, which is built from the
 		// COMMITTED w3-verdicts.ndjson — so a regression in the matcher itself would leave it green.
@@ -348,6 +355,25 @@ describe('measured verdicts (W-3) — measurements cross-checked, absences contr
 		}
 		expect(live.size).toBe(14);
 		expect([...new Set(live.values())]).toEqual(['ABSENT']);
+	}, 120_000);
+
+	it('every name-ABSENT §34.5 query carries a CAPABILITY verdict, and none of them is ABSENT', () => {
+		// THE POINT OF THE DELTA INVESTIGATION, held as a gate: name-absence is not capability-absence.
+		// The roster is 14-of-14 name-absent AND 0-of-14 capability-absent — 2 pure naming divergences,
+		// 12 partials. A future edit that lets a query fall to ABSENT capability without a filed finding
+		// reddens here. The roster is derived from the corpus (same block as the assertion above), so
+		// this cannot drift from the ratified list.
+		const block = /^## 34\.5 Queries[\r\n]+```text\r?\n([\s\S]*?)^```/m.exec(DOMAIN_MODEL)?.[1];
+		const ratified = block!
+			.split('\n')
+			.map((l) => l.trim())
+			.filter((l) => l.length > 0);
+		const judged = sql<{ name: string; value: string }>(
+			'SELECT i.name, a.value FROM attrs a JOIN items i ON i.id = a.item_id ' +
+				"WHERE a.key = 'delta_classification' AND i.id LIKE 'cap:query:%' ORDER BY i.name"
+		);
+		expect(judged.map((r) => r.name).sort()).toEqual([...ratified].sort());
+		for (const row of judged) expect(row.value, row.name).not.toContain('ABSENT');
 	});
 
 	it('the substring-match correction is on the record, and names what it overturned', () => {

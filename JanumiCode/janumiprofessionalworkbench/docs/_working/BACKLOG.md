@@ -9,20 +9,74 @@ rewritten 136 files, so age everything below accordingly.
 Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by deleting.
 
 ## Actionable now
-- [ ] **W-3 finding (i): ~~13 of~~ ALL 14 ratified DOC-002 §34.5 queries are name-ABSENT** —
-  `getBaseline`, `getEventHistory`, `getProfessionalWorkGraph` and eleven more appear nowhere in
-  packages/+apps/ (consumer-walk with fired positive control; roster: `census/w3-verdicts.ndjson`).
-  **CORRECTED 2026-08-20 (REG-F-199): the count AND the named survivor were both wrong.** The walk
-  matched unanchored SUBSTRINGS, so `getPwu` read as present inside `getPwuTemplate`
-  (`rph-product-realization-pwa/src/ontology.ts:34`, an unrelated ontology lookup) — the sole
-  positive result in the population the walk existed to measure was a coincidence of spelling, and
-  this bullet's own claim that "`getAssuranceStatus`-adjacent naming survives" named a query
-  (`getPwuAssuranceStatus`) that the same roster lists as ABSENT. Fixed:
+- [x] ~~**W-3 finding (i): the §34.5 query roster**~~ — **CLOSED 2026-08-20, REG-F-199, in both halves.**
+  (a) THE INSTRUMENT: the walk matched unanchored SUBSTRINGS, so `getPwu` read as present inside
+  `getPwuTemplate` — the sole positive result in the population it was commissioned to measure. The
+  roster is **14 of 14** name-absent, not 13, and this bullet's own named survivor
+  (`getAssuranceStatus`-adjacent) was in the ABSENT column all along. Fixed:
   `scripts/tracker/match.ts` + `verif/tracker-name-match.test.ts` +
-  `MU-TRACKER-01-boundary-check-always-passes`. Blast radius DERIVED over all 118 consumer-walk
-  items: one tier, two witness citations. ⚠ STILL OPEN — name-level absence is not capability
-  absence; equivalents may exist under other names, and the delta investigation is owed before any
-  is filed as a gap. Also name-ABSENT: the ratified **Execution Workbench** surface.
+  `MU-TRACKER-01-boundary-check-always-passes` (KILLED). Blast radius DERIVED over all 118
+  consumer-walk items: one tier, two witness citations.
+  (b) THE DELTA INVESTIGATION (5 lanes, investigate → adversarially refute, 15 subjects):
+  **0 ABSENT · 2 EQUIVALENT · 13 PARTIAL.** No ratified capability is missing outright, so nothing
+  from this roster may be filed as a bare gap. **§34.5 is an early, non-exhaustive enumeration, not a
+  by-name contract** (REG-F-083 ratifies §34 as a MINIMUM surface and records its own omissions; the
+  section supplies no signatures) — **§32.x/§29.x are the contract, and that is where the deltas
+  are.** Per-subject roster: `census/f199-query-delta.ndjson`, gated in `tracker-ingest.test.ts`.
+
+### REG-F-199 residue — the deltas the investigation found (each verified by a refuter; re-verify at pickup)
+
+- [ ] **(1) `getObject` is the "unrestricted CRUD" read §34's own preamble forbids** — it is type-blind
+  (`queries.ts:214`), stands in for four ratified typed queries, and no call site asserts the
+  discriminator. Live consequence, confirmed: `/undertakings/<any-object-id>` renders a PWU, Baseline
+  or Decision **as an Undertaking** instead of 404-ing (the loader's only guard is existence,
+  `+page.server.ts:250`; `objectType` appears zero times in it). The discriminator IS in materialized
+  state and IS checked — on the WRITE side only (`pwu.ts:192`). ⚠ This is the one limb of §34 that
+  binds on substance rather than by name.
+- [ ] **(2) The OPEN-observation filter is tautological in two read models** —
+  `professional-work-graph.ts:100` and `work-projection.ts:113-135` test the RECORDING EVENT's
+  `disposition`, hard-coded `'OPEN'` at `assurance.ts:2386`, so a WAIVED or REMEDIATED finding would
+  still suppress a green node (DOC-004 §38 limb 2). Every GATE does it correctly, loading current
+  state (`assurance.ts:2076-2077` says so in terms) — an intra-repo divergence on one fact.
+  ⚠ CAVEAT THAT MUST TRAVEL WITH IT: `RecordAssuranceObservation` is the only observation command and
+  no command transitions `disposition`, so today every observation IS open and the defect is
+  **unobservable at runtime** — it must be judged from the code, and a probe would wrongly clear it.
+- [ ] **(3) `getPwuHierarchy` returns a SUPERSET of the hierarchy** — `professional-work-graph.ts:45-50`
+  emits parent→child edges on `DecompositionProposed` alone and never consults the contract's later
+  status, so a decomposition validated INVALID (`DecompositionRejected`, a real dispatchable outcome)
+  keeps its edges in the graph forever. Also no tombstone filter on nodes, where `listPwas`/`listPwuTypes`
+  both have one.
+- [ ] **(4) DEF-W4-002 is a FALSE-NEGATIVE deferral, live in four documents** — `G4-gate-package.md:14,:43`,
+  `JAN-W4-DR-001:21`, `PROGRAM-STATUS.md:47` all say the Execution Workbench drill-down is deferred; it
+  is **built** (JAN-EXECPLAN DWP-01..05, DR-004 DWP-06, JAN-EXECREM). Correct the records, and record the
+  genuine residue instead: **the authoring half**. All 19 Undertaking-Workbench form actions were
+  enumerated and none authors a plan; the only `ProposeExecutionPlan` path mints a hard-coded single
+  TRANSFORMATION step with all four policy bags as empty literals, then auto-approves and activates.
+  `ApplyTacticalChange` — a ratified §34.3 command with a real handler — has zero occurrences under `apps/`.
+- [ ] **(5) The successor-version gap (the driven half of the headline)** — once PUBLISHED a `pwaId`'s
+  `version` is frozen forever (`EditPwa` refuses outside DRAFT; the publication machine has no arrow
+  back), so `PwaVersionReference`'s one-pwaId-many-versions addressing has no representation and
+  Ref-Demo §19 L741's "changes create a successor version" is unimplementable. ⚠ The *other* half of that
+  finding — "RPH-CON-009's version limb is a control that cannot fail" — was **REFUTED by driving it**;
+  `packages/rph-application/src/handlers/pwa-version-binding.test.ts` shows the guard firing and
+  discriminating. Do not re-file the dead-control claim.
+- [ ] **(6) The ratified REL-4 traceability chain breaks at two named hops** — `TraceLinkType`
+  (`traceability-view.ts:12-20`) has no PRODUCES/artifact member and `linksFor` has no `ArtifactRecorded`
+  case, though `ArtifactRecorded` IS emitted with `producingPwuId` (`artifact.ts:74`); no `DecisionProposed`
+  case either. And the consumer keeps a link only if an endpoint is a PWU, so Evidence–SUPPORTS→Claim is
+  DROPPED — the exact chain §32.4 names is what the view cannot show. `TraceLinkSchema` is minted by nothing.
+- [ ] **(7) Built-but-unreachable seams** — `readAggregateEvents` is implemented
+  (`sqlite-storage-adapter.ts:251`) and is NOT a member of `EngineHandle`, so no read surface can ask for
+  one object's history; the §28.2 assurance aggregate is computed (`+page.server.ts:131`), serialized, and
+  **rendered nowhere**; `plansForPwus` has no per-PWU entry point. Each is a seam, not a build.
+- [ ] **(8) Write-only fields (the REG-F-005 shape, alive)** — `affectedClaimIds` (written
+  `assurance.ts:642`, no reader), `downstreamImpactObjectIds` (`governance.ts:593`, no reader),
+  `professional_work_object_versions` (one INSERT, zero SELECTs), `activeExecutionPlanId` (zero writers
+  AND zero readers, though ratified). Sweep-or-file, with REG-F-005's discipline.
+- **NOT residue — already ruled, do not re-file:** `getImpactAnalysis`'s deltas belong to **REG-F-006**
+  (OPEN/NARROWED, blocked on sponsor escalation REG-E-030), and `getPwuExecutionStatus`'s missing rollup
+  is **corpus-CONFORMANT** under REG-F-080's ratified safe default ("`PWU.executionState` … is
+  caller-asserted").
 - [x] ~~**W-3 finding (ii): CaptureIntent's ratified birth state is observed by NOTHING**~~ —
   **FIXED 2026-08-20, and the recorded mechanism was WRONG first** (the citation-currency lesson,
   in miniature): the ratified axis state WAS observed (`intent.test.ts` asserts
