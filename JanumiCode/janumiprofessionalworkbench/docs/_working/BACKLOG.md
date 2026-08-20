@@ -28,12 +28,33 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 
 - [ ] **(1) `getObject` is the "unrestricted CRUD" read §34's own preamble forbids** — it is type-blind
   (`queries.ts:214`), stands in for four ratified typed queries, and no call site asserts the
-  discriminator. Live consequence, confirmed: `/undertakings/<any-object-id>` renders a PWU, Baseline
+  discriminator. Live consequence, **DRIVEN 2026-08-20 and worse than recorded** — the loader was executed against a
+  PWA id and did NOT throw: it returned `undertaking.name = "Product Realization"`, the PWA's own
+  name, because every downstream read is scoped and degrades to empty (`u.pwaId` is absent, so the
+  PWA lookup becomes `getObject(engine, 'undefined')`, and `listPwus` filters to `[]`). **The page
+  does not even look broken.** Only a NON-EXISTENT id 404s. Design ready (a `getObjectOfType` seam;
+  the discriminator was measured present on 130/130 seeded aggregates). Originally: `/undertakings/<any-object-id>` renders a PWU, Baseline
   or Decision **as an Undertaking** instead of 404-ing (the loader's only guard is existence,
   `+page.server.ts:250`; `objectType` appears zero times in it). The discriminator IS in materialized
   state and IS checked — on the WRITE side only (`pwu.ts:192`). ⚠ This is the one limb of §34 that
   binds on substance rather than by name.
-- [ ] **(2) The OPEN-observation filter is tautological in two read models** —
+- [x] ~~**(2) half A — the OPEN-observation filter in `professional-work-graph.ts`**~~ — **FIXED
+  2026-08-20.** It now reads each observation's CURRENT disposition from the store and FAILS CLOSED
+  (diverging from all three assurance gates, which fail open — deliberate: its output is a green
+  node). Red constructed at the seam by decorating `loadObject`, because the defect is unobservable
+  end to end; `MU-F199-2-graph-reads-recording-event-disposition` KILLED. Two hand-maintained
+  enumerations re-pointed in the same commit (`observation-command-surface.test.ts`'s tripwire
+  message, and the ledger's "both retire together" → 2 of 3).
+- [ ] **(2) half B — `work-projection.ts:14/:124`: NOT fixable there, and this bullet's original
+  framing was WRONG.** ⚠ Do not attempt the same fix: `workProjector` has ZERO production consumers
+  (`enforcement-register.ts:2314` already records this), and `Projector.apply(view, event)` takes no
+  handle by ratified contract (RPH-PER-009) — a projector reaching the store would break rebuild
+  determinism. Decisively: `work-projection.test.ts:193-215` already drives a synthetic REMEDIATED
+  event through the fold and asserts `{}`, so **no red is available there at any layer**. The honest
+  remedy is authoring the missing `WaiveAssuranceObservation` command + event + fold, which carries
+  governance questions — a work package, not a fix. Re-filed as a named consumer of the
+  `verif/observation-command-surface.test.ts` tripwire, which now names all three dead read branches.
+- [ ] ~~**(2) The OPEN-observation filter is tautological in two read models**~~ —
   `professional-work-graph.ts:100` and `work-projection.ts:113-135` test the RECORDING EVENT's
   `disposition`, hard-coded `'OPEN'` at `assurance.ts:2386`, so a WAIVED or REMEDIATED finding would
   still suppress a green node (DOC-004 §38 limb 2). Every GATE does it correctly, loading current
@@ -41,7 +62,16 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   ⚠ CAVEAT THAT MUST TRAVEL WITH IT: `RecordAssuranceObservation` is the only observation command and
   no command transitions `disposition`, so today every observation IS open and the defect is
   **unobservable at runtime** — it must be judged from the code, and a probe would wrongly clear it.
-- [ ] **(3) `getPwuHierarchy` returns a SUPERSET of the hierarchy** — `professional-work-graph.ts:45-50`
+- [x] ~~**(3) `getPwuHierarchy` returns a SUPERSET of the hierarchy**~~ — **FIXED 2026-08-20**, and
+  the OBVIOUS fix was wrong: keying on the contract's status being INVALID is defeated by one
+  accepted `ReviseDecomposition` (INVALID is an in-arrow to SUPERSEDED, `decomposition.ts:491`, and
+  the contract can never be re-validated), which resurrects the withdrawn edge. Keys on the
+  `DecompositionRejected` EVENT instead — a log cannot be walked back. Four tests, and the fourth
+  (ESCAPE) is what chooses between the designs; `MU-F199-3` KILLED. ⚠ The TOMBSTONE half is NOT
+  done and should be filed separately, not folded in: hiding an ABANDONED node would delete the
+  `workLifecycleState` the view exists to display and force `listPwus` to change too — a
+  ratification act, not a repair (the REG-F-102 pattern).
+- [ ] ~~**(3) `getPwuHierarchy` returns a SUPERSET of the hierarchy**~~ — `professional-work-graph.ts:45-50`
   emits parent→child edges on `DecompositionProposed` alone and never consults the contract's later
   status, so a decomposition validated INVALID (`DecompositionRejected`, a real dispatchable outcome)
   keeps its edges in the graph forever. Also no tombstone filter on nodes, where `listPwas`/`listPwuTypes`
