@@ -3112,5 +3112,25 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/csaa/src/subject/analyzer-closure.test.ts'],
 		why: 'REG-F-196: a closure that reports a problem AND returns a population invites the caller to use the population, which is the hand-enumerated defect with a diagnostic attached',
 		source: 'REG-F-196 Finding 2'
+	},
+	// ── REG-F-199: the measuring instrument's own guard ─────────────────────────────────────────────────────────
+	// The ground-truth tracker's consumer walk decides, for every ratified name, whether an implementation of it
+	// exists. It did that with `String.includes` — and so reported the ratified query `getPwu` as implemented
+	// because `getPwuTemplate` is spelled that way for its first six characters. That was the SOLE positive
+	// result in the fourteen-name population the walk was commissioned to measure.
+	//
+	// This mutant collapses the boundary test back to the exact behaviour that produced the incident. It is
+	// declared with TWO victims on purpose: the matcher's unit witness (which reddens because the decision is
+	// wrong) AND the census leg (which reddens only because a LIVE `measure.ts` run was added beside the
+	// DB-reading assertion — without it, an instrument regression would leave the committed file, and therefore
+	// the whole census gate, green).
+	{
+		id: 'MU-TRACKER-01-boundary-check-always-passes',
+		file: 'scripts/tracker/match.ts',
+		find: 'if (!IDENTIFIER_CHAR.test(before) && !IDENTIFIER_CHAR.test(after)) return true;',
+		replace: 'return true;',
+		expectRed: ['verif/tracker-name-match.test.ts', 'verif/tracker-ingest.test.ts'],
+		why: 'THE INSTRUMENT NEEDS ITS OWN MUTANT. A measurement tool that cannot be shown to fail is a claim about the codebase with no standing — the REG-F-196 shape, applied to the thing that grades everything else. Collapsing the boundary test reproduces the 2026-08-20 substring incident exactly.',
+		source: 'REG-F-199'
 	}
 ];

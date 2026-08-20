@@ -9,12 +9,20 @@ rewritten 136 files, so age everything below accordingly.
 Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by deleting.
 
 ## Actionable now
-- [ ] **W-3 finding (i): 13 of the 14 ratified DOC-002 §34.5 queries are name-ABSENT** — only
-  `getAssuranceStatus`-adjacent naming survives; `getBaseline`, `getEventHistory`,
-  `getProfessionalWorkGraph` and ten more appear nowhere in packages/+apps/ (consumer-walk with
-  fired positive control; roster: `census/w3-verdicts.ndjson`). ⚠ Name-level absence — equivalents
-  may exist under other names in `rph-engine/src/queries.ts`; the delta investigation is owed
-  before any is filed as a gap. Also name-ABSENT: the ratified **Execution Workbench** surface.
+- [ ] **W-3 finding (i): ~~13 of~~ ALL 14 ratified DOC-002 §34.5 queries are name-ABSENT** —
+  `getBaseline`, `getEventHistory`, `getProfessionalWorkGraph` and eleven more appear nowhere in
+  packages/+apps/ (consumer-walk with fired positive control; roster: `census/w3-verdicts.ndjson`).
+  **CORRECTED 2026-08-20 (REG-F-199): the count AND the named survivor were both wrong.** The walk
+  matched unanchored SUBSTRINGS, so `getPwu` read as present inside `getPwuTemplate`
+  (`rph-product-realization-pwa/src/ontology.ts:34`, an unrelated ontology lookup) — the sole
+  positive result in the population the walk existed to measure was a coincidence of spelling, and
+  this bullet's own claim that "`getAssuranceStatus`-adjacent naming survives" named a query
+  (`getPwuAssuranceStatus`) that the same roster lists as ABSENT. Fixed:
+  `scripts/tracker/match.ts` + `verif/tracker-name-match.test.ts` +
+  `MU-TRACKER-01-boundary-check-always-passes`. Blast radius DERIVED over all 118 consumer-walk
+  items: one tier, two witness citations. ⚠ STILL OPEN — name-level absence is not capability
+  absence; equivalents may exist under other names, and the delta investigation is owed before any
+  is filed as a gap. Also name-ABSENT: the ratified **Execution Workbench** surface.
 - [x] ~~**W-3 finding (ii): CaptureIntent's ratified birth state is observed by NOTHING**~~ —
   **FIXED 2026-08-20, and the recorded mechanism was WRONG first** (the citation-currency lesson,
   in miniature): the ratified axis state WAS observed (`intent.test.ts` asserts
