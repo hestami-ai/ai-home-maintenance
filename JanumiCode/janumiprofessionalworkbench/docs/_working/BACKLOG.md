@@ -58,7 +58,7 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   ⚠ **THE GENERAL FORM IS OPEN:** this fixed ONE loader. An audit of every production path where an
   externally-supplied id reaches a type-blind read is running; its roster decides where the seam is
   adopted next. Do not assume this class is closed because one instance is.
-- [ ] ~~**(1) superseded bullet**~~ — — it is type-blind
+- [x] ~~**(1) THE ORIGINAL BULLET, kept for its evidence** — `getObject` is type-blind~~
   (`queries.ts:214`), stands in for four ratified typed queries, and no call site asserts the
   discriminator. Live consequence, **DRIVEN 2026-08-20 and worse than recorded** — the loader was executed against a
   PWA id and did NOT throw: it returned `undertaking.name = "Product Realization"`, the PWA's own
@@ -182,10 +182,18 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   accepting). What is missing is version SUCCESSION: a `pwaId` holds one `version` for life, so an
   upgrade has nothing to upgrade *to*. Fix the deferral AND `W8-W10/disposition-and-gates.md:36`
   together, or the contradiction survives in the half you did not touch.
-- [ ] **(c) The 5 PARTIALs need splitting, not closing** — `DEF-W1-001`, `DEF-W1-002`, `DEF-W2-003`,
-  `DEF-W3-001`, `DEF-W3-002`. Each is built in part, so each misleads in exactly its built half. The
-  audit records which half for each; a partial deferral restated as two rows (discharged / still
-  deferred) is the honest shape.
+- [ ] **(c) The 5 PARTIALs — NARROWED 2026-08-20 after checking my own item, which was overstated.**
+  `DEF-W1-001`, `DEF-W1-002`, `DEF-W2-003`, `DEF-W3-001`, `DEF-W3-002`. Each is built in part, so
+  each misleads in exactly its built half — that stands. What does NOT stand is the implied sweep: I
+  classified every carrier and **the majority are DATED GATE PACKAGES**, which are exit records and
+  are deliberately not rewritten (the same distinction that scoped residue (a)). The index already
+  carries the precise built/unbuilt split per deferral in `deferral_evidence`, and it is the live
+  answer.
+  So the residual is small and takes REG-F-100's grandfathering shape rather than a campaign:
+  **when a PARTIAL is next touched for its own reasons, split it there** — restated as two rows,
+  discharged and still-deferred — and only in FORWARD-LOOKING carriers: the `JAN-W*-DR-001` roadmap
+  prose and the `JAN-W1-DR-001.yaml` structured rows. Explicitly *not in a sweep*, and explicitly not
+  in the gate packages.
 - [ ] **(d) A STANDING GATE over roadmap deferrals** — design-first. It would need: a machine-checkable
   DISCHARGE PREDICATE per row (named production symbol, route, or `data-testid`), failing when the
   predicate resolves in production while the row still reads deferred; a check that a deferral's
