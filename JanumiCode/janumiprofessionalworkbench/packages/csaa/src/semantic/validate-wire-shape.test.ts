@@ -837,21 +837,17 @@ describe('semantic wire shape materialization hardening', () => {
 		// which is precisely the case that needs no test. Adding a snapshot array field reddens this.
 		expect([...SNAPSHOT_ARRAY_FIELDS]).toEqual([...arrayFields].sort());
 		for (const field of SNAPSHOT_ARRAY_FIELDS) {
-			// a non-object reaches the list visitor
-			expectIssue(
-				{ [field]: 0 },
-				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
-			);
-			// an object that is not an array reaches the inert-array check
-			expectIssue(
-				{ [field]: {} },
-				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
-			);
-			// null is the case the deleted guard's !Array.isArray() also covered
-			expectIssue(
-				{ [field]: null },
-				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
-			);
+			// The three kinds the deleted guard's !Array.isArray() covered. They do NOT exercise three
+			// separate checks — a non-object falls through visitList's early return to inertArray and
+			// produces the byte-identical issue there, so all three land on the same refusal. They are
+			// kept because they are the input classes a caller can actually send, not because they
+			// reach distinct code.
+			for (const notAnArray of [0, {}, null]) {
+				expectIssue(
+					{ [field]: notAnArray },
+					{ budget: false, message: 'Expected an array.', path: `$.${field}` }
+				);
+			}
 		}
 	});
 });

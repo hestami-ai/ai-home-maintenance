@@ -501,10 +501,13 @@ function expectedCandidateExportBinding(
 
 /**
  * Unsafe in exactly one respect: it assumes the closed wire shape has already been established.
- * The parameter type is what carries that assumption — only `materializeSemanticSnapshotWire` can
- * mint a `SemanticSnapshotWireValue`, so a future caller cannot reach this function without having
- * gone through the wire. That precondition used to be re-checked here at runtime by a guard that
- * could never fire; the compiler enforces it now, for every caller rather than for none.
+ * The parameter type carries that assumption as far as a type can — only
+ * `materializeSemanticSnapshotWire` can mint a `SemanticSnapshotWireValue`, so a caller who skips
+ * the wire entirely is refused by the compiler. It marks PROVENANCE rather than shape: a minted
+ * value that is then spread or edited keeps the brand, so the type would not catch that. See the
+ * type's own comment. What keeps the shape true in practice is the single call site, which passes
+ * the wire's value straight through, and the per-field assertions in validate-wire-shape.test.ts
+ * and this file's own INVALID_SHAPE test.
  */
 function validateStaticSemanticSnapshotUnsafe(
 	value: SemanticSnapshotWireValue,

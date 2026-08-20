@@ -1273,15 +1273,22 @@ function canonicalStringBytes(text: string): number {
 declare const SEMANTIC_WIRE_MATERIALIZED: unique symbol;
 
 /**
- * A value this module produced, and therefore one whose closed wire shape has already been
- * established — every required key present, every array field an actual dense array, no proxies,
- * accessors or symbol keys.
+ * A value this module returned, and therefore one whose closed wire shape was established AT THE
+ * INSTANT IT WAS MINTED — every required key present, every array field an actual dense array, no
+ * proxies, accessors or symbol keys.
  *
- * The brand exists so that precondition is carried by the type rather than by a comment or by a
- * downstream re-check. `validateStaticSemanticSnapshotUnsafe` is unsafe precisely in that it
- * assumes this, and nothing but this function can mint the token that says so.
+ * WHAT THIS DOES AND DOES NOT BUY, stated precisely because the obvious reading is too strong.
+ * The brand records PROVENANCE, not shape. It stops a caller who never went through the wire: the
+ * compiler refuses a plain object for want of the symbol, and nothing outside this module can mint
+ * one. It does NOT stop a caller who takes a minted value and changes it — `{ ...branded, x: 1 }`
+ * keeps the brand through the spread and still type-checks, and a widened index signature would
+ * make a direct write legal too. `readonly` below closes the write; the spread is not closeable at
+ * the type level and is not pretended otherwise.
+ *
+ * So the guarantee is: this reference came from the wire. Whether it still holds the wire's shape
+ * is kept true by there being exactly one call site, which passes the value straight through.
  */
-export type SemanticSnapshotWireValue = Record<string, unknown> & {
+export type SemanticSnapshotWireValue = Readonly<Record<string, unknown>> & {
 	readonly [SEMANTIC_WIRE_MATERIALIZED]: true;
 };
 
