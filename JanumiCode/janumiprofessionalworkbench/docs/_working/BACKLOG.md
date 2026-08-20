@@ -26,6 +26,44 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   (`handlers/floor-gate.ts`) is an UNRATIFIED EXTRAPOLATION: the general §8.15/§12.2 waiver mechanism
   applied to the three REQUIRED floor policies, which canon exempts from that relief. RPH-GOV-005
   anchors on ASR-14 and governs how a waiver BEHAVES — it never granted a waiver reach over the floor.
+  **⚠ DESIGNED, DRIVEN AND MEASURED 2026-08-20 — then REVERTED deliberately, unfinished rather than rushed.**
+  The change was applied end-to-end in a working tree, the red was proven, the breakage was measured, and the
+  tree was returned to green because half-removing an enforcement site is the one way to make this worse. Nothing
+  below is a hypothesis; every number was observed.
+  - **THE RED, MEASURED.** Added beside the existing control in `floor-waiver-scope.test.ts`: a waiver perfect in
+    every scope dimension (exact policy, criterion, object, version; EFFECTIVE; unexpired) must NOT discharge.
+    Failed as predicted — *"ASR-3: the floor is UNCONDITIONAL — a waiver may not discharge it: expected
+    'ACCEPTED' to be 'REJECTED'"*. After the change it passed and the OLD control failed: the pair IS the
+    inversion, and writing both makes the change visible instead of described.
+  - **THE EDIT.** `floorGateBlock` stops consulting the discharge filter, and the apparatus goes with it —
+    `openFindingCodes`, `FloorWaiver`, `effectiveFloorWaivers`, `waiverDischargesFloorPolicy`, plus the
+    `waiverCovers`/`waiverStillDischarges` import and `FloorRecord.assessmentId`. **The deletion is TOTAL, not
+    scoped, and that is forced:** `floorGateBlock` iterates only `FLOOR_POLICY_IDS_REQUIRED` and
+    `waiverDischargesFloorPolicy` had exactly ONE call site inside it, so "do not consult it for those three" IS
+    "do not consult it at all". Leaving it fails lint (`no-unused-vars`); `check-types` will NOT catch it (the
+    base tsconfig sets neither `noUnusedLocals` nor `noUnusedParameters`).
+  - **THE BREAKAGE, MEASURED: 5 of 1,067 tests**, every one asserting the pre-ruling behaviour —
+    `floor-waiver-scope.test.ts` (the old control), `pwa-authoring.test.ts:916`,
+    `execution-detail.test.ts:383` (⚠ the floor blocks EXECUTION STEP completion too, not only PWA publish —
+    the change is broader than "publishing" and that is correct under ASR-3),
+    `decision-kind-guard.test.ts:273`, and `execrem-wp16-enforcement-observed.test.ts` (the RPH-GOV-005 probe).
+  - **THE ONE JUDGMENT CALL, with its answer.** RPH-GOV-005's register row is ENFORCED and its probe map is TOTAL
+    over the ENFORCED rows, so the row cannot simply be orphaned. It does NOT need re-classifying: the rule keeps
+    a live enforcement site at `waiver-authorization.ts:54` (`resolveWaiverAuthorization`, reached in production
+    from `pwu.ts:1529`, refusing on decisionType/object/version and naming RPH-GOV-005 in its own refusal text).
+    **Re-aim the probe there.** The accurate narrowing is neither "reach narrows" nor "reach becomes empty":
+    RPH-GOV-005 loses its DISCHARGE site and keeps its AUTHORIZATION site.
+  - **DO NOT also refuse at `RequestWaiver`.** Considered and rejected as over-refusal: ASR-14 (*"a waiver
+    accepts risk; it never rewrites truth"*) describes exactly a recorded acceptance that changes no outcome. The
+    ruling narrows a waiver's REACH, not its RECORDABILITY. What must not recur is a recorded waiver silently
+    moving a gate — so make the non-discharge AUDIBLE at the surface instead.
+  - **`floor-waiver-scope.test.ts` does not simply break — 3 of its 4 tests go VACUOUS**, asserting a REJECTED
+    publish that becomes the unconditional answer. Its own header records that it passed for months in exactly
+    that state (REG-F-015). Deleting it silently retires a ratified rule; keeping it leaves three tests that
+    cannot fail. Re-aim: the kernel test `rph-domain/governance.test.ts:86-89` already exercises all three
+    conjuncts non-vacuously, so delete the command-layer duplicates **with a header recording why the
+    command-layer site vanished**.
+
   **Work, in order:**
   1. RED FIRST — a floor waiver that discharges today must stop discharging. Controls both ways: a
      NON-floor waiver must still discharge, and a SATISFIED floor must still pass.
