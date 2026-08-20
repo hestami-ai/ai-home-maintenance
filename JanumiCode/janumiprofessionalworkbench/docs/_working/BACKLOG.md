@@ -17,11 +17,17 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   exception discipline). REG-F-180 P4 + REG-E-019 updated in place. **Remaining sponsor act:** only REG-E-019's formal
   closure on Ratify Sheet R1 — the L1186 pointer already retired WITH its document on 2026-07-17
   (JAN-ENGC-001 §7.1 replaced it; both audits missed this — see the register's same-day correction).
-- [ ] **REG-F-180 P1/P2 audits (never performed)** — REG-Q-045's survivorship hold (does the seeded
-  Product Realization PWA carry RPH-DOC-003/004's hierarchy, catalog, profiles, taxonomies
-  losslessly?) and REG-D-008's shape-survivorship audit (an enforced repository reference artifact
-  for every ratified schema in six source documents). Each is substantial; the entry's own warning
-  applies: *"a partial audit that does not name its own scope reads as a complete one."*
+- [ ] **REG-F-180 P2: the REG-D-008 shape-survivorship audit** — in progress 2026-08-20; design at
+  `DESIGN-shape-survivorship-audit.md`. ⚠ ~~"P1/P2 audits (never performed)"~~ — **P1 WAS performed,
+  at REG-F-183, the same day as REG-F-180 and three entries later**; this backlog inherited
+  REG-F-180's bullet without reading past it (the citation-currency failure, again). REG-F-183:
+  all 58 REG-Q-045 items ARE carried, but 36 live in prose strings gated by NOTHING (four carriers:
+  `purpose`/`sourceSection`/`completionClaims` on `PwuTemplate`, `appliesToRisk` on
+  `ConformanceProfile`).
+- [ ] **REG-F-183's remedy increment** — move the 36 prose-carried items to structured, gated
+  carriage. Design-first; separate increment by the register's own no-riding rule. Related but
+  distinct: `AUDIT-vocab-sourceSection.md` (81% of field-bearing vocab entries cite sources that
+  never define their fields — provenance theater; unworked since 2026-07-16).
 - [ ] **REG-F-120 residue** — see Dispositions below; only the orphaned-docstring hunt remained
   performable, worked 2026-08-20.
 
