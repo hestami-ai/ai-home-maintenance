@@ -17,7 +17,43 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   guessable non-ULID policy id, `/pwa/floor.reasoning-review`, rendered as a draft PWA) and
   `PwaAuthoringBroker.getPwa()`, whose `?? 'DRAFT'` INVERTED the agent endpoint's lifecycle guard —
   it refused the legitimate PUBLISHED PWA and admitted every non-PWA. Six mutants KILLED; 74 e2e green.
-- [ ] **REG-F-202: the waiver gate is switched off by silence** — DESIGN-FIRST, and the remedy shape
+### ⭐ NEXT — RULED AND READY (sponsor ruling 2026-08-20, recorded in REG-F-202)
+
+- [ ] **REG-F-202: the de minimis floor must never be skippable — remove floor-waiver discharge.**
+  **THE QUESTION IS SETTLED; this is execution, not design.** ASR-3 (JPWB-DOC-003:249, ratified) —
+  *"The de minimis assurance floor is UNCONDITIONAL. Risk proportionality governs assurance above a
+  mandatory floor; it never makes the floor optional."* `waiverDischargesFloorPolicy`
+  (`handlers/floor-gate.ts`) is an UNRATIFIED EXTRAPOLATION: the general §8.15/§12.2 waiver mechanism
+  applied to the three REQUIRED floor policies, which canon exempts from that relief. RPH-GOV-005
+  anchors on ASR-14 and governs how a waiver BEHAVES — it never granted a waiver reach over the floor.
+  **Work, in order:**
+  1. RED FIRST — a floor waiver that discharges today must stop discharging. Controls both ways: a
+     NON-floor waiver must still discharge, and a SATISFIED floor must still pass.
+  2. `floorGateBlock` stops consulting the discharge path for `FLOOR_POLICY_IDS_REQUIRED`.
+  3. **Record RPH-GOV-005's NARROWED REACH** — the rule is NOT retired (it still governs waivers over
+     non-floor policies); leaving the narrowing implicit is how an enforcement site half-vanishes.
+  4. Withdraw the demo's `recordWaiver` affordance on a blocking floor — the engine will refuse it, so
+     the surface must stop offering it rather than offer-and-fail.
+  5. Mutants, one victim each, including one for the control (a gate that refused EVERY waiver would
+     pass the main test while breaking non-floor waivers).
+  ⚠ Blast radius, derived: 10 files reference the discharge path (`floor-gate.ts`, `governance.ts`,
+  `execution.ts`, `pwa-authoring.ts`, `skip-authorization.ts`, `enforcement-register.ts`,
+  `floor-waiver-scope.test.ts`, `pwa-publish-stale-floor.test.ts`, `floor-gate.test.ts`,
+  `__tests__/floor-fixtures.ts`) plus `apps/rph-demo/e2e/assurance-floor.e2e.ts`.
+  ⚠ `floor-waiver-scope.test.ts` exists to prove the SCOPING of a mechanism that will no longer reach
+  the floor — it must be re-aimed at non-floor waivers, not deleted.
+  ⚠ THE LESSON THAT CAME WITH THE RULING, worth re-reading before starting: the discharge machinery is
+  criterion-exact, version-exact, expiry-aware and fail-closed — and all of that precision is EVIDENCE
+  OF THE PROBLEM, not mitigation. Rigor went into making floor waivers precise, none into asking
+  whether they should exist. A carefully-specified exception to an unconditional rule reads as MORE
+  legitimate than a sloppy one, which is exactly how it survived a ratified scope rule, a dedicated
+  test suite, a REG-F-015 repair, and my own review an hour before the ruling.
+
+- [ ] ~~**REG-F-202: the waiver gate is switched off by silence**~~ — **SUPERSEDED by the ruling above.**
+  Retained for its evidence: `governance.ts:548-549` gates the only enforcement of §36.4 behind
+  `waiverRules.length > 0` and no production policy declares them. **Now second-order** — it governs a
+  path that should not exist for the three required floor policies. Re-file for NON-floor policies once
+  the floor path is removed; that is where §36.4 still binds. Originally: DESIGN-FIRST, and the remedy shape
   is already named by precedent. `governance.ts:548-549` gates the ONLY enforcement of DOC-004 §12.2 /
   JCPWA §36.4 (*"a waiver may never drop a control to nothing"*) behind `waiverRules.length > 0`, and
   **no production policy declares `waiverRules`** — so it is enforced nowhere, and the demo drives a
@@ -240,6 +276,9 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   fail. A ratchet (the count may not increase, pinned the way the mutation ratchets are) makes the
   policy real without triggering the REG-F-194 wholesale-reformat churn trap. Design-first: it
   changes `gate:fast`.
+- [ ] **Push `main` to origin** — 30 commits ahead as of 2026-08-20, carrying REG-F-199..202 and the
+  whole ground-truth programme. NOT done autonomously: history on this branch is shared and pushing is
+  outward-facing. Needs an explicit go-ahead.
 - [ ] **W-3b: the 192 invariants' prose→code mapping** — judgment work (lanes + refuters, the
   REG-F-197 pattern), deliberately NOT done by grep in W-3. The canon 62 FAM-N invariants are the
   priority slice.
