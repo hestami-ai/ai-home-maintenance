@@ -17,6 +17,29 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   guessable non-ULID policy id, `/pwa/floor.reasoning-review`, rendered as a draft PWA) and
   `PwaAuthoringBroker.getPwa()`, whose `?? 'DRAFT'` INVERTED the agent endpoint's lifecycle guard —
   it refused the legitimate PUBLISHED PWA and admitted every non-PWA. Six mutants KILLED; 74 e2e green.
+- [ ] **REG-F-202: the waiver gate is switched off by silence** — DESIGN-FIRST, and the remedy shape
+  is already named by precedent. `governance.ts:548-549` gates the ONLY enforcement of DOC-004 §12.2 /
+  JCPWA §36.4 (*"a waiver may never drop a control to nothing"*) behind `waiverRules.length > 0`, and
+  **no production policy declares `waiverRules`** — so it is enforced nowhere, and the demo drives a
+  waiver against the BLOCKING floor policy with `compensatingControls: []`.
+  `assurance.ts:1874-1888` fixed the identical shape and named the class it left behind: *"a policy
+  field that defaults to 'no constraint' is a gate switched off by silence"*. **Remedy = UNION a floor
+  in, not `??`.** ⚠ Turns on a canon question this cannot settle: does §36.4 bind a waiver against a
+  FLOOR policy, and what is the minimum compensating control when the policy declares no rules?
+  ⚠ **UNVERIFIED LIMB** — that the granted waiver then discharges the floor and permits publication.
+  Drive it before relying on it.
+- [ ] **REG-F-202 (b): align Gate B with its own file-mate** — `assurance.ts:1841` collapses ABSENT and
+  EMPTY `permittedControlActions` into "unconstrained"; `:148` distinguishes them and documents that
+  collapsing *"would fail OPEN"*. NOT exploitable today — every shipped policy declares a non-empty
+  set and every authoring path defaults to `'ESCALATE'` — so this is a FRAGILE SAFETY, not a gap.
+  One-line alignment when next touched.
+- [ ] **Fix the workflow-script bug that silenced three refuters** — a backticked method call inside a
+  backtick template literal closed the template early, so ALL THREE adversarial reviewers failed to
+  launch, the lane results came back empty, and the synthesis agent re-derived the sweep alone and
+  UNREFUTED. The failure WAS reported in the task result, but the roster it produced read as complete.
+  ⚠ The standing lesson is not "escape backticks": it is that **a sweep must show its refuter lane
+  actually ran before any of its findings are trusted** — hand-verification promptly downgraded one of
+  its three "exploitable" findings.
 - [ ] **A STANDING GATE for the type-blind class** — design-first. The audit closed the known sites;
   nothing stops the next one. A gate would have to identify reads whose id ORIGINATES EXTERNALLY
   (URL param, form field, query string) and reaches `getObject`/`loadObject` without a type
