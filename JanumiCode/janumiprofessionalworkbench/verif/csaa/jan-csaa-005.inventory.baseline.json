@@ -38,15 +38,15 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 20,
+      "discovered": 21,
       "excluded": 0,
       "failed": 0,
-      "included": 20,
+      "included": 21,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 20
+      "successfullyInventoried": 21
     },
     {
       "artifactClass": "SOURCE",
@@ -74,15 +74,15 @@
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 46,
+      "discovered": 47,
       "excluded": 0,
       "failed": 0,
-      "included": 46,
+      "included": 47,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 46
+      "successfullyInventoried": 47
     }
   ],
   "assuranceSurfaces": {
@@ -527,6 +527,7 @@
         "verif/source-resolution.test.ts",
         "verif/test-modes.test.ts",
         "verif/tracker-deferrals.test.ts",
+        "verif/tracker-ingest.test.ts",
         "verif/tracker-substrate.test.ts",
         "verif/transition-provenance-carried.test.ts",
         "verif/trigger-claim-truth.test.ts",
@@ -2502,7 +2503,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "d060c558705e4f833c49ed7178c4668791e273d055dae848e1055993b032b6d4",
+    "configurationDigest": "093c05da925b434bfd25d9a504b011b6bb0bfb8d69923a750508c90f86a25121",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -4836,7 +4837,7 @@
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "615c568fe634a8d0db0c550fd352833fe4463eca57bf778bfd29f2379a25eaea",
+          "projectResolutionDigest": "68bf9006602dfe658d5e3709e4f15b6d65537d46fde04678d0239f7bf721603d",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4854,6 +4855,7 @@
             "scripts/tracker/bun-sqlite.d.ts",
             "scripts/tracker/check.ts",
             "scripts/tracker/core.ts",
+            "scripts/tracker/ingest.ts",
             "scripts/tracker/query.ts"
           ]
         },
@@ -4926,7 +4928,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "96d29666b44283f98374fcde81a004e96294763d26a6d8b483444385724bc5c3",
+          "projectResolutionDigest": "d52d1591f92be76b95e49e349786fa81a5c9905d5918a9bc112faacb3e5abad9",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4971,6 +4973,7 @@
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
             "verif/tracker-deferrals.test.ts",
+            "verif/tracker-ingest.test.ts",
             "verif/tracker-substrate.test.ts",
             "verif/transition-provenance-carried.test.ts",
             "verif/trigger-claim-truth.test.ts",
@@ -5667,7 +5670,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "6d9cdb61e9f37931bb0bae346aaa87ffd8cb3dab7b858c1cf568fb37fc0c9712",
+    "fileManifestDigest": "69e3f15d65eedd32a8b94f93127dc64b7a272e5d6b54850ccf2b7d59d68e98f0",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5730,7 +5733,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 954,
+    "selectedFileCount": 956,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -12006,16 +12009,23 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 11260,
+        "bytes": 12811,
         "path": "scripts/tracker/core.ts",
-        "sha256": "8493cb9d60c28dd6c391d4165ffb24b85b034e266718bb282cbce47ca88d17f6",
+        "sha256": "23e6ea50f7ee2b5d9016351c5e2a32ee0c80c3f6f7d2dda30906e484ec67b1b1",
         "subjectArtifactClass": "SCRIPT"
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 4142,
+        "bytes": 16172,
+        "path": "scripts/tracker/ingest.ts",
+        "sha256": "fa6e096ef1c93461be47070a83fea4f661600ad8ab887df9e8a6982a72c68b33",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
+        "bytes": 4727,
         "path": "scripts/tracker/query.ts",
-        "sha256": "f10d8d16463ed8fa0e8f9431dcf361cbc1ec9515ab2c4ca2ef86d5556941c11d",
+        "sha256": "29014b516cd08a5b12743408877ce3d5e0e485ccd82e2c7b44b63e6c62d4df88",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12335,6 +12345,13 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 7060,
+        "path": "verif/tracker-ingest.test.ts",
+        "sha256": "f251acbec07497a4e08e4cee1d30c8ac3f35502a015e1c0076eb556c397aafe5",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 6917,
         "path": "verif/tracker-substrate.test.ts",
         "sha256": "70c5c40a0605766f48c3fb0881e383fa12e165ea25ac1269a2d55ec2513b5a16",
@@ -12411,7 +12428,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "d8296d711753d6bec1ea9621d548cf35d61828abb6c9f5fc98a39c41fcb1af97",
+    "subjectId": "dfac32c9b62070dfaff49605fe4126799630a45f001a23e5a9960e435e560ed8",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14274,7 +14291,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 13,
+      "candidateArtifactCount": 14,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14315,6 +14332,7 @@
         "scripts/tracker/bun-sqlite.d.ts",
         "scripts/tracker/check.ts",
         "scripts/tracker/core.ts",
+        "scripts/tracker/ingest.ts",
         "scripts/tracker/query.ts"
       ],
       "resolvedRootState": "RESOLVED_DWP002",
@@ -14353,7 +14371,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 46,
+      "candidateArtifactCount": 47,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14421,6 +14439,7 @@
         "verif/source-resolution.test.ts",
         "verif/test-modes.test.ts",
         "verif/tracker-deferrals.test.ts",
+        "verif/tracker-ingest.test.ts",
         "verif/tracker-substrate.test.ts",
         "verif/transition-provenance-carried.test.ts",
         "verif/trigger-claim-truth.test.ts",
@@ -14916,6 +14935,7 @@
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
         "package.json#/scripts/tracker:build",
+        "verif/tracker-ingest.test.ts",
         "verif/tracker-substrate.test.ts"
       ],
       "path": "scripts/tracker/build.ts",
@@ -14958,7 +14978,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/core.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "8493cb9d60c28dd6c391d4165ffb24b85b034e266718bb282cbce47ca88d17f6",
+      "contentSha256": "23e6ea50f7ee2b5d9016351c5e2a32ee0c80c3f6f7d2dda30906e484ec67b1b1",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -14971,13 +14991,29 @@
       "role": "SCRIPT"
     },
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/ingest.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "fa6e096ef1c93461be47070a83fea4f661600ad8ab887df9e8a6982a72c68b33",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "FILESYSTEM_OR_TEXT",
+      "gateCarriers": [
+        "UNMAPPED"
+      ],
+      "path": "scripts/tracker/ingest.ts",
+      "provenance": [
+        "scripts/tracker/ingest.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/query.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "f10d8d16463ed8fa0e8f9431dcf361cbc1ec9515ab2c4ca2ef86d5556941c11d",
+      "contentSha256": "29014b516cd08a5b12743408877ce3d5e0e485ccd82e2c7b44b63e6c62d4df88",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
         "package.json#/scripts/tracker:query",
+        "verif/tracker-ingest.test.ts",
         "verif/tracker-substrate.test.ts"
       ],
       "path": "scripts/tracker/query.ts",
@@ -15622,6 +15658,22 @@
       "path": "verif/tracker-deferrals.test.ts",
       "provenance": [
         "verif/tracker-deferrals.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "f251acbec07497a4e08e4cee1d30c8ac3f35502a015e1c0076eb556c397aafe5",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/tracker-ingest.test.ts"
+      ],
+      "path": "verif/tracker-ingest.test.ts",
+      "provenance": [
+        "verif/tracker-ingest.test.ts"
       ],
       "role": "TEST"
     },

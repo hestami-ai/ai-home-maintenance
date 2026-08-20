@@ -22,6 +22,8 @@ import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
+import { ingestAll } from './ingest.js';
+
 export const DDL = `
 CREATE TABLE sources (path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, parser TEXT NOT NULL);
 CREATE TABLE items (
@@ -34,6 +36,7 @@ CREATE TABLE verdicts (
 	evidence TEXT NOT NULL, method TEXT NOT NULL, measured_at TEXT NOT NULL
 );
 CREATE TABLE refs (from_id TEXT NOT NULL, to_id TEXT NOT NULL, kind TEXT NOT NULL);
+CREATE TABLE attrs (item_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL);
 CREATE VIRTUAL TABLE items_fts USING fts5(id UNINDEXED, name, anchor_text, evidence);
 `;
 
@@ -232,6 +235,11 @@ export const SOURCE_DOCS: readonly string[] = [
 
 export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Database {
 	const census = loadRecords(censusDir);
+	// W-1: the tracking documents are PARSED, not merely hashed. Ingested rows and census rows share
+	// one table set; `origin` separates them, and the census's append-only validation deliberately
+	// does NOT apply to ingested rows — their ground truth is the source document, re-derived every
+	// build, so "editing" them means editing the source, which SOURCE_STALE already polices.
+	const ingested = ingestAll(repoRoot);
 	const db = new Database(dbPath, { create: true });
 	db.exec('PRAGMA journal_mode = MEMORY;');
 	db.exec(DDL);
@@ -242,9 +250,13 @@ export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Da
 		insertSource.run(
 			path,
 			createHash('sha256').update(readFileSync(absolute)).digest('hex'),
-			'hash-only:w0'
+			ingested.parsers.get(path) ?? 'hash-only:w0'
 		);
 	}
+	// An ingested id colliding with a census id would silently shadow authored ground truth — refuse.
+	const censusIds = new Set(census.items.map((i) => i.id));
+	for (const i of ingested.items)
+		if (censusIds.has(i.id)) fail(`ingested id '${i.id}' collides with a census record id`);
 	const insertItem = db.prepare(
 		'INSERT INTO items (id, kind, name, anchor_doc, anchor_text, origin, created_at, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
 	);
@@ -272,6 +284,23 @@ export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Da
 		insertVerdict.run(v.item_id, v.verdict, v.evidence, v.method, v.measured_at);
 	const insertRef = db.prepare('INSERT INTO refs (from_id, to_id, kind) VALUES (?, ?, ?)');
 	for (const r of census.refs) insertRef.run(r.from_id, r.to_id, r.kind);
+	for (const i of ingested.items) {
+		insertItem.run(
+			i.id,
+			i.kind,
+			i.name,
+			i.anchor_doc ?? null,
+			i.anchor_text ?? null,
+			i.origin,
+			i.created_at
+		);
+		insertFts.run(i.id, i.name, i.anchor_text ?? '', '');
+	}
+	for (const v of ingested.verdicts)
+		insertVerdict.run(v.item_id, v.verdict, v.evidence, v.method, v.measured_at);
+	for (const r of ingested.refs) insertRef.run(r.from_id, r.to_id, r.kind);
+	const insertAttr = db.prepare('INSERT INTO attrs (item_id, key, value) VALUES (?, ?, ?)');
+	for (const a of ingested.attrs) insertAttr.run(a.item_id, a.key, a.value);
 	return db;
 }
 
@@ -293,7 +322,8 @@ export function canonicalDigest(db: Database): string {
 				'SELECT item_id, verdict, evidence, method, measured_at FROM verdicts ORDER BY item_id, measured_at, verdict'
 			)
 			.all(),
-		refs: db.prepare('SELECT from_id, to_id, kind FROM refs ORDER BY from_id, to_id, kind').all()
+		refs: db.prepare('SELECT from_id, to_id, kind FROM refs ORDER BY from_id, to_id, kind').all(),
+		attrs: db.prepare('SELECT item_id, key, value FROM attrs ORDER BY item_id, key, value').all()
 	};
 	return createHash('sha256').update(JSON.stringify(dump)).digest('hex');
 }

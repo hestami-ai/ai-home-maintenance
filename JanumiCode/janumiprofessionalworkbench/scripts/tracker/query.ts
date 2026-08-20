@@ -98,6 +98,18 @@ switch (command) {
 		console.log(JSON.stringify({ ok: true, item: item ?? null, history }));
 		break;
 	}
+	case 'sql': {
+		// SELECT-only, on a READONLY connection — this exists so the verif ingest gate can express
+		// its cross-checks without every check becoming a bespoke subcommand. The readonly open is
+		// the enforcement; the prefix check is the polite refusal in front of it.
+		const statement = positional.slice(1).join(' ');
+		if (!/^\s*select\b/i.test(statement)) {
+			console.error(JSON.stringify({ ok: false, error: 'sql accepts SELECT statements only' }));
+			process.exit(1);
+		}
+		console.log(JSON.stringify({ ok: true, rows: db.prepare(statement).all() }));
+		break;
+	}
 	default: {
 		console.error(JSON.stringify({ ok: false, error: `unknown command '${command}'` }));
 		process.exit(1);
