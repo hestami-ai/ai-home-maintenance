@@ -84,7 +84,7 @@
 
 ### UNK-W0-001
 - **statement:** exact per-capability conformance depth of each master W1/W2 outcome in JPWB (conformant vs partial vs hollow).
-- **type:** unknown. **impact:** later-wave sizing. **resolution_method:** DWP-004/005/006 + later-wave roadmaps. **resolution_gate:** G1+. **owner:** agent. **status:** OPEN.
+- **type:** unknown. **impact:** later-wave sizing. **resolution_method:** DWP-004/005/006 + later-wave roadmaps. **resolution_gate:** G1+. **owner:** agent. **status:** ~~OPEN~~ **RESOLVED (recorded 2026-08-20, REG-F-200)** — resolved by the SAME evidence that discharged its paired deferral DEF-W0-001 above, and its `resolution_gate` (G1+) has since closed TWICE. The statement asks for depth *"conformant vs partial vs hollow"*; `W1-DR-001` §4 grades all eight W1 master WPs in exactly those three values with code grounding, and `W2-DR-001` §2 carries W2's by reference to `evidence/persistence-current-state.md`'s *"Per-WP verdicts"*. ⚠ A DEFERRAL AND AN UNKNOWN ASKING THE SAME QUESTION WENT STALE TOGETHER, which is the finding one level up: this file keeps its DIV and DEC rows current and left BOTH of the other record types untouched.
 
 ## 5. ADR baseline (initial)
 
