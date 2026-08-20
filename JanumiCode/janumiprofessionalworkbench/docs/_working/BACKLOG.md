@@ -69,10 +69,29 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   (`sqlite-storage-adapter.ts:251`) and is NOT a member of `EngineHandle`, so no read surface can ask for
   one object's history; the §28.2 assurance aggregate is computed (`+page.server.ts:131`), serialized, and
   **rendered nowhere**; `plansForPwus` has no per-PWU entry point. Each is a seam, not a build.
-- [ ] **(8) Write-only fields (the REG-F-005 shape, alive)** — `affectedClaimIds` (written
-  `assurance.ts:642`, no reader), `downstreamImpactObjectIds` (`governance.ts:593`, no reader),
-  `professional_work_object_versions` (one INSERT, zero SELECTs), `activeExecutionPlanId` (zero writers
-  AND zero readers, though ratified). Sweep-or-file, with REG-F-005's discipline.
+- [ ] **(8) Write-only fields (the REG-F-005 shape, alive) — RE-VERIFIED 2026-08-20 with
+  identifier-boundary searches, and ONE OF THE FOUR TURNED OUT NOT TO BE A DEFECT.** Confirmed
+  written-and-never-read: `affectedClaimIds` (writer `assurance.ts:642`, schema `messages.ts`, one
+  test — no production reader), `downstreamImpactObjectIds` (writer `governance.ts:593`, schema
+  `objects.ts:374` — those are its ONLY two occurrences in the tree), and
+  `professional_work_object_versions` (CREATE at `schema.ts:81`, one INSERT at
+  `sqlite-storage-adapter.ts:197`, zero SELECTs). Those three are the REG-F-005 shape and are
+  sweep-or-file.
+  ⚠ **`activeExecutionPlanId` IS NOT ONE OF THEM — DO NOT SWEEP IT.** It is ratified with zero
+  writers and zero readers, and that is a RECORDED DECISION, not drift. RPH-EXE-001 ("a PWU has at
+  most one active Execution Plan") is ENFORCED, by DERIVING the fact from authoritative plan state;
+  writing the pointer was considered and REJECTED, because it hangs off the PWU aggregate while the
+  command targets the Execution aggregate (DOC-002 §3.3), so maintaining it would mean a
+  cross-aggregate write plus a PWU event type no contract defines — "inventing a shape to satisfy a
+  guard". The reasoning is at `packages/rph-application/src/handlers/execution.ts:394-408`, and it
+  also records the original defect: the guard USED to read the pointer, which was permanently
+  `undefined`, so its one-active-plan limb was unreachable — "the kernel was wired; the fact it
+  decides on was not."
+  ⚠ **A READING TRAP, recorded because it nearly caught me.** `enforcement-register.ts:2222` says
+  `currentBaselineId` is dead and "that is precisely the shape `activeExecutionPlanId` had before
+  RPH-EXE-001 was enforced". That is literally true and easy to misread as "so the field was
+  populated" — it was not; the RULE was enforced around it. The register row is about
+  `currentBaselineId`'s own liveness, which remains a live finding THERE, not here.
 - **NOT residue — already ruled, do not re-file:** `getImpactAnalysis`'s deltas belong to **REG-F-006**
   (OPEN/NARROWED, blocked on sponsor escalation REG-E-030), and `getPwuExecutionStatus`'s missing rollup
   is **corpus-CONFORMANT** under REG-F-080's ratified safe default ("`PWU.executionState` … is
@@ -84,6 +103,11 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   (`lifecycleStatus`, fused with the axis on every transition, set independently in the birth
   literal). Assertion added and proven RED against the exact surviving mutation; correction +
   OBSERVED verdict appended to `census/w3-probes.ndjson`; gate asserts the full history.
+- [ ] **A format-conformance RATCHET** — `format:check` is red for 267 files and is invoked by no
+  gate, so the standing "conformance arrives edit-by-edit" policy has no measurement and cannot
+  fail. A ratchet (the count may not increase, pinned the way the mutation ratchets are) makes the
+  policy real without triggering the REG-F-194 wholesale-reformat churn trap. Design-first: it
+  changes `gate:fast`.
 - [ ] **W-3b: the 192 invariants' prose→code mapping** — judgment work (lanes + refuters, the
   REG-F-197 pattern), deliberately NOT done by grep in W-3. The canon 62 FAM-N invariants are the
   priority slice.
@@ -146,9 +170,24 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 
 - **REG-F-100's 64 grandfathered register entries** — burned down as each is next touched,
   explicitly *"not in a sweep."*
-- **`format:check` red at HEAD for `scripts/mutants/ledger.ts`** — reformatting it wholesale is the
-  REG-F-194 Finding 3 churn trap. Conformance arrives edit-by-edit. ⚠ Re-verify before citing: the
-  sonar campaign touched `ledger.ts`; this fact may have aged.
+- **`format:check` is red for ~~`scripts/mutants/ledger.ts`~~ 267 FILES, and is in NO gate** —
+  **CORRECTED 2026-08-20 by measuring what the note actually claims.** This bullet named ONE file;
+  `bunx prettier --check "**/*.ts"` (the exact `format:check` command, `.prettierignore` already
+  excluding node_modules/dist/coverage/docs) reports **267**: rph-application 105, rph-demo 38,
+  rph-domain 27, rph-engine 17, rph-projections 16, csaa 6, contracts 4, authoring 3,
+  scripts/mutants 2, and 3 loose files. `scripts/mutants/ledger.ts` is not a special case; it is two
+  of two hundred and sixty-seven. The policy stands — wholesale reformatting is the REG-F-194
+  Finding 3 churn trap, and conformance arrives edit-by-edit (verify your edited REGION against
+  `bunx prettier <file>`'s output, not the whole file). What changes is that the note no longer
+  reads as "one stubborn file".
+  ⚠ **AND THE POLICY IS CURRENTLY UNFALSIFIABLE.** `format:check` is referenced by NOTHING —
+  derived: no `gate`, `gate:fast`, `test` or `check-types` leg invokes it. So nothing measures
+  whether "edit-by-edit convergence" is converging, and the number could rise without any signal.
+  That is the hollow-instrument shape this programme is built to name, applied to formatting.
+  A RATCHET (the count may not increase) would make the policy real, the way the mutation and
+  coverage ratchets do. Recorded as an item below rather than done here, because it touches
+  `gate:fast` and is a policy change, not a fix. NOT measured: whether 267 is rising or falling —
+  there is no history to compare against, which is itself the point.
 
 ## Handed off (CSAA coding agent — touch only if we break it)
 
