@@ -4460,3 +4460,27 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 
 ---
 
+### REG-F-201 — a default chosen to be convenient inverted a lifecycle guard, and a docblock about a missing capability was scored as the capability
+
+**Date:** 2026-08-20 · **Type:** FINDINGS + FIXES (the general form of REG-F-199 residue 1, plus an instrument defect found by causing it) · **Status:** MERGED — both surfaces typed, the walk reads code only, six mutants KILLED
+
+- **THE GENERAL FORM WAS WORTH ASKING.** REG-F-199 residue (1) fixed ONE loader. An audit of every production path where an EXTERNALLY-SUPPLIED id reaches a type-blind read found two more exploitable sites, and the second is not another instance of the same defect — it is a control pointing backwards.
+
+- **BOTH SITES CARRY THE SAME PAIR:** a read that asserts nothing about the object, and a `?? 'DRAFT'` fallback. `publicationStatus` exists ONLY on PWAs (`handlers/pwa-authoring.ts`), so on any other object the fallback FABRICATES `'DRAFT'`. **A default chosen to be convenient is a default chosen to be PERMISSIVE, and it fires precisely when the object is not what the code thinks it is.**
+
+- **(1) `/pwa/[id]` rendered a non-PWA AND UNLOCKED THE AUTHORING SURFACE.** The fabricated DRAFT drives `isDraft`, so a guessed URL got **more editing surface on a non-PWA than on the genuine seeded PWA**, which is PUBLISHED and correctly offers none. Not ULID-gated either: `/pwa/floor.reasoning-review` — a module-constant policy id, publicly guessable — rendered as a draft PWA named *"Reasoning Review"*. That case is in the test.
+
+- **(2) THE AGENT ENDPOINT'S LIFECYCLE GUARD WAS EXACTLY INVERTED.** `routes/pwa/[id]/agent/+server.ts` refuses unless `publicationStatus === 'DRAFT'` — a real check, correct for real PWAs. `PwaAuthoringBroker.getPwa()` (`broker.ts:262`) carries the identical `?? 'DRAFT'`, which synthesizes the very value the guard admits. So **it refused the legitimate PUBLISHED PWA and admitted every non-PWA.** Past it lies a persistent process-local authoring turn keyed to a non-PWA id, a forked engine, an external model invocation, and fork-recorded assurance objects asserting `objectType: 'PROFESSIONAL_WORK_ARCHITECTURE'` about something that is not one. Verified by reading both lines rather than on the audit's word: a fallback and a predicate twelve files apart compose into a guard that is precisely backwards, and neither is wrong on its own.
+
+- **⚠⚠ AND I MANUFACTURED A CAPABILITY BY DOCUMENTING ITS ABSENCE.** The docblock written for residue (1)'s fix — "`getObject` … stands in for four ratified typed queries (getUndertaking, getPwu, getBaseline, getPwaVersion)" — flipped all four from ABSENT to DECLARED. The consumer walk read a sentence ABOUT capabilities that do not exist as evidence that they do. **This is REG-F-113's rule one layer out**: the register parser already had to strip inline code spans before matching fields, for exactly this reason. Prose about a thing is not the thing. Fixed at `scripts/tracker/match.ts` (`stripComments`), whose limits are asserted rather than implied — it is lexical, so a `//` inside a string can only ever LOSE a match, never invent one, and the positive control is now checked against the STRIPPED text so a broken strip disables absence claims entirely.
+
+- **BLAST RADIUS, DERIVED over all 118 consumer-walk items: FIVE.** Four self-inflicted the same hour. **The fifth was already there and is the finding: `ClaimRejected` had been scored TESTED since W-3 because its ONLY test mention is a header comment** (`claim-assessment.test.ts:4`), while production genuinely emits it (`handlers/assurance.ts:723`). A ratified event believed tested was only ever mentioned. Corrected to DECLARED, append-only in `census/w3-corrections.ndjson`. A further **41 records changed their cited WITNESS FILE without changing tier** — the previous first match was a comment in an earlier file — which is the scale of comment-noise that had been sitting in the evidence strings.
+
+- **A NEAR-MISS WORTH THE RECORD.** My first check for `ClaimRejected` returned ZERO occurrences and I briefly concluded the whole result was an artifact of a concurrent session's scratch files. It was a false negative: the grep ran from the outer repo root, where `packages/` does not exist. **An absence is a claim about YOUR SEARCH — and that applies to the search that DISSOLVES a finding at least as hard as to the one that raises it** (the REG-F-120 lesson, arriving from the other direction).
+
+- **SIX MUTANTS, ONE VICTIM EACH, ALL KILLED.** Two revert the reads; `F201-broker-asserts-the-wrong-type` exists FOR THE CONTROL — asserting the wrong type would satisfy both refusal tests while breaking authoring for every real PWA, and it shares its sibling's anchor deliberately, because the same one line IS the whole guard and the two mutations fail in OPPOSITE directions. `MU-TRACKER-03` reverts the comment strip, its victim the census leg's LIVE `measure.ts` run — the second time that live assertion has caught what the committed journal could not.
+
+- **Merge target:** Repository — `68f5fbc1` (the walk reads code only) · `89211813` (both PWA surfaces typed) · this commit. Extends REG-F-199's `getObjectOfType` seam to its second and third adopters.
+
+---
+

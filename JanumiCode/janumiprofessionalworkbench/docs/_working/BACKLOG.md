@@ -9,6 +9,23 @@ rewritten 136 files, so age everything below accordingly.
 Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by deleting.
 
 ## Actionable now
+
+### REG-F-201 residue — the type-blind class is CLOSED for externally-supplied ids; two follow-ons
+
+- [x] ~~**The general form of residue (1)**~~ — **AUDITED AND CLOSED 2026-08-20 (REG-F-201).** Two more
+  exploitable sites, both fixed: `/pwa/[id]` (fabricated DRAFT unlocked the authoring surface; a
+  guessable non-ULID policy id, `/pwa/floor.reasoning-review`, rendered as a draft PWA) and
+  `PwaAuthoringBroker.getPwa()`, whose `?? 'DRAFT'` INVERTED the agent endpoint's lifecycle guard —
+  it refused the legitimate PUBLISHED PWA and admitted every non-PWA. Six mutants KILLED; 74 e2e green.
+- [ ] **A STANDING GATE for the type-blind class** — design-first. The audit closed the known sites;
+  nothing stops the next one. A gate would have to identify reads whose id ORIGINATES EXTERNALLY
+  (URL param, form field, query string) and reaches `getObject`/`loadObject` without a type
+  assertion. ⚠ State its limits: it cannot see an id laundered through a variable, nor judge whether
+  a downstream guard is genuine — the inverted guard at the agent endpoint LOOKED like one.
+- [ ] **`?? 'DRAFT'` is a pattern, not two instances** — both fixed sites kept the fallback (now
+  unreachable, since a real PWA always carries the field). Sweep for OTHER permissive defaults on
+  lifecycle/status fields: a default chosen to be convenient is a default chosen to be permissive,
+  and it fires exactly when the object is not what the code thinks it is.
 - [x] ~~**W-3 finding (i): the §34.5 query roster**~~ — **CLOSED 2026-08-20, REG-F-199, in both halves.**
   (a) THE INSTRUMENT: the walk matched unanchored SUBSTRINGS, so `getPwu` read as present inside
   `getPwuTemplate` — the sole positive result in the population it was commissioned to measure. The
