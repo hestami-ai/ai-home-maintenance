@@ -43,9 +43,12 @@ const db = new Database(dbPath, { readonly: true });
 
 // Latest verdict per item = the last record in (measured_at, rowid) order — append-only journals
 // make "latest" a total order without any mutable status column existing anywhere.
+// 'at-build' is the DECLARED floor re-derived every build — it must sort EARLIEST, or the floor
+// shadows every dated measurement above it (found when commands reported DECLARED while carrying a
+// dated TESTED: lexicographically 'at-build' > '2026-08-20', so recency picked the floor).
 const LATEST =
 	'SELECT v.item_id, v.verdict, v.evidence, v.method, v.measured_at FROM verdicts v ' +
-	'WHERE v.rowid = (SELECT v2.rowid FROM verdicts v2 WHERE v2.item_id = v.item_id ORDER BY v2.measured_at DESC, v2.rowid DESC LIMIT 1)';
+	"WHERE v.rowid = (SELECT v2.rowid FROM verdicts v2 WHERE v2.item_id = v.item_id ORDER BY CASE WHEN v2.measured_at = 'at-build' THEN '' ELSE v2.measured_at END DESC, v2.rowid DESC LIMIT 1)";
 
 switch (command) {
 	case 'counts': {

@@ -9,6 +9,20 @@ rewritten 136 files, so age everything below accordingly.
 Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by deleting.
 
 ## Actionable now
+- [ ] **W-3 finding (i): 13 of the 14 ratified DOC-002 §34.5 queries are name-ABSENT** — only
+  `getAssuranceStatus`-adjacent naming survives; `getBaseline`, `getEventHistory`,
+  `getProfessionalWorkGraph` and ten more appear nowhere in packages/+apps/ (consumer-walk with
+  fired positive control; roster: `census/w3-verdicts.ndjson`). ⚠ Name-level absence — equivalents
+  may exist under other names in `rph-engine/src/queries.ts`; the delta investigation is owed
+  before any is filed as a gap. Also name-ABSENT: the ratified **Execution Workbench** surface.
+- [ ] **W-3 finding (ii): CaptureIntent's ratified birth state is observed by NOTHING** — probe
+  mutation RAW→PROVISIONAL stayed green across intent.test.ts, ALL of rph-application (902) and
+  rph-engine (149). The command is TESTED (a driving test names it) and its central ratified
+  property is unobserved — the stub-tier distinction made concrete. Fix = a birth-state assertion
+  (and consider a ledger mutant); recorded at `cap:command:CaptureIntent` as a probe_mutation attr.
+- [ ] **W-3b: the 192 invariants' prose→code mapping** — judgment work (lanes + refuters, the
+  REG-F-197 pattern), deliberately NOT done by grep in W-3. The canon 62 FAM-N invariants are the
+  priority slice.
 - [ ] **Implementation ground-truth program** — design + roadmap landed 2026-08-20
   (`DESIGN-implementation-ground-truth.md`, `ROADMAP-implementation-ground-truth.md`): a bun:sqlite
   INDEX over the existing trackers (never a peer tracker) + the capability census with the

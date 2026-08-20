@@ -243,3 +243,70 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		expect(rows).toEqual([{ verdict: 'DECLARED', n: 266 }]);
 	});
 });
+
+describe('measured verdicts (W-3) — measurements cross-checked, absences controlled', () => {
+	it('enforcement-register verdicts match an independent per-kind count of the register file', () => {
+		// The measure script's regex missed two comment-shadowed entries on its first run (110 of
+		// 112); this cross-check is what makes that class of miss impossible to ship.
+		const registerSource = readFileSync(
+			join(REPO, 'packages', 'rph-domain', 'src', 'enforcement-register.ts'),
+			'utf8'
+		);
+		// ⚠ The bare `kind: '…'` count over-reads by three: the discriminated union's TYPE
+		// declarations (`readonly kind: '…';`) carry each literal once. Found when this check's first
+		// run disagreed 32 vs 31 — the disagreement doing exactly its job, against the CHECK this time.
+		const independent = { ENFORCED: 0, UNENFORCED_DISCLOSED: 0, NOT_A_COMMAND_REFUSAL: 0 };
+		for (const m of registerSource.matchAll(
+			/(readonly )?kind: '(ENFORCED|UNENFORCED_DISCLOSED|NOT_A_COMMAND_REFUSAL)'/g
+		))
+			if (m[1] === undefined) independent[m[2] as keyof typeof independent] += 1;
+		const enforced = sql<{ n: number }>(
+			"SELECT COUNT(*) AS n FROM verdicts WHERE method = 'enforcement-register:w3' AND verdict = 'ENFORCED'"
+		)[0]!.n;
+		const disclosed = sql<{ n: number }>(
+			"SELECT COUNT(*) AS n FROM verdicts WHERE method = 'enforcement-register:w3' AND verdict = 'DIVERGENT_FILED'"
+		)[0]!.n;
+		const classified = sql<{ n: number }>(
+			"SELECT COUNT(*) AS n FROM attrs WHERE key = 'enforcement_class' AND value = 'NOT_A_COMMAND_REFUSAL'"
+		)[0]!.n;
+		expect(enforced).toBe(independent.ENFORCED);
+		expect(disclosed).toBe(independent.UNENFORCED_DISCLOSED);
+		expect(classified).toBe(independent.NOT_A_COMMAND_REFUSAL);
+		expect(enforced + disclosed + classified).toBe(112);
+	});
+
+	it('every consumer-walk ABSENT states its search and its fired positive control', () => {
+		const rows = sql<{ evidence: string }>(
+			"SELECT evidence FROM verdicts WHERE method = 'consumer-walk:w3' AND verdict = 'ABSENT'"
+		);
+		expect(rows.length).toBeGreaterThan(0);
+		for (const row of rows) {
+			expect(row.evidence).toContain('not found');
+			expect(row.evidence).toContain('positive control');
+		}
+	});
+
+	it('OBSERVED verdicts exist only where a probe mutation was actually driven', () => {
+		const rows = sql<{ item_id: string; method: string }>(
+			"SELECT item_id, method FROM verdicts WHERE verdict = 'OBSERVED' ORDER BY item_id"
+		);
+		expect(rows).toEqual([
+			{ item_id: 'cap:machine:Intent.intentStatus', method: 'probe-mutation:w3' },
+			{ item_id: 'cap:policy:POL-ASSUMPTION-DISCLOSURE', method: 'probe-mutation:w3' }
+		]);
+	});
+
+	it('the CaptureIntent probe SURVIVAL is recorded as a finding, never laundered into a verdict', () => {
+		const attrs = sql<{ value: string }>(
+			"SELECT value FROM attrs WHERE item_id = 'cap:command:CaptureIntent' AND key = 'probe_mutation'"
+		);
+		expect(attrs).toHaveLength(1);
+		expect(attrs[0]!.value).toContain('SURVIVED');
+		expect(attrs[0]!.value).toContain('RAW');
+		// And the item's ladder tier remains TESTED — a survived probe must not raise OR erase it.
+		const latest = sql<{ verdict: string }>(
+			"SELECT verdict FROM verdicts WHERE item_id = 'cap:command:CaptureIntent' AND measured_at <> 'at-build'"
+		);
+		expect(latest.map((r) => r.verdict)).toEqual(['TESTED']);
+	});
+});

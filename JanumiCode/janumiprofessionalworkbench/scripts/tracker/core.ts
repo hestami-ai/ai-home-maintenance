@@ -102,11 +102,19 @@ export interface RefRecord {
 }
 export type TrackerRecord = ItemRecord | VerdictRecord | SupersedeRecord | RefRecord;
 
+export interface CensusAttrRecord {
+	readonly type: 'attr';
+	readonly item_id: string;
+	readonly key: string;
+	readonly value: string;
+}
+
 export interface LoadedCensus {
 	readonly items: ItemRecord[];
 	readonly verdicts: VerdictRecord[];
 	readonly supersedes: SupersedeRecord[];
 	readonly refs: RefRecord[];
+	readonly attrs: CensusAttrRecord[];
 }
 
 function fail(message: string): never {
@@ -129,6 +137,7 @@ export function loadRecords(censusDir: string): LoadedCensus {
 	const verdicts: VerdictRecord[] = [];
 	const supersedes: SupersedeRecord[] = [];
 	const refs: RefRecord[] = [];
+	const attrs: CensusAttrRecord[] = [];
 	const ids = new Set<string>();
 	const files = existsSync(censusDir)
 		? readdirSync(censusDir)
@@ -202,6 +211,17 @@ export function loadRecords(censusDir: string): LoadedCensus {
 						kind: requireText(record, 'kind', where)
 					});
 					break;
+				case 'attr':
+					// W-3: a measurement may attach a CLASSIFICATION rather than a ladder verdict (e.g.
+					// the enforcement register's NOT_A_COMMAND_REFUSAL — a scope statement, not an
+					// implementation tier). Attrs never appear in the verdict ladder queries.
+					attrs.push({
+						type: 'attr',
+						item_id: requireText(record, 'item_id', where),
+						key: requireText(record, 'key', where),
+						value: requireText(record, 'value', where)
+					});
+					break;
 				default:
 					fail(
 						`${where}: unknown record type '${String(record.type as string | number | boolean)}'`
@@ -209,15 +229,16 @@ export function loadRecords(censusDir: string): LoadedCensus {
 			}
 		});
 	}
-	// THE APPEND-ONLY LAW, half two: every reference resolves. A dangling supersede or verdict is a
-	// record about nothing, and tolerating it is how a roster decays back into a count.
+	// THE APPEND-ONLY LAW, half two: supersede references resolve WITHIN the census — a census
+	// record may only supersede another census record. ⚠ VERDICT references are validated LATER,
+	// in buildDb after the ingest merge (W-3): a measured verdict legitimately targets an INGESTED
+	// item (`cap:command:*`, `cap:rule:*`), which this loader cannot see. Moving the check, not
+	// dropping it — a dangling verdict still refuses the build, one layer up.
 	for (const s of supersedes) {
 		if (!ids.has(s.id)) fail(`supersede of unknown item '${s.id}'`);
 		if (!ids.has(s.superseded_by)) fail(`supersede target '${s.superseded_by}' does not exist`);
 	}
-	for (const v of verdicts)
-		if (!ids.has(v.item_id)) fail(`verdict for unknown item '${v.item_id}'`);
-	return { items, verdicts, supersedes, refs };
+	return { items, verdicts, supersedes, refs, attrs };
 }
 
 /**
@@ -309,6 +330,18 @@ export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Da
 	for (const r of ingested.refs) insertRef.run(r.from_id, r.to_id, r.kind);
 	const insertAttr = db.prepare('INSERT INTO attrs (item_id, key, value) VALUES (?, ?, ?)');
 	for (const a of ingested.attrs) insertAttr.run(a.item_id, a.key, a.value);
+	for (const a of census.attrs) insertAttr.run(a.item_id, a.key, a.value);
+	// THE DANGLING-VERDICT LAW, enforced POST-MERGE (moved from loadRecords in W-3): a measured
+	// verdict or classification may target an ingested item, but never a nonexistent one — a
+	// verdict about nothing is how a roster decays back into a count.
+	const allIds = new Set<string>([
+		...census.items.map((i) => i.id),
+		...ingested.items.map((i) => i.id)
+	]);
+	for (const v of census.verdicts)
+		if (!allIds.has(v.item_id)) fail(`verdict for unknown item '${v.item_id}'`);
+	for (const a of census.attrs)
+		if (!allIds.has(a.item_id)) fail(`attr for unknown item '${a.item_id}'`);
 	return db;
 }
 

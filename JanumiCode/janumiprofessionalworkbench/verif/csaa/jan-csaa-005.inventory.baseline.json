@@ -38,15 +38,15 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 21,
+      "discovered": 22,
       "excluded": 0,
       "failed": 0,
-      "included": 21,
+      "included": 22,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 21
+      "successfullyInventoried": 22
     },
     {
       "artifactClass": "SOURCE",
@@ -2503,7 +2503,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "093c05da925b434bfd25d9a504b011b6bb0bfb8d69923a750508c90f86a25121",
+    "configurationDigest": "3ef3b4853959a8411f7f96abce67ca3d3ac6d76a1d473dfc811584006a3daa6f",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -4837,7 +4837,7 @@
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "68bf9006602dfe658d5e3709e4f15b6d65537d46fde04678d0239f7bf721603d",
+          "projectResolutionDigest": "c0aa2cb83510e71244aa8cb1d842a62a9db9d7bcb26f5efa022522682f040332",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4856,6 +4856,7 @@
             "scripts/tracker/check.ts",
             "scripts/tracker/core.ts",
             "scripts/tracker/ingest.ts",
+            "scripts/tracker/measure.ts",
             "scripts/tracker/query.ts"
           ]
         },
@@ -5670,7 +5671,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "26597c34c1f4ff90e04445891680ccc6c2acf5dc57cec8ce82831b35081f6405",
+    "fileManifestDigest": "dee5ce6c25e7de1d0dfb9a5bb1b2459409bb3391fe20de1af1e11a981a3ce392",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5733,7 +5734,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 956,
+    "selectedFileCount": 957,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -12009,9 +12010,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 13241,
+        "bytes": 14779,
         "path": "scripts/tracker/core.ts",
-        "sha256": "86445086f67d2df08c57fa901dbe236fcfacd01893088afcc43a62632707e6bb",
+        "sha256": "dfe3f99d03218bc6beb1656bc7f21057eb7a7e9c7118db03e5d9711781d018ec",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12023,9 +12024,16 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 4727,
+        "bytes": 9059,
+        "path": "scripts/tracker/measure.ts",
+        "sha256": "9e3a16b966c1eca7a6e9a514491f654b09d50fcde9313f30443b8d22d7a68616",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
+        "bytes": 5073,
         "path": "scripts/tracker/query.ts",
-        "sha256": "29014b516cd08a5b12743408877ce3d5e0e485ccd82e2c7b44b63e6c62d4df88",
+        "sha256": "971d2c17057f745b283e97922397d213fb3ce57102699057a648624b70804ea9",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12345,9 +12353,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11371,
+        "bytes": 14713,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "43c3caab61b9f49da84ebe0d6fcdc6def466af46c931d313d510d2eabe5811d9",
+        "sha256": "2a6a2c97cfbc5406045a3d6eaa053135ae6726df05b66c9d5190839ff875ee6e",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12428,7 +12436,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "08b69281ecdbca7d60eef0e14f69184ac204d52170e87ffc3da18f254095777c",
+    "subjectId": "3dd6428516cde98f4c5220732d04f3b68ccdaffe3267c2b3fe1f88adf360a8e2",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14291,7 +14299,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 14,
+      "candidateArtifactCount": 15,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14333,6 +14341,7 @@
         "scripts/tracker/check.ts",
         "scripts/tracker/core.ts",
         "scripts/tracker/ingest.ts",
+        "scripts/tracker/measure.ts",
         "scripts/tracker/query.ts"
       ],
       "resolvedRootState": "RESOLVED_DWP002",
@@ -14978,7 +14987,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/core.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "86445086f67d2df08c57fa901dbe236fcfacd01893088afcc43a62632707e6bb",
+      "contentSha256": "dfe3f99d03218bc6beb1656bc7f21057eb7a7e9c7118db03e5d9711781d018ec",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15006,9 +15015,24 @@
       "role": "SCRIPT"
     },
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/measure.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "9e3a16b966c1eca7a6e9a514491f654b09d50fcde9313f30443b8d22d7a68616",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "FILESYSTEM_OR_TEXT",
+      "gateCarriers": [
+        "UNMAPPED"
+      ],
+      "path": "scripts/tracker/measure.ts",
+      "provenance": [
+        "scripts/tracker/measure.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/query.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "29014b516cd08a5b12743408877ce3d5e0e485ccd82e2c7b44b63e6c62d4df88",
+      "contentSha256": "971d2c17057f745b283e97922397d213fb3ce57102699057a648624b70804ea9",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -15664,7 +15688,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "43c3caab61b9f49da84ebe0d6fcdc6def466af46c931d313d510d2eabe5811d9",
+      "contentSha256": "2a6a2c97cfbc5406045a3d6eaa053135ae6726df05b66c9d5190839ff875ee6e",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
