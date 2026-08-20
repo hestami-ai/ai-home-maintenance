@@ -1,0 +1,8 @@
+# The monorepo root marks `*.ndjson -diff` because SESSION/TRANSCRIPT journals can carry
+# non-UTF-8 bytes that break UTF-8 diff decoding. Census journals are the opposite case:
+# validated, machine-written UTF-8 JSON whose whole design goal is DIFF-FRIENDLY append-only
+# review (design §3) — a binary-flagged roster cannot be reviewed, and an unreviewable roster
+# defeats the reason it is plaintext. A deeper .gitattributes overrides the parent for exactly
+# this subtree, the same shape as this workspace's .gitignore re-including `packages/` against
+# the parent's Swift-template `Packages/` rule.
+census/*.ndjson diff
