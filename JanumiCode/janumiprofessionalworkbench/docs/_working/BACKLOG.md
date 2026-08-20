@@ -17,8 +17,24 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   exception discipline). REG-F-180 P4 + REG-E-019 updated in place. **Remaining sponsor act:** only REG-E-019's formal
   closure on Ratify Sheet R1 — the L1186 pointer already retired WITH its document on 2026-07-17
   (JAN-ENGC-001 §7.1 replaced it; both audits missed this — see the register's same-day correction).
-- [ ] **REG-F-180 P2: the REG-D-008 shape-survivorship audit** — in progress 2026-08-20; design at
-  `DESIGN-shape-survivorship-audit.md`. ⚠ ~~"P1/P2 audits (never performed)"~~ — **P1 WAS performed,
+- [x] ~~**REG-F-180 P2: the REG-D-008 shape-survivorship audit**~~ — **PERFORMED 2026-08-20,
+  REG-F-197.** 247 schemas: 163 ENFORCED, 35 DIVERGENT_FILED, 18 DIVERGENT_UNFILED, 11
+  REFERENCE_NO_FIXTURE, 3 PLACEHOLDER, 17 ABSENT. Full roster with evidence preserved at
+  `AUDIT-shape-survivorship-2026-08-20.md` — the REG-F-120 lesson applied. Residue below.
+- [ ] **REG-F-197 residue (i): file-or-moot the 18 DIVERGENT_UNFILED** — each divergence needs a
+  register filing (deliberate, like the 35 filed) or a drift fix. Rostered in the audit artifact.
+  ⚠ 28 of the DOC-007/008/009 actionables are UNREFUTED hypotheses with a measured ~36%% overturn
+  rate — re-verify each before acting on it.
+- [ ] **REG-F-197 residue (ii): the three PLACEHOLDER types** (`assurance_assessment_evidence`
+  z.record, `ControlActionRecommendation`, DOC-004 §33 validator output) — the REG-F-005 shape,
+  alive. Real types + fixtures, or a filed exception.
+- [ ] **REG-F-197 residue (iii, SPONSOR): the DOC-000 vocabulary-governance fork** — JPWB-DOC-002
+  claims to SUCCEED the “retired” charter; REG-D-034 makes the source corpora SOURCE OF RECORD.
+  Which governs family-level vocabulary decides whether the DOC-000 ABSENT rows are findings.
+- [ ] **REG-F-197 residue (iv, SPONSOR): build-or-moot the DOC-009 legacy-migration table family**
+  (`migration_batches`, `legacy_object_mappings`, `dialogue_migration_status`,
+  `migration_comparisons`) — greenfield repo, possibly never-to-be-built ground; needs a ruling,
+  not a guess. ⚠ ~~"P1/P2 audits (never performed)"~~ — **P1 WAS performed,
   at REG-F-183, the same day as REG-F-180 and three entries later**; this backlog inherited
   REG-F-180's bullet without reading past it (the citation-currency failure, again). REG-F-183:
   all 58 REG-Q-045 items ARE carried, but 36 live in prose strings gated by NOTHING (four carriers:
