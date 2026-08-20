@@ -40,9 +40,33 @@ function collectPwuProposed(
 	}
 }
 
-/** Collect a DecompositionProposed event's parent→children edges into the shared accumulator. Mutates
- * `edges` in place — behaviour-identical to the inline branch it replaces. */
-function collectDecompositionProposed(payload: unknown, edges: GraphEdge[]): void {
+/**
+ * The event whose presence WITHDRAWS a decomposition's proposed edges — REG-F-199 residue (3).
+ *
+ * `DecompositionProposed` records a PROPOSAL. `ValidateDecomposition { disposition: 'INVALID' }`
+ * refuses it and emits `DecompositionRejected`, so those parent→child links were never part of the
+ * hierarchy. Reading the proposal alone made this query return every link ever PROPOSED — a
+ * SUPERSET, not the hierarchy.
+ *
+ * ⚠ WHY THIS KEYS ON THE EVENT AND NOT ON THE CONTRACT'S STATUS, which was the obvious fix and is
+ * DEFEATED BY ONE COMMAND. `DecompositionContract.status` admits INVALID as an in-arrow to
+ * SUPERSEDED (handlers/decomposition.ts:491), a revise cannot change the child set, and the
+ * contract can never be re-validated (`validateDecomposition` requires UNDER_REVIEW, written only
+ * at birth). So a single accepted `ReviseDecomposition` moves the contract off INVALID forever
+ * while the refusal it recorded still stands — and a status-keyed guard would resurrect the
+ * withdrawn edge. The event log cannot be walked back, which is exactly the property this needs;
+ * `decomposition-edge-withdrawal.test.ts` drives that escape as its own test.
+ */
+const WITHDRAWING_DECOMPOSITION_EVENT = 'DecompositionRejected';
+
+/** Collect a DecompositionProposed event's parent→children edges into the shared accumulator, unless
+ * the proposal was subsequently REFUSED. Mutates `edges` in place. */
+function collectDecompositionProposed(
+	payload: unknown,
+	withdrawn: boolean,
+	edges: GraphEdge[]
+): void {
+	if (withdrawn) return;
 	const p = payload as { parentWorkUnitId?: string; childWorkUnitIds?: string[] };
 	for (const child of p.childWorkUnitIds ?? []) {
 		if (p.parentWorkUnitId) {
@@ -61,12 +85,17 @@ export function professionalWorkGraph(
 	const pwuIds: string[] = [];
 	const edges: GraphEdge[] = [];
 	const seen = new Set<string>();
+	// One pass to learn which contracts were refused, because the refusal is emitted AFTER the
+	// proposal it withdraws and the edge loop below reads the log in order.
+	const withdrawnContracts = new Set(
+		events.filter((e) => e.eventType === WITHDRAWING_DECOMPOSITION_EVENT).map((e) => e.aggregateId)
+	);
 
 	for (const e of events) {
 		if (e.eventType === 'PwuProposed') {
 			collectPwuProposed(e.payload, seen, pwuIds, edges);
 		} else if (e.eventType === 'DecompositionProposed') {
-			collectDecompositionProposed(e.payload, edges);
+			collectDecompositionProposed(e.payload, withdrawnContracts.has(e.aggregateId), edges);
 		}
 	}
 

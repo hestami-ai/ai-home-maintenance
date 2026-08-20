@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 365,
+      "discovered": 366,
       "excluded": 0,
       "failed": 0,
-      "included": 365,
+      "included": 366,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 365
+      "successfullyInventoried": 366
     },
     {
       "artifactClass": "VERIFICATION",
@@ -440,6 +440,7 @@
         "packages/rph-engine/src/assessment-drive.test.ts",
         "packages/rph-engine/src/assessment-startedat-contract.test.ts",
         "packages/rph-engine/src/assurance-view.test.ts",
+        "packages/rph-engine/src/decomposition-edge-withdrawal.test.ts",
         "packages/rph-engine/src/durability-roundtrip.test.ts",
         "packages/rph-engine/src/emitted-event-conformance.test.ts",
         "packages/rph-engine/src/engine.test.ts",
@@ -2505,7 +2506,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "dcba678d494cd01469ab67d76408a86ad32bf7cba48265beeeb07715047216b7",
+    "configurationDigest": "51438dea01727a187daf42050f16d5ef26a4d514facedcd80f290cb013c7e873",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -4344,7 +4345,7 @@
           "configPath": "packages/rph-engine/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "182b5aee7b1aa7fbd22ab4d71427f7760bad2d751d6870c1df9c88cc1a2e8c8e",
+          "projectResolutionDigest": "3d324f3c4fea1162faea74b9f4805de84cbc65515bb02e6cc9950d600608f340",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4354,6 +4355,7 @@
             "packages/rph-engine/src/assessment-drive.ts",
             "packages/rph-engine/src/assessment-startedat-contract.test.ts",
             "packages/rph-engine/src/assurance-view.test.ts",
+            "packages/rph-engine/src/decomposition-edge-withdrawal.test.ts",
             "packages/rph-engine/src/durability-roundtrip.test.ts",
             "packages/rph-engine/src/emitted-event-conformance.test.ts",
             "packages/rph-engine/src/engine.test.ts",
@@ -5676,7 +5678,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "803e6403f19b4cc68fc26040106a6635c5fe3caabe6e336142d007b304f8418a",
+    "fileManifestDigest": "f77aa20596229923cb577a970364802fa206fa60f90099b02580a7d3ec8accef",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5739,7 +5741,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 960,
+    "selectedFileCount": 961,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -11126,6 +11128,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 5712,
+        "path": "packages/rph-engine/src/decomposition-edge-withdrawal.test.ts",
+        "sha256": "872994756ed6ee5790f7f2e0c86cc1ebad6d038d1b6155cdc71885d6f61765d6",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 3377,
         "path": "packages/rph-engine/src/durability-roundtrip.test.ts",
         "sha256": "cfe6d9b18b31d09f475c1bbe7ce0718c810029dd2082ce58b4b3bd754103c5a5",
@@ -11231,9 +11240,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 5112,
+        "bytes": 6753,
         "path": "packages/rph-engine/src/professional-work-graph.ts",
-        "sha256": "02165dc36fb4fa4c7604fc25058561ca1da84a1c80f14f4d741d633d01ce0ac7",
+        "sha256": "17d797019d12574a1ca28c770ed853f49830d6c8d493ccbbafd3a978efba1fc1",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11959,9 +11968,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 262363,
+        "bytes": 263769,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "c42e0fbe63b75b69ef5dabadc15fa11a8f1e2de691877b00cdc67c143bca30ab",
+        "sha256": "d7e9deefc5349f622fd255712b524e3e33d05a50b1b9a1a931b4a22478bb4f13",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12462,7 +12471,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "c26f62f093d050221c827da3bbbe0e74e7e80c9ea0e98b57c0a0406f507afcdc",
+    "subjectId": "ca66f16d62292bc1356fc5bf297fbf077a44d525f626d886319a81ebb2815378",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -13886,7 +13895,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 42,
+      "candidateArtifactCount": 43,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13917,6 +13926,7 @@
         "packages/rph-engine/src/assessment-drive.ts",
         "packages/rph-engine/src/assessment-startedat-contract.test.ts",
         "packages/rph-engine/src/assurance-view.test.ts",
+        "packages/rph-engine/src/decomposition-edge-withdrawal.test.ts",
         "packages/rph-engine/src/durability-roundtrip.test.ts",
         "packages/rph-engine/src/emitted-event-conformance.test.ts",
         "packages/rph-engine/src/engine.test.ts",
@@ -14869,7 +14879,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "c42e0fbe63b75b69ef5dabadc15fa11a8f1e2de691877b00cdc67c143bca30ab",
+      "contentSha256": "d7e9deefc5349f622fd255712b524e3e33d05a50b1b9a1a931b4a22478bb4f13",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [

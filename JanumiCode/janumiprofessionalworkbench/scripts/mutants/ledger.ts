@@ -3144,5 +3144,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/tracker-ingest.test.ts'],
 		why: 'SHARPER THAN MU-TRACKER-01 AND AIMED ELSEWHERE. Dropping only the TRAILING check admits exactly one class of false positive — a ratified name that is a PREFIX of a longer identifier — which is the 2026-08-20 incident precisely, and nothing else. Its victim is the CENSUS leg, so what this proves is not that the matcher is wrong but that the tracker gate can SEE the matcher being wrong: it reddens through the live `measure.ts` run, not through the committed journal. Observed: reddens EXACTLY 1 of the census suite’s 24 tests — the live-instrument assertion and nothing else, which is the discrimination a broad red cannot give you.',
 		source: 'REG-F-199'
+	},
+	// ── REG-F-199 residue (3): the hierarchy that returned a superset ───────────────────────────────────────────
+	{
+		id: 'MU-F199-3-withdrawal-keys-on-the-wrong-event',
+		file: 'packages/rph-engine/src/professional-work-graph.ts',
+		find: "const WITHDRAWING_DECOMPOSITION_EVENT = 'DecompositionRejected';",
+		replace: "const WITHDRAWING_DECOMPOSITION_EVENT = 'DecompositionRevised';",
+		expectRed: ['packages/rph-engine/src/decomposition-edge-withdrawal.test.ts'],
+		why: "THE GUARD IS ONE STRING, so the mutant is that string. Naming a REAL BUT WRONG event keeps every piece of machinery intact — the set is still built, the filter still runs, the types still check — and withdraws the wrong edges, which is the shape a plausible edit actually takes. A nonsense literal would break the build and prove less. \u26a0 The plausible-looking ALTERNATIVE DESIGN, keying on the contract's status being 'INVALID', is the one this fix rejected and the suite's ESCAPE test exists to kill: one accepted ReviseDecomposition moves the contract to SUPERSEDED (handlers/decomposition.ts:491) while the refusal it recorded still stands, so a status-keyed guard resurrects the withdrawn edge. That test fails the status design and passes this one, which is the only reason to prefer it.",
+		source: 'REG-F-199 residue (3)'
 	}
 ];
