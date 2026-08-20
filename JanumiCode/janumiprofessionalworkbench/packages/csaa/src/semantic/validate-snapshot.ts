@@ -94,7 +94,10 @@ import {
 	semanticLiteralDescriptor,
 	typescriptSyntaxKindName
 } from './syntax-projection.js';
-import { materializeSemanticSnapshotWire } from './validate-wire-shape.js';
+import {
+	materializeSemanticSnapshotWire,
+	type SemanticSnapshotWireValue
+} from './validate-wire-shape.js';
 
 export type SemanticValidationIssueCode =
 	| 'UNSUPPORTED_SCHEMA_VERSION'
@@ -496,8 +499,15 @@ function expectedCandidateExportBinding(
 	return { carrierId: null, syntax: 'NONE' };
 }
 
+/**
+ * Unsafe in exactly one respect: it assumes the closed wire shape has already been established.
+ * The parameter type is what carries that assumption — only `materializeSemanticSnapshotWire` can
+ * mint a `SemanticSnapshotWireValue`, so a future caller cannot reach this function without having
+ * gone through the wire. That precondition used to be re-checked here at runtime by a guard that
+ * could never fire; the compiler enforces it now, for every caller rather than for none.
+ */
 function validateStaticSemanticSnapshotUnsafe(
-	value: unknown,
+	value: SemanticSnapshotWireValue,
 	canonicalBytes: number,
 	overrides: Partial<SemanticValidationOptions> = {},
 	context: SemanticValidationContext = {}
@@ -540,44 +550,12 @@ function validateStaticSemanticSnapshotUnsafe(
 		};
 	}
 
-	const arrayNames = [
-		'aliases',
-		'assignabilityRequests',
-		'assignments',
-		'astNodes',
-		'capabilities',
-		'compilerInputs',
-		'declarationCandidates',
-		'declarations',
-		'diagnostics',
-		'invocations',
-		'limitations',
-		'literals',
-		'moduleExports',
-		'moduleResolutions',
-		'overloadSets',
-		'populations',
-		'programs',
-		'projects',
-		'provenances',
-		'references',
-		'requestedCapabilities',
-		'scopes',
-		'signatureParameters',
-		'signatures',
-		'sources',
-		'symbols',
-		'typeParameters',
-		'typeRelations',
-		'types'
-	] as const;
-	function checkInvalidShape(shape: Record<string, unknown>): void {
-		for (const name of arrayNames) {
-			if (!Array.isArray(shape[name])) issue('INVALID_SHAPE', `$.${name}`, 'Expected an array.');
-		}
-	}
-	checkInvalidShape(value);
-	if (issues.length > 0) return { issues, state: 'INVALID' };
+	// The closed wire shape — every required key present and every array field an actual dense
+	// array — is established by `materializeSemanticSnapshotWire` and carried here by the
+	// `SemanticSnapshotWireValue` parameter type. It was previously re-checked at this point by a
+	// guard that could never fire, because the wire refuses the same inputs earlier with a
+	// byte-identical code, message and path. The guarantee is asserted per field in
+	// validate-wire-shape.test.ts, where it is actually enforced.
 
 	const snapshot = value as unknown as StaticSemanticSnapshot;
 	const recordCount =

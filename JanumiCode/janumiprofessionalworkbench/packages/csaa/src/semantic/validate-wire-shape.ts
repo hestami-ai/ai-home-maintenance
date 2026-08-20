@@ -1270,10 +1270,25 @@ function canonicalStringBytes(text: string): number {
 	return text.length + 2;
 }
 
+declare const SEMANTIC_WIRE_MATERIALIZED: unique symbol;
+
+/**
+ * A value this module produced, and therefore one whose closed wire shape has already been
+ * established — every required key present, every array field an actual dense array, no proxies,
+ * accessors or symbol keys.
+ *
+ * The brand exists so that precondition is carried by the type rather than by a comment or by a
+ * downstream re-check. `validateStaticSemanticSnapshotUnsafe` is unsafe precisely in that it
+ * assumes this, and nothing but this function can mint the token that says so.
+ */
+export type SemanticSnapshotWireValue = Record<string, unknown> & {
+	readonly [SEMANTIC_WIRE_MATERIALIZED]: true;
+};
+
 export interface SemanticWireMaterializationResult {
 	readonly canonicalBytes?: number;
 	readonly issues: readonly SemanticWireInspectionIssue[];
-	readonly value?: unknown;
+	readonly value?: SemanticSnapshotWireValue;
 }
 
 export function materializeSemanticSnapshotWire(
@@ -1562,7 +1577,11 @@ export function materializeSemanticSnapshotWire(
 
 	try {
 		const materialized = visit(value, 'snapshot', 0, '$');
-		return issues.length === 0 ? { canonicalBytes, issues: [], value: materialized } : { issues };
+		// The only mint site for the brand: reached only when this walk produced no issue, which is
+		// what makes the assertion below true rather than merely asserted.
+		return issues.length === 0
+			? { canonicalBytes, issues: [], value: materialized as SemanticSnapshotWireValue }
+			: { issues };
 	} catch (error) {
 		issue(
 			false,
