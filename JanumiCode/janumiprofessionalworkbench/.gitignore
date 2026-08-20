@@ -33,3 +33,6 @@ scripts/mutants/.harvest-run.json
 # Inputs to a verdict, never a record — a committed baseline would let yesterday's red excuse today's finding.
 scripts/mutants/.baseline-run.json
 scripts/mutants/.control-run.json
+
+# Ground-truth tracker index — DERIVED, rebuilt via `bun run tracker:build` (design: docs/_working/DESIGN-implementation-ground-truth.md)
+.tracker/
