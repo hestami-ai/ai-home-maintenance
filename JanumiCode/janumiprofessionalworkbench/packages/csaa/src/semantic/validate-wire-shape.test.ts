@@ -786,4 +786,62 @@ describe('semantic wire shape materialization hardening', () => {
 		expect(first).toEqual(second);
 		expect(first).not.toBe(second);
 	});
+
+	// Every snapshot field that must be an array, refused per name and per non-array kind.
+	//
+	// LOAD-BEARING FOR A CALLER THAT CANNOT SEE IT. validate-snapshot.ts hands
+	// validateStaticSemanticSnapshotUnsafe the value this module materializes, and relies on that
+	// value having arrays in all of these fields — a precondition established here and nowhere else.
+	// It was previously re-checked downstream by a guard that could never fire, and that guard was
+	// the only statement of the assumption anywhere. Asserting it at the layer that actually
+	// enforces it means removing a name from the required-key set or from the array walk reddens
+	// here, rather than silently widening what reaches the snapshot validator.
+	//
+	// The names are the exact set that guard iterated.
+	it('refuses every snapshot array field that is not an array', () => {
+		const arrayFields = [
+			'aliases',
+			'assignabilityRequests',
+			'assignments',
+			'astNodes',
+			'capabilities',
+			'compilerInputs',
+			'declarationCandidates',
+			'declarations',
+			'diagnostics',
+			'invocations',
+			'limitations',
+			'literals',
+			'moduleExports',
+			'moduleResolutions',
+			'overloadSets',
+			'populations',
+			'programs',
+			'projects',
+			'provenances',
+			'references',
+			'requestedCapabilities',
+			'scopes',
+			'signatureParameters',
+			'signatures',
+			'sources',
+			'symbols',
+			'typeParameters',
+			'typeRelations',
+			'types'
+		] as const;
+		expect(arrayFields).toHaveLength(29);
+		for (const field of arrayFields) {
+			// a non-object reaches the list visitor
+			expectIssue(
+				{ [field]: 0 },
+				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
+			);
+			// an object that is not an array reaches the inert-array check
+			expectIssue(
+				{ [field]: {} },
+				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
+			);
+		}
+	});
 });
