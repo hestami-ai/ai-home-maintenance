@@ -39,7 +39,13 @@ function seedSources(): void {
 		'docs/JPWB Implementation Roadmap and Tracker.md',
 		'docs/JPWB Reconciliation Ratify Sheet (M0).md',
 		'docs/_working/BACKLOG.md',
-		'docs/_working/AUDIT-shape-survivorship-2026-08-20.md'
+		'docs/_working/AUDIT-shape-survivorship-2026-08-20.md',
+		// W-2 code-side enumerables: fixture bodies parse to ZERO items by design — the parsers are
+		// lenient, and the strictness lives in the real-tree ingest gate's cross-checks.
+		'packages/rph-contracts/src/messages.ts',
+		'packages/rph-domain/src/transitions.data.ts',
+		'packages/rph-domain/vocab/m12-conformance.json',
+		'packages/rph-product-realization-pwa/src/ontology.data.ts'
 	]) {
 		const absolute = join(root, relative);
 		mkdirSync(dirname(absolute), { recursive: true });

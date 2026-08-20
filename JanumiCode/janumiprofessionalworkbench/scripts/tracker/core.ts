@@ -203,7 +203,9 @@ export function loadRecords(censusDir: string): LoadedCensus {
 					});
 					break;
 				default:
-					fail(`${where}: unknown record type '${String(record.type)}'`);
+					fail(
+						`${where}: unknown record type '${String(record.type as string | number | boolean)}'`
+					);
 			}
 		});
 	}
@@ -230,7 +232,13 @@ export const SOURCE_DOCS: readonly string[] = [
 	'docs/JPWB Implementation Roadmap and Tracker.md',
 	'docs/JPWB Reconciliation Ratify Sheet (M0).md',
 	'docs/_working/BACKLOG.md',
-	'docs/_working/AUDIT-shape-survivorship-2026-08-20.md'
+	'docs/_working/AUDIT-shape-survivorship-2026-08-20.md',
+	// W-2: the four code-side enumerables (design §7). Hash-tracked like every source, so a command
+	// added without a rebuild reddens tracker:check the same way a register edit does.
+	'packages/rph-contracts/src/messages.ts',
+	'packages/rph-domain/src/transitions.data.ts',
+	'packages/rph-domain/vocab/m12-conformance.json',
+	'packages/rph-product-realization-pwa/src/ontology.data.ts'
 ];
 
 export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Database {

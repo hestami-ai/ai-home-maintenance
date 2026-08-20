@@ -151,3 +151,95 @@ describe('tracker ingest (W-1) — two independent readers must agree', () => {
 		for (const id of ids) expect(id).toMatch(/^backlog:[0-9a-f]{12}$/);
 	});
 });
+
+describe('capability census, code-side (W-2) — the second reader is module EXECUTION', () => {
+	// The strongest independent reader available: import the actual modules under Node and compare
+	// against what the bun-side regex parser ingested. A drift in either — the code, or the parser —
+	// splits the pair. ⚠ This is also the check that retired a stale claim on day one: the command
+	// map holds 102 entries, not the 84 the dispatch census's header prose still says (that suite
+	// asserts only a `> 50` floor, so its prose rotted while the floor slept).
+	it('commands: the ingest matches Object.keys(COMMANDS) exactly, id for id', async () => {
+		const { COMMANDS } = await import('@janumipwb/rph-contracts');
+		const executed = Object.keys(COMMANDS)
+			.map((k) => `cap:command:${k}`)
+			.sort();
+		const ingested = sql<{ id: string }>(
+			"SELECT id FROM items WHERE id LIKE 'cap:command:%' ORDER BY id"
+		).map((r) => r.id);
+		expect(ingested).toEqual(executed);
+		expect(ingested.length).toBeGreaterThanOrEqual(102);
+	});
+
+	it('machines: the ingest matches Object.keys(STATE_MACHINES) exactly', async () => {
+		const { STATE_MACHINES } = await import('@janumipwb/rph-domain');
+		const executed = Object.keys(STATE_MACHINES)
+			.map((k) => `cap:machine:${k}`)
+			.sort();
+		const ingested = sql<{ id: string }>(
+			"SELECT id FROM items WHERE id LIKE 'cap:machine:%' ORDER BY id"
+		).map((r) => r.id);
+		expect(ingested).toEqual(executed);
+		expect(ingested).toHaveLength(27);
+	});
+
+	it('rules: the ingest matches m12-conformance.json ruleCatalog exactly', () => {
+		const catalog = (
+			JSON.parse(
+				readFileSync(join(REPO, 'packages', 'rph-domain', 'vocab', 'm12-conformance.json'), 'utf8')
+			) as { ruleCatalog: { id: string }[] }
+		).ruleCatalog;
+		const independent = catalog.map((r) => `cap:rule:${r.id}`).sort();
+		const ingested = sql<{ id: string }>(
+			"SELECT id FROM items WHERE id LIKE 'cap:rule:%' ORDER BY id"
+		).map((r) => r.id);
+		expect(ingested).toEqual(independent);
+		expect(ingested).toHaveLength(125);
+	});
+
+	it('policies: the ingest matches the distinct POL ids of the seeded ontology', () => {
+		const ontology = readFileSync(
+			join(REPO, 'packages', 'rph-product-realization-pwa', 'src', 'ontology.data.ts'),
+			'utf8'
+		);
+		const independent = [
+			...new Set([...ontology.matchAll(/\bPOL-[A-Z][A-Z-]+\b/g)].map((m) => m[0]))
+		]
+			.map((p) => `cap:policy:${p}`)
+			.sort();
+		const ingested = sql<{ id: string }>(
+			"SELECT id FROM items WHERE id LIKE 'cap:policy:%' ORDER BY id"
+		).map((r) => r.id);
+		expect(ingested).toEqual(independent);
+		expect(ingested).toHaveLength(12);
+	});
+
+	it('every census-record anchor still occurs in its source document', () => {
+		// The census NDJSON's anchors are its ONLY tie back to the corpus — the mutation ledger's
+		// anchor law, applied to records: an anchor that no longer occurs means the doc moved under
+		// the roster, and the record must be superseded, not silently tolerated. Whitespace is
+		// collapsed on both sides; nothing else is normalized (a paraphrase must fail).
+		const collapse = (s: string): string => s.replace(/\s+/g, ' ').trim();
+		const docCache = new Map<string, string>();
+		const rows = sql<{ id: string; anchor_doc: string | null; anchor_text: string | null }>(
+			"SELECT id, anchor_doc, anchor_text FROM items WHERE origin LIKE 'census:%'"
+		);
+		for (const row of rows) {
+			if (row.anchor_doc === null || row.anchor_text === null) continue;
+			if (!docCache.has(row.anchor_doc))
+				docCache.set(row.anchor_doc, collapse(readFileSync(join(REPO, row.anchor_doc), 'utf8')));
+			expect(
+				docCache.get(row.anchor_doc)!.includes(collapse(row.anchor_text)),
+				`${row.id}: anchor no longer occurs in ${row.anchor_doc}`
+			).toBe(true);
+		}
+	});
+
+	it('every code-side capability carries exactly one DECLARED verdict, and nothing higher yet', () => {
+		// W-2's separation law: enumeration and verdicting are different acts. A tier above DECLARED
+		// appearing here would mean a verdict rode in on enumeration — the two-errors-hiding shape.
+		const rows = sql<{ verdict: string; n: number }>(
+			"SELECT v.verdict, COUNT(*) AS n FROM verdicts v WHERE v.method = 'code-enumerable:w2' GROUP BY v.verdict"
+		);
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 266 }]);
+	});
+});

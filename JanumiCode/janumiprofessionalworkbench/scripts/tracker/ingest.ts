@@ -339,6 +339,135 @@ export function parseAuditRoster(text: string, path: string): IngestResult {
 	return { items, verdicts, attrs: [], refs, parsers: new Map([[path, 'audit-roster:w1']]) };
 }
 
+/**
+ * ── W-2: the four CODE-SIDE enumerables (design §7's governing rule: reuse what exists) ───────
+ *
+ * These populations are authoritative in code/data, each with a standing guard; the census
+ * INGESTS them rather than re-deriving them from prose. Each item receives a DECLARED-tier
+ * verdict — that is the ladder's honest reading of "the name exists in code", and nothing higher:
+ * enumeration and verdicting are separate acts (W-3 raises tiers), so an enumeration error and a
+ * verdict error can never hide each other.
+ *
+ * `measured_at: 'at-build'` is deliberate and documented: these verdicts are RE-DERIVED from the
+ * current code on every build (unlike census NDJSON verdicts, which carry their measurement
+ * date). A dated stamp here would either lie or break determinism.
+ *
+ * Parsers are LENIENT on non-matching content (the substrate fixture seeds these paths with
+ * dummy bodies); the STRICTNESS lives in verif/tracker-ingest.test.ts, where each population is
+ * cross-checked against an independent reader — including Node-side EXECUTION of the actual
+ * modules, the strongest second reader available. ⚠ That gate is what caught the first stale
+ * claim before this census even existed: the command map holds 102 entries, not the 84 its own
+ * census test's header prose still records (its assertion is a `> 50` floor, so the prose rotted
+ * while the floor slept).
+ */
+function declaredVerdict(itemId: string, evidence: string): VerdictRecord {
+	return {
+		type: 'verdict',
+		item_id: itemId,
+		verdict: 'DECLARED',
+		evidence,
+		method: 'code-enumerable:w2',
+		measured_at: 'at-build'
+	};
+}
+
+export function parseCommands(text: string, path: string): IngestResult {
+	const items: ItemRecord[] = [];
+	const verdicts: VerdictRecord[] = [];
+	const attrs: AttrRecord[] = [];
+	// Keys of `export const COMMANDS = { … } as const;` — one-tab-indented PascalCase properties.
+	// The command's own emitted event rides along as an attr for the W-3 event-delta work.
+	const mapMatch = /^export const COMMANDS = \{$([\s\S]*?)^\} as const;/m.exec(text);
+	for (const m of (mapMatch?.[1] ?? '').matchAll(
+		/^\t([A-Z][A-Za-z0-9]+): \{$([\s\S]*?)^\t\},?$/gm
+	)) {
+		const name = m[1]!;
+		const id = `cap:command:${name}`;
+		items.push(item(id, 'capability', `command ${name}`, path, 'undated', path, `${name}: {`));
+		verdicts.push(declaredVerdict(id, `${path} COMMANDS.${name}`));
+		const emits = /emitsEvent: '([A-Za-z]+)'/.exec(m[2] ?? '');
+		if (emits) attrs.push({ item_id: id, key: 'emits_event', value: emits[1]! });
+	}
+	return { items, verdicts, attrs, refs: [], parsers: new Map([[path, 'commands:w2']]) };
+}
+
+export function parseMachines(text: string, path: string): IngestResult {
+	const items: ItemRecord[] = [];
+	const verdicts: VerdictRecord[] = [];
+	const attrs: AttrRecord[] = [];
+	// Each machine spec carries `name: 'X'` at two-tab indent, mirroring its record key — the
+	// generated registry (27 machines, from vocab/m2-transitions.json).
+	for (const m of text.matchAll(/^\t\tname: '([^']+)',?$/gm)) {
+		const name = m[1]!;
+		const id = `cap:machine:${name}`;
+		items.push(
+			item(id, 'capability', `state machine ${name}`, path, 'undated', path, `name: '${name}'`)
+		);
+		verdicts.push(declaredVerdict(id, `${path} STATE_MACHINES['${name}']`));
+	}
+	return { items, verdicts, attrs, refs: [], parsers: new Map([[path, 'machines:w2']]) };
+}
+
+export function parseRules(text: string, path: string): IngestResult {
+	const items: ItemRecord[] = [];
+	const verdicts: VerdictRecord[] = [];
+	const attrs: AttrRecord[] = [];
+	// m12-conformance.json is honest JSON — the one population that needs no regex at all. A
+	// fixture body is not JSON; leniency means zero items, and the real-tree gate pins 125.
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		return { items, verdicts, attrs, refs: [], parsers: new Map([[path, 'rules:w2']]) };
+	}
+	const catalog = (parsed as { ruleCatalog?: unknown }).ruleCatalog;
+	if (Array.isArray(catalog))
+		for (const rule of catalog as {
+			id?: string;
+			statement?: string;
+			layer?: number;
+			sourceRef?: string;
+		}[]) {
+			if (typeof rule.id !== 'string') continue;
+			const id = `cap:rule:${rule.id}`;
+			items.push(
+				item(
+					id,
+					'capability',
+					`${rule.id} — ${(rule.statement ?? '').slice(0, 160)}`,
+					path,
+					'undated',
+					path,
+					rule.id
+				)
+			);
+			verdicts.push(declaredVerdict(id, `${path} ruleCatalog ${rule.id}`));
+			if (typeof rule.layer === 'number')
+				attrs.push({ item_id: id, key: 'layer', value: String(rule.layer) });
+			if (typeof rule.sourceRef === 'string')
+				attrs.push({ item_id: id, key: 'source_ref', value: rule.sourceRef });
+		}
+	return { items, verdicts, attrs, refs: [], parsers: new Map([[path, 'rules:w2']]) };
+}
+
+export function parsePolicies(text: string, path: string): IngestResult {
+	const items: ItemRecord[] = [];
+	const verdicts: VerdictRecord[] = [];
+	// Distinct POL-* ids from the seeded ontology, in first-appearance order (deterministic).
+	// ⚠ The POL-001..025 namespace trap does not bite here: this file is the assurance seed, and
+	// its ids are word-form (POL-INTENT-FIDELITY), never numeric.
+	const seen = new Set<string>();
+	for (const m of text.matchAll(/\bPOL-[A-Z][A-Z-]+\b/g)) {
+		const name = m[0];
+		if (seen.has(name)) continue;
+		seen.add(name);
+		const id = `cap:policy:${name}`;
+		items.push(item(id, 'capability', `assurance policy ${name}`, path, 'undated', path, name));
+		verdicts.push(declaredVerdict(id, `${path} seeded ${name}`));
+	}
+	return { items, verdicts, attrs: [], refs: [], parsers: new Map([[path, 'policies:w2']]) };
+}
+
 /** ── All sources, one deterministic pass ───────────────────────────────────────────────────── */
 export function ingestAll(root: string): IngestResult {
 	const read = (p: string): string => readFileSync(join(root, p), 'utf8');
@@ -370,6 +499,22 @@ export function ingestAll(root: string): IngestResult {
 		parseAuditRoster(
 			read('docs/_working/AUDIT-shape-survivorship-2026-08-20.md'),
 			'docs/_working/AUDIT-shape-survivorship-2026-08-20.md'
+		),
+		parseCommands(
+			read('packages/rph-contracts/src/messages.ts'),
+			'packages/rph-contracts/src/messages.ts'
+		),
+		parseMachines(
+			read('packages/rph-domain/src/transitions.data.ts'),
+			'packages/rph-domain/src/transitions.data.ts'
+		),
+		parseRules(
+			read('packages/rph-domain/vocab/m12-conformance.json'),
+			'packages/rph-domain/vocab/m12-conformance.json'
+		),
+		parsePolicies(
+			read('packages/rph-product-realization-pwa/src/ontology.data.ts'),
+			'packages/rph-product-realization-pwa/src/ontology.data.ts'
 		)
 	];
 	const merged: IngestResult = { items: [], verdicts: [], attrs: [], refs: [], parsers: new Map() };
