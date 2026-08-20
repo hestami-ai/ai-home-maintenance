@@ -41,6 +41,10 @@ describe('REG-F-167 — the observation aggregate has exactly ONE command, and i
 			'the observation command surface MOVED. If a command that changes `disposition` now exists, then ' +
 				'REG-F-161\'s two dead READ branches may be live: re-drive `governance.ts` waived flag (RPH-BAS-003\'s ' +
 				'waiver escape) and `floor-gate.ts` resolved-finding filter, and RETIRE the two `expectSurvive` ledger ' +
+				'entries deliberately rather than letting them flip to KILLED unexplained. ⚠ A THIRD consumer joined them ' +
+				'on 2026-08-20 (REG-F-199 residue 2): `professional-work-graph.ts` now reads each observation’s CURRENT ' +
+				'disposition from the store rather than from the recording event, so its WAIVED branch is dead for the ' +
+				'same reason and comes alive on the same day — see professional-work-graph-current-disposition.test.ts. ' +
 				'entries deliberately rather than letting them flip to KILLED unexplained.'
 		).toEqual(['RecordAssuranceObservation']);
 	});

@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 366,
+      "discovered": 367,
       "excluded": 0,
       "failed": 0,
-      "included": 366,
+      "included": 367,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 366
+      "successfullyInventoried": 367
     },
     {
       "artifactClass": "VERIFICATION",
@@ -452,6 +452,7 @@
         "packages/rph-engine/src/graph-conformance.test.ts",
         "packages/rph-engine/src/ontology-delivery-census.test.ts",
         "packages/rph-engine/src/outbox-recovery.test.ts",
+        "packages/rph-engine/src/professional-work-graph-current-disposition.test.ts",
         "packages/rph-engine/src/projection-rebuild.test.ts",
         "packages/rph-engine/src/projection-trace-compat.test.ts",
         "packages/rph-engine/src/pwa-ontology.test.ts",
@@ -2506,7 +2507,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "51438dea01727a187daf42050f16d5ef26a4d514facedcd80f290cb013c7e873",
+    "configurationDigest": "a59be162ffe1e77904b11f65685c0b5777d86df281cf6774db9b118d45477255",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -4345,7 +4346,7 @@
           "configPath": "packages/rph-engine/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "3d324f3c4fea1162faea74b9f4805de84cbc65515bb02e6cc9950d600608f340",
+          "projectResolutionDigest": "0414aabf51933facfd08d3af7188577b5d589aa4c279b49f276b826e510b8592",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4371,6 +4372,7 @@
             "packages/rph-engine/src/index.ts",
             "packages/rph-engine/src/ontology-delivery-census.test.ts",
             "packages/rph-engine/src/outbox-recovery.test.ts",
+            "packages/rph-engine/src/professional-work-graph-current-disposition.test.ts",
             "packages/rph-engine/src/professional-work-graph.ts",
             "packages/rph-engine/src/projection-rebuild.test.ts",
             "packages/rph-engine/src/projection-trace-compat.test.ts",
@@ -5678,7 +5680,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "f77aa20596229923cb577a970364802fa206fa60f90099b02580a7d3ec8accef",
+    "fileManifestDigest": "d3b36edaeacff23a7aad2672e86b53d400e8f2e86c983bba3aef7282c3fc1668",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5741,7 +5743,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 961,
+    "selectedFileCount": 962,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -11239,10 +11241,17 @@
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
+        "artifactClass": "TEST",
+        "bytes": 5324,
+        "path": "packages/rph-engine/src/professional-work-graph-current-disposition.test.ts",
+        "sha256": "586dde196dc7de56e19aaf234bfc96ed9dabb63e99cff5204114fc4f345fb130",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
         "artifactClass": "SOURCE",
-        "bytes": 6753,
+        "bytes": 7731,
         "path": "packages/rph-engine/src/professional-work-graph.ts",
-        "sha256": "17d797019d12574a1ca28c770ed853f49830d6c8d493ccbbafd3a978efba1fc1",
+        "sha256": "8ede07356af96d40badfc60453840d37b5051dd22b4676c1dabaaae882edcc9b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11968,9 +11977,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 263769,
+        "bytes": 265647,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "d7e9deefc5349f622fd255712b524e3e33d05a50b1b9a1a931b4a22478bb4f13",
+        "sha256": "46cfd4a63153665e71182053f8c07821f7f189b3404d990e8e83e6a14119c0be",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12304,9 +12313,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 10019,
+        "bytes": 10474,
         "path": "verif/observation-command-surface.test.ts",
-        "sha256": "eb191ecdcd6d40c58a0bb57f8b80174577e7a1e0a8402ec0a564d46d5702f077",
+        "sha256": "913fe14f858725c42b965e0dae9f2b0121048871bac4eff9d3ebe68dccb2c66f",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12471,7 +12480,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "ca66f16d62292bc1356fc5bf297fbf077a44d525f626d886319a81ebb2815378",
+    "subjectId": "b18b4c40c5dc17ba9725d70d751b045384924fad59812509fa1f799b3c0f9064",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -13895,7 +13904,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 43,
+      "candidateArtifactCount": 44,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13942,6 +13951,7 @@
         "packages/rph-engine/src/index.ts",
         "packages/rph-engine/src/ontology-delivery-census.test.ts",
         "packages/rph-engine/src/outbox-recovery.test.ts",
+        "packages/rph-engine/src/professional-work-graph-current-disposition.test.ts",
         "packages/rph-engine/src/professional-work-graph.ts",
         "packages/rph-engine/src/projection-rebuild.test.ts",
         "packages/rph-engine/src/projection-trace-compat.test.ts",
@@ -14879,7 +14889,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "d7e9deefc5349f622fd255712b524e3e33d05a50b1b9a1a931b4a22478bb4f13",
+      "contentSha256": "46cfd4a63153665e71182053f8c07821f7f189b3404d990e8e83e6a14119c0be",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -15570,7 +15580,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/observation-command-surface.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "eb191ecdcd6d40c58a0bb57f8b80174577e7a1e0a8402ec0a564d46d5702f077",
+      "contentSha256": "913fe14f858725c42b965e0dae9f2b0121048871bac4eff9d3ebe68dccb2c66f",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

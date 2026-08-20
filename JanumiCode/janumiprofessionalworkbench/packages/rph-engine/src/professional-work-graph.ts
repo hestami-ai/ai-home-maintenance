@@ -122,11 +122,23 @@ export function professionalWorkGraph(
 	for (const event of events) {
 		if (event.eventType !== 'AssuranceObservationRecorded') continue;
 		const p = event.payload as {
+			observationId?: string;
 			subjectObjectIds?: string[];
 			severity?: string;
-			disposition?: string;
 		};
-		if (p.disposition !== 'OPEN' || !p.severity) continue;
+		// THE DISPOSITION COMES FROM THE OBJECT, NOT FROM THE EVENT — REG-F-199 residue (2).
+		// `disposition` on `AssuranceObservationRecorded` is a hard-coded `'OPEN'` literal at the
+		// emitter (handlers/assurance.ts), so testing it here was a TAUTOLOGY over this function's own
+		// input: a finding later WAIVED or REMEDIATED went on suppressing a green node forever. Every
+		// assurance GATE already loads current state and says why (assurance.ts:2076-2077).
+		//
+		// ⚠ FAIL CLOSED, AND THAT DIVERGES FROM ALL THREE OF THOSE GATES ON PURPOSE. They DROP an
+		// observation they cannot load (assurance.ts:2096, floor-gate.ts:255-257) — they fail OPEN.
+		// This one cannot: its output is a GREEN NODE, and a false green is the one output this system
+		// must never produce. The divergence is deliberate and is asserted by its own test.
+		const current = handle.loadObject(p.observationId ?? '')?.state as
+			{ disposition?: string } | undefined;
+		if ((current?.disposition ?? 'OPEN') !== 'OPEN' || !p.severity) continue;
 		for (const subjectId of p.subjectObjectIds ?? []) {
 			const counts = openBySubject.get(subjectId) ?? {};
 			counts[p.severity] = (counts[p.severity] ?? 0) + 1;
