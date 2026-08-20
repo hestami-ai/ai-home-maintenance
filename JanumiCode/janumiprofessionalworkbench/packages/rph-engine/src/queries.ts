@@ -3,7 +3,10 @@
 // event log and returns their current materialized state; the typed wrappers name the RPH-DOC-010 view sources
 // (PWA Library, PWU Types, Undertaking Portfolio, and the Undertaking's execution/assurance/decision/baseline
 // working sets). The Professional Work Graph itself is built by professionalWorkGraph() (see that module).
-import { ProfessionalWorkObjectTypeSchema } from '@janumipwb/rph-contracts';
+import {
+	ProfessionalWorkObjectTypeSchema,
+	type ProfessionalWorkObjectType
+} from '@janumipwb/rph-contracts';
 import type { EngineHandle } from './engine.js';
 
 export interface ObjectRow {
@@ -210,7 +213,37 @@ export function getConversation(h: EngineHandle, pwaId: string): ObjectRow | und
 	return byField(listByType(h, 'AUTHORING_CONVERSATION'), 'pwaId', pwaId)[0];
 }
 
-/** A single object's current state by id, or undefined. */
+/**
+ * A single object's current state by id, ONLY IF it is of the named type — REG-F-199 residue (1).
+ *
+ * WHY THIS EXISTS ALONGSIDE `getObject`. DOC-002 §34's preamble says the first implementation
+ * "should expose commands and queries rather than unrestricted CRUD". `getObject` is that
+ * unrestricted read: it hands back whatever object carries the id, asserting nothing about what it
+ * is, and it stands in for four ratified typed queries (getUndertaking, getPwu, getBaseline,
+ * getPwaVersion). That is fine where the id comes from inside the system — another object's state,
+ * a module constant — and it is NOT fine where the id comes from a URL.
+ *
+ * ⚠ THE DEFECT THIS CLOSES WAS DRIVEN, AND IT IS WORSE THAN "renders wrong". The Undertaking
+ * Workbench loader guarded only existence, so `/undertakings/<a PWA id>` did not 404 — it returned
+ * the PWA's own `name` as the Undertaking's, because every downstream read is scoped and degrades
+ * to empty. The page did not even look broken. Only a NON-EXISTENT id was refused.
+ *
+ * `objectType` is written into every object's state by `newEnvelope` and is already the write
+ * side's authority (handlers/pwu.ts:163, :192 — RPH-CON-009), so this asserts a fact the system
+ * already maintains rather than inventing one. The parameter is the CONTRACT union, not `string`,
+ * so a typo is a compile error instead of a permanent `undefined`.
+ */
+export function getObjectOfType(
+	handle: EngineHandle,
+	objectType: ProfessionalWorkObjectType,
+	id: string
+): Record<string, unknown> | undefined {
+	const state = handle.loadObject(id)?.state as Record<string, unknown> | undefined;
+	return state?.objectType === objectType ? state : undefined;
+}
+
+/** A single object's current state by id, or undefined. ⚠ TYPE-BLIND — see `getObjectOfType` above
+ * before using this with an id that arrives from outside the system. */
 export function getObject(handle: EngineHandle, id: string): Record<string, unknown> | undefined {
 	return handle.loadObject(id)?.state as Record<string, unknown> | undefined;
 }

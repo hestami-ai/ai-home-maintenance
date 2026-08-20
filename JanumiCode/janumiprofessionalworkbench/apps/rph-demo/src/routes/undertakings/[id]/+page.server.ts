@@ -5,6 +5,7 @@ import { error, fail } from '@sveltejs/kit';
 import { parseRiskProfile } from '$lib/authoring/riskProfile';
 import {
 	getObject,
+	getObjectOfType,
 	listAssessments,
 	listBaselines,
 	listByType,
@@ -246,7 +247,10 @@ function buildAttemptsByStepId(
 
 export const load: PageServerLoad = ({ params }) => {
 	const engine = getEngine();
-	const u = getObject(engine, params.id);
+	// TYPED, not merely existent: `params.id` arrives from the URL, and a type-blind read rendered a
+	// PWA's own name as this Undertaking's without throwing (REG-F-199 residue 1). One throw still
+	// covers both cases — the seam returns undefined for wrong-type AND for absent.
+	const u = getObjectOfType(engine, 'UNDERTAKING', params.id);
 	if (!u) throw error(404, 'Undertaking not found');
 	const pwa = getObject(engine, String(u.pwaId as string));
 	// The bound PWA's PWU Types are the instantiable options (§14 / §28: an instance realizes a type).
@@ -537,7 +541,12 @@ function assurancePrelude(pwuId: string, assessmentId: string): Step[] {
 		? []
 		: [
 				['CreateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD],
-				['ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID }]
+				[
+					'ActivateAssurancePolicy',
+					'ASSURANCE_POLICY',
+					DEMO_POLICY_ID,
+					{ policyId: DEMO_POLICY_ID }
+				]
 			];
 	driveAssessmentToAssessing(
 		(commandType, targetAggregateType, targetAggregateId, payload) =>
@@ -1140,7 +1149,12 @@ export const actions: Actions = {
 					subjectSemanticVersions: { [pwuId]: 1 }
 				}
 			],
-			['AbandonPwu', PWU, pwuId, { abandonmentDecisionId: decisionId, reasonCode: 'NO_LONGER_REQUIRED' }]
+			[
+				'AbandonPwu',
+				PWU,
+				pwuId,
+				{ abandonmentDecisionId: decisionId, reasonCode: 'NO_LONGER_REQUIRED' }
+			]
 		]);
 		if (err) return fail(400, { error: `Abandonment refused: ${err}` });
 		return { advanced: 'abandoned' };

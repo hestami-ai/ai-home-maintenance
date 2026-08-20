@@ -3166,5 +3166,33 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-engine/src/professional-work-graph-current-disposition.test.ts'],
 		why: "REVERTS THE FIX TO THE TAUTOLOGY IT REPLACED, and the closed-form argument matters more than the red: `disposition` on AssuranceObservationRecorded is a hard-coded 'OPEN' literal at the emitter (handlers/assurance.ts) and NO command transitions the field, so the mutated line is behaviourally IDENTICAL to HEAD for every event the system can currently produce. KILLED_UNNAMED is therefore impossible by construction \u2014 no suite anywhere can tell the difference except one that constructs a WAIVED observation at the seam, which is exactly what the named victim does. That is why this control had to be built by decorating a handle rather than by driving a command: the defect is real and, today, unobservable end to end.",
 		source: 'REG-F-199 residue (2) half A'
+	},
+	// ── REG-F-199 residue (1): the type-blind read, and the CONTROL that keeps its fix honest ──────────────────
+	// TWO mutants, one victim each, and BOTH name the DEMO LOADER suite on purpose. The first proves the guard;
+	// the second proves the CONTROL inside that same suite — a guard that refused EVERY id would satisfy the
+	// refusal test while breaking the page for everyone, and only the control can catch that.
+	//
+	// \u26a0 OPERATIONAL: `bun run build` MUST precede `bun run mutants` for the first of these. `compileVerdict`
+	// picks the tsconfig from `pkgOf(m.file)`, so a mutant in apps/rph-demo compiles under that app's config,
+	// which resolves `@janumipwb/rph-engine` through the GITIGNORED `dist/`. Against a stale dist it reports
+	// `TS2305: … has no exported member 'getObjectOfType'` and scores NO_COMPILE — a false verdict about the
+	// instrument, not the guard. `check-types` is safe because turbo gives it `^build`; `mutants` is not.
+	{
+		id: 'F199-undertaking-loader-goes-back-to-the-type-blind-read',
+		file: 'apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts',
+		find: "const u = getObjectOfType(engine, 'UNDERTAKING', params.id);",
+		replace: 'const u = getObject(engine, params.id);',
+		expectRed: ['apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts'],
+		why: "REVERTS THE LOADER TO THE EXACT LINE THAT SHIPPED THE DEFECT. It is not a synthetic weakening: this is verbatim what the file said before, and it left `/undertakings/<a PWA id>` rendering the PWA's own name as the Undertaking's without throwing, because the existence guard on the next line is satisfied by ANY object. Every other read on the page degrades silently to empty, so nothing downstream turns it into a visible failure \u2014 which is why 135 rph-demo tests and two adversarial reviews of the surface never saw it.",
+		source: 'REG-F-199 residue (1)'
+	},
+	{
+		id: 'F199-the-typed-read-refuses-every-id',
+		file: 'packages/rph-engine/src/queries.ts',
+		find: 'return state?.objectType === objectType ? state : undefined;',
+		replace: 'return undefined;',
+		expectRed: ['apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts'],
+		why: "THE CONTROL NEEDS ITS OWN MUTANT (a control that cannot fail is not a control). A seam that refused EVERY id would satisfy the refusal test above perfectly while 404-ing the Undertaking Workbench for every real user. Its victim is deliberately the DEMO LOADER suite and not the engine seam suite, because the assertion that must redden is the CONTROL \u2014 'a real Undertaking id still renders' \u2014 and that control lives with the loader. Measured: reddens the control alone, leaving the refusal test green, which is the opposite polarity from the mutant above and is what makes the pair discriminating rather than redundant.",
+		source: 'REG-F-199 residue (1)'
 	}
 ];
