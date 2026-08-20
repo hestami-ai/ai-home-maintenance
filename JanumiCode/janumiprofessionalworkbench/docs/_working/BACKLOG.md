@@ -14,8 +14,9 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   stale (hits now exist) but none was the placement — the properties header itself pointed into the
   sibling repo, L1186's defect in a second location. **Placement authored: `docs/operations/sonarqube.md`**
   (scope authority, per-batch gate, the REG-F-100/`f9b8642f` mutation-anchor constraint, L1188/L1220
-  exception discipline). REG-F-180 P4 + REG-E-019 updated in place. **Remaining sponsor act:** retire the
-  Constitution L1186 pointer (ratified canon — not ours to edit).
+  exception discipline). REG-F-180 P4 + REG-E-019 updated in place. **Remaining sponsor act:** only REG-E-019's formal
+  closure on Ratify Sheet R1 — the L1186 pointer already retired WITH its document on 2026-07-17
+  (JAN-ENGC-001 §7.1 replaced it; both audits missed this — see the register's same-day correction).
 - [ ] **REG-F-180 P1/P2 audits (never performed)** — REG-Q-045's survivorship hold (does the seeded
   Product Realization PWA carry RPH-DOC-003/004's hierarchy, catalog, profiles, taxonomies
   losslessly?) and REG-D-008's shape-survivorship audit (an enforced repository reference artifact
@@ -47,6 +48,9 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   Binding until settled: no increment may cite an end-to-end capsule run as evidence.
   ⚠ The sonar campaign has since rewritten much of `packages/csaa` — the failure needs re-confirming
   before being cited.
+  ⚠ A SECOND smoke suite is also known-failing: `csaa:semantic:smoke:declaration-context-analysis`
+  (~72 min/run, opt-in) was found failing since BEFORE the campaign and REPORTED rather than fixed
+  (`ef1f884c`, final section) — same class as Finding 1.
 - **csaa CONTROLs remain ungradeable** while `EXCLUDED_PROJECTS = ['csaa']` holds — the filter
   reaches whole-workspace runs only (`run.ts`), so named-victim mutants are unaffected.
 

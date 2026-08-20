@@ -1,16 +1,20 @@
 # SonarQube Operations — JPWB
 
-**This document is the REG-E-019 placement**: the home, inside JPWB, of the SonarQube operating
-procedure that the Engineering Constitution's quality section (L1186) previously reached only by
-pointing into the sibling directory. Driver *mechanics* — how the headless SonarLint language
-server is spawned, initialized, and driven over LSP — remain documented in
-`../../../janumicode_v2/docs/sonarqube-headless-remediation-guide.md`, referenced here **as a
-tool**, the way one references bun or vitest. What must not live only there, and now does not, is
-the JPWB-specific procedure below.
+**This document is the artifact JAN-ENGC-001 §7.1 names** — the "accepted operations
+documentation" through which the repository defines how its quality gates are executed — and the
+REG-E-019 placement. Driver *mechanics* — how the headless SonarLint language server is spawned,
+initialized, and driven over LSP — remain documented in
+`../../../janumicode_v2/docs/sonarqube-headless-remediation-guide.md`, consulted **as background
+per §7.1**: an out-of-repository guide MAY be consulted but SHALL NOT silently control this
+repository. Between 2026-07-17 and this document's landing, that guide was the only operational
+Sonar procedure anywhere — precisely the state §7.1 forbids.
 
-Authority: Engineering Constitution L1186 (procedure pointer), L1188 (complexity findings addressed
-"fully"), L1220 (documented exceptions), reconciled per REG-E-018 as **"explicit recorded
-exception, never silence."** Register context: REG-E-019, REG-F-180 P4, REG-F-100.
+Authority: **JAN-ENGC-001** (normative, effective 2026-07-17) §7.1 repository-local procedure,
+§7.3 findings remediated fully by default, §7.4 recorded exceptions. Provenance, not authority:
+the retired pre-control Constitution's L1186 pointer / L1188 "fully" / L1220 exceptions
+(`docs/Recursive Professional Harness/retired/`, preserved as non-normative historical evidence —
+its README forbids citing it as current authority), reconciled historically per REG-E-018.
+Register context: REG-E-019, REG-F-180 P4, REG-F-100.
 
 ## 1. What is scanned
 
@@ -38,6 +42,11 @@ jar, eslint-bridge, Node path) are in guide §2. The tooling lives in
 byte-identical to the IDE Problems panel. Batch mode pays the ~30–40 s boot once and streams
 files at ~2–4 s each; a stale `ledger.json` in the output dir silently skips files, so a true
 re-sweep needs a fresh output dir.
+
+⚠ The tooling's hardcoded machine paths ROT: as of 2026-08-20, `driver.js` pins a SonarLint
+extension version that no longer exists (auto-updated away), so the ad-hoc single-file path is
+broken until its constants are re-pointed per guide §2. Verify the extension path before a
+campaign, not during one.
 
 ## 3. The JPWB gate per remediation batch
 
@@ -82,8 +91,11 @@ leading whitespace (ledger rule #4), or supersede the entry explicitly.
 
 ## 5. Exception discipline
 
-L1188 says "fully"; L1220 permits documented exceptions; REG-E-018's reconciliation — explicit
-recorded exception, never silence — governs. In practice:
+JAN-ENGC-001 §7.3 (remediate fully by default) and §7.4 (a finding MAY remain only under an
+explicit, reviewable exception recording tool/rule/location, why, risk, compensating controls,
+approving authority, owner and expiry — "Convenience and silence SHALL NOT" justify one) govern.
+REG-E-018's earlier reconciliation — explicit recorded exception, never silence — is the same rule
+as register precedent. In practice:
 
 - A finding deferred rather than fixed is **ruled**, with its verification rather than its
   argument, either in the register (pattern: `cd0bad4d`, which settled two deferred regex findings
@@ -91,6 +103,14 @@ recorded exception, never silence — governs. In practice:
   the site — the repository carries many; follow their form.
 - A principled won't-fix records its rationale where the next scan will meet it. Silence is not a
   disposition.
+- Standing refusal families a future sweep must not re-open: **S2871 sort comparators are
+  `Number(a>b)-Number(a<b)`, never `localeCompare`** — Sonar's own message recommends
+  `localeCompare` and it is wrong for this package (locale-dependent order would break pinned
+  canonical orderings). The recorded mechanism travels with each site.
+- **Never hand-gloss a rule ID.** Derive rule-id→message pairs from the sweep worklist itself:
+  in the 2026-08-19 campaign 11 of 22 hand-written glosses were materially wrong — agents were
+  handed a confident description of a different rule — costing three findings re-issued
+  (`32299e6c`, instrument-defect section).
 - **`scripts/mutants/ledger.ts` is prettier-non-conformant at HEAD and stays that way**:
   wholesale reformatting it is the REG-F-194 Finding 3 churn trap (238 rewritten lines around an
   18-line edit, four anchors detached in a prior sweep). Conformance arrives edit-by-edit.
