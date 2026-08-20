@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 367,
+      "discovered": 369,
       "excluded": 0,
       "failed": 0,
-      "included": 367,
+      "included": 369,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 367
+      "successfullyInventoried": 369
     },
     {
       "artifactClass": "VERIFICATION",
@@ -195,6 +195,7 @@
         "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
         "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
         "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
+        "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
         "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
         "apps/rph-demo/src/lib/theme.test.ts",
@@ -458,6 +459,7 @@
         "packages/rph-engine/src/pwa-ontology.test.ts",
         "packages/rph-engine/src/pwu-fold-drive-sites.test.ts",
         "packages/rph-engine/src/pwu-kind-vocabulary-census.test.ts",
+        "packages/rph-engine/src/queries-object-type.test.ts",
         "packages/rph-engine/src/queries-revision.test.ts",
         "packages/rph-engine/src/query-scope.test.ts",
         "packages/rph-engine/src/record-assurance.test.ts",
@@ -2507,7 +2509,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "a59be162ffe1e77904b11f65685c0b5777d86df281cf6774db9b118d45477255",
+    "configurationDigest": "8943699710976536f854120bcc5c3a35811c47e1585fe753c9fd06f82bdf9f91",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -3018,7 +3020,7 @@
           "configPath": "apps/rph-demo/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "94d83fd2d0fab64fd9c5a37f7fbb64549cba16a0f97aa3db2a2655359c5c73b9",
+          "projectResolutionDigest": "1c01f10c858eca17b0e336d860368f276ec22988c09794857e3588a4d1f0ba20",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3086,6 +3088,7 @@
             "apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
+            "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
             "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
             "apps/rph-demo/src/lib/server/workbench-id.test.ts",
             "apps/rph-demo/src/lib/server/workbench.ts",
@@ -4346,7 +4349,7 @@
           "configPath": "packages/rph-engine/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "0414aabf51933facfd08d3af7188577b5d589aa4c279b49f276b826e510b8592",
+          "projectResolutionDigest": "9dcbc839dd0554919c1cc8070961256ae0ab6f849a6254cee9b4c82854eb970e",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4380,6 +4383,7 @@
             "packages/rph-engine/src/pwa-ontology.ts",
             "packages/rph-engine/src/pwu-fold-drive-sites.test.ts",
             "packages/rph-engine/src/pwu-kind-vocabulary-census.test.ts",
+            "packages/rph-engine/src/queries-object-type.test.ts",
             "packages/rph-engine/src/queries-revision.test.ts",
             "packages/rph-engine/src/queries.ts",
             "packages/rph-engine/src/query-scope.test.ts",
@@ -5680,7 +5684,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "d3b36edaeacff23a7aad2672e86b53d400e8f2e86c983bba3aef7282c3fc1668",
+    "fileManifestDigest": "ab1fa0572bffcd8a572c2d5fdd2201288ff09bf00ed9fdc4cfdf6b28b22176df",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5743,7 +5747,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 962,
+    "selectedFileCount": 964,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6601,6 +6605,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 3686,
+        "path": "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
+        "sha256": "c580f7f42b48bff22629b80f9e7002559f68342a2535c7c6986eca834dbf2012",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 11161,
         "path": "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
         "sha256": "cdc3e04678a04d0a7e91f68bfe631b3dadbae6c56df596da7f998fc7a74af192",
@@ -6776,9 +6787,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 61071,
+        "bytes": 61437,
         "path": "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
-        "sha256": "61e04c5248d183b62078c9df6b4b2bec6e500c0095fc37637434ab56d7f68fcc",
+        "sha256": "1d48030aed1a6c6ad6ce53d0b1be6c78dff03232d85099b47ea8189b979d87dc",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11298,6 +11309,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 2611,
+        "path": "packages/rph-engine/src/queries-object-type.test.ts",
+        "sha256": "d02be57e71d77d48204e9f784f2f45e636dc195807bb062503afad5d5b0a7335",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 5908,
         "path": "packages/rph-engine/src/queries-revision.test.ts",
         "sha256": "e8875b046de3939412f2b34a7ff000d5d565404ca3f532fd00597533877c7187",
@@ -11305,9 +11323,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 18542,
+        "bytes": 20411,
         "path": "packages/rph-engine/src/queries.ts",
-        "sha256": "67c4f3420d915254095e703430f39fb5b5bd8e2574ee7a423c367bf702b35655",
+        "sha256": "3d44a3d801d8beb6460d66cd05d1800dd8f4f8568eb572df4b9b7760f0ebd143",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11977,9 +11995,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 265647,
+        "bytes": 269794,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "46cfd4a63153665e71182053f8c07821f7f189b3404d990e8e83e6a14119c0be",
+        "sha256": "562abd32c3dd54fd280f790c5ada24c62ccd5269f56e858e38c7424e237f347c",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12054,16 +12072,16 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 2596,
+        "bytes": 5137,
         "path": "scripts/tracker/match.ts",
-        "sha256": "09549fd072407a336879b4f4a4de0d90ba240fa6e2c933e2647165c03549ef2a",
+        "sha256": "e84cc2467020285ef23a0f38b5cdeb91283afa4a0b832b253f75d66f9fe04c8d",
         "subjectArtifactClass": "SCRIPT"
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 9353,
+        "bytes": 9680,
         "path": "scripts/tracker/measure.ts",
-        "sha256": "65264def139339d1b8e3ce967ca80f9e67f81fcd2fce722b597ef3d9ccc5f7e7",
+        "sha256": "7c2db3cc90d1612d1bee30788096c60e7285f381cba005140ec79dae8aa7e605",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12397,9 +12415,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 4550,
+        "bytes": 7442,
         "path": "verif/tracker-name-match.test.ts",
-        "sha256": "5f395c9cbea38b21f4d68744fbd6a3ec2659fb36a701616f1f367f307a3a6e5f",
+        "sha256": "cbc1fd67e9803af8a0c053349bb7f094201c172199743530b822f75ba2b9c276",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12480,7 +12498,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "b18b4c40c5dc17ba9725d70d751b045384924fad59812509fa1f799b3c0f9064",
+    "subjectId": "70000fe164859373833fbb9e25ff82f36056389c82b06d87078a5750f12f95e7",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -12611,7 +12629,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 93,
+      "candidateArtifactCount": 94,
       "compilerOptions": {
         "allowJs": true,
         "checkJs": true,
@@ -12752,6 +12770,7 @@
         "apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
         "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
         "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
+        "apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts",
         "apps/rph-demo/src/lib/server/workbench-durability.test.ts",
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
         "apps/rph-demo/src/lib/server/workbench.ts",
@@ -13904,7 +13923,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 44,
+      "candidateArtifactCount": 45,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13959,6 +13978,7 @@
         "packages/rph-engine/src/pwa-ontology.ts",
         "packages/rph-engine/src/pwu-fold-drive-sites.test.ts",
         "packages/rph-engine/src/pwu-kind-vocabulary-census.test.ts",
+        "packages/rph-engine/src/queries-object-type.test.ts",
         "packages/rph-engine/src/queries-revision.test.ts",
         "packages/rph-engine/src/queries.ts",
         "packages/rph-engine/src/query-scope.test.ts",
@@ -14889,9 +14909,9 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "46cfd4a63153665e71182053f8c07821f7f189b3404d990e8e83e6a14119c0be",
+      "contentSha256": "562abd32c3dd54fd280f790c5ada24c62ccd5269f56e858e38c7424e237f347c",
       "disposition": "RETAIN_DELEGATED",
-      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
         "verif/mutant-ledger.test.ts",
@@ -15068,7 +15088,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/match.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "09549fd072407a336879b4f4a4de0d90ba240fa6e2c933e2647165c03549ef2a",
+      "contentSha256": "e84cc2467020285ef23a0f38b5cdeb91283afa4a0b832b253f75d66f9fe04c8d",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -15084,7 +15104,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/measure.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "65264def139339d1b8e3ce967ca80f9e67f81fcd2fce722b597ef3d9ccc5f7e7",
+      "contentSha256": "7c2db3cc90d1612d1bee30788096c60e7285f381cba005140ec79dae8aa7e605",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15772,7 +15792,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-name-match.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "5f395c9cbea38b21f4d68744fbd6a3ec2659fb36a701616f1f367f307a3a6e5f",
+      "contentSha256": "cbc1fd67e9803af8a0c053349bb7f094201c172199743530b822f75ba2b9c276",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
