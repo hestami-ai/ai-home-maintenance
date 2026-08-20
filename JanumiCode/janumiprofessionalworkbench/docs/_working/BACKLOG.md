@@ -9,6 +9,12 @@ rewritten 136 files, so age everything below accordingly.
 Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by deleting.
 
 ## Actionable now
+- [ ] **Implementation ground-truth program** — design + roadmap landed 2026-08-20
+  (`DESIGN-implementation-ground-truth.md`, `ROADMAP-implementation-ground-truth.md`): a bun:sqlite
+  INDEX over the existing trackers (never a peer tracker) + the capability census with the
+  stub-proof verdict ladder. Next: W-0 (substrate, with a check that can FAIL). Driven facts on
+  record: better-sqlite3 does not load under bun; bun:sqlite has FTS5 (3.53.0); the corpus has
+  zero INV-* ids; R1 checkboxes do not encode ratification.
 
 - [x] ~~**REG-F-180 P4 re-audit (REG-E-019, Sonar placement)**~~ — **DONE 2026-08-20.** Search was
   stale (hits now exist) but none was the placement — the properties header itself pointed into the
