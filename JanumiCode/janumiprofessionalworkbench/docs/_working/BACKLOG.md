@@ -190,7 +190,7 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   OBSERVED verdict appended to `census/w3-probes.ndjson`; gate asserts the full history.
 ### REG-F-200 residue — 9 of 21 deferrals misstate the tree (audited + indexed; corrections owed)
 
-- [ ] **(a) Correct the stale CARRIERS — but NOT the dated gate packages.** The distinction is
+- [x] ~~**(a) Correct the stale CARRIERS**~~ — **DONE 2026-08-20** (`8f5efe23`): the live status field `DEF-W0-001`, its paired `UNK-W0-001` (same question, gate closed twice), `W4/JAN-W4-DR-001:22`, and `PROGRAM-STATUS.md:47`. The gate packages were left as written. ⚠ Kept below for the DISTINCTION, which is the reusable part: **NOT the dated gate packages.** The distinction is
   load-bearing: a gate package is a wave's dated EXIT RECORD, so G1 saying "deferred → W2" while G2
   says "delivered" is the correct flow, not a contradiction, and rewriting it would falsify history.
   What may be corrected is (i) LIVE status fields — done for `DEF-W0-001` in
@@ -199,7 +199,7 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   still asserts absence, e.g. `W4/JAN-W4-DR-001…roadmap.md:22` ("the demo route stubs it") and
   `PROGRAM-STATUS.md:47`. The full carrier roster with line numbers is in the audit output; the
   indexed status is queryable now via `tracker:query`.
-- [ ] **(b) Re-state DEF-W9-003's premise, together with the row that asserts it.** It says PWA
+- [x] ~~**(b) Re-state DEF-W9-003's premise, together with the row that asserts it**~~ — **DONE 2026-08-20** (`8f5efe23`), both carriers in one edit, and stated more precisely than the audit did: the binding is INSUFFICIENT, not absent. Kept below for the reasoning. It says PWA
   upgrade "folds on the **(built)** version binding". ⚠ Do NOT file this as "the foundation does not
   exist" — the binding EXISTS and is ENFORCED (REG-F-199 drove RPH-CON-009 both refusing and
   accepting). What is missing is version SUCCESSION: a `pwaId` holds one `version` for life, so an
