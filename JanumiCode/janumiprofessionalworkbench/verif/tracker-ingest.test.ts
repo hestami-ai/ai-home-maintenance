@@ -12,7 +12,7 @@
  * undefined ref) are facts the register itself records in prose, cited at each assertion.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -374,6 +374,37 @@ describe('measured verdicts (W-3) — measurements cross-checked, absences contr
 		);
 		expect(judged.map((r) => r.name).sort()).toEqual([...ratified].sort());
 		for (const row of judged) expect(row.value, row.name).not.toContain('ABSENT');
+	});
+
+	it('every DEF-* deferral in the corpus is indexed with an audited status (REG-F-200)', () => {
+		// THE SECOND READER IS THE CORPUS ITSELF. A deferral is a claim that something is NOT built —
+		// the converse of everything else this index tracks, and the one row type whose staleness
+		// nothing could see: the 21 ids live only in DATED gate packages (correctly immutable), while
+		// JAN-ROADMAP-001-C-living-control-registers.yaml declares a `deferral` record contract and
+		// then holds `deferrals: []`. This assertion re-derives the population from docs/ and fails if
+		// a NEW deferral is ever taken without being indexed — which is how the 43% accumulated.
+		const found = new Set<string>();
+		const walk = (dir: string): void => {
+			for (const entry of readdirSync(dir)) {
+				const full = join(dir, entry);
+				if (statSync(full).isDirectory()) walk(full);
+				else if (/\.(md|yaml)$/.test(entry))
+					for (const m of readFileSync(full, 'utf8').matchAll(/DEF-[A-Z0-9]+-\d{3}/g))
+						found.add(m[0]);
+			}
+		};
+		walk(join(REPO, 'docs'));
+		const indexed = sql<{ name: string }>(
+			"SELECT name FROM items WHERE kind = 'deferral' ORDER BY name"
+		).map((r) => r.name);
+		expect(indexed).toEqual([...found].sort());
+		expect(indexed.length).toBeGreaterThanOrEqual(21);
+		// Every indexed deferral carries an audited status — an index that admits an unjudged row is
+		// the same hole one layer up.
+		const statuses = sql<{ item_id: string }>(
+			"SELECT item_id FROM attrs WHERE key = 'deferral_status'"
+		);
+		expect(statuses).toHaveLength(indexed.length);
 	});
 
 	it('the substring-match correction is on the record, and names what it overturned', () => {

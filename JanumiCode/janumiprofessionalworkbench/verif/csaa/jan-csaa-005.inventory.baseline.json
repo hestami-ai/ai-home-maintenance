@@ -5676,7 +5676,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "57380075321497e1171230e16c46cabd22bd9d32494e27f5694bd47c8fdd30ad",
+    "fileManifestDigest": "803e6403f19b4cc68fc26040106a6635c5fe3caabe6e336142d007b304f8418a",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -12022,9 +12022,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 14779,
+        "bytes": 15532,
         "path": "scripts/tracker/core.ts",
-        "sha256": "dfe3f99d03218bc6beb1656bc7f21057eb7a7e9c7118db03e5d9711781d018ec",
+        "sha256": "da71eea592d8014bd0c7fd49aa86707f72753432db7da2d78764270416192602",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12372,9 +12372,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 22549,
+        "bytes": 24158,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "59155583940e88399fbb6fa6f452835b12652025be88fce31eb8809306318f96",
+        "sha256": "8994dee4f48963c5f38a42739d2960f987c2ced597b479992622fb7e37950ce8",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12462,7 +12462,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "c5c76f45baa9f7aee294506349dcdb085516ee6d2d151b156a81a9158b6830bf",
+    "subjectId": "c26f62f093d050221c827da3bbbe0e74e7e80c9ea0e98b57c0a0406f507afcdc",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -15018,7 +15018,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/core.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "dfe3f99d03218bc6beb1656bc7f21057eb7a7e9c7118db03e5d9711781d018ec",
+      "contentSha256": "da71eea592d8014bd0c7fd49aa86707f72753432db7da2d78764270416192602",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15736,7 +15736,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "59155583940e88399fbb6fa6f452835b12652025be88fce31eb8809306318f96",
+      "contentSha256": "8994dee4f48963c5f38a42739d2960f987c2ced597b479992622fb7e37950ce8",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

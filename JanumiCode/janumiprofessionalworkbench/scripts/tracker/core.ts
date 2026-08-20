@@ -50,6 +50,15 @@ export const KINDS = new Set([
 	'tracker-row',
 	'backlog-item',
 	'audit-roster-item',
+	// REG-F-200. A roadmap DEFERRAL is a disclosed claim that something is NOT built — the exact
+	// converse of everything else this index tracks, and therefore the one row type whose staleness
+	// nothing could see. The 21 DEF-* ids live only in DATED, per-wave gate packages, which are
+	// historical exit records and must NOT be rewritten; the artifact meant to carry current status,
+	// JAN-ROADMAP-001-C-living-control-registers.yaml, declares a `deferral` record contract and then
+	// holds `deferrals: []`. So "is this deferral still open?" had no artifact to answer it, and 9 of
+	// 21 had drifted. Indexing them here is the same move this whole programme made once already:
+	// an INDEX over the sources, never a rewrite of them.
+	'deferral',
 	'capability',
 	'schema',
 	'mutant',

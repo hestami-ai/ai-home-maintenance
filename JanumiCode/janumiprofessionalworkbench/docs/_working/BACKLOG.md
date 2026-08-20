@@ -103,6 +103,45 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   (`lifecycleStatus`, fused with the axis on every transition, set independently in the birth
   literal). Assertion added and proven RED against the exact surviving mutation; correction +
   OBSERVED verdict appended to `census/w3-probes.ndjson`; gate asserts the full history.
+### REG-F-200 residue — 9 of 21 deferrals misstate the tree (audited + indexed; corrections owed)
+
+- [ ] **(a) Correct the stale CARRIERS — but NOT the dated gate packages.** The distinction is
+  load-bearing: a gate package is a wave's dated EXIT RECORD, so G1 saying "deferred → W2" while G2
+  says "delivered" is the correct flow, not a contradiction, and rewriting it would falsify history.
+  What may be corrected is (i) LIVE status fields — done for `DEF-W0-001` in
+  `W0/evidence/divergence-register.md`, and `UNK-W0-001` in the same file still reads `status: OPEN`
+  although its `resolution_gate` (G1+) closed at both G1 and G2; and (ii) FORWARD-LOOKING prose that
+  still asserts absence, e.g. `W4/JAN-W4-DR-001…roadmap.md:22` ("the demo route stubs it") and
+  `PROGRAM-STATUS.md:47`. The full carrier roster with line numbers is in the audit output; the
+  indexed status is queryable now via `tracker:query`.
+- [ ] **(b) Re-state DEF-W9-003's premise, together with the row that asserts it.** It says PWA
+  upgrade "folds on the **(built)** version binding". ⚠ Do NOT file this as "the foundation does not
+  exist" — the binding EXISTS and is ENFORCED (REG-F-199 drove RPH-CON-009 both refusing and
+  accepting). What is missing is version SUCCESSION: a `pwaId` holds one `version` for life, so an
+  upgrade has nothing to upgrade *to*. Fix the deferral AND `W8-W10/disposition-and-gates.md:36`
+  together, or the contradiction survives in the half you did not touch.
+- [ ] **(c) The 5 PARTIALs need splitting, not closing** — `DEF-W1-001`, `DEF-W1-002`, `DEF-W2-003`,
+  `DEF-W3-001`, `DEF-W3-002`. Each is built in part, so each misleads in exactly its built half. The
+  audit records which half for each; a partial deferral restated as two rows (discharged / still
+  deferred) is the honest shape.
+- [ ] **(d) A STANDING GATE over roadmap deferrals** — design-first. It would need: a machine-checkable
+  DISCHARGE PREDICATE per row (named production symbol, route, or `data-testid`), failing when the
+  predicate resolves in production while the row still reads deferred; a check that a deferral's
+  stated TARGET WAVE did not close with the id neither discharged nor re-carried; and a check on
+  affirmative PREMISE clauses ("folds on the *built* X"). ⚠ State its limits the way
+  `verif/deferral-honesty.test.ts` does — it could not see delivery UNDER ANOTHER NAME
+  (`startStepGate` discharged `canStartStep`; the command-bus receipt discharged `resolveIdempotency`),
+  REACHABILITY (a symbol whose only caller is itself dead), SEMANTIC SUFFICIENCY (DEF-W3-001's "with
+  impact analysis" would score discharged on an emitted `impactAnalysisRequired` that is
+  `z.literal(true)` with zero readers), deferrals with no production symbol at all, or deferrals
+  never given an id.
+- [ ] **(e) SPONSOR / structural: the living control register is an empty template.**
+  `JAN-ROADMAP-001-C-living-control-registers.yaml` declares record contracts for decisions,
+  divergences, deferrals, waivers and assumptions — with required `status` fields — and holds `[]`
+  for all five, under its own `status: ACTIVE_TEMPLATE`. Either populate it as the live home, or
+  retire it and name the real one. The census index (`f200-deferrals.ndjson`) answers the deferral
+  question today, but the other four registers have the same hole and no index.
+
 - [ ] **A format-conformance RATCHET** — `format:check` is red for 267 files and is invoked by no
   gate, so the standing "conformance arrives edit-by-edit" policy has no measurement and cannot
   fail. A ratchet (the count may not increase, pinned the way the mutation ratchets are) makes the
