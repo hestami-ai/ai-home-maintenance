@@ -15,15 +15,21 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   fired positive control; roster: `census/w3-verdicts.ndjson`). ⚠ Name-level absence — equivalents
   may exist under other names in `rph-engine/src/queries.ts`; the delta investigation is owed
   before any is filed as a gap. Also name-ABSENT: the ratified **Execution Workbench** surface.
-- [ ] **W-3 finding (ii): CaptureIntent's ratified birth state is observed by NOTHING** — probe
-  mutation RAW→PROVISIONAL stayed green across intent.test.ts, ALL of rph-application (902) and
-  rph-engine (149). The command is TESTED (a driving test names it) and its central ratified
-  property is unobserved — the stub-tier distinction made concrete. Fix = a birth-state assertion
-  (and consider a ledger mutant); recorded at `cap:command:CaptureIntent` as a probe_mutation attr.
+- [x] ~~**W-3 finding (ii): CaptureIntent's ratified birth state is observed by NOTHING**~~ —
+  **FIXED 2026-08-20, and the recorded mechanism was WRONG first** (the citation-currency lesson,
+  in miniature): the ratified axis state WAS observed (`intent.test.ts` asserts
+  `state.intentStatus === 'RAW'`); the unobserved thing was the ENVELOPE MIRROR at birth
+  (`lifecycleStatus`, fused with the axis on every transition, set independently in the birth
+  literal). Assertion added and proven RED against the exact surviving mutation; correction +
+  OBSERVED verdict appended to `census/w3-probes.ndjson`; gate asserts the full history.
 - [ ] **W-3b: the 192 invariants' prose→code mapping** — judgment work (lanes + refuters, the
   REG-F-197 pattern), deliberately NOT done by grep in W-3. The canon 62 FAM-N invariants are the
   priority slice.
-- [ ] **Implementation ground-truth program** — design + roadmap landed 2026-08-20
+- [x] ~~**Implementation ground-truth program**~~ — **W-0..W-5 ALL LANDED 2026-08-20 (REG-F-198)**:
+  substrate + ingest + census + measured verdicts + DRIVEN bridge + `tracker:build` in `gate:fast`.
+  Remaining program residue: W-3b invariant mapping (below), the query-name delta (below), and the
+  optional semantic layer (design §4, opt-in, never gate-load-bearing).
+  Originally: design + roadmap landed 2026-08-20
   (`DESIGN-implementation-ground-truth.md`, `ROADMAP-implementation-ground-truth.md`): a bun:sqlite
   INDEX over the existing trackers (never a peer tracker) + the capability census with the
   stub-proof verdict ladder. Next: W-0 (substrate, with a check that can FAIL). Driven facts on

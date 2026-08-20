@@ -23,7 +23,7 @@
 		"mutants:preflight": "MUTANTS_PREFLIGHT=1 bun run scripts/mutants/run.ts",
 		"mutants:harvest": "MUTANTS_HARVEST=1 bun run scripts/mutants/run.ts",
 		"gate": "bun run gate:fast && bun run mutants",
-		"gate:fast": "bun run csaa:inventory:check && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
+		"gate:fast": "bun run csaa:inventory:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
 		"spec:obligations": "bun run scripts/spec-obligations.ts",
 		"csaa:inventory": "bun run scripts/csaa-inventory.ts --write",
 		"csaa:inventory:check": "bun run scripts/csaa-inventory.ts --check",

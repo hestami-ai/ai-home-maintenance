@@ -291,22 +291,58 @@ describe('measured verdicts (W-3) — measurements cross-checked, absences contr
 			"SELECT item_id, method FROM verdicts WHERE verdict = 'OBSERVED' ORDER BY item_id"
 		);
 		expect(rows).toEqual([
+			{ item_id: 'cap:command:CaptureIntent', method: 'probe-mutation:w3' },
 			{ item_id: 'cap:machine:Intent.intentStatus', method: 'probe-mutation:w3' },
 			{ item_id: 'cap:policy:POL-ASSUMPTION-DISCLOSURE', method: 'probe-mutation:w3' }
 		]);
 	});
 
-	it('the CaptureIntent probe SURVIVAL is recorded as a finding, never laundered into a verdict', () => {
-		const attrs = sql<{ value: string }>(
-			"SELECT value FROM attrs WHERE item_id = 'cap:command:CaptureIntent' AND key = 'probe_mutation'"
+	it('the CaptureIntent probe history is complete: survival, correction, and the red-proven fix', () => {
+		// The survival attr stands (append-only history), its CORRECTION stands beside it — the
+		// mechanism first recorded was wrong (the axis field WAS observed; the envelope mirror at
+		// birth was not) — and the OBSERVED verdict exists only because the new assertion was proven
+		// RED against the exact mutation that had survived 1,051 tests.
+		const attrs = sql<{ key: string; value: string }>(
+			"SELECT key, value FROM attrs WHERE item_id = 'cap:command:CaptureIntent' AND key LIKE 'probe_mutation%' ORDER BY key"
 		);
-		expect(attrs).toHaveLength(1);
+		expect(attrs.map((a) => a.key)).toEqual(['probe_mutation', 'probe_mutation_correction']);
 		expect(attrs[0]!.value).toContain('SURVIVED');
-		expect(attrs[0]!.value).toContain('RAW');
-		// And the item's ladder tier remains TESTED — a survived probe must not raise OR erase it.
-		const latest = sql<{ verdict: string }>(
-			"SELECT verdict FROM verdicts WHERE item_id = 'cap:command:CaptureIntent' AND measured_at <> 'at-build'"
+		expect(attrs[1]!.value).toContain('envelope');
+		// Journal FILENAME order decides rowid order (w3-probes < w3-verdicts < w4-driven), so the
+		// history is asserted as a SET — the dates tie and the tier logic never reads rowid order.
+		const history = sql<{ verdict: string }>(
+			"SELECT verdict FROM verdicts WHERE item_id = 'cap:command:CaptureIntent' AND measured_at <> 'at-build' ORDER BY verdict"
 		);
-		expect(latest.map((r) => r.verdict)).toEqual(['TESTED']);
+		expect(history.map((r) => r.verdict)).toEqual(['DRIVEN', 'OBSERVED', 'TESTED']);
+	});
+
+	it('DRIVEN verdicts exist exactly for the commands the reference-undertaking drive dispatches', () => {
+		// Two independent readers again: the DRIVEN journal vs a fresh extraction of send('X') calls
+		// from the drive source, intersected with the COMMANDS map. The drive THROWS on any
+		// non-ACCEPTED dispatch, and the rph-engine suites that call it run in the gate — so a DRIVEN
+		// row here is backed by an end-to-end execution every gate re-performs.
+		const driveSource = readFileSync(
+			join(REPO, 'packages', 'rph-engine', 'src', 'reference-undertaking.ts'),
+			'utf8'
+		);
+		const sent = new Set<string>();
+		for (const m of driveSource.matchAll(/send\(\s*\n?\s*'([A-Za-z]+)'/g)) sent.add(m[1]!);
+		const commandsSource = readFileSync(
+			join(REPO, 'packages', 'rph-contracts', 'src', 'messages.ts'),
+			'utf8'
+		);
+		const block = /^export const COMMANDS = \{$([\s\S]*?)^\} as const;/m.exec(commandsSource)![1]!;
+		const commandIds = new Set(
+			[...block.matchAll(/^\t([A-Z][A-Za-z0-9]+): \{$/gm)].map((m) => m[1]!)
+		);
+		const independent = [...sent]
+			.filter((s) => commandIds.has(s))
+			.map((c) => `cap:command:${c}`)
+			.sort();
+		const recorded = sql<{ item_id: string }>(
+			"SELECT DISTINCT item_id FROM verdicts WHERE verdict = 'DRIVEN' ORDER BY item_id"
+		).map((r) => r.item_id);
+		expect(recorded).toEqual(independent);
+		expect(recorded.length).toBeGreaterThanOrEqual(35);
 	});
 });

@@ -1481,7 +1481,7 @@
       "categories": [
         "TEST"
       ],
-      "command": "bun run csaa:inventory:check && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
+      "command": "bun run csaa:inventory:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
       "name": "gate:fast",
       "owner": ".",
       "provenance": [
@@ -2503,7 +2503,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "3ef3b4853959a8411f7f96abce67ca3d3ac6d76a1d473dfc811584006a3daa6f",
+    "configurationDigest": "291355314b34b85662e6561ead7c0724eccfafe520f8f2ff362a7923de209501",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2592,9 +2592,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 5795,
+          "bytes": 5820,
           "path": "package.json",
-          "sha256": "ce6ca37e9da2c55026a77f94a4d4001c8a34fb129c0552d469337b980d735cf5"
+          "sha256": "fdf8a9e9a8fbc063bf94fb9c71a2c7d5b6cfb318c1cc25aa1701977d554e3fb2"
         },
         {
           "artifactClass": "MANIFEST",
@@ -4833,11 +4833,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "f63d7c8b5e63631e1fba9faeeb522f60e964ea3d9edb26d20997a81e75a3ed04",
+          "configClosureDigest": "92eed4a891bb2b306a29f3dfc2c731d20b790af0cf241a5370fab89c649e617a",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "c0aa2cb83510e71244aa8cb1d842a62a9db9d7bcb26f5efa022522682f040332",
+          "projectResolutionDigest": "716139e497e8f49d4b28b0c6d3548ace61d7403eb39c86c34e6f776659978ee4",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4887,11 +4887,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "cd033efe2f8694dc9f5fa0b948f7413e8bcf92d58f05ca8eec27a86feef3993a",
+          "configClosureDigest": "05b445ad747c3105132dc4ef5117033d0888e169ffb15e91d1a9cf5a32189097",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "5a8e7ed5613ed0547f27f204a3353fb811132be083168fcdbc3eae0c2b1ebd3f",
+          "projectResolutionDigest": "a19ffabbcb7d22b2f646180b21695c92c1adfd09a7e07486af1523427b670ae8",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4925,11 +4925,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "eb06af5e1e580281ca31cc702fa112669e3bb625ecebcf47504a686656cc573c",
+          "configClosureDigest": "cf0746b998ee2af8f67463cad27250beca9e137c3375af02ffa6787fbaae0050",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d52d1591f92be76b95e49e349786fa81a5c9905d5918a9bc112faacb3e5abad9",
+          "projectResolutionDigest": "9ef23aadde3cfe6c970290ddff9dbc634c517fba81109de58910c17d53fcf103",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5671,7 +5671,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "dee5ce6c25e7de1d0dfb9a5bb1b2459409bb3391fe20de1af1e11a981a3ce392",
+    "fileManifestDigest": "7b8f38b2fb123e7d0413a42b11320c80a397b64e222672c24fb3afcd25d33157",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -6837,9 +6837,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 5795,
+        "bytes": 5820,
         "path": "package.json",
-        "sha256": "ce6ca37e9da2c55026a77f94a4d4001c8a34fb129c0552d469337b980d735cf5",
+        "sha256": "fdf8a9e9a8fbc063bf94fb9c71a2c7d5b6cfb318c1cc25aa1701977d554e3fb2",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -9182,9 +9182,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 7876,
+        "bytes": 8875,
         "path": "packages/rph-application/src/handlers/intent.test.ts",
-        "sha256": "f47fb9e056793e6e82f5f8751af5e7224b2496a731eaf2a0d963b5fa9a87a238",
+        "sha256": "e43358d8f74e6b989a281634c0050d881fcbb6c24901ec84dccf2ead5b14912f",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -12353,9 +12353,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 14713,
+        "bytes": 16785,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "2a6a2c97cfbc5406045a3d6eaa053135ae6726df05b66c9d5190839ff875ee6e",
+        "sha256": "6ea8f34208716baf4a82cdececbaae3b519f504b68e0c40c10afa52d22709227",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12436,7 +12436,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "3dd6428516cde98f4c5220732d04f3b68ccdaffe3267c2b3fe1f88adf360a8e2",
+    "subjectId": "ce198375c45fd2d1e3a56124be6df7667fd866a60fe39eac3971107acbb12224",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -15688,7 +15688,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "2a6a2c97cfbc5406045a3d6eaa053135ae6726df05b66c9d5190839ff875ee6e",
+      "contentSha256": "6ea8f34208716baf4a82cdececbaae3b519f504b68e0c40c10afa52d22709227",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

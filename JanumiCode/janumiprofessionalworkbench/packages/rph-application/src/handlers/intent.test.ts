@@ -9,7 +9,6 @@ import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
-
 describe('Intent lifecycle handlers (live command drive)', () => {
 	let store: SqliteStorageAdapter;
 	let engine: AuthedEngine;
@@ -20,7 +19,8 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => '2026-07-12T00:00:00Z' });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(),
+		engine = new Engine({
+			authenticate: testAuthenticator(),
 			store,
 			now: () => '2026-07-12T00:00:00Z',
 			newEventId: () => `evt_${++seq}`
@@ -84,7 +84,11 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 		engine.dispatch(formalize([{ description: 'x' }]));
 		// the intent is at semantic version 1; an approval naming v2 is a mismatched/stale binding
 		const stale = engine.dispatch(
-			cmd('ApproveIntent', { decisionId: 'dec_x', approvedSemanticVersion: 2, approvalScope: 'full' })
+			cmd('ApproveIntent', {
+				decisionId: 'dec_x',
+				approvedSemanticVersion: 2,
+				approvalScope: 'full'
+			})
 		);
 		expect(stale.status).not.toBe('ACCEPTED');
 		expect(stale.error?.code).toBe('RPH_INVARIANT_VIOLATION');
@@ -93,7 +97,11 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 		// the control: approving the CURRENT version succeeds
 		expect(
 			engine.dispatch(
-				cmd('ApproveIntent', { decisionId: 'dec_x', approvedSemanticVersion: 1, approvalScope: 'full' })
+				cmd('ApproveIntent', {
+					decisionId: 'dec_x',
+					approvedSemanticVersion: 1,
+					approvalScope: 'full'
+				})
 			).status
 		).toBe('ACCEPTED');
 		expect(status()).toBe('APPROVED');
@@ -102,6 +110,22 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 	it('drives the full lifecycle RAW -> UNDER_DISCOVERY -> PROVISIONAL -> FORMALIZED -> APPROVED -> REVISED -> APPROVED', () => {
 		expect(engine.dispatch(capture()).status).toBe('ACCEPTED');
 		expect(status()).toBe('RAW');
+		// ⚠ THE ENVELOPE MIRROR AT BIRTH, asserted because a probe proved nothing observed it
+		// (2026-08-20): `lifecycleStatus` is the generic envelope status and `intentStatus` the
+		// machine axis; kit.ts documents transitions as "set the status field (+ mirror
+		// lifecycleStatus)" and intent.ts:176 keeps them fused on every hop — but at BIRTH the two
+		// are set independently in the handler's literal. A mutation of the birth `lifecycleStatus`
+		// to PROVISIONAL stayed green across this file, all of rph-application (902) and rph-engine
+		// (149): intents born with a corrupt envelope, and no test could see one. This assertion is
+		// the observer; it was proven RED against that exact mutation before it was trusted.
+		{
+			const born = store.loadObject(INTENT_ID)?.state as {
+				lifecycleStatus?: string;
+				intentStatus?: string;
+			};
+			expect(born.lifecycleStatus).toBe('RAW');
+			expect(born.lifecycleStatus).toBe(born.intentStatus);
+		}
 
 		expect(engine.dispatch(cmd('BeginIntentDiscovery', {})).status).toBe('ACCEPTED');
 		expect(status()).toBe('UNDER_DISCOVERY');
