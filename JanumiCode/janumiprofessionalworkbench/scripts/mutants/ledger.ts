@@ -3133,7 +3133,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: 'if (!IDENTIFIER_CHAR.test(before) && !IDENTIFIER_CHAR.test(after)) return true;',
 		replace: 'return true;',
 		expectRed: ['verif/tracker-name-match.test.ts'],
-		why: "THE INSTRUMENT NEEDS ITS OWN MUTANT. A measurement tool that cannot be shown to fail is a claim about the codebase with no standing — the REG-F-196 shape, applied to the thing that grades everything else. Collapsing the boundary test to a bare `return true` IS `String.includes`, the exact behaviour that reported the ratified query `getPwu` as implemented because `getPwuTemplate` starts the same way.",
+		why: 'THE INSTRUMENT NEEDS ITS OWN MUTANT. A measurement tool that cannot be shown to fail is a claim about the codebase with no standing — the REG-F-196 shape, applied to the thing that grades everything else. Collapsing the boundary test to a bare `return true` IS `String.includes`, the exact behaviour that reported the ratified query `getPwu` as implemented because `getPwuTemplate` starts the same way.',
 		source: 'REG-F-199'
 	},
 	{
@@ -3142,7 +3142,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: 'if (!IDENTIFIER_CHAR.test(before) && !IDENTIFIER_CHAR.test(after)) return true;',
 		replace: 'if (!IDENTIFIER_CHAR.test(before)) return true;',
 		expectRed: ['verif/tracker-ingest.test.ts'],
-		why: 'SHARPER THAN MU-TRACKER-01 AND AIMED ELSEWHERE. Dropping only the TRAILING check admits exactly one class of false positive — a ratified name that is a PREFIX of a longer identifier — which is the 2026-08-20 incident precisely, and nothing else. Its victim is the CENSUS leg, so what this proves is not that the matcher is wrong but that the tracker gate can SEE the matcher being wrong: it reddens through the live `measure.ts` run, not through the committed journal.',
+		why: 'SHARPER THAN MU-TRACKER-01 AND AIMED ELSEWHERE. Dropping only the TRAILING check admits exactly one class of false positive — a ratified name that is a PREFIX of a longer identifier — which is the 2026-08-20 incident precisely, and nothing else. Its victim is the CENSUS leg, so what this proves is not that the matcher is wrong but that the tracker gate can SEE the matcher being wrong: it reddens through the live `measure.ts` run, not through the committed journal. Observed: reddens EXACTLY 1 of the census suite’s 24 tests — the live-instrument assertion and nothing else, which is the discrimination a broad red cannot give you.',
 		source: 'REG-F-199'
 	}
 ];
