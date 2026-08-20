@@ -17,6 +17,7 @@ import type {
 	StaticSemanticSnapshot
 } from '../contracts/semantic.js';
 import { SUBJECT_POLICY_VERSION, SUBJECT_SCHEMA_VERSION } from '../contracts/subject.js';
+import { SNAPSHOT_ARRAY_FIELDS } from './validate-wire-shape.js';
 import {
 	FULL_JAN_CSAA_007_CONFORMANCE,
 	SEMANTIC_AST_TRAVERSAL_PROFILE,
@@ -9813,5 +9814,26 @@ describe('bounded semantic snapshot validation', () => {
 			]),
 			state: 'INVALID'
 		});
+	});
+
+	// The PUBLIC observable the deleted checkInvalidShape guard used to guarantee: a caller of
+	// validateStaticSemanticSnapshot sees INVALID_SHAPE / 'Expected an array.' at the field's own
+	// path. The wire enforces it, but the wire's own issue carries no CODE — that is applied by the
+	// mapping in this module — so pinning it at the wire alone would leave the triple callers
+	// actually depend on unasserted.
+	it('reports every non-array snapshot field to callers as INVALID_SHAPE at its own path', () => {
+		expect(SNAPSHOT_ARRAY_FIELDS.length).toBeGreaterThan(0);
+		for (const field of SNAPSHOT_ARRAY_FIELDS) {
+			expect(validateSnapshot({ ...fixture(), [field]: 0 }), field).toMatchObject({
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						code: 'INVALID_SHAPE',
+						message: 'Expected an array.',
+						path: `$.${field}`
+					})
+				]),
+				state: 'INVALID'
+			});
+		}
 	});
 });

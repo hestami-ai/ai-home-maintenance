@@ -1291,6 +1291,22 @@ export interface SemanticWireMaterializationResult {
 	readonly value?: SemanticSnapshotWireValue;
 }
 
+/**
+ * The snapshot fields this module both REQUIRES and walks as an array — derived from the two
+ * declarations that decide it rather than restated, so it cannot drift from them.
+ *
+ * Exported for one reason: `validateStaticSemanticSnapshotUnsafe` relies on every one of these
+ * being an actual array and no longer re-checks it, so the set is load-bearing for a caller that
+ * cannot see it. A test pins this against the expected membership; adding a snapshot array field
+ * without extending that expectation reddens rather than silently widening what reaches the
+ * snapshot validator.
+ */
+export const SNAPSHOT_ARRAY_FIELDS: readonly string[] = Object.keys(ARRAY_CHILD)
+	.filter((field) => field.startsWith('snapshot.'))
+	.map((field) => field.slice('snapshot.'.length))
+	.filter((field) => (KEYS['snapshot'] ?? []).includes(field))
+	.sort((left, right) => Number(left > right) - Number(left < right));
+
 export function materializeSemanticSnapshotWire(
 	value: unknown,
 	options: SemanticWireInspectionOptions

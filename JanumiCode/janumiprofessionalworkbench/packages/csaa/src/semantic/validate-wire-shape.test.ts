@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	inspectSemanticSnapshotWire,
 	materializeSemanticSnapshotWire,
+	SNAPSHOT_ARRAY_FIELDS,
 	type SemanticWireInspectionIssue,
 	type SemanticWireInspectionOptions
 } from './validate-wire-shape.js';
@@ -830,8 +831,12 @@ describe('semantic wire shape materialization hardening', () => {
 			'typeRelations',
 			'types'
 		] as const;
-		expect(arrayFields).toHaveLength(29);
-		for (const field of arrayFields) {
+		// The real completeness guard: the expected membership is compared against the set DERIVED
+		// from the wire's own required-key and array-walk declarations. Asserting the literal's own
+		// length here instead would be a tautology — it can only fail if someone edits the literal,
+		// which is precisely the case that needs no test. Adding a snapshot array field reddens this.
+		expect([...SNAPSHOT_ARRAY_FIELDS]).toEqual([...arrayFields].sort());
+		for (const field of SNAPSHOT_ARRAY_FIELDS) {
 			// a non-object reaches the list visitor
 			expectIssue(
 				{ [field]: 0 },
@@ -840,6 +845,11 @@ describe('semantic wire shape materialization hardening', () => {
 			// an object that is not an array reaches the inert-array check
 			expectIssue(
 				{ [field]: {} },
+				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
+			);
+			// null is the case the deleted guard's !Array.isArray() also covered
+			expectIssue(
+				{ [field]: null },
 				{ budget: false, message: 'Expected an array.', path: `$.${field}` }
 			);
 		}
