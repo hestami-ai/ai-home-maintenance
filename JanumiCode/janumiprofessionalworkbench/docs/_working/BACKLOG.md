@@ -26,7 +26,22 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 
 ### REG-F-199 residue — the deltas the investigation found (each verified by a refuter; re-verify at pickup)
 
-- [ ] **(1) `getObject` is the "unrestricted CRUD" read §34's own preamble forbids** — it is type-blind
+- [x] ~~**(1) `getObject` is the "unrestricted CRUD" read §34's own preamble forbids**~~ — **FIXED
+  2026-08-20** by a typed seam, `getObjectOfType(handle, objectType, id)`, adopted at the Undertaking
+  Workbench loader. It asserts a discriminator the system already maintains (`newEnvelope` writes
+  `objectType`; the write side has gated on it all along at `handlers/pwu.ts:163,:192`), and takes the
+  CONTRACT union rather than `string`, so a typo is a compile error and not a permanent `undefined`.
+  `getObject` stays with a warning at its docblock — its other 14 call sites read INTERNAL ids (object
+  state, module constants), which is not this defect. Two mutants, one victim each, opposite polarity:
+  one reverts the loader, one makes the seam refuse everything so the CONTROL is what reddens.
+  ⚠ **OWED, and the reason is recorded in the commit:** `csaa:inventory` regeneration and the two
+  mutant RUNS were both deferred because a concurrent audit had scratch files in the tree — the
+  inventory would have baked another session's scratch into the baseline, and a dirty tree scores
+  ABORTED_DIRTY and voids every mutant verdict. `bun run build` must precede `bun run mutants` here.
+  ⚠ **THE GENERAL FORM IS OPEN:** this fixed ONE loader. An audit of every production path where an
+  externally-supplied id reaches a type-blind read is running; its roster decides where the seam is
+  adopted next. Do not assume this class is closed because one instance is.
+- [ ] ~~**(1) superseded bullet**~~ — — it is type-blind
   (`queries.ts:214`), stands in for four ratified typed queries, and no call site asserts the
   discriminator. Live consequence, **DRIVEN 2026-08-20 and worse than recorded** — the loader was executed against a
   PWA id and did NOT throw: it returned `undertaking.name = "Product Realization"`, the PWA's own

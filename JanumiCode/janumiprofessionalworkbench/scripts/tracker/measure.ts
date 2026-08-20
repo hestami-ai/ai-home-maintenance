@@ -31,7 +31,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadRecords } from './core.js';
-import { hasIdentifierOccurrence } from './match.js';
+import { hasIdentifierOccurrence, stripComments } from './match.js';
 
 const SCRIPT_DIR = fileURLToPath(new URL('.', import.meta.url));
 const ROOT = resolve(join(SCRIPT_DIR, '..', '..'));
@@ -75,9 +75,12 @@ walk(join(ROOT, 'apps'), sourceFiles);
 const isTest = (p: string): boolean => /\.(test|spec|e2e)\.ts$/.test(p) || p.includes('e2e');
 const production = sourceFiles.filter((p) => !isTest(p));
 const tests = sourceFiles.filter(isTest);
+// CODE ONLY, NEVER COMMENTS — see match.ts for the incident: a docblock naming four ratified queries
+// as things that DO NOT exist was read as production evidence that they DO, flipping all four from
+// ABSENT to DECLARED. Writing the documentation would have manufactured the implementation.
 const cache = new Map<string, string>();
 const text = (p: string): string => {
-	if (!cache.has(p)) cache.set(p, readFileSync(p, 'utf8'));
+	if (!cache.has(p)) cache.set(p, stripComments(readFileSync(p, 'utf8')));
 	return cache.get(p)!;
 };
 // IDENTIFIER-BOUNDARY, never substring — see match.ts for the `getPwu` ⊂ `getPwuTemplate` incident

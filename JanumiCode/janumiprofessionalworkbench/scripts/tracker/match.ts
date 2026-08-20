@@ -28,6 +28,64 @@
 const IDENTIFIER_CHAR = /[A-Za-z0-9_$]/;
 
 /**
+ * Blank out `//` line comments and block comments, preserving length and line structure.
+ *
+ * ⚠ WHY THE WALK MUST NOT SEARCH COMMENTS, found the way everything here gets found — by causing it.
+ * On 2026-08-20 a docblock was added to `queries.ts` explaining that `getObject` "stands in for four
+ * ratified typed queries (getUndertaking, getPwu, getBaseline, getPwaVersion)". The consumer walk
+ * read that PROSE as production evidence and flipped all four from ABSENT to DECLARED: a sentence
+ * ABOUT a missing capability was scored AS that capability. Writing the documentation would have
+ * manufactured the implementation.
+ *
+ * The blast radius was derived over all 118 consumer-walk items, and the fifth row was already
+ * there: `ClaimRejected` scored TESTED because its only test mention is a header COMMENT
+ * (claim-assessment.test.ts:4) — production emits it (assurance.ts:723) and no test names it. A
+ * ratified event believed tested was only ever mentioned.
+ *
+ * This is REG-F-113's rule one layer out: the register parser already had to strip inline code spans
+ * before matching fields, for exactly this reason. Prose about a thing is not the thing.
+ *
+ * LIMITS, stated rather than implied: this is a lexical strip, not a parser. A `//` inside a string
+ * or template literal blanks the rest of that line, which can only ever LOSE a match (making the walk
+ * more conservative — it can under-credit, never over-credit). The positive control is asserted
+ * against the STRIPPED text for that reason: if stripping ever broke the search itself, the
+ * instrument refuses to emit absence claims at all.
+ */
+export function stripComments(source: string): string {
+	const out: string[] = [];
+	/** Blank to end of line; returns the index after the run. */
+	const blankLineComment = (from: number): number => {
+		let at = from;
+		while (at < source.length && source[at] !== '\n') {
+			out.push(' ');
+			at++;
+		}
+		return at;
+	};
+	/** Blank to the closing delimiter, keeping newlines; returns the index after it. */
+	const blankBlockComment = (from: number): number => {
+		let at = from;
+		while (at < source.length && source.slice(at, at + 2) !== '*/') {
+			out.push(source[at] === '\n' ? '\n' : ' ');
+			at++;
+		}
+		out.push('  ');
+		return at + 2;
+	};
+	let at = 0;
+	while (at < source.length) {
+		const pair = source.slice(at, at + 2);
+		if (pair === '//') at = blankLineComment(at);
+		else if (pair === '/*') at = blankBlockComment(at);
+		else {
+			out.push(source[at]!);
+			at++;
+		}
+	}
+	return out.join('');
+}
+
+/**
  * True when `needle` occurs in `haystack` at least once as a whole identifier/phrase rather than as
  * a fragment of a longer one. An empty needle never matches: a name we do not have is not a name we
  * found everywhere.

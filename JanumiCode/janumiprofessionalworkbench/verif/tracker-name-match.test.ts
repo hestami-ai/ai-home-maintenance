@@ -22,7 +22,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { hasIdentifierOccurrence } from '../scripts/tracker/match.js';
+import { hasIdentifierOccurrence, stripComments } from '../scripts/tracker/match.js';
 
 describe('consumer-walk name matching (identifier boundaries, never substrings)', () => {
 	it('refuses the incident: getPwu is not present merely because getPwuTemplate is', () => {
@@ -76,6 +76,60 @@ describe('consumer-walk name matching (identifier boundaries, never substrings)'
 		// A name we failed to extract from a document must not read as a name present everywhere —
 		// that is how a parser bug becomes a wall of false ENFORCED.
 		expect(hasIdentifierOccurrence('anything at all', '')).toBe(false);
+	});
+
+	it('refuses the SECOND incident: a docblock naming a MISSING capability is not evidence of it', () => {
+		// The literal shape that flipped four ratified queries from ABSENT to DECLARED on 2026-08-20 —
+		// a comment explaining that `getObject` stands in for queries that DO NOT EXIST. Writing the
+		// documentation would have manufactured the implementation.
+		const source = [
+			'/**',
+			' * stands in for four ratified typed queries (getUndertaking, getPwu, getBaseline).',
+			' */',
+			'export function getObject(handle, id) { return handle.loadObject(id); }'
+		].join('\n');
+		expect(hasIdentifierOccurrence(source, 'getUndertaking'), 'raw text does contain it').toBe(
+			true
+		);
+		expect(
+			hasIdentifierOccurrence(stripComments(source), 'getUndertaking'),
+			'a name appearing ONLY in a comment must not read as an implementation'
+		).toBe(false);
+		// THE CONTROL: the real declaration in the same file survives the strip, so this discriminates
+		// rather than being a stripper that eats everything.
+		expect(hasIdentifierOccurrence(stripComments(source), 'getObject')).toBe(true);
+	});
+
+	it('strips both comment forms while preserving length and line structure', () => {
+		// Asserted as PROPERTIES rather than as literal space counts: the properties are what the walk
+		// depends on (offsets and line numbers stay usable), and a hand-counted string of blanks is a
+		// fixture that tests my arithmetic instead of the code — my first version of this test got the
+		// count wrong by one and would have been "fixed" by copying whatever the code emitted, which is
+		// how a test starts asserting the bug.
+		for (const source of ['a // b\nc', 'a /* b\nc */ d', 'x/*y*/z // tail\nw']) {
+			const stripped = stripComments(source);
+			expect(stripped, source).toHaveLength(source.length);
+			expect(stripped.split('\n'), source).toHaveLength(source.split('\n').length);
+			// No comment CONTENT survives: 'b' and 'y' appear only inside comments in these fixtures.
+			expect(stripped.includes('b'), source).toBe(false);
+			expect(stripped.includes('y'), source).toBe(false);
+		}
+		// …and code outside the comments is untouched.
+		expect(stripComments('x/*y*/z // tail\nw')).toContain('x');
+		expect(stripComments('x/*y*/z // tail\nw')).toContain('z');
+		expect(stripComments('x/*y*/z // tail\nw')).toContain('w');
+	});
+
+	it('is lexical, so it can only ever LOSE a match and never invent one', () => {
+		// A `//` inside a string blanks the rest of that line. That makes the walk CONSERVATIVE — it can
+		// under-credit and never over-credit — which is the safe direction for an instrument whose whole
+		// job is to refuse false evidence. Stated as a test so the limitation is measured, not implied.
+		expect(
+			hasIdentifierOccurrence(
+				stripComments('const u = "https://x.test/getPwuHierarchy";'),
+				'getPwuHierarchy'
+			)
+		).toBe(false);
 	});
 
 	it('finds a later boundary occurrence even when an earlier one is a fragment', () => {

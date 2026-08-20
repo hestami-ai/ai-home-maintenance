@@ -3194,5 +3194,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts'],
 		why: "THE CONTROL NEEDS ITS OWN MUTANT (a control that cannot fail is not a control). A seam that refused EVERY id would satisfy the refusal test above perfectly while 404-ing the Undertaking Workbench for every real user. Its victim is deliberately the DEMO LOADER suite and not the engine seam suite, because the assertion that must redden is the CONTROL \u2014 'a real Undertaking id still renders' \u2014 and that control lives with the loader. Measured: reddens the control alone, leaving the refusal test green, which is the opposite polarity from the mutant above and is what makes the pair discriminating rather than redundant.",
 		source: 'REG-F-199 residue (1)'
+	},
+	{
+		id: 'MU-TRACKER-03-walk-searches-comments-again',
+		file: 'scripts/tracker/measure.ts',
+		find: 'if (!cache.has(p)) cache.set(p, stripComments(readFileSync(p, \'utf8\')));',
+		replace: "if (!cache.has(p)) cache.set(p, readFileSync(p, 'utf8'));",
+		expectRed: ['verif/tracker-ingest.test.ts'],
+		why: "PROSE ABOUT A CAPABILITY IS NOT THE CAPABILITY, and this mutant is the day I proved it by accident. A docblock added to queries.ts explaining that getObject 'stands in for four ratified typed queries (getUndertaking, getPwu, getBaseline, getPwaVersion)' flipped all four from ABSENT to DECLARED \u2014 the walk read a sentence ABOUT missing capabilities as evidence they existed. Writing the documentation would have manufactured the implementation. Reverting the strip restores exactly that, and the census leg reddens through its LIVE measure.ts run, which is the second time that live assertion has earned its place. Blast radius when the strip was added, derived over all 118 consumer-walk items: 5 \u2014 the 4 self-inflicted, plus ClaimRejected, which had been scored TESTED since W-3 because its ONLY test mention is a header comment (claim-assessment.test.ts:4) while production emits it (assurance.ts:723).",
+		source: 'REG-F-201'
 	}
 ];
