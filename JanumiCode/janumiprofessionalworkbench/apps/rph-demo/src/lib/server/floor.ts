@@ -98,7 +98,12 @@ export interface FloorView {
 	readonly subjectId: string;
 	readonly aggregate: string;
 	readonly satisfied: boolean;
-	/** True iff an EFFECTIVE governance WAIVER covers the subject — publication is permitted despite the floor. */
+	/** True iff an EFFECTIVE governance WAIVER covers the subject. ⚠ THAT IS ALL IT MEANS. This docblock read
+	 *  "— publication is permitted despite the floor", and it was the contract-level source of every waiver claim
+	 *  the UI made: `data.floor.waived` gates the badge and the hint on the floor panel, and both said what this
+	 *  line told them to say. ASR-3 makes the floor UNCONDITIONAL (REG-F-202), so an EFFECTIVE waiver permits
+	 *  NOTHING here — it records accepted risk (ASR-14) while the floor keeps blocking. Fixing the markup without
+	 *  fixing this line leaves the next reader authoring the same claim again. */
 	readonly waived: boolean;
 	readonly policies: FloorPolicyView[];
 	/** Open Reasoning-Review observation statements for display. Remediation decisions MUST use the structured
@@ -252,7 +257,9 @@ const isFloorPolicy = (id: unknown): boolean =>
 	id === FLOOR_POLICY_IDS.IDENTITY_PROVENANCE ||
 	id === FLOOR_POLICY_IDS.REASONING_REVIEW;
 
-/** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId` (the auditable override of a blocking floor). */
+/** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId`. ⚠ NOT "the auditable override of a
+ *  blocking floor", which is what this said: under ASR-3 nothing overrides the floor. It is an auditable record
+ *  of accepted risk, and the floor blocks regardless (REG-F-202). */
 function hasEffectiveWaiver(engine: AuthedEngineHandle, subjectId: string): boolean {
 	// WORKSPACE, and deliberately so (SPEC-001 INV-02 / FORK-9): this lookup's subject is the `subjectId` argument
 	// filtered below, not an Undertaking. A waiver may be authored anywhere in the workspace and still cover this

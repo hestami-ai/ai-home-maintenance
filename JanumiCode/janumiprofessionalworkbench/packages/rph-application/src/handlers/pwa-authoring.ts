@@ -948,7 +948,11 @@ export const validatePwa: CommandHandler = (ctx, command) =>
  *  against the PWA's CURRENT semanticVersion (guide §8.4; version-bound, so a stale floor cannot authorize a
  *  re-versioned PWA). The floor applies to an AI-produced PWA (createdBy AGENT/MODEL) AND to any PWA that HAS a
  *  recorded floor — if it was assessed (e.g. an agent shaped the graph over the human-created shell), it must pass. A
- *  purely human-authored, never-assessed PWA passes; an EFFECTIVE governance waiver overrides a block. The shared,
+ *  purely human-authored, never-assessed PWA passes. ⚠ AN EFFECTIVE GOVERNANCE WAIVER DOES NOT OVERRIDE A BLOCK —
+ *  this line used to say it did, and ASR-3 (JPWB-DOC-003 §Semantic Model, ratified) makes the floor UNCONDITIONAL:
+ *  "Risk proportionality governs assurance above a mandatory floor; it never makes the floor optional." The
+ *  discharge apparatus was deleted from floor-gate.ts (REG-F-202); floorGateBlock now consults no waiver at all. A
+ *  waiver remains RECORDABLE and stands as accepted risk (ASR-14) — it simply moves no gate. The shared,
  *  plane-agnostic decision lives in floorGateBlock (reused by the execution-plane gate). */
 function pwaFloorGate(
 	command: DomainCommand,
@@ -969,7 +973,11 @@ function pwaFloorGate(
 	return reject(
 		command,
 		'RPH_INVARIANT_VIOLATION',
-		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for PWA ${pwaId} at v${version} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version, or a governance waiver, before publishing.`,
+		// ⚠ THE MESSAGE NAMES ONE ROUTE BECAUSE THERE IS ONE. It used to end "…for the current version, or a
+		// governance waiver, before publishing." — naming a second route that ASR-3 abolished, in the sentence a
+		// blocked user reads to learn what to do next. Recording the waiver and retrying returns this identical
+		// refusal, so the old text sent them in a circle.
+		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for PWA ${pwaId} at v${version} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version before publishing. The floor is unconditional: no governance waiver discharges it.`,
 		[pwaId]
 	);
 }

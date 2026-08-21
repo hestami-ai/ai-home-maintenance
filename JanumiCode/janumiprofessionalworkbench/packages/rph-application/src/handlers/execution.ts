@@ -1439,7 +1439,12 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 					return reject(
 						command,
 						'RPH_INVARIANT_VIOLATION',
-						`CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result ${subject.subjectId} at v${subject.version}, produced by step ${p.executionStepId} (${detail}). Satisfy or record a waiver over the floor of that result before completing.`,
+						// ⚠ THE EXECUTION-PLANE TWIN of the PublishPwa refusal, and it was worse: it said "Satisfy or
+						// record a waiver over the floor of that result before completing." ASR-3 leaves only the
+						// first half, and the demo's Undertaking Workbench offers no waiver affordance at all — so
+						// the old text sent an operator hunting for a control that does not exist and would not have
+						// worked. `floorGateBlock` consults no waiver on either plane (REG-F-202).
+						`CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result ${subject.subjectId} at v${subject.version}, produced by step ${p.executionStepId} (${detail}). Satisfy the floor for that result before completing. The floor is unconditional: no governance waiver discharges it.`,
 						[p.executionStepId, subject.subjectId]
 					);
 				}

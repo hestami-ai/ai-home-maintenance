@@ -631,8 +631,19 @@ export const actions: Actions = {
 		return advancePwa('RetirePwa', params.id, {}, expectedRevision);
 	},
 
-	// Human-in-the-loop resolution: record + grant an auditable governance WAIVER over the de minimis assurance
-	// floor so a non-SATISFIED PWA can PUBLISH — the alternative to revising the graph and re-running the floor.
+	// Record + grant an auditable governance WAIVER naming the blocking floor policy and the finding it accepts.
+	//
+	// ⚠ THIS DOES NOT UNBLOCK PUBLISHING, and this docblock used to say it did — "so a non-SATISFIED PWA can
+	// PUBLISH — the alternative to revising the graph and re-running the floor" — which is the exact reach ASR-3
+	// (JPWB-DOC-003 §Semantic Model, ratified) removed: the de minimis floor is UNCONDITIONAL. `floorGateBlock`
+	// consults no waiver, so PublishPwa refuses identically before and after this action succeeds. There is ONE
+	// route past the floor and it is revision. This docblock is why the surface above it said what it said, so it
+	// is corrected here rather than only in the markup (REG-F-202).
+	//
+	// It is KEPT, not withdrawn, and that was the sponsor's ruling read carefully: ASR-14 — "a waiver accepts risk;
+	// it never rewrites truth" — narrows a waiver's REACH, not its RECORDABILITY. Refusing to record one would be
+	// over-refusal. The act mints a real EFFECTIVE WAIVER Decision; what changed is that the surface must not
+	// present it as clearing anything.
 	recordWaiver: async ({ request, params }) => {
 		const rationale = String(((await request.formData()).get('rationale') ?? '') as string).trim();
 		if (!rationale) return fail(400, { error: 'A waiver rationale is required.' });

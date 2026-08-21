@@ -2948,32 +2948,42 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'reference — which is the same shape as RPH-GOV-002\'s and RPH-GOV-007\'s and is why this family needed ' +
 			'a census rather than a reading.'
 	},
-	// ENFORCED INVERSELY, and the shape is worth naming because it is the first of its kind in this register. Every
-	// other ENFORCED row points at a guard that refuses when the rule is VIOLATED. Nothing refuses "this waiver is
-	// out of scope". The floor gate refuses the PUBLISH, and the waiver's scope decides whether that refusal happens
-	// at all — so the rule is enforced by a check that PERMITS narrowly rather than one that refuses. The probe is
-	// built accordingly: both runs grant the SAME waiver and differ only in WHEN, so the version it pins is the only
-	// variable and the refusal is attributable to scope rather than to the floor being unsatisfied.
+	// ⚠ THIS BLOCK DESCRIBED AN ENFORCEMENT THAT NO LONGER EXISTS, IN THE PRESENT TENSE, DIRECTLY ABOVE A ROW WHOSE
+	// OWN `enforcedAt` SAYS SO. Corrected 2026-08-20 (REG-F-202). The 26 lines here opened "ENFORCED INVERSELY …
+	// Nothing refuses 'this waiver is out of scope'" and closed on an OBJECT-limb census built entirely out of
+	// `effectiveFloorWaivers` — a function ASR-3 deleted. `enforcedAt` and `refusalMarker` were updated the same day
+	// and this prose was not, which is the rot the register's own §"a stale justification" rule names: a reader meets
+	// the introduction before the field that contradicts it. The HISTORY is kept below because the inverse shape was
+	// genuinely the first of its kind here and the reasoning is worth having — but it is now dated, not current.
 	//
-	// THREE LIMBS, THREE DIFFERENT MECHANISMS, and the census matters more here than usual because the predicate
-	// that LOOKS like it enforces all three does not.
+	// CURRENT (2026-08-20 onward): a DIRECT refusal. `resolveWaiverAuthorization` (waiver-authorization.ts) refuses
+	// in its own voice on decisionType, OBJECT and the VERSION pin; `rejectUnauthorizedWaiver` (pwu.ts) is the
+	// refusal a caller sees, reached from ChangePwuState. A direct refusal is a STRONGER enforcement than the
+	// inverse one it replaced, so the row stays ENFORCED and no limb was lost.
 	//
-	//   CRITERION — `waiverCovers`' waivedCriterionId conjunct. Genuinely decides, genuinely observed:
-	//               pwa-authoring.test.ts has a control that publishes and a discriminator that does not.
-	//   VERSION   — `waiverCovers`' subjectSemanticVersion conjunct. Genuinely decides. Had NO command-layer reader
-	//               until this row's probe; neutralising it reddened only the rph-domain kernel unit test.
-	//   OBJECT    — NOT `waiverCovers`. Its subjectObjectId conjunct is a TAUTOLOGY at the only production call
-	//               site: `effectiveFloorWaivers` builds the view with `subjectObjectId: subjectId`, the very value
-	//               it is compared against, so the conjunct compares a thing with itself. The limb is enforced
-	//               instead by that function's `subjectObjectIds.includes(subjectId)` filter and, REDUNDANTLY, by
-	//               the `?? -1` version fallback beside it — a waiver that does not name this subject carries no
-	//               version entry for it. Either alone suffices, which is why NEITHER is independently killable.
+	//   CRITERION — `waiverCovers`' waivedCriterionId conjunct. Kernel-proven (governance.test.ts). ⚠ Its former
+	//               command-layer control (pwa-authoring.test.ts's publishing control) is GONE, because under ASR-3
+	//               no waiver publishes anything — the control it needed cannot exist on that path any more.
+	//   VERSION   — the pins are derived at PROPOSAL time, so no bus-level arrangement can move a version between
+	//               proposal and waive. `waiver-authority.test.ts` records this and drives the limb at the RESOLVER
+	//               rather than through the bus; a bus-level version probe would be a control that cannot fail.
+	//   OBJECT    — the limb this row's probe now drives (execrem-wp16-enforcement-observed.test.ts), directly.
 	//
-	// THE FIRST READING OF THAT LAST POINT WAS WRONG AND IS RECORDED AS WRONG. Deleting the subject filter leaves
-	// the entire suite green, which reads as an unguarded bypass — a waiver over another PWA discharging this one's
-	// floor. It is not: the version fallback fail-closes first. The correction was proved by a COMBINED mutant
-	// (filter -> false AND `?? -1` -> `?? 2`), which does redden the object test. A finding that dissolves needs
-	// more evidence than the finding did, and single-line green was not evidence of a hole — only of redundancy.
+	// ── DATED, KEPT FOR ITS REASONING (pre-2026-08-20; every mechanism below was deleted with the discharge path) ──
+	// ENFORCED INVERSELY, and the shape was worth naming because it was the first of its kind in this register. Every
+	// other ENFORCED row points at a guard that refuses when the rule is VIOLATED. Nothing refused "this waiver is
+	// out of scope". The floor gate refused the PUBLISH, and the waiver's scope decided whether that refusal happened
+	// at all — so the rule was enforced by a check that PERMITTED narrowly rather than one that refused.
+	//
+	// The OBJECT limb was NOT `waiverCovers`: its subjectObjectId conjunct was a TAUTOLOGY at the only production
+	// call site, `effectiveFloorWaivers`, which built the view with `subjectObjectId: subjectId` — the very value it
+	// was compared against. The limb was enforced instead by that function's `subjectObjectIds.includes(subjectId)`
+	// filter and, REDUNDANTLY, by the `?? -1` version fallback beside it.
+	//
+	// THE FIRST READING OF THAT LAST POINT WAS WRONG AND IS RECORDED AS WRONG. Deleting the subject filter left the
+	// entire suite green, which read as an unguarded bypass. It was not: the version fallback fail-closed first. The
+	// correction was proved by a COMBINED mutant (filter -> false AND `?? -1` -> `?? 2`). A finding that dissolves
+	// needs more evidence than the finding did, and single-line green was not evidence of a hole — only of redundancy.
 	'RPH-GOV-005': {
 		kind: 'ENFORCED',
 		canonCarriage: {
@@ -2987,10 +2997,16 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'A waiver of one object',
 		declaredMutations: [
-			"neutralise `waiverCovers`' subjectSemanticVersion conjunct (`=== ` -> `true`) — this probe reports ADMITTED, because the v1 waiver then discharges the v2 floor and the publish is accepted",
-			"neutralise `waiverCovers`' waivedCriterionId conjunct — this probe still refuses (its criterion matches), but pwa-authoring.test.ts's no-bleeding test reddens; the two limbs are independently killable, which is what makes the criterion cite and this row distinct claims",
-			'drop `w.waivedPolicyId === policyId` from waiverDischargesFloorPolicy\'s filter — floor-waiver-scope.test.ts\'s cross-policy test reddens; this probe does not, since it never crosses policies',
-			"NEITHER OBJECT-LIMB LINE IS INDEPENDENTLY KILLABLE, recorded so a reader re-running these does not read green as absence of enforcement: `subjectObjectIds.includes(subjectId)` -> `false` alone, and `?? -1` -> a matching version alone, each leave the whole suite green. TOGETHER they redden floor-waiver-scope.test.ts's object test. Redundant enforcement, not a hole.",
+			// ⚠ REWRITTEN 2026-08-20 (REG-F-202). Three of the five entries here instructed a reader to mutate
+			// `waiverDischargesFloorPolicy`, `effectiveFloorWaivers` and their `?? -1` fallback — all deleted by ASR-3 —
+			// and a fourth asserted that neutralising the version conjunct makes "the v1 waiver then discharge the v2
+			// floor and the publish is accepted", which the floor now forbids outright. `enforcedAt` and `refusalMarker`
+			// were moved with the rule and THIS FIELD WAS NOT. The register already rules the class: "A
+			// `declaredMutations` entry that cannot be applied is worse than an absent one — an untestable instruction
+			// wearing the authority of a checked record." Filed against myself; the row's own repair missed it.
+			"neutralise the OBJECT conjunct in `resolveWaiverAuthorization` (waiver-authorization.ts) so a waiver naming ANOTHER object authorizes this one — this row's probe reports ADMITTED where it must report REFUSED, and its refusal marker 'A waiver of one object' disappears",
+			"neutralise `waiverCovers`' waivedCriterionId conjunct — rph-domain's governance.test.ts reddens. ⚠ ITS FORMER COMMAND-LAYER CONTROL IS GONE: pwa-authoring.test.ts used to pair this with a waiver that PUBLISHED, and under ASR-3 no waiver publishes anything, so the criterion limb is now kernel-proven only. Recorded rather than left as a silent downgrade.",
+			"⚠ DO NOT DECLARE A BUS-LEVEL VERSION MUTANT. The version pins are derived at PROPOSAL time and no command in reach moves the version between proposal and waive, so an arrangement built through the bus would be a control that cannot fail. `waiver-authority.test.ts` drives that limb at the resolver instead, and says so.",
 			"NO MUTATION IS NEEDED TO SHOW WHAT THIS ROW'S CITE USED TO REST ON — floor-waiver-scope.test.ts, the file named for this rule, passed for months while seeding no floor policies, arranging no assessments, and never once reaching waiverCovers. See REG-F-015."
 		]
 	},

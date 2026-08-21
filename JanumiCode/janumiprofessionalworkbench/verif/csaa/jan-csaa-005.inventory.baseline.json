@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 370,
+      "discovered": 371,
       "excluded": 0,
       "failed": 0,
-      "included": 370,
+      "included": 371,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 370
+      "successfullyInventoried": 371
     },
     {
       "artifactClass": "VERIFICATION",
@@ -116,6 +116,7 @@
         "apps/rph-demo/e2e/agent-retention.e2e.ts",
         "apps/rph-demo/e2e/agent-sse.e2e.ts",
         "apps/rph-demo/e2e/agent-ui.e2e.ts",
+        "apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts",
         "apps/rph-demo/e2e/assurance-floor.e2e.ts",
         "apps/rph-demo/e2e/baselines.e2e.ts",
         "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
@@ -2510,7 +2511,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "beae7d798774da2f719ae73f627e445641d8c5be1436858fac80cc03ced0b2f4",
+    "configurationDigest": "7e2a764d5a41bd18570aeb4f7514243950c9b82c21ca0e44c1035944f3dc2b0d",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2929,7 +2930,7 @@
           "configPath": "apps/rph-demo/e2e/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "9834e6bf94e4f45e35ce20f289556072c5e19d95af37efec20e9f0bdc96f9880",
+          "projectResolutionDigest": "48ce2083a6987d6e637f1013f28051d9c29067f21b14b16ec2c0deabcc0153c2",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -2938,6 +2939,7 @@
             "apps/rph-demo/e2e/agent-retention.e2e.ts",
             "apps/rph-demo/e2e/agent-sse.e2e.ts",
             "apps/rph-demo/e2e/agent-ui.e2e.ts",
+            "apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts",
             "apps/rph-demo/e2e/assurance-floor.e2e.ts",
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
@@ -5686,7 +5688,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "70b8d00e05ef550f074ad3c8971d2f4c67e36aee747b94a0ea20a78f3f0922e5",
+    "fileManifestDigest": "9bad88f6a18f2b1d3eeadc29f088b139279e1d044fe8e591229e4ad9537496e3",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5749,7 +5751,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 965,
+    "selectedFileCount": 966,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -5938,6 +5940,13 @@
         "bytes": 3976,
         "path": "apps/rph-demo/e2e/agent-ui.e2e.ts",
         "sha256": "ef4b0355831125e9c5e0c49afc461ffc71f8cb3daab3bfb7daf8be82a0c08bc8",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 10098,
+        "path": "apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts",
+        "sha256": "1d5904a280580252d75cddb8973507be447bea0e2def87de133e74fabf257ab5",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -6565,9 +6574,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 21901,
+        "bytes": 22595,
         "path": "apps/rph-demo/src/lib/server/floor.ts",
-        "sha256": "74af6e1a8282d6a56931eee746f82d0bcafec5342d86b4cb32ffad2712b98bc0",
+        "sha256": "cfcb6a180f7f193ee283183a80ff34d25512ae20e9ef34b25e78dd62472a4554",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -6733,16 +6742,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 42577,
+        "bytes": 43473,
         "path": "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
-        "sha256": "c2432a037cda63d883dc42ed560349c34879d82691fe4a4cf82fdf72b8e69cb1",
+        "sha256": "784689bb98916f6ee1eeb560dd85cd1a03ea6ff6e295e8d1ac177c13dc9eabb1",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 96180,
+        "bytes": 98080,
         "path": "apps/rph-demo/src/routes/pwa/[id]/+page.svelte",
-        "sha256": "a6b1b1c3f541c2b146e1a2055ed9689c3f5e2133e1965dc6de86b0068ba7049d",
+        "sha256": "989c626730379c06f5c5930b2ad3c26926a211a789754c04888206a78d3e74c3",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9148,9 +9157,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 108401,
+        "bytes": 108924,
         "path": "packages/rph-application/src/handlers/execution.ts",
-        "sha256": "d97b66335f29c7b8a9da8c79dfc603670254068de906c3cf91db9411decb35d5",
+        "sha256": "5651d0e2a407868dcfd7a62f3d89270a5ce8bb934da457bebf508abb43ebdfcd",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9169,9 +9178,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 19572,
+        "bytes": 20107,
         "path": "packages/rph-application/src/handlers/floor-gate.ts",
-        "sha256": "d62b1ecf23275f80f9137bfa564015def31938cbb3ba27a083672fdc77c5bf43",
+        "sha256": "4c5346dc402531b3471f56b7510cefe03b6908df2cc337f1edd586a6f46816a8",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9190,9 +9199,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 61541,
+        "bytes": 62088,
         "path": "packages/rph-application/src/handlers/governance.ts",
-        "sha256": "467ef369cb2369c0128188bbc6d550ff9004db1b4fd5c979f68dbc22e0f1caa5",
+        "sha256": "fdfe1c03b77e52d61024cf033b0f63fa1c7905a2603599231f6cacf3467f6a16",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9281,9 +9290,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 51240,
+        "bytes": 52110,
         "path": "packages/rph-application/src/handlers/pwa-authoring.ts",
-        "sha256": "93bc595e4ad18ca317a67721bf5e301c998d43133e283a8cfa02e3d74b6be1fe",
+        "sha256": "e47fe51754b9c62d8e9796e8c38d03cc1c17732c3b34a60e36b575deafcaa0e7",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12507,12 +12516,12 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "312770846b8b43e3450dc4e32f37a09e7f9008e265e1acf4aa14d3a1fc37a9e4",
+    "subjectId": "7aafb16ef52ce9949f488f088a8ac67fb8e88194c8e24d46dc8d7303ef9fd92e",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
     {
-      "candidateArtifactCount": 52,
+      "candidateArtifactCount": 53,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -12593,6 +12602,7 @@
         "apps/rph-demo/e2e/agent-retention.e2e.ts",
         "apps/rph-demo/e2e/agent-sse.e2e.ts",
         "apps/rph-demo/e2e/agent-ui.e2e.ts",
+        "apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts",
         "apps/rph-demo/e2e/assurance-floor.e2e.ts",
         "apps/rph-demo/e2e/baselines.e2e.ts",
         "apps/rph-demo/e2e/cardinality-rail.e2e.ts",

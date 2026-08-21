@@ -2918,6 +2918,40 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectSurvive: "SURVIVAL IS THE FINDING. MEASURED 2026-08-14 with this exact deletion: `rph-application` + `rph-domain` + `rph-assurance` ran 137 files / 1511 tests, ALL PASSING. ⚠ PAIRED WITH `F161-the-baseline-waiver-escape-is-starved` — one root cause, two consumers, and BOTH fail closed, which is why this is filed as a dead-branch census rather than as a defect needing a hotfix. A KILL means the disposition machine acquired a writer; retire both entries together.",
 		source: 'REG-F-161'
 	},
+	// ── REG-F-202: THE SURFACE MUST NOT OFFER A WAIVER AS A ROUTE PAST THE FLOOR ──────────────────────────────
+	// ASR-3 makes the de minimis floor UNCONDITIONAL and commit d24c19ec deleted the discharge apparatus. That
+	// headline was proven at PACKAGE level and nowhere on the surface, which went on saying the opposite. These
+	// three defend the three distinct claims `assurance-floor-waiver.e2e.ts` makes; the third defends its CONTROL,
+	// because a control that cannot fail is the defect this ledger exists to catch.
+	{
+		id: 'MU-F202-the-blocked-hint-offers-a-waiver-again',
+		file: 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte',
+		find: 'Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.',
+		replace:
+			'Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a waiver.',
+		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
+		why: "THE EXACT TEXT THAT WAS THERE, restored verbatim — this is a REGRESSION mutant, not an invented one. The hint is the sentence a blocked professional reads to learn what to do next, and naming a waiver there sends them down a route ASR-3 abolished: they record it, retry, and get the identical refusal. The spec's claim is `expect(hint).not.toContainText(/waiv/i)`, so the substring alone reddens it without touching the form below.",
+		source: 'REG-F-202 (ASR-3, JPWB-DOC-003 §Semantic Model)'
+	},
+	{
+		id: 'MU-F202-the-publish-refusal-offers-a-waiver-again',
+		file: 'packages/rph-application/src/handlers/pwa-authoring.ts',
+		find:
+			'for the current version before publishing. The floor is unconditional: no governance waiver discharges it.',
+		replace: 'for the current version, or a governance waiver, before publishing.',
+		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
+		why: "THE ENGINE'S OWN VOICE, and the highest-traffic false statement the sweep found — this refusal is the demo's answer to \"why can't I publish?\", surfaced verbatim through `advancePwa` -> `refuse(r)` -> the `{#if form?.error}` block. It survived the d24c19ec landing untouched because that increment changed the GATE and never read what the gate SAYS. Restoring the old wording reddens two assertions at once (the required `no governance waiver discharges it` and the forbidden `or a governance waiver`), which is deliberate: the spec pins both the presence of the correction and the absence of the error.",
+		source: 'REG-F-202 (ASR-3, JPWB-DOC-003 §Semantic Model)'
+	},
+	{
+		id: 'MU-F202-the-blocked-hint-renders-on-a-satisfied-floor',
+		file: 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte',
+		find: '{#if !data.floor.satisfied}',
+		replace: '{#if data.floor}',
+		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
+		why: "THE CONTROL'S OWN MUTANT, which the other two cannot supply. Both of them arrange a BLOCKING floor, so a panel that rendered the blocked hint and the waiver form UNCONDITIONALLY would pass both while lying on every satisfied floor — and the spec's third test exists precisely for that world. `{#if data.floor}` rather than `{#if true}` is the realistic slip (an existence check standing in for a state check) and it typechecks, where `if (true)` invites the dead-code NO_COMPILE this ledger's header documents. It is inside the outer `{#if data.floor}` block, so it is unconditionally true there.",
+		source: 'REG-F-202 (a control needs its own mutant)'
+	},
 	// ── JAN-PWUWP W-5.5 (REG-D-043 / REG-F-193 / REG-F-194) ──────────────────────────────────────────────────
 	// ⚠ THESE FOUR EXIST BECAUSE THE GATE WAS GREEN AND SAID NOTHING. The W-5.5 run measured 205 distinct
 	// mutations — IDENTICAL IN EVERY CELL to the run before it — while the increment added a command, a guard

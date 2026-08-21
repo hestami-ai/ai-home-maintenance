@@ -113,7 +113,9 @@
 		},
 		minZoom: 0.2
 	});
-	// A floor waiver is a pre-publication override — offer it through the publish FSM up to (not incl.) PUBLISHED.
+	// Recording a waiver is a pre-publication governance act — offer it through the publish FSM up to (not incl.)
+	// PUBLISHED. ⚠ It is NOT an override: this comment read "a floor waiver is a pre-publication override" until
+	// ASR-3 (REG-F-202) made the floor unconditional. The act still records accepted risk (ASR-14); it moves no gate.
 	const canWaive = $derived(
 		['DRAFT', 'UNDER_REVIEW', 'VALIDATED'].includes(data.pwa.publicationStatus)
 	);
@@ -1852,7 +1854,14 @@
 							>
 							<span class="floorsub">mandatory assurance policies · always applies</span>
 							{#if data.floor.waived}
-								<span class="waivedbadge" data-testid="assurance-waived">waiver in force</span>
+								<!-- "in force" read as "and therefore publication is permitted", which ASR-3 makes false. A
+								     waiver is EFFECTIVE as a record and discharges nothing on this floor. -->
+								<span
+									class="waivedbadge"
+									data-testid="assurance-waived"
+									title="An EFFECTIVE governance waiver covers this PWA. It records accepted risk; it does not discharge the de minimis floor (ASR-3)."
+									>waiver recorded</span
+								>
 							{/if}
 						</div>
 						<ul class="floorpolicies">
@@ -1871,24 +1880,39 @@
 								{#each data.floor.reasoningGaps.slice(0, 5) as g}<li>{g}</li>{/each}
 							</ul>
 						{/if}
-						{#if !data.floor.satisfied && data.floor.waived}
-							<p class="floorhint">
-								A governance waiver is in force — publishing is permitted despite the floor (an auditable,
-								recorded override).
+						<!-- ASR-3 (REG-F-202): the de minimis floor is UNCONDITIONAL, so REVISION is the only route past
+						     it and this hint may not name another. It used to read "revise the graph and re-run, or record
+						     a waiver", and the waived arm above it announced "publishing is permitted despite the floor" —
+						     the exact reach ASR-3 removed. Recording a waiver is still OFFERED below, because ASR-14 keeps
+						     it recordable ("a waiver accepts risk; it never rewrites truth") and the act is real: it mints
+						     an EFFECTIVE WAIVER Decision. What it no longer does is move this gate. -->
+						{#if !data.floor.satisfied}
+							<p class="floorhint" data-testid="floor-blocked-hint">
+								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.
 							</p>
-						{:else if !data.floor.satisfied}
-							<p class="floorhint">
-								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a
-								waiver.
-							</p>
+							{#if data.floor.waived}
+								<p class="floorhint warn" data-testid="floor-waiver-nondischarge">
+									A governance waiver is recorded against this PWA. It does <strong>not</strong> clear the floor —
+									the floor is unconditional, so publishing stays blocked. The waiver stands as an auditable
+									record of accepted risk.
+								</p>
+							{/if}
 							{#if canWaive}
+								<!-- ⚠ THIS RECORDS ACCEPTED RISK. It does NOT unblock publishing, and its labels must never
+								     imply it does — the button read "Record waiver + allow publish" and the placeholder asked
+								     "why publish despite the floor", both of which describe an outcome the engine refuses. -->
 								<form method="POST" action="?/recordWaiver" use:enhance class="floorwaiver">
 									<input
 										name="rationale"
-										placeholder="Waiver rationale — why publish despite the floor"
+										placeholder="Rationale — why this risk is accepted (does not unblock publishing)"
 										required
 									/>
-									<button class="ghost small danger" type="submit">Record waiver + allow publish</button>
+									<button
+										class="ghost small danger"
+										type="submit"
+										title="Records an auditable WAIVER Decision accepting this risk. The de minimis floor is unconditional (ASR-3), so publishing remains blocked."
+										>Record accepted risk (floor still blocks)</button
+									>
 								</form>
 							{/if}
 						{/if}

@@ -19,12 +19,29 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   it refused the legitimate PUBLISHED PWA and admitted every non-PWA. Six mutants KILLED; 74 e2e green.
 ### ✅ LANDED — the de minimis floor is unconditional in code (REG-F-202, 2026-08-20)
 
-- [ ] **RESIDUE: make the non-discharge AUDIBLE at the demo surface.** The engine now records a waiver over a
-  blocking floor WITHOUT it discharging anything, correct under ASR-14 (a waiver accepts risk; it never
-  rewrites truth). What is wrong is the SURFACE: recordWaiver on a blocking floor still presents itself as an
-  action that clears the floor. Stop offering it as a clearing action; show the recorded-but-non-discharging
-  waiver for what it is. WARNING: do NOT refuse at RequestWaiver - considered and rejected as over-refusal;
-  the ruling narrows REACH, not RECORDABILITY.
+- [x] ~~**RESIDUE: make the non-discharge AUDIBLE at the demo surface.**~~ — **LANDED 2026-08-20.** Full detail in
+  REG-F-202. Kept here for the two REVERSALS, which are the reusable part:
+  - **I "proved" the affordance could never succeed, and the proof was a SEARCH.** Driving `recordWaiver` returned
+    `"Nothing to waive: the floor is not blocking."` on a panel reading REJECTED (the panel renders a staged
+    CANDIDATE's floor; the action reads CANONICAL), and all three seeds held ZERO non-SATISFIED canonical floor
+    assessments — so I deleted the action, the form and the census row. **Wrong.** A refuter named
+    `test-api/dispatch`: the assessment lifecycle is ordinary ratified commands on the same bus, and re-driving it
+    got `Request`/`Begin`/`RecordObservation` all ACCEPTED and `recordWaiver` SUCCEEDING
+    (`decisions: ['WAIVER/EFFECTIVE']`). My population was "the three seeds"; the real one was "the command bus".
+  - **The remedy recorded in this file was RIGHT and its stated REASON was FALSE** — "the engine will refuse it"
+    (it does not; the ROUTE ACTION did, and had since before ASR-3). Acting on the reason would have deleted a
+    working ratified affordance. Always re-derive a recorded remedy's MECHANISM, not just its instruction.
+  - **The sweep found four ENGINE refusal messages still offering a waiver as the way out** — including PublishPwa's,
+    which is the demo's verbatim answer to "why can't I publish?" and formed a LOOP (record the waiver, retry, same
+    refusal). d24c19ec changed what the gate DOES and never read what the gate SAYS.
+
+- [ ] **NEW, from the same sweep: the demo can author ONLY the waiver kind that no longer does anything.**
+  Its single `RequestWaiver` path (`pwa/[id]/+page.server.ts` `recordWaiver`) derives `waivedPolicyId` from the
+  blocking FLOOR policy, so every waiver the workbench can mint is a floor waiver — and under ASR-3 a floor waiver
+  discharges nothing. A NON-floor waiver, the kind that still legitimately discharges, cannot be authored anywhere
+  in the surface. `decisions/+page.server.ts` deliberately does not offer one (ProposeDecision cannot carry DOC-004
+  §12.2's WaiverDetail) and points at the floor panel as THE authoring path — which is now precisely the wrong
+  place. Design-first: this is a missing capability, not a stale string, and building it is not residue.
 
 ### ✅ LANDED — original item, kept for its measurements
 
@@ -158,10 +175,29 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   (URL param, form field, query string) and reaches `getObject`/`loadObject` without a type
   assertion. ⚠ State its limits: it cannot see an id laundered through a variable, nor judge whether
   a downstream guard is genuine — the inverted guard at the agent endpoint LOOKED like one.
-- [ ] **`?? 'DRAFT'` is a pattern, not two instances** — both fixed sites kept the fallback (now
-  unreachable, since a real PWA always carries the field). Sweep for OTHER permissive defaults on
-  lifecycle/status fields: a default chosen to be convenient is a default chosen to be permissive,
-  and it fires exactly when the object is not what the code thinks it is.
+- [ ] **`?? 'DRAFT'` is a pattern, not two instances — SWEPT 2026-08-20, five sites survived refutation.**
+  The population was DERIVED (`??`/`||` defaults over lifecycle/status/disposition/permission fields, packages +
+  apps) rather than guessed, and it is WIDER than "lifecycle": two of the five are boolean governed ASSERTIONS,
+  which the original framing would have missed. Each is refuter-confirmed; re-verify at pickup.
+  - `decomposition.ts:647` `parentCompletionClaimSupported: p.… ?? true` and `:648`
+    `parentConstraintsHoldAgainstWhole: p.… ?? true` — both `z.boolean().optional()` on the wire, and `true` is
+    the PASSING value: `evaluateRecomposition` pushes its §14.1 whole-check reason only on FALSE. **Omit the
+    field and the check is skipped and the contract advances to COMPOSABLE** — the engine records that the
+    parent's completion claim is supported and its constraints hold, on an assertion nobody made. ⚠ The polarity
+    contrast is in the same package: `execution.ts:782` documents `required ?? true` as FAIL-CLOSED, because
+    there `true` is the strict value. Same operator, opposite safety — which is why this class cannot be swept
+    by pattern alone.
+  - `validators.ts:238` `severity: f.severity ?? 'MATERIAL'` — a Reasoning Review finding with `failed: true` and
+    no RECOGNISED severity is recorded at the highest severity that does NOT block. Absence is routine, not
+    exotic: the live adapter writes the field only on an exact case-sensitive enum match, so `"blocking"` in
+    lowercase lands here.
+  - `workbench.ts:414` `publicationStatus: String((pwa.publicationStatus ?? 'DRAFT'))` — the UN-REPAIRED THIRD
+    INSTANCE of the pair fixed under REG-F-201, reached through a type-blind `getObject` whose own docblock warns
+    about exactly this. The `if (!pwa) return undefined` above it proves existence, never type.
+  - `agent/index.ts:30` `publicationStatus: pwa?.publicationStatus ?? 'DRAFT'` — when the broker cannot resolve
+    the PWA, the live agent's system prompt is told DRAFT, and `system-prompt.ts:74` emits its "authoring is
+    closed" guardrail ONLY when the value is not DRAFT. **The one case where the system knows least is the case
+    where it drops the guardrail.**
 - [x] ~~**W-3 finding (i): the §34.5 query roster**~~ — **CLOSED 2026-08-20, REG-F-199, in both halves.**
   (a) THE INSTRUMENT: the walk matched unanchored SUBSTRINGS, so `getPwu` read as present inside
   `getPwuTemplate` — the sole positive result in the population it was commissioned to measure. The
@@ -406,6 +442,13 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   never define their fields — provenance theater; unworked since 2026-07-16).
 - [ ] **REG-F-120 residue** — see Dispositions below; only the orphaned-docstring hunt remained
   performable, worked 2026-08-20.
+
+- [ ] **⚠ PRE-EXISTING RED, NOT OURS — `packages/csaa/src/subject/subject.test.ts` "matches the confirmed public
+  TypeScript root populations"** fails with `expected 16 to be 8` for `scripts/tsconfig.json`. **Verified
+  pre-existing by stashing:** it reproduces at HEAD with every working-tree change removed, so it is not a
+  consequence of the REG-F-202 work. Recorded here ONLY so the next full-gate run is not mis-attributed — under
+  the standing rule this belongs to the CSAA coding agent and we touch CSAA only where we break it. (We DID break
+  `csaa:inventory:check` by editing covered sources, and regenerated the baseline; that is green.)
 
 ## Blocked / awaiting sponsor
 

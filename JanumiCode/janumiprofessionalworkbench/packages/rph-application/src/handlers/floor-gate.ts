@@ -1,6 +1,12 @@
 // Shared de minimis floor protected-transition logic (guide §8.4 step 4), PLANE-AGNOSTIC: given a subject, is its
-// recorded assurance floor SATISFIED (or waived)? Reused by the authoring-plane PublishPwa gate (pwa-authoring) and
-// the execution-plane completeExecutionStep gate (execution).
+// recorded assurance floor SATISFIED? Reused by the authoring-plane PublishPwa gate (pwa-authoring) and the
+// execution-plane completeExecutionStep gate (execution).
+//
+// ⚠ THAT QUESTION USED TO READ "SATISFIED (or waived)", and the parenthesis was the whole defect. ASR-3
+// (JPWB-DOC-003 §Semantic Model, ratified) — "The de minimis assurance floor is UNCONDITIONAL. Risk
+// proportionality governs assurance above a mandatory floor; it never makes the floor optional." The discharge
+// apparatus was deleted here on 2026-08-20 (REG-F-202): this module now consults NO waiver at any point. A waiver
+// over a floor policy stays RECORDABLE and stands as accepted risk (ASR-14) — it simply moves no gate.
 //
 // The three required floor policy ids come from the single canonical source, @janumipwb/rph-assurance's
 // FLOOR_POLICY_IDS. They were previously duplicated as string literals here, justified by "the package DAG forbids

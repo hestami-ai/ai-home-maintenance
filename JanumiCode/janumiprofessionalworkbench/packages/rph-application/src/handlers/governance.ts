@@ -377,8 +377,10 @@ function makeDecisionEffective(
 
 /** ApproveDecision — PROPOSED -> EFFECTIVE (records the approved subject versions + selected option).
  * Addresses any decision kind EXCEPT a waiver (`!== 'WAIVER'`, not `=== 'APPROVAL'` — the seed approves a
- * PROMOTE_BASELINE decision). Granting a waiver is GrantWaiver's act, which is what records the waiver fact
- * the floor gate scopes by. */
+ * PROMOTE_BASELINE decision). Granting a waiver is GrantWaiver's act, which is what records the WaiverGranted
+ * fact — the duration and expiry a waiver's own record depends on. ⚠ It used to read "the waiver fact the floor
+ * gate scopes by"; ASR-3 (REG-F-202) deleted the floor's waiver scoping entirely, so the justification moved to
+ * the waiver RECORD's integrity. The RULE is untouched: this is still not the command that grants a waiver. */
 export const approveDecision: CommandHandler = makeDecisionEffective(
 	'EFFECTIVE',
 	'DecisionEffective',
@@ -388,7 +390,7 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
 		"the target decision's decisionType is not WAIVER (granting is GrantWaiver's act)",
 		({ state, command }) =>
 			String(state.decisionType) === 'WAIVER'
-				? `ApproveDecision cannot make WAIVER decision ${command.targetAggregateId} effective: a waiver becomes effective only via GrantWaiver, whose WaiverGranted event is the waiver fact the assurance floor audits. Approving it here would discharge the floor with no WaiverGranted fact recorded.`
+				? `ApproveDecision cannot make WAIVER decision ${command.targetAggregateId} effective: a waiver becomes effective only via GrantWaiver, whose WaiverGranted event carries the grant's duration and expiry. Approving it here would make the waiver EFFECTIVE with no WaiverGranted fact recorded.`
 				: null
 	),
 	[
@@ -659,7 +661,7 @@ export const grantWaiver: CommandHandler = makeDecisionEffective(
 		"the target decision's decisionType is WAIVER (a non-waiver becomes effective via ApproveDecision)",
 		({ state, command }) =>
 			String(state.decisionType) !== 'WAIVER'
-				? `GrantWaiver cannot make ${String(state.decisionType)} decision ${command.targetAggregateId} effective: only a Decision of decisionType WAIVER carries the waiver detail the floor gate scopes by. A non-waiver decision becomes effective via ApproveDecision.`
+				? `GrantWaiver cannot make ${String(state.decisionType)} decision ${command.targetAggregateId} effective: only a Decision of decisionType WAIVER carries the DOC-004 §12.2 waiver detail (policy, criterion, finding, compensating controls) that defines what it covers. A non-waiver decision becomes effective via ApproveDecision.`
 				: null
 	),
 	undefined,
@@ -672,8 +674,9 @@ export const grantWaiver: CommandHandler = makeDecisionEffective(
 	// helper's hard-coded `DecisionEffective` payload: the emitted WaiverGranted carried `decisionId` /
 	// `decisionType` / `subjectObjectIds` / `subjectSemanticVersions` / `selectedOption` / `rationale` — five keys
 	// the strict shape rejects — and NONE of `waiverDecisionId`, `duration`, `status`. The grant of a waiver is the
-	// fact the assurance floor audits (see the decisionType predicate above); its record could not say the waiver
-	// became EFFECTIVE, nor for how long.
+	// fact the governance record turns on (see the decisionType predicate above); its record could not say the waiver
+	// became EFFECTIVE, nor for how long. ⚠ This read "the fact the assurance floor audits" until ASR-3 (REG-F-202)
+	// stopped the floor auditing waivers at all; the defect it documents is unchanged.
 	//
 	// `waiverDecisionId` / `effectiveAt` / `status` come from the COMMITTED NEXT STATE — the event records what
 	// HAPPENED, and `effectiveAt` in particular is the value `extraMutate` above actually wrote (`command.issuedAt`),

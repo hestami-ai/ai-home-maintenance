@@ -4530,6 +4530,80 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
   justification has rotted is an exemption nobody can audit.** Corrected in place. I over-declared it as dead
   first and the gate refused me — *"DECLARED DEAD BUT NOW CALLED"* — which is how I learned the counting rule.
 
+- **✅ THE RESIDUE IS CLOSED, 2026-08-20 — and DRIVING IT REVERSED MY OWN DIAGNOSIS TWICE, which is the part
+  worth keeping.** Full verification: types 0, lint 0, 173 files / 1,754 unit tests, verif 40/40, **77/77
+  Playwright** (74 + 3 new), CSAA inventory regenerated and green.
+
+- **⚠⚠ FIRST REVERSAL — I "PROVED" THE AFFORDANCE COULD NEVER SUCCEED, AND MY PROOF WAS A SEARCH, NOT A FACT.**
+  Driving `recordWaiver` returned, verbatim,
+  `{"type":"failure","status":400,"data":"[{\"error\":1},\"Nothing to waive: the floor is not blocking.\"]"}`
+  on a panel simultaneously reading **⚖ REJECTED** — because the panel renders a staged CANDIDATE's floor (the
+  load hands `loadPwaFloor` a fork) while the action reads CANONICAL. I then checked all three seeds
+  (`reference` / `empty` / `bare`), found **zero** non-SATISFIED canonical floor assessments, and concluded the
+  affordance was offer-and-fail *by construction* — so I deleted the action, the form and the census row.
+  **That conclusion was wrong.** An adversarial refuter pointed at `test-api/dispatch/+server.ts`: the assessment
+  lifecycle is ordinary ratified commands on the same bus with no privilege, and specs already stage canonical
+  state that way. Re-driven: `RequestAssuranceAssessment` → `BeginAssuranceAssessment` →
+  `RecordAssuranceObservation` all **ACCEPTED** on canonical, the floor went non-satisfied, and `recordWaiver`
+  **succeeded** — `decisions: ['WAIVER/EFFECTIVE']`. **My search was "the three seeds"; the population was "the
+  command bus."** This is [[feedback_absence_of_evidence]] committed by the person who wrote it down, and it was
+  caught only because a refuter re-derived the population instead of re-reading my argument.
+
+- **⚠ SECOND REVERSAL — THE REMEDY THE BACKLOG RECORDED WAS RIGHT AND ITS STATED REASON WAS FALSE.** Step 4 read
+  *"Withdraw the demo's `recordWaiver` affordance — the engine will refuse it, so the surface must stop offering
+  it rather than offer-and-fail."* The ENGINE never sees it (it accepts `RequestWaiver`/`GrantWaiver` happily);
+  the ROUTE ACTION refused first, on its own canonical read, and had done so since before ASR-3. Acting on the
+  recorded reason would have deleted a working, ratified affordance. The LATER residue bullet — *"show the
+  recorded-but-non-discharging waiver for what it is"* — was the correct instruction, and it is the one that
+  landed. [[feedback_verify_the_recorded_remedy]].
+
+- **WHAT THE SWEEP FOUND THAT I HAD MISSED ENTIRELY, and it dwarfs the demo copy: THE ENGINE'S OWN REFUSALS STILL
+  OFFERED A WAIVER AS THE WAY OUT.** The d24c19ec increment changed what the gate DOES and never read what the
+  gate SAYS. Four live messages, all corrected:
+  - `pwa-authoring.ts` PublishPwa — *"…for the current version, **or a governance waiver**, before publishing."*
+    This is the demo's verbatim answer to "why can't I publish?" (surfaced through `advancePwa` → `refuse(r)` →
+    the `{#if form?.error}` block). A user who followed it recorded a waiver, retried, and got the identical
+    refusal: **the sentence was a loop.**
+  - `execution.ts` CompleteExecutionStep — *"Satisfy **or record a waiver over the floor of that result** before
+    completing."* Worse on this plane: the Undertaking Workbench offers no waiver affordance at all, so it sent
+    an operator hunting for a control that does not exist and would not have worked.
+  - `governance.ts` ApproveDecision — justified itself by *"would **discharge the floor**"*; and GrantWaiver by
+    *"the waiver detail **the floor gate scopes by**"*. Both RULES are untouched and correct; only their stated
+    reasons had rotted, so the reasons moved to the waiver RECORD's own integrity.
+  Each now ends *"The floor is unconditional: no governance waiver discharges it."*
+
+- **⚠ AND THIS ROW'S OWN REPAIR HAD MISSED TWO FIELDS OF ITSELF.** Yesterday I moved RPH-GOV-005's `enforcedAt`
+  and `refusalMarker` and left (a) the 26-line prose block that INTRODUCES the row still asserting, in the present
+  tense, that nothing refuses an out-of-scope waiver — directly above the field that says it moved — and (b)
+  `declaredMutations`, three of whose five entries instruct a reader to mutate `waiverDischargesFloorPolicy` /
+  `effectiveFloorWaivers` / their `?? -1` fallback, **all deleted**, and a fourth claiming a neutralised version
+  conjunct lets "the publish be accepted", which ASR-3 forbids. This file already ruled the class — *"A
+  `declaredMutations` entry that cannot be applied is worse than an absent one — an untestable instruction
+  wearing the authority of a checked record."* Both corrected; the inverse-enforcement reasoning is KEPT but
+  DATED rather than deleted.
+
+- **THE SURFACE, as landed.** The waiver affordance STAYS (ASR-14: the ruling narrows REACH, not RECORDABILITY —
+  refusing to record would be the over-refusal already rejected). What changed is every claim around it: the hint
+  drops *"or record a waiver"*; the button *"Record waiver + allow publish"* → *"Record accepted risk (floor still
+  blocks)"*; the placeholder *"why publish despite the floor"* → *"why this risk is accepted"*; the badge *"waiver
+  in force"* → *"waiver recorded"*; and the arm that read *"A governance waiver is in force — publishing is
+  permitted despite the floor"* now says it does **not** clear the floor, **without** the blocked hint
+  disappearing — that disappearance was the old lie. `FloorView.waived`'s docblock (*"— publication is permitted
+  despite the floor"*) was the contract-level source all four read from, and is corrected too.
+
+- **THE PROOF IS AT THE SURFACE FOR THE FIRST TIME.** `apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts` records a
+  waiver through the real form, asserts it becomes `WAIVER/EFFECTIVE`, and asserts PublishPwa **still refuses** —
+  the ASR-3 headline, previously proven only at package level. ⚠ Its arrangement is the hard part and the cheap
+  one is VACUOUS: staging a blocking floor via an agent turn leaves it in a fork, where the waiver is never
+  recorded, so the spec would assert the non-discharge of a waiver that never existed. Three mutants defend it,
+  the third defending the CONTROL — `MU-F202-the-blocked-hint-renders-on-a-satisfied-floor`, because the other two
+  both arrange a blocking floor and would pass a panel that rendered the hint unconditionally.
+
+- **STILL OPEN, filed rather than absorbed:** the demo can author ONLY the kind of waiver that no longer
+  discharges anything (its one `RequestWaiver` path hardcodes the blocking FLOOR policy as the subject) and
+  cannot author a NON-floor waiver, which is the kind that still legitimately discharges. See
+  `docs/_working/BACKLOG.md`.
+
 - **RESIDUE, and it is the "make it audible" half rather than a gap:** the demo still offers `recordWaiver` on a
   blocking floor, and the engine now records that waiver without it discharging anything. Per ASR-14 that
   recording is CORRECT — a waiver accepts risk without rewriting truth — so the fix is at the surface: stop
