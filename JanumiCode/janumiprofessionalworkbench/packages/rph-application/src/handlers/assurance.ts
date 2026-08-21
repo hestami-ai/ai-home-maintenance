@@ -1832,14 +1832,26 @@ function parseCompletion(
 }
 
 /** GATE B (Increment R) — permittedControlActions ENFORCED: a validator may only recommend a control action the
- *  policy permits (§11). An empty permitted set constrains nothing (skip). Returns a rejection or null (pass). */
+ *  policy permits (§11). Returns a rejection or null (pass).
+ *
+ *  ⚠ ABSENT AND EMPTY ARE DIFFERENT, and this guard used to collapse them (REG-F-202 (b)). It read
+ *  `new Set(permittedControlActions ?? [])` then `if (permitted.size === 0) return null`, so a policy declaring an
+ *  explicit `[]` — permitting NO control action — admitted every recommendation. Its FILE-MATE twenty lines up,
+ *  `rejectRemediationActionsNotPermitted`, had already ruled the same question the other way and said why:
+ *  collapsing `[]` into "unconstrained" fails OPEN, since X ⊆ [] holds only for empty X. Two guards over one policy
+ *  field disagreeing about what an empty set means, with only the authoring-path one tested for it.
+ *
+ *  Not exploitable when found — every shipped policy declares a non-empty set and every authoring path defaults to
+ *  ESCALATE — so this was a FRAGILE SAFETY rather than a live hole, and is aligned here rather than left as one. */
 function rejectUnpermittedControlActions(
 	command: DomainCommand,
 	validatorResult: CompleteValidatorResult | undefined,
 	permittedControlActions: readonly string[] | undefined
 ): CommandResult | null {
-	const permitted = new Set(permittedControlActions ?? []);
-	if (permitted.size === 0) return null;
+	// UNDECLARED means unconstrained and cannot be subset-checked; an explicit `[]` is a constraint that permits
+	// nothing. Only the first is a skip.
+	if (permittedControlActions === undefined) return null;
+	const permitted = new Set(permittedControlActions);
 	const offending = (validatorResult?.recommendedControlActions ?? [])
 		.map((r) => (r as { action?: unknown }).action)
 		.filter((a): a is string => typeof a === 'string' && !permitted.has(a));

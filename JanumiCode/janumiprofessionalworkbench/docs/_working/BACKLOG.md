@@ -158,11 +158,17 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   FLOOR policy, and what is the minimum compensating control when the policy declares no rules?
   ⚠ **UNVERIFIED LIMB** — that the granted waiver then discharges the floor and permits publication.
   Drive it before relying on it.
-- [ ] **REG-F-202 (b): align Gate B with its own file-mate** — `assurance.ts:1841` collapses ABSENT and
-  EMPTY `permittedControlActions` into "unconstrained"; `:148` distinguishes them and documents that
-  collapsing *"would fail OPEN"*. NOT exploitable today — every shipped policy declares a non-empty
-  set and every authoring path defaults to `'ESCALATE'` — so this is a FRAGILE SAFETY, not a gap.
-  One-line alignment when next touched.
+- [x] ~~**REG-F-202 (b): align Gate B with its own file-mate**~~ — **DONE 2026-08-20**, and it needed a test
+  before it needed a fix. Gate B collapsed ABSENT and EMPTY `permittedControlActions` into one skip, so a policy
+  declaring an explicit `[]` — permitting NO control action — admitted every recommendation; its file-mate
+  `rejectRemediationActionsNotPermitted` had already ruled the same question the other way and DOCUMENTED the
+  reason (*"collapsing `[]` into 'unconstrained' would fail OPEN"*). ⚠ **The empty-set arm had no test because it
+  was not EXPRESSIBLE:** the suite's `createPolicy` helper hard-coded `permittedControlActions: ['CONTINUE']`, so
+  the one arrangement that separates fail-open from fail-closed could not be built. Parameterising the helper was
+  the actual unblock. Predicted red observed — *"expected 'ACCEPTED' to be 'REJECTED'"* — then the one-line
+  alignment; 138 files / 1,526 tests green. Mutant `MU-F202B-gate-b-collapses-absent-and-empty-again` guards it,
+  and its anchor must carry the comment line above the guard: both code lines are BYTE-IDENTICAL in the file-mate
+  twenty lines up, so either alone reports UNANCHORED.
 - [ ] **Fix the workflow-script bug that silenced three refuters** — a backticked method call inside a
   backtick template literal closed the template early, so ALL THREE adversarial reviewers failed to
   launch, the lane results came back empty, and the synthesis agent re-derived the sweep alone and

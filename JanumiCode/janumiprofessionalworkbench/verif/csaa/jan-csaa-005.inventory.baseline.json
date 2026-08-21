@@ -5688,7 +5688,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "b0ab0a9e32dbd0d095dcc75e73f1ad9d11655e1c4b30fa1255a178bf07467e7c",
+    "fileManifestDigest": "16306898ff391c6d40ed72c9edcd8db98f75bda845f858ff0ed80fad0c11b08a",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -8723,9 +8723,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 45472,
+        "bytes": 48005,
         "path": "packages/rph-application/src/handlers/assurance-independence.test.ts",
-        "sha256": "c0f87921fd0a6a8496afeae0b03cabd3a079c67ecb5802f4db57745c3a03b641",
+        "sha256": "f7ead161bf3bdb37d6842c2c067a51811bc5c0f1252a6550b9c6002278180f1a",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8737,9 +8737,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 140219,
+        "bytes": 141233,
         "path": "packages/rph-application/src/handlers/assurance.ts",
-        "sha256": "84a124519cb67b341ec1a08a05fb9dd2e9733d20bb481bfa2a4578f0dfbfbe2c",
+        "sha256": "45fe5b471ca5657916b67606184e94c3d8869f5a7e788ddc603b5bdac95f00fc",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12013,9 +12013,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 277454,
+        "bytes": 278772,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "b9c4a8b24997db097dea4699051185061f60646c53e904d7e4086865a7af8e22",
+        "sha256": "41a7ad1657d182816a2ec995b9edce466d240696232d5500d7e7d02a32737ce0",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12516,7 +12516,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "7a0a3e4533c5dd804deb7eeff3370f278446bc2f81b0acd41edc55057fc9fae6",
+    "subjectId": "b8f36f81888a815380735c98233d94e564d7c4dba6b88c549505a3f9ad3b0269",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14929,7 +14929,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "b9c4a8b24997db097dea4699051185061f60646c53e904d7e4086865a7af8e22",
+      "contentSha256": "41a7ad1657d182816a2ec995b9edce466d240696232d5500d7e7d02a32737ce0",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [

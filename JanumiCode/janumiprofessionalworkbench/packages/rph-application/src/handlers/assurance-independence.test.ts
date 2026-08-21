@@ -54,7 +54,15 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 
 	/** Create + activate a policy at version 1.0.0 with a given independence requirement. Pass activate:false to
 	 *  leave it DRAFT (regular policies are born DRAFT; assessments require ACTIVE). */
-	function createPolicy(independenceRequirement: string, opts: { activate?: boolean } = {}): void {
+	/** ⚠ `permittedControlActions` is PARAMETERISED so an EMPTY set is expressible. It was hard-coded to
+	 *  `['CONTINUE']`, which is why Gate B's empty-set behaviour had no test at all — the one arrangement
+	 *  that distinguishes fail-open from fail-closed could not be built. `defaultControlActions` follows it:
+	 *  a finding definition may not default to an action its own policy does not permit. */
+	function createPolicy(
+		independenceRequirement: string,
+		opts: { activate?: boolean; permittedControlActions?: readonly string[] } = {}
+	): void {
+		const permitted = opts.permittedControlActions ?? ['CONTINUE'];
 		dispatchOk(
 			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
 				policyId: POLICY,
@@ -85,10 +93,10 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 						description: 'Not fit.',
 						defaultSeverity: 'MATERIAL',
 						affectedClaimTypes: ['FITNESS'],
-						defaultControlActions: ['CONTINUE']
+						defaultControlActions: [...permitted]
 					}
 				],
-				permittedControlActions: ['CONTINUE']
+				permittedControlActions: [...permitted]
 			})
 		);
 		if (opts.activate !== false) {
@@ -573,6 +581,40 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		dispatchOk(
 			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
 				validatorResult: { ...v, recommendedControlActions: [{ action: 'CONTINUE' }] }
+			})
+		);
+		expect(stateOf(A)?.assessmentState).toBe('SATISFIED');
+	});
+
+	// ⚠ GATE B'S EMPTY-SET ARM, AND ITS FILE-MATE ALREADY RULED THIS EXACT QUESTION THE OTHER WAY (REG-F-202 (b)).
+	// `rejectRemediationActionsNotPermitted` (assurance.ts:143) skips ONLY on `undefined` and documents why:
+	// "an explicit `[]` means the policy permits NO control action, so ANY non-empty remediationAction is
+	// ungoverned and must reject … collapsing `[]` into 'unconstrained' would fail OPEN, the exact state this
+	// guard forecloses" — and `#5 remediationRules: an explicit EMPTY permittedControlActions…` below proves it.
+	// Gate B, twenty lines away in the same file, did `new Set(permittedControlActions ?? [])` and then
+	// `if (permitted.size === 0) return null`, collapsing ABSENT and EMPTY into the same skip. Two guards over one
+	// policy field, disagreeing about what an empty set means, and only one of them tested for it.
+	it('§11 Gate B: an explicit EMPTY permittedControlActions rejects ANY recommended action (fail-CLOSED, matching its file-mate)', () => {
+		createPolicy('NONE', { permittedControlActions: [] });
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A41';
+		requestAssessment(A);
+		const v = verdict(A, 'reviewer-x');
+		const rejected = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: { ...v, recommendedControlActions: [{ action: 'CONTINUE' }] }
+			})
+		);
+		expect(
+			rejected.status,
+			'a policy permitting NO control action must not admit one — X ⊆ [] holds only for empty X'
+		).toBe('REJECTED');
+		expect(stateOf(A)?.assessmentState).toBe('ASSESSING');
+
+		// THE CONTROL, and it is what keeps the assertion above from being "an empty policy rejects everything":
+		// recommending NOTHING still completes. A guard that refused unconditionally would pass the test above.
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: { ...v, recommendedControlActions: [] }
 			})
 		);
 		expect(stateOf(A)?.assessmentState).toBe('SATISFIED');

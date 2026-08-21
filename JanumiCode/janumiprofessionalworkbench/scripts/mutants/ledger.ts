@@ -2952,6 +2952,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "THE CONTROL'S OWN MUTANT, which the other two cannot supply. Both of them arrange a BLOCKING floor, so a panel that rendered the blocked hint and the waiver form UNCONDITIONALLY would pass both while lying on every satisfied floor — and the spec's third test exists precisely for that world. `{#if data.floor}` rather than `{#if true}` is the realistic slip (an existence check standing in for a state check) and it typechecks, where `if (true)` invites the dead-code NO_COMPILE this ledger's header documents. It is inside the outer `{#if data.floor}` block, so it is unconditionally true there. OBSERVED 2026-08-20, and the attribution is the point rather than the kill: tests 1 and 2 both PASS under this mutation (they arrange BLOCKING floors, where the hint renders either way) and ONLY the control at :213 fails, on `floor-blocked-hint` toHaveCount(0). A control whose mutant reddened a sibling would be measuring nothing of its own.",
 		source: 'REG-F-202 (a control needs its own mutant)'
 	},
+	{
+		id: 'MU-F202B-gate-b-collapses-absent-and-empty-again',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		find: '\t// nothing. Only the first is a skip.\n\tif (permittedControlActions === undefined) return null;',
+		replace: '\t// nothing. Only the first is a skip.\n\tif ((permittedControlActions ?? []).length === 0) return null;',
+		expectRed: ['packages/rph-application/src/handlers/assurance-independence.test.ts'],
+		why: "THE EXACT FAIL-OPEN THAT WAS THERE (REG-F-202 (b)), restored as a REGRESSION mutant. Gate B read `new Set(permittedControlActions ?? [])` then `if (permitted.size === 0) return null`, collapsing UNDECLARED (unconstrained, un-subset-checkable) into EXPLICIT `[]` (a constraint permitting nothing) — so a policy permitting NO control action admitted every recommendation. ⚠ THE ANCHOR CARRIES ITS COMMENT LINE BECAUSE IT MUST: `if (permittedControlActions === undefined) return null;` and `const permitted = new Set(permittedControlActions);` are BYTE-IDENTICAL in the file-mate `rejectRemediationActionsNotPermitted` twenty lines up (:148-149), so either line alone is ambiguous and would report UNANCHORED. The comment at :1852 is unique to Gate B.",
+		source: 'REG-F-202 (b) — §11 permittedControlActions; the file-mate at assurance.ts:143 already ruled it'
+	},
 	// ── JAN-PWUWP W-5.5 (REG-D-043 / REG-F-193 / REG-F-194) ──────────────────────────────────────────────────
 	// ⚠ THESE FOUR EXIST BECAUSE THE GATE WAS GREEN AND SAID NOTHING. The W-5.5 run measured 205 distinct
 	// mutations — IDENTICAL IN EVERY CELL to the run before it — while the increment added a command, a guard
