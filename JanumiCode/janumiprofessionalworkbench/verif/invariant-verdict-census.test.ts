@@ -121,11 +121,11 @@ describe('W-3b — the invariant enforcement census', () => {
 	// someone lands evidence — and it can never move DOWN without this reddening.
 	it('the verdicted count is pinned, so the hole cannot quietly change size', () => {
 		const verdicted = new Set(verdicts.map((v) => String(v.limb_id)));
-		expect(verdicted.size, 'limbs carrying a verdict').toBe(46);
+		expect(verdicted.size, 'limbs carrying a verdict').toBe(65);
 		expect(
 			307 - verdicted.size,
 			'limbs still unverdicted — this is the OPEN half of W-3b and it is meant to be large'
-		).toBe(261);
+		).toBe(242);
 	});
 
 	it('every verdict names a limb that exists, exactly once', () => {
@@ -151,13 +151,13 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 10,
-			ENFORCED_BY_CONSTRUCTION: 6,
-			ENFORCED_MULTI_SITE: 4,
-			PARTIAL_DIVERGENT_FILED: 12,
-			DIVERGENT_UNFILED: 7,
-			UNENFORCED_OBSERVED_ADMISSION: 4,
-			UNENFORCED_DEAD_PREDICATE: 1,
+			ENFORCED_DRIVEN: 12,
+			ENFORCED_BY_CONSTRUCTION: 8,
+			ENFORCED_MULTI_SITE: 5,
+			PARTIAL_DIVERGENT_FILED: 18,
+			DIVERGENT_UNFILED: 8,
+			UNENFORCED_OBSERVED_ADMISSION: 10,
+			UNENFORCED_DEAD_PREDICATE: 2,
 			UNENFORCED_NO_SHAPE: 2
 		});
 	});
@@ -230,7 +230,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		for (const r of rows) {
 			expect(String(r.owed ?? ''), `${String(r.limb_id)} must say what filing it owes`).not.toBe('');
 		}
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(7);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(8);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -281,7 +281,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	it('the refutation tally is pinned, so an unrun refuter stage cannot read as a run one', () => {
 		const tally: Record<string, number> = {};
 		for (const v of verdicts) tally[String(v.refutation)] = (tally[String(v.refutation)] ?? 0) + 1;
-		expect(tally).toEqual({ HELD: 12, OVERTURNED: 14, UNREFUTED: 20 });
+		expect(tally).toEqual({ HELD: 17, OVERTURNED: 16, UNREFUTED: 32 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
@@ -303,7 +303,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(new Set(roster.map((r) => String(r.origin)))).toEqual(new Set(['census:w2-doc-extraction']));
 		expect(new Set(limbs.map((l) => String(l.rule)))).toEqual(new Set(['w3b-limb-split/1.0.0']));
 		expect(new Set(verdicts.map((v) => String(v.method)))).toEqual(
-			new Set(['w3b-lane:v0-trial', 'w3b-lane:v1-sta'])
+			new Set(['w3b-lane:v0-trial', 'w3b-lane:v1-sta', 'w3b-lane:v1-objrel'])
 		);
 	});
 });
