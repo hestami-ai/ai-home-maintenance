@@ -181,29 +181,48 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   (URL param, form field, query string) and reaches `getObject`/`loadObject` without a type
   assertion. ⚠ State its limits: it cannot see an id laundered through a variable, nor judge whether
   a downstream guard is genuine — the inverted guard at the agent endpoint LOOKED like one.
-- [ ] **`?? 'DRAFT'` is a pattern, not two instances — SWEPT 2026-08-20, five sites survived refutation.**
-  The population was DERIVED (`??`/`||` defaults over lifecycle/status/disposition/permission fields, packages +
-  apps) rather than guessed, and it is WIDER than "lifecycle": two of the five are boolean governed ASSERTIONS,
-  which the original framing would have missed. Each is refuter-confirmed; re-verify at pickup.
-  - `decomposition.ts:647` `parentCompletionClaimSupported: p.… ?? true` and `:648`
-    `parentConstraintsHoldAgainstWhole: p.… ?? true` — both `z.boolean().optional()` on the wire, and `true` is
-    the PASSING value: `evaluateRecomposition` pushes its §14.1 whole-check reason only on FALSE. **Omit the
-    field and the check is skipped and the contract advances to COMPOSABLE** — the engine records that the
-    parent's completion claim is supported and its constraints hold, on an assertion nobody made. ⚠ The polarity
-    contrast is in the same package: `execution.ts:782` documents `required ?? true` as FAIL-CLOSED, because
-    there `true` is the strict value. Same operator, opposite safety — which is why this class cannot be swept
-    by pattern alone.
-  - `validators.ts:238` `severity: f.severity ?? 'MATERIAL'` — a Reasoning Review finding with `failed: true` and
-    no RECOGNISED severity is recorded at the highest severity that does NOT block. Absence is routine, not
-    exotic: the live adapter writes the field only on an exact case-sensitive enum match, so `"blocking"` in
-    lowercase lands here.
-  - `workbench.ts:414` `publicationStatus: String((pwa.publicationStatus ?? 'DRAFT'))` — the UN-REPAIRED THIRD
-    INSTANCE of the pair fixed under REG-F-201, reached through a type-blind `getObject` whose own docblock warns
-    about exactly this. The `if (!pwa) return undefined` above it proves existence, never type.
-  - `agent/index.ts:30` `publicationStatus: pwa?.publicationStatus ?? 'DRAFT'` — when the broker cannot resolve
-    the PWA, the live agent's system prompt is told DRAFT, and `system-prompt.ts:74` emits its "authoring is
-    closed" guardrail ONLY when the value is not DRAFT. **The one case where the system knows least is the case
-    where it drops the guardrail.**
+- [x] ~~**`?? 'DRAFT'` is a pattern, not two instances**~~ — **SWEPT TWICE 2026-08-20, and THE SECOND SWEEP
+  REFUTED THREE OF MY OWN FIVE.** ⚠ I filed five sites here as "each refuter-confirmed". That was wrong, and the
+  reason is worth more than the finding: **the first sweep's refuters attacked the TEXT** (is the quoted default
+  really there, is it really the permissive value?) **and never attacked REACHABILITY or STAKE.** A second pass
+  that asked "can absence actually arrive, and does anything downstream behave differently?" — with a separate
+  agent attacking each proposed REMEDY rather than each finding — killed three. **A refuter only refutes the
+  question you gave it.**
+  - **REFUTED — `validators.ts:238` `severity ?? 'MATERIAL'`.** I called this the most serious of the five because
+    it sits on the assurance floor. It is **FAIL-CLOSED**, and the investigator DROVE it rather than reading it:
+    mandatory-ness comes from the POLICY criterion (`severityIfNotMet`), not from the observation's severity, so
+    with `severityIfNotMet=BLOCKING` an ABSENT severity still yields `disposition=REJECTED`. The field is **inert
+    at the gate** for exactly the criteria that gate. My "a BLOCKING finding downgraded to MATERIAL would let the
+    floor pass" was the claim I should have driven before filing.
+  - **REFUTED — `workbench.ts:414` `publicationStatus ?? 'DRAFT'`.** Not reachable. `publicationStatus` is
+    **required** on `ProfessionalWorkArchitectureSchema` (`objects.ts:717`, not `.optional()`), and both
+    production callers prove PWA-ness one frame up via `getObjectOfType`. It is NOT the "un-repaired third
+    instance" of the REG-F-201 pair — the ids do not originate externally. Dead fallback, not a hole.
+  - **REFUTED — `agent/index.ts:30` `pwa?.publicationStatus ?? 'DRAFT'`.** Not reachable: the route already 404s
+    at `agent/+server.ts:280-282` using the SAME `broker.getPwa()`, one frame above the only call site. By the
+    time the factory runs, the PWA has resolved.
+  - **SURVIVED (both) — `decomposition.ts:647` / `:648`.** Genuinely FAIL_OPEN, and confirmed by a live PASSING
+    test: `recomposition.test.ts:164` completes with a payload carrying nothing but the claim id and reaches
+    **COMPOSABLE / parentSatisfied: true**. ⚠ **BUT THEY ARE ALREADY FILED — see REG-F-041 (OPEN) and
+    `enforcement-register.ts:831-836` (RPH-EVD-001, `UNENFORCED_DISCLOSED`, `OBSERVED_ADMISSION`).** I ran a
+    ten-agent sweep to re-find a disclosed item. **GREP THE REGISTER FIRST.** What IS new is below.
+
+- [ ] **REG-F-041 IS UNBLOCKED, and nobody noticed because the blocker dissolved in a different entry.**
+  Its **Merge target** reads *"…none of which change until **REG-E-028** rules"*, and REG-E-028 was
+  **WITHDRAWN THE SAME DAY IT WAS FILED** (register:1407) — *"it is not a sponsor question, because the ratified
+  corpus answers it"* — superseded by REG-F-042/043/044. **The recorded reason for inaction points at a question
+  that no longer exists.** Verified by hand, both entries read in full.
+  What survives is the SEPARABLE interim ask REG-F-041 states itself: making the three payload fields
+  **REQUIRED**, *"the `GrantWaiver.effectiveAt` and `parentCompletionClaimId` medicine"* — explicitly available
+  *"without any ratification"* since the shapes are AUTHORED. Its two recorded costs stand and are the whole of
+  the remaining decision: it **refuses every existing caller**, and the vocab note declaring composable-by-default
+  (`m3-commands-events.json:1960`, *"Defaults to true (preserves prior composable-by-default…)"*) is an authored
+  decision that *"deserves an explicit reversal rather than a quiet one."*
+  ⚠ **DESIGN-FIRST, and deliberately not slipped into a cleanup increment.** It edits GENERATED contracts via
+  their vocab source, reverses a stated design property, and **no proposed remedy survived adversarial attack**
+  (0 of 5 sound). Do not act on the sweep's remedies as written — they are recorded in the run transcript with
+  their attacks, and every one needs re-deriving.
+
 - [x] ~~**W-3 finding (i): the §34.5 query roster**~~ — **CLOSED 2026-08-20, REG-F-199, in both halves.**
   (a) THE INSTRUMENT: the walk matched unanchored SUBSTRINGS, so `getPwu` read as present inside
   `getPwuTemplate` — the sole positive result in the population it was commissioned to measure. The

@@ -1127,6 +1127,26 @@ Recorded at founding as session-known ground truth; the canon must not contradic
 - **WHAT IS NOT CLAIMED, stated so the finding is not read wider than it is.** The CONFLICTED routing itself is **correct and proved**: a non-empty list forces CONFLICTED even when every child is individually SATISFIED, which is the recomposition analog of property P1 and is exactly what §14.1 requires. Child acceptability is genuinely read from the store and its per-child computation fails **closed**. **The defect is the population, not the logic** — REG-F-022's Gate A shape, on the input that decides whether a recomposition conflicts at all.
 - **Disposition:** **RECORDED, NOT FIXED**, and the reason is not deferral. A detector needs an aggregation step that does not exist and a ratified answer to *what a conflict IS over child outputs* — filed as **REG-E-028**. **What could be done without any ratification, and is deliberately not done here:** making the three payload fields **REQUIRED** would force a caller to STATE a judgement instead of inheriting one — the `GrantWaiver.effectiveAt` and `parentCompletionClaimId` medicine, and the shapes are AUTHORED so they are ours to change. It is not taken unilaterally because it **refuses every existing caller**, and because the note declaring composable-by-default is an authored decision that deserves an explicit reversal rather than a quiet one.
 - **Merge target:** Repository — `handlers/decomposition.ts`, `rph-domain/src/decomposition.ts`, and the three `m3-commands-events.json` field notes, none of which change until REG-E-028 rules. **Status:** OPEN.
+- **⚠ THE BLOCKER NAMED IN THAT MERGE TARGET NO LONGER EXISTS (noted 2026-08-20).** REG-E-028 was **WITHDRAWN the
+  same day it was filed** — *"it is not a sponsor question, because the ratified corpus answers it"* — and
+  superseded by REG-F-042/043/044. So *"none of which change until REG-E-028 rules"* has been an unsatisfiable
+  condition since 2026-08-06: this entry has been gated on a question that was closed two weeks before, and the
+  gate held **because the withdrawal was recorded in Section E and this line was never re-read against it.** A
+  cross-entry dependency is only as live as the last time somebody read BOTH ends of it.
+- **WHAT THAT DOES AND DOES NOT UNBLOCK.** It does NOT unblock the detector — that remains a capability, and
+  REG-E-028's own withdrawal note settles who owes it: *"the analysis was never the kernel's to perform; the
+  engine's part is to require the assessment and refuse without it."* It DOES unblock the interim act this entry
+  already scoped for itself — making the three payload fields **REQUIRED** — which it recorded as available
+  *"without any ratification"*. Both of its stated costs still stand unchanged: it **refuses every existing
+  caller**, and reversing the authored *"preserves prior composable-by-default"* note *"deserves an explicit
+  reversal rather than a quiet one."* **Recorded, still not taken** — this is a note about the GATE, not a
+  decision about the ACT.
+- **HOW IT SURFACED, recorded because the route was wasteful.** A ten-agent sweep for fail-open defaults
+  re-derived `parentCompletionClaimSupported ?? true` and `parentConstraintsHoldAgainstWhole ?? true` from
+  scratch — both already disclosed HERE and at `enforcement-register.ts:831-836` (RPH-EVD-001,
+  `UNENFORCED_DISCLOSED`). [[feedback_search_the_register_first]] exists for exactly this and was not applied.
+  The sweep's one genuine yield was this line — found only because an investigator followed the merge target's
+  citation instead of trusting it. **Status:** OPEN (unchanged).
 - **⚠ CITATION CORRECTED (same day).** This entry cited the judged-act rule as ~~*"DOC-003 §6 DEC-6"*~~; **DEC-6 is JPWB-DOC-003 §7** (*Decomposition and recomposition*). §6 contains the string `DEC-6` because **STA-4 CITES it** — so a grep for the rule's name lands in a section that does not contain the rule, which is the same trap as REG-F-030's heading and is why §N is never inferred from a hit. The substance is unaffected; **what the correct section then yielded is not** — see **REG-F-042**, which reads DEC-6 limb by limb and finds this entry understated the gap.
 
 ### REG-F-042 — DEC-6 names NINE checks for recomposition and the engine derives ONE, and that one admits a disposition two ratified rules exclude by name
