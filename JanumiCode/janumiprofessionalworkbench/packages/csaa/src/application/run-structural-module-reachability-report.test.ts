@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -11,6 +12,9 @@ import {
 import { canonicalSemanticJson } from '../semantic/canonical.js';
 import {
 	runStructuralModuleReachabilityReport,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
+	type StructuralModuleReachabilityReportProgressEvent,
 	structuralModuleReachabilityReportExitCode
 } from './run-structural-module-reachability-report.js';
 
@@ -135,7 +139,11 @@ afterEach(() => {
 describe('runStructuralModuleReachabilityReport', () => {
 	it('renders deterministic reverse structural importer candidates and original import witnesses', () => {
 		const root = fixture();
-		const first = runStructuralModuleReachabilityReport(request(), { repositoryRoot: root });
+		const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		const first = runStructuralModuleReachabilityReport(request(), {
+			onProgress: (event) => progress.push(event),
+			repositoryRoot: root
+		});
 		expect(first.outcome).toBe('partial');
 		expect(structuralModuleReachabilityReportExitCode(first)).toBe(3);
 		if (first.outcome !== 'partial') throw new Error(JSON.stringify(first));
@@ -215,8 +223,187 @@ describe('runStructuralModuleReachabilityReport', () => {
 		const firstJson = canonicalSemanticJson(first);
 		expect(firstJson).not.toContain(root);
 		expect(firstJson).not.toContain(root.replaceAll('\\', '/'));
-		const second = runStructuralModuleReachabilityReport(request(), { repositoryRoot: root });
+		expect(progress.length).toBeGreaterThan(10);
+		expect(progress.map((event) => event.sequence)).toEqual(progress.map((_, index) => index + 1));
+		expect(
+			progress.every(
+				(event, index) => index === 0 || event.elapsedMs >= progress[index - 1]!.elapsedMs
+			)
+		).toBe(true);
+		expect(
+			progress.every(
+				(event) =>
+					event.deliverySemantics === 'SYNCHRONOUS_TRUSTED_HOST_CALLBACK' &&
+					event.nonclaims === STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS &&
+					event.protocolRole === 'PRELIMINARY_CAP_027_REPORT_TELEMETRY' &&
+					event.reportIdentityEffect === 'EXCLUDED_FROM_REPORT_IDENTITY' &&
+					event.wallClockBudgetEffect === 'CALLBACK_TIME_MAY_CONSUME_ACTIVE_DURATION_BUDGET'
+			)
+		).toBe(true);
+		expect(
+			progress.every(
+				(event) =>
+					event.schemaVersion === STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION
+			)
+		).toBe(true);
+		const reportStages = progress.filter((event) => event.kind === 'REPORT_STAGE');
+		expect(reportStages.map(({ phase, stage, state }) => ({ phase, stage, state }))).toEqual(
+			(
+				[
+					['REQUEST_BIND', 'REQUEST'],
+					['SUBJECT_PROJECT_PATH_BIND', 'SUBJECT'],
+					['CRITERION_PATH_BIND', 'CRITERION'],
+					['SUBJECT_CAPTURE', 'SUBJECT'],
+					['CRITERION_ARTIFACT_BIND', 'CRITERION'],
+					['SEMANTIC_SNAPSHOT', 'SEMANTIC_SNAPSHOT'],
+					['MODULE_GRAPH', 'MODULE_GRAPH'],
+					['CRITERION_NODE_BIND', 'CRITERION'],
+					['ANALYSIS', 'ANALYSIS'],
+					['CURRENTNESS', 'CURRENTNESS'],
+					['RESULT', 'RESULT']
+				] as const
+			).flatMap(([phase, stage]) => [
+				{ phase, stage, state: 'STARTED' },
+				{ phase, stage, state: 'COMPLETED' }
+			])
+		);
+		expect(
+			reportStages.every(
+				(event) =>
+					JSON.stringify(Object.keys(event).sort()) ===
+					JSON.stringify(
+						[
+							'deliverySemantics',
+							'detailCode',
+							'elapsedMs',
+							'kind',
+							'nonclaims',
+							'observations',
+							'operationVersion',
+							'phase',
+							'protocolRole',
+							'reportIdentityEffect',
+							'schemaVersion',
+							'sequence',
+							'stage',
+							'state',
+							'wallClockBudgetEffect'
+						].sort()
+					)
+			)
+		).toBe(true);
+		expect(progress.some((event) => event.detailCode === 'STAGE_INTERRUPTED')).toBe(false);
+		const selectedCriterionEvents = progress.filter((event) =>
+			event.observations.some((observation) => observation.metric === 'SELECTED_CRITERIA')
+		);
+		expect(selectedCriterionEvents).toHaveLength(1);
+		expect(selectedCriterionEvents[0]).toMatchObject({
+			kind: 'REPORT_STAGE',
+			phase: 'CRITERION_NODE_BIND',
+			state: 'COMPLETED'
+		});
+		const analysisCompletion = reportStages.find(
+			(event) => event.phase === 'ANALYSIS' && event.state === 'COMPLETED'
+		);
+		expect(
+			analysisCompletion?.observations.find(
+				(observation) => observation.metric === 'ANALYSIS_CONSUMED_INPUT_RECORDS'
+			)
+		).toMatchObject({
+			basis: 'EXACT',
+			limit: request().budgets.reachability.maxInputRecords,
+			unit: 'COUNT'
+		});
+		expect(
+			analysisCompletion?.observations.find(
+				(observation) => observation.metric === 'ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS'
+			)
+		).toMatchObject({
+			basis: 'EXACT',
+			limit: request().budgets.reachability.maxInputStringCharacters,
+			unit: 'COUNT'
+		});
+		expect(progress.at(-1)).toMatchObject({
+			detailCode: 'PARTIAL',
+			kind: 'REPORT_STAGE',
+			stage: 'RESULT',
+			state: 'COMPLETED'
+		});
+		expect(
+			progress.at(-1)?.observations.find((observation) => observation.metric === 'RESULT_BYTES')
+		).toMatchObject({
+			basis: 'EXACT',
+			limit: request().budgets.maxResultBytes,
+			unit: 'BYTES',
+			value: Buffer.byteLength(firstJson, 'utf8') + 1
+		});
+		const semanticSerialization = progress.find(
+			(event) =>
+				event.kind === 'SEMANTIC_SNAPSHOT' &&
+				event.semanticProgress.phase === 'SERIALIZE' &&
+				event.semanticProgress.state === 'COMPLETED'
+		);
+		expect(semanticSerialization).toBeDefined();
+		expect(
+			semanticSerialization?.observations.find(
+				(observation) => observation.metric === 'SEMANTIC_CANONICAL_BYTES'
+			)
+		).toMatchObject({ basis: 'EXACT', limit: request().budgets.semantic.maxSnapshotBytes });
+		const progressJson = canonicalSemanticJson(progress);
+		expect(progressJson).not.toContain(root);
+		expect(progressJson).not.toContain(root.replaceAll('\\', '/'));
+
+		const second = runStructuralModuleReachabilityReport(request(), {
+			onProgress: () => {
+				throw new Error('Observer failure must remain out of band.');
+			},
+			repositoryRoot: root
+		});
 		expect(canonicalSemanticJson(second)).toBe(firstJson);
+	});
+
+	it('attributes a failed path bind to the exact active phase', () => {
+		const root = fixture();
+		const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		const outcome = runStructuralModuleReachabilityReport(
+			request({ criterionLogicalPath: 'packages/demo/src/missing.ts' }),
+			{ onProgress: (event) => progress.push(event), repositoryRoot: root }
+		);
+		expect(outcome).toMatchObject({ code: 'CRITERION_PATH_INVALID', outcome: 'unavailable' });
+		expect(
+			progress
+				.filter((event) => event.kind === 'REPORT_STAGE')
+				.map(({ detailCode, phase, state }) => ({ detailCode, phase, state }))
+		).toEqual([
+			{ detailCode: null, phase: 'REQUEST_BIND', state: 'STARTED' },
+			{ detailCode: 'REQUEST_ADMITTED', phase: 'REQUEST_BIND', state: 'COMPLETED' },
+			{ detailCode: null, phase: 'SUBJECT_PROJECT_PATH_BIND', state: 'STARTED' },
+			{
+				detailCode: 'SUBJECT_PROJECT_PATHS_BOUND',
+				phase: 'SUBJECT_PROJECT_PATH_BIND',
+				state: 'COMPLETED'
+			},
+			{ detailCode: null, phase: 'CRITERION_PATH_BIND', state: 'STARTED' },
+			{
+				detailCode: 'CRITERION_PATH_INVALID',
+				phase: 'CRITERION_PATH_BIND',
+				state: 'FAILED'
+			}
+		]);
+	});
+
+	it('contains rejected observer results without replacing the terminal outcome', async () => {
+		const root = fixture();
+		const baseline = runStructuralModuleReachabilityReport({}, { repositoryRoot: root });
+		const observed = runStructuralModuleReachabilityReport(
+			{},
+			{
+				onProgress: () => Promise.reject(new Error('observer rejection')),
+				repositoryRoot: root
+			}
+		);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
 	});
 
 	it('fails closed on hostile shape, traversal, excess ceilings, and absent paths', () => {
@@ -276,4 +463,126 @@ describe('runStructuralModuleReachabilityReport', () => {
 		});
 		expect(structuralModuleReachabilityReportExitCode(outcome)).toBe(3);
 	});
+
+	it('reports exact canonical snapshot bytes when the semantic snapshot budget refuses the run', () => {
+		const root = fixture();
+		const calibrationProgress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		const calibration = runStructuralModuleReachabilityReport(request(), {
+			onProgress: (event) => calibrationProgress.push(event),
+			repositoryRoot: root
+		});
+		expect(calibration.outcome).toBe('partial');
+		const calibratedBytes = calibrationProgress
+			.find(
+				(event) =>
+					event.kind === 'SEMANTIC_SNAPSHOT' &&
+					event.semanticProgress.phase === 'SERIALIZE' &&
+					event.semanticProgress.state === 'COMPLETED'
+			)
+			?.observations.find(
+				(observation) => observation.metric === 'SEMANTIC_CANONICAL_BYTES'
+			)?.value;
+		expect(calibratedBytes).toBeGreaterThan(2_048);
+		const maxSnapshotBytes = calibratedBytes! - 1_024;
+		const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		const baseline = request();
+		const outcome = runStructuralModuleReachabilityReport(
+			request({
+				budgets: {
+					...baseline.budgets,
+					semantic: { ...baseline.budgets.semantic, maxSnapshotBytes }
+				}
+			}),
+			{ onProgress: (event) => progress.push(event), repositoryRoot: root }
+		);
+		expect(outcome).toMatchObject({
+			code: 'SEMANTIC_SNAPSHOT_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'SEMANTIC_SNAPSHOT',
+			state: 'resource-refused'
+		});
+		const failedSerialization = progress.find(
+			(event) =>
+				event.kind === 'SEMANTIC_SNAPSHOT' &&
+				event.semanticProgress.phase === 'SERIALIZE' &&
+				event.semanticProgress.state === 'FAILED'
+		);
+		expect(failedSerialization?.detailCode).toBe('SEMANTIC_BUDGET_EXCEEDED');
+		const bytes = failedSerialization?.observations.find(
+			(observation) => observation.metric === 'SEMANTIC_CANONICAL_BYTES'
+		);
+		expect(bytes).toMatchObject({ basis: 'EXACT', limit: maxSnapshotBytes, unit: 'BYTES' });
+		expect(bytes?.value).toBeGreaterThan(maxSnapshotBytes);
+		expect(progress.at(-1)).toMatchObject({
+			detailCode: 'SEMANTIC_SNAPSHOT_UNAVAILABLE',
+			kind: 'REPORT_STAGE',
+			stage: 'SEMANTIC_SNAPSHOT',
+			state: 'FAILED'
+		});
+	}, 60_000);
+
+	it('reports lower-bound consumed-input usage when either analyzer input budget refuses', () => {
+		const root = fixture();
+		const calibrationProgress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		const calibration = runStructuralModuleReachabilityReport(request(), {
+			onProgress: (event) => calibrationProgress.push(event),
+			repositoryRoot: root
+		});
+		expect(calibration.outcome).toBe('partial');
+		const analysisCompletion = calibrationProgress.find(
+			(event) =>
+				event.kind === 'REPORT_STAGE' && event.phase === 'ANALYSIS' && event.state === 'COMPLETED'
+		);
+		const calibrated = {
+			maxInputRecords: analysisCompletion?.observations.find(
+				(observation) => observation.metric === 'ANALYSIS_CONSUMED_INPUT_RECORDS'
+			)?.value,
+			maxInputStringCharacters: analysisCompletion?.observations.find(
+				(observation) => observation.metric === 'ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS'
+			)?.value
+		};
+		expect(calibrated.maxInputRecords).toBeGreaterThan(1);
+		expect(calibrated.maxInputStringCharacters).toBeGreaterThan(1);
+
+		for (const [budgetKey, metric] of [
+			['maxInputRecords', 'ANALYSIS_CONSUMED_INPUT_RECORDS'],
+			['maxInputStringCharacters', 'ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS']
+		] as const) {
+			const limit = calibrated[budgetKey]! - 1;
+			const baseline = request();
+			const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+			const outcome = runStructuralModuleReachabilityReport(
+				request({
+					budgets: {
+						...baseline.budgets,
+						reachability: { ...baseline.budgets.reachability, [budgetKey]: limit }
+					}
+				}),
+				{ onProgress: (event) => progress.push(event), repositoryRoot: root }
+			);
+			expect(outcome).toMatchObject({
+				code: 'STRUCTURAL_MODULE_REACHABILITY_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'ANALYSIS',
+				state: 'resource-refused'
+			});
+			const analysisFailure = progress.at(-1);
+			expect(analysisFailure).toMatchObject({
+				detailCode: 'BUDGET_EXCEEDED',
+				kind: 'REPORT_STAGE',
+				phase: 'ANALYSIS',
+				state: 'FAILED'
+			});
+			const usage = analysisFailure?.observations.find(
+				(observation) => observation.metric === metric
+			);
+			expect(usage).toMatchObject({ basis: 'LOWER_BOUND', limit, unit: 'COUNT' });
+			expect(usage?.value).toBeGreaterThan(0);
+			expect(usage?.value).toBeLessThanOrEqual(calibrated[budgetKey]!);
+			if (budgetKey === 'maxInputStringCharacters') expect(usage?.value).toBeGreaterThan(limit);
+			const outcomeJson = canonicalSemanticJson(outcome);
+			expect(outcomeJson).not.toContain('ANALYSIS_CONSUMED_INPUT_RECORDS');
+			expect(outcomeJson).not.toContain('ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS');
+		}
+	}, 60_000);
 });

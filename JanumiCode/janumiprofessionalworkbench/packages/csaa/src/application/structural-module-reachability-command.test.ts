@@ -1,9 +1,14 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION
+} from './run-structural-module-reachability-report.js';
+import { STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './structural-module-reachability-progress-jsonl.js';
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
@@ -16,6 +21,48 @@ function run(args: readonly string[], input?: string) {
 		encoding: 'utf8',
 		input,
 		windowsHide: true
+	});
+}
+
+function runWithClosedProgressPipe(
+	input: string
+): Promise<{ readonly status: number | null; readonly stdout: string }> {
+	return new Promise((resolve, reject) => {
+		const child = spawn('bun', [SCRIPT, '--stdin'], {
+			cwd: REPOSITORY_ROOT,
+			stdio: ['pipe', 'pipe', 'pipe'],
+			windowsHide: true
+		});
+		let stdout = '';
+		child.stdout.setEncoding('utf8');
+		child.stdout.on('data', (chunk: string) => {
+			stdout += chunk;
+		});
+		child.on('error', reject);
+		child.on('close', (status) => resolve({ status, stdout }));
+		child.stderr.destroy();
+		child.stdin.end(input);
+	});
+}
+
+function runWithClosedTerminalPipe(
+	input: string
+): Promise<{ readonly status: number | null; readonly stderr: string }> {
+	return new Promise((resolve, reject) => {
+		const child = spawn('bun', [SCRIPT, '--stdin'], {
+			cwd: REPOSITORY_ROOT,
+			stdio: ['pipe', 'pipe', 'pipe'],
+			windowsHide: true
+		});
+		let stderr = '';
+		child.stderr.setEncoding('utf8');
+		child.stderr.on('data', (chunk: string) => {
+			stderr += chunk;
+		});
+		child.on('error', reject);
+		child.on('close', (status) => resolve({ status, stderr }));
+		child.stdout.destroy();
+		child.stdin.end(input);
 	});
 }
 
@@ -45,6 +92,82 @@ describe('structural module reachability command adapter', () => {
 			error: 'request-input-invalid',
 			message: 'Request input is not valid JSON.'
 		});
+	});
+
+	it('keeps versioned progress on stderr and one terminal envelope on stdout', () => {
+		const result = run(['--stdin'], '{}');
+		expect(result.status).toBe(2);
+		expect(result.stdout.split('\n').filter(Boolean)).toHaveLength(1);
+		expect(JSON.parse(result.stdout)).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'incompatible'
+		});
+		const progress = result.stderr
+			.split('\n')
+			.filter(Boolean)
+			.map((line) => JSON.parse(line) as Record<string, unknown>);
+		expect(progress).toHaveLength(2);
+		const admittedSchemas = new Set<string>([
+			STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
+			STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION
+		]);
+		expect(progress.every((event) => admittedSchemas.has(String(event.schemaVersion)))).toBe(true);
+		expect(
+			progress.every(
+				(event) =>
+					event.deliverySemantics === 'SYNCHRONOUS_TRUSTED_HOST_CALLBACK' &&
+					event.protocolRole === 'PRELIMINARY_CAP_027_REPORT_TELEMETRY' &&
+					event.reportIdentityEffect === 'EXCLUDED_FROM_REPORT_IDENTITY' &&
+					event.wallClockBudgetEffect === 'CALLBACK_TIME_MAY_CONSUME_ACTIVE_DURATION_BUDGET' &&
+					JSON.stringify(event.nonclaims) ===
+						JSON.stringify(STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS)
+			)
+		).toBe(true);
+		expect(progress).toEqual([
+			expect.objectContaining({
+				kind: 'REPORT_STAGE',
+				schemaVersion: STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
+				sequence: 1,
+				phase: 'REQUEST_BIND',
+				stage: 'REQUEST',
+				state: 'STARTED'
+			}),
+			expect.objectContaining({
+				detailCode: 'REQUEST_SHAPE_INVALID',
+				kind: 'REPORT_STAGE',
+				schemaVersion: STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
+				sequence: 2,
+				phase: 'REQUEST_BIND',
+				stage: 'REQUEST',
+				state: 'FAILED'
+			})
+		]);
+		expect(result.stderr).not.toContain(REPOSITORY_ROOT);
+		expect(result.stderr).not.toContain(REPOSITORY_ROOT.replaceAll('\\', '/'));
+	});
+
+	it('keeps the terminal stdout envelope when the progress pipe is closed', async () => {
+		const result = await runWithClosedProgressPipe('{}');
+		expect(result.status).toBe(2);
+		expect(result.stdout.split('\n').filter(Boolean)).toHaveLength(1);
+		expect(JSON.parse(result.stdout)).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable'
+		});
+	});
+
+	it('contains a closed terminal pipe without emitting an EPIPE stack', async () => {
+		const result = await runWithClosedTerminalPipe('{}');
+		expect(result.status).toBe(2);
+		expect(result.stderr).not.toContain('EPIPE');
+		const records = result.stderr
+			.split('\n')
+			.filter(Boolean)
+			.map((line) => JSON.parse(line) as Record<string, unknown>);
+		expect(records).toHaveLength(2);
+		expect(records.every((record) => record.kind === 'REPORT_STAGE')).toBe(true);
 	});
 
 	it('bounds request-file reads before parsing', () => {

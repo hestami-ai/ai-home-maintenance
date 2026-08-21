@@ -17,7 +17,10 @@ import {
 	type StructuralModuleReachabilityValidationOptions
 } from '../contracts/structural-module-reachability-analysis.js';
 import { buildModuleDependencyGraph } from './build-module-dependency-graph.js';
-import { buildStructuralModuleReachabilityAnalysis } from './build-structural-module-reachability-analysis.js';
+import {
+	buildStructuralModuleReachabilityAnalysis,
+	buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage
+} from './build-structural-module-reachability-analysis.js';
 import { structuralModuleReachabilityAnalysisContentDigest } from './structural-module-reachability-analysis-canonical.js';
 import {
 	createStructuralSccGraphFixture,
@@ -236,6 +239,13 @@ describe('structural module reachability boundary coverage', { timeout: 60_000 }
 
 	it('rejects unsafe consumed input populations and enforces both input budgets', () => {
 		const base = inputsFor(baseFixture);
+		const measuredBase = buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(base);
+		expect(measuredBase.outcome).toMatchObject({ outcome: 'partial' });
+		expect(measuredBase.consumedInputUsage).toEqual({
+			basis: 'EXACT',
+			records: 692,
+			stringUtf16CodeUnits: 17_240
+		});
 		// Exact consumed-record and UTF-16 code-unit populations of the frozen fixture.
 		for (const budgets of [{ maxInputRecords: 692 }, { maxInputStringCharacters: 17_240 }])
 			expect(
@@ -281,12 +291,35 @@ describe('structural module reachability boundary coverage', { timeout: 60_000 }
 		];
 		expectUnavailable(accessorProperty, 'SOURCE_GRAPH_INVALID');
 
-		for (const budgets of [{ maxInputRecords: 691 }, { maxInputStringCharacters: 17_239 }])
-			expectUnavailable(
-				{ ...base, request: { ...base.request, budgets: { ...base.request.budgets, ...budgets } } },
-				'BUDGET_EXCEEDED',
-				'The consumed predecessor projection exceeds an input budget.'
-			);
+		for (const [key, limit] of [
+			['maxInputRecords', 691],
+			['maxInputStringCharacters', 17_239]
+		] as const) {
+			const measured = buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage({
+				...base,
+				request: {
+					...base.request,
+					budgets: { ...base.request.budgets, [key]: limit }
+				}
+			});
+			expect(measured.outcome).toMatchObject({
+				diagnostics: [
+					expect.objectContaining({
+						code: 'BUDGET_EXCEEDED',
+						message: 'The consumed predecessor projection exceeds an input budget.'
+					})
+				],
+				outcome: 'unavailable'
+			});
+			expect(measured.consumedInputUsage).toMatchObject({ basis: 'LOWER_BOUND' });
+			const measuredValue =
+				key === 'maxInputRecords'
+					? measured.consumedInputUsage?.records
+					: measured.consumedInputUsage?.stringUtf16CodeUnits;
+			expect(measuredValue).toBeGreaterThan(0);
+			expect(measuredValue).toBeLessThanOrEqual(key === 'maxInputRecords' ? 692 : 17_240);
+			if (key === 'maxInputStringCharacters') expect(measuredValue).toBeGreaterThan(limit);
+		}
 	});
 
 	it('classifies scalar, cycle, prototype, key, and array-population hostility in consumed input', () => {
@@ -334,7 +367,37 @@ describe('structural module reachability boundary coverage', { timeout: 60_000 }
 			...oversizedArray.request,
 			budgets: { ...oversizedArray.request.budgets, maxInputRecords: 1_000 }
 		};
-		expectUnavailable(oversizedArray, 'BUDGET_EXCEEDED');
+		const oversizedMeasured =
+			buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(oversizedArray);
+		expect(oversizedMeasured.outcome).toMatchObject({
+			diagnostics: [expect.objectContaining({ code: 'BUDGET_EXCEEDED' })],
+			outcome: 'unavailable'
+		});
+		expect(oversizedMeasured.consumedInputUsage).toMatchObject({ basis: 'LOWER_BOUND' });
+		expect(oversizedMeasured.consumedInputUsage?.records).toBeGreaterThan(0);
+		expect(oversizedMeasured.consumedInputUsage?.records).toBeLessThanOrEqual(1_000);
+
+		const sparseOversizedArray = cloneInputs(base);
+		const sparseOversizedNodes = new Array(2_000) as unknown[];
+		sparseOversizedNodes[0] = sparseOversizedArray.graph.nodes[0];
+		(sparseOversizedArray.graph as unknown as { nodes: unknown[] }).nodes = sparseOversizedNodes;
+		(
+			sparseOversizedArray as unknown as {
+				request: StructuralModuleReachabilityAnalysisRequest;
+			}
+		).request = {
+			...sparseOversizedArray.request,
+			budgets: { ...sparseOversizedArray.request.budgets, maxInputRecords: 1_000 }
+		};
+		const sparseOversizedMeasured =
+			buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(sparseOversizedArray);
+		expect(sparseOversizedMeasured.outcome).toMatchObject({
+			diagnostics: [expect.objectContaining({ code: 'BUDGET_EXCEEDED' })],
+			outcome: 'unavailable'
+		});
+		expect(sparseOversizedMeasured.consumedInputUsage).toMatchObject({ basis: 'LOWER_BOUND' });
+		expect(sparseOversizedMeasured.consumedInputUsage?.records).toBeGreaterThan(0);
+		expect(sparseOversizedMeasured.consumedInputUsage?.records).toBeLessThanOrEqual(1_000);
 
 		const inheritedRecord = cloneInputs(base);
 		(inheritedRecord.graph as unknown as { coverage: object }).coverage = Object.assign(

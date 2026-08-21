@@ -84,9 +84,22 @@ export { buildSourceOriginCorrelation } from './semantic/build-source-origin-cor
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
 export {
 	runStructuralModuleReachabilityReport,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
 	structuralModuleReachabilityReportExitCode,
-	type RunStructuralModuleReachabilityReportOptions
+	type RunStructuralModuleReachabilityReportOptions,
+	type StructuralModuleReachabilityReportProgressEvent,
+	type StructuralModuleReachabilityReportProgressObservation,
+	type StructuralModuleReachabilityReportProgressObservationBasis,
+	type StructuralModuleReachabilityReportProgressObservationMetric,
+	type StructuralModuleReachabilityReportProgressPhase
 } from './application/run-structural-module-reachability-report.js';
+export {
+	STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_BYTES,
+	STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_EVENTS,
+	STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type StructuralModuleReachabilityProgressTransportTruncation
+} from './application/structural-module-reachability-progress-jsonl.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';

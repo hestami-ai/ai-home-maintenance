@@ -69,8 +69,14 @@ import {
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_BYTES,
+	STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_EVENTS,
+	STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION,
@@ -158,6 +164,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildProjectContextGraph).toBeTypeOf('function');
 		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(runStructuralModuleReachabilityReport).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty(
+			'buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage'
+		);
+		expect(publicSurface).not.toHaveProperty(
+			'createStructuralModuleReachabilityProgressJsonlWriter'
+		);
 		expect(structuralModuleReachabilityReportExitCode).toBeTypeOf('function');
 		expect(buildStructuralSccAnalysis).toBeTypeOf('function');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
@@ -396,6 +408,21 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION).toBe(
 			'jan-csaa-report-structural-module-reachability/0.1.0'
 		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-module-reachability-report-progress/0.1.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS).toEqual({
+			dwp006Completion: 'NOT_CLAIMED',
+			facadeNonclaims: STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS,
+			janCsaa007OperationProgressResponse: 'NOT_CLAIMED',
+			runtimeOutcomeInvariance: 'NOT_CLAIMED',
+			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
+		});
+		expect(STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-module-reachability-progress-transport/0.1.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
 			'jan-csaa-structural-module-reachability-report-request/0.1.0'
 		);

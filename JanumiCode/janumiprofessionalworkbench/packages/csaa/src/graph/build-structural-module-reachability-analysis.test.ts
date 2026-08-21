@@ -11,7 +11,10 @@ import {
 	type StructuralModuleReachabilityAnalysisSnapshot,
 	type StructuralModuleReachabilityDiagnostic
 } from '../contracts/structural-module-reachability-analysis.js';
-import { buildStructuralModuleReachabilityAnalysis } from './build-structural-module-reachability-analysis.js';
+import {
+	buildStructuralModuleReachabilityAnalysis,
+	buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage
+} from './build-structural-module-reachability-analysis.js';
 import { structuralModuleReachabilityAnalysisContentDigest } from './structural-module-reachability-analysis-canonical.js';
 import {
 	createStructuralSccGraphFixture,
@@ -203,6 +206,24 @@ describe('buildStructuralModuleReachabilityAnalysis', () => {
 			});
 			expectDeeplyFrozen(first);
 		}
+	});
+
+	it('keeps consumed-input usage outside the canonical outcome and analysis identity', () => {
+		const inputs = inputsFor(nodeId('src/d.ts'));
+		const legacy = buildStructuralModuleReachabilityAnalysis(inputs);
+		const first = buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(inputs);
+		const second = buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(inputs);
+		expect(first).toEqual(second);
+		expect(first.outcome).toEqual(legacy);
+		expect(first.consumedInputUsage).toMatchObject({ basis: 'EXACT' });
+		expect(Object.isFrozen(first)).toBe(true);
+		expect(Object.isFrozen(first.consumedInputUsage)).toBe(true);
+		expect(first.outcome).not.toHaveProperty('consumedInputUsage');
+		if (first.outcome.outcome !== 'partial') throw new Error(JSON.stringify(first));
+		expect(first.outcome.analysis).not.toHaveProperty('consumedInputUsage');
+		expect(first.outcome.analysis.contentDigest).toBe(
+			structuralModuleReachabilityAnalysisContentDigest(first.outcome.analysis)
+		);
 	});
 
 	it('refuses every one-below graph, traversal, materialization, witness, and frontier budget', () => {

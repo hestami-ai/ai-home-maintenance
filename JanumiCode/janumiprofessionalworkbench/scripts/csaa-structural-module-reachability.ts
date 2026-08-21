@@ -5,9 +5,17 @@ import {
 	runStructuralModuleReachabilityReport,
 	structuralModuleReachabilityReportExitCode
 } from '../packages/csaa/src/index.js';
+import { createStructuralModuleReachabilityProgressJsonlWriter } from '../packages/csaa/src/application/structural-module-reachability-progress-jsonl.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const MAX_REQUEST_BYTES = 1024 * 1024;
+
+process.stderr.on('error', () => {
+	// Progress and adapter diagnostics are best-effort side channels; stdout owns the terminal envelope.
+});
+process.stdout.on('error', () => {
+	// A closed terminal consumer cannot receive the envelope, but must not trigger an unhandled EPIPE.
+});
 
 class RequestInputError extends Error {}
 
@@ -71,7 +79,13 @@ try {
 	} catch {
 		throw new RequestInputError('Request input is not valid JSON.');
 	}
-	const outcome = runStructuralModuleReachabilityReport(request, { repositoryRoot: ROOT });
+	const progressWriter = createStructuralModuleReachabilityProgressJsonlWriter({
+		write: (line) => process.stderr.write(line)
+	});
+	const outcome = runStructuralModuleReachabilityReport(request, {
+		onProgress: (event) => progressWriter.emit(event),
+		repositoryRoot: ROOT
+	});
 	process.stdout.write(`${canonicalSemanticJson(outcome)}\n`);
 	process.exitCode = structuralModuleReachabilityReportExitCode(outcome);
 } catch (error) {

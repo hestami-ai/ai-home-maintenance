@@ -50,27 +50,27 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 319,
+      "discovered": 320,
       "excluded": 0,
       "failed": 0,
-      "included": 319,
+      "included": 320,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 319
+      "successfullyInventoried": 320
     },
     {
       "artifactClass": "TEST",
-      "discovered": 373,
+      "discovered": 374,
       "excluded": 0,
       "failed": 0,
-      "included": 373,
+      "included": 374,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 373
+      "successfullyInventoried": 374
     },
     {
       "artifactClass": "VERIFICATION",
@@ -204,6 +204,7 @@
         "apps/rph-demo/src/lib/walkthrough.test.ts",
         "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
         "packages/csaa/src/application/structural-module-reachability-command.test.ts",
+        "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
@@ -2525,7 +2526,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "9a9fa3b9e595754947f0921a306448dae3dc32e79a76843a8b4d9f22110edd27",
+    "configurationDigest": "201b95ced25086832addd4652950111947ac45eaa343ac08cfe61b84e4ec9ec4",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -3161,13 +3162,14 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "1fe023dcbe6bf9e994946ee320c5e88ee1bf231efaa81ebaae0121b0e8e5b3e9",
+          "projectResolutionDigest": "6543d1323a2734a0e1d2690af1412904db75679b4663995bfbb91ad955bad5d5",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
             "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+            "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -3349,7 +3351,7 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "ab18e950203a03b865aa444b3eb01728cdd405b61c7a133a1c676e9f6b5daef0",
+          "projectResolutionDigest": "bda872c4537954abfff1f2d1643d3e280e8b56c456fed7876827d5390019638c",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3358,6 +3360,8 @@
             "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
             "packages/csaa/src/application/run-structural-module-reachability-report.ts",
             "packages/csaa/src/application/structural-module-reachability-command.test.ts",
+            "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
+            "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -5707,7 +5711,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "f5dc2dd3a1ef08ca59b75d367291da67a6502e9452337faafd06afc206101dc5",
+    "fileManifestDigest": "e32296b7e8342d8b99292cd6d034846cdf397e5a4ec1f2103ffb5b74c5a05f71",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5770,7 +5774,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 971,
+    "selectedFileCount": 973,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6915,24 +6919,38 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 9998,
+        "bytes": 21257,
         "path": "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
-        "sha256": "a19ee0ec20ffc4b3db20727d75cec5d05625b2a1e4ac1ad0a7324633eaed2722",
+        "sha256": "aa53d243774cbf9c5a75326fd6683d74bd7c904a932441402f69d1a0f7c5341f",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 32321,
+        "bytes": 50905,
         "path": "packages/csaa/src/application/run-structural-module-reachability-report.ts",
-        "sha256": "baa36e10b5b20eca30caf02c36d9d94efbaa915fb60c4cc298719cc0b03fc662",
+        "sha256": "2d4ed9175ed3d4b2af963712b7fd7e9eeac4ef29eecced3b6cb67e552cc5e565",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 2233,
+        "bytes": 6593,
         "path": "packages/csaa/src/application/structural-module-reachability-command.test.ts",
-        "sha256": "6f5e87e485100d3905a2e7c8e739b36be4c4b6a823ade3a264866cb55808b1c3",
+        "sha256": "7b2aac60fc595b3550de6596f6232092ef281e5ef06e37fd859ff3946d89f035",
         "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 4896,
+        "path": "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
+        "sha256": "d86bffc2516836a9075e2ce813c25c7cbf6a49803cb0b67e281354c532a2d35b",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4963,
+        "path": "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
+        "sha256": "f8cb91298a4b645846c2dcb3778b340b357adf098bb43dfa45a169828ea7d687",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
@@ -7279,16 +7297,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 12456,
+        "bytes": 13530,
         "path": "packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts",
-        "sha256": "5e64beaee34ce56eb12cf83efa2764e4575e830b763757b48097998cf10e3cb5",
+        "sha256": "48bdafb9497eebebfd01bd25551e1e38ecc85ae8e1c5492d9dc2e3eba78e5e7c",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 38603,
+        "bytes": 41518,
         "path": "packages/csaa/src/graph/build-structural-module-reachability-analysis.ts",
-        "sha256": "bc2ff6db83c953c018ec5540e1e3652757ba8c3f914e52c3a4b21b3b91f540ec",
+        "sha256": "e03a670d2ee69195bd191ca4e6ace3026fed553f48489c8bf6ab270cfab4247d",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7503,9 +7521,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 24789,
+        "bytes": 27407,
         "path": "packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts",
-        "sha256": "b9502d3732e17573f90839f7c7777e68425485fbeca4b3a3807512a8093aca32",
+        "sha256": "f1b7d58ec60fcc28cfe959c26db1aeb6ca726aa632f42a2c3e0dc76966b0c61a",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -7678,16 +7696,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 20646,
+        "bytes": 22033,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "46a5779d14257ddc27eda2cd0eecc8508371719c7f2168744db883f108821398",
+        "sha256": "6d617a9bf8d6ede9c654244ddaf9a16e643717014217006db53c4dd67e48b2de",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 10166,
+        "bytes": 10909,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "90833e206e4956185584f426fff583a35e0e5883ec7eb4bbb56fd78e3ae9ecdc",
+        "sha256": "5d86bdb6d3282c5a8deafcd56c1e22e3c86c33f9b0100a762462e5186678864a",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12060,9 +12078,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 2907,
+        "bytes": 3532,
         "path": "scripts/csaa-structural-module-reachability.ts",
-        "sha256": "3d6a8973a453198a7f350e7fbf7f04ce77d86c18416edfd42ae116aeb8bd63be",
+        "sha256": "8f0b57a2f91f7e99bbc53d656f1e0f071ea740bc2ad1638b488e34326f3fea1a",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12570,7 +12588,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "5de89251678661acddeb7c6d17ac11e1e9046751e5520e7c56713af899870f57",
+    "subjectId": "881e054cfaed4ee97570d9f72d431f8da7183c64880b1a027b207afba6410880",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -12872,7 +12890,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 148,
+      "candidateArtifactCount": 149,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -12900,6 +12918,7 @@
       "references": [],
       "resolvedRootFiles": [
         "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+        "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -13054,7 +13073,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 245,
+      "candidateArtifactCount": 247,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13084,6 +13103,8 @@
         "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
         "packages/csaa/src/application/run-structural-module-reachability-report.ts",
         "packages/csaa/src/application/structural-module-reachability-command.test.ts",
+        "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -14990,7 +15011,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-structural-module-reachability.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "3d6a8973a453198a7f350e7fbf7f04ce77d86c18416edfd42ae116aeb8bd63be",
+      "contentSha256": "8f0b57a2f91f7e99bbc53d656f1e0f071ea740bc2ad1638b488e34326f3fea1a",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [

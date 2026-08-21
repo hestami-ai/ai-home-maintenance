@@ -42,13 +42,20 @@ import {
 	type SubjectDiagnostic
 } from '../contracts/subject.js';
 import { buildModuleDependencyGraph } from '../graph/build-module-dependency-graph.js';
-import { buildStructuralModuleReachabilityAnalysis } from '../graph/build-structural-module-reachability-analysis.js';
+import {
+	buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage,
+	type StructuralModuleReachabilityConsumedInputUsage
+} from '../graph/build-structural-module-reachability-analysis.js';
 import {
 	canonicalSemanticJsonWitness,
 	isProxyValue,
 	isUnicodeScalarString
 } from '../semantic/canonical.js';
 import { buildStaticSemanticSnapshot } from '../semantic/build-static-semantic-snapshot.js';
+import type {
+	StaticSemanticSnapshotProgressEvent,
+	StaticSemanticSnapshotProgressPhase
+} from '../semantic/build-static-semantic-snapshot.js';
 import { verifyFrozenSubject } from '../subject/freshness.js';
 import {
 	assertCanonicalRelativePath,
@@ -96,6 +103,393 @@ interface DiagnosticLike {
 	readonly path: string | null;
 	readonly phase?: string;
 	readonly severity?: 'INFO' | 'WARNING' | 'ERROR';
+}
+
+export const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION =
+	'jan-csaa-structural-module-reachability-report-progress/0.1.0' as const;
+
+export const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS = Object.freeze({
+	dwp006Completion: 'NOT_CLAIMED',
+	facadeNonclaims: STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS,
+	janCsaa007OperationProgressResponse: 'NOT_CLAIMED',
+	runtimeOutcomeInvariance: 'NOT_CLAIMED',
+	terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
+} as const);
+
+export type StructuralModuleReachabilityReportProgressObservationBasis = 'EXACT' | 'LOWER_BOUND';
+
+/** `ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS` counts string values only, excluding key text. */
+export type StructuralModuleReachabilityReportProgressObservationMetric =
+	| 'ANALYSIS_CHARGED_TRAVERSAL_STEPS'
+	| 'ANALYSIS_CONSUMED_INPUT_RECORDS'
+	| 'ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS'
+	| 'ANALYSIS_ENCOUNTERED_FRONTIERS'
+	| 'ANALYSIS_EXAMINED_EDGES'
+	| 'ANALYSIS_INPUT_EDGES'
+	| 'ANALYSIS_INPUT_NODES'
+	| 'ANALYSIS_REACHED_NODES'
+	| 'ANALYSIS_WITNESS_EDGES'
+	| 'CURRENTNESS_CHANGED_PATHS'
+	| 'GRAPH_EDGES'
+	| 'GRAPH_LIMITATIONS'
+	| 'GRAPH_NODES'
+	| 'RESULT_BYTES'
+	| 'SELECTED_CRITERIA'
+	| 'SEMANTIC_AST_NODES'
+	| 'SEMANTIC_CANONICAL_BYTES'
+	| 'SEMANTIC_PROGRESS_ELAPSED_MILLISECONDS'
+	| 'SEMANTIC_HEAP_USED_BYTES'
+	| 'SEMANTIC_PROJECTS'
+	| 'SEMANTIC_RSS_BYTES'
+	| 'SEMANTIC_SOURCES'
+	| 'SEMANTIC_SYMBOLS'
+	| 'SUBJECT_ARTIFACTS'
+	| 'SUBJECT_DISCOVERED_FILES'
+	| 'SUBJECT_EXCLUDED_RECORDS'
+	| 'SUBJECT_FILE_BUDGET_RECORDS'
+	| 'SUBJECT_PROJECTS'
+	| 'SUBJECT_RETAINED_BYTES';
+
+export type StructuralModuleReachabilityReportProgressPhase =
+	| 'ANALYSIS'
+	| 'CRITERION_ARTIFACT_BIND'
+	| 'CRITERION_NODE_BIND'
+	| 'CRITERION_PATH_BIND'
+	| 'CURRENTNESS'
+	| 'MODULE_GRAPH'
+	| 'REQUEST_BIND'
+	| 'RESULT'
+	| 'SEMANTIC_SNAPSHOT'
+	| 'SUBJECT_CAPTURE'
+	| 'SUBJECT_PROJECT_PATH_BIND';
+
+const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_PHASE_STAGE = Object.freeze({
+	ANALYSIS: 'ANALYSIS',
+	CRITERION_ARTIFACT_BIND: 'CRITERION',
+	CRITERION_NODE_BIND: 'CRITERION',
+	CRITERION_PATH_BIND: 'CRITERION',
+	CURRENTNESS: 'CURRENTNESS',
+	MODULE_GRAPH: 'MODULE_GRAPH',
+	REQUEST_BIND: 'REQUEST',
+	RESULT: 'RESULT',
+	SEMANTIC_SNAPSHOT: 'SEMANTIC_SNAPSHOT',
+	SUBJECT_CAPTURE: 'SUBJECT',
+	SUBJECT_PROJECT_PATH_BIND: 'SUBJECT'
+} as const satisfies Readonly<
+	Record<StructuralModuleReachabilityReportProgressPhase, StructuralModuleReachabilityReportStage>
+>);
+
+export interface StructuralModuleReachabilityReportProgressObservation {
+	/**
+	 * `EXACT` applies only to this numeric local measurement. It does not establish capability,
+	 * closure, freshness, result, or evidence completeness.
+	 */
+	readonly basis: StructuralModuleReachabilityReportProgressObservationBasis;
+	/** The exact admitted caller limit for this metric when one exists; never a recommendation. */
+	readonly limit: number | null;
+	readonly metric: StructuralModuleReachabilityReportProgressObservationMetric;
+	readonly unit: 'BYTES' | 'COUNT' | 'MILLISECONDS';
+	readonly value: number;
+}
+
+interface StructuralModuleReachabilityReportProgressEventBase {
+	readonly deliverySemantics: 'SYNCHRONOUS_TRUSTED_HOST_CALLBACK';
+	readonly detailCode: string | null;
+	readonly elapsedMs: number;
+	readonly nonclaims: typeof STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS;
+	readonly observations: readonly StructuralModuleReachabilityReportProgressObservation[];
+	readonly operationVersion: typeof STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION;
+	readonly phase: StructuralModuleReachabilityReportProgressPhase;
+	readonly protocolRole: 'PRELIMINARY_CAP_027_REPORT_TELEMETRY';
+	readonly reportIdentityEffect: 'EXCLUDED_FROM_REPORT_IDENTITY';
+	readonly schemaVersion: typeof STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION;
+	readonly sequence: number;
+	readonly stage: StructuralModuleReachabilityReportStage;
+	readonly wallClockBudgetEffect: 'CALLBACK_TIME_MAY_CONSUME_ACTIVE_DURATION_BUDGET';
+}
+
+/**
+ * Stage state describes local orchestration only. A `COMPLETED` stage is not the terminal report
+ * outcome and does not strengthen CAP-027/PARTIAL or any facade closure/currentness claim. Timing,
+ * memory, sequence, and delivery are best-effort nondeterministic telemetry excluded from report
+ * identity and evidence. A trusted callback runs inline, can mutate host state, and can consume an
+ * active duration budget; runtime-outcome invariance is explicitly not claimed.
+ */
+export type StructuralModuleReachabilityReportProgressEvent =
+	| (StructuralModuleReachabilityReportProgressEventBase & {
+			readonly kind: 'REPORT_STAGE';
+			readonly semanticProgress?: never;
+			readonly state: 'STARTED' | 'COMPLETED' | 'FAILED';
+	  })
+	| (StructuralModuleReachabilityReportProgressEventBase & {
+			readonly kind: 'SEMANTIC_SNAPSHOT';
+			readonly phase: 'SEMANTIC_SNAPSHOT';
+			readonly semanticProgress: StaticSemanticSnapshotProgressEvent;
+			readonly stage: 'SEMANTIC_SNAPSHOT';
+			readonly state: StaticSemanticSnapshotProgressEvent['state'];
+	  });
+
+interface ReportProgressRecorder {
+	complete(
+		observations?: readonly StructuralModuleReachabilityReportProgressObservation[],
+		detailCode?: string | null
+	): void;
+	fail(
+		observations?: readonly StructuralModuleReachabilityReportProgressObservation[],
+		detailCode?: string | null
+	): void;
+	enabled(): boolean;
+	finish(
+		outcome: StructuralModuleReachabilityReportOutcome
+	): StructuralModuleReachabilityReportOutcome;
+	forwardSemantic(event: StaticSemanticSnapshotProgressEvent, budgets: SemanticBudgets): void;
+	start(
+		phase: StructuralModuleReachabilityReportProgressPhase,
+		observations?: readonly StructuralModuleReachabilityReportProgressObservation[]
+	): void;
+}
+
+function progressObservation(
+	metric: StructuralModuleReachabilityReportProgressObservationMetric,
+	value: number,
+	limit: number | null,
+	unit: StructuralModuleReachabilityReportProgressObservation['unit'],
+	basis: StructuralModuleReachabilityReportProgressObservationBasis = 'EXACT'
+): StructuralModuleReachabilityReportProgressObservation {
+	const boundedValue =
+		Number.isFinite(value) && value >= 0 ? Math.min(value, Number.MAX_SAFE_INTEGER) : 0;
+	return Object.freeze({ basis, limit, metric, unit, value: boundedValue });
+}
+
+function semanticProgressObservations(
+	event: StaticSemanticSnapshotProgressEvent,
+	budgets: SemanticBudgets
+): readonly StructuralModuleReachabilityReportProgressObservation[] {
+	const normalizedPhases = new Set<StaticSemanticSnapshotProgressPhase>([
+		'FREEZE',
+		'SERIALIZE',
+		'VALIDATE',
+		'FINAL_FRESHNESS',
+		'FINALIZE'
+	]);
+	const normalized =
+		normalizedPhases.has(event.phase) ||
+		(event.phase === 'NORMALIZE' && event.state === 'COMPLETED');
+	const populationBasis = normalized ? 'EXACT' : 'LOWER_BOUND';
+	const canonicalBytesExact =
+		event.counts.canonicalBytes > 0 &&
+		(normalizedPhases.has(event.phase) ||
+			(event.phase === 'SERIALIZE' && event.state !== 'STARTED'));
+	return Object.freeze([
+		progressObservation(
+			'SEMANTIC_PROGRESS_ELAPSED_MILLISECONDS',
+			event.elapsedMs,
+			null,
+			'MILLISECONDS'
+		),
+		progressObservation('SEMANTIC_RSS_BYTES', event.memoryUsage.rss, null, 'BYTES'),
+		progressObservation('SEMANTIC_HEAP_USED_BYTES', event.memoryUsage.heapUsed, null, 'BYTES'),
+		progressObservation(
+			'SEMANTIC_AST_NODES',
+			event.counts.astNodes,
+			budgets.maxAstNodes,
+			'COUNT',
+			populationBasis
+		),
+		progressObservation(
+			'SEMANTIC_CANONICAL_BYTES',
+			event.counts.canonicalBytes,
+			budgets.maxSnapshotBytes,
+			'BYTES',
+			canonicalBytesExact ? 'EXACT' : 'LOWER_BOUND'
+		),
+		progressObservation(
+			'SEMANTIC_PROJECTS',
+			event.counts.semanticProjects,
+			budgets.maxProjects,
+			'COUNT',
+			populationBasis
+		),
+		progressObservation(
+			'SEMANTIC_SOURCES',
+			event.counts.sources,
+			budgets.maxSources,
+			'COUNT',
+			populationBasis
+		),
+		progressObservation('SEMANTIC_SYMBOLS', event.counts.symbols, null, 'COUNT', populationBasis)
+	]);
+}
+
+function analysisInputUsageObservations(
+	usage: StructuralModuleReachabilityConsumedInputUsage | null,
+	budgets: StructuralModuleReachabilityAnalysisBudgets
+): readonly StructuralModuleReachabilityReportProgressObservation[] {
+	if (usage === null) return [];
+	return Object.freeze([
+		progressObservation(
+			'ANALYSIS_CONSUMED_INPUT_RECORDS',
+			usage.records,
+			budgets.maxInputRecords,
+			'COUNT',
+			usage.basis
+		),
+		progressObservation(
+			'ANALYSIS_CONSUMED_INPUT_UTF16_CODE_UNITS',
+			usage.stringUtf16CodeUnits,
+			budgets.maxInputStringCharacters,
+			'COUNT',
+			usage.basis
+		)
+	]);
+}
+
+function containRejectedObserverResult(result: unknown): void {
+	if (result === undefined) return;
+	void Promise.resolve(result).catch(() => {
+		// Rejected thenables are contained like synchronous observer exceptions.
+	});
+}
+
+function createReportProgressRecorder(
+	options: RunStructuralModuleReachabilityReportOptions
+): ReportProgressRecorder {
+	let sink: ((event: StructuralModuleReachabilityReportProgressEvent) => unknown) | undefined;
+	try {
+		const descriptor = Reflect.getOwnPropertyDescriptor(options, 'onProgress');
+		if (descriptor !== undefined && 'value' in descriptor && typeof descriptor.value === 'function')
+			sink = descriptor.value as (
+				event: StructuralModuleReachabilityReportProgressEvent
+			) => unknown;
+	} catch {
+		// Observer inspection exceptions are suppressed; callback time remains part of wall-clock use.
+	}
+	let active: StructuralModuleReachabilityReportProgressPhase | null = null;
+	let sequence = 0;
+	let lastElapsedMs = 0;
+	let origin: bigint | null = null;
+	if (sink !== undefined)
+		try {
+			origin = process.hrtime.bigint();
+		} catch {
+			origin = null;
+		}
+
+	const elapsed = (): number => {
+		if (origin === null) return lastElapsedMs;
+		try {
+			const measured = Number(process.hrtime.bigint() - origin) / 1_000_000;
+			if (Number.isFinite(measured)) lastElapsedMs = Math.max(lastElapsedMs, measured);
+		} catch {
+			// Retain the last monotonic observation when timing telemetry is unavailable.
+		}
+		return lastElapsedMs;
+	};
+	const emit = (
+		event:
+			| Omit<
+					Extract<
+						StructuralModuleReachabilityReportProgressEvent,
+						{ readonly kind: 'REPORT_STAGE' }
+					>,
+					| 'elapsedMs'
+					| 'deliverySemantics'
+					| 'nonclaims'
+					| 'operationVersion'
+					| 'protocolRole'
+					| 'reportIdentityEffect'
+					| 'schemaVersion'
+					| 'sequence'
+					| 'wallClockBudgetEffect'
+			  >
+			| Omit<
+					Extract<
+						StructuralModuleReachabilityReportProgressEvent,
+						{ readonly kind: 'SEMANTIC_SNAPSHOT' }
+					>,
+					| 'elapsedMs'
+					| 'deliverySemantics'
+					| 'nonclaims'
+					| 'operationVersion'
+					| 'protocolRole'
+					| 'reportIdentityEffect'
+					| 'schemaVersion'
+					| 'sequence'
+					| 'wallClockBudgetEffect'
+			  >
+	): void => {
+		if (sink === undefined) return;
+		try {
+			sequence += 1;
+			const materialized = Object.freeze({
+				...event,
+				deliverySemantics: 'SYNCHRONOUS_TRUSTED_HOST_CALLBACK' as const,
+				elapsedMs: elapsed(),
+				nonclaims: STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,
+				observations: Object.freeze([...event.observations]),
+				operationVersion: STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
+				protocolRole: 'PRELIMINARY_CAP_027_REPORT_TELEMETRY' as const,
+				reportIdentityEffect: 'EXCLUDED_FROM_REPORT_IDENTITY' as const,
+				schemaVersion: STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
+				sequence,
+				wallClockBudgetEffect: 'CALLBACK_TIME_MAY_CONSUME_ACTIVE_DURATION_BUDGET' as const
+			}) as StructuralModuleReachabilityReportProgressEvent;
+			containRejectedObserverResult(sink(materialized));
+		} catch {
+			// Sink and serialization failures remain outside the evidence-producing path.
+		}
+	};
+	const close = (
+		state: 'COMPLETED' | 'FAILED',
+		observations: readonly StructuralModuleReachabilityReportProgressObservation[],
+		detailCode: string | null
+	): void => {
+		if (active === null) return;
+		const phase = active;
+		const stage = STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_PHASE_STAGE[phase];
+		active = null;
+		emit({ detailCode, kind: 'REPORT_STAGE', observations, phase, stage, state });
+	};
+
+	return {
+		complete(observations = [], detailCode = null): void {
+			close('COMPLETED', observations, detailCode);
+		},
+		enabled(): boolean {
+			return sink !== undefined;
+		},
+		fail(observations = [], detailCode = null): void {
+			close('FAILED', observations, detailCode);
+		},
+		finish(outcome): StructuralModuleReachabilityReportOutcome {
+			if (active !== null)
+				close('FAILED', [], outcome.outcome === 'unavailable' ? outcome.code : 'STAGE_INTERRUPTED');
+			return outcome;
+		},
+		forwardSemantic(event, budgets): void {
+			emit({
+				detailCode: event.detailCode,
+				kind: 'SEMANTIC_SNAPSHOT',
+				observations: semanticProgressObservations(event, budgets),
+				phase: 'SEMANTIC_SNAPSHOT',
+				semanticProgress: event,
+				stage: 'SEMANTIC_SNAPSHOT',
+				state: event.state
+			});
+		},
+		start(phase, observations = []): void {
+			if (active !== null) close('FAILED', [], 'STAGE_INTERRUPTED');
+			active = phase;
+			emit({
+				detailCode: null,
+				kind: 'REPORT_STAGE',
+				observations,
+				phase,
+				stage: STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_PHASE_STAGE[phase],
+				state: 'STARTED'
+			});
+		}
+	};
 }
 
 class ReportRequestError extends Error {
@@ -526,14 +920,22 @@ function selectCriterion(
 }
 
 export interface RunStructuralModuleReachabilityReportOptions {
+	/**
+	 * Trusted-host telemetry callback. Exceptions/rejections are suppressed and events are excluded
+	 * from report identity/evidence. The callback runs synchronously, can mutate trusted host state,
+	 * and can consume an active duration budget; runtime-outcome invariance is not claimed.
+	 */
+	readonly onProgress?: (event: StructuralModuleReachabilityReportProgressEvent) => unknown;
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
 }
 
-export function runStructuralModuleReachabilityReport(
+function runStructuralModuleReachabilityReportInternal(
 	requestValue: unknown,
-	options: RunStructuralModuleReachabilityReportOptions
+	options: RunStructuralModuleReachabilityReportOptions,
+	progress: ReportProgressRecorder
 ): StructuralModuleReachabilityReportOutcome {
+	progress.start('REQUEST_BIND');
 	let request: StructuralModuleReachabilityReportRequest;
 	try {
 		request = materializeRequest(requestValue);
@@ -561,6 +963,8 @@ export function runStructuralModuleReachabilityReport(
 			request
 		);
 	}
+	progress.complete([], 'REQUEST_ADMITTED');
+	progress.start('SUBJECT_PROJECT_PATH_BIND');
 
 	const resolvedProject = existingFile(
 		repositoryRoot,
@@ -582,6 +986,8 @@ export function runStructuralModuleReachabilityReport(
 		if ('outcome' in resolved) return resolved;
 		resolvedSubjectProjects.push(resolved);
 	}
+	progress.complete([], 'SUBJECT_PROJECT_PATHS_BOUND');
+	progress.start('CRITERION_PATH_BIND');
 	const resolvedCriterion = existingFile(
 		repositoryRoot,
 		request.criterionLogicalPath,
@@ -590,7 +996,8 @@ export function runStructuralModuleReachabilityReport(
 		request
 	);
 	if ('outcome' in resolvedCriterion) return resolvedCriterion;
-
+	progress.complete([], 'CRITERION_PATH_BOUND');
+	progress.start('SUBJECT_CAPTURE');
 	const subjectOutcome = resolveSubject({
 		budgets: request.budgets.subject,
 		expectEmpty: false,
@@ -616,6 +1023,38 @@ export function runStructuralModuleReachabilityReport(
 		return failure(identity.code, 'SUBJECT', identity.state, subjectDiagnostics, request);
 	}
 	const subject = subjectOutcome.subject;
+	progress.complete(
+		[
+			progressObservation('SUBJECT_ARTIFACTS', subject.artifacts.length, null, 'COUNT'),
+			progressObservation(
+				'SUBJECT_FILE_BUDGET_RECORDS',
+				subject.artifacts.length + subject.excludedArtifacts.length,
+				request.budgets.subject.maxFiles,
+				'COUNT'
+			),
+			progressObservation('SUBJECT_DISCOVERED_FILES', subject.population.discovered, null, 'COUNT'),
+			progressObservation(
+				'SUBJECT_RETAINED_BYTES',
+				subject.artifacts.reduce((total, artifact) => total + artifact.bytes, 0),
+				null,
+				'BYTES'
+			),
+			progressObservation(
+				'SUBJECT_PROJECTS',
+				subject.projects.length,
+				request.budgets.subject.maxProjects,
+				'COUNT'
+			),
+			progressObservation(
+				'SUBJECT_EXCLUDED_RECORDS',
+				subject.excludedArtifacts.length,
+				null,
+				'COUNT'
+			)
+		],
+		subjectOutcome.completeness
+	);
+	progress.start('CRITERION_ARTIFACT_BIND');
 	const criterionArtifact = subject.artifacts.find(
 		(artifact) => artifact.canonicalPathKey === resolvedCriterion.canonicalPathKey
 	);
@@ -644,7 +1083,9 @@ export function runStructuralModuleReachabilityReport(
 			subject
 		);
 	}
+	progress.complete([], 'CRITERION_ARTIFACT_BOUND');
 
+	progress.start('SEMANTIC_SNAPSHOT');
 	const semanticOutcome = buildStaticSemanticSnapshot(
 		{
 			assignabilityRequests: [],
@@ -656,7 +1097,12 @@ export function runStructuralModuleReachabilityReport(
 			schemaVersion: SEMANTIC_REQUEST_SCHEMA_VERSION,
 			subjectId: subject.descriptor.subjectId
 		},
-		{ subject }
+		{ subject },
+		progress.enabled()
+			? {
+					onProgress: (event) => progress.forwardSemantic(event, request.budgets.semantic)
+				}
+			: undefined
 	);
 	const semanticDiagnostics = projectDiagnostics(
 		semanticOutcome.diagnostics,
@@ -677,7 +1123,9 @@ export function runStructuralModuleReachabilityReport(
 			subject
 		);
 	const snapshot = semanticOutcome.snapshot;
+	progress.complete([], semanticOutcome.outcome.toUpperCase());
 
+	progress.start('MODULE_GRAPH');
 	const graphOutcome = buildModuleDependencyGraph(
 		{
 			operationVersion: MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
@@ -702,7 +1150,26 @@ export function runStructuralModuleReachabilityReport(
 			subject
 		);
 	const graph = graphOutcome.graph;
+	progress.complete(
+		[
+			progressObservation(
+				'GRAPH_NODES',
+				graph.nodes.length,
+				request.budgets.reachability.maxNodes,
+				'COUNT'
+			),
+			progressObservation(
+				'GRAPH_EDGES',
+				graph.edges.length,
+				request.budgets.reachability.maxEdges,
+				'COUNT'
+			),
+			progressObservation('GRAPH_LIMITATIONS', graph.limitations.length, null, 'COUNT')
+		],
+		graphOutcome.outcome.toUpperCase()
+	);
 
+	progress.start('CRITERION_NODE_BIND');
 	const project = selectProject(snapshot, resolvedProject.canonicalPathKey);
 	if (project === 'ABSENT' || project === 'AMBIGUOUS') {
 		const code = project === 'ABSENT' ? 'PROJECT_NOT_ANALYZED' : 'PROJECT_AMBIGUOUS';
@@ -751,7 +1218,12 @@ export function runStructuralModuleReachabilityReport(
 			request,
 			subject
 		);
+	progress.complete(
+		[progressObservation('SELECTED_CRITERIA', 1, null, 'COUNT')],
+		'CRITERION_GRAPH_NODE_BOUND'
+	);
 
+	progress.start('ANALYSIS');
 	const analysisInputs = {
 		graph,
 		request: {
@@ -772,13 +1244,23 @@ export function runStructuralModuleReachabilityReport(
 		},
 		semanticSnapshot: snapshot
 	};
-	const analysisOutcome = buildStructuralModuleReachabilityAnalysis(analysisInputs);
+	const measuredAnalysis =
+		buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(analysisInputs);
+	const analysisOutcome = measuredAnalysis.outcome;
+	const analysisInputObservations = analysisInputUsageObservations(
+		measuredAnalysis.consumedInputUsage,
+		request.budgets.reachability
+	);
 	const analysisDiagnostics = projectDiagnostics(
 		analysisOutcome.diagnostics,
 		'ANALYSIS',
 		repositoryRoot
 	);
-	if (analysisOutcome.outcome !== 'partial')
+	if (analysisOutcome.outcome !== 'partial') {
+		progress.fail(
+			analysisInputObservations,
+			analysisOutcome.diagnostics[0]?.code ?? 'STRUCTURAL_MODULE_REACHABILITY_UNAVAILABLE'
+		);
 		return failure(
 			'STRUCTURAL_MODULE_REACHABILITY_UNAVAILABLE',
 			'ANALYSIS',
@@ -787,8 +1269,58 @@ export function runStructuralModuleReachabilityReport(
 			request,
 			subject
 		);
+	}
 	const analysis = analysisOutcome.analysis;
+	progress.complete(
+		[
+			...analysisInputObservations,
+			progressObservation(
+				'ANALYSIS_INPUT_NODES',
+				analysis.coverage.inputNodes,
+				request.budgets.reachability.maxNodes,
+				'COUNT'
+			),
+			progressObservation(
+				'ANALYSIS_INPUT_EDGES',
+				analysis.coverage.inputEdges,
+				request.budgets.reachability.maxEdges,
+				'COUNT'
+			),
+			progressObservation(
+				'ANALYSIS_REACHED_NODES',
+				analysis.coverage.reachedNodes,
+				request.budgets.reachability.maxReachableNodes,
+				'COUNT'
+			),
+			progressObservation(
+				'ANALYSIS_EXAMINED_EDGES',
+				analysis.coverage.examinedEdges,
+				null,
+				'COUNT'
+			),
+			progressObservation(
+				'ANALYSIS_CHARGED_TRAVERSAL_STEPS',
+				analysis.coverage.chargedTraversalSteps,
+				request.budgets.reachability.maxTraversalSteps,
+				'COUNT'
+			),
+			progressObservation(
+				'ANALYSIS_WITNESS_EDGES',
+				analysis.coverage.witnessEdges,
+				request.budgets.reachability.maxWitnessEdges,
+				'COUNT'
+			),
+			progressObservation(
+				'ANALYSIS_ENCOUNTERED_FRONTIERS',
+				analysis.coverage.encounteredFrontiers,
+				request.budgets.reachability.maxFrontierRecords,
+				'COUNT'
+			)
+		],
+		'PARTIAL'
+	);
 
+	progress.start('CURRENTNESS');
 	let freshness: ReturnType<typeof verifyFrozenSubject>;
 	try {
 		freshness = verifyFrozenSubject(subject, { rootLocator: repositoryRoot });
@@ -814,7 +1346,14 @@ export function runStructuralModuleReachabilityReport(
 		'CURRENTNESS',
 		repositoryRoot
 	);
+	progress.complete(
+		[
+			progressObservation('CURRENTNESS_CHANGED_PATHS', freshness.changedPaths.length, null, 'COUNT')
+		],
+		currentnessState
+	);
 
+	progress.start('RESULT');
 	const nodeById = new Map(graph.nodes.map((node) => [node.id, node] as const));
 	const evidenceNodes = analysis.members.map((member) => nodeById.get(member.nodeId));
 	if (evidenceNodes.some((node) => node === undefined))
@@ -987,7 +1526,12 @@ export function runStructuralModuleReachabilityReport(
 		subject: subject.descriptor
 	};
 	try {
-		if (canonicalSemanticJsonWitness(report).bytes + 1 > request.budgets.maxResultBytes)
+		const resultBytes = canonicalSemanticJsonWitness(report).bytes + 1;
+		if (resultBytes > request.budgets.maxResultBytes) {
+			progress.fail(
+				[progressObservation('RESULT_BYTES', resultBytes, request.budgets.maxResultBytes, 'BYTES')],
+				'RESULT_BUDGET_EXCEEDED'
+			);
 			return failure(
 				'RESULT_BUDGET_EXCEEDED',
 				'RESULT',
@@ -1001,8 +1545,14 @@ export function runStructuralModuleReachabilityReport(
 				request,
 				subject
 			);
+		}
+		progress.complete(
+			[progressObservation('RESULT_BYTES', resultBytes, request.budgets.maxResultBytes, 'BYTES')],
+			'PARTIAL'
+		);
 		return report;
 	} catch {
+		progress.fail([], 'RESULT_SERIALIZATION_FAILED');
 		return failure(
 			'RESULT_SERIALIZATION_FAILED',
 			'RESULT',
@@ -1016,6 +1566,21 @@ export function runStructuralModuleReachabilityReport(
 			request,
 			subject
 		);
+	}
+}
+
+export function runStructuralModuleReachabilityReport(
+	requestValue: unknown,
+	options: RunStructuralModuleReachabilityReportOptions
+): StructuralModuleReachabilityReportOutcome {
+	const progress = createReportProgressRecorder(options);
+	try {
+		return progress.finish(
+			runStructuralModuleReachabilityReportInternal(requestValue, options, progress)
+		);
+	} catch (error) {
+		progress.fail([], 'INTERNAL_FAILURE');
+		throw error;
 	}
 }
 

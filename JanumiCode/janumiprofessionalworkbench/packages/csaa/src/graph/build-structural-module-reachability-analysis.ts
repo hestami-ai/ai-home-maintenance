@@ -292,26 +292,75 @@ function projectConsumedSemanticKeys(
 /** Outcome of one consumed-input admission step. Aliased because five helpers return it. */
 type ConsumedInputState = 'BUDGET_EXCEEDED' | 'INVALID' | 'VALID';
 
+export interface StructuralModuleReachabilityConsumedInputUsage {
+	/** `EXACT` means the consumed projection census completed; otherwise these are safe lower bounds. */
+	readonly basis: 'EXACT' | 'LOWER_BOUND';
+	/** Value occurrences charged by the consumed-input census. */
+	readonly records: number;
+	/** UTF-16 code units in consumed string values; object property names are not charged. */
+	readonly stringUtf16CodeUnits: number;
+}
+
+export interface StructuralModuleReachabilityMeasuredBuildOutcome {
+	/** Null when no safely reportable census result was produced. */
+	readonly consumedInputUsage: StructuralModuleReachabilityConsumedInputUsage | null;
+	readonly outcome: StructuralModuleReachabilityAnalysisBuildOutcome;
+}
+
+interface ConsumedInputCensus {
+	readonly state: ConsumedInputState;
+	readonly usage: StructuralModuleReachabilityConsumedInputUsage;
+}
+
+interface ConsumedInputLedger {
+	records: number;
+	stringUtf16CodeUnits: number;
+}
+
+interface StructuralModuleReachabilityBuildMeasurements {
+	consumedInputUsage: StructuralModuleReachabilityConsumedInputUsage | null;
+}
+
+function saturatedAdd(left: number, right: number): number {
+	return Math.min(Number.MAX_SAFE_INTEGER, left + right);
+}
+
+function consumedInputCensus(
+	state: ConsumedInputState,
+	ledger: ConsumedInputLedger
+): ConsumedInputCensus {
+	return Object.freeze({
+		state,
+		usage: Object.freeze({
+			basis: state === 'VALID' ? 'EXACT' : 'LOWER_BOUND',
+			records: ledger.records,
+			stringUtf16CodeUnits: ledger.stringUtf16CodeUnits
+		})
+	});
+}
+
 function consumedStringState(
 	value: string,
-	characters: number,
+	ledger: ConsumedInputLedger,
 	maxInputStringCharacters: number
 ): ConsumedInputState {
 	if (!isUnicodeScalarString(value)) return 'INVALID';
-	if (characters + value.length > maxInputStringCharacters) return 'BUDGET_EXCEEDED';
+	const exceedsBudget = value.length > maxInputStringCharacters - ledger.stringUtf16CodeUnits;
+	ledger.stringUtf16CodeUnits = saturatedAdd(ledger.stringUtf16CodeUnits, value.length);
+	if (exceedsBudget) return 'BUDGET_EXCEEDED';
 	return 'VALID';
 }
 
 function expandConsumedArray(
 	value: unknown[],
 	pending: ConsumedInputItem[],
-	records: number,
+	ledger: ConsumedInputLedger,
 	maxInputRecords: number
 ): ConsumedInputState {
 	if (Object.getPrototypeOf(value) !== Array.prototype) return 'INVALID';
 	const length = arrayLength(value);
 	if (length === null) return 'INVALID';
-	if (records + length > maxInputRecords) return 'BUDGET_EXCEEDED';
+	if (length > maxInputRecords - ledger.records) return 'BUDGET_EXCEEDED';
 	const keys = Reflect.ownKeys(value);
 	if (keys.length !== length + 1) return 'INVALID';
 	if (keys.some((key) => typeof key === 'symbol')) return 'INVALID';
@@ -327,13 +376,13 @@ function expandConsumedArray(
 function expandConsumedObject(
 	value: object,
 	pending: ConsumedInputItem[],
-	records: number,
+	ledger: ConsumedInputLedger,
 	maxInputRecords: number
 ): ConsumedInputState {
 	if (Object.getPrototypeOf(value) !== Object.prototype) return 'INVALID';
 	const keys = Reflect.ownKeys(value);
 	if (keys.some((key) => typeof key !== 'string')) return 'INVALID';
-	if (records + keys.length > maxInputRecords) return 'BUDGET_EXCEEDED';
+	if (keys.length > maxInputRecords - ledger.records) return 'BUDGET_EXCEEDED';
 	for (const key of keys) {
 		if (typeof key !== 'string') return 'INVALID';
 		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
@@ -348,7 +397,7 @@ function visitConsumedComposite(
 	value: unknown,
 	pending: ConsumedInputItem[],
 	active: WeakSet<object>,
-	records: number,
+	ledger: ConsumedInputLedger,
 	maxInputRecords: number
 ): ConsumedInputState {
 	if (
@@ -361,16 +410,17 @@ function visitConsumedComposite(
 	if (active.has(value)) return 'INVALID';
 	active.add(value);
 	pending.push({ kind: 'LEAVE', value });
-	if (Array.isArray(value)) return expandConsumedArray(value, pending, records, maxInputRecords);
-	return expandConsumedObject(value, pending, records, maxInputRecords);
+	if (Array.isArray(value)) return expandConsumedArray(value, pending, ledger, maxInputRecords);
+	return expandConsumedObject(value, pending, ledger, maxInputRecords);
 }
 
-function consumedInputBudgetState(
+function measureConsumedInput(
 	inputs: StructuralModuleReachabilityAnalysisInputs,
 	request: StructuralModuleReachabilityAnalysisRequest
-): ConsumedInputState {
+): ConsumedInputCensus {
+	const ledger: ConsumedInputLedger = { records: 0, stringUtf16CodeUnits: 0 };
 	const semanticProjection = projectConsumedSemanticKeys(inputs.semanticSnapshot);
-	if (semanticProjection === null) return 'INVALID';
+	if (semanticProjection === null) return consumedInputCensus('INVALID', ledger);
 	const pending: ConsumedInputItem[] = [
 		{
 			kind: 'VISIT',
@@ -378,36 +428,34 @@ function consumedInputBudgetState(
 		}
 	];
 	const active = new WeakSet<object>();
-	let records = 0;
-	let characters = 0;
 	while (pending.length > 0) {
 		const item = pending.pop()!;
 		if (item.kind === 'LEAVE') {
 			active.delete(item.value);
 			continue;
 		}
-		records += 1;
-		if (records > request.budgets.maxInputRecords) return 'BUDGET_EXCEEDED';
+		const exceedsRecordBudget = 1 > request.budgets.maxInputRecords - ledger.records;
+		ledger.records = saturatedAdd(ledger.records, 1);
+		if (exceedsRecordBudget) return consumedInputCensus('BUDGET_EXCEEDED', ledger);
 		if (typeof item.value === 'string') {
 			const stringState = consumedStringState(
 				item.value,
-				characters,
+				ledger,
 				request.budgets.maxInputStringCharacters
 			);
-			if (stringState !== 'VALID') return stringState;
-			characters += item.value.length;
+			if (stringState !== 'VALID') return consumedInputCensus(stringState, ledger);
 			continue;
 		}
 		const compositeState = visitConsumedComposite(
 			item.value,
 			pending,
 			active,
-			records,
+			ledger,
 			request.budgets.maxInputRecords
 		);
-		if (compositeState !== 'VALID') return compositeState;
+		if (compositeState !== 'VALID') return consumedInputCensus(compositeState, ledger);
 	}
-	return 'VALID';
+	return consumedInputCensus('VALID', ledger);
 }
 
 interface ProjectedNode {
@@ -855,7 +903,8 @@ function consumedInputUnavailable(
 
 function bindPreconditionFailure(
 	boundInputs: StructuralModuleReachabilityAnalysisInputs,
-	request: StructuralModuleReachabilityAnalysisRequest
+	request: StructuralModuleReachabilityAnalysisRequest,
+	measurements: StructuralModuleReachabilityBuildMeasurements
 ): StructuralModuleReachabilityAnalysisBuildOutcome | null {
 	if (!inputIdentitiesReconcile(boundInputs, request))
 		return unavailable(
@@ -863,8 +912,9 @@ function bindPreconditionFailure(
 			'The request, graph, and semantic snapshot identities differ.',
 			'BIND'
 		);
-	const inputBudgetState = consumedInputBudgetState(boundInputs, request);
-	if (inputBudgetState !== 'VALID') return consumedInputUnavailable(inputBudgetState);
+	const inputCensus = measureConsumedInput(boundInputs, request);
+	measurements.consumedInputUsage = inputCensus.usage;
+	if (inputCensus.state !== 'VALID') return consumedInputUnavailable(inputCensus.state);
 	const inputNodeCount = arrayLength(boundInputs.graph.nodes);
 	const inputEdgeCount = arrayLength(boundInputs.graph.edges);
 	if (inputNodeCount === null || inputEdgeCount === null)
@@ -985,7 +1035,8 @@ function constructionValidationUnavailable(
 }
 
 function buildInternal(
-	inputs: StructuralModuleReachabilityAnalysisInputs
+	inputs: StructuralModuleReachabilityAnalysisInputs,
+	measurements: StructuralModuleReachabilityBuildMeasurements
 ): StructuralModuleReachabilityAnalysisBuildOutcome {
 	const closedInputs = essentialInputShell(inputs);
 	if (closedInputs === null)
@@ -1001,7 +1052,7 @@ function buildInternal(
 		return unavailable('REQUEST_INVALID', refusalMessage(error), 'REQUEST');
 	}
 	const boundInputs = { ...closedInputs, request };
-	const bindFailure = bindPreconditionFailure(boundInputs, request);
+	const bindFailure = bindPreconditionFailure(boundInputs, request, measurements);
 	if (bindFailure !== null) return bindFailure;
 	const graphFailure = sourceGraphValidationFailure(boundInputs, request);
 	if (graphFailure !== null) return graphFailure;
@@ -1039,16 +1090,32 @@ function buildInternal(
 	return deepFreeze({ analysis, diagnostics: [], outcome: 'partial' });
 }
 
-export function buildStructuralModuleReachabilityAnalysis(
+/**
+ * Package-internal measured seam for the preliminary report facade. The usage envelope is
+ * out-of-band operational telemetry and is not part of the analysis snapshot, outcome, or digest.
+ * @internal
+ */
+export function buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(
 	inputs: StructuralModuleReachabilityAnalysisInputs
-): StructuralModuleReachabilityAnalysisBuildOutcome {
+): StructuralModuleReachabilityMeasuredBuildOutcome {
+	const measurements: StructuralModuleReachabilityBuildMeasurements = {
+		consumedInputUsage: null
+	};
+	let outcome: StructuralModuleReachabilityAnalysisBuildOutcome;
 	try {
-		return buildInternal(inputs);
+		outcome = buildInternal(inputs, measurements);
 	} catch {
-		return unavailable(
+		outcome = unavailable(
 			'SOURCE_GRAPH_INVALID',
 			'The structural module reachability inputs could not be inspected safely.',
 			'BIND'
 		);
 	}
+	return Object.freeze({ consumedInputUsage: measurements.consumedInputUsage, outcome });
+}
+
+export function buildStructuralModuleReachabilityAnalysis(
+	inputs: StructuralModuleReachabilityAnalysisInputs
+): StructuralModuleReachabilityAnalysisBuildOutcome {
+	return buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage(inputs).outcome;
 }
