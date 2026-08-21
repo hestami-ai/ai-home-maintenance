@@ -311,3 +311,4 @@ JanumiCode/janumiprofessionalworkbench/docs/_canon_draft/_extracts/extract-*.md
 JanumiCode/janumiprofessionalworkbench/docs/ASTs and Code Analysis/records/*
 .turbo/cache
 JanumiCode/janumiprofessionalworkbench/coverage-builder*/
+.codex-tmp/

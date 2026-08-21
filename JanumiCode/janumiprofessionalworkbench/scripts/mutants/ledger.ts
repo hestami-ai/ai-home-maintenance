@@ -2965,7 +2965,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t.filter((r) => r.disposition !== 'SATISFIED')",
 		replace: "\t\t.filter((r) => r.disposition === 'REJECTED')",
 		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
-		why: "THE REALISTIC FAIL-OPEN, not an invented one: narrowing 'anything that is not SATISFIED blocks' to 'only an explicit REJECTED blocks' lets an assessment that is still ASSESSING, or INCONCLUSIVE, or MISSING entirely, pass the de minimis floor. ⚠ THE VICTIM WAS CHOSEN BECAUSE ITS ARRANGEMENT DISCRIMINATES: `assurance-floor-waiver.e2e.ts` stages a blocking floor by leaving the latest reasoning-review assessment in ASSESSING with a BLOCKING observation — deliberately NOT completed to REJECTED — so under this mutation that floor stops blocking and PublishPwa is admitted where the spec asserts refusal. `assurance-floor.e2e.ts` would NOT discriminate: its blocked case is a genuinely REJECTED review, which this mutation still blocks.",
+		why: "THE REALISTIC FAIL-OPEN, not an invented one: narrowing 'anything that is not SATISFIED blocks' to 'only an explicit REJECTED blocks' lets an assessment that is still ASSESSING, or INCONCLUSIVE, or MISSING entirely, pass the de minimis floor. ⚠ THE VICTIM WAS CHOSEN BECAUSE ITS ARRANGEMENT DISCRIMINATES: `assurance-floor-waiver.e2e.ts` stages a blocking floor by leaving the latest reasoning-review assessment in ASSESSING with a BLOCKING observation — deliberately NOT completed to REJECTED — so under this mutation that floor stops blocking and PublishPwa is admitted where the spec asserts refusal. `assurance-floor.e2e.ts` would NOT discriminate: its blocked case is a genuinely REJECTED review, which this mutation still blocks. OBSERVED 2026-08-21: KILLED, and the discrimination held as reasoned.",
 		source: 'REG-F-202 (ASR-3: the de minimis floor is UNCONDITIONAL)'
 	},
 	{
@@ -2974,7 +2974,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t.filter((r) => r.disposition !== 'SATISFIED')",
 		replace: '\t\t.filter(() => true)',
 		expectRed: ['apps/rph-demo/e2e/assurance-floor.e2e.ts'],
-		why: "THE OPPOSITE-POLARITY PAIR, and the one that defends the CONTROL. A gate that blocked unconditionally would satisfy every refusal assertion in the suite — including its sibling's — while making publication impossible for a perfectly satisfied floor. The victim is the spec whose FIRST test drives a clean graph all the way to PUBLISHED, so the kill lands on the admit path rather than on any refusal. ⚠ Same anchor as its sibling by design: the one line IS the decision, and the two mutations fail in opposite directions.",
+		why: "THE OPPOSITE-POLARITY PAIR, and the one that defends the CONTROL. A gate that blocked unconditionally would satisfy every refusal assertion in the suite — including its sibling's — while making publication impossible for a perfectly satisfied floor. The victim is the spec whose FIRST test drives a clean graph all the way to PUBLISHED, so the kill lands on the admit path rather than on any refusal. ⚠ Same anchor as its sibling by design: the one line IS the decision, and the two mutations fail in opposite directions. OBSERVED 2026-08-21: KILLED.",
 		source: 'REG-F-202 (a control needs its own mutant)'
 	},
 	// ── REG-F-041 S-0: an empty composition is not a composition ──────────────────────────────────────────────
