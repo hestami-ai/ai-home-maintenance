@@ -121,11 +121,11 @@ describe('W-3b — the invariant enforcement census', () => {
 	// someone lands evidence — and it can never move DOWN without this reddening.
 	it('the verdicted count is pinned, so the hole cannot quietly change size', () => {
 		const verdicted = new Set(verdicts.map((v) => String(v.limb_id)));
-		expect(verdicted.size, 'limbs carrying a verdict').toBe(65);
+		expect(verdicted.size, 'limbs carrying a verdict').toBe(94);
 		expect(
 			307 - verdicted.size,
 			'limbs still unverdicted — this is the OPEN half of W-3b and it is meant to be large'
-		).toBe(242);
+		).toBe(213);
 	});
 
 	it('every verdict names a limb that exists, exactly once', () => {
@@ -151,14 +151,14 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 12,
-			ENFORCED_BY_CONSTRUCTION: 8,
+			ENFORCED_DRIVEN: 17,
+			ENFORCED_BY_CONSTRUCTION: 10,
 			ENFORCED_MULTI_SITE: 5,
-			PARTIAL_DIVERGENT_FILED: 18,
-			DIVERGENT_UNFILED: 8,
-			UNENFORCED_OBSERVED_ADMISSION: 10,
-			UNENFORCED_DEAD_PREDICATE: 2,
-			UNENFORCED_NO_SHAPE: 2
+			PARTIAL_DIVERGENT_FILED: 21,
+			DIVERGENT_UNFILED: 12,
+			UNENFORCED_OBSERVED_ADMISSION: 22,
+			UNENFORCED_DEAD_PREDICATE: 3,
+			UNENFORCED_NO_SHAPE: 4
 		});
 	});
 
@@ -196,7 +196,15 @@ describe('W-3b — the invariant enforcement census', () => {
 		const owing = verdicts
 			.filter((v) => String(v.verdict) === 'ENFORCED_DRIVEN' && !v.enforcing_anchor)
 			.map((v) => String(v.limb_id));
-		expect(owing).toEqual(['limb:DEC-6:6', 'limb:STA-6:3']);
+		// ⚠ STA-6:3 IS PAID AND DEC-6:6 IS NOT, AND THE DIFFERENCE IS THE POINT. STA-6:3 owed its citation for a
+		// MECHANICAL reason — nobody disputed the site; the row simply named it in prose and never in a field that
+		// resolves. A debt pass re-drove the refusal AND its control, and the control settled more than the debt
+		// asked: it ran under a RAW intent and was ACCEPTED, proving the guard is a SUPERSEDED-only equality test
+		// and not the INTENT_AT_LEAST_PROVISIONAL readiness set. The anchor installed is byte-identical to
+		// enforcement-register.ts:1568's `refusalMarker`, which is load-bearing at runtime (:3951 returns MASKED
+		// when the observed message stops containing it), so a reword reddens a gate instead of orphaning this row.
+		// DEC-6:6 stays owed because its debt is SUBSTANTIVE: its cited site enforces a different DOCUMENT's rule.
+		expect(owing).toEqual(['limb:DEC-6:6']);
 	});
 
 	it('every ENFORCED_DRIVEN anchor that EXISTS resolves EXACTLY ONCE in the file it cites', () => {
@@ -230,7 +238,76 @@ describe('W-3b — the invariant enforcement census', () => {
 		for (const r of rows) {
 			expect(String(r.owed ?? ''), `${String(r.limb_id)} must say what filing it owes`).not.toBe('');
 		}
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(8);
+		// ⚠ 8 -> 12 ACROSS THE DEC/LYR SLICE, and the growth is the arm working rather than failing. Four of the
+		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
+		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
+		// this number would be one where nobody opened the filings it rested on.
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(12);
+	});
+
+	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
+	// PARTIAL_DIVERGENT_FILED makes TWO claims at once — enforcement is partial, AND the divergence is already
+	// recorded somewhere. The second half is the one that lets a row REST: a filed divergence is somebody's
+	// tracked debt, an unfiled one is this programme's. So a row on this arm naming no filing is the same defect
+	// as an ENFORCED_DRIVEN row with no anchor — and unlike that one, it was unguarded until a records pass went
+	// looking. Three rows assert a filing exists without naming it. All three were moved ONTO this arm by a V-0
+	// refuter whose correction argued PARTIALITY and never mentioned a filing at all: the arm's two halves came
+	// apart and only one of them was ever established.
+	// ⚠ THEY ARE PINNED, NOT RECLASSIFIED. Moving them to DIVERGENT_UNFILED would assert that no filing exists —
+	// a claim about a search nobody ran. The honest state is "not yet checked for a filing", which is what this
+	// list says. It shrinks when someone looks, in either direction.
+	it('PARTIAL_DIVERGENT_FILED rows name the filing they rest on, and the three that do not are counted', () => {
+		const unnamed = verdicts
+			.filter((v) => String(v.verdict) === 'PARTIAL_DIVERGENT_FILED')
+			.filter((v) => String(v.filed_as ?? '') === '')
+			.map((v) => String(v.limb_id));
+		expect(unnamed, 'an arm asserting a filing, on a row that names none').toEqual([
+			'limb:STA-4:5',
+			'limb:ASR-14:2',
+			'limb:DEC-6:3'
+		]);
+	});
+
+	// ── ⚠ A REFUTER OVERTURNS A SCALAR; THE ROW IS A NARRATIVE ──────────────────────────────────────────────
+	// The merge step replaces `verdict` and appends `refuter_correction`. EVERY OTHER FIELD — evidence, observed,
+	// census, owed, filed_as — was authored by the LANE to support the arm the refuter just removed, and it stays
+	// behind unmarked, still arguing the superseded case.
+	// `limb:DEC-4:6` is the instance that forced this test, and it is the worst possible one: the arm now says the
+	// engine ACCEPTS softening a MANDATORY security constraint to ADVISORY with no authority, while the row's own
+	// `owed` field opens "FOUR THINGS, none of them a live hole in the prohibition" — written when the arm was
+	// ENFORCED_BY_CONSTRUCTION. Its `observed` transcript likewise shows only the refusals the LANE provoked. A
+	// reader who reads the row rather than the correction gets the opposite conclusion from the one the data holds.
+	// ⚠ AND NO KEYWORD CHECK FINDS THIS. The obvious probe — does an admission transcript contain "ACCEPTED"? —
+	// returns zero offenders here, because every transcript contains both words: the controls are in there too.
+	// That probe is a control that cannot fail. The only thing that separates a live narrative from an orphaned
+	// one is whether the arm MOVED, so that is what the row records.
+	it('a row whose arm the refuter changed records the arm its narrative was written for', () => {
+		const changed = verdicts.filter((v) => v.superseded_verdict !== undefined);
+		for (const v of changed) {
+			expect(String(v.refutation), `${String(v.limb_id)}: only an overturn moves an arm`).toBe('OVERTURNED');
+			expect(String(v.superseded_verdict), `${String(v.limb_id)}`).not.toBe(String(v.verdict));
+			expect(
+				(ARMS as readonly string[]).includes(String(v.superseded_verdict)),
+				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
+			).toBe(true);
+		}
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(9);
+	});
+
+	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
+	// DIVERGENT_UNFILED means NOTHING RECORDS THIS. Seven rows on that arm carried `filed_as` anyway — and the
+	// content was good every time: each named a filing that EXISTS and does NOT cover this limb. That near miss is
+	// worth more than silence, because the next reader who greps the register WILL find that filing, and without
+	// this note they will close the row on it. The content stays; the name stops contradicting the arm.
+	it('DIVERGENT_UNFILED rows carry no filed_as — a near miss is recorded as a near miss', () => {
+		const bad = verdicts
+			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED' && v.filed_as !== undefined)
+			.map((v) => String(v.limb_id));
+		expect(bad, 'filed_as on an UNFILED arm asserts the opposite of the row it sits on').toEqual([]);
+		expect(
+			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
+			'filings that exist and do NOT cover their limb'
+		).toBe(7);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -281,7 +358,13 @@ describe('W-3b — the invariant enforcement census', () => {
 	it('the refutation tally is pinned, so an unrun refuter stage cannot read as a run one', () => {
 		const tally: Record<string, number> = {};
 		for (const v of verdicts) tally[String(v.refutation)] = (tally[String(v.refutation)] ?? 0) + 1;
-		expect(tally).toEqual({ HELD: 17, OVERTURNED: 16, UNREFUTED: 32 });
+		// ⚠ THE OVERTURN RATE ACROSS THE THREE V-1 SLICES, MEASURED RATHER THAN HOPED: STA 3/12 = 25%, OBJ/REL
+		// 5/19 = 26%, DEC/LYR 8/29 = 28%. Against V-0's 11/14 = 79%. The difference is not that the later lanes
+		// were better staffed — it is that their prompts carried the MEASURED error modes WITH INSTANCES (the
+		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
+		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
+		// and not of the families audited.
+		expect(tally).toEqual({ HELD: 38, OVERTURNED: 24, UNREFUTED: 32 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
@@ -303,7 +386,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(new Set(roster.map((r) => String(r.origin)))).toEqual(new Set(['census:w2-doc-extraction']));
 		expect(new Set(limbs.map((l) => String(l.rule)))).toEqual(new Set(['w3b-limb-split/1.0.0']));
 		expect(new Set(verdicts.map((v) => String(v.method)))).toEqual(
-			new Set(['w3b-lane:v0-trial', 'w3b-lane:v1-sta', 'w3b-lane:v1-objrel'])
+			new Set(['w3b-lane:v0-trial', 'w3b-lane:v1-sta', 'w3b-lane:v1-objrel', 'w3b-lane:v1-declyr'])
 		);
 	});
 });
