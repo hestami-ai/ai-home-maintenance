@@ -496,6 +496,20 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 - [ ] **REG-F-120 residue** — see Dispositions below; only the orphaned-docstring hunt remained
   performable, worked 2026-08-20.
 
+- [ ] **⚠ CSAA's SUITE IS NOT RELIABLE UNDER PARALLEL FILE EXECUTION — MEASURED 2026-08-21, and it makes every
+  full-gate run's CSAA result untrustworthy.** Three consecutive `vitest run packages/csaa` invocations over
+  IDENTICAL code produced **5, then 6, then 7** failures with **different members each time**
+  (`build-command-handler-graph`, `build-call-graph`, `guard-classification-overlay-encoding-coverage`,
+  `inventory`, the guard-ledger provider). Every one of them passes when run ALONE. Re-run with
+  `--no-file-parallelism`: **83 of 84 files pass, 1374 tests**, and the ONLY red is the separately-verified
+  pre-existing `subject.test.ts`. **A failure set that is not stable across runs of unchanged code is not a
+  failure of the code** — these are heavy TypeScript-program tests contending for the same resources.
+  ⚠ **THE COST IS MIS-ATTRIBUTION, AND IT ALREADY HAPPENED ONCE:** on this evidence I reported three baselines
+  broken by S-1a; exactly ONE was. Running each in isolation cost two minutes and moved the count from three to
+  one. Until this is fixed, **no CSAA failure from a parallel full-suite run may be attributed to a change
+  without first re-running that file alone.** CSAA agent's under the standing scope rule — recorded here so the
+  next person does not repeat the mis-attribution.
+
 - [ ] **⚠ PRE-EXISTING RED, NOT OURS — `packages/csaa/src/subject/subject.test.ts` "matches the confirmed public
   TypeScript root populations"** fails with `expected 16 to be 8` for `scripts/tsconfig.json`. **Verified
   pre-existing by stashing:** it reproduces at HEAD with every working-tree change removed, so it is not a
