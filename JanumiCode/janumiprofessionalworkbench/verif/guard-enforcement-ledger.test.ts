@@ -57,9 +57,9 @@ const COUNTS = {
 	// next increment then ENFORCED the guard and re-drove the row (45->44, 14->15) — *"the way to move it is to
 	// enforce a guard and re-drive its row, never to reclassify one"*, done in that order rather than claimed.
 	ARROW_UNREACHABLE: 20,
-	ENFORCED: 16,
+	ENFORCED: 18,
 	REDUNDANT_WITH_MACHINE: 2,
-	UNENFORCED: 44
+	UNENFORCED: 42
 };
 
 describe('C-0b — every declared arrow guard is classified, and the ledger is pinned', () => {

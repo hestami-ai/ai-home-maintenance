@@ -1575,6 +1575,54 @@
 			]
 		},
 		{
+			"commandType": "BeginPwuRecomposition",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+			"emitsEvent": "PwuRecompositionBegun",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "SATISFIED",
+			"drivesTo": "RECOMPOSING",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-21, under REG-D-029 / REG-D-044 S-1b). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. Do NOT treat this sourceSection as proof the shape is ratified: REG-D-029 grants authoring, NOT ratification. \u26a0 ON THE NAME. DOC-002 \u00a78.1 labels this arrow's act \"Begin recomposition\", and DOC-002 \u00a734.1 lists a bare verb `beginRecomposition` -- but \u00a734.1 assigns NO target object to ANY verb, and \u00a78.1's Command column routinely names acts owned by other aggregates (\"Promote baseline\" sits on the PWU's -> BASELINED arrow while `promoteBaseline` drives Baseline.status). `BeginRecomposition` is therefore kept for the CONTRACT hop it already performs and this PWU act is named distinctly, exactly as `BaselinePwu` was minted beside `promoteBaseline`. Both names appear in REG-F-085's own body.",
+			"payloadFields": [
+				{
+					"field": "recompositionContractId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref to the RecompositionContract naming this PWU as `parentWorkUnitId`. REQUIRED and deliberately NOT derived by search: DOC-002 \u00a78.1's trigger for this arrow is \"Parent exists and recomposition is required\", and BOTH conjuncts are checked against THIS contract -- it must name this PWU as parent (REG-Q-028's safe default: recomposition is parent-owned, the contract holder) and it must require at least one child. \u26a0 REG-Q-028 IS OPEN: which PWU carries RECOMPOSING/RECOMPOSED is unstated and \"state-machine implementations must not invent it\". This field ENFORCES the recorded safe default; it does not answer the question."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 \u00a737 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
+			"commandType": "CompletePwuRecomposition",
+			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+			"emitsEvent": "PwuRecomposed",
+			"drivesMachine": "PWU.workLifecycleState",
+			"drivesFrom": "RECOMPOSING",
+			"drivesTo": "RECOMPOSED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-21, under REG-D-029 / REG-D-044 S-1b). DOC-007 schematizes NO interface for this command; these fields are AUTHORED. Do NOT treat this sourceSection as proof the shape is ratified. \u26a0 THIS COMMAND IS THE REASON REG-F-085 BLOCKED FOR TWELVE DAYS. DOC-002 \u00a78.1 guards this arrow on \"Recomposition contract satisfied\", and until S-1a NOTHING could drive RecompositionContract.status to SATISFIED -- so REG-F-085 recorded that a build agent's only two ways out were both forbidden: ship a command that can never fire, or accept COMPOSABLE and silently weaken a ratified guard. REG-D-044 Ruling 1 settled that the guard means the ENUM LITERAL (\u00a78.1's other cross-object rows cite enum literals in lowercase participle form), and S-1a's `AcceptRecomposition` made SATISFIED reachable. The guard is therefore enforced literally here, with no COMPOSABLE fallback and no disclosure carve-out.",
+			"payloadFields": [
+				{
+					"field": "recompositionContractId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref to the RecompositionContract whose `status` must read the enum literal SATISFIED and whose `parentWorkUnitId` must be this PWU. \u26a0 NOT COMPOSABLE: that is the CANDIDATE state (JPWB-DOC-001 -- recompose creates \"candidate parent state subject to assessment and decision\"), and accepting it would substitute \"no contradiction found\" for \"contract satisfied\" -- the substitution class open as REG-F-076."
+				},
+				{
+					"field": "supportingObjectIds",
+					"required": false,
+					"type": "string[]",
+					"note": "DOC-002 \u00a737 control-action record: evidence/observations considered."
+				}
+			]
+		},
+		{
 			"commandType": "UnblockPwu",
 			"targetAggregateType": "PROFESSIONAL_WORK_UNIT",
 			"emitsEvent": "PwuUnblocked",
@@ -1917,9 +1965,9 @@
 			"commandType": "BeginRecomposition",
 			"targetAggregateType": "RECOMPOSITION_CONTRACT",
 			"emitsEvent": "RecompositionStarted",
-			"drivesMachine": "PWU.workLifecycleState",
-			"drivesFrom": "SATISFIED",
-			"drivesTo": "RECOMPOSING",
+			"drivesMachine": "RecompositionContract.status",
+			"drivesFrom": "READY|CONFLICTED|INSUFFICIENT",
+			"drivesTo": "EVALUATING",
 			"schematized": false,
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (beginRecomposition)",
 			"payloadFields": [
@@ -1935,9 +1983,9 @@
 			"commandType": "CompleteRecomposition",
 			"targetAggregateType": "RECOMPOSITION_CONTRACT",
 			"emitsEvent": "RecompositionCompleted",
-			"drivesMachine": "PWU.workLifecycleState",
-			"drivesFrom": "RECOMPOSING",
-			"drivesTo": "RECOMPOSED",
+			"drivesMachine": "RecompositionContract.status",
+			"drivesFrom": "EVALUATING",
+			"drivesTo": "COMPOSABLE|CONFLICTED|INSUFFICIENT",
 			"schematized": false,
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (completeRecomposition)",
 			"payloadFields": [
@@ -6002,6 +6050,46 @@
 			]
 		},
 		{
+			"eventType": "PwuRecompositionBegun",
+			"aggregateType": "ProfessionalWorkUnit",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-21, under REG-D-029 / REG-D-044 S-1b), precedent REG-D-032's `PwuEscalated` -- the ACT is ratified (DOC-002 \u00a78.1 carries the arrow and its trigger VERBATIM) and only the contract shape was missing. Do NOT treat this sourceSection as proof the shape is ratified. \u26a0 NAMED `PwuRecompositionBegun` RATHER THAN `PwuRecompositionStarted` ON PURPOSE: the latter would CONTAIN the live event name `RecompositionStarted` as a substring, and this repository has substring-matching readers -- mutation-ledger anchors, verif/recomposition-ungoverned's `indexOf` control, and the dispatch census's literal scan. A containment relation between two live event names is a latent ambiguity in every one of them.",
+			"payloadFields": [
+				{
+					"field": "recompositionContractId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref; the contract this move cites. Carried on the EVENT because command_receipts stores only a payload_hash -- the event is the only place the citation survives."
+				},
+				{
+					"field": "workLifecycleState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "SATISFIED -> RECOMPOSING. \u26a0 THE FIELD NAME IS LOAD-BEARING: packages/rph-projections/src/pwu-replay.ts's named-event group reads `p.workLifecycleState`. `PwuBaselined` declares `newState` instead and needed its own fold case; matching the group is what lets this event join it."
+				}
+			]
+		},
+		{
+			"eventType": "PwuRecomposed",
+			"aggregateType": "ProfessionalWorkUnit",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-21, under REG-D-029 / REG-D-044 S-1b), precedent REG-D-032's `PwuEscalated`. The ACT is ratified (DOC-002 \u00a78.1: RECOMPOSING -> RECOMPOSED, guard \"Recomposition contract satisfied\"); only the contract shape was missing. Do NOT treat this sourceSection as proof the shape is ratified. \u26a0 THE \u00a726 GOLDEN TRACE NEVER OCCUPIES RECOMPOSING OR RECOMPOSED -- it moves the CONTRACT to SATISFIED and goes straight to a Decision and a Baseline. So this event is authored for a ratified arrow the worked scenario does not exercise, which is why it needs an EXPLICIT_DRIVE_SITE rather than seed coverage.",
+			"payloadFields": [
+				{
+					"field": "recompositionContractId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref; the SATISFIED contract this move cites. The event is the only durable record of WHICH contract discharged the guard."
+				},
+				{
+					"field": "workLifecycleState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "WorkLifecycleStateSchema",
+					"note": "RECOMPOSING -> RECOMPOSED. Same field name as every named PWU event except PwuBaselined, for the fold reason recorded on PwuRecompositionBegun."
+				}
+			]
+		},
+		{
 			"eventType": "PwuUnblocked",
 			"aggregateType": "ProfessionalWorkUnit",
 			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-16, under REG-D-029 / REG-D-043 / JAN-PWUWP W-5.5). The ACT is RULED: the sponsor ruled directly that a recovery act EXISTS for BLOCKED and ESCALATED rather than declaring them closed (REG-D-043), which is what REG-F-083 had declined to decide — \"authoring a SHAPE for a ratified act is not the same as authoring a new ACT\". The ARROWS are DERIVED from §8.2 reversed, not invented. The SHAPE below is AUTHORED: do NOT treat this sourceSection as proof it is ratified. ⚠ THIS IS NOT A §5.2 GOVERNANCE ACT, and it carries NO authority guard for the same reason BlockPwu and EscalatePwu carry none: §5.2 reserves waiver, risk acceptance, rejection, abandonment and promotion, and recovery is none of them. Making trouble easy to report and its resolution hard to record would be the same defect wearing the opposite costume.",
@@ -6460,7 +6548,7 @@
 					"required": false,
 					"type": "enum",
 					"enumRef": "WorkLifecycleStateSchema",
-					"note": "parent PWU RECOMPOSING->RECOMPOSED"
+					"note": "parent PWU RECOMPOSING->RECOMPOSED \u26a0 PERMANENTLY DEAD AS OF 2026-08-21 (REG-D-044 S-1b) AND KEPT ONLY SO THE ABSENCE IS EXPLICIT. The parent PWU's move is now recorded by its own events, `PwuRecompositionBegun` / `PwuRecomposed`. Populating this field would make one event carry two aggregates' state -- the AGG-1 violation REG-F-046 records this repository has NO remedy tier for. Do NOT wire it."
 				}
 			]
 		},
@@ -6569,7 +6657,7 @@
 					"required": false,
 					"type": "enum",
 					"enumRef": "WorkLifecycleStateSchema",
-					"note": "parent PWU SATISFIED->RECOMPOSING"
+					"note": "parent PWU SATISFIED->RECOMPOSING \u26a0 PERMANENTLY DEAD AS OF 2026-08-21 (REG-D-044 S-1b) AND KEPT ONLY SO THE ABSENCE IS EXPLICIT. The parent PWU's move is now recorded by its own events, `PwuRecompositionBegun` / `PwuRecomposed`. Populating this field would make one event carry two aggregates' state -- the AGG-1 violation REG-F-046 records this repository has NO remedy tier for. Do NOT wire it."
 				}
 			]
 		},
@@ -8056,18 +8144,18 @@
 		{
 			"commandType": "BeginRecomposition",
 			"eventType": "RecompositionStarted",
-			"machine": "PWU.workLifecycleState",
-			"from": "SATISFIED",
-			"to": "RECOMPOSING",
-			"note": "DOC-002-only; also RecompositionContract.status READY->EVALUATING"
+			"machine": "RecompositionContract.status",
+			"from": "READY | CONFLICTED | INSUFFICIENT",
+			"to": "EVALUATING",
+			"note": "REG-F-082 CLOSED 2026-08-21 (S-1b). This row read `PWU.workLifecycleState SATISFIED -> RECOMPOSING` and the handler has always driven the CONTRACT, saying so verbatim in its own comment. \u26a0 THE ROW WAS NOT A FALSE ATTRIBUTION AND ITS FIRST PRESCRIBED REMEDY WAS STRUCK BEFORE IT WAS APPLIED: relocating it unchanged would have named `RECOMPOSING` on a machine that has no such state. The ratified trigger DOES name `beginRecomposition` on the PWU arrow -- and that record is not lost, it lives in m2-transitions.json / transitions.data.ts, which C-0d reads as its third independent witness. The PWU half is now carried by `BeginPwuRecomposition` below: four rows, not two relocated ones."
 		},
 		{
 			"commandType": "CompleteRecomposition",
 			"eventType": "RecompositionCompleted",
-			"machine": "PWU.workLifecycleState",
-			"from": "RECOMPOSING",
-			"to": "RECOMPOSED",
-			"note": "DOC-002-only; also RecompositionContract.status EVALUATING->SATISFIED"
+			"machine": "RecompositionContract.status",
+			"from": "EVALUATING",
+			"to": "COMPOSABLE | CONFLICTED | INSUFFICIENT",
+			"note": "REG-F-082 CLOSED 2026-08-21 (S-1b) -- see the BeginRecomposition row. \u26a0 THIS NOTE WAS ALSO STALE IN ITS OWN RIGHT: it read \"also RecompositionContract.status EVALUATING->SATISFIED\", but `completeRecomposition` targets COMPOSABLE/CONFLICTED/INSUFFICIENT. `EVALUATING -> SATISFIED` was never this command's arrow, and COMPOSABLE -> SATISFIED is `AcceptRecomposition`'s (S-1a)."
 		},
 		{
 			"commandType": "InvalidateEvidence",
@@ -8308,6 +8396,22 @@
 			"from": "SATISFIED | RECOMPOSED",
 			"to": "BASELINED",
 			"note": "JAN-PWUWP W-4.5. Both in-arrows are one act. There was NO binding for -> BASELINED at all before this: the arrow was performed only by the generic setter, whose rejectUnbackedBaselining guard has moved here."
+		},
+		{
+			"commandType": "BeginPwuRecomposition",
+			"eventType": "PwuRecompositionBegun",
+			"machine": "PWU.workLifecycleState",
+			"from": "SATISFIED",
+			"to": "RECOMPOSING",
+			"note": "REG-D-044 S-1b. The PWU half of REG-F-082's four rows. Guard is DOC-002 \u00a78.1's trigger read literally in both conjuncts: a RecompositionContract naming this PWU as parent (REG-Q-028 safe default) that requires at least one child."
+		},
+		{
+			"commandType": "CompletePwuRecomposition",
+			"eventType": "PwuRecomposed",
+			"machine": "PWU.workLifecycleState",
+			"from": "RECOMPOSING",
+			"to": "RECOMPOSED",
+			"note": "REG-D-044 S-1b. Guard is DOC-002 \u00a78.1's \"Recomposition contract satisfied\" read as the ENUM LITERAL, which only became reachable when S-1a wired the acceptance."
 		},
 		{
 			"commandType": "BlockPwu",

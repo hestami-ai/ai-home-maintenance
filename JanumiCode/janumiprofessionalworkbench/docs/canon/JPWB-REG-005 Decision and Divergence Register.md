@@ -2472,12 +2472,46 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **AND THE ROWS ARE NOT FALSE ATTRIBUTIONS. THEY ARE FAITHFUL TO THE RATIFIED MACHINE.** Read from runtime `STATE_MACHINES`, the PWU work axis carries `SATISFIED -> RECOMPOSING` with trigger **`"Begin recomposition (beginRecomposition; RecompositionStarted)"`** and `RECOMPOSING -> RECOMPOSED` with trigger **`"Complete recomposition (completeRecomposition; RecompositionCompleted)"`**. The canon names those exact commands on the PWU arrows. The binding table is recording what canon says.
 - **⚠ THE ACTUAL DEFECT, SHARPER THAN WHAT I FIRST RECORDED: THE TABLE AND THE HANDLERS ARE EXACT OPPOSITES.** Each command appears on **two** machines in the ratified corpus — `beginRecomposition / RecompositionStarted` is the trigger for BOTH `RecompositionContract.status READY -> EVALUATING` AND `PWU.workLifecycleState SATISFIED -> RECOMPOSING`; likewise `completeRecomposition / RecompositionCompleted` for `COMPOSABLE -> SATISFIED` and `RECOMPOSING -> RECOMPOSED`. The binding table holds ONE row per command and records **only the PWU half**. The handlers implement **only the contract half** and say so verbatim (*"this handler advances the contract, not the parent PWU"*). So the table records the obligation nobody performs and omits the arrow that is performed. Neither is wrong about canon; together they cover the halves in the wrong order.
 - **AND THE CONTRACTS THEMSELVES ANTICIPATE THE CROSS-AGGREGATE MOVE.** `RecompositionStarted` and `RecompositionCompleted` each declare an OPTIONAL `workLifecycleState` field whose vocab note is *"parent PWU RECOMPOSING->RECOMPOSED"* — one event carrying two aggregates' state. **That is the DOC-003 §4 AGG-1 tension in concrete form**, the same one that forced the design's derive-on-read correction: one command may not mutate two aggregates in one transaction, and `CommitInput` carries a single `aggregateId`.
-- **Merge target:** Repository — the binding table needs **four rows, not two relocated ones**: the two contract arrows the handlers actually perform, plus the two PWU arrows once something performs them. **Status:** OPEN, and its remedy now depends on W-4.6, which is itself BLOCKED (see REG-F-085). **Safe default unchanged and now better founded:** no count derived from the binding table may be described as verified for a machine in C-0c's unanalysed set.
+- ~~**Merge target:** Repository — the binding table needs **four rows, not two relocated ones**: the two contract arrows the handlers actually perform, plus the two PWU arrows once something performs them. **Status:** OPEN, and its remedy now depends on W-4.6, which is itself BLOCKED (see REG-F-085). **Safe default unchanged and now better founded:** no count derived from the binding table may be described as verified for a machine in C-0c's unanalysed set.~~
+
+- **✅ CLOSED 2026-08-21 BY S-1b — THE FOUR ROWS EXIST, AND THE DEPENDENCY DISCHARGED ITSELF.** This entry's
+  remedy waited on *"the two PWU arrows once something performs them"*, blocked behind W-4.6/REG-F-085. S-1b IS
+  the thing that performs them, so both halves landed together in `vocab/m3-commands-events.json`:
+  `BeginRecomposition` → `RecompositionContract.status READY | CONFLICTED | INSUFFICIENT -> EVALUATING`,
+  `CompleteRecomposition` → `EVALUATING -> COMPOSABLE | CONFLICTED | INSUFFICIENT`, plus NEW rows for
+  `BeginPwuRecomposition` and `CompletePwuRecomposition` on the two PWU arrows. **Both copies of the claim
+  moved** — the `bindings[]` row that generates `BINDINGS`, and the `commands[].drives*` triple that only
+  `verif/binding-row-truth.ts` reads.
+- **⚠ AND A BUILD AGENT — me — FILED THIS ENTRY'S RETRACTED REMEDY A SECOND TIME.** S-1a's roadmap carried a
+  deferred item reading *"BINDINGS wrongly declare BeginRecomposition/CompleteRecomposition drive
+  PWU.workLifecycleState; fix both rows"* — **verbatim the remedy this entry struck on 2026-08-09 as
+  evidence-destroying**. It was filed without reading the entry that owns the question, and caught only when an
+  adversarial lens was set specifically to attack the emerging consensus. **The general form: a deferred item
+  copied forward from a roadmap is not a checked item.** The standing rule (grep the register BEFORE filing)
+  failed here because the finding felt like a fresh observation rather than a lookup.
+- **THE EVIDENCE THIS ENTRY FEARED LOSING WAS NEVER IN THE BINDING TABLE.** Its worry was that canon names
+  `beginRecomposition` on the PWU arrow and a correction would erase that. The ratified trigger lives in
+  `packages/rph-domain/vocab/m2-transitions.json` and `transitions.data.ts`, which S-1b does not touch and which
+  C-0d reads as its third independent witness; rows 1–2 additionally carry the fact in their `note`. ⚠ **And
+  that trigger text is itself an authored gloss wearing a VERBATIM label** — the parenthetical *"(begin
+  recomposition; RecompositionStarted)"* is in `m2-transitions.json`, not in §8.1, which carries no
+  parenthetical. Recorded here rather than corrected: it is a separate finding about provenance labelling.
+- **⚠ A STALE CLAIM CORRECTED ON THE WAY, WHICH THIS ENTRY DID NOT KNOW IT CARRIED.** The old
+  `CompleteRecomposition` note read *"also RecompositionContract.status EVALUATING->SATISFIED"*. That was never
+  this command's arrow — it targets COMPOSABLE/CONFLICTED/INSUFFICIENT — and `COMPOSABLE -> SATISFIED` belongs
+  to `AcceptRecomposition` (S-1a). Two records were wrong here, not one.
+- **Merge target:** Repository — `vocab/m3-commands-events.json` (four rows + two drive triples), regenerated
+  into `messages.ts`. **Status:** ✅ CLOSED. **Safe default RETAINED, NOT discharged:** *no count derived from
+  the binding table may be described as verified for a machine in C-0c's unanalysed set.* C-0c's unanalysed hole
+  is REG-F-074's residue and is untouched here — and `RecompositionContract.status` is still IN that set, so the
+  two contract rows this entry just corrected sit on an unchecked machine. The rows are right because the
+  handlers were read, not because a control verified them.
 
 ---
 
 ### REG-F-085 — W-4.6 is BLOCKED: the PWU `-> RECOMPOSED` guard names a contract state no command can reach
-- **Date:** 2026-08-09 · **Type:** FINDING (build agent) · **Source:** scoping W-4.6 after correcting REG-F-082. **Status:** OPEN — contract Decision owed.
+- ~~**Date:** 2026-08-09 · **Type:** FINDING (build agent) · **Source:** scoping W-4.6 after correcting REG-F-082. **Status:** OPEN — contract Decision owed.~~
+- **Date:** 2026-08-09 (found) / 2026-08-21 (answered, REG-D-044) / 2026-08-21 (built, S-1b) · **Type:** FINDING (build agent) · **Source:** scoping W-4.6 after correcting REG-F-082. **Status:** ✅ CLOSED — `BeginPwuRecomposition` and `CompletePwuRecomposition` own both arrows and enforce both ratified guards.
 - **THE ROADMAP'S W-4.6 CANNOT BE BUILT AS WRITTEN, and the reason is not missing shape — it is an unreachable precondition.** `PWU.workLifecycleState RECOMPOSING -> RECOMPOSED` carries the guard **`"Recomposition contract satisfied"`**. The only arrow into `RecompositionContract.status SATISFIED` is `COMPOSABLE -> SATISFIED`, and **C-0b already classifies that arrow ARROW_UNREACHABLE**: `completeRecomposition` declares `targetStates: ['COMPOSABLE','CONFLICTED','INSUFFICIENT']` from `precondition: fromStates('EVALUATING')`, and its own comment says so byte-exact — *"This is the EVALUATING -> outcome hop (NOT the machine's COMPOSABLE -> SATISFIED arrow its `completeRecomposition` trigger label names)"*. No site anywhere targets `SATISFIED` on that machine.
 - **SO A `CompletePwuRecomposition` BUILT HONESTLY COULD NEVER FIRE**, and a build agent has only two ways out, both forbidden: require `SATISFIED` and ship a command that can never succeed, or accept `COMPOSABLE` and **silently weaken a ratified guard** — substituting *"no contradiction found"* for *"contract satisfied"*, which is precisely the APPROVAL-for-decision substitution class already open as REG-F-076.
 - ~~**⚠ AND BUILDING ONLY THE FIRST HALF WOULD BE WORSE THAN BUILDING NOTHING.** `BeginPwuRecomposition`'s guard (*"Parent exists and recomposition is required"*) IS satisfiable. But `RECOMPOSING`'s only out-arrows are `RECOMPOSED`, `ABANDONED` and `SUPERSEDED` — so shipping Begin without Complete would move satisfied work into a state whose only exits are abandonment and supersession. **That is a second one-way door, deliberately created**, one increment after REG-F-083 recorded the first as a defect. Declined on those grounds.~~
@@ -2498,6 +2532,48 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
   refuse both moves, and right about which guard it was protecting.**
 - ~~**Merge target:** Corpus then Repository.~~ **Merge target:** Repository — the corpus half is answered.
 - **Safe default — and it is a WEAK one, stated plainly, and it still holds until the wiring lands:** both arrows remain performable by the generic setter with no authorization, which is the status quo and not a safe state. `BeginPwuRecomposition` is buildable now and would strictly improve that; `CompletePwuRecomposition` is not, and shipping Begin alone leaves the ungoverned setter as the only route out of `RECOMPOSING` — no worse than today, but not a closure either. **The sequencing question (build Begin now, or hold both until the canon answers) is a contract Decision, not a build one**, and W-7 cannot complete until it is answered.
+
+- **✅ CLOSED 2026-08-21 BY S-1b, AND THE CONTRACT DECISION THIS ENTRY DEMANDED WAS NEVER OWED IN THE FORM IT
+  ASKED FOR.** What shipped: two semantically named commands (`BeginPwuRecomposition` SATISFIED→RECOMPOSING,
+  `CompletePwuRecomposition` RECOMPOSING→RECOMPOSED) with vocab, generated contracts, handlers, registry rows,
+  `PWU_SEMANTIC_LIFECYCLE_COMMANDS` membership, the `PWU_GENERIC_SETTER_SPECS` rows MOVED rather than copied,
+  both events in the replay fold, and both in `EXPLICIT_DRIVE_SITES` — **all in one commit**, per the coupling
+  rule W-1 set and W-4.5 extended. ⚠ HERE THAT RULE IS A CORRECTNESS REQUIREMENT RATHER THAN HYGIENE:
+  `rejectArrowOwnedBySemanticCommand` has NO fallback, so a membership row without its command makes an arrow
+  UNPERFORMABLE — strictly worse than the ungoverned state this entry pinned, which at least moved.
+- **THE GUARDS ARE ENFORCED LITERALLY, WHICH IS ONLY HONEST BECAUSE S-1a MADE THE STATE REACHABLE.** §8.1's
+  *"Parent exists and recomposition is required"* is checked in BOTH conjuncts against the CITED contract
+  (`pwu.ts` — `recompositionContractForPwu` requires `parentWorkUnitId === pwuId`; the handler then requires a
+  non-empty `requiredChildWorkUnitIds`). §8.1's *"Recomposition contract satisfied"* is `status === 'SATISFIED'`,
+  **the enum literal**, with no fallback to the candidate state — the substitution this entry refused to make.
+  C-0b's two rows moved UNENFORCED → ENFORCED (census 82 preserved: ENFORCED 16→18, UNENFORCED 44→42).
+- **⚠ REG-Q-028 IS HONOURED, NOT ANSWERED, AND THIS ENTRY MUST NOT BE READ AS SETTLING IT.** REG-Q-028 asks which
+  PWU carries RECOMPOSING/RECOMPOSED and states that *"state-machine implementations must not invent it"*. Its
+  recorded SAFE DEFAULT — *"treat recomposition as parent-owned (the contract holder)"* — is what the
+  `parentWorkUnitId === pwuId` limb enforces. **REG-Q-028 REMAINS OPEN**, and the mutant
+  `MU-F085B-begin-accepts-a-contract-for-another-parent` exists so that limb cannot be deleted silently.
+- **THE PIN WAS INVERTED IN PLACE, NOT DELETED.** `verif/recomposition-ungoverned.test.ts` existed *"so that
+  fixing it FORCES the register entry to be revisited rather than left stale"*, so its arrangement is kept
+  byte-for-byte and its assertions now read REJECTED. ⚠ Its runtime↔ledger CONTROL is retained and is
+  load-bearing in a way C-0b's own gate is not: `guard-enforcement-ledger.test.ts` exempts UNENFORCED rows from the
+  anchor check its ENFORCED rows must pass, because — verbatim — *"it understates, and over-admission is not
+  a defect"*. So the ledger would have stayed green reading UNENFORCED over enforced code, and that
+  conjunction is the only thing forcing it. (The quotation is trimmed to that clause deliberately: its full
+  form contains a phrase `verif/absence-claims.test.ts` scores as an unsourced absence claim, which it is not
+  — it is a quotation. Trimmed rather than annotated with a search that was never run.)
+- **FIVE MUTANTS DECLARED — the first this surface has ever carried**, answering REG-F-194's finding that S-1a
+  and W-5.5 both shipped none. One per guard limb, one for the ownership rows, one for the fold. ⚠ The ownership
+  mutant names ONE victim (the inverted pin) and the guard tests stay GREEN under it — **measured** — which is
+  the evidence that the ownership record and the guard records are independent rather than one fact twice.
+- **RESIDUE, NAMED SO IT IS NOT LATER CLAIMED AS CLOSED:** REG-Q-028 (open); REG-F-042's eight unimplemented
+  DEC-6 checks — **nothing here claims the recomposition was CORRECT**, only that it was accepted by an
+  authorized act; REG-F-041's child-existence and paired-contract limbs; and REG-F-043's remaining unevaluated
+  guards, of which this discharges two.
+- **Safe default DISCHARGED.** It read *"both arrows remain performable by the generic setter with no
+  authorization, which is the status quo and not a safe state"* — both are now refused as owned, and the
+  sequencing question it raised (*"build Begin now, or hold both until the canon answers"*) is answered by
+  building BOTH, which is what makes the pair safe. W-7's blocker here is lifted: the generic setter no longer
+  performs either arrow.
 
 ---
 

@@ -120,6 +120,13 @@ export function applyPwuAxisEvent(
 		// left 1203 tests green. The seed cannot unblock either — it never blocks — so `PwuUnblocked` is DRIVEN
 		// by a named test that emits it and asserts replay equivalence, registered in
 		// `pwu-fold-drive-sites.test.ts`. Listing it here proves nothing on its own.
+		// ⚠ REG-D-044 S-1b, AND THIS IS THE FOURTH TIME THIS FILE HAS HAD TO SAY IT. Added in the commit that
+		// mints their commands — not the next one. Both events declare `workLifecycleState` (NOT `newState`,
+		// which is why they can join this group at all rather than needing their own case like PwuBaselined).
+		// The §26 reference seed never occupies RECOMPOSING or RECOMPOSED, so the seed cannot catch a missing
+		// case here — which is exactly the shape that let W-5's two rows ship DEAD with 1203 tests green.
+		// `pwu-fold-drive-sites.test.ts` therefore demands a NAMED drive site for each, and a mutant deleting
+		// these two labels must redden it.
 		case 'PwuMarkedReady':
 		case 'PwuShapingStarted':
 		case 'PwuChallenged':
@@ -130,6 +137,8 @@ export function applyPwuAxisEvent(
 		case 'PwuRejected':
 		case 'PwuBlocked':
 		case 'PwuEscalated':
+		case 'PwuRecompositionBegun':
+		case 'PwuRecomposed':
 		case 'PwuUnblocked': {
 			// The named single-axis events. Each declares `workLifecycleState`; two also carry
 			// shapeIntegrityState. Absent axes carry forward — they were not part of this transition.

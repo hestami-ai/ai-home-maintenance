@@ -143,6 +143,10 @@ describe('validate', () => {
 		// 354 -> 356 (2026-08-21, REG-D-044 / S-1a): `AcceptRecompositionPayload` and
 		// `RecompositionAcceptedPayload` — the command that drives RecompositionContract.status
 		// COMPOSABLE->SATISFIED, the arrow that had no driver and therefore blocked REG-F-085.
-		expect(buildContractRegistry().ids()).toHaveLength(356);
+		// 356 -> 360 (2026-08-21, REG-D-044 S-1b): `BeginPwuRecompositionPayload`,
+		// `CompletePwuRecompositionPayload`, `PwuRecompositionBegunPayload`, `PwuRecomposedPayload`. +4
+		// rather than +2 because BOTH commands mint a new event shape; a command reusing an existing
+		// payload moves this by less (REG-F-131's `IntentSupersededPayload` moved it by 1).
+		expect(buildContractRegistry().ids()).toHaveLength(360);
 	});
 });

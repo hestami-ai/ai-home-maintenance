@@ -14,12 +14,14 @@ import {
 import {
 	abandonPwu,
 	baselinePwu,
+	beginPwuRecomposition,
 	blockPwu,
 	beginPwuShaping,
 	challengePwu,
 	changePwuState,
 	invalidatePwu,
 	markPwuReady,
+	completePwuRecomposition,
 	escalatePwu,
 	proposePwu,
 	rejectPwu,
@@ -146,8 +148,10 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	AbandonPwu: abandonPwu,
 	// JAN-PWUWP W-4.5: BASELINED had no command at all — promoteBaseline advances the Baseline, never the PWU.
 	BaselinePwu: baselinePwu,
+	BeginPwuRecomposition: beginPwuRecomposition,
 	// W-5: neither is a §5.2 act — PER-3 wants every arrow named, not every arrow authorized.
 	BlockPwu: blockPwu,
+	CompletePwuRecomposition: completePwuRecomposition,
 	EscalatePwu: escalatePwu,
 	// W-5.5 (REG-D-043): the deferred half of W-5 — the way back out of both. Same reasoning on authority: if
 	// reporting trouble needs no §5.2 act, neither does recording that it is over.

@@ -27,7 +27,9 @@ import type {
 	MarkPwuReadyPayload,
 	AbandonPwuPayload,
 	BaselinePwuPayload,
+	BeginPwuRecompositionPayload,
 	BlockPwuPayload,
+	CompletePwuRecompositionPayload,
 	ProposePwuPayload,
 	PwuAbandonedPayload,
 	EscalatePwuPayload,
@@ -40,6 +42,8 @@ import type {
 	PwuInvalidatedPayload,
 	PwuMarkedReadyPayload,
 	PwuProposedPayload,
+	PwuRecomposedPayload,
+	PwuRecompositionBegunPayload,
 	PwuReshapingStartedPayload,
 	PwuShapingStartedPayload,
 	PwuStateChangedPayload,
@@ -445,7 +449,13 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
 	// W-5. Neither is a §5.2 act — the rows exist because PER-3 wants a NAMED command for every
 	// arrow, not because either needs authority.
 	BLOCKED: 'BlockPwu',
-	ESCALATED: 'EscalatePwu'
+	ESCALATED: 'EscalatePwu',
+	// REG-D-044 S-1b. THE SAME COUPLING RULE, AND HERE IT IS A CORRECTNESS REQUIREMENT RATHER THAN HYGIENE:
+	// these two rows and the two commands below must land in ONE commit. `rejectArrowOwnedBySemanticCommand`
+	// has no fallback, so a row without its command makes the arrow UNPERFORMABLE — strictly worse than the
+	// ungoverned state REG-F-085 pinned, which at least moved.
+	RECOMPOSING: 'BeginPwuRecomposition',
+	RECOMPOSED: 'CompletePwuRecomposition'
 } as const satisfies Readonly<Record<string, string>>;
 
 /**
@@ -473,6 +483,151 @@ export const PWU_SEMANTIC_LIFECYCLE_COMMANDS = {
  * ownership sets DISJOINT and every ratified arrow ACCOUNTED FOR by one table or the other.
  */
 export type OwnedLifecycleTarget = keyof typeof PWU_SEMANTIC_LIFECYCLE_COMMANDS;
+
+// ── RECOMPOSITION: THE PARENT'S OWN LIFECYCLE, GOVERNED AT LAST (REG-D-044 S-1b, closing REG-F-085) ──────────
+//
+// Both arrows carried ratified guards and were enforced by NOTHING. Measured, not inferred: a PWU seeded to
+// SATISFIED, then `ChangePwuState SATISFIED -> RECOMPOSING` with `reasonCode: 'CONTROLLER'` and
+// `supportingObjectIds: []` was ACCEPTED, and so was `RECOMPOSING -> RECOMPOSED`. Neither state was in
+// `PWU_SEMANTIC_LIFECYCLE_COMMANDS`, so the setter was never refused, and no substance check in `changePwuState`
+// branched on either. `verif/recomposition-ungoverned.test.ts` pinned that as a DEFECT rather than a feature.
+//
+// ⚠ WHY THIS COULD NOT BE BUILT UNTIL TODAY. `RECOMPOSING -> RECOMPOSED` is guarded on *"Recomposition contract
+// satisfied"*, and until S-1a NOTHING in this engine could drive `RecompositionContract.status` to `SATISFIED`.
+// REG-F-085 recorded that a build agent had only two ways out and both were forbidden: ship a command that can
+// never fire, or accept `COMPOSABLE` and silently weaken a ratified guard. REG-D-044 ruled the fork incomplete —
+// the acceptance act is the ratified `decide` verb, UNWIRED rather than absent — and `AcceptRecomposition` wired
+// it. The guard below is therefore enforced LITERALLY, which is only honest because the state is now reachable.
+
+/**
+ * The RecompositionContract that backs this PWU's recomposition, or `undefined`.
+ *
+ * ⚠ `parentWorkUnitId === pwuId` IS REG-Q-028's SAFE DEFAULT BEING ENFORCED, NOT A QUESTION BEING ANSWERED.
+ * REG-Q-028 is OPEN: *"RPH-DOC-002 puts 'begin recomposition' on the SATISFIED child PWU while recomposition
+ * contracts belong to the parent … Which PWU carries RECOMPOSING/RECOMPOSED is unstated; **state-machine
+ * implementations must not invent it.**"* Its recorded safe default is *"treat recomposition as parent-owned
+ * (the contract holder)"*, and that is exactly what this line does. Nothing here settles the canon question, and
+ * no artifact of this increment may say it does.
+ *
+ * DERIVE-ON-READ: the caller names WHICH contract; this reads WHETHER it qualifies. Naming an id is not
+ * asserting a state — the same rule `baselineBacksPwu` above follows.
+ */
+function recompositionContractForPwu(
+	ctx: HandlerContext,
+	pwuId: string,
+	contractId: string
+): { readonly status?: string; readonly requiredChildWorkUnitIds?: readonly string[] } | undefined {
+	const obj = ctx.store.loadObject(contractId);
+	if (obj?.objectType !== 'RECOMPOSITION_CONTRACT') return undefined;
+	const s = obj.state as { parentWorkUnitId?: string };
+	if (s.parentWorkUnitId !== pwuId) return undefined;
+	return obj.state as { status?: string; requiredChildWorkUnitIds?: readonly string[] };
+}
+
+/**
+ * BeginPwuRecomposition — SATISFIED -> RECOMPOSING. REG-D-044 S-1b, under REG-D-029.
+ *
+ * DOC-002 §8.1's trigger is *"Parent exists and recomposition is required"* and BOTH conjuncts are checked,
+ * separately, against the cited contract: it must name this PWU as its parent, and it must require at least one
+ * child. ⚠ THE SECOND CONJUNCT IS NOT DECORATION. `requiredChildWorkUnitIds: []` makes every downstream
+ * child-acceptability check VACUOUSLY TRUE — that is REG-F-041's S-0 finding one object over, and the reason
+ * `proposeRecomposition` now refuses an empty composition at birth. Checking it here too is deliberate
+ * redundancy: a contract could in principle predate that guard.
+ *
+ * ⚠ NO AUTHORITY GUARD, AND THAT IS AUTHORED RATHER THAN OMITTED. JPWB-DOC-001 §5.2 reserves waiver, risk
+ * acceptance, rejection, abandonment and promotion to Governance — it does not reserve BEGINNING a recomposition.
+ * The authority that matters arrives at the other end: `CompletePwuRecomposition` requires a contract whose
+ * SATISFIED status can only be reached through an EFFECTIVE APPROVAL Decision (S-1a). Gating the start as well
+ * would be a second lock on a door whose far side is already locked. This states one gate's basis and asserts
+ * nothing general about what authorizes a governance act — REG-F-076 records that this repository has TWO rules
+ * for that and that they disagree.
+ */
+export const beginPwuRecomposition: CommandHandler = (ctx, command) => {
+	const p = command.payload as BeginPwuRecompositionPayload;
+	const id = command.targetAggregateId;
+	const contract = recompositionContractForPwu(ctx, id, p.recompositionContractId);
+	if (!contract) {
+		return reject(
+			command,
+			'RPH_EVIDENCE_MISSING',
+			`BeginPwuRecomposition ${id}: ${p.recompositionContractId} is not a RECOMPOSITION_CONTRACT whose ` +
+				`parentWorkUnitId is ${id}. DOC-002 §8.1 permits SATISFIED -> RECOMPOSING only where "Parent ` +
+				`exists and recomposition is required", and REG-Q-028's safe default makes the contract holder ` +
+				`the parent — so the contract naming this PWU IS the parent's existence.`,
+			[id, p.recompositionContractId]
+		);
+	}
+	if ((contract.requiredChildWorkUnitIds ?? []).length === 0) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`BeginPwuRecomposition ${id}: ${p.recompositionContractId} requires no child work units, so ` +
+				`recomposition is not required of this parent. An empty required-child set does not make ` +
+				`recomposition trivially due — it makes every child check vacuously true (REG-F-041 S-0).`,
+			[id, p.recompositionContractId]
+		);
+	}
+	return advancePwuLifecycle(ctx, command, {
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.BeginPwuRecomposition,
+		eventPayload: (next) =>
+			({
+				recompositionContractId: p.recompositionContractId,
+				workLifecycleState:
+					next.workLifecycleState as PwuRecompositionBegunPayload['workLifecycleState']
+			}) satisfies PwuRecompositionBegunPayload
+	});
+};
+
+/**
+ * CompletePwuRecomposition — RECOMPOSING -> RECOMPOSED. REG-D-044 S-1b, under REG-D-029.
+ *
+ * DOC-002 §8.1's guard is *"Recomposition contract satisfied"*, and `satisfied` is the ENUM LITERAL rather than
+ * ordinary language. ⚠ THAT READING WAS CONTESTED AND SURVIVED. Three independent lanes converged on the loose
+ * reading — which would have licensed accepting `COMPOSABLE` and unblocked the work most cheaply — and it was
+ * REFUTED: §8.1's other two cross-object rows cite enum literals in exactly this lowercase participle form
+ * (*"Active execution plan **approved**"* ↔ `'APPROVED'`; *"Runtime bindings **authorized**"* ↔ `'AUTHORIZED'`),
+ * as does the sister contract's own row. The three lanes' agreement was ONE inference counted three times.
+ *
+ * ⚠ AND `COMPOSABLE` IS NOT A NEAR-MISS, IT IS THE OPPOSITE STATE. Canon calls what `completeRecomposition`
+ * produces *"candidate parent state subject to assessment and decision"* — a candidacy, not a verdict. Accepting
+ * it here would substitute *"no contradiction found"* for *"contract satisfied"*: the APPROVAL-for-decision
+ * substitution class open as REG-F-076, arrived at by a different road.
+ */
+export const completePwuRecomposition: CommandHandler = (ctx, command) => {
+	const p = command.payload as CompletePwuRecompositionPayload;
+	const id = command.targetAggregateId;
+	const contract = recompositionContractForPwu(ctx, id, p.recompositionContractId);
+	if (!contract) {
+		return reject(
+			command,
+			'RPH_EVIDENCE_MISSING',
+			`CompletePwuRecomposition ${id}: ${p.recompositionContractId} is not a RECOMPOSITION_CONTRACT ` +
+				`whose parentWorkUnitId is ${id}.`,
+			[id, p.recompositionContractId]
+		);
+	}
+	if (contract.status !== 'SATISFIED') {
+		return reject(
+			command,
+			'RPH_EVIDENCE_MISSING',
+			`CompletePwuRecomposition ${id}: ${p.recompositionContractId} reads ${String(contract.status)}, ` +
+				`not SATISFIED. DOC-002 §8.1 guards RECOMPOSING -> RECOMPOSED on "Recomposition contract ` +
+				`satisfied", which names the enum literal. COMPOSABLE is the CANDIDATE state — the recomposition ` +
+				`was found free of contradiction, which is not the same as accepted. Reaching SATISFIED requires ` +
+				`AcceptRecomposition, citing an EFFECTIVE APPROVAL Decision and an explicit assessment over the ` +
+				`parent completion claim.`,
+			[id, p.recompositionContractId]
+		);
+	}
+	return advancePwuLifecycle(ctx, command, {
+		spec: PWU_LIFECYCLE_COMMAND_SPECS.CompletePwuRecomposition,
+		eventPayload: (next) =>
+			({
+				recompositionContractId: p.recompositionContractId,
+				workLifecycleState: next.workLifecycleState as PwuRecomposedPayload['workLifecycleState']
+			}) satisfies PwuRecomposedPayload
+	});
+};
 
 /** Shared advance of the workLifecycle axis for an authored transition that does not change the sub-axes:
  * load -> canAdvanceWorkLifecycle (legality + cross-axis guard) -> commit. */

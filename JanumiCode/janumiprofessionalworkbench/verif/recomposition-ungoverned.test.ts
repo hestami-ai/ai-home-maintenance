@@ -1,19 +1,21 @@
-// REG-F-085 — the two PWU recomposition arrows are performable by ANYONE, with NOTHING cited. Pinned as a DEFECT.
+// REG-F-085 — the two PWU recomposition arrows are GOVERNED. ✅ CLOSED 2026-08-21 (REG-D-044 S-1b).
 //
-// ⚠ READ THE LABEL BEFORE THE ASSERTIONS. Every `ACCEPTED` below records something this repository considers
-// WRONG. This file is a characterization pin, not an approval: it exists so the ungoverned behaviour cannot be
-// fixed silently, and so that fixing it FORCES the register entry to be revisited rather than left stale.
+// ⚠ THIS FILE WAS A CHARACTERIZATION PIN AND IS NOW ITS OWN INVERSE, DELIBERATELY KEPT RATHER THAN DELETED.
+// Every assertion below used to read `ACCEPTED` and to record something this repository considered WRONG: both
+// arrows were performable by anyone with `reasonCode: 'CONTROLLER'` and `supportingObjectIds: []`. The pin
+// existed *"so that fixing it FORCES the register entry to be revisited rather than left stale"* — so it is
+// inverted IN PLACE, and the arrangement is kept byte-for-byte. A deleted pin proves nothing about the fix; an
+// inverted one proves the exact behaviour it used to admit is now refused.
 //
-// WHY IT EXISTS AT ALL. Scoping W-4.6 I wrote into the register that neither arrow was performable — reasoning
-// from the ratified machine, where `RECOMPOSING -> RECOMPOSED` is guarded on *"Recomposition contract satisfied"*
-// and the only arrow into contract `SATISFIED` is one C-0b already calls ARROW_UNREACHABLE. Then I drove the
-// engine. Both hops are ACCEPTED with `reasonCode: 'CONTROLLER'` and `supportingObjectIds: []`. The guard is
-// ratified and enforced by nothing; `RECOMPOSING`/`RECOMPOSED` are absent from `PWU_SEMANTIC_LIFECYCLE_COMMANDS`,
-// so the generic setter is never refused, and no substance check in `changePwuState` branches on either state.
+// WHAT CHANGED, AND WHY IT COULD NOT CHANGE SOONER. `RECOMPOSING -> RECOMPOSED` is guarded on *"Recomposition
+// contract satisfied"*, and until S-1a NOTHING could drive `RecompositionContract.status` to `SATISFIED` — C-0b
+// carried that arrow as ARROW_UNREACHABLE, so an honest `CompletePwuRecomposition` could never have fired.
+// REG-D-044 ruled the acceptance act is the ratified `decide` verb, UNWIRED rather than absent; S-1a wired it;
+// S-1b's two commands now own both arrows and enforce both ratified guards literally.
 //
-// **C-0b HAD THIS RIGHT THE WHOLE TIME** — both guards sit in the ledger as UNENFORCED, not ARROW_UNREACHABLE. I
-// nearly filed a finding contradicted by my own control. The last assertion here ties the two records together so
-// that enforcing the guard without moving the ledger row (or the reverse) reddens.
+// **C-0b HAD THIS RIGHT THE WHOLE TIME** — both guards sat in the ledger as UNENFORCED, not ARROW_UNREACHABLE. I
+// nearly filed a finding contradicted by my own control. The last assertion here still ties the two records
+// together, now in the other direction: moving the code without moving the ledger row (or the reverse) reddens.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { Engine } from '@janumipwb/rph-application';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -25,7 +27,7 @@ const TS = '2026-08-09T00:00:00Z';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H9200';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H9210';
 
-describe('REG-F-085 — PWU recomposition arrows are ungoverned (pinned defect)', () => {
+describe('REG-F-085 — PWU recomposition arrows are governed (pin inverted, CLOSED)', () => {
 	function arrange() {
 		const store = new SqliteStorageAdapter({ now: () => TS });
 		let n = 0;
@@ -101,43 +103,65 @@ describe('REG-F-085 — PWU recomposition arrows are ungoverned (pinned defect)'
 		return { store, setter };
 	}
 
-	it('PINNED DEFECT — SATISFIED -> RECOMPOSING is ACCEPTED with no contract and no parent named', async () => {
+	it('SATISFIED -> RECOMPOSING is REFUSED with no contract and no parent named', async () => {
 		const { store, setter } = arrange();
 		const { seedPwuWorkLifecycleState_FIXTURE } = await import(
 			'../packages/rph-application/src/handlers/__tests__/pwu-fixtures.js'
 		);
 		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'SATISFIED');
-		// The ratified guard is "Parent exists and recomposition is required". Nothing loads a parent, and nothing
-		// establishes that recomposition is required. Both facts are simply absent from the write path.
+		// The ratified guard is "Parent exists and recomposition is required". This dispatch names no contract and
+		// no parent — exactly the citation-free call that used to be ACCEPTED. `BeginPwuRecomposition` now owns the
+		// arrow, so the generic setter is refused before any guard is even consulted.
 		const r = setter('SATISFIED', 'RECOMPOSING');
-		expect(r.status, 'if this is now REJECTED the defect is FIXED — update REG-F-085').toBe(
-			'ACCEPTED'
+		expect(r.status, 'if this is ACCEPTED again the defect has REGRESSED — REG-F-085 must reopen').toBe(
+			'REJECTED'
 		);
+		expect(r.error?.message, 'the refusal must name the command that now owns the arrow').toContain(
+			'BeginPwuRecomposition'
+		);
+		expect(
+			(store.loadObject(PWU)!.state as Record<string, string>).workLifecycleState,
+			'a refused command must not move the object'
+		).toBe('SATISFIED');
 	});
 
-	it('PINNED DEFECT — RECOMPOSING -> RECOMPOSED is ACCEPTED though no contract can reach SATISFIED', async () => {
+	it('RECOMPOSING -> RECOMPOSED is REFUSED — and the contract state it names is now reachable', async () => {
 		const { store, setter } = arrange();
 		const { seedPwuWorkLifecycleState_FIXTURE } = await import(
 			'../packages/rph-application/src/handlers/__tests__/pwu-fixtures.js'
 		);
 		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'RECOMPOSING');
-		// ⚠ THE SHARPEST FORM OF IT. The guard is "Recomposition contract satisfied"; `RecompositionContract.status
-		// SATISFIED` is reachable by NO command in the codebase (C-0b: ARROW_UNREACHABLE, and `completeRecomposition`
-		// says so in its own comment). So the arrow's precondition is not merely unchecked — it is currently
-		// IMPOSSIBLE TO SATISFY — and the arrow fires anyway, on an empty citation list.
+		// ⚠ THIS WAS THE SHARPEST FORM OF THE DEFECT, AND BOTH HALVES OF IT ARE GONE. The guard is "Recomposition
+		// contract satisfied". `RecompositionContract.status SATISFIED` used to be reachable by NO command — so the
+		// precondition was not merely unchecked, it was IMPOSSIBLE TO SATISFY — and the arrow fired anyway on an
+		// empty citation list. S-1a made the state reachable (AcceptRecomposition) and S-1b made the arrow require
+		// it. The setter no longer performs this hop at all.
 		const r = setter('RECOMPOSING', 'RECOMPOSED');
-		expect(r.status, 'if this is now REJECTED the defect is FIXED — update REG-F-085').toBe(
-			'ACCEPTED'
+		expect(r.status, 'if this is ACCEPTED again the defect has REGRESSED — REG-F-085 must reopen').toBe(
+			'REJECTED'
 		);
-		expect((store.loadObject(PWU)!.state as Record<string, string>).workLifecycleState).toBe(
-			'RECOMPOSED'
+		expect(r.error?.message, 'the refusal must name the command that now owns the arrow').toContain(
+			'CompletePwuRecomposition'
 		);
+		expect(
+			(store.loadObject(PWU)!.state as Record<string, string>).workLifecycleState,
+			'the PWU must NOT have moved — this assertion read RECOMPOSED while the defect was live'
+		).toBe('RECOMPOSING');
 	});
 
 	// ── THE TWO RECORDS MUST AGREE ────────────────────────────────────────────────────────────────────────────
-	// Runtime says ungoverned; the ledger must say UNENFORCED. Reddens if either moves without the other — which
-	// is how a ledger row and the code it describes drift apart, the failure REG-F-081 caught in C-0b's anchors.
-	it('CONTROL — C-0b agrees: both recomposition guards are recorded UNENFORCED', () => {
+	// Runtime says governed; the ledger must say ENFORCED. Reddens if either moves without the other — which is
+	// how a ledger row and the code it describes drift apart, the failure REG-F-081 caught in C-0b's anchors.
+	//
+	// ⚠ THE CONJUNCTION IS THE POINT AND IT IS WHY THIS CONTROL SURVIVES THE INVERSION. C-0b's own gate does NOT
+	// force these two rows: `guard-enforcement-ledger.test.ts` states verbatim that "`UNENFORCED` needs no such
+	// check: it understates, and over-admission is not a defect". So the ledger would have stayed green reading
+	// UNENFORCED over enforced code. THIS assertion is the only thing that forces the ledger to follow the code.
+	//
+	// ⚠ AND IT LOCATES ROWS BY `indexOf`, WHICH BIT S-1a: a new row's evidence prose quoted ANOTHER row's guard
+	// string, so `indexOf` landed inside the wrong row and read its disposition. Neither evidence block may
+	// contain the other guard's literal text, and `disposition:` must stay inside the 400-char window below.
+	it('CONTROL — C-0b agrees: both recomposition guards are recorded ENFORCED', () => {
 		const ledger = readFileSync(new URL('./guard-enforcement-ledger.data.ts', import.meta.url), 'utf8');
 		for (const guard of [
 			'Parent exists and recomposition is required',
@@ -148,8 +172,8 @@ describe('REG-F-085 — PWU recomposition arrows are ungoverned (pinned defect)'
 			const disposition = /disposition:\s*"(\w+)"/.exec(ledger.slice(at, at + 400))?.[1];
 			expect(
 				disposition,
-				`${guard}: runtime shows the arrow firing on an empty citation, so the ledger must read UNENFORCED`
-			).toBe('UNENFORCED');
+				`${guard}: runtime refuses the arrow on an empty citation, so the ledger must read ENFORCED`
+			).toBe('ENFORCED');
 		}
 	});
 });
