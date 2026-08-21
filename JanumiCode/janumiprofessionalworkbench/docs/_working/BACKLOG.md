@@ -64,6 +64,36 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
     conjuncts non-vacuously, so delete the command-layer duplicates **with a header recording why the
     command-layer site vanished**.
 
+  **⚠⚠ SECOND ATTEMPT, 2026-08-20: FOUR OF THE FIVE RE-AIMS ARE DONE AND PROVEN; ONE PIECE BLOCKS, AND IT IS
+  ITS OWN INCREMENT.** Applied again, driven again, reverted again — but this time the remainder is a single
+  named artifact rather than "the rest of the work". Everything below was OBSERVED, not planned.
+  - **DONE AND GREEN when applied** (902 of 904 → 903 of 904 as each landed): `floor-waiver-scope.test.ts`
+    re-aimed to ASR-3 + a control that can still publish (a SATISFIED floor — the ONLY arrangement that still
+    publishes, therefore the only control available); `pwa-authoring.test.ts` inverted;
+    `execution-detail.test.ts` inverted AND renamed; `decision-kind-guard.test.ts` inverted with its subject
+    preserved (the ApproveDecision refusal still holds; only the CONSEQUENCE changed).
+  - **THE ONE BLOCKER: the RPH-GOV-005 probe in `execrem-wp16-enforcement-observed.test.ts:1633`.** It cannot be
+    minimally patched, and the file itself explains why at `:1623`: **RPH-GOV-005 was enforced INVERSELY** — no
+    handler ever refused "this waiver is out of scope"; the FLOOR GATE refused, because the waiver failed to
+    discharge. Deleting discharge deletes that inverse enforcement entirely. The probe's REFUSED arm still
+    refuses (same code, same marker — the floor still blocks), but its CONTROL arm can never publish again, and
+    re-arranging the control to publish via a SATISFIED floor would make the two arms differ by "floor satisfied
+    or not" instead of by waiver scope — **a vacuous probe, which is the REG-F-015 defect this whole file
+    exists to prevent.** So the probe must MOVE, not be patched.
+  - **WHERE IT MOVES, and this is the good news: to a DIRECT refusal, which is stronger than the inverse one.**
+    `resolveWaiverAuthorization` (`waiver-authorization.ts:54`, reached from `pwu.ts:1529`) refuses IN ITS OWN
+    VOICE on decisionType (`:84`, "requires decisionType=WAIVER"), object (`:99`, "does not name") and version
+    pin (`:110`). Re-aim the probe at the DECISION-TYPE or OBJECT limb — both are dispatchable through the bus.
+    ⚠ **NOT the version limb:** `waiver-authority.test.ts:220-226` records that the pins are derived at PROPOSAL
+    time and no command in reach moves the version between proposal and waive, so a bus-level version
+    arrangement would be a control that cannot fail. That file drives it at the resolver instead, and says so.
+  - **The register row moves with it:** `enforcedAt` (currently naming the deleted `waiverDischargesFloorPolicy`
+    and `effectiveFloorWaivers`), `refusalMarker` (currently the floor's "the de minimis assurance floor is not
+    SATISFIED for PWA" — becomes the authorization refusal's own text), and `declaredMutations` (the version
+    conjunct now bites at the authorization path). The row stays **ENFORCED**; it does not need re-classifying.
+  - **Helpers already in the probe file** for the new arrangement: `proposePwuAgainstIntent` (`:701`),
+    `captureIntent` (`:727`), and the `dispatch`/`ok` pair. A decision arrangement to model on is at `:513`.
+
   **Work, in order:**
   1. RED FIRST — a floor waiver that discharges today must stop discharging. Controls both ways: a
      NON-floor waiver must still discharge, and a SATISFIED floor must still pass.
