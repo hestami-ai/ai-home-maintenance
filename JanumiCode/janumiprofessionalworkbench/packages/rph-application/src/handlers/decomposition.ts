@@ -5,6 +5,7 @@
 // further wiring increment. Recomposition begin/complete advance the RecompositionContract.status machine.
 import type {
 	CommandResult,
+	AcceptRecompositionPayload,
 	CompleteRecompositionPayload,
 	ConstraintPropagation,
 	DomainCommand,
@@ -15,6 +16,7 @@ import type {
 // REG-F-102: the value import, so `authorityBasis` can establish DECISION-ness the way the §5.2 resolvers do.
 import { DecisionObjectSchema } from '@janumipwb/rph-contracts';
 import {
+	assessmentHasConcluded,
 	evaluateRecomposition,
 	validateConstraintPropagation,
 	validateObligationConservation,
@@ -685,6 +687,118 @@ function buildRecompositionInput(
  * a detected conflict forces CONFLICTED even when every child is individually SATISFIED, and an unacceptable
  * required child or a failed whole-check forces INSUFFICIENT.
  */
+/** Does `decisionId` name an EFFECTIVE APPROVAL Decision covering this contract? Structural mirror of
+ *  `baselineBacksPwu` (pwu.ts): objectType, then verdict, then the BACK-REFERENCE that names this object — the
+ *  third limb is what stops a Decision about something else authorizing this. */
+function decisionAcceptsRecomposition(
+	ctx: HandlerContext,
+	contractId: string,
+	decisionId: string
+): boolean {
+	const obj = ctx.store.loadObject(decisionId);
+	if (obj?.objectType !== 'DECISION') return false;
+	const d = obj.state as { decisionType?: string; status?: string; subjectObjectIds?: string[] };
+	return (
+		d.decisionType === 'APPROVAL' &&
+		d.status === 'EFFECTIVE' &&
+		(d.subjectObjectIds ?? []).includes(contractId)
+	);
+}
+
+/** §14.1 bullet 6 — "A recomposed result requires an explicit assessment." Does `assessmentId` name a CONCLUDED
+ *  assessment covering the parent completion claim THIS contract was proposed to settle?
+ *
+ *  ⚠ CONCLUDED, NOT SATISFIED, AND THE DIFFERENCE IS THE RULING. `ASSESSMENT_CONCLUDED_STATES` includes REJECTED,
+ *  INCONCLUSIVE and ESCALATED, so this admits an acceptance taken over an assessment that did NOT pass. That is
+ *  deliberate and it is the recommend/decide split: JPWB-DOC-001 — "Validators detect and characterize; they
+ *  RECOMMEND policy-permitted control actions", and Governance "alone authorizes waiver, RISK ACCEPTANCE,
+ *  rejection or abandonment". REG-Q-011 states the same from the other side: "A passing Assessment never advances
+ *  assurance or lifecycle automatically." Requiring SATISFIED here would make the ASSESSMENT decisive and collapse
+ *  the split in the opposite direction — the authority lives in the cited Decision, and the assessment's job is to
+ *  make that decision INFORMED rather than to make it for them.
+ *
+ *  `assessmentHasConcluded` is INVOKED rather than re-enumerated: it is a POSITIVE list, so a state added to the
+ *  §30 machine later reads as NOT concluded and this guard fails closed. */
+function assessmentCoversParentClaim(
+	ctx: HandlerContext,
+	contract: Record<string, unknown>,
+	assessmentId: string
+): boolean {
+	const obj = ctx.store.loadObject(assessmentId);
+	if (obj?.objectType !== 'ASSURANCE_ASSESSMENT') return false;
+	const a = obj.state as {
+		assessmentState?: string;
+		claimIds?: string[];
+		subjectObjectIds?: string[];
+	};
+	if (!assessmentHasConcluded(a.assessmentState)) return false;
+	// ⚠ THE SUBJECT IS THE PARENT, NOT THE CONTRACT, and that is §14.1's own wording rather than a convenience:
+	// the invariant is that "a recomposed RESULT requires an explicit assessment", and the recomposed result is
+	// the PARENT's integrated result — the contract is the record of the judging, not the thing judged. (It is
+	// also what the engine permits: assurance policies declare `applicableObjectTypes`, and an assessment
+	// subjected on a RECOMPOSITION_CONTRACT is refused NOT_APPLICABLE by every policy shipped today.)
+	const parentId = str(contract.parentWorkUnitId);
+	if (parentId === '' || !(a.subjectObjectIds ?? []).includes(parentId)) return false;
+	const claimId = str(contract.parentCompletionClaimId);
+	return claimId !== '' && (a.claimIds ?? []).includes(claimId);
+}
+
+/**
+ * AcceptRecomposition — RecompositionContract.status COMPOSABLE -> SATISFIED. REG-D-044 (delegated ruling).
+ *
+ * ⚠ THIS COMMAND DOES NOT PERFORM THE ACCEPTANCE. The ratified `decide` verb does, through
+ * ProposeDecision/ApproveDecision over a Decision whose `subjectObjectIds` name this contract. This RECORDS THE
+ * EFFECT of an already-EFFECTIVE Decision on the contract aggregate — the engine's idiom for applying a Decision
+ * to another object. Advancing the contract inside `approveDecision` instead would be a cross-aggregate write.
+ *
+ * WHY THE ARROW EXISTS AT ALL, since REG-F-085 blocked on it for twelve days. JPWB-DOC-001 says `recompose`
+ * creates "candidate parent state subject to assessment and decision", and that "Parent completion remains
+ * unavailable until required recomposition is ACCEPTED". So COMPOSABLE is the candidacy `completeRecomposition`
+ * correctly produces, and SATISFIED is the settled outcome an acceptance reaches. Nothing drove that arrow, which
+ * is why PWU RECOMPOSING -> RECOMPOSED — guarded on "Recomposition contract satisfied" — could not be enforced
+ * without either shipping an unfireable command or weakening a guard. This is the missing wiring, not a new act.
+ */
+export const acceptRecomposition: CommandHandler = (ctx, command, payload) => {
+	const p = payload as AcceptRecompositionPayload;
+	const contract = loadState(ctx, command.targetAggregateId);
+	if (!contract) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`AcceptRecomposition requires an existing recomposition contract ${command.targetAggregateId}`
+		);
+	}
+	if (!decisionAcceptsRecomposition(ctx, command.targetAggregateId, p.acceptanceDecisionId)) {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`AcceptRecomposition: decision ${p.acceptanceDecisionId} does not accept recomposition contract ${command.targetAggregateId} — an acceptance requires an EFFECTIVE APPROVAL Decision naming this contract as a subject. The acceptance is the Decision; this command only records its effect.`,
+			[command.targetAggregateId]
+		);
+	}
+	if (!assessmentCoversParentClaim(ctx, contract, p.parentAssessmentId)) {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`AcceptRecomposition: assessment ${p.parentAssessmentId} does not cover this contract's parent completion claim — §14.1 requires that a recomposed result have an explicit, CONCLUDED assessment of the claim it settles.`,
+			[command.targetAggregateId]
+		);
+	}
+	return advanceStatus(ctx, command, {
+		objectType: RECOMP,
+		statusField: 'status',
+		machine: 'RecompositionContract.status',
+		target: 'SATISFIED',
+		precondition: fromStates('COMPOSABLE'),
+		eventType: 'RecompositionAccepted',
+		eventPayload: (next) => ({
+			acceptanceDecisionId: p.acceptanceDecisionId,
+			parentAssessmentId: p.parentAssessmentId,
+			status: String((next.status ?? '') as string | number | boolean)
+		})
+	});
+};
+
 export const completeRecomposition: CommandHandler = (ctx, command, payload) => {
 	const p = payload as CompleteRecompositionPayload;
 	const contract = loadState(ctx, command.targetAggregateId);

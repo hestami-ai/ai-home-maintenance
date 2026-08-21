@@ -98,6 +98,7 @@ import {
 } from './governance.js';
 import {
 	beginRecomposition,
+	acceptRecomposition,
 	completeRecomposition,
 	proposeDecomposition,
 	proposeRecomposition,
@@ -231,6 +232,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ReviseDecomposition: reviseDecomposition,
 	ProposeRecomposition: proposeRecomposition,
 	BeginRecomposition: beginRecomposition,
+	AcceptRecomposition: acceptRecomposition,
 	CompleteRecomposition: completeRecomposition,
 	// PWA-authoring context (RPH-DOC-010 §6, §11, §20, §42)
 	CreatePwa: createPwa,

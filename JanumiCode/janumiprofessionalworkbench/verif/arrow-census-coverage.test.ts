@@ -153,8 +153,8 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			// `SupersedeIntent` declares the machine's six ratified in-arrows to SUPERSEDED, so Intent.intentStatus
 			// goes 6/15 -> 12/15 — the honest ceiling, because the three WITHDRAWN arrows have no ratified event and
 			// are deliberately left uncovered.
-			declarationRows: 184,
-			distinctArrowsDeclared: 181,
+			declarationRows: 185,
+			distinctArrowsDeclared: 182,
 			// ⚠ UNMOVED AT 156 ACROSS BOTH REG-F-122 AND REG-F-124, which is the point of pinning it SEPARATELY
 			// (REG-F-121). Two fabrication defects have now been removed from this instrument and neither cost a
 			// single ratified arrow — because a fabricated arrow was, by construction, one no machine ratified.
@@ -163,7 +163,7 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			// note beside it said that if a fabrication-removal ever moved it, that removal took truth with it.
 			// This movement is the OTHER direction and the other cause: six arrows a command can now really
 			// perform. The invariant it guards is intact — removals must not move it; additions must.
-			ratifiedArrowsCovered: 166
+			ratifiedArrowsCovered: 167
 		});
 	});
 

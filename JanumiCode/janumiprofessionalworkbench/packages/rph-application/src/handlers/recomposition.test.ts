@@ -13,6 +13,7 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-19T00:00:00Z';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5V00';
@@ -22,6 +23,10 @@ const CHILD_B = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5V0B';
 const RCP = 'rcp_01ARZ3NDEKTSV4RRFFQ69G5V05';
 const CLAIM = 'clm_01ARZ3NDEKTSV4RRFFQ69G5V06';
 const WAIVER_A = 'dec_01ARZ3NDEKTSV4RRFFQ69G5V07';
+const ACCEPT_DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5V09';
+const OTHER_DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5V0C';
+const ASSESSMENT = 'assess_01ARZ3NDEKTSV4RRFFQ69G5V0D';
+const POLICY = 'pol_recomposition_integrity';
 
 describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §14.1, live pipeline)', () => {
 	let store: SqliteStorageAdapter;
@@ -308,4 +313,172 @@ describe('CompleteRecomposition evaluates instead of concatenating (WP-1-006, §
 			expect(statusOf(RCP)).toBe('INSUFFICIENT');
 		});
 	});
+	// ── REG-D-044 / S-1a: THE ACCEPTANCE REACHES THE CONTRACT ────────────────────────────────────────────────
+	//
+	// `RecompositionContract.status COMPOSABLE -> SATISFIED` had NO driver, which is exactly what blocked
+	// REG-F-085 for twelve days: the PWU arrow RECOMPOSING -> RECOMPOSED is guarded on "Recomposition contract
+	// satisfied", and a guard naming a state nothing can reach cannot be enforced without either shipping an
+	// unfireable command or weakening the guard. REG-D-044 ruled that the acceptance act is the ratified `decide`
+	// verb — ProposeDecision/ApproveDecision — and that it was UNWIRED rather than absent.
+	//
+	// ⚠ THESE TESTS COULD NOT HAVE BEEN WRITTEN BEFORE THE COMMAND EXISTED: the bus refuses an unknown command
+	// type outright. The RED is therefore carried by the mutants (MU-F085A-*), which restore each missing conjunct
+	// against the tests below — that is the stronger claim anyway, since it survives the command existing.
+	describe('AcceptRecomposition records the effect of an EFFECTIVE decision on the contract', () => {
+		/** An EFFECTIVE APPROVAL Decision over `subjects`. Approval, not GrantWaiver: an APPROVAL is what
+		 *  `decisionAcceptsRecomposition` requires, and ApproveDecision is the ratified act that makes one
+		 *  EFFECTIVE. */
+		function approval(id: string, subjects: string[]): void {
+			const ok = (r: { status: string; error?: { message?: string } }, what: string): void => {
+				expect(r.status, `${what}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			};
+			ok(
+				dispatch('ProposeDecision', id, 'DECISION', {
+					decisionType: 'APPROVAL',
+					subjectObjectIds: subjects,
+					selectedOption: 'accept the recomposition',
+					rationale: 'The recomposed whole was assessed and the residual risk is accepted.',
+					authority: { actorId: 'u1', actorType: 'HUMAN', displayName: 'Operator' },
+					consideredEvidenceIds: [],
+					consideredObservationIds: []
+				}),
+				'propose approval'
+			);
+			ok(
+				dispatch('ApproveDecision', id, 'DECISION', {
+					selectedOption: 'accept the recomposition',
+					rationale: 'The recomposed whole was assessed and the residual risk is accepted.',
+					consideredEvidenceIds: [],
+					consideredObservationIds: [],
+					subjectSemanticVersions: Object.fromEntries(subjects.map((x) => [x, 1]))
+				}),
+				'approve'
+			);
+		}
+
+		/** A CONCLUDED assessment whose claimIds include `claimId` — §14.1 bullet 6's "explicit assessment". */
+		function concludedAssessment(id: string, claimId: string): void {
+			const ok = (r: { status: string; error?: { message?: string } }, what: string): void => {
+				expect(r.status, `${what}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			};
+			ok(
+				dispatch('RequestAssuranceAssessment', id, 'ASSURANCE_ASSESSMENT', {
+					assessmentId: id,
+					assurancePolicyId: POLICY,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [PARENT],
+					subjectSemanticVersions: { [PARENT]: 1 },
+					claimIds: [claimId]
+				}),
+				'request assessment'
+			);
+			ok(dispatch('BeginAssuranceAssessment', id, 'ASSURANCE_ASSESSMENT', {}), 'begin assessment');
+			ok(
+				dispatch('CompleteAssuranceAssessment', id, 'ASSURANCE_ASSESSMENT', {
+					validatorResult: {
+						validatorId: 'test.recomposition-integrity',
+						validatorVersion: '1',
+						policyId: POLICY,
+						policyVersion: '1.0.0',
+						assessmentId: id,
+						subjectObjectIds: [PARENT],
+						subjectSemanticVersions: { [PARENT]: 1 },
+						claimResults: [],
+						evidenceConsideredIds: [],
+						evidenceRejected: [],
+						observations: [],
+						dispositionRecommendation: 'SATISFIED',
+						recommendedControlActions: [],
+						residualUncertainty: [],
+						limitations: [],
+						executionProvenance: {
+							evaluator: { actorId: 'u1', actorType: 'HUMAN', displayName: 'Operator' }
+						}
+					}
+				}),
+				'complete assessment'
+			);
+		}
+
+		/** Drive a contract all the way to COMPOSABLE — the candidacy an acceptance settles. */
+		function composable(): void {
+			waiveChild(CHILD_A, WAIVER_A);
+			propose([CHILD_A]);
+			expect(complete().status).toBe('ACCEPTED');
+			expect(statusOf(RCP), 'the arrangement must reach COMPOSABLE or nothing below is about acceptance').toBe(
+				'COMPOSABLE'
+			);
+		}
+
+		const accept = (decisionId = ACCEPT_DEC, assessmentId: string = ASSESSMENT) =>
+			dispatch('AcceptRecomposition', RCP, 'RECOMPOSITION_CONTRACT', {
+				acceptanceDecisionId: decisionId,
+				parentAssessmentId: assessmentId
+			});
+
+		beforeEach(() => {
+			seedPolicy(engine, POLICY);
+		});
+
+		it('a cited EFFECTIVE approval and a concluded assessment take COMPOSABLE -> SATISFIED', () => {
+			composable();
+			approval(ACCEPT_DEC, [RCP]);
+			concludedAssessment(ASSESSMENT, CLAIM);
+			const r = accept();
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(statusOf(RCP)).toBe('SATISFIED');
+		});
+
+		it('refuses a decision that names ANOTHER object — authority does not bleed', () => {
+			composable();
+			approval(OTHER_DEC, [PARENT]);
+			concludedAssessment(ASSESSMENT, CLAIM);
+			const r = accept(OTHER_DEC);
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain('does not accept recomposition contract');
+			expect(statusOf(RCP)).toBe('COMPOSABLE');
+		});
+
+		it('refuses a decision that is only PROPOSED — an unapproved recommendation is not an acceptance', () => {
+			composable();
+			expect(
+				dispatch('ProposeDecision', ACCEPT_DEC, 'DECISION', {
+					decisionType: 'APPROVAL',
+					subjectObjectIds: [RCP],
+					selectedOption: 'accept',
+					rationale: 'r',
+					authority: { actorId: 'u1', actorType: 'HUMAN', displayName: 'Operator' },
+					consideredEvidenceIds: [],
+					consideredObservationIds: []
+				}).status
+			).toBe('ACCEPTED');
+			concludedAssessment(ASSESSMENT, CLAIM);
+			const r = accept();
+			expect(r.status).toBe('REJECTED');
+			expect(statusOf(RCP)).toBe('COMPOSABLE');
+		});
+
+		// §14.1 bullet 6 — the invariant that had no consumer until this command gave it a field.
+		it('refuses when the named assessment does not cover the parent completion claim', () => {
+			composable();
+			approval(ACCEPT_DEC, [RCP]);
+			concludedAssessment(ASSESSMENT, 'clm_01ARZ3NDEKTSV4RRFFQ69G5VZZ');
+			const r = accept();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain('explicit');
+			expect(statusOf(RCP)).toBe('COMPOSABLE');
+		});
+
+		it('refuses from EVALUATING — acceptance settles a CANDIDACY, and there is not one yet', () => {
+			waiveChild(CHILD_A, WAIVER_A);
+			propose([CHILD_A]); // leaves the contract EVALUATING; no complete() yet
+			approval(ACCEPT_DEC, [RCP]);
+			concludedAssessment(ASSESSMENT, CLAIM);
+			const r = accept();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			expect(statusOf(RCP)).toBe('EVALUATING');
+		});
+	});
+
 });

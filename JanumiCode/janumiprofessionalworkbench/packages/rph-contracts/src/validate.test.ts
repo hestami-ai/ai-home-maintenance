@@ -140,6 +140,9 @@ describe('validate', () => {
 		// already named, the corpus names no recovery event at all — REG-F-083 declined to author one precisely
 		// because the ACT was unruled. The sponsor ruled it (REG-D-043), so both shapes are authored together.
 		// ⚠ `blockedFrom` on `PwuBlocked` adds NO id: it is a field on an existing payload, not a new contract.
-		expect(buildContractRegistry().ids()).toHaveLength(354);
+		// 354 -> 356 (2026-08-21, REG-D-044 / S-1a): `AcceptRecompositionPayload` and
+		// `RecompositionAcceptedPayload` — the command that drives RecompositionContract.status
+		// COMPOSABLE->SATISFIED, the arrow that had no driver and therefore blocked REG-F-085.
+		expect(buildContractRegistry().ids()).toHaveLength(356);
 	});
 });

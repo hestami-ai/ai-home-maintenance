@@ -133,6 +133,12 @@ const EMITTED_2026_08_04 = new Set([
 	'PwaPublished', 'PwaRetired', 'PwaSubmittedForReview', 'PwaValidated', 'PwuChallenged',
 	'PwuInvalidated', 'PwuMarkedReady', 'PwuProposed', 'PwuReshapingStarted', 'PwuShapingStarted',
 	'PwuStateChanged', 'PwuSuperseded', 'PwuTypeDefined', 'PwuTypeRedefined', 'PwuTypeRemoved',
+	// ⚠ 'RecompositionAccepted' ADDED 2026-08-21 (REG-D-044 / S-1a), and this is an ARGUED edit rather than a
+	// count bump, which is what this snapshot exists to force. `acceptRecomposition` (decomposition.ts) emits it
+	// through `advanceStatus`'s `eventType`, driving RecompositionContract.status COMPOSABLE -> SATISFIED — the
+	// arrow that had no driver and therefore blocked REG-F-085 for twelve days. It is proven emitted by
+	// recomposition.test.ts's acceptance suite, not by inspection of the vocab that BINDS it.
+	'RecompositionAccepted',
 	'RecompositionCompleted', 'RecompositionConflictDetected', 'RecompositionFailed',
 	'RecompositionProposed', 'RecompositionStarted', 'RuntimeBindingAuthorized', 'RuntimeBindingDenied',
 	'RuntimeBindingRequested', 'RuntimeCapabilityRevoked', 'TacticalChangeApplied', 'UndertakingCreated',

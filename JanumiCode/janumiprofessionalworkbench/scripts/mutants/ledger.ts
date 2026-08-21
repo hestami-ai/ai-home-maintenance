@@ -2193,8 +2193,18 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// the gate runs: this mutation is now refused by the ENGINE at dispatch (VALIDATION_FAILED), and the victim
 		// reddens on the dispatch assertion rather than on the payload assertion. Two independent kills, which is
 		// what ratification bought.
-		find: "status: String((next.status ?? '') as string | number | boolean)",
-		replace: "status: '' // MUTANT: the resulting status is not recorded",
+		// ⚠ RE-ANCHORED 2026-08-21 (ledger rule #5: re-anchor IN THIS COMMIT). The one-line anchor
+		// `status: String((next.status ?? '') as ...)` became AMBIGUOUS the moment `acceptRecomposition` was
+		// added to this file and built its event payload the same idiomatic way — 2 occurrences, reported
+		// UNANCHORED by verif/mutant-ledger.test.ts before any mutation was attempted.
+		// ⚠ THE COLLISION IS NOT THE NEW CODE'S FAULT. That line is this file's normal way to record a
+		// resulting status, so a UNIQUE anchor has to carry the field naming WHICH event it belongs to.
+		// Anchoring on a common idiom is a LATENT ambiguity that surfaces only when someone writes the idiom
+		// a second time — which is what happened, and the gate caught it rather than a mutation run.
+		find:
+			"supersedesDecompositionContractId: command.targetAggregateId,\n\t\t\trationale: String((p.rationale ?? '') as string | number | boolean),\n\t\t\tsemanticVersion: Number(next.semanticVersion ?? 0),\n\t\t\tstatus: String((next.status ?? '') as string | number | boolean)",
+		replace:
+			"supersedesDecompositionContractId: command.targetAggregateId,\n\t\t\trationale: String((p.rationale ?? '') as string | number | boolean),\n\t\t\tsemanticVersion: Number(next.semanticVersion ?? 0),\n\t\t\tstatus: '' // MUTANT: the resulting status is not recorded",
 		expectRed: ["packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts"],
 		why: 'F-I: an audit record that omits the transition it records is not an audit record',
 		source: 'JPWB-SPEC-001-DR-002 F-I'

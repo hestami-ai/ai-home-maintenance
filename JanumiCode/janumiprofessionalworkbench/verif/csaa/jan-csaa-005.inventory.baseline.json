@@ -5688,7 +5688,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "34cfc7e29972300d1765077e1c9ac80df2fb4276e6e8d2d7e66efa8ddf31cce6",
+    "fileManifestDigest": "6b307c9ed901318894cad639b0f4c56cd0185d3e86d557275cb45167e5ee16d8",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -8884,9 +8884,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 45477,
+        "bytes": 51689,
         "path": "packages/rph-application/src/handlers/decomposition.ts",
-        "sha256": "a62dd8e184f2130ceda636f4935d83a419a4d2ebc3e14f2ae4d06c65c85cfe90",
+        "sha256": "594b98bbc38b6bf11a4c1030fe1e927e15445000e79e20c3be84d6aebb0e60ea",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -9346,16 +9346,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 14298,
+        "bytes": 21494,
         "path": "packages/rph-application/src/handlers/recomposition.test.ts",
-        "sha256": "49eb9e2c25924103878ef6eee2d7896f0f0e63f1025357bb8f695ddb1211e6ad",
+        "sha256": "87672e4fd4026cb56f47de04e9f6ab7b2f666de4e31ba8df099fc801e285f31c",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8612,
+        "bytes": 8677,
         "path": "packages/rph-application/src/handlers/registry.ts",
-        "sha256": "1e328785aeeba78ebff435374426b6d93a313b2e1c0912754974af966d9337f0",
+        "sha256": "fae93454edf3e3e3bc04e0d93c7bbcca6cef671a3bfb854c9f7e45e27a485cdd",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -10606,9 +10606,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 124397,
+        "bytes": 125200,
         "path": "packages/rph-contracts/src/messages.ts",
-        "sha256": "fa970fc087bb0c3c02866355cfb298bbbbc67c1fd5576b735264e5c7ee13fd98",
+        "sha256": "26f92de59848019bed6bc2706f1d23244c81a688a47a851b5d4170079f921d4a",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -10634,9 +10634,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11610,
+        "bytes": 11874,
         "path": "packages/rph-contracts/src/validate.test.ts",
-        "sha256": "8e8b7be8c92ff5f945891a01604539692ce172503aaee71dbf69577ce82ad477",
+        "sha256": "d73cd6ca011a294e1cdfbcc6a41fbf4aae91e2f880241c7d1b61d0c65997069e",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10676,9 +10676,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 367034,
+        "bytes": 371061,
         "path": "packages/rph-contracts/vocab/m3-commands-events.json",
-        "sha256": "ca8e8078f30771ee9ec01f65be6bcd6518a4fc2a4203338a982f11570f55bbda",
+        "sha256": "241afa792f2b48e8f4be160f10967dd4941750a411b08f326133e95f8a8c39bb",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -12013,9 +12013,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 284950,
+        "bytes": 286150,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "efdb5d40be21ef2b9b61d4b04fa9098d1f0b23bc1fae37d96b87d0f56cbefb4e",
+        "sha256": "5089327333416624683be7d8414f9bf33e2bb6d80b50bd1a1dd26cc7009787ea",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12148,14 +12148,14 @@
         "artifactClass": "VERIFICATION",
         "bytes": 26297,
         "path": "verif/arrow-census-coverage.test.ts",
-        "sha256": "9c475669d7b4733118fc53eb734cce6be3d038649ac6f6ea2e724ae2c23a1505",
+        "sha256": "14ebd858e03b99ecde58925db23d84eb96875eb4a2e6e570c529659d74de82dd",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7342,
+        "bytes": 7283,
         "path": "verif/arrow-command-census.baseline.json",
-        "sha256": "dcb9f055abe121b3df21fa150ef9721ccc7e070432d9c91de9c2271689a9fa7a",
+        "sha256": "c87eb9bfae19654879194a88e0e6710926772193ab612f45cbfaaf26df5ed608",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -12293,9 +12293,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 20140,
+        "bytes": 20693,
         "path": "verif/event-surface-census.test.ts",
-        "sha256": "dce3a34da71ee14e368c2438a2dc90be8144d3256196131bf3185f1fe485d8cb",
+        "sha256": "ca1e396b9d3756c8018c54ae8e9b995929c34c715ef56f7ea6875b1d847fb4ca",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12307,16 +12307,16 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 110414,
+        "bytes": 111511,
         "path": "verif/guard-enforcement-ledger.data.ts",
-        "sha256": "9f42401a4346e908882dcbe2e8639c1a75ae241c46efe1f0512ec86837ef2876",
+        "sha256": "5b7b57d8336229102927c55cee71d841a5a97df17a176f9155c468c93e99a782",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
         "bytes": 19242,
         "path": "verif/guard-enforcement-ledger.test.ts",
-        "sha256": "b380cd640755c1069e0b3c589868abf7c040d940b8213499aa63ac578d07b2c9",
+        "sha256": "9386d1e56b12a4fe1a962bba106c0a79eb150cdc64727e819cd3755000b11a71",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12426,9 +12426,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 24158,
+        "bytes": 24367,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "8994dee4f48963c5f38a42739d2960f987c2ced597b479992622fb7e37950ce8",
+        "sha256": "004363fa407992a692a8413386b0e1db30047da49974c79593234aa9f741e03d",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12516,7 +12516,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "2cec514337f2e52ab0c83cb4a476d3545a50c937d012770dd7c83c0332155778",
+    "subjectId": "752c5609954f35c3f9210b2263fadd304ed9754b854266e6e3cab5014d7b6370",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14929,7 +14929,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "efdb5d40be21ef2b9b61d4b04fa9098d1f0b23bc1fae37d96b87d0f56cbefb4e",
+      "contentSha256": "5089327333416624683be7d8414f9bf33e2bb6d80b50bd1a1dd26cc7009787ea",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15173,7 +15173,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/arrow-census-coverage.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "9c475669d7b4733118fc53eb734cce6be3d038649ac6f6ea2e724ae2c23a1505",
+      "contentSha256": "14ebd858e03b99ecde58925db23d84eb96875eb4a2e6e570c529659d74de82dd",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -15487,7 +15487,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/event-surface-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "dce3a34da71ee14e368c2438a2dc90be8144d3256196131bf3185f1fe485d8cb",
+      "contentSha256": "ca1e396b9d3756c8018c54ae8e9b995929c34c715ef56f7ea6875b1d847fb4ca",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -15521,7 +15521,7 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "9f42401a4346e908882dcbe2e8639c1a75ae241c46efe1f0512ec86837ef2876",
+      "contentSha256": "5b7b57d8336229102927c55cee71d841a5a97df17a176f9155c468c93e99a782",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -15538,7 +15538,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/guard-enforcement-ledger.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "b380cd640755c1069e0b3c589868abf7c040d940b8213499aa63ac578d07b2c9",
+      "contentSha256": "9386d1e56b12a4fe1a962bba106c0a79eb150cdc64727e819cd3755000b11a71",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -15796,7 +15796,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "8994dee4f48963c5f38a42739d2960f987c2ced597b479992622fb7e37950ce8",
+      "contentSha256": "004363fa407992a692a8413386b0e1db30047da49974c79593234aa9f741e03d",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

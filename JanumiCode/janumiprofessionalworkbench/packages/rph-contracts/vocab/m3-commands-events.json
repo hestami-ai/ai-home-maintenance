@@ -1968,6 +1968,30 @@
 			]
 		},
 		{
+			"commandType": "AcceptRecomposition",
+			"targetAggregateType": "RECOMPOSITION_CONTRACT",
+			"emitsEvent": "RecompositionAccepted",
+			"drivesMachine": "RecompositionContract.status",
+			"drivesFrom": "COMPOSABLE",
+			"drivesTo": "SATISFIED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (REG-D-044, 2026-08-21, delegated ruling). The corpus names NO command for this arrow: DOC-002 \u00a734.1 lists only beginRecomposition and completeRecomposition, and DOC-002 \u00a714 is a bare enum with NO transition matrix. \u26a0 THIS COMMAND DOES NOT PERFORM THE ACCEPTANCE \u2014 the ratified `decide` verb does, via ProposeDecision/ApproveDecision over a Decision whose subjectObjectIds name this contract (JPWB-DOC-001: 'recompose ... creating candidate parent state subject to assessment and decision'). It RECORDS THE EFFECT of an already-EFFECTIVE Decision on the contract aggregate, which is this engine's idiom for applying a Decision to another object (baselineBacksPwu, resolveWaiverAuthorization); the alternative, mutating the contract inside approveDecision, is a cross-aggregate write. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 \u00a714.1 bullet 6 (a recomposed result requires an explicit assessment); JPWB-DOC-001 (parent completion unavailable until required recomposition is accepted).",
+			"payloadFields": [
+				{
+					"field": "acceptanceDecisionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref to the EFFECTIVE APPROVAL Decision naming this contract in subjectObjectIds. REQUIRED and deliberately NOT defaulted: an acceptance whose authority is inferred rather than cited is the shape OBJ-1 prohibits and REG-F-041 measured."
+				},
+				{
+					"field": "parentAssessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref to a CONCLUDED ASSURANCE_ASSESSMENT whose claimIds include this contract's parentCompletionClaimId. This is DOC-002 \u00a714.1 bullet 6 \u2014 'a recomposed result requires an explicit assessment' \u2014 given a FIELD so the invariant has a consumer rather than a comment."
+				}
+			]
+		},
+		{
 			"commandType": "InvalidateEvidence",
 			"targetAggregateType": "EVIDENCE",
 			"emitsEvent": "EvidenceInvalidated",
@@ -6437,6 +6461,32 @@
 					"type": "enum",
 					"enumRef": "WorkLifecycleStateSchema",
 					"note": "parent PWU RECOMPOSING->RECOMPOSED"
+				}
+			]
+		},
+		{
+			"eventType": "RecompositionAccepted",
+			"aggregateType": "RecompositionContract",
+			"sourceSection": "UNRATIFIED-AUTHORED (REG-D-044, 2026-08-21, delegated ruling). The corpus names NO command for this arrow: DOC-002 \u00a734.1 lists only beginRecomposition and completeRecomposition, and DOC-002 \u00a714 is a bare enum with NO transition matrix. \u26a0 THIS COMMAND DOES NOT PERFORM THE ACCEPTANCE \u2014 the ratified `decide` verb does, via ProposeDecision/ApproveDecision over a Decision whose subjectObjectIds name this contract (JPWB-DOC-001: 'recompose ... creating candidate parent state subject to assessment and decision'). It RECORDS THE EFFECT of an already-EFFECTIVE Decision on the contract aggregate, which is this engine's idiom for applying a Decision to another object (baselineBacksPwu, resolveWaiverAuthorization); the alternative, mutating the contract inside approveDecision, is a cross-aggregate write. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 \u00a714.1 bullet 6 (a recomposed result requires an explicit assessment); JPWB-DOC-001 (parent completion unavailable until required recomposition is accepted).",
+			"payloadFields": [
+				{
+					"field": "acceptanceDecisionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref; the authority this acceptance rests on, carried on the EVENT because command_receipts stores only a payload_hash \u2014 the event is the only place a citation survives."
+				},
+				{
+					"field": "parentAssessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref; the explicit assessment DOC-002 \u00a714.1 bullet 6 requires."
+				},
+				{
+					"field": "status",
+					"required": true,
+					"type": "enum",
+					"enumRef": "RecompositionContractStatusSchema",
+					"note": "COMPOSABLE->SATISFIED"
 				}
 			]
 		},

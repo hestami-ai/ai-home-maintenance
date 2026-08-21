@@ -56,8 +56,8 @@ const COUNTS = {
 	// ledger read WORSE, which is what separates it from the reclassification the docblock below forbids. The
 	// next increment then ENFORCED the guard and re-drove the row (45->44, 14->15) — *"the way to move it is to
 	// enforce a guard and re-drive its row, never to reclassify one"*, done in that order rather than claimed.
-	ARROW_UNREACHABLE: 21,
-	ENFORCED: 15,
+	ARROW_UNREACHABLE: 20,
+	ENFORCED: 16,
 	REDUNDANT_WITH_MACHINE: 2,
 	UNENFORCED: 44
 };
@@ -253,7 +253,7 @@ describe('C-0b — every declared arrow guard is classified, and the ledger is p
 			{ arrowUnreachableRows: rows, vacuousBecauseCensusBlind: vacuous },
 			'the unreachability check can only speak about rows whose machines the census SEES; the rest pass by ' +
 				'construction. If this moves, the gate’s honest reach moved with it — re-derive before re-pinning.'
-		).toEqual({ arrowUnreachableRows: 21, vacuousBecauseCensusBlind: 9 });
+		).toEqual({ arrowUnreachableRows: 20, vacuousBecauseCensusBlind: 9 });
 	});
 
 	// ── THE OTHER DISMISSIVE DISPOSITION IS CHECKED TOO, AND UNLIKE THE LAST ONE IT IS WORTH IT ─────────────

@@ -122,7 +122,6 @@
 		"PWU.shapeIntegrityState  VIOLATED -> RESHAPING_REQUIRED",
 		"PwuType.status  DRAFT -> PUBLISHED",
 		"PwuType.status  PUBLISHED -> DEPRECATED",
-		"RecompositionContract.status  COMPOSABLE -> SATISFIED",
 		"RecompositionContract.status  COMPOSABLE -> SUPERSEDED",
 		"RecompositionContract.status  CONFLICTED -> SUPERSEDED",
 		"RecompositionContract.status  DRAFT -> READY",

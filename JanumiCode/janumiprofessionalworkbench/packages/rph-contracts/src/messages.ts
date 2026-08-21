@@ -489,6 +489,11 @@ export const CompleteRecompositionPayloadSchema = z.strictObject({
 	parentConstraintsHoldAgainstWhole: z.boolean().optional()
 });
 export type CompleteRecompositionPayload = z.infer<typeof CompleteRecompositionPayloadSchema>;
+export const AcceptRecompositionPayloadSchema = z.strictObject({
+	acceptanceDecisionId: z.string(),
+	parentAssessmentId: z.string()
+});
+export type AcceptRecompositionPayload = z.infer<typeof AcceptRecompositionPayloadSchema>;
 export const InvalidateEvidencePayloadSchema = z.strictObject({
 	invalidationReason: z.string(),
 	affectedClaimIds: z.array(z.string()).optional()
@@ -1519,6 +1524,12 @@ export const RecompositionCompletedPayloadSchema = z.strictObject({
 	workLifecycleState: WorkLifecycleStateSchema.optional()
 });
 export type RecompositionCompletedPayload = z.infer<typeof RecompositionCompletedPayloadSchema>;
+export const RecompositionAcceptedPayloadSchema = z.strictObject({
+	acceptanceDecisionId: z.string(),
+	parentAssessmentId: z.string(),
+	status: RecompositionContractStatusSchema
+});
+export type RecompositionAcceptedPayload = z.infer<typeof RecompositionAcceptedPayloadSchema>;
 export const RecompositionConflictDetectedPayloadSchema = z.strictObject({
 	conflictingChildWorkUnitIds: z.array(z.string()),
 	conflictDescription: z.string(),
@@ -2176,6 +2187,12 @@ export const COMMANDS = {
 		emitsEvent: 'RecompositionCompleted',
 		firstSlice: false
 	},
+	AcceptRecomposition: {
+		payload: AcceptRecompositionPayloadSchema,
+		targetAggregateType: 'RECOMPOSITION_CONTRACT',
+		emitsEvent: 'RecompositionAccepted',
+		firstSlice: false
+	},
 	InvalidateEvidence: {
 		payload: InvalidateEvidencePayloadSchema,
 		targetAggregateType: 'EVIDENCE',
@@ -2680,6 +2697,10 @@ export const EVENTS = {
 	PwuSuperseded: { payload: PwuSupersededPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	RecompositionCompleted: {
 		payload: RecompositionCompletedPayloadSchema,
+		aggregateType: 'RecompositionContract'
+	},
+	RecompositionAccepted: {
+		payload: RecompositionAcceptedPayloadSchema,
 		aggregateType: 'RecompositionContract'
 	},
 	RecompositionConflictDetected: {
