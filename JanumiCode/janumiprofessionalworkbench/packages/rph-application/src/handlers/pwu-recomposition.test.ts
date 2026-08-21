@@ -17,6 +17,7 @@ import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { RecompositionContractSchema } from '@janumipwb/rph-contracts';
 import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
 import {
@@ -239,6 +240,46 @@ describe('REG-D-044 S-1b — BeginPwuRecomposition and CompletePwuRecomposition'
 		);
 	}
 
+
+	/** Empty an EXISTING contract's required-child set.
+	 *
+	 * ⚠ THIS BYPASSES THE COMMAND BUS DELIBERATELY, AND A SURVIVING MUTANT IS WHY IT EXISTS. The test below
+	 * used to arrange this case through `ProposeRecomposition` — which REFUSES an empty composition (REG-F-041
+	 * S-0) — so the contract never existed and `BeginPwuRecomposition` refused on the FIRST conjunct, not the
+	 * second. The test read as coverage of the child-count limb and covered the parent-match limb twice.
+	 * `MU-F085B-begin-admits-an-empty-composition` SURVIVED and said so.
+	 *
+	 * The state this seeds is one the command surface can no longer mint — which is exactly the case the limb
+	 * is for: a contract written BEFORE S-0 landed. Re-parsed against the schema before writing, per
+	 * `pwu-fixtures.ts`'s rule that a fixture able to write a shape the contract forbids is its own defect. */
+	function emptyTheRequiredChildren(): void {
+		const stored = store.loadObject(RCP);
+		expect(stored, 'nothing to empty — the arrangement did not happen').toBeTruthy();
+		const nextState = RecompositionContractSchema.parse({
+			...RecompositionContractSchema.parse(stored!.state),
+			requiredChildWorkUnitIds: []
+		});
+		const result = store.commit({
+			aggregateType: 'RECOMPOSITION_CONTRACT',
+			aggregateId: RCP,
+			objectType: 'RECOMPOSITION_CONTRACT',
+			expectedRevision: stored!.revision,
+			newRevision: stored!.revision + 1,
+			newSemanticVersion: stored!.semanticVersion,
+			currentState: nextState,
+			events: [],
+			receipt: {
+				commandId: 'fixture-emptyRecompositionChildren',
+				idempotencyKey: 'fixture-emptyRecompositionChildren',
+				commandType: 'FixtureEmptyRecompositionChildren',
+				targetAggregateId: RCP,
+				status: 'ACCEPTED',
+				producedEventIds: []
+			}
+		});
+		expect(result.ok, 'fixture commit refused').toBe(true);
+	}
+
 	const begin = (contractId = RCP, pwu = PARENT) =>
 		dispatch('BeginPwuRecomposition', pwu, 'PROFESSIONAL_WORK_UNIT', {
 			recompositionContractId: contractId
@@ -291,21 +332,30 @@ describe('REG-D-044 S-1b — BeginPwuRecomposition and CompletePwuRecomposition'
 			expect(lifecycle()).toBe('SATISFIED');
 		});
 
-		it('REFUSES when the contract requires NO children — an empty set is not a recomposition', () => {
-			// The contract cannot be minted empty any more (REG-F-041 S-0 refuses it at PROPOSE), so this drives
-			// the conjunct directly: a contract requiring nothing makes every child check vacuously true.
+		it('CONTROL — S-0 still refuses to MINT an empty composition', () => {
 			const proposed = dispatch('ProposeRecomposition', RCP, 'RECOMPOSITION_CONTRACT', {
 				parentWorkUnitId: PARENT,
 				requiredChildWorkUnitIds: [],
 				parentCompletionClaimId: CLAIM,
 				conflictResolutionRules: []
 			});
-			expect(proposed.status, 'S-0 must still refuse this — if it ACCEPTS, REG-F-041 S-0 has regressed').toBe(
-				'REJECTED'
-			);
+			expect(proposed.status, 'if this ACCEPTS, REG-F-041 S-0 has regressed').toBe('REJECTED');
+		});
+
+		it('REFUSES when the contract requires NO children — an empty set is not a recomposition', () => {
+			// ⚠ THE ARRANGEMENT IS THE POINT. This case used to be built by proposing an empty contract, which
+			// S-0 refuses — so no contract existed and Begin refused on the FIRST conjunct while the test claimed
+			// to be about the second. `MU-F085B-begin-admits-an-empty-composition` SURVIVED and exposed it.
+			// A real contract is minted, THEN emptied, which is the one state this limb is actually for: a
+			// contract written before S-0 landed.
+			contract();
+			emptyTheRequiredChildren();
 			seedPwuWorkLifecycleState_FIXTURE(store, PARENT, 'SATISFIED');
 			const r = begin();
-			expect(r.status, 'and with no contract at all, Begin refuses on the first conjunct').toBe('REJECTED');
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message, 'the refusal must be about the CHILDREN, not the missing contract').toContain(
+				'requires no child work units'
+			);
 			expect(lifecycle()).toBe('SATISFIED');
 		});
 
