@@ -16,6 +16,7 @@ export * from './contracts/graph.js';
 export * from './contracts/logical-graph-composition.js';
 export * from './contracts/module-resolution-trace.js';
 export * from './contracts/project-context-graph.js';
+export * from './contracts/project-context-report.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
 export * from './contracts/structural-module-reachability-analysis.js';
@@ -78,6 +79,24 @@ export { validateGuardEnforcementLedgerObservation } from './providers/jpwb-guar
 export { buildModuleDependencyGraph } from './graph/build-module-dependency-graph.js';
 export { buildLogicalGraphComposition } from './graph/build-logical-graph-composition.js';
 export { buildProjectContextGraph } from './graph/build-project-context-graph.js';
+export {
+	runProjectContextReport,
+	PROJECT_CONTEXT_REPORT_PROGRESS_NONCLAIMS,
+	PROJECT_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION,
+	projectContextReportExitCode,
+	type ProjectContextReportProgressEvent,
+	type ProjectContextReportProgressObservation,
+	type ProjectContextReportProgressObservationBasis,
+	type ProjectContextReportProgressObservationMetric,
+	type ProjectContextReportProgressPhase,
+	type RunProjectContextReportOptions
+} from './application/run-project-context-report.js';
+export {
+	PROJECT_CONTEXT_PROGRESS_MAX_BYTES,
+	PROJECT_CONTEXT_PROGRESS_MAX_EVENTS,
+	PROJECT_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type ProjectContextProgressTransportTruncation
+} from './application/project-context-progress-jsonl.js';
 export { buildConditionalExportResolution } from './resolution/build-conditional-export-resolution.js';
 export { buildModuleResolutionTrace } from './resolution/build-module-resolution-trace.js';
 export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';

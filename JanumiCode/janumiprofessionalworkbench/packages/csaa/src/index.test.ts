@@ -41,6 +41,16 @@ import {
 	PROJECT_CONTEXT_GRAPH_PROGRESS_SCHEMA_VERSION,
 	PROJECT_CONTEXT_GRAPH_REQUEST_SCHEMA_VERSION,
 	PROJECT_CONTEXT_GRAPH_SCHEMA_VERSION,
+	PROJECT_CONTEXT_PROGRESS_MAX_BYTES,
+	PROJECT_CONTEXT_PROGRESS_MAX_EVENTS,
+	PROJECT_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	PROJECT_CONTEXT_REPORT_NONCLAIMS,
+	PROJECT_CONTEXT_REPORT_OPERATION_VERSION,
+	PROJECT_CONTEXT_REPORT_PROGRESS_NONCLAIMS,
+	PROJECT_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION,
+	PROJECT_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION,
+	PROJECT_CONTEXT_REPORT_RESULT_SCHEMA_VERSION,
+	PROJECT_CONTEXT_REPORT_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
 	READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_SCHEMA_VERSION,
@@ -106,6 +116,8 @@ import {
 	buildModuleDependencyGraph,
 	buildLogicalGraphComposition,
 	buildProjectContextGraph,
+	runProjectContextReport,
+	projectContextReportExitCode,
 	buildStructuralModuleReachabilityAnalysis,
 	runStructuralModuleReachabilityReport,
 	structuralModuleReachabilityReportExitCode,
@@ -173,6 +185,9 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
 		expect(buildLogicalGraphComposition).toBeTypeOf('function');
 		expect(buildProjectContextGraph).toBeTypeOf('function');
+		expect(runProjectContextReport).toBeTypeOf('function');
+		expect(projectContextReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createProjectContextProgressJsonlWriter');
 		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(runStructuralModuleReachabilityReport).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty(
@@ -410,6 +425,29 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-project-context-graph-request/1.0.0'
 		);
 		expect(PROJECT_CONTEXT_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-project-context-graph/1.0.0');
+		expect(PROJECT_CONTEXT_REPORT_OPERATION_VERSION).toBe('jan-csaa-report-project-context/0.1.0');
+		expect(PROJECT_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-project-context-report-progress/0.1.0'
+		);
+		expect(PROJECT_CONTEXT_REPORT_PROGRESS_NONCLAIMS).toEqual({
+			dwp006Completion: 'NOT_CLAIMED',
+			facadeNonclaims: PROJECT_CONTEXT_REPORT_NONCLAIMS,
+			janCsaa007OperationProgressResponse: 'NOT_CLAIMED',
+			runtimeOutcomeInvariance: 'NOT_CLAIMED',
+			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
+		});
+		expect(PROJECT_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-project-context-progress-transport/0.1.0'
+		);
+		expect(PROJECT_CONTEXT_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(PROJECT_CONTEXT_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(PROJECT_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-project-context-report-request/0.1.0'
+		);
+		expect(PROJECT_CONTEXT_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-project-context-report-result/0.1.0'
+		);
+		expect(PROJECT_CONTEXT_REPORT_SCHEMA_VERSION).toBe('jan-csaa-project-context-report/0.1.0');
 		expect(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION).toBe(
 			'jan-csaa-analyze-structural-module-reachability/0.1.0'
 		);
