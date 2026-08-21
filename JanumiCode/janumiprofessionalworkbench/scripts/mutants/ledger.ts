@@ -2952,6 +2952,31 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "THE CONTROL'S OWN MUTANT, which the other two cannot supply. Both of them arrange a BLOCKING floor, so a panel that rendered the blocked hint and the waiver form UNCONDITIONALLY would pass both while lying on every satisfied floor — and the spec's third test exists precisely for that world. `{#if data.floor}` rather than `{#if true}` is the realistic slip (an existence check standing in for a state check) and it typechecks, where `if (true)` invites the dead-code NO_COMPILE this ledger's header documents. It is inside the outer `{#if data.floor}` block, so it is unconditionally true there. OBSERVED 2026-08-20, and the attribution is the point rather than the kill: tests 1 and 2 both PASS under this mutation (they arrange BLOCKING floors, where the hint renders either way) and ONLY the control at :213 fails, on `floor-blocked-hint` toHaveCount(0). A control whose mutant reddened a sibling would be measuring nothing of its own.",
 		source: 'REG-F-202 (a control needs its own mutant)'
 	},
+	// ── REG-F-202: floorGateBlock's OWN decision, which had no declared mutant ────────────────────────────────
+	// ⚠ FILED AS A COVERAGE GAP IN THE LEDGER ITSELF. Three mutants already name `floor-gate.ts` (WP11-M7/M8/M9)
+	// and ALL THREE aim at ADMISSIBILITY — `aiProduced`, `subjectCount`, `structuredResultHasContent` — i.e. at
+	// whether the gate RUNS. Not one aimed at what it DECIDES once it runs. The ASR-3 increment rewrote exactly
+	// that line and retired the only mutant that had touched the surrounding function, so the post-change
+	// predicate shipped with no declared mutation at all. A ledger can be dense around a file and empty at its
+	// decision.
+	{
+		id: 'MU-F202-the-floor-blocks-only-on-REJECTED',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: "\t\t.filter((r) => r.disposition !== 'SATISFIED')",
+		replace: "\t\t.filter((r) => r.disposition === 'REJECTED')",
+		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
+		why: "THE REALISTIC FAIL-OPEN, not an invented one: narrowing 'anything that is not SATISFIED blocks' to 'only an explicit REJECTED blocks' lets an assessment that is still ASSESSING, or INCONCLUSIVE, or MISSING entirely, pass the de minimis floor. ⚠ THE VICTIM WAS CHOSEN BECAUSE ITS ARRANGEMENT DISCRIMINATES: `assurance-floor-waiver.e2e.ts` stages a blocking floor by leaving the latest reasoning-review assessment in ASSESSING with a BLOCKING observation — deliberately NOT completed to REJECTED — so under this mutation that floor stops blocking and PublishPwa is admitted where the spec asserts refusal. `assurance-floor.e2e.ts` would NOT discriminate: its blocked case is a genuinely REJECTED review, which this mutation still blocks.",
+		source: 'REG-F-202 (ASR-3: the de minimis floor is UNCONDITIONAL)'
+	},
+	{
+		id: 'MU-F202-the-floor-blocks-everything',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: "\t\t.filter((r) => r.disposition !== 'SATISFIED')",
+		replace: '\t\t.filter(() => true)',
+		expectRed: ['apps/rph-demo/e2e/assurance-floor.e2e.ts'],
+		why: "THE OPPOSITE-POLARITY PAIR, and the one that defends the CONTROL. A gate that blocked unconditionally would satisfy every refusal assertion in the suite — including its sibling's — while making publication impossible for a perfectly satisfied floor. The victim is the spec whose FIRST test drives a clean graph all the way to PUBLISHED, so the kill lands on the admit path rather than on any refusal. ⚠ Same anchor as its sibling by design: the one line IS the decision, and the two mutations fail in opposite directions.",
+		source: 'REG-F-202 (a control needs its own mutant)'
+	},
 	// ── REG-F-041 S-0: an empty composition is not a composition ──────────────────────────────────────────────
 	// `requiredChildWorkUnitIds` had no `.min(1)` (both schemas are GENERATED, so the constraint has no home
 	// there) and `buildRecompositionInput` read it `?? []`. With an empty list the kernel's child rung —
