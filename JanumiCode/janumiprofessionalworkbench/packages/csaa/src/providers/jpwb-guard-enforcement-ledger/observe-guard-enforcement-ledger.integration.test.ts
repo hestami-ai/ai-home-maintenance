@@ -218,8 +218,12 @@ describe('JPWB retained guard-enforcement ledger real-subject integration', () =
 				// baseline move, not a weakening: the enforcedWithoutSite / enforcedAnchorBroken assertions below
 				// are deliberately untouched, so a row that claimed ENFORCED without a resolvable site would
 				// still redden this test.
-				{ count: 21, disposition: 'ARROW_UNREACHABLE' },
-				{ count: 15, disposition: 'ENFORCED' },
+				// ⚠ 21->20 / 15->16 (2026-08-21, REG-D-044 / S-1a). This is a JPWB change reaching a CSAA baseline:
+				// `acceptRecomposition` gave RecompositionContract.status COMPOSABLE->SATISFIED a driver, so the guard
+				// 'a recomposed result requires an explicit assessment' moved ARROW_UNREACHABLE -> ENFORCED in
+				// verif/guard-enforcement-ledger.data.ts. The TOTAL is preserved (82); one row changed bucket.
+				{ count: 20, disposition: 'ARROW_UNREACHABLE' },
+				{ count: 16, disposition: 'ENFORCED' },
 				{ count: 2, disposition: 'REDUNDANT_WITH_MACHINE' },
 				{ count: 44, disposition: 'UNENFORCED' }
 			],
