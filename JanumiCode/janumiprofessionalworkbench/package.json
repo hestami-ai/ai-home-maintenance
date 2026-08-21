@@ -27,6 +27,7 @@
 		"spec:obligations": "bun run scripts/spec-obligations.ts",
 		"csaa:inventory": "bun run scripts/csaa-inventory.ts --write",
 		"csaa:inventory:check": "bun run scripts/csaa-inventory.ts --check",
+		"csaa:analyze:declaration-context": "bun scripts/csaa-declaration-context.ts",
 		"csaa:analyze:module-resolution-trace": "bun scripts/csaa-module-resolution-trace.ts",
 		"csaa:analyze:project-context": "bun run scripts/csaa-project-context.ts",
 		"csaa:analyze:structural-module-reachability": "bun run scripts/csaa-structural-module-reachability.ts",

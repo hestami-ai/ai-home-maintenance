@@ -14,6 +14,18 @@ import {
 	DECLARATION_CONTEXT_ANALYSIS_PROGRESS_SCHEMA_VERSION,
 	DECLARATION_CONTEXT_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	DECLARATION_CONTEXT_ANALYSIS_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_PROGRESS_MAX_BYTES,
+	DECLARATION_CONTEXT_PROGRESS_MAX_EVENTS,
+	DECLARATION_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_NONCLAIMS,
+	DECLARATION_CONTEXT_REPORT_OPERATION_VERSION,
+	DECLARATION_CONTEXT_REPORT_PREDECESSOR_NONCLAIMS,
+	DECLARATION_CONTEXT_REPORT_PROGRESS_NONCLAIMS,
+	DECLARATION_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_RESULT_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_SELECTION,
 	SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION,
 	SOURCE_ORIGIN_CORRELATION_PROGRESS_SCHEMA_VERSION,
 	SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION,
@@ -117,6 +129,7 @@ import {
 	buildCallGraph,
 	buildConditionalExportResolution,
 	buildDeclarationContextAnalysis,
+	declarationContextReportExitCode,
 	buildSourceOriginCorrelation,
 	buildModuleResolutionTrace,
 	moduleResolutionTraceReportExitCode,
@@ -130,6 +143,7 @@ import {
 	buildLogicalGraphComposition,
 	buildProjectContextGraph,
 	runProjectContextReport,
+	runDeclarationContextReport,
 	runModuleResolutionTraceReport,
 	projectContextReportExitCode,
 	buildStructuralModuleReachabilityAnalysis,
@@ -188,6 +202,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
 		expect(buildConditionalExportResolution).toBeTypeOf('function');
 		expect(buildDeclarationContextAnalysis).toBeTypeOf('function');
+		expect(runDeclarationContextReport).toBeTypeOf('function');
+		expect(declarationContextReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createDeclarationContextProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runDeclarationContextCommand');
+		expect(publicSurface).not.toHaveProperty('admitModuleResolutionTraceReportRequest');
+		expect(publicSurface).not.toHaveProperty('captureModuleResolutionTraceReportPipeline');
 		expect(buildSourceOriginCorrelation).toBeTypeOf('function');
 		expect(buildModuleResolutionTrace).toBeTypeOf('function');
 		expect(runModuleResolutionTraceReport).toBeTypeOf('function');
@@ -322,6 +342,49 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(DECLARATION_CONTEXT_ANALYSIS_SCHEMA_VERSION).toBe(
 			'jan-csaa-declaration-context-analysis/1.0.0'
 		);
+		expect(DECLARATION_CONTEXT_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-declaration-context/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-report-request/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-report-result/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-report/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-report-progress/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-declaration-context-progress-transport/0.1.0'
+		);
+		expect(DECLARATION_CONTEXT_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(DECLARATION_CONTEXT_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(DECLARATION_CONTEXT_REPORT_NONCLAIMS).toContain(
+			'COMPILER_CONTEXT_OR_CONTEXT_ONLY_TARGET_FILESYSTEM_CURRENTNESS'
+		);
+		expect(DECLARATION_CONTEXT_REPORT_NONCLAIMS).not.toContain('CURRENTNESS_OR_FRESHNESS');
+		expect(DECLARATION_CONTEXT_REPORT_SELECTION).toMatchObject({
+			declarationContext: {
+				criterion:
+					'ONE_EXACT_PACKAGE_ROOT_EXPORT_DECLARATION_BINDING_IN_CAP011_SELECTED_DECLARATION_TARGET'
+			},
+			moduleResolution: {
+				moduleMode: 'IMPORT',
+				occurrenceKind: 'IMPORT',
+				typeOnly: false,
+				valueKind: 'VALUE_NON_TYPE_ONLY'
+			}
+		});
+		expect(DECLARATION_CONTEXT_REPORT_PREDECESSOR_NONCLAIMS.declarationContextAnalysis).toContain(
+			'CURRENTNESS_OR_FRESHNESS'
+		);
+		expect(DECLARATION_CONTEXT_REPORT_PROGRESS_NONCLAIMS).toMatchObject({
+			compilerCaptureCurrentness: 'NOT_ASSESSED',
+			targetArtifactCurrentness: 'NOT_ASSESSED'
+		});
 		expect(SOURCE_ORIGIN_CORRELATION_OPERATION_VERSION).toBe(
 			'jan-csaa-build-source-origin-correlation/0.1.0'
 		);

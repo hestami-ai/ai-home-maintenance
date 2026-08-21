@@ -7,7 +7,8 @@ import {
 	CONDITIONAL_EXPORT_RESOLUTION_SELECTION,
 	type ConditionalExportResolutionBuildInputs,
 	type ConditionalExportResolutionBudgets,
-	type ConditionalExportResolutionProgressEvent
+	type ConditionalExportResolutionProgressEvent,
+	type ConditionalExportResolutionSnapshot
 } from '../contracts/conditional-export-resolution.js';
 import {
 	MODULE_RESOLUTION_TRACE_OPERATION_VERSION,
@@ -15,7 +16,8 @@ import {
 	MODULE_RESOLUTION_TRACE_SELECTION,
 	type ModuleResolutionTraceBudgets,
 	type ModuleResolutionTraceBuildInputs,
-	type ModuleResolutionTraceProgressEvent
+	type ModuleResolutionTraceProgressEvent,
+	type ModuleResolutionTraceSnapshot
 } from '../contracts/module-resolution-trace.js';
 import {
 	MODULE_RESOLUTION_TRACE_REPORT_NONCLAIMS,
@@ -37,19 +39,22 @@ import {
 	PROJECT_CONTEXT_GRAPH_OPERATION_VERSION,
 	PROJECT_CONTEXT_GRAPH_REQUEST_SCHEMA_VERSION,
 	PROJECT_CONTEXT_GRAPH_SELECTION,
-	type ProjectContextGraphBudgets
+	type ProjectContextGraphBudgets,
+	type ProjectContextGraphSnapshot
 } from '../contracts/project-context-graph.js';
 import {
 	SEMANTIC_BUDGET_KEYS,
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
-	type SemanticBudgets
+	type SemanticBudgets,
+	type StaticSemanticSnapshot
 } from '../contracts/semantic.js';
 import {
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
 	type FrozenSubject,
 	type SubjectBudgets,
+	type SubjectCompleteness,
 	type SubjectDiagnostic,
 	type SubjectResolutionOutcome
 } from '../contracts/subject.js';
@@ -307,6 +312,52 @@ export interface RunModuleResolutionTraceReportOptions {
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
 }
+
+/**
+ * Trusted application-only handoff for a same-process successor capability. It is deliberately not
+ * exported from the package root and is never serialized as report evidence.
+ */
+export interface ModuleResolutionTraceReportPipelineCapture {
+	readonly conditionalExportRequest: ConditionalExportResolutionBuildInputs['request'];
+	readonly conditionalExportResolution: ConditionalExportResolutionSnapshot;
+	readonly diagnostics: readonly ModuleResolutionTraceReportDiagnostic[];
+	readonly frozenSubject: FrozenSubject;
+	readonly moduleResolutionRequest: ModuleResolutionTraceBuildInputs['request'];
+	readonly moduleResolutionTrace: ModuleResolutionTraceSnapshot;
+	readonly outcome: 'captured';
+	readonly predecessorStageOutcomes: {
+		readonly conditionalExport: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'partial';
+		};
+		readonly moduleResolutionTrace: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'partial';
+		};
+		readonly projectContext: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'partial';
+		};
+		readonly semanticSnapshot: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'complete' | 'partial';
+		};
+		readonly subject: {
+			readonly completeness: SubjectCompleteness;
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'resolved';
+		};
+	};
+	readonly projectContextGraph: ProjectContextGraphSnapshot;
+	/** Canonical absolute root retained only for the same-process trusted successor. */
+	readonly repositoryRoot: string;
+	readonly request: ModuleResolutionTraceReportRequest;
+	readonly semanticSnapshot: StaticSemanticSnapshot;
+}
+
+export type ModuleResolutionTraceReportPipelineOutcome =
+	| ModuleResolutionTraceReportPipelineCapture
+	| Extract<ModuleResolutionTraceReportOutcome, { readonly outcome: 'unavailable' }>;
 
 function createProgressRecorder(options: RunModuleResolutionTraceReportOptions): ProgressRecorder {
 	let sink: ((event: ModuleResolutionTraceReportProgressEvent) => unknown) | undefined;
@@ -754,6 +805,47 @@ function materializeRequest(value: unknown): ModuleResolutionTraceReportRequest 
 	});
 }
 
+export type ModuleResolutionTraceReportRequestAdmission =
+	| {
+			readonly outcome: 'admitted';
+			readonly request: ModuleResolutionTraceReportRequest;
+	  }
+	| {
+			readonly code: string;
+			readonly message: string;
+			readonly outcome: 'rejected';
+			readonly path: string;
+			readonly state: ModuleResolutionTraceReportFailureState;
+	  };
+
+/** @internal Exact hostile-safe request admission shared only with same-process successor facades. */
+export function admitModuleResolutionTraceReportRequest(
+	requestValue: unknown
+): ModuleResolutionTraceReportRequestAdmission {
+	try {
+		return Object.freeze({
+			outcome: 'admitted' as const,
+			request: materializeRequest(requestValue)
+		});
+	} catch (error) {
+		if (error instanceof ReportRequestError)
+			return Object.freeze({
+				code: error.code,
+				message: error.message,
+				outcome: 'rejected' as const,
+				path: error.path,
+				state: error.state
+			});
+		return Object.freeze({
+			code: 'REQUEST_INVALID',
+			message: 'The report request could not be inspected safely.',
+			outcome: 'rejected' as const,
+			path: '$',
+			state: 'incompatible' as const
+		});
+	}
+}
+
 function reportDiagnostic(
 	code: string,
 	message: string,
@@ -902,21 +994,16 @@ function existingFile(
 function runInternal(
 	requestValue: unknown,
 	options: RunModuleResolutionTraceReportOptions,
-	progress: ProgressRecorder
-): ModuleResolutionTraceReportOutcome {
+	progress: ProgressRecorder,
+	capturePipeline = false
+): ModuleResolutionTraceReportOutcome | ModuleResolutionTraceReportPipelineCapture {
 	progress.start('REQUEST_BIND');
-	let request: ModuleResolutionTraceReportRequest;
-	try {
-		request = materializeRequest(requestValue);
-	} catch (error) {
-		if (error instanceof ReportRequestError)
-			return failure(error.code, 'REQUEST', error.state, [
-				reportDiagnostic(error.code, error.message, error.path, 'REQUEST')
-			]);
-		return failure('REQUEST_INVALID', 'REQUEST', 'incompatible', [
-			reportDiagnostic('REQUEST_INVALID', 'The report request could not be inspected safely.', '$')
+	const admission = admitModuleResolutionTraceReportRequest(requestValue);
+	if (admission.outcome === 'rejected')
+		return failure(admission.code, 'REQUEST', admission.state, [
+			reportDiagnostic(admission.code, admission.message, admission.path, 'REQUEST')
 		]);
-	}
+	const request = admission.request;
 
 	let repositoryRoot: string;
 	try {
@@ -1385,6 +1472,51 @@ function runInternal(
 		],
 		'PARTIAL'
 	);
+	const predecessorStageOutcomes: ModuleResolutionTraceReportPipelineCapture['predecessorStageOutcomes'] =
+		{
+			conditionalExport: {
+				diagnosticCodes: conditionalOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: 'partial'
+			},
+			moduleResolutionTrace: {
+				diagnosticCodes: traceOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: 'partial'
+			},
+			projectContext: {
+				diagnosticCodes: projectContextOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: 'partial'
+			},
+			semanticSnapshot: {
+				diagnosticCodes: semanticOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: semanticOutcome.outcome
+			},
+			subject: {
+				completeness: subjectOutcome.completeness,
+				diagnosticCodes: subjectOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: 'resolved'
+			}
+		};
+	if (capturePipeline)
+		return Object.freeze({
+			conditionalExportRequest: conditionalInputs.request,
+			conditionalExportResolution: conditionalResolution,
+			diagnostics: Object.freeze([
+				...subjectDiagnostics,
+				...semanticDiagnostics,
+				...projectContextDiagnostics,
+				...conditionalDiagnostics,
+				...traceDiagnostics
+			]),
+			frozenSubject: subject,
+			moduleResolutionRequest: traceInputs.request,
+			moduleResolutionTrace: trace,
+			outcome: 'captured' as const,
+			predecessorStageOutcomes: Object.freeze(predecessorStageOutcomes),
+			projectContextGraph: graph,
+			repositoryRoot,
+			request,
+			semanticSnapshot: snapshot
+		});
 
 	progress.start('CURRENTNESS');
 	let freshness: ReturnType<typeof verifyFrozenSubject>;
@@ -1441,30 +1573,10 @@ function runInternal(
 			subject
 		);
 	const stageOutcomes: ModuleResolutionTraceReportStageOutcomes = {
-		conditionalExport: {
-			diagnosticCodes: conditionalOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'partial'
-		},
+		...predecessorStageOutcomes,
 		currentness: {
 			diagnosticCodes: freshness.diagnostics.map((diagnostic) => diagnostic.code),
 			state: currentnessState
-		},
-		moduleResolutionTrace: {
-			diagnosticCodes: traceOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'partial'
-		},
-		projectContext: {
-			diagnosticCodes: projectContextOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'partial'
-		},
-		semanticSnapshot: {
-			diagnosticCodes: semanticOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: semanticOutcome.outcome
-		},
-		subject: {
-			completeness: subjectOutcome.completeness,
-			diagnosticCodes: subjectOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'resolved'
 		}
 	};
 	const report: ModuleResolutionTraceReportOutcome = {
@@ -1586,7 +1698,29 @@ export function runModuleResolutionTraceReport(
 ): ModuleResolutionTraceReportOutcome {
 	const progress = createProgressRecorder(options);
 	try {
-		return progress.finish(runInternal(requestValue, options, progress));
+		const outcome = runInternal(requestValue, options, progress);
+		if (outcome.outcome === 'captured')
+			throw new Error('The public CAP-011 report path returned an internal pipeline capture.');
+		return progress.finish(outcome);
+	} catch (error) {
+		progress.fail([], 'INTERNAL_FAILURE');
+		throw error;
+	}
+}
+
+/** @internal Same-process successor seam; never export from the package root or serialize. */
+export function captureModuleResolutionTraceReportPipeline(
+	requestValue: unknown,
+	options: RunModuleResolutionTraceReportOptions
+): ModuleResolutionTraceReportPipelineOutcome {
+	const progress = createProgressRecorder(options);
+	try {
+		const outcome = runInternal(requestValue, options, progress, true);
+		if (outcome.outcome === 'captured') return outcome;
+		const terminal = progress.finish(outcome);
+		if (terminal.outcome !== 'unavailable')
+			throw new Error('The internal CAP-011 pipeline returned a terminal partial report.');
+		return terminal;
 	} catch (error) {
 		progress.fail([], 'INTERNAL_FAILURE');
 		throw error;

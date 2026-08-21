@@ -2,6 +2,7 @@ export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
 export * from './contracts/conditional-export-resolution.js';
 export * from './contracts/declaration-context-analysis.js';
+export * from './contracts/declaration-context-report.js';
 export * from './contracts/source-origin-correlation.js';
 export * from './contracts/arrow-command-census.js';
 export * from './contracts/command-handler-graph.js';
@@ -118,6 +119,24 @@ export {
 	MODULE_RESOLUTION_TRACE_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type ModuleResolutionTraceProgressTransportTruncation
 } from './application/module-resolution-trace-progress-jsonl.js';
+
+export {
+	declarationContextReportExitCode,
+	runDeclarationContextReport,
+	DECLARATION_CONTEXT_REPORT_PROGRESS_NONCLAIMS,
+	DECLARATION_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION,
+	type DeclarationContextReportProgressEvent,
+	type DeclarationContextReportProgressObservation,
+	type DeclarationContextReportProgressPhase,
+	type RunDeclarationContextReportOptions
+} from './application/run-declaration-context-report.js';
+
+export {
+	DECLARATION_CONTEXT_PROGRESS_MAX_BYTES,
+	DECLARATION_CONTEXT_PROGRESS_MAX_EVENTS,
+	DECLARATION_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type DeclarationContextProgressTransportTruncation
+} from './application/declaration-context-progress-jsonl.js';
 export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';
 export { buildSourceOriginCorrelation } from './semantic/build-source-origin-correlation.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';

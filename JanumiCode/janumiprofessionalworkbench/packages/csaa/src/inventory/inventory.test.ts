@@ -52,6 +52,14 @@ import {
 	DECLARATION_CONTEXT_ANALYSIS_SELECTION
 } from '../contracts/declaration-context-analysis.js';
 import {
+	DECLARATION_CONTEXT_REPORT_NONCLAIMS,
+	DECLARATION_CONTEXT_REPORT_OPERATION_VERSION,
+	DECLARATION_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_RESULT_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_SCHEMA_VERSION,
+	DECLARATION_CONTEXT_REPORT_SELECTION
+} from '../contracts/declaration-context-report.js';
+import {
 	GUARD_ENFORCEMENT_LEDGER_ADAPTER_ID,
 	GUARD_ENFORCEMENT_LEDGER_INTEGRATION_STRATEGY,
 	GUARD_ENFORCEMENT_LEDGER_METHOD,
@@ -144,6 +152,13 @@ import {
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION
 } from '../contracts/structural-module-reachability-analysis.js';
 import {
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_RESULT_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION
+} from '../contracts/structural-module-reachability-report.js';
+import {
 	STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER,
 	STRUCTURAL_SCC_ANALYSIS_CAPABILITY,
 	STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS,
@@ -178,6 +193,8 @@ const STRUCTURAL_SCC_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_SCC vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_MODULE_REACHABILITY vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND =
+	'bun run scripts/csaa-structural-module-reachability.ts';
 const LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=FULL CSAA_REPOSITORY_SMOKE_SUITE=LOGICAL_GRAPH_COMPOSITION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
@@ -190,6 +207,7 @@ const MODULE_RESOLUTION_TRACE_ONLY_SMOKE_COMMAND =
 const MODULE_RESOLUTION_TRACE_REPORT_COMMAND = 'bun scripts/csaa-module-resolution-trace.ts';
 const DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=DECLARATION_CONTEXT_ANALYSIS vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const DECLARATION_CONTEXT_REPORT_COMMAND = 'bun scripts/csaa-declaration-context.ts';
 const SOURCE_ORIGIN_CORRELATION_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=SOURCE_ORIGIN_CORRELATION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const LEGACY_STRUCTURAL_FULL_SUITE_SMOKE_COMMAND =
@@ -204,6 +222,17 @@ const LOGICAL_GRAPH_COMPOSITION_PROVENANCE = [
 	'packages/csaa/src/graph/build-logical-graph-composition.test.ts',
 	'packages/csaa/src/graph/logical-graph-composition-coverage.test.ts',
 	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/structural-module-reachability-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/application/run-structural-module-reachability-report.ts',
+	'packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts',
+	'packages/csaa/src/application/run-structural-module-reachability-report.test.ts',
+	'packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts',
+	'packages/csaa/src/application/structural-module-reachability-command.test.ts',
+	'scripts/csaa-structural-module-reachability.ts'
 ] as const;
 const PROJECT_CONTEXT_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/project-context-graph.ts',
@@ -287,6 +316,20 @@ const DECLARATION_CONTEXT_ANALYSIS_PROVENANCE = [
 	'packages/csaa/src/semantic/validate-declaration-context-analysis.test.ts',
 	'packages/csaa/src/semantic/validate-declaration-context-analysis.ts'
 ] as const;
+const DECLARATION_CONTEXT_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/declaration-context-report.ts',
+	'packages/csaa/src/contracts/module-resolution-trace-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/application/declaration-context-command.test.ts',
+	'packages/csaa/src/application/declaration-context-progress-jsonl.test.ts',
+	'packages/csaa/src/application/run-declaration-context-report.ts',
+	'packages/csaa/src/application/run-declaration-context-command.ts',
+	'packages/csaa/src/application/declaration-context-progress-jsonl.ts',
+	'packages/csaa/src/application/run-declaration-context-report.test.ts',
+	'packages/csaa/src/application/run-module-resolution-trace-report.ts',
+	'scripts/csaa-declaration-context.ts'
+] as const;
 const SOURCE_ORIGIN_CORRELATION_PROVENANCE = [
 	'package.json',
 	'packages/csaa/src/contracts/source-origin-correlation.ts',
@@ -315,6 +358,7 @@ function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:semantic:smoke:declaration-context-analysis') {
 		return DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND;
 	}
+	if (name === 'csaa:analyze:declaration-context') return DECLARATION_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:semantic:smoke:source-origin-correlation') {
 		return SOURCE_ORIGIN_CORRELATION_ONLY_SMOKE_COMMAND;
 	}
@@ -333,6 +377,9 @@ function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
 		return STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND;
+	}
+	if (name === 'csaa:analyze:structural-module-reachability') {
+		return STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND;
 	}
 	return name === 'csaa:semantic:smoke:structural-scc' ? STRUCTURAL_SCC_ONLY_SMOKE_COMMAND : 'true';
 }
@@ -758,6 +805,7 @@ describe('inventory discovery and identity', () => {
 			state: 'PARTIAL'
 		});
 		for (const expectedProvenance of [
+			...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 			'capabilities#dependency-graph',
 			'capabilities#symbol-table',
 			'capabilities#typescript-ast',
@@ -774,7 +822,8 @@ describe('inventory discovery and identity', () => {
 			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
 			'packages/csaa/src/providers/typescript/extract-symbols.ts',
 			'packages/csaa/src/semantic/repository-smoke.test.ts',
-			'package.json#/scripts/csaa:semantic:smoke:structural-module-reachability'
+			'package.json#/scripts/csaa:semantic:smoke:structural-module-reachability',
+			'package.json#/scripts/csaa:analyze:structural-module-reachability'
 		])
 			expect(structuralModuleReachabilityCapability!.provenance.includes(expectedProvenance)).toBe(
 				true
@@ -792,7 +841,12 @@ describe('inventory discovery and identity', () => {
 			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.edgePopulation,
 			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.parallelEdges,
 			STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SELECTION.witnessPolicy,
-			...STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_NONCLAIMS
+			...STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_NONCLAIMS,
+			STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
+			STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION,
+			STRUCTURAL_MODULE_REACHABILITY_REPORT_RESULT_SCHEMA_VERSION,
+			STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION,
+			...STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS
 		])
 			expect(structuralModuleReachabilityCapability!.explanation).toContain(exactBoundary);
 		for (const boundary of [
@@ -803,6 +857,18 @@ describe('inventory discovery and identity', () => {
 			'structural closure is exact only within that one validated graph and criterion',
 			'upstream closure may remain OPEN',
 			'Unvisited nodes have no irrelevance or non-impact meaning',
+			'implementation-local preliminary coding-agent report facade',
+			'one explicit bounded project set plus one exact project/logical-path criterion and one FORWARD or REVERSE direction',
+			'runs the partial CAP-027 analysis',
+			'maxResultBytes-bounded admitted partial',
+			'bounded predecessor-forest witness evidence',
+			'CURRENT_FOR_CAPTURED_SUBJECT is scoped to SELECTED_CAPTURED_SUBJECT_ONLY',
+			'not the stable JAN-CSAA-007 query envelope',
+			'does not complete DWP-005 or DWP-006',
+			'bounded best-effort JSONL progress transport is excluded from report identity and evidence',
+			'machine-facing coding-agent invocation bun run --silent csaa:analyze:structural-module-reachability',
+			'package root publicly exports the analysis builder plus the report contract, runner, progress-event schema, and transport schema/limits/types',
+			'JSONL progress writer and executable command adapter remain trust-bound implementation details and are not package-root exports',
 			'dedicated structural module-reachability-only smoke command',
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
@@ -1075,11 +1141,13 @@ describe('inventory discovery and identity', () => {
 		});
 		for (const expectedProvenance of [
 			...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+			...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 			'capabilities#conditional-export-resolution',
 			'capabilities#module-resolution-trace',
 			'capabilities#project-context-graph',
 			'capabilities#typescript-ast',
-			'package.json#/scripts/csaa:semantic:smoke:declaration-context-analysis'
+			'package.json#/scripts/csaa:semantic:smoke:declaration-context-analysis',
+			'package.json#/scripts/csaa:analyze:declaration-context'
 		])
 			expect(declarationContextAnalysisCapability!.provenance).toContain(expectedProvenance);
 		expect(new Set(declarationContextAnalysisCapability!.provenance).size).toBe(
@@ -1101,7 +1169,13 @@ describe('inventory discovery and identity', () => {
 			DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE,
 			DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE,
 			JSON.stringify(DECLARATION_CONTEXT_ANALYSIS_SELECTION),
-			...DECLARATION_CONTEXT_ANALYSIS_NONCLAIMS
+			...DECLARATION_CONTEXT_ANALYSIS_NONCLAIMS,
+			DECLARATION_CONTEXT_REPORT_OPERATION_VERSION,
+			DECLARATION_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION,
+			DECLARATION_CONTEXT_REPORT_RESULT_SCHEMA_VERSION,
+			DECLARATION_CONTEXT_REPORT_SCHEMA_VERSION,
+			JSON.stringify(DECLARATION_CONTEXT_REPORT_SELECTION),
+			...DECLARATION_CONTEXT_REPORT_NONCLAIMS
 		])
 			expect(declarationContextAnalysisCapability!.explanation).toContain(exactBoundary);
 		for (const boundary of [
@@ -1129,6 +1203,21 @@ describe('inventory discovery and identity', () => {
 			'progress-aware canonicalSemanticJsonWithProgress, canonicalSemanticJsonWitnessWithProgress, canonicalSemanticJsonPrefixedSha256, and compareCanonicalSemanticJsonStrings helpers',
 			'callback-free one-argument canonicalSemanticJson and canonicalSemanticJsonWitness APIs remain package-root public and byte-compatible',
 			'remain trust-bound implementation details and are not package-root exports',
+			'implementation-local preliminary coding-agent report facade',
+			'one explicit bounded project set plus one exact project/source/literal importer coordinate, one bare workspace package, and one exact package-root export name',
+			'reuses the validated CAP-010/CAP-012/CAP-011 captured predecessor chain',
+			'constructs one partial CAP-013 declaration context analysis',
+			'maxResultBytes-bounded admitted partial',
+			'full embedded project-context, conditional-export, module-resolution-trace, and declaration-context evidence',
+			'CURRENT_FOR_CAPTURED_SUBJECT is scoped to SELECTED_CAPTURED_SUBJECT_ONLY',
+			'compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED',
+			'preserves its predecessor nonclaims as nested evidence',
+			'does not complete DWP-003, DWP-004, DWP-005, or DWP-006',
+			'adds no authority',
+			'bounded best-effort JSONL progress transport is excluded from report identity and evidence',
+			'machine-facing coding-agent invocation bun run --silent csaa:analyze:declaration-context',
+			'package root additionally exports the report contract, runner, progress-event schema, and transport schema/limits/types',
+			'parsed-request command adapter, JSONL progress writer, internal inherited-request admission seam admitModuleResolutionTraceReportRequest, and internal predecessor capture seam captureModuleResolutionTraceReportPipeline remain trust-bound implementation details and are not package-root exports',
 			'dedicated STRUCTURAL-profile declaration-context-analysis-only smoke command',
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
@@ -1336,6 +1425,7 @@ describe('inventory discovery and identity', () => {
 				'capabilities#module-resolution-trace',
 				'capabilities#source-origin-correlation',
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
 				'packages/csaa/src/graph/build-logical-graph-composition.ts',
@@ -1354,6 +1444,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
+				...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
@@ -1383,6 +1474,9 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain('deterministic structural SCC analysis');
 		expect(semanticBoundary).toContain('deterministic static module-reachability traversal');
 		expect(semanticBoundary).toContain(
+			'preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness'
+		);
+		expect(semanticBoundary).toContain(
 			'exact reference-only semanticSourceId composition of independently validated module and call graph layers'
 		);
 		expect(semanticBoundary).toContain(
@@ -1404,6 +1498,9 @@ describe('inventory discovery and identity', () => {
 			'One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target'
 		);
 		expect(semanticBoundary).toContain(
+			'A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED'
+		);
+		expect(semanticBoundary).toContain(
 			'A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission'
 		);
 		expect(semanticBoundary).toContain(
@@ -1411,7 +1508,10 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'does not execute the retained event-surface gate, the preliminary project-context or module-resolution-trace report coding-agent commands, or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
+			'preliminary project-context, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+		);
+		expect(semanticBoundary).toContain(
+			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
 		);
 		expect(semanticBoundary).toContain(
 			'JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice'
@@ -1473,6 +1573,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
+				...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
@@ -1491,6 +1592,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/resolution/validate-module-resolution-trace.ts',
 				...MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE,
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
@@ -1503,6 +1605,9 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`structural module reachability analysis has graph authority ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'preliminary structural module reachability report facade adds no authority; its final selected-captured-subject currentness does not create semantic-query, code-slice, change-impact, whole-program, irrelevance, non-impact, or safe-removal proof'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`logical graph composition has graph authority ${LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY}, authority transfer ${LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER}, and gate effect ${LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT}`
@@ -1551,6 +1656,9 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`freshness is ${DECLARATION_CONTEXT_ANALYSIS_FRESHNESS}, currentness is ${DECLARATION_CONTEXT_ANALYSIS_CURRENTNESS}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'preliminary declaration-context report facade adds no authority; its final selected-captured-subject currentness does not assess compiler-capture or CONTEXT_ONLY-target filesystem currentness and does not alter or promote embedded predecessor fields'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`Full JAN-CSAA-013 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_013_CONFORMANCE}, full JAN-CSAA-007 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${DECLARATION_CONTEXT_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE}`
@@ -1967,6 +2075,7 @@ describe('JPWB population non-vacuity', () => {
 				'test:coverage',
 				'csaa:semantic:smoke:conditional-export-resolution',
 				'csaa:semantic:smoke:declaration-context-analysis',
+				'csaa:analyze:declaration-context',
 				'csaa:semantic:smoke:source-origin-correlation',
 				'csaa:semantic:smoke:module-resolution-trace',
 				'csaa:analyze:module-resolution-trace',
@@ -1976,6 +2085,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:analyze:project-context',
 				'csaa:semantic:smoke:project-context-graph',
 				'csaa:semantic:smoke:structural-module-reachability',
+				'csaa:analyze:structural-module-reachability',
 				'csaa:semantic:smoke:structural-scc'
 			].map((name) => [name, jpwbFixtureScriptCommand(name)])
 		);
@@ -2065,6 +2175,26 @@ describe('JPWB population non-vacuity', () => {
 		).toThrow(
 			'Required JPWB assurance command is absent: csaa:semantic:smoke:declaration-context-analysis'
 		);
+
+		const missingDeclarationContextReportCommand = fixture();
+		write(
+			missingDeclarationContextReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:declaration-context'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingDeclarationContextReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:declaration-context');
 
 		const missingSourceOriginCorrelationSmoke = fixture();
 		write(
@@ -2257,6 +2387,28 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is absent: csaa:semantic:smoke:structural-module-reachability'
 		);
 
+		const missingStructuralModuleReachabilityReportCommand = fixture();
+		write(
+			missingStructuralModuleReachabilityReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:structural-module-reachability'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingStructuralModuleReachabilityReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:analyze:structural-module-reachability'
+		);
+
 		const missingStructuralSccSmoke = fixture();
 		write(
 			missingStructuralSccSmoke,
@@ -2314,6 +2466,22 @@ describe('JPWB population non-vacuity', () => {
 		).toThrow(
 			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:declaration-context-analysis'
 		);
+
+		const incompatibleDeclarationContextReportCommand = fixture();
+		write(
+			incompatibleDeclarationContextReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:declaration-context': 'bun run scripts/wrong-declaration-context.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleDeclarationContextReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:declaration-context');
 
 		const incompatibleSourceOriginCorrelationSmoke = fixture();
 		write(
@@ -2459,6 +2627,25 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is incompatible: csaa:semantic:smoke:structural-module-reachability'
 		);
 
+		const incompatibleStructuralModuleReachabilityReportCommand = fixture();
+		write(
+			incompatibleStructuralModuleReachabilityReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:structural-module-reachability':
+					'bun run scripts/wrong-structural-module-reachability.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleStructuralModuleReachabilityReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:structural-module-reachability'
+		);
+
 		const noSemanticImplementation = fixture();
 		write(noSemanticImplementation, 'package.json', manifest(['packages/*', 'apps/*']));
 		expect(() =>
@@ -2487,6 +2674,7 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:declaration-context-analysis',
+						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:module-resolution-trace',
@@ -2496,6 +2684,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:project-context',
 						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
+						'csaa:analyze:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
 				),
@@ -2587,6 +2776,7 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:declaration-context-analysis',
+						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:module-resolution-trace',
@@ -2596,6 +2786,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:project-context',
 						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
+						'csaa:analyze:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
 				),
@@ -2652,6 +2843,7 @@ describe('JPWB population non-vacuity', () => {
 						'test:coverage',
 						'csaa:semantic:smoke:conditional-export-resolution',
 						'csaa:semantic:smoke:declaration-context-analysis',
+						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:module-resolution-trace',
@@ -2661,6 +2853,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:project-context',
 						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
+						'csaa:analyze:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
 				),
@@ -2766,6 +2959,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
 			'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
 			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
+			...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 			...PROJECT_CONTEXT_REPORT_PROVENANCE,
@@ -2773,6 +2967,7 @@ describe('JPWB population non-vacuity', () => {
 			...MODULE_RESOLUTION_TRACE_PROVENANCE,
 			...MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE,
 			...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+			...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 			...SOURCE_ORIGIN_CORRELATION_PROVENANCE.filter((path) => path !== 'package.json')
 		];
 		for (const path of requiredPaths)
@@ -2844,6 +3039,15 @@ describe('JPWB population non-vacuity', () => {
 		);
 
 		write(root, missingStructuralModuleReachability, 'export {};\n');
+		for (const missingStructuralModuleReachabilityReportPath of STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE) {
+			rmSync(join(root, ...missingStructuralModuleReachabilityReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB structural module reachability report facade or verification source is absent: ${missingStructuralModuleReachabilityReportPath}`
+			);
+			write(root, missingStructuralModuleReachabilityReportPath, 'export {};\n');
+		}
 		for (const missingLogicalGraphCompositionPath of LOGICAL_GRAPH_COMPOSITION_PROVENANCE.filter(
 			(path) => path !== 'packages/csaa/src/semantic/repository-smoke.test.ts'
 		)) {
@@ -2894,7 +3098,8 @@ describe('JPWB population non-vacuity', () => {
 			(path) =>
 				path !== 'packages/csaa/src/providers/typescript/compiler-input-journal.ts' &&
 				path !== 'packages/csaa/src/semantic/build-static-semantic-snapshot.ts' &&
-				path !== 'packages/csaa/src/semantic/repository-smoke.test.ts'
+				path !== 'packages/csaa/src/semantic/repository-smoke.test.ts' &&
+				!STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE.some((shared) => shared === path)
 		)) {
 			rmSync(join(root, ...missingModuleResolutionTracePath.split('/')));
 			expect(() =>
@@ -2925,6 +3130,20 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB declaration context analysis implementation or verification source is absent: ${missingDeclarationContextAnalysisPath}`
 			);
 			write(root, missingDeclarationContextAnalysisPath, 'export {};\n');
+		}
+		for (const missingDeclarationContextReportPath of DECLARATION_CONTEXT_REPORT_PROVENANCE.filter(
+			(path) =>
+				!MODULE_RESOLUTION_TRACE_PROVENANCE.some((shared) => shared === path) &&
+				!MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!DECLARATION_CONTEXT_ANALYSIS_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingDeclarationContextReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB declaration context report facade or verification source is absent: ${missingDeclarationContextReportPath}`
+			);
+			write(root, missingDeclarationContextReportPath, 'export {};\n');
 		}
 		for (const missingSourceOriginCorrelationPath of SOURCE_ORIGIN_CORRELATION_PROVENANCE.filter(
 			(path) =>
@@ -2978,6 +3197,15 @@ describe('JPWB population non-vacuity', () => {
 		).toMatchObject({
 			categories: ['OTHER'],
 			command: DECLARATION_CONTEXT_ANALYSIS_ONLY_SMOKE_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
+				(command) => command.owner === '.' && command.name === 'csaa:analyze:declaration-context'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: DECLARATION_CONTEXT_REPORT_COMMAND,
 			state: 'CONFIGURED_NOT_RUN'
 		});
 		expect(
@@ -3054,6 +3282,16 @@ describe('JPWB population non-vacuity', () => {
 		expect(
 			inventory.commands.find(
 				(command) =>
+					command.owner === '.' && command.name === 'csaa:analyze:structural-module-reachability'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
+				(command) =>
 					command.owner === '.' && command.name === 'csaa:semantic:smoke:guard-classification'
 			)
 		).toMatchObject({
@@ -3075,6 +3313,7 @@ describe('JPWB population non-vacuity', () => {
 			expect.arrayContaining([
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.test.ts',
 				'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
+				...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/build-structural-scc-analysis.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-fixture.test-support.ts',
@@ -3083,6 +3322,7 @@ describe('JPWB population non-vacuity', () => {
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE,
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
 			])
 		);
