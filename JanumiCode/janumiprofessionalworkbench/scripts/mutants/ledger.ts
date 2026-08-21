@@ -2903,6 +2903,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'F161-the-floor-gate-resolved-finding-filter-is-starved',
+		// ⚠ RETIRED 2026-08-20 (REG-F-202). Its target — `openFindingCodes` in floor-gate.ts — was DELETED with the
+		// whole waiver-discharge apparatus, because ASR-3 makes the de minimis floor UNCONDITIONAL. This is the
+		// RETIRED case the ledger's header distinguishes from UNANCHORED: the code did not drift out from under a
+		// claim, it was removed deliberately and this entry says where the finding went. The starvation this
+		// documented (a disposition filter over a field only ever written 'OPEN') SURVIVES at its pair, which is
+		// the other consumer of the same root cause and is still anchored.
+		supersededBy: 'F161-the-baseline-waiver-escape-is-starved',
 		file: 'packages/rph-application/src/handlers/floor-gate.ts',
 		find: "\t\tif (s.disposition && s.disposition !== 'OPEN') continue; // already resolved/waived elsewhere",
 		replace: '\t\t// already resolved/waived elsewhere',

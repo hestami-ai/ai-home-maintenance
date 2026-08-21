@@ -71,8 +71,6 @@ const AGENT: ActorReference = {
 const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
 const AI_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5S00';
 const AI_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5S10';
-const OTHER_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5S30';
-const OTHER_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5S40';
 const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5S20';
 const SCHEMA = 'floor.schema-invariant';
 const IDENTITY = 'floor.identity-provenance';
@@ -90,7 +88,12 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		idSeq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
 		// Shield 1 above. Without this every floor assessment is refused and the file proves nothing.
 		seedFloorPolicies(engine, TS);
 	});
@@ -118,7 +121,13 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 	}
 
 	/** Every arranging dispatch is checked. Shield 1 existed because these were not. */
-	function ok(actor: ActorReference, commandType: string, payload: unknown, id: string, type: string) {
+	function ok(
+		actor: ActorReference,
+		commandType: string,
+		payload: unknown,
+		id: string,
+		type: string
+	) {
 		const r = d(actor, commandType, payload, id, type);
 		expect(r.status, `${commandType} ${id}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
 		return r;
@@ -248,7 +257,41 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 	// DEFAULT for an AI-produced PWA — it is what MISSING, stale, and unwaived all produce. Without a run that
 	// PUBLISHES, no test here can distinguish "the waiver was correctly refused" from "the arrangement never
 	// happened", which is precisely how the previous version of this file passed for months.
-	it('CONTROL: a waiver naming the exact policy, criterion, object and version DOES discharge the floor', () => {
+	// ⚠⚠ ASR-3 — THE FLOOR IS UNCONDITIONAL, AND THIS FILE'S SUBJECT CHANGED ON 2026-08-20 (REG-F-202).
+	//
+	// JPWB-DOC-003:249, ratified: "The de minimis assurance floor is UNCONDITIONAL. Risk proportionality governs
+	// assurance above a mandatory floor; it never makes the floor optional." Sponsor ruling, same day: the floor is
+	// never skippable. So `waiverDischargesFloorPolicy` and the whole discharge apparatus were deleted from
+	// `floor-gate.ts`, and this file no longer has a call site whose SCOPING it can prove.
+	//
+	// ── WHAT WAS HERE, AND WHY DELETING IT WAS NOT ENOUGH ────────────────────────────────────────────────────────
+	// Four tests: a CONTROL that published through an exactly-scoped waiver, and three limbs (OBJECT, VERSION,
+	// POLICY) asserting that an out-of-scope waiver leaves publish REJECTED.
+	//
+	// Only the CONTROL broke. THE THREE LIMBS STAYED GREEN AND WENT VACUOUS — they assert a REJECTED publish, and
+	// after the change REJECTED is the UNCONDITIONAL answer for any AI-produced PWA with a non-SATISFIED floor.
+	// Their arrangements can no longer change the outcome, so they would have passed forever while proving nothing.
+	//
+	// THAT IS THIS FILE'S OWN HISTORY REPEATING. Its header records that until 2026-08-03 it held exactly that
+	// shape — "a correct assertion about an arrangement that was never built" — filed as REG-F-015, and states the
+	// remedy: "Without a run that PUBLISHES, no test here can distinguish 'the waiver was correctly refused' from
+	// 'the arrangement never happened'." The change deleted the only run that publishes. Keeping the limbs would
+	// have restored the defect the file exists to forbid; deleting them silently would have retired a ratified
+	// rule's only command-layer proof. So they are deleted WITH THIS HEADER, and their subject is named below.
+	//
+	// ── WHERE RPH-GOV-005 IS STILL PROVEN, because it is NOT retired ─────────────────────────────────────────────
+	// The rule has two applications and lost only one:
+	//   DISCHARGE      — whether an existing waiver clears a floor finding. Deleted; no such path exists now.
+	//   AUTHORIZATION  — whether a cited Decision may authorize a waive at all. LIVE, at
+	//                    `waiver-authorization.ts:54` (`resolveWaiverAuthorization`), reached in production from
+	//                    `pwu.ts:1529`, refusing on decisionType, object and version pin and naming RPH-GOV-005 in
+	//                    its own refusal text. Its control is `waiver-authority.test.ts:248`.
+	// The three CONJUNCTS this file used to drive are exercised non-vacuously by the kernel at
+	// `rph-domain/src/governance.test.ts` (waiverCovers over criterion, object and version).
+	it('ASR-3: a PERFECTLY scoped waiver does NOT discharge a required floor policy', () => {
+		// The waiver is exact in every dimension the old scope limbs varied — policy, criterion, object, version —
+		// and EFFECTIVE and unexpired. Under ASR-3 none of that matters, which is the point: this test would have
+		// been the CONTROL a day ago, asserting the opposite outcome from the identical arrangement.
 		authorValidatedAiPwa();
 		recordFailingFloor(AI_PWA);
 		expect(publish().status, 'unwaived, the failing Reasoning Review must block').toBe('REJECTED');
@@ -256,82 +299,31 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		grantWaiverScopedTo({ policyId: REVIEW, criterionId: FAILED_CRITERION });
 
 		const r = publish();
+		expect(r.status, 'ASR-3: the floor is UNCONDITIONAL — a waiver may not discharge it').toBe(
+			'REJECTED'
+		);
+		expect(pub()).toBe('VALIDATED');
+	});
+
+	// THE CONTROL THIS FILE STILL NEEDS, and for the same reason as before: every assertion above is a REJECTED
+	// publish, which is now the DEFAULT. Without a run that PUBLISHES, nothing here distinguishes "the floor
+	// correctly refused" from "the arrangement never happened" — REG-F-015 in one sentence. A SATISFIED floor is
+	// the only arrangement that still publishes, so it is the only control available.
+	it('CONTROL: a SATISFIED floor still publishes, so the gate discriminates rather than refusing everything', () => {
+		authorValidatedAiPwa();
+		const version = pwaVersion(AI_PWA);
+		for (const policyId of [SCHEMA, IDENTITY, REVIEW]) {
+			recordFloorAssessment(engine, {
+				assessmentId: ulid('asmt'),
+				policyId,
+				subjectId: AI_PWA,
+				subjectSemanticVersion: version,
+				disposition: 'SATISFIED',
+				now: TS
+			});
+		}
+		const r = publish();
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(pub()).toBe('PUBLISHED');
-	});
-
-	// LIMB 2 — ANOTHER OBJECT. Identical to the control in every field except WHICH PWA the waiver names.
-	//
-	// PREDICTED RED, and it takes TWO mutations at once because the limb is enforced twice over — stated as a pair
-	// because a single-line predicted red was tried here first and DID NOT FIRE, which is the only reason this
-	// comment is trustworthy. In `effectiveFloorWaivers`: replace `!s.subjectObjectIds.includes(subjectId)` with
-	// `false` AND `?? -1` with `?? 2`. Then this test fails (the publish becomes ACCEPTED) while the control stays
-	// green. Either mutation ALONE leaves the whole suite green: the filter drops the foreign waiver, and failing
-	// that, the version fallback gives it -1 and the version conjunct drops it. Redundant enforcement, not a hole.
-	//
-	// NOT PROVABLE HERE, and stated so no one reads this test as covering it: `waiverCovers`' own subjectObjectId
-	// conjunct is unreachable-by-construction from this path, because `effectiveFloorWaivers` builds the view with
-	// `subjectObjectId: subjectId`. Neutralising that conjunct leaves this test green. The limb is enforced; the
-	// predicate that appears to enforce it is not what does.
-	it('a waiver naming ANOTHER OBJECT does not discharge this PWA floor (RPH-GOV-005: no bleeding across objects)', () => {
-		authorValidatedAiPwa();
-		authorValidatedAiPwa(OTHER_PWA, OTHER_ROOT);
-		recordFailingFloor(AI_PWA);
-		expect(publish().status).toBe('REJECTED');
-
-		// Same policy, same criterion, same version number — everything but the object.
-		grantWaiverScopedTo({
-			policyId: REVIEW,
-			criterionId: FAILED_CRITERION,
-			subjectPwaId: OTHER_PWA
-		});
-
-		const r = publish();
-		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
-		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
-		expect(pub()).toBe('VALIDATED');
-	});
-
-	// LIMB 3 — ANOTHER VERSION. The rule's literal example: "a waiver for policy criterion AC-04 on Architecture
-	// version 2 ... does not waive Architecture version 3."
-	//
-	// The mismatch is arranged by ORDER, not by a payload field: `requestWaiver` pins the subject version from the
-	// store, so granting BEFORE `DefinePwuType` pins v1, and `DefinePwuType` then raises the PWA to v2. The floor is
-	// recorded at the current version, so the ONLY thing stale is the waiver.
-	//
-	// PREDICTED RED: neutralise `waiverCovers`' `subjectSemanticVersion` conjunct and this test must fail while the
-	// control stays green. Before this test that mutation reddened only the rph-domain kernel unit test — the
-	// version limb had no command-layer reader.
-	it('a waiver pinned to an EARLIER version does not discharge the current one (RPH-GOV-005: no bleeding across versions)', () => {
-		createPwa(AI_PWA);
-		expect(pwaVersion(AI_PWA), 'the waiver must pin v1').toBe(1);
-		grantWaiverScopedTo({ policyId: REVIEW, criterionId: FAILED_CRITERION });
-
-		validatePwa(AI_PWA, AI_ROOT);
-		expect(pwaVersion(AI_PWA), 'DefinePwuType materially edits the graph and raises the version').toBe(2);
-		recordFailingFloor(AI_PWA);
-
-		const r = publish();
-		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
-		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
-		expect(pub()).toBe('VALIDATED');
-	});
-
-	// The POLICY half of "exact policy and criterion" (DOC-004 §12.2). `waiverCovers` scopes by criterion only; the
-	// policy comparison lives in `waiverDischargesFloorPolicy`'s filter. A criterion id that happened to repeat
-	// across two policies would bleed between them without it.
-	//
-	// PREDICTED RED: drop `w.waivedPolicyId === policyId` from that filter and this test must fail.
-	it('a waiver of the SAME criterion id under ANOTHER POLICY does not discharge this policy', () => {
-		authorValidatedAiPwa();
-		recordFailingFloor(AI_PWA);
-		expect(publish().status).toBe('REJECTED');
-
-		// Names the failing criterion, but attributes it to the schema policy rather than the Reasoning Review.
-		grantWaiverScopedTo({ policyId: SCHEMA, criterionId: FAILED_CRITERION });
-
-		const r = publish();
-		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
-		expect(pub()).toBe('VALIDATED');
 	});
 });

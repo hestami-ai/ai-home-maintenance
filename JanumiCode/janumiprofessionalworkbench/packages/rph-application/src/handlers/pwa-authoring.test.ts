@@ -26,7 +26,12 @@ describe('PWA-authoring handlers (live)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
 	});
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -289,7 +294,9 @@ describe('PWA-authoring handlers (live)', () => {
 		createDraftPwa(); // version 1.0.0
 		defineRoot();
 		// A type's identity binds to a VERSIONED PWA — pwaVersion is derived from the owning PWA, not a bare pwaId.
-		expect((store.loadObject(ROOT_TYPE)?.state as { pwaVersion?: string }).pwaVersion).toBe('1.0.0');
+		expect((store.loadObject(ROOT_TYPE)?.state as { pwaVersion?: string }).pwaVersion).toBe(
+			'1.0.0'
+		);
 		publish();
 		// The Undertaking's bound pwaVersion must be the PWA's actual version (fail-closed, not caller-trusted).
 		const bad = d(
@@ -645,7 +652,12 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		asmtSeq = 0;
-		engine = new Engine({ authenticate: DIR.authenticate, store, now: () => TS, newEventId: () => `e${++seq}` });
+		engine = new Engine({
+			authenticate: DIR.authenticate,
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		});
 		// Seeded by the human: policy creation is workbench setup, not part of the AI-authored graph under test.
 		seedFloorPolicies(as(HUMAN)); // the floor assessments below cite floor.* policies — now they must exist
 	});
@@ -742,13 +754,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			);
 			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
 			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-			d(
-				SVC,
-				'BeginAssuranceAssessment',
-				{},
-				assessmentId,
-				'ASSURANCE_ASSESSMENT'
-			);
+			d(SVC, 'BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT');
 			d(
 				SVC,
 				'CompleteAssuranceAssessment',
@@ -807,7 +813,13 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		d(
 			AGENT,
 			'CreatePwa',
-			{ pwaId: AI_PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
+			{
+				pwaId: AI_PWA,
+				name: 'Agent-authored',
+				description: 'd',
+				domain: 'software',
+				version: '1.0.0'
+			},
 			AI_PWA,
 			'PROFESSIONAL_WORK_ARCHITECTURE'
 		);
@@ -926,11 +938,18 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		grantWaiver({
 			policyId: REVIEW,
 			criterionId: 'RR-04-completeness-shortcut',
+			// ⚠ INVERTED 2026-08-20 (REG-F-202, sponsor ruling on ASR-3). This asserted ACCEPTED: an exactly-scoped
+			// waiver used to discharge the floor. ASR-3 (JPWB-DOC-003:249) makes the de minimis floor UNCONDITIONAL,
+			// so the discharge apparatus was deleted from floor-gate.ts and NO waiver reaches a required floor policy.
+			// The waiver is still RECORDED and still EFFECTIVE — ASR-14's "a waiver accepts risk; it never rewrites
+			// truth" — it simply discharges nothing. What changed is its REACH, not its recordability.
 			findingIds: [findingId]
 		});
 		const r = publish();
-		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
-		expect(pub()).toBe('PUBLISHED');
+		expect(r.status, 'ASR-3: the floor is unconditional; the waiver discharges nothing').toBe(
+			'REJECTED'
+		);
+		expect(pub()).toBe('VALIDATED');
 	});
 
 	/**
@@ -994,7 +1013,15 @@ describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-00
 	const defineType = (id: string, extra: Record<string, unknown>) =>
 		dispatch(
 			'DefinePwuType',
-			{ pwuTypeId: id, pwaId: B_PWA, pwuKind: 'X', name: 'X', purpose: 'p', isRoot: false, ...extra },
+			{
+				pwuTypeId: id,
+				pwaId: B_PWA,
+				pwuKind: 'X',
+				name: 'X',
+				purpose: 'p',
+				isRoot: false,
+				...extra
+			},
 			id,
 			'PWU_TYPE'
 		);
@@ -1005,7 +1032,12 @@ describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-00
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
 		const r = dispatch(
 			'CreatePwa',
 			{ pwaId: B_PWA, name: 'Boundary', description: 'd', domain: 'healthcare', version: '1.0.0' },
@@ -1189,7 +1221,15 @@ describe('PWU-Type assurance-policy references — handler write-boundary gate (
 	const defineType = (id: string, extra: Record<string, unknown>) =>
 		dispatch(
 			'DefinePwuType',
-			{ pwuTypeId: id, pwaId: F_PWA, pwuKind: 'X', name: 'X', purpose: 'p', isRoot: false, ...extra },
+			{
+				pwuTypeId: id,
+				pwaId: F_PWA,
+				pwuKind: 'X',
+				name: 'X',
+				purpose: 'p',
+				isRoot: false,
+				...extra
+			},
 			id,
 			'PWU_TYPE'
 		);
@@ -1202,7 +1242,12 @@ describe('PWU-Type assurance-policy references — handler write-boundary gate (
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
 		seedFloorPolicies(engine);
 		createPolicy(ACTIVE_POL, true);
 		createPolicy(DRAFT_POL, false);
@@ -1235,7 +1280,9 @@ describe('PWU-Type assurance-policy references — handler write-boundary gate (
 	});
 
 	it('accepts an ACTIVE non-floor policy reference and persists it', () => {
-		expect(defineType(F_TYPE, { requiredAssurancePolicyIds: [ACTIVE_POL] }).status).toBe('ACCEPTED');
+		expect(defineType(F_TYPE, { requiredAssurancePolicyIds: [ACTIVE_POL] }).status).toBe(
+			'ACCEPTED'
+		);
 		expect(load(F_TYPE)!.requiredAssurancePolicyIds).toEqual([ACTIVE_POL]);
 	});
 
@@ -1251,13 +1298,20 @@ describe('PWU-Type assurance-policy references — handler write-boundary gate (
 	});
 
 	it('retains a since-suspended reference on an unrelated edit, but rejects newly adding a non-ACTIVE one', () => {
-		expect(defineType(F_TYPE, { requiredAssurancePolicyIds: [ACTIVE_POL] }).status).toBe('ACCEPTED');
+		expect(defineType(F_TYPE, { requiredAssurancePolicyIds: [ACTIVE_POL] }).status).toBe(
+			'ACCEPTED'
+		);
 		expect(
 			dispatch('SuspendAssurancePolicy', { policyId: ACTIVE_POL }, ACTIVE_POL, 'ASSURANCE_POLICY')
 				.status
 		).toBe('ACCEPTED');
 		// The reference is now to a SUSPENDED policy — an unrelated edit must retain it, not re-reject.
-		const e = dispatch('EditPwuType', { pwuTypeId: F_TYPE, purpose: 'clarified' }, F_TYPE, 'PWU_TYPE');
+		const e = dispatch(
+			'EditPwuType',
+			{ pwuTypeId: F_TYPE, purpose: 'clarified' },
+			F_TYPE,
+			'PWU_TYPE'
+		);
 		expect(e.status, JSON.stringify(e.error)).toBe('ACCEPTED');
 		expect(load(F_TYPE)!.requiredAssurancePolicyIds).toEqual([ACTIVE_POL]);
 		// But NEWLY adding a non-ACTIVE policy on an edit is still rejected.

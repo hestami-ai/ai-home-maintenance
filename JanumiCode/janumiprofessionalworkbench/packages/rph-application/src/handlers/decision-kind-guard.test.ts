@@ -30,8 +30,16 @@ import { Engine } from '../index.js';
 import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-23T00:00:00Z';
-const AGENT: ActorReference = { actorId: 'agent-1', actorType: 'AGENT', displayName: 'Authoring Agent' };
-const SVC: ActorReference = { actorId: 'assurance', actorType: 'SERVICE', displayName: 'Assurance' };
+const AGENT: ActorReference = {
+	actorId: 'agent-1',
+	actorType: 'AGENT',
+	displayName: 'Authoring Agent'
+};
+const SVC: ActorReference = {
+	actorId: 'assurance',
+	actorType: 'SERVICE',
+	displayName: 'Assurance'
+};
 const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
 
 // THREE ACTORS, AND THE SEPARATION IS LOAD-BEARING — which is why `d`'s first parameter must select a session
@@ -78,7 +86,13 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		seedFloorPolicies(sessionOf(HUMAN));
 	});
 
-	function d(actor: ActorReference, commandType: string, payload: unknown, id: string, type: string) {
+	function d(
+		actor: ActorReference,
+		commandType: string,
+		payload: unknown,
+		id: string,
+		type: string
+	) {
 		const n = ++seq;
 		const command: DomainCommand = {
 			commandId: `c-${n}`,
@@ -167,7 +181,8 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 			'DECISION'
 		);
 
-	const denyWaiver = (id = WAIVER) => d(HUMAN, 'DenyWaiver', { rationale: 'Risk not accepted.' }, id, 'DECISION');
+	const denyWaiver = (id = WAIVER) =>
+		d(HUMAN, 'DenyWaiver', { rationale: 'Risk not accepted.' }, id, 'DECISION');
 
 	// ---- the floor fixture (pwa-authoring.test.ts's shape) — for proving the DISCHARGE half ----
 
@@ -175,14 +190,27 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		d(
 			AGENT,
 			'CreatePwa',
-			{ pwaId: AI_PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
+			{
+				pwaId: AI_PWA,
+				name: 'Agent-authored',
+				description: 'd',
+				domain: 'software',
+				version: '1.0.0'
+			},
 			AI_PWA,
 			'PROFESSIONAL_WORK_ARCHITECTURE'
 		);
 		d(
 			AGENT,
 			'DefinePwuType',
-			{ pwuTypeId: AI_ROOT, pwaId: AI_PWA, pwuKind: 'PRODUCT_REALIZATION', name: 'R', purpose: 'root', isRoot: true },
+			{
+				pwuTypeId: AI_ROOT,
+				pwaId: AI_PWA,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'R',
+				purpose: 'root',
+				isRoot: true
+			},
 			AI_ROOT,
 			'PWU_TYPE'
 		);
@@ -217,13 +245,7 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 			);
 			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
 			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-			d(
-				SVC,
-				'BeginAssuranceAssessment',
-				{},
-				assessmentId,
-				'ASSURANCE_ASSESSMENT'
-			);
+			d(SVC, 'BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT');
 			expect(req.status, JSON.stringify(req.error)).toBe('ACCEPTED');
 			const done = d(
 				SVC,
@@ -272,11 +294,19 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 	// granted through GrantWaiver must still discharge — proving the guard removed the exploit, not the capability.
 	it('ApproveDecision on a PROPOSED WAIVER is REFUSED — and the floor stays blocked until GrantWaiver records the fact', () => {
 		authorValidatedAiPwa();
-		const ids = recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		const ids = recordFloor({
+			[SCHEMA]: 'SATISFIED',
+			[IDENTITY]: 'SATISFIED',
+			[REVIEW]: 'REJECTED'
+		});
 		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
 		expect(publish().status).toBe('REJECTED');
 
-		requestWaiver({ policyId: REVIEW, criterionId: 'RR-04-completeness-shortcut', findingIds: [findingId] });
+		requestWaiver({
+			policyId: REVIEW,
+			criterionId: 'RR-04-completeness-shortcut',
+			findingIds: [findingId]
+		});
 
 		const exploit = approveDecision(WAIVER);
 		expect(exploit.status).toBe('REJECTED');
@@ -291,8 +321,13 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		const grant = grantWaiver();
 		expect(grant.status, JSON.stringify(grant.error)).toBe('ACCEPTED');
 		expect(eventsOfType('WaiverGranted')).toHaveLength(1);
+		// ⚠ INVERTED 2026-08-20 (REG-F-202 / ASR-3). This test's SUBJECT is unchanged and still holds: an
+		// ApproveDecision on a PROPOSED WAIVER is refused, and only GrantWaiver records the fact — the assertion
+		// above still proves it. What changed is the CONSEQUENCE. GrantWaiver now records a waiver that discharges
+		// NOTHING against a required floor policy, so the publish stays REJECTED. The governance act is real and
+		// recorded (ASR-14: "a waiver accepts risk; it never rewrites truth"); its REACH over the floor is not.
 		const r = publish();
-		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(r.status, 'ASR-3: the granted waiver does not discharge the floor').toBe('REJECTED');
 	});
 
 	it('GrantWaiver on a PROPOSED non-waiver decision is REFUSED with no event', () => {

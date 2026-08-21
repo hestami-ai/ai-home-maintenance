@@ -9,7 +9,6 @@
 // only contracts/domain/ports, so the edge is acyclic). The edge is taken (see assurance.ts), so the copy is gone.
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import type { ExecutionProvenance } from '@janumipwb/rph-contracts';
-import { waiverCovers, waiverStillDischarges, type WaiverView } from '@janumipwb/rph-domain';
 import type { HandlerContext } from './kit.js';
 
 export const FLOOR_POLICY_IDS_REQUIRED = [
@@ -245,126 +244,37 @@ function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<st
 	return latest;
 }
 
-/** The OPEN finding codes recorded against `assessmentId` — the exact criteria that failed, which a waiver must
- *  name to discharge (DOC-004 §12.2 "exact policy and criterion"). An assessment that never ran has none. */
-function openFindingCodes(ctx: HandlerContext, assessmentId: string): string[] {
-	const ids = new Set<string>();
-	for (const e of ctx.store.readAllEvents())
-		if (e.aggregateType === 'ASSURANCE_OBSERVATION') ids.add(e.aggregateId);
-	const codes: string[] = [];
-	for (const id of ids) {
-		const s = ctx.store.loadObject(id)?.state as
-			{ assessmentId?: string; findingCode?: string; disposition?: string } | undefined;
-		if (s?.assessmentId !== assessmentId) continue;
-		if (s.disposition && s.disposition !== 'OPEN') continue; // already resolved/waived elsewhere
-		if (s.findingCode) codes.push(String(s.findingCode));
-	}
-	return codes;
-}
-
 /**
- * Every EFFECTIVE WAIVER Decision naming `subjectId`. Deliberately NOT a Boolean: §16 item 12's safe default is
- * "Never implement waiver as a Boolean—require a version-bound Decision with scope, expiry, rationale, controls,
- * and preserved finding." Callers must decide per policy, and must be able to see WHY a waiver was insufficient.
+ * ⚠ THE DISCHARGE APPARATUS WAS DELETED HERE (2026-08-20, REG-F-202 — sponsor ruling on ASR-3).
+ *
+ * `openFindingCodes`, `FloorWaiver`, `effectiveFloorWaivers` and `waiverDischargesFloorPolicy` lived at this
+ * point and let a governed waiver discharge a REQUIRED floor policy. **ASR-3 (JPWB-DOC-003:249) makes the de
+ * minimis floor UNCONDITIONAL** — *"Risk proportionality governs assurance above a mandatory floor; it never
+ * makes the floor optional"* — so no waiver has reach over it, and the whole apparatus was an UNRATIFIED
+ * EXTRAPOLATION: the general waiver mechanism canon provides for assurance policies (DOC-004 §12.2, guide
+ * §8.15), applied to the three policies canon exempts from that relief.
+ *
+ * ⚠ WHY THE DELETION IS TOTAL RATHER THAN SCOPED. `floorGateBlock` iterates `FLOOR_POLICY_IDS_REQUIRED` and
+ * nothing else, and `waiverDischargesFloorPolicy` had exactly ONE call site — inside it. So "do not consult
+ * the discharge path for the three required policies" IS "do not consult it at all"; there is no non-floor
+ * discharge path for it to keep serving. Leaving the code in place fails `bun run lint` (no-unused-vars) and
+ * would leave a reader believing a discharge route exists.
+ *
+ * ⚠ WHAT THIS DID **NOT** REMOVE, because the distinction decides whether RPH-GOV-005 still has teeth.
+ * RPH-GOV-005 ("authorization does not bleed") applies in TWO places, and only one of them was here:
+ *   - DISCHARGE — whether an existing waiver clears a floor finding. That was this code. It is gone.
+ *   - AUTHORIZATION — whether a cited Decision may authorize a waive at all: `resolveWaiverAuthorization`
+ *     (`waiver-authorization.ts:54`), reached in production from `pwu.ts:1529` via `rejectUnauthorizedWaiver`,
+ *     which refuses on decisionType, object and version pin and names RPH-GOV-005 in its own refusal text.
+ * That site is untouched, touches no floor code, and keeps its control at `waiver-authority.test.ts:248`. The
+ * rule is NOT retired; it loses its discharge site and keeps its authorization site.
+ *
+ * ⚠ AND A WAIVER OVER A FLOOR POLICY IS STILL RECORDABLE. `RequestWaiver` still accepts one and `GrantWaiver`
+ * still makes it EFFECTIVE — deliberately. ASR-14 (*"a waiver accepts risk; it never rewrites truth"*)
+ * describes exactly a recorded risk-acceptance that changes no outcome, so refusing to RECORD it would be an
+ * over-refusal: this ruling narrows a waiver's REACH, not its RECORDABILITY. What must never happen again is
+ * the recorded waiver silently changing a gate.
  */
-export interface FloorWaiver {
-	/** The kernel's read-model — what `waiverCovers` / `waiverStillDischarges` reason over. */
-	readonly view: WaiverView;
-	/** DOC-004 §12.2's "exact policy" half. `waiverCovers` scopes by criterion; this stops a criterion id that
-	 *  happens to repeat across two policies from bleeding between them. */
-	readonly waivedPolicyId: string;
-}
-
-export function effectiveFloorWaivers(
-	ctx: HandlerContext,
-	subjectId: string,
-	now: string
-): FloorWaiver[] {
-	const ids = new Set<string>();
-	for (const e of ctx.store.readAllEvents())
-		if (e.aggregateType === 'DECISION') ids.add(e.aggregateId);
-	const out: FloorWaiver[] = [];
-	for (const id of ids) {
-		const s = ctx.store.loadObject(id)?.state as
-			| {
-					decisionType?: string;
-					status?: string;
-					subjectObjectIds?: string[];
-					subjectSemanticVersions?: Record<string, number>;
-					waiver?: {
-						waivedPolicyId?: string;
-						waivedCriterionId?: string;
-						expiresAt?: string;
-					};
-			  }
-			| undefined;
-		if (
-			s?.decisionType !== 'WAIVER' ||
-			s.status !== 'EFFECTIVE' ||
-			!Array.isArray(s.subjectObjectIds) ||
-			!s.subjectObjectIds.includes(subjectId)
-		)
-			continue;
-		// A WAIVER Decision with no `waiver` detail cannot name its policy/criterion, so it can discharge nothing
-		// (§16 item 12's "never a Boolean"). Skipping it here is the fail-closed path for legacy/malformed waivers.
-		const w = s.waiver;
-		if (!w?.waivedPolicyId || !w.waivedCriterionId) continue;
-		out.push({
-			waivedPolicyId: String(w.waivedPolicyId),
-			view: {
-				decisionId: id,
-				status: String(s.status),
-				waivedCriterionId: String(w.waivedCriterionId),
-				subjectObjectId: subjectId,
-				subjectSemanticVersion: s.subjectSemanticVersions?.[subjectId] ?? -1,
-				// The kernel is clock-free by design (§ RPH-GOV-006 leaves `expired` caller-computed), so expiry is
-				// resolved here against the command's own issuedAt — never a wall clock, which would make replay
-				// non-deterministic.
-				expired: !!w.expiresAt && w.expiresAt <= now
-			}
-		});
-	}
-	return out;
-}
-
-/**
- * Does an EFFECTIVE waiver discharge floor policy `policyId` over this subject/version?
- *
- * Routes through `rph-domain`'s `waiverCovers` + `waiverStillDischarges` — written and unit-proven since before
- * this program began, and callable only now that `WaiverDetail` gives the criterion a wire home (§16 item 12's
- * gap, closed under the sponsor's 2026-07-16 grant by serializing DOC-004 §12.2's ratified field list).
- *
- * The rule is CRITERION-EXACT, not policy-broad, because §8.15 L1101 / DOC-004 §12.2 require a waiver to name
- * "the exact policy, criterion, finding, object and semantic version" and RPH-GOV-005 says a waiver "does not
- * bleed to another criterion, another object, or another version." So a policy is discharged only when EVERY
- * open finding recorded against it is individually covered. A waiver of RR-01 does not discharge a policy that
- * failed RR-04 — which is exactly the bleeding that made any waiver nuke the whole floor.
- *
- * Fail-closed branches, each deliberate:
- *   - no open findings (e.g. the review is MISSING — it never ran): nothing to waive, and §8.4 L854 says "A
- *     missing … required review cannot satisfy assurance or permit its protected transition." A waiver cannot
- *     manufacture a review that never happened.
- *   - `subjectVersion` unknown: version-exactness is unverifiable, so the waiver is not honored.
- *   - a WAIVER Decision carrying no `waiver` detail (legacy/malformed) names no criterion → discharges nothing.
- */
-function waiverDischargesFloorPolicy(
-	ctx: HandlerContext,
-	subjectId: string,
-	policyId: string,
-	subjectVersion: number | undefined,
-	assessmentId: string | undefined,
-	now: string
-): boolean {
-	if (subjectVersion === undefined || !assessmentId) return false;
-	const openFindings = openFindingCodes(ctx, assessmentId);
-	if (openFindings.length === 0) return false;
-	const waivers = effectiveFloorWaivers(ctx, subjectId, now).filter(
-		(w) => w.waivedPolicyId === policyId && waiverStillDischarges(w.view)
-	);
-	return openFindings.every((code) =>
-		waivers.some((w) => waiverCovers(w.view, code, subjectId, subjectVersion))
-	);
-}
 
 export interface FloorBlock {
 	readonly policyId: string;
@@ -403,17 +313,6 @@ export function floorGateBlock(
 		};
 	})
 		.filter((r) => r.disposition !== 'SATISFIED')
-		.filter(
-			(r) =>
-				!waiverDischargesFloorPolicy(
-					ctx,
-					subjectId,
-					r.policyId,
-					opts.subjectVersion,
-					r.assessmentId,
-					opts.now
-				)
-		)
 		.map((r) => ({ policyId: r.policyId, disposition: r.disposition }));
 	return blocking.length === 0 ? null : blocking;
 }

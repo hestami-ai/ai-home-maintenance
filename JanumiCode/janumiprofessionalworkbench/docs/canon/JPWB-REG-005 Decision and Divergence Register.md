@@ -4486,13 +4486,55 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 
 ### REG-F-202 — the waiver gate is switched off by silence, and the same file already ruled that this is a defect and named the class
 
-**Date:** 2026-08-20 · **Type:** FINDING (verified by hand; the sweep that produced it could not verify itself — see the disclosure below) · **Status:** OPEN — **SPONSOR HAS RULED (2026-08-20): the de minimis floor is NEVER SKIPPABLE.** Reading (b). The remedy is scoped below and NOT yet applied
+**Date:** 2026-08-20 · **Type:** FINDING (verified by hand; the sweep that produced it could not verify itself — see the disclosure below) · **Status:** **LANDED 2026-08-20** — the floor is unconditional in code. Sponsor ruled reading (b); the discharge apparatus is deleted and RPH-GOV-005 moved to a direct refusal. Residue: the demo affordance (below)
 
 - **⚠⚠ THIS ENTRY'S EVIDENCE WAS PRODUCED BY AN UNREFUTED SWEEP, AND THE REASON IS A BUG I WROTE.** The workflow's three adversarial refuters ALL FAILED to launch: the reviewer prompt was built in a backtick template literal and contained a backticked `` `.every()` ``, so JavaScript closed the template and called `.every` on the string. The lane results came back EMPTY and the synthesis agent silently re-derived the whole sweep alone. **So nothing in it was attacked, and every claim below was verified by hand instead** — which promptly downgraded one of its three "exploitable" findings (see the last bullet). Recorded here because an audit whose verification half did not run, and did not announce that it had not run, is exactly the instrument shape this register exists to catch.
 
 - **THE FINDING, verified limb by limb.** `handlers/governance.ts:548-549` reads `policy?.waiverRules ?? []` and then `if (waiverRules.length > 0)`. Everything inside that branch is the ONLY enforcement of DOC-004 §12.2 / JCPWA §36.4 — *"a waiver may never drop a control to nothing"*: the criterion-eligibility check (`:552`) and the compensating-controls check (`:561-563`). **NO PRODUCTION POLICY DECLARES `waiverRules`** — and the search is stated, because under CON-000 B3 an absence without one is not a finding. **Searched:** `waiverRules` across `packages/` + `apps/`, all `*.ts`/`*.svelte`, excluding `node_modules` and `dist`, partitioned into test and production by filename. **Result:** every `waiverRules: [` authoring literal in the tree is in a test file (`waiver-rules.test.ts`, `waiver-rule-contract.test.ts`, `assurance-policy.test.ts`, `waiver-attachment-live.test.ts`, and three more); production occurrences are exclusively the schema declarations, the `?? []` default at `assurance.ts:245`, the settable-field list, and this gate itself. **POSITIVE CONTROL:** the identical grep DOES return authored literals — 7 test files' worth — so the search finds the pattern where it exists and returns zero in production because production has none. Corroborating: the three locked floor policies (`packages/rph-assurance/src/floor-policies.ts`) declare none, and the shipped ontology declares none. So the branch never executes, and the ratified rule is enforced NOWHERE.
 
 - **AND THE DEMO WALKS THROUGH IT.** `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:636` `recordWaiver` derives its target from the RECORDED floor — `floor.policies.find((p) => p.disposition !== 'SATISFIED')`, i.e. deliberately **the blocking one** — and sends `compensatingControls: []` (`:663`), which `RequestWaiver` accepts because the gate above it is inert, followed by `GrantWaiver`. ⚠ **NOT VERIFIED BY ME, and stated as unverified rather than repeated:** the sweep further claims this discharges the floor and lets the PWA publish over an un-remediated BLOCKING finding (`floor-gate.ts` `waiverDischargesFloorPolicy`). That limb needs driving before it is relied on.
+
+- **✅ LANDED 2026-08-20. What the change actually cost, measured rather than estimated:** 5 test re-aims,
+  2 gate consequences, 1 probe MOVE, and 4 register/census fields. Full verification: types 0, lint 0,
+  **171 test files / 1,684 passed**, verif 41/41, csaa inventory green, **74/74 Playwright**.
+
+- **THE DELETION WAS TOTAL, AND THAT WAS FORCED RATHER THAN CHOSEN.** `floorGateBlock` iterated only
+  `FLOOR_POLICY_IDS_REQUIRED` and `waiverDischargesFloorPolicy` had exactly ONE call site — inside it. So "stop
+  consulting the discharge path for the three required policies" was identically "stop consulting it at all",
+  and `openFindingCodes`, `FloorWaiver`, `effectiveFloorWaivers` and the kernel import went with it. ⚠ Lint
+  forces this; `check-types` does NOT — the base tsconfig sets neither `noUnusedLocals` nor `noUnusedParameters`,
+  so a partial deletion would have typechecked and left a reader believing a discharge route still existed.
+
+- **⚠ THE PROBE HAD TO MOVE, NOT BE PATCHED — and the file said why before I did.** Its own comment records that
+  **RPH-GOV-005 was enforced INVERSELY**: no handler ever refused *"this waiver is out of scope"*; the floor gate
+  refused because the waiver failed to discharge. Deleting discharge deleted that inverse enforcement. The
+  probe's REFUSED arm still refused with the same code and marker — but its CONTROL arm could never publish
+  again, and re-arranging the control to publish via a SATISFIED floor would have made the two arms differ by
+  *"floor satisfied or not"* instead of by waiver scope. **That is a vacuous probe — the REG-F-015 defect the
+  file exists to prevent.** It now drives the OBJECT limb at `waiver-authorization.ts`, where the refusal is
+  DIRECT, which is a stronger claim than the inverse one it replaced. ⚠ NOT the version limb: the pins are
+  derived at PROPOSAL time, so a bus-level version arrangement would be a control that cannot fail
+  (`waiver-authority.test.ts` records this and drives that limb at the resolver instead).
+
+- **TWO GATES CAUGHT THE CONSEQUENCES, WHICH IS THE SYSTEM WORKING.** (1) The dead-kernel census: deleting the
+  only production caller made `waiverStillDischarges` newly dead. (2) The mutant ledger:
+  `F161-the-floor-gate-resolved-finding-filter-is-starved` went UNANCHORED because its target was deleted —
+  retired with `supersededBy` naming the pair that survives, which is the ledger's own distinction between code
+  that DRIFTED out from under a claim and code somebody removed deliberately.
+
+- **⚠ AND A GATE WAS CARRYING A STALE CLAIM ABOUT ITS OWN SUBJECT.** `dead-kernel-census.test.ts` exempted
+  `waiverCovers` from the dead list, annotated *"called by floor-gate.ts"*. That annotation became false the
+  moment the caller was deleted — and the exemption would have kept holding, because this census counts a
+  UNIT-TEST call as a call and `governance.test.ts` still exercises all three conjuncts. So the symbol is
+  correctly not-dead for a reason that has nothing to do with what the comment says. **An exemption whose
+  justification has rotted is an exemption nobody can audit.** Corrected in place. I over-declared it as dead
+  first and the gate refused me — *"DECLARED DEAD BUT NOW CALLED"* — which is how I learned the counting rule.
+
+- **RESIDUE, and it is the "make it audible" half rather than a gap:** the demo still offers `recordWaiver` on a
+  blocking floor, and the engine now records that waiver without it discharging anything. Per ASR-14 that
+  recording is CORRECT — a waiver accepts risk without rewriting truth — so the fix is at the surface: stop
+  presenting it as an action that clears the floor, and show the recorded-but-non-discharging waiver for what it
+  is. Filed in `docs/_working/BACKLOG.md`.
 
 - **⚠⚠⚠ SPONSOR RULING, 2026-08-20: *"de minimis floor should never be skippable"* — and *"I don't understand how this is even a question given the corpus position."* THE SPONSOR IS RIGHT, AND THE QUESTION WAS MINE, NOT THE CORPUS'S.** I framed it as an open canon question. It is not one, and here is the specific error. I saw `RPH-GOV-005` — a RATIFIED rule governing floor-waiver SCOPE, with its own enforcement site, its own test suite and a REG-F-015 repair — and read the existence of a scope rule as evidence that the mechanism it scopes was authorized. **It is not.** RPH-GOV-005's canon anchor is **ASR-14** (*"A waiver accepts risk; it never rewrites truth"*, JPWB-DOC-003 §8), whose clause forbids a waiver bleeding *"to another criterion, another object, or a future semantic version"*. That constrains how a waiver BEHAVES; **it does not grant a waiver reach over the floor.** Searched: no canon document outside this register connects waivers to the de minimis floor at all. **ASR-3 is the specific rule and it is unqualified — the floor is UNCONDITIONAL.**
 

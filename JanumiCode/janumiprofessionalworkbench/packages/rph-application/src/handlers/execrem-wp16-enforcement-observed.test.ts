@@ -37,8 +37,6 @@ import { Engine } from '../index.js';
 import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
 import {
 	floorValidatorResult,
-	recordFloorAssessment,
-	seedFloorPolicies,
 	seedPolicy as seedFloorPolicyFixture
 } from './__tests__/floor-fixtures.js';
 
@@ -163,7 +161,10 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 	}
 
 	const seedFloorPolicy = (policyId: string): void =>
-		seedFloorPolicyFixture({ dispatch: (c: unknown) => engine.dispatch(c as never) } as never, policyId);
+		seedFloorPolicyFixture(
+			{ dispatch: (c: unknown) => engine.dispatch(c as never) } as never,
+			policyId
+		);
 
 	const ok = (r: Outcome, what: string): Outcome => {
 		expect(r.status, `${what}: ${r.message}`).toBe('ACCEPTED');
@@ -338,7 +339,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 										// present in BOTH arrangements and the RATIONALE is the only delta — otherwise
 										// the control would fail for the sibling reason under the same finding code.
 										// It is a REAL effective Decision (minted above), not a literal naming nothing.
-									authorityDecisionId: v.auth,
+										authorityDecisionId: v.auth,
 										...(pass ? { rationale: 'the child holds no PII' } : {})
 									}
 						]
@@ -416,11 +417,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						description: 'd',
 						intentId: INT2,
 						boundaries: {
-					inScope: ['the governed work under test'],
-					outOfScope: ['not yet known'],
-					permittedChanges: [],
-					prohibitedChanges: []
-				},
+							inScope: ['the governed work under test'],
+							outOfScope: ['not yet known'],
+							permittedChanges: [],
+							prohibitedChanges: []
+						},
 						obligationIds: [],
 						constraintIds: [],
 						assumptionIds: [],
@@ -439,10 +440,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				),
 				'propose subject pwu'
 			);
-			const requestAndComplete = (
-				id: string,
-				disposition: 'SATISFIED' | 'REJECTED'
-			) => {
+			const requestAndComplete = (id: string, disposition: 'SATISFIED' | 'REJECTED') => {
 				ok(
 					dispatch(
 						'RequestAssuranceAssessment',
@@ -459,14 +457,9 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 					),
 					`request ${id}`
 				);
-					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
-					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-					dispatch(
-						'BeginAssuranceAssessment',
-						{},
-						id,
-						'ASSURANCE_ASSESSMENT'
-					);
+				// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+				// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+				dispatch('BeginAssuranceAssessment', {}, id, 'ASSURANCE_ASSESSMENT');
 				ok(
 					dispatch(
 						'CompleteAssuranceAssessment',
@@ -521,8 +514,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						// REG-F-073: `v.base` joins every arrangement because a promotion decision must NAME the
 						// baseline it authorizes (RPH-GOV-005 scope). Before that rule any effective promotion
 						// decision authorized any promotion, which is why these probes did not need it.
-						subjectObjectIds:
-							defect === 'stale-version' ? [v.pwu, INT2, v.base] : [v.pwu, v.base],
+						subjectObjectIds: defect === 'stale-version' ? [v.pwu, INT2, v.base] : [v.pwu, v.base],
 						selectedOption: 'promote',
 						rationale: 'ready',
 						authority: actor
@@ -833,14 +825,9 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			),
 			`request assessment ${assessmentId}`
 		);
-			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
-			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-			dispatch(
-				'BeginAssuranceAssessment',
-				{},
-				assessmentId,
-				'ASSURANCE_ASSESSMENT'
-			);
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+		// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+		dispatch('BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT');
 		return dispatch(
 			'CompleteAssuranceAssessment',
 			{
@@ -1225,8 +1212,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						),
 						`admit ${evId}`
 					);
-				const assess = (claimId: string, targetStatus: string, extra: Record<string, unknown> = {}) =>
-					dispatch('RecordClaimAssessment', { targetStatus, ...extra }, claimId, 'CLAIM');
+				const assess = (
+					claimId: string,
+					targetStatus: string,
+					extra: Record<string, unknown> = {}
+				) => dispatch('RecordClaimAssessment', { targetStatus, ...extra }, claimId, 'CLAIM');
 
 				const CLAIM_OK = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE1';
 				const CLAIM_BAD = 'clm_01ARZ3NDEKTSV4RRFFQ69G5FE2';
@@ -1248,8 +1238,12 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				return {
 					// The control has ADMISSIBLE evidence and must be ACCEPTED — without it, a guard that refused
 					// every move to SUPPORTED would pass this row while enforcing nothing about admissibility.
-					control: assess(CLAIM_OK, 'SUPPORTED', { assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE4' }),
-					observed: assess(CLAIM_BAD, 'SUPPORTED', { assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE5' })
+					control: assess(CLAIM_OK, 'SUPPORTED', {
+						assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE4'
+					}),
+					observed: assess(CLAIM_BAD, 'SUPPORTED', {
+						assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5FE5'
+					})
 				};
 			}
 		},
@@ -1462,7 +1456,10 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const HEIR = 'int_01ARZ3NDEKTSV4RRFFQ69H6221';
 				captureIntent(DEAD);
 				captureIntent(HEIR);
-				ok(dispatch('SupersedeIntent', { supersedingIntentId: HEIR }, DEAD, 'INTENT'), `supersede ${DEAD}`);
+				ok(
+					dispatch('SupersedeIntent', { supersedingIntentId: HEIR }, DEAD, 'INTENT'),
+					`supersede ${DEAD}`
+				);
 				// CONTROL: the SAME command against a LIVE intent. A handler that refused every proposal — or one that
 				// reused the READINESS set and so refused RAW — cannot green this row.
 				const LIVE = 'int_01ARZ3NDEKTSV4RRFFQ69H6222';
@@ -1507,7 +1504,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-CMP-004': null,
 		'RPH-GOV-001': {
 			arrangement:
-				"a Decision whose recorded `authority.actorType` is AGENT, approved — refused UNAUTHORIZED / RPH_AUTHORITY_INSUFFICIENT, against the byte-identical decision whose authority is HUMAN, which is ACCEPTED",
+				'a Decision whose recorded `authority.actorType` is AGENT, approved — refused UNAUTHORIZED / RPH_AUTHORITY_INSUFFICIENT, against the byte-identical decision whose authority is HUMAN, which is ACCEPTED',
 			run: () => {
 				const SUBJ = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6600';
 				const OK_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6610';
@@ -1575,17 +1572,17 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-DEC-002': {
 			arrangement:
 				'ValidateDecomposition -> VALID on a decomposition leaving a MANDATORY parent obligation neither allocated nor retained, against the identical decomposition that allocates it',
-			run: () => decompositionProbe('obligation'),
+			run: () => decompositionProbe('obligation')
 		},
 		'RPH-DEC-003': {
 			arrangement:
 				'ValidateDecomposition -> VALID on a decomposition leaving a MANDATORY parent constraint undispositioned for a relevant child, against the identical decomposition that propagates it',
-			run: () => decompositionProbe('constraint'),
+			run: () => decompositionProbe('constraint')
 		},
 		'RPH-CNS-003': {
 			arrangement:
 				'a constraint dispositioned INAPPLICABLE with NO rationale, against the byte-adjacent record that carries one',
-			run: () => decompositionProbe('rationale'),
+			run: () => decompositionProbe('rationale')
 		},
 		'RPH-DEC-005': null,
 		'RPH-DEC-001': null,
@@ -1632,120 +1629,84 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// kernel unit test.
 		'RPH-GOV-005': {
 			arrangement:
-				'PublishPwa under a waiver pinned to the PWA at v1 while its recorded floor is at v2, against the identical publish whose waiver was pinned at v2',
+				'ChangePwuState -> assuranceState=WAIVED citing an EFFECTIVE waiver that names ANOTHER object, against the identical waive citing one that names THIS PWU',
 			run: () => {
 				const n = ++probeSeq;
-				// Once per engine: RequestAssuranceAssessment fails closed on a policy the store has never seen, so
-				// without this every floor assessment below is refused and BOTH runs report a floor of MISSING — the
-				// exact way floor-waiver-scope.test.ts passed for months while arranging nothing (REG-F-015).
-				seedFloorPolicies({ dispatch: (c: unknown) => engine.dispatch(c as never) } as never, TS);
-				const drive = (pass: boolean): Outcome => {
-					const t = pass ? 'A' : 'B';
-					const pwa = `pwa_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}0`;
-					const root = `pwut_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}1`;
-					const wvr = `dec_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}2`;
-					const REVIEW = 'floor.reasoning-review';
-					const CRITERION = 'RR-04-no-proxy-satisfaction';
-					const version = () =>
-						Number(
-							(store.loadObject(pwa)?.state as { semanticVersion?: number } | undefined)
-								?.semanticVersion ?? 1
-						);
-					const grantWaiver = () => {
-						ok(
-							dispatch(
-								'RequestWaiver',
-								{
-									subjectObjectIds: [pwa],
-									scope: CRITERION,
-									rationale: 'Accepted residual risk for the pilot.',
-									duration: 'until superseded',
-									affectedObjectIds: [pwa],
-									waivedPolicyId: REVIEW,
-									waivedCriterionId: CRITERION,
-									waivedFindingIds: [],
-									compensatingControls: [],
-									reviewConditions: []
-								},
-								wvr,
-								'DECISION'
-							),
-							'request waiver'
-						);
-						ok(
-							dispatch(
-								'GrantWaiver',
-								{ waiverDecisionId: wvr, duration: 'until superseded' },
-								wvr,
-								'DECISION'
-							),
-							'grant waiver'
-						);
-					};
+				const intent = `int_01ARZ3NDEKTSV4RRFFQ69J${String(700 + n).padStart(4, '0')}`;
+				const pwu = `pwu_01ARZ3NDEKTSV4RRFFQ69J${String(710 + n).padStart(4, '0')}`;
+				const other = `pwu_01ARZ3NDEKTSV4RRFFQ69J${String(720 + n).padStart(4, '0')}`;
+				captureIntent(intent);
+				ok(proposePwuAgainstIntent(pwu, intent), 'propose pwu');
+				// WAIVED is not reachable from the birth axis; the reference suite
+				// (waiver-authority.test.ts) sets EVIDENCE_REQUIRED first for the same reason.
+				ok(
+					dispatch(
+						'ChangePwuState',
+						{
+							previousState: 'PROPOSED',
+							newState: 'PROPOSED',
+							executionState: 'NOT_PLANNED',
+							assuranceState: 'EVIDENCE_REQUIRED',
+							shapeIntegrityState: 'UNKNOWN',
+							reasonCode: 'CONTROLLER',
+							supportingObjectIds: []
+						},
+						pwu,
+						'PROFESSIONAL_WORK_UNIT'
+					),
+					'set assurance axis'
+				);
+
+				/** An EFFECTIVE WAIVER over `subjects`. A waiver becomes effective ONLY via GrantWaiver — the engine
+				 *  refuses ApproveDecision here, because WaiverGranted is the fact the assurance floor audits. */
+				const waiver = (subjects: string[], suffix: number): string => {
+					const id = `dec_01ARZ3NDEKTSV4RRFFQ69J${String(730 + suffix).padStart(4, '0')}`;
 					ok(
 						dispatch(
-							'CreatePwa',
-							{ pwaId: pwa, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
-							pwa,
-							'PROFESSIONAL_WORK_ARCHITECTURE'
-						),
-						'create pwa'
-					);
-					// THE ARRANGING ACT, and the ONLY difference between the two runs: the failing run pins the waiver
-					// at v1, BEFORE the PWU-Type raises the PWA to v2.
-					if (!pass) grantWaiver();
-					ok(
-						dispatch(
-							'DefinePwuType',
+							'ProposeDecision',
 							{
-								pwuTypeId: root,
-								pwaId: pwa,
-								pwuKind: 'PRODUCT_REALIZATION',
-								name: 'R',
-								purpose: 'root',
-								isRoot: true
+								decisionType: 'WAIVER',
+								subjectObjectIds: subjects,
+								selectedOption: 'go',
+								rationale: 'r',
+								authority: actor,
+								consideredEvidenceIds: [],
+								consideredObservationIds: []
 							},
-							root,
-							'PWU_TYPE'
+							id,
+							'DECISION'
 						),
-						'define root'
+						'propose waiver'
 					);
-					ok(dispatch('SubmitPwaForReview', {}, pwa, 'PROFESSIONAL_WORK_ARCHITECTURE'), 'submit');
-					ok(dispatch('ValidatePwa', {}, pwa, 'PROFESSIONAL_WORK_ARCHITECTURE'), 'validate');
-					const at = version();
-					for (const policyId of ['floor.schema-invariant', 'floor.identity-provenance'])
-						recordFloorAssessment(
-							{ dispatch: (c: unknown) => engine.dispatch(c as never) } as never,
-							{
-								assessmentId: `asmt_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}${policyId === 'floor.schema-invariant' ? '3' : '4'}`,
-								policyId,
-								subjectId: pwa,
-								subjectSemanticVersion: at,
-								disposition: 'SATISFIED',
-								now: TS
-							}
-						);
-					recordFloorAssessment({ dispatch: (c: unknown) => engine.dispatch(c as never) } as never, {
-						assessmentId: `asmt_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}5`,
-						policyId: REVIEW,
-						subjectId: pwa,
-						subjectSemanticVersion: at,
-						disposition: 'REJECTED',
-						openFindings: [
-							{ observationId: `obs_01ARZ3NDEKTSV4RRFFQ69HA${n}${t}6`, findingCode: CRITERION }
-						],
-						now: TS
-					});
-					// The passing run grants the SAME waiver here instead — after the version rose, so it pins v2.
-					if (pass) grantWaiver();
-					return dispatch(
-						'PublishPwa',
-						{ rootPwuTypeId: root },
-						pwa,
-						'PROFESSIONAL_WORK_ARCHITECTURE'
+					ok(
+						dispatch('GrantWaiver', { waiverDecisionId: id, duration: 'P30D' }, id, 'DECISION'),
+						'grant waiver'
 					);
+					return id;
 				};
-				return { control: drive(true), observed: drive(false) };
+
+				/** The identical waive; only WHICH decision it cites differs. */
+				const waive = (authorizationId: string): Outcome =>
+					dispatch(
+						'ChangePwuState',
+						{
+							previousState: 'PROPOSED',
+							newState: 'PROPOSED',
+							executionState: 'NOT_PLANNED',
+							assuranceState: 'WAIVED',
+							shapeIntegrityState: 'UNKNOWN',
+							reasonCode: 'CONTROLLER',
+							supportingObjectIds: [authorizationId]
+						},
+						pwu,
+						'PROFESSIONAL_WORK_UNIT'
+					);
+
+				// OBSERVED first: the foreign waiver must not bleed onto this PWU. Doing it first also proves the
+				// control's ACCEPT is not merely the axis already sitting at WAIVED.
+				const observed = waive(waiver([other], n * 2));
+				const control = waive(waiver([pwu], n * 2 + 1));
+				return { control, observed };
 			}
 		},
 		'RPH-ASM-006': {
@@ -1984,7 +1945,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			}
 		},
 		'RPH-PWU-004': {
-			arrangement: 'MarkPwuReady on a SHAPING PWU whose expectedOutputs is empty — readiness attested over nothing',
+			arrangement:
+				'MarkPwuReady on a SHAPING PWU whose expectedOutputs is empty — readiness attested over nothing',
 			run: () => {
 				// THE FIXTURE MUST SATISFY EVERY OTHER READINESS LIMB, or the control is refused for reasons that
 				// have nothing to do with this rule and the marker never gets exercised. `checkPwuShapeReadiness`
@@ -1994,10 +1956,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const READY_INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H6330';
 				captureIntent(READY_INTENT);
 				ok(dispatch('BeginIntentDiscovery', {}, READY_INTENT, 'INTENT'), 'discover');
-				ok(
-					dispatch('ProvisionIntent', { ambiguityIds: [] }, READY_INTENT, 'INTENT'),
-					'provision'
-				);
+				ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, READY_INTENT, 'INTENT'), 'provision');
 				const propose = (pwuId: string, expectedOutputs: unknown[]) =>
 					ok(
 						dispatch(
@@ -2035,7 +1994,10 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const markReady = (pwuId: string) =>
 					dispatch(
 						'MarkPwuReady',
-						{ shapeReadinessAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69H6320', expectedSemanticVersion: 1 },
+						{
+							shapeReadinessAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69H6320',
+							expectedSemanticVersion: 1
+						},
 						pwuId,
 						'PROFESSIONAL_WORK_UNIT'
 					);
@@ -2048,7 +2010,11 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				const OK_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6310';
 				const BAD_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6311';
 				propose(OK_PWU, [
-					{ artifactType: 'DOCUMENT', description: 'the architecture note', verificationCriteria: ['reviewed'] }
+					{
+						artifactType: 'DOCUMENT',
+						description: 'the architecture note',
+						verificationCriteria: ['reviewed']
+					}
 				]);
 				propose(BAD_PWU, []);
 				shape(OK_PWU);

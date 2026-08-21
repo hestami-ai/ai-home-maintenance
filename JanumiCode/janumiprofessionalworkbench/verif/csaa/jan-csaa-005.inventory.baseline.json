@@ -5686,7 +5686,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "c365dc226e3efe1c3e4612e9fccc65681bb96cf5577d9752849cc476a7ae8c77",
+    "fileManifestDigest": "70b8d00e05ef550f074ad3c8971d2f4c67e36aee747b94a0ea20a78f3f0922e5",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -8833,9 +8833,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 16746,
+        "bytes": 17385,
         "path": "packages/rph-application/src/handlers/decision-kind-guard.test.ts",
-        "sha256": "228f8ebe82fb26d80dc99f95810a4cf82b8feebbbc2b53c57de1aa5e3b582e6d",
+        "sha256": "6c9014ffbd00bf991cd4fae3d4abf8128d06b984cf76248b19fa07e9bf200502",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -9015,9 +9015,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 85165,
+        "bytes": 81770,
         "path": "packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts",
-        "sha256": "490e396453282a23e95a3f1bcb5823825ecb5de1d784c6c35ff89774ac211391",
+        "sha256": "e49998900fc3d2a179c19936db9eb6385415c1f6631e80cbf3ed0940567a29ed",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -9050,9 +9050,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 16285,
+        "bytes": 17088,
         "path": "packages/rph-application/src/handlers/execution-detail.test.ts",
-        "sha256": "b32edc3d39c459f74ae23cf963318295ee1b4c50ab3cf274cd4ddf4c2b1bcf85",
+        "sha256": "3801b45bd1fa75eff077d7c40429407da52bdc54e0e3bff0743f8619eebdf760",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -9169,16 +9169,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 22709,
+        "bytes": 19572,
         "path": "packages/rph-application/src/handlers/floor-gate.ts",
-        "sha256": "7042b5dd2657695d8f26dc3be80bce79d6bd7014172d23b13d416456591627da",
+        "sha256": "d62b1ecf23275f80f9137bfa564015def31938cbb3ba27a083672fdc77c5bf43",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 16088,
+        "bytes": 16124,
         "path": "packages/rph-application/src/handlers/floor-waiver-scope.test.ts",
-        "sha256": "4b1a74be366a40b22f8600a54253cac346707c194c01140f29f5c4d39c462b2b",
+        "sha256": "4e4028cdee95d69b49720b9b3be6a2459bd47b6b382168de2aafca9df729f301",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -9274,9 +9274,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 44300,
+        "bytes": 45040,
         "path": "packages/rph-application/src/handlers/pwa-authoring.test.ts",
-        "sha256": "0ed073bfc6600b272540d41e8f12e8d2d80b9b5b809d124e19ac53212354b50e",
+        "sha256": "32c0d40974b93b5eb953a49c8e06060fee9c4ad0d10b1cfb67ba539089c1bce8",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -10779,9 +10779,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 327974,
+        "bytes": 324463,
         "path": "packages/rph-domain/src/enforcement-register.ts",
-        "sha256": "0a21962447d22e0f1e4cf0ad6dfc42c078151f1ef7e52d4b67e4feb1032034c8",
+        "sha256": "de4459c2b25dd540ef5c82b7fe20136085dcdf301ed8bcb18961bfd42b0f4328",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12004,9 +12004,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 272930,
+        "bytes": 273607,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "baf4c45d808ddea21bc39ec9a49295005e9e1e80b6d15995ae50c27829722736",
+        "sha256": "4cfec024b2c96b144d4fdb0986889f79cba65d479d18826f7a267fd560096cd6",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12256,9 +12256,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 25176,
+        "bytes": 27543,
         "path": "verif/dead-kernel-census.test.ts",
-        "sha256": "bcf1a49081e541bd859c23ff6f51222d8309bc2b25dcbf177ea6a59467fac743",
+        "sha256": "545cf6e0ef93ef5a4b8b181b0ea8e7e7a1b68f79ca0546c4b7706a8db69f285c",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12507,7 +12507,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "2d408d49598cc284dc039d1a7d214513934746b644aa2ce7089a9fb75e2ff02d",
+    "subjectId": "312770846b8b43e3450dc4e32f37a09e7f9008e265e1acf4aa14d3a1fc37a9e4",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14919,7 +14919,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "baf4c45d808ddea21bc39ec9a49295005e9e1e80b6d15995ae50c27829722736",
+      "contentSha256": "4cfec024b2c96b144d4fdb0986889f79cba65d479d18826f7a267fd560096cd6",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15412,7 +15412,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/dead-kernel-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "bcf1a49081e541bd859c23ff6f51222d8309bc2b25dcbf177ea6a59467fac743",
+      "contentSha256": "545cf6e0ef93ef5a4b8b181b0ea8e7e7a1b68f79ca0546c4b7706a8db69f285c",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

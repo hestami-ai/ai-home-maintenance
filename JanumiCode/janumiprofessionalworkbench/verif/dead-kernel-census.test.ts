@@ -66,6 +66,28 @@ interface DeadEntry {
  * longer go stale without something turning red.
  */
 const CENSUS: Readonly<Record<string, DeadEntry>> = {
+	// ── REG-F-202 (2026-08-20): the two waiver-scope predicates lost their only production caller ────────────────
+	// ASR-3 (JPWB-DOC-003:249) makes the de minimis floor UNCONDITIONAL, so `waiverDischargesFloorPolicy` and the
+	// whole discharge apparatus were deleted from `handlers/floor-gate.ts` — and it was the ONLY production caller
+	// of both. ⚠ `waiverCovers` was previously asserted LIVE in this file's own exemption list, annotated "called
+	// by floor-gate.ts". That annotation became FALSE the moment the caller was deleted, and the exemption would
+	// have kept asserting it — a gate carrying a stale claim about its own subject. The exemption is removed and
+	// both predicates are declared here instead.
+	//
+	// They are NOT deleted, and the distinction matters: RPH-GOV-005 still holds, it simply moved from an INVERSE
+	// enforcement (the floor gate refusing because a waiver failed to discharge) to a DIRECT one
+	// (`waiver-authorization.ts` refusing in its own voice). These predicates encode the scope arithmetic canon
+	// states in ASR-14, they are unit-proven at `rph-domain/src/governance.test.ts:86-89`, and they are the
+	// natural home for that arithmetic if a NON-floor discharge path is ever built.
+	waiverStillDischarges: {
+		kind: 'GATE_HELPER',
+		why:
+			'A waiver discharges only while EFFECTIVE and unexpired (RPH-GOV-006 / RPH-CNS-004). Same story as ' +
+			'waiverCovers: its only production caller was the floor discharge path deleted under ASR-3. ' +
+			'⚠ enforcement-register.ts:3642 still records that expiry "has one [effect] on the FLOOR path, where ' +
+			'waiverStillDischarges reads expired" — that sentence is now historical, and the expiry limb has no ' +
+			'production consumer at all.'
+	},
 	// ── GATE_HELPER (11) — the instruments this repository grades itself with ─────────────────────────────────
 	// Every one is called by a gate test and by no handler, which is the CORRECT state: a production call would
 	// mean the running engine consulting the conformance record about itself. They appear here because "dead in
@@ -82,11 +104,11 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	// assertion like any other, and nothing was checking this one.
 	classifyRefusal: {
 		kind: 'GATE_HELPER',
-		why: 'The enforcement register\'s verdict function (KILLED / ADMITTED / WRONG_CODE / MASKED). Called by the two observation suites. It is also the clearest case for counting CALLS rather than mentions: several production comments name it, so a mention census reports it live.'
+		why: "The enforcement register's verdict function (KILLED / ADMITTED / WRONG_CODE / MASKED). Called by the two observation suites. It is also the clearest case for counting CALLS rather than mentions: several production comments name it, so a mention census reports it live."
 	},
 	conflictStatusRuleIds: {
 		kind: 'GATE_HELPER',
-		why: 'Back-compat alias over rowsDeclaringRefusalStatus(\'CONFLICT\'), consumed by the register selftests.'
+		why: "Back-compat alias over rowsDeclaringRefusalStatus('CONFLICT'), consumed by the register selftests."
 	},
 	deadPredicateRuleIds: {
 		kind: 'GATE_HELPER',
@@ -114,7 +136,7 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	},
 	residualSourceStates: {
 		kind: 'GATE_HELPER',
-		why: 'The arrow census denominator: states the machine would admit into a command\'s target minus the states it declares. Widening a sourceStates set must be argued, not absorbed.'
+		why: "The arrow census denominator: states the machine would admit into a command's target minus the states it declares. Widening a sourceStates set must be argued, not absorbed."
 	},
 	shortRefusalMarkers: {
 		kind: 'GATE_HELPER',
@@ -190,15 +212,15 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	},
 	canSupersedeBaseline: {
 		kind: 'DEAD_BY_DESIGN',
-		why: 'Triage §3: superseded by the live sibling path — supersession runs through the state machine\'s declared arrows.'
+		why: "Triage §3: superseded by the live sibling path — supersession runs through the state machine's declared arrows."
 	},
 	isEffectiveApproval: {
 		kind: 'DEAD_BY_DESIGN',
-		why: 'Triage §3. RPH-GOV-002\'s row records this predicate as dead and explains why the ROW is arm 3 rather than a second ENFORCED claim: the effective-approval guard it duplicates is the one RPH-GOV-001 already claims, and two rows over one refusal site would let a single mutant redden both.'
+		why: "Triage §3. RPH-GOV-002's row records this predicate as dead and explains why the ROW is arm 3 rather than a second ENFORCED claim: the effective-approval guard it duplicates is the one RPH-GOV-001 already claims, and two rows over one refusal site would let a single mutant redden both."
 	},
 	waiverPreservesFindings: {
 		kind: 'DEAD_BY_DESIGN',
-		why: 'Triage §3. RPH-GOV-004\'s row records it dead — and records that the outcome it checks is not produced either: no command anywhere sets an AssuranceObservation.disposition to WAIVED.'
+		why: "Triage §3. RPH-GOV-004's row records it dead — and records that the outcome it checks is not produced either: no command anywhere sets an AssuranceObservation.disposition to WAIVED."
 	},
 	executionAloneSatisfiesAssurance: {
 		kind: 'DEAD_BY_DESIGN',
@@ -220,7 +242,7 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	},
 	assessDecisionRevocation: {
 		kind: 'DEFERRED',
-		why: 'Triage §4, W2. RPH-GOV-007\'s row records something worse than deadness: it is a CONSTANT FUNCTION that ignores its argument and can never return half its own declared union, so its unit test cannot discriminate.'
+		why: "Triage §4, W2. RPH-GOV-007's row records something worse than deadness: it is a CONSTANT FUNCTION that ignores its argument and can never return half its own declared union, so its unit test cannot discriminate."
 	},
 	assessAcceptance: {
 		kind: 'DEFERRED',
@@ -238,7 +260,7 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	// has the same shape as the limb just closed. Left DEFERRED deliberately rather than quietly rewritten.
 	canStartStep: {
 		kind: 'DEFERRED',
-		why: 'Triage §4, W3 execution harness (WP-3-005). The live start gate is canStartStepUnderPlan\'s wired sibling path; this bare form has no caller.'
+		why: "Triage §4, W3 execution harness (WP-3-005). The live start gate is canStartStepUnderPlan's wired sibling path; this bare form has no caller."
 	},
 	canReuseBindingForNewAttempt: {
 		kind: 'DEFERRED',
@@ -246,7 +268,7 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	},
 	assessModelOutput: {
 		kind: 'DEFERRED',
-		why: 'Triage §4, W3. JPWB hosts no tool or model invocation — the boundary RPH-EXE-004\'s row argues at length — so nothing produces model output to assess.'
+		why: "Triage §4, W3. JPWB hosts no tool or model invocation — the boundary RPH-EXE-004's row argues at length — so nothing produces model output to assess."
 	},
 	selectControlAction: {
 		kind: 'DEFERRED',
@@ -416,14 +438,20 @@ describe('the dead-kernel census is DATA, not prose', () => {
 		const measured = uncalledKernelExports();
 		expect(measured.length, 'the derivation found nothing at all').toBeGreaterThan(0);
 		for (const live of [
-			'waiverCovers', // called by floor-gate.ts
+			// ⚠ ANNOTATION CORRECTED 2026-08-20 (REG-F-202), and the correction is the point. This read "called by
+			// floor-gate.ts" — which stopped being true the moment ASR-3 deleted the discharge apparatus. The symbol
+			// is still not reported dead, because THIS census counts a unit-test call as a call and
+			// rph-domain/governance.test.ts:86-89 exercises all three conjuncts. So the exemption still holds and its
+			// STATED REASON did not: an exemption whose justification has rotted is an exemption nobody can audit.
+			'waiverCovers', // called by rph-domain/governance.test.ts (NO production caller since 2026-08-20)
 			'canPromoteBaseline', // called by handlers/governance.ts
 			'decisionAuthorizesVersions', // called by handlers/governance.ts
 			'validateObligationConservation' // called by handlers/decomposition.ts
 		])
-			expect(measured, `${live} has a production call site and must not be reported dead`).not.toContain(
-				live
-			);
+			expect(
+				measured,
+				`${live} has a production call site and must not be reported dead`
+			).not.toContain(live);
 		// and a function reached ONLY from inside its own module still counts as live — the false positive that a
 		// mention-based census produces, and the reason this one counts calls.
 		expect(

@@ -17,7 +17,16 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   guessable non-ULID policy id, `/pwa/floor.reasoning-review`, rendered as a draft PWA) and
   `PwaAuthoringBroker.getPwa()`, whose `?? 'DRAFT'` INVERTED the agent endpoint's lifecycle guard —
   it refused the legitimate PUBLISHED PWA and admitted every non-PWA. Six mutants KILLED; 74 e2e green.
-### ⭐ NEXT — RULED AND READY (sponsor ruling 2026-08-20, recorded in REG-F-202)
+### ✅ LANDED — the de minimis floor is unconditional in code (REG-F-202, 2026-08-20)
+
+- [ ] **RESIDUE: make the non-discharge AUDIBLE at the demo surface.** The engine now records a waiver over a
+  blocking floor WITHOUT it discharging anything, correct under ASR-14 (a waiver accepts risk; it never
+  rewrites truth). What is wrong is the SURFACE: recordWaiver on a blocking floor still presents itself as an
+  action that clears the floor. Stop offering it as a clearing action; show the recorded-but-non-discharging
+  waiver for what it is. WARNING: do NOT refuse at RequestWaiver - considered and rejected as over-refusal;
+  the ruling narrows REACH, not RECORDABILITY.
+
+### ✅ LANDED — original item, kept for its measurements
 
 - [ ] **REG-F-202: the de minimis floor must never be skippable — remove floor-waiver discharge.**
   **THE QUESTION IS SETTLED; this is execution, not design.** ASR-3 (JPWB-DOC-003:249, ratified) —

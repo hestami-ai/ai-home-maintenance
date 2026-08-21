@@ -110,12 +110,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			);
 			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
 			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-			dispatch(
-				'BeginAssuranceAssessment',
-				{},
-				id,
-				'ASSURANCE_ASSESSMENT'
-			);
+			dispatch('BeginAssuranceAssessment', {}, id, 'ASSURANCE_ASSESSMENT');
 			dispatch(
 				'CompleteAssuranceAssessment',
 				{
@@ -160,7 +155,12 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
 		seedFloorPolicies(engine); // floor assessments below cite floor.* policies — now they must exist
 		dispatch(
 			'CaptureIntent',
@@ -323,8 +323,12 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			(store.loadObject(BIND)?.state as { authorizationStatus: string }).authorizationStatus
 		).toBe('REQUESTED');
 		expect(
-			dispatch('AuthorizeRuntimeBinding', { grantedCapabilities: [{ capability: 'file-system' }] }, BIND, 'RUNTIME_BINDING')
-				.status
+			dispatch(
+				'AuthorizeRuntimeBinding',
+				{ grantedCapabilities: [{ capability: 'file-system' }] },
+				BIND,
+				'RUNTIME_BINDING'
+			).status
 		).toBe('ACCEPTED');
 		expect(
 			(store.loadObject(BIND)?.state as { authorizationStatus: string }).authorizationStatus
@@ -380,7 +384,11 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	 * DOC-009 §18.1 makes it a Professional Work Object with an envelope. The waiver was never the blocker; the
 	 * subject was.
 	 */
-	it('an EFFECTIVE waiver naming the exact failed criterion lets a blocked step complete', () => {
+	// ⚠ RENAMED AND INVERTED 2026-08-20 (REG-F-202). Worth reading for WHAT IT PROVES BEYOND PUBLISHING: the de
+	// minimis floor blocks EXECUTION STEP COMPLETION, not only PwaPublish, so removing waiver discharge is
+	// broader than the PWA surface — and that breadth is correct under ASR-3, which makes the floor
+	// unconditional at every protected transition rather than at one of them.
+	it('an EFFECTIVE waiver naming the exact failed criterion does NOT unblock a step (ASR-3)', () => {
 		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
 		recordArtifact();
 		const ids = recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
@@ -425,8 +433,14 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			WAIVER,
 			'DECISION'
 		);
+		// ⚠ INVERTED 2026-08-20 (REG-F-202 / ASR-3). The waiver is EFFECTIVE, exactly scoped, and names the
+		// artifact's failed criterion — and the step STAYS BLOCKED, because the de minimis floor is unconditional
+		// at EVERY protected transition, step completion included. This is the test that shows the ruling reaches
+		// past PwaPublish.
 		const done = dispatch('CompleteExecutionStep', complete, PLAN, 'EXECUTION_PLAN');
-		expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
-		expect(stepState()).toBe('SUCCEEDED');
+		expect(done.status, 'ASR-3: the floor is unconditional; the waiver discharges nothing').toBe(
+			'REJECTED'
+		);
+		expect(stepState()).not.toBe('SUCCEEDED');
 	});
 });
