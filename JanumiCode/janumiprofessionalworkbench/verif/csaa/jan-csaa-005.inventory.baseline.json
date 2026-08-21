@@ -38,39 +38,39 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 23,
+      "discovered": 24,
       "excluded": 0,
       "failed": 0,
-      "included": 23,
+      "included": 24,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 23
+      "successfullyInventoried": 24
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 317,
+      "discovered": 319,
       "excluded": 0,
       "failed": 0,
-      "included": 317,
+      "included": 319,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 317
+      "successfullyInventoried": 319
     },
     {
       "artifactClass": "TEST",
-      "discovered": 371,
+      "discovered": 373,
       "excluded": 0,
       "failed": 0,
-      "included": 371,
+      "included": 373,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 371
+      "successfullyInventoried": 373
     },
     {
       "artifactClass": "VERIFICATION",
@@ -202,6 +202,8 @@
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
         "apps/rph-demo/src/lib/theme.test.ts",
         "apps/rph-demo/src/lib/walkthrough.test.ts",
+        "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
+        "packages/csaa/src/application/structural-module-reachability-command.test.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
@@ -1241,6 +1243,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/check-types"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "bun run scripts/csaa-structural-module-reachability.ts",
+      "name": "csaa:analyze:structural-module-reachability",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:analyze:structural-module-reachability"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -2511,7 +2525,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "7e2a764d5a41bd18570aeb4f7514243950c9b82c21ca0e44c1035944f3dc2b0d",
+    "configurationDigest": "9a9fa3b9e595754947f0921a306448dae3dc32e79a76843a8b4d9f22110edd27",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2600,9 +2614,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 5820,
+          "bytes": 5927,
           "path": "package.json",
-          "sha256": "fdf8a9e9a8fbc063bf94fb9c71a2c7d5b6cfb318c1cc25aa1701977d554e3fb2"
+          "sha256": "8d735cf3436907be498a2b16a50cf4f45714bccd8e8977fb7081b74cf1feed15"
         },
         {
           "artifactClass": "MANIFEST",
@@ -3147,12 +3161,13 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "b4930a6bbc2cc30d53ed409bc598cf08e5b1fb885490d91dddb626c11be32daa",
+          "projectResolutionDigest": "1fe023dcbe6bf9e994946ee320c5e88ee1bf231efaa81ebaae0121b0e8e5b3e9",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/application/run-structural-module-reachability-report.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -3174,6 +3189,7 @@
             "packages/csaa/src/contracts/source-origin-correlation.ts",
             "packages/csaa/src/contracts/state-machine-graph.ts",
             "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
+            "packages/csaa/src/contracts/structural-module-reachability-report.ts",
             "packages/csaa/src/contracts/structural-scc-analysis.ts",
             "packages/csaa/src/contracts/subject.ts",
             "packages/csaa/src/graph/build-call-graph.ts",
@@ -3333,12 +3349,15 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "cfc3c9457e3503277fc50cf01af01252d11d50aaf839a99d82e40c652e9aa06a",
+          "projectResolutionDigest": "ab18e950203a03b865aa444b3eb01728cdd405b61c7a133a1c676e9f6b5daef0",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
+            "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+            "packages/csaa/src/application/structural-module-reachability-command.test.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -3360,6 +3379,7 @@
             "packages/csaa/src/contracts/source-origin-correlation.ts",
             "packages/csaa/src/contracts/state-machine-graph.ts",
             "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
+            "packages/csaa/src/contracts/structural-module-reachability-report.ts",
             "packages/csaa/src/contracts/structural-scc-analysis.ts",
             "packages/csaa/src/contracts/subject.ts",
             "packages/csaa/src/graph/build-call-graph.test.ts",
@@ -4848,11 +4868,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "92eed4a891bb2b306a29f3dfc2c731d20b790af0cf241a5370fab89c649e617a",
+          "configClosureDigest": "eeb4123846a329827ea0a8156378554d55efdef9268ab8592287d47e8889be30",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "22bd0e4ea1e40b350fbf85157848713d30c90a451e40fd248200fb67210a71f1",
+          "projectResolutionDigest": "d23a4e0c8293803578e3dc23b709ed79d589a0c4984e121044f43d642bbd77ae",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4860,6 +4880,7 @@
           "rootNames": [
             "scripts/csaa-inventory.ts",
             "scripts/csaa-product-boundary.ts",
+            "scripts/csaa-structural-module-reachability.ts",
             "scripts/mutants/ledger.ts",
             "scripts/mutants/measured.ts",
             "scripts/mutants/run.ts",
@@ -4903,11 +4924,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "05b445ad747c3105132dc4ef5117033d0888e169ffb15e91d1a9cf5a32189097",
+          "configClosureDigest": "285631eb47ad01d928ec3a8ca8ad4abbf5d78ddb18d68291464ab030790791fe",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "a19ffabbcb7d22b2f646180b21695c92c1adfd09a7e07486af1523427b670ae8",
+          "projectResolutionDigest": "ff8e47958b3f7c1e8793a823cc3b29bb4d655476fc460659b0747174bfe3e210",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4941,11 +4962,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "cf0746b998ee2af8f67463cad27250beca9e137c3375af02ffa6787fbaae0050",
+          "configClosureDigest": "07db86e06caae0653eb47c6b27809205f4b456927cfc6349d8e188e06dd3a642",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "b753a5efc8a6120b94b41d9db8c8205bfbc39dc2409727210138843aaebaadde",
+          "projectResolutionDigest": "0665bc3d81277c8af92612283cb3f1afb6a1d3918fbe5d0657ae277f35a48fbf",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5611,11 +5632,10 @@
         "id": "jan-csaa-exclude-build/1",
         "includedFileCount": 0,
         "physicalPopulationState": "EXCLUDED_BEFORE_ENUMERATION",
-        "policyRuleCount": 5,
+        "policyRuleCount": 4,
         "rules": [
           "Compiled output is not an authored compiler input.",
           "Coverage output is derived evidence, not a compiler input.",
-          "E2E results are derived outputs.",
           "Test results are derived outputs.",
           "Unconsumed generated framework output."
         ]
@@ -5648,9 +5668,8 @@
         "id": "jan-csaa-exclude-local-state/1",
         "includedFileCount": 0,
         "physicalPopulationState": "EXCLUDED_BEFORE_ENUMERATION",
-        "policyRuleCount": 2,
+        "policyRuleCount": 1,
         "rules": [
-          "Known mutation-runner transient state is not a source input.",
           "RPH demo harness state is outside the accepted DWP-002 subject."
         ]
       },
@@ -5688,7 +5707,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "51bc357751823a35d20befc7ec9020958beb45a8d24234f881480b111c5f0383",
+    "fileManifestDigest": "f5dc2dd3a1ef08ca59b75d367291da67a6502e9452337faafd06afc206101dc5",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5751,7 +5770,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 966,
+    "selectedFileCount": 971,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6875,9 +6894,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 5820,
+        "bytes": 5927,
         "path": "package.json",
-        "sha256": "fdf8a9e9a8fbc063bf94fb9c71a2c7d5b6cfb318c1cc25aa1701977d554e3fb2",
+        "sha256": "8d735cf3436907be498a2b16a50cf4f45714bccd8e8977fb7081b74cf1feed15",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -6893,6 +6912,27 @@
         "path": "packages/csaa/package.json",
         "sha256": "0ec113c9146d0c6193b9b6794eae51ee95f8df8006da816aa62194e517810567",
         "subjectArtifactClass": "MANIFEST"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 9998,
+        "path": "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
+        "sha256": "a19ee0ec20ffc4b3db20727d75cec5d05625b2a1e4ac1ad0a7324633eaed2722",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 32321,
+        "path": "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+        "sha256": "baa36e10b5b20eca30caf02c36d9d94efbaa915fb60c4cc298719cc0b03fc662",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 2233,
+        "path": "packages/csaa/src/application/structural-module-reachability-command.test.ts",
+        "sha256": "6f5e87e485100d3905a2e7c8e739b36be4c4b6a823ade3a264866cb55808b1c3",
+        "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
@@ -7039,6 +7079,13 @@
         "bytes": 13123,
         "path": "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "sha256": "b1b0dc97aeeb84eecab63681762ab517ab005fd2c01f456786b1f1bb4ca8574b",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 9675,
+        "path": "packages/csaa/src/contracts/structural-module-reachability-report.ts",
+        "sha256": "aadbf735a4be3ecfd92372c3d828ec889be5906795ddd790dbdd258d7f482ea0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7631,16 +7678,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 19821,
+        "bytes": 20646,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "bdf9fbbba4bd4468a08b44ec7386e32f058858c306d6be95f71c60fab45c762c",
+        "sha256": "46a5779d14257ddc27eda2cd0eecc8508371719c7f2168744db883f108821398",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 9882,
+        "bytes": 10166,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "907e903548190316543e7f579cc67976193157384bdd0fe23a7a13e49564c2c1",
+        "sha256": "90833e206e4956185584f426fff583a35e0e5883ec7eb4bbb56fd78e3ae9ecdc",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12013,6 +12060,13 @@
       },
       {
         "artifactClass": "SCRIPT",
+        "bytes": 2907,
+        "path": "scripts/csaa-structural-module-reachability.ts",
+        "sha256": "3d6a8973a453198a7f350e7fbf7f04ce77d86c18416edfd42ae116aeb8bd63be",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
         "bytes": 286150,
         "path": "scripts/mutants/ledger.ts",
         "sha256": "5089327333416624683be7d8414f9bf33e2bb6d80b50bd1a1dd26cc7009787ea",
@@ -12516,7 +12570,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "dfcd7d9ed2f127ea7cf441bc92f336105ae55dda8d1895c871af2fabff88c709",
+    "subjectId": "5de89251678661acddeb7c6d17ac11e1e9046751e5520e7c56713af899870f57",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -12818,7 +12872,7 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 146,
+      "candidateArtifactCount": 148,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -12845,6 +12899,7 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/application/run-structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -12866,6 +12921,7 @@
         "packages/csaa/src/contracts/source-origin-correlation.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
+        "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
         "packages/csaa/src/contracts/subject.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
@@ -12998,7 +13054,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 241,
+      "candidateArtifactCount": 245,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13025,6 +13081,9 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
+        "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+        "packages/csaa/src/application/structural-module-reachability-command.test.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -13046,6 +13105,7 @@
         "packages/csaa/src/contracts/source-origin-correlation.ts",
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
+        "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
         "packages/csaa/src/contracts/subject.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
@@ -14386,7 +14446,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 16,
+      "candidateArtifactCount": 17,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14417,6 +14477,7 @@
       "resolvedRootFiles": [
         "scripts/csaa-inventory.ts",
         "scripts/csaa-product-boundary.ts",
+        "scripts/csaa-structural-module-reachability.ts",
         "scripts/mutants/ledger.ts",
         "scripts/mutants/measured.ts",
         "scripts/mutants/run.ts",
@@ -14923,6 +14984,21 @@
       "path": "scripts/csaa-product-boundary.ts",
       "provenance": [
         "scripts/csaa-product-boundary.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-structural-module-reachability.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "3d6a8973a453198a7f350e7fbf7f04ce77d86c18416edfd42ae116aeb8bd63be",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "gateCarriers": [
+        "package.json#/scripts/csaa:analyze:structural-module-reachability"
+      ],
+      "path": "scripts/csaa-structural-module-reachability.ts",
+      "provenance": [
+        "scripts/csaa-structural-module-reachability.ts"
       ],
       "role": "SCRIPT"
     },

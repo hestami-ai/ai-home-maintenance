@@ -27,6 +27,7 @@
 		"spec:obligations": "bun run scripts/spec-obligations.ts",
 		"csaa:inventory": "bun run scripts/csaa-inventory.ts --write",
 		"csaa:inventory:check": "bun run scripts/csaa-inventory.ts --check",
+		"csaa:analyze:structural-module-reachability": "bun run scripts/csaa-structural-module-reachability.ts",
 		"tracker:build": "bun run scripts/tracker/build.ts",
 		"tracker:check": "bun run scripts/tracker/check.ts",
 		"tracker:query": "bun run scripts/tracker/query.ts",

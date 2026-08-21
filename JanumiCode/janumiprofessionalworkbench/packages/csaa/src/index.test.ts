@@ -68,6 +68,9 @@ import {
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION,
@@ -89,6 +92,8 @@ import {
 	buildLogicalGraphComposition,
 	buildProjectContextGraph,
 	buildStructuralModuleReachabilityAnalysis,
+	runStructuralModuleReachabilityReport,
+	structuralModuleReachabilityReportExitCode,
 	buildStructuralSccAnalysis,
 	buildStateMachineGraph,
 	buildStaticSemanticSnapshot,
@@ -152,6 +157,8 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildLogicalGraphComposition).toBeTypeOf('function');
 		expect(buildProjectContextGraph).toBeTypeOf('function');
 		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
+		expect(runStructuralModuleReachabilityReport).toBeTypeOf('function');
+		expect(structuralModuleReachabilityReportExitCode).toBeTypeOf('function');
 		expect(buildStructuralSccAnalysis).toBeTypeOf('function');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
 		expect(buildStaticSemanticSnapshot).toBeTypeOf('function');
@@ -385,6 +392,15 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION).toBe(
 			'jan-csaa-structural-module-reachability-analysis/1.0.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-structural-module-reachability/0.1.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-module-reachability-report-request/0.1.0'
+		);
+		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-module-reachability-report/0.1.0'
 		);
 		expect(STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION).toBe('jan-csaa-analyze-structural-scc/0.1.0');
 		expect(STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(

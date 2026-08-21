@@ -19,6 +19,7 @@ export * from './contracts/project-context-graph.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
 export * from './contracts/structural-module-reachability-analysis.js';
+export * from './contracts/structural-module-reachability-report.js';
 export * from './contracts/structural-scc-analysis.js';
 export * from './contracts/subject.js';
 export * from './inventory/canonical.js';
@@ -81,6 +82,11 @@ export { buildModuleResolutionTrace } from './resolution/build-module-resolution
 export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';
 export { buildSourceOriginCorrelation } from './semantic/build-source-origin-correlation.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
+export {
+	runStructuralModuleReachabilityReport,
+	structuralModuleReachabilityReportExitCode,
+	type RunStructuralModuleReachabilityReportOptions
+} from './application/run-structural-module-reachability-report.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
