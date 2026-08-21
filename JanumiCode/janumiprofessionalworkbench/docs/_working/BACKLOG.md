@@ -45,14 +45,26 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 
 ### ✅ LANDED — original item, kept for its measurements
 
-- [ ] **REG-F-202: the de minimis floor must never be skippable — remove floor-waiver discharge.**
+- [x] ~~**REG-F-202: the de minimis floor must never be skippable — remove floor-waiver discharge.**~~ — **LANDED.**
   **THE QUESTION IS SETTLED; this is execution, not design.** ASR-3 (JPWB-DOC-003:249, ratified) —
   *"The de minimis assurance floor is UNCONDITIONAL. Risk proportionality governs assurance above a
   mandatory floor; it never makes the floor optional."* `waiverDischargesFloorPolicy`
   (`handlers/floor-gate.ts`) is an UNRATIFIED EXTRAPOLATION: the general §8.15/§12.2 waiver mechanism
   applied to the three REQUIRED floor policies, which canon exempts from that relief. RPH-GOV-005
   anchors on ASR-14 and governs how a waiver BEHAVES — it never granted a waiver reach over the floor.
-  **⚠ DESIGNED, DRIVEN AND MEASURED 2026-08-20 — then REVERTED deliberately, unfinished rather than rushed.**
+  **⚠ CORRECTED 2026-08-21, FOUND BY W-3b's OWN TRIAL MAPPING. THIS PARAGRAPH WAS STALE AND CONTRADICTED THE
+  SECTION HEADING FOUR LINES ABOVE IT** — the heading already read *"✅ LANDED"* while the body below said the
+  change had been reverted. **The code settles it: LANDED.** `floor-gate.ts:254-262` carries the deletion notice
+  for `openFindingCodes` / `FloorWaiver` / `effectiveFloorWaivers` / `waiverDischargesFloorPolicy`, and the W-3b
+  trial drove `CompleteExecutionStep` against an artifact carrying no floor assessment and got
+  *"...(floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING). ... The
+  floor is unconditional: no governance waiver discharges it."*
+  ⚠ **AND THE STALENESS WAS LOAD-BEARING, WHICH IS WHY IT IS RECORDED RATHER THAN QUIETLY FIXED.** A W-3b lane
+  reading this paragraph would have scored ASR-3 UNENFORCED on a rule that is enforced on two planes. That is the
+  REG-F-120 shape — a record maintained after the condition it describes had changed — reaching an audit through
+  its own INPUT rather than its output. The original sentence is struck rather than deleted, because the
+  measurements beneath it are real and were reused:
+  ~~**⚠ DESIGNED, DRIVEN AND MEASURED 2026-08-20 — then REVERTED deliberately, unfinished rather than rushed.**~~
   The change was applied end-to-end in a working tree, the red was proven, the breakage was measured, and the
   tree was returned to green because half-removing an enforcement site is the one way to make this worse. Nothing
   below is a hypothesis; every number was observed.

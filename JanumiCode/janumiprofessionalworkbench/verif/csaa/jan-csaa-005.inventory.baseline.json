@@ -38,15 +38,15 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 23,
+      "discovered": 24,
       "excluded": 0,
       "failed": 0,
-      "included": 23,
+      "included": 24,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 23
+      "successfullyInventoried": 24
     },
     {
       "artifactClass": "SOURCE",
@@ -74,15 +74,15 @@
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 48,
+      "discovered": 49,
       "excluded": 0,
       "failed": 0,
-      "included": 48,
+      "included": 49,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 48
+      "successfullyInventoried": 49
     }
   ],
   "assuranceSurfaces": {
@@ -521,6 +521,7 @@
         "verif/event-surface-census.test.ts",
         "verif/evidence-gate-reachability.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
+        "verif/invariant-verdict-census.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
         "verif/mutant-verdict.test.ts",
@@ -2512,7 +2513,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "5a15e14ea0b1e95ccc9c1d7a1ed8a033d5c68b13bc18c7963a892b9ca55e31e3",
+    "configurationDigest": "f6e25d180cacb020d227d5e1eed6afaeb64502e808a413b3b48b1039fb326b3b",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -4854,12 +4855,13 @@
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "22bd0e4ea1e40b350fbf85157848713d30c90a451e40fd248200fb67210a71f1",
+          "projectResolutionDigest": "103732ddd6f8caa8a34e63ebddbb53400f65155c2c2497aa33a534394f7c8895",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "scripts/census/derive-invariant-limbs.ts",
             "scripts/csaa-inventory.ts",
             "scripts/csaa-product-boundary.ts",
             "scripts/mutants/ledger.ts",
@@ -4947,7 +4949,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "b753a5efc8a6120b94b41d9db8c8205bfbc39dc2409727210138843aaebaadde",
+          "projectResolutionDigest": "b8ec17336fca0b89cfda1a36b32bfe5a2133ed92e8a89372671dc83c9905ef3b",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4978,6 +4980,7 @@
             "verif/guard-enforcement-ledger.data.ts",
             "verif/guard-enforcement-ledger.test.ts",
             "verif/guard-enforcement-ledger.ts",
+            "verif/invariant-verdict-census.test.ts",
             "verif/lifecycle-arrow-declarations.test.ts",
             "verif/mutant-ledger.test.ts",
             "verif/mutant-verdict.test.ts",
@@ -5690,7 +5693,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "1828531e063916058b2c72801c7f339a04c527b86321c1c6050b72b98a18f5cd",
+    "fileManifestDigest": "14e53bc198bac08df7461ad36bcc36f991adcfd50c1ccee8100303e3d8de47d6",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5753,7 +5756,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 967,
+    "selectedFileCount": 969,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -9327,9 +9330,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 16514,
+        "bytes": 18847,
         "path": "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
-        "sha256": "a6a80b48f21b60456aa1da2cfcfeaa1429e793fe032c795b3ace3ad9c837a3ac",
+        "sha256": "a24c30469c412ea3e3dbeb26cc3dfe85149e4de9276e8487e7cf2101fd43d847",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -12008,6 +12011,13 @@
       },
       {
         "artifactClass": "SCRIPT",
+        "bytes": 9450,
+        "path": "scripts/census/derive-invariant-limbs.ts",
+        "sha256": "b75d066dad94fe7bd5ce402a78697991e736a1bf888bfb1f355e37532f638314",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
         "bytes": 1153,
         "path": "scripts/csaa-inventory.ts",
         "sha256": "01fe8027d8a47a2817dcd979e8f09118b3fc9cf9094d743d59363832c4beea17",
@@ -12337,6 +12347,13 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 19241,
+        "path": "verif/invariant-verdict-census.test.ts",
+        "sha256": "b3af74c7727cdcb82cff1ed2b86e62b60535edeecd88d26bb324330dd7f204d2",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 16329,
         "path": "verif/lifecycle-arrow-declarations.test.ts",
         "sha256": "beac0f704e2b150b339618e809be12ad74bf32a2edc810be42d37615c9ffcc29",
@@ -12525,7 +12542,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "f1855b39966e864f76daada2242a7c288cc47c092b758de766eeb4fa30a90750",
+    "subjectId": "903ae1999c7e044f73f03eea9ee9d9d8e75f09d4ea9eb5575630a80a3772825c",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14396,7 +14413,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 16,
+      "candidateArtifactCount": 17,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14425,6 +14442,7 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "scripts/census/derive-invariant-limbs.ts",
         "scripts/csaa-inventory.ts",
         "scripts/csaa-product-boundary.ts",
         "scripts/mutants/ledger.ts",
@@ -14478,7 +14496,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 48,
+      "candidateArtifactCount": 49,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14532,6 +14550,7 @@
         "verif/guard-enforcement-ledger.data.ts",
         "verif/guard-enforcement-ledger.test.ts",
         "verif/guard-enforcement-ledger.ts",
+        "verif/invariant-verdict-census.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
         "verif/mutant-verdict.test.ts",
@@ -14906,6 +14925,21 @@
   ],
   "verificationAssets": [
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/census/derive-invariant-limbs.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "b75d066dad94fe7bd5ce402a78697991e736a1bf888bfb1f355e37532f638314",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "FILESYSTEM_OR_TEXT",
+      "gateCarriers": [
+        "UNMAPPED"
+      ],
+      "path": "scripts/census/derive-invariant-limbs.ts",
+      "provenance": [
+        "scripts/census/derive-invariant-limbs.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-inventory.ts at execution time.",
       "associatedBaselines": [],
       "contentSha256": "01fe8027d8a47a2817dcd979e8f09118b3fc9cf9094d743d59363832c4beea17",
@@ -15138,6 +15172,7 @@
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
+        "verif/invariant-verdict-census.test.ts",
         "verif/tracker-ingest.test.ts",
         "verif/tracker-name-match.test.ts"
       ],
@@ -15578,6 +15613,22 @@
         "verif/guard-enforcement-ledger.ts"
       ],
       "role": "ANALYZER"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/invariant-verdict-census.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "b3af74c7727cdcb82cff1ed2b86e62b60535edeecd88d26bb324330dd7f204d2",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/invariant-verdict-census.test.ts"
+      ],
+      "path": "verif/invariant-verdict-census.test.ts",
+      "provenance": [
+        "verif/invariant-verdict-census.test.ts"
+      ],
+      "role": "TEST"
     },
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/lifecycle-arrow-declarations.test.ts.",
