@@ -520,6 +520,34 @@ export const proposeRecomposition: CommandHandler = (ctx, command, payload) => {
 			[id]
 		);
 	}
+	// AN EMPTY COMPOSITION IS NOT A COMPOSITION (REG-F-041 / DESIGN-recomposition-judgement.md S-0).
+	//
+	// ⚠ THE HOLE THIS CLOSES IS A VACUOUS RUNG, NOT A MISSING CHECK, which is why nothing caught it.
+	// `requiredChildWorkUnitIds` has no `.min(1)` on either schema (both are GENERATED, so the constraint has no
+	// home there), and `buildRecompositionInput` reads it `?? []`. With an empty list `requiredChildResults` is
+	// empty, so the kernel's rung 2 — `unsatisfied.length > 0` (rph-domain/src/decomposition.ts) — is VACUOUSLY
+	// FALSE, every child-acceptability check passes by having nothing to check, and the recomposition proceeds to
+	// parent-satisfied. That is OBJ-1's named prohibition: no semantic state may be inferred from an empty array.
+	//
+	// DEC-6's valid inference opens with "assured required child results" and JPWB-DOC-003 warns that
+	// "completion-counting is the most seductive collapse in the model because it is almost always locally
+	// plausible". Counting to ZERO is the limiting case of that collapse, and it was plausible to this engine.
+	//
+	// ⚠ REFUSED AT PROPOSE, DELIBERATELY, and no payload-side remedy could have reached it: the field lives on the
+	// CONTRACT, written here, while every remedy considered for REG-F-041 operates on the CompleteRecomposition
+	// payload boundary. A contract minted empty is already wrong when it is minted.
+	//
+	// ⚠ NOT CLAIMED: that the named children EXIST, or that they match the paired DecompositionContract. REG-F-041
+	// records both gaps and they are NOT closed here — this guard refuses an empty list, nothing more. Widening it
+	// silently would make the register entry read as more closed than it is.
+	if (p.requiredChildWorkUnitIds.length === 0) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposeRecomposition requires at least one required child work unit: a recomposition contract naming none is not a composition, and its child-acceptability check would pass by having nothing to check (§14.1 / DEC-6).`,
+			[id]
+		);
+	}
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, RECOMP, id, {
 			lifecycleStatus: 'READY',

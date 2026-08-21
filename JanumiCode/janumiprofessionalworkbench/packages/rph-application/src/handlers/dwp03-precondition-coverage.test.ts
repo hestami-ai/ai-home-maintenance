@@ -380,7 +380,9 @@ describe('DWP-03 decomposition/recomposition — re-issue refused + the re-evalu
 	}
 
 	it('BeginRecomposition (from READY) refuses a re-issue once EVALUATING — the only NOOP', () => {
-		beginRecomposition([]);
+		// The child list is incidental to this test's subject (the refused NOOP) but may not be EMPTY: a
+		// recomposition contract naming no required children is refused at propose (REG-F-041 S-0).
+		beginRecomposition([CHILD_A]);
 		const again = h.d('BeginRecomposition', RCP, 'RECOMPOSITION_CONTRACT', { recompositionContractId: RCP });
 		expect(again.status).toBe('REJECTED');
 		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
@@ -413,17 +415,23 @@ describe('DWP-03 decomposition/recomposition — re-issue refused + the re-evalu
 	});
 
 	it('CompleteRecomposition (from EVALUATING) refuses a re-issue once a terminal-ish outcome is recorded', () => {
-		beginRecomposition([]); // no required children, no conflict -> COMPOSABLE
+		// ⚠ THE OUTCOME HERE IS INSUFFICIENT, NOT COMPOSABLE, and the change is honest rather than cosmetic. This
+		// read `beginRecomposition([])` — "no required children, no conflict -> COMPOSABLE" — which reached the
+		// happy outcome only because an empty child list makes the kernel's child rung vacuously true. That is now
+		// refused at propose (REG-F-041 S-0), so the contract carries a real, freshly-proposed (UNASSESSED, hence
+		// unacceptable) child and lands INSUFFICIENT. **This test's subject is untouched:** it asks whether a
+		// re-issued CompleteRecomposition is refused once an outcome is RECORDED, and INSUFFICIENT is an outcome.
+		beginRecomposition([CHILD_A]);
 		expect(
 			h.d('CompleteRecomposition', RCP, 'RECOMPOSITION_CONTRACT', { parentCompletionClaimId: CLAIM }).status
 		).toBe('ACCEPTED');
-		expect(statusOf(RCP)).toBe('COMPOSABLE');
+		expect(statusOf(RCP)).toBe('INSUFFICIENT');
 
 		const again = h.d('CompleteRecomposition', RCP, 'RECOMPOSITION_CONTRACT', {
 			parentCompletionClaimId: CLAIM
 		});
 		expect(again.status).toBe('REJECTED');
 		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
-		expect(statusOf(RCP)).toBe('COMPOSABLE'); // the refused re-issue left the recorded outcome untouched
+		expect(statusOf(RCP)).toBe('INSUFFICIENT'); // the refused re-issue left the recorded outcome untouched
 	});
 });

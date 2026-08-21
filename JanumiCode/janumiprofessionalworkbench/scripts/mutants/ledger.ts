@@ -2952,6 +2952,29 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "THE CONTROL'S OWN MUTANT, which the other two cannot supply. Both of them arrange a BLOCKING floor, so a panel that rendered the blocked hint and the waiver form UNCONDITIONALLY would pass both while lying on every satisfied floor — and the spec's third test exists precisely for that world. `{#if data.floor}` rather than `{#if true}` is the realistic slip (an existence check standing in for a state check) and it typechecks, where `if (true)` invites the dead-code NO_COMPILE this ledger's header documents. It is inside the outer `{#if data.floor}` block, so it is unconditionally true there. OBSERVED 2026-08-20, and the attribution is the point rather than the kill: tests 1 and 2 both PASS under this mutation (they arrange BLOCKING floors, where the hint renders either way) and ONLY the control at :213 fails, on `floor-blocked-hint` toHaveCount(0). A control whose mutant reddened a sibling would be measuring nothing of its own.",
 		source: 'REG-F-202 (a control needs its own mutant)'
 	},
+	// ── REG-F-041 S-0: an empty composition is not a composition ──────────────────────────────────────────────
+	// `requiredChildWorkUnitIds` had no `.min(1)` (both schemas are GENERATED, so the constraint has no home
+	// there) and `buildRecompositionInput` read it `?? []`. With an empty list the kernel's child rung —
+	// `unsatisfied.length > 0` — is VACUOUSLY FALSE, so every child-acceptability check passed by having nothing
+	// to check. These two are opposite polarities on the one guard that closes it.
+	{
+		id: 'MU-F041S0-the-empty-composition-is-admitted-again',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		find: '\tif (p.requiredChildWorkUnitIds.length === 0) {',
+		replace: '\tif (false && p.requiredChildWorkUnitIds.length === 0) {',
+		expectRed: ['packages/rph-application/src/handlers/recomposition.test.ts'],
+		why: "THE FAIL-OPEN RESTORED. ⚠ `&& ` RATHER THAN A BARE `if (false)`, deliberately: the ledger's own V-2c lesson (header, ~:38-56) records that `if (cond) -> if (false)` makes the guarded block STATICALLY DEAD and TypeScript then reports the `return` as unreachable — 21 harvested mutants died that way. Preserving the operand keeps the block live to the compiler while the condition can never hold. Reddens `refuses a recomposition contract naming NO required children`, which asserts REJECTED and that no contract is minted.",
+		source: 'REG-F-041 S-0 (OBJ-1: no semantic state inferred from an empty array; DEC-6)'
+	},
+	{
+		id: 'MU-F041S0-the-guard-refuses-every-proposal',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		find: '\tif (p.requiredChildWorkUnitIds.length === 0) {',
+		replace: '\tif (p.requiredChildWorkUnitIds.length >= 0) {',
+		expectRed: ['packages/rph-application/src/handlers/recomposition.test.ts'],
+		why: "THE CONTROL'S OWN MUTANT, and the pair's whole point: `=== 0` -> `>= 0` is the realistic operator slip, and it makes the guard refuse EVERY proposal — including valid ones. The refusal test above would pass perfectly in that world, which is why it cannot be the only claim. Reddens `CONTROL: a contract naming one required child is proposed normally`. ⚠ Same anchor as its sibling BY DESIGN — the one line IS the whole guard and the two mutations fail in opposite directions; `F201-broker-asserts-the-wrong-type` states the same discipline. ⚠ It also reddens `dwp03-precondition-coverage.test.ts`, which arranges recompositions for an unrelated subject; the victim named here is the file whose tests make the CLAIM, and the collateral is recorded rather than left for a reader to discover.",
+		source: 'REG-F-041 S-0 (a control needs its own mutant)'
+	},
 	{
 		id: 'MU-F202B-gate-b-collapses-absent-and-empty-again',
 		file: 'packages/rph-application/src/handlers/assurance.ts',

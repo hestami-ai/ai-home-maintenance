@@ -1127,6 +1127,40 @@ Recorded at founding as session-known ground truth; the canon must not contradic
 - **WHAT IS NOT CLAIMED, stated so the finding is not read wider than it is.** The CONFLICTED routing itself is **correct and proved**: a non-empty list forces CONFLICTED even when every child is individually SATISFIED, which is the recomposition analog of property P1 and is exactly what §14.1 requires. Child acceptability is genuinely read from the store and its per-child computation fails **closed**. **The defect is the population, not the logic** — REG-F-022's Gate A shape, on the input that decides whether a recomposition conflicts at all.
 - **Disposition:** **RECORDED, NOT FIXED**, and the reason is not deferral. A detector needs an aggregation step that does not exist and a ratified answer to *what a conflict IS over child outputs* — filed as **REG-E-028**. **What could be done without any ratification, and is deliberately not done here:** making the three payload fields **REQUIRED** would force a caller to STATE a judgement instead of inheriting one — the `GrantWaiver.effectiveAt` and `parentCompletionClaimId` medicine, and the shapes are AUTHORED so they are ours to change. It is not taken unilaterally because it **refuses every existing caller**, and because the note declaring composable-by-default is an authored decision that deserves an explicit reversal rather than a quiet one.
 - **Merge target:** Repository — `handlers/decomposition.ts`, `rph-domain/src/decomposition.ts`, and the three `m3-commands-events.json` field notes, none of which change until REG-E-028 rules. **Status:** OPEN.
+- **✅ S-0 LANDED 2026-08-21 — an empty composition is refused at PROPOSE.** `proposeRecomposition` rejects a
+  contract naming no required children. This entry recorded the missing `.min(1)`; what it did not price is that
+  the consequence is a **VACUOUS RUNG**, not a missing check — with an empty list `requiredChildResults` is empty,
+  the kernel's `unsatisfied.length > 0` is vacuously false, and every child-acceptability check passes by having
+  nothing to check. **Refused at PROPOSE deliberately:** the field lives on the CONTRACT, so no
+  `CompleteRecomposition`-payload remedy — the boundary all three designed approaches operate on — could ever have
+  reached it. ⚠ NOT closed here: that the named children EXIST, or match the paired DecompositionContract. Both
+  are this entry's, and both stay open.
+- **⚠ THE EXHIBIT HAD TO EARN ITS OUTCOME, and that was the real work.** `recomposition.test.ts`'s discriminating
+  control — the ONLY test reaching COMPOSABLE, and therefore the only thing standing between this suite and an
+  `evaluateRecomposition` that returned INSUFFICIENT unconditionally — was `propose([])`. It reached the happy
+  outcome *because* of the defect. Re-arranged onto a child driven to an acceptable assurance state HONESTLY: a
+  real WAIVER Decision, proposed and GRANTED (never ApproveDecision), then cited on the child's assurance hop.
+  **WAIVED rather than SATISFIED on purpose** — both are in `ACCEPTABLE_CHILD_ASSURANCE`, but SATISFIED needs the
+  PWU at UNDER_ASSURANCE via execution hops this suite has no reason to walk, while the assurance axis moves with
+  workLifecycle still PROPOSED. It also gives the WAIVED arm a LIVE CONSUMER; REG-F-042 kept it on DEC-6's
+  exception clause and until now only an exact-membership assertion pinned it.
+- **AND THE REPOSITORY'S OWN GUARDS CAUGHT THREE THINGS I DID NOT.** (1) REG-F-015's dispatch guard fired on the
+  suite's `propose()` helper the moment the refusal existed — *"DISPATCH REFUSED AND NEVER READ … if it was an
+  arrangement, the arrangement did not happen and nothing here could tell."* It had dispatched and discarded both
+  results for as long as it existed; an arrangement that cannot report its own failure is not an arrangement.
+  (2) ASR-15 refused the waiver's declared authority when it named a convenient literal rather than the issuing
+  actor. (3) Lint caught an unused id. Two mutants guard the guard, opposite polarities on one line:
+  `MU-F041S0-the-empty-composition-is-admitted-again` and `MU-F041S0-the-guard-refuses-every-proposal`, the second
+  defending the control, because a guard that refused EVERY proposal would satisfy the refusal test perfectly.
+- **⚠ AND TWO OF THIS ENTRY'S OWN EARLIER NOTES BROKE THE REGISTER'S GATES, which is worth more than the fix.**
+  Running `verif/` after this increment reddened P-5 (`register-status`) and P-3 (`absence-claims`) on text I had
+  committed in the two preceding commits: I had left REG-F-041 carrying **two live `**Status:**` lines**, and
+  written *"nothing in this entry could have said so"* — an absence phrasing — with no stated search. Both commits
+  were docs-only and I ran `git diff --stat` and committed **without running the doc gates**, twice. The gates
+  existed, were correct, and were simply not invoked. Fixed: one live status line, and the CSAA claim now states
+  its search with a positive control (`'trigger'`, the sibling key in the same exact-key list).
+  Verification: types 0, lint 0, **173 files / 1,757 tests**, verif 40/40, **77/77 Playwright**, inventory green.
+
 - **⚠ DESIGNED 2026-08-21, AND THE DESIGN DECLINES THIS ENTRY'S OWN INTERIM ACT AS THE NEXT INCREMENT.**
   `docs/_working/DESIGN-recomposition-judgement.md` — nine agents (three grounding lanes, three independent
   approaches, three judges on separate lenses). Three results bear directly on the text above.
@@ -1153,7 +1187,7 @@ Recorded at founding as session-known ground truth; the canon must not contradic
     `.min(1)`; the consequence is that the kernel's rung 2 (`unsatisfied.length > 0`) is **VACUOUSLY FALSE** on an
     empty list — and this entry's own live exhibit, `recomposition.test.ts:162`, is `propose([])`. **The exhibit is
     a recomposition of NOTHING.** No payload-side remedy can reach it: the field lives on the CONTRACT, written at
-    propose. **Status:** OPEN (unchanged — designed, not implemented).
+    propose. The entry's status is unchanged — designed, not implemented; its single live **Status** line stands above.
 - **⚠ THE BLOCKER NAMED IN THAT MERGE TARGET NO LONGER EXISTS (noted 2026-08-20).** REG-E-028 was **WITHDRAWN the
   same day it was filed** — *"it is not a sponsor question, because the ratified corpus answers it"* — and
   superseded by REG-F-042/043/044. So *"none of which change until REG-E-028 rules"* has been an unsatisfiable
@@ -1173,7 +1207,7 @@ Recorded at founding as session-known ground truth; the canon must not contradic
   scratch — both already disclosed HERE and at `enforcement-register.ts:831-836` (RPH-EVD-001,
   `UNENFORCED_DISCLOSED`). [[feedback_search_the_register_first]] exists for exactly this and was not applied.
   The sweep's one genuine yield was this line — found only because an investigator followed the merge target's
-  citation instead of trusting it. **Status:** OPEN (unchanged).
+  citation instead of trusting it. The entry's single live **Status** line is unchanged and stands above.
 - **⚠ CITATION CORRECTED (same day).** This entry cited the judged-act rule as ~~*"DOC-003 §6 DEC-6"*~~; **DEC-6 is JPWB-DOC-003 §7** (*Decomposition and recomposition*). §6 contains the string `DEC-6` because **STA-4 CITES it** — so a grep for the rule's name lands in a section that does not contain the rule, which is the same trap as REG-F-030's heading and is why §N is never inferred from a hit. The substance is unaffected; **what the correct section then yielded is not** — see **REG-F-042**, which reads DEC-6 limb by limb and finds this entry understated the gap.
 
 ### REG-F-042 — DEC-6 names NINE checks for recomposition and the engine derives ONE, and that one admits a disposition two ratified rules exclude by name
@@ -1209,9 +1243,13 @@ Recorded at founding as session-known ground truth; the canon must not contradic
 - **AND THE DIRECTION OF THE DRIFT IS THE WARNING.** REG-F-072's original census read **21 ENFORCED of 86 texts**; the persisted ledger reads **14 of 82**. Two rows record their own demotion in terms — *"REFUTED BY THE SKEPTIC PASS, having first been classified ENFORCED"* — including one whose refusal is real, whose mutants do redden, and which the constrained actor **disables with one boolean from the payload**. **A false ENFORCED is worse than a recorded UNENFORCED**, because it retires the question. The population moved too (86 → 82 texts), so the difference is not purely demotions and is not reported as such.
 - **THE COUNTS RECONCILE, so this is not drift:** *"333 transitions across 26 machines"* is **304 transitions + 29 illegal rows**, over a set that is now **27** machines. The denominator here silently includes `illegal`, which the arrow census counts separately — worth stating because two numbers for one table is how a reconciliation gets abandoned.
 - **⚠ ITS COST CLAIM HAS ROTTED, MEASURED 2026-08-21 — the rename is no longer "zero behavioural cost".**
-  That phrase was TRUE when written (2026-08-06). It is not now, and nothing in this entry could have said so,
-  because what changed happened in another package after the fact. **CSAA reads `transitions.data.ts` and it reads
-  the literal property name.**
+  That phrase was TRUE when written (2026-08-06). It is not now, and this entry could not have said so, because
+  what changed happened in another package after the fact. **CSAA reads `transitions.data.ts` and it reads the
+  literal property name.**
+  **THE SEARCH, stated:** grepped `packages/csaa/src` (all `.ts`, excluding `dist`) for reads of the literal
+  property name, then read each hit at its own location. **Positive control:** `'trigger'` — the sibling field in
+  the same exact-key list — is present at the same site and same line range, so the search demonstrably reaches
+  the file rather than returning a false zero.
   - `packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts:537` —
     `guard: optionalString(context, properties, 'guard', itemPath)` — an AST read keyed on the string `'guard'`,
     against an **EXACT key set** at `:516`: `['from', 'guard', 'note', 'to', 'trigger']`.

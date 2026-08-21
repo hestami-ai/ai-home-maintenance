@@ -223,10 +223,14 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   only), but the act ranks 3rd of 3 on two of three lenses and **retains no record of the judgement it compels**.
   The reordering is the point: `COMPOSABLE` has NO consumer, while `RECOMPOSING -> RECOMPOSED` is driven-ACCEPTED
   with nothing cited (`verif/recomposition-ungoverned.test.ts`, REG-F-085). Work order is now:
-  - [ ] **S-0 — refuse an empty composition.** `requiredChildWorkUnitIds` has no `.min(1)`, so the kernel's rung 2
-    is VACUOUSLY FALSE and REG-F-041's own exhibit (`recomposition.test.ts:162`) is `propose([])` — a
-    recomposition of NOTHING. Cheapest, fully independent, needs its OWN red. ⚠ Its target is simultaneously the
-    suite's discriminating control: re-arrange with real children, do not delete.
+  - [x] ~~**S-0 — refuse an empty composition.**~~ — **LANDED 2026-08-21.** `proposeRecomposition` refuses a
+    contract naming no required children; red observed first, two mutants (opposite polarities on one line, the
+    second defending the control). The discriminating control was re-arranged onto a child made acceptable by a
+    real GRANTED waiver — WAIVED rather than SATISFIED, because the assurance axis moves while workLifecycle
+    stays PROPOSED. ⚠ Along the way REG-F-015's guard caught that the suite's `propose()` helper had dispatched
+    and DISCARDED its results for as long as it existed, and `verif/` caught two register-gate violations in my
+    own preceding two commits — both docs-only, both committed without running the doc gates. **Run `verif/`
+    before committing register prose; `git diff --stat` is not a check.**
   - [ ] **S-1 — gate the PWU arrow on a SATISFIED contract.** This is what makes the verdict mean anything.
     ⚠ Retires REG-F-085's pin, which that file exists to FORCE — the register entry must move with it.
   - [ ] **S-2 — then strengthen the verdict** (RAC + four named grafts, in the design).
