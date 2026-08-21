@@ -231,8 +231,15 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
     and DISCARDED its results for as long as it existed, and `verif/` caught two register-gate violations in my
     own preceding two commits — both docs-only, both committed without running the doc gates. **Run `verif/`
     before committing register prose; `git diff --stat` is not a check.**
-  - [ ] **S-1 — gate the PWU arrow on a SATISFIED contract.** This is what makes the verdict mean anything.
-    ⚠ Retires REG-F-085's pin, which that file exists to FORCE — the register entry must move with it.
+  - [ ] **S-1 — ⚠ SPONSOR-BLOCKED. ESCALATED 2026-08-21, NOT BUILT.** REG-F-085 (`JPWB-REG-005:2481-2487`,
+    Status OPEN — *contract Decision owed*) forbids **both** routes by name: requiring `SATISFIED` ships a command
+    that can never fire, and accepting `COMPOSABLE` *"silently weakens a ratified guard … precisely the
+    APPROVAL-for-decision substitution class already open as REG-F-076."* It states the fork is *"THE CANON
+    QUESTION A BUILD AGENT MAY NOT ANSWER"* — (a) a missing acceptance act (new work) vs (b) `completeRecomposition`
+    on the wrong arrow (a defect) — *"These have different authorities"* — and that the sequencing is *"a contract
+    Decision, not a build one."* ⚠ My own design doc wrote S-1 as buildable because I read the PIN's header
+    instead of the register entry it points at. See DESIGN-recomposition-judgement.md for the corrected §4 and for
+    the blast-radius findings worth keeping (pwu-replay fold, event-surface-census, the unperformable-arrow trap).
   - [ ] **S-2 — then strengthen the verdict** (RAC + four named grafts, in the design).
   - S-3 — the other eight DEC-6 checks are a capability, not a fix (REG-F-042). Out of scope.
 

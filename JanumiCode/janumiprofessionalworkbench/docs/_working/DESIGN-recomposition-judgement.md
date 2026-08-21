@@ -122,10 +122,38 @@ arguing about how strong the verdict must be.**
   reds across the three approaches would notice it. ⚠ It changes `recomposition.test.ts:162`, which is
   simultaneously the suite's discriminating control and REG-F-041's live exhibit — so the control must be
   re-arranged with real children, not deleted.
-- **S-1 — Gate the PWU arrow on a SATISFIED contract.** `RECOMPOSING -> RECOMPOSED` stops being performable with
-  nothing cited. This is what makes the contract's verdict mean anything. ⚠ It retires
-  `verif/recomposition-ungoverned.test.ts`'s pin, which that file exists to force — *"so that fixing it FORCES
-  the register entry to be revisited rather than left stale."* REG-F-085 must move with it.
+- **S-1 — ⚠⚠ SPONSOR-BLOCKED, AND THIS DESIGN GOT IT WRONG (corrected 2026-08-21).** As first written, S-1 read
+  *"gate the PWU arrow on a SATISFIED contract"*. **REG-F-085 forbids both ways of doing that, by name, and I had
+  not read its body** — only the header comment of the pin file it produced. Verbatim, at
+  `JPWB-REG-005:2481-2487`:
+  - *"a build agent has only two ways out, **both forbidden**: require `SATISFIED` and ship a command that can
+    never succeed, or accept `COMPOSABLE` and **silently weaken a ratified guard** — substituting 'no
+    contradiction found' for 'contract satisfied', which is precisely the APPROVAL-for-decision substitution class
+    already open as REG-F-076."*
+  - *"**THE CANON QUESTION A BUILD AGENT MAY NOT ANSWER.** … Either (a) a third command is missing that takes an
+    evaluated contract to `SATISFIED` (an acceptance act) … or (b) `completeRecomposition` is implemented on the
+    wrong arrow. **These have different authorities: (a) is new work, (b) is a defect.**"*
+  - *"**The sequencing question … is a contract Decision, not a build one**"*, and its Merge target is
+    **Corpus then Repository**, Status **OPEN — contract Decision owed**.
+  A nine-agent panel independently produced exactly the two forbidden options, designed both in full, and had
+  **both attacked to `sound: false`** — one of the attackers landing on this same register line. That is a costly
+  way to rediscover a block that was already written down. **[[feedback_search_the_register_first]]**, and the
+  sharper form of it: *a pin's header is not the register entry it points at.*
+  **So S-1 is ESCALATED, not built.** What a build agent MAY do without the ruling: nothing on this arrow.
+  ⚠ Note the safe default is a WEAK one and the register says so: both arrows stay performable by the generic
+  setter with nothing cited. Holding is not safety here — it is the status quo, which is the defect.
+- **⚠ WHAT THE PANEL FOUND THAT IS WORTH KEEPING FOR WHEN THE RULING LANDS.** Two attackers verified blast-radius
+  omissions that would have bitten whichever branch was taken: (i) `packages/rph-projections/src/pwu-replay.ts`'s
+  PWU axis fold ends `default: return axes`, so new `PwuRecompositionBegun`/`PwuRecomposed` events would carry the
+  OLD workLifecycleState forward and diverge replay from the object — that file's own comments record this exact
+  miss shipping THREE times; (ii) `verif/event-surface-census.test.ts` pins EMITTED as a hand-authored snapshot,
+  so any new bound event reddens it and the repair is an argued edit, not a count bump; (iii) `PWU_SEMANTIC_
+  LIFECYCLE_COMMANDS` membership REFUSES the generic setter **without a fallback**, so adding the two states
+  without minting real commands makes both arrows UNPERFORMABLE rather than governed. And a mutation-discipline
+  catch worth carrying: the proposed "control mutants" swapped `SATISFIED` for `COMPOSABLE`, which reddens a
+  REFUSAL test the same document authored — **a main-test mutant wearing a control's label**. The control's own
+  mutant is unconditional refusal.
+
 - **S-2 — Then, and only then, strengthen the verdict.** Take **RAC**, grafting: the second `?? []` at
   `handlers/decomposition.ts:735` (a dormant fail-open in the event builder that A alone found); the verif test
   pinning emitted optionality (§1.2); Derive-on-Read's REFUSE arm for INCONCLUSIVE/ESCALATED rather than mapping
