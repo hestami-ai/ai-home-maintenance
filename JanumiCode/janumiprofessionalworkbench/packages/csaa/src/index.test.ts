@@ -67,6 +67,18 @@ import {
 	MODULE_RESOLUTION_TRACE_PROGRESS_SCHEMA_VERSION,
 	MODULE_RESOLUTION_TRACE_REQUEST_SCHEMA_VERSION,
 	MODULE_RESOLUTION_TRACE_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_PROGRESS_MAX_BYTES,
+	MODULE_RESOLUTION_TRACE_PROGRESS_MAX_EVENTS,
+	MODULE_RESOLUTION_TRACE_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_REPORT_NONCLAIMS,
+	MODULE_RESOLUTION_TRACE_REPORT_OPERATION_VERSION,
+	MODULE_RESOLUTION_TRACE_REPORT_PREDECESSOR_NONCLAIMS,
+	MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_NONCLAIMS,
+	MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_REPORT_REQUEST_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_REPORT_RESULT_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_REPORT_SCHEMA_VERSION,
+	MODULE_RESOLUTION_TRACE_REPORT_SELECTION,
 	SEMANTIC_EXTRACTION_VERSION,
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
@@ -107,6 +119,7 @@ import {
 	buildDeclarationContextAnalysis,
 	buildSourceOriginCorrelation,
 	buildModuleResolutionTrace,
+	moduleResolutionTraceReportExitCode,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
 	buildGuardClassificationOverlay,
@@ -117,6 +130,7 @@ import {
 	buildLogicalGraphComposition,
 	buildProjectContextGraph,
 	runProjectContextReport,
+	runModuleResolutionTraceReport,
 	projectContextReportExitCode,
 	buildStructuralModuleReachabilityAnalysis,
 	runStructuralModuleReachabilityReport,
@@ -176,6 +190,10 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildDeclarationContextAnalysis).toBeTypeOf('function');
 		expect(buildSourceOriginCorrelation).toBeTypeOf('function');
 		expect(buildModuleResolutionTrace).toBeTypeOf('function');
+		expect(runModuleResolutionTraceReport).toBeTypeOf('function');
+		expect(moduleResolutionTraceReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createModuleResolutionTraceProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runModuleResolutionTraceCommand');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
@@ -403,6 +421,44 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-module-resolution-trace-request/1.0.0'
 		);
 		expect(MODULE_RESOLUTION_TRACE_SCHEMA_VERSION).toBe('jan-csaa-module-resolution-trace/1.0.0');
+		expect(MODULE_RESOLUTION_TRACE_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-module-resolution-trace/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-report-request/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-report-result/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-report/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-report-progress/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-resolution-trace-progress-transport/0.1.0'
+		);
+		expect(MODULE_RESOLUTION_TRACE_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(MODULE_RESOLUTION_TRACE_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_NONCLAIMS).toContain(
+			'COMPILER_CONTEXT_OR_CONTEXT_ONLY_TARGET_FILESYSTEM_CURRENTNESS'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_NONCLAIMS).not.toContain('CURRENTNESS_OR_FRESHNESS');
+		expect(MODULE_RESOLUTION_TRACE_REPORT_NONCLAIMS).toContain('TYPE_ONLY_IMPORT_OCCURRENCE');
+		expect(MODULE_RESOLUTION_TRACE_REPORT_SELECTION).toMatchObject({
+			moduleMode: 'IMPORT',
+			occurrenceKind: 'IMPORT',
+			typeOnly: false,
+			valueKind: 'VALUE_NON_TYPE_ONLY'
+		});
+		expect(MODULE_RESOLUTION_TRACE_REPORT_PREDECESSOR_NONCLAIMS.moduleResolutionTrace).toContain(
+			'CURRENTNESS_OR_FRESHNESS'
+		);
+		expect(MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_NONCLAIMS).toMatchObject({
+			compilerCaptureCurrentness: 'NOT_ASSESSED',
+			targetArtifactCurrentness: 'NOT_ASSESSED'
+		});
 		expect(LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION).toBe(
 			'jan-csaa-compose-logical-graph/0.1.0'
 		);

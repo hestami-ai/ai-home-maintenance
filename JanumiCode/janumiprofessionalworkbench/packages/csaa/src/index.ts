@@ -15,6 +15,7 @@ export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/logical-graph-composition.js';
 export * from './contracts/module-resolution-trace.js';
+export * from './contracts/module-resolution-trace-report.js';
 export * from './contracts/project-context-graph.js';
 export * from './contracts/project-context-report.js';
 export * from './contracts/semantic.js';
@@ -99,6 +100,24 @@ export {
 } from './application/project-context-progress-jsonl.js';
 export { buildConditionalExportResolution } from './resolution/build-conditional-export-resolution.js';
 export { buildModuleResolutionTrace } from './resolution/build-module-resolution-trace.js';
+
+export {
+	moduleResolutionTraceReportExitCode,
+	runModuleResolutionTraceReport,
+	MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_NONCLAIMS,
+	MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_SCHEMA_VERSION,
+	type ModuleResolutionTraceReportProgressEvent,
+	type ModuleResolutionTraceReportProgressObservation,
+	type ModuleResolutionTraceReportProgressPhase,
+	type RunModuleResolutionTraceReportOptions
+} from './application/run-module-resolution-trace-report.js';
+
+export {
+	MODULE_RESOLUTION_TRACE_PROGRESS_MAX_BYTES,
+	MODULE_RESOLUTION_TRACE_PROGRESS_MAX_EVENTS,
+	MODULE_RESOLUTION_TRACE_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type ModuleResolutionTraceProgressTransportTruncation
+} from './application/module-resolution-trace-progress-jsonl.js';
 export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';
 export { buildSourceOriginCorrelation } from './semantic/build-source-origin-correlation.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
