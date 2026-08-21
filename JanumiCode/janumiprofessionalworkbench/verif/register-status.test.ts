@@ -82,7 +82,10 @@ const GRANDFATHERED: ReadonlySet<string> = new Set([
 	'REG-Q-037', 'REG-Q-038', 'REG-Q-039', 'REG-Q-040', 'REG-Q-041', 'REG-Q-042',
 	'REG-Q-043', 'REG-Q-044', 'REG-Q-045', 'REG-Q-046', 'REG-Q-047', 'REG-Q-048',
 	'REG-Q-049', 'REG-Q-050', 'REG-F-043', 'REG-F-047', 'REG-F-054', 'REG-F-067',
-	'REG-F-070', 'REG-F-085', 'REG-F-084'
+	// ⚠ 'REG-F-085' REMOVED 2026-08-21: REG-D-044 answered it and its status was repaired to a single live line.
+	// This list is SHRINK-ONLY and this gate caught the repair itself — "a repair happened, so remove them from
+	// the list deliberately" — which is the whole point of grandfathering by ID rather than by count.
+	'REG-F-070', 'REG-F-084'
 ]);
 
 describe('P-5 — every register entry states its status exactly once', () => {

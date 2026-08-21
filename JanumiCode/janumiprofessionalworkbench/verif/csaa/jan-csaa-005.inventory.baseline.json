@@ -5688,7 +5688,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "49a5e8101b0eaffc3fee0fd87b74bd77c8ab1c3d3c573c6ec28a5c5fd275ae0f",
+    "fileManifestDigest": "34cfc7e29972300d1765077e1c9ac80df2fb4276e6e8d2d7e66efa8ddf31cce6",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -12384,9 +12384,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 7920,
+        "bytes": 8234,
         "path": "verif/register-status.test.ts",
-        "sha256": "510a4c1d153f60eb3d16a2c3a7422a60e1c75706dba6d92f78d2440d073cb0cb",
+        "sha256": "29d72195a7d787fcfd5ce31d3a21b8908e434eba6757b1270417258410a15a3e",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12516,7 +12516,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "18226542033c69c81372b95b1bfd8256c9a3814944fc071d800188e25b16f215",
+    "subjectId": "2cec514337f2e52ab0c83cb4a476d3545a50c937d012770dd7c83c0332155778",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -15700,7 +15700,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-status.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "510a4c1d153f60eb3d16a2c3a7422a60e1c75706dba6d92f78d2440d073cb0cb",
+      "contentSha256": "29d72195a7d787fcfd5ce31d3a21b8908e434eba6757b1270417258410a15a3e",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

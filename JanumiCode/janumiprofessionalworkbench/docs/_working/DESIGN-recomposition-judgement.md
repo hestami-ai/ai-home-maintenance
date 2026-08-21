@@ -122,6 +122,59 @@ arguing about how strong the verdict must be.**
   reds across the three approaches would notice it. ⚠ It changes `recomposition.test.ts:162`, which is
   simultaneously the suite's discriminating control and REG-F-041's live exhibit — so the control must be
   re-arranged with real children, not deleted.
+- **S-1 — ✅ UNBLOCKED 2026-08-21 BY REG-D-044 (delegated ruling), AND THE UNBLOCKING IS NOT THE ONE ANYONE
+  EXPECTED.** The fork REG-F-085 posed was incomplete. Both limbs are refuted; the acceptance act is REQUIRED and
+  is NOT a missing command. Full reasoning in REG-D-044; the buildable consequence is here.
+  - **The guard means the enum literal, and the cheap reading was REFUSED.** Three independent lanes converged on
+    reading §8.1's *"Recomposition contract satisfied"* as ordinary language, which would have licensed gating the
+    PWU arrow on `COMPOSABLE`. It is refuted: §8.1's other two cross-object rows cite enum literals in lowercase
+    participle form — *"Active execution plan **approved**"* ↔ `'APPROVED'` (CDM:1239), *"Runtime bindings
+    **authorized**"* ↔ `'AUTHORIZED'` (CDM:1335) — as does the sister contract at CDM:904 (*"valid or
+    conditionally valid"* ↔ `'VALID'`/`'CONDITIONALLY_VALID'`). ⚠ The three lanes' agreement was **one inference
+    counted three times**, and each had flagged it as its own weakest link. The adversary set to attack the
+    convenient answer is what caught it. **So the earlier §4 option "gate on COMPOSABLE, disclosed as a floor" is
+    now CLOSED, not merely disfavoured.**
+  - **`COMPOSABLE` is the CANDIDATE state and canon says so in its own voice** — JPWB-DOC-001:244: *"recompose …
+    creating **candidate parent state subject to assessment and decision**"*; :228: *"Parent completion remains
+    unavailable until required recomposition is **accepted**."* So `completeRecomposition` producing COMPOSABLE is
+    correct, and REG-F-042 was right that the machine models this better than anyone credited.
+  - **The acceptance act is `decide` — already ratified, merely UNWIRED.** JPWB-DOC-001:244 lists nine primary
+    verbs including `decide` (*"records authorized disposition over an identified version"*), and the apparatus
+    exists: `decisionType: 'APPROVAL'` (CDM:1363) over `subjectObjectIds` (CDM:1373), `DecisionProposed` /
+    `DecisionEffective`, `proposeDecision` / `approveDecision`. **No new Minimum-API-Surface command**, which is
+    why this is not the "new work" authority REG-F-085 feared. The corpus even exhibits the shape: the FSM
+    fixture runs `RecompositionCompleted → DecisionProposed: Approve Architecture → DecisionEffective →
+    BaselineCreated`, and its Intent block states the template twice.
+  - ⚠ **And REG-Q-011 forbids the shortcut** (register:229): *"A passing Assessment never advances assurance or
+    lifecycle automatically; advancement requires a validated Command/Event."* So §14.1's sixth invariant cannot
+    be discharged by an assessment alone — locating it in Assurance PROVES an acceptance is needed.
+
+  **THE BUILDABLE SEQUENCE, replacing the old S-1/S-2:**
+  - **S-1a — wire the acceptance.** `RecompositionContract.status COMPOSABLE → SATISFIED`, driven by an EFFECTIVE
+    `APPROVAL` Decision naming the contract as subject, gated on §14.1 b6 (an explicit assessment over the
+    parent completion claim the contract already carries as `parentCompletionClaimId`). Whether that is a thin
+    command over the ratified Decision surface or a guard on `approveDecision` is a SHAPE question, delegated
+    under REG-D-004. ⚠ This also makes `SATISFIED` reachable, which is the precondition everything else waited on.
+  - **S-1b — mint the two PWU acts and enforce the guard LITERALLY.** §8.1 names them: *"Begin recomposition"*
+    (SATISFIED→RECOMPOSING, *"Parent exists and recomposition is required"*) and *"Complete recomposition"*
+    (RECOMPOSING→RECOMPOSED, *"Recomposition contract satisfied"* = `status === 'SATISFIED'`). **No weakening, no
+    disclosure carve-out, and REG-F-076's substitution class is avoided entirely** — a real Decision is present
+    rather than substituted for. ⚠ Mint BOTH in one commit: `PWU_SEMANTIC_LIFECYCLE_COMMANDS` membership refuses
+    the generic setter with NO fallback, so half the pair leaves an arrow unperformable.
+  - **⚠ A DEFECT TO FIX ON THE WAY, found while grounding this:** `messages.ts` BINDINGS (:3156-3170) declare
+    `BeginRecomposition` and `CompleteRecomposition` drive **`PWU.workLifecycleState`** — but their handlers drive
+    `RecompositionContract.status`, and their own comments say so. `ProposeRecomposition`'s row correctly names the
+    contract machine. Those two rows are wrong today and must be corrected when the PWU commands are minted, or
+    two commands will claim the same arrows.
+  - **The blast radius the panel verified, all of it still applies:** `pwu-replay.ts`'s axis fold ends
+    `default: return axes` (new events would diverge replay from the object — that file records this miss shipping
+    THREE times); `verif/event-surface-census.test.ts` pins EMITTED as a hand-authored snapshot; the
+    `PWU_GENERIC_SETTER_SPECS` rows must MOVE, not be copied; and `pwu-fold-drive-sites.test.ts` demands an
+    explicit drive site per semantic command.
+  - **⚠ MUTATION DISCIPLINE, carried from the panel because it was wrong there:** the proposed "control mutants"
+    swapped `SATISFIED` for `COMPOSABLE`, which reddens a REFUSAL test — **a main-test mutant wearing a control's
+    label**. The control's own mutant is UNCONDITIONAL REFUSAL (`return false`); its complement is `return true`.
+
 - **S-1 — ⚠⚠ SPONSOR-BLOCKED, AND THIS DESIGN GOT IT WRONG (corrected 2026-08-21).** As first written, S-1 read
   *"gate the PWU arrow on a SATISFIED contract"*. **REG-F-085 forbids both ways of doing that, by name, and I had
   not read its body** — only the header comment of the pin file it produced. Verbatim, at

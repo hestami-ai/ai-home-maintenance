@@ -231,7 +231,15 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
     and DISCARDED its results for as long as it existed, and `verif/` caught two register-gate violations in my
     own preceding two commits — both docs-only, both committed without running the doc gates. **Run `verif/`
     before committing register prose; `git diff --stat` is not a check.**
-  - [ ] **S-1 — ⚠ SPONSOR-BLOCKED. ESCALATED 2026-08-21, NOT BUILT.** REG-F-085 (`JPWB-REG-005:2481-2487`,
+  - [ ] **S-1 — ✅ UNBLOCKED by REG-D-044 (delegated ruling, 2026-08-21). Now S-1a + S-1b; see
+    DESIGN-recomposition-judgement.md §4.** The acceptance act is the ratified `decide` verb, UNWIRED — not a
+    missing command, so no new-work authority is needed. **S-1a:** drive `COMPOSABLE → SATISFIED` from an
+    EFFECTIVE APPROVAL Decision naming the contract, gated on §14.1 b6. **S-1b:** mint *"Begin recomposition"* /
+    *"Complete recomposition"* as PWU acts (§8.1 names both) and enforce `status === 'SATISFIED'` LITERALLY.
+    ⚠ Fix the two wrong BINDINGS rows (`messages.ts:3156-3170` claim the PWU machine for contract-driving
+    commands) in the same increment. ⚠ Gating on COMPOSABLE is now CLOSED, not disfavoured.
+  - [x] ~~**S-1 — SPONSOR-BLOCKED, ESCALATED**~~ — superseded by the above the same day.
+    Kept for the lesson: REG-F-085 (`JPWB-REG-005:2481-2487`,
     Status OPEN — *contract Decision owed*) forbids **both** routes by name: requiring `SATISFIED` ships a command
     that can never fire, and accepting `COMPOSABLE` *"silently weakens a ratified guard … precisely the
     APPROVAL-for-decision substitution class already open as REG-F-076."* It states the fork is *"THE CANON
