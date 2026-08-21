@@ -218,10 +218,19 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   the remaining decision: it **refuses every existing caller**, and the vocab note declaring composable-by-default
   (`m3-commands-events.json:1960`, *"Defaults to true (preserves prior composable-by-default…)"*) is an authored
   decision that *"deserves an explicit reversal rather than a quiet one."*
-  ⚠ **DESIGN-FIRST, and deliberately not slipped into a cleanup increment.** It edits GENERATED contracts via
-  their vocab source, reverses a stated design property, and **no proposed remedy survived adversarial attack**
-  (0 of 5 sound). Do not act on the sweep's remedies as written — they are recorded in the run transcript with
-  their attacks, and every one needs re-deriving.
+  ⚠ **DESIGNED 2026-08-21 — `docs/_working/DESIGN-recomposition-judgement.md`. The design DECLINES this act as the
+  next increment and re-sequences the work.** The cost objection is void (ZERO production callers; test edits
+  only), but the act ranks 3rd of 3 on two of three lenses and **retains no record of the judgement it compels**.
+  The reordering is the point: `COMPOSABLE` has NO consumer, while `RECOMPOSING -> RECOMPOSED` is driven-ACCEPTED
+  with nothing cited (`verif/recomposition-ungoverned.test.ts`, REG-F-085). Work order is now:
+  - [ ] **S-0 — refuse an empty composition.** `requiredChildWorkUnitIds` has no `.min(1)`, so the kernel's rung 2
+    is VACUOUSLY FALSE and REG-F-041's own exhibit (`recomposition.test.ts:162`) is `propose([])` — a
+    recomposition of NOTHING. Cheapest, fully independent, needs its OWN red. ⚠ Its target is simultaneously the
+    suite's discriminating control: re-arrange with real children, do not delete.
+  - [ ] **S-1 — gate the PWU arrow on a SATISFIED contract.** This is what makes the verdict mean anything.
+    ⚠ Retires REG-F-085's pin, which that file exists to FORCE — the register entry must move with it.
+  - [ ] **S-2 — then strengthen the verdict** (RAC + four named grafts, in the design).
+  - S-3 — the other eight DEC-6 checks are a capability, not a fix (REG-F-042). Out of scope.
 
 - [x] ~~**W-3 finding (i): the §34.5 query roster**~~ — **CLOSED 2026-08-20, REG-F-199, in both halves.**
   (a) THE INSTRUMENT: the walk matched unanchored SUBSTRINGS, so `getPwu` read as present inside
@@ -474,6 +483,17 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   consequence of the REG-F-202 work. Recorded here ONLY so the next full-gate run is not mis-attributed — under
   the standing rule this belongs to the CSAA coding agent and we touch CSAA only where we break it. (We DID break
   `csaa:inventory:check` by editing covered sources, and regenerated the baseline; that is green.)
+
+- [ ] **REG-F-043's `guard` -> `guardDescription` rename — STILL RIGHT, NO LONGER CHEAP (re-priced 2026-08-21).**
+  154 `guard:` entries in `packages/rph-domain/src/transitions.data.ts`, and the projection ALREADY renames it
+  downstream (`packages/rph-projections/src/pwu-behavior.ts:119` — `guardDescription: transition.guard`), so the
+  source is the dishonest end and the fix is real: for 68 of 82 texts the field names a condition NOT enforced on
+  that arrow. ⚠ **But its recorded "zero behavioural cost" is stale.** CSAA now reads the literal property name —
+  `providers/jpwb-state-machines/observe-state-machines.ts:537` with an EXACT key set at `:516` — and names the
+  file by path at `graph/validate-guard-classification-overlay.ts:85`. Renaming it breaks a CSAA observer, its
+  overlay validation and its baselines. **That lands in the CSAA coding agent's territory under the standing scope
+  rule, so it is not ours to take unilaterally** — it needs either a coordinated change or an explicit hand-off.
+  Recorded in REG-F-043 with the mechanism.
 
 ## Blocked / awaiting sponsor
 

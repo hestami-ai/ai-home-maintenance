@@ -1127,6 +1127,33 @@ Recorded at founding as session-known ground truth; the canon must not contradic
 - **WHAT IS NOT CLAIMED, stated so the finding is not read wider than it is.** The CONFLICTED routing itself is **correct and proved**: a non-empty list forces CONFLICTED even when every child is individually SATISFIED, which is the recomposition analog of property P1 and is exactly what §14.1 requires. Child acceptability is genuinely read from the store and its per-child computation fails **closed**. **The defect is the population, not the logic** — REG-F-022's Gate A shape, on the input that decides whether a recomposition conflicts at all.
 - **Disposition:** **RECORDED, NOT FIXED**, and the reason is not deferral. A detector needs an aggregation step that does not exist and a ratified answer to *what a conflict IS over child outputs* — filed as **REG-E-028**. **What could be done without any ratification, and is deliberately not done here:** making the three payload fields **REQUIRED** would force a caller to STATE a judgement instead of inheriting one — the `GrantWaiver.effectiveAt` and `parentCompletionClaimId` medicine, and the shapes are AUTHORED so they are ours to change. It is not taken unilaterally because it **refuses every existing caller**, and because the note declaring composable-by-default is an authored decision that deserves an explicit reversal rather than a quiet one.
 - **Merge target:** Repository — `handlers/decomposition.ts`, `rph-domain/src/decomposition.ts`, and the three `m3-commands-events.json` field notes, none of which change until REG-E-028 rules. **Status:** OPEN.
+- **⚠ DESIGNED 2026-08-21, AND THE DESIGN DECLINES THIS ENTRY'S OWN INTERIM ACT AS THE NEXT INCREMENT.**
+  `docs/_working/DESIGN-recomposition-judgement.md` — nine agents (three grounding lanes, three independent
+  approaches, three judges on separate lenses). Three results bear directly on the text above.
+  - **THE COST OBJECTION IS VOID, MEASURED.** *"It refuses every existing caller"* is literally true and costs
+    **test edits only**: 6 dispatch statements / 12 invocations, all in `.test.ts`, **ZERO production call sites**,
+    and `apps/` authors no recomposition at all. **Not one caller anywhere has ever supplied
+    `parentConstraintsHoldAgainstWhole`**, so requiring that field alone refuses 100% of dispatches, as does
+    requiring all three. This entry named that condition as decision-changing; it is now met.
+  - **BUT THE ACT RANKS THIRD OF THREE on corpus-fidelity and on buildability**, and its own advocate supplies why:
+    `RecompositionCompleted` carries `{parentCompletionClaimId, status, workLifecycleState}` and `command_receipts`
+    stores `payload_hash`, not the payload — **so it compels a judgement, acts on it, and retains no readable
+    record of it.** The accountability gain this entry credits to required-ness is not delivered by required-ness
+    as scoped. A stronger design (cite a CONCLUDED assessment and derive the whole-check from its disposition) wins
+    two of three lenses using machinery that already exists.
+  - **AND THE ORDERING IS WRONG, which is the finding that matters.** `COMPOSABLE` has **no consumer** — outside
+    `handlers/decomposition.ts` it appears only in the enum and the transition table, so nothing reads a
+    RecompositionContract's status to decide anything. Meanwhile `verif/recomposition-ungoverned.test.ts`
+    (REG-F-085) pins, by driving the engine, that `RECOMPOSING -> RECOMPOSED` is **ACCEPTED with nothing cited and
+    zero RecompositionContract objects in the store.** So this entry's remedy would harden a command whose verdict
+    nothing reads, on a path a second command bypasses entirely. **Unreachable and ungoverned are opposite
+    problems and the engine has the second.** Sequencing in the design: refuse an empty composition, gate the PWU
+    arrow, THEN strengthen the verdict.
+  - **⚠ A THIRD HOLE THIS ENTRY NAMED AND DID NOT PRICE.** It records that `requiredChildWorkUnitIds` has no
+    `.min(1)`; the consequence is that the kernel's rung 2 (`unsatisfied.length > 0`) is **VACUOUSLY FALSE** on an
+    empty list — and this entry's own live exhibit, `recomposition.test.ts:162`, is `propose([])`. **The exhibit is
+    a recomposition of NOTHING.** No payload-side remedy can reach it: the field lives on the CONTRACT, written at
+    propose. **Status:** OPEN (unchanged — designed, not implemented).
 - **⚠ THE BLOCKER NAMED IN THAT MERGE TARGET NO LONGER EXISTS (noted 2026-08-20).** REG-E-028 was **WITHDRAWN the
   same day it was filed** — *"it is not a sponsor question, because the ratified corpus answers it"* — and
   superseded by REG-F-042/043/044. So *"none of which change until REG-E-028 rules"* has been an unsatisfiable
@@ -1181,6 +1208,32 @@ Recorded at founding as session-known ground truth; the canon must not contradic
 - **THE PRECISE TRUTH, and it is the sentence this entry should have led with: THE FIELD IS READ BY NOTHING THAT DECIDES.** Re-censused today, the readers of `transition.guard` are still exactly three in kind — the generator serialising it, the projection re-emitting it as `guardDescription`, and now C-0b censusing it — and `classifyTransition` still does not read it. **A censusing reader is not an enforcing one**, so C-0b joins the list without disturbing the finding: enforcement, where it exists, is written somewhere else and nothing links the two. *A declaration and its enforcement that no artifact connects are two facts, not one guarantee.*
 - **AND THE DIRECTION OF THE DRIFT IS THE WARNING.** REG-F-072's original census read **21 ENFORCED of 86 texts**; the persisted ledger reads **14 of 82**. Two rows record their own demotion in terms — *"REFUTED BY THE SKEPTIC PASS, having first been classified ENFORCED"* — including one whose refusal is real, whose mutants do redden, and which the constrained actor **disables with one boolean from the payload**. **A false ENFORCED is worse than a recorded UNENFORCED**, because it retires the question. The population moved too (86 → 82 texts), so the difference is not purely demotions and is not reported as such.
 - **THE COUNTS RECONCILE, so this is not drift:** *"333 transitions across 26 machines"* is **304 transitions + 29 illegal rows**, over a set that is now **27** machines. The denominator here silently includes `illegal`, which the arrow census counts separately — worth stating because two numbers for one table is how a reconciliation gets abandoned.
+- **⚠ ITS COST CLAIM HAS ROTTED, MEASURED 2026-08-21 — the rename is no longer "zero behavioural cost".**
+  That phrase was TRUE when written (2026-08-06). It is not now, and nothing in this entry could have said so,
+  because what changed happened in another package after the fact. **CSAA reads `transitions.data.ts` and it reads
+  the literal property name.**
+  - `packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts:537` —
+    `guard: optionalString(context, properties, 'guard', itemPath)` — an AST read keyed on the string `'guard'`,
+    against an **EXACT key set** at `:516`: `['from', 'guard', 'note', 'to', 'trigger']`.
+  - `packages/csaa/src/graph/validate-guard-classification-overlay.ts:85` names the file by path:
+    `const STATE_SOURCE_PATH = 'packages/rph-domain/src/transitions.data.ts'`.
+  - The guard-enforcement ledger keys on guard TEXT throughout its provider
+    (`normalize-guard-enforcement-ledger.ts:303-306`, `parse-worker-output.ts:166-169`, `worker.ts:292`), each with
+    the same exact-key discipline.
+  So renaming the source field would break a CSAA observer, its overlay validation and its baselines — a
+  cross-package change in a subsystem under a standing scope rule that reserves it for the CSAA coding agent.
+  **The remedy is still RIGHT and is no longer CHEAP**, and those are separate properties that this entry, like
+  most entries, recorded as one.
+- **THE GENERAL FORM, because this is now the third variant inside two days and they are not the same failure.**
+  A recorded remedy has at least four perishable clauses and they rot independently:
+  its **instruction** (what to do), its **mechanism** (why it works), its **blocker** (what gates it), and its
+  **cost** (what it breaks). REG-F-202's residue had a right instruction with a FALSE MECHANISM — "the engine will
+  refuse it" when the route action refused first. REG-F-041's blocker had **DISSOLVED** — gated on REG-E-028,
+  withdrawn the same day it was filed. This one's **COST** has rotted while instruction, mechanism and blocker all
+  still hold. [[feedback_verify_the_recorded_remedy]] says a remedy is a hypothesis; the sharper statement is that
+  **every clause of it is a separate hypothesis, and re-verifying one is not re-verifying the others.**
+  ⚠ Note which way this cuts: the cost went UP here, but in REG-F-041 the blocker went AWAY. Re-verification is
+  not a synonym for finding new obstacles — the same discipline unblocked one entry and re-priced another.
 - **THE RECORDED REMEDY IS UNDONE AND STILL RIGHT — C-0b strengthens it.** Renaming the field `guardDescription` at the source costs nothing behaviourally, and there is now a measured reason: for 68 of 82 texts the field describes a condition that is **not** enforced on that arrow, and for the 14 that are, the enforcement lives elsewhere and is recorded elsewhere. Calling it `guard` invites exactly the assumption this entry, its own headline, and three passes of this programme all made. **Status:** OPEN — the rename, and the 44 UNENFORCED rows one at a time.
 
 ### REG-F-044 — The claim-assessment lifecycle was never built, and four findings I had been carrying separately are one hole: seven of eight ratified Claim states are unreachable and no command exists to reach them
