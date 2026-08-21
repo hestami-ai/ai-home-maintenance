@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"noEmit": true,
+		"noLib": true,
+		"strict": true,
+		"target": "ES2022"
+	},
+	"files": ["a.ts", "b.ts", "leaf.ts"]
+}

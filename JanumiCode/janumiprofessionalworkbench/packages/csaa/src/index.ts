@@ -21,6 +21,7 @@ export * from './contracts/state-machine-graph.js';
 export * from './contracts/structural-module-reachability-analysis.js';
 export * from './contracts/structural-module-reachability-report.js';
 export * from './contracts/structural-scc-analysis.js';
+export * from './contracts/structural-scc-report.js';
 export * from './contracts/subject.js';
 export * from './inventory/canonical.js';
 export * from './inventory/collect-inventory.js';
@@ -101,6 +102,24 @@ export {
 	type StructuralModuleReachabilityProgressTransportTruncation
 } from './application/structural-module-reachability-progress-jsonl.js';
 export { buildStructuralSccAnalysis } from './graph/build-structural-scc-analysis.js';
+export {
+	runStructuralSccReport,
+	STRUCTURAL_SCC_REPORT_PROGRESS_NONCLAIMS,
+	STRUCTURAL_SCC_REPORT_PROGRESS_SCHEMA_VERSION,
+	structuralSccReportExitCode,
+	type RunStructuralSccReportOptions,
+	type StructuralSccReportProgressEvent,
+	type StructuralSccReportProgressObservation,
+	type StructuralSccReportProgressObservationBasis,
+	type StructuralSccReportProgressObservationMetric,
+	type StructuralSccReportProgressPhase
+} from './application/run-structural-scc-report.js';
+export {
+	STRUCTURAL_SCC_PROGRESS_MAX_BYTES,
+	STRUCTURAL_SCC_PROGRESS_MAX_EVENTS,
+	STRUCTURAL_SCC_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type StructuralSccProgressTransportTruncation
+} from './application/structural-scc-progress-jsonl.js';
 export { buildStateMachineGraph } from './graph/build-state-machine-graph.js';
 export { compareDependencyProviders } from './graph/compare-dependency-providers.js';
 export { validateDependencyProviderComparison } from './graph/validate-dependency-comparison.js';

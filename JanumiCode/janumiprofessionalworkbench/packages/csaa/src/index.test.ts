@@ -80,6 +80,15 @@ import {
 	STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_NONCLAIMS,
+	STRUCTURAL_SCC_REPORT_OPERATION_VERSION,
+	STRUCTURAL_SCC_REPORT_PROGRESS_NONCLAIMS,
+	STRUCTURAL_SCC_REPORT_PROGRESS_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_SCHEMA_VERSION,
+	STRUCTURAL_SCC_PROGRESS_MAX_BYTES,
+	STRUCTURAL_SCC_PROGRESS_MAX_EVENTS,
+	STRUCTURAL_SCC_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION,
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION,
 	TYPESCRIPT_PROVIDER_VERSION,
@@ -101,6 +110,8 @@ import {
 	runStructuralModuleReachabilityReport,
 	structuralModuleReachabilityReportExitCode,
 	buildStructuralSccAnalysis,
+	runStructuralSccReport,
+	structuralSccReportExitCode,
 	buildStateMachineGraph,
 	buildStaticSemanticSnapshot,
 	canonicalSemanticJson,
@@ -172,6 +183,9 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(structuralModuleReachabilityReportExitCode).toBeTypeOf('function');
 		expect(buildStructuralSccAnalysis).toBeTypeOf('function');
+		expect(runStructuralSccReport).toBeTypeOf('function');
+		expect(structuralSccReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createStructuralSccProgressJsonlWriter');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
 		expect(buildStaticSemanticSnapshot).toBeTypeOf('function');
 		expect(compareDependencyProviders).toBeTypeOf('function');
@@ -434,6 +448,26 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-structural-scc-analysis-request/1.0.0'
 		);
 		expect(STRUCTURAL_SCC_ANALYSIS_SCHEMA_VERSION).toBe('jan-csaa-structural-scc-analysis/1.0.0');
+		expect(STRUCTURAL_SCC_REPORT_OPERATION_VERSION).toBe('jan-csaa-report-structural-scc/0.1.0');
+		expect(STRUCTURAL_SCC_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-scc-report-progress/0.1.0'
+		);
+		expect(STRUCTURAL_SCC_REPORT_PROGRESS_NONCLAIMS).toEqual({
+			dwp006Completion: 'NOT_CLAIMED',
+			facadeNonclaims: STRUCTURAL_SCC_REPORT_NONCLAIMS,
+			janCsaa007OperationProgressResponse: 'NOT_CLAIMED',
+			runtimeOutcomeInvariance: 'NOT_CLAIMED',
+			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
+		});
+		expect(STRUCTURAL_SCC_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-scc-progress-transport/0.1.0'
+		);
+		expect(STRUCTURAL_SCC_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(STRUCTURAL_SCC_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(STRUCTURAL_SCC_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-structural-scc-report-request/0.1.0'
+		);
+		expect(STRUCTURAL_SCC_REPORT_SCHEMA_VERSION).toBe('jan-csaa-structural-scc-report/0.1.0');
 		expect(DEPENDENCY_CRUISER_PROVIDER_VERSION).toBe('16.10.4');
 		expect(DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION).toBe(
 			'jan-csaa-normalize-dependency-cruiser-output/0.1.0'

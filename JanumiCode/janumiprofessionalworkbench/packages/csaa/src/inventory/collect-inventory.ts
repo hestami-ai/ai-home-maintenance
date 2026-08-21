@@ -129,6 +129,13 @@ import {
 	STRUCTURAL_SCC_ANALYSIS_SELECTION
 } from '../contracts/structural-scc-analysis.js';
 import {
+	STRUCTURAL_SCC_REPORT_NONCLAIMS,
+	STRUCTURAL_SCC_REPORT_OPERATION_VERSION,
+	STRUCTURAL_SCC_REPORT_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_RESULT_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_SCHEMA_VERSION
+} from '../contracts/structural-scc-report.js';
+import {
 	INVENTORY_GENERATOR_ID,
 	INVENTORY_GENERATOR_VERSION,
 	INVENTORY_SCHEMA_VERSION,
@@ -190,6 +197,20 @@ const TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE = [
 	'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
 	'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
 	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+
+const TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/structural-scc-report.ts',
+	'packages/csaa/src/application/run-structural-scc-report.ts',
+	'packages/csaa/src/application/structural-scc-progress-jsonl.ts',
+	'packages/csaa/src/application/run-structural-scc-report.test.ts',
+	'packages/csaa/src/application/structural-scc-progress-jsonl.test.ts',
+	'packages/csaa/src/application/structural-scc-command.test.ts',
+	'packages/csaa/test-fixtures/structural-scc-command/tsconfig.json',
+	'packages/csaa/test-fixtures/structural-scc-command/a.ts',
+	'packages/csaa/test-fixtures/structural-scc-command/b.ts',
+	'packages/csaa/test-fixtures/structural-scc-command/leaf.ts',
+	'scripts/csaa-structural-scc.ts'
 ] as const;
 
 const TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE = [
@@ -1083,6 +1104,7 @@ function providerInventory(
 							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+							...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 							...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
 							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
 							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
@@ -1381,17 +1403,19 @@ function capabilities(): CapabilityInventory[] {
 			state: 'PARTIAL'
 		},
 		{
-			explanation: `The twelfth bounded DWP-004 increment applies ${STRUCTURAL_SCC_ANALYSIS_METHOD} to one independently validated TypeScript module-dependency graph and deterministically partitions ${STRUCTURAL_SCC_ANALYSIS_SELECTION.nodePopulation} over ${STRUCTURAL_SCC_ANALYSIS_SELECTION.edgePopulation} in ${STRUCTURAL_SCC_ANALYSIS_SELECTION.direction} direction while preserving parallel edges and self-loops. It publishes canonical component membership, node-to-component indexing, internal-edge attribution, cycle-kind classification, exact population and edge-accounting reconciliation, source-graph identity, semantic-snapshot identity, and explicit upstream-closure status under ${STRUCTURAL_SCC_ANALYSIS_CAPABILITY} with ${STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS} status. Structural closure is exact only for the selected validated graph; graph authority is ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer is ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect is ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}. The dedicated structural SCC-only smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are ${STRUCTURAL_SCC_ANALYSIS_NONCLAIMS.join(', ')}. Full JAN-CSAA-007 conformance is ${STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE}.`,
+			explanation: `The twelfth bounded DWP-004 increment applies ${STRUCTURAL_SCC_ANALYSIS_METHOD} to one independently validated TypeScript module-dependency graph and deterministically partitions ${STRUCTURAL_SCC_ANALYSIS_SELECTION.nodePopulation} over ${STRUCTURAL_SCC_ANALYSIS_SELECTION.edgePopulation} in ${STRUCTURAL_SCC_ANALYSIS_SELECTION.direction} direction while preserving parallel edges and self-loops. It publishes canonical component membership, node-to-component indexing, internal-edge attribution, cycle-kind classification, exact population and edge-accounting reconciliation, source-graph identity, semantic-snapshot identity, and explicit upstream-closure status under ${STRUCTURAL_SCC_ANALYSIS_CAPABILITY} with ${STRUCTURAL_SCC_ANALYSIS_CAPABILITY_STATUS} status. Structural closure is exact only for the selected validated graph; graph authority is ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer is ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect is ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}. An implementation-local preliminary report facade under ${STRUCTURAL_SCC_REPORT_OPERATION_VERSION} admits one explicit bounded project set, captures one frozen subject and semantic snapshot, constructs and analyzes one validated module-dependency graph, verifies selected-captured-subject currentness, and emits a maxResultBytes-bounded terminal ${STRUCTURAL_SCC_REPORT_SCHEMA_VERSION} envelope with ${STRUCTURAL_SCC_REPORT_RESULT_SCHEMA_VERSION} evidence. Its request schema is ${STRUCTURAL_SCC_REPORT_REQUEST_SCHEMA_VERSION}; it is not a registered JAN-CSAA-007 OperationResponse, and its report nonclaims are ${STRUCTURAL_SCC_REPORT_NONCLAIMS.join(', ')}. The bounded best-effort JSONL progress transport is excluded from report identity and evidence. The coding-agent command csaa:analyze:structural-scc and dedicated structural SCC-only smoke command are CONFIGURED_NOT_RUN by inventory generation. The analysis nonclaims are ${STRUCTURAL_SCC_ANALYSIS_NONCLAIMS.join(', ')}. Full JAN-CSAA-007 conformance is ${STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${STRUCTURAL_SCC_ANALYSIS_FULL_JAN_CSAA_008_CONFORMANCE}.`,
 			id: 'structural-scc-analysis',
 			provider: 'typescript+validated-module-dependency-graph-scc',
 			provenance: canonicalProvenance(
 				...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 				...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 				...TYPESCRIPT_STRUCTURAL_SEMANTIC_PROVENANCE,
 				'capabilities#dependency-graph',
 				'capabilities#symbol-table',
 				'capabilities#typescript-ast',
-				'package.json#/scripts/csaa:semantic:smoke:structural-scc'
+				'package.json#/scripts/csaa:semantic:smoke:structural-scc',
+				'package.json#/scripts/csaa:analyze:structural-scc'
 			),
 			state: 'PARTIAL'
 		},
@@ -1774,6 +1798,11 @@ function assertJpwbNonVacuity(
 	);
 	assertRequiredSelectedPaths(
 		selectedPaths,
+		TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
+		'Required JPWB structural SCC report facade or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
 		TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 		'Required JPWB structural module reachability analysis implementation source'
 	);
@@ -1888,6 +1917,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+					...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
 					...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
 					...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
@@ -1942,6 +1972,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+					...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE
 				),
 				statement: [

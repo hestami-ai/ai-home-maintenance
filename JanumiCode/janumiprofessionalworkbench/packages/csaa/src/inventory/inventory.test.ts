@@ -140,6 +140,13 @@ import {
 	STRUCTURAL_SCC_ANALYSIS_NONCLAIMS,
 	STRUCTURAL_SCC_ANALYSIS_SELECTION
 } from '../contracts/structural-scc-analysis.js';
+import {
+	STRUCTURAL_SCC_REPORT_NONCLAIMS,
+	STRUCTURAL_SCC_REPORT_OPERATION_VERSION,
+	STRUCTURAL_SCC_REPORT_REQUEST_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_RESULT_SCHEMA_VERSION,
+	STRUCTURAL_SCC_REPORT_SCHEMA_VERSION
+} from '../contracts/structural-scc-report.js';
 import { ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS } from '../providers/jpwb-arrow-command-census/artifact-set.js';
 import { collectInventory } from './collect-inventory.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
@@ -632,12 +639,22 @@ describe('inventory discovery and identity', () => {
 			state: 'PARTIAL'
 		});
 		for (const expectedProvenance of [
+			'packages/csaa/src/application/run-structural-scc-report.test.ts',
+			'packages/csaa/src/application/run-structural-scc-report.ts',
+			'packages/csaa/src/application/structural-scc-command.test.ts',
+			'packages/csaa/src/application/structural-scc-progress-jsonl.test.ts',
+			'packages/csaa/src/application/structural-scc-progress-jsonl.ts',
+			'packages/csaa/test-fixtures/structural-scc-command/tsconfig.json',
+			'packages/csaa/test-fixtures/structural-scc-command/a.ts',
+			'packages/csaa/test-fixtures/structural-scc-command/b.ts',
+			'packages/csaa/test-fixtures/structural-scc-command/leaf.ts',
 			'capabilities#dependency-graph',
 			'capabilities#symbol-table',
 			'capabilities#typescript-ast',
 			'packages/csaa/src/contracts/graph.ts',
 			'packages/csaa/src/contracts/semantic.ts',
 			'packages/csaa/src/contracts/structural-scc-analysis.ts',
+			'packages/csaa/src/contracts/structural-scc-report.ts',
 			'packages/csaa/src/graph/build-module-dependency-graph.ts',
 			'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 			'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
@@ -646,7 +663,9 @@ describe('inventory discovery and identity', () => {
 			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
 			'packages/csaa/src/providers/typescript/extract-symbols.ts',
 			'packages/csaa/src/semantic/repository-smoke.test.ts',
-			'package.json#/scripts/csaa:semantic:smoke:structural-scc'
+			'package.json#/scripts/csaa:semantic:smoke:structural-scc',
+			'package.json#/scripts/csaa:analyze:structural-scc',
+			'scripts/csaa-structural-scc.ts'
 		])
 			expect(structuralSccCapability!.provenance.includes(expectedProvenance)).toBe(true);
 		for (const exactBoundary of [
@@ -661,13 +680,22 @@ describe('inventory discovery and identity', () => {
 			STRUCTURAL_SCC_ANALYSIS_SELECTION.nodePopulation,
 			STRUCTURAL_SCC_ANALYSIS_SELECTION.edgePopulation,
 			STRUCTURAL_SCC_ANALYSIS_SELECTION.direction,
-			...STRUCTURAL_SCC_ANALYSIS_NONCLAIMS
+			...STRUCTURAL_SCC_ANALYSIS_NONCLAIMS,
+			STRUCTURAL_SCC_REPORT_OPERATION_VERSION,
+			STRUCTURAL_SCC_REPORT_REQUEST_SCHEMA_VERSION,
+			STRUCTURAL_SCC_REPORT_RESULT_SCHEMA_VERSION,
+			STRUCTURAL_SCC_REPORT_SCHEMA_VERSION,
+			...STRUCTURAL_SCC_REPORT_NONCLAIMS
 		])
 			expect(structuralSccCapability!.explanation).toContain(exactBoundary);
 		for (const boundary of [
 			'independently validated TypeScript module-dependency graph',
 			'preserving parallel edges and self-loops',
 			'Structural closure is exact only for the selected validated graph',
+			'implementation-local preliminary report facade',
+			'not a registered JAN-CSAA-007 OperationResponse',
+			'progress transport is excluded from report identity and evidence',
+			'coding-agent command csaa:analyze:structural-scc',
 			'dedicated structural SCC-only smoke command',
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
@@ -2534,9 +2562,20 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/providers/jpwb-state-machines/observe-state-machines.ts',
 			'packages/csaa/src/providers/jpwb-state-machines/validate-state-machine-observation.ts',
 			'packages/csaa/src/contracts/structural-scc-analysis.ts',
+			'packages/csaa/src/contracts/structural-scc-report.ts',
+			'packages/csaa/src/application/run-structural-scc-report.ts',
+			'packages/csaa/src/application/structural-scc-progress-jsonl.ts',
+			'packages/csaa/src/application/run-structural-scc-report.test.ts',
+			'packages/csaa/src/application/structural-scc-progress-jsonl.test.ts',
+			'packages/csaa/src/application/structural-scc-command.test.ts',
+			'packages/csaa/test-fixtures/structural-scc-command/tsconfig.json',
+			'packages/csaa/test-fixtures/structural-scc-command/a.ts',
+			'packages/csaa/test-fixtures/structural-scc-command/b.ts',
+			'packages/csaa/test-fixtures/structural-scc-command/leaf.ts',
 			'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 			'packages/csaa/src/graph/structural-scc-analysis-canonical.ts',
 			'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
+			'scripts/csaa-structural-scc.ts',
 			'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 			'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 			'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',

@@ -2,15 +2,15 @@
   "artifactPopulations": [
     {
       "artifactClass": "CONFIGURATION",
-      "discovered": 59,
+      "discovered": 60,
       "excluded": 0,
       "failed": 0,
-      "included": 59,
+      "included": 60,
       "provenance": [
         "subject.selectedFiles#artifactClass=CONFIGURATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 59
+      "successfullyInventoried": 60
     },
     {
       "artifactClass": "GENERATED_SOURCE",
@@ -38,39 +38,39 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 24,
+      "discovered": 25,
       "excluded": 0,
       "failed": 0,
-      "included": 24,
+      "included": 25,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 24
+      "successfullyInventoried": 25
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 320,
+      "discovered": 326,
       "excluded": 0,
       "failed": 0,
-      "included": 320,
+      "included": 326,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 320
+      "successfullyInventoried": 326
     },
     {
       "artifactClass": "TEST",
-      "discovered": 374,
+      "discovered": 377,
       "excluded": 0,
       "failed": 0,
-      "included": 374,
+      "included": 377,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 374
+      "successfullyInventoried": 377
     },
     {
       "artifactClass": "VERIFICATION",
@@ -203,8 +203,11 @@
         "apps/rph-demo/src/lib/theme.test.ts",
         "apps/rph-demo/src/lib/walkthrough.test.ts",
         "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
+        "packages/csaa/src/application/run-structural-scc-report.test.ts",
         "packages/csaa/src/application/structural-module-reachability-command.test.ts",
         "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-scc-command.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology-coverage.test.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.test.ts",
@@ -873,16 +876,23 @@
       "state": "PARTIAL"
     },
     {
-      "explanation": "The twelfth bounded DWP-004 increment applies validated-directed-strong-connectivity-partition/1.0.0 to one independently validated TypeScript module-dependency graph and deterministically partitions ALL_VALIDATED_GRAPH_NODES over ALL_VALIDATED_GRAPH_EDGES in DECLARED_SOURCE_TO_TARGET direction while preserving parallel edges and self-loops. It publishes canonical component membership, node-to-component indexing, internal-edge attribution, cycle-kind classification, exact population and edge-accounting reconciliation, source-graph identity, semantic-snapshot identity, and explicit upstream-closure status under JAN-CSAA-CAP-027 with PARTIAL status. Structural closure is exact only for the selected validated graph; graph authority is NONE, authority transfer is NONE, and gate effect is NONE. The dedicated structural SCC-only smoke command is CONFIGURED_NOT_RUN by inventory generation. The published nonclaims are JAN_CSAA_CAP_009_GRAPH_COMPOSITION, JAN_CSAA_CAP_029_SEMANTIC_QUERY, JAN_CSAA_CAP_030_CODE_SLICE, WHOLE_PROGRAM_OR_BEHAVIORAL_REACHABILITY, ENTRY_MECHANISM_OR_POPULATION_CLOSURE, ORPHAN_OR_DEAD_CODE_CANDIDACY, SAFE_REMOVAL_OR_NON_IMPACT, RUNTIME_EXECUTION_OR_BEHAVIOR, FINDING_GATE_DECISION_OR_REMEDIATION_AUTHORITY, FULL_JAN_CSAA_007_OR_008_CONFORMANCE. Full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED.",
+      "explanation": "The twelfth bounded DWP-004 increment applies validated-directed-strong-connectivity-partition/1.0.0 to one independently validated TypeScript module-dependency graph and deterministically partitions ALL_VALIDATED_GRAPH_NODES over ALL_VALIDATED_GRAPH_EDGES in DECLARED_SOURCE_TO_TARGET direction while preserving parallel edges and self-loops. It publishes canonical component membership, node-to-component indexing, internal-edge attribution, cycle-kind classification, exact population and edge-accounting reconciliation, source-graph identity, semantic-snapshot identity, and explicit upstream-closure status under JAN-CSAA-CAP-027 with PARTIAL status. Structural closure is exact only for the selected validated graph; graph authority is NONE, authority transfer is NONE, and gate effect is NONE. An implementation-local preliminary report facade under jan-csaa-report-structural-scc/0.1.0 admits one explicit bounded project set, captures one frozen subject and semantic snapshot, constructs and analyzes one validated module-dependency graph, verifies selected-captured-subject currentness, and emits a maxResultBytes-bounded terminal jan-csaa-structural-scc-report/0.1.0 envelope with jan-csaa-structural-scc-report-result/0.1.0 evidence. Its request schema is jan-csaa-structural-scc-report-request/0.1.0; it is not a registered JAN-CSAA-007 OperationResponse, and its report nonclaims are JAN_CSAA_CAP_009_GRAPH_COMPOSITION, JAN_CSAA_CAP_026_ARCHITECTURE_DISCOVERY, JAN_CSAA_CAP_029_SEMANTIC_QUERY, JAN_CSAA_CAP_030_CODE_SLICE, JAN_CSAA_CAP_031_CHANGE_IMPACT, JAN_CSAA_CAP_032_SEMANTIC_COMPARISON, DWP_004_DWP_005_OR_DWP_006_COMPLETION, FULL_JAN_CSAA_007_008_009_010_OR_011_CONFORMANCE, JAN_CSAA_007_REGISTERED_OPERATION_OR_OPERATION_RESPONSE_ENVELOPE, PROVIDER_QUALIFICATION, WORKING_CHANGE_MERGE_BASE_TARGET_REVISION_OR_CANDIDATE_MERGE_BINDING, CROSS_SNAPSHOT_DELTA_EQUIVALENCE_OR_SEMANTIC_COMPARISON, WHOLE_PROGRAM_BEHAVIORAL_FRAMEWORK_DYNAMIC_ENTRY_OR_RUNTIME_CLOSURE, SELECTED_GRAPH_SCC_PARTITION_OR_ABSENCE_OF_CYCLIC_COMPONENTS_AS_WHOLE_PROGRAM_ACYCLICITY_OR_NON_INTERACTION, RECOGNIZED_ARCHITECTURE_OR_ARCHITECTURE_VIOLATION, CYCLIC_COMPONENT_AS_DEFECT_SEVERITY_OR_REMEDIATION_PRIORITY, ORPHAN_DEAD_CODE_IRRELEVANCE_NON_IMPACT_OR_SAFE_REMOVAL, BEHAVIORAL_PRESERVATION_OR_TEST_SELECTION_PROOF, RULE_FINDING_SEVERITY_GATE_DESIGN_MERGE_REMEDIATION_OR_DISPOSITION_AUTHORITY. The bounded best-effort JSONL progress transport is excluded from report identity and evidence. The coding-agent command csaa:analyze:structural-scc and dedicated structural SCC-only smoke command are CONFIGURED_NOT_RUN by inventory generation. The analysis nonclaims are JAN_CSAA_CAP_009_GRAPH_COMPOSITION, JAN_CSAA_CAP_029_SEMANTIC_QUERY, JAN_CSAA_CAP_030_CODE_SLICE, WHOLE_PROGRAM_OR_BEHAVIORAL_REACHABILITY, ENTRY_MECHANISM_OR_POPULATION_CLOSURE, ORPHAN_OR_DEAD_CODE_CANDIDACY, SAFE_REMOVAL_OR_NON_IMPACT, RUNTIME_EXECUTION_OR_BEHAVIOR, FINDING_GATE_DECISION_OR_REMEDIATION_AUTHORITY, FULL_JAN_CSAA_007_OR_008_CONFORMANCE. Full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED.",
       "id": "structural-scc-analysis",
       "provenance": [
         "capabilities#dependency-graph",
         "capabilities#symbol-table",
         "capabilities#typescript-ast",
+        "package.json#/scripts/csaa:analyze:structural-scc",
         "package.json#/scripts/csaa:semantic:smoke:structural-scc",
+        "packages/csaa/src/application/run-structural-scc-report.test.ts",
+        "packages/csaa/src/application/run-structural-scc-report.ts",
+        "packages/csaa/src/application/structural-scc-command.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/contracts/structural-scc-report.ts",
         "packages/csaa/src/graph/build-module-dependency-graph.ts",
         "packages/csaa/src/graph/build-structural-scc-analysis.ts",
         "packages/csaa/src/graph/ids.ts",
@@ -900,7 +910,12 @@
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
         "packages/csaa/src/semantic/raw-semantic-model.ts",
         "packages/csaa/src/semantic/repository-smoke.test.ts",
-        "packages/csaa/src/semantic/validate-snapshot.ts"
+        "packages/csaa/src/semantic/validate-snapshot.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/leaf.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+        "scripts/csaa-structural-scc.ts"
       ],
       "provider": "typescript+validated-module-dependency-graph-scc",
       "state": "PARTIAL"
@@ -1256,6 +1271,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/csaa:analyze:structural-module-reachability"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "bun run scripts/csaa-structural-scc.ts",
+      "name": "csaa:analyze:structural-scc",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:analyze:structural-scc"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -2365,6 +2392,11 @@
         "bun.lock",
         "package.json",
         "package.json#/scripts/check-types",
+        "packages/csaa/src/application/run-structural-scc-report.test.ts",
+        "packages/csaa/src/application/run-structural-scc-report.ts",
+        "packages/csaa/src/application/structural-scc-command.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -2381,6 +2413,7 @@
         "packages/csaa/src/contracts/source-origin-correlation.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/contracts/structural-scc-report.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
@@ -2472,6 +2505,10 @@
         "packages/csaa/src/semantic/validate-snapshot.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.test.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/leaf.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
         "packages/csaa/tsconfig.build.json",
         "packages/csaa/tsconfig.json",
         "packages/rph-application/tsconfig.build.json",
@@ -2496,6 +2533,7 @@
         "packages/rph-product-realization-pwa/tsconfig.json",
         "packages/rph-projections/tsconfig.build.json",
         "packages/rph-projections/tsconfig.json",
+        "scripts/csaa-structural-scc.ts",
         "scripts/tsconfig.json",
         "tsconfig.json",
         "verif/event-surface-census.test.ts",
@@ -2526,7 +2564,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "201b95ced25086832addd4652950111947ac45eaa343ac08cfe61b84e4ec9ec4",
+    "configurationDigest": "556ed48bbf9eb2f205be73e0944bfa34559e4c1285d174fc161a453271d786f0",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2615,9 +2653,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 5927,
+          "bytes": 6002,
           "path": "package.json",
-          "sha256": "8d735cf3436907be498a2b16a50cf4f45714bccd8e8977fb7081b74cf1feed15"
+          "sha256": "caa6f062618b7d518995571933b0ca005a15cdc3cde30a0a3bb1c8fc06cf07bf"
         },
         {
           "artifactClass": "MANIFEST",
@@ -2630,6 +2668,12 @@
           "bytes": 10946,
           "path": "packages/csaa/src/contracts/dependency-cruiser.ts",
           "sha256": "2b0d13db0f56ab5dcd1f0e57e703ad622be3aeadf1408561f1c0922ead759599"
+        },
+        {
+          "artifactClass": "PROJECT_CONFIGURATION",
+          "bytes": 200,
+          "path": "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+          "sha256": "9757818028bc65001e8191eaf2d0618f087ef3bdffd5f9b68f89230442123d68"
         },
         {
           "artifactClass": "PROJECT_CONFIGURATION",
@@ -3132,6 +3176,31 @@
         },
         {
           "compilerOptions": {
+            "configFilePath": "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+            "module": 199,
+            "moduleResolution": 99,
+            "noEmit": true,
+            "noLib": true,
+            "strict": true,
+            "target": 9
+          },
+          "configClosureDigest": "9578f82a9bfb3d9b27704d382b5c9e409fe6138eab908b5defc7acab46467714",
+          "configPath": "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+          "kind": "PROJECT",
+          "projectReferences": [],
+          "projectResolutionDigest": "7351756f0e85865678cd3f17369c58827c87e63faf8f3ee3c8470a6210d16623",
+          "provider": {
+            "id": "typescript",
+            "version": "5.9.3"
+          },
+          "rootNames": [
+            "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+            "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+            "packages/csaa/test-fixtures/structural-scc-command/leaf.ts"
+          ]
+        },
+        {
+          "compilerOptions": {
             "configFilePath": "packages/csaa/tsconfig.build.json",
             "declaration": true,
             "declarationMap": true,
@@ -3162,14 +3231,16 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "6543d1323a2734a0e1d2690af1412904db75679b4663995bfbb91ad955bad5d5",
+          "projectResolutionDigest": "f9843631a83e32bb11d698e2c58bd56889b45fca86b336526d0b6aec9319c661",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
             "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+            "packages/csaa/src/application/run-structural-scc-report.ts",
             "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
+            "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -3193,6 +3264,7 @@
             "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
             "packages/csaa/src/contracts/structural-module-reachability-report.ts",
             "packages/csaa/src/contracts/structural-scc-analysis.ts",
+            "packages/csaa/src/contracts/structural-scc-report.ts",
             "packages/csaa/src/contracts/subject.ts",
             "packages/csaa/src/graph/build-call-graph.ts",
             "packages/csaa/src/graph/build-command-dispatch-topology.ts",
@@ -3351,7 +3423,7 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "bda872c4537954abfff1f2d1643d3e280e8b56c456fed7876827d5390019638c",
+          "projectResolutionDigest": "b3c6ed3d09acd707c4b5bfa2896c68a51b962af60dad750141a71bc4e2ed7246",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -3359,9 +3431,14 @@
           "rootNames": [
             "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
             "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+            "packages/csaa/src/application/run-structural-scc-report.test.ts",
+            "packages/csaa/src/application/run-structural-scc-report.ts",
             "packages/csaa/src/application/structural-module-reachability-command.test.ts",
             "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
             "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
+            "packages/csaa/src/application/structural-scc-command.test.ts",
+            "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+            "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -3385,6 +3462,7 @@
             "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
             "packages/csaa/src/contracts/structural-module-reachability-report.ts",
             "packages/csaa/src/contracts/structural-scc-analysis.ts",
+            "packages/csaa/src/contracts/structural-scc-report.ts",
             "packages/csaa/src/contracts/subject.ts",
             "packages/csaa/src/graph/build-call-graph.test.ts",
             "packages/csaa/src/graph/build-call-graph.ts",
@@ -4872,11 +4950,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "eeb4123846a329827ea0a8156378554d55efdef9268ab8592287d47e8889be30",
+          "configClosureDigest": "cf14b5fd5e2cb000de5a904f7b2e1117887941eb8ca7900b76217575346f4be7",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d23a4e0c8293803578e3dc23b709ed79d589a0c4984e121044f43d642bbd77ae",
+          "projectResolutionDigest": "8d9d92dc2615b02258a2b81e335448d22c18db0d3ae4f44a9865d4dc48adbbe0",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4885,6 +4963,7 @@
             "scripts/csaa-inventory.ts",
             "scripts/csaa-product-boundary.ts",
             "scripts/csaa-structural-module-reachability.ts",
+            "scripts/csaa-structural-scc.ts",
             "scripts/mutants/ledger.ts",
             "scripts/mutants/measured.ts",
             "scripts/mutants/run.ts",
@@ -4928,11 +5007,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "285631eb47ad01d928ec3a8ca8ad4abbf5d78ddb18d68291464ab030790791fe",
+          "configClosureDigest": "be42742d6ad8f4d657f0b8b95f399eadd6e585e6bfff6e285f6729613088dd25",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "ff8e47958b3f7c1e8793a823cc3b29bb4d655476fc460659b0747174bfe3e210",
+          "projectResolutionDigest": "839f370dadb8a90515f8680716dffc714c1ea8e39b0f1d622d82f643325ff5cd",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4966,11 +5045,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "07db86e06caae0653eb47c6b27809205f4b456927cfc6349d8e188e06dd3a642",
+          "configClosureDigest": "033dfebb465188cb67e6d31e0f28c5e9a13d09e0fb30a12c9dd81d3c3ed25eef",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "0665bc3d81277c8af92612283cb3f1afb6a1d3918fbe5d0657ae277f35a48fbf",
+          "projectResolutionDigest": "900adc0787dcab3d7705c77bc53bea24b0fde1ad0bdbc22d1e92f1641c342d7f",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5711,7 +5790,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "e32296b7e8342d8b99292cd6d034846cdf397e5a4ec1f2103ffb5b74c5a05f71",
+    "fileManifestDigest": "1f34e421abdd42cb1b98238c582e4fe21d8643b76de8b2cc25e81927b0b67d91",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5774,7 +5853,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 973,
+    "selectedFileCount": 984,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -6898,9 +6977,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 5927,
+        "bytes": 6002,
         "path": "package.json",
-        "sha256": "8d735cf3436907be498a2b16a50cf4f45714bccd8e8977fb7081b74cf1feed15",
+        "sha256": "caa6f062618b7d518995571933b0ca005a15cdc3cde30a0a3bb1c8fc06cf07bf",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -6933,6 +7012,20 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 14962,
+        "path": "packages/csaa/src/application/run-structural-scc-report.test.ts",
+        "sha256": "4f5d531969d1f485faabe1b2e1e80d36c46db9abeb5bc97acb6336ac05a55133",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 41189,
+        "path": "packages/csaa/src/application/run-structural-scc-report.ts",
+        "sha256": "04c793cd3a450d92645a2b31f57e9404cf2d961da147d83f0e421eafad80a936",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 6593,
         "path": "packages/csaa/src/application/structural-module-reachability-command.test.ts",
         "sha256": "7b2aac60fc595b3550de6596f6232092ef281e5ef06e37fd859ff3946d89f035",
@@ -6950,6 +7043,27 @@
         "bytes": 4963,
         "path": "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
         "sha256": "f8cb91298a4b645846c2dcb3778b340b357adf098bb43dfa45a169828ea7d687",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 8619,
+        "path": "packages/csaa/src/application/structural-scc-command.test.ts",
+        "sha256": "9b1f82a29031667fbc9639225d4134ebf55d5730aba88c2a511f1641c103457a",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 4592,
+        "path": "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+        "sha256": "9f4f0a68acee74a028d6569bebe74e0f3e554cf77226e537b6a49447a75e603d",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4607,
+        "path": "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
+        "sha256": "3db45672fe7311846c4ebe6e0bad22ff89c36da1a9ddda3ac12c62654c0dff25",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7111,6 +7225,13 @@
         "bytes": 10140,
         "path": "packages/csaa/src/contracts/structural-scc-analysis.ts",
         "sha256": "2ed40ed8482c4df66e2a512b093f407604a142c3ddcd0f6de6aa36a1732dd42c",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 8943,
+        "path": "packages/csaa/src/contracts/structural-scc-report.ts",
+        "sha256": "8ce4cfa08551f0863531200c0a110a1c449b4c72027ea2043b0af3c3628a85e0",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7696,16 +7817,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 22033,
+        "bytes": 23663,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "6d617a9bf8d6ede9c654244ddaf9a16e643717014217006db53c4dd67e48b2de",
+        "sha256": "9a22717b24c7f271e0d54e4bd10ab5587612feb16404c500a9e05d6ce25a7418",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 10909,
+        "bytes": 11673,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "5d86bdb6d3282c5a8deafcd56c1e22e3c86c33f9b0100a762462e5186678864a",
+        "sha256": "a46d65ca3a0cd4eec0d23a8aed762effd1b06669008062ba89ca360647a150fd",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7731,16 +7852,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 119693,
+        "bytes": 121948,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "4b3e7d2afb0f576915f64ce23ac5dfb551f781efcdca21d0d672f6b20467d16d",
+        "sha256": "2c8c5c2ff63add2bc291b2323b2f24ac2a70f672114800032146db0f939f00c2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 132463,
+        "bytes": 134639,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "dd4f21c86638d4b80ad3007c6954e8796a84c62d1da73e64339cabf773cf8ec5",
+        "sha256": "9db87d0be2be4325d267cd4b8d8f2459da51fe40742a6511fea9b64757dcca36",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -8652,6 +8773,34 @@
         "path": "packages/csaa/src/subject/workspaces.ts",
         "sha256": "1a391840a2cc617e26e42e5655448f353343bce63317fd52db53b7977138b72b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 53,
+        "path": "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+        "sha256": "869cd4638f9f1cc0e72154ddc1d1a3cb8207e5fdeab739ca835b9abc79814457",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 62,
+        "path": "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+        "sha256": "c57b471d5416e995e5f5eca3615b121a05a8e5413f06d3e0251626993165ce9b",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 23,
+        "path": "packages/csaa/test-fixtures/structural-scc-command/leaf.ts",
+        "sha256": "7793baa4ebf94a1dc487ccb2ed6c1cb1e4403b380d6d264327f36b3eeda63738",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "CONFIGURATION",
+        "bytes": 200,
+        "path": "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+        "sha256": "9757818028bc65001e8191eaf2d0618f087ef3bdffd5f9b68f89230442123d68",
+        "subjectArtifactClass": "PROJECT_CONFIGURATION"
       },
       {
         "artifactClass": "CONFIGURATION",
@@ -12085,6 +12234,13 @@
       },
       {
         "artifactClass": "SCRIPT",
+        "bytes": 3426,
+        "path": "scripts/csaa-structural-scc.ts",
+        "sha256": "a3a13c371ffe4e6388137e4bbbfbb85e37e59412583b9d43690d03db57882325",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
         "bytes": 286150,
         "path": "scripts/mutants/ledger.ts",
         "sha256": "5089327333416624683be7d8414f9bf33e2bb6d80b50bd1a1dd26cc7009787ea",
@@ -12588,7 +12744,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "881e054cfaed4ee97570d9f72d431f8da7183c64880b1a027b207afba6410880",
+    "subjectId": "e82736f2180e6e14d142f9e91c4d0db3bef35e03fe58f5dc289724c5da2ddd65",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -12890,7 +13046,47 @@
       "status": "PARTIAL"
     },
     {
-      "candidateArtifactCount": 149,
+      "candidateArtifactCount": 3,
+      "compilerOptions": {
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "noEmit": true,
+        "noLib": true,
+        "strict": true,
+        "target": "ES2022"
+      },
+      "diagnostics": [],
+      "diagnosticsState": "RUN",
+      "exclude": null,
+      "extends": null,
+      "files": [
+        "a.ts",
+        "b.ts",
+        "leaf.ts"
+      ],
+      "frameworkCandidates": [],
+      "generatedContexts": [],
+      "include": null,
+      "parseState": "PARSED",
+      "partialityReasons": [],
+      "path": "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+      "provenance": [
+        "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
+        "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json"
+      ],
+      "references": [],
+      "resolvedRootFiles": [
+        "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/leaf.ts"
+      ],
+      "resolvedRootState": "RESOLVED_DWP002",
+      "rootDisposition": "COMPILER_ROOTS",
+      "semanticOptionCoverage": "COMPLETE_RAW_DECLARATION",
+      "status": "COMPLETE"
+    },
+    {
+      "candidateArtifactCount": 152,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -12918,7 +13114,9 @@
       "references": [],
       "resolvedRootFiles": [
         "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+        "packages/csaa/src/application/run-structural-scc-report.ts",
         "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -12942,6 +13140,7 @@
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/contracts/structural-scc-report.ts",
         "packages/csaa/src/contracts/subject.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
@@ -13073,7 +13272,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 247,
+      "candidateArtifactCount": 253,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -13102,9 +13301,14 @@
       "resolvedRootFiles": [
         "packages/csaa/src/application/run-structural-module-reachability-report.test.ts",
         "packages/csaa/src/application/run-structural-module-reachability-report.ts",
+        "packages/csaa/src/application/run-structural-scc-report.test.ts",
+        "packages/csaa/src/application/run-structural-scc-report.ts",
         "packages/csaa/src/application/structural-module-reachability-command.test.ts",
         "packages/csaa/src/application/structural-module-reachability-progress-jsonl.test.ts",
         "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
+        "packages/csaa/src/application/structural-scc-command.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -13128,6 +13332,7 @@
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/contracts/structural-scc-report.ts",
         "packages/csaa/src/contracts/subject.ts",
         "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
@@ -14467,7 +14672,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 17,
+      "candidateArtifactCount": 18,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14499,6 +14704,7 @@
         "scripts/csaa-inventory.ts",
         "scripts/csaa-product-boundary.ts",
         "scripts/csaa-structural-module-reachability.ts",
+        "scripts/csaa-structural-scc.ts",
         "scripts/mutants/ledger.ts",
         "scripts/mutants/measured.ts",
         "scripts/mutants/run.ts",
@@ -14671,6 +14877,11 @@
         "capabilities#type-graph",
         "capabilities#typescript-ast",
         "package.json",
+        "packages/csaa/src/application/run-structural-scc-report.test.ts",
+        "packages/csaa/src/application/run-structural-scc-report.ts",
+        "packages/csaa/src/application/structural-scc-command.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -14692,6 +14903,7 @@
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/contracts/structural-scc-report.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
@@ -14811,9 +15023,14 @@
         "packages/csaa/src/semantic/validate-source-origin-correlation.test.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
         "packages/csaa/src/subject/analyzer-closure.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/leaf.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
         "packages/rph-contracts/vocab/m3-commands-events.json",
+        "scripts/csaa-structural-scc.ts",
         "verif/event-surface-census.test.ts"
       ],
       "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, filesystem freshness/currentness after capture, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED."
@@ -14821,6 +15038,11 @@
     {
       "provenance": [
         "package.json",
+        "packages/csaa/src/application/run-structural-scc-report.test.ts",
+        "packages/csaa/src/application/run-structural-scc-report.ts",
+        "packages/csaa/src/application/structural-scc-command.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
+        "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
@@ -14837,6 +15059,7 @@
         "packages/csaa/src/contracts/state-machine-graph.ts",
         "packages/csaa/src/contracts/structural-module-reachability-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
+        "packages/csaa/src/contracts/structural-scc-report.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
@@ -14936,9 +15159,14 @@
         "packages/csaa/src/semantic/validate-source-origin-correlation.test.ts",
         "packages/csaa/src/semantic/validate-source-origin-correlation.ts",
         "packages/csaa/src/subject/analyzer-closure.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/a.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/b.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/leaf.ts",
+        "packages/csaa/test-fixtures/structural-scc-command/tsconfig.json",
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
         "packages/rph-contracts/vocab/m3-commands-events.json",
+        "scripts/csaa-structural-scc.ts",
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.baseline.json",
         "verif/arrow-command-census.test.ts",
@@ -15020,6 +15248,21 @@
       "path": "scripts/csaa-structural-module-reachability.ts",
       "provenance": [
         "scripts/csaa-structural-module-reachability.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-structural-scc.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "a3a13c371ffe4e6388137e4bbbfbb85e37e59412583b9d43690d03db57882325",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "gateCarriers": [
+        "package.json#/scripts/csaa:analyze:structural-scc"
+      ],
+      "path": "scripts/csaa-structural-scc.ts",
+      "provenance": [
+        "scripts/csaa-structural-scc.ts"
       ],
       "role": "SCRIPT"
     },
