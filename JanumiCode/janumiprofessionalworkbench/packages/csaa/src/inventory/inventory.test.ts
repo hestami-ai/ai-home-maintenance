@@ -29,6 +29,18 @@ import {
 	CALL_GRAPH_REPORT_SELECTION
 } from '../contracts/call-graph-report.js';
 import {
+	STATE_MACHINE_GRAPH_REPORT_AUTHORITY,
+	STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER,
+	STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT,
+	STATE_MACHINE_GRAPH_REPORT_NONCLAIMS,
+	STATE_MACHINE_GRAPH_REPORT_OPERATION_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_SELECTION
+} from '../contracts/state-machine-graph-report.js';
+import { STATE_MACHINE_GRAPH_VERIFIER_AUTHORITY } from '../contracts/state-machine-graph.js';
+import {
 	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
@@ -323,6 +335,21 @@ const CALL_GRAPH_REPORT_PROVENANCE = [
 	'packages/csaa/src/application/run-project-context-report.ts',
 	'packages/csaa/src/graph/build-call-graph.test.ts',
 	'scripts/csaa-call-graph.ts'
+] as const;
+const STATE_MACHINE_GRAPH_REPORT_PROVENANCE = [
+	'packages/csaa/command-subjects/state-machine-graph/transitions.data.ts',
+	'packages/csaa/command-subjects/state-machine-graph/tsconfig.json',
+	'packages/csaa/src/application/run-project-context-report.ts',
+	'packages/csaa/src/application/run-state-machine-graph-command.ts',
+	'packages/csaa/src/application/run-state-machine-graph-report.test.ts',
+	'packages/csaa/src/application/run-state-machine-graph-report.ts',
+	'packages/csaa/src/application/state-machine-graph-command.test.ts',
+	'packages/csaa/src/application/state-machine-graph-progress-jsonl.test.ts',
+	'packages/csaa/src/application/state-machine-graph-progress-jsonl.ts',
+	'packages/csaa/src/contracts/state-machine-graph-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-state-machine-graph.ts'
 ] as const;
 const READ_WRITE_ACCESS_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-report.ts',
@@ -1480,6 +1507,44 @@ describe('inventory discovery and identity', () => {
 		expect(callGraphExplanation).toContain('parsed-request command adapter');
 		for (const nonclaim of CALL_GRAPH_REPORT_NONCLAIMS)
 			expect(callGraphExplanation).toContain(nonclaim);
+		const stateMachineCapability = capabilities.get('state-machine-graph');
+		expect(stateMachineCapability).toBeDefined();
+		const stateMachineExplanation = stateMachineCapability!.explanation;
+		expect(stateMachineCapability).toMatchObject({
+			explanation: expect.stringContaining(
+				'observes the exact frozen generated JPWB transition table without executing it'
+			),
+			provider: 'jpwb-generated-transition-table',
+			provenance: expect.arrayContaining([
+				'packages/csaa/src/contracts/state-machine-graph.ts',
+				'packages/csaa/src/graph/build-state-machine-graph.ts',
+				'packages/csaa/src/graph/validate-state-machine-graph.ts',
+				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
+				'package.json#/scripts/csaa:analyze:state-machine-graph'
+			]),
+			state: 'PARTIAL'
+		});
+		expect(stateMachineExplanation).toContain(STATE_MACHINE_GRAPH_REPORT_OPERATION_VERSION);
+		expect(stateMachineExplanation).toContain(STATE_MACHINE_GRAPH_REPORT_REQUEST_SCHEMA_VERSION);
+		expect(stateMachineExplanation).toContain(STATE_MACHINE_GRAPH_REPORT_RESULT_SCHEMA_VERSION);
+		expect(stateMachineExplanation).toContain(STATE_MACHINE_GRAPH_REPORT_SCHEMA_VERSION);
+		expect(stateMachineExplanation).toContain(JSON.stringify(STATE_MACHINE_GRAPH_REPORT_SELECTION));
+		expect(stateMachineExplanation).toContain(
+			`analysis authority is ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY}`
+		);
+		expect(stateMachineExplanation).toContain(
+			`authority transfer is ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER}`
+		);
+		expect(stateMachineExplanation).toContain(
+			`gate effect is ${STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT}`
+		);
+		expect(stateMachineExplanation).toContain(
+			`existing specialized verifier authority remains ${STATE_MACHINE_GRAPH_VERIFIER_AUTHORITY} and is neither held nor transferred by the facade`
+		);
+		expect(stateMachineExplanation).toContain('successful evidence is never truncated');
+		expect(stateMachineExplanation).toContain('parsed-request command adapter');
+		for (const nonclaim of STATE_MACHINE_GRAPH_REPORT_NONCLAIMS)
+			expect(stateMachineExplanation).toContain(nonclaim);
 		expect(arrowCapability!.provider).toBe(ARROW_COMMAND_CENSUS_ADAPTER_ID);
 		for (const expectedProvenance of [
 			'packages/csaa/src/contracts/arrow-command-census.ts',
@@ -1576,6 +1641,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
@@ -1613,6 +1679,9 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain('first seventeen bounded DWP-004 increments implement');
 		expect(semanticBoundary).toContain('a deliberately partial static call graph');
 		expect(semanticBoundary).toContain(
+			'complete bounded generated JPWB state-machine topology projection for one exact generated source'
+		);
+		expect(semanticBoundary).toContain(
 			'complete bounded Program-local read/write projection with exact project/source mappings'
 		);
 		expect(semanticBoundary).toContain(
@@ -1620,7 +1689,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, read/write-access'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -1669,7 +1738,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -1757,6 +1826,7 @@ describe('inventory discovery and identity', () => {
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
@@ -1784,6 +1854,12 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`call-graph report facade has analysis authority ${CALL_GRAPH_REPORT_AUTHORITY}, authority transfer ${CALL_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${CALL_GRAPH_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`state-machine-graph report facade has analysis authority ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY}, authority transfer ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`neither holds nor transfers the embedded graph's ${STATE_MACHINE_GRAPH_VERIFIER_AUTHORITY} specialized verifier authority`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`freshness is ${LOGICAL_GRAPH_COMPOSITION_FRESHNESS}, currentness is ${LOGICAL_GRAPH_COMPOSITION_CURRENTNESS}`
@@ -2924,6 +3000,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:call-graph',
+						'csaa:analyze:state-machine-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
@@ -2994,6 +3071,7 @@ describe('JPWB population non-vacuity', () => {
 			...readWritePaths,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
+			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
 			...commandDispatchPaths,
@@ -3148,6 +3226,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/validate-read-write-access-graph.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
+			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
 			'packages/csaa/src/graph/build-command-handler-graph.ts',
@@ -3254,6 +3333,14 @@ describe('JPWB population non-vacuity', () => {
 		);
 
 		write(root, missingStateGraph, 'export {};\n');
+		const missingStateGraphReport =
+			'packages/csaa/src/application/run-state-machine-graph-report.ts';
+		rmSync(join(root, ...missingStateGraphReport.split('/')));
+		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
+			`Required JPWB state-machine graph report facade or verification source is absent: ${missingStateGraphReport}`
+		);
+
+		write(root, missingStateGraphReport, 'export {};\n');
 		const missingCommandEventOverlay =
 			'packages/csaa/src/graph/validate-command-event-contract-overlay.ts';
 		rmSync(join(root, ...missingCommandEventOverlay.split('/')));

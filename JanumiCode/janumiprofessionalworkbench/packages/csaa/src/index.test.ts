@@ -122,7 +122,15 @@ import {
 	SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
 	STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
+	STATE_MACHINE_GRAPH_PROGRESS_MAX_BYTES,
+	STATE_MACHINE_GRAPH_PROGRESS_MAX_EVENTS,
+	STATE_MACHINE_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_OPERATION_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	STATE_MACHINE_GRAPH_REPORT_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
@@ -183,6 +191,8 @@ import {
 	runStructuralSccReport,
 	structuralSccReportExitCode,
 	buildStateMachineGraph,
+	runStateMachineGraphReport,
+	stateMachineGraphReportExitCode,
 	buildStaticSemanticSnapshot,
 	runCallGraphReport,
 	canonicalSemanticJson,
@@ -289,6 +299,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(structuralSccReportExitCode).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty('createStructuralSccProgressJsonlWriter');
 		expect(buildStateMachineGraph).toBeTypeOf('function');
+		expect(runStateMachineGraphReport).toBeTypeOf('function');
+		expect(stateMachineGraphReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createStateMachineGraphProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runStateMachineGraphCommand');
+		expect(publicSurface).not.toHaveProperty('classifyStateMachineGraphFailureState');
+		expect(publicSurface).not.toHaveProperty('classifyStateMachineObservationFailureState');
 		expect(buildStaticSemanticSnapshot).toBeTypeOf('function');
 		expect(compareDependencyProviders).toBeTypeOf('function');
 		expect(normalizeDependencyCruiserOutput).toBeTypeOf('function');
@@ -548,6 +564,26 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-state-machine-graph-request/1.0.0'
 		);
 		expect(STATE_MACHINE_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-state-machine-graph/1.0.0');
+		expect(STATE_MACHINE_GRAPH_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-state-machine-graph/0.1.0'
+		);
+		expect(STATE_MACHINE_GRAPH_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-graph-report-request/0.1.0'
+		);
+		expect(STATE_MACHINE_GRAPH_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-graph-report-result/0.1.0'
+		);
+		expect(STATE_MACHINE_GRAPH_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-graph-report/0.1.0'
+		);
+		expect(STATE_MACHINE_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-graph-report-progress/0.1.0'
+		);
+		expect(STATE_MACHINE_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-state-machine-graph-progress-transport/0.1.0'
+		);
+		expect(STATE_MACHINE_GRAPH_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(STATE_MACHINE_GRAPH_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-module-dependency-graph/0.1.1'
 		);

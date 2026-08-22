@@ -24,6 +24,7 @@ export * from './contracts/project-context-graph.js';
 export * from './contracts/project-context-report.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
+export * from './contracts/state-machine-graph-report.js';
 export * from './contracts/structural-module-reachability-analysis.js';
 export * from './contracts/structural-module-reachability-report.js';
 export * from './contracts/structural-scc-analysis.js';
@@ -160,6 +161,25 @@ export {
 	CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type CallGraphProgressTransportTruncation
 } from './application/call-graph-progress-jsonl.js';
+
+export {
+	runStateMachineGraphReport,
+	stateMachineGraphReportExitCode,
+	STATE_MACHINE_GRAPH_REPORT_PROGRESS_NONCLAIMS,
+	STATE_MACHINE_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION,
+	type RunStateMachineGraphReportOptions,
+	type StateMachineGraphReportProgressEvent,
+	type StateMachineGraphReportProgressObservation,
+	type StateMachineGraphReportProgressObservationMetric,
+	type StateMachineGraphReportProgressPhase
+} from './application/run-state-machine-graph-report.js';
+
+export {
+	STATE_MACHINE_GRAPH_PROGRESS_MAX_BYTES,
+	STATE_MACHINE_GRAPH_PROGRESS_MAX_EVENTS,
+	STATE_MACHINE_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type StateMachineGraphProgressTransportTruncation
+} from './application/state-machine-graph-progress-jsonl.js';
 
 export {
 	declarationContextReportExitCode,
