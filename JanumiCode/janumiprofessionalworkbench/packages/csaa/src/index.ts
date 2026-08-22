@@ -6,6 +6,7 @@ export * from './contracts/declaration-context-analysis.js';
 export * from './contracts/declaration-context-report.js';
 export * from './contracts/source-origin-correlation.js';
 export * from './contracts/arrow-command-census.js';
+export * from './contracts/arrow-command-census-report.js';
 export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-event-contract-overlay.js';
 export * from './contracts/command-dispatch-topology.js';
@@ -161,6 +162,25 @@ export {
 	CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type CallGraphProgressTransportTruncation
 } from './application/call-graph-progress-jsonl.js';
+
+export {
+	arrowCommandCensusReportExitCode,
+	runArrowCommandCensusReport,
+	ARROW_COMMAND_CENSUS_REPORT_PROGRESS_NONCLAIMS,
+	ARROW_COMMAND_CENSUS_REPORT_PROGRESS_SCHEMA_VERSION,
+	type ArrowCommandCensusReportProgressEvent,
+	type ArrowCommandCensusReportProgressObservation,
+	type ArrowCommandCensusReportProgressObservationMetric,
+	type ArrowCommandCensusReportProgressPhase,
+	type RunArrowCommandCensusReportOptions
+} from './application/run-arrow-command-census-report.js';
+
+export {
+	ARROW_COMMAND_CENSUS_PROGRESS_MAX_BYTES,
+	ARROW_COMMAND_CENSUS_PROGRESS_MAX_EVENTS,
+	ARROW_COMMAND_CENSUS_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type ArrowCommandCensusProgressTransportTruncation
+} from './application/arrow-command-census-progress-jsonl.js';
 
 export {
 	runStateMachineGraphReport,

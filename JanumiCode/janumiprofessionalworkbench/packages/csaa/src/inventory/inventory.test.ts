@@ -18,6 +18,21 @@ import {
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
 import {
+	ARROW_COMMAND_CENSUS_REPORT_AUTHORITY,
+	ARROW_COMMAND_CENSUS_REPORT_AUTHORITY_TRANSFER,
+	ARROW_COMMAND_CENSUS_REPORT_CAPABILITY_STATUS,
+	ARROW_COMMAND_CENSUS_REPORT_EXECUTION_SELECTION,
+	ARROW_COMMAND_CENSUS_REPORT_GATE_EFFECT,
+	ARROW_COMMAND_CENSUS_REPORT_NONCLAIMS,
+	ARROW_COMMAND_CENSUS_REPORT_OPERATION_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_REGISTRY_STATUS,
+	ARROW_COMMAND_CENSUS_REPORT_REQUEST_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_RESULT_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_SELECTION,
+	ARROW_COMMAND_CENSUS_REPORT_SCOPE
+} from '../contracts/arrow-command-census-report.js';
+import {
 	CALL_GRAPH_REPORT_AUTHORITY,
 	CALL_GRAPH_REPORT_AUTHORITY_TRANSFER,
 	CALL_GRAPH_REPORT_GATE_EFFECT,
@@ -246,6 +261,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=PROJECT_CONTEXT_GRAPH vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts';
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
+const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-census.ts';
 const CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 const READ_WRITE_ACCESS_REPORT_COMMAND = 'bun scripts/csaa-read-write-access.ts';
 const CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND =
@@ -350,6 +366,18 @@ const STATE_MACHINE_GRAPH_REPORT_PROVENANCE = [
 	'packages/csaa/src/index.test.ts',
 	'packages/csaa/src/index.ts',
 	'scripts/csaa-state-machine-graph.ts'
+] as const;
+const ARROW_COMMAND_CENSUS_REPORT_PROVENANCE = [
+	'packages/csaa/src/application/arrow-command-census-command.test.ts',
+	'packages/csaa/src/application/arrow-command-census-progress-jsonl.test.ts',
+	'packages/csaa/src/application/arrow-command-census-progress-jsonl.ts',
+	'packages/csaa/src/application/run-arrow-command-census-command.ts',
+	'packages/csaa/src/application/run-arrow-command-census-report.test.ts',
+	'packages/csaa/src/application/run-arrow-command-census-report.ts',
+	'packages/csaa/src/contracts/arrow-command-census-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-arrow-command-census.ts'
 ] as const;
 const READ_WRITE_ACCESS_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-report.ts',
@@ -479,6 +507,7 @@ function jpwbFixtureScriptCommand(name: string): string {
 	}
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
+	if (name === 'csaa:analyze:arrow-command-census') return ARROW_COMMAND_CENSUS_REPORT_COMMAND;
 	if (name === 'csaa:analyze:call-graph') return CALL_GRAPH_REPORT_COMMAND;
 	if (name === 'csaa:analyze:read-write-access') return READ_WRITE_ACCESS_REPORT_COMMAND;
 	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
@@ -1551,7 +1580,9 @@ describe('inventory discovery and identity', () => {
 			'packages/csaa/src/providers/jpwb-arrow-command-census/observe-arrow-command-census.ts',
 			'packages/csaa/src/providers/jpwb-arrow-command-census/validate-arrow-command-census.ts',
 			'verif/arrow-command-census.ts',
-			'verif/arrow-command-census.baseline.json'
+			'verif/arrow-command-census.baseline.json',
+			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			'package.json#/scripts/csaa:analyze:arrow-command-census'
 		]) {
 			expect(arrowCapability!.provenance.includes(expectedProvenance)).toBe(true);
 		}
@@ -1564,6 +1595,40 @@ describe('inventory discovery and identity', () => {
 		expect(arrowCapability!.explanation).toContain(
 			'process isolation rather than a hostile-code security sandbox'
 		);
+		expect(arrowCapability!.explanation).toContain(ARROW_COMMAND_CENSUS_REPORT_OPERATION_VERSION);
+		expect(arrowCapability!.explanation).toContain(
+			ARROW_COMMAND_CENSUS_REPORT_REQUEST_SCHEMA_VERSION
+		);
+		expect(arrowCapability!.explanation).toContain(
+			ARROW_COMMAND_CENSUS_REPORT_RESULT_SCHEMA_VERSION
+		);
+		expect(arrowCapability!.explanation).toContain(ARROW_COMMAND_CENSUS_REPORT_SCHEMA_VERSION);
+		expect(arrowCapability!.explanation).toContain(
+			JSON.stringify(ARROW_COMMAND_CENSUS_REPORT_SELECTION)
+		);
+		expect(arrowCapability!.explanation).toContain(ARROW_COMMAND_CENSUS_REPORT_EXECUTION_SELECTION);
+		expect(arrowCapability!.explanation).toContain(
+			`capability status is ${ARROW_COMMAND_CENSUS_REPORT_CAPABILITY_STATUS}`
+		);
+		expect(arrowCapability!.explanation).toContain(
+			`registry status is ${ARROW_COMMAND_CENSUS_REPORT_REGISTRY_STATUS}`
+		);
+		expect(arrowCapability!.explanation).toContain(`scope is ${ARROW_COMMAND_CENSUS_REPORT_SCOPE}`);
+		expect(arrowCapability!.explanation).toContain(
+			`analysis authority is ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY}`
+		);
+		expect(arrowCapability!.explanation).toContain(
+			`authority transfer is ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY_TRANSFER}`
+		);
+		expect(arrowCapability!.explanation).toContain(
+			`gate effect is ${ARROW_COMMAND_CENSUS_REPORT_GATE_EFFECT}`
+		);
+		expect(arrowCapability!.explanation).toContain('successful evidence is never truncated');
+		expect(arrowCapability!.explanation).toContain('selected-captured-subject currentness');
+		expect(arrowCapability!.explanation).toContain('Retained dead-covered and orphan labels');
+		expect(arrowCapability!.explanation).toContain("report's parsed-request command adapter");
+		for (const nonclaim of ARROW_COMMAND_CENSUS_REPORT_NONCLAIMS)
+			expect(arrowCapability!.explanation).toContain(nonclaim);
 		const readWriteCapability = capabilities.get('read-write-access-graph');
 		expect(readWriteCapability).toBeDefined();
 		const readWriteExplanation = readWriteCapability!.explanation;
@@ -1642,6 +1707,7 @@ describe('inventory discovery and identity', () => {
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
+				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
@@ -1682,6 +1748,9 @@ describe('inventory discovery and identity', () => {
 			'complete bounded generated JPWB state-machine topology projection for one exact generated source'
 		);
 		expect(semanticBoundary).toContain(
+			'exact selected retained arrow-command census evidence and baseline comparison'
+		);
+		expect(semanticBoundary).toContain(
 			'complete bounded Program-local read/write projection with exact project/source mappings'
 		);
 		expect(semanticBoundary).toContain(
@@ -1689,7 +1758,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, read/write-access'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -1738,7 +1807,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -1827,6 +1896,7 @@ describe('inventory discovery and identity', () => {
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
+				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
@@ -1857,6 +1927,18 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`state-machine-graph report facade has analysis authority ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY}, authority transfer ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`arrow-command-census report facade has analysis authority ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY}, authority transfer ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY_TRANSFER}, and gate effect ${ARROW_COMMAND_CENSUS_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`neither holds nor transfers the retained census's ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'does not execute the retained test gate or turn a baseline match into correctness proof'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'formal JAN-CSAA finding, repository-code dead/orphan classification'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`neither holds nor transfers the embedded graph's ${STATE_MACHINE_GRAPH_VERIFIER_AUTHORITY} specialized verifier authority`
@@ -2327,6 +2409,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:analyze:declaration-context',
 				'csaa:semantic:smoke:source-origin-correlation',
 				'csaa:semantic:smoke:module-resolution-trace',
+				'csaa:analyze:arrow-command-census',
 				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
 				'csaa:analyze:module-resolution-trace',
@@ -2511,6 +2594,26 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:module-dependency');
+
+		const missingArrowCommandCensusReportCommand = fixture();
+		write(
+			missingArrowCommandCensusReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:arrow-command-census'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingArrowCommandCensusReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:arrow-command-census');
 
 		const missingCallGraphReportCommand = fixture();
 		write(
@@ -2843,6 +2946,22 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:module-dependency');
 
+		const incompatibleArrowCommandCensusReportCommand = fixture();
+		write(
+			incompatibleArrowCommandCensusReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:arrow-command-census': 'bun scripts/wrong-arrow-command-census.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleArrowCommandCensusReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:arrow-command-census');
+
 		const incompatibleCallGraphReportCommand = fixture();
 		write(
 			incompatibleCallGraphReportCommand,
@@ -2999,6 +3118,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
+						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:state-machine-graph',
 						'csaa:analyze:module-dependency',
@@ -3072,6 +3192,7 @@ describe('JPWB population non-vacuity', () => {
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
+			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
 			...commandDispatchPaths,
@@ -3109,6 +3230,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
+						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
@@ -3181,6 +3303,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
+						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
@@ -3227,6 +3350,7 @@ describe('JPWB population non-vacuity', () => {
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
+			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
 			'packages/csaa/src/graph/build-command-handler-graph.ts',
@@ -3307,6 +3431,7 @@ describe('JPWB population non-vacuity', () => {
 			...PROJECT_CONTEXT_REPORT_PROVENANCE,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
+			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 			...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -3326,6 +3451,17 @@ describe('JPWB population non-vacuity', () => {
 		);
 
 		write(root, missing, 'export {};\n');
+		for (const missingArrowCommandCensusReportPath of ARROW_COMMAND_CENSUS_REPORT_PROVENANCE.filter(
+			(path) => !CALL_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingArrowCommandCensusReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB arrow-command census report facade or verification source is absent: ${missingArrowCommandCensusReportPath}`
+			);
+			write(root, missingArrowCommandCensusReportPath, 'export {};\n');
+		}
 		const missingStateGraph = 'packages/csaa/src/graph/validate-state-machine-graph.ts';
 		rmSync(join(root, ...missingStateGraph.split('/')));
 		expect(() => collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })).toThrow(
@@ -3667,6 +3803,15 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) => command.owner === '.' && command.name === 'csaa:analyze:arrow-command-census'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: ARROW_COMMAND_CENSUS_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) => command.owner === '.' && command.name === 'csaa:analyze:call-graph'
 			)
 		).toMatchObject({
@@ -3750,6 +3895,7 @@ describe('JPWB population non-vacuity', () => {
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
 			])

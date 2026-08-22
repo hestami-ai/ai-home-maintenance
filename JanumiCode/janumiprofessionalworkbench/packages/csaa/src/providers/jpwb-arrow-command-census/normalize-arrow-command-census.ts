@@ -209,7 +209,11 @@ function parseArrowKey(value: string, path: string): ArrowCommandCensusArrowReco
 function commandDeclarationPath(locator: string): string | null {
 	if (/^STEP_COMMAND_SPECS\.[^\s]+$/u.test(locator))
 		return 'packages/rph-domain/src/step-command-spec.ts';
-	if (/^PWU_LIFECYCLE_COMMAND_SPECS\.[^\s]+$/u.test(locator))
+	if (
+		/^(?:PWU_LIFECYCLE_COMMAND_SPECS|PWU_GENERIC_SETTER_SPECS|PWU_RECOVERY_COMMAND_SPECS)\.[^\s]+$/u.test(
+			locator
+		)
+	)
 		return 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts';
 	return null;
 }
@@ -477,13 +481,20 @@ export function normalizeArrowCommandCensusObservation(
 	const declaredMachines = [...new Set(evidence.declaredArrows.map((arrow) => arrow.machine))].sort(
 		compareText
 	);
-	const expectedUnanalysed = declaredMachines.filter(
-		(machine) => !occupiableByMachine.has(machine)
-	);
-	if (!sameStrings(expectedUnanalysed, evidence.deadCovered.unanalysed))
+	const declaredMachineSet = new Set(declaredMachines);
+	const unanalysedMachineSet = new Set(evidence.deadCovered.unanalysed);
+	const uncoveredMachineSet = new Set(uncoveredArrows.map((arrow) => arrow.machine));
+	if (
+		declaredMachines.some(
+			(machine) =>
+				(!occupiableByMachine.has(machine) || uncoveredMachineSet.has(machine)) &&
+				!unanalysedMachineSet.has(machine)
+		) ||
+		evidence.deadCovered.unanalysed.some((machine) => !declaredMachineSet.has(machine))
+	)
 		fail(
 			'$input.evidence.deadCovered.unanalysed',
-			'Unanalysed machines do not reconcile with declared and occupiable populations.'
+			'Unanalysed machines must include declared machines without occupancy or with uncovered arrows and must not name undeclared machines.'
 		);
 	if (evidence.census.orphans.some((machine) => declaredMachines.includes(machine)))
 		fail(

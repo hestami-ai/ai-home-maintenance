@@ -84,7 +84,16 @@ import {
 	READ_WRITE_ACCESS_REPORT_SCHEMA_VERSION,
 	ARROW_COMMAND_CENSUS_OBSERVATION_SCHEMA_VERSION,
 	ARROW_COMMAND_CENSUS_OPERATION_VERSION,
+	ARROW_COMMAND_CENSUS_PROGRESS_MAX_BYTES,
+	ARROW_COMMAND_CENSUS_PROGRESS_MAX_EVENTS,
 	ARROW_COMMAND_CENSUS_PROGRESS_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_ADMISSION_LIMITS,
+	ARROW_COMMAND_CENSUS_REPORT_OPERATION_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_PROGRESS_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_REQUEST_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_RESULT_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_REPORT_SCHEMA_VERSION,
 	DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION,
 	DEPENDENCY_CRUISER_PROVIDER_VERSION,
 	DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION,
@@ -175,6 +184,8 @@ import {
 	readWriteAccessReportExitCode,
 	runReadWriteAccessReport,
 	buildArrowCommandCensusArtifactSet,
+	arrowCommandCensusReportExitCode,
+	runArrowCommandCensusReport,
 	buildModuleDependencyGraph,
 	moduleDependencyReportExitCode,
 	runModuleDependencyReport,
@@ -273,6 +284,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('admitProjectContextReportRequest');
 		expect(publicSurface).not.toHaveProperty('captureProjectContextReportPipeline');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
+		expect(runArrowCommandCensusReport).toBeTypeOf('function');
+		expect(arrowCommandCensusReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createArrowCommandCensusProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runArrowCommandCensusCommand');
+		expect(publicSurface).not.toHaveProperty('admitArrowCommandCensusReportRequest');
+		expect(publicSurface).not.toHaveProperty('runArrowCommandCensusReportWithDependencies');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
 		expect(runModuleDependencyReport).toBeTypeOf('function');
 		expect(moduleDependencyReportExitCode).toBeTypeOf('function');
@@ -544,6 +561,30 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(ARROW_COMMAND_CENSUS_PROGRESS_SCHEMA_VERSION).toBe(
 			'jan-csaa-arrow-command-census-progress/1.0.0'
 		);
+		expect(ARROW_COMMAND_CENSUS_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-arrow-command-census/0.1.0'
+		);
+		expect(ARROW_COMMAND_CENSUS_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-arrow-command-census-report-request/0.1.0'
+		);
+		expect(ARROW_COMMAND_CENSUS_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-arrow-command-census-report-result/0.1.0'
+		);
+		expect(ARROW_COMMAND_CENSUS_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-arrow-command-census-report/0.1.0'
+		);
+		expect(ARROW_COMMAND_CENSUS_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-arrow-command-census-report-progress/0.1.0'
+		);
+		expect(ARROW_COMMAND_CENSUS_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-arrow-command-census-progress-transport/0.1.0'
+		);
+		expect(ARROW_COMMAND_CENSUS_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(ARROW_COMMAND_CENSUS_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(ARROW_COMMAND_CENSUS_REPORT_ADMISSION_LIMITS).toEqual({
+			maxDiagnosticPathCharacters: 10_000,
+			maxProjectPathCharacters: 4_096
+		});
 		expect(GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION).toBe(
 			'jan-csaa-observe-jpwb-guard-enforcement-ledger/0.1.0'
 		);

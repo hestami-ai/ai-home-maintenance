@@ -178,7 +178,7 @@ function evidence(): ArrowCommandCensusRawOutput {
 			dead: ['Machine.status  C -> B'],
 			orphans: ['Orphan.status'],
 			total: 3,
-			unanalysed: ['ExecutionStep.stepState'],
+			unanalysed: ['ExecutionStep.stepState', 'Machine.status'],
 			uncovered: ['Machine.status  D -> E']
 		},
 		births: [{ machine: 'Machine.status', states: ['A'] }],
@@ -189,7 +189,7 @@ function evidence(): ArrowCommandCensusRawOutput {
 		},
 		deadCovered: {
 			dead: ['Machine.status  C -> B'],
-			unanalysed: ['ExecutionStep.stepState']
+			unanalysed: ['ExecutionStep.stepState', 'Machine.status']
 		},
 		declaredArrows: [
 			{ from: 'A', machine: 'Machine.status', site: 'handler.ts:7', to: 'B' },
@@ -259,6 +259,22 @@ describe('normalizeArrowCommandCensusObservation', () => {
 		expect(result.observation.coverage.reconciles).toBe(true);
 	});
 
+	it('preserves retained unanalysed machines that have occupancy but incomplete arrow coverage', () => {
+		const set = artifactSet();
+		const result = normalizeArrowCommandCensusObservation({
+			artifactSet: set,
+			evidence: evidence(),
+			executor: executor(),
+			request: request(set)
+		});
+
+		expect(result.observation.census.unanalysedMachines).toEqual([
+			'ExecutionStep.stepState',
+			'Machine.status'
+		]);
+		expect(result.observation.coverage.reconciles).toBe(true);
+	});
+
 	it('rejects malformed retained arrow keys and impossible denominators', () => {
 		const set = artifactSet();
 		const raw = evidence();
@@ -300,6 +316,12 @@ describe('normalizeArrowCommandCensusObservation', () => {
 			},
 			(value) => {
 				value.deadCovered.unanalysed = ['Other.status'];
+			},
+			(value) => {
+				value.deadCovered.unanalysed = ['ExecutionStep.stepState'];
+			},
+			(value) => {
+				value.deadCovered.unanalysed = ['Machine.status'];
 			},
 			(value) => {
 				value.census.orphans = ['Machine.status'];
@@ -480,24 +502,62 @@ describe('normalizeArrowCommandCensusObservation', () => {
 				request: request(set)
 			})
 		).toThrow(ArrowCommandCensusNormalizationError);
-		const missingTableBinding = structuredClone(evidence()) as unknown as Record<string, any>;
-		missingTableBinding.declaredArrows[0] = {
-			...missingTableBinding.declaredArrows[0]!,
-			site: 'PWU_LIFECYCLE_COMMAND_SPECS.Advance'
-		};
+		for (const site of [
+			'PWU_GENERIC_SETTER_SPECS.PLANNED',
+			'PWU_RECOVERY_COMMAND_SPECS.UnblockPwu'
+		]) {
+			const symbolic = structuredClone(evidence()) as unknown as Record<string, any>;
+			symbolic.declaredArrows[0] = { ...symbolic.declaredArrows[0]!, site };
+			const observation = normalizeArrowCommandCensusObservation({
+				artifactSet: set,
+				evidence: symbolic as ArrowCommandCensusRawOutput,
+				executor: executor(),
+				request: request(set)
+			}).observation;
+			expect(
+				observation.declaredSites.find((candidate) => candidate.source.locator === site)?.source
+			).toEqual({ line: null, locator: site, path: null });
+		}
+		for (const site of [
+			'PWU_GENERIC_SETTER_SPECS.',
+			'PWU_GENERIC_SETTER_SPECS.PLANNED extra',
+			'PWU_RECOVERY_COMMAND_SPECS.'
+		]) {
+			const malformed = structuredClone(evidence()) as unknown as Record<string, any>;
+			malformed.declaredArrows[0] = { ...malformed.declaredArrows[0]!, site };
+			expect(() =>
+				normalizeArrowCommandCensusObservation({
+					artifactSet: set,
+					evidence: malformed as ArrowCommandCensusRawOutput,
+					executor: executor(),
+					request: request(set)
+				})
+			).toThrow(ArrowCommandCensusNormalizationError);
+		}
 		const setWithoutPwuBinding = structuredClone(set) as unknown as Record<string, any>;
 		setWithoutPwuBinding.artifacts = setWithoutPwuBinding.artifacts.filter(
 			(artifact: { readonly path: string }) =>
 				artifact.path !== 'packages/rph-domain/src/pwu-lifecycle-command-spec.ts'
 		);
-		expect(() =>
-			normalizeArrowCommandCensusObservation({
-				artifactSet: setWithoutPwuBinding as ArrowCommandCensusArtifactSetBinding,
-				evidence: missingTableBinding as ArrowCommandCensusRawOutput,
-				executor: executor(),
-				request: { ...request(set), artifactSetId: setWithoutPwuBinding.id }
-			})
-		).toThrow(ArrowCommandCensusNormalizationError);
+		for (const site of [
+			'PWU_LIFECYCLE_COMMAND_SPECS.Advance',
+			'PWU_GENERIC_SETTER_SPECS.PLANNED',
+			'PWU_RECOVERY_COMMAND_SPECS.UnblockPwu'
+		]) {
+			const missingTableBinding = structuredClone(evidence()) as unknown as Record<string, any>;
+			missingTableBinding.declaredArrows[0] = {
+				...missingTableBinding.declaredArrows[0]!,
+				site
+			};
+			expect(() =>
+				normalizeArrowCommandCensusObservation({
+					artifactSet: setWithoutPwuBinding as ArrowCommandCensusArtifactSetBinding,
+					evidence: missingTableBinding as ArrowCommandCensusRawOutput,
+					executor: executor(),
+					request: { ...request(set), artifactSetId: setWithoutPwuBinding.id }
+				})
+			).toThrow(ArrowCommandCensusNormalizationError);
+		}
 	});
 
 	it('validates the canonical projection and fails closed on mutations and hostile containers', () => {

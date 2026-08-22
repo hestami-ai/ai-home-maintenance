@@ -391,7 +391,7 @@ export const ARROW_COMMAND_CENSUS_LIMITATIONS = [
 	{
 		code: 'BIRTH_DECLARATIONS_PARTIAL',
 		reason:
-			'Dead-covered analysis is supported only for machines with retained-verifier-readable birth declarations; every other covered machine remains explicitly unanalysed.'
+			'Dead-covered occupancy analysis requires retained-verifier-readable birth declarations and complete retained arrow coverage; machines missing either basis remain explicitly unanalysed, although separate topology proofs can still identify dead arrows.'
 	},
 	{
 		code: 'DECLARED_NOT_RUNTIME_PERFORMABILITY',
