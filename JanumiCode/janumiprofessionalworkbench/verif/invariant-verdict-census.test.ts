@@ -128,6 +128,42 @@ describe('W-3b — the invariant enforcement census', () => {
 		).toBe(137);
 	});
 
+	// ── ⚠ THE HOLE INSIDE THE HOLE, AND IT WAS DUG BY THIS PROGRAMME'S OWN TOOLING ──────────────────────────
+	// The count above is honest and still hides something. 21 invariants have never been touched and hold 114
+	// limbs — but 137 limbs are unverdicted. The missing 23 belong to SEVEN invariants that are scored IN PART:
+	// V-0's trial took the limbs it found interesting and left the rest, and every per-invariant view since has
+	// reported those seven as done.
+	//
+	// ⚠ INCLUDING THE DRIVE QUEUE THAT SELECTED EVERY V-1 SLICE. Its "already verdicted" set was built as
+	// `limb_id.split(':')[1]` — the INVARIANT segment of `limb:DEC-6:6` — so a single scored limb retired all of
+	// its siblings from the queue. **The unit of this audit is a LIMB, and the instrument that chose its work was
+	// keyed by INVARIANT.** That is §2's founding finding — the reason the row is a limb at all — reappearing one
+	// level up, inside the tooling written to honour it. STA-4 is the exact invariant §2 uses to argue the limb
+	// unit (limb 8 ENFORCED, limb 1 UNENFORCED), and STA-4 is on this list with FIVE limbs unscored.
+	//
+	// Pinned as a LIST rather than a count so the debt is nameable and shrinks visibly.
+	it('invariants scored only IN PART are named, not averaged away', () => {
+		const scored = new Set(verdicts.map((v) => String(v.limb_id)));
+		const byInvariant = new Map<string, string[]>();
+		for (const l of limbs) {
+			const inv = String(l.invariant);
+			byInvariant.set(inv, [...(byInvariant.get(inv) ?? []), String(l.id)]);
+		}
+		const partial: string[] = [];
+		let orphanedLimbs = 0;
+		for (const [inv, ids] of byInvariant) {
+			const hit = ids.filter((id) => scored.has(id)).length;
+			if (hit > 0 && hit < ids.length) {
+				partial.push(inv);
+				orphanedLimbs += ids.length - hit;
+			}
+		}
+		expect(partial.sort(), 'invariants with some limbs scored and some not').toEqual(
+			['ASR-14', 'ASR-15', 'ASR-3', 'DEC-6', 'OBJ-1', 'PER-7', 'STA-4'].sort()
+		);
+		expect(orphanedLimbs, 'limbs a per-invariant view reports as done').toBe(23);
+	});
+
 	it('every verdict names a limb that exists, exactly once', () => {
 		const known = new Set(limbs.map((l) => String(l.id)));
 		expect(verdicts.map((v) => String(v.limb_id)).filter((id) => !known.has(id))).toEqual([]);
