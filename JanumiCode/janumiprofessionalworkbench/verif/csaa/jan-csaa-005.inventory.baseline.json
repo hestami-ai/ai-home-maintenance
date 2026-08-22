@@ -5693,7 +5693,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "553a4d71b40e9faa001f66a0156a1a0e55134c5762456de6be664a36ed64eaaa",
+    "fileManifestDigest": "f61451af5bbabc4abd6e58ddb5be24d8116f1ea4be9dc1654e7256609b39e57f",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10800,9 +10800,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 326104,
+        "bytes": 337095,
         "path": "packages/rph-domain/src/enforcement-register.ts",
-        "sha256": "ce6e20883c1272a34bd405a1550a72afdc0d41af52f807765ef8b12e7f910147",
+        "sha256": "684146a537f997c1e23a32f5c91529e8088b81f64b67b318dd20f5aeeb962253",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12347,9 +12347,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 35250,
+        "bytes": 38963,
         "path": "verif/invariant-verdict-census.test.ts",
-        "sha256": "b569e8ea7a25b9b9d90eb9b6b35615ed53e7ef4df9923b2cd02a276975a0da37",
+        "sha256": "53a038b8f21024466eb996efa9f566c562271d3074aff33bb19d09d6ace7f02b",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12542,7 +12542,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "12fdd42d713198dcd4c9753d3b1a11f2d22db533eddabd9b57ea27c082524377",
+    "subjectId": "fa2bb918079895f8106747be237885a6eead8b6726d33992f18f8e1ff3d5741b",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -15617,7 +15617,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/invariant-verdict-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "b569e8ea7a25b9b9d90eb9b6b35615ed53e7ef4df9923b2cd02a276975a0da37",
+      "contentSha256": "53a038b8f21024466eb996efa9f566c562271d3074aff33bb19d09d6ace7f02b",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

@@ -1021,14 +1021,50 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §7. Note this anchor and RPH-EVD-005\'s resolve to the SAME LINE of the same artifact — one canon sentence carrying two ratified rules — and the two anchors are distinct substrings of it, so neither claim is satisfied by the other\'s text.'
 		},
 		why:
-			'What the rule forbids is a SILENT DISCARD, and no command\'s acceptance discards contradicting evidence, ' +
-			'so there is nothing a dispatch could be arranged to refuse. The one real tension is that `AssertClaim` ' +
-			'carries the subject noun `contradictingEvidenceIds` on its payload — but it routes through `createObject` ' +
-			'with `expectedRevision: undefined`, which the storage adapter turns into a no-op for an existing ' +
-			'aggregate, so a re-assertion cannot overwrite a claim\'s evidence links either. The rule is satisfied by ' +
-			'the absence of any curating command rather than by a guard, and there is no arrangement that would ' +
-			'demonstrate otherwise — which is what separates this from the three disclosures above, each of which is ' +
-			'backed by an observed admission.'
+			'⚠ THE WHOLE ARGUMENT BELOW IS STRUCK, CORRECTED 2026-08-22 BY A DRIVEN REFUTATION. It is quoted ' +
+			'rather than deleted because a row certifying a FALSE ABSENCE is worse than silence — a reader who ' +
+			'trusts it stops looking — so the sentence that did that here stays legible. AS WRITTEN: ~~"What the ' +
+			'rule forbids is a SILENT DISCARD, and no command\'s acceptance discards contradicting evidence, so ' +
+			'there is nothing a dispatch could be arranged to refuse. The one real tension is that `AssertClaim` ' +
+			'carries the subject noun `contradictingEvidenceIds` on its payload — but it routes through ' +
+			'`createObject` with `expectedRevision: undefined`, which the storage adapter turns into a no-op for ' +
+			'an existing aggregate, so a re-assertion cannot overwrite a claim\'s evidence links either. The rule ' +
+			'is satisfied by the absence of any curating command rather than by a guard, and there is no ' +
+			'arrangement that would demonstrate otherwise — which is what separates this from the three ' +
+			'disclosures above, each of which is backed by an observed admission."~~ ' +
+			'THE ARRANGEMENT EXISTS AND IT IS `RecordClaimAssessment`, WHICH DID NOT YET EXIST WHEN THIS ROW WAS ' +
+			'WRITTEN: this row landed in aa6843fd (2026-08-01) and both the command\'s registration and the ' +
+			'curating write landed in b40220bd (2026-08-06) — the same commit that re-dispositioned RPH-EVD-002, ' +
+			'whose ground the identical handler had just expired (REG-F-133). Two rows of one family, killed by ' +
+			'one commit, and only the neighbour noticed. THE MECHANISM: `recordClaimAssessment`\'s `mutate` ' +
+			'(packages/rph-application/src/handlers/assurance.ts:892-894) writes `contradictingEvidenceIds: ' +
+			'p.contradictingEvidenceIds` whenever the payload carries a NON-EMPTY list — a wholesale REPLACEMENT ' +
+			'of the claim\'s contradicting links, not a union — and that arm is unscoped by target status, so it ' +
+			'fires on the hop INTO SUPPORTED. DRIVEN THROUGH `Engine.dispatch`: a claim carrying one ADMISSIBLE ' +
+			'supporting item and one ADMISSIBLE contradicting item EVBAD; `RecordClaimAssessment{targetStatus: ' +
+			'\'SUPPORTED\', contradictingEvidenceIds: [EVOTHER]}` ACCEPTED; the claim then reads status ' +
+			'SUPPORTED, `contradictingEvidenceIds: [EVOTHER]`, and EVBAD appears NOWHERE in the claim aggregate ' +
+			'— not in state, and not in any of its three events, because `ClaimAsserted` carries no ' +
+			'contradicting field and `ClaimSupported` carries only the supporting one. A silent discard, ' +
+			'performed by an accepted command, ending in support. THE CONTROL IS THE SAME COMMAND: the ' +
+			'byte-identical dispatch with `contradictingEvidenceIds` OMITTED is also ACCEPTED, also reaches ' +
+			'SUPPORTED, and leaves EVBAD attached — so the discard is attributable to that one optional field, ' +
+			'not to the status hop and not to a replace-on-every-write. A second control closes the other ' +
+			'reading: supplying `[EVBAD, EVOTHER]` keeps BOTH. THE SUBSIDIARY MECHANISM WAS ALSO WRONG, in the ' +
+			'direction that happens to be safe (REG-F-141\'s shape — a conclusion that survives its argument): a ' +
+			're-issued `AssertClaim` is REFUSED, `CONFLICT` / `RPH_REVISION_CONFLICT` / "Revision conflict on ' +
+			'<claimId> (actual revision 2)", not silently no-opped, and the claim\'s links are unchanged. ' +
+			'WHAT SURVIVES OF THE ORIGINAL, so this is not read wider than it is: no DELETION verb exists — ' +
+			'`DeleteEvidence`, `RemoveContradictingEvidence`, `DetachEvidence` and `WithdrawEvidence` are each ' +
+			'"Unknown command type" against the live registry — and the Evidence object itself survives the ' +
+			'discard ADMISSIBLE, still naming the claim in `contradictsClaimIds`. The curation is by FIELD ' +
+			'REPLACEMENT on the CLAIM, which is precisely what a census of curating COMMANDS cannot see; that is ' +
+			'how the original argument reached the wrong answer honestly. THE ARM IS NOW OWED A MOVE to ' +
+			'UNENFORCED_DISCLOSED with an OBSERVED_ADMISSION guard — the arrangement and the control above are ' +
+			'that guard\'s two fields already. It is NOT taken in this edit, in RPH-EVD-002\'s own order ' +
+			'(correction first, move second): the probe map in `disclosure-observed.test.ts` is TOTAL over the ' +
+			'OBSERVED_ADMISSION rows, so flipping the kind without landing the observation there turns this ' +
+			'register\'s own gate red.'
 	},
 	'RPH-EVD-007': {
 		kind: 'ENFORCED',
@@ -1352,7 +1388,31 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'All three consequents are outcomes of accepted commands, not refusals. "Both remain visible" is a ' +
 			'property of the event log and the projections over it — nothing curates an assessment away, because no ' +
 			'command exists that could. "The aggregate becomes contested/inconclusive/escalated" is a derived ' +
-			'disposition, computed by `aggregateDisposition` in the kernel and surfaced by the assurance view. And ' +
+			'disposition FOR EXACTLY ONE OF THE THREE. ~~computed by `aggregateDisposition` in the kernel and ' +
+			'surfaced by the assurance view~~ — CORRECTED 2026-08-22 (W-3b census, limb:ASR-10:3), struck rather ' +
+			'than deleted: that clause was written of all three consequents and holds for INCONCLUSIVE alone. ⚠ EACH ' +
+			'WAS DRIVEN SEPARATELY, WITH THE ACCEPTED ONE AS THE CONTROL. INCONCLUSIVE — TRUE AS WRITTEN: ' +
+			'CompleteAssuranceAssessment recommending INCONCLUSIVE is ACCEPTED, and `buildApplicablePolicies` + ' +
+			'`aggregateDispositionFor` over that subject then report aggregate INCONCLUSIVE — derived by the kernel, ' +
+			'surfaced by the view, exactly as the struck clause says. ESCALATED — NEITHER: it belongs to neither ' +
+			'aggregate range (`AggregateAssuranceDispositionSchema`, six values; ' +
+			'`AssuranceViewAggregateDispositionSchema`, nine), and `aggregate-assurance.ts:75` maps it AWAY — ' +
+			'`ESCALATED_MAPS_TO = INCONCLUSIVE` — so an escalated constituent yields an INCONCLUSIVE aggregate BY ' +
+			'DESIGN. Driving Gate D (`escalateOnOpenObservation`) to a genuinely ESCALATED assessment left the PWU at ' +
+			'UNASSESSED and the view reporting EVIDENCE_REQUIRED, because `applyAssuranceEvent` carries no ' +
+			'`AssuranceAssessmentEscalated` case and folds that policy as disposition-absent. ESCALATED does exist on ' +
+			'the PWU assurance axis, but only as an ACT: ChangePwuState assuranceState=ESCALATED is refused ' +
+			'RPH_EVIDENCE_MISSING until it CITES the escalated assessment. CONTESTED — NEITHER DERIVED NOR ' +
+			'PERFORMABLE: it is a member of no assurance enum, living in this system only as a ClaimStatus ' +
+			'(enums.ts:207) — a different aggregate over a different subject — and both ChangePwuState ' +
+			'assuranceState=CONTESTED and CompleteAssuranceAssessment recommending CONTESTED are refused ' +
+			'RPH_VALIDATION_SCHEMA_FAILED. An exhaustive sweep of BOTH aggregation kernels — `aggregateDisposition` ' +
+			'(rph-assurance) and `aggregateAssuranceDisposition` (rph-domain, the one the view actually calls) — over ' +
+			'every ratified assessment disposition returns a range of exactly six values, containing neither ' +
+			'CONTESTED nor ESCALATED. TWO OF THE THREE CONSEQUENTS ARE UNDERIVABLE, NOT MERELY UNDERIVED, so this ' +
+			'sentence must not be read as disposing of them, and the instrument named at the end of this row cannot ' +
+			'hold them either: a property test cannot assert an outcome outside its function\'s own return type. ' +
+			'Closing that half needs a contract change, and it is owed a REG-F finding of its own. And ' +
 			'"results are not averaged silently" forbids an IMPLEMENTATION TECHNIQUE rather than a command: there is ' +
 			'no dispatch whose acceptance would constitute averaging, so there is no arrangement a probe could make. ' +
 			'The rule is a constraint on how the aggregate is DERIVED, and the instrument that can hold it is a ' +
@@ -1662,7 +1722,34 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor:
-				'required inputs, expected outputs, at least one completion claim or verification criterion',
+				// ⚠ ANCHOR NARROWED 2026-08-22 (W-3b invariant census, limb STA-5:4), recorded beside the original
+				// rather than quietly rewritten. It read 'required inputs, expected outputs, at least one completion
+				// claim or verification criterion' — THREE of the four requirements STA-5's last limb names — while
+				// the `refusalMarker` below pins ONE of them. DRIVEN through Engine.dispatch, one site, one fixture
+				// family: expectedOutputs [] -> REJECTED | RPH_VALIDATION_SEMANTIC_FAILED | "MarkPwuReady: PWU … does
+				// not satisfy the shape readiness contract (DOC-002 §9): expected output (DOC-002 §9.1)", left at
+				// SHAPING. THE CONTROL — the identical fixture with one expected output, at CRITICAL risk — is
+				// ACCEPTED and reaches READY with `inputRequirements` [] and `verificationCriterionIds` [] read off
+				// the store, so "required inputs" and "at least one completion claim or verification criterion" are
+				// ADMITTED at the very site this row cites. Neither is something `checkPwuShapeReadiness` merely
+				// forgot: both fields are hardcoded [] by `proposePwu`, `ProposePwuPayloadSchema` is a strictObject
+				// that refuses to carry either (VALIDATION_FAILED when they are supplied), and pwuGuards.ts WITHHOLDS
+				// the completion limb by name. Nor does the surviving limb reach them sideways — expectedOutputs
+				// [{}], one empty OutputDefinition, is ACCEPTED to READY, so that limb is a cardinality check and
+				// nothing more. THE KIND IS UNCHANGED AND CORRECT: the refusal is real and it discriminates — the
+				// same fixture with inScope [] refuses with "in-scope statement (DOC-002 §9.1)", a different marker
+				// tail. What was wrong was the BREADTH OF THE QUOTATION: an ENFORCED row quoting three requirements
+				// is read as three enforced, which is REG-F-043's shape one layer out — an honest artifact read as
+				// enforcement because nothing beside it said how far it went.
+				// THE DISCLOSED COST OF THE NARROWING, stated here rather than discovered later: 'expected outputs'
+				// is two words and also occurs in JPWB-DOC-001 §7.2's delegation-envelope sentence and in DOC-003's
+				// own PWU glossary row, so the carriage gate no longer reddens if STA-5 alone loses the clause. That
+				// is a weaker gate honestly aimed, not a stronger one aimed at text this row does not enforce.
+				// STILL OWED AND NOT CLAIMED HERE: an OBSERVED_ADMISSION disclosure carrying the admitted
+				// arrangement above for "required inputs" and for the assurance half of "the applicable risk/
+				// assurance profile" — which the anchor never quoted, and which RPH-PWU-007 already records as
+				// written and read by nothing.
+				'expected outputs',
 			note: 'JPWB-DOC-003 §5 STA-5 (readiness is a substantive shape gate) enumerates the admission requirements this rule names, including the expected-outputs limb the marker pins.'
 		},
 		enforcedAt:
@@ -2759,9 +2846,29 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'decomposition.ts:439, which mentions it inside a REJECTION STRING saying the opposite of what this row ' +
 			'claimed. A delta investigation nearly overturned a correct finding by trusting this sentence. ' +
 			'Contrast `validateLinkDirectionality` and `TRACE_DIRECTIONALITY` in the ' +
-			'same kernel module, whose only reference is their own definition file — correct, unit-tested link ' +
-			'machinery that nothing asks. That dead pair is deliberately NOT filed as this row\'s guard: it ' +
-			'implements link DIRECTIONALITY, which no ratified RPH-TRC rule states, and attaching a dead predicate ' +
+			'same kernel module. ⚠ CORRECTED 2026-08-22 (W-3b invariant census, limb:REL-1:1; the REG-F entry is ' +
+			'owed and deliberately left unnumbered here): this row previously read "whose only reference is their ' +
+			'own definition file — correct, unit-tested link machinery that nothing asks", and called them a dead ' +
+			'pair. THE REFERENCE CENSUS WAS RIGHT AND THE INFERENCE DRAWN FROM IT WAS WRONG — true of the ' +
+			'IDENTIFIER, false of the CALL. `TraceGraph.addLink` (traceability.ts:151) calls ' +
+			'`validateLinkDirectionality` from inside that same file, and `addLink` has a production caller: ' +
+			'`supportsGraph` (packages/rph-application/src/handlers/assurance.ts:585) calls it at :598, and ' +
+			'`invalidateEvidence` calls `supportsGraph` at :643. MEASURED RATHER THAN READ, since a reference ' +
+			'census is exactly what missed it: under NODE_V8_COVERAGE a CaptureIntent -> ProposePwu -> AssertClaim ' +
+			'-> ProposeEvidence -> AdmitEvidence -> InvalidateEvidence dispatch scores `validateLinkDirectionality` ' +
+			'1 and `addLink` 1, while `impactedObjects`, `findPath`, `incoming` and `getNode` score 0 in the SAME ' +
+			'file in the SAME run, and the identical script with only the InvalidateEvidence dispatch removed scores ' +
+			'`validateLinkDirectionality` 0. The pair is LIVE, on every InvalidateEvidence. LIVE IS NOT THE SAME AS ' +
+			'LOAD-BEARING, which is the honest version of the original point: the sole production caller passes the ' +
+			'literal `relation: \'SUPPORTS\'` with literal endpoint types EVIDENCE/CLAIM, so no wire value picks ' +
+			'the relation. It is still not unreachable — two ProposeEvidence dispatches, the second naming its OWN ' +
+			'evidence id in `supportsClaimIds`, were both ACCEPTED, and a later InvalidateEvidence against the ' +
+			'FIRST, well-formed evidence THREW `Invalid trace link: SUPPORTS source must be one of ' +
+			'EVIDENCE|ASSURANCE_ASSESSMENT, got CLAIM` out of `dispatch` instead of returning a rejection. That is a ' +
+			'defect at `supportsGraph`, not at this predicate, and it is recorded here because this row is where a ' +
+			'reader who trusted "nothing asks" would have stopped looking. WHAT THE CORRECTION DOES NOT CHANGE: the ' +
+			'pair is still deliberately NOT filed as this row\'s guard, because it implements link DIRECTIONALITY, ' +
+			'which no ratified RPH-TRC rule states, and attaching a predicate ' +
 			'to a rule it does not implement is the substitution this register exists to prevent.'
 	},
 	'RPH-CMP-001': {

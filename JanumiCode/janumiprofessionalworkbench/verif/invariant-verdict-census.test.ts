@@ -379,6 +379,63 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(78);
 	});
 
+	// ── ⚠ GATE THE PROVENANCE, BECAUSE THE PROSE CANNOT BE GATED ───────────────────────────────────────────
+	// `superseded_verdict` makes staleness VISIBLE. It does not make it RECONCILED — and `owed` is the field a
+	// filing pass actually drafts from. A survey of all 55 DIVERGENT_UNFILED rows found FOURTEEN whose `owed`
+	// describes a remedy for an arm the row no longer holds. A regex over denial-phrasings found seven of them.
+	//
+	// ⚠ AND NO CONTENT CHECK CAN FIND THE REST — that was established, not assumed. The decisive pair:
+	// `limb:REL-1:11`'s owed says the divergence "is filed once, there" (DEFECTIVE — it is not) against
+	// `limb:LYR-2:1`'s "THAT FILING IS ALREADY OWED BY limb:PER-6:3" (CORRECT). Identical shape, one word apart,
+	// opposite verdicts — and the polarity is decidable only by reading a DIFFERENT ROW. Any denial-scan must
+	// also swallow "nothing anywhere records it", which is the arm's own assertion in five CORRECT rows. Four of
+	// the fourteen are grammatically indistinguishable from a correct `owed`; `REL-1:12`'s names a REG-F entry,
+	// the canon document, the invariant, the limb, the conjunct and two file:line sites, and is defective only
+	// because the site it names is not the site the refuter drove.
+	//
+	// So this gate never reads the prose. It records the arm each `owed` was authored FOR and asks whether anyone
+	// re-authored the field after the arm moved. That is complete BY CONSTRUCTION rather than by pattern.
+	it('every row records the arm its `owed` was authored for', () => {
+		const missing = verdicts.filter((v) => !v.owed_for_verdict).map((v) => String(v.limb_id));
+		expect(missing, 'fail closed: a row with no provenance is unreconciled, not exempt').toEqual([]);
+		const bad = verdicts
+			.filter((v) => !(ARMS as readonly string[]).includes(String(v.owed_for_verdict)))
+			.map((v) => String(v.limb_id));
+		expect(bad).toEqual([]);
+	});
+
+	// ⚠ THIS NUMBER IS A DEBT AND IT MUST REACH ZERO, alongside `DIVERGENT_UNFILED`. It is pinned rather than
+	// asserted-away because 66 rows genuinely have not been re-read since their arm moved, and a gate that
+	// demanded zero today would be satisfied by stamping the field rather than by doing the work — the exact
+	// failure REG-F-043 records. It can only move DOWN without this reddening.
+	it('the unreconciled-owed debt is counted, not hidden', () => {
+		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(66);
+		expect(
+			stale.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED').length,
+			'the subset that blocks V-4: these rows owe a filing and describe the wrong one'
+		).toBe(22);
+	});
+
+	// The one part of the class that IS mechanically decidable, and it is decidable from the LADDER rather than
+	// from wording: an `owed` written to accompany an ENFORCED_* verdict cannot state the filing owed by a live
+	// divergence, because the two arms are mutually exclusive. Named individually so the list shrinks visibly.
+	it('a live divergence whose owed was written for an ENFORCED arm is named', () => {
+		const ENFORCED = new Set([
+			'ENFORCED_BY_CONSTRUCTION',
+			'ENFORCED_DRIVEN',
+			'ENFORCED_MULTI_SITE',
+			'ENFORCED_AT_SURFACE_ONLY'
+		]);
+		const bad = verdicts
+			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED')
+			.filter((v) => ENFORCED.has(String(v.owed_for_verdict)))
+			.map((v) => String(v.limb_id));
+		expect(bad.sort()).toEqual(
+			['limb:ASR-10:5', 'limb:ASR-8:3', 'limb:REL-1:11', 'limb:REL-1:12'].sort()
+		);
+	});
+
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
 	// DIVERGENT_UNFILED means NOTHING RECORDS THIS. Seven rows on that arm carried `filed_as` anyway — and the
 	// content was good every time: each named a filing that EXISTS and does NOT cover this limb. That near miss is
