@@ -121,11 +121,11 @@ describe('W-3b — the invariant enforcement census', () => {
 	// someone lands evidence — and it can never move DOWN without this reddening.
 	it('the verdicted count is pinned, so the hole cannot quietly change size', () => {
 		const verdicted = new Set(verdicts.map((v) => String(v.limb_id)));
-		expect(verdicted.size, 'limbs carrying a verdict').toBe(126);
+		expect(verdicted.size, 'limbs carrying a verdict').toBe(170);
 		expect(
 			307 - verdicted.size,
 			'limbs still unverdicted — this is the OPEN half of W-3b and it is meant to be large'
-		).toBe(181);
+		).toBe(137);
 	});
 
 	it('every verdict names a limb that exists, exactly once', () => {
@@ -151,14 +151,15 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 18,
-			ENFORCED_BY_CONSTRUCTION: 17,
-			ENFORCED_MULTI_SITE: 5,
-			PARTIAL_DIVERGENT_FILED: 33,
-			DIVERGENT_UNFILED: 17,
-			UNENFORCED_OBSERVED_ADMISSION: 27,
+			ENFORCED_DRIVEN: 21,
+			ENFORCED_BY_CONSTRUCTION: 29,
+			ENFORCED_MULTI_SITE: 7,
+			ENFORCED_AT_SURFACE_ONLY: 1,
+			PARTIAL_DIVERGENT_FILED: 39,
+			DIVERGENT_UNFILED: 30,
+			UNENFORCED_OBSERVED_ADMISSION: 31,
 			UNENFORCED_DEAD_PREDICATE: 3,
-			UNENFORCED_NO_SHAPE: 6
+			UNENFORCED_NO_SHAPE: 9
 		});
 	});
 
@@ -211,9 +212,12 @@ describe('W-3b — the invariant enforcement census', () => {
 		// asserting it — transitions.data.ts declares the COMPOSABLE→SATISFIED arrow under the guard text
 		// "a recomposed result requires an explicit assessment (§14.1)", and `acceptRecomposition` is the only
 		// handler that performs that arrow.
-		// ⚠ THE LIST IS EMPTY AND THAT IS A RESULT, NOT AN ABSENCE OF CHECKING. It reddens the moment a driven
-		// verdict lands without a resolving anchor, which is how both entries got here in the first place.
-		expect(owing).toEqual([]);
+		// ⚠ AND IT REFILLED ON THE VERY NEXT SLICE, WHICH IS THE ONLY PROOF THIS PIN IS ALIVE. It went to empty
+		// when both original debts were paid, then `limb:PER-10:3` arrived owing one: its refuter reproduced the
+		// drive exactly — the same five commands run twice in one store, changing ONLY the credential, with
+		// AGENT PublishPwa REJECTED where HUMAN reached PUBLISHED — and still challenged the citation. A debt
+		// list that only ever shrinks is a list nobody is feeding.
+		expect(owing).toEqual(['limb:PER-10:3']);
 	});
 
 	it('every ENFORCED_DRIVEN anchor that EXISTS resolves EXACTLY ONCE in the file it cites', () => {
@@ -251,7 +255,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(17);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(30);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -312,7 +316,7 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(15);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(25);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -328,7 +332,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(8);
+		).toBe(12);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -348,11 +352,23 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(r.limb_id)}: a surface-only claim is only meaningful if the engine was shown to accept`
 			).toContain('ACCEPTED');
 		}
-		// ⚠ ZERO TODAY, AND THE ZERO IS A RESULT RATHER THAN AN ABSENCE. The trial filed ASR-15:9 under this arm;
-		// a refuter overturned it, because the cited route action gates ProposeDecision — which mints a PROPOSED
-		// decision — while limb 9 speaks of an APPROVAL, which in this engine requires status EFFECTIVE. The arm
-		// stays declared because the SHAPE is real and was measured; nothing currently occupies it.
-		expect(rows.length).toBe(0);
+		// ⚠ THE ARM WAS EMPTY FOR FIVE SLICES AND NOW HAS EXACTLY ONE OCCUPANT, WHICH IS THE VINDICATION OF
+		// DECLARING IT. The trial filed ASR-15:9 here; a refuter overturned it, because the cited route action
+		// gates ProposeDecision — which mints a PROPOSED decision — while limb 9 speaks of an APPROVAL, which in
+		// this engine requires status EFFECTIVE. So the arm sat at zero, held open only by the argument that the
+		// SHAPE was real. `limb:PER-12:5` is the shape, and it is the worst possible subject to find it on.
+		//
+		// PER-12 is SPONSOR-RULED (REG-D-015). Limb 5 says a model's reasoning trace in an evaluator's context IS
+		// a hidden-context independence violation. DRIVEN: the CoT trace was submitted as evidence, the assessment
+		// was begun and completed with that trace in `evidenceConsidered`, all ACCEPTED, terminal state SATISFIED
+		// — and NO AssuranceIndependenceViolated event was emitted. The engine does not treat it as a violation.
+		// The only thing that keeps a reasoning trace away from a reviewer is `narrationOf` at
+		// apps/rph-demo/src/lib/server/agent/transcript.ts:36, filtering to role === 'AGENT' && kind === 'message'
+		// so a `thinking` entry cannot reach the evaluator — real, lock-tested, and entirely above the seam.
+		//
+		// Had this arm not existed, the row would have scored ENFORCED on a genuine, cited, tested fix, and a
+		// sponsor ruling would have been reported as held by a filter the engine has never heard of.
+		expect(rows.length).toBe(1);
 	});
 
 	// ── ⚠ THE REFUTATION LEDGER, BECAUSE REG-F-202 IS THREE WEEKS OLD ───────────────────────────────────────
@@ -385,7 +401,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
 		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
 		// and not of the families audited.
-		expect(tally).toEqual({ HELD: 59, OVERTURNED: 37, UNREFUTED: 30 });
+		expect(tally).toEqual({ HELD: 87, OVERTURNED: 53, UNREFUTED: 30 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
@@ -412,7 +428,8 @@ describe('W-3b — the invariant enforcement census', () => {
 				'w3b-lane:v1-sta',
 				'w3b-lane:v1-objrel',
 				'w3b-lane:v1-declyr',
-				'w3b-lane:v1-asr'
+				'w3b-lane:v1-asr',
+				'w3b-lane:v1-perrel'
 			])
 		);
 	});
