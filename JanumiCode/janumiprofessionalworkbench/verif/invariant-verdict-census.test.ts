@@ -499,6 +499,59 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(noSearch, 'the absence must be established by a recorded search, not asserted').toEqual([]);
 	});
 
+	// ── ⚠ THE FILING PARTITION, AND WHY ITS COUNT WAS SETTLED TWICE ────────────────────────────────────────
+	// The 49 live divergences must become filed register findings, and filing 49 entries would be a defect if
+	// they are fewer defects seen from more angles. Three GLOBAL readers clustered them under three lenses —
+	// by MECHANISM (what is broken in the code), by REMEDY (what one commit closes), by SITE (what function it
+	// lives at) — returning 28, 36 and 35. A synthesis reconciled them into 36.
+	//
+	// ⚠ AND THE FIRST SYNTHESIS RAN ON A TRUNCATED INPUT THAT I CAUSED. The three lens outputs were embedded
+	// inline and capped at 60,000 characters; they total 141,583. Mechanism arrived whole, remedy was cut
+	// mid-cluster, and THE SITE LENS NEVER ARRIVED — while the brief told that agent it was reconciling three.
+	// It NOTICED, refused to "average two lenses and call it three", and rebuilt a substitute site signal from
+	// file:line references in the rows themselves. Re-run against the full input from disk, the count came back
+	// 36 again — but a DIFFERENT PARTITION: 27 clusters identical, six groupings changed, four ratification
+	// flags flipped.
+	//
+	// ⚠⚠ THE PART WORTH KEEPING IS WHY THE SUBSTITUTE MISLED. Its three dissolved clusters were all labelled
+	// ALL_THREE_AGREE — and all three are cases where the DERIVED site map co-located rows the REAL site lens
+	// separates. A signal reconstructed from the evidence you already have CANNOT DISSENT FROM IT: it agrees by
+	// construction, and it agrees in the same vocabulary, so it reads as corroboration. The disclosure was
+	// honest and the instrument was still systematically optimistic.
+	it('every live divergence belongs to exactly one filing cluster', () => {
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const unclustered = rows.filter((v) => !v.cluster_id).map((v) => String(v.limb_id));
+		expect(unclustered, 'a divergence with no cluster would be filed alone or not at all').toEqual([]);
+		const ids = new Set(rows.map((v) => String(v.cluster_id)));
+		expect(ids.size, 'distinct filing clusters, settled against the COMPLETE three-lens input').toBe(36);
+		// Cluster sizes must reconcile with membership — a row claiming a size its cluster does not have is a
+		// partition that was edited in one place and not the other.
+		const bySize: Record<string, number> = {};
+		for (const v of rows) bySize[String(v.cluster_id)] = (bySize[String(v.cluster_id)] ?? 0) + 1;
+		const wrong = rows
+			.filter((v) => bySize[String(v.cluster_id)] !== Number(v.cluster_size))
+			.map((v) => String(v.limb_id));
+		expect(wrong, 'declared cluster size disagrees with actual membership').toEqual([]);
+	});
+
+	// The confidence split is pinned because it is the honest shape of the disagreement, and because the FIRST
+	// synthesis used these same three words for a weaker instrument. 14 clusters had all three lenses produce
+	// the exact set; 14 had two and a resolved dissent; 8 are CONTESTED — no two lenses agreed, or a dissent
+	// carrying DRIVEN evidence was overridden. Eight rows sit in five RATIFICATION-FIRST clusters, where the
+	// remedy is a canon question and writing code would ratify the narrower reading by accident.
+	it('the filing clusters declare how much the lenses actually agreed', () => {
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const seen = new Map<string, string>();
+		for (const v of rows) seen.set(String(v.cluster_id), String(v.cluster_confidence));
+		const dist: Record<string, number> = {};
+		for (const c of seen.values()) dist[c] = (dist[c] ?? 0) + 1;
+		expect(dist).toEqual({ ALL_THREE_AGREE: 14, TWO_OF_THREE: 14, CONTESTED: 8 });
+		expect(
+			rows.filter((v) => v.cluster_ratification_first === true).length,
+			'rows whose remedy is an adjudication, not code'
+		).toBe(8);
+	});
+
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
 		const bad = verdicts
 			.filter((v) => String(v.verdict) === 'ENFORCED_BY_CONSTRUCTION')

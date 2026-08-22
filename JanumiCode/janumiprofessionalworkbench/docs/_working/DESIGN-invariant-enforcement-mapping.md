@@ -521,3 +521,67 @@ stated rather than remediated: 52 rows still carry `DIVERGENT_UNFILED`, each ass
 its divergence, and the V-4 filing pass must re-run each of those searches under EM-7 **before** drafting an
 entry. Three of the twenty-two rows re-examined under this rule in V-4b turned out to be already filed — a
 13.6% base rate on a population that had already been searched once.
+
+---
+
+## 15. ⚠ ADDENDUM — A RECONSTRUCTED SIGNAL CANNOT DISSENT, AND I TRUNCATED THE INPUT THAT PROVED IT
+
+Three global readers clustered the 49 live divergences under three lenses — **mechanism** (what is broken in
+the code), **remedy** (what one commit closes), **site** (what function it lives at) — returning 28, 36 and
+35 clusters. A fourth agent reconciled them.
+
+**Its input was truncated, and I did it.** The three lens outputs were embedded inline in the workflow script
+under `slice(0, 60000)`. They total **141,583 characters**. Mechanism (38,815) arrived whole; the remedy lens
+had 21,185 characters of room and was cut mid-cluster; **the site lens never arrived at all** — while the
+brief told that agent, in plain words, that it was reconciling three lenses.
+
+### 15.1 It noticed, and that is the only reason this is a redo rather than a corruption
+
+Its first paragraph is the one to keep: it refused to *"average two lenses and call it three"*, said exactly
+what it had received, rebuilt a substitute site signal by extracting `file:line` references from the rows
+themselves, and treated each row's own `shares_filing_with` as a fourth declaration. Then it labelled its
+confidence accordingly and returned 36 clusters.
+
+Re-run against the full input read **from disk**, the count came back **36 again** — and a *different
+partition*: 27 clusters identical, **six groupings changed**, four ratification flags flipped.
+
+### 15.2 ⚠ THE FINDING: A SUBSTITUTE BUILT FROM THE EVIDENCE YOU HAVE AGREES WITH IT BY CONSTRUCTION
+
+Three clusters the first synthesis labelled `ALL_THREE_AGREE` dissolve under the full input. **All three are
+cases where the DERIVED site map co-located rows that the REAL site lens separates.**
+
+That is not bad luck. A site map extracted from the rows' own prose can only co-locate what that prose
+co-locates — it is a *function of the other signals*, so it cannot contradict them. It agrees by
+construction, it agrees in the same vocabulary, and it therefore reads as corroboration. **The disclosure was
+honest and the instrument was still systematically optimistic**, in the one direction that matters: toward
+agreement.
+
+The generalisation, which applies well beyond this programme:
+
+> **A reconstructed proxy for a missing signal is not a weak version of that signal. It is a restatement of
+> the signals you already have, wearing the missing one's name.** Where the real signal would have dissented,
+> the proxy concurs — and the confidence vocabulary does not change, so nothing downstream can tell.
+
+The countermeasure is not "label the proxy more cautiously". The first agent *did* label it, in its own
+`agreement` field, and the labels still said `ALL_THREE_AGREE`. The countermeasure is to **go and get the
+missing signal**, and to treat a proxy's concurrence as carrying no information at all.
+
+### 15.3 The mechanical lesson: pass by reference
+
+This is the **fifth** truncation in this programme — after the OBJ-3 lane payload cut mid-field (two rows
+left unrefuted for four slices), `PER-10:3`'s `refuter_correction` cut mid-sentence (a citation dropped on an
+argument nobody could finish reading), and two partial-coverage fields read as measured zeros.
+
+**A silent truncation of an agent's input is invisible to that agent**, and produces confident output over a
+population it does not know it is missing. Inline embedding with a character cap is the mechanism every time.
+
+> **EM-8 — HAND AN AGENT A PATH, NOT A PAYLOAD.** Write the artifact to disk and tell the agent to read it.
+> That is already how lanes receive the census, the limb split and the register; it should be how every
+> stage receives the stage before it. Where a payload must be inline, assert its full length in the prompt so
+> the agent can detect the cut itself.
+
+⚠ AND THE CAUSE HERE WAS VERIFIED RATHER THAN ASSUMED, which is why it can be stated this precisely: every
+remedy cluster behind a changed grouping — C17, C20, C21, C24, C25, C30, C34, C35, C36 — sits **past the
+cut**, as does the remedy lens's entire `reasoning` block, because the schema serialises `clusters` before
+`reasoning`. The truncation did not remove a random 58%; it removed the *tail* of the second signal and the
+*whole* of the third, which is precisely the part a reconciliation exists to weigh.
