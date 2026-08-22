@@ -80,9 +80,18 @@ import {
 	DEPENDENCY_CRUISER_NORMALIZATION_OPERATION_VERSION,
 	DEPENDENCY_CRUISER_PROVIDER_VERSION,
 	DEPENDENCY_PROVIDER_COMPARISON_OPERATION_VERSION,
+	MODULE_DEPENDENCY_GRAPH_CANONICAL_PROFILE,
 	MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION,
 	MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION,
 	MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION,
+	MODULE_DEPENDENCY_PROGRESS_MAX_BYTES,
+	MODULE_DEPENDENCY_PROGRESS_MAX_EVENTS,
+	MODULE_DEPENDENCY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	MODULE_DEPENDENCY_REPORT_OPERATION_VERSION,
+	MODULE_DEPENDENCY_REPORT_PROGRESS_SCHEMA_VERSION,
+	MODULE_DEPENDENCY_REPORT_REQUEST_SCHEMA_VERSION,
+	MODULE_DEPENDENCY_REPORT_RESULT_SCHEMA_VERSION,
+	MODULE_DEPENDENCY_REPORT_SCHEMA_VERSION,
 	MODULE_RESOLUTION_TRACE_OPERATION_VERSION,
 	MODULE_RESOLUTION_TRACE_PROGRESS_SCHEMA_VERSION,
 	MODULE_RESOLUTION_TRACE_REQUEST_SCHEMA_VERSION,
@@ -150,6 +159,8 @@ import {
 	runReadWriteAccessReport,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
+	moduleDependencyReportExitCode,
+	runModuleDependencyReport,
 	buildLogicalGraphComposition,
 	buildProjectContextGraph,
 	runProjectContextReport,
@@ -237,6 +248,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('captureProjectContextReportPipeline');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
+		expect(runModuleDependencyReport).toBeTypeOf('function');
+		expect(moduleDependencyReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createModuleDependencyProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runModuleDependencyCommand');
+		expect(publicSurface).not.toHaveProperty('classifyModuleDependencyGraphFailureState');
+		expect(publicSurface).not.toHaveProperty('projectedModuleDependencyPopulation');
 		expect(buildLogicalGraphComposition).toBeTypeOf('function');
 		expect(buildProjectContextGraph).toBeTypeOf('function');
 		expect(runProjectContextReport).toBeTypeOf('function');
@@ -502,12 +519,33 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(STATE_MACHINE_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-state-machine-graph/1.0.0');
 		expect(MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION).toBe(
-			'jan-csaa-build-module-dependency-graph/0.1.0'
+			'jan-csaa-build-module-dependency-graph/0.1.1'
+		);
+		expect(MODULE_DEPENDENCY_GRAPH_CANONICAL_PROFILE).toBe(
+			'jan-csaa-module-dependency-graph-canonical/1.0.1'
 		);
 		expect(MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION).toBe(
 			'jan-csaa-module-dependency-graph-request/1.0.0'
 		);
 		expect(MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-module-dependency-graph/1.0.0');
+		expect(MODULE_DEPENDENCY_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-module-dependency/0.1.0'
+		);
+		expect(MODULE_DEPENDENCY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-dependency-report-request/0.1.0'
+		);
+		expect(MODULE_DEPENDENCY_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-dependency-report-result/0.1.0'
+		);
+		expect(MODULE_DEPENDENCY_REPORT_SCHEMA_VERSION).toBe('jan-csaa-module-dependency-report/0.1.0');
+		expect(MODULE_DEPENDENCY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-dependency-report-progress/0.1.0'
+		);
+		expect(MODULE_DEPENDENCY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-module-dependency-progress-transport/0.1.0'
+		);
+		expect(MODULE_DEPENDENCY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(MODULE_DEPENDENCY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(MODULE_RESOLUTION_TRACE_OPERATION_VERSION).toBe(
 			'jan-csaa-build-module-resolution-trace/0.1.0'
 		);

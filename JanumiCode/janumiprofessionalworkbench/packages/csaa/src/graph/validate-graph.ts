@@ -739,7 +739,10 @@ function expectedLimitations(snapshot: StaticSemanticSnapshot): ModuleDependency
 				closureEffect: 'DEGRADES_CLOSURE',
 				kind: 'NON_SOURCE_MODULE_TARGET',
 				moduleResolutionId: resolution.id,
-				reason: `The ${resolution.resolutionState} module target is represented as an explicit graph-native endpoint outside the source-node population.`,
+				reason:
+					resolution.targetSourceId === null
+						? `The ${resolution.resolutionState} module target is represented as an explicit graph-native endpoint outside the source-node population.`
+						: `The ${resolution.resolutionState} classification is preserved while the available captured context source is retained as the edge endpoint.`,
 				sourceId: resolution.sourceId
 			});
 		else if (resolution.resolutionState === 'UNRESOLVED')

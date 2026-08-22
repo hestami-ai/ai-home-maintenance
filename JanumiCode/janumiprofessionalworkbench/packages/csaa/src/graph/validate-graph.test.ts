@@ -149,7 +149,11 @@ describe('validateModuleDependencyGraph', () => {
 		});
 		expect(graph.edges[0]?.target.kind).toBe('SOURCE');
 		expect(graph.limitations).toContainEqual(
-			expect.objectContaining({ kind: 'NON_SOURCE_MODULE_TARGET' })
+			expect.objectContaining({
+				kind: 'NON_SOURCE_MODULE_TARGET',
+				reason:
+					'The RESOLVED_EXTERNAL classification is preserved while the available captured context source is retained as the edge endpoint.'
+			})
 		);
 		expect(validateModuleDependencyGraph(graph, snapshot)).toEqual({
 			issues: [],

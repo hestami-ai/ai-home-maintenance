@@ -18,11 +18,13 @@ export const MODULE_DEPENDENCY_GRAPH_REQUEST_SCHEMA_VERSION =
 export const MODULE_DEPENDENCY_GRAPH_SCHEMA_VERSION =
 	'jan-csaa-module-dependency-graph/1.0.0' as const;
 export const MODULE_DEPENDENCY_GRAPH_OPERATION_VERSION =
-	'jan-csaa-build-module-dependency-graph/0.1.0' as const;
+	'jan-csaa-build-module-dependency-graph/0.1.1' as const;
 export const MODULE_DEPENDENCY_GRAPH_CANONICAL_PROFILE =
-	'jan-csaa-module-dependency-graph-canonical/1.0.0' as const;
+	'jan-csaa-module-dependency-graph-canonical/1.0.1' as const;
 export const MODULE_DEPENDENCY_GRAPH_METHOD =
 	'typescript-public-module-resolution-projection/1.0.0' as const;
+export const MODULE_DEPENDENCY_GRAPH_CAPABILITY = 'JAN-CSAA-CAP-004' as const;
+export const MODULE_DEPENDENCY_GRAPH_CAPABILITY_STATUS = 'PARTIAL' as const;
 
 declare const moduleDependencyGraphIdBrand: unique symbol;
 export type ModuleDependencyGraphId = string & {

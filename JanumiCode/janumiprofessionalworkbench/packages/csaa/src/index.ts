@@ -18,6 +18,7 @@ export * from './contracts/graph.js';
 export * from './contracts/logical-graph-composition.js';
 export * from './contracts/module-resolution-trace.js';
 export * from './contracts/module-resolution-trace-report.js';
+export * from './contracts/module-dependency-report.js';
 export * from './contracts/project-context-graph.js';
 export * from './contracts/project-context-report.js';
 export * from './contracts/semantic.js';
@@ -120,6 +121,25 @@ export {
 	MODULE_RESOLUTION_TRACE_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type ModuleResolutionTraceProgressTransportTruncation
 } from './application/module-resolution-trace-progress-jsonl.js';
+
+export {
+	moduleDependencyReportExitCode,
+	runModuleDependencyReport,
+	MODULE_DEPENDENCY_REPORT_PROGRESS_NONCLAIMS,
+	MODULE_DEPENDENCY_REPORT_PROGRESS_SCHEMA_VERSION,
+	type ModuleDependencyReportProgressEvent,
+	type ModuleDependencyReportProgressObservation,
+	type ModuleDependencyReportProgressObservationMetric,
+	type ModuleDependencyReportProgressPhase,
+	type RunModuleDependencyReportOptions
+} from './application/run-module-dependency-report.js';
+
+export {
+	MODULE_DEPENDENCY_PROGRESS_MAX_BYTES,
+	MODULE_DEPENDENCY_PROGRESS_MAX_EVENTS,
+	MODULE_DEPENDENCY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type ModuleDependencyProgressTransportTruncation
+} from './application/module-dependency-progress-jsonl.js';
 
 export {
 	declarationContextReportExitCode,
