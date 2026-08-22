@@ -462,3 +462,62 @@ V-0's are genuinely unrecoverable.
 The general form, and it is now three-for-three in this programme: **a partial-coverage field reads exactly
 like a measured zero.** The drive queue keyed by invariant (§ the partial-coverage gate), the merge that
 marked only repaired rows, and this backfill are the same defect at three altitudes.
+
+---
+
+## 14. ⚠ ADDENDUM — THE SEARCH TOOL HIDES THE FILINGS, AND THAT INVALIDATES A METHOD RATHER THAN A ROW
+
+Every "not filed" verdict in this census rests on a search of four corpora. **Two of those corpora are largely
+invisible to the default search tool**, and the tool does not fail — it reports the match and withholds the
+text:
+
+```
+$ Grep "on every peer both ran over an"  docs/canon/JPWB-REG-005 …md
+909:[Omitted long matching line]
+```
+
+That line is 2046 characters. It is REG-F-029 review finding (e), CLOSED 2026-08-05, and it adjudicates —
+by name, with a committed, green control test — the exact arrangement `limb:ASR-10:5` had been filed as an
+**unrecorded divergence**. A reader scanning Grep output for "is this filed?" sees a line number and no
+answer, and the absence of text reads as the absence of a filing.
+
+### 14.1 The measurement, because the scale is the finding
+
+| corpus | lines | over 1000 chars | share of the file's characters on those lines |
+|---|---|---|---|
+| `JPWB-REG-005 Decision and Divergence Register.md` | 4872 | 116 (2.4%) | **11.3%** |
+| `verif/guard-enforcement-ledger.data.ts` | 392 | 58 (14.8%) | **67.9%** |
+| `packages/rph-domain/src/enforcement-register.ts` | 4168 | 2 (0.0%) | 0.7% |
+
+**Two thirds of the guard-enforcement ledger's content sits on lines the tool omits.** And the omission is
+not random with respect to content: the longest entries are the most thoroughly reasoned ones — the findings
+that quote canon, name the site, state the arrangement and record the control. **The tool hides exactly the
+filings most likely to settle a question.**
+
+### 14.2 Why this is worse than the error modes above it
+
+EM-1 through EM-5 corrupt a ROW. This corrupts a METHOD. Every absence claim in this programme took the form
+*"I searched the register and found nothing"* — and for any filing living on a long line, that sentence was
+true of the search and false about the world. Three errors already recorded here have this as their
+mechanism, and none was diagnosed as such at the time:
+
+- `limb:AGG-1:2` claimed its violation was *"recorded ONLY in a working design document"*. REG-005:1316 states
+  it **by name** — `⚠ SO withPwaVersionBump VIOLATES AGG-1 BY NAME` — counts its three call sites, and cites
+  that working paper as its own analysis.
+- `limb:PER-9:5` reported NONE FOUND from a search that never opened the corpus holding the finding.
+- `limb:ASR-10:5` sat on `DIVERGENT_UNFILED` for nine slices over a CLOSED, test-pinned adjudication, found
+  only when an agent searched **by site** and read the raw line.
+
+### 14.3 The countermeasure, and it is not "search harder"
+
+> **EM-7 — READ THE LINE, DO NOT TRUST THE MATCH.** When searching a filing corpus, use `grep` through Bash
+> (which prints the full line) rather than the Grep tool, and when a hit lands on a long line, read it with
+> `sed -n 'Np' <file>`. **Search by SITE — the file path, the symbol, the function name — as well as by
+> invariant id.** A filing that governs your limb may never name it: the one that settled ASR-10:5 names a
+> handler and a gate, and mentions no invariant at all.
+
+⚠ AND EVERY ABSENCE CLAIM IN THIS CENSUS PREDATING THIS ADDENDUM IS SUSPECT TO EXACTLY THIS EXTENT. That is
+stated rather than remediated: 52 rows still carry `DIVERGENT_UNFILED`, each asserting that nothing records
+its divergence, and the V-4 filing pass must re-run each of those searches under EM-7 **before** drafting an
+entry. Three of the twenty-two rows re-examined under this rule in V-4b turned out to be already filed — a
+13.6% base rate on a population that had already been searched once.

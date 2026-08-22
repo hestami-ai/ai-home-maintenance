@@ -201,12 +201,12 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 28,
+			ENFORCED_DRIVEN: 29,
 			ENFORCED_BY_CONSTRUCTION: 44,
 			ENFORCED_MULTI_SITE: 20,
 			ENFORCED_AT_SURFACE_ONLY: 2,
-			PARTIAL_DIVERGENT_FILED: 56,
-			DIVERGENT_UNFILED: 55,
+			PARTIAL_DIVERGENT_FILED: 58,
+			DIVERGENT_UNFILED: 52,
 			UNENFORCED_OBSERVED_ADMISSION: 64,
 			UNENFORCED_DEAD_PREDICATE: 12,
 			UNENFORCED_NO_SHAPE: 26
@@ -267,7 +267,16 @@ describe('W-3b — the invariant enforcement census', () => {
 		// drive exactly — the same five commands run twice in one store, changing ONLY the credential, with
 		// AGENT PublishPwa REJECTED where HUMAN reached PUBLISHED — and still challenged the citation. A debt
 		// list that only ever shrinks is a list nobody is feeding.
-		expect(owing).toEqual(['limb:PER-10:3']);
+		// ⚠ PAID, AND BY RESTORING THE ORIGINAL CITATION RATHER THAN FINDING A NEW ONE. The refuter was RIGHT to
+		// challenge (the arm was re-driven a third time and held: HUMAN PublishPwa ACCEPTED → PUBLISHED against
+		// AGENT REJECTED) and WRONG about the replacement — command-bus `stampOrRefuse` is actor-type-blind by its
+		// own control, and carries PER-3, not this limb. The correct site was pwa-authoring.ts:963 all along.
+		// ⚠ AND A RECORDS DEFECT MADE THIS DEBT MORE EXPENSIVE THAN IT NEEDED TO BE: the row's
+		// `refuter_correction` is TRUNCATED MID-SENTENCE, ending "This command declar", so the refuter's proposed
+		// replacement site was never legible to the merge step that dropped the citation. A citation was dropped on
+		// an argument nobody could finish reading — the same truncation shape that left OBJ-3:2 and OBJ-3:3
+		// unrefuted for four slices.
+		expect(owing).toEqual([]);
 	});
 
 	it('every ENFORCED_DRIVEN anchor that EXISTS resolves EXACTLY ONCE in the file it cites', () => {
@@ -305,7 +314,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(55);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(52);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -347,10 +356,12 @@ describe('W-3b — the invariant enforcement census', () => {
 		// available either, because that arm asserts a LIVE violation and nobody has driven the promotion path
 		// with a conditionally-satisfied subject. A DRIVE IS OWED BEFORE AN ARM CAN BE CHOSEN. Choosing either one
 		// now would assert something nobody has measured.
-		expect(unnamed, 'an arm asserting a filing, on a row that names none').toEqual([
-			'limb:STA-4:5',
-			'limb:DEC-6:3'
-		]);
+		// ⚠ EMPTY, AND THE LAST TWO LEFT ON A DRIVE RATHER THAN A DECISION. STA-4:5 and DEC-6:3 were stuck between
+		// arms because no filing covered the PROMOTION consequent and nobody had ever driven it. It has now been
+		// driven: promotion IS gated, by PROMOTABLE_DISPOSITIONS at governance.ts:261, so DIVERGENT_UNFILED — which
+		// asserts a live violation — would have been WRONG. Both rest on RPH-BAS-004, which records the mechanism;
+		// what they still owe is the INSTANCE, and that is in `owed` rather than hidden by an empty field.
+		expect(unnamed, 'an arm asserting a filing, on a row that names none').toEqual([]);
 	});
 
 	// ── ⚠ A REFUTER OVERTURNS A SCALAR; THE ROW IS A NARRATIVE ──────────────────────────────────────────────
@@ -410,11 +421,14 @@ describe('W-3b — the invariant enforcement census', () => {
 	// failure REG-F-043 records. It can only move DOWN without this reddening.
 	it('the unreconciled-owed debt is counted, not hidden', () => {
 		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
-		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(66);
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(44);
+		// ⚠ THE SUBSET THAT BLOCKED V-4 IS ZERO. Every row asserting a live unfiled divergence now describes THAT
+		// divergence — re-verified as still reproducing, and re-searched against all four filing corpora. The
+		// remaining 44 sit on other arms, where a stale `owed` misleads but does not misdirect a filing.
 		expect(
 			stale.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED').length,
 			'the subset that blocks V-4: these rows owe a filing and describe the wrong one'
-		).toBe(22);
+		).toBe(0);
 	});
 
 	// The one part of the class that IS mechanically decidable, and it is decidable from the LADDER rather than
@@ -431,9 +445,9 @@ describe('W-3b — the invariant enforcement census', () => {
 			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED')
 			.filter((v) => ENFORCED.has(String(v.owed_for_verdict)))
 			.map((v) => String(v.limb_id));
-		expect(bad.sort()).toEqual(
-			['limb:ASR-10:5', 'limb:ASR-8:3', 'limb:REL-1:11', 'limb:REL-1:12'].sort()
-		);
+		// Empty as of V-4b, and three of the four left by being RE-ARMED rather than re-worded: ASR-10:5 was never
+		// a divergence (a CLOSED, test-pinned adjudication), while ASR-8:5 and STA-2:3 were already filed.
+		expect(bad.sort()).toEqual([]);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -449,7 +463,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(24);
+		).toBe(23);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
