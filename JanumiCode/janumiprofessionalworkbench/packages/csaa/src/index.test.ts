@@ -51,7 +51,16 @@ import {
 	GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_MAX_BYTES,
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_MAX_EVENTS,
 	GUARD_ENFORCEMENT_LEDGER_PROGRESS_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_ADMISSION_LIMITS,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_OPERATION_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_PROGRESS_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_REQUEST_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_RESULT_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_SCHEMA_VERSION,
 	LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION,
 	LOGICAL_GRAPH_COMPOSITION_PROGRESS_SCHEMA_VERSION,
@@ -180,6 +189,8 @@ import {
 	buildCommandHandlerGraph,
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
+	guardEnforcementLedgerReportExitCode,
+	runGuardEnforcementLedgerReport,
 	buildReadWriteAccessGraph,
 	readWriteAccessReportExitCode,
 	runReadWriteAccessReport,
@@ -276,6 +287,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
+		expect(runGuardEnforcementLedgerReport).toBeTypeOf('function');
+		expect(guardEnforcementLedgerReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createGuardEnforcementLedgerProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runGuardEnforcementLedgerCommand');
+		expect(publicSurface).not.toHaveProperty('admitGuardEnforcementLedgerReportRequest');
+		expect(publicSurface).not.toHaveProperty('runGuardEnforcementLedgerReportWithDependencies');
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
 		expect(runReadWriteAccessReport).toBeTypeOf('function');
 		expect(readWriteAccessReportExitCode).toBeTypeOf('function');
@@ -594,6 +611,30 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(GUARD_ENFORCEMENT_LEDGER_PROGRESS_SCHEMA_VERSION).toBe(
 			'jan-csaa-guard-enforcement-ledger-progress/1.0.0'
 		);
+		expect(GUARD_ENFORCEMENT_LEDGER_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-guard-enforcement-ledger/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-report-request/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-report-result/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-report/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-report-progress/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-enforcement-ledger-progress-transport/0.1.0'
+		);
+		expect(GUARD_ENFORCEMENT_LEDGER_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(GUARD_ENFORCEMENT_LEDGER_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(GUARD_ENFORCEMENT_LEDGER_REPORT_ADMISSION_LIMITS).toEqual({
+			maxDiagnosticPathCharacters: 10_000,
+			maxProjectPathCharacters: 4_096
+		});
 		expect(STATE_MACHINE_TOPOLOGY_OBSERVATION_OPERATION_VERSION).toBe(
 			'jan-csaa-observe-jpwb-state-machine-topology/0.1.0'
 		);

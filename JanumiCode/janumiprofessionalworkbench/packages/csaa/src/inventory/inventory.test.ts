@@ -105,6 +105,22 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_VERIFIER_AUTHORITY
 } from '../contracts/guard-enforcement-ledger.js';
 import {
+	GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY_TRANSFER,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_ANALYZER_DEPENDENCY_PATH,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_CAPABILITY_STATUS,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_EXECUTION_SELECTION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_GATE_EFFECT,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_NONCLAIMS,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_OPERATION_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_REGISTRY_STATUS,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_REQUEST_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_RESULT_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_SELECTION,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_SCOPE
+} from '../contracts/guard-enforcement-ledger-report.js';
+import {
 	LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER,
 	LOGICAL_GRAPH_COMPOSITION_CAPABILITY,
 	LOGICAL_GRAPH_COMPOSITION_CAPABILITY_STATUS,
@@ -262,6 +278,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts';
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
 const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-census.ts';
+const GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND = 'bun scripts/csaa-guard-enforcement-ledger.ts';
 const CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 const READ_WRITE_ACCESS_REPORT_COMMAND = 'bun scripts/csaa-read-write-access.ts';
 const CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND =
@@ -378,6 +395,19 @@ const ARROW_COMMAND_CENSUS_REPORT_PROVENANCE = [
 	'packages/csaa/src/index.test.ts',
 	'packages/csaa/src/index.ts',
 	'scripts/csaa-arrow-command-census.ts'
+] as const;
+const GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE = [
+	GUARD_ENFORCEMENT_LEDGER_REPORT_ANALYZER_DEPENDENCY_PATH,
+	'packages/csaa/src/application/guard-enforcement-ledger-command.test.ts',
+	'packages/csaa/src/application/guard-enforcement-ledger-progress-jsonl.test.ts',
+	'packages/csaa/src/application/guard-enforcement-ledger-progress-jsonl.ts',
+	'packages/csaa/src/application/run-guard-enforcement-ledger-command.ts',
+	'packages/csaa/src/application/run-guard-enforcement-ledger-report.test.ts',
+	'packages/csaa/src/application/run-guard-enforcement-ledger-report.ts',
+	'packages/csaa/src/contracts/guard-enforcement-ledger-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-guard-enforcement-ledger.ts'
 ] as const;
 const READ_WRITE_ACCESS_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-report.ts',
@@ -508,6 +538,8 @@ function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:arrow-command-census') return ARROW_COMMAND_CENSUS_REPORT_COMMAND;
+	if (name === 'csaa:analyze:guard-enforcement-ledger')
+		return GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND;
 	if (name === 'csaa:analyze:call-graph') return CALL_GRAPH_REPORT_COMMAND;
 	if (name === 'csaa:analyze:read-write-access') return READ_WRITE_ACCESS_REPORT_COMMAND;
 	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
@@ -591,6 +623,37 @@ describe('inventory discovery and identity', () => {
 		expect(inventory.verificationAssets).toHaveLength(2);
 		expect(inventory.subject.selectedFileCount).toBeGreaterThan(0);
 		expect(inventory.subject.subjectId).toBe(projectSubjectForInventory(root).descriptor.subjectId);
+	});
+
+	it('matches verification command carriers by path token without basename substrings', () => {
+		const root = fixture();
+		write(
+			root,
+			'package.json',
+			JSON.stringify({
+				name: 'fixture-workbench',
+				private: true,
+				scripts: {
+					'check-types': 'tsc --noEmit',
+					'collision-check': 'bun scripts/report-ledger.ts',
+					test: 'vitest run'
+				},
+				workspaces: ['packages/*', 'apps/*']
+			})
+		);
+		write(root, 'scripts/report-ledger.ts', 'export const report = true;\n');
+		write(root, 'scripts/mutants/ledger.ts', 'export const unrelated = true;\n');
+
+		const inventory = collectInventory({ repositoryRoot: root });
+		const commandCarrier = 'package.json#/scripts/collision-check';
+		expect(
+			inventory.verificationAssets.find((asset) => asset.path === 'scripts/report-ledger.ts')
+				?.gateCarriers
+		).toContain(commandCarrier);
+		expect(
+			inventory.verificationAssets.find((asset) => asset.path === 'scripts/mutants/ledger.ts')
+				?.gateCarriers
+		).not.toContain(commandCarrier);
 	});
 
 	it('distinguishes a locked tool from configuration, gate wiring, and a CSAA adapter', () => {
@@ -715,6 +778,8 @@ describe('inventory discovery and identity', () => {
 		expect(guardCapability!.state).toBe('PARTIAL');
 		for (const expectedProvenance of [
 			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
+			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+			'package.json#/scripts/csaa:analyze:guard-enforcement-ledger',
 			'packages/csaa/src/contracts/guard-enforcement-ledger.ts',
 			'packages/csaa/src/providers/jpwb-arrow-command-census/executor-environment.ts',
 			'packages/csaa/src/providers/jpwb-guard-enforcement-ledger/artifact-set.ts',
@@ -737,6 +802,44 @@ describe('inventory discovery and identity', () => {
 		expect(guardCapability!.explanation).toContain(
 			'retained subject initializers may execute inside the capsule'
 		);
+		expect(guardCapability!.explanation).toContain(
+			GUARD_ENFORCEMENT_LEDGER_REPORT_OPERATION_VERSION
+		);
+		expect(guardCapability!.explanation).toContain(
+			GUARD_ENFORCEMENT_LEDGER_REPORT_REQUEST_SCHEMA_VERSION
+		);
+		expect(guardCapability!.explanation).toContain(
+			GUARD_ENFORCEMENT_LEDGER_REPORT_RESULT_SCHEMA_VERSION
+		);
+		expect(guardCapability!.explanation).toContain(GUARD_ENFORCEMENT_LEDGER_REPORT_SCHEMA_VERSION);
+		expect(guardCapability!.explanation).toContain(
+			JSON.stringify(GUARD_ENFORCEMENT_LEDGER_REPORT_SELECTION)
+		);
+		expect(guardCapability!.explanation).toContain(
+			GUARD_ENFORCEMENT_LEDGER_REPORT_EXECUTION_SELECTION
+		);
+		expect(guardCapability!.explanation).toContain(
+			`capability status is ${GUARD_ENFORCEMENT_LEDGER_REPORT_CAPABILITY_STATUS}`
+		);
+		expect(guardCapability!.explanation).toContain(
+			`registry status is ${GUARD_ENFORCEMENT_LEDGER_REPORT_REGISTRY_STATUS}`
+		);
+		expect(guardCapability!.explanation).toContain(
+			`scope is ${GUARD_ENFORCEMENT_LEDGER_REPORT_SCOPE}`
+		);
+		expect(guardCapability!.explanation).toContain(
+			`analysis authority is ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY}`
+		);
+		expect(guardCapability!.explanation).toContain(
+			`authority transfer is ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY_TRANSFER}`
+		);
+		expect(guardCapability!.explanation).toContain(
+			`gate effect is ${GUARD_ENFORCEMENT_LEDGER_REPORT_GATE_EFFECT}`
+		);
+		expect(guardCapability!.explanation).toContain('successful evidence is never truncated');
+		expect(guardCapability!.explanation).toContain('selected-captured-subject currentness');
+		for (const nonclaim of GUARD_ENFORCEMENT_LEDGER_REPORT_NONCLAIMS)
+			expect(guardCapability!.explanation).toContain(nonclaim);
 		expect(commandHandlerCapability!.provider).toBe('typescript+jpwb-arrow-command-census-overlay');
 		expect(commandHandlerCapability!.state).toBe('PARTIAL');
 		for (const expectedProvenance of [
@@ -1708,6 +1811,7 @@ describe('inventory discovery and identity', () => {
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
@@ -1751,6 +1855,9 @@ describe('inventory discovery and identity', () => {
 			'exact selected retained arrow-command census evidence and baseline comparison'
 		);
 		expect(semanticBoundary).toContain(
+			'exact selected retained guard-enforcement-ledger audit and classification evidence'
+		);
+		expect(semanticBoundary).toContain(
 			'complete bounded Program-local read/write projection with exact project/source mappings'
 		);
 		expect(semanticBoundary).toContain(
@@ -1758,7 +1865,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, read/write-access'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, guard-enforcement-ledger, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -1807,7 +1914,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, guard-enforcement-ledger, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -1897,6 +2004,7 @@ describe('inventory discovery and identity', () => {
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
@@ -1930,6 +2038,9 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`arrow-command-census report facade has analysis authority ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY}, authority transfer ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY_TRANSFER}, and gate effect ${ARROW_COMMAND_CENSUS_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`guard-enforcement-ledger report facade has analysis authority ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY}, authority transfer ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY_TRANSFER}, and gate effect ${GUARD_ENFORCEMENT_LEDGER_REPORT_GATE_EFFECT}`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`neither holds nor transfers the retained census's ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority`
@@ -2410,6 +2521,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:semantic:smoke:source-origin-correlation',
 				'csaa:semantic:smoke:module-resolution-trace',
 				'csaa:analyze:arrow-command-census',
+				'csaa:analyze:guard-enforcement-ledger',
 				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
 				'csaa:analyze:module-resolution-trace',
@@ -2614,6 +2726,26 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:arrow-command-census');
+
+		const missingGuardEnforcementLedgerReportCommand = fixture();
+		write(
+			missingGuardEnforcementLedgerReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:guard-enforcement-ledger'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingGuardEnforcementLedgerReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:guard-enforcement-ledger');
 
 		const missingCallGraphReportCommand = fixture();
 		write(
@@ -2962,6 +3094,24 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:arrow-command-census');
 
+		const incompatibleGuardEnforcementLedgerReportCommand = fixture();
+		write(
+			incompatibleGuardEnforcementLedgerReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:guard-enforcement-ledger': 'bun scripts/wrong-guard-enforcement-ledger.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleGuardEnforcementLedgerReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:guard-enforcement-ledger'
+		);
+
 		const incompatibleCallGraphReportCommand = fixture();
 		write(
 			incompatibleCallGraphReportCommand,
@@ -3119,6 +3269,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
+						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:state-machine-graph',
 						'csaa:analyze:module-dependency',
@@ -3193,6 +3344,7 @@ describe('JPWB population non-vacuity', () => {
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
 			...commandDispatchPaths,
@@ -3231,6 +3383,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
+						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
@@ -3304,6 +3457,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
+						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
@@ -3351,6 +3505,7 @@ describe('JPWB population non-vacuity', () => {
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
 			'packages/csaa/src/graph/build-command-handler-graph.ts',
@@ -3432,6 +3587,7 @@ describe('JPWB population non-vacuity', () => {
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 			...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -3461,6 +3617,19 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB arrow-command census report facade or verification source is absent: ${missingArrowCommandCensusReportPath}`
 			);
 			write(root, missingArrowCommandCensusReportPath, 'export {};\n');
+		}
+		for (const missingGuardEnforcementLedgerReportPath of GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE.filter(
+			(path) =>
+				path !== GUARD_ENFORCEMENT_LEDGER_REPORT_ANALYZER_DEPENDENCY_PATH &&
+				!ARROW_COMMAND_CENSUS_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingGuardEnforcementLedgerReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB guard-enforcement-ledger report facade or verification source is absent: ${missingGuardEnforcementLedgerReportPath}`
+			);
+			write(root, missingGuardEnforcementLedgerReportPath, 'export {};\n');
 		}
 		const missingStateGraph = 'packages/csaa/src/graph/validate-state-machine-graph.ts';
 		rmSync(join(root, ...missingStateGraph.split('/')));
@@ -3812,6 +3981,16 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:analyze:guard-enforcement-ledger'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) => command.owner === '.' && command.name === 'csaa:analyze:call-graph'
 			)
 		).toMatchObject({
@@ -3896,6 +4075,7 @@ describe('JPWB population non-vacuity', () => {
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
 			])

@@ -11,6 +11,7 @@ export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-event-contract-overlay.js';
 export * from './contracts/command-dispatch-topology.js';
 export * from './contracts/guard-enforcement-ledger.js';
+export * from './contracts/guard-enforcement-ledger-report.js';
 export * from './contracts/guard-classification-overlay.js';
 export * from './contracts/read-write-access-graph.js';
 export * from './contracts/read-write-access-report.js';
@@ -181,6 +182,25 @@ export {
 	ARROW_COMMAND_CENSUS_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type ArrowCommandCensusProgressTransportTruncation
 } from './application/arrow-command-census-progress-jsonl.js';
+
+export {
+	guardEnforcementLedgerReportExitCode,
+	runGuardEnforcementLedgerReport,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_PROGRESS_NONCLAIMS,
+	GUARD_ENFORCEMENT_LEDGER_REPORT_PROGRESS_SCHEMA_VERSION,
+	type GuardEnforcementLedgerReportProgressEvent,
+	type GuardEnforcementLedgerReportProgressObservation,
+	type GuardEnforcementLedgerReportProgressObservationMetric,
+	type GuardEnforcementLedgerReportProgressPhase,
+	type RunGuardEnforcementLedgerReportOptions
+} from './application/run-guard-enforcement-ledger-report.js';
+
+export {
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_MAX_BYTES,
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_MAX_EVENTS,
+	GUARD_ENFORCEMENT_LEDGER_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type GuardEnforcementLedgerProgressTransportTruncation
+} from './application/guard-enforcement-ledger-progress-jsonl.js';
 
 export {
 	runStateMachineGraphReport,
