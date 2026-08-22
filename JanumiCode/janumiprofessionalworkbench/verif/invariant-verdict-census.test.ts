@@ -114,18 +114,28 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect([...new Set(orphans)], 'limbs naming an invariant the roster does not hold').toEqual([]);
 	});
 
-	// ── THE HOLE, COUNTED ───────────────────────────────────────────────────────────────────────────────────
-	// ⚠ THIS ASSERTION IS THE POINT OF THE FILE AND IT IS DELIBERATELY NOT `toBe(307)`. The honest state today is
-	// that most limbs are unverdicted, and a gate that demanded totality on day one would have to be either
-	// skipped or satisfied by guesses. It pins the CURRENT verdicted count, so the number moves only when
-	// someone lands evidence — and it can never move DOWN without this reddening.
-	it('the verdicted count is pinned, so the hole cannot quietly change size', () => {
+	// ── THE HOLE, CLOSED ────────────────────────────────────────────────────────────────────────────────────
+	// ⚠ THIS ASSERTION SPENT NINE SLICES SAYING IT WAS *DELIBERATELY NOT* `toBe(307)`, and the reason was good:
+	// a gate demanding totality on day one has to be either skipped or satisfied by guesses, and this repository
+	// has REG-F-043 as the record of what a table satisfied by guesses does downstream. So it pinned the CURRENT
+	// count and let the number move only when someone landed evidence.
+	//
+	// It is 307 now, and the count reached totality by being raised 10 times against committed evidence rather
+	// than by being asserted once. That history is the claim; the number is only its residue.
+	//
+	// ⚠ AND TOTALITY HERE MEANS EXACTLY ONE THING: EVERY LIMB CARRIES A VERDICT. It does NOT mean every verdict
+	// is right — 113 of these rows were OVERTURNED by a refuter, and 30 remain UNREFUTED and are labelled as
+	// hypotheses in the data. It does NOT mean canon is enforced — 50 rows are live divergences with no filing
+	// and 62 are admissions the engine was DRIVEN into accepting. A complete census of a partly-unenforced
+	// system is a complete census, not a clean bill. Every one of those distinctions is pinned below, so no
+	// later reader can collapse "307/307" into "done".
+	it('every limb carries a verdict — the census is total', () => {
 		const verdicted = new Set(verdicts.map((v) => String(v.limb_id)));
-		expect(verdicted.size, 'limbs carrying a verdict').toBe(251);
+		expect(verdicted.size, 'limbs carrying a verdict').toBe(307);
 		expect(
-			307 - verdicted.size,
-			'limbs still unverdicted — this is the OPEN half of W-3b and it is meant to be large'
-		).toBe(56);
+			limbs.map((l) => String(l.id)).filter((id) => !verdicted.has(id)),
+			'a limb with no verdict — totality is now the standing condition, and losing it must redden'
+		).toEqual([]);
 	});
 
 	// ── ⚠ THE HOLE INSIDE THE HOLE, AND IT WAS DUG BY THIS PROGRAMME'S OWN TOOLING ──────────────────────────
@@ -191,15 +201,15 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 26,
-			ENFORCED_BY_CONSTRUCTION: 42,
-			ENFORCED_MULTI_SITE: 12,
+			ENFORCED_DRIVEN: 27,
+			ENFORCED_BY_CONSTRUCTION: 47,
+			ENFORCED_MULTI_SITE: 18,
 			ENFORCED_AT_SURFACE_ONLY: 2,
-			PARTIAL_DIVERGENT_FILED: 55,
-			DIVERGENT_UNFILED: 42,
-			UNENFORCED_OBSERVED_ADMISSION: 43,
-			UNENFORCED_DEAD_PREDICATE: 6,
-			UNENFORCED_NO_SHAPE: 23
+			PARTIAL_DIVERGENT_FILED: 63,
+			DIVERGENT_UNFILED: 50,
+			UNENFORCED_OBSERVED_ADMISSION: 62,
+			UNENFORCED_DEAD_PREDICATE: 10,
+			UNENFORCED_NO_SHAPE: 28
 		});
 	});
 
@@ -295,7 +305,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(42);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(50);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -333,7 +343,9 @@ describe('W-3b — the invariant enforcement census', () => {
 			'limb:AUT-1:1',
 			'limb:AUT-1:4',
 			'limb:PER-11:1',
-			'limb:PER-9:5'
+			'limb:PER-9:5',
+			'limb:ASR-4:8',
+			'limb:ASR-5:1'
 		]);
 	});
 
@@ -360,7 +372,7 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(44);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(63);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -376,7 +388,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(18);
+		).toBe(21);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -445,7 +457,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
 		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
 		// and not of the families audited.
-		expect(tally).toEqual({ HELD: 133, OVERTURNED: 88, UNREFUTED: 30 });
+		expect(tally).toEqual({ HELD: 164, OVERTURNED: 113, UNREFUTED: 30 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
@@ -476,7 +488,8 @@ describe('W-3b — the invariant enforcement census', () => {
 				'w3b-lane:v1-perrel',
 				'w3b-lane:v1-orphans',
 				'w3b-lane:v2-a',
-				'w3b-lane:v2-b'
+				'w3b-lane:v2-b',
+				'w3b-lane:v2-c'
 			])
 		);
 	});
