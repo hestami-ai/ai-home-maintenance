@@ -7,6 +7,17 @@ import {
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
 import {
+	CALL_GRAPH_REPORT_AUTHORITY,
+	CALL_GRAPH_REPORT_AUTHORITY_TRANSFER,
+	CALL_GRAPH_REPORT_GATE_EFFECT,
+	CALL_GRAPH_REPORT_NONCLAIMS,
+	CALL_GRAPH_REPORT_OPERATION_VERSION,
+	CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_SELECTION
+} from '../contracts/call-graph-report.js';
+import {
 	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
@@ -320,6 +331,23 @@ const TYPESCRIPT_CALL_GRAPH_PROVENANCE = [
 	'packages/csaa/src/graph/call-graph-input.ts',
 	'packages/csaa/src/graph/validate-call-graph.ts'
 ] as const;
+
+const TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/call-graph-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/application/call-graph-command.test.ts',
+	'packages/csaa/src/application/call-graph-progress-jsonl.test.ts',
+	'packages/csaa/src/application/call-graph-progress-jsonl.ts',
+	'packages/csaa/src/application/run-call-graph-command.ts',
+	'packages/csaa/src/application/run-call-graph-report.test.ts',
+	'packages/csaa/src/application/run-call-graph-report.ts',
+	'packages/csaa/src/application/run-project-context-report.ts',
+	'packages/csaa/src/graph/build-call-graph.test.ts',
+	'scripts/csaa-call-graph.ts'
+] as const;
+
+const JPWB_CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 
 const TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE = [
 	'packages/csaa/src/contracts/logical-graph-composition.ts',
@@ -1245,6 +1273,7 @@ function providerInventory(
 							...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 							...TYPESCRIPT_MODULE_DEPENDENCY_REPORT_PROVENANCE,
 							...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+							...TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
 							...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 							...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
 							...TYPESCRIPT_PROJECT_CONTEXT_REPORT_PROVENANCE,
@@ -1436,11 +1465,15 @@ function capabilities(): CapabilityInventory[] {
 			state: 'PARTIAL'
 		},
 		{
-			explanation:
-				'The third bounded DWP-004 increment enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site into a validated graph with exact structural/lexical ownership within the declared method, open compiler-bound callable candidates, and explicit external-dispatch, unresolved, or unsupported frontiers. Runtime caller and evaluation ownership remain coarsened and are not inferred from the structural ownership edge. Invocation-specific resolved signatures, dispatch closure, runtime observations, and all twelve entry-mechanism classes are not yet analyzed, so exact targets, whole-program reachability, dead-code conclusions, and full JAN-CSAA-007 conformance are not claimed.',
+			explanation: `The third bounded DWP-004 increment enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site into a validated graph with exact structural/lexical ownership within the declared method, open compiler-bound callable candidates, and explicit external-dispatch, unresolved, or unsupported frontiers. An implementation-local preliminary coding-agent report facade under ${CALL_GRAPH_REPORT_OPERATION_VERSION} admits one explicit bounded project set, requests the exact TS_PROJECT, TS_SYMBOL, TS_SYNTAX, and TS_TYPE semantic capability closure through the trusted CAP-010 successor seam, and performs bounded deterministic invocation-classification record inspection before it admits the exact complete selected node, edge, and limitation populations. It then materializes and independently validates one full ${CALL_GRAPH_REPORT_SCHEMA_VERSION} graph report with both indexes, layer manifests, complete project/source identity evidence, final selected-captured-subject currentness, and ${CALL_GRAPH_REPORT_RESULT_SCHEMA_VERSION} result under maxResultBytes; successful evidence is never truncated and refusal envelopes remain emit-able. Its request schema is ${CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION}, exact selection is ${JSON.stringify(CALL_GRAPH_REPORT_SELECTION)}, analysis authority is ${CALL_GRAPH_REPORT_AUTHORITY}, authority transfer is ${CALL_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect is ${CALL_GRAPH_REPORT_GATE_EFFECT}. The graph and facade remain PARTIAL/OPEN: runtime caller and evaluation ownership remain coarsened, invocation-specific resolved signatures, exact or exclusive targets, dispatch closure, runtime observations, whole-program reachability, and all twelve entry-mechanism classes are not claimed; runtime caller and evaluation ownership are not inferred from the structural ownership edge. Final CURRENT_FOR_CAPTURED_SUBJECT is scoped to SELECTED_CAPTURED_SUBJECT_ONLY and does not establish persistent or cross-revision currentness. The facade is not a registered JAN-CSAA-007 OperationResponse, does not complete DWP-004, DWP-005, or DWP-006, and publishes ${CALL_GRAPH_REPORT_NONCLAIMS.join(', ')}. Its bounded best-effort JSONL progress transport is excluded from report identity and evidence. The machine-facing coding-agent invocation bun run --silent csaa:analyze:call-graph is CONFIGURED_NOT_RUN by inventory generation. The package root exports the report contract, runner, progress-event schema, and transport schema/limits/types; the bounded builder seam, parsed-request command adapter, JSONL writer, failure classifier, and internal TS_TYPE capture seam remain implementation-private. Exact/exhaustive caller sets, reachability, dead-code or safe-removal conclusions, architecture discovery or violation, query, slicing, impact, comparison, findings, gates, remediation, and disposition remain outside this facade.`,
 			id: 'call-graph',
 			provider: 'typescript',
-			provenance: [...TYPESCRIPT_CALL_GRAPH_PROVENANCE, ...TYPESCRIPT_SEMANTIC_PROVENANCE],
+			provenance: [
+				...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+				...TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
+				...TYPESCRIPT_SEMANTIC_PROVENANCE,
+				'package.json#/scripts/csaa:analyze:call-graph'
+			],
 			state: 'PARTIAL'
 		},
 		{
@@ -1822,6 +1855,7 @@ function assertJpwbRequiredRootCommands(configuredCommands: readonly CommandInve
 		'csaa:semantic:smoke:command-event-contract',
 		'csaa:semantic:smoke:guard-classification',
 		'csaa:semantic:smoke:logical-graph-composition',
+		'csaa:analyze:call-graph',
 		'csaa:analyze:declaration-context',
 		'csaa:analyze:module-dependency',
 		'csaa:analyze:module-resolution-trace',
@@ -1894,6 +1928,11 @@ function assertJpwbNonVacuity(
 	);
 	assertJpwbAssuranceCommandExact(
 		configuredCommands,
+		'csaa:analyze:call-graph',
+		JPWB_CALL_GRAPH_REPORT_COMMAND
+	);
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
 		'csaa:analyze:module-dependency',
 		JPWB_MODULE_DEPENDENCY_REPORT_COMMAND
 	);
@@ -1942,6 +1981,11 @@ function assertJpwbNonVacuity(
 		selectedPaths,
 		TYPESCRIPT_SEMANTIC_PROVENANCE,
 		'Required JPWB TypeScript semantic implementation source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
+		'Required JPWB TypeScript call-graph report facade or verification source'
 	);
 	assertRequiredSelectedPaths(
 		selectedPaths,
@@ -2140,6 +2184,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
 					...TYPESCRIPT_MODULE_DEPENDENCY_REPORT_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
 					...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 					...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
 					...TYPESCRIPT_PROJECT_CONTEXT_REPORT_PROVENANCE,
@@ -2187,7 +2232,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#type-graph'
 				),
 				statement:
-					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary project-context, module-dependency, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED."
+					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge, the complete selected open static call projection with every retained invocation and candidate/frontier edge, and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies, callers, or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary project-context, module-dependency, call-graph, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED."
 			},
 			{
 				provenance: canonicalProvenance(
@@ -2201,6 +2246,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
 					...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 					...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+					...TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
 					...TYPESCRIPT_MODULE_DEPENDENCY_REPORT_PROVENANCE,
 					...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 					...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
@@ -2236,6 +2282,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					`The source origin correlation has analysis authority ${SOURCE_ORIGIN_CORRELATION_AUTHORITY}, authority transfer ${SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER}, and gate effect ${SOURCE_ORIGIN_CORRELATION_GATE_EFFECT}; freshness is ${SOURCE_ORIGIN_CORRELATION_FRESHNESS}, currentness is ${SOURCE_ORIGIN_CORRELATION_CURRENTNESS}, and it changes no retained verifier authority. It accepts a self-contained FrozenSubject and StaticSemanticSnapshot request without a CAP-013 predecessor and implements only the strict external flat version-3 declaration-map slice over exact fresh re-emission and caller captures. The configured smoke's ignored local target and map captures are absent from FrozenSubject and are neither checked-in build-output provenance nor freshness, currentness, or build-authority evidence. Full JAN-CSAA-014 conformance is ${SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_014_CONFORMANCE}, full JAN-CSAA-007 conformance is ${SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_007_CONFORMANCE}, and full JAN-CSAA-008 conformance is ${SOURCE_ORIGIN_CORRELATION_FULL_JAN_CSAA_008_CONFORMANCE}.`,
 					`The read/write-access report facade has analysis authority ${READ_WRITE_ACCESS_REPORT_AUTHORITY}, authority transfer ${READ_WRITE_ACCESS_REPORT_AUTHORITY_TRANSFER}, and gate effect ${READ_WRITE_ACCESS_REPORT_GATE_EFFECT}; it changes no retained verifier authority, does not promote the embedded PARTIAL/OPEN projection, and is not JAN-CSAA-CAP-007 data flow.`,
 					`The module-dependency report facade has analysis authority ${MODULE_DEPENDENCY_REPORT_AUTHORITY}, authority transfer ${MODULE_DEPENDENCY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${MODULE_DEPENDENCY_REPORT_GATE_EFFECT}; it changes no retained verifier authority, does not promote an embedded COMPLETE/CLOSED selected compiler projection to full CAP-004 or whole-program closure, and confers no query, slicing, impact, architecture, dead-code, or safe-removal conclusion.`,
+					`The call-graph report facade has analysis authority ${CALL_GRAPH_REPORT_AUTHORITY}, authority transfer ${CALL_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${CALL_GRAPH_REPORT_GATE_EFFECT}; it changes no retained verifier authority, does not promote the embedded PARTIAL/OPEN graph to full CAP-005, exact or exhaustive callers, dispatch or entry closure, whole-program reachability, dead-code, or safe-removal proof.`,
 					'The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED.',
 					'Neither wrapper, preliminary report facades, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority.',
 					'No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance.',

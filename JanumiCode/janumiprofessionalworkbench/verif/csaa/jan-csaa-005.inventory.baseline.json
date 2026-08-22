@@ -38,39 +38,39 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 30,
+      "discovered": 31,
       "excluded": 0,
       "failed": 0,
-      "included": 30,
+      "included": 31,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 30
+      "successfullyInventoried": 31
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 349,
+      "discovered": 353,
       "excluded": 0,
       "failed": 0,
-      "included": 349,
+      "included": 353,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 349
+      "successfullyInventoried": 353
     },
     {
       "artifactClass": "TEST",
-      "discovered": 392,
+      "discovered": 395,
       "excluded": 0,
       "failed": 0,
-      "included": 392,
+      "included": 395,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 392
+      "successfullyInventoried": 395
     },
     {
       "artifactClass": "VERIFICATION",
@@ -202,6 +202,8 @@
         "apps/rph-demo/src/lib/server/workbench-id.test.ts",
         "apps/rph-demo/src/lib/theme.test.ts",
         "apps/rph-demo/src/lib/walkthrough.test.ts",
+        "packages/csaa/src/application/call-graph-command.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
         "packages/csaa/src/application/declaration-context-command.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.test.ts",
         "packages/csaa/src/application/module-dependency-command.test.ts",
@@ -212,6 +214,7 @@
         "packages/csaa/src/application/project-context-progress-jsonl.test.ts",
         "packages/csaa/src/application/read-write-access-command.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.test.ts",
+        "packages/csaa/src/application/run-call-graph-report.test.ts",
         "packages/csaa/src/application/run-declaration-context-report.test.ts",
         "packages/csaa/src/application/run-module-dependency-report.test.ts",
         "packages/csaa/src/application/run-module-resolution-trace-report.test.ts",
@@ -617,7 +620,7 @@
       "state": "PARTIAL"
     },
     {
-      "explanation": "The third bounded DWP-004 increment enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site into a validated graph with exact structural/lexical ownership within the declared method, open compiler-bound callable candidates, and explicit external-dispatch, unresolved, or unsupported frontiers. Runtime caller and evaluation ownership remain coarsened and are not inferred from the structural ownership edge. Invocation-specific resolved signatures, dispatch closure, runtime observations, and all twelve entry-mechanism classes are not yet analyzed, so exact targets, whole-program reachability, dead-code conclusions, and full JAN-CSAA-007 conformance are not claimed.",
+      "explanation": "The third bounded DWP-004 increment enumerates every retained TypeScript CALL, NEW, and TAGGED_TEMPLATE site into a validated graph with exact structural/lexical ownership within the declared method, open compiler-bound callable candidates, and explicit external-dispatch, unresolved, or unsupported frontiers. An implementation-local preliminary coding-agent report facade under jan-csaa-report-call-graph/0.1.0 admits one explicit bounded project set, requests the exact TS_PROJECT, TS_SYMBOL, TS_SYNTAX, and TS_TYPE semantic capability closure through the trusted CAP-010 successor seam, and performs bounded deterministic invocation-classification record inspection before it admits the exact complete selected node, edge, and limitation populations. It then materializes and independently validates one full jan-csaa-call-graph-report/0.1.0 graph report with both indexes, layer manifests, complete project/source identity evidence, final selected-captured-subject currentness, and jan-csaa-call-graph-report-result/0.1.0 result under maxResultBytes; successful evidence is never truncated and refusal envelopes remain emit-able. Its request schema is jan-csaa-call-graph-report-request/0.1.0, exact selection is {\"entryMechanisms\":\"ALL_TWELVE_CLASSES_NOT_ANALYZED\",\"frontierTreatment\":\"EVERY_NON_CANDIDATE_SELECTED_INVOCATION_HAS_ONE_EXPLICIT_EXTERNAL_DISPATCH_UNRESOLVED_OR_UNSUPPORTED_FRONTIER\",\"invocationPopulation\":\"ALL_RETAINED_CALL_NEW_AND_TAGGED_TEMPLATE_INVOCATION_RECORDS_IN_THE_SELECTED_SEMANTIC_SNAPSHOT\",\"method\":\"typescript-5.9.3-direct-static-call-projection/0.1.0\",\"ownership\":\"NEAREST_RETAINED_LEXICAL_CALLABLE_OR_SOURCE_REGION_STRUCTURAL_OWNER; RUNTIME_CALLER_AND_EVALUATION_OWNER_NOT_CLAIMED\",\"projectContextEvidence\":\"ALL_VALIDATED_PROJECTS_PROGRAMS_SOURCES_MEMBERSHIPS_AND_PROJECT_REFERENCES\",\"semanticCapabilities\":[\"TS_PROJECT\",\"TS_SYMBOL\",\"TS_SYNTAX\",\"TS_TYPE\"],\"targetPopulation\":\"ALL_OPEN_COMPILER_BOUND_LOCAL_CALLABLE_CANDIDATES_OR_ONE_EXPLICIT_FRONTIER_PER_SELECTED_INVOCATION; NO_EXACT_OR_EXCLUSIVE_TARGET_CLAIM\"}, analysis authority is NONE, authority transfer is NONE, and gate effect is NONE. The graph and facade remain PARTIAL/OPEN: runtime caller and evaluation ownership remain coarsened, invocation-specific resolved signatures, exact or exclusive targets, dispatch closure, runtime observations, whole-program reachability, and all twelve entry-mechanism classes are not claimed; runtime caller and evaluation ownership are not inferred from the structural ownership edge. Final CURRENT_FOR_CAPTURED_SUBJECT is scoped to SELECTED_CAPTURED_SUBJECT_ONLY and does not establish persistent or cross-revision currentness. The facade is not a registered JAN-CSAA-007 OperationResponse, does not complete DWP-004, DWP-005, or DWP-006, and publishes FULL_JAN_CSAA_CAP_005_CALL_GRAPH, EXACT_OR_EXCLUSIVE_CALL_TARGETS, EXHAUSTIVE_CALLER_SETS, INVOCATION_SPECIFIC_RESOLVED_SIGNATURES, DISPATCH_CLOSURE_OVERRIDE_CLOSURE_OR_POINTS_TO_CLOSURE, RUNTIME_CALLER_EVALUATION_OWNER_OR_EXECUTION_OBSERVATION, PACKAGE_FRAMEWORK_TEST_DYNAMIC_DEPENDENCY_INJECTION_EVENT_DECORATOR_REFLECTION_CONFIG_GENERATED_EXTERNAL_OR_RUNTIME_ENTRY_CLOSURE, WHOLE_REPOSITORY_OR_WHOLE_PROGRAM_REACHABILITY, JAN_CSAA_CAP_006_CONTROL_FLOW, JAN_CSAA_CAP_007_DATA_FLOW, JAN_CSAA_CAP_009_GRAPH_COMPOSITION, JAN_CSAA_CAP_026_ARCHITECTURE_DISCOVERY, JAN_CSAA_CAP_029_SEMANTIC_QUERY, JAN_CSAA_CAP_030_CODE_SLICE, JAN_CSAA_CAP_031_CHANGE_IMPACT, JAN_CSAA_CAP_032_SEMANTIC_COMPARISON, DWP_004_DWP_005_OR_DWP_006_COMPLETION, FULL_JAN_CSAA_007_008_009_010_OR_011_CONFORMANCE, JAN_CSAA_007_REGISTERED_OPERATION_OR_OPERATION_RESPONSE_ENVELOPE, PROVIDER_QUALIFICATION, PERSISTED_OR_DESERIALIZED_CAPTURE_REPLAY, PERSISTENT_FRESHNESS_OR_CROSS_REVISION_CURRENTNESS, WORKING_CHANGE_MERGE_BASE_TARGET_REVISION_OR_CANDIDATE_MERGE_BINDING, ZERO_EDGE_ZERO_INCOMING_EDGE_OR_UNREACHED_NODE_AS_UNUSED_DEAD_ORPHAN_IRRELEVANT_NON_IMPACT_OR_SAFE_REMOVAL, RECOGNIZED_ARCHITECTURE_ARCHITECTURE_VIOLATION_OR_LAYER_CONFORMANCE, BEHAVIORAL_PRESERVATION_OR_TEST_SELECTION_PROOF, RULE_FINDING_SEVERITY_GATE_DESIGN_MERGE_REMEDIATION_OR_DISPOSITION_AUTHORITY. Its bounded best-effort JSONL progress transport is excluded from report identity and evidence. The machine-facing coding-agent invocation bun run --silent csaa:analyze:call-graph is CONFIGURED_NOT_RUN by inventory generation. The package root exports the report contract, runner, progress-event schema, and transport schema/limits/types; the bounded builder seam, parsed-request command adapter, JSONL writer, failure classifier, and internal TS_TYPE capture seam remain implementation-private. Exact/exhaustive caller sets, reachability, dead-code or safe-removal conclusions, architecture discovery or violation, query, slicing, impact, comparison, findings, gates, remediation, and disposition remain outside this facade.",
       "id": "call-graph",
       "provenance": [
         "packages/csaa/src/contracts/call-graph.ts",
@@ -626,6 +629,18 @@
         "packages/csaa/src/graph/call-graph-ids.ts",
         "packages/csaa/src/graph/call-graph-input.ts",
         "packages/csaa/src/graph/validate-call-graph.ts",
+        "packages/csaa/src/contracts/call-graph-report.ts",
+        "packages/csaa/src/index.test.ts",
+        "packages/csaa/src/index.ts",
+        "packages/csaa/src/application/call-graph-command.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.ts",
+        "packages/csaa/src/application/run-call-graph-command.ts",
+        "packages/csaa/src/application/run-call-graph-report.test.ts",
+        "packages/csaa/src/application/run-call-graph-report.ts",
+        "packages/csaa/src/application/run-project-context-report.ts",
+        "packages/csaa/src/graph/build-call-graph.test.ts",
+        "scripts/csaa-call-graph.ts",
         "packages/csaa/src/contracts/semantic.ts",
         "packages/csaa/src/providers/typescript/compiler-input-journal.ts",
         "packages/csaa/src/providers/typescript/extract-static-raw.ts",
@@ -636,7 +651,8 @@
         "packages/csaa/src/semantic/raw-semantic-model.ts",
         "packages/csaa/src/semantic/normalize-semantic-snapshot.ts",
         "packages/csaa/src/semantic/validate-snapshot.ts",
-        "packages/csaa/src/providers/typescript/extract-types.ts"
+        "packages/csaa/src/providers/typescript/extract-types.ts",
+        "package.json#/scripts/csaa:analyze:call-graph"
       ],
       "provider": "typescript",
       "state": "PARTIAL"
@@ -1344,6 +1360,18 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/check-types"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "bun scripts/csaa-call-graph.ts",
+      "name": "csaa:analyze:call-graph",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/csaa:analyze:call-graph"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -2537,6 +2565,9 @@
         "bun.lock",
         "package.json",
         "package.json#/scripts/check-types",
+        "packages/csaa/src/application/call-graph-command.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.ts",
         "packages/csaa/src/application/declaration-context-command.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
@@ -2552,6 +2583,9 @@
         "packages/csaa/src/application/read-write-access-command.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+        "packages/csaa/src/application/run-call-graph-command.ts",
+        "packages/csaa/src/application/run-call-graph-report.test.ts",
+        "packages/csaa/src/application/run-call-graph-report.ts",
         "packages/csaa/src/application/run-declaration-context-command.ts",
         "packages/csaa/src/application/run-declaration-context-report.test.ts",
         "packages/csaa/src/application/run-declaration-context-report.ts",
@@ -2576,6 +2610,7 @@
         "packages/csaa/src/application/structural-scc-command.test.ts",
         "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
         "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
+        "packages/csaa/src/contracts/call-graph-report.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -2599,6 +2634,7 @@
         "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-report.ts",
+        "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
@@ -2726,6 +2762,7 @@
         "packages/rph-product-realization-pwa/tsconfig.json",
         "packages/rph-projections/tsconfig.build.json",
         "packages/rph-projections/tsconfig.json",
+        "scripts/csaa-call-graph.ts",
         "scripts/csaa-declaration-context.ts",
         "scripts/csaa-module-dependency.ts",
         "scripts/csaa-module-resolution-trace.ts",
@@ -2763,7 +2800,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "a52a6140011f3b453bbe4744cc0761aec927f65757bbc0dd9abdfb4ad134c27e",
+    "configurationDigest": "a0a1b8e430d6fa873bf7a6187b8890e9c3a942becb105645262162b2c62e5068",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -2852,9 +2889,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 6403,
+          "bytes": 6466,
           "path": "package.json",
-          "sha256": "269625c0c582b17567ab56a7d9b79476015288fea70ee9cdfe025d7ce0ce66e8"
+          "sha256": "10f7c90f8fd335a9618337db601b78f571643a1c5fc25cac6a148e3149f851e0"
         },
         {
           "artifactClass": "MANIFEST",
@@ -3522,17 +3559,20 @@
           "configPath": "packages/csaa/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "4757360516b3264dd321e527e51d9dcd1a75873091734ceead7d55341cbb87ec",
+          "projectResolutionDigest": "b1329c3433131c51e2bc462eb381f0d2c096d713f2a0d4e9d9025e75905b297d",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/application/call-graph-progress-jsonl.ts",
             "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
             "packages/csaa/src/application/module-dependency-progress-jsonl.ts",
             "packages/csaa/src/application/module-resolution-trace-progress-jsonl.ts",
             "packages/csaa/src/application/project-context-progress-jsonl.ts",
             "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+            "packages/csaa/src/application/run-call-graph-command.ts",
+            "packages/csaa/src/application/run-call-graph-report.ts",
             "packages/csaa/src/application/run-declaration-context-command.ts",
             "packages/csaa/src/application/run-declaration-context-report.ts",
             "packages/csaa/src/application/run-module-dependency-command.ts",
@@ -3547,6 +3587,7 @@
             "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
             "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
+            "packages/csaa/src/contracts/call-graph-report.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
             "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -3733,12 +3774,15 @@
           "configPath": "packages/csaa/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "bf1db855e5eaa8c5b642fedf53df4fd31a5a3b55707d34ffca2257eeb6255089",
+          "projectResolutionDigest": "9579492ee7a35bb980f983d14ef121aa2e1a7f6f8f023a77ab213b2958f8f631",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "packages/csaa/src/application/call-graph-command.test.ts",
+            "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+            "packages/csaa/src/application/call-graph-progress-jsonl.ts",
             "packages/csaa/src/application/declaration-context-command.test.ts",
             "packages/csaa/src/application/declaration-context-progress-jsonl.test.ts",
             "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
@@ -3754,6 +3798,9 @@
             "packages/csaa/src/application/read-write-access-command.test.ts",
             "packages/csaa/src/application/read-write-access-progress-jsonl.test.ts",
             "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+            "packages/csaa/src/application/run-call-graph-command.ts",
+            "packages/csaa/src/application/run-call-graph-report.test.ts",
+            "packages/csaa/src/application/run-call-graph-report.ts",
             "packages/csaa/src/application/run-declaration-context-command.ts",
             "packages/csaa/src/application/run-declaration-context-report.test.ts",
             "packages/csaa/src/application/run-declaration-context-report.ts",
@@ -3779,6 +3826,7 @@
             "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
             "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
             "packages/csaa/src/contracts/arrow-command-census.ts",
+            "packages/csaa/src/contracts/call-graph-report.ts",
             "packages/csaa/src/contracts/call-graph.ts",
             "packages/csaa/src/contracts/command-dispatch-topology.ts",
             "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -5294,16 +5342,17 @@
               "node"
             ]
           },
-          "configClosureDigest": "bd1a221969bcf2a544c07fb4000ab6d7b1e3375f35b062c3f3fe5a49a36501bf",
+          "configClosureDigest": "ff59c1b36108ea3e22ea1adba3b60016ad68566ef6536a2e396b843ea0451674",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "49a13afa6630f0c96af623578ab6371ad2ff58f02c12959a1a6e0fe9a9a4d85e",
+          "projectResolutionDigest": "4a94ca8bb220e2a06d0b4df42c74dffd6dd2472d4028e2028254649f9e69b398",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "scripts/csaa-call-graph.ts",
             "scripts/csaa-declaration-context.ts",
             "scripts/csaa-inventory.ts",
             "scripts/csaa-module-dependency.ts",
@@ -5356,11 +5405,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "c179fe9005985d745070d1fef2de2f1f161b2adb1925c19fbd0a60d3a84cf8d6",
+          "configClosureDigest": "79ddb1686cc1f563168d3f1f76b32c488dad93584e42bc43f4089b0b13d0638c",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "4b1d7b9ada1a1cbac6eea6bfdb80cf1b63586703d6b0959f411ffbb284035b23",
+          "projectResolutionDigest": "cabe45d67387da9a61f63bf469cfb2d90ee4552a4cfdc6c43cc348455790f358",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5394,11 +5443,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "82ebd01318147d709d5a2743149c265b311c08993abd9b704d9f26fb8933e3bf",
+          "configClosureDigest": "1d73d5a7ed93819c7655e23d891bc17cda1701de13d145d3078ab9d3316085c6",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "0f088bc8c516fbfec7441a6167cd8f9177f7e761718cc897711f6f767d324b31",
+          "projectResolutionDigest": "5df6f5d69d398dbc8a28cab4a2f3b69d3f3e453a1250d0ad84afeb1f2484d40f",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -6139,7 +6188,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "84e1a9ad1b2348c7eb8af672b0c5d1caa8e8d4f5666b9d9f50b17378dced92ac",
+    "fileManifestDigest": "625ec548b9cde1ba1e77088b14d69401941bb2ccc9c52c184a22111acc23061f",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -6202,7 +6251,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 1031,
+    "selectedFileCount": 1039,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -7326,9 +7375,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 6403,
+        "bytes": 6466,
         "path": "package.json",
-        "sha256": "269625c0c582b17567ab56a7d9b79476015288fea70ee9cdfe025d7ce0ce66e8",
+        "sha256": "10f7c90f8fd335a9618337db601b78f571643a1c5fc25cac6a148e3149f851e0",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -7344,6 +7393,27 @@
         "path": "packages/csaa/package.json",
         "sha256": "0ec113c9146d0c6193b9b6794eae51ee95f8df8006da816aa62194e517810567",
         "subjectArtifactClass": "MANIFEST"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 9999,
+        "path": "packages/csaa/src/application/call-graph-command.test.ts",
+        "sha256": "9269c7eef7392b3f4bd267894751be48eee8c240c12f052d33414ef648b1e390",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 4054,
+        "path": "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+        "sha256": "be8073b0a9c274b2b8f1807015b72bf3cddfab4b5f31f025785fe33462f4b9a4",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 4299,
+        "path": "packages/csaa/src/application/call-graph-progress-jsonl.ts",
+        "sha256": "8fa6414964b01c93298808f9f215a437d3b177e514804cbe50b5e1f4c0571325",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
@@ -7452,6 +7522,27 @@
       },
       {
         "artifactClass": "SOURCE",
+        "bytes": 1059,
+        "path": "packages/csaa/src/application/run-call-graph-command.ts",
+        "sha256": "77823180122536632527448768da7e99e8f55e55e8478d28d0fc8c48513f6c71",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 15608,
+        "path": "packages/csaa/src/application/run-call-graph-report.test.ts",
+        "sha256": "435bac5127e35e3252ca64628c7ac863fc0e00cd4b52a6249bb9f773440302d2",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 33225,
+        "path": "packages/csaa/src/application/run-call-graph-report.ts",
+        "sha256": "4839fd72a47cd212b5de2b58ff73cd97061698bd201e3e9378d6e01783edc112",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
         "bytes": 1163,
         "path": "packages/csaa/src/application/run-declaration-context-command.ts",
         "sha256": "ac43b8a930994b9b55752e17010f96b29225c7ff855b2a4d367e47d91146cece",
@@ -7522,9 +7613,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 45554,
+        "bytes": 45864,
         "path": "packages/csaa/src/application/run-project-context-report.ts",
-        "sha256": "9075271f9d90c2d369a02556d95499b6c20f193e2acb79611fd381d9c564015a",
+        "sha256": "62ed096c0e8766e0eff6b84b4d0f7d7b0a7e543df4c181259c47dce4b1badbef",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7623,6 +7714,13 @@
         "bytes": 23284,
         "path": "packages/csaa/src/contracts/arrow-command-census.ts",
         "sha256": "f3cc0e1200da9dced366fd9f06f916af270a1bfcca7c4b3ddcbbe19827d4c778",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 10223,
+        "path": "packages/csaa/src/contracts/call-graph-report.ts",
+        "sha256": "747b707457ea35cffa9aae2ba7aca074f7bc149fe30741df740bb99eef770980",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -7830,16 +7928,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 100201,
+        "bytes": 107369,
         "path": "packages/csaa/src/graph/build-call-graph.test.ts",
-        "sha256": "fd8fcae8a6dfa3699da88fd037eb8e341d38063999f19c4ab2c63eec1c12d7f0",
+        "sha256": "a21db06f8d863fef2761eb10ee5e5f2f23b82cfef7abd173df44826a3868e966",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 64024,
+        "bytes": 78934,
         "path": "packages/csaa/src/graph/build-call-graph.ts",
-        "sha256": "056acd1fde5d0ac77d21fafbfe7855350f93388e52d8102a5dee8ffdd5d9f8f1",
+        "sha256": "5ef920ed0a11277e792f494fdc393199033b051670aa926c6c259c438c31817a",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8404,16 +8502,16 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 34654,
+        "bytes": 36144,
         "path": "packages/csaa/src/index.test.ts",
-        "sha256": "fc677731a79b1f9b5497777db485ced506b25f7c85f812bb7746455b6e240f56",
+        "sha256": "e4b84e553717263db4ad244c6eb22a3e8eb0d36f909211e3bae6c95e6e1ffadd",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 15499,
+        "bytes": 16150,
         "path": "packages/csaa/src/index.ts",
-        "sha256": "7a125c54b15946b9769c6a6af07cf582f5ad35ef452330369f86c8ecab25c75a",
+        "sha256": "52369845711416c16da257a57e8ef15a75a327479f8b421b26d4cfc33f7ba15b",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -8439,16 +8537,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 148020,
+        "bytes": 152501,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "7ef299aab35be26deee481c1a742ae19c6461856b1d5f65d1315425462e4c832",
+        "sha256": "a7f5ee5de622dc2f1e73d2bb43f871d8a247b7b7df7635d5c7e045e2fe8a4921",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 168681,
+        "bytes": 173527,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "95c5a29e432ac597ea37d848a5411f91fc9637505254a8a5cf3fdc2ba73433cc",
+        "sha256": "b4fceb187e6b4941c279327220b4a91e4ee3da0a381ae71c938ec16cab6b0dab",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -9351,7 +9449,7 @@
         "artifactClass": "TEST",
         "bytes": 70288,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "b7a229172fad1789d0054f4e7ac0786f7049e408d0f6aefd0d99228e502d4abb",
+        "sha256": "8c6f010267dff6266f1abcca59130a7c8b3ae2b132778f9722f4bc1aacd78f57",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -12856,6 +12954,13 @@
       },
       {
         "artifactClass": "SCRIPT",
+        "bytes": 3095,
+        "path": "scripts/csaa-call-graph.ts",
+        "sha256": "b6a2ec49665e7a457f6f09dd895202f99673b815913caace91070904cbd80757",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
         "bytes": 3122,
         "path": "scripts/csaa-declaration-context.ts",
         "sha256": "934e268366def588ec0b2a04cf8fce9c23086d49d1ea447077bee43333a44208",
@@ -13422,7 +13527,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "6647cc3efab1606b793819453403d8e8199be856d54d04896fe660e2ccfe9970",
+    "subjectId": "c68478641e37d25165e8267e09d3268aa28dc339824200ad85bf395babe2407e",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -13870,7 +13975,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 171,
+      "candidateArtifactCount": 175,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -13897,11 +14002,14 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/application/call-graph-progress-jsonl.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
         "packages/csaa/src/application/module-dependency-progress-jsonl.ts",
         "packages/csaa/src/application/module-resolution-trace-progress-jsonl.ts",
         "packages/csaa/src/application/project-context-progress-jsonl.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+        "packages/csaa/src/application/run-call-graph-command.ts",
+        "packages/csaa/src/application/run-call-graph-report.ts",
         "packages/csaa/src/application/run-declaration-context-command.ts",
         "packages/csaa/src/application/run-declaration-context-report.ts",
         "packages/csaa/src/application/run-module-dependency-command.ts",
@@ -13916,6 +14024,7 @@
         "packages/csaa/src/application/structural-module-reachability-progress-jsonl.ts",
         "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
+        "packages/csaa/src/contracts/call-graph-report.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -14075,7 +14184,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 287,
+      "candidateArtifactCount": 294,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -14102,6 +14211,9 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "packages/csaa/src/application/call-graph-command.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.ts",
         "packages/csaa/src/application/declaration-context-command.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
@@ -14117,6 +14229,9 @@
         "packages/csaa/src/application/read-write-access-command.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+        "packages/csaa/src/application/run-call-graph-command.ts",
+        "packages/csaa/src/application/run-call-graph-report.test.ts",
+        "packages/csaa/src/application/run-call-graph-report.ts",
         "packages/csaa/src/application/run-declaration-context-command.ts",
         "packages/csaa/src/application/run-declaration-context-report.test.ts",
         "packages/csaa/src/application/run-declaration-context-report.ts",
@@ -14142,6 +14257,7 @@
         "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
         "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
+        "packages/csaa/src/contracts/call-graph-report.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -15509,7 +15625,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 23,
+      "candidateArtifactCount": 24,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -15538,6 +15654,7 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "scripts/csaa-call-graph.ts",
         "scripts/csaa-declaration-context.ts",
         "scripts/csaa-inventory.ts",
         "scripts/csaa-module-dependency.ts",
@@ -15719,6 +15836,9 @@
         "capabilities#type-graph",
         "capabilities#typescript-ast",
         "package.json",
+        "packages/csaa/src/application/call-graph-command.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.ts",
         "packages/csaa/src/application/declaration-context-command.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
@@ -15734,6 +15854,9 @@
         "packages/csaa/src/application/read-write-access-command.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+        "packages/csaa/src/application/run-call-graph-command.ts",
+        "packages/csaa/src/application/run-call-graph-report.test.ts",
+        "packages/csaa/src/application/run-call-graph-report.ts",
         "packages/csaa/src/application/run-declaration-context-command.ts",
         "packages/csaa/src/application/run-declaration-context-report.test.ts",
         "packages/csaa/src/application/run-declaration-context-report.ts",
@@ -15759,6 +15882,7 @@
         "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
         "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
+        "packages/csaa/src/contracts/call-graph-report.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -15786,6 +15910,7 @@
         "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-report.ts",
+        "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
@@ -15920,6 +16045,7 @@
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
         "packages/rph-contracts/vocab/m3-commands-events.json",
+        "scripts/csaa-call-graph.ts",
         "scripts/csaa-declaration-context.ts",
         "scripts/csaa-module-dependency.ts",
         "scripts/csaa-module-resolution-trace.ts",
@@ -15929,11 +16055,14 @@
         "scripts/csaa-structural-scc.ts",
         "verif/event-surface-census.test.ts"
       ],
-      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary project-context, module-dependency, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED."
+      "statement": "TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge, the complete selected open static call projection with every retained invocation and candidate/frontier edge, and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies, callers, or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary project-context, module-dependency, call-graph, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED."
     },
     {
       "provenance": [
         "package.json",
+        "packages/csaa/src/application/call-graph-command.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.test.ts",
+        "packages/csaa/src/application/call-graph-progress-jsonl.ts",
         "packages/csaa/src/application/declaration-context-command.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.test.ts",
         "packages/csaa/src/application/declaration-context-progress-jsonl.ts",
@@ -15949,6 +16078,9 @@
         "packages/csaa/src/application/read-write-access-command.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.test.ts",
         "packages/csaa/src/application/read-write-access-progress-jsonl.ts",
+        "packages/csaa/src/application/run-call-graph-command.ts",
+        "packages/csaa/src/application/run-call-graph-report.test.ts",
+        "packages/csaa/src/application/run-call-graph-report.ts",
         "packages/csaa/src/application/run-declaration-context-command.ts",
         "packages/csaa/src/application/run-declaration-context-report.test.ts",
         "packages/csaa/src/application/run-declaration-context-report.ts",
@@ -15974,6 +16106,7 @@
         "packages/csaa/src/application/structural-scc-progress-jsonl.test.ts",
         "packages/csaa/src/application/structural-scc-progress-jsonl.ts",
         "packages/csaa/src/contracts/arrow-command-census.ts",
+        "packages/csaa/src/contracts/call-graph-report.ts",
         "packages/csaa/src/contracts/call-graph.ts",
         "packages/csaa/src/contracts/command-dispatch-topology.ts",
         "packages/csaa/src/contracts/command-event-contract-overlay.ts",
@@ -15997,6 +16130,7 @@
         "packages/csaa/src/contracts/structural-module-reachability-report.ts",
         "packages/csaa/src/contracts/structural-scc-analysis.ts",
         "packages/csaa/src/contracts/structural-scc-report.ts",
+        "packages/csaa/src/graph/build-call-graph.test.ts",
         "packages/csaa/src/graph/build-call-graph.ts",
         "packages/csaa/src/graph/build-command-dispatch-topology.ts",
         "packages/csaa/src/graph/build-command-event-contract-overlay.ts",
@@ -16114,6 +16248,7 @@
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/tsconfig.json",
         "packages/rph-contracts/vocab/m3-commands-events.json",
+        "scripts/csaa-call-graph.ts",
         "scripts/csaa-declaration-context.ts",
         "scripts/csaa-module-dependency.ts",
         "scripts/csaa-module-resolution-trace.ts",
@@ -16137,7 +16272,7 @@
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/route-action-census.test.ts"
       ],
-      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it does not change retained verifier authority. The structural module reachability analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority. The preliminary structural module reachability report facade adds no authority; its final selected-captured-subject currentness does not create semantic-query, code-slice, change-impact, whole-program, irrelevance, non-impact, or safe-removal proof. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The logical graph composition has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is NOT_CLAIMED. The project context graph has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. The preliminary project-context report facade adds no authority; its separate final selected-captured-subject currentness observation does not alter or promote those embedded graph fields. Full JAN-CSAA-010 conformance is NOT_CLAIMED. The conditional export resolution has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-012 conformance is NOT_CLAIMED. The module resolution trace has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. The preliminary module-resolution-trace report facade adds no authority; its final selected-captured-subject currentness observation does not assess compiler-capture or CONTEXT_ONLY-target filesystem currentness and does not alter or promote embedded predecessor fields. Full JAN-CSAA-011 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The declaration context analysis has analysis authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. The preliminary declaration-context report facade adds no authority; its final selected-captured-subject currentness does not assess compiler-capture or CONTEXT_ONLY-target filesystem currentness and does not alter or promote embedded predecessor fields. Its selected same-root zero-hop direct or one-hop local-only explicit-ExportSpecifier declaration-binding slice is implemented without conferring authority over broader declaration, merge, augmentation, ambient-effect, CAP-002, or CAP-023 surfaces. Full JAN-CSAA-013 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The source origin correlation has analysis authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. It accepts a self-contained FrozenSubject and StaticSemanticSnapshot request without a CAP-013 predecessor and implements only the strict external flat version-3 declaration-map slice over exact fresh re-emission and caller captures. The configured smoke's ignored local target and map captures are absent from FrozenSubject and are neither checked-in build-output provenance nor freshness, currentness, or build-authority evidence. Full JAN-CSAA-014 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The read/write-access report facade has analysis authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority, does not promote the embedded PARTIAL/OPEN projection, and is not JAN-CSAA-CAP-007 data flow. The module-dependency report facade has analysis authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority, does not promote an embedded COMPLETE/CLOSED selected compiler projection to full CAP-004 or whole-program closure, and confers no query, slicing, impact, architecture, dead-code, or safe-removal conclusion. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, preliminary report facades, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
+      "statement": "Existing graph-relevant verif censuses remain authoritative for their specialized repository gates. The arrow-command analyzer's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-arrow-command-census using method jpwb-retained-arrow-command-census-adapter/0.1.0, while its source, exact baseline, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged. The guard-enforcement ledger's WRAP integration strategy is IMPLEMENTED by bounded CSAA adapter jan-csaa-jpwb-guard-enforcement-ledger using method jpwb-retained-guard-enforcement-ledger-adapter/0.1.0; its retained analyzer, data, tests, RETAINED_DELEGATED verifier authority, oracle, and gate effect remain unchanged, and its Vitest authority is not executed by CSAA. The static command-handler projection independently reconciles COMMANDS and HANDLERS and correlates retained sites. The compositional command-bus topology overlay references that predecessor graph and binds the retained command-dispatch census artifact by exact identity, but does not execute, normalize, integrate, replace, or infer runtime behavior from that literal-presence proxy. The static command-event-contract overlay binds the exact vocabulary and retained event-surface artifacts, reproduces only the supported BOUND formula and dated pinned EMITTED declaration, and does not execute or integrate the retained Vitest gate; its RETAINED_DELEGATED authority, oracle, baseline, and gate effect remain unchanged. The structural SCC analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it does not change retained verifier authority. The structural module reachability analysis has graph authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority. The preliminary structural module reachability report facade adds no authority; its final selected-captured-subject currentness does not create semantic-query, code-slice, change-impact, whole-program, irrelevance, non-impact, or safe-removal proof. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing. The logical graph composition has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is NOT_CLAIMED. The project context graph has graph authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. The preliminary project-context report facade adds no authority; its separate final selected-captured-subject currentness observation does not alter or promote those embedded graph fields. Full JAN-CSAA-010 conformance is NOT_CLAIMED. The conditional export resolution has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. Full JAN-CSAA-012 conformance is NOT_CLAIMED. The module resolution trace has resolution authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. The preliminary module-resolution-trace report facade adds no authority; its final selected-captured-subject currentness observation does not assess compiler-capture or CONTEXT_ONLY-target filesystem currentness and does not alter or promote embedded predecessor fields. Full JAN-CSAA-011 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The declaration context analysis has analysis authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. The preliminary declaration-context report facade adds no authority; its final selected-captured-subject currentness does not assess compiler-capture or CONTEXT_ONLY-target filesystem currentness and does not alter or promote embedded predecessor fields. Its selected same-root zero-hop direct or one-hop local-only explicit-ExportSpecifier declaration-binding slice is implemented without conferring authority over broader declaration, merge, augmentation, ambient-effect, CAP-002, or CAP-023 surfaces. Full JAN-CSAA-013 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The source origin correlation has analysis authority NONE, authority transfer NONE, and gate effect NONE; freshness is NOT_ASSESSED, currentness is NOT_CLAIMED, and it changes no retained verifier authority. It accepts a self-contained FrozenSubject and StaticSemanticSnapshot request without a CAP-013 predecessor and implements only the strict external flat version-3 declaration-map slice over exact fresh re-emission and caller captures. The configured smoke's ignored local target and map captures are absent from FrozenSubject and are neither checked-in build-output provenance nor freshness, currentness, or build-authority evidence. Full JAN-CSAA-014 conformance is NOT_CLAIMED, full JAN-CSAA-007 conformance is NOT_CLAIMED, and full JAN-CSAA-008 conformance is NOT_CLAIMED. The read/write-access report facade has analysis authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority, does not promote the embedded PARTIAL/OPEN projection, and is not JAN-CSAA-CAP-007 data flow. The module-dependency report facade has analysis authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority, does not promote an embedded COMPLETE/CLOSED selected compiler projection to full CAP-004 or whole-program closure, and confers no query, slicing, impact, architecture, dead-code, or safe-removal conclusion. The call-graph report facade has analysis authority NONE, authority transfer NONE, and gate effect NONE; it changes no retained verifier authority, does not promote the embedded PARTIAL/OPEN graph to full CAP-005, exact or exhaustive callers, dispatch or entry closure, whole-program reachability, dead-code, or safe-removal proof. The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED. Neither wrapper, preliminary report facades, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority. No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance. Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed."
     },
     {
       "provenance": [
@@ -16159,6 +16294,21 @@
     }
   ],
   "verificationAssets": [
+    {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-call-graph.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "b6a2ec49665e7a457f6f09dd895202f99673b815913caace91070904cbd80757",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
+      "gateCarriers": [
+        "package.json#/scripts/csaa:analyze:call-graph"
+      ],
+      "path": "scripts/csaa-call-graph.ts",
+      "provenance": [
+        "scripts/csaa-call-graph.ts"
+      ],
+      "role": "SCRIPT"
+    },
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-declaration-context.ts at execution time.",
       "associatedBaselines": [],

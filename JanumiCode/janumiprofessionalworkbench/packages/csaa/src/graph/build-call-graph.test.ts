@@ -27,7 +27,7 @@ import {
 import { buildStaticSemanticSnapshot } from '../semantic/build-static-semantic-snapshot.js';
 import { canonicalSemanticJson } from '../semantic/canonical.js';
 import { resolveSubject } from '../subject/resolve-subject.js';
-import { buildCallGraph } from './build-call-graph.js';
+import { buildBoundedCallGraph, buildCallGraph } from './build-call-graph.js';
 import { callGraphContentDigest } from './call-graph-content.js';
 import { callGraphEdgeId } from './call-graph-ids.js';
 import { validateCallGraph } from './validate-call-graph.js';
@@ -258,6 +258,33 @@ function graphRequest(semanticSnapshot: StaticSemanticSnapshot): BuildCallGraphR
 	};
 }
 
+function boundedAttempt(semanticSnapshot: StaticSemanticSnapshot, maxClassificationSteps: number) {
+	return buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+		budgets: {
+			maxClassificationSteps,
+			maxEdges: 50_000,
+			maxLimitations: 50_004,
+			maxNodes: 75_000
+		}
+	});
+}
+
+function minimumClassificationSteps(semanticSnapshot: StaticSemanticSnapshot): number {
+	let lower = 1;
+	let upper = 1;
+	while (boundedAttempt(semanticSnapshot, upper).outcome === 'unavailable') {
+		lower = upper + 1;
+		upper *= 2;
+		if (upper > 100_000_000) throw new Error('Classification boundary was not admitted.');
+	}
+	while (lower < upper) {
+		const middle = Math.floor((lower + upper) / 2);
+		if (boundedAttempt(semanticSnapshot, middle).outcome === 'unavailable') lower = middle + 1;
+		else upper = middle;
+	}
+	return lower;
+}
+
 function callSites(graph: CallGraphSnapshot): CallGraphCallSiteNode[] {
 	return graph.nodes.filter((node): node is CallGraphCallSiteNode => node.kind === 'CALL_SITE');
 }
@@ -386,6 +413,190 @@ afterEach(() => {
 });
 
 describe('buildCallGraph', () => {
+	it('admits exact graph populations before materialization and preserves legacy graph bytes', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const legacy = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (legacy.outcome === 'unavailable') throw new Error(JSON.stringify(legacy));
+		const exactBudgets = {
+			maxClassificationSteps: 10_000_000,
+			maxEdges: legacy.graph.edges.length,
+			maxLimitations: legacy.graph.limitations.length,
+			maxNodes: legacy.graph.nodes.length
+		};
+		const bounded = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+			budgets: exactBudgets
+		});
+		expect(bounded).toEqual(legacy);
+
+		for (const key of ['maxEdges', 'maxLimitations', 'maxNodes'] as const) {
+			const refused = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+				budgets: { ...exactBudgets, [key]: exactBudgets[key] - 1 }
+			});
+			expect(refused, key).toMatchObject({
+				diagnostics: [
+					expect.objectContaining({
+						code: 'BUDGET_EXCEEDED',
+						path: `$options.budgets.${key}`
+					})
+				],
+				outcome: 'unavailable'
+			});
+		}
+	});
+
+	it('bounds classification work independently of graph populations', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+			budgets: {
+				maxClassificationSteps: 1,
+				maxEdges: 50_000,
+				maxLimitations: 50_004,
+				maxNodes: 75_000
+			}
+		});
+		expect(outcome).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'BUDGET_EXCEEDED',
+					path: '$options.budgets.maxClassificationSteps'
+				})
+			],
+			outcome: 'unavailable'
+		});
+	});
+
+	it('admits the exact classification-inspection boundary and refuses one step below it', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const boundary = minimumClassificationSteps(semanticSnapshot);
+		const admitted = boundedAttempt(semanticSnapshot, boundary);
+		expect(admitted.outcome).toBe('partial');
+		const refused = boundedAttempt(semanticSnapshot, boundary - 1);
+		expect(refused).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'BUDGET_EXCEEDED',
+					path: '$options.budgets.maxClassificationSteps'
+				})
+			],
+			outcome: 'unavailable'
+		});
+	});
+
+	it('precharges wide callee traversal and multi-reference ordering before bounded work', () => {
+		const targetReferences = Array.from({ length: 128 }, () => 'target').join(', ');
+		const narrowSubtree = snapshot(
+			fixtureFromSource('function target(): void {}\n([target][0])();')
+		);
+		const wideSubtree = snapshot(
+			fixtureFromSource(`function target(): void {}\n([${targetReferences}][0])();`)
+		);
+		const narrowReferences = snapshot(
+			fixtureFromSource('function target(): void {}\n(target, target)();')
+		);
+		const wideReferences = snapshot(
+			fixtureFromSource(`function target(): void {}\n(${targetReferences})();`)
+		);
+
+		const narrowSubtreeBoundary = minimumClassificationSteps(narrowSubtree);
+		const wideSubtreeBoundary = minimumClassificationSteps(wideSubtree);
+		const narrowReferenceBoundary = minimumClassificationSteps(narrowReferences);
+		const wideReferenceBoundary = minimumClassificationSteps(wideReferences);
+		expect(wideSubtreeBoundary).toBeGreaterThan(narrowSubtreeBoundary);
+		expect(wideReferenceBoundary).toBeGreaterThan(narrowReferenceBoundary);
+
+		for (const [semanticSnapshot, boundary] of [
+			[wideSubtree, wideSubtreeBoundary],
+			[wideReferences, wideReferenceBoundary]
+		] as const) {
+			expect(boundedAttempt(semanticSnapshot, boundary).outcome).toBe('partial');
+			expect(boundedAttempt(semanticSnapshot, boundary - 1)).toMatchObject({
+				diagnostics: [
+					expect.objectContaining({
+						code: 'BUDGET_EXCEEDED',
+						path: '$options.budgets.maxClassificationSteps'
+					})
+				],
+				outcome: 'unavailable'
+			});
+		}
+	});
+
+	it('refuses a monotonic base-population breach before invocation classification', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+			budgets: {
+				maxClassificationSteps: 1,
+				maxEdges: 50_000,
+				maxLimitations: 50_004,
+				maxNodes: 1
+			}
+		});
+		expect(outcome).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'BUDGET_EXCEEDED',
+					path: '$options.budgets.maxNodes'
+				})
+			],
+			outcome: 'unavailable'
+		});
+	});
+
+	it('refuses mandatory per-invocation edge and limitation minima before classification', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const invocationCount = semanticSnapshot.invocations.length;
+		const minimumLimitations = 3 + Number(semanticSnapshot.health === 'PARTIAL') + invocationCount;
+		for (const scenario of [
+			{ key: 'maxEdges' as const, value: invocationCount * 2 - 1 },
+			{ key: 'maxLimitations' as const, value: minimumLimitations - 1 }
+		]) {
+			const outcome = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+				budgets: {
+					maxClassificationSteps: 1,
+					maxEdges: 50_000,
+					maxLimitations: 50_004,
+					maxNodes: 75_000,
+					[scenario.key]: scenario.value
+				}
+			});
+			expect(outcome, scenario.key).toMatchObject({
+				diagnostics: [
+					expect.objectContaining({
+						code: 'BUDGET_EXCEEDED',
+						path: `$options.budgets.${scenario.key}`
+					})
+				],
+				outcome: 'unavailable'
+			});
+		}
+	});
+
+	it('refuses candidate fanout at the remaining edge allowance', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const legacy = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (legacy.outcome === 'unavailable') throw new Error(JSON.stringify(legacy));
+		expect(legacy.graph.coverage.candidateTargetEdges).toBeGreaterThan(
+			legacy.graph.coverage.candidateSetCallSites
+		);
+		const outcome = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
+			budgets: {
+				maxClassificationSteps: 10_000_000,
+				maxEdges: semanticSnapshot.invocations.length * 2,
+				maxLimitations: 50_004,
+				maxNodes: 75_000
+			}
+		});
+		expect(outcome).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({
+					code: 'BUDGET_EXCEEDED',
+					path: '$options.budgets.maxEdges'
+				})
+			],
+			outcome: 'unavailable'
+		});
+	});
+
 	it('projects every invocation once without collapsing candidate, external, unresolved, or unsupported targets', () => {
 		const semanticSnapshot = snapshot(fixture('CALLS'));
 		expect(new Set(semanticSnapshot.invocations.map((entry) => entry.invocationKind))).toEqual(

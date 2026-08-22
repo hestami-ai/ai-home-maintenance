@@ -6,6 +6,14 @@ import {
 	CALL_GRAPH_OPERATION_VERSION,
 	CALL_GRAPH_REQUEST_SCHEMA_VERSION,
 	CALL_GRAPH_SCHEMA_VERSION,
+	CALL_GRAPH_PROGRESS_MAX_BYTES,
+	CALL_GRAPH_PROGRESS_MAX_EVENTS,
+	CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_OPERATION_VERSION,
+	CALL_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_SCHEMA_VERSION,
 	CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION,
 	CONDITIONAL_EXPORT_RESOLUTION_PROGRESS_SCHEMA_VERSION,
 	CONDITIONAL_EXPORT_RESOLUTION_REQUEST_SCHEMA_VERSION,
@@ -144,6 +152,7 @@ import {
 	STATE_MACHINE_TOPOLOGY_OBSERVATION_SCHEMA_VERSION,
 	TYPESCRIPT_PROVIDER_VERSION,
 	buildCallGraph,
+	callGraphReportExitCode,
 	buildConditionalExportResolution,
 	buildDeclarationContextAnalysis,
 	declarationContextReportExitCode,
@@ -175,6 +184,7 @@ import {
 	structuralSccReportExitCode,
 	buildStateMachineGraph,
 	buildStaticSemanticSnapshot,
+	runCallGraphReport,
 	canonicalSemanticJson,
 	canonicalSemanticJsonWitness,
 	compareDependencyProviders,
@@ -221,6 +231,12 @@ function manifest(relativeUrl: string): PackageManifest {
 describe('@janumipwb/csaa public semantic and graph surface', () => {
 	it('exports the DWP-003 semantic and bounded DWP-004 graph surfaces', () => {
 		expect(buildCallGraph).toBeTypeOf('function');
+		expect(runCallGraphReport).toBeTypeOf('function');
+		expect(callGraphReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('buildBoundedCallGraph');
+		expect(publicSurface).not.toHaveProperty('createCallGraphProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runCallGraphCommand');
+		expect(publicSurface).not.toHaveProperty('classifyCallGraphFailureState');
 		expect(buildConditionalExportResolution).toBeTypeOf('function');
 		expect(buildDeclarationContextAnalysis).toBeTypeOf('function');
 		expect(runDeclarationContextReport).toBeTypeOf('function');
@@ -351,6 +367,20 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(CALL_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-call-graph/0.1.0');
 		expect(CALL_GRAPH_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-call-graph-request/1.0.0');
 		expect(CALL_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-call-graph/1.0.0');
+		expect(CALL_GRAPH_REPORT_OPERATION_VERSION).toBe('jan-csaa-report-call-graph/0.1.0');
+		expect(CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-call-graph-report-request/0.1.0'
+		);
+		expect(CALL_GRAPH_REPORT_RESULT_SCHEMA_VERSION).toBe('jan-csaa-call-graph-report-result/0.1.0');
+		expect(CALL_GRAPH_REPORT_SCHEMA_VERSION).toBe('jan-csaa-call-graph-report/0.1.0');
+		expect(CALL_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-call-graph-report-progress/0.1.0'
+		);
+		expect(CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-call-graph-progress-transport/0.1.0'
+		);
+		expect(CALL_GRAPH_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(CALL_GRAPH_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(CONDITIONAL_EXPORT_RESOLUTION_OPERATION_VERSION).toBe(
 			'jan-csaa-resolve-conditional-export/0.1.0'
 		);

@@ -18,6 +18,17 @@ import {
 	ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY
 } from '../contracts/arrow-command-census.js';
 import {
+	CALL_GRAPH_REPORT_AUTHORITY,
+	CALL_GRAPH_REPORT_AUTHORITY_TRANSFER,
+	CALL_GRAPH_REPORT_GATE_EFFECT,
+	CALL_GRAPH_REPORT_NONCLAIMS,
+	CALL_GRAPH_REPORT_OPERATION_VERSION,
+	CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_SCHEMA_VERSION,
+	CALL_GRAPH_REPORT_SELECTION
+} from '../contracts/call-graph-report.js';
+import {
 	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_REGISTRY_PATH,
 	COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH,
@@ -223,6 +234,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=PROJECT_CONTEXT_GRAPH vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts';
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
+const CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 const READ_WRITE_ACCESS_REPORT_COMMAND = 'bun scripts/csaa-read-write-access.ts';
 const CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=CONDITIONAL_EXPORT_RESOLUTION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
@@ -297,6 +309,20 @@ const MODULE_DEPENDENCY_REPORT_PROVENANCE = [
 	'packages/csaa/src/application/run-module-dependency-report.test.ts',
 	'packages/csaa/src/application/run-module-dependency-report.ts',
 	'scripts/csaa-module-dependency.ts'
+] as const;
+const CALL_GRAPH_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/call-graph-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/application/call-graph-command.test.ts',
+	'packages/csaa/src/application/call-graph-progress-jsonl.test.ts',
+	'packages/csaa/src/application/call-graph-progress-jsonl.ts',
+	'packages/csaa/src/application/run-call-graph-command.ts',
+	'packages/csaa/src/application/run-call-graph-report.test.ts',
+	'packages/csaa/src/application/run-call-graph-report.ts',
+	'packages/csaa/src/application/run-project-context-report.ts',
+	'packages/csaa/src/graph/build-call-graph.test.ts',
+	'scripts/csaa-call-graph.ts'
 ] as const;
 const READ_WRITE_ACCESS_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-report.ts',
@@ -426,6 +452,7 @@ function jpwbFixtureScriptCommand(name: string): string {
 	}
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
+	if (name === 'csaa:analyze:call-graph') return CALL_GRAPH_REPORT_COMMAND;
 	if (name === 'csaa:analyze:read-write-access') return READ_WRITE_ACCESS_REPORT_COMMAND;
 	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
 		return STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND;
@@ -589,6 +616,7 @@ describe('inventory discovery and identity', () => {
 				...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 				...PROJECT_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...CALL_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -1422,7 +1450,9 @@ describe('inventory discovery and identity', () => {
 			provenance: expect.arrayContaining([
 				'packages/csaa/src/contracts/call-graph.ts',
 				'packages/csaa/src/graph/build-call-graph.ts',
-				'packages/csaa/src/graph/validate-call-graph.ts'
+				'packages/csaa/src/graph/validate-call-graph.ts',
+				...CALL_GRAPH_REPORT_PROVENANCE,
+				'package.json#/scripts/csaa:analyze:call-graph'
 			]),
 			state: 'PARTIAL'
 		});
@@ -1430,9 +1460,26 @@ describe('inventory discovery and identity', () => {
 			'exact structural/lexical ownership within the declared method'
 		);
 		expect(callGraphExplanation).toContain(
-			'Runtime caller and evaluation ownership remain coarsened'
+			'runtime caller and evaluation ownership remain coarsened'
 		);
 		expect(callGraphExplanation).toContain('not inferred from the structural ownership edge');
+		expect(callGraphExplanation).toContain(CALL_GRAPH_REPORT_OPERATION_VERSION);
+		expect(callGraphExplanation).toContain(CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION);
+		expect(callGraphExplanation).toContain(CALL_GRAPH_REPORT_RESULT_SCHEMA_VERSION);
+		expect(callGraphExplanation).toContain(CALL_GRAPH_REPORT_SCHEMA_VERSION);
+		expect(callGraphExplanation).toContain(JSON.stringify(CALL_GRAPH_REPORT_SELECTION));
+		expect(callGraphExplanation).toContain(`analysis authority is ${CALL_GRAPH_REPORT_AUTHORITY}`);
+		expect(callGraphExplanation).toContain(
+			`authority transfer is ${CALL_GRAPH_REPORT_AUTHORITY_TRANSFER}`
+		);
+		expect(callGraphExplanation).toContain(`gate effect is ${CALL_GRAPH_REPORT_GATE_EFFECT}`);
+		expect(callGraphExplanation).toContain('successful evidence is never truncated');
+		expect(callGraphExplanation).toContain(
+			'complete selected node, edge, and limitation populations'
+		);
+		expect(callGraphExplanation).toContain('parsed-request command adapter');
+		for (const nonclaim of CALL_GRAPH_REPORT_NONCLAIMS)
+			expect(callGraphExplanation).toContain(nonclaim);
 		expect(arrowCapability!.provider).toBe(ARROW_COMMAND_CENSUS_ADAPTER_ID);
 		for (const expectedProvenance of [
 			'packages/csaa/src/contracts/arrow-command-census.ts',
@@ -1528,6 +1575,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...CALL_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
@@ -1572,7 +1620,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, read/write-access'
+			'preliminary project-context, module-dependency, call-graph, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -1621,7 +1669,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary project-context, module-dependency, call-graph, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -1708,6 +1756,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...CALL_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
@@ -1732,6 +1781,9 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`module-dependency report facade has analysis authority ${MODULE_DEPENDENCY_REPORT_AUTHORITY}, authority transfer ${MODULE_DEPENDENCY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${MODULE_DEPENDENCY_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`call-graph report facade has analysis authority ${CALL_GRAPH_REPORT_AUTHORITY}, authority transfer ${CALL_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${CALL_GRAPH_REPORT_GATE_EFFECT}`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`freshness is ${LOGICAL_GRAPH_COMPOSITION_FRESHNESS}, currentness is ${LOGICAL_GRAPH_COMPOSITION_CURRENTNESS}`
@@ -2199,6 +2251,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:analyze:declaration-context',
 				'csaa:semantic:smoke:source-origin-correlation',
 				'csaa:semantic:smoke:module-resolution-trace',
+				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
 				'csaa:analyze:module-resolution-trace',
 				'csaa:semantic:smoke:command-event-contract',
@@ -2382,6 +2435,24 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:module-dependency');
+
+		const missingCallGraphReportCommand = fixture();
+		write(
+			missingCallGraphReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(([name]) => name !== 'csaa:analyze:call-graph')
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingCallGraphReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:call-graph');
 
 		const missingModuleResolutionTraceReportCommand = fixture();
 		write(
@@ -2696,6 +2767,22 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:module-dependency');
 
+		const incompatibleCallGraphReportCommand = fixture();
+		write(
+			incompatibleCallGraphReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:call-graph': 'bun scripts/wrong-call-graph.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleCallGraphReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:call-graph');
+
 		const selectorlessLogicalGraphCompositionSmoke = fixture();
 		write(
 			selectorlessLogicalGraphCompositionSmoke,
@@ -2836,6 +2923,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
+						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
@@ -2905,6 +2993,7 @@ describe('JPWB population non-vacuity', () => {
 			...semanticPaths,
 			...readWritePaths,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...CALL_GRAPH_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
 			...commandDispatchPaths,
@@ -2942,6 +3031,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
+						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
@@ -2976,6 +3066,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/semantic/validate-snapshot.ts',
 			'packages/csaa/src/providers/typescript/extract-types.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...CALL_GRAPH_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/read-write-access-graph.ts',
 			'packages/csaa/src/graph/build-read-write-access-graph.ts',
 			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
@@ -3012,6 +3103,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:declaration-context',
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
+						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
@@ -3055,6 +3147,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
 			'packages/csaa/src/graph/validate-read-write-access-graph.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...CALL_GRAPH_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
 			'packages/csaa/src/graph/build-command-handler-graph.ts',
@@ -3134,6 +3227,7 @@ describe('JPWB population non-vacuity', () => {
 			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 			...PROJECT_CONTEXT_REPORT_PROVENANCE,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...CALL_GRAPH_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 			...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -3263,7 +3357,9 @@ describe('JPWB population non-vacuity', () => {
 				missingProjectContextReportPath.endsWith('.json') ? '{}\n' : 'export {};\n'
 			);
 		}
-		for (const missingModuleDependencyReportPath of MODULE_DEPENDENCY_REPORT_PROVENANCE) {
+		for (const missingModuleDependencyReportPath of MODULE_DEPENDENCY_REPORT_PROVENANCE.filter(
+			(path) => !CALL_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
 			rmSync(join(root, ...missingModuleDependencyReportPath.split('/')));
 			expect(() =>
 				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
@@ -3271,6 +3367,15 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB TypeScript module-dependency report facade or verification source is absent: ${missingModuleDependencyReportPath}`
 			);
 			write(root, missingModuleDependencyReportPath, 'export {};\n');
+		}
+		for (const missingCallGraphReportPath of CALL_GRAPH_REPORT_PROVENANCE) {
+			rmSync(join(root, ...missingCallGraphReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB TypeScript call-graph report facade or verification source is absent: ${missingCallGraphReportPath}`
+			);
+			write(root, missingCallGraphReportPath, 'export {};\n');
 		}
 		for (const missingReadWriteAccessReportPath of READ_WRITE_ACCESS_REPORT_PROVENANCE.filter(
 			(path) => !MODULE_DEPENDENCY_REPORT_PROVENANCE.some((shared) => shared === path)
@@ -3475,6 +3580,15 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) => command.owner === '.' && command.name === 'csaa:analyze:call-graph'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: CALL_GRAPH_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) => command.owner === '.' && command.name === 'csaa:analyze:read-write-access'
 			)
 		).toMatchObject({
@@ -3548,6 +3662,7 @@ describe('JPWB population non-vacuity', () => {
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...CALL_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
 			])

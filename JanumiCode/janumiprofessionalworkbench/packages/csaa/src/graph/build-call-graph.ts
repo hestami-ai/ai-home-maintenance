@@ -164,6 +164,75 @@ interface CallClassification {
 	readonly targetSpecs: readonly CallableSpec[];
 }
 
+export interface CallGraphProjectionBudgets {
+	readonly maxClassificationSteps: number;
+	readonly maxEdges: number;
+	readonly maxLimitations: number;
+	readonly maxNodes: number;
+}
+
+export interface BuildCallGraphOptions {
+	/** Operational materialization limits; excluded from graph content and identity. */
+	readonly budgets: CallGraphProjectionBudgets;
+}
+
+export interface BoundedCallGraphBuildDiagnostic extends Omit<CallGraphBuildDiagnostic, 'code'> {
+	readonly code: CallGraphBuildDiagnostic['code'] | 'BUDGET_EXCEEDED';
+}
+
+export type BoundedCallGraphBuildOutcome =
+	| {
+			readonly diagnostics: readonly BoundedCallGraphBuildDiagnostic[];
+			readonly graph: CallGraphSnapshot;
+			readonly outcome: 'complete' | 'partial';
+	  }
+	| {
+			readonly diagnostics: readonly BoundedCallGraphBuildDiagnostic[];
+			readonly graph?: never;
+			readonly outcome: 'unavailable';
+	  };
+
+class CallGraphClassificationBudgetError extends RangeError {
+	readonly code = 'BUDGET_EXCEEDED';
+	readonly path = '$options.budgets.maxClassificationSteps';
+}
+
+class CallGraphCandidateEdgeBudgetError extends RangeError {
+	constructor(readonly minimumTargetCount: number) {
+		super('Call graph candidate target population exceeds the remaining edge budget.');
+	}
+}
+
+class ClassificationStepBudget {
+	private used = 0;
+
+	constructor(private readonly maximum: number | null) {}
+
+	consume(count = 1): void {
+		if (!Number.isSafeInteger(count) || count < 0)
+			throw new Error('Call graph classification step count is invalid.');
+		if (count > Number.MAX_SAFE_INTEGER - this.used)
+			throw new CallGraphClassificationBudgetError(
+				'Call graph classification steps exceed the safe-integer range.'
+			);
+		this.used += count;
+		if (this.maximum !== null && this.used > this.maximum)
+			throw new CallGraphClassificationBudgetError(
+				`Call graph classification steps exceed maxClassificationSteps ${String(this.maximum)}.`
+			);
+	}
+}
+
+function consumeSortInspections(steps: ClassificationStepBudget, recordCount: number): void {
+	if (recordCount <= 1) return;
+	const passes = Math.ceil(Math.log2(recordCount));
+	if (recordCount > Math.floor(Number.MAX_SAFE_INTEGER / passes))
+		throw new CallGraphClassificationBudgetError(
+			'Call graph classification sort inspections exceed the safe-integer range.'
+		);
+	steps.consume(recordCount * passes);
+}
+
 function diagnostic(
 	code: CallGraphBuildDiagnostic['code'],
 	message: string,
@@ -180,6 +249,24 @@ function unavailable(
 	path: string | null = null
 ): CallGraphBuildOutcome {
 	return { diagnostics: [diagnostic(code, message, phase, path)], outcome: 'unavailable' };
+}
+
+function boundedDiagnostic(
+	code: BoundedCallGraphBuildDiagnostic['code'],
+	message: string,
+	phase: BoundedCallGraphBuildDiagnostic['phase'],
+	path: string | null = null
+): BoundedCallGraphBuildDiagnostic {
+	return { code, message, path, phase };
+}
+
+function boundedUnavailable(
+	code: BoundedCallGraphBuildDiagnostic['code'],
+	message: string,
+	phase: BoundedCallGraphBuildDiagnostic['phase'],
+	path: string | null = null
+): BoundedCallGraphBuildOutcome {
+	return { diagnostics: [boundedDiagnostic(code, message, phase, path)], outcome: 'unavailable' };
 }
 
 function materializeRequest(value: unknown): BuildCallGraphRequest {
@@ -208,6 +295,65 @@ function materializeRequest(value: unknown): BuildCallGraphRequest {
 	if (record.operationVersion !== CALL_GRAPH_OPERATION_VERSION)
 		throw new TypeError('Unsupported call graph operation version.');
 	return record as unknown as BuildCallGraphRequest;
+}
+
+function exactDataRecord(
+	value: unknown,
+	expectedKeys: readonly string[],
+	label: string
+): Readonly<Record<string, unknown>> {
+	if (value === null || typeof value !== 'object' || Array.isArray(value) || isProxy(value))
+		throw new TypeError(`${label} must be a plain data object.`);
+	const prototype = Reflect.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new TypeError(`${label} must have a plain prototype.`);
+	const keys = Reflect.ownKeys(value);
+	if (
+		keys.some((key) => typeof key !== 'string') ||
+		keys.length !== expectedKeys.length ||
+		expectedKeys.some((key) => !keys.includes(key))
+	)
+		throw new TypeError(`${label} has an invalid field set.`);
+	const result: Record<string, unknown> = {};
+	for (const key of expectedKeys) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor))
+			throw new TypeError(`${label}.${key} must be enumerable data.`);
+		result[key] = descriptor.value;
+	}
+	return result;
+}
+
+function positiveSafeInteger(value: unknown, label: string): number {
+	if (
+		typeof value !== 'number' ||
+		!Number.isSafeInteger(value) ||
+		Object.is(value, -0) ||
+		value <= 0
+	)
+		throw new TypeError(`${label} must be a positive safe integer.`);
+	return value;
+}
+
+function materializeBuildOptions(value: unknown): BuildCallGraphOptions | null {
+	if (value === undefined) return null;
+	const options = exactDataRecord(value, ['budgets'], 'Call graph build options');
+	const budgets = exactDataRecord(
+		options.budgets,
+		['maxClassificationSteps', 'maxEdges', 'maxLimitations', 'maxNodes'],
+		'Call graph projection budgets'
+	);
+	return {
+		budgets: {
+			maxClassificationSteps: positiveSafeInteger(
+				budgets.maxClassificationSteps,
+				'budgets.maxClassificationSteps'
+			),
+			maxEdges: positiveSafeInteger(budgets.maxEdges, 'budgets.maxEdges'),
+			maxLimitations: positiveSafeInteger(budgets.maxLimitations, 'budgets.maxLimitations'),
+			maxNodes: positiveSafeInteger(budgets.maxNodes, 'budgets.maxNodes')
+		}
+	};
 }
 
 function compareId(left: { readonly id: string }, right: { readonly id: string }): number {
@@ -801,7 +947,11 @@ function buildSpecsBySymbol(
 	return specsBySymbol;
 }
 
-function buildProjection(snapshot: StaticSemanticSnapshot, index: SemanticIndex) {
+function buildProjection(
+	snapshot: StaticSemanticSnapshot,
+	index: SemanticIndex,
+	classificationSteps: ClassificationStepBudget
+) {
 	const graphInputDigest = callGraphInputDigest(snapshot);
 	const graphId = callGraphId({
 		canonicalProfile: CALL_GRAPH_CANONICAL_PROFILE,
@@ -814,32 +964,27 @@ function buildProjection(snapshot: StaticSemanticSnapshot, index: SemanticIndex)
 		subjectId: snapshot.subjectId
 	});
 	const layerId = callGraphLayerId(graphId, 'TYPESCRIPT_STATIC_CALL', 0);
-	const sourceNodes = projectSourceNodes(snapshot, graphId, layerId);
-	const sourceNodeBySourceId = new Map(
-		sourceNodes.map((node) => {
-			if (node.kind !== 'SOURCE_REGION') throw new Error('Invalid source-region projection.');
-			return [node.semanticSourceId, node] as const;
-		})
+	const sourceNodeIdBySourceId = new Map(
+		snapshot.sources.map((source) => [source.id, callGraphSourceRegionNodeId(graphId, source.id)])
 	);
-	const callableNodes = projectCallableNodes(snapshot, index, graphId, layerId);
-	const callableNodeBySemanticNodeId = new Map(
-		callableNodes.map((node) => [node.semanticNodeId, node])
+	const callableNodeIdBySemanticNodeId = new Map(
+		[...index.callableSpecsByNode.values()].map((spec) => [
+			spec.node.id,
+			callGraphCallableTargetNodeId(graphId, spec.node.id)
+		])
 	);
-	const callableNodeById = new Map(callableNodes.map((node) => [node.id, node]));
 	const specsBySymbol = buildSpecsBySymbol(index.callableSpecsByNode);
 	const invocationNodeIds = new Set(snapshot.invocations.map((invocation) => invocation.nodeId));
 	return {
-		callableNodeById,
-		callableNodeBySemanticNodeId,
-		callableNodes,
+		callableNodeIdBySemanticNodeId,
+		classificationSteps,
 		graphId,
 		graphInputDigest,
 		index,
 		invocationNodeIds,
 		layerId,
 		snapshot,
-		sourceNodeBySourceId,
-		sourceNodes,
+		sourceNodeIdBySourceId,
 		specsBySymbol
 	};
 }
@@ -848,56 +993,82 @@ type Projection = ReturnType<typeof buildProjection>;
 
 function subtreeIds(
 	root: SemanticAstNodeRecord,
-	index: SemanticIndex
+	index: SemanticIndex,
+	steps: ClassificationStepBudget
 ): Set<SemanticAstNodeRecord['id']> {
 	const result = new Set<SemanticAstNodeRecord['id']>();
 	const stack = [root];
 	while (stack.length > 0) {
 		const current = stack.pop()!;
+		steps.consume();
 		if (result.has(current.id)) continue;
 		result.add(current.id);
-		for (const child of index.childrenByParent.get(current.id) ?? []) stack.push(child);
+		const children = index.childrenByParent.get(current.id) ?? [];
+		steps.consume(children.length);
+		for (const child of children) stack.push(child);
 	}
 	return result;
+}
+
+function collectInlineCallableSpecs(
+	root: SemanticAstNodeRecord,
+	invocationKind: SemanticInvocationSiteRecord['invocationKind'],
+	index: SemanticIndex,
+	steps: ClassificationStepBudget,
+	result: CallableSpec[]
+): void {
+	steps.consume();
+	const direct = index.callableSpecsByNode.get(root.id);
+	if (direct !== undefined && compatibleCallable(invocationKind, direct)) {
+		result.push(direct);
+		return;
+	}
+	if (root.kind === ts.SyntaxKind.ClassExpression) {
+		const children = index.childrenByParent.get(root.id) ?? [];
+		steps.consume(children.length);
+		for (const child of children) {
+			const spec = index.callableSpecsByNode.get(child.id);
+			if (spec?.callableKind === 'CONSTRUCTOR' && compatibleCallable(invocationKind, spec)) {
+				result.push(spec);
+				return;
+			}
+		}
+		return;
+	}
+	if (!TRANSPARENT_CALLEE_KINDS.has(root.kind)) return;
+	const children = index.childrenByParent.get(root.id) ?? [];
+	steps.consume(children.length);
+	for (const child of children)
+		collectInlineCallableSpecs(child, invocationKind, index, steps, result);
 }
 
 function inlineCallableSpecs(
 	root: SemanticAstNodeRecord,
 	invocationKind: SemanticInvocationSiteRecord['invocationKind'],
-	index: SemanticIndex
+	index: SemanticIndex,
+	steps: ClassificationStepBudget
 ): CallableSpec[] {
-	const direct = index.callableSpecsByNode.get(root.id);
-	if (direct !== undefined && compatibleCallable(invocationKind, direct)) return [direct];
-	if (root.kind === ts.SyntaxKind.ClassExpression) {
-		const constructor = (index.childrenByParent.get(root.id) ?? [])
-			.map((child) => index.callableSpecsByNode.get(child.id))
-			.find(
-				(spec): spec is CallableSpec =>
-					spec?.callableKind === 'CONSTRUCTOR' && compatibleCallable(invocationKind, spec)
-			);
-		return constructor === undefined ? [] : [constructor];
-	}
-	if (!TRANSPARENT_CALLEE_KINDS.has(root.kind)) return [];
-	return (index.childrenByParent.get(root.id) ?? []).flatMap((child) =>
-		inlineCallableSpecs(child, invocationKind, index)
-	);
+	const result: CallableSpec[] = [];
+	collectInlineCallableSpecs(root, invocationKind, index, steps, result);
+	return result;
 }
 
 function ownerFor(invocationNode: SemanticAstNodeRecord, projection: Projection): CallGraphNodeId {
 	let parentId = invocationNode.parentId;
 	const visited = new Set<SemanticAstNodeRecord['id']>();
 	while (parentId !== null) {
+		projection.classificationSteps.consume();
 		if (visited.has(parentId)) throw new Error('AST ancestry contains a cycle.');
 		visited.add(parentId);
-		const callable = projection.callableNodeBySemanticNodeId.get(parentId);
-		if (callable !== undefined) return callable.id;
+		const callableNodeId = projection.callableNodeIdBySemanticNodeId.get(parentId);
+		if (callableNodeId !== undefined) return callableNodeId;
 		const parent = projection.index.nodeById.get(parentId);
 		if (parent === undefined) throw new Error('Invocation ancestry has a missing node.');
 		parentId = parent.parentId;
 	}
-	const sourceNode = projection.sourceNodeBySourceId.get(invocationNode.sourceId);
-	if (sourceNode === undefined) throw new Error('Invocation source region is missing.');
-	return sourceNode.id;
+	const sourceNodeId = projection.sourceNodeIdBySourceId.get(invocationNode.sourceId);
+	if (sourceNodeId === undefined) throw new Error('Invocation source region is missing.');
+	return sourceNodeId;
 }
 
 interface ClassificationBase {
@@ -907,7 +1078,11 @@ interface ClassificationBase {
 	readonly source: SemanticSourceRecord;
 }
 
-function beginClassification(invocation: SemanticInvocationSiteRecord, projection: Projection) {
+function beginClassification(
+	invocation: SemanticInvocationSiteRecord,
+	projection: Projection,
+	maxCandidateTargets: number | null
+) {
 	const invocationNode = projection.index.nodeById.get(invocation.nodeId);
 	const callee = projection.index.nodeById.get(invocation.calleeNodeId);
 	const source = projection.index.sourceById.get(invocation.sourceId);
@@ -919,7 +1094,14 @@ function beginClassification(invocation: SemanticInvocationSiteRecord, projectio
 		callee.sourceId !== invocation.sourceId
 	)
 		throw new Error(`Invocation ${invocation.id} has invalid semantic endpoints.`);
-	const inlineSpecs = inlineCallableSpecs(callee, invocation.invocationKind, projection.index);
+	projection.classificationSteps.consume();
+	const inlineSpecs = inlineCallableSpecs(
+		callee,
+		invocation.invocationKind,
+		projection.index,
+		projection.classificationSteps
+	);
+	consumeSortInspections(projection.classificationSteps, inlineSpecs.length);
 	inlineSpecs.sort((left, right) => compareText(left.node.id, right.node.id));
 	const baseProvenance = sortedUnique([
 		source.provenanceId,
@@ -937,6 +1119,7 @@ function beginClassification(invocation: SemanticInvocationSiteRecord, projectio
 		callee,
 		inlineSpecs,
 		invocation,
+		maxCandidateTargets,
 		memberReferences: [] as SemanticReferenceRecord[],
 		projection,
 		subtreeReferences: [] as SemanticReferenceRecord[]
@@ -970,16 +1153,19 @@ function classifyDynamicCallee(state: ClassificationState): CallClassification |
 function classifyInlineTargets(state: ClassificationState): CallClassification | null {
 	const inlineSpecs = state.inlineSpecs;
 	if (inlineSpecs.length === 1) {
-		const target = state.projection.callableNodeBySemanticNodeId.get(inlineSpecs[0]!.node.id);
-		if (target === undefined) throw new Error('Inline callable target node is missing.');
+		const targetSpec = inlineSpecs[0]!;
+		const targetNodeId = state.projection.callableNodeIdBySemanticNodeId.get(targetSpec.node.id);
+		if (targetNodeId === undefined) throw new Error('Inline callable target node is missing.');
+		state.projection.classificationSteps.consume(targetSpec.symbolIds.size);
+		consumeSortInspections(state.projection.classificationSteps, targetSpec.symbolIds.size);
 		return {
 			...state.base,
 			provenanceIds: state.baseProvenance,
 			reasonCode: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
 			referenceIds: [],
 			resolutionClass: 'CANDIDATE_SET',
-			resolvedSymbolIds: target.symbolIds,
-			targetCallableNodeIds: [target.id],
+			resolvedSymbolIds: sortedUnique(targetSpec.symbolIds),
+			targetCallableNodeIds: [targetNodeId],
 			targetSpecs: inlineSpecs
 		};
 	}
@@ -998,7 +1184,12 @@ function classifyInlineTargets(state: ClassificationState): CallClassification |
 }
 
 function classifyNestedInvocationCallee(state: ClassificationState): CallClassification | null {
-	const calleeSubtree = subtreeIds(state.callee, state.projection.index);
+	const calleeSubtree = subtreeIds(
+		state.callee,
+		state.projection.index,
+		state.projection.classificationSteps
+	);
+	state.projection.classificationSteps.consume(calleeSubtree.size);
 	let containsNestedInvocation = false;
 	for (const nodeId of calleeSubtree)
 		if (state.projection.invocationNodeIds.has(nodeId)) {
@@ -1018,10 +1209,17 @@ function classifyNestedInvocationCallee(state: ClassificationState): CallClassif
 			targetSpecs: []
 		};
 	const subtreeReferences: SemanticReferenceRecord[] = [];
-	for (const nodeId of calleeSubtree)
-		subtreeReferences.push(...(state.projection.index.referencesByNode.get(nodeId) ?? []));
+	for (const nodeId of calleeSubtree) {
+		state.projection.classificationSteps.consume();
+		for (const reference of state.projection.index.referencesByNode.get(nodeId) ?? []) {
+			state.projection.classificationSteps.consume();
+			subtreeReferences.push(reference);
+		}
+	}
+	consumeSortInspections(state.projection.classificationSteps, subtreeReferences.length);
 	subtreeReferences.sort(compareId);
 	state.subtreeReferences = subtreeReferences;
+	state.projection.classificationSteps.consume(subtreeReferences.length);
 	state.memberReferences = subtreeReferences.filter(
 		(reference) => reference.role === 'MEMBER_NAME'
 	);
@@ -1045,7 +1243,12 @@ function classifyReceiverDispatch(state: ClassificationState): CallClassificatio
 			targetCallableNodeIds: [],
 			targetSpecs: []
 		};
-	if (callee.kind === ts.SyntaxKind.ElementAccessExpression && state.memberReferences.length === 0)
+	if (
+		callee.kind === ts.SyntaxKind.ElementAccessExpression &&
+		state.memberReferences.length === 0
+	) {
+		state.projection.classificationSteps.consume(state.subtreeReferences.length);
+		consumeSortInspections(state.projection.classificationSteps, state.subtreeReferences.length);
 		return {
 			...state.base,
 			provenanceIds: state.baseProvenance,
@@ -1056,6 +1259,7 @@ function classifyReceiverDispatch(state: ClassificationState): CallClassificatio
 			targetCallableNodeIds: [],
 			targetSpecs: []
 		};
+	}
 	return null;
 }
 
@@ -1069,6 +1273,8 @@ function selectCalleeReferences(state: ClassificationState): readonly SemanticRe
 		return state.memberReferences;
 	if (callee.kind === ts.SyntaxKind.Identifier || callee.kind === ts.SyntaxKind.PrivateIdentifier)
 		return state.projection.index.referencesByNode.get(callee.id) ?? [];
+	if (TRANSPARENT_CALLEE_KINDS.has(callee.kind))
+		state.projection.classificationSteps.consume(state.subtreeReferences.length);
 	if (TRANSPARENT_CALLEE_KINDS.has(callee.kind))
 		return state.subtreeReferences.filter(
 			(reference) => reference.role === 'SYMBOL_USE' || reference.role === 'MEMBER_NAME'
@@ -1095,7 +1301,14 @@ function classifyReferenceCardinality(
 			targetCallableNodeIds: [],
 			targetSpecs: []
 		};
-	if (selectedReferences.length > 1)
+	if (selectedReferences.length > 1) {
+		const referenceCount = selectedReferences.length;
+		const provenanceCount = state.baseProvenance.length + referenceCount * 2;
+		state.projection.classificationSteps.consume(referenceCount * 5);
+		state.projection.classificationSteps.consume(provenanceCount);
+		consumeSortInspections(state.projection.classificationSteps, provenanceCount);
+		consumeSortInspections(state.projection.classificationSteps, referenceCount);
+		consumeSortInspections(state.projection.classificationSteps, referenceCount);
 		return {
 			...state.base,
 			provenanceIds: sortedUnique([
@@ -1116,6 +1329,7 @@ function classifyReferenceCardinality(
 			targetCallableNodeIds: [],
 			targetSpecs: []
 		};
+	}
 	return null;
 }
 
@@ -1127,20 +1341,26 @@ function externalDispatchClassification(
 	symbolId: SemanticSymbolId
 ): CallClassification {
 	const index = state.projection.index;
-	const declarations = declarationIds.map((id) => index.declarationById.get(id)!);
-	const externalOnly =
-		declarations.length > 0 &&
-		declarations.every((declaration) => {
-			const declarationSource = index.sourceById.get(declaration.sourceId)!;
-			return (
-				declaration.ambient ||
-				declarationSource.analysisDisposition === 'CONTEXT_ONLY' ||
-				declarationSource.origin === 'EXTERNAL_DECLARATION' ||
-				declarationSource.origin === 'TOOLCHAIN_LIBRARY' ||
-				declarationSource.artifactClass === 'EXTERNAL_DEPENDENCY' ||
-				declarationSource.artifactClass === 'VENDOR'
-			);
-		});
+	let externalOnly = declarationIds.length > 0;
+	for (const declarationId of declarationIds) {
+		state.projection.classificationSteps.consume(2);
+		const declaration = index.declarationById.get(declarationId);
+		if (declaration === undefined) throw new Error(`Declaration ${declarationId} is absent.`);
+		const declarationSource = index.sourceById.get(declaration.sourceId);
+		if (declarationSource === undefined)
+			throw new Error(`Declaration source ${declaration.sourceId} is absent.`);
+		if (
+			!declaration.ambient &&
+			declarationSource.analysisDisposition !== 'CONTEXT_ONLY' &&
+			declarationSource.origin !== 'EXTERNAL_DECLARATION' &&
+			declarationSource.origin !== 'TOOLCHAIN_LIBRARY' &&
+			declarationSource.artifactClass !== 'EXTERNAL_DEPENDENCY' &&
+			declarationSource.artifactClass !== 'VENDOR'
+		) {
+			externalOnly = false;
+			break;
+		}
+	}
 	return {
 		...state.base,
 		provenanceIds: referenceProvenance,
@@ -1189,13 +1409,20 @@ function classifyResolvedReference(
 	const symbolId = reference.resolvedSymbolId;
 	const symbol = state.projection.index.symbolById.get(symbolId);
 	if (symbol === undefined) throw new Error(`Resolved symbol ${symbolId} is absent.`);
-	const candidates = (state.projection.specsBySymbol.get(symbolId) ?? []).filter((spec) =>
-		compatibleCallable(state.invocation.invocationKind, spec)
-	);
-	const candidateNodes = sortedUnique(
-		candidates.map((spec) => callGraphCallableTargetNodeId(state.projection.graphId, spec.node.id))
-	).map((id) => state.projection.callableNodeById.get(id)!);
-	if (candidateNodes.length > 0)
+	const symbolSpecs = state.projection.specsBySymbol.get(symbolId) ?? [];
+	const candidates: CallableSpec[] = [];
+	const candidateNodeIdSet = new Set<CallGraphNodeId>();
+	for (const spec of symbolSpecs) {
+		state.projection.classificationSteps.consume(3);
+		if (!compatibleCallable(state.invocation.invocationKind, spec)) continue;
+		candidates.push(spec);
+		candidateNodeIdSet.add(callGraphCallableTargetNodeId(state.projection.graphId, spec.node.id));
+		if (state.maxCandidateTargets !== null && candidateNodeIdSet.size > state.maxCandidateTargets)
+			throw new CallGraphCandidateEdgeBudgetError(candidateNodeIdSet.size);
+	}
+	consumeSortInspections(state.projection.classificationSteps, candidateNodeIdSet.size);
+	const candidateNodeIds = [...candidateNodeIdSet].sort(compareText);
+	if (candidateNodeIds.length > 0)
 		return {
 			...state.base,
 			provenanceIds: referenceProvenance,
@@ -1203,7 +1430,7 @@ function classifyResolvedReference(
 			referenceIds: [reference.id],
 			resolutionClass: 'CANDIDATE_SET',
 			resolvedSymbolIds: [symbolId],
-			targetCallableNodeIds: candidateNodes.map((node) => node.id),
+			targetCallableNodeIds: candidateNodeIds,
 			targetSpecs: candidates
 		};
 	return externalDispatchClassification(
@@ -1217,9 +1444,10 @@ function classifyResolvedReference(
 
 function classifyInvocation(
 	invocation: SemanticInvocationSiteRecord,
-	projection: Projection
+	projection: Projection,
+	maxCandidateTargets: number | null
 ): CallClassification {
-	const state = beginClassification(invocation, projection);
+	const state = beginClassification(invocation, projection, maxCandidateTargets);
 	const dynamicCallee = classifyDynamicCallee(state);
 	if (dynamicCallee !== null) return dynamicCallee;
 	const inlineTargets = classifyInlineTargets(state);
@@ -1229,6 +1457,7 @@ function classifyInvocation(
 	const receiverDispatch = classifyReceiverDispatch(state);
 	if (receiverDispatch !== null) return receiverDispatch;
 	const selectedReferences = selectCalleeReferences(state);
+	projection.classificationSteps.consume(selectedReferences.length);
 	const cardinality = classifyReferenceCardinality(state, selectedReferences);
 	if (cardinality !== null) return cardinality;
 	return classifyResolvedReference(state, selectedReferences[0]!);
@@ -1614,6 +1843,150 @@ function buildLimitations(
 	return limitations;
 }
 
+interface CallGraphProjectedPopulation {
+	readonly edges: number;
+	readonly limitations: number;
+	readonly nodes: number;
+}
+
+function checkedPopulationAdd(left: number, right: number): number {
+	const result = left + right;
+	if (!Number.isSafeInteger(result)) throw new RangeError('Call graph population is not safe.');
+	return result;
+}
+
+function baseProjectedPopulation(
+	snapshot: StaticSemanticSnapshot,
+	callableCount: number
+): CallGraphProjectedPopulation {
+	const invocationCount = snapshot.invocations.length;
+	return {
+		edges: checkedPopulationAdd(invocationCount, invocationCount),
+		limitations: checkedPopulationAdd(3 + Number(snapshot.health === 'PARTIAL'), invocationCount),
+		nodes: checkedPopulationAdd(
+			checkedPopulationAdd(snapshot.sources.length, callableCount),
+			invocationCount
+		)
+	};
+}
+
+function classificationLimitationCount(classification: CallClassification): number {
+	switch (classification.resolutionClass) {
+		case 'CANDIDATE_SET':
+			return (
+				1 +
+				Number(
+					classification.dispatchClass === 'MEMBER_REFERENCE' ||
+						classification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
+				)
+			);
+		case 'EXTERNAL_DISPATCH':
+			return 1 + Number(classification.reasonCode === 'CALLABLE_VALUE_FLOW_NOT_MODELED');
+		case 'UNRESOLVED':
+		case 'UNSUPPORTED':
+			return 1;
+		case 'EXACT':
+			throw new Error('The initial call graph producer cannot classify exact targets.');
+	}
+}
+
+function targetEdgeCount(classification: CallClassification): number {
+	return classification.resolutionClass === 'CANDIDATE_SET'
+		? classification.targetCallableNodeIds.length
+		: 1;
+}
+
+function populationExceeds(
+	population: CallGraphProjectedPopulation,
+	budgets: CallGraphProjectionBudgets
+): boolean {
+	return (
+		population.edges > budgets.maxEdges ||
+		population.limitations > budgets.maxLimitations ||
+		population.nodes > budgets.maxNodes
+	);
+}
+
+function populationBudgetRejection(
+	population: CallGraphProjectedPopulation,
+	budgets: CallGraphProjectionBudgets
+): BoundedCallGraphBuildOutcome {
+	const diagnostics = (
+		[
+			['edges', 'maxEdges'],
+			['limitations', 'maxLimitations'],
+			['nodes', 'maxNodes']
+		] as const
+	).flatMap(([populationKey, budgetKey]) =>
+		population[populationKey] <= budgets[budgetKey]
+			? []
+			: [
+					boundedDiagnostic(
+						'BUDGET_EXCEEDED',
+						`The projected call-graph ${populationKey} population has reached ${String(population[populationKey])}, which exceeds ${budgetKey} ${String(budgets[budgetKey])}.`,
+						'PROJECT',
+						`$options.budgets.${budgetKey}`
+					)
+				]
+	);
+	return { diagnostics, outcome: 'unavailable' };
+}
+
+function classifyProjection(
+	projection: Projection,
+	budgets: CallGraphProjectionBudgets | null
+):
+	| {
+			readonly classifications: readonly CallClassification[];
+			readonly population: CallGraphProjectedPopulation;
+	  }
+	| { readonly rejection: BoundedCallGraphBuildOutcome } {
+	const snapshot = projection.snapshot;
+	let population = baseProjectedPopulation(snapshot, projection.index.callableSpecsByNode.size);
+	if (budgets !== null && populationExceeds(population, budgets))
+		return { rejection: populationBudgetRejection(population, budgets) };
+	const classifications: CallClassification[] = [];
+	for (const invocation of snapshot.invocations) {
+		let classification: CallClassification;
+		try {
+			classification = classifyInvocation(
+				invocation,
+				projection,
+				budgets === null ? null : checkedPopulationAdd(budgets.maxEdges - population.edges, 1)
+			);
+		} catch (error) {
+			if (error instanceof CallGraphCandidateEdgeBudgetError)
+				return {
+					rejection: populationBudgetRejection(
+						{
+							...population,
+							edges: checkedPopulationAdd(population.edges, error.minimumTargetCount - 1)
+						},
+						budgets!
+					)
+				};
+			throw error;
+		}
+		population = {
+			edges: checkedPopulationAdd(population.edges, targetEdgeCount(classification) - 1),
+			limitations: checkedPopulationAdd(
+				population.limitations,
+				classificationLimitationCount(classification) - 1
+			),
+			nodes: checkedPopulationAdd(
+				population.nodes,
+				Number(classification.resolutionClass !== 'CANDIDATE_SET')
+			)
+		};
+		if (budgets !== null && populationExceeds(population, budgets))
+			return { rejection: populationBudgetRejection(population, budgets) };
+		classifications.push(classification);
+	}
+	if (classifications.length !== snapshot.invocations.length)
+		throw new Error('Call graph population planning did not retain every invocation.');
+	return { classifications, population };
+}
+
 function buildCoverage(
 	snapshot: StaticSemanticSnapshot,
 	callSiteNodes: readonly CallGraphCallSiteNode[],
@@ -1755,16 +2128,36 @@ function finalizeCallGraph(
 	};
 }
 
-function projectCallGraph(snapshot: StaticSemanticSnapshot): CallGraphBuildOutcome {
+function projectCallGraph(
+	snapshot: StaticSemanticSnapshot,
+	budgets: CallGraphProjectionBudgets | null
+): BoundedCallGraphBuildOutcome {
+	const mandatoryPopulation = baseProjectedPopulation(snapshot, 0);
+	if (budgets !== null && populationExceeds(mandatoryPopulation, budgets))
+		return populationBudgetRejection(mandatoryPopulation, budgets);
 	const index = buildSemanticIndex(snapshot);
-	const projection = buildProjection(snapshot, index);
-	const classifications: CallClassification[] = snapshot.invocations.map((invocation) =>
-		classifyInvocation(invocation, projection)
+	const exactBasePopulation = baseProjectedPopulation(snapshot, index.callableSpecsByNode.size);
+	if (budgets !== null && populationExceeds(exactBasePopulation, budgets))
+		return populationBudgetRejection(exactBasePopulation, budgets);
+	const projection = buildProjection(
+		snapshot,
+		index,
+		new ClassificationStepBudget(budgets?.maxClassificationSteps ?? null)
+	);
+	const plan = classifyProjection(projection, budgets);
+	if ('rejection' in plan) return plan.rejection;
+	const classifications = plan.classifications;
+	const sourceNodes = projectSourceNodes(snapshot, projection.graphId, projection.layerId);
+	const callableNodes = projectCallableNodes(
+		snapshot,
+		index,
+		projection.graphId,
+		projection.layerId
 	);
 	const { callSiteNodes, frontierNodes } = projectCallSiteNodes(classifications, projection);
 	const nodes: CallGraphNode[] = [
-		...projection.sourceNodes,
-		...projection.callableNodes,
+		...sourceNodes,
+		...callableNodes,
 		...callSiteNodes,
 		...frontierNodes
 	].sort(compareId);
@@ -1780,21 +2173,52 @@ function projectCallGraph(snapshot: StaticSemanticSnapshot): CallGraphBuildOutco
 		projection
 	);
 	const limitations = buildLimitations(snapshot, classifications);
+	if (
+		nodes.length !== plan.population.nodes ||
+		edges.length !== plan.population.edges ||
+		limitations.length !== plan.population.limitations
+	)
+		throw new Error(
+			'Call graph materialization does not reconcile with its exact population plan.'
+		);
 	const coverage = buildCoverage(snapshot, callSiteNodes, frontierNodes, edges);
 	assertCoverageReconciles(coverage);
 	const graph = assembleGraph(projection, classifications, nodes, edges, limitations, coverage);
 	return finalizeCallGraph(graph, snapshot, projection.graphInputDigest, limitations);
 }
 
-export function buildCallGraph(
+function buildCallGraphInternal(
 	requestValue: unknown,
 	snapshot: StaticSemanticSnapshot
-): CallGraphBuildOutcome {
+): CallGraphBuildOutcome;
+function buildCallGraphInternal(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot,
+	optionsValue: BuildCallGraphOptions
+): BoundedCallGraphBuildOutcome;
+function buildCallGraphInternal(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot,
+	optionsValue?: BuildCallGraphOptions
+): CallGraphBuildOutcome | BoundedCallGraphBuildOutcome {
+	let options: BuildCallGraphOptions | null;
+	try {
+		options = materializeBuildOptions(optionsValue);
+	} catch (error) {
+		return unavailable(
+			'REQUEST_INVALID',
+			error instanceof Error ? error.message : 'Invalid call graph build options.',
+			'REQUEST',
+			'$options'
+		);
+	}
 	const rejection = requestRejection(requestValue, snapshot);
 	if (rejection !== null) return rejection;
 	try {
-		return projectCallGraph(snapshot);
+		return projectCallGraph(snapshot, options?.budgets ?? null);
 	} catch (error) {
+		if (error instanceof CallGraphClassificationBudgetError)
+			return boundedUnavailable('BUDGET_EXCEEDED', error.message, 'PROJECT', error.path);
 		return unavailable(
 			'DANGLING_SEMANTIC_REFERENCE',
 			error instanceof Error
@@ -1803,4 +2227,21 @@ export function buildCallGraph(
 			'PROJECT'
 		);
 	}
+}
+
+/** Public low-level operation; graph identity and behavior remain unchanged. */
+export function buildCallGraph(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot
+): CallGraphBuildOutcome {
+	return buildCallGraphInternal(requestValue, snapshot);
+}
+
+/** @internal Trusted bounded materialization seam for the coding-agent report facade. */
+export function buildBoundedCallGraph(
+	requestValue: unknown,
+	snapshot: StaticSemanticSnapshot,
+	options: BuildCallGraphOptions
+): BoundedCallGraphBuildOutcome {
+	return buildCallGraphInternal(requestValue, snapshot, options);
 }

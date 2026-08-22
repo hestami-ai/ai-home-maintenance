@@ -305,6 +305,8 @@ export interface RunProjectContextReportOptions {
 
 /** Trusted same-process options for a capture that deliberately emits no report telemetry. */
 export interface CaptureProjectContextReportPipelineOptions {
+	/** Successor-only semantic enrichment; the public CAP-010 report remains syntax/symbol scoped. */
+	readonly includeTypeCapability?: true;
 	/** Absolute fixed worktree root supplied by the successor facade. */
 	readonly repositoryRoot: string;
 }
@@ -981,7 +983,8 @@ function runProjectContextReportInternal(
 	requestValue: unknown,
 	options: RunProjectContextReportOptions,
 	progress: ReportProgressRecorder,
-	capturePipeline = false
+	capturePipeline = false,
+	includeTypeCapability = false
 ): ProjectContextReportOutcome | ProjectContextReportPipelineCapture {
 	progress.start('REQUEST_BIND');
 	const admission = admitProjectContextReportRequest(requestValue);
@@ -1079,7 +1082,12 @@ function runProjectContextReportInternal(
 		{
 			assignabilityRequests: [],
 			budgets: request.budgets.semantic,
-			capabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'],
+			capabilities: [
+				'TS_PROJECT',
+				'TS_SYMBOL',
+				'TS_SYNTAX',
+				...(includeTypeCapability ? (['TS_TYPE'] as const) : [])
+			],
 			expectEmpty: false,
 			operationVersion: SEMANTIC_OPERATION_VERSION,
 			rootLocator: repositoryRoot,
@@ -1401,7 +1409,13 @@ export function captureProjectContextReportPipeline(
 	const captureOptions: RunProjectContextReportOptions = { repositoryRoot: options.repositoryRoot };
 	const progress = createReportProgressRecorder(captureOptions);
 	try {
-		const outcome = runProjectContextReportInternal(requestValue, captureOptions, progress, true);
+		const outcome = runProjectContextReportInternal(
+			requestValue,
+			captureOptions,
+			progress,
+			true,
+			options.includeTypeCapability === true
+		);
 		if (outcome.outcome === 'captured') return outcome;
 		const terminal = progress.finish(outcome);
 		if (terminal.outcome !== 'unavailable')

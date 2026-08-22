@@ -1,5 +1,6 @@
 export * from './contracts/inventory.js';
 export * from './contracts/call-graph.js';
+export * from './contracts/call-graph-report.js';
 export * from './contracts/conditional-export-resolution.js';
 export * from './contracts/declaration-context-analysis.js';
 export * from './contracts/declaration-context-report.js';
@@ -140,6 +141,25 @@ export {
 	MODULE_DEPENDENCY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type ModuleDependencyProgressTransportTruncation
 } from './application/module-dependency-progress-jsonl.js';
+
+export {
+	callGraphReportExitCode,
+	runCallGraphReport,
+	CALL_GRAPH_REPORT_PROGRESS_NONCLAIMS,
+	CALL_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION,
+	type CallGraphReportProgressEvent,
+	type CallGraphReportProgressObservation,
+	type CallGraphReportProgressObservationMetric,
+	type CallGraphReportProgressPhase,
+	type RunCallGraphReportOptions
+} from './application/run-call-graph-report.js';
+
+export {
+	CALL_GRAPH_PROGRESS_MAX_BYTES,
+	CALL_GRAPH_PROGRESS_MAX_EVENTS,
+	CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type CallGraphProgressTransportTruncation
+} from './application/call-graph-progress-jsonl.js';
 
 export {
 	declarationContextReportExitCode,
