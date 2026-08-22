@@ -349,3 +349,54 @@ with a genuinely different arm. **The marker is written by the MERGE step, not b
 distinction is itself a finding: the first implementation repaired the existing rows and left the merge
 alone, so the very next slice changed five more arms while the pinned count stayed at 10 and the gate passed.
 A gate that counts a population must be fed by whatever CREATES that population, or it silently undercounts.
+
+---
+
+## 12. ⚠ ADDENDUM — THE SPLICED TRANSCRIPT, AND WHY ONLY ONE KIND OF REFUTER CATCHES IT
+
+`limb:ASR-15:6` was filed `ENFORCED_BY_CONSTRUCTION` with a driven transcript. **The arm survived a properly
+controlled re-drive. The transcript did not — it describes an observation that never happened.**
+
+Its `observed` field reads, in one breath:
+
+> `E BEFORE: rev=1 sv=1 status=ADMISSIBLE lifecycle=ADMISSIBLE bytes=780`
+> `E AFTER an EFFECTIVE decision about it: rev=0 sv=1 status=PROPOSED contradicts=["clm_1"] bytes=769`
+> **— IDENTICAL to before.**
+
+`rev 1 → 0`, `ADMISSIBLE → PROPOSED`, `780 → 769` is not identical to anything. The two halves came from **two
+different runs**: the setup and the control from `lane-ASR-15d.mjs`, the "unchanged" readings from
+`lane-ASR-15c.mjs`, set side by side and read as one observation.
+
+The consequence is not cosmetic. In the run where the decisive probe was actually driven, the invalidation it
+depends on **had been REFUSED** — so its stated premise, *"an EFFECTIVE decision citing the now-INVALID
+evidence"*, is false there. And that run's own CONTROL had failed: nothing in it demonstrated the probe could
+see a change at all, so every *"unchanged"* it reported proved nothing on its own terms
+(**§4** — a control that returns nothing is not a control).
+
+### 12.1 This is not the census error one level over. It is worse in one specific way
+
+A broken census (§EM-2) produces a number the command cannot produce — anyone re-running the quoted command
+sees it. **A spliced transcript reproduces perfectly, line by line, as long as you run the script the row
+names.** Both halves are real. Both were really observed. The defect is the JOIN, and the join exists only in
+the row.
+
+So the countermeasure is not "re-run the census". It is:
+
+> **R2b — RE-RUN THE LANE'S OWN SCRIPT, NOT ONLY YOUR OWN RE-DERIVATION.** A refuter that writes a fresh probe
+> and gets the same verdict has confirmed the CLAIM and has not touched the EVIDENCE. Run the file the row
+> names, read its actual stdout, and check that every number the row quotes appears in ONE run of ONE script.
+
+This refuter did exactly that — `grep -c "AdmitEvidence" lane-ASR-15c.mjs` → **0**, which is what proved the
+`ADMISSIBLE` reading could not have come from that file — and it got there because the quoted numbers were
+INTERNALLY INCONSISTENT. That tell will not always be present. The instruction has to stand without it.
+
+### 12.2 Why the gate cannot pin this, stated so nobody assumes it does
+
+A spliced transcript is well-formed text. It satisfies every mechanical check the gate has: the arm is in the
+closed vocabulary, `confidence` is `DROVE_THE_ENGINE`, `observed` is far longer than 20 characters, the anchor
+resolves exactly once. **There is no string property that separates two runs spliced from one run reported.**
+
+What the audit has instead is the refutation stage, and this row is the argument for its cost: the splice was
+invisible to the lane that wrote it, invisible to the merge, invisible to the gate, and visible only to an
+adversary who opened the lane's files. **Every row not marked `HELD` or `OVERTURNED` — `UNREFUTED` stands at
+30 — is a row where this class of defect would still be sitting.**

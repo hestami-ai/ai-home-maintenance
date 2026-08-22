@@ -121,11 +121,11 @@ describe('W-3b — the invariant enforcement census', () => {
 	// someone lands evidence — and it can never move DOWN without this reddening.
 	it('the verdicted count is pinned, so the hole cannot quietly change size', () => {
 		const verdicted = new Set(verdicts.map((v) => String(v.limb_id)));
-		expect(verdicted.size, 'limbs carrying a verdict').toBe(170);
+		expect(verdicted.size, 'limbs carrying a verdict').toBe(193);
 		expect(
 			307 - verdicted.size,
 			'limbs still unverdicted — this is the OPEN half of W-3b and it is meant to be large'
-		).toBe(137);
+		).toBe(114);
 	});
 
 	// ── ⚠ THE HOLE INSIDE THE HOLE, AND IT WAS DUG BY THIS PROGRAMME'S OWN TOOLING ──────────────────────────
@@ -158,10 +158,14 @@ describe('W-3b — the invariant enforcement census', () => {
 				orphanedLimbs += ids.length - hit;
 			}
 		}
-		expect(partial.sort(), 'invariants with some limbs scored and some not').toEqual(
-			['ASR-14', 'ASR-15', 'ASR-3', 'DEC-6', 'OBJ-1', 'PER-7', 'STA-4'].sort()
-		);
-		expect(orphanedLimbs, 'limbs a per-invariant view reports as done').toBe(23);
+		// ⚠ PAID IN FULL, ONE COMMIT AFTER IT WAS FOUND — and the test STAYS, inverted, because the defect that
+		// created it was structural rather than a one-off oversight. Any future slice that scores part of an
+		// invariant and moves on reddens this immediately, instead of waiting for someone to notice that
+		// "unverdicted" and "unqueued" had drifted apart again.
+		// The 23 were scored with their already-verdicted siblings supplied as EVIDENCE, which made EM-1 — the
+		// sibling error, normally a hypothesis a lane has to test — directly checkable against committed data.
+		expect(partial.sort(), 'invariants with some limbs scored and some not').toEqual([]);
+		expect(orphanedLimbs, 'limbs a per-invariant view reports as done').toBe(0);
 	});
 
 	it('every verdict names a limb that exists, exactly once', () => {
@@ -187,14 +191,14 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 21,
-			ENFORCED_BY_CONSTRUCTION: 29,
-			ENFORCED_MULTI_SITE: 7,
+			ENFORCED_DRIVEN: 25,
+			ENFORCED_BY_CONSTRUCTION: 33,
+			ENFORCED_MULTI_SITE: 9,
 			ENFORCED_AT_SURFACE_ONLY: 1,
-			PARTIAL_DIVERGENT_FILED: 39,
-			DIVERGENT_UNFILED: 30,
-			UNENFORCED_OBSERVED_ADMISSION: 31,
-			UNENFORCED_DEAD_PREDICATE: 3,
+			PARTIAL_DIVERGENT_FILED: 41,
+			DIVERGENT_UNFILED: 36,
+			UNENFORCED_OBSERVED_ADMISSION: 34,
+			UNENFORCED_DEAD_PREDICATE: 5,
 			UNENFORCED_NO_SHAPE: 9
 		});
 	});
@@ -291,7 +295,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(30);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(36);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -352,7 +356,7 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(25);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(31);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -368,7 +372,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(12);
+		).toBe(15);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -404,7 +408,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		//
 		// Had this arm not existed, the row would have scored ENFORCED on a genuine, cited, tested fix, and a
 		// sponsor ruling would have been reported as held by a filter the engine has never heard of.
-		expect(rows.length).toBe(1);
+		expect(rows).toHaveLength(1);
 	});
 
 	// ── ⚠ THE REFUTATION LEDGER, BECAUSE REG-F-202 IS THREE WEEKS OLD ───────────────────────────────────────
@@ -437,7 +441,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
 		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
 		// and not of the families audited.
-		expect(tally).toEqual({ HELD: 87, OVERTURNED: 53, UNREFUTED: 30 });
+		expect(tally).toEqual({ HELD: 101, OVERTURNED: 62, UNREFUTED: 30 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
@@ -465,7 +469,8 @@ describe('W-3b — the invariant enforcement census', () => {
 				'w3b-lane:v1-objrel',
 				'w3b-lane:v1-declyr',
 				'w3b-lane:v1-asr',
-				'w3b-lane:v1-perrel'
+				'w3b-lane:v1-perrel',
+				'w3b-lane:v1-orphans'
 			])
 		);
 	});
