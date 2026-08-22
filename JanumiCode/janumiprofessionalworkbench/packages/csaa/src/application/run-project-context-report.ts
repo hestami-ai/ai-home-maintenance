@@ -25,13 +25,15 @@ import {
 	SEMANTIC_BUDGET_KEYS,
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
-	type SemanticBudgets
+	type SemanticBudgets,
+	type StaticSemanticSnapshot
 } from '../contracts/semantic.js';
 import {
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
 	type FrozenSubject,
 	type SubjectBudgets,
+	type SubjectCompleteness,
 	type SubjectDiagnostic,
 	type SubjectResolutionOutcome
 } from '../contracts/subject.js';
@@ -300,6 +302,43 @@ export interface RunProjectContextReportOptions {
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
 }
+
+/** Trusted same-process options for a capture that deliberately emits no report telemetry. */
+export interface CaptureProjectContextReportPipelineOptions {
+	/** Absolute fixed worktree root supplied by the successor facade. */
+	readonly repositoryRoot: string;
+}
+
+/** Trusted same-process evidence handoff for bounded successor report facades. */
+export interface ProjectContextReportPipelineCapture {
+	readonly diagnostics: readonly ProjectContextReportDiagnostic[];
+	readonly frozenSubject: FrozenSubject;
+	readonly outcome: 'captured';
+	readonly predecessorStageOutcomes: {
+		readonly projectContext: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'partial';
+		};
+		readonly semanticSnapshot: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'complete' | 'partial';
+		};
+		readonly subject: {
+			readonly completeness: SubjectCompleteness;
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'resolved';
+		};
+	};
+	readonly projectContextGraph: ProjectContextGraphSnapshot;
+	/** Canonical absolute root retained only for the trusted same-process successor. */
+	readonly repositoryRoot: string;
+	readonly request: ProjectContextReportRequest;
+	readonly semanticSnapshot: StaticSemanticSnapshot;
+}
+
+export type ProjectContextReportPipelineOutcome =
+	| ProjectContextReportPipelineCapture
+	| Extract<ProjectContextReportOutcome, { readonly outcome: 'unavailable' }>;
 
 function createReportProgressRecorder(
 	options: RunProjectContextReportOptions
@@ -686,6 +725,47 @@ function materializeRequest(value: unknown): ProjectContextReportRequest {
 	});
 }
 
+export type ProjectContextReportRequestAdmission =
+	| {
+			readonly outcome: 'admitted';
+			readonly request: ProjectContextReportRequest;
+	  }
+	| {
+			readonly code: string;
+			readonly message: string;
+			readonly outcome: 'rejected';
+			readonly path: string;
+			readonly state: ProjectContextReportFailureState;
+	  };
+
+/** @internal Exact hostile-safe admission shared only with same-process successor facades. */
+export function admitProjectContextReportRequest(
+	requestValue: unknown
+): ProjectContextReportRequestAdmission {
+	try {
+		return Object.freeze({
+			outcome: 'admitted' as const,
+			request: materializeRequest(requestValue)
+		});
+	} catch (error) {
+		if (error instanceof ReportRequestError)
+			return Object.freeze({
+				code: error.code,
+				message: error.message,
+				outcome: 'rejected' as const,
+				path: error.path,
+				state: error.state
+			});
+		return Object.freeze({
+			code: 'REQUEST_INVALID',
+			message: 'The report request could not be inspected safely.',
+			outcome: 'rejected' as const,
+			path: '$',
+			state: 'incompatible' as const
+		});
+	}
+}
+
 function reportDiagnostic(
 	code: string,
 	message: string,
@@ -900,21 +980,16 @@ function evidenceReconciles(graph: ProjectContextGraphSnapshot): boolean {
 function runProjectContextReportInternal(
 	requestValue: unknown,
 	options: RunProjectContextReportOptions,
-	progress: ReportProgressRecorder
-): ProjectContextReportOutcome {
+	progress: ReportProgressRecorder,
+	capturePipeline = false
+): ProjectContextReportOutcome | ProjectContextReportPipelineCapture {
 	progress.start('REQUEST_BIND');
-	let request: ProjectContextReportRequest;
-	try {
-		request = materializeRequest(requestValue);
-	} catch (error) {
-		if (error instanceof ReportRequestError)
-			return failure(error.code, 'REQUEST', error.state, [
-				reportDiagnostic(error.code, error.message, error.path, 'REQUEST')
-			]);
-		return failure('REQUEST_INVALID', 'REQUEST', 'incompatible', [
-			reportDiagnostic('REQUEST_INVALID', 'The report request could not be inspected safely.', '$')
+	const admission = admitProjectContextReportRequest(requestValue);
+	if (admission.outcome === 'rejected')
+		return failure(admission.code, 'REQUEST', admission.state, [
+			reportDiagnostic(admission.code, admission.message, admission.path, 'REQUEST')
 		]);
-	}
+	const request = admission.request;
 
 	let repositoryRoot: string;
 	try {
@@ -1125,6 +1200,37 @@ function runProjectContextReportInternal(
 		],
 		'PARTIAL'
 	);
+	const predecessorStageOutcomes: ProjectContextReportPipelineCapture['predecessorStageOutcomes'] =
+		{
+			projectContext: {
+				diagnosticCodes: projectContextOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: 'partial'
+			},
+			semanticSnapshot: {
+				diagnosticCodes: semanticOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: semanticOutcome.outcome
+			},
+			subject: {
+				completeness: subjectOutcome.completeness,
+				diagnosticCodes: subjectOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+				outcome: 'resolved'
+			}
+		};
+	if (capturePipeline)
+		return Object.freeze({
+			diagnostics: Object.freeze([
+				...subjectDiagnostics,
+				...semanticDiagnostics,
+				...projectContextDiagnostics
+			]),
+			frozenSubject: subject,
+			outcome: 'captured' as const,
+			predecessorStageOutcomes: Object.freeze(predecessorStageOutcomes),
+			projectContextGraph: graph,
+			repositoryRoot,
+			request,
+			semanticSnapshot: snapshot
+		});
 
 	progress.start('CURRENTNESS');
 	let freshness: ReturnType<typeof verifyFrozenSubject>;
@@ -1180,19 +1286,7 @@ function runProjectContextReportInternal(
 			diagnosticCodes: freshness.diagnostics.map((diagnostic) => diagnostic.code),
 			state: currentnessState
 		},
-		projectContext: {
-			diagnosticCodes: projectContextOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'partial'
-		},
-		semanticSnapshot: {
-			diagnosticCodes: semanticOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: semanticOutcome.outcome
-		},
-		subject: {
-			completeness: subjectOutcome.completeness,
-			diagnosticCodes: subjectOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'resolved'
-		}
+		...predecessorStageOutcomes
 	};
 	const report: ProjectContextReportOutcome = {
 		diagnostics: [
@@ -1289,7 +1383,30 @@ export function runProjectContextReport(
 ): ProjectContextReportOutcome {
 	const progress = createReportProgressRecorder(options);
 	try {
-		return progress.finish(runProjectContextReportInternal(requestValue, options, progress));
+		const outcome = runProjectContextReportInternal(requestValue, options, progress);
+		if (outcome.outcome === 'captured')
+			throw new Error('The public CAP-010 report path returned an internal pipeline capture.');
+		return progress.finish(outcome);
+	} catch (error) {
+		progress.fail([], 'INTERNAL_FAILURE');
+		throw error;
+	}
+}
+
+/** @internal Same-process successor seam; never export from the package root or serialize. */
+export function captureProjectContextReportPipeline(
+	requestValue: unknown,
+	options: CaptureProjectContextReportPipelineOptions
+): ProjectContextReportPipelineOutcome {
+	const captureOptions: RunProjectContextReportOptions = { repositoryRoot: options.repositoryRoot };
+	const progress = createReportProgressRecorder(captureOptions);
+	try {
+		const outcome = runProjectContextReportInternal(requestValue, captureOptions, progress, true);
+		if (outcome.outcome === 'captured') return outcome;
+		const terminal = progress.finish(outcome);
+		if (terminal.outcome !== 'unavailable')
+			throw new Error('The internal CAP-010 pipeline returned a terminal partial report.');
+		return terminal;
 	} catch (error) {
 		progress.fail([], 'INTERNAL_FAILURE');
 		throw error;

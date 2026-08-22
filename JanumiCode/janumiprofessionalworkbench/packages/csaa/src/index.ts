@@ -11,6 +11,7 @@ export * from './contracts/command-dispatch-topology.js';
 export * from './contracts/guard-enforcement-ledger.js';
 export * from './contracts/guard-classification-overlay.js';
 export * from './contracts/read-write-access-graph.js';
+export * from './contracts/read-write-access-report.js';
 export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
@@ -137,6 +138,23 @@ export {
 	DECLARATION_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type DeclarationContextProgressTransportTruncation
 } from './application/declaration-context-progress-jsonl.js';
+export {
+	readWriteAccessReportExitCode,
+	runReadWriteAccessReport,
+	READ_WRITE_ACCESS_REPORT_PROGRESS_NONCLAIMS,
+	READ_WRITE_ACCESS_REPORT_PROGRESS_SCHEMA_VERSION,
+	type ReadWriteAccessReportProgressEvent,
+	type ReadWriteAccessReportProgressObservation,
+	type ReadWriteAccessReportProgressObservationMetric,
+	type ReadWriteAccessReportProgressPhase,
+	type RunReadWriteAccessReportOptions
+} from './application/run-read-write-access-report.js';
+export {
+	READ_WRITE_ACCESS_PROGRESS_MAX_BYTES,
+	READ_WRITE_ACCESS_PROGRESS_MAX_EVENTS,
+	READ_WRITE_ACCESS_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type ReadWriteAccessProgressTransportTruncation
+} from './application/read-write-access-progress-jsonl.js';
 export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';
 export { buildSourceOriginCorrelation } from './semantic/build-source-origin-correlation.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';

@@ -66,6 +66,14 @@ import {
 	READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION,
 	READ_WRITE_ACCESS_GRAPH_REQUEST_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_GRAPH_SCHEMA_VERSION,
+	READ_WRITE_ACCESS_PROGRESS_MAX_BYTES,
+	READ_WRITE_ACCESS_PROGRESS_MAX_EVENTS,
+	READ_WRITE_ACCESS_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	READ_WRITE_ACCESS_REPORT_OPERATION_VERSION,
+	READ_WRITE_ACCESS_REPORT_PROGRESS_SCHEMA_VERSION,
+	READ_WRITE_ACCESS_REPORT_REQUEST_SCHEMA_VERSION,
+	READ_WRITE_ACCESS_REPORT_RESULT_SCHEMA_VERSION,
+	READ_WRITE_ACCESS_REPORT_SCHEMA_VERSION,
 	ARROW_COMMAND_CENSUS_OBSERVATION_SCHEMA_VERSION,
 	ARROW_COMMAND_CENSUS_OPERATION_VERSION,
 	ARROW_COMMAND_CENSUS_PROGRESS_SCHEMA_VERSION,
@@ -138,6 +146,8 @@ import {
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	buildReadWriteAccessGraph,
+	readWriteAccessReportExitCode,
+	runReadWriteAccessReport,
 	buildArrowCommandCensusArtifactSet,
 	buildModuleDependencyGraph,
 	buildLogicalGraphComposition,
@@ -219,6 +229,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(buildReadWriteAccessGraph).toBeTypeOf('function');
+		expect(runReadWriteAccessReport).toBeTypeOf('function');
+		expect(readWriteAccessReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createReadWriteAccessProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runReadWriteAccessCommand');
+		expect(publicSurface).not.toHaveProperty('admitProjectContextReportRequest');
+		expect(publicSurface).not.toHaveProperty('captureProjectContextReportPipeline');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(buildModuleDependencyGraph).toBeTypeOf('function');
 		expect(buildLogicalGraphComposition).toBeTypeOf('function');
@@ -362,6 +378,24 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(DECLARATION_CONTEXT_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
 		expect(DECLARATION_CONTEXT_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(READ_WRITE_ACCESS_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-read-write-access/0.1.0'
+		);
+		expect(READ_WRITE_ACCESS_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-read-write-access-report-request/0.1.0'
+		);
+		expect(READ_WRITE_ACCESS_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-read-write-access-report-result/0.1.0'
+		);
+		expect(READ_WRITE_ACCESS_REPORT_SCHEMA_VERSION).toBe('jan-csaa-read-write-access-report/0.1.0');
+		expect(READ_WRITE_ACCESS_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-read-write-access-report-progress/0.1.0'
+		);
+		expect(READ_WRITE_ACCESS_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-read-write-access-progress-transport/0.1.0'
+		);
+		expect(READ_WRITE_ACCESS_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(READ_WRITE_ACCESS_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(DECLARATION_CONTEXT_REPORT_NONCLAIMS).toContain(
 			'COMPILER_CONTEXT_OR_CONTEXT_ONLY_TARGET_FILESYSTEM_CURRENTNESS'
 		);

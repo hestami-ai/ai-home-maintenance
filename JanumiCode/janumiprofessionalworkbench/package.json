@@ -30,6 +30,7 @@
 		"csaa:analyze:declaration-context": "bun scripts/csaa-declaration-context.ts",
 		"csaa:analyze:module-resolution-trace": "bun scripts/csaa-module-resolution-trace.ts",
 		"csaa:analyze:project-context": "bun run scripts/csaa-project-context.ts",
+		"csaa:analyze:read-write-access": "bun scripts/csaa-read-write-access.ts",
 		"csaa:analyze:structural-module-reachability": "bun run scripts/csaa-structural-module-reachability.ts",
 		"csaa:analyze:structural-scc": "bun run scripts/csaa-structural-scc.ts",
 		"tracker:build": "bun run scripts/tracker/build.ts",
