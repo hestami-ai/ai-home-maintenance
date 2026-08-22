@@ -151,12 +151,12 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 17,
+			ENFORCED_DRIVEN: 16,
 			ENFORCED_BY_CONSTRUCTION: 10,
 			ENFORCED_MULTI_SITE: 5,
 			PARTIAL_DIVERGENT_FILED: 21,
 			DIVERGENT_UNFILED: 12,
-			UNENFORCED_OBSERVED_ADMISSION: 22,
+			UNENFORCED_OBSERVED_ADMISSION: 23,
 			UNENFORCED_DEAD_PREDICATE: 3,
 			UNENFORCED_NO_SHAPE: 4
 		});
@@ -203,8 +203,17 @@ describe('W-3b — the invariant enforcement census', () => {
 		// and not the INTENT_AT_LEAST_PROVISIONAL readiness set. The anchor installed is byte-identical to
 		// enforcement-register.ts:1568's `refusalMarker`, which is load-bearing at runtime (:3951 returns MASKED
 		// when the observed message stops containing it), so a reword reddens a gate instead of orphaning this row.
-		// DEC-6:6 stays owed because its debt is SUBSTANTIVE: its cited site enforces a different DOCUMENT's rule.
-		expect(owing).toEqual(['limb:DEC-6:6']);
+		// DEC-6:6's debt was SUBSTANTIVE and is now also paid. Its cited site (pwu.ts:609) branches on
+		// `contract.status !== 'SATISFIED'` and enforces JPWB-DOC-002 §8.1's PWU-lifecycle guard — a real guard for
+		// a DIFFERENT sentence. The two gates COMPOSE, which is exactly why the wrong one looked right: pwu.ts will
+		// not move the parent until the contract reads SATISFIED, and only `acceptRecomposition` can set that. The
+		// correct site is decomposition.ts:783, and the state machine agrees rather than the debt pass merely
+		// asserting it — transitions.data.ts declares the COMPOSABLE→SATISFIED arrow under the guard text
+		// "a recomposed result requires an explicit assessment (§14.1)", and `acceptRecomposition` is the only
+		// handler that performs that arrow.
+		// ⚠ THE LIST IS EMPTY AND THAT IS A RESULT, NOT AN ABSENCE OF CHECKING. It reddens the moment a driven
+		// verdict lands without a resolving anchor, which is how both entries got here in the first place.
+		expect(owing).toEqual([]);
 	});
 
 	it('every ENFORCED_DRIVEN anchor that EXISTS resolves EXACTLY ONCE in the file it cites', () => {
@@ -291,7 +300,7 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(9);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(10);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -364,7 +373,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
 		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
 		// and not of the families audited.
-		expect(tally).toEqual({ HELD: 38, OVERTURNED: 24, UNREFUTED: 32 });
+		expect(tally).toEqual({ HELD: 39, OVERTURNED: 25, UNREFUTED: 30 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
