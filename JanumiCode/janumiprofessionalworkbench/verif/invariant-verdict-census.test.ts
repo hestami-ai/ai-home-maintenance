@@ -201,15 +201,15 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 27,
-			ENFORCED_BY_CONSTRUCTION: 47,
-			ENFORCED_MULTI_SITE: 18,
+			ENFORCED_DRIVEN: 28,
+			ENFORCED_BY_CONSTRUCTION: 44,
+			ENFORCED_MULTI_SITE: 20,
 			ENFORCED_AT_SURFACE_ONLY: 2,
-			PARTIAL_DIVERGENT_FILED: 63,
-			DIVERGENT_UNFILED: 50,
-			UNENFORCED_OBSERVED_ADMISSION: 62,
-			UNENFORCED_DEAD_PREDICATE: 10,
-			UNENFORCED_NO_SHAPE: 28
+			PARTIAL_DIVERGENT_FILED: 56,
+			DIVERGENT_UNFILED: 55,
+			UNENFORCED_OBSERVED_ADMISSION: 64,
+			UNENFORCED_DEAD_PREDICATE: 12,
+			UNENFORCED_NO_SHAPE: 26
 		});
 	});
 
@@ -305,7 +305,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(50);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(55);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -334,18 +334,22 @@ describe('W-3b — the invariant enforcement census', () => {
 			.filter((v) => String(v.verdict) === 'PARTIAL_DIVERGENT_FILED')
 			.filter((v) => String(v.filed_as ?? '') === '')
 			.map((v) => String(v.limb_id));
+		// ⚠ ELEVEN BECAME TWO, AND THE SEARCH SETTLED IT IN BOTH DIRECTIONS — which is what the list was pinned
+		// FOR. Six were FILED all along and only the naming was missing (ASR-14:2 -> RPH-GOV-004, whose canonAnchor
+		// is a byte-exact prefix of the limb; ASR-17:3 -> RPH-BAS-002, whose `guard.arrangement` IS the refuter's
+		// own drive, so the refuter re-derived a filing that already existed; ASR-4:8, ASR-5:1, PER-9:5, AGG-1:2).
+		// One is PARTLY filed (ASR-13:1). Three left the arm entirely: PER-11:1 to DIVERGENT_UNFILED, and both
+		// AUT-1 rows back to the ENFORCED family, because their own `owed` fields open "NOT A DIVERGENCE" and the
+		// search found nothing filed — so that arm was false on BOTH of its claims at once.
+		// ⚠ THE TWO THAT REMAIN ARE A SHARPER STATE THAN THE LIST ORIGINALLY MEANT. It used to mean "not yet
+		// checked for a filing". For these it now means: CHECKED, no filing exists (REG-F-042 quotes both limbs
+		// verbatim but measures, fixes and closes only the recomposition half) — AND `DIVERGENT_UNFILED` is not
+		// available either, because that arm asserts a LIVE violation and nobody has driven the promotion path
+		// with a conditionally-satisfied subject. A DRIVE IS OWED BEFORE AN ARM CAN BE CHOSEN. Choosing either one
+		// now would assert something nobody has measured.
 		expect(unnamed, 'an arm asserting a filing, on a row that names none').toEqual([
 			'limb:STA-4:5',
-			'limb:ASR-14:2',
-			'limb:DEC-6:3',
-			'limb:ASR-13:1',
-			'limb:ASR-17:3',
-			'limb:AUT-1:1',
-			'limb:AUT-1:4',
-			'limb:PER-11:1',
-			'limb:PER-9:5',
-			'limb:ASR-4:8',
-			'limb:ASR-5:1'
+			'limb:DEC-6:3'
 		]);
 	});
 
@@ -372,7 +376,7 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(63);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(78);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -388,7 +392,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(21);
+		).toBe(24);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -457,7 +461,16 @@ describe('W-3b — the invariant enforcement census', () => {
 		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
 		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
 		// and not of the families audited.
-		expect(tally).toEqual({ HELD: 164, OVERTURNED: 113, UNREFUTED: 30 });
+		// ⚠ `UNREFUTED` IS GONE — not suppressed, EMPTIED. It stood at 30 for six slices, and every one of those
+		// rows is now HELD or OVERTURNED. The label existed because REG-F-202 is the recorded case of this exact
+		// workflow's refuter half silently failing to launch, with the synthesis then producing a confident,
+		// well-cited sweep under ZERO adversarial pressure. Rather than assert the stage ran, the rows that had
+		// not faced one said so IN THE DATA until they had.
+		// ⚠ AND THE DEBT WAS WORTH PAYING AT EXACTLY THE RATE PREDICTED: those 30 rows came back 15 HELD / 15
+		// OVERTURNED — a 50% overturn rate, the highest of any slice in the programme, against a measured band of
+		// 25–48% and V-0's 79%. Fifteen wrong verdicts were sitting in a census that already read as complete.
+		// The vocabulary keeps UNREFUTED so a future row can be honest again; nothing occupies it today.
+		expect(tally).toEqual({ HELD: 179, OVERTURNED: 128 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
