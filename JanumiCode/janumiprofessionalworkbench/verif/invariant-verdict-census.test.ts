@@ -205,8 +205,8 @@ describe('W-3b — the invariant enforcement census', () => {
 			ENFORCED_BY_CONSTRUCTION: 44,
 			ENFORCED_MULTI_SITE: 20,
 			ENFORCED_AT_SURFACE_ONLY: 2,
-			PARTIAL_DIVERGENT_FILED: 58,
-			DIVERGENT_UNFILED: 52,
+			PARTIAL_DIVERGENT_FILED: 61,
+			DIVERGENT_UNFILED: 49,
 			UNENFORCED_OBSERVED_ADMISSION: 64,
 			UNENFORCED_DEAD_PREDICATE: 12,
 			UNENFORCED_NO_SHAPE: 26
@@ -314,7 +314,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(52);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(49);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -378,16 +378,29 @@ describe('W-3b — the invariant enforcement census', () => {
 	// That probe is a control that cannot fail. The only thing that separates a live narrative from an orphaned
 	// one is whether the arm MOVED, so that is what the row records.
 	it('a row whose arm the refuter changed records the arm its narrative was written for', () => {
+		// ⚠ THIS TEST ONCE ASSERTED "only an overturn moves an arm", AND THAT WAS WRONG — it was true when written
+		// and falsified by the V-4c filing search. An arm moves for TWO reasons, and they are different kinds:
+		// a REFUTER overturns the verdict on evidence the lane had, or a LATER PASS establishes a fact the refuter
+		// did not have. `limb:PER-12:1` and `limb:REL-1:6` were both HELD by their refuters — correctly, on what
+		// was visible — and then moved off DIVERGENT_UNFILED when an EM-7 re-search found them already filed in
+		// `docs/_working/`, a corpus the original searches never opened. Requiring OVERTURNED would have forced a
+		// false refutation label onto a row whose refuter was right.
+		// So the invariant is the one that actually matters: a moved arm must carry a RECORDED REASON.
 		const changed = verdicts.filter((v) => v.superseded_verdict !== undefined);
 		for (const v of changed) {
-			expect(String(v.refutation), `${String(v.limb_id)}: only an overturn moves an arm`).toBe('OVERTURNED');
+			const overturned = String(v.refutation) === 'OVERTURNED';
+			const explained = String(v.merge_note ?? '').length > 40 || String(v.filed_as ?? '').length > 40;
+			expect(
+				overturned || explained,
+				`${String(v.limb_id)}: an arm moved with neither an overturn nor a recorded reason`
+			).toBe(true);
 			expect(String(v.superseded_verdict), `${String(v.limb_id)}`).not.toBe(String(v.verdict));
 			expect(
 				(ARMS as readonly string[]).includes(String(v.superseded_verdict)),
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(78);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(80);
 	});
 
 	// ── ⚠ GATE THE PROVENANCE, BECAUSE THE PROSE CANNOT BE GATED ───────────────────────────────────────────
@@ -464,6 +477,26 @@ describe('W-3b — the invariant enforcement census', () => {
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
 		).toBe(23);
+	});
+
+	// ── ⚠ THE ARM NOW CARRIES ITS OWN REMEDY, RE-SEARCHED UNDER EM-7 ───────────────────────────────────────
+	// Every remaining live divergence has a DRAFTED FILING STATEMENT — what canon requires, what the code does
+	// with a file:line, the driven arrangement, and the remedy — written so it can be pasted into REG-005 with an
+	// ordinal on the front. The arm can only reach zero by those statements becoming entries, and a row that
+	// loses its statement has lost the work, not just a field.
+	//
+	// ⚠ AND EVERY ONE OF THESE ABSENCES WAS RE-ESTABLISHED UNDER EM-7 (DESIGN §14) rather than inherited. The
+	// original searches used a tool that reports `[Omitted long matching line]` on the longest register entries —
+	// which are the most thoroughly reasoned ones. Re-searching by SITE as well as by id, with Bash grep and
+	// `sed -n` on every long hit, moved THREE more rows off this arm: they had been filed all along. Two of the
+	// three were in `docs/_working/`, the corpus an earlier search skipped entirely — which is now the source of
+	// three of this programme's six already-filed discoveries.
+	it('every live divergence carries a drafted filing statement and its EM-7 search', () => {
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const noStatement = rows.filter((v) => String(v.filing_statement ?? '').length < 80).map((v) => String(v.limb_id));
+		expect(noStatement, 'an unfiled divergence with no drafted remedy is a debt with no plan').toEqual([]);
+		const noSearch = rows.filter((v) => String(v.em7_search ?? '').length < 40).map((v) => String(v.limb_id));
+		expect(noSearch, 'the absence must be established by a recorded search, not asserted').toEqual([]);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
