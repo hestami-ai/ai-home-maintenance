@@ -121,11 +121,11 @@ describe('W-3b — the invariant enforcement census', () => {
 	// someone lands evidence — and it can never move DOWN without this reddening.
 	it('the verdicted count is pinned, so the hole cannot quietly change size', () => {
 		const verdicted = new Set(verdicts.map((v) => String(v.limb_id)));
-		expect(verdicted.size, 'limbs carrying a verdict').toBe(193);
+		expect(verdicted.size, 'limbs carrying a verdict').toBe(251);
 		expect(
 			307 - verdicted.size,
 			'limbs still unverdicted — this is the OPEN half of W-3b and it is meant to be large'
-		).toBe(114);
+		).toBe(56);
 	});
 
 	// ── ⚠ THE HOLE INSIDE THE HOLE, AND IT WAS DUG BY THIS PROGRAMME'S OWN TOOLING ──────────────────────────
@@ -191,15 +191,15 @@ describe('W-3b — the invariant enforcement census', () => {
 		const dist: Record<string, number> = {};
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
-			ENFORCED_DRIVEN: 25,
-			ENFORCED_BY_CONSTRUCTION: 33,
-			ENFORCED_MULTI_SITE: 9,
-			ENFORCED_AT_SURFACE_ONLY: 1,
-			PARTIAL_DIVERGENT_FILED: 41,
-			DIVERGENT_UNFILED: 36,
-			UNENFORCED_OBSERVED_ADMISSION: 34,
-			UNENFORCED_DEAD_PREDICATE: 5,
-			UNENFORCED_NO_SHAPE: 9
+			ENFORCED_DRIVEN: 26,
+			ENFORCED_BY_CONSTRUCTION: 42,
+			ENFORCED_MULTI_SITE: 12,
+			ENFORCED_AT_SURFACE_ONLY: 2,
+			PARTIAL_DIVERGENT_FILED: 55,
+			DIVERGENT_UNFILED: 42,
+			UNENFORCED_OBSERVED_ADMISSION: 43,
+			UNENFORCED_DEAD_PREDICATE: 6,
+			UNENFORCED_NO_SHAPE: 23
 		});
 	});
 
@@ -295,7 +295,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
 		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
 		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(36);
+		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(42);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -329,7 +329,11 @@ describe('W-3b — the invariant enforcement census', () => {
 			'limb:ASR-14:2',
 			'limb:DEC-6:3',
 			'limb:ASR-13:1',
-			'limb:ASR-17:3'
+			'limb:ASR-17:3',
+			'limb:AUT-1:1',
+			'limb:AUT-1:4',
+			'limb:PER-11:1',
+			'limb:PER-9:5'
 		]);
 	});
 
@@ -356,7 +360,7 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(31);
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(44);
 	});
 
 	// ── ⚠ A FIELD THAT ASSERTED THE OPPOSITE OF ITS OWN ARM ─────────────────────────────────────────────────
@@ -372,7 +376,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(15);
+		).toBe(18);
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
@@ -408,7 +412,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		//
 		// Had this arm not existed, the row would have scored ENFORCED on a genuine, cited, tested fix, and a
 		// sponsor ruling would have been reported as held by a filter the engine has never heard of.
-		expect(rows).toHaveLength(1);
+		expect(rows).toHaveLength(2);
 	});
 
 	// ── ⚠ THE REFUTATION LEDGER, BECAUSE REG-F-202 IS THREE WEEKS OLD ───────────────────────────────────────
@@ -441,7 +445,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// sibling limb; the census whose positive control returned zero; the pattern blind to shorthand writes).
 		// The rate has now been flat for three slices, which is the evidence that it is a property of the METHOD
 		// and not of the families audited.
-		expect(tally).toEqual({ HELD: 101, OVERTURNED: 62, UNREFUTED: 30 });
+		expect(tally).toEqual({ HELD: 133, OVERTURNED: 88, UNREFUTED: 30 });
 	});
 
 	it('every OVERTURNED row records what the refuter found', () => {
@@ -470,7 +474,9 @@ describe('W-3b — the invariant enforcement census', () => {
 				'w3b-lane:v1-declyr',
 				'w3b-lane:v1-asr',
 				'w3b-lane:v1-perrel',
-				'w3b-lane:v1-orphans'
+				'w3b-lane:v1-orphans',
+				'w3b-lane:v2-a',
+				'w3b-lane:v2-b'
 			])
 		);
 	});

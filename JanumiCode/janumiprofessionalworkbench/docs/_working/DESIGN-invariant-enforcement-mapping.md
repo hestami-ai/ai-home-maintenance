@@ -400,3 +400,65 @@ What the audit has instead is the refutation stage, and this row is the argument
 invisible to the lane that wrote it, invisible to the merge, invisible to the gate, and visible only to an
 adversary who opened the lane's files. **Every row not marked `HELD` or `OVERTURNED` — `UNREFUTED` stands at
 30 — is a row where this class of defect would still be sitting.**
+
+---
+
+## 13. ⚠ ADDENDUM — THE OVERTURN RATE IS TWO NUMBERS, AND THEY MEAN OPPOSITE THINGS
+
+Every slice has reported one figure: *N of M rows overturned*. That figure conflates two failures with
+different consequences, and the data separates them for free — `superseded_verdict` is present **iff** the
+refuter moved the arm.
+
+| | what the refuter changed | what would have shipped |
+|---|---|---|
+| **ARM MOVED** | the verdict itself | a **wrong answer** about whether canon is enforced |
+| **ARM KEPT** | the citation or the evidence | the **right answer** resting on evidence that does not support it |
+
+Measured over the 251 rows, excluding V-0 (see §13.2):
+
+```
+slice         rows  overt   arm MOVED   arm KEPT
+v1-sta          23      3         9%         4%
+v1-objrel       19      3        16%         0%
+v1-declyr       29      8        24%         3%
+v1-asr          32     12        16%        22%
+v1-perrel       44     16        23%        14%
+v1-orphans      23      9        26%        13%
+v2-a            25     12        28%        20%
+v2-b            33     14        12%        30%
+
+77 decomposable overturns = 44 arm moved (57%) + 33 arm kept (43%)
+```
+
+### 13.1 The 43% is the number this programme exists for
+
+An arm-moved overturn is a caught mistake, and any careful second reader might catch it. **An arm-kept
+overturn is a row that was RIGHT and would have shipped with a citation that does not support it** — the
+enforcement claim true, the pointer to it false. That is REG-F-043's sentence exactly, the one §3 of this
+design quotes as the reason the gate lands before the audit: *"A declaration and its enforcement that no
+artifact connects are two facts, not one guarantee."*
+
+Nothing downstream would ever have found those 33. The verdict reads correct; the distribution reads correct;
+the gate's anchor check passes, because a wrong anchor still resolves exactly once in the file it names. Only
+an adversary who opens the cited site and asks *"does this predicate refuse THIS limb?"* sees it.
+
+**And the split moves with the method, which is the operational point.** `v2-b` — the census-heavy tail —
+inverts: 12% arm moved against 30% arm kept. Its lanes were mostly RIGHT about enforcement and wrong about
+the commands they quoted. `v1-objrel` is the mirror: 16% moved, **0% kept**. A slice's two numbers say which
+half of its lane brief was underweight, and a programme reporting only the sum cannot tell the difference
+between "our judgment is off" and "our evidence discipline is off".
+
+### 13.2 ⚠ V-0 CANNOT BE DECOMPOSED, AND SAYING SO IS THE POINT
+
+V-0's 11 overturns are absent from the table because **its lane verdicts were never journaled in a
+recoverable form** — 23 rows have no recoverable pre-refutation arm, so the split is unavailable, not zero.
+
+This was nearly reported as `0%` arm-moved for V-0, which would have been a striking and entirely false
+result. The mechanism was the audit's own recurring one: `superseded_verdict` had been backfilled from **two**
+journals when eight existed, and a field present for part of a population was read as though it were total.
+Re-running the backfill across every journal recovered two further rows (both `v1-sta`) and established that
+V-0's are genuinely unrecoverable.
+
+The general form, and it is now three-for-three in this programme: **a partial-coverage field reads exactly
+like a measured zero.** The drive queue keyed by invariant (§ the partial-coverage gate), the merge that
+marked only repaired rows, and this backfill are the same defect at three altitudes.
