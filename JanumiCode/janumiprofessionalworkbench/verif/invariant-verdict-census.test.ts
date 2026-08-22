@@ -552,6 +552,48 @@ describe('W-3b — the invariant enforcement census', () => {
 		).toBe(8);
 	});
 
+	// ── ⚠ NO EVIDENCE FIELD MAY BE A SLICE ─────────────────────────────────────────────────────────────────
+	// Half this census was severed and nobody noticed for eleven commits. Every merge script written for this
+	// programme passed agent output through a character cap — `[:3000]`, `[:2400]`, `[:1600]` — and committed
+	// the result. The measurement when it was finally taken: 296 field values ending on a round number, 211 of
+	// them mid-token, across 151 of 307 rows. `refuter_correction` — the field recording WHY a verdict was
+	// overturned — was cut at exactly 2400 on 129 rows. `filing_statement`, the field V-4 drafts register
+	// entries from, was cut at exactly 3000 on all 49. 679,997 characters were recovered from the journals,
+	// where the agents' output had been intact all along: the loss happened on the way IN.
+	//
+	// ⚠ IT WAS FOUND BY THE AGENTS READING IT, NOT BY ANY GATE. Twenty-four of thirty-six drafters reported it
+	// unprompted, several naming exactly what the cut removed — one row's `filing_statement` ended
+	// "REMEDY: (i) …" with items (ii) onward severed; another was cut inside its own CONTROL transcript with the
+	// verdict gone, so a reader could not tell what the control showed.
+	//
+	// THE SIGNATURE IS MECHANICAL AND THAT IS THE WHOLE POINT: a slice ends at a length several rows SHARE, and
+	// it ends mid-token. A sentence ends on punctuation, and its length is its own. Both conditions together,
+	// because either alone has false positives — three rows here legitimately share a length and all three end
+	// on a full stop.
+	it('no evidence field is a slice — shared exact length AND a mid-token ending', () => {
+		const FIELDS = [
+			'filing_statement', 'em7_search', 'observed', 'owed', 'evidence', 'census',
+			'refuter_correction', 'owed_verified', 'owed_registry_search', 'filed_as', 'near_miss_filing'
+		];
+		const offenders: string[] = [];
+		for (const f of FIELDS) {
+			const byLen = new Map<number, string[]>();
+			for (const v of verdicts) {
+				const s = String(v[f] ?? '');
+				if (s.length < 300) continue;
+				byLen.set(s.length, [...(byLen.get(s.length) ?? []), String(v.limb_id)]);
+			}
+			for (const [len, ids] of byLen) {
+				if (ids.length < 3) continue;
+				const midToken = verdicts
+					.filter((v) => ids.includes(String(v.limb_id)) && String(v[f] ?? '').length === len)
+					.filter((v) => /[A-Za-z0-9]$/.test(String(v[f] ?? '')));
+				if (midToken.length >= 3) offenders.push(`${f}@${len}: ${midToken.length} rows`);
+			}
+		}
+		expect(offenders, 'a truncated evidence field is evidence that has been silently edited').toEqual([]);
+	});
+
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {
 		const bad = verdicts
 			.filter((v) => String(v.verdict) === 'ENFORCED_BY_CONSTRUCTION')
