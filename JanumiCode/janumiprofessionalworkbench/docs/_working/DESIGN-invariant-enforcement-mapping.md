@@ -249,3 +249,103 @@ reading and judgment, which is slower per unit of certainty than a probe.
 **Projection at limb granularity (316 limbs): ~1.0-1.3 hours per invariant → 65-80 hours for the 62, plus
 refutation.** This is a multi-wave programme, not an increment. The roadmap sequences it so that **each wave lands
 a complete, gated, honest partial** rather than an 80-hour bet.
+
+---
+
+## 10. ⚠ ADDENDUM (V-1, 126/307 limbs in) — THE LADDER MIXES TWO AXES, AND THE MEASUREMENT IS THAT ITS NAME BEAT ITS SPEC
+
+**The specification in §3 was already right.** The table says `PARTIAL_DIVERGENT_FILED` requires *"the entry
+id"* as its evidence. It does not say "some enforcement is partial"; it demands the filing be named. And yet:
+
+> **five of 33 rows on that arm name no filing at all** — `limb:STA-4:5`, `limb:ASR-14:2`, `limb:DEC-6:3`,
+> `limb:ASR-13:1`, `limb:ASR-17:3`.
+
+Two of them contradict the arm in their own text. `ASR-13:1`'s `owed` opens *"A REG-F FINDING IS OWED IN TWO
+PARTS, NEITHER RECORDED ANYWHERE TODAY"*. `ASR-17:3`'s says *"Nothing owed against this limb"* while its
+evidence argues both conjuncts hold by construction. Neither row is on the arm its own prose describes.
+
+### 10.1 Why this is not operator carelessness, which is the whole reason it belongs in the design
+
+**All five were placed on the arm by REFUTERS, not by lanes** — and lanes and refuters are separately
+prompted, adversarially posed, and never see each other's instructions. When both ends of a deliberately
+independent pipeline make the *same* misreading, the defect is upstream of both. It is the ARM'S NAME.
+
+An operator carries the label in their head for the whole of a row; the evidence table is read once at the
+start. `PARTIAL_DIVERGENT_FILED` leads with `PARTIAL`, and the reading it invites — *"enforcement is
+partial"* — is true of every row that landed there. The second claim, *"and the divergence is filed"*, is
+the one that decides whether the row is a **resting state or a debt**, and it is the one the name buries.
+
+This is the same shape as REG-F-113's *"prose about a status is not a status"*, one level up: **a label that
+asserts two things will be read as asserting the more prominent one.**
+
+### 10.2 The structural diagnosis: FILING IS AN ORTHOGONAL AXIS
+
+The ladder encodes filing status inside exactly two of its nine arms — `PARTIAL_DIVERGENT_FILED` and
+`DIVERGENT_UNFILED` — and nowhere else. But **any** enforcement verdict can carry an unfiled divergence. A
+row can be `ENFORCED_MULTI_SITE` with one site's partiality recorded nowhere; `ENFORCED_BY_CONSTRUCTION`
+with an ungated census nobody has filed; `UNENFORCED_DEAD_PREDICATE` with no finding raised. The audit has
+produced instances of all three, and each had to smuggle the filing fact into `owed` as prose.
+
+So the two arms are not two points on one ladder. They are **one enforcement verdict crossed with one filing
+status**, flattened into a vocabulary that can only express the cross for a single enforcement value.
+
+That also explains the second symptom, which looked unrelated until this: **eight rows carried `filed_as` on
+a `DIVERGENT_UNFILED` verdict** — a field asserting the exact opposite of its own arm. The content was good
+every time (each named a filing that EXISTS and does NOT cover the limb, which is exactly the near miss a
+later reader needs so they do not close the row on it). Operators reached for a filing field because filing
+is a real, separate thing they had observed; the vocabulary had nowhere to put it. Renamed
+`near_miss_filing`, which keeps the content and stops the contradiction — but the rename treats the symptom.
+
+### 10.3 The remedy, PROPOSED AND DELIBERATELY NOT PERFORMED
+
+Separate the axes:
+
+| axis | values |
+|---|---|
+| `verdict` — what the code does | the nine arms, minus the two filing-flavoured ones, plus a plain `PARTIAL` |
+| `filing` — what the record says | `FILED` (names the entry) · `UNFILED` (names what is owed) · `NEAR_MISS` (a filing exists and does not cover this limb) · `NOT_APPLICABLE` (nothing divergent to file) |
+
+`DIVERGENT_UNFILED`'s standing rule — *the population must be zero at programme close* — becomes
+`filing = UNFILED` over ALL verdicts, which is **strictly stronger** than today: it catches the unfiled
+partiality currently hiding inside four other arms.
+
+**⚠ AND IT IS NOT DONE NOW, ON PURPOSE.** Re-cutting the vocabulary mid-audit re-opens every one of the 126
+rows already scored: each would need its filing axis established, and for most of them nobody has looked —
+which is precisely the claim-about-a-search this programme refuses to make (§4.1). Performing it under a
+slice commit would also make the slice's own numbers unauditable against the ones before it. It is **V-4
+work**, to be done once with the population complete, as a stated migration with its own before/after
+counts.
+
+### 10.4 What holds the line until then
+
+- `verif/invariant-verdict-census.test.ts` pins the five unnamed-filing rows **as an explicit list**, not a
+  count. A sixth reddens it; a fix shrinks it. They are pinned rather than reclassified because moving them
+  to `DIVERGENT_UNFILED` would assert that no filing exists — a claim about a search nobody ran.
+- The same gate refuses `filed_as` on any `DIVERGENT_UNFILED` row, and pins the `near_miss_filing` count.
+- Lane and refuter prompts state the two-claim structure explicitly rather than relying on the arm name.
+
+---
+
+## 11. ⚠ ADDENDUM — A REFUTER OVERTURNS A SCALAR; THE ROW IS A NARRATIVE
+
+The merge step replaces `verdict` and appends `refuter_correction`. **Every other field** — `evidence`,
+`observed`, `census`, `owed`, `filed_as` — was authored by the LANE to argue the arm just removed, and stays
+behind unmarked, still arguing the superseded case.
+
+`limb:DEC-4:6` is the worst instance the audit has produced. Its arm says the engine ACCEPTS softening a
+MANDATORY security constraint to ADVISORY without authority. Its own `owed` field opens *"FOUR THINGS, none
+of them a live hole in the prohibition"* — true of the arm it used to carry. Its `observed` transcript shows
+only refusals, because those are the ones the lane provoked. **A reader who reads the row rather than the
+correction gets the opposite conclusion from the one the data holds.**
+
+**⚠ AND THE OBVIOUS PROBE FOR IT IS A CONTROL THAT CANNOT FAIL.** The first check written asked whether an
+admission transcript contains `ACCEPTED` and a driven-refusal transcript contains a refusal. It returned
+**zero offenders across all 94 rows then present** — not because they were clean, but because every
+transcript contains both words: the controls are in there too. That green meant nothing. The only signal
+separating a live narrative from an orphaned one is whether the ARM MOVED.
+
+**Remedy, PERFORMED:** rows record `superseded_verdict`, and the gate requires such a row to be `OVERTURNED`
+with a genuinely different arm. **The marker is written by the MERGE step, not by a repair pass** — that
+distinction is itself a finding: the first implementation repaired the existing rows and left the merge
+alone, so the very next slice changed five more arms while the pinned count stayed at 10 and the gate passed.
+A gate that counts a population must be fed by whatever CREATES that population, or it silently undercounts.

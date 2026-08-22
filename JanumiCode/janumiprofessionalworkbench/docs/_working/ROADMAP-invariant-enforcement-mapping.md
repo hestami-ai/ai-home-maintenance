@@ -119,6 +119,31 @@ close**); the backlog item retires by striking, not deletion.
 - **AGG-1** — a shipped three-call-site violation recorded ONLY in a working design document.
 - **ASR-14 tier limb** — no field exists in the contract; the remedy is a schema change, not a wire.
 
+### ⚠ V-4 GAINED A SECOND DELIVERABLE AT V-1 (126/307 limbs in): THE LADDER MIGRATION
+
+`DESIGN §10` records the finding in full. In short: the ladder encodes FILING STATUS inside two of its nine
+arms and nowhere else, but any enforcement verdict can carry an unfiled divergence — so the axis leaks, and
+five of 33 `PARTIAL_DIVERGENT_FILED` rows name no filing at all despite `DESIGN §3` requiring the entry id.
+All five were placed there by REFUTERS, who are prompted separately from lanes and never see their
+instructions; when both ends of a deliberately independent pipeline make the same misreading, the defect is
+the arm's NAME, not the operators.
+
+**V-4 splits the axes** — `verdict` (what the code does) crossed with `filing` (`FILED` / `UNFILED` /
+`NEAR_MISS` / `NOT_APPLICABLE`). The close condition strengthens rather than moves: *"`DIVERGENT_UNFILED`
+must be zero"* becomes *"`filing = UNFILED` must be zero across ALL verdicts"*, which catches the unfiled
+partiality now hiding inside four other arms.
+
+**⚠ WHY IT IS V-4 AND NOT NOW.** Re-cutting the vocabulary mid-audit re-opens every already-scored row:
+each would need its filing axis established, and for most of them nobody has looked — which is exactly the
+claim-about-a-search this programme refuses to make (`DESIGN §4.1`). It would also make the slice's own
+numbers unauditable against the ones before it. Do it ONCE, with the population complete, as a stated
+migration carrying its own before/after counts.
+
+**Holding the line until then:** the gate pins the five unnamed-filing rows as an explicit LIST (a sixth
+reddens it, a fix shrinks it), refuses `filed_as` on any `DIVERGENT_UNFILED` row, and pins the
+`near_miss_filing` count. Lane and refuter prompts state the two-claim structure explicitly instead of
+relying on the arm name.
+
 ---
 
 ## ⚠ A record defect found on the way, and it is OURS
